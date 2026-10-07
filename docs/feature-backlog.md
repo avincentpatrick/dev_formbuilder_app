@@ -12270,8 +12270,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   preview needed a new architectural edge justified. `resources/js/Pages/submissions/Encode.vue:13-14` reads
   *"The import crosses from `resources/js/` into `resources/public-runtime/` for the first time; the reverse
   edge already existed"*. ⛔ **The forward edge already existed in four files inside `resources/js/components/builder/`
-  alone** — `condition-model.ts:37`, `condition-describer.ts:43`, `logic-rail.ts:25` and `draft-snapshot.ts:55-56`
-  — and the reverse edge is three, not one (`FieldControl.vue:9`, `InstanceField.vue:13`, `context.ts:2`).
+  alone** — `condition-model.ts:37`, `condition-describer.ts:43`, `logic-rail.ts:25` and `draft-snapshot.ts` (its
+  `public-runtime` imports; the line number was dropped by `M145`, whose docblock shifted it) — and the reverse edge is three, not one (`FieldControl.vue:9`, `InstanceField.vue:13`, `context.ts:2`).
   ⚠️ **The claim matters more than it looks:** a session reading it concludes that importing the runtime from an
   authenticated page is novel and owes an argument, when it is ordinary and already gated by
   `component-import-lint`. `M118` spent a verification pass establishing that. **Live.** Filed by `M118`.
@@ -12413,7 +12413,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   door is now an ACCEPTED risk with no open row, and the entry should say so and cite `D33`. A hub file.
   **Live.** Filed by `M121`. **Tier: during-testing.**
 
-- **`minor` · The builder preview can lose every condition in silence, because its draft projection passes rule rows
+- ✅ **CLOSED BY `M145` (2026-10-07) — **`minor` · The builder preview can lose every condition in silence, because its draft projection passes rule rows
   to the engine unchecked.** Measured by `M121` while giving the respondent a notice for the same failure. The preview
   mounts its own engine and never `RuntimeSession`, so that notice does not reach it. `draft-snapshot.ts` pre-parses
   `relevant_expression` — its own rule is *record an issue, never degrade* — but passes structured rule rows and a
@@ -12422,7 +12422,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   rest of the session. ⚠️ **Reachability is unmeasured:** whether the builder's autosave can persist such a row was
   not checked (`M116`'s publish gate refuses them, but a draft is saved long before publish). The remedy is a
   projection issue in `draft-snapshot.ts`, not a copy of the respondent notice. **Latent.** Filed by `M121`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** ✅ **CLOSED BY `M145` (2026-10-07), PR #338:** measured REACHABLE and persisted, by four paths — Basics → Requiredness *Conditional* → *Add condition* seeds a `required_if` with no operator and no compared question and the server saves it (`UpdateFieldRequest` rules both columns plain `nullable`; `replaceValidations()` inserts the nulls; `BuilderPresenter` sends it back on reload); the Validation tab's `greater_than_field` before a compared question is chosen; deleting or re-keying a compared question (filed below); a half-typed free-text rule. Three corrections to the row: the preview is remounted on `shape` change, so the loss is silent rather than for the rest of the session; only `required_if`/`skip_if` throw on a missing operator (`_with` lowers a null one to "is answered"); a missing compared question throws for all six related-field kinds. The fix: `projectDraft()` runs every rule row through the engine's own `StructuredRuleLowering` and parser inside a try/catch after every key is assigned, omits a row the engine would throw on (and a grouped row with no connective), and records one `incomplete_rule` issue per field, which the preview renders under the question. Eleven Vitest cases (8 red first, including the real engine's `engineFailed`), four hand mutations caught, and a real-browser case where a hidden question stays hidden after the seed.
 
 - **`minor` · The line cannot say that one row waits on another row's code, so two unbuildable rows read `ready`.**
   Measured by `M121`. A row's state comes from its liveness and an `Awaits Dn` token, and from nothing else.
@@ -12949,7 +12949,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   form's status, so `/f/{slug}` still mints, renders and accepts. Meanwhile `FormPresenter` leaves archived
   forms out of the list, so responses arrive on a form its author can no longer find. Either archiving closes
   the link (and the guest routes refuse an archived form with the 404 they give a disabled one), or the list
-  shows archived forms that still collect. **Live.** Filed by `M130`. **Tier: during-testing.**
+  shows archived forms that still collect. **Live.** Filed by `M130`. **Awaits D99.** **Tier: during-testing.**
 
 - ✅ **CLOSED BY `M130` (2026-10-04) — `minor` · An offline submit shows "Retrying" at once, because the page asks the service worker to send while
   the device is known to be offline.** Found by `M130` in its own E2E run: `public-runtime-offline.spec.ts`'s
@@ -13061,7 +13061,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   no test covers an export of a repeat group. The seeders write repeat answers flat, at the top level, which is why the
   dev data shows values. The remedy is a shape decision as much as a fix: one row per response with the instances
   joined into one cell, or one row per instance. **Live.** It needs a published form with a repeatable section and a
-  response to it. Filed by `M133`. **Tier: during-testing.**
+  response to it. Filed by `M133`. **Awaits D100.** **Tier: during-testing.**
 
 - **`minor` · There is no workspace time zone, so `today()` is the UTC calendar day and a date or time cannot be
   compared with `now()`.** Queued on the user's answer to `D89`. Both engines stamp the clock in UTC
@@ -13397,3 +13397,24 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   a digit the same way. New ink for the bake-off to measure before a rule is chosen (drop a leading `I`/`l` whose symbol
   box sits at the region's left edge, or refuse a number that starts with one). **Live.** Filed by `M144`.
   **Tier: during-testing.**
+
+- **`minor` · Deleting or re-keying a question that another question's rule compares with leaves that rule pointing
+  at a key that no longer exists, and the owner's next autosave saves it with no compared question at all.** Found by
+  `M145` while measuring `R-551873af`'s reachability. `useBuilderStore.removeFieldLocal()` drops only the deleted field,
+  and nothing in the store rewrites another field's `related_field_key` on a delete or a key edit — so the rule names a
+  key the draft no longer has. On the owner's next PATCH, `FormBuilderService::resolveValidationSiblings()` yields no
+  entry for the stale key and the row reaches the INSERT as `related_form_field_id => null` (its own comment says so);
+  after a delete the server had already cascade-deleted the rule row, and the store re-inserts it the same way. Publish
+  then refuses `rule_missing_related_field` on a rule the author never touched. After `M145` the preview says the
+  rule compares with a question that no longer exists, which is the only notice anywhere. The remedy is in the store:
+  on a delete, clear or repoint every dependent rule and say so in the undo entry; on a key edit, carry the new key into
+  every `related_field_key` that held the old one — or refuse to delete a compared question while a rule names it.
+  Not one of the 19 comments (`D72`), so filed below the testing line. **Live.** Filed by `M145`.
+  **Tier: during-testing.**
+
+- **`nit` · `PreviewRuntime.vue` keys a question's issue chips by `issue.code`, so two issues of one code on one
+  question would collide in the render.** Found by `M145` while adding `incomplete_rule`: the `<li>` under a field is
+  keyed on the code, and the projection therefore records at most one `incomplete_rule` per field however many of its
+  rules are broken (a case pins it). Every other code is recorded once per field by construction today. A key of
+  `${code}:${index}` ends the constraint. **Latent** — it needs a projection state that records two issues of one code
+  on one field, and none does. Filed by `M145`. **Tier: during-testing.**

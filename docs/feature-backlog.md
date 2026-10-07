@@ -10003,14 +10003,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ordering guarantees; not reproduced). The audit log and the inbox order by a unique id and are unaffected.
   ⚠️ Add the primary key as a second sort key. **Latent.** — needs two rows in the same second across a page
   boundary. Filed by `M96`. **Tier: during-testing.**
-- **`minor` · The inbox orders a promoted draft by when it was started, not when it was submitted.** Found by
+- ✅ **CLOSED BY `M146` (2026-10-08) — **`minor` · The inbox orders a promoted draft by when it was started, not when it was submitted.** Found by
   `M96` (2026-09-15) while choosing the inbox's order line. `SubmissionInboxPresenter` orders by `id`, a
   UUIDv7 minted when the row is created. A response submitted in one step gets its row and `submitted_at`
   together, but `SubmissionDraftService` promotes a saved draft in place, so a response resumed from a draft
   keeps the id of its first save and sits in the list by when it was started, while its Submitted column
   shows when it was sent. `M96`'s "Newest first." line is true for every other response. ⚠️ Order by
   `submitted_at` with `id` as the tie-breaker, and check the index. **Live.** Filed by `M96`.
-  **Tier: during-testing.**
+  **Tier: during-testing.** ✅ **CLOSED BY `M146` (2026-10-08), PR #339:** one scope, `Submission::scopeOrderBySubmitted()` (`submitted_at`, then `id`), for the inbox, the form hub's recent panel (whose comment said it used the inbox's order) and global search. ⚠️ **"Check the index" resolved to NO migration, measured:** `EXPLAIN` on the dev database shows both `submissions_form_finalized_idx` and `submissions_analytics_series_idx` serving the order (Index Scan Backward, Incremental Sort on id) — and a `NULLS LAST` would have cost the index (Bitmap Heap Scan, full Sort), so there is none; every caller is `countable()` or filtered to drafts. `AnalyticsIndexShapeTest` pins nine indexes under ADR-0011's budget. The export's ascending-by-id order is filed as its own row: its file belonged to another row of this batch (`D13`). Three cases red first; two mutants caught.
 - **`minor` · API v1 must send a mapping fingerprint in an undocumented format, and a blank heading is refused
   there.** Found by `M96` (2026-09-15) while stamping the fingerprint server-side for the tenant rule requests.
   The API v1 subscription requests share `SubscriptionConfigRules`, so an integrator creating a Sheets or
@@ -12661,11 +12661,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   task. Rare in testing, because it needs a server refusal on an autosave. **Live.** Filed by `M128`.
   **Tier: during-testing.**
 
-- **`nit` · A refused builder save names the request path, not the setting, in its message.**
+- ✅ **CLOSED BY `M146` (2026-10-08) — **`nit` · A refused builder save names the request path, not the setting, in its message.**
   Found by `M128`. `UpdateFieldRequest` declares no `attributes()` and the app has no `lang/` directory, so Laravel
   writes "The config.options.0.label field is required." The inline mark now sits on the right control, but a key with
   no control of its own is listed in the alert under that raw path. The remedy is an `attributes()` map in the request,
-  which is the one place that knows every path. **Live.** Filed by `M128`. **Tier: during-testing.**
+  which is the one place that knows every path. **Live.** Filed by `M128`. **Tier: during-testing.** ✅ **CLOSED BY `M146` (2026-10-08), PR #339:** `attributes()` on the request, keyed by the wildcard path, naming every key `rules()` can return for every field type — and a census case that refuses a new path shipped unnamed. ⚠️ **Premise correction:** the row's example ("… field is required") cannot occur — an option label is `nullable`; the reachable case is a length overrun, which is the one pinned. Scramble cannot publish this request (a tenant web route), so the contract cannot move. The six sibling requests and the reorder validation are filed as their own row. Both cases red first; the mutant caught.
 
 - **`minor` · The two `/api/v1` OCR endpoints the architecture names do not exist; single-form OCR is reachable only
   through the session web routes.** Found by `M128`. `docs/architecture/technical-architecture.md` and
@@ -12941,7 +12941,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   note reaches it. The base belongs to whatever renders, or leaves out, the section heading. **Latent.**
   Filed by `M130`. **Tier: during-testing.**
 
-- **`major` · An archived form keeps collecting responses through its public link while the forms list hides it.**
+- ✅ **CLOSED BY `M146` (2026-10-08) — **`major` · An archived form keeps collecting responses through its public link while the forms list hides it.**
   Found by `M130` while verifying `R-db169c29`. `FormService::archive()` discards the draft and leaves
   `allow_guest_submissions` and `current_published_version_id` as they were
   (`docs/form-versioning-schema-migration.md` §9 keeps the published version "addressable for historical
@@ -12949,7 +12949,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   form's status, so `/f/{slug}` still mints, renders and accepts. Meanwhile `FormPresenter` leaves archived
   forms out of the list, so responses arrive on a form its author can no longer find. Either archiving closes
   the link (and the guest routes refuse an archived form with the 404 they give a disabled one), or the list
-  shows archived forms that still collect. **Live.** Filed by `M130`. **Awaits D99.** **Tier: during-testing.**
+  shows archived forms that still collect. **Live.** Filed by `M130`. **Tier: during-testing.** ✅ **CLOSED BY `M146` (2026-10-08), PR #339, `D99` A:** one predicate, `Form::allowsGuestAccess()` (guest access on AND not archived), read by every guest route and by `GuestReachability::reachable()`, each route keeping its own refusal shape (web 404, API 403 `guest_disabled`, the three reads their own 404). ⚠️ **The row was a floor:** eleven reads of the flag in eight files, plus `GuestDraftResumeController::show`, which checked nothing about the form (now the same 403; the contract regenerated). ⚠️ **Two premise corrections:** there is NO un-archive anywhere — `D99` A's "un-archiving reopens the link" named a feature that does not exist, filed as `D101`, and the archive dialog now says archiving cannot be undone; and a queued offline response PARKS ON ITS FIRST REPLAY (the mint's 404 is `terminal`), stronger than a form that closed mid-queue (five retries) — pinned in `replay.test.ts`, which had no mint-404 case. Five Pest cases red at their post-archive line with every control green, two mutants caught, one Vitest hand mutant caught.
 
 - ✅ **CLOSED BY `M130` (2026-10-04) — `minor` · An offline submit shows "Retrying" at once, because the page asks the service worker to send while
   the device is known to be offline.** Found by `M130` in its own E2E run: `public-runtime-offline.spec.ts`'s
@@ -13050,7 +13050,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **Live.** It needs someone who may manage webhooks and a host whose DNS they control. Filed by `M132`.
   **Tier: before-launch.**
 
-- **`major` · An export, a Google Sheets sync and an Airtable sync write every answer inside a repeat group as an
+- ✅ **CLOSED BY `M146` (2026-10-08) — **`major` · An export, a Google Sheets sync and an Airtable sync write every answer inside a repeat group as an
   empty cell.** Found by `M133` while mapping the readers of a form's answers. `SubmissionRowProjector::resolveColumns()`
   makes a column for every data field of each version, repeat members included, and `answerValues()` reads each one at
   the top level of the stored answers (`$answers[$key]`). A repeat group's answers are stored under the SECTION key as a
@@ -13061,7 +13061,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   no test covers an export of a repeat group. The seeders write repeat answers flat, at the top level, which is why the
   dev data shows values. The remedy is a shape decision as much as a fix: one row per response with the instances
   joined into one cell, or one row per instance. **Live.** It needs a published form with a repeatable section and a
-  response to it. Filed by `M133`. **Awaits D100.** **Tier: during-testing.**
+  response to it. Filed by `M133`. **Tier: during-testing.** ✅ **CLOSED BY `M146` (2026-10-08), PR #339, `D100` A:** `SubmissionRowProjector::resolveColumns()` records each repeat member's section key in the resolution map and `answerValues()` reads the section's instance list, formats each instance through `displayValue()` (a multi-select keeps its `; `) and joins with ` | ` IN POSITION — an instance that left the member blank still contributes a part, so the member columns line up; all-empty is `''`. Every channel inherits it; the column keys stay the raw member keys (a Sheets or Airtable mapping persists them). ⚠️ **Premise addition:** both seeders wrote repeat members FLAT, a shape a real submit refuses, which is why the dev export showed values while the inbox and PDF showed blanks — now nested as one instance. A calculated question inside a repeat is never stored at all (`R-1c31e7cf`, not this row). Three export cases and the webhook case red first; three mutants caught.
 
 - **`minor` · There is no workspace time zone, so `today()` is the UTC calendar day and a date or time cannot be
   compared with `now()`.** Queued on the user's answer to `D89`. Both engines stamp the clock in UTC
@@ -13418,3 +13418,21 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   rules are broken (a case pins it). Every other code is recorded once per field by construction today. A key of
   `${code}:${index}` ends the constraint. **Latent** — it needs a projection state that records two issues of one code
   on one field, and none does. Filed by `M145`. **Tier: during-testing.**
+
+- **`nit` · Six sibling builder requests and the reorder validation still name the request path in a refused save's
+  message.** Found by `M146` while naming `UpdateFieldRequest`'s paths (`R-b2d4a2c5`). `UpdateSectionRequest`,
+  `StoreFieldRequest`, `StoreFieldFromLibraryRequest`, `SaveFieldToLibraryRequest`, `ConvertFieldRequest` and
+  `UpdateConfirmationMessageRequest` declare no `attributes()`, and `FormBuilderController::reorder()` validates inline
+  with wildcard keys (`fields.*.sequence`), so each writes Laravel's raw-path sentence into the same save alert
+  (`ConfigPanel.vue` shows the server's message as sent) or, for the confirmation message, inline under its box. The
+  remedy is an `attributes()` on each — the field requests can share `UpdateFieldRequest`'s map — and a named attribute
+  list for the reorder rules. **Live.** It needs a refused save on one of those routes, which a length overrun reaches.
+  Filed by `M146`. **Tier: during-testing.**
+
+- **`nit` · The CSV and XLSX export orders rows by `id` ascending, so a response resumed from a draft sits by when it
+  was started while its Submitted column says when it was sent.** Found by `M146` while fixing the same order in the
+  inbox (`R-cf423290`): `SubmissionExporter::stream()` reads `->orderBy('id')`, and a promoted draft keeps the id its
+  first save minted. The inbox, the form hub's recent panel and global search now order through
+  `Submission::scopeOrderBySubmitted()`; the export was left out of that row because `SubmissionExporter.php` was
+  another row's file in the same batch (`D13`). The remedy is one line, `->orderBySubmitted('asc')`, which the two
+  partial indexes serve as they serve the inbox. **Live.** Filed by `M146`. **Tier: during-testing.**

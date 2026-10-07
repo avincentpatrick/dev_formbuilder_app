@@ -1654,6 +1654,30 @@ The options:
 
 ---
 
+### D96 — The first printed blank form was reviewed on paper before any OCR sample existed: unorganized, with one-letter-per-box combs that limit respondents, on paper mostly printed in monochrome. What does the paper look like? **A — layout 2: one open box for text in block capitals; combs only for numbers, phones and dates; choices side by side; numbered questions; a boxed instruction banner; monochrome; a `Layout 2` word beside the stamp.**
+
+**Filed and answered 2026-10-07 (user decision, in chat), recorded by Lane A in `M143`'s claim — A, the recommendation.** Asked because the user looked at the rendered "Survey Question Sampling" blank before printing the Oct 8 samples, said so in chat ("unorganized"; the boxes "limiting"; "printed in monochrome more frequently"), and asked for industry research first. Researched against the ICR form-design guidance (Accusoft's whitepaper: square pen-sized boxes, at least 1.5 box widths between fields, a bold top-of-form instruction with example characters wherever answers are written freely; Tungsten/OmniPage's OMR floor of 3.5–4mm for a check box marked with an X; LEADTOOLS on registration marks), Google's own Vision guidance (`DOCUMENT_TEXT_DETECTION`, at least 1024×768) and the 2026 benchmark of handwritten-form digitisation (arXiv 2604.16504). It supersedes the 2026-08-09 layout decisions of record (`docs/ocr-pipeline-design.md` §2.5, `PrintAnswerArea`'s docblock): combs for every text answer, one option per line, tenant colour on paper.
+
+- **A — layout 2, as above.** The reader follows the paper: `OcrAnswerReader::choices()` reads many options to a line, the layout word is read back by `PrintedFormMatcher::layoutOf()`, and a layout-1 sheet is refused with a reason rather than misread.
+- **B — keep the combs, reorder only.** Numbered, spaced, monochrome, but a box per letter stays. Best for recognition; still what the user called limiting.
+- **C — a free-form sheet for a vision-language model.** No boxes at all, every answer on a line; readable only through an LLM. Trades deterministic positional parsing for model judgement before a single sample has been measured.
+
+**Recommendation: A.** The combs stay exactly where they buy accuracy — digits, where positional parsing is the whole point of a machine-readable date — and go where they cost goodwill: names, addresses. The banner carries what the comb used to enforce. No registration marks and no QR, both for one reason: the app container has no GD or imagick, so nothing server-side can warp an image or decode a code, and Vision has no barcode feature. ⚠️ **Every sheet printed before `M143` is refused by the reader once it deploys** — the samples must be printed from layout 2, which `ocr-provider-bakeoff`'s blocker now says.
+
+---
+
+### D97 — Which engine reads the layout-2 samples in the bake-off, and what is the fallback? **A — Cloud Vision alone first; a vision-language-model arm only if G9 is missed; Document AI not pursued.**
+
+**Filed and answered 2026-10-07 (user decision, in chat), recorded by Lane A in `M143`'s claim — A, the recommendation.** Asked beside `D96`, because `ocr-provider-bakeoff`'s title named Document AI as the alternative and the research changed the picture. Measured facts: Document AI's Form Parser needs a service account (no API key), costs about $30 per 1,000 pages against Vision's $1.50 after the free 1,000 a month, and its own documentation says it "doesn't reliably parse a KVP with an unfilled value" — a weak fit for a layout this product prints itself and already maps field by field. The 2026 benchmark of 17 vision-language models on handwritten medical forms (arXiv 2604.16504) puts the best at about 85% strict field accuracy with 6–8% hallucination, weakest on check boxes and tilted phone photos. Azure Document Intelligence is the one cloud OCR with native selection marks; AWS Textract's handwriting is English-only. No existing agent skill fits: the "handwritten OCR" skills found route free text through a vision LLM and output documents, none maps fields on a known layout.
+
+- **A — Vision alone first.** The harness exists (`ocr:bakeoff`), the key reads on staging, and the reader anchors on our own layout. A VLM arm is written into ADR-0010 as the fallback: output constrained to the printed options, behind the reviewer, triggered only if G9 (under 15% of fields corrected on a clean scan) is missed.
+- **B — Vision and a VLM side by side now.** A second reader in the harness before the first result; a second Google product and a service account to set up.
+- **C — Vision and Document AI side by side.** The original pairing; the facts above argue against spending the samples on it.
+
+**Recommendation: A.** `M144` runs it; ADR-0010 records the measurement, the fallback and the rejection with their reasons.
+
+---
+
 ### D15 — `D13`'s one-hub-row cap is now the binding constraint on batch composition, and it is stricter than its own purpose. **ANSWERED — option 4: the cap reads the files a row REMEDY EDITS, excluding the close-out artefacts.** **Tier: early-testing.**
 
 **Filed 2026-09-05 by Lane A, during `M72`, at the moment the cap decided a batch that value had not.**

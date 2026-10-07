@@ -87,12 +87,13 @@ The paper is rendered from a **published version's frozen `schema_snapshot`** �
 
 Classified per field type by `App\Enums\PrintAnswerArea`, a total `default`-less match over the 31-case `FieldType` catalog — the fourth in the `OcrFieldEligibility` / `PdfFieldRole` / `PipingEligibility` family. **It deliberately disagrees with both of its nearest siblings and must not be collapsed into either** (pinned by `tests/Unit/Forms/PrintAnswerAreaTest.php`):
 
-| Area | Field types | On paper |
+| Area | Field types | On paper (layout 2, `M143`, `D96`) |
 |---|---|---|
-| `comb` | `short_text`, `email`, `phone`, `url`, `integer`, `decimal`, `date`, `time`, `datetime`, `duration`, `cascading_select` | a row of separated character boxes |
-| `ruled` | `long_text` | one 46pt bordered box |
-| `choices` | `single_select`, `multi_select`, `dropdown`, `yes_no`, `likert_scale` | each option listed with a 10pt drawn box |
-| `grid` | `matrix`, `likert_matrix` | a real table, `config.rows` down, `config.columns` across, a 9pt box per cell |
+| `comb` | `phone`, `integer`, `decimal`, `date`, `time`, `datetime`, `duration`, `cascading_select` | a row of separated 18pt character boxes — digits a pen prints one per box |
+| `line` | `short_text`, `email`, `url` | one open 26pt box, written in block capitals (text left the comb in layout 2: respondents found a box per letter limiting) |
+| `ruled` | `long_text` | one 60pt bordered box |
+| `choices` | `single_select`, `multi_select`, `dropdown`, `yes_no`, `likert_scale` | each option with a 14pt drawn box, the options SIDE BY SIDE and wrapping between them |
+| `grid` | `matrix`, `likert_matrix` | a real table, `config.rows` down, `config.columns` across, a 12pt box per cell |
 | `signature_line` | `signature` | a 30pt ruled line at 60% width |
 | `prose` | `note` | the text, no answer area |
 | `unavailable` | `geopoint`, `geotrace`, `geoshape`, `file_upload`, `image_capture`, `audio_capture`, `video_capture` | the label, then *"Not collected on paper - record this in the app."*, and **no writing area** |
@@ -109,11 +110,11 @@ Classified per field type by `App\Enums\PrintAnswerArea`, a total `default`-less
 
 ### 2.5.3 Comb geometry — the ICR contract
 
-**Comb fields (one box per character) are the single biggest handwriting-recognition win available in a layout decision**, because character segmentation is free when the characters are pre-separated. This is the layout H1d's bake-off must score ICR against.
+**Comb fields (one box per character) are the single biggest handwriting-recognition win available in a layout decision**, because character segmentation is free when the characters are pre-separated. Since layout 2 (`M143`, `D96`) they are used where the answer is DIGITS — a number, a phone, a date or a time — and text is written freely in an open box (`line`), because respondents found a box per letter limiting and the ICR guidance's other lever, a bold instruction to write in block capitals with a worked example, now carries that load. This is the layout H1d's bake-off scores.
 
-- **Cell 14pt wide × 16pt tall, on a 15.5pt pitch** (1.5pt of horizontal `border-spacing`), a 0.6pt `#7a7a7a` border. About 4.94mm of writing width.
-- **Maximum 30 cells per run**, derived from the page rather than chosen: A4 minus 16mm margins leaves 178mm, and 30 cells at this pitch occupy ~164mm. The cell is *not* shrunk to fit more — a comb narrower than about 5mm stops being comfortable to hand-print in, which costs exactly the accuracy the comb buys. An authored `max_length` narrows the run; anything above 30 clamps (dompdf clips an over-wide table rather than wrapping it).
-- **Default run 24 cells**; `integer`/`decimal` default to 10.
+- **Cell 18pt square, on a 20pt pitch** (2pt of horizontal `border-spacing`), a 0.75pt `#333333` border. About 6.3mm of writing width — the square, pen-sized box the ICR guidance asks for.
+- **Maximum 23 cells per run**, derived from the page rather than chosen: A4 minus 16mm margins leaves 178mm = 504.6pt, a run of N cells in G+1 groups is `20N + 12G + 2` points wide because `border-spacing` lands at both table edges as well as between cells, and with three gaps (a datetime, a four-level cascade) 23 cells fit (500pt) where 24 clip. The cell is *not* shrunk to fit more — a comb narrower than about 5mm stops being comfortable to hand-print in, which costs exactly the accuracy the comb buys. An authored `max_length` narrows the run; anything above 23 clamps (dompdf clips an over-wide table rather than wrapping it).
+- **A phone defaults to 13 cells** (a mobile number with its country code). **A number is sized from its authored `max_value`** — the digits of the maximum plus a sign for an `integer`, plus a sign, a point and two places for a `decimal` — else 6 and 8; never fewer than two. Fewer empty boxes are fewer places for a stray mark to become a digit. `max_length` keeps precedence over `max_value`.
 - **Date and time comb into FIXED, CAPTIONED groups**, separated by a 7pt borderless spacer with the caption centred under its group:
   - `date` → `DD` (2) · `MM` (2) · `YYYY` (4)
   - `time` → `HH` (2) · `MM` (2)
@@ -121,17 +122,19 @@ Classified per field type by `App\Enums\PrintAnswerArea`, a total `default`-less
   - `duration` → `HRS` (3) · `MIN` (2)
 
   **This is why a handwritten date is machine-readable at all**: `03/04` is the 3rd of April or the 4th of March depending on who filled it in, and no recognizer can recover that from the ink. **§3 must parse dates positionally from these groups, never as free text.**
-- **`cascading_select` gets one captioned run per declared level**, captioned with the uppercased level key (truncated to 10 characters, which is roughly what fits over a group at 6.5pt). Per-level width divides the 30-cell budget — a 3-level hierarchy gets 10 cells each — with a floor of 4 so a deep hierarchy degrades legibly instead of silently dropping its deepest levels. A hierarchy deep enough to overflow at 4 cells per level would exceed the page; the floor is a documented bound, not a guarantee.
+- **`cascading_select` gets one captioned run per declared level**, captioned with the uppercased level key (truncated to 10 characters, which is roughly what fits over a group at 8pt). Per-level width divides the 23-cell budget — a 3-level hierarchy gets 7 cells each — with a floor of 4 so a deep hierarchy degrades legibly instead of silently dropping its deepest levels. A hierarchy deep enough to overflow at 4 cells per level would exceed the page; the floor is a documented bound, not a guarantee.
 
-### 2.5.4 The field-key stamp
+### 2.5.4 The field-key stamp, and the question number
 
-**Every answer area carries its field `key` printed beside the label** — 7pt monospace, `#9a9a9a`, right-floated on the label line. This is what lets an extraction stage map a scanned region back to a field unambiguously, and it survives a page being scanned rotated or out of sequence. `omitted` fields contribute no key, because they contribute no area.
+**Every answer area carries its field `key` printed beside the label** — 8pt monospace, `#444444` (dark enough to survive a monochrome printer and a phone photo; layout 1's 7pt light grey did not have to), right-floated on the label line. This is what lets an extraction stage map a scanned region back to a field unambiguously, and it survives a page being scanned rotated or out of sequence. `omitted` fields contribute no key, because they contribute no area.
+
+**Since layout 2 every question is also numbered**, `1.`, `2.`, … in printed order across the whole sheet, repeat instances included; prose, page breaks and omitted rows take no number and leave no gap (`PrintAnswerArea::isQuestion()`). The number is its own element BEFORE the label, never part of the label text: the matcher anchors a question on its label when the stamp was not read, and the bake-off's answer template names its columns by it, and both compare with the authored text. The matcher strips a leading number before comparing.
 
 ### 2.5.5 Page identity, and why there is no barcode
 
-The running head repeats on **every page** (a `position: fixed` block) and carries the form title, `v{n}`, and **the first 8 characters of the version `checksum`** in monospace.
+The running head repeats on **every page** (a `position: fixed` block) and carries the form title, `v{n}`, the word **`Layout` and the layout number** (since `M143`; `BlankFormPrintPresenter::LAYOUT`), and **the first 8 characters of the version `checksum`** — the last two in bold 9pt monospace, so they read off a phone photo. The checksum names the SCHEMA; the layout number names the TEMPLATE it was typeset with, so a sheet printed before a layout change cannot be mistaken for one printed after it (`R-d6546409`, closed by `M143`). The layout number changes whenever an answer area moves relative to its label.
 
-- **No barcode, no QR, no logo.** `ext-gd` is absent from the app container and from all four CI jobs, so a raster would render on a developer's machine and throw in the pipeline (the H23a4 finding). The identity travels as printed text.
+- **No barcode, no QR, no logo.** `ext-gd` is absent from the app container and from all four CI jobs, so a raster would render on a developer's machine and throw in the pipeline (the H23a4 finding). A vector QR is drawable (`bacon/bacon-qr-code` is installed and dompdf draws SVG through an `<img data:>` URI) but NOTHING SERVER-SIDE CAN DECODE ONE off a photo — Cloud Vision has no barcode feature and the PHP decoders need GD — so it would be ink the reader cannot use, against the template's "no images" contract. The identity travels as printed text, and the matcher reads both words of it.
 - **No page numbers.** dompdf's page counters go through `page_text()`, its inline-PHP API, and `isPhpEnabled` is false by security contract (`piping-output-encoding-design.md` §5).
 - **⚠️ Every box is drawn in CSS, never typed as a glyph.** dompdf's built-in fonts are the PDF core fonts and are WinAnsi-encoded; `U+2610` BALLOT BOX is not in that repertoire and dompdf drops or mangles it *silently*. `BlankFormPrintRendererTest` renders an ASCII-only fixture and asserts the whole output round-trips through Windows-1252, which is the WinAnsi repertoire.
 
@@ -141,18 +144,36 @@ A repeatable section prints `min_instances` numbered blank copies (default 1), *
 
 ### 2.5.7 What the paper says about itself
 
-The footer states, per version and re-derived from that version's own frozen bytes via `CapabilityFlags::isOcrCompatible()`, whether *"Scans of this form can be read automatically"* or *"cannot be read automatically; responses must be keyed in."* It is deliberately not read off `forms.capability_flags`, which describes only the currently published version and is stale for a superseded one — the §2 as-built note's standing warning to H18a/H19, honoured here.
+**The instruction banner** (layout 2) sits under the title, boxed and bold: *"THIS FORM IS READ BY A COMPUTER. Write in BLOCK CAPITALS. Where boxes are printed, write one letter or number in each box. Mark a choice with an X inside its box. Dates are day, month, year."* — followed by a worked example: six filled cells `A B C 1 2 3`, a box marked with an X labelled *marked*, an empty one labelled *not marked*. It is the ICR guidance's one non-negotiable once text answers are written freely rather than combed. ⚠️ It is NOT in the matcher's static list: it sits above every question's anchor so it never falls inside an answer region, and its sample line normalises to the same words as a real "X Yes" answer line, which the static list's substring rule would then blank.
+
+The footer chooses one of THREE sentences (`R-6bbf9d73`, closed by `M143`): *"Scans of this form can be read automatically."* when the version is OCR-compatible AND the form accepts scans (`forms.allow_ocr_single`); *"Scanning is switched off for this form, so responses must be keyed in."* when only the version half holds; *"Scans of this form cannot be read automatically; responses must be keyed in."* otherwise. The version half is re-derived from that version's own frozen bytes via `CapabilityFlags::isOcrCompatible()`, deliberately not read off `forms.capability_flags`, which describes only the currently published version and is stale for a superseded one — the §2 as-built note's standing warning to H18a/H19, honoured here. The matcher knows all three sentences as printed text, because the footer lands inside the last question's region.
 
 ### 2.5.8 Known limitations, recorded rather than guessed at
 
 - **One locale per print.** The form's `default_locale` is used for every label, hint and option label; there is no "print this in Tagalog" affordance. A real gap for multi-locale forms, and the natural place to close it is a validated `?locale=` against `forms.supported_locales`.
 - **⚠️ A form authored outside the WinAnsi repertoire does not print correctly, and fails SILENTLY.** The same constraint as §2.5.5, seen from the other side: dompdf's core fonts cover Latin-1 plus a couple of dozen extras, so a label in Chinese, Japanese, Arabic, Greek, Cyrillic or Thai drops or mangles with no error. The renderer test cannot catch this — it deliberately uses an ASCII-only fixture so it measures the *templates* — and this product has no such tenant today. Closing it means shipping an embedded TrueType font and a `@font-face`, which the §5 security posture currently forbids (`isRemoteEnabled = false` plus a chroot), so it is a real increment and not a config change. **Anything beyond Latin script is out of scope until then.**
-- **No answer-area sizing from content.** A `long_text` box is a fixed 46pt regardless of what the question asks for.
-- **No fiducial/registration marks.** If the bake-off shows the provider needs corner anchors for deskew, they belong in `.runhead`'s stylesheet and would be drawn as bordered elements for the same WinAnsi reason.
+- **No answer-area sizing from content.** A `long_text` box is a fixed 60pt and a `line` a fixed 26pt regardless of what the question asks for; only a comb is sized, from `max_length` or `max_value`.
+- **No fiducial/registration marks, and none can help this pipeline as built.** The app container has no `gd` or `imagick`, so nothing server-side can warp pixels; the deskew is done on the provider's word coordinates (`OcrLineBuilder`), which corrects a tilt and never a perspective. Corner marks would be ink nothing reads. Recorded with the reason rather than deferred (`M143`); the day the image is pre-processed server-side is the day to revisit this.
+- **A choice question's `appearance` is not honoured on paper.** Every choice list flows side by side whatever `columns`/`columns-pack` the author chose for the screen (filed by `M143`).
+- **Layout 1 sheets are refused, not read.** The reader keeps one geometry. A sheet whose legible running head carries no `Layout` word is refused with `layout_outdated` (job) or listed as `old_layout` (bake-off); no field paper existed when layout 2 shipped, so reading layout 1 beside it is deliberately not built (filed by `M143`).
 
 ### 2.5.9 Delivery
 
 `GET /forms/{form}/versions/{version}/print`, `->scopeBindings()`, gated `can:view,form` — the XLSForm export's shape exactly. **Ungated by plan**: `feature:ocr_single` would be wrong twice over (that key is Professional+, and printing a blank form is useful with no OCR anywhere in the picture). Synchronous, no job, and — like `XlsformExporter` and unlike the submission PDF — **no audit row and no metering**, because nothing is stored and no respondent data is disclosed.
+
+### 2.5.10 Layout 2 (M143, 2026-10-07) — what changed, and why
+
+The first paper (the 2026-08-09 decisions of record above) was printed and reviewed by the user on 2026-10-07, before a single OCR sample existed: *unorganized*, and the one-letter-per-box combs *limiting*; it would mostly be printed in monochrome. `D96` (answered in chat the same day) superseded those decisions with layout 2, designed against the ICR form-design guidance (square pen-sized boxes, spacing, a bold top-of-form instruction with example characters, check boxes above the 3.5–4mm OMR floor marked with an X):
+
+- **Monochrome.** No tenant colour anywhere on the paper; black and dark greys that print solid. The renderer passes no palette (ADR-0014's note of the same date).
+- **The instruction banner** (§2.5.7) under the title.
+- **Numbered questions** (§2.5.4), the number before the label.
+- **One open box for text** (`line`: `short_text`, `email`, `url`); **combs only for digits**, 18pt square on a 20pt pitch, 23 cells at most, numbers sized from `max_value`, a phone 13 (§2.5.3).
+- **Choices side by side**, 14pt boxes, wrapping between options (§2.5.2).
+- **The `Layout 2` word beside the stamp** (§2.5.5), read back by `PrintedFormMatcher::layoutOf()`.
+- **A truthful footer** (§2.5.7).
+
+**The reader followed the paper, and the test fixture went first.** Every OCR test lays its page out with `tests/Feature/Ocr/Support/PrintedPageTypesetter.php`, which hand-codes the geometry; a layout change leaves the suite green until that fixture is rewritten. `M143` rewrote it first and measured the suite red in eleven places (a mark before *Female* credited to *Male*; *2. Age* no longer anchoring *Age*; the open box unknown to the reader; the new footer sentence read as the last answer), then changed the reader until green: `OcrAnswerReader::choices()` finds each option's label as a span in printed order and credits a mark to the label it immediately precedes; `startsWithLabel()` compares with the leading number stripped; the three footer sentences are static text; `layoutOf()` reads the running head and refuses a sheet only on positive evidence (a legible head with no layout word, or a lower number) and warns otherwise. Six deliberate defects through `scripts/mutate.php` each turned a test red.
 
 ---
 
@@ -175,7 +196,8 @@ The footer states, per version and re-derived from that version's own frozen byt
 >   - a page photographed at a tilt is deskewed;
 >   - each question is anchored on its key stamp, or else its label, in printed order;
 >   - a captioned comb is split by where each character sits under DD / MM / YYYY, never by counting;
->   - an X before an option's label is a mark.
+>   - a mark before an option's label is that option's mark — since layout 2 several options share a line, each label is found as a span of words in printed order, and the mark credited to it is the run of mark words immediately before that span (`M143`);
+>   - an open text box (`line`) is read as free text.
 >
 >   Confidence is the lowest character confidence, scaled to 0–100. The 90 / 70 thresholds are `config/ocr.php`, where H1d calibrates them. Below 70 the value is withheld and the text kept. A blank question is `blank`, not a failure (§2.5.1).
 > - ⚠️ **Departures from this document, each deliberate:**
@@ -184,7 +206,7 @@ The footer states, per version and re-derived from that version's own frozen byt
 >   - **§3's per-field record.** It lives in `ocr_scans.extraction` rather than in a staged draft. `attachments.ocr_confidence_avg` holds the per-scan average, on every page.
 >   - **§6, provider failures.** A provider failure worth retrying (rate-limited, unavailable, no answer in time) is counted on the row and retried with a growing delay, up to `ocr.max_attempts`. Anything else fails the scan with an actionable message, and the files are kept. A file the provider cannot open fails the scan as `unreadable_file`. That is not §6's "poor scan quality", which still degrades into low confidence, because the provider returns text for a poor photo and an error only for a file it cannot decode.
 >   - **The provider's own error shape.** A wrong key is answered `400 INVALID_ARGUMENT` with reason `API_KEY_INVALID`, and billing off is `403 BILLING_DISABLED`. The client reads the reason before the status. ⚠️ **On 2026-10-03 the platform's key was refused for billing**, so no real scan has been read yet; the matcher is built and tested against Vision's documented response shape. ✅ **First real read 2026-10-05 (`M135`), on the testing server:** the project's billing account had been closed (a free trial that ended), so the project was moved to a new one, and the server got its own key restricted to the Cloud Vision API; a 759-byte test image came back through `GoogleVisionClient` as "MERIDIAN OCR 135". This laptop's key sits in a different project whose billing is still off.
-> - **§2.5 changed with it.** A yes/no question prints two tick boxes; it printed a write-in box before, because it stores no options. The header asks respondents to mark each choice with an X. The checksum stamp cannot tell those two layouts apart, so the matcher also reads a written YES or NO. A layout revision on the stamp is a filed row. **M133 (`R-5da4a30f`):** a single choice or dropdown that takes its choices from another form prints a write-in box, because its list is live and the sheet cannot hold it, and the reader takes what was written as the answer (`D85`: the text chosen) rather than reporting it unreadable.
+> - **§2.5 changed with it.** A yes/no question prints two tick boxes; it printed a write-in box before, because it stores no options. The header asks respondents to mark each choice with an X. The checksum stamp cannot tell those two layouts apart, so the matcher also reads a written YES or NO. A layout revision on the stamp was a filed row; since `M143` it is the `Layout 2` word in the running head (§2.5.5), and a sheet without it is refused as `layout_outdated` rather than misread. **M133 (`R-5da4a30f`):** a single choice or dropdown that takes its choices from another form prints a write-in box, because its list is live and the sheet cannot hold it, and the reader takes what was written as the answer (`D85`: the text chosen) rather than reporting it unreadable.
 > - **Groundwork 2 inherits these facts:**
 >   - `SubmissionDraftService::saveDraft()` and `promote()` refuse a superseded version, so a scan of old paper needs a decision before it can become a draft;
 >   - `AttachmentPolicy` knows only `submission` and `form_field` owners, so the review screen cannot yet serve a scan image;
@@ -278,6 +300,7 @@ H1d chooses the provider and calibrates §3's 90/70 thresholds on real samples, 
   - nothing read.
 
 **The samples, step by step.**
+0. **Print the samples from a build at or after `M143` (layout 2)** — the running head reads `Layout 2` beside the stamp. A sheet from an earlier build is listed as `old_layout` and never scored. Print single-sided on plain paper of at least 80 gsm, so the back does not show through.
 1. Export the layout where the form was printed from. On the testing server that is one guarded block in chat, and `layout.json` comes back to the laptop.
 2. Fill the template for the scans that have correct answers. Type dates as `2026-10-08`.
 3. Run `ocr:bakeoff` with the host's PHP, which can see any folder. The app container sees only the repository.
@@ -292,7 +315,7 @@ H1d chooses the provider and calibrates §3's 90/70 thresholds on real samples, 
      shifts every line beneath it, and this repository cites documents as `path:N` — 25 such
      citations point into the files that carry markers. End-of-file shifts nothing. -->
 <!-- pipeline: id=ocr-single-form title="PRD Feature #1 — single-form OCR, groundwork 2: the per-form accept-scans setting, the upload and review-and-correct screen with its 90/70 colours, and the save into SubmissionPipeline (groundwork 1, the reading path, shipped in M128)" phase=3 state=done size=XL tier=early-testing done="M129 — the scans page, the review-and-correct screen with its 90/70 notes and the save into SubmissionPipeline, with the accept-scans setting as the hub Settings tab's Scanning section; recorded in docs/claims/lane-a.md's M129 release. The live read waits on ocr-testing-server-key" -->
-<!-- pipeline: id=ocr-provider-bakeoff title="H1d — choose the OCR provider (Cloud Vision or Document AI) on real samples, calibrate the 90/70 thresholds, and write the reserved ADR-0010" phase=3 state=blocked size=M blocker="user: needs 10–20 hand-filled Print blank copies, scanned and photographed, with correct answers for five — due 2026-10-08 (D72) — and a Vision key that reads where ocr:bakeoff runs (this laptop's key has billing off; the testing server's reads; §9)" tier=early-testing -->
+<!-- pipeline: id=ocr-provider-bakeoff title="H1d — choose the OCR provider on real samples (Cloud Vision first, a vision-language model only if G9 is missed — D97), calibrate the 90/70 thresholds, and write the reserved ADR-0010" phase=3 state=blocked size=M blocker="user: needs about 15 hand-filled Print blank copies printed from layout 2 (M143 or later), scanned and photographed, with correct answers for at least five — and a Vision key that reads where ocr:bakeoff runs (this laptop's key has billing off; the testing server's reads; §9)" tier=early-testing -->
 <!-- pipeline: id=ocr-linelist title="PRD Feature #2 — the linelist OCR channel" phase=3 state=blocked size=L blocker="user: needs 2–3 scanned linelist sheets and their blank templates (D72 puts it after Oct 12)" tier=during-testing -->
 <!-- pipeline: id=ocr-testing-server-key title="Single-form OCR on the testing server: the Cloud Vision key in the server .env, and billing switched on for the Google Cloud project that owns it. Without both every scan fails with a message (billing measured off on 2026-10-03, 403 BILLING_DISABLED)" phase=3 state=done size=S tier=early-testing done="M135 — billing on (the closed trial account replaced by a new one), a server-only key restricted to the Cloud Vision API in the testing server .env, config cached and the worker restarted, and a real read on the box (a test image read back as MERIDIAN OCR 135); recorded in docs/claims/lane-a.md's M135 release" -->
 <!-- pipeline: id=ocr-bakeoff-harness title="H1d prep, sample-free: a harness that runs the reader over a folder of scans and scores it against a ground-truth sheet (fields needing correction, PRD G9), per confidence threshold, so the Oct 8 samples are judged in hours rather than a day" phase=3 state=done size=M tier=early-testing done="M136 — ocr:bakeoff-layout writes the form's versions and a blank answer sheet; ocr:bakeoff reads a folder with the real reader, no database needed, caches each page's provider answer, and reports fields needing correction and silent errors per threshold (§9); recorded in docs/claims/lane-a.md's M136 release" -->

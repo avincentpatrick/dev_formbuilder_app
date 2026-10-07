@@ -13294,3 +13294,59 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the run history, which grows by one row per automation per response. "Run AI" stays refused. The rest of `D93`'s
   order (recipients and answers from the form, a review/approval step, a failure alert) is `R-1ceb198f`.
   **Live.** Filed by `M142`. **Tier: during-testing.**
+
+- **`minor` · The printed blank form is hard to fill and hard to read back: every text answer in one-letter-per-box combs,
+  choices one per line, no question numbers, no instruction that a computer reads the sheet, and tenant colour on paper
+  printed in monochrome.** Found by the user on 2026-10-07, reviewing the rendered "Survey Question Sampling" blank
+  before printing the first OCR samples ("unorganized"; the boxes "limiting"), and confirmed against the ICR form-design
+  guidance: square pen-sized boxes, fields at least 1.5 box widths apart, a bold top-of-form instruction with example
+  characters wherever answers are written freely, check boxes of at least 3.5–4mm marked with an X. The paper is
+  `BlankFormPrintPresenter` → `resources/views/pdf/blank-form.blade.php` with `_blank-form-styles.blade.php`: its combs
+  were 14×16pt in light grey, its choice boxes 10pt one per line, its key stamp 7pt `#9a9a9a`, and the head rule and
+  title took `$brand['bg']`. The reader (`OcrAnswerReader::choices()`) reads one option per line and the OCR tests'
+  fixture (`tests/Feature/Ocr/Support/PrintedPageTypesetter.php`) hand-codes the same geometry, so the layout, the
+  reader and the fixture change together — the fixture first, measured red. `D96` decides the shape.
+  **Live.** Filed by `M143`. **Tier: early-testing.**
+
+- **`nit` · A sheet printed from layout 1 is refused rather than read; reading it would need layout 1's geometry kept
+  beside layout 2's.** Found by `M143` while adding the `Layout 2` word to the running head (`R-d6546409`).
+  `PrintedFormMatcher::layoutOf()` tells old paper by a legible stamp with no layout word beside it, and
+  `OcrScanReader` fails such a scan `layout_outdated` with the way out (key it in by hand, print fresh copies). Reading
+  a layout-1 sheet would mean a second presenter geometry and a second typesetter in the tests, kept for paper that does
+  not exist: no field paper was printed before `M143`, the first real read anywhere was on 2026-10-05, and the Oct 8
+  samples are reprinted. Build it the day a stack of layout-1 paper turns up. **Latent.** Filed by `M143`.
+  **Tier: after-launch.**
+
+- **`nit` · The paper ignores a choice question's appearance: every choice list flows side by side whatever `columns`,
+  `columns-pack` or one-per-line the author chose for the screen.** Found by `M143` while laying choices out side by
+  side (`D96`). `FieldAppearance` carries the author's layout for the guest runtime; `BlankFormPrintPresenter::fieldRows()`
+  reads none of it and the template prints one inline run that wraps at the margin. A long option list reads fine that
+  way; a list the author laid out in columns for a reason (a Likert scale's order, a two-column pair) prints in whatever
+  order the margin dictates. The reader is indifferent — it finds each label as a span on any line — so this is paper,
+  not OCR. **Live.** Filed by `M143`. **Tier: during-testing.**
+
+- **`nit` · Registration marks and a QR stamp stay off the paper, and cannot help this pipeline as built: the app
+  container has no GD or imagick, so nothing server-side can warp an image or decode a code, and Cloud Vision has no
+  barcode feature.** Found by `M143`'s research into industry form design, which recommends L-shaped corner marks for
+  alignment and a code for identity. The deskew is done on the provider's word coordinates (`OcrLineBuilder`), which
+  corrects a tilt and never a perspective; a vector QR is drawable (`bacon/bacon-qr-code` with `SvgImageBackEnd`, as
+  `FormShareQrController` already does) but unreadable server-side, and `resources/views/pdf/blank-form.blade.php`
+  carries a "no images" contract for the same reason. The identity travels as text — `Layout 2` and the stamp — which
+  the matcher reads. Revisit when images are pre-processed server-side (ADR-0014 names GD's arrival as a revisit
+  trigger) or the provider decodes codes. **Latent.** Filed by `M143`. **Tier: after-launch.**
+
+- **`nit` · A short written answer that is a substring of any printed text in its region is dropped as printed text, so
+  "FORM" written in a box above a footer that says "Scans of this form…" reads as blank.** Found by `M143` while
+  deciding where the instruction banner may go. `OcrAnswerReader::isStatic()` drops an answer line of four or more
+  characters whose normalised text is a SUBSTRING of a static string (a hint, a block label, a footer sentence), so a
+  hint that wraps is recognised wherever it lands — and so is a genuine four-letter answer that happens to sit inside
+  one. The exposure predates `M143` (the old footer carried "form" too) and is why the banner is kept out of the static
+  list. A fix compares by line geometry (a static line is where the printed text IS, not any line that reads like a
+  piece of it) or asks a longer match of a substring hit. **Live.** Filed by `M143`. **Tier: during-testing.**
+
+- **`nit` · The root `package-lock.json` records the design-system workspace's `vue` range as `^3.5.39` while
+  `packages/design-system/package.json` asks for `^3.5.43`, so an `npm install` in the node container rewrites the
+  lockfile by one line on every restart.** Found by `M143` when the node container was restarted and the lockfile turned
+  up modified: `M137`'s trunk-wide vue bump moved the workspace's `package.json` and not the lockfile's copy of its
+  range. CI's `npm ci` tolerates it (every run since has been green), so the fix is one `npm install` committed on its
+  own, in an increment that touches the frontend anyway. **Live.** Filed by `M143`. **Tier: during-testing.**

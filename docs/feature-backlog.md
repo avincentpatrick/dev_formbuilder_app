@@ -7602,7 +7602,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/Http/Controllers/Public/GuestSubmissionController.php:170`,
   `app/Http/Controllers/Tenant/SubmissionController.php:117` and
   `app/Http/Controllers/Tenant/SubmissionDraftController.php:97` — never `ApiImport`. ⚠️ **Scope that
-  precisely, because the pipeline DOES accept the value**: `database/seeders/DemoSeeder.php:923` and
+  precisely, because the pipeline DOES accept the value**: `database/seeders/DemoSeeder.php` and
   `tests/Feature/Submissions/SubmissionPipelineTest.php` pass it in directly, so what is missing is an HTTP
   ingress, not pipeline support. The contradiction is in the code itself:
   `app/Enums/SubmissionSource.php:9` lists `api_import` among "the later channels". ⚠️ **Documentary, not

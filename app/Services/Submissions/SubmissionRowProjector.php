@@ -77,7 +77,7 @@ final class SubmissionRowProjector
      * one column no matter which versions carry it.
      *
      * @param  Collection<int, FormVersion>  $versions
-     * @return array{0: array<string, string>, 1: array<string, array<string, array{type: FieldType, config: array<string, mixed>}>>}
+     * @return array{0: array<string, string>, 1: array<string, array<string, array{type: FieldType, config: array<string, mixed>, repeat: string|null}>>}
      */
     public function resolveColumns(Collection $versions, string $locale): array
     {
@@ -92,6 +92,16 @@ final class SubmissionRowProjector
             // are pipeable sources without being data columns of their own.
             $sources = TemplateSources::fromSnapshot($fields);
 
+            // M146 (`R-6c0f0e56`, `D100` A) — the members of a repeatable section, by the section's key: their
+            // answers live under THAT key as a list of instances ({@see StructuralAnswerNormalizer}), never at the
+            // top level, which is where this projector read every member until M146 and wrote blanks on every channel.
+            $repeatSections = [];
+            foreach ($version->schema_snapshot['sections'] ?? [] as $section) {
+                if (is_array($section) && ($section['is_repeatable'] ?? false) === true && is_string($section['key'] ?? null)) {
+                    $repeatSections[$section['key']] = true;
+                }
+            }
+
             foreach ($fields as $field) {
                 $type = FieldType::tryFrom((string) ($field['field_type'] ?? ''));
                 if ($type === null || ! $this->formatter->isDataField($type)) {
@@ -100,7 +110,12 @@ final class SubmissionRowProjector
 
                 $key = (string) $field['key'];
                 $config = is_array($field['config'] ?? null) ? $field['config'] : [];
-                $fieldMeta[$version->id][$key] = ['type' => $type, 'config' => $config];
+                $sectionKey = $field['section_key'] ?? null;
+                $fieldMeta[$version->id][$key] = [
+                    'type' => $type,
+                    'config' => $config,
+                    'repeat' => is_string($sectionKey) && isset($repeatSections[$sectionKey]) ? $sectionKey : null,
+                ];
 
                 if (! array_key_exists($key, $columns)) {
                     $columns[$key] = $this->header($field, $locale, $key, $sources);
@@ -123,7 +138,10 @@ final class SubmissionRowProjector
      * language, or a column of choice labels in per-respondent languages becomes unusable for analysis. The
      * respondent's own locale is still available as {@see META_LOCALE}.
      *
-     * @param  array<string, array<string, array{type: FieldType, config: array<string, mixed>}>>  $fieldMeta
+     * A repeat member (M146, `D100` A) is read from its section's instance list and joined into one cell by
+     * {@see repeatCell()}; the column keeps the member's own key, because a Sheets or Airtable mapping persists it.
+     *
+     * @param  array<string, array<string, array{type: FieldType, config: array<string, mixed>, repeat: string|null}>>  $fieldMeta
      * @return array<string, string>
      */
     public function answerValues(Submission $submission, array $fieldMeta, string $locale): array
@@ -136,10 +154,57 @@ final class SubmissionRowProjector
         $values = [];
 
         foreach ($versionMap as $key => $meta) {
-            $values[$key] = $this->formatter->displayValue($meta['type'], $answers[$key] ?? null, $meta['config'], $locale);
+            $values[$key] = $meta['repeat'] === null
+                ? $this->formatter->displayValue($meta['type'], $answers[$key] ?? null, $meta['config'], $locale)
+                : $this->repeatCell($meta['type'], $meta['config'], $this->instancesOf($answers, $meta['repeat']), $key, $locale);
         }
 
         return $values;
+    }
+
+    /**
+     * A repeatable section's stored instances — a list of per-instance field-key ⇒ value maps, the shape
+     * {@see StructuralAnswerNormalizer} persists; the mirror of `SubmissionInboxPresenter::instancesOf()`.
+     * Fail-closed: anything else is no instances at all.
+     *
+     * @param  array<string, mixed>  $answers
+     * @return list<array<string, mixed>>
+     */
+    private function instancesOf(array $answers, string $sectionKey): array
+    {
+        $instances = $answers[$sectionKey] ?? null;
+
+        if (! is_array($instances)) {
+            return [];
+        }
+
+        return array_values(array_filter($instances, is_array(...)));
+    }
+
+    /**
+     * One repeat member's cell (M146, `D100` A): every instance formatted on its own through
+     * {@see SchemaValueFormatter::displayValue()} — so a multi-select keeps its `; ` — and joined with ` | `
+     * IN POSITION: an instance that left the member blank still contributes an empty part, so the member columns
+     * of one response line up (`Kid A | Kid B` beside ` | Cooking` says which kid cooks). A cell whose every part
+     * is empty is `''`, as every other empty answer is. A pipe rather than `; ` because the inner join already
+     * spends `; `, and nothing else in an answer is written with one. `D100` B (a Kobo-style sheet per repeat)
+     * would build on this cell, not replace it.
+     *
+     * @param  array<string, mixed>  $config
+     * @param  list<array<string, mixed>>  $instances
+     */
+    private function repeatCell(FieldType $type, array $config, array $instances, string $key, string $locale): string
+    {
+        $parts = array_map(
+            fn (array $instance): string => $this->formatter->displayValue($type, $instance[$key] ?? null, $config, $locale),
+            $instances,
+        );
+
+        if (array_filter($parts, fn (string $part): bool => $part !== '') === []) {
+            return '';
+        }
+
+        return implode(' | ', $parts);
     }
 
     /**

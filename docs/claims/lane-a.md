@@ -16,7 +16,89 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M142` is merged; `D94`'s three items are done (security, CSV choice lists, automation conditions), and the early-testing line waits on the user (the OCR samples and a key, the staging scan)
+## Status: ACTIVE CLAIM — `M143`, the OCR provider bake-off on real samples (H1d, ADR-0010) and one real scan on staging (m143-ocr-provider-bakeoff)
+
+Taken 2026-10-07. Branch `m143-ocr-provider-bakeoff`, cut from `origin/main` at `ff88fc03`, PR into `main`.
+The user brought the time for OCR today (`D94`: OCR goes ahead of everything once its inputs arrive), and was sent the
+step list in chat: one staging form, about 15 hand-filled Print blank copies, scans and phone photos, correct answers
+for at least five, and a second Vision key for this laptop. Two rows, the whole remaining early-testing work bar a
+latent one:
+- **`ocr-provider-bakeoff`** (`docs/ocr-pipeline-design.md`, end-of-file marker): choose Cloud Vision or Document AI on
+  the samples, calibrate the 90/70 thresholds, write the reserved ADR-0010.
+- **`ocr-staging-scan`** (`docs/deployment-infrastructure.md`, end-of-file marker): one real scan saved through
+  staging's scans page, then the `.env` backup on the box deleted.
+
+### Evidence verified
+
+Against `ff88fc03`:
+- **Held.** Both markers read `state=blocked` with the user as blocker; `docs/pipeline.md` puts them first and second
+  in early-testing.
+- **Held.** `config/ocr.php` carries `confidence.auto` 90 and `review` 70, read in one place
+  (`PrintedFormMatcher`'s thresholds, through `config()`).
+- **Held.** Both harness commands exist and boot on host PHP (`php artisan list ocr` lists `ocr:bakeoff` and
+  `ocr:bakeoff-layout`). `docs/ocr-pipeline-design.md` §9 is the runbook.
+- **Held.** `docs/adr/` has the one gap at 0010, and `state.php` names it reserved for H1d.
+
+### Premise verified
+
+- **The laptop key still cannot read.** `.env`'s `OCR_GOOGLE_VISION_KEY` still ends `CSmo`, the key in the
+  billing-off project (`M135`). The user is making a second key in "My First Project" (billing on, Vision only).
+  `bootstrap/cache` holds no `config.php` on this host, so the `.env` edit applies on the next host run with no
+  `config:cache`.
+- **The paper comes from staging, at the current build.** The deploy of `ec6a9ec9` succeeded (run `37543979213`), so
+  `ocr:bakeoff-layout` exists on the box. The print layout there is the one the matcher reads, and one set of paper
+  serves both rows.
+- **ADR-0010 is not a free-standing document.** `scripts/state.php` hard-codes `ADR_RESERVED = [10]` and refuses to
+  measure when the gaps disagree with it. CLAUDE.md's ADR-gap paragraph would turn false the moment 0010 exists. Both
+  change in the ADR's own commit. Eight ADRs, `docs/PRD.md` and `docs/data-dictionary.md` mention 0010 as reserved;
+  those are dated records, edited only where they state a forward fact.
+- **No test pins the configured thresholds.** The scorer's unit tests pass their own `['auto' => 90, 'review' => 70]`.
+  `ReadOcrScanJobTest` reads a page average, not a tier. So moving the config numbers reds nothing by itself (grep
+  measured).
+- **Document AI takes a service account, not an API key.** If the report points there, it is a decision put to the
+  user then, not built here.
+- **The backup `C:\meridian\env.pre-M135.bak` holds every staging secret.** Deleting it is one guarded block the user
+  runs, after the staging scan is saved.
+- **`PROGRESS.md` has 4,308 bytes of headroom** (preflight), so the close-out bullet very likely owes the tenth tracker
+  surgery.
+
+### Remedy verdict
+
+- **The bake-off works as prescribed.** `M136` built the harness for exactly this. Its hand run on synthetic scans
+  matched the hand count (2 of 21 fields, 1 silent error). It measures G9 and silent errors per threshold and names
+  each correction's cause, which is what the provider choice is read from: not found or unreadable points at the
+  layout or matcher; wrong or withheld points at the recognizer.
+- **The staging scan works as prescribed.** The scans page has existed since `M129`, and staging has read for real
+  since `M135`.
+- **What cannot be measured before the samples:** whether the matcher needs a fix. If the report blames it, the fix is
+  in this increment, proved red-first, and the files below already name it.
+
+Files:
+- **Config:** `config/ocr.php` (the calibrated thresholds).
+- **New:** `docs/adr/0010-*.md`.
+- **Namespace bookkeeping:** `scripts/state.php` (`ADR_RESERVED`), `CLAUDE.md` (the ADR-gap paragraph).
+- **Docs:** `docs/ocr-pipeline-design.md` (§3 as-built and §9 results, both markers there), `docs/deployment-infrastructure.md`
+  (the `ocr-staging-scan` marker), `docs/PRD.md` (the G9 risk line, once measured).
+- **Only if the report blames the matcher:** `app/Services/Ocr/PrintedFormMatcher.php`, `OcrAnswerReader.php`,
+  `VisionDocumentParser.php`, and their tests under `tests/Feature/Ocr/` and `tests/Unit/Ocr/`.
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`,
+`PROGRESS.md` (own block, and the archive if the surgery is owed), `PROGRESS_ARCHIVE.md`.
+
+Paired files taken: none known.
+
+Namespaces spent: ADR `0010`, the reserved one, filled rather than newly allocated. No migration, no decision unless the
+report calls for Document AI.
+
+Prediction, written before any sample exists:
+- **Vision stays.** The matcher anchors on this product's own printed layout, so Document AI's form parser would be
+  finding fields we already know.
+- **Clean scans in block capitals meet G9 at the chosen thresholds.** Cursive is the main cause of corrections there,
+  as "wrong".
+- **Phone photos do worse, mostly as "not found" or a mis-split comb.** The deskew corrects rotation, not perspective.
+- ⚠️ **Most expected WRONG: the thresholds.** I expect Vision's handwriting confidence to sit below 90 even when the
+  value is right, so `auto` comes down. By how much is a guess.
+- CI 6/6 on the first run.
 
 ## RELEASED — `M142`, a condition on each form automation: it runs only for a response that matches (merged as PR #335, `ec6a9ec9`, 6/6 green on its first COMPLETED run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

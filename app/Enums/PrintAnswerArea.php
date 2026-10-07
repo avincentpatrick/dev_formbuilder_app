@@ -64,19 +64,26 @@ use App\Services\Forms\BlankFormPrintPresenter;
 enum PrintAnswerArea: string
 {
     /**
-     * A row of separated character boxes ("comb" fields): numbers, a phone, a date or a time. Segmentation
-     * is free when the characters are pre-separated, which is why H1d's bake-off scores them. Text left
-     * this area in layout 2 (`M143`, `D96`): respondents found a box per letter limiting.
+     * A row of separated character boxes ("comb" fields) under printed captions: a date, a time, a duration,
+     * a cascading select's levels. The captioned groups are what make a handwritten date machine-readable
+     * at all (03/04 is ambiguous ink; DD and MM under it are not). Text left this area in layout 2 (`M143`,
+     * `D96`): respondents found a box per letter limiting. Numbers and phones left it in layout 3 (`M144`,
+     * `D98`): a digit string reads as well from one open box, and the comb bought only the segmentation
+     * the recognizer does itself.
      */
     case Comb = 'comb';
 
     /**
-     * One open box, written in block capitals (layout 2, `D96`): short text, email, url. The instruction
-     * banner now carries what the comb used to enforce; the reader takes the line as free text.
+     * One open box, written in block capitals (layout 2, `D96`): short text, email, url — and since layout 3
+     * (`D98`) a phone and a number too. The instruction banner carries what the comb used to enforce; the
+     * reader takes the line as free text and parses a number out of it.
      */
     case Line = 'line';
 
-    /** One multi-line bordered box. Free prose has no character count to comb. */
+    /**
+     * One bordered box of several lines, sized from the question's authored `max_length` (layout 3, `M144`)
+     * — three lines at least, ten at most. Free prose has no character count to comb.
+     */
     case Ruled = 'ruled';
 
     /** The option list, boxes side by side since layout 2, each with a drawn box to mark with an X. */
@@ -108,18 +115,19 @@ enum PrintAnswerArea: string
     case Omitted = 'omitted';
 
     /**
-     * The TOTAL classification of the 31-case {@see FieldType} catalog: 8 comb / 3 line / 1 ruled /
+     * The TOTAL classification of the 31-case {@see FieldType} catalog: 5 comb / 6 line / 1 ruled /
      * 5 choices / 2 grid / 1 signature / 1 prose / 7 unavailable / 1 page break / 2 omitted.
      * Deliberately a `match` with NO `default` arm — see the class docblock.
      */
     public static function for(FieldType $type): self
     {
         return match ($type) {
-            // ── Digits a pen prints into separated boxes: numbers, a phone, the calendar and clock ──
+            // ── The calendar and the clock: digits a pen prints into CAPTIONED groups ─────────────
             // The date and time types comb into FIXED groups (DD MM YYYY, HH MM) rather than a free
             // run, which is what makes a handwritten date machine-readable at all — see the
-            // presenter's `combGroups()`. `duration` is a scalar written on a line, per ocr-pipeline §2.
-            FieldType::Phone, FieldType::Integer, FieldType::Decimal,
+            // presenter's `combGroups()`. A free run of digits (a number, a phone) moved to an open
+            // box in layout 3 (`D98`): the reader parses it as text, and the comb bought nothing but
+            // the segmentation the recognizer does itself.
             FieldType::Date, FieldType::Time, FieldType::Datetime, FieldType::Duration,
 
             // ⚠️ `cascading_select` IS A COMB, NOT A CHOICE LIST, AND THE REASON IS CORRECTNESS
@@ -132,10 +140,14 @@ enum PrintAnswerArea: string
             // shape of a paper address block. See {@see BlankFormPrintPresenter::combGroups()}.
             FieldType::CascadingSelect => self::Comb,
 
-            // ── Short text in one open box (layout 2, `D96`): a box per letter limited respondents ──
-            FieldType::ShortText, FieldType::Email, FieldType::Url => self::Line,
+            // ── One open box (layout 2, `D96`): a box per letter limited respondents ──────────────
+            // A phone and a number joined in layout 3 (`D98`). The reader reads the box as free text
+            // and parses a number out of it (`OcrAnswerReader::number()`), letter-for-digit fixes
+            // included; a date could not be parsed that way, which is why it stays combed above.
+            FieldType::ShortText, FieldType::Email, FieldType::Url,
+            FieldType::Phone, FieldType::Integer, FieldType::Decimal => self::Line,
 
-            // ── Free prose: unbounded, so there is nothing to comb ───────────────────────────────
+            // ── Free prose: unbounded, so there is nothing to comb; the box is sized from max_length
             FieldType::LongText => self::Ruled,
 
             // ── Author-defined option lists, FLAT ones ───────────────────────────────────────────

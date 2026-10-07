@@ -14,6 +14,7 @@ use App\Services\Submissions\SchemaValueFormatter;
 use App\Services\Submissions\SubmissionPdfPresenter;
 use App\Support\Forms\LocaleVariant;
 use App\Support\Forms\StepProjection;
+use LogicException;
 
 /**
  * The render model for one PUBLISHED version's printable BLANK form (Increment I12) — a pure array,
@@ -77,16 +78,10 @@ final class BlankFormPrintPresenter
      * (`M143`, `D96`). The checksum stamp identifies the schema; this identifies the template it was typeset
      * with, so a sheet printed before a layout change cannot be read against the layout after it. Bump it
      * whenever the geometry the reader depends on changes — where an answer sits relative to its label.
+     * Layout 3 (`M144`, `D98`): a phone and a number in one open box, the long-text box sized from its
+     * `max_length`.
      */
-    public const int LAYOUT = 2;
-
-    /** Comb cells for a phone number when nothing narrows it: a mobile number with its country code. */
-    private const PHONE_CELLS = 13;
-
-    /** Comb cells for a whole number when nothing sizes it; for a decimal, the point and two places more. */
-    private const INTEGER_CELLS = 6;
-
-    private const DECIMAL_CELLS = 8;
+    public const int LAYOUT = 3;
 
     /**
      * The hard ceiling on a comb run, and it is derived from the page rather than chosen.
@@ -99,11 +94,32 @@ final class BlankFormPrintPresenter
      * pen-sized box the ICR guidance asks for, and a comb narrower than about 5mm stops being
      * comfortable to hand-print in, which costs exactly the accuracy the comb exists to buy.
      *
-     * Without the clamp an authored `max_length` of 255 emits 255 boxes, and dompdf CLIPS an
-     * over-wide table rather than wrapping it — so the row would silently lose its right-hand end in
-     * the PDF while every model-level assertion stayed green.
+     * Since layout 3 only the captioned combs remain (a date, a time, a duration, a cascade's levels),
+     * and this budget is what a cascading select divides between its levels. dompdf CLIPS an over-wide
+     * table rather than wrapping it, so a run past this width would silently lose its right-hand end
+     * in the PDF while every model-level assertion stayed green.
      */
     private const MAX_COMB_CELLS = 23;
+
+    /**
+     * How many hand-printed block capitals fit on one line of an open box (layout 3, `M144`,
+     * `R-d696ba9e`). The content width is 178mm (see {@see self::MAX_COMB_CELLS}); a capital written
+     * freely with a pen, with its spacing, runs about 4mm — denser than a 6.3mm comb cell, far sparser
+     * than type. The figure sizes the long-text box from its `max_length`; the bake-off's samples are
+     * where it gets measured.
+     */
+    private const CAPITALS_PER_LINE = 45;
+
+    /**
+     * The long-text box in LINES — the template owns the points (20pt a line, so three lines is the 60pt
+     * box layout 2 printed). Three at least, because a `long_text` with no `max_length` is the common
+     * case and a paragraph needs room; ten at most, so one question cannot swallow a page — `.q` is
+     * `page-break-inside: avoid`, and a box taller than the page could never be placed. The banner tells
+     * the respondent what to do when a box runs out: continue on another sheet, with the question number.
+     */
+    private const RULED_LINES_MIN = 3;
+
+    private const RULED_LINES_MAX = 10;
 
     public function __construct(private readonly SchemaValueFormatter $formatter) {}
 
@@ -371,6 +387,11 @@ final class BlankFormPrintPresenter
                 'conditional' => ($field['is_required'] ?? null) === RequiredMode::Conditional->value
                     || $this->stringOrNull($field['relevant_expression'] ?? null) !== null,
                 'comb' => $area === PrintAnswerArea::Comb ? $this->combGroups($type, $field) : null,
+                // Layout 3 (`R-d696ba9e`): the long-text box's height in lines, from the authored
+                // `max_length`. Null for every other area — an open `line` box is one line whatever
+                // its `max_length` says, because a short text, a phone or a number is a one-line answer
+                // and a 255 cap on one is a sanity limit, not a length promise.
+                'lines' => $area === PrintAnswerArea::Ruled ? $this->ruledLines($field) : null,
                 'options' => $area === PrintAnswerArea::Choices ? $this->choiceOptions($type, $config, $locale) : [],
                 'grid' => $area === PrintAnswerArea::Grid ? [
                     'rows' => $this->optionList($config, 'rows', $locale),
@@ -391,7 +412,11 @@ final class BlankFormPrintPresenter
      * March depending on who filled it in, and no recognizer can resolve that from the ink. The
      * captions are ASCII on purpose (see the renderer's WinAnsi note).
      *
-     * Everything else takes one run, narrowed by an authored `max_length` where there is one.
+     * Since layout 3 (`D98`) ONLY captioned combs exist: a free run of digits — a number, a phone — is an
+     * open box, because the reader parses a digit string from free text as well as from boxes and the
+     * comb bought only the segmentation the recognizer does itself. {@see PrintAnswerArea::for()} is the
+     * single place that decides which types reach this method, so the default arm is unreachable and
+     * says so rather than printing an empty comb.
      *
      * @param  array<string, mixed>  $field
      * @return list<array{cells: int, caption: ?string}>
@@ -419,18 +444,11 @@ final class BlankFormPrintPresenter
                 ['cells' => 3, 'caption' => 'HRS'],
                 ['cells' => 2, 'caption' => 'MIN'],
             ],
-            FieldType::Integer => [
-                ['cells' => $this->numericCells($field, self::INTEGER_CELLS, 1), 'caption' => null],
-            ],
-            FieldType::Decimal => [
-                ['cells' => $this->numericCells($field, self::DECIMAL_CELLS, 4), 'caption' => null],
-            ],
             FieldType::CascadingSelect => $this->cascadingGroups($field),
-            // A phone number, and — since layout 2 moved short text, email and url to an open box
-            // (`PrintAnswerArea::Line`) — nothing else reaches this arm.
-            default => [
-                ['cells' => $this->combCells($field, self::PHONE_CELLS), 'caption' => null],
-            ],
+            default => throw new LogicException(sprintf(
+                'PrintAnswerArea::for() sends only the captioned types to a comb; %s reached combGroups()',
+                $type->value,
+            )),
         };
     }
 
@@ -492,19 +510,31 @@ final class BlankFormPrintPresenter
     }
 
     /**
-     * How many cells one free comb run gets: the field's authored `max_length` where it has one,
-     * else `$default`, and never more than {@see self::MAX_COMB_CELLS}.
-     *
-     * The clamp is not decoration. dompdf CLIPS an over-wide table rather than wrapping it, so an
-     * authored `max_length` of 255 would silently truncate the printed row at the page edge — a
-     * defect that shows up only in the rendered PDF, never in a test that reads the model.
+     * Layout 3 (`R-d696ba9e`) — how many lines the long-text box gets: the authored `max_length` divided
+     * into lines of {@see self::CAPITALS_PER_LINE}, never fewer than {@see self::RULED_LINES_MIN} nor more
+     * than {@see self::RULED_LINES_MAX}; the minimum when nothing is authored. The template turns lines
+     * into points, and the OCR test fixture mirrors the same count, so the reader's region grows with it.
      *
      * @param  array<string, mixed>  $field
      */
-    private function combCells(array $field, int $default): int
+    private function ruledLines(array $field): int
     {
-        $cells = $default;
+        $max = $this->authoredMaxLength($field);
+        if ($max === null) {
+            return self::RULED_LINES_MIN;
+        }
 
+        return max(self::RULED_LINES_MIN, min((int) ceil($max / self::CAPITALS_PER_LINE), self::RULED_LINES_MAX));
+    }
+
+    /**
+     * The field's first authored `max_length` rule of one or more, or null. Rules travel in the snapshot as
+     * `{rule_type, rule_value}` with the value a string, the serializer's shape.
+     *
+     * @param  array<string, mixed>  $field
+     */
+    private function authoredMaxLength(array $field): ?int
+    {
         foreach ($this->listAt($field, 'validations') as $rule) {
             if (($rule['rule_type'] ?? null) !== ValidationRuleType::MaxLength->value) {
                 continue;
@@ -512,12 +542,11 @@ final class BlankFormPrintPresenter
 
             $value = $rule['rule_value'] ?? null;
             if (is_numeric($value) && (int) $value >= 1) {
-                $cells = (int) $value;
-                break;
+                return (int) $value;
             }
         }
 
-        return max(1, min($cells, self::MAX_COMB_CELLS));
+        return null;
     }
 
     /**
@@ -718,40 +747,5 @@ final class BlankFormPrintPresenter
         }
 
         return $blocks;
-    }
-
-    /**
-     * Layout 2 — how many cells a NUMBER comb gets: an authored `max_length` first (the same precedence
-     * every comb has), else the digits of an authored `max_value` plus `$extra` (a sign for a whole
-     * number; a sign, a point and two places for a decimal), else `$default`. Never fewer than two, never
-     * more than {@see self::MAX_COMB_CELLS}. An age capped at 120 prints four boxes rather than ten, which is
-     * both easier to fill and harder to misread — an empty box is where a stray mark becomes a digit.
-     *
-     * @param  array<string, mixed>  $field
-     */
-    private function numericCells(array $field, int $default, int $extra): int
-    {
-        $rules = $this->listAt($field, 'validations');
-
-        foreach ($rules as $rule) {
-            if (($rule['rule_type'] ?? null) === ValidationRuleType::MaxLength->value) {
-                return $this->combCells($field, $default);
-            }
-        }
-
-        foreach ($rules as $rule) {
-            if (($rule['rule_type'] ?? null) !== ValidationRuleType::MaxValue->value) {
-                continue;
-            }
-
-            $value = $rule['rule_value'] ?? null;
-            if (is_numeric($value)) {
-                $digits = strlen((string) abs((int) floor(abs((float) $value))));
-
-                return max(2, min($digits + $extra, self::MAX_COMB_CELLS));
-            }
-        }
-
-        return max(2, min($default, self::MAX_COMB_CELLS));
     }
 }

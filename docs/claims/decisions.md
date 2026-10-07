@@ -1149,6 +1149,26 @@ end state and needs a disclosure-safe refusal designed first, which is a decisio
 
 **Recommendation: A**, with B added if the deploying agency's privacy officer asks for notice at collection. A is what the threat model owes in any case, and B is a printed sentence that can be added without touching the reading path.
 
+### D99 — An archived form keeps collecting responses through its public link while the forms list hides it. What does archiving do to the link? **Tier: during-testing.**
+
+**Filed 2026-10-07 by `M145`, silently under `D66`, from `R-f6567fc2` (a `major`, `during-testing`), which reads `ready` while its remaining work is this choice.** `FormService::archive()` discards the draft and leaves `allow_guest_submissions` and `current_published_version_id` as they were; neither `GuestFormController::mint()` nor `GuestSubmissionController::store()` reads the form's status, so `/f/{slug}` still mints, renders and accepts; `FormPresenter` leaves archived forms out of the list. Responses arrive on a form its author can no longer find. The row carries `**Awaits D99.**`, so the line shows it blocked on this rather than ready.
+
+- **A — archiving closes the link.** The guest routes answer an archived form with the same 404 they give a disabled one, a queued offline response to it is refused like any closed form, and un-archiving reopens the link. The list stays as it is.
+- **B — the list shows archived forms that still collect.** A badge on the card, and an archived form keeps its link until the author disables guest submissions by hand.
+- **C — archiving asks.** A confirmation that offers to close the link or keep it, remembered per form.
+
+**Recommendation: A.** It is what every tester will assume "archive" means, it is the smaller change, and B leaves the trap in place with a label on it. A changes nothing for a form that is not archived, and the testing server has no archived form collecting today.
+
+### D100 — An export, a Google Sheets sync and an Airtable sync write every answer inside a repeat group as an empty cell. What shape does a repeat group take in a spreadsheet? **Tier: during-testing.**
+
+**Filed 2026-10-07 by `M145`, silently under `D66`, from `R-6c0f0e56` (a `major`, `during-testing`), which reads `ready` while its remaining work is this choice.** `SubmissionRowProjector::resolveColumns()` makes a column for every data field, repeat members included, and `answerValues()` reads each at the top level of the stored answers — but a repeat group's answers are stored under the SECTION key as a list of instances, so the lookup always misses and every caller (`SubmissionExporter`, `GoogleSheetsConnector`, `AirtableConnector`, the automation webhook) writes blanks. The row carries `**Awaits D100.**`.
+
+- **A — one row per response, each repeat question's instances joined into one cell** (`Kid A | Kid B`), the same on every channel. Smallest change; a Sheets or Airtable table has one row per response in any case.
+- **B — Kobo-style: the file export gets one sheet per repeat group** with a column naming the parent response and the instance number, while Sheets and Airtable take A. Analysts who know Kobo expect it; the file export grows a second sheet per repeat.
+- **C — one row per instance in the main sheet**, the response's other answers repeated on each. Readable for one repeat, wrong for two.
+
+**Recommendation: A** for the testing window, because it fixes every channel at once and loses nothing a reviewer cannot read; B after testing if analysts ask for it, built on A's cell format.
+
 
 ## ANSWERED
 ### D57 — Reported item 16 asks for three ways to present sections; `forms.single_page_mode` is a boolean that expresses two of them and "tabular" is not expressible at all. What is the model? **A now, C next — ship the two modes the boolean already expresses, then make "per page" real by honouring `page_break`.**

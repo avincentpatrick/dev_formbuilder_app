@@ -1,12 +1,14 @@
 /**
  * The draft → snapshot projection (Increment M112, `B6`).
  *
- * Eight draft-only states the published serializer never sees, each asserted separately. The
- * unparsable-expression case is the highest-value one in the file and the reason the module exists in
- * this shape: `safeEvaluate()` (`useFormRuntime.ts:310-319`) catches a parser throw by degrading the
- * WHOLE FORM to everything-relevant and latching `engineFailed` true for the session, so one keystroke
- * mid-condition would otherwise kill relevance with no recovery short of a remount. This suite is the
- * only thing between a keystroke and a poisoned preview.
+ * Eight draft-only states the published serializer never sees, each asserted separately, and a ninth
+ * (M145) for the rule rows. The unparsable-expression case is the highest-value one in the file and the
+ * reason the module exists in this shape: `safeEvaluate()` in `useFormRuntime.ts` catches an engine throw by
+ * degrading the WHOLE FORM to everything-relevant and setting `engineFailed`, so one keystroke
+ * mid-condition would otherwise kill relevance — silently, because the preview never reads the flag. The
+ * ninth group is the same case for a half-built rule row (`R-551873af`): the "Add condition" seed is a
+ * `required_if` with no operator and no compared question, the server saves it, and the engine's lowering
+ * throws on it at mount. This suite is the only thing between a keystroke and a poisoned preview.
  */
 
 import { describe as group, expect, it } from 'vitest';
@@ -18,7 +20,9 @@ import {
     shapeOf,
     type DraftProjectionInput,
 } from './draft-snapshot';
-import type { LocalField, LocalSection } from './types';
+import type { BuilderValidation, LocalField, LocalSection } from './types';
+
+import { createFormRuntime } from '../../../public-runtime/composables/useFormRuntime';
 
 function field(overrides: Partial<LocalField> & { uid: string }): LocalField {
     return {
@@ -330,6 +334,21 @@ group('the governing rule', () => {
                     field({ uid: 'a', key: '', label: '', relevant_expression: '((((' }),
                     field({ uid: 'b', key: '', label: '', field_type: 'calculated', config: { formula: '' }, sequence: 1 }),
                     field({ uid: 'c', key: 'a', field_type: 'matrix', config: { rows: [], columns: [] }, sequence: 2, form_section_id: 'gone' }),
+                    // M145: every rule-row shape the engine throws on — the seed, a stale compared question, a
+                    // half-typed expression, a row with neither half, and a grouped row with no connective.
+                    field({
+                        uid: 'd',
+                        key: 'd',
+                        sequence: 3,
+                        validations: [
+                            { rule_type: 'required_if', operator: null, rule_value: null, expression: null, error_message: null, related_field_key: null, sequence: 0 },
+                            { rule_type: 'greater_than_field', operator: null, rule_value: null, expression: null, error_message: null, related_field_key: 'gone', sequence: 1 },
+                            { rule_type: null, operator: null, rule_value: null, expression: '((((', error_message: null, related_field_key: null, sequence: 2 },
+                            { rule_type: null, operator: null, rule_value: null, expression: null, error_message: null, related_field_key: null, sequence: 3 },
+                            { rule_type: 'min_length', operator: null, rule_value: '1', expression: null, error_message: null, related_field_key: null, sequence: 4, logic_group: 'g', logic_operator: 'and' },
+                            { rule_type: 'max_length', operator: null, rule_value: '9', expression: null, error_message: null, related_field_key: null, sequence: 5, logic_group: 'g', logic_operator: null },
+                        ],
+                    }),
                 ]),
             ),
         ).not.toThrow();
@@ -345,5 +364,143 @@ group('the governing rule', () => {
         );
 
         expect(schema.version.schema.fields).toHaveLength(3);
+    });
+});
+
+group('9. rule rows — screened through the engine’s own lowering (M145, R-551873af)', () => {
+    // ⛔ THE SAME LOAD-BEARING SHAPE AS CASE 5, ONE TABLE OVER. A rule row the lowering throws on — the
+    // "Add condition" seed is one, and the server SAVES it — degrades the whole preview to everything-
+    // relevant, and the preview never says so. The screen must run the ENGINE'S OWN lowering and parser,
+    // never a list of rule names: `required_with` with no operator is a legitimate "is answered" condition.
+    const rule = (overrides: Partial<BuilderValidation>): BuilderValidation => ({
+        rule_type: 'required_if',
+        operator: null,
+        rule_value: null,
+        expression: null,
+        error_message: null,
+        related_field_key: null,
+        sequence: 0,
+        ...overrides,
+    });
+    const earlier = field({ uid: 'e', key: 'earlier', sequence: 0 });
+    const trigger = (validations: BuilderValidation[]): LocalField => field({ uid: 't', key: 'trigger', sequence: 1, validations });
+    const later = field({ uid: 'l', key: 'later', sequence: 2 });
+    const rulesOf = (schema: ReturnType<typeof projectDraft>['schema']) => schema.version.schema.fields[1].validations;
+
+    it('9. omits the Add-condition seed — a required_if with no operator and no compared question — and records it', () => {
+        const { schema, issues } = projectDraft(input([earlier, trigger([rule({})]), later]));
+
+        expect(rulesOf(schema)).toHaveLength(0);
+        expect(issues.map((i) => [i.uid, i.code])).toEqual([['t', 'incomplete_rule']]);
+        expect(issues[0].message).toContain('not finished');
+    });
+
+    it('9b. keeps a complete required_if that names an EARLIER question, with no issue', () => {
+        const { schema, issues } = projectDraft(
+            input([earlier, trigger([rule({ operator: 'eq', rule_value: 'yes', related_field_key: 'earlier' })]), later]),
+        );
+
+        expect(rulesOf(schema)).toHaveLength(1);
+        expect(rulesOf(schema)[0].related_field_key).toBe('earlier');
+        expect(issues).toHaveLength(0);
+    });
+
+    it('9c. keeps a rule that names a LATER question, because every key is assigned before the screen runs', () => {
+        const { schema, issues } = projectDraft(
+            input([earlier, trigger([rule({ operator: 'eq', rule_value: 'yes', related_field_key: 'later' })]), later]),
+        );
+
+        expect(rulesOf(schema)).toHaveLength(1);
+        expect(issues).toHaveLength(0);
+    });
+
+    it('9d. omits a rule whose compared question no longer exists, and says which kind of gap it is', () => {
+        const { schema, issues } = projectDraft(
+            input([earlier, trigger([rule({ operator: 'eq', rule_value: 'yes', related_field_key: 'gone' })]), later]),
+        );
+
+        expect(rulesOf(schema)).toHaveLength(0);
+        expect(issues.map((i) => i.code)).toEqual(['incomplete_rule']);
+        expect(issues[0].message).toContain('no longer exists');
+    });
+
+    it('9e. omits a greater_than_field with no compared question', () => {
+        const { schema, issues } = projectDraft(input([earlier, trigger([rule({ rule_type: 'greater_than_field' })]), later]));
+
+        expect(rulesOf(schema)).toHaveLength(0);
+        expect(issues.map((i) => i.code)).toEqual(['incomplete_rule']);
+    });
+
+    it('9f. omits a half-typed free-text rule rather than nulling it, and keeps one that parses', () => {
+        const { schema, issues } = projectDraft(
+            input([
+                earlier,
+                trigger([
+                    rule({ rule_type: null, expression: '${earlier} >' }),
+                    rule({ rule_type: null, expression: "${earlier} > '1'", sequence: 1 }),
+                ]),
+                later,
+            ]),
+        );
+
+        // A row with BOTH halves null throws `unlowerable_rule_type`, so nulling the expression is the wrong fix.
+        expect(rulesOf(schema).map((v) => v.expression)).toEqual(["${earlier} > '1'"]);
+        expect(issues.map((i) => i.code)).toEqual(['incomplete_rule']);
+    });
+
+    it('9g. keeps a required_with with no operator — the engine lowers it to "is answered"', () => {
+        const { schema, issues } = projectDraft(
+            input([earlier, trigger([rule({ rule_type: 'required_with', related_field_key: 'earlier' })]), later]),
+        );
+
+        expect(rulesOf(schema)).toHaveLength(1);
+        expect(issues).toHaveLength(0);
+    });
+
+    it('9h. omits a grouped row with no connective and keeps the first', () => {
+        const complete = { operator: 'eq', rule_value: 'a', related_field_key: 'earlier', logic_group: 'g' };
+        const { schema, issues } = projectDraft(
+            input([
+                earlier,
+                trigger([
+                    rule({ ...complete, logic_operator: 'or', sequence: 0 }),
+                    rule({ ...complete, rule_value: 'b', logic_operator: null, sequence: 1 }),
+                ]),
+                later,
+            ]),
+        );
+
+        expect(rulesOf(schema).map((v) => v.rule_value)).toEqual(['a']);
+        expect(issues.map((i) => i.code)).toEqual(['incomplete_rule']);
+    });
+
+    it('9i. an omitted row leaves the shape where a draft with no rule has it, so finishing the row rebuilds the preview', () => {
+        const none = projectDraft(input([earlier, trigger([]), later])).shape;
+        const seeded = projectDraft(input([earlier, trigger([rule({})]), later])).shape;
+        const complete = projectDraft(input([earlier, trigger([rule({ operator: 'eq', rule_value: 'yes', related_field_key: 'earlier' })]), later])).shape;
+
+        expect(seeded).toBe(none);
+        expect(complete).not.toBe(none);
+    });
+
+    it('9j. the real engine neither fails nor turns everything relevant', () => {
+        // The integration proof: the seed on `trigger`, a sibling hidden until `trigger` says show. Before the
+        // screen, the lowering throws at mount, `safeEvaluate()` returns everything-relevant and the sibling shows.
+        const dependent = field({ uid: 'd', key: 'dependent', sequence: 2, relevant_expression: "${trigger} = 'show'" });
+        const { schema } = projectDraft(input([earlier, trigger([rule({})]), dependent]));
+
+        const runtime = createFormRuntime(schema);
+
+        expect(runtime.fieldRelevance.value.dependent).toBe(false);
+        expect(runtime.engineFailed.value).toBe(false);
+    });
+
+    it('9k. records one issue per field however many of its rules are broken', () => {
+        // `PreviewRuntime.vue` keys a field’s issue list by `issue.code`, so a second chip of one code would collide.
+        const { issues } = projectDraft(
+            input([earlier, trigger([rule({}), rule({ rule_type: 'greater_than_field', sequence: 1 })]), later]),
+        );
+
+        expect(issues).toHaveLength(1);
     });
 });

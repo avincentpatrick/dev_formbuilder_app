@@ -13361,7 +13361,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   too. The remedy follows `D98`: with A, `integer`/`decimal`/`phone` move to `Line` (the enum's total match, its test table,
   the presenter's sizing, the typesetter), the captioned combs stay; with B, a date parser and a printed `DD/MM/YYYY` hint as
   well. Either is `LAYOUT` 3, which refuses layout-2 sheets — so it ships BEFORE the bake-off samples are printed, in one
-  increment with the paragraph row below. **Live.** Filed by `M143`. **Awaits D98.** **Tier: early-testing.**
+  increment with the paragraph row below. **Live.** Filed by `M143`. **Tier: early-testing.**
 
 - **`minor` · A long-text answer gets a fixed 60pt box (about three lines) and a short-text answer a single 26pt line,
   whatever the question asks for — a paragraph has nowhere to go on the paper.** Found by the user on 2026-10-07 ("what if
@@ -13374,3 +13374,26 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   cap of about ten so one question cannot swallow a page), or an author-chosen row count beside it, and print "continue on
   another sheet, with the question number" where the cap bites; mirror the height in `PrintedPageTypesetter` and add a case
   where the answer runs to four lines. `LAYOUT` 3 with the row above. **Live.** Filed by `M143`. **Tier: early-testing.**
+
+- **`nit` · A paragraph written over several lines of the long-text box is saved as one line: `OcrAnswerReader::ruled()`
+  joins the region's lines with spaces, so the line breaks a respondent wrote are lost.** Found by `M144` while sizing the
+  box from `max_length` (layout 3, `R-d696ba9e`): the region is read top to bottom and the breaks are not kept, which the
+  matcher's four-line and six-line paragraph case pins as the behaviour. Harmless for a sentence, lossy for a list written
+  one item to a line. A fix joins with a newline where the next OCR line sits below the previous one's baseline, which
+  `OcrLine` already knows. **Live.** Filed by `M144`. **Tier: during-testing.**
+
+- **`nit` · An integer written with a thousands separator in its open box (`1,234`) is `unreadable`, and a decimal written
+  `1,234.5` becomes `1.234.5` and is unreadable too.** Found by `M144` while moving numbers out of their combs (layout 3,
+  `D98`): `OcrAnswerReader::number()` strips spaces, maps the letter lookalikes and, for a decimal only, turns a comma into a
+  point, then requires a plain digit string. A comb never left room for a separator; an open box does. The reviewer corrects
+  it by hand today. The bake-off's samples should say whether respondents write one before a rule is chosen (drop a comma
+  followed by exactly three digits, or refuse as now). **Live.** Filed by `M144`. **Tier: during-testing.**
+
+- **`nit` · An open box's left wall read as the letter `I` or `l` becomes a leading `1` in a number — flagged for review
+  at 89, but shown as a plausible value.** Found by `M144` while moving numbers out of their combs (layout 3, `D98`):
+  `ruled()` now drops a wall read as a bar (`OcrText::BORDER_ARTEFACTS`), but `DIGIT_LOOKALIKES` turns `I` and `l` into
+  `1`, so a wall the recognizer reads as a letter is a wrong digit in front of the right ones (an age of `34` shown as
+  `134`), and the substitution cap is the only thing that makes a reviewer look. In a comb the wall was never read beside
+  a digit the same way. New ink for the bake-off to measure before a rule is chosen (drop a leading `I`/`l` whose symbol
+  box sits at the region's left edge, or refuse a number that starts with one). **Live.** Filed by `M144`.
+  **Tier: during-testing.**

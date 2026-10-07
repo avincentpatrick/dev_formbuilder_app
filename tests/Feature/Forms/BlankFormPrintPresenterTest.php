@@ -172,35 +172,45 @@ it('combs a date into captioned DD / MM / YYYY groups', function (): void {
     ]);
 });
 
-it('narrows a comb to an authored max_length and clamps a page-breaking one', function (): void {
-    // The clamp is not cosmetic: dompdf CLIPS an over-wide table rather than wrapping it, so an
-    // authored max_length of 255 would silently lose the right-hand end of the row in the PDF while
-    // every model-level assertion stayed green. Layout 2 (M143): the ceiling is 23, derived from an
-    // 18pt cell on a 20pt pitch with `border-spacing` at both table edges, and a phone defaults to 13.
+it('sizes the long-text box from its max_length: three lines at least, ten at most (layout 3, R-d696ba9e)', function (): void {
+    // The user's second comment on layout 2: a paragraph had nowhere to go in a fixed 60pt box. The box is
+    // now `lines` tall — about 45 hand-printed block capitals to a line, never fewer than three (a long text
+    // with no max_length is the common case) and never more than ten (`.q` cannot split across pages). The
+    // template turns a line into 20pt, so three lines IS layout 2's 60pt. An open `line` box carries no
+    // count at all: a short text's 255 is a sanity cap, not a promise of six lines of writing.
     [$form, $version] = printFixture([
         'sections' => [],
         'fields' => [
-            printField('code', 'phone', ['sequence' => 0, 'validations' => [
-                ['rule_type' => 'max_length', 'rule_value' => '6'],
+            printField('plain', 'long_text', ['sequence' => 0]),
+            printField('brief', 'long_text', ['sequence' => 1, 'validations' => [
+                ['rule_type' => 'max_length', 'rule_value' => '50'],
             ]]),
-            printField('essay', 'phone', ['sequence' => 1, 'validations' => [
+            printField('story', 'long_text', ['sequence' => 2, 'validations' => [
+                ['rule_type' => 'max_length', 'rule_value' => '200'],
+            ]]),
+            printField('full_page', 'long_text', ['sequence' => 3, 'validations' => [
+                ['rule_type' => 'max_length', 'rule_value' => '450'],
+            ]]),
+            printField('essay', 'long_text', ['sequence' => 4, 'validations' => [
+                ['rule_type' => 'max_length', 'rule_value' => '600'],
+            ]]),
+            printField('nickname', 'short_text', ['sequence' => 5, 'validations' => [
                 ['rule_type' => 'max_length', 'rule_value' => '255'],
             ]]),
-            printField('plain', 'phone', ['sequence' => 2]),
         ],
     ]);
 
     $fields = $this->present->present($form, $version)['blocks'][0]['fields'];
 
-    expect($fields[0]['comb'])->toBe([['cells' => 6, 'caption' => null]])
-        ->and($fields[1]['comb'])->toBe([['cells' => 23, 'caption' => null]])
-        ->and($fields[2]['comb'])->toBe([['cells' => 13, 'caption' => null]]);
+    expect(array_map(static fn (array $f): ?int => $f['lines'], $fields))->toBe([3, 3, 5, 10, 10, null])
+        ->and($fields[5]['area'])->toBe('line');
 });
 
-it('gives short text, email and url one open box, and keeps digits in combs (layout 2, D96)', function (): void {
-    // The user's finding on the first printed paper: a box per letter limits respondents. Text moved
-    // to an open box written in block capitals; a phone, a number and a date stay combed, because
-    // digits in separated boxes are what the reader splits positionally.
+it('gives short text, email, url, a phone and a number one open box, and keeps the calendar combed (layout 3, D98)', function (): void {
+    // The user's finding on the first printed paper: a box per letter limits respondents. Text moved to
+    // an open box in layout 2; a phone and a number followed in layout 3 (D98 A), because the reader
+    // parses a digit string from free text as well as from boxes. A date stays combed: DD MM YYYY under
+    // captions is the one comb that buys correctness rather than convenience.
     [$form, $version] = printFixture([
         'sections' => [],
         'fields' => [
@@ -209,44 +219,24 @@ it('gives short text, email and url one open box, and keeps digits in combs (lay
             printField('website', 'url', ['sequence' => 2]),
             printField('remarks', 'long_text', ['sequence' => 3]),
             printField('mobile', 'phone', ['sequence' => 4]),
+            printField('age', 'integer', ['sequence' => 5, 'validations' => [
+                ['rule_type' => 'max_value', 'rule_value' => '120'],
+            ]]),
+            printField('weight', 'decimal', ['sequence' => 6]),
+            printField('visit', 'date', ['sequence' => 7]),
         ],
     ]);
 
     $fields = $this->present->present($form, $version)['blocks'][0]['fields'];
 
-    expect(array_column($fields, 'area'))->toBe(['line', 'line', 'line', 'ruled', 'comb'])
-        ->and($fields[0]['comb'])->toBeNull()
-        ->and($fields[4]['comb'])->toBe([['cells' => 13, 'caption' => null]]);
-});
-
-it('sizes a number comb from an authored maximum, under an authored max_length (layout 2)', function (): void {
-    // An age capped at 120 prints four boxes (three digits and a sign), not ten: fewer empty boxes
-    // are fewer places for a stray mark to become a digit. A decimal keeps room for the point and two
-    // places. `max_length` keeps the precedence every comb gives it, and nothing goes below two.
-    [$form, $version] = printFixture([
-        'sections' => [],
-        'fields' => [
-            printField('count', 'integer', ['sequence' => 0]),
-            printField('age', 'integer', ['sequence' => 1, 'validations' => [
-                ['rule_type' => 'max_value', 'rule_value' => '120'],
-            ]]),
-            printField('code', 'integer', ['sequence' => 2, 'validations' => [
-                ['rule_type' => 'max_value', 'rule_value' => '120'],
-                ['rule_type' => 'max_length', 'rule_value' => '2'],
-            ]]),
-            printField('score', 'decimal', ['sequence' => 3]),
-            printField('temperature', 'decimal', ['sequence' => 4, 'validations' => [
-                ['rule_type' => 'max_value', 'rule_value' => '99.5'],
-            ]]),
-            printField('rank', 'integer', ['sequence' => 5, 'validations' => [
-                ['rule_type' => 'max_value', 'rule_value' => '5'],
-            ]]),
-        ],
-    ]);
-
-    $fields = $this->present->present($form, $version)['blocks'][0]['fields'];
-
-    expect(array_map(static fn (array $f): int => $f['comb'][0]['cells'], $fields))->toBe([6, 4, 2, 8, 6, 2]);
+    expect(array_column($fields, 'area'))->toBe(['line', 'line', 'line', 'ruled', 'line', 'line', 'line', 'comb'])
+        ->and(array_map(static fn (array $f): mixed => $f['comb'], array_slice($fields, 0, 7)))->toBe(array_fill(0, 7, null))
+        ->and($fields[3]['lines'])->toBe(3)
+        ->and($fields[7]['comb'])->toBe([
+            ['cells' => 2, 'caption' => 'DD'],
+            ['cells' => 2, 'caption' => 'MM'],
+            ['cells' => 4, 'caption' => 'YYYY'],
+        ]);
 });
 
 it('numbers every question across blocks and repeat instances, skipping prose and page breaks (layout 2)', function (): void {
@@ -277,7 +267,7 @@ it('numbers every question across blocks and repeat instances, skipping prose an
     expect(printedKeys($model))->toBe(['intro', 'respondent', 'new_page', 'member_age', 'new_page', 'member_age'])
         ->and($numbers)->toBe([null, 1, null, 2, null, 3])
         ->and($model['blocks'][0]['fields'][1]['label'])->toBe('Respondent')
-        ->and($model['layout'])->toBe(2);
+        ->and($model['layout'])->toBe(3);
 });
 
 it('says whether the form accepts scans, so the footer can promise only what is true (R-6bbf9d73)', function (): void {
@@ -545,7 +535,7 @@ it('reads the key names a REAL publish actually writes', function (): void {
         ->and($lead['hint'])->toBe('As written on the ID.')
         ->and($lead['area'])->toBe('line')
         ->and($lead['number'])->toBe(1)
-        ->and($model['layout'])->toBe(2)
+        ->and($model['layout'])->toBe(3)
         // Created through FormService, which leaves scanning off.
         ->and($model['accepts_scans'])->toBeFalse();
 });

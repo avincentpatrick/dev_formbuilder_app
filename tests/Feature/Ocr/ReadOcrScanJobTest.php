@@ -126,7 +126,7 @@ it('reads a photographed page end to end and records the answers, the version an
 // the assertion on it would pass or fail for the wrong reason (measured: it did both).
 
 it('refuses a sheet printed from an older layout, with the reason and the way out (M143, R-d6546409)', function (): void {
-    // The stamp names the schema; "Layout 2" beside it names the template. A sheet whose running head was
+    // The stamp names the schema; "Layout N" beside it names the template. A sheet whose running head was
     // legibly read WITHOUT it is layout-1 paper, whose answers sit in other places than the reader expects.
     $scan = ocrJobScan($this->form, $this->user);
     Http::fake(['vision.googleapis.com/*' => Http::response(ocrJobAnswer($this->form, ['age' => '41'], ['layout' => null]))]);
@@ -136,8 +136,27 @@ it('refuses a sheet printed from an older layout, with the reason and the way ou
 
     expect($scan->status)->toBe(OcrScanStatus::Failed)
         ->and($scan->error_code)->toBe('layout_outdated')
+        ->and($scan->error_message)->toContain('without a layout mark')
         ->and($scan->error_message)->toContain('older layout')
         ->and($scan->error_message)->toContain('Key the response in by hand');
+});
+
+it('refuses a layout-2 sheet now that the paper is layout 3, naming both numbers (M144, D98)', function (): void {
+    // Layout 3 moved a phone and a number out of their combs and let the long-text box grow, so a layout-2
+    // sheet's answers sit where the reader no longer looks. Refused on the number read off its running head,
+    // and the message says which number the sheet carries and which the reader expects — never a date, which
+    // was false the day this layout shipped.
+    $scan = ocrJobScan($this->form, $this->user);
+    Http::fake(['vision.googleapis.com/*' => Http::response(ocrJobAnswer($this->form, ['age' => '41'], ['layout' => 2]))]);
+
+    ocrJobRun($scan);
+    $scan->refresh();
+
+    expect($scan->status)->toBe(OcrScanStatus::Failed)
+        ->and($scan->error_code)->toBe('layout_outdated')
+        ->and($scan->error_message)->toContain('from layout 2')
+        ->and($scan->error_message)->toContain('the current paper is layout '.BlankFormPrintPresenter::LAYOUT)
+        ->and($scan->error_message)->not->toContain('2026-');
 });
 
 it('refuses a sheet whose layout number is below the current one the same way', function (): void {

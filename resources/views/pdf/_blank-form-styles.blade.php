@@ -30,6 +30,13 @@
     BlankFormPrintPresenter::MAX_COMB_CELLS derives it from the numbers in this file, including the
     `border-spacing` dompdf lands at BOTH table edges.
 
+    -- LAYOUT 3 (M144, D98): DIGITS IN AN OPEN BOX, THE LONG-TEXT BOX SIZED FROM ITS MAX_LENGTH --------
+    The user's two comments on layout 2. A comb now exists only under captions (a date, a time, a
+    duration, a cascade's levels): a free run of digits - a number, a phone - reads as well from one
+    open box, and the reader parses it out of the text. The long-text box is `lines` x 20pt, three
+    lines (layout 2's 60pt) to ten, from the question's max_length at about 45 hand-printed capitals
+    a line; the banner tells the respondent to continue on another sheet when a box runs out.
+
     -- MONOCHROME, SO NO BRAND COLOUR (D96; ADR-0014 SS-D8 note of 2026-10-07) ------------------------
     The paper is printed in black most of the time, and a tenant colour that dithers to grey helps
     neither the respondent nor the reader. Every colour below is black or a grey dark enough to print
@@ -126,8 +133,11 @@ body { font-family: sans-serif; font-size: 10pt; line-height: 1.4; color: #00000
 .comb__caption td { border: none; height: auto; font-size: 8pt; color: #333333; text-align: center; }
 
 /* -- Line and Ruled --------------------------------------------------------------------------- */
-/* One open box for a short text answer (layout 2): 26pt is about 9mm, a comfortable line of block
-   capitals. The long-text box is three such lines with no inner rules — a rule reads as ink. */
+/* One open box for a short text answer (layout 2), and for a phone or a number since layout 3: 26pt
+   is about 9mm, a comfortable line of block capitals. The long-text box is N lines at a 20pt pitch
+   with no inner rules — a rule reads as ink; the template sets its height inline from the presenter's
+   line count (three to ten, layout 3), and the 60pt here is the fallback for the optionless choice
+   list's write-in box, whose row carries no count. */
 .line { border: 0.75pt solid #333333; height: 26pt; }
 .ruled { border: 0.75pt solid #333333; height: 60pt; }
 

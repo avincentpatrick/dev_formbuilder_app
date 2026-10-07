@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\FieldType;
 use App\Enums\RequiredMode;
 use App\Models\Form;
+use App\Models\FormFieldValidation;
 use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Models\Tenant;
@@ -56,7 +57,17 @@ function printableForm(Tenant $tenant, User $user, string $title = 'Household Su
 
     addFormField($draft, $user, 'full_name', FieldType::ShortText, 0, ['is_required' => RequiredMode::Required]);
     addFormField($draft, $user, 'visit_date', FieldType::Date, 1);
-    addFormField($draft, $user, 'remarks', FieldType::LongText, 2);
+    $remarks = addFormField($draft, $user, 'remarks', FieldType::LongText, 2);
+    // Layout 3: the long-text box is sized from its max_length — 200 capitals is five 20pt lines. A
+    // validation is a relation, not a column, so it is a row of its own (the serializer reads it).
+    FormFieldValidation::create([
+        'form_version_id' => $draft->id,
+        'form_field_id' => $remarks->id,
+        'rule_type' => 'max_length',
+        'rule_value' => '200',
+        'error_message' => 'Keep it short.',
+        'sequence' => 0,
+    ]);
     addFormField($draft, $user, 'color', FieldType::SingleSelect, 3, ['config' => ['options' => [
         ['value' => 'r', 'label' => 'Red'], ['value' => 'b', 'label' => 'Blue'],
     ]]]);
@@ -276,24 +287,28 @@ it('prints a yes/no question as two tick boxes, and tells the respondent to mark
         ->and($html)->toContain('Mark a choice with an X inside its box');
 });
 
-it('typesets layout 2: a numbered label, the layout token, the banner, an open box for text, and no brand colour (M143, D96)', function (): void {
+it('typesets layout 3: a numbered label, the layout token, the banner with its overflow sentence, an open box for text, a long-text box sized from max_length, and no brand colour (M143, D96; M144, D98)', function (): void {
     [$form, $version] = printableForm($this->tenant, $this->user);
     $html = $this->renderer->html($form, $version);
 
     expect($html)
         // The running head names the layout beside the stamp, so the reader can tell old paper from new.
-        ->toContain('class="runhead__layout">Layout 2</span>')
-        // The instruction banner, bold and boxed, with its worked example.
+        ->toContain('class="runhead__layout">Layout 3</span>')
+        // The instruction banner, bold and boxed, with its worked example — and, since layout 3, what to do
+        // when a box runs out. It lives here, above every anchor, and NOT under each capped box: the matcher's
+        // static list is one list for the whole form, and a per-question note would blank its words as answers.
         ->toContain('class="banner"')
         ->toContain('THIS FORM IS READ BY A COMPUTER. Write in BLOCK CAPITALS.')
+        ->toContain('If an answer needs more room, continue on another sheet and write the question number beside it.')
         ->toContain('choice__box--sample">X</span>marked</span>')
         // Questions are numbered in printed order; the number is its own span, never inside the label.
         ->toContain('<span class="q__num">1.</span>')
         ->toContain('<span class="q__num">2.</span>')
         ->not->toContain('1. Full name')
-        // Short text gets one open box; long text keeps the taller ruled box; a comb stays for digits.
+        // Short text gets one open box; the long-text box is five 20pt lines for a max_length of 200 (layout 3),
+        // its height inline from the model; a comb stays for the date.
         ->toContain('class="line"')
-        ->toContain('class="ruled"')
+        ->toContain('class="ruled" style="height: 100pt"')
         ->toContain('class="comb"')
         // Monochrome: the tenant palette is nowhere on the paper.
         ->not->toContain(BrandPalette::current()['bg'])

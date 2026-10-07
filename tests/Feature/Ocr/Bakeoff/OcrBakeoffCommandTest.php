@@ -187,6 +187,8 @@ it('reads a folder offline and scores it: corrections, silent errors and the day
     file_put_contents("{$samples}/two-pages/p2.png", (string) base64_decode(ReadScanFixture::PNG));
     file_put_contents("{$samples}/two-pages/p2.png".OcrBakeoffFolder::CACHE_SUFFIX, (string) json_encode(['responses' => [['fullTextAnnotation' => ['text' => '', 'pages' => [['width' => 1000, 'height' => 1414, 'blocks' => []]]]]]]));
     file_put_contents("{$samples}/notes.txt", 'not a scan');
+    // A sheet printed from layout 1 (no "Layout" word beside a legible stamp): listed, never scored (M143).
+    ocrBakeoffScan("{$samples}/old-print.png", $this->model, ocrBakeoffCleanAnswers(), ['layout' => null]);
 
     $answers = ocrBakeoffSheet("{$this->dir}/answers.csv", [
         ocrBakeoffCleanRow('sheet1', 'clean'),
@@ -216,6 +218,7 @@ it('reads a folder offline and scores it: corrections, silent errors and the day
         ->toContain('| withheld below the review threshold, though it was right | 1 |')
         ->toContain('| wrong, and NOT flagged (a silent error) | 2 |')
         ->toContain('| two-pages | 2 | clean | read | v1 (stamp) |')
+        ->toContain('| old-print.png | 1 |  | old_layout | v1 (stamp) |')
         ->toContain('notes.txt — text/plain is not a type the app takes')
         ->toContain('  - bogus_column')
         ->toContain('- **Scans with no answer row (read, not scored):** 1')

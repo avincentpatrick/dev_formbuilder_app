@@ -119,6 +119,14 @@ final class OcrScanReviewPresenter
             ];
         }
 
+        if (in_array('layout_unconfirmed', $warnings, true)) {
+            $notices[] = [
+                'code' => 'layout_unconfirmed',
+                'tone' => 'warning',
+                'message' => 'The layout mark on this paper could not be read. If the sheet was printed before 2026-10-07, its answers may sit in the wrong places; check each one against the paper.',
+            ];
+        }
+
         if (in_array('pages_beyond_limit', $warnings, true)) {
             $max = (int) config('ocr.upload.max_pages', 5);
             $notices[] = [

@@ -6,6 +6,7 @@ use App\Enums\FieldType;
 use App\Enums\OcrFieldEligibility;
 use App\Enums\PdfFieldRole;
 use App\Enums\PrintAnswerArea;
+use App\Services\Ocr\PrintedFormMatcher;
 
 // I12's printed-blank-form field classification, locked type by type. The fourth member of the
 // OcrFieldEligibilityTest / PipingEligibilityTest / PdfFieldRoleTest family, with the same totality
@@ -23,15 +24,17 @@ use App\Enums\PrintAnswerArea;
 function printVerdictTable(): array
 {
     return [
-        // Bounded runs of characters a pen can print into separated boxes (11). `cascading_select`
-        // is here rather than in `choices` because its option pool is one FLAT list spanning every
-        // level — see the dedicated case below.
+        // Digits a pen prints into separated boxes (8). `cascading_select` is here rather than in
+        // `choices` because its option pool is one FLAT list spanning every level — see the dedicated
+        // case below. Text left this set in layout 2 (M143, D96).
         'comb' => [
-            'short_text', 'email', 'phone', 'url',
+            'phone',
             'integer', 'decimal',
             'date', 'time', 'datetime', 'duration',
             'cascading_select',
         ],
+        // One open box, block capitals (3) — layout 2: a box per letter limited respondents.
+        'line' => ['short_text', 'email', 'url'],
         // Free prose: nothing to comb (1).
         'ruled' => ['long_text'],
         // FLAT option lists whose entries are alternatives to one another (5).
@@ -156,4 +159,17 @@ it('puts ink on the page for every area except Omitted', function (): void {
     foreach (PrintAnswerArea::cases() as $area) {
         expect($area->isPrinted())->toBe($area !== PrintAnswerArea::Omitted, "isPrinted() is wrong for {$area->name}");
     }
+});
+
+it('numbers every area that asks something, and only those (layout 2)', function (): void {
+    // `isQuestion()` is what the presenter numbers the paper by and what the matcher reads a scan by;
+    // the matcher's own `NOT_A_QUESTION` is the same three names, pinned here so the two cannot drift.
+    $notQuestions = [PrintAnswerArea::Prose, PrintAnswerArea::PageBreak, PrintAnswerArea::Omitted];
+
+    foreach (PrintAnswerArea::cases() as $area) {
+        expect($area->isQuestion())->toBe(! in_array($area, $notQuestions, true), "isQuestion() is wrong for {$area->name}");
+    }
+
+    expect(array_map(static fn (PrintAnswerArea $a): string => $a->value, $notQuestions))
+        ->toEqualCanonicalizing(PrintedFormMatcher::NOT_A_QUESTION);
 });

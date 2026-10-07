@@ -1,5 +1,6 @@
 {{--
-    The printable BLANK form (Increment I12) - one published version, typeset for a pen.
+    The printable BLANK form (Increment I12; layout 2 since M143, `D96`) - one published version,
+    typeset for a pen, a monochrome printer and the OCR reader.
 
     -- THE ESCAPING CONTRACT, WHICH IS THE POINT OF THIS FILE ----------------------------------------
     EVERY interpolation below uses the escaping braces, which is Blade's e() -> htmlspecialchars($v,
@@ -26,8 +27,20 @@
     -- NO IMAGES OF ANY KIND ------------------------------------------------------------------------
     No <img>, no <link>, no @font-face, no url(). dompdf runs with `isRemoteEnabled = false` and
     `ext-gd` is absent from the app container and from every CI job, so a logo, a barcode or a QR
-    would render on a developer's machine and throw in the pipeline. The version identity a scanning
-    stage needs travels as printed TEXT in `.runhead`, repeated on every page.
+    would render on a developer's machine and throw in the pipeline - and nothing server-side could
+    DECODE a QR off a photo anyway (Vision has no barcode feature; the PHP decoders need GD). The
+    identity a scanning stage needs travels as printed TEXT in `.runhead`, repeated on every page:
+    the version's checksum stamp and, since layout 2, the layout number beside it.
+
+    -- WHAT THE READER DEPENDS ON, SO CHANGE IT WITH THE READER ---------------------------------------
+    PrintedFormMatcher anchors each question on the line that carries its key stamp (right-aligned)
+    or, failing that, its label (left, after the number); a question's answer region is every line
+    below that anchor down to the next question's. OcrAnswerReader then reads a comb by the position
+    of each character, a choice by the mark before each option's label (several options to a line),
+    and an open box as free text. The instruction banner sits ABOVE the first anchor so it never
+    falls inside a region, and it must NOT be added to the matcher's static list: its sample line
+    normalises to the same words as a real "X Yes" answer line. Moving an answer area relative to its
+    label is a new layout number (BlankFormPrintPresenter::LAYOUT).
 --}}
 <!DOCTYPE html>
 <html lang="{{ $model['locale'] ?? 'en' }}">
@@ -37,11 +50,13 @@
     <style>@include('pdf._blank-form-styles')</style>
 </head>
 <body>
-    {{-- Repeated on every page. Identifies the schema a loose scanned sheet came from. --}}
+    {{-- Repeated on every page. Identifies the schema AND the layout a loose scanned sheet came from.
+         The two floats are stamp-first in source order so the stamp lands rightmost. --}}
     <div class="runhead">
         @if ($model['schema_stamp'] !== null)
             <span class="runhead__stamp">{{ $model['schema_stamp'] }}</span>
         @endif
+        <span class="runhead__layout">Layout {{ $model['layout'] }}</span>
         {{-- No HTML entity here, deliberately: an entity is ASCII in the source and would sail
              through a round-trip check on the markup while still handing dompdf a glyph its
              WinAnsi fonts cannot draw. Separators in this file are plain ASCII. --}}
@@ -57,9 +72,22 @@
 
         <p class="head__meta">
             Version {{ $model['version_number'] }}@if ($model['published_at'] !== null), published {{ $model['published_at'] }}@endif.
-            Please write in CAPITAL LETTERS, one character per box, and mark each choice with an X.
         </p>
     </header>
+
+    {{-- The instruction banner (layout 2). Bold, boxed, at the top, with a worked example - the ICR
+         guidance's one non-negotiable once text answers are written freely rather than combed. Every
+         string here is ASCII and every box is drawn, like everything else on the page. --}}
+    <div class="banner">
+        <p class="banner__rule">THIS FORM IS READ BY A COMPUTER. Write in BLOCK CAPITALS. Where boxes are printed, write one letter or number in each box. Mark a choice with an X inside its box. Dates are day, month, year.</p>
+        <table class="banner__sample">
+            <tr>
+                <td>Example:</td>
+                <td>@include('pdf._blank-form-comb', ['groups' => [['cells' => 6, 'caption' => null]], 'sample' => ['A', 'B', 'C', '1', '2', '3']])</td>
+                <td><span class="choice"><span class="choice__box choice__box--sample">X</span>marked</span><span class="choice"><span class="choice__box"></span>not marked</span></td>
+            </tr>
+        </table>
+    </div>
 
     @foreach ($model['blocks'] as $block)
         <section class="block">
@@ -93,9 +121,11 @@
                     <div class="q">
                         <p class="q__label">
                             {{-- Floated, so it must come FIRST in source order to sit on the label's
-                                 own line. Printed small and grey: it is for the extraction stage and
-                                 for anyone reconciling a scan, not for the respondent. --}}
+                                 own line. Printed small and dark: it is for the reader and for anyone
+                                 reconciling a scan, not for the respondent. The question NUMBER is a
+                                 separate span, never part of the label text the reader anchors on. --}}
                             <span class="q__key">{{ $field['key'] }}</span>
+                            @if (($field['number'] ?? null) !== null)<span class="q__num">{{ $field['number'] }}.</span>@endif
                             {{ $field['label'] }}@if ($field['required'])<span class="q__req">*</span>@endif
                             @if ($field['conditional'])<span class="q__flag">(if applicable)</span>@endif
                         </p>
@@ -105,20 +135,35 @@
                         @endif
 
                         @if ($field['area'] === 'comb')
-                            @include('pdf._blank-form-comb', ['groups' => $field['comb']])
+                            @include('pdf._blank-form-comb', ['groups' => $field['comb'], 'sample' => null])
+                        @elseif ($field['area'] === 'line')
+                            {{-- One open box for a short text answer (layout 2): written freely in
+                                 block capitals, read as free text. --}}
+                            <div class="line"></div>
                         @elseif ($field['area'] === 'ruled')
                             <div class="ruled"></div>
                         @elseif ($field['area'] === 'choices')
-                            {{-- @forelse, not @foreach: a choice field with no options cannot be
-                                 published (StructuralValidationGate refuses it), but a hand-built
-                                 snapshot can carry one, and @foreach would print a labelled question
-                                 with NOWHERE TO ANSWER IT. A ruled box degrades to "write it in"
-                                 rather than to a dead end. --}}
-                            @forelse ($field['options'] as $option)
-                                <div class="choice"><span class="choice__box"></span>{{ $option['label'] }}</div>
-                            @empty
+                            {{-- The empty branch is deliberate: a choice field with no options cannot
+                                 be published (StructuralValidationGate refuses it), but a hand-built
+                                 snapshot can carry one, and printing nothing would leave a labelled
+                                 question with NOWHERE TO ANSWER IT. A ruled box degrades to "write it
+                                 in" rather than to a dead end — and since M133 a choice list linked to
+                                 another form prints this way on purpose, because its list is live.
+
+                                 The options sit in a block row of their own, below the label, so the
+                                 14pt boxes never rise into the label's line. The box and its label are
+                                 ONE inline-block span with no whitespace between them: the reader
+                                 credits a mark to the label that follows it on the same line, so
+                                 options may wrap between spans but never inside one. --}}
+                            @if ($field['options'] !== [])
+                                <div class="choices">
+                                    @foreach ($field['options'] as $option)
+                                        <span class="choice"><span class="choice__box"></span>{{ $option['label'] }}</span>
+                                    @endforeach
+                                </div>
+                            @else
                                 <div class="ruled"></div>
-                            @endforelse
+                            @endif
                         @elseif ($field['area'] === 'grid')
                             <table class="grid">
                                 <tr>
@@ -157,8 +202,15 @@
              the person holding the paper has to be able to see a branch in order to follow it. --}}
         <p>This is a blank copy of every question in version {{ $model['version_number'] }}. Questions
             marked "(if applicable)" depend on earlier answers.</p>
-        @if ($model['ocr_compatible'])
+        {{-- Three sentences, and PrintedFormMatcher::match() knows all three as printed text: the
+             footer lands inside the last question's region, so a sentence the matcher does not know
+             reads as that question's answer (R-6bbf9d73). Whether the VERSION can be read is a fact
+             about its fields; whether the FORM accepts scans is a setting — the paper promises
+             automatic reading only when both hold. --}}
+        @if ($model['ocr_compatible'] && $model['accepts_scans'])
             <p>Scans of this form can be read automatically.</p>
+        @elseif ($model['ocr_compatible'])
+            <p>Scanning is switched off for this form, so responses must be keyed in.</p>
         @else
             <p>Scans of this form cannot be read automatically; responses must be keyed in.</p>
         @endif

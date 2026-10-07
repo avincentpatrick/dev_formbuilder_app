@@ -73,12 +73,16 @@ function ocrJobScan(Form $form, User $user, int $pages = 1, ScanStatus $scan = S
     return $stored->refresh();
 }
 
-/** The Vision answer for a filled copy of the form's printed page. */
-function ocrJobAnswer(Form $form, array $answers): array
+/**
+ * The Vision answer for a filled copy of the form's printed page.
+ *
+ * @param  array<string, mixed>  $options  the typesetter's — `layout` null prints a layout-1 sheet
+ */
+function ocrJobAnswer(Form $form, array $answers, array $options = []): array
 {
     $model = app(BlankFormPrintPresenter::class)->present($form, $form->currentPublishedVersion);
 
-    return PrintedPageTypesetter::fromModel($model, $answers)->visionImageAnswer(0.04);
+    return PrintedPageTypesetter::fromModel($model, $answers, $options)->visionImageAnswer(0.04);
 }
 
 function ocrJobRun(OcrScan $scan): ReadOcrScanJob
@@ -107,12 +111,71 @@ it('reads a photographed page end to end and records the answers, the version an
             'patient_name' => 'ANA REYES',
             'age' => '41',
             'consent' => false,
-        ]);
+        ])
+        // A layout-2 sheet with a legible running head: nothing for the reviewer to be warned about.
+        ->and($scan->extraction['warnings'])->toBe([]);
 
     $page = Attachment::query()->findOrFail($scan->pages[0]['attachment_id']);
     expect((float) $page->ocr_confidence_avg)->toBeGreaterThan(90.0);
     Storage::disk('local')->assertExists($scan->pages[0]['response_path']);
     Http::assertSentCount(1);
+});
+
+// ⚠️ ONE PROVIDER ANSWER PER CASE. `Http::fake()` STACKS its stubs and the first one that answers wins, so a
+// second fake in the same case is never reached — the second scan would be read off the first case's page, and
+// the assertion on it would pass or fail for the wrong reason (measured: it did both).
+
+it('refuses a sheet printed from an older layout, with the reason and the way out (M143, R-d6546409)', function (): void {
+    // The stamp names the schema; "Layout 2" beside it names the template. A sheet whose running head was
+    // legibly read WITHOUT it is layout-1 paper, whose answers sit in other places than the reader expects.
+    $scan = ocrJobScan($this->form, $this->user);
+    Http::fake(['vision.googleapis.com/*' => Http::response(ocrJobAnswer($this->form, ['age' => '41'], ['layout' => null]))]);
+
+    ocrJobRun($scan);
+    $scan->refresh();
+
+    expect($scan->status)->toBe(OcrScanStatus::Failed)
+        ->and($scan->error_code)->toBe('layout_outdated')
+        ->and($scan->error_message)->toContain('older layout')
+        ->and($scan->error_message)->toContain('Key the response in by hand');
+});
+
+it('refuses a sheet whose layout number is below the current one the same way', function (): void {
+    $scan = ocrJobScan($this->form, $this->user);
+    Http::fake(['vision.googleapis.com/*' => Http::response(ocrJobAnswer($this->form, ['age' => '41'], ['layout' => 1]))]);
+
+    ocrJobRun($scan);
+
+    expect($scan->refresh()->status)->toBe(OcrScanStatus::Failed)
+        ->and($scan->error_code)->toBe('layout_outdated');
+});
+
+it('warns, rather than refuses, when the layout word is garbled', function (): void {
+    // A refusal needs positive evidence. A garbled word says nothing about the paper; the sheet is read and
+    // the reviewer is told to check against the paper.
+    $scan = ocrJobScan($this->form, $this->user);
+    Http::fake(['vision.googleapis.com/*' => Http::response(ocrJobAnswer($this->form, ['age' => '41'], ['layout' => 'Z']))]);
+
+    ocrJobRun($scan);
+    $scan->refresh();
+
+    expect($scan->status)->toBe(OcrScanStatus::Read)
+        ->and($scan->extraction['warnings'])->toBe(['layout_unconfirmed'])
+        ->and($scan->extraction['fields']['age']['value'])->toBe('41');
+});
+
+it('warns, rather than refuses, when the running head was not read at all', function (): void {
+    // No stamp and no layout word: refusing on absence would refuse every badly photographed NEW sheet. Both
+    // uncertainties are reported, and the current version is used as before.
+    $scan = ocrJobScan($this->form, $this->user);
+    Http::fake(['vision.googleapis.com/*' => Http::response(ocrJobAnswer($this->form, ['age' => '41'], ['layout' => null, 'stamp' => null]))]);
+
+    ocrJobRun($scan);
+    $scan->refresh();
+
+    expect($scan->status)->toBe(OcrScanStatus::Read)
+        ->and($scan->extraction['version']['matched_by'])->toBe('unconfirmed')
+        ->and($scan->extraction['warnings'])->toBe(['version_unconfirmed', 'layout_unconfirmed']);
 });
 
 it('reuses a page answer already on disk instead of paying for the page twice', function (): void {

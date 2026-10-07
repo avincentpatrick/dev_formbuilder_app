@@ -135,6 +135,14 @@ final class OcrBakeoffCommand extends Command
                 continue;
             }
 
+            // The same gate the reading job applies (M143): a sheet from an older layout is listed, not scored.
+            $printedLayout = $matcher->layoutOf($pages, $resolved['stamp']);
+            if ($printedLayout['evidence'] === 'absent' || ($printedLayout['layout'] !== null && $printedLayout['layout'] < BlankFormPrintPresenter::LAYOUT)) {
+                $scans[] = new OcrBakeoffScan($entry['name'], $files, 'old_layout', 'Printed from layout '.($printedLayout['layout'] ?? 1).'; the reader expects layout '.BlankFormPrintPresenter::LAYOUT.'. Print the samples from the current build.', null, $version->version_number, $resolved['matched_by']);
+
+                continue;
+            }
+
             $fields = $matcher->match($layout->form, $version, $pages, ['auto' => 0, 'review' => 0])['fields'];
 
             $row = $sheet?->rowFor($entry['name']);

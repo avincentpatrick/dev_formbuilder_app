@@ -245,10 +245,14 @@ it('carries old paper onto the current version question by question, and lists e
 });
 
 it('says what the reading could not vouch for before the reviewer checks a single answer', function (): void {
-    $scan = ReadScanFixture::make($this->form, $this->admin, ocrReviewSheet(), warnings: ['version_unconfirmed', 'pages_beyond_limit']);
-    $codes = collect($this->actingAs($this->admin)->get(ocrReviewUrl($this->form, $scan))->viewData('page')['props']['scan']['notices'])->pluck('code')->all();
+    $scan = ReadScanFixture::make($this->form, $this->admin, ocrReviewSheet(), warnings: ['version_unconfirmed', 'layout_unconfirmed', 'pages_beyond_limit']);
+    $notices = collect($this->actingAs($this->admin)->get(ocrReviewUrl($this->form, $scan))->viewData('page')['props']['scan']['notices']);
+    $codes = $notices->pluck('code')->all();
 
     expect($codes)->toContain('version_unconfirmed')
+        // M143: the layout mark (R-d6546409) — a warning with words, never a refusal, when it was merely not read.
+        ->and(in_array('layout_unconfirmed', $codes, true))->toBeTrue()
+        ->and($notices->firstWhere('code', 'layout_unconfirmed')['message'])->toContain('printed before 2026-10-07')
         ->and(in_array('pages_beyond_limit', $codes, true))->toBeTrue()
         ->and(in_array('nothing_read', $codes, true))->toBeFalse();
 

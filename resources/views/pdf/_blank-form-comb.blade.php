@@ -25,16 +25,22 @@
     wall into one continuous ruled line and the comb silently stops being a comb - the single change
     to this file most likely to destroy the increment's purpose while still rendering something that
     looks deliberate.
+
+    -- `$sample` IS FOR THE INSTRUCTION BANNER ONLY (layout 2) ---------------------------------------
+    A list of characters printed one per cell, so the banner can show what a filled comb looks like.
+    Every question's comb passes null and prints empty cells: ink inside a comb cell is what the
+    reader takes as the answer.
 --}}
 @use('Illuminate\Support\Arr')
 <table class="comb">
     <tr>
+        @php($cell = 0)
         @foreach ($groups as $group)
             @if (! $loop->first)
                 <td class="comb__gap"></td>
             @endif
             @for ($i = 0; $i < $group['cells']; $i++)
-                <td></td>
+                <td>{{ $sample[$cell++] ?? '' }}</td>
             @endfor
         @endforeach
     </tr>

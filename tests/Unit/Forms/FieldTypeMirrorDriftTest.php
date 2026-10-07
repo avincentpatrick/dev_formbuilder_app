@@ -221,7 +221,7 @@ it('keeps all three media mirrors equal to FieldType::isMedia()', function (): v
 it('pins the text control grouping as a stated grouping, because it mirrors nothing in PHP', function (): void {
     // ⛔ THIS MIRRORS NOTHING AND THEREFORE CANNOT BE CHECKED AGAINST PHP — measured, not assumed.
     // `ValueShape::Text` is `{short_text, long_text, email, phone, url, hidden}`; `FieldCategory::Text`
-    // is five; `PrintAnswerArea::Comb` is eleven. None of them is this seven. It is a TypeScript-only
+    // is five; `PrintAnswerArea::Comb` is eight. None of them is this seven. It is a TypeScript-only
     // CONTROL-KIND grouping — the seventh partition of the same thirty-one cases. Until `M130` a second copy
     // (`schema-mapping.ts`'s `TEXT_TYPES`) was pinned equal to it; that copy fed only the unread
     // `controlFor()` and was deleted with it, so the membership is now STATED here, the way

@@ -22,16 +22,18 @@ use App\Services\Forms\BlankFormPrintPresenter;
  * ── HOW A QUESTION IS FOUND ─────────────────────────────────────────────────────────────────────────
  * Each printed question carries its field key, small and right-aligned on its label line (§2.5.4). A
  * question is ANCHORED on the line whose right end reads as that key, or failing that, on the line whose
- * left part reads as its label. Anchors are searched in printed order, so two questions with similar
- * labels cannot swap. A question's REGION is every line below its anchor down to the next anchored
- * question on the same page — a question never splits across pages, because the template forbids it
- * (`.q { page-break-inside: avoid }`).
+ * left part reads as its label — after the printed question number, since layout 2. Anchors are searched
+ * in printed order, so two questions with similar labels cannot swap. A question's REGION is every line
+ * below its anchor down to the next anchored question on the same page — a question never splits across
+ * pages, because the template forbids it (`.q { page-break-inside: avoid }`).
  *
- * ── THE VERSION IS READ OFF THE PAGE ────────────────────────────────────────────────────────────────
- * Every page's running head carries the first eight characters of its version's checksum (§2.5.5). The
- * scan is matched against THAT version — a superseded one included, because paper in the field outlives a
- * republish — and only among the versions of the form the scan was uploaded to. When no stamp is read the
- * current published version is used and the result says so.
+ * ── THE VERSION AND THE LAYOUT ARE READ OFF THE PAGE ────────────────────────────────────────────────
+ * Every page's running head carries the first eight characters of its version's checksum (§2.5.5) and,
+ * since layout 2 (`M143`), the word "Layout" and the layout number beside it. The scan is matched against
+ * THAT version — a superseded one included, because paper in the field outlives a republish — and only
+ * among the versions of the form the scan was uploaded to. When no stamp is read the current published
+ * version is used and the result says so. {@see layoutOf()} tells a sheet printed from an older layout
+ * from one whose running head was merely not read.
  *
  * Nothing here decides what a reviewer must look at; it reports what it read and how sure it was, and the
  * thresholds in `config/ocr.php` turn that into tiers.
@@ -89,6 +91,56 @@ final class PrintedFormMatcher
     }
 
     /**
+     * Which LAYOUT the paper was printed with, read off the running head's "Layout N" beside the stamp (layout 2,
+     * `M143`, closing `R-d6546409`). The checksum stamp identifies the schema, this identifies the template, and
+     * a sheet from an older template cannot be read against the current one.
+     *
+     * ⚠️ `absent` NEEDS POSITIVE EVIDENCE. A sheet whose running head was not read at all says nothing about its
+     * layout, and refusing it would refuse every badly photographed NEW sheet — so the token's absence counts as
+     * old paper only when the stamp's own line was legibly read without it. A "Layout" word with no digit after it
+     * is `garbled`; no stamp and no token is `none`. Both are a warning for the reviewer, never a refusal.
+     *
+     * @param  list<OcrPage>  $pages
+     * @param  string|null  $stamp  the stamp token `resolveVersion()` matched, lower-cased 8-hex
+     * @return array{layout: int|null, evidence: 'token'|'garbled'|'absent'|'none'}
+     */
+    public function layoutOf(array $pages, ?string $stamp): array
+    {
+        $garbled = false;
+        $stampLineSeen = false;
+
+        foreach ($pages as $index => $page) {
+            foreach ($this->lines->lines($page, $index) as $line) {
+                $keys = array_map(static fn (OcrWord $w): string => OcrText::key($w->text), $line->words);
+
+                foreach ($keys as $i => $key) {
+                    if ($key === 'layout' || (str_starts_with($key, 'layout') && strlen($key) > 6)) {
+                        $digits = $key === 'layout' ? ($keys[$i + 1] ?? '') : substr($key, 6);
+                        if (preg_match('/^\d{1,2}$/', $digits) === 1) {
+                            return ['layout' => (int) $digits, 'evidence' => 'token'];
+                        }
+                        $garbled = true;
+                    }
+                }
+
+                if ($stamp !== null) {
+                    foreach ($keys as $i => $key) {
+                        if ($key === $stamp || $key.($keys[$i + 1] ?? '') === $stamp) {
+                            $stampLineSeen = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        if ($garbled) {
+            return ['layout' => null, 'evidence' => 'garbled'];
+        }
+
+        return ['layout' => null, 'evidence' => $stampLineSeen ? 'absent' : 'none'];
+    }
+
+    /**
      * The extraction for one scan against one version.
      *
      * `$thresholds` defaults to `config/ocr.php`. The bake-off harness (M136) passes zero for both, so that no value is
@@ -128,7 +180,13 @@ final class PrintedFormMatcher
         $this->addStatic($static, '(if applicable)');
         $this->addStatic($static, 'Not collected on paper - record this in the app.');
         $this->addStatic($static, 'This is a blank copy of every question in version '.$version->version_number.'. Questions marked "(if applicable)" depend on earlier answers.');
+        // All three sentences the footer chooses between (`R-6bbf9d73`): the footer lands inside the last
+        // question's region, so a sentence unknown here reads as that question's answer. The instruction
+        // banner is deliberately NOT here — it sits above every anchor, and its sample line normalises to the
+        // same words as a real "X Yes" answer line, which `isStatic()`'s substring rule would then blank.
         $this->addStatic($static, 'Scans of this form can be read automatically.');
+        $this->addStatic($static, 'Scanning is switched off for this form, so responses must be keyed in.');
+        $this->addStatic($static, 'Scans of this form cannot be read automatically; responses must be keyed in.');
 
         $lines = [];
         foreach ($pages as $index => $page) {
@@ -232,14 +290,21 @@ final class PrintedFormMatcher
         return false;
     }
 
-    /** Whether the left part of a line reads as the question's label, its required-marker and flag aside. */
+    /**
+     * Whether the left part of a line reads as the question's label, its required-marker and flag aside.
+     *
+     * Since layout 2 (`M143`) every question is numbered, "2. Age", and the number is printed before the label
+     * rather than inside it. It is compared both ways — with the leading number stripped and as read — because
+     * a label that genuinely starts with a digit ("2nd visit") must still anchor when its printed number is lost.
+     */
     private function startsWithLabel(OcrLine $line, string $label): bool
     {
         $left = array_filter($line->words, static fn (OcrWord $w): bool => $w->x0 < 0.6);
         $text = implode(' ', array_map(static fn (OcrWord $w): string => $w->text, $left));
         $text = str_replace(['(if applicable)', '*'], '', $text);
+        $bare = (string) preg_replace('/^\s*\d{1,3}[.)]?\s*/', '', $text);
 
-        return OcrText::similarity($text, $label) >= 0.85;
+        return max(OcrText::similarity($text, $label), OcrText::similarity($bare, $label)) >= 0.85;
     }
 
     /**

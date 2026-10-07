@@ -12,6 +12,7 @@ use App\Models\Attachment;
 use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\OcrScan;
+use App\Services\Forms\BlankFormPrintPresenter;
 use App\Services\Forms\CapabilityFlags;
 use Illuminate\Support\Facades\Storage;
 
@@ -168,11 +169,25 @@ final class OcrScanReader
             return;
         }
 
+        // Layout 2 (`M143`, closing `R-d6546409`): the stamp names the schema, the "Layout N" word beside it names
+        // the template, and a sheet from an older template would be read against the wrong geometry. Refused
+        // only on POSITIVE evidence — a legible running head with no layout word, or a lower number; a head
+        // that was not read is a warning, or every badly photographed new sheet would be refused too.
+        $layout = $this->matcher->layoutOf($pages, $resolved['stamp']);
+        if ($layout['evidence'] === 'absent' || ($layout['layout'] !== null && $layout['layout'] < BlankFormPrintPresenter::LAYOUT)) {
+            $this->fail($scan, 'layout_outdated', 'This sheet was printed from an older layout of the form, before 2026-10-07, and cannot be read automatically. Key the response in by hand, and print fresh copies for scanning.');
+
+            return;
+        }
+
         $matched = $this->matcher->match($form, $version, $pages);
 
         $warnings = [];
         if ($resolved['matched_by'] === 'unconfirmed') {
             $warnings[] = 'version_unconfirmed';
+        }
+        if ($layout['layout'] !== BlankFormPrintPresenter::LAYOUT) {
+            $warnings[] = 'layout_unconfirmed'; // garbled, not read at all, or a higher number — a misread either way
         }
         if ($totalPages > count($pages)) {
             $warnings[] = 'pages_beyond_limit';

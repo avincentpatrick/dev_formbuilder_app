@@ -175,25 +175,124 @@ it('combs a date into captioned DD / MM / YYYY groups', function (): void {
 it('narrows a comb to an authored max_length and clamps a page-breaking one', function (): void {
     // The clamp is not cosmetic: dompdf CLIPS an over-wide table rather than wrapping it, so an
     // authored max_length of 255 would silently lose the right-hand end of the row in the PDF while
-    // every model-level assertion stayed green.
+    // every model-level assertion stayed green. Layout 2 (M143): the ceiling is 23, derived from an
+    // 18pt cell on a 20pt pitch with `border-spacing` at both table edges, and a phone defaults to 13.
     [$form, $version] = printFixture([
         'sections' => [],
         'fields' => [
-            printField('code', 'short_text', ['sequence' => 0, 'validations' => [
+            printField('code', 'phone', ['sequence' => 0, 'validations' => [
                 ['rule_type' => 'max_length', 'rule_value' => '6'],
             ]]),
-            printField('essay', 'short_text', ['sequence' => 1, 'validations' => [
+            printField('essay', 'phone', ['sequence' => 1, 'validations' => [
                 ['rule_type' => 'max_length', 'rule_value' => '255'],
             ]]),
-            printField('plain', 'short_text', ['sequence' => 2]),
+            printField('plain', 'phone', ['sequence' => 2]),
         ],
     ]);
 
     $fields = $this->present->present($form, $version)['blocks'][0]['fields'];
 
     expect($fields[0]['comb'])->toBe([['cells' => 6, 'caption' => null]])
-        ->and($fields[1]['comb'])->toBe([['cells' => 30, 'caption' => null]])
-        ->and($fields[2]['comb'])->toBe([['cells' => 24, 'caption' => null]]);
+        ->and($fields[1]['comb'])->toBe([['cells' => 23, 'caption' => null]])
+        ->and($fields[2]['comb'])->toBe([['cells' => 13, 'caption' => null]]);
+});
+
+it('gives short text, email and url one open box, and keeps digits in combs (layout 2, D96)', function (): void {
+    // The user's finding on the first printed paper: a box per letter limits respondents. Text moved
+    // to an open box written in block capitals; a phone, a number and a date stay combed, because
+    // digits in separated boxes are what the reader splits positionally.
+    [$form, $version] = printFixture([
+        'sections' => [],
+        'fields' => [
+            printField('full_name', 'short_text', ['sequence' => 0]),
+            printField('email', 'email', ['sequence' => 1]),
+            printField('website', 'url', ['sequence' => 2]),
+            printField('remarks', 'long_text', ['sequence' => 3]),
+            printField('mobile', 'phone', ['sequence' => 4]),
+        ],
+    ]);
+
+    $fields = $this->present->present($form, $version)['blocks'][0]['fields'];
+
+    expect(array_column($fields, 'area'))->toBe(['line', 'line', 'line', 'ruled', 'comb'])
+        ->and($fields[0]['comb'])->toBeNull()
+        ->and($fields[4]['comb'])->toBe([['cells' => 13, 'caption' => null]]);
+});
+
+it('sizes a number comb from an authored maximum, under an authored max_length (layout 2)', function (): void {
+    // An age capped at 120 prints four boxes (three digits and a sign), not ten: fewer empty boxes
+    // are fewer places for a stray mark to become a digit. A decimal keeps room for the point and two
+    // places. `max_length` keeps the precedence every comb gives it, and nothing goes below two.
+    [$form, $version] = printFixture([
+        'sections' => [],
+        'fields' => [
+            printField('count', 'integer', ['sequence' => 0]),
+            printField('age', 'integer', ['sequence' => 1, 'validations' => [
+                ['rule_type' => 'max_value', 'rule_value' => '120'],
+            ]]),
+            printField('code', 'integer', ['sequence' => 2, 'validations' => [
+                ['rule_type' => 'max_value', 'rule_value' => '120'],
+                ['rule_type' => 'max_length', 'rule_value' => '2'],
+            ]]),
+            printField('score', 'decimal', ['sequence' => 3]),
+            printField('temperature', 'decimal', ['sequence' => 4, 'validations' => [
+                ['rule_type' => 'max_value', 'rule_value' => '99.5'],
+            ]]),
+            printField('rank', 'integer', ['sequence' => 5, 'validations' => [
+                ['rule_type' => 'max_value', 'rule_value' => '5'],
+            ]]),
+        ],
+    ]);
+
+    $fields = $this->present->present($form, $version)['blocks'][0]['fields'];
+
+    expect(array_map(static fn (array $f): int => $f['comb'][0]['cells'], $fields))->toBe([6, 4, 2, 8, 6, 2]);
+});
+
+it('numbers every question across blocks and repeat instances, skipping prose and page breaks (layout 2)', function (): void {
+    // The number is its own key, never folded into `label`: the matcher anchors a scan on the label
+    // and the bake-off names its columns by it. A repeatable section's copies number on through, so
+    // "3." on the paper means one question however many copies print.
+    [$form, $version] = printFixture([
+        'sections' => [
+            ['key' => 'members', 'label' => 'Household member', 'sequence' => 1, 'is_repeatable' => true, 'min_instances' => 2],
+        ],
+        'fields' => [
+            printField('intro', 'note', ['section_key' => null, 'sequence' => 0]),
+            printField('respondent', 'short_text', ['section_key' => null, 'sequence' => 1]),
+            printField('new_page', 'page_break', ['section_key' => 'members', 'section_sequence' => 0]),
+            printField('member_age', 'integer', ['section_key' => 'members', 'section_sequence' => 1]),
+        ],
+    ]);
+
+    $model = $this->present->present($form, $version);
+
+    $numbers = [];
+    foreach ($model['blocks'] as $block) {
+        foreach ($block['fields'] as $field) {
+            $numbers[] = $field['number'];
+        }
+    }
+
+    expect(printedKeys($model))->toBe(['intro', 'respondent', 'new_page', 'member_age', 'new_page', 'member_age'])
+        ->and($numbers)->toBe([null, 1, null, 2, null, 3])
+        ->and($model['blocks'][0]['fields'][1]['label'])->toBe('Respondent')
+        ->and($model['layout'])->toBe(2);
+});
+
+it('says whether the form accepts scans, so the footer can promise only what is true (R-6bbf9d73)', function (): void {
+    // `ocr_compatible` is a fact about the VERSION; whether scanning is switched on is a fact about
+    // the FORM. The footer needs both. A fresh or unsaved form has the setting off.
+    [$form, $version] = printFixture([
+        'sections' => [],
+        'fields' => [printField('name', 'short_text')],
+    ]);
+
+    expect($this->present->present($form, $version)['accepts_scans'])->toBeFalse();
+
+    $form->allow_ocr_single = true;
+
+    expect($this->present->present($form, $version)['accepts_scans'])->toBeTrue();
 });
 
 it('marks a field a pen cannot answer instead of dropping it or boxing it', function (): void {
@@ -297,11 +396,11 @@ it('gives a cascading select one captioned comb run per level', function (): voi
     $field = $this->present->present($form, $version)['blocks'][0]['fields'][0];
 
     expect($field['area'])->toBe('comb')
-        // 30 cells split three ways.
+        // 23 cells (layout 2's page-derived ceiling) split three ways.
         ->and($field['comb'])->toBe([
-            ['cells' => 10, 'caption' => 'PROVINCE'],
-            ['cells' => 10, 'caption' => 'CITY'],
-            ['cells' => 10, 'caption' => 'BARANGAY'],
+            ['cells' => 7, 'caption' => 'PROVINCE'],
+            ['cells' => 7, 'caption' => 'CITY'],
+            ['cells' => 7, 'caption' => 'BARANGAY'],
         ])
         // ...and emphatically NOT a tick-list that would set Manila beside NCR as its sibling.
         ->and($field['options'])->toBe([]);
@@ -316,7 +415,7 @@ it('still gives a level-less cascading select somewhere to write', function (): 
     ]);
 
     expect($this->present->present($form, $version)['blocks'][0]['fields'][0]['comb'])
-        ->toBe([['cells' => 24, 'caption' => null]]);
+        ->toBe([['cells' => 23, 'caption' => null]]);
 });
 
 it('truncates a comb caption without cutting a multibyte character in half', function (): void {
@@ -444,7 +543,11 @@ it('reads the key names a REAL publish actually writes', function (): void {
     $lead = $model['blocks'][0]['fields'][0];
     expect($lead['required'])->toBeTrue()
         ->and($lead['hint'])->toBe('As written on the ID.')
-        ->and($lead['area'])->toBe('comb');
+        ->and($lead['area'])->toBe('line')
+        ->and($lead['number'])->toBe(1)
+        ->and($model['layout'])->toBe(2)
+        // Created through FormService, which leaves scanning off.
+        ->and($model['accepts_scans'])->toBeFalse();
 });
 
 // Increment M124 (`R-8c517fb6`) — a page break prints, but it is not a question. Until M124 a section holding only

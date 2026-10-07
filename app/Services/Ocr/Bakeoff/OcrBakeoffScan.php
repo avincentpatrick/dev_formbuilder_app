@@ -8,8 +8,8 @@ namespace App\Services\Ocr\Bakeoff;
  * One scan as the bake-off saw it (M136): what was read off it, and the correct answers it is scored against.
  *
  * `status` is `read` (matched against a version), `not_read` (no provider answer — `--offline` with nothing cached),
- * `failed` (the provider refused the file, or the run's credential) or `not_eligible` (its version cannot be read
- * automatically). Only a `read` scan is scored.
+ * `failed` (the provider refused the file, or the run's credential), `not_eligible` (its version cannot be read
+ * automatically) or `old_layout` (printed from a layout before the current one, M143). Only a `read` scan is scored.
  */
 final readonly class OcrBakeoffScan
 {

@@ -72,23 +72,38 @@ final class BlankFormPrintPresenter
      */
     private const MAX_REPEAT_INSTANCES = 5;
 
-    /** Comb cells per answer when nothing narrows it. Fits one line at the §2.5 cell pitch. */
-    private const DEFAULT_COMB_CELLS = 24;
+    /**
+     * The revision of the printed LAYOUT, printed beside the version stamp and read back by the matcher
+     * (`M143`, `D96`). The checksum stamp identifies the schema; this identifies the template it was typeset
+     * with, so a sheet printed before a layout change cannot be read against the layout after it. Bump it
+     * whenever the geometry the reader depends on changes — where an answer sits relative to its label.
+     */
+    public const int LAYOUT = 2;
+
+    /** Comb cells for a phone number when nothing narrows it: a mobile number with its country code. */
+    private const PHONE_CELLS = 13;
+
+    /** Comb cells for a whole number when nothing sizes it; for a decimal, the point and two places more. */
+    private const INTEGER_CELLS = 6;
+
+    private const DECIMAL_CELLS = 8;
 
     /**
      * The hard ceiling on a comb run, and it is derived from the page rather than chosen.
      *
-     * A4 is 210mm; `@page` takes 16mm off each side, leaving 178mm of content. §2.5's cell pitch is
-     * 15.5pt (a 14pt cell plus 1.5pt of separation) which is about 5.47mm, so 30 cells occupy
-     * ~164mm and 31 begin to crowd the margin. The cell is not shrunk to fit more: a comb narrower
-     * than about 5mm stops being comfortable to hand-print in, which would cost exactly the ICR
-     * accuracy the comb exists to buy.
+     * A4 is 210mm; `@page` takes 16mm off each side, leaving 178mm = 504.6pt of content. Layout 2's cell
+     * is 18pt square on a 20pt pitch (`border-spacing: 2pt`), and a group gap is a 10pt cell, so a run
+     * of N cells in G+1 groups is `20N + 12G + 2` points wide — `border-spacing` lands at both table
+     * edges as well as between cells. With three gaps (a datetime, a four-level cascade) that allows
+     * 23 cells (500pt); 24 clips. The cell is not shrunk to fit more: 18pt is about 6.3mm, the square,
+     * pen-sized box the ICR guidance asks for, and a comb narrower than about 5mm stops being
+     * comfortable to hand-print in, which costs exactly the accuracy the comb exists to buy.
      *
      * Without the clamp an authored `max_length` of 255 emits 255 boxes, and dompdf CLIPS an
      * over-wide table rather than wrapping it — so the row would silently lose its right-hand end in
      * the PDF while every model-level assertion stayed green.
      */
-    private const MAX_COMB_CELLS = 30;
+    private const MAX_COMB_CELLS = 23;
 
     public function __construct(private readonly SchemaValueFormatter $formatter) {}
 
@@ -132,7 +147,12 @@ final class BlankFormPrintPresenter
             // from this version's own bytes, never read off `forms.capability_flags` — that column
             // describes the CURRENTLY published version and is stale for a superseded one.
             'ocr_compatible' => CapabilityFlags::isOcrCompatible($version),
-            'blocks' => $this->blocks($sections, $bySection, $locale),
+            // Whether the FORM accepts scans today (`forms.allow_ocr_single`), which with `ocr_compatible`
+            // decides what the footer promises (`M143`, `R-6bbf9d73`). A form setting, not a version fact:
+            // the same paper reads differently once scanning is switched on, and the footer says so.
+            'accepts_scans' => $form->allow_ocr_single === true,
+            'layout' => self::LAYOUT,
+            'blocks' => $this->numbered($this->blocks($sections, $bySection, $locale)),
         ];
     }
 
@@ -399,12 +419,17 @@ final class BlankFormPrintPresenter
                 ['cells' => 3, 'caption' => 'HRS'],
                 ['cells' => 2, 'caption' => 'MIN'],
             ],
-            FieldType::Integer, FieldType::Decimal => [
-                ['cells' => $this->combCells($field, 10), 'caption' => null],
+            FieldType::Integer => [
+                ['cells' => $this->numericCells($field, self::INTEGER_CELLS, 1), 'caption' => null],
+            ],
+            FieldType::Decimal => [
+                ['cells' => $this->numericCells($field, self::DECIMAL_CELLS, 4), 'caption' => null],
             ],
             FieldType::CascadingSelect => $this->cascadingGroups($field),
+            // A phone number, and — since layout 2 moved short text, email and url to an open box
+            // (`PrintAnswerArea::Line`) — nothing else reaches this arm.
             default => [
-                ['cells' => $this->combCells($field, self::DEFAULT_COMB_CELLS), 'caption' => null],
+                ['cells' => $this->combCells($field, self::PHONE_CELLS), 'caption' => null],
             ],
         };
     }
@@ -444,10 +469,11 @@ final class BlankFormPrintPresenter
         }
 
         // A cascading select with no declared levels cannot publish (StructuralValidationGate
-        // refuses it), so this is the hand-built-snapshot path: one plain run, never zero groups,
-        // because zero groups renders a labelled question with nowhere to answer it.
+        // refuses it), so this is the hand-built-snapshot path: one plain run at the page's full
+        // width, never zero groups, because zero groups renders a labelled question with nowhere to
+        // answer it.
         if ($levels === []) {
-            return [['cells' => self::DEFAULT_COMB_CELLS, 'caption' => null]];
+            return [['cells' => self::MAX_COMB_CELLS, 'caption' => null]];
         }
 
         $cells = max(4, intdiv(self::MAX_COMB_CELLS, count($levels)));
@@ -664,5 +690,68 @@ final class BlankFormPrintPresenter
         }
 
         return $this->optionList($config, 'options', $locale);
+    }
+
+    /**
+     * Layout 2 (`M143`, `D96`) — every question carries its printed number, 1-based across the whole sheet.
+     *
+     * The number is a separate key, never folded into `label`: the label is what the matcher anchors a
+     * scanned question on and what the bake-off's answer template names its columns by, and both compare
+     * it with the authored text. Prose, page breaks and omitted rows are not questions
+     * ({@see PrintAnswerArea::isQuestion()}), so they take no number and leave no gap. A repeatable section's
+     * instances number on through, so "7." on the paper means one thing however many copies print.
+     *
+     * @param  list<array<string, mixed>>  $blocks
+     * @return list<array<string, mixed>>
+     */
+    private function numbered(array $blocks): array
+    {
+        $number = 0;
+
+        foreach ($blocks as $b => $block) {
+            /** @var list<array<string, mixed>> $rows */
+            $rows = $block['fields'];
+            foreach ($rows as $r => $row) {
+                $area = PrintAnswerArea::tryFrom((string) ($row['area'] ?? ''));
+                $blocks[$b]['fields'][$r]['number'] = $area !== null && $area->isQuestion() ? ++$number : null;
+            }
+        }
+
+        return $blocks;
+    }
+
+    /**
+     * Layout 2 — how many cells a NUMBER comb gets: an authored `max_length` first (the same precedence
+     * every comb has), else the digits of an authored `max_value` plus `$extra` (a sign for a whole
+     * number; a sign, a point and two places for a decimal), else `$default`. Never fewer than two, never
+     * more than {@see self::MAX_COMB_CELLS}. An age capped at 120 prints four boxes rather than ten, which is
+     * both easier to fill and harder to misread — an empty box is where a stray mark becomes a digit.
+     *
+     * @param  array<string, mixed>  $field
+     */
+    private function numericCells(array $field, int $default, int $extra): int
+    {
+        $rules = $this->listAt($field, 'validations');
+
+        foreach ($rules as $rule) {
+            if (($rule['rule_type'] ?? null) === ValidationRuleType::MaxLength->value) {
+                return $this->combCells($field, $default);
+            }
+        }
+
+        foreach ($rules as $rule) {
+            if (($rule['rule_type'] ?? null) !== ValidationRuleType::MaxValue->value) {
+                continue;
+            }
+
+            $value = $rule['rule_value'] ?? null;
+            if (is_numeric($value)) {
+                $digits = strlen((string) abs((int) floor(abs((float) $value))));
+
+                return max(2, min($digits + $extra, self::MAX_COMB_CELLS));
+            }
+        }
+
+        return max(2, min($default, self::MAX_COMB_CELLS));
     }
 }

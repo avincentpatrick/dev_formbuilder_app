@@ -94,7 +94,9 @@ it('names the setting, not the request path, when a save is refused', function (
         ])
         ->assertStatus(422);
 
-    $message = (string) $response->json('errors.config.options.0.label.0');
+    // The error key itself holds dots, so it cannot be walked with dot notation: read the bag and index it whole.
+    $message = (string) ($response->json('errors')['config.options.0.label'][0] ?? '');
+    expect($message)->not->toBe('');
 
     expect($message)->toContain('choice label')
         ->and(str_contains($message, 'config.options'))->toBeFalse()

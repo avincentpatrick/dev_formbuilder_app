@@ -128,6 +128,99 @@ final class UpdateFieldRequest extends FormRequest
     }
 
     /**
+     * What each path is CALLED when a save is refused (M146, `R-b2d4a2c5`). With no `lang/` directory Laravel
+     * writes the raw path — "The config.options.0.label field must not be greater than 500 characters." — and the
+     * builder's save alert shows the server's message as sent. This request is the one place that knows every
+     * path, so it names every one; keyed by the WILDCARD path, which Laravel resolves for the numbered one. The
+     * same reasoning as `StoreConnectionRuleRequest::attributes()`.
+     *
+     * ⛔ EVERY KEY `rules()` CAN RETURN, FOR EVERY FIELD TYPE, HAS AN ENTRY HERE, and `FieldSaveAttributeNamesTest`
+     * refuses a new path that ships without one. Plain words only: a dot or an underscore in a name is a path leak.
+     *
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return [
+            'key' => 'key',
+            'label' => 'label',
+            'hint' => 'hint',
+            'placeholder' => 'placeholder',
+            'is_required' => 'required setting',
+            'relevant_expression' => 'show-when condition',
+            'appearance' => 'layout',
+            'config' => 'settings',
+            'default_value' => 'default value',
+            'default_value_is_expression' => 'default value kind',
+            'is_pii' => 'personal data flag',
+            'is_sensitive' => 'sensitive flag',
+            'is_queryable' => 'queryable flag',
+            'indexed_data_type' => 'indexed type',
+            'version' => 'version',
+            'validations' => 'rules',
+            'validations.*.rule_type' => 'rule type',
+            'validations.*.operator' => 'rule operator',
+            'validations.*.rule_value' => 'rule value',
+            'validations.*.expression' => 'rule expression',
+            'validations.*.error_message' => 'rule message',
+            'validations.*.related_field_key' => 'compared question',
+            'validations.*.logic_group' => 'rule group',
+            'validations.*.logic_operator' => 'group operator',
+            // Media.
+            'config.accepted_types' => 'accepted file types',
+            'config.accepted_types.*' => 'accepted file type',
+            'config.max_file_size_bytes' => 'maximum file size',
+            'config.max_count' => 'maximum number of files',
+            'config.min_count' => 'minimum number of files',
+            'config.capture_source' => 'capture source',
+            // Geospatial.
+            'config.capture_altitude' => 'altitude capture',
+            'config.accuracy_threshold' => 'accuracy threshold',
+            'config.default_center' => 'default map centre',
+            'config.default_center.lat' => 'default latitude',
+            'config.default_center.lon' => 'default longitude',
+            'config.default_zoom' => 'default zoom',
+            // Choices, cascading select (its levels, and the level and parent on each choice), and a linked list.
+            'config.options' => 'choices',
+            'config.options.*.value' => 'choice value',
+            'config.options.*.label' => 'choice label',
+            'config.options.*.level' => 'choice level',
+            'config.options.*.parent' => 'choice parent',
+            'config.options.*.label_translations' => 'choice label translations',
+            'config.options.*.label_translations.*' => 'choice label translation',
+            'config.options_source' => 'choices source',
+            'config.options_source.form_id' => 'source form',
+            'config.options_source.field_key' => 'source question',
+            'config.levels' => 'levels',
+            'config.levels.*.key' => 'level key',
+            'config.levels.*.label' => 'level label',
+            'config.levels.*.label_translations' => 'level label translations',
+            'config.levels.*.label_translations.*' => 'level label translation',
+            'config.levels.*.list' => 'level choice list',
+            // The two grids.
+            'config.rows' => 'rows',
+            'config.rows.*.value' => 'row value',
+            'config.rows.*.label' => 'row label',
+            'config.rows.*.label_translations' => 'row label translations',
+            'config.rows.*.label_translations.*' => 'row label translation',
+            'config.columns' => 'columns',
+            'config.columns.*.value' => 'column value',
+            'config.columns.*.label' => 'column label',
+            'config.columns.*.label_translations' => 'column label translations',
+            'config.columns.*.label_translations.*' => 'column label translation',
+            'config.cells' => 'cells',
+            'config.cells.*.value' => 'cell value',
+            'config.cells.*.label' => 'cell label',
+            'config.cells.*.label_translations' => 'cell label translations',
+            'config.cells.*.label_translations.*' => 'cell label translation',
+            // Hidden, and a note.
+            'config.prefill_source' => 'value source',
+            'config.url_param' => 'URL parameter',
+            'config.content' => 'content',
+        ];
+    }
+
+    /**
      * The per-type `config` shape rules (lenient — type/structure only; see the class docblock). A choice
      * type validates its `options` list; `cascading_select` validates its `levels` + parented `options`; a
      * geospatial type (Increment G5b2b) validates its map-capture options (all optional). All values are

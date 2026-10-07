@@ -10,14 +10,18 @@ use App\Services\Expressions\Coercion;
 /**
  * Reads ONE printed question's answer out of the lines between its label and the next question's (M128).
  *
- * The layout it reads is `docs/ocr-pipeline-design.md` §2.5, and each area has its own rule:
+ * The layout it reads is `docs/ocr-pipeline-design.md` §2.5 (layout 2 since `M143`), and each area has its
+ * own rule:
  *   - `comb`    — characters in a row of boxes. A captioned comb (a date's DD / MM / YYYY, a time, a
  *     duration, a cascading select's levels) is split into its groups by WHERE each character sits under
  *     the captions, never by counting, because §2.5.3 is explicit that a date must be parsed positionally.
- *   - `ruled`   — free text in one box.
- *   - `choices` — an X in the box before an option's label. A yes/no question is read here too, and also
- *     from a written YES or NO, because a sheet printed before `M128` gave it a write-in box under the same
- *     checksum stamp.
+ *   - `line`    — free text written in one open box (short text, email, url since layout 2).
+ *   - `ruled`   — free text in one taller box.
+ *   - `choices` — an X in the box before an option's label. Since layout 2 the options sit SIDE BY SIDE,
+ *     several to a line, so each label is found as a span of words in printed order and the mark credited
+ *     to it is the run of mark words immediately before that span — never a mark that belongs to an
+ *     earlier label on the same line. A yes/no question is read here too, and also from a written YES or
+ *     NO, which rescues a respondent who writes the word beside the boxes.
  * Grids, signature lines and the "not collected on paper" note make a version ineligible for OCR (§2), so
  * a version reaching this class never has one to read; they are reported as `skipped` if they do.
  *
@@ -50,7 +54,7 @@ final class OcrAnswerReader
     {
         return match ($row['area'] ?? null) {
             'comb' => $this->comb($row, $type, $config, $lines, $static),
-            'ruled' => $this->ruled($type, $this->answerLines($lines, $static, [])),
+            'line', 'ruled' => $this->ruled($type, $this->answerLines($lines, $static, [])),
             'choices' => $this->choices($row, $type, $lines, $static),
             default => ['state' => 'skipped', 'value' => null, 'text' => null, 'confidence' => null],
         };
@@ -317,29 +321,53 @@ final class OcrAnswerReader
             }
         }
 
-        $marked = [];
-        $markSymbols = [];
-        $optionLines = [];
-        foreach ($options as $option) {
-            foreach ($lines as $line) {
-                $mark = $this->markBeforeLabel($line, $option['label']);
-                if ($mark === null) {
+        // Layout 2 (`M143`): the options sit side by side, so one line carries several labels. Each option's
+        // label is found as a span of words, in PRINTED order along the line, and the mark credited to it is
+        // the run of mark words walking back from its span to the end of the previous one — so in
+        // "X Female Male" the X is Female's, and in "Female X Male" it is Male's. The old reader matched the
+        // TAIL of a line to one label and took every mark to its left, which credited the first case to Male.
+        /** @var array<int, list<OcrSymbol>> $found option index => the mark's characters (empty: box seen, unmarked) */
+        $found = [];
+        foreach ($lines as $line) {
+            if ($this->isStatic($line, $static)) {
+                continue;
+            }
+            $words = $line->words;
+            $end = 0;
+            foreach ($options as $i => $option) {
+                if (array_key_exists($i, $found)) {
                     continue;
                 }
-                $optionLines[] = $line;
-                if ($mark !== []) {
-                    $marked[] = $option;
-                    array_push($markSymbols, ...$mark);
+                $span = $this->labelSpan($words, $end, $option['label']);
+                if ($span === null) {
+                    continue;
                 }
-                break;
+                $marks = $span['lead'] === null ? [] : [$span['lead']];
+                for ($w = $span['start'] - 1; $w >= $end; $w--) {
+                    if (! OcrText::isMark($words[$w]->text)) {
+                        break;
+                    }
+                    $marks = [...$words[$w]->symbols, ...$marks];
+                }
+                $found[$i] = $marks;
+                $end = $span['start'] + $span['length'];
+            }
+        }
+
+        $marked = [];
+        $markSymbols = [];
+        foreach ($found as $i => $marks) {
+            if ($marks !== []) {
+                $marked[] = $options[$i];
+                array_push($markSymbols, ...$marks);
             }
         }
 
         // ⚠️ A YES/NO IS TICK-BOX LAYOUT ONLY WHEN BOTH ITS LABELS ARE FOUND. A sheet printed before `M128`
         // gave it a write-in box, and a written "YES" reads exactly like the printed label "Yes" — so one
-        // matching line proves nothing. Today's layout always prints both, one per line; anything less is
-        // read as writing.
-        if ($type === FieldType::YesNo && count($optionLines) < count($options)) {
+        // matching label proves nothing. The paper always prints both; anything less is read as writing,
+        // which also rescues a respondent who writes the word beside the boxes.
+        if ($type === FieldType::YesNo && count($found) < count($options)) {
             return $this->ruled($type, $this->answerLines($lines, $static, []));
         }
 
@@ -351,7 +379,7 @@ final class OcrAnswerReader
             return $this->ruled($type, $this->answerLines($lines, $static, []));
         }
 
-        if ($optionLines === []) {
+        if ($found === []) {
             return $this->blankOrUnreadable($this->answerLines($lines, $static, []));
         }
 
@@ -376,38 +404,37 @@ final class OcrAnswerReader
     }
 
     /**
-     * Whether `$line` is the line of the option labelled `$label`, and if so the mark written before it.
+     * Where the option labelled `$label` sits on a line: the first span of words at or after `$from` that reads as
+     * the label, longest span first so "Not marked" is not taken for "marked".
      *
-     * Returns null when the line is not that option's; `[]` when it is and its box is empty; otherwise the
-     * mark's characters. A mark is a separate word to the left of the label that reads as an X, a tick or
-     * a stroke — or a mark run together with the label's first word ("XFemale"), which a recognizer does
-     * when the pen comes close to the text.
+     * A mark run together with the label's first word ("XFemale"), which a recognizer does when the pen comes
+     * close to the text, is tried BEFORE the plain comparison at each position: "xfemale" is within the plain
+     * tolerance of "female", and taking it that way would lose the mark.
      *
-     * @return list<OcrSymbol>|null
+     * @param  list<OcrWord>  $words
+     * @return array{start: int, length: int, lead: OcrSymbol|null}|null
      */
-    private function markBeforeLabel(OcrLine $line, string $label): ?array
+    private function labelSpan(array $words, int $from, string $label): ?array
     {
-        $words = $line->words;
         $n = count($words);
+        $labelWords = count(preg_split('/\s+/', trim($label)) ?: []);
+        $longest = max(1, $labelWords + 1);
 
-        for ($k = 0; $k < $n; $k++) {
-            $tail = implode(' ', array_map(static fn (OcrWord $w): string => $w->text, array_slice($words, $k)));
-            if (OcrText::similarity($tail, $label) >= 0.8) {
-                $mark = [];
-                foreach (array_slice($words, 0, $k) as $prefix) {
-                    if (OcrText::isMark($prefix->text)) {
-                        array_push($mark, ...$prefix->symbols);
+        for ($k = $from; $k < $n; $k++) {
+            for ($length = min($longest, $n - $k); $length >= 1; $length--) {
+                $slice = array_slice($words, $k, $length);
+                $text = implode(' ', array_map(static fn (OcrWord $w): string => $w->text, $slice));
+
+                $first = $slice[0]->symbols[0] ?? null;
+                if ($first !== null && OcrText::isMark($first->text) && mb_strlen($slice[0]->text) > 1) {
+                    $rest = mb_substr($text, 1);
+                    if (OcrText::similarity($rest, $label) >= 0.8) {
+                        return ['start' => $k, 'length' => $length, 'lead' => $first];
                     }
                 }
 
-                return $mark;
-            }
-
-            // The run-together case, tried once on the first word only.
-            if ($k === 0 && $words[0]->symbols !== [] && OcrText::isMark($words[0]->symbols[0]->text)) {
-                $rest = mb_substr($words[0]->text, 1).($n > 1 ? ' '.implode(' ', array_map(static fn (OcrWord $w): string => $w->text, array_slice($words, 1))) : '');
-                if (OcrText::similarity($rest, $label) >= 0.8) {
-                    return [$words[0]->symbols[0]];
+                if (OcrText::similarity($text, $label) >= 0.8) {
+                    return ['start' => $k, 'length' => $length, 'lead' => null];
                 }
             }
         }

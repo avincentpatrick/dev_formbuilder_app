@@ -171,6 +171,55 @@ it('refuses two marked boxes on a one-answer question, and keeps both on a many-
         ->and($fields['symptoms']['value'])->toBe(['fever', 'cough', 'fatigue']);
 });
 
+it('credits a mark to the option it precedes on a shared line, never to the last label on it (M143, layout 2)', function (): void {
+    // Layout 2 prints the options side by side. The old reader matched the TAIL of a line to one label and took
+    // every mark to its left, so an X before "Female" was Male's — measured red with the layout-2 typesetter
+    // before this change. Now each label is a span found in printed order, and a mark belongs to the label it
+    // immediately precedes.
+    $female = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['sex' => ['Female'], 'symptoms' => ['Cough']]);
+    $male = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['sex' => ['Male'], 'symptoms' => ['Fever', 'Fatigue']]);
+
+    expect($female['sex'])->toMatchArray(['state' => 'read', 'value' => 'f'])
+        ->and($female['symptoms']['value'])->toBe(['cough'])
+        ->and($male['sex'])->toMatchArray(['state' => 'read', 'value' => 'm'])
+        ->and($male['symptoms']['value'])->toBe(['fever', 'fatigue']);
+});
+
+it('reads a mark run together with its label as that label\'s mark, on a shared line too', function (): void {
+    // The pen came close to the text and the recognizer read "XFemale" as one word. "xfemale" is within the
+    // plain tolerance of "female", so the run-together reading has to be tried first or the mark is lost.
+    $female = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['sex' => ['Female']], ['run_together' => ['sex']]);
+    $male = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['sex' => ['Male']], ['run_together' => ['sex']]);
+
+    expect($female['sex'])->toMatchArray(['state' => 'read', 'value' => 'f'])
+        ->and($male['sex'])->toMatchArray(['state' => 'read', 'value' => 'm']);
+});
+
+it('reads the layout off the running head, and tells old paper from a head that was not read (M143, R-d6546409)', function (): void {
+    $pages = fn (array $options): array => [PrintedPageTypesetter::fromModel($this->model, [], $options)->page()];
+    $stamp = strtolower((string) $this->model['schema_stamp']);
+
+    expect($this->matcher->layoutOf($pages([]), $stamp))->toBe(['layout' => 2, 'evidence' => 'token'])
+        // "Layout2" read as one word.
+        ->and($this->matcher->layoutOf($pages(['run_together' => ['runhead']]), $stamp))->toBe(['layout' => 2, 'evidence' => 'token'])
+        ->and($this->matcher->layoutOf($pages(['layout' => 1]), $stamp))->toBe(['layout' => 1, 'evidence' => 'token'])
+        // Layout-1 paper: the stamp's own line was legibly read, and no layout word is on it.
+        ->and($this->matcher->layoutOf($pages(['layout' => null]), $stamp))->toBe(['layout' => null, 'evidence' => 'absent'])
+        // A running head that was not read at all says nothing about the layout — never a refusal.
+        ->and($this->matcher->layoutOf($pages(['layout' => null, 'stamp' => null]), null))->toBe(['layout' => null, 'evidence' => 'none'])
+        ->and($this->matcher->layoutOf($pages(['layout' => 'Z']), $stamp))->toBe(['layout' => null, 'evidence' => 'garbled']);
+});
+
+it('knows all three footer sentences as printed text, so none is read as the last question\'s answer (R-6bbf9d73)', function (): void {
+    // The fixture form has scanning switched off, so every page in this file carries the "switched off"
+    // sentence inside `notes`' region — the happy path above already proves it stays out. The other two:
+    $accepting = ocrMatchFields($this->matcher, $this->form, $this->version, [...$this->model, 'accepts_scans' => true], ocrMatchAnswers());
+    $incompatible = ocrMatchFields($this->matcher, $this->form, $this->version, [...$this->model, 'ocr_compatible' => false], ocrMatchAnswers());
+
+    expect($accepting['notes']['value'])->toBe('MILD FEVER FOR TWO DAYS')
+        ->and($incompatible['notes']['value'])->toBe('MILD FEVER FOR TWO DAYS');
+});
+
 it('turns confidence into tiers and withholds a value below the review threshold', function (): void {
     $fields = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ocrMatchAnswers(), ['confidence' => [
         'patient_name' => 0.95,

@@ -13589,3 +13589,73 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   column then names no row, and publish refuses with "option “X” has no valid parent" — true, but silent on the cause.
   The remedy is one sentence beside the upload in `CascadingEditor.vue` and in Settings → Choice lists (keep codes as
   text, or use letters), and the same hint on that refusal. **Live.** Filed by `M148`. **Tier: during-testing.**
+
+- ✅ **CLOSED BY `M149` (2026-10-08) — ****`major` · A phone photo stored on its side is read without being turned upright, so every question on it is "not
+  found".** Found by `M149` in the OCR bake-off's first round (15 hand-filled layout-4 forms, both pages photographed with a
+  phone, 30 real Cloud Vision reads): 177 of 180 fields needed correction, 158 of them "question not found". Every photo is
+  4624×3468 with EXIF orientation 6, and Vision reports its boxes in that stored frame; the median baseline angle of each
+  page's long words is −89.5° to −90.9° on all 30 pages. `OcrLineBuilder::tilt()` corrects nothing past `MAX_DESKEW` (17°), so
+  `lines()` slices across vertical text and `PrintedFormMatcher` finds no label. Phone photos are the main input, and a staging
+  upload reaches the same matcher through `ReadOcrScanJob`, so the scans page fails the same way. The remedy reads the page's
+  own word angles, not EXIF (Vision's answer carries none, and a scanned PDF has none): snap their median to a quarter turn,
+  map every word and character box, swap the page's sides, then deskew the remainder as before. Measured on the cached pages
+  turned upright: 98.3% → 76.1% needing correction, 0 not found. **Live.** Filed by `M149`. **Tier: early-testing.** ✅ **CLOSED BY `M149` (2026-10-08):** `OcrLineBuilder::upright()` turns the page by whole quarter turns before the deskew — each multi-character word votes for the quarter nearest its baseline and the commonest vote wins (a vote, because an upside-down page's angles straddle ±π), then every word and character box is mapped and the page's sides swapped on an odd turn. A typeset page turned one, two and three quarters reads exactly as the upright one, layout token included; red first, and a mutant that skips the turn CAUGHT. The thirty real pages, untransformed: 0 not found.
+
+- ✅ **CLOSED BY `M149` (2026-10-08) — ****`major` · A question's key stamp read as a line of its own puts the question's label into its answer, and the next
+  question's key into the one before.** Found by `M149` in the same round, once the pages were upright. The right-aligned
+  `field_N` stamp sits about 0.006 of the page above its label and clusters as its own line on about half the photos.
+  `PrintedFormMatcher::anchor()` anchors on the key first, so `region()` starts above the label and holds it — "2. Age 29",
+  which no integer parses, and "3. Weight ( kg ) 60" — and it ends at the next anchor's LABEL line, keeping the next key below
+  the previous answer ("ORLY MARIE M. CABAL field_2"). The remedy anchors on the label line when it follows the key within
+  two lines, and ends the previous region at the next question's KEY line. Measured: 76.1% → 61.1% (the label anchor alone,
+  73.9%, leaked the next key into the names). **Live.** Filed by `M149`. **Tier: early-testing.** ✅ **CLOSED BY `M149` (2026-10-08):** an anchor is a pair — `line`, below which the answer begins, and `top`, above which the question before ends — and a stamp found as its own line looks within `STAMP_REACH` (two) lines either side for its label, taking the lower as `line` and the upper as `top`. A typeset page with every stamp raised above its label reads every answer as the level page does; red first ("1. Patient name JUAN DELA CRUZ", the age unread), and a mutant that skips the search CAUGHT.
+
+- ✅ **CLOSED BY `M149` (2026-10-08) — ****`major` · A tick read as a symbol (☑ ✓ ✗ ×) is swallowed into its option's label, so a ticked choice reads blank.** Found by
+  `M149` in the same round: 37 answered choices read blank. `OcrAnswerReader::labelSpan()` tries the longest span first and
+  `OcrText::similarity()` compares normal forms, which erase symbols, so "☑ Male" and "✓ Male" match the label "Male" with no
+  lead and the loop that walks back for marks starts before the mark. Only a letter mark (x, v) survives — which is why the
+  fixture's "X" never showed it. Vision also returned ticks as ☑ (most often), a Greek Χ and 区, and ☑, ☒, χ and 区 are not in
+  `OcrText::MARKS`. The remedy: a word that is wholly a mark never starts a label span, and those four join `MARKS`. Measured:
+  blank choices 37 → 27, 61.1% → 60.0%. **Live.** Filed by `M149`. **Tier: early-testing.** ✅ **CLOSED BY `M149` (2026-10-08):** a word that is wholly a mark is never part of a label span unless the label holds it (a letter mark only when it IS the label, an option called "X"; a symbol only when the label contains it, "N/A"), and ☑ ☒ χ 区 are marks. The first fix skipped only a LEADING mark and still failed: the longest-first search took the tick at the END of the label before it ("Female ✓" one span), so the second option of a pair read blank. Seven glyphs on a yes/no, a one-answer and a many-answer question, red first; mutants removing the span rule and ☑ CAUGHT.
+
+- ✅ **CLOSED BY `M149` (2026-10-08) — ****`minor` · Cloud Vision is asked with no language hint, so handwriting reads worse and Tagalog picks up Cyrillic
+  letters.** Found by `M149` in the same round. `GoogleVisionClient::annotate()` sends `DOCUMENT_TEXT_DETECTION` with no
+  `imageContext`, and four answers came back with Cyrillic letters ("аконь" for AKONG). Google documents
+  `languageHints: ["en-t-i0-handwrit"]` for handwriting; 30 fresh reads with it, through the reader with the three fixes
+  above, measured 57.2% → 51.1%, silent errors 1 → 0, Cyrillic 4 → 0, and every printed label still found. **Live.** Filed by `M149`. **Tier: early-testing.** ✅ **CLOSED BY `M149` (2026-10-08):** `config/ocr.php`'s `google_vision.language_hints` (`["en-t-i0-handwrit"]`; an empty list sends none) goes out as `imageContext.languageHints` for a photo and a PDF alike; red first, and a mutant emptying the list CAUGHT.
+
+- ✅ **CLOSED BY `M149` (2026-10-08) — ****`minor` · The bake-off's answer sheet matches a scan by its literal name, so a sheet re-saved in Excel names none of
+  folders `01` to `09`.** Found by `M149`: the user typed `01`…`15` as asked, Excel stored the first nine as the numbers
+  1…9, and `OcrAnswerSheet::rowFor()` compares stems as strings, so nine rows would have matched no folder and the run would
+  have scored nothing for them. A purely numeric stem should compare by its value. **Live.** Filed by `M149`.
+  **Tier: early-testing.** ✅ **CLOSED BY `M149` (2026-10-08):** `OcrAnswerSheet::stem()` gives an all-digit stem by its value (`01` and `1` are one name, `1` and `10` are not), which `rowFor()` and the orphan check both use; red first, and a mutant restoring the literal stem CAUGHT.
+
+- **`minor` · A tick's confidence is the recognizer's confidence in the glyph, so a choice read right is withheld.** Found
+  by `M149` in the same round, with the fixes above and the language hint applied: of 45 answered choices, 16 were read right
+  and withheld below the review threshold of 70, and six shown. A ☑ or an X found in the box before an option's label is
+  evidence of a tick whatever the recognizer thinks the glyph is; `OcrAnswerReader::confidenceOf()` scores the glyph instead.
+  Calibrating it belongs with the bake-off's thresholds. **Live.** Filed by `M149`. **Tier: early-testing.**
+
+- **`minor` · Cloud Vision returns no character at all for most ticks in a box, so most ticked choices read blank.** Found by
+  `M149` in the same round, with every fix above applied: 22 of 45 answered choices read blank, and on the option lines Vision
+  returned nothing between the printed labels, or a letter (`Y`, `H`, `F`) the reader rightly does not take as a mark. A text
+  recognizer is the wrong instrument for a tick: measuring the ink inside each printed box, or `D97`'s vision-language arm,
+  reads it. Choices alone are 39 of the 92 fields that still needed correction. **Live.** Filed by `M149`.
+  **Tier: early-testing.**
+
+- **`minor` · A `1` written as one stroke in a date or time box is dropped as the box's wall, and a printed `/` is sometimes
+  read as `1` or `0`.** Found by `M149` in the same round: "12 / 11 / 1981" read as `122111 190`, "21 / 10 / 2025" as
+  `2111012025`, "09 / 06 / 2024" as `09 006 2024`. `OcrText::isBorderArtefact()` drops `|`, which is also how a recognizer
+  reads a one-stroke 1 inside a cell; a separator misread as a digit makes a group longer than its cells, which `M148`'s
+  `overfills()` correctly refuses, so these fail closed rather than wrong. With the hint, 2 of 15 dates were unreadable.
+  **Live.** Filed by `M149`. **Tier: during-testing.**
+
+- **`minor` · The reader joins a recognized word's punctuation with a space, so a name reads "DE GUZMAN JR ." and an address
+  "STA MESA".** Found by `M149` in the same round. `OcrAnswerReader` joins Vision's words with spaces, and Vision returns `.`
+  `,` `@` as words of their own; an email and a URL drop spaces and survive, a name, an address and a remark carry the stray
+  space or lose the point, and the reviewer has to fix text that was read right. Vision marks each symbol's following break
+  (`property.detectedBreak`), which says where a space really was. **Live.** Filed by `M149`. **Tier: during-testing.**
+
+- **`nit` · A crossed-out word is read as part of the answer.** Found by `M149` in the same round: an email written
+  "rey.deguzmanjr@~~pitahc~~.pitahc.gov.ph" read as `rey.deguzmanjr@pital.pitahc.gov.ph`, withheld at 50. The confidence
+  rule caught it here; nothing in the reader knows a strike-through. **Live.** Filed by `M149`. **Tier: during-testing.**

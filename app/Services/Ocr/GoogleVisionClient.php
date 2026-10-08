@@ -77,6 +77,12 @@ final class GoogleVisionClient
             ]]];
         }
 
+        // M149: the page is handwriting on a printed form, and saying so measurably helps (`config/ocr.php`).
+        $hints = array_values(array_filter((array) config('ocr.google_vision.language_hints', []), 'is_string'));
+        if ($hints !== []) {
+            $body['requests'][0]['imageContext'] = ['languageHints' => $hints];
+        }
+
         try {
             $response = Http::withHeaders(['X-Goog-Api-Key' => $key])
                 ->withOptions(['allow_redirects' => false])

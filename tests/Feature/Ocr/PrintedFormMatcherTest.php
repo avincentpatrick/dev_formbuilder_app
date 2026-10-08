@@ -212,6 +212,55 @@ it('reads a page photographed at a tilt exactly as a level one', function (): vo
     expect(array_column($tilted, 'value'))->toBe(array_column($level, 'value'));
 });
 
+it('reads a photo stored on its side, either way, or upside down exactly as an upright one (M149)', function (): void {
+    // A phone keeps a portrait photo on its side and says so only in EXIF, which the recognizer's answer does not
+    // carry: all thirty of the bake-off's pages arrived with their words at about -90 degrees, and every question on
+    // them was "not found". The page's own word angles say how far it is turned.
+    $upright = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ocrMatchAnswers());
+    $stamp = strtolower((string) $this->model['schema_stamp']);
+
+    foreach ([1, 2, 3] as $quarters) {
+        $page = PrintedPageTypesetter::fromModel($this->model, ocrMatchAnswers())->turned($quarters);
+        $fields = $this->matcher->match($this->form, $this->version, [$page])['fields'];
+
+        expect(array_column($fields, 'value'))->toBe(array_column($upright, 'value'), "turned {$quarters} quarter(s)")
+            ->and(array_values(array_unique(array_column($fields, 'state'))))->toBe(['read'], "turned {$quarters} quarter(s)")
+            ->and($this->matcher->layoutOf([$page], $stamp))->toBe(['layout' => BlankFormPrintPresenter::LAYOUT, 'evidence' => 'token']);
+    }
+});
+
+it('reads each answer under its own label when the key stamp is read as a line of its own above it (M149)', function (): void {
+    // On about half the bake-off's photos the right-aligned key sat a few thousandths of the page above its label and
+    // clustered alone. Anchored on it, a region began ABOVE the label — "2. Age 29", which no integer parses — and ran
+    // on to the next label, keeping the next question's key under the name.
+    $clean = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ocrMatchAnswers());
+    $raised = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ocrMatchAnswers(), ['key_rise' => 0.6]);
+
+    expect(array_map(static fn (array $f): mixed => $f['value'], $raised))->toBe(array_map(static fn (array $f): mixed => $f['value'], $clean));
+
+    foreach ($raised as $key => $field) {
+        expect($field['state'])->toBe('read', $key)
+            ->and($field['anchored_by'])->toBe('key', $key);
+    }
+});
+
+it('reads a tick the recognizer returns as a symbol as its option\'s mark, never as part of the label (M149)', function (): void {
+    // "✓ Male" and "☑ Male" normalise to "male", so the longest-first label search took the tick into the label and
+    // the walk back for marks found nothing: 37 of the bake-off's answered choices read blank. ☑ was the commonest
+    // glyph Vision returned for a tick; a Greek chi and 区 came back too.
+    foreach (['✓', '☑', '☒', '✗', '×', 'Χ', '区'] as $glyph) {
+        $fields = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, [
+            'consent' => ['Yes'],
+            'sex' => ['Male'],
+            'symptoms' => ['Fever', 'Fatigue'],
+        ], ['marks' => ['consent' => $glyph, 'sex' => $glyph, 'symptoms' => $glyph]]);
+
+        expect($fields['consent'])->toMatchArray(['state' => 'read', 'value' => true], $glyph)
+            ->and($fields['sex'])->toMatchArray(['state' => 'read', 'value' => 'm'], $glyph)
+            ->and($fields['symptoms'])->toMatchArray(['state' => 'read', 'value' => ['fever', 'fatigue']], $glyph);
+    }
+});
+
 it('finds a question by its label when the small key stamp was not read, and reports one found by neither', function (): void {
     $fields = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ocrMatchAnswers(), [
         'omit_keys' => ['age', 'notes'],

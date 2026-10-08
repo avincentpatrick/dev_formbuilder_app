@@ -18,9 +18,13 @@ final class OcrText
      * What a reviewer would accept as "an X in the box". A tick reads back as many things depending on the
      * pen, and a box that is merely drawn round can read as a letter O — so O is deliberately NOT a mark.
      *
+     * The last four are what Cloud Vision returned for real ticks in the bake-off (M149): a ticked or crossed BOX
+     * (☑ the commonest of all, ☒), a Greek chi (compared lower-cased, so Χ too) and 区, a character shaped like a
+     * crossed box. An empty box (☐) is not a mark.
+     *
      * @var list<string>
      */
-    public const array MARKS = ['x', '×', '✓', '✔', '✗', '✘', 'v', '/', '\\', '*', '+'];
+    public const array MARKS = ['x', '×', '✓', '✔', '✗', '✘', 'v', '/', '\\', '*', '+', '☑', '☒', 'χ', '区'];
 
     /** What a recognizer makes of a drawn box wall: a bar, a broken bar, a box-drawing line. */
     private const array BORDER_ARTEFACTS = ['|', '¦', '│'];

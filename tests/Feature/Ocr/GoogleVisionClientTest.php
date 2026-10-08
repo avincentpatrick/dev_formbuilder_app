@@ -65,6 +65,21 @@ it('sends a PDF inline to files:annotate, naming its first five pages', function
         && $r['requests'][0]['pages'] === [1, 2, 3, 4, 5]);
 });
 
+it('asks for handwriting in its language hint, for a photo and a PDF alike (M149)', function (): void {
+    // The bake-off's thirty pages, read again with the hint: 57.2% → 51.1% of fields needing correction, no silent
+    // error left, and no more Cyrillic letters in Tagalog answers — the printed labels were all still found.
+    Http::fake(['vision.googleapis.com/*' => Http::response(['responses' => [['fullTextAnnotation' => ['pages' => []], 'responses' => [], 'totalPages' => 1]]])]);
+
+    app(GoogleVisionClient::class)->annotate('jpeg-bytes', 'image/jpeg');
+    app(GoogleVisionClient::class)->annotate('%PDF-bytes', 'application/pdf');
+
+    Http::assertSentCount(2);
+    Http::assertSent(static fn (Request $r): bool => str_ends_with($r->url(), '/images:annotate')
+        && ($r['requests'][0]['imageContext']['languageHints'] ?? null) === ['en-t-i0-handwrit']);
+    Http::assertSent(static fn (Request $r): bool => str_ends_with($r->url(), '/files:annotate')
+        && ($r['requests'][0]['imageContext']['languageHints'] ?? null) === ['en-t-i0-handwrit']);
+});
+
 it('sends nothing at all when no key is configured', function (): void {
     config()->set('ocr.google_vision.key', '');
     Http::fake();

@@ -67,14 +67,18 @@ final class PrintedPageTypesetter
      *                                                       group strings, or for choices the labels marked
      * @param  array{omit_keys?: list<string>, omit_labels?: list<string>, omit_captions?: bool, omit_numbers?: bool,
      *               stamp?: string|null, layout?: int|string|null, run_together?: list<string>,
-     *               confidence?: array<string, float>, gap_reads?: array<string, list<string|null>>}  $options
+     *               confidence?: array<string, float>, gap_reads?: array<string, list<string|null>>,
+     *               key_rise?: float, marks?: array<string, string>}  $options
      *                                                   `layout` null prints no layout word (a layout-1 sheet);
      *                                                   a string prints it garbled. `run_together` names the keys
      *                                                   whose first marked option's X is read as one word with the
      *                                                   label ("XFemale"), or `runhead` for "Layout2". `gap_reads`
      *                                                   says, per comb key and gap, what the recognizer read where
      *                                                   the separator is printed (null: nothing) — a misread `/`,
-     *                                                   or a mark a pen made there.
+     *                                                   or a mark a pen made there. `key_rise` lifts every key
+     *                                                   stamp that many lines above its label, as the bake-off's
+     *                                                   photos read it (M149); `marks` says, per choice key, what
+     *                                                   the recognizer read a tick as instead of `X`.
      */
     public static function fromModel(array $model, array $answers, array $options = []): self
     {
@@ -86,6 +90,8 @@ final class PrintedPageTypesetter
         $runTogether = $options['run_together'] ?? [];
         $confidence = $options['confidence'] ?? [];
         $gapReads = $options['gap_reads'] ?? [];
+        $keyRise = $options['key_rise'] ?? 0.0;
+        $marks = $options['marks'] ?? [];
         $stamp = array_key_exists('stamp', $options) ? $options['stamp'] : ($model['schema_stamp'] ?? null);
         $layout = array_key_exists('layout', $options) ? $options['layout'] : ($model['layout'] ?? null);
 
@@ -155,7 +161,7 @@ final class PrintedPageTypesetter
                     $page->text((string) $row['label'], $x);
                 }
                 if (! in_array($key, $omitKeys, true)) {
-                    $page->word($key, 0.84, $page->y);
+                    $page->word($key, 0.84, $page->y - $keyRise * self::LINE);
                 }
                 $page->advance();
 
@@ -166,7 +172,7 @@ final class PrintedPageTypesetter
                 $answer = $answers[$key] ?? null;
                 match ($row['area']) {
                     'comb' => $page->comb($row['comb'], $answer, $omitCaptions, $conf, $gapReads[$key] ?? null),
-                    'choices' => $page->choices($row['options'], is_array($answer) ? $answer : [], $conf, in_array($key, $runTogether, true)),
+                    'choices' => $page->choices($row['options'], is_array($answer) ? $answer : [], $conf, in_array($key, $runTogether, true), $marks[$key] ?? 'X'),
                     'line' => $page->line(is_string($answer) ? $answer : null, $conf),
                     'ruled' => $page->ruled(is_string($answer) ? $answer : null, (int) ($row['lines'] ?? 3), $conf),
                     default => $page->advance(),
@@ -257,6 +263,43 @@ final class PrintedPageTypesetter
         }
 
         return new OcrPage(self::WIDTH, self::HEIGHT, $words);
+    }
+
+    /**
+     * The page as a photo STORED turned by whole quarter turns (M149), the way a phone keeps a portrait shot on its
+     * side and says so only in EXIF, which a recognizer's answer does not carry. 1: the text runs up the stored
+     * image (EXIF orientation 6, every one of the bake-off's thirty pages); 2: upside down; 3: the text runs down
+     * (orientation 8). The stored frame swaps its sides on an odd turn, and every word's baseline turns with it.
+     */
+    public function turned(int $quarters): OcrPage
+    {
+        $quarters = (($quarters % 4) + 4) % 4;
+        $map = match ($quarters) {
+            1 => static fn (float $x, float $y): array => [$y, 1.0 - $x],
+            2 => static fn (float $x, float $y): array => [1.0 - $x, 1.0 - $y],
+            3 => static fn (float $x, float $y): array => [1.0 - $y, $x],
+            default => static fn (float $x, float $y): array => [$x, $y],
+        };
+        $box = static function (float $x0, float $y0, float $x1, float $y1) use ($map): array {
+            [$ax, $ay] = $map($x0, $y0);
+            [$bx, $by] = $map($x1, $y1);
+
+            return [min($ax, $bx), min($ay, $by), max($ax, $bx), max($ay, $by)];
+        };
+        $angle = [0.0, -M_PI / 2, M_PI, M_PI / 2][$quarters];
+
+        $words = [];
+        foreach ($this->words as $word) {
+            $symbols = [];
+            foreach ($this->symbolBoxes($word) as [$char, $x0, $y0, $x1, $y1]) {
+                $symbols[] = new OcrSymbol($char, $word['confidence'], ...$box($x0, $y0, $x1, $y1));
+            }
+            $words[] = new OcrWord($word['text'], $word['confidence'], ...[...$box($word['x0'], $word['y0'], $word['x1'], $word['y1']), $angle, $symbols]);
+        }
+
+        return $quarters % 2 === 1
+            ? new OcrPage(self::HEIGHT, self::WIDTH, $words)
+            : new OcrPage(self::WIDTH, self::HEIGHT, $words);
     }
 
     /**
@@ -351,8 +394,9 @@ final class PrintedPageTypesetter
      * @param  list<array{value: string, label: string}>  $options
      * @param  list<string>  $marked  labels whose box holds an X
      * @param  bool  $runTogether  read the first marked option's X and the label's first word as ONE word
+     * @param  string  $mark  what the recognizer read the tick as — `X` unless a case says otherwise
      */
-    private function choices(array $options, array $marked, float $confidence, bool $runTogether): void
+    private function choices(array $options, array $marked, float $confidence, bool $runTogether, string $mark = 'X'): void
     {
         $x = self::LEFT + 0.004;
         $joined = false;
@@ -371,14 +415,14 @@ final class PrintedPageTypesetter
                 // The pen came close to the text: the recognizer reads "XFemale" as one word.
                 $words = preg_split('/\s+/', trim($option['label'])) ?: [];
                 $first = array_shift($words) ?? '';
-                $this->words[] = ['text' => 'X'.$first, 'x0' => $x, 'y0' => $this->y, 'x1' => $labelX + (mb_strlen($first) + 1) * self::CHAR, 'y1' => $this->y + self::LINE * 0.8, 'confidence' => $confidence];
+                $this->words[] = ['text' => $mark.$first, 'x0' => $x, 'y0' => $this->y, 'x1' => $labelX + (mb_strlen($first) + 1) * self::CHAR, 'y1' => $this->y + self::LINE * 0.8, 'confidence' => $confidence];
                 if ($words !== []) {
                     $this->text(implode(' ', $words), $labelX + (mb_strlen($first) + 1) * self::CHAR);
                 }
                 $joined = true;
             } else {
                 if ($isMarked) {
-                    $this->word('X', $x + 0.004, $this->y, $confidence);
+                    $this->word($mark, $x + 0.004, $this->y, $confidence);
                 }
                 $this->text($option['label'], $labelX);
             }

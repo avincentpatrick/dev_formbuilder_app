@@ -698,6 +698,20 @@ export function useBuilderStore(props: BuilderPageProps) {
         else void commitSectionEdit(target.uid);
     }
 
+    /**
+     * A label edited in place (M150, `R-34edf1f5`): set once and saved now — one PATCH, one undo entry — through the same
+     * commit the settings pane's debounced edits use, so the baseline, a 409 and a refusal behave exactly as they do there.
+     * A blank or unchanged label is not an edit, and the server refuses a blank one anyway (`required`).
+     */
+    function renameField(uid: Uid, label: string): void {
+        const field = findField(uid);
+        const next = label.trim();
+        if (!field || next === '' || next === field.label) return;
+        field.label = next;
+        touch(uid, 'field');
+        flushCommit();
+    }
+
     function commitFieldEdit(uid: Uid): Promise<void> {
         return enqueue(async () => {
             const field = findField(uid);
@@ -1091,6 +1105,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         cancelReorder,
         commitReorder,
         touch,
+        renameField,
         select,
         undo,
         redo,

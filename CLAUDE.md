@@ -116,12 +116,13 @@ file, never copy out of it. `state.php` reports how far behind the trunk that fi
   so it goes at the end of the section it governs and carries its own title.
 - Decisions live in `docs/claims/decisions.md`. When something is genuinely the user's call, **append
   the question, two or three real options and your recommendation, then take the next row in the same
-  turn.** Never idle on a question, and never re-ask an open one.
-- ⛔ **File a decision silently; put it to the user only when the tier being worked holds a row whose
-  remaining work is blocked on it.** Ask for those by name, with their options, and **never read the board
-  at them.** The trigger is a *work* row — not the decision row, and not the decision own tier. The line
-  spends the same two words on a question nobody has ever seen and on a row whose precondition merely does
-  not hold, so a raw count of them reads as *decide all of this now*.
+  turn.** Never idle on a question, and never re-ask an answered one.
+- ⛔ **Ask every decision in the session that files it.** Before that session ends, put it to the user by
+  name — in plain words, with its options and your recommendation — and record the answer the moment it
+  comes. One left unanswered is asked again first thing by the next session, before any row it blocks.
+  **Never leave a decision unasked, and never read the board at the user:** ask the questions themselves, a
+  few at a time, never a count or a list of ids. A recommendation creates work as often as it ratifies what
+  is built, so recording an answer files that work with a tier in the same push.
 - **A held row is unscheduled, not invisible.** It sits in the line, in its position, with its blocker
   named. Do not start one, do not offer it as the next step, and do not re-derive its blocker for the
   user — it becomes work only on their explicit signal. **Progress is counted over the whole pipeline,
@@ -213,6 +214,11 @@ the parent commit and accidentally gives the right answer.
 4. Update only your own status block, run `php scripts/pipeline.php` — the bullet you prepend moves the
    markers the line cites — then `php scripts/next.php --lane=a --write`, and push them together.
 5. End with a three-to-five bullet status and the bare next-prompt line.
+
+⛔ **A fix to a user's comment is announced by name.** The close-out quotes the comment, says it is fixed
+and where it is live, and gives the exact clicks to check it. Until the user confirms it, the next session
+opens with that check — before any step that depends on it, and before asking for anything that step needs.
+Say what a step is *for* in one line before any question about its inputs.
 
 ## Signalling
 

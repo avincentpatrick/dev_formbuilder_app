@@ -16,7 +16,55 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M146` is merged; the next session takes the during-testing tier's next rows by `D13`'s overlap rule (the line names them), and the bake-off goes ahead of everything the moment the layout-3 samples and a key that reads arrive
+## Status: ACTIVE CLAIM — `M147`, every open decision answered: the user answered all thirty in chat (twenty-eight as recommended, `D39` B, `D40` B) and replaced `D66`'s "file a decision silently" with "ask it in the session that files it" (`m147-decisions-answered`)
+
+Taken 2026-10-08. Branch `m147-decisions-answered`, cut from `origin/main` at `a9a82c41`, PR into `main`. Docs and scripts only.
+The session opened on the user's interruption of the previous one: they asked whether their Print blank comment (contact numbers
+boxed per digit) was fixed, why they were being asked about samples, and why thirty decisions were still open when their rule is
+that nothing blocking upcoming work stays open. Answered in chat from the code: layout 3 (`M144`) prints a phone and a number in one
+open box, it is deployed on both hosts, and no session ever told the user to look. The user then answered every open decision in one
+pass — **accept the recommendation on every decision that carries one; `D39` B (Meridian stays through testing, a name is chosen
+before launch); `D40` B (the pilot customer is chosen after internal testing)** — and set two standing rules: a session that files a
+decision asks it by name before the session ends, and a fix to a user's comment is announced by name with the steps to check it.
+The OCR bake-off stays first in the line and is not touched here; it waits on the user's approval of the layout-3 paper.
+
+### Evidence verified
+- **Thirty open.** `php scripts/state.php` lists them by tier (11 during-testing, 8 before-launch, 11 after-launch); `docs/claims/decisions.md`
+  is split into open and answered on its `## ANSWERED` heading by both `scripts/state.php` and `scripts/pipeline-lint.php`, so moving
+  an entry below that heading is what answers it.
+- **Seven `**Awaits Dn.**` tokens** in `docs/feature-backlog.md`, naming `D8`, `D16`, `D17`, `D23`, `D27` (two rows) and `D29`. Three
+  rows are `during-testing` (`D27` ×2, `D29`), four `after-launch`.
+- **The rule being replaced** is written in three places: `CLAUDE.md`'s *Taking a row* section ("File a decision silently…" and "never
+  re-ask an open one"), `scripts/next.php`'s generated hand-off ("do not re-ask them and do not stall"), and PROGRESS.md Standing Rule 7's
+  `decisions.md` paragraph ("The user answers in batches"). No test pins either sentence (grepped `tests/` and `scripts/`).
+
+### Premise verified
+- **The answers are the user's, given in chat this session**, as every decision since `D66` has been; the Board is stale and is not
+  read. Twenty-eight entries carry a recommendation; `D39` carries none by design (a name is its owner's call) and `D40`'s presumes a
+  candidate exists, so both were asked separately and answered B.
+- **"Accept the recommendation" is not "change nothing".** Several recommendations create work — `D27`'s save-door refusal, `D29`'s
+  two wrappers and its documented rule, `D1`'s docblock, `D10`'s discovery sweep, `D30`'s comment, `D45`'s committed harness, `D50`'s
+  header read, `D56`'s revisit, `D73`'s threat-model row and sentence, `D39`'s rename — and each is filed with a tier in this push, or
+  added to the open row that already carries it, so no answer leaves an unqueued obligation. Answers that ratify what is built
+  (`D3`, `D4`, `D19`, `D55`, `D101` and the as-built gate answers) file nothing.
+- **`D66` was the user's own rule** (2026-09-26). It is superseded by their direction today, recorded as a new answered decision whose
+  number `state.php` derives, not overwritten: `D66`'s record stays as history.
+
+### Remedy verdict
+Works as measured: each entry moves below `## ANSWERED` with an *Answered 2026-10-08* paragraph and its heading's tier token replaced
+by the answer, exactly as `D99` and `D100` were recorded; `pipeline-lint` P7e refuses an `Awaits` naming an answered decision, so every
+one of the seven is stripped or retargeted in the same push. The line, the census and the hand-off are regenerated after.
+
+Files: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `CLAUDE.md`, `PROGRESS.md` (Standing Rule 7's paragraph and the lane-A
+status bullet only), `scripts/next.php`, `docs/PRD.md` (the product-name note and markers), `docs/deployment-infrastructure.md`
+and `docs/ocr-pipeline-design.md` (markers only, at end of file), `docs/claims/lane-a.md`; regenerated `docs/pipeline.md`,
+`docs/backlog-triage.md`, `docs/gate-baselines.md`.
+Shared artefacts taken: `docs/**`, `PROGRESS.md` (own block only), `CLAUDE.md`.
+Paired files taken: none.
+Namespaces spent: one decision id (the standing rule), derived by `state.php`; nothing from the ADR or migration namespaces.
+Prediction: every host lint green on the first run after the line is regenerated; `state.php` reports zero open decisions; CI 6/6, with
+PHPStan unmoved (the diff touches no scanned path) and Pint reaching `scripts/next.php`. The one most likely wrong: `pipeline-lint`
+refusing a new marker or a stripped token on its first run, because a marker's grammar is positional and a token can sit mid-row.
 
 ## RELEASED — `M146`, the during-testing batch: an archived form's link closes (`D99` A), repeat groups reach the spreadsheet (`D100` A), the inbox orders by when a response was sent, and a refused field save names the setting (merged as PR #339, `bf628880`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

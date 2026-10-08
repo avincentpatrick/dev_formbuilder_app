@@ -16,7 +16,69 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M148` is merged; the next session opens with the user's check of the Layout 4 Print blank (`r3-print`) and the sample CSVs (`r3-c11`) on the smoke-test page, then — once the paper passes — the ~15 layout-4 samples for the bake-off (the laptop key already reads, made by a side session in the `formbuilder-ocr` worktree; its guide is `~/.claude/plans/while-other-session-is-lexical-grove.md`, Part B); the builder rows `D103` put before Oct 12 are `M149` (Structure: the handle, a drag that glides, a label edited in place, the handle's screen-reader text) and `M150` (Preview: a label edited in place, dragging)
+## Status: ACTIVE CLAIM — `M149`, the OCR bake-off's first round and the three reader defects it found: a phone photo stored on its side is never turned upright, a key stamp read as its own line puts the question's own label (and the next question's key) into the answer, and a tick read as a symbol (☑ ✓ ✗) is swallowed into its option's label; plus the handwriting language hint and the answer sheet's leading-zero file names (`m149-ocr-reader-fixes`)
+
+Taken 2026-10-08 by the bake-off side session, in its own worktree `C:\laragon\www\formbuilder-ocr` (the main checkout is idle on
+`main`). Branch `m149-ocr-reader-fixes`, cut from `origin/main` at `c173721d`, PR into `main`. The user built the OCR Test Form on
+staging (12 questions, Scanning on), printed 15 layout-4 copies, filled them by hand and photographed both pages of each with a
+phone; `ocr:bakeoff-layout` ran on the server and `ocr:bakeoff` on the laptop with the `meridian-laptop-bakeoff` key (30 real
+reads). `D94` puts OCR first the moment its inputs arrive, so this takes the number `M148`'s release gave the `D103` builder rows;
+they move to the next two. Rows: none exist yet — filed in this increment's first work commit from the measurements below, three
+`major` closed by it and the rest filed open with tiers.
+
+### Evidence verified
+Measured on the 30 real pages (cached Vision answers beside each photo outside the repository; none is committed, because they carry
+the testers' names and addresses):
+- **Real path: 177 of 180 fields need correction (98.3%), 158 "question not found".** Every photo is 4624×3468 with EXIF
+  orientation 6. Vision reports boxes in the stored frame, and the median baseline angle of each page's long words is −89.5° to
+  −90.9° on 30 of 30 pages, every word within 15° of it. `OcrLineBuilder::tilt()` returns 0 past `MAX_DESKEW` (17°), so the lines
+  are slices across vertical text — its own docblock: "the matcher then finds no anchors and says so per field".
+- **Turned upright** (each cached answer's vertices mapped into the upright frame): 0 not found, 76.1%. Lines dumped through
+  `OcrLineBuilder`: the right-aligned key `field_N` sits about 0.006 of the page above its label and clusters as its own line on
+  about half the photos. `PrintedFormMatcher::anchor()` takes the key first, so `region()` holds the label line — "2. Age 29", which
+  no integer parses — and stops at the next anchor's label line, keeping the next key: "ORLY MARIE M. CABAL field_2".
+- **37 answered choices read blank.** `OcrAnswerReader::labelSpan()` tries the longest span first and `OcrText::similarity()` compares
+  normal forms, which erase symbols, so "☑ Male" and "✓ Male" match "Male" with no lead and the mark is lost; only a letter mark
+  (x, v) survives. Vision returned the marks as ☑ (most often), ✓, ✗ joined to the label, X, x, a Greek Χ and 区; ☑, ☒, χ and 区
+  are not in `OcrText::MARKS`.
+- **The answer sheet:** Excel stored the user's `01`…`09` as numbers, and `OcrAnswerSheet::rowFor()` compares stems literally, so no
+  row matched its folder.
+
+### Premise verified
+- Every coordinate consumer goes through `OcrLineBuilder::lines()` (`PrintedFormMatcher::layoutOf()`, `match()`, `stampTokens()`),
+  and the review screen draws no box over the page, so turning the page there reaches everything. The stamp and the layout number
+  were found on all 15 sideways scans (they read tokens), so only placement fails.
+- Phone photos are the primary input — the user chose phone only — and a staging upload takes the same JPEG through `ReadOcrScanJob`
+  to the same matcher, so staging fails the same way today; `ocr-staging-scan` should follow this deploy.
+- The thresholds are not the defect: at confidence 90 and above, 54 right and 1 wrong; below 70, about as many wrong as right.
+- G9 stays missed after these fixes (54.4%), which triggers `D97`'s vision-language arm; that, and the threshold write-up and
+  ADR-0010, stay on `ocr-provider-bakeoff` — not this increment.
+
+### Remedy verdict
+- **Works, measured on the same cached pages through the real matcher and scorer (`--offline`) before any test was written:**
+  upright frame 98.3% → 76.1%; anchoring on the label line when the key clusters above it AND ending the previous region at the next
+  KEY line → 61.1% (the label anchor alone measured 73.9% and leaked the next key into the names); a whole mark word never starting a
+  label span, with ☑ ☒ χ 区 as marks → 60.0%, blank choices 37 → 27 (the other 27 Vision never returned); `languageHints:
+  ["en-t-i0-handwrit"]` on 30 fresh reads → 54.4%, silent errors 2 → 1, Cyrillic substitutions in Tagalog text 4 → 0.
+- **The product remedy for the turn reads the page's own word angles** — snap their median to a quarter turn, map every box, swap the
+  page's sides — rather than EXIF: Vision's answer carries no orientation and a scanned PDF has none. It is the mapping measured above.
+
+Files: `app/Services/Ocr/OcrLineBuilder.php`, `app/Services/Ocr/PrintedFormMatcher.php`, `app/Services/Ocr/OcrAnswerReader.php`,
+`app/Services/Ocr/OcrText.php`, `app/Services/Ocr/GoogleVisionClient.php`, `config/ocr.php`,
+`app/Services/Ocr/Bakeoff/OcrAnswerSheet.php`, `tests/Feature/Ocr/Support/PrintedPageTypesetter.php`,
+`tests/Feature/Ocr/PrintedFormMatcherTest.php`, `tests/Feature/Ocr/GoogleVisionClientTest.php`,
+`tests/Feature/Ocr/Bakeoff/OcrBakeoffCommandTest.php`, `docs/ocr-pipeline-design.md` (§9's results and the end-of-file markers),
+`docs/deployment-infrastructure.md` (the `ocr-staging-scan` marker's blocker); and by procedure `docs/feature-backlog.md`,
+`docs/claims/lane-a.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block).
+Shared artefacts taken: `docs/**`, `PROGRESS.md` (own block).
+Paired files taken: none — no design-system, token or notification file is touched.
+Namespaces spent: nothing from either namespace; ADR `0010` stays reserved for the bake-off's write-up.
+Prediction: each fix's new case red first on the unfixed reader (a sideways page finds no question; a key above its label leaves an
+integer unreadable and a name carrying the next key; "✓ Male" and "☑ Male" read blank); every existing OCR case stays green;
+four `mutate.php` mutants CAUGHT (no turn, no label re-anchor, no mark skip, ☑ out of `MARKS`); and the real cached pages, read
+`--offline` from the ORIGINAL sideways folder with no transform, reproduce 54.4% within two points. **Most likely wrong:** that last
+number — the product turn maps normalised boxes and re-measures the residual tilt, where the measurement mapped pixel vertices, and
+line clustering is sensitive to a few thousandths of a page.
 
 ## RELEASED — `M148`, Print blank layout 4: each comb gap prints its separator and no box, the reader drops a printed separator and refuses a group longer than its boxes, and a renderer case reads what dompdf draws; the staging smoke test's Round 2 filed with tiers and `D103` recorded (merged as PR #341, `8d67c4a1`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

@@ -16,85 +16,53 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M150`, Structure's four builder rows from `D103`: the drag handle is hard to see, a dragged question jumps instead of gliding, a question's label cannot be edited in place, and the handles' screen-reader text names only Enter; plus a keyboard reorder that loses focus and never saves (`m150-structure-builder`)
+## Status: NO ACTIVE CLAIM — `M150` is merged and live on staging; the next session opens with the user's check of the Structure fixes on staging (`r2-c17`, `r2-c18`: the handle, a drag that glides, **Edit label**) and, if it is still not done, the user's staging scan (`ocr-staging-scan`, then the server's `.env` backup deleted); then takes Preview's two `D103` rows — a label edited in place (`R-74c3cf35`, reusing `InlineLabelEdit.vue`) and dragging in Preview (`R-2baef8ea`, the riskiest) — as the next increment
 
-Taken 2026-10-09. Branch `m150-structure-builder`, cut from `origin/main` at `78eec4f3`, PR into `main`. Rows: `R-91c1792e`,
-`R-adce6e14`, `R-34edf1f5`, `R-732e0715` (all `early-testing`, filed by `M148` from Round 2 of the staging smoke test, `r2-c17` and
-`r2-c18`), and the focus row filed in this claim. **Batching:** `D103` put these four in one increment by name, so they share
-`BuilderCanvas.vue` and `useCanvasReorder.ts` against `D13`'s one-file-per-batch rule — they are one surface, and the user's
-answer grouped them. **Also in this increment's first work commit:** `D104`, answered A in this session (recorded in `docs/claims/decisions.md`, its
-markers in `docs/ocr-pipeline-design.md`, `R-a21fa6e8` retiered `during-testing` with its reason), and six rows filed while
-planning — not in this claim commit, because the pre-push guard holds a claim push to protocol paths and the design doc is not one.
+## RELEASED — `M150`, Structure's four builder rows from `D103` and the keyboard focus row beside them: the grip drawn heavier, rows that glide to their new places, a question's label edited on its row, the grips naming Space, and a keyboard step that keeps focus; `D104` recorded as A (merged as PR #343, `fe096004`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-### Evidence verified
-Each row against the trunk at `78eec4f3`; the three commits since `c173721d` touch no file under `resources/`.
-- **`R-91c1792e` — held.** `.canvas__grip` in `BuilderCanvas.vue` is a transparent 28px button with no border, `MdsIcon name="grip"
-  size="sm"`, colour `--mds-color-text-secondary`, a background only on hover. `icons.ts` draws `grip` as six `h.01` strokes, and
-  `Icon.vue` strokes every icon at 1.5 in a 24-unit box, so each dot is about 1px at 16px. `ScopeTree.vue` uses the same glyph.
-- **`R-adce6e14` — held, and one cause in it is not one.** `onFieldDragMove` calls `store.placeField` on every `pointermove` with no
-  threshold and no auto-scroll, and nothing in `BuilderCanvas.vue` animates a row's change of place, so each row snaps. The row's
-  "no animation frame throttle" is not a cause: a `placeField` to the same slot writes the same values, which Vue does not
-  re-render, and Chromium already coalesces `pointermove` to one per frame.
-- **`R-34edf1f5` — held.** The label is a `span` inside `button.canvas__field-main`; it is edited only through `ConfigPanel.vue`'s
-  Label input (`setField`, then the store's 600ms `touch()`, then one PATCH and one undo entry per burst); `UpdateFieldRequest`
-  refuses an empty label (`required|max:500`); no inline editor exists in the design system or the app (`ReferenceFilesPanel.vue`'s
-  rename is the nearest — an `MdsTextInput` swapped in place, opened by an `edit` icon button). The two E2E locators on
-  `.canvas__field-main` are `builder-axe.spec.ts` and `builder-preview-authoring.spec.ts`'s `selectField()`.
-- **`R-732e0715` — held, and it has a second copy.** Both `BuilderCanvas.vue` labels say "Press Enter to grab"; `onFieldKeydown` and
-  `onSectionKeydown` grab on Enter or Space. `ScopeTree.vue`'s grip says the same and `useScopeTreeMove.ts` also takes Space —
-  fixed here too, as the same defect.
-- **The focus row — held by reading, to be proved red first.** Each group renders its own `ul`, so a keyboard step into another
-  section destroys the focused grip; the next Enter reaches the page, `commitReorder` never runs, and `grabbedUid` stays set, which
-  both pointer-down handlers read as "a keyboard grab is on". The spec that steps a question out of a section asserts only the
-  local list and a saved state that was already true.
+Shipped 2026-10-09. Branch `m150-structure-builder`, cut from `origin/main` at `78eec4f3`. The claim is `98519f77`, pushed before any file
+was opened; the work is `16652209` (`D104` recorded with the work it files, six rows filed), `721deaca` (the code and its tests) and
+`64f0e4c8` (the five rows closed). Deployed by itself (`D47`): run 37818587521 ran `deploy.ps1` in 1m50s after the post-merge CI run
+37814936542 (6/6, the same step counts).
 
-### Premise verified
-- **Who sees it:** the user asked for all four before Oct 12 (`D103`); the next increment does Preview's two and will reuse the
-  inline editor, so the editor takes no store knowledge and lives in `components/builder/`.
-- **One surface, one writer:** no other session is in the builder (one lane, `ADR-0022`); the `formbuilder-ocr` worktree is detached
-  at the trunk and idle.
-- **What re-runs on each move:** `PreviewPane`'s shape watch and `LogicRail`'s refresh both return early when their view is hidden,
-  so a drag in Structure costs one model recompute per slot change, not per event — nothing needs pausing.
-- **The design system's glyph is shared** (ScopeTree, the scopes page's Move button), so the handle is fixed in the builder and the
-  glyph is filed rather than changed under two other pages.
-- **The label's write path already has one PATCH, one undo entry, a 409 and a field-error display**; an in-place editor must go
-  through it rather than a second path.
+**What changed:**
+- **The grip (`R-91c1792e`).** The design system's icon at `md` with the builder's own stroke of 3 — dots about 2.5px where they were about
+  one — and a grabbing cursor while a drag is on. The colour was never the cause (about 6:1); a resting border, the obvious fix, measured
+  about 1.2:1. The glyph itself is shared and filed against the design system.
+- **The glide (`R-adce6e14`).** `useFlipReorder.ts`: every row and section measured before Vue patches a new order, each moved node put
+  back where it was and let go to `--mds-duration-moderate` — sections first, rows net of their section. `<TransitionGroup>` was rejected on
+  reading Vue's runtime. A press becomes a drag only past 4px, `pointercancel` puts everything back, a second pointer is ignored, and the
+  dragged row is left out of its own hit-test by uid.
+- **The label (`R-34edf1f5`).** "Edit label" or a double-click swaps the row's main button for `InlineLabelEdit.vue` (an `MdsTextInput`,
+  no store knowledge); Enter or blur commits once through `useBuilderStore.renameField()` — one PATCH, one undo entry — Escape cancels, a
+  blank or unchanged label is not an edit, and focus returns to the row. The type caption steps aside while editing.
+- **The words (`R-732e0715`).** "Press Enter or Space to grab" on both builder grips and on `ScopeTree.vue`'s.
+- **The focus row (filed and taken here).** After each keyboard step focus returns to the moved item's grip; before, a step out of a
+  section dropped it on the page, the drop was never saved and the grab stayed on, refusing every later drag.
+- **`D104` = A, recorded** with what it files: `ocr-vlm-arm` (`during-testing`, blocked on an Anthropic key and the agency's consent),
+  the bake-off's remaining work as ADR-0010 (`ready`), and `R-a21fa6e8` retiered `during-testing` with its reason.
+- **Filed open, `during-testing`:** the design system's grip glyph, a keyboard grab that follows focus rather than the grabbed item, a
+  section drag announced without its name, the generic "Duplicate field" and "Delete field" names, and a section's title edited in place.
 
-### Remedy verdict
-- **`R-91c1792e` — works with a different cause than the row names.** The colour is about 6:1 on white; the dots are too small to
-  carry it. A resting border or a sunken background, the obvious fix, measures about 1.2:1 and would not show. The builder's grip
-  draws the icon at `md` with its own stroke of 3 (about 2.5px dots) and shows a grabbing cursor while dragging; the before and
-  after are screenshotted in both themes at 1440 and 375.
-- **`R-adce6e14` — the prescribed `TransitionGroup` is wrong here.** Read against Vue's runtime: in CSS mode a leaving row stays in
-  the layout for two frames (a duplicate under the pointer on every cross-section move), a moved row does not glide across lists at
-  all, nested groups double-count a moving section's shift, and Vue Test Utils stubs it. The remedy is a small FLIP over the whole
-  canvas keyed by `data-field-uid` and a new `data-group-key` (measure before the patch, offset after, groups first), a 4px
-  threshold before a drag begins, and `pointercancel` handled; `setPointerCapture` is deliberately not used, because the row is
-  recreated on a cross-section move and the capture would go with it.
-- **`R-34edf1f5` — works through a store action, never per keystroke.** Writing on each keystroke through `touch()` would save a
-  partial label at any pause over 600ms and leave one undo entry per pause. `renameField(uid, label)` sets the trimmed label and
-  flushes once — one PATCH, one undo entry — and refuses an empty or unchanged one; the editor commits on Enter or blur, cancels on
-  Escape, and returns focus to the row.
-- **`R-732e0715` — works:** "Press Enter or Space to grab", still matching `/^Reorder Short text/`.
-- **The focus row — works:** after each keyboard step, focus returns to the moved item's grip.
-
-Files: `resources/js/components/builder/BuilderCanvas.vue`, `resources/js/components/builder/useCanvasReorder.ts`,
-`resources/js/components/builder/useFlipReorder.ts` (new), `resources/js/components/builder/InlineLabelEdit.vue` (new),
-`resources/js/components/builder/useBuilderStore.ts` (`renameField`), `resources/js/components/scopes/ScopeTree.vue` (one label),
-their Vitest specs (`BuilderCanvas.test.ts`, new `useCanvasReorder.test.ts` and `useFlipReorder.test.ts`), and E2E
-`tests/e2e/builder-preview-authoring.spec.ts`, `tests/e2e/builder-axe.spec.ts`, new `tests/e2e/builder-structure.spec.ts`
-(with the shared helpers moved under `tests/e2e/support/`); and by procedure `docs/feature-backlog.md`, `docs/claims/lane-a.md`,
-`docs/claims/decisions.md`, `docs/ocr-pipeline-design.md`, `docs/deployment-infrastructure.md` (`ocr-staging-scan`, when the
-user's scan is done), `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block).
-Shared artefacts taken: `docs/**`, the three `tests/e2e/*.spec.ts` above, `PROGRESS.md` (own block).
-Paired files taken: none — no design-system, token or notification file is touched; colours are semantic tokens only.
-Namespaces spent: nothing from either namespace; ADR `0010` stays reserved for the bake-off's write-up.
-Prediction: the hardened keyboard spec red first on the trunk's code (the grip not focused after a step out of a section, and no
-"Dropped"); every new Vitest case red against its mutant by the byte-backup harness (`mutate.php` drives Pest only); the whole Vitest
-suite and the three E2E specs green; PHPStan cannot move (no PHP in the diff); CI 6/6 on the first run. **Most likely wrong:** the
-FLIP — happy-dom has no layout, so its unit test proves the arithmetic on stubbed rects and only the E2E drag and a screen recording
-prove the glide; and a within-group keyboard step may keep focus after all, in which case the focus row's proof rests on the
-cross-section case alone.
+**How the prediction fared:**
+- ✅ The hardened keyboard spec went red first on the trunk's code for the predicted reason — after the step out of the section the new grip
+  was not focused — and green after the fix; it now also waits for the reorder request and checks the order after a reload.
+- ✅ The three E2E specs green at all three viewports (21 passed, 13.8 min, one worker: `builder-structure`, `builder-preview-authoring`,
+  and `builder-axe`'s "populated & interactive" and "choices from another form" in both themes); Vitest 207 files and 3,418 tests;
+  `vue-tsc` clean on both configs; Pint clean; PHPStan could not move (no PHP in the diff); CI 6/6 on its first run.
+- ❌ **"Every new Vitest case red against its mutant" was wrong on the first pass — two of seventeen SURVIVED, and both were real
+  findings.** The hidden-canvas check after the patch was redundant (the measurement before it already skips a hidden canvas) and is gone;
+  and the finish-once guard was masked by `renameField`'s unchanged-label check — the case that shows it is Escape followed by a blur,
+  which would have saved the discarded text, and it is now a test. 17 of 17 after, by the byte-restore harness (`mutate.php` drives Pest
+  only).
+- ⚠️ **The one named most likely wrong held as written:** the FLIP's unit test proves its arithmetic on stubbed rects, the E2E drag proves
+  the order and the save, and the glide itself is seen only by eye — the screenshots were taken with reduced motion, so they show where
+  rows sit, not how they move. The within-group focus question was not measured separately; the cross-section case carried the proof.
+- ❌ **Two defects the claim did not foresee, both fixed before the PR:** the move that begins a drag hit-tested the dragged row against
+  itself (the threshold put the flag and the hit-test in one tick, before the flag rendered) — found writing the unit test; and at 375px
+  the editor was about 50px wide beside the type caption's 84px floor — found by the screenshot.
+- ⚠️ **A process trap:** the claim push was refused by the pre-push guard because it carried `docs/ocr-pipeline-design.md`, which is not a
+  protocol path; the `D104` record moved to the first work commit, as `M148` and `M149` had done.
 
 ## RELEASED — `M149`, the OCR bake-off's first round and the three reader defects it found: a photo stored on its side is turned upright, a key stamp read as its own line no longer puts the label into the answer, a tick read as a symbol is a mark; plus the handwriting language hint and the answer sheet's numeric file names (merged as PR #342, `49412bb4`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

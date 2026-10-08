@@ -13641,7 +13641,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   returned nothing between the printed labels, or a letter (`Y`, `H`, `F`) the reader rightly does not take as a mark. A text
   recognizer is the wrong instrument for a tick: measuring the ink inside each printed box, or `D97`'s vision-language arm,
   reads it. Choices alone are 39 of the 92 fields that still needed correction. **Live.** Filed by `M149`.
-  **Tier: early-testing.**
+  **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-08 by `M150`: `D104` answered A — this row's remedy is
+  the vision-language arm (`ocr-vlm-arm`), which is built and measured during testing; until then a reviewer keys a blank tick on
+  the mandatory review screen.**
 
 - **`minor` · A `1` written as one stroke in a date or time box is dropped as the box's wall, and a printed `/` is sometimes
   read as `1` or `0`.** Found by `M149` in the same round: "12 / 11 / 1981" read as `122111 190`, "21 / 10 / 2025" as
@@ -13659,3 +13661,39 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`nit` · A crossed-out word is read as part of the answer.** Found by `M149` in the same round: an email written
   "rey.deguzmanjr@~~pitahc~~.pitahc.gov.ph" read as `rey.deguzmanjr@pital.pitahc.gov.ph`, withheld at 50. The confidence
   rule caught it here; nothing in the reader knows a strike-through. **Live.** Filed by `M149`. **Tier: during-testing.**
+
+- **`minor` · A keyboard reorder that moves a question's row loses focus, so the move is never saved and every later drag is
+  refused until the page is reloaded.** Found by `M150` while planning the Structure rows. Each group renders its own list in
+  `BuilderCanvas.vue`, so an arrow key that steps a question into another section (`useCanvasReorder.ts`, `stepFieldAcross`)
+  destroys its row and the focused grip with it, and a step that makes Vue move the grabbed row's node blurs it too. The next
+  Enter lands on the page rather than the grip, `commitReorder` never runs, the order is never saved, and `grabbedUid` stays
+  set — which `onFieldPointerDown` and `onSectionPointerDown` read as "a keyboard grab is on" and refuse every pointer drag.
+  `builder-preview-authoring.spec.ts` passes over it: it asserts the local list, and a saved state that was already true. The
+  remedy re-focuses the moved item's grip after each step. **Live.** Filed by `M150`. **Tier: early-testing.**
+
+- **`nit` · The design system's `grip` icon draws six dots about one pixel across at its small size.** Found by `M150` while
+  fixing `R-91c1792e`. `icons.ts` draws `grip` as six zero-length strokes at the shared 1.5 stroke width, so each dot is about
+  1px at `sm` and 1.25px at `md`; the builder's grip now thickens its own stroke, but `ScopeTree.vue`'s grip and the scopes
+  page's Move button still draw the faint glyph. The remedy is a heavier glyph in the design system, checked on every use.
+  **Live.** Filed by `M150`. **Tier: during-testing.**
+
+- **`minor` · A keyboard grab follows the grip that has focus rather than the item that was grabbed.** Found by `M150` beside
+  the focus row above. `onFieldKeydown(event, uid)` acts on the uid of the grip that received the key, and nothing ends a grab
+  when focus leaves its grip, so grabbing one question, tabbing to another's grip and pressing an arrow moves the second one
+  inside the first one's reorder session, and Enter there announces the second as dropped. The remedy acts on `grabbedUid`,
+  or cancels a grab when its grip loses focus. **Live.** Filed by `M150`. **Tier: during-testing.**
+
+- **`nit` · A section drag is announced as "Dragging a section", without the section's name.** Found by `M150` in
+  `useCanvasReorder.ts`: a question's drag, grab and drop name the question, and a section's name only its position
+  ("Dropped section, section 2 of 3"). **Live.** Filed by `M150`. **Tier: during-testing.**
+
+- **`nit` · Every question's Duplicate and Delete buttons share one name, "Duplicate field" and "Delete field".** Found by
+  `M150` in `BuilderCanvas.vue`: a screen reader listing the buttons hears the same two names on every row, and the builder
+  says "question" everywhere else. The remedy names the question, as the grip does ("Reorder Age …").
+  **Live.** Filed by `M150`. **Tier: during-testing.**
+
+- **`minor` · A section's title cannot be edited in Structure.** Found by `M150` beside `R-34edf1f5`, which gives a question's
+  label an in-place editor: a section's title is still text inside `button.canvas__section-head` in `BuilderCanvas.vue`, edited
+  only from the settings pane (`ConfigPanel.vue`'s `setSection`), and the server caps it at 255 characters. The same
+  `InlineLabelEdit` serves it, through a `renameSection` beside `renameField`. **Live.** Filed by `M150`.
+  **Tier: during-testing.**

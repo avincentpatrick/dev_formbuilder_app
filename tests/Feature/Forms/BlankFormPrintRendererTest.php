@@ -81,6 +81,91 @@ function printableForm(Tenant $tenant, User $user, string $title = 'Household Su
     return [$form->refresh(), $published];
 }
 
+/**
+ * A published form holding one question of every combed type, for the geometry case (layout 4, `M148`).
+ *
+ * @return array{0: Form, 1: FormVersion}
+ */
+function combedForm(Tenant $tenant, User $user): array
+{
+    $form = app(FormService::class)->create($tenant, $user, 'Combs');
+    $draft = $form->draftVersion;
+
+    addFormField($draft, $user, 'visit_date', FieldType::Date, 0);
+    addFormField($draft, $user, 'visit_time', FieldType::Time, 1);
+    addFormField($draft, $user, 'seen_at', FieldType::Datetime, 2);
+    addFormField($draft, $user, 'travel', FieldType::Duration, 3);
+    addFormField($draft, $user, 'address', FieldType::CascadingSelect, 4, ['config' => [
+        'levels' => [['key' => 'region'], ['key' => 'city']],
+        'options' => [
+            ['value' => 'ncr', 'label' => 'NCR', 'level' => 'region', 'parent' => null],
+            ['value' => 'manila', 'label' => 'Manila', 'level' => 'city', 'parent' => 'ncr'],
+        ],
+    ]]);
+
+    $published = app(PublishService::class)->publish($form->refresh(), $user);
+
+    return [$form->refresh(), $published];
+}
+
+/**
+ * The box row of every question's comb as dompdf DRAWS it, keyed by the question's key: each cell's computed
+ * left border, its width with that border, its text, and whether it is a group gap.
+ *
+ * Read through the `end_frame` callback because nothing else can see it. The HTML says what was ASKED for; the
+ * cascade decides what is drawn, and layouts 2 and 3 both shipped a gap that the HTML called borderless and
+ * dompdf drew as an answer box (`.comb td` outranked `.comb__gap`). The frame tree is disposed by the end of
+ * `render()`, so the callback is the only point where a frame's computed style can be read. The banner's
+ * sample comb sits outside any question and is skipped.
+ *
+ * @return array<string, list<array{gap: bool, border: float, width: float, text: string}>>
+ */
+function drawnCombCells(string $html): array
+{
+    $cells = [];
+    $dompdf = new Dompdf\Dompdf(SubmissionPdfRenderer::dompdfOptions());
+    $dompdf->setPaper('A4');
+    $dompdf->setCallbacks([['event' => 'end_frame', 'f' => static function ($frame) use (&$cells): void {
+        $node = $frame->get_node();
+        $row = $node->parentNode;
+        if (! $node instanceof DOMElement || $node->nodeName !== 'td'
+            || ! $row instanceof DOMElement || $row->getAttribute('class') !== '') {
+            return; // not a cell, or a cell of the caption row
+        }
+
+        $table = $row;
+        while ($table instanceof DOMElement && $table->nodeName !== 'table') {
+            $table = $table->parentNode;
+        }
+        $question = $table;
+        while ($question instanceof DOMElement && $question->getAttribute('class') !== 'q') {
+            $question = $question->parentNode;
+        }
+        if (! $table instanceof DOMElement || $table->getAttribute('class') !== 'comb' || ! $question instanceof DOMElement) {
+            return;
+        }
+
+        $key = '';
+        foreach ($question->getElementsByTagName('span') as $span) {
+            if ($span->getAttribute('class') === 'q__key') {
+                $key = trim($span->textContent);
+                break;
+            }
+        }
+
+        $cells[$key][] = [
+            'gap' => $node->getAttribute('class') === 'comb__gap',
+            'border' => (float) $frame->get_style()->border_left_width,
+            'width' => round((float) $frame->get_border_box()['w'], 2),
+            'text' => trim($node->textContent),
+        ];
+    }]]);
+    $dompdf->loadHtml($html, 'UTF-8');
+    $dompdf->render();
+
+    return $cells;
+}
+
 it('emits a real PDF', function (): void {
     [$form, $version] = printableForm($this->tenant, $this->user);
 
@@ -195,6 +280,44 @@ it('draws every box with a border instead of typing it as a character', function
         ->and($html)->toContain('>YYYY<');
 });
 
+it('draws the gap between a comb\'s groups as its printed separator and never as a box to write in (layout 4, M148)', function (): void {
+    // The user's comment on layout 3: "the date has 10 boxes … the 2 more in between are separators … just dont
+    // let the user fill that box wrongly". The gap was meant to be a borderless spacer, and dompdf drew it as an
+    // 18pt answer box because `.comb td` outranked `.comb__gap`. Every assertion here is on what dompdf DREW; the
+    // string-level cases above could not see it, and did not, through two layouts.
+    [$form, $version] = combedForm($this->tenant, $this->user);
+    $cells = drawnCombCells($this->renderer->html($form, $version));
+
+    $expected = [
+        'visit_date' => ['boxes' => 8, 'gaps' => ['/', '/']],
+        'visit_time' => ['boxes' => 4, 'gaps' => [':']],
+        'seen_at' => ['boxes' => 12, 'gaps' => ['/', '/', '', ':']],
+        'travel' => ['boxes' => 5, 'gaps' => [':']],
+        // A cascade's levels are written words, where a hyphen is a real answer: a plain gap, no mark.
+        'address' => ['boxes' => 22, 'gaps' => ['']],
+    ];
+
+    expect(array_keys($cells))->toEqual(array_keys($expected));
+
+    foreach ($expected as $key => $want) {
+        $gaps = array_values(array_filter($cells[$key], static fn (array $c): bool => $c['gap']));
+        $boxes = array_values(array_filter($cells[$key], static fn (array $c): bool => ! $c['gap']));
+
+        expect(count($boxes))->toBe($want['boxes'], "{$key}: answer boxes")
+            ->and(array_column($gaps, 'text'))->toBe($want['gaps'], "{$key}: the separators printed in the gaps");
+
+        foreach ($boxes as $box) {
+            expect($box['border'])->toBeGreaterThan(0.0, "{$key}: an answer box keeps its border")
+                ->and($box['text'])->toBe('', "{$key}: a question's answer box prints empty");
+        }
+        foreach ($gaps as $gap) {
+            // No border, and narrower than any answer box — nothing on the paper invites a pen into it.
+            expect($gap['border'])->toBe(0.0, "{$key}: a gap is drawn with no border")
+                ->and($gap['width'])->toBeLessThan(12.0, "{$key}: a gap is narrower than an answer box");
+        }
+    }
+});
+
 it('prints the field key beside each answer area', function (): void {
     // Decided with the user 2026-08-09: the OCR stage maps a scanned region back to a field by this
     // stamp, so it must survive a page being scanned out of order.
@@ -287,13 +410,13 @@ it('prints a yes/no question as two tick boxes, and tells the respondent to mark
         ->and($html)->toContain('Mark a choice with an X inside its box');
 });
 
-it('typesets layout 3: a numbered label, the layout token, the banner with its overflow sentence, an open box for text, a long-text box sized from max_length, and no brand colour (M143, D96; M144, D98)', function (): void {
+it('typesets layout 4: a numbered label, the layout token, the banner with its overflow sentence, an open box for text, a long-text box sized from max_length, and no brand colour (M143, D96; M144, D98; M148)', function (): void {
     [$form, $version] = printableForm($this->tenant, $this->user);
     $html = $this->renderer->html($form, $version);
 
     expect($html)
         // The running head names the layout beside the stamp, so the reader can tell old paper from new.
-        ->toContain('class="runhead__layout">Layout 3</span>')
+        ->toContain('class="runhead__layout">Layout 4</span>')
         // The instruction banner, bold and boxed, with its worked example — and, since layout 3, what to do
         // when a box runs out. It lives here, above every anchor, and NOT under each capped box: the matcher's
         // static list is one list for the whole form, and a per-question note would blank its words as answers.

@@ -79,9 +79,10 @@ final class BlankFormPrintPresenter
      * with, so a sheet printed before a layout change cannot be read against the layout after it. Bump it
      * whenever the geometry the reader depends on changes — where an answer sits relative to its label.
      * Layout 3 (`M144`, `D98`): a phone and a number in one open box, the long-text box sized from its
-     * `max_length`.
+     * `max_length`. Layout 4 (`M148`): the gap between a comb's groups carries its separator (`/`, `:`) and
+     * no border, where layouts 2 and 3 drew it as one more box to write in.
      */
-    public const int LAYOUT = 3;
+    public const int LAYOUT = 4;
 
     /**
      * The hard ceiling on a comb run, and it is derived from the page rather than chosen.
@@ -418,31 +419,37 @@ final class BlankFormPrintPresenter
      * single place that decides which types reach this method, so the default arm is unreachable and
      * says so rather than printing an empty comb.
      *
+     * `separator` is what the gap BEFORE a group prints (layout 4, `M148`): `/` inside a date, `:` inside a
+     * time and a duration, and null for a first group, for the plain gap between a datetime's date and its
+     * time, and for every cascade level, whose written words can hold a real hyphen or slash. The user's
+     * comment on layout 3 found the gap printed as a tenth box nobody knew what to write in; a printed mark
+     * with no border says what the gap is, and the reader drops it again (`OcrAnswerReader`).
+     *
      * @param  array<string, mixed>  $field
-     * @return list<array{cells: int, caption: ?string}>
+     * @return list<array{cells: int, caption: ?string, separator: ?string}>
      */
     private function combGroups(FieldType $type, array $field): array
     {
         return match ($type) {
             FieldType::Date => [
-                ['cells' => 2, 'caption' => 'DD'],
-                ['cells' => 2, 'caption' => 'MM'],
-                ['cells' => 4, 'caption' => 'YYYY'],
+                ['cells' => 2, 'caption' => 'DD', 'separator' => null],
+                ['cells' => 2, 'caption' => 'MM', 'separator' => '/'],
+                ['cells' => 4, 'caption' => 'YYYY', 'separator' => '/'],
             ],
             FieldType::Time => [
-                ['cells' => 2, 'caption' => 'HH'],
-                ['cells' => 2, 'caption' => 'MM'],
+                ['cells' => 2, 'caption' => 'HH', 'separator' => null],
+                ['cells' => 2, 'caption' => 'MM', 'separator' => ':'],
             ],
             FieldType::Datetime => [
-                ['cells' => 2, 'caption' => 'DD'],
-                ['cells' => 2, 'caption' => 'MM'],
-                ['cells' => 4, 'caption' => 'YYYY'],
-                ['cells' => 2, 'caption' => 'HH'],
-                ['cells' => 2, 'caption' => 'MM'],
+                ['cells' => 2, 'caption' => 'DD', 'separator' => null],
+                ['cells' => 2, 'caption' => 'MM', 'separator' => '/'],
+                ['cells' => 4, 'caption' => 'YYYY', 'separator' => '/'],
+                ['cells' => 2, 'caption' => 'HH', 'separator' => null],
+                ['cells' => 2, 'caption' => 'MM', 'separator' => ':'],
             ],
             FieldType::Duration => [
-                ['cells' => 3, 'caption' => 'HRS'],
-                ['cells' => 2, 'caption' => 'MIN'],
+                ['cells' => 3, 'caption' => 'HRS', 'separator' => null],
+                ['cells' => 2, 'caption' => 'MIN', 'separator' => ':'],
             ],
             FieldType::CascadingSelect => $this->cascadingGroups($field),
             default => throw new LogicException(sprintf(
@@ -471,7 +478,7 @@ final class BlankFormPrintPresenter
      * has never existed in this product, and §2.5.8 records the bound rather than hiding it.
      *
      * @param  array<string, mixed>  $field
-     * @return list<array{cells: int, caption: ?string}>
+     * @return list<array{cells: int, caption: ?string, separator: null}>
      */
     private function cascadingGroups(array $field): array
     {
@@ -491,7 +498,7 @@ final class BlankFormPrintPresenter
         // width, never zero groups, because zero groups renders a labelled question with nowhere to
         // answer it.
         if ($levels === []) {
-            return [['cells' => self::MAX_COMB_CELLS, 'caption' => null]];
+            return [['cells' => self::MAX_COMB_CELLS, 'caption' => null, 'separator' => null]];
         }
 
         $cells = max(4, intdiv(self::MAX_COMB_CELLS, count($levels)));
@@ -504,6 +511,7 @@ final class BlankFormPrintPresenter
             static fn (string $key): array => [
                 'cells' => $cells,
                 'caption' => mb_strtoupper(mb_substr($key, 0, 10)),
+                'separator' => null,
             ],
             $levels,
         );

@@ -37,6 +37,12 @@
     lines (layout 2's 60pt) to ten, from the question's max_length at about 45 hand-printed capitals
     a line; the banner tells the respondent to continue on another sheet when a box runs out.
 
+    -- LAYOUT 4 (M148): THE GAP BETWEEN A COMB'S GROUPS IS A PRINTED SEPARATOR, NOT A BOX --------------
+    The user's comment on layout 3: a date printed ten boxes and nobody knew what the two extra were
+    for. They were the group gaps, which this file asked to be borderless and dompdf drew bordered,
+    because the rule asking lost on specificity (see the comb section). The gap now carries `/` or `:`
+    and no border; BlankFormPrintRendererTest reads what dompdf DREW, not the HTML it was handed.
+
     -- MONOCHROME, SO NO BRAND COLOUR (D96; ADR-0014 SS-D8 note of 2026-10-07) ------------------------
     The paper is printed in black most of the time, and a tenant colour that dithers to grey helps
     neither the respondent nor the reader. Every colour below is black or a grey dark enough to print
@@ -129,7 +135,10 @@ body { font-family: sans-serif; font-size: 10pt; line-height: 1.4; color: #00000
    spacing lands at both table edges as well as between cells, which MAX_COMB_CELLS accounts for. */
 .comb { border-collapse: separate; border-spacing: 2pt 0; margin: 0; }
 .comb td { width: 18pt; height: 18pt; border: 0.75pt solid #333333; padding: 0; }
-.comb__gap { width: 10pt; border: none; }
+/* `.comb td.comb__gap`, NEVER the bare class (layout 4, M148). `.comb td` is specificity 0,1,1 and a lone
+   `.comb__gap` is 0,1,0, and dompdf honours specificity: through layouts 2 and 3 every gap printed as one more
+   18pt answer box, so a date read as ten boxes. The gap holds its group's printed separator, bold and centred. */
+.comb td.comb__gap { width: 10pt; border: none; text-align: center; font-size: 12pt; font-weight: bold; color: #000000; }
 .comb__caption td { border: none; height: auto; font-size: 8pt; color: #333333; text-align: center; }
 
 /* -- Line and Ruled --------------------------------------------------------------------------- */

@@ -155,7 +155,7 @@ it('drops a section that holds nothing printable, heading included', function ()
         ->and(printedKeys($model))->toBe(['name']);
 });
 
-it('combs a date into captioned DD / MM / YYYY groups', function (): void {
+it('combs a date into captioned DD / MM / YYYY groups with a printed slash in each gap (layout 4, M148)', function (): void {
     // The layout decision the whole increment turns on: a free run of eight boxes cannot distinguish
     // the 3rd of April from the 4th of March, and no recognizer can recover that from the ink.
     [$form, $version] = printFixture([
@@ -166,9 +166,9 @@ it('combs a date into captioned DD / MM / YYYY groups', function (): void {
     $comb = $this->present->present($form, $version)['blocks'][0]['fields'][0]['comb'];
 
     expect($comb)->toBe([
-        ['cells' => 2, 'caption' => 'DD'],
-        ['cells' => 2, 'caption' => 'MM'],
-        ['cells' => 4, 'caption' => 'YYYY'],
+        ['cells' => 2, 'caption' => 'DD', 'separator' => null],
+        ['cells' => 2, 'caption' => 'MM', 'separator' => '/'],
+        ['cells' => 4, 'caption' => 'YYYY', 'separator' => '/'],
     ]);
 });
 
@@ -233,9 +233,9 @@ it('gives short text, email, url, a phone and a number one open box, and keeps t
         ->and(array_map(static fn (array $f): mixed => $f['comb'], array_slice($fields, 0, 7)))->toBe(array_fill(0, 7, null))
         ->and($fields[3]['lines'])->toBe(3)
         ->and($fields[7]['comb'])->toBe([
-            ['cells' => 2, 'caption' => 'DD'],
-            ['cells' => 2, 'caption' => 'MM'],
-            ['cells' => 4, 'caption' => 'YYYY'],
+            ['cells' => 2, 'caption' => 'DD', 'separator' => null],
+            ['cells' => 2, 'caption' => 'MM', 'separator' => '/'],
+            ['cells' => 4, 'caption' => 'YYYY', 'separator' => '/'],
         ]);
 });
 
@@ -267,7 +267,7 @@ it('numbers every question across blocks and repeat instances, skipping prose an
     expect(printedKeys($model))->toBe(['intro', 'respondent', 'new_page', 'member_age', 'new_page', 'member_age'])
         ->and($numbers)->toBe([null, 1, null, 2, null, 3])
         ->and($model['blocks'][0]['fields'][1]['label'])->toBe('Respondent')
-        ->and($model['layout'])->toBe(3);
+        ->and($model['layout'])->toBe(4);
 });
 
 it('says whether the form accepts scans, so the footer can promise only what is true (R-6bbf9d73)', function (): void {
@@ -388,9 +388,9 @@ it('gives a cascading select one captioned comb run per level', function (): voi
     expect($field['area'])->toBe('comb')
         // 23 cells (layout 2's page-derived ceiling) split three ways.
         ->and($field['comb'])->toBe([
-            ['cells' => 7, 'caption' => 'PROVINCE'],
-            ['cells' => 7, 'caption' => 'CITY'],
-            ['cells' => 7, 'caption' => 'BARANGAY'],
+            ['cells' => 7, 'caption' => 'PROVINCE', 'separator' => null],
+            ['cells' => 7, 'caption' => 'CITY', 'separator' => null],
+            ['cells' => 7, 'caption' => 'BARANGAY', 'separator' => null],
         ])
         // ...and emphatically NOT a tick-list that would set Manila beside NCR as its sibling.
         ->and($field['options'])->toBe([]);
@@ -405,7 +405,7 @@ it('still gives a level-less cascading select somewhere to write', function (): 
     ]);
 
     expect($this->present->present($form, $version)['blocks'][0]['fields'][0]['comb'])
-        ->toBe([['cells' => 23, 'caption' => null]]);
+        ->toBe([['cells' => 23, 'caption' => null, 'separator' => null]]);
 });
 
 it('truncates a comb caption without cutting a multibyte character in half', function (): void {
@@ -535,7 +535,7 @@ it('reads the key names a REAL publish actually writes', function (): void {
         ->and($lead['hint'])->toBe('As written on the ID.')
         ->and($lead['area'])->toBe('line')
         ->and($lead['number'])->toBe(1)
-        ->and($model['layout'])->toBe(3)
+        ->and($model['layout'])->toBe(4)
         // Created through FormService, which leaves scanning off.
         ->and($model['accepts_scans'])->toBeFalse();
 });

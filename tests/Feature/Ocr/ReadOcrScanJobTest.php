@@ -159,6 +159,22 @@ it('refuses a layout-2 sheet now that the paper is layout 3, naming both numbers
         ->and($scan->error_message)->not->toContain('2026-');
 });
 
+it('refuses a layout-3 sheet now that the paper is layout 4 (M148)', function (): void {
+    // Layout 3 printed each comb gap as one more box to write in, and the reader took whatever was written there into
+    // the group beside it. Layout 4 prints the separator instead; a layout-3 sheet is refused on its running head.
+    $scan = ocrJobScan($this->form, $this->user);
+    Http::fake(['vision.googleapis.com/*' => Http::response(ocrJobAnswer($this->form, ['age' => '41'], ['layout' => 3]))]);
+
+    ocrJobRun($scan);
+    $scan->refresh();
+
+    expect(BlankFormPrintPresenter::LAYOUT)->toBe(4)
+        ->and($scan->status)->toBe(OcrScanStatus::Failed)
+        ->and($scan->error_code)->toBe('layout_outdated')
+        ->and($scan->error_message)->toContain('from layout 3')
+        ->and($scan->error_message)->toContain('the current paper is layout 4');
+});
+
 it('refuses a sheet whose layout number is below the current one the same way', function (): void {
     $scan = ocrJobScan($this->form, $this->user);
     Http::fake(['vision.googleapis.com/*' => Http::response(ocrJobAnswer($this->form, ['age' => '41'], ['layout' => 1]))]);

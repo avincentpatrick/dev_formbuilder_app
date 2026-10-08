@@ -13514,9 +13514,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `_blank-form-styles.blade.php`, so dompdf draws every box-row gap as an 18pt answer box (19.5pt wide with its border,
   measured through dompdf's `end_frame` callback): a date prints ten boxes, a time five, a datetime sixteen, a duration
   six, and a cascade one more per level. The reader expects nothing there. `OcrAnswerReader::combSymbols()` keeps a
-  written `/`, `-` or `:`, `assignToCaptions()` gives a gap-1 character to DD, `int()` reads `I`, `l` and `i` as `1`,
-  and no positional parser checks a group against its cells, so a slash read as `1` turns day `03` into `031` → the 31st,
-  at the recognizer's own confidence, in any month that has one. No test reads rendered geometry (every renderer case
+  written `/`, `-` or `:`, `assignToCaptions()` gives a gap character to the nearer group, `int()` reads `I`, `l` and
+  `i` as `1`, and no positional parser checks a group against its cells: a `/` read as `1` beside a month of `01`, the
+  other separator unread, made `011` — November, at the recognizer's own confidence (measured by `M148`); most fills
+  fail closed instead, so every date written with slashes is keyed by hand. No test reads rendered geometry (every renderer case
   asserts the HTML string) and `PrintedPageTypesetter` models the gap as designed, so layouts 2 and 3 both shipped it;
   `docs/ocr-pipeline-design.md` §2.5.3 says 7pt where the CSS says 10pt. The remedy is layout 4: the gap carries its
   separator as printed text with no border (`/` in a date, `:` in a time and a duration, a plain gap between a

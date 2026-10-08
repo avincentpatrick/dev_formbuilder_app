@@ -20,6 +20,13 @@
     has to line up with the boxes above it and only a shared table geometry guarantees that. The gap
     is skipped before the first group.
 
+    Since layout 4 (`M148`) the box-row gap prints the group's `separator` - `/` in a date, `:` in a
+    time - and the caption-row gap stays empty, because the reader recognises the caption row only
+    when every word on it is a caption. Layouts 2 and 3 printed nothing here AND drew the gap as an
+    answer box (see the stylesheet's specificity note), so a date read as ten boxes and a respondent
+    could write a slash the reader then counted as part of the day. Only ASCII separators: the
+    WinAnsi round trip below applies to them too.
+
     -- border-collapse MUST STAY separate -----------------------------------------------------------
     `border-spacing` is what puts air between the cells. Collapsing the borders merges every cell
     wall into one continuous ruled line and the comb silently stops being a comb - the single change
@@ -37,7 +44,7 @@
         @php($cell = 0)
         @foreach ($groups as $group)
             @if (! $loop->first)
-                <td class="comb__gap"></td>
+                <td class="comb__gap">{{ $group['separator'] ?? '' }}</td>
             @endif
             @for ($i = 0; $i < $group['cells']; $i++)
                 <td>{{ $sample[$cell++] ?? '' }}</td>

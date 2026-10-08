@@ -59,6 +59,9 @@ Files: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `CLAUDE.md`, `PROG
 status bullet only), `scripts/next.php`, `docs/PRD.md` (the product-name note and markers), `docs/deployment-infrastructure.md`
 and `docs/ocr-pipeline-design.md` (markers only, at end of file), `docs/claims/lane-a.md`; regenerated `docs/pipeline.md`,
 `docs/backlog-triage.md`, `docs/gate-baselines.md`.
+**Extended before either file was opened** (a read-only sweep of every backlog row citing the thirty found them): `docs/security-threat-model.md`
+— §9's two sentences still calling `D10` and `D56` open, corrected in place — and PROGRESS.md's `deferral-site-disposition` marker, whose
+`after-launch` tier contradicts `D24` option 1's "taken first" beside the `during-testing` `prd-feature-disposition` (tier only).
 Shared artefacts taken: `docs/**`, `PROGRESS.md` (own block only), `CLAUDE.md`.
 Paired files taken: none.
 Namespaces spent: one decision id (the standing rule), derived by `state.php`; nothing from the ADR or migration namespaces.

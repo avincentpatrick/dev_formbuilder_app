@@ -24,7 +24,15 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ Every decision that was open on 2026-10-08 was answered that day (`M147`). A new one is appended here **and asked by name before its session ends** (`D102`).
+### D104 — Cloud Vision alone misses G9 on the first real round of samples, even with the reader's three defects fixed (`M149`), and `D97` says a vision-language arm comes next. What does single-form OCR do before and after the Oct 12 testing? **Tier: early-testing.**
+
+**Filed 2026-10-08 by `M149`, and asked in the same session (`D102`), from `ocr-provider-bakeoff`, whose remaining work is this choice.** Fifteen hand-filled layout-4 forms, both pages photographed with a phone: with the three `major`s fixed and the handwriting hint on, 98 of 180 fields (54.4%) still need correction against G9's bar of 15%. Ticks are 43 of the 98 — Vision returns no character for most of them (28 of 45 answered choices read blank) and a low confidence for the rest; the other 55 are handwriting misreads and right answers withheld in names, emails, phones and remarks. The thresholds hold: at confidence 90 and above, 54 right and 1 wrong. A vision-language model reads ticks and handwriting together and can be held to the printed options, but it is a second provider that receives every scanned page.
+
+- **A — Cloud Vision as it is for the Oct 12 testing; the vision-language arm during testing.** The `M149` fixes ship; reviewers key what is withheld (the review screen is mandatory in any case). The arm — Claude through the Anthropic API, its output held to the printed options, behind the reviewer — is built into the harness and measured on these same fifteen forms, and reaches staging only if it meets G9. It needs an Anthropic API key and the agency's consent to send scans to a second provider.
+- **B — tick detection first, with no new provider.** Measure the ink inside each printed box from the photo itself, and keep Vision for the writing. If every tick were read, about 31% would still need correction, so G9 stays missed on handwriting and a vision-language arm likely follows anyway.
+- **C — the vision-language arm before Oct 12.** Four days for a new provider, a new key and consent: the most G9 can gain, at the most risk to the testing date.
+
+**Recommendation: A.** Testers get a reader that works on phone photos now, every withheld field is keyed by a person anyway, and the arm is measured on paper that already exists before anything reaches staging. B is the fallback if a second provider is not allowed.
 
 
 ## ANSWERED

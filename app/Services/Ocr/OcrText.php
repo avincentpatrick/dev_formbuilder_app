@@ -26,6 +26,15 @@ final class OcrText
     private const array BORDER_ARTEFACTS = ['|', '¦', '│'];
 
     /**
+     * What layout 4 prints in a date's, a time's and a duration's comb gaps (`/`, `:`), and the marks a pen
+     * writes there by habit (`-`, `.`, a dash the recognizer returns as a long one). Kept apart from
+     * {@see self::MARKS}, which holds `/` too but answers a different question: whether a CHOICE box is marked.
+     *
+     * @var list<string>
+     */
+    private const array SEPARATORS = ['/', ':', '-', '.', '–', '—'];
+
+    /**
      * A field key compared the way a 7pt stamp survives a scan: lower-cased, with everything but letters
      * and digits removed. The underscore is the character most often lost, so it is not required.
      */
@@ -72,6 +81,15 @@ final class OcrText
     public static function isBorderArtefact(string $text): bool
     {
         return in_array($text, self::BORDER_ARTEFACTS, true);
+    }
+
+    /**
+     * Whether a recognised character is a date or time separator rather than a digit (layout 4, `M148`). Only
+     * the positional combs ask: a cascade level is a written word, where a hyphen is part of the answer.
+     */
+    public static function isSeparator(string $text): bool
+    {
+        return in_array($text, self::SEPARATORS, true);
     }
 
     /**

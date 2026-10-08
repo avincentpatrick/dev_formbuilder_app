@@ -87,8 +87,12 @@ final class OcrAnswerReader
             }
         }
 
+        // A date, a time, a datetime and a duration are digits under captions, and since layout 4 (`M148`) their gaps
+        // print `/` and `:` — the paper's, never the answer's. A cascade level is a written word and keeps its hyphen.
+        $positional = in_array($type, [FieldType::Date, FieldType::Time, FieldType::Datetime, FieldType::Duration], true);
+
         $answer = $this->answerLines($lines, $static, $captionLine === null ? [] : [$captionLine]);
-        $symbols = $answer === [] ? [] : $this->combSymbols($answer[0]);
+        $symbols = $answer === [] ? [] : $this->combSymbols($answer[0], $positional);
 
         if ($symbols === []) {
             return $this->blank();
@@ -107,6 +111,13 @@ final class OcrAnswerReader
             : $this->splitByCells($symbols, $groups);
 
         if ($parts === null) {
+            return $this->unreadable($this->joinWithGaps($symbols), $confidence);
+        }
+
+        // A group can never hold more digits than it has boxes. More means something in a gap was read as a digit —
+        // a separator misread as `1`, or a pen's mark — and the nearer group took it: `01` became `011`, November,
+        // at the recognizer's own confidence (`M148`). Refused for a person to read, never guessed.
+        if ($positional && $this->overfills($parts, $groups)) {
             return $this->unreadable($this->joinWithGaps($symbols), $confidence);
         }
 
@@ -158,24 +169,46 @@ final class OcrAnswerReader
     }
 
     /**
-     * The characters written in a comb row, left to right, without the box walls a recognizer reads as `|`.
+     * The characters written in a comb row, left to right, without the box walls a recognizer reads as `|` — and,
+     * for a positional comb, without the separators layout 4 prints in its gaps.
      *
      * @return list<OcrSymbol>
      */
-    private function combSymbols(OcrLine $line): array
+    private function combSymbols(OcrLine $line, bool $dropSeparators): array
     {
         $symbols = [];
         foreach ($line->words as $word) {
             foreach ($word->symbols as $symbol) {
-                if (! OcrText::isBorderArtefact($symbol->text) && trim($symbol->text) !== '') {
-                    $symbols[] = $symbol;
+                if (OcrText::isBorderArtefact($symbol->text) || trim($symbol->text) === '') {
+                    continue;
                 }
+                if ($dropSeparators && OcrText::isSeparator($symbol->text)) {
+                    continue;
+                }
+                $symbols[] = $symbol;
             }
         }
 
         usort($symbols, static fn (OcrSymbol $a, OcrSymbol $b): int => $a->centerX() <=> $b->centerX());
 
         return $symbols;
+    }
+
+    /**
+     * Whether any group was read with more characters than it has printed cells.
+     *
+     * @param  list<string|null>  $parts
+     * @param  list<array{cells: int, caption: string|null}>  $groups
+     */
+    private function overfills(array $parts, array $groups): bool
+    {
+        foreach ($parts as $i => $part) {
+            if ($part !== null && mb_strlen(str_replace(' ', '', $part)) > ($groups[$i]['cells'] ?? 0)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

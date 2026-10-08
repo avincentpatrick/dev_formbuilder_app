@@ -149,6 +149,62 @@ it('refuses a date that does not exist rather than rolling it over', function ()
         ->and($fields['visit_date']['text'])->toBe('31 02 2026');
 });
 
+it('reads a date and a time through their printed separators, and a comb holding only its separators as blank (layout 4, M148)', function (): void {
+    // Layout 4 prints `/` and `:` in a comb's gaps, as text the recognizer reads like the digits beside it. They are
+    // the paper's, never the answer's: the date reads as its three groups, and an unanswered comb stays blank.
+    $filled = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ocrMatchAnswers());
+    $empty = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['age' => '34']);
+
+    expect($filled['visit_date'])->toMatchArray(['state' => 'read', 'value' => '2026-10-03', 'text' => '03 10 2026'])
+        ->and($filled['visit_time'])->toMatchArray(['state' => 'read', 'value' => '14:05', 'text' => '14 05'])
+        ->and($empty['visit_date']['state'])->toBe('blank')
+        ->and($empty['visit_time']['state'])->toBe('blank');
+});
+
+it('refuses a day or a month longer than its boxes, rather than reading a separator as one more digit (M148)', function (): void {
+    // The user's comment on layout 3 found the gaps printed as boxes, which invited a pen. A gap character goes to the
+    // nearer group, and a `/` misread as `1` beside a month of `01` made `011` — November, at the recognizer's own
+    // confidence — whenever the other separator was not read. No group may hold more characters than it has boxes.
+    $misread = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['visit_date' => ['03', '01', '2026']], [
+        'gap_reads' => ['visit_date' => [null, '1']],
+    ]);
+    $bothMisread = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['visit_date' => ['03', '01', '2026']], [
+        'gap_reads' => ['visit_date' => ['1', '1']],
+    ]);
+
+    expect($misread['visit_date']['state'])->toBe('unreadable')
+        ->and($misread['visit_date']['value'])->toBeNull()
+        ->and($bothMisread['visit_date']['state'])->toBe('unreadable')
+        ->and($bothMisread['visit_date']['value'])->toBeNull();
+});
+
+it('reads a datetime and a duration through their separators, and keeps the hyphen a cascade level was written with (M148)', function (): void {
+    // A cascade's gap prints no separator: its levels are written words, and a hyphen in one is the answer.
+    $form = app(FormService::class)->create($this->tenant, $this->user, 'Referral');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'seen_at', FieldType::Datetime, 1, ['label' => 'Seen at']);
+    addFormField($draft, $this->user, 'travel', FieldType::Duration, 2, ['label' => 'Travel time']);
+    addFormField($draft, $this->user, 'address', FieldType::CascadingSelect, 3, ['label' => 'Address', 'config' => [
+        'levels' => [['key' => 'region'], ['key' => 'city']],
+        'options' => [
+            ['value' => 'r7', 'label' => 'Central Visayas', 'level' => 'region', 'parent' => null],
+            ['value' => 'lapu_lapu', 'label' => 'Lapu-Lapu', 'level' => 'city', 'parent' => 'r7'],
+        ],
+    ]]);
+    $version = app(PublishService::class)->publish($form->refresh(), $this->user);
+    $model = app(BlankFormPrintPresenter::class)->present($form->refresh(), $version);
+
+    $fields = ocrMatchFields($this->matcher, $form, $version, $model, [
+        'seen_at' => ['03', '10', '2026', '14', '05'],
+        'travel' => ['2', '30'],
+        'address' => ['R7', 'LAPU-LAPU'],
+    ]);
+
+    expect($fields['seen_at'])->toMatchArray(['state' => 'read', 'value' => '2026-10-03T14:05'])
+        ->and($fields['travel'])->toMatchArray(['state' => 'read', 'value' => 9000])
+        ->and($fields['address'])->toMatchArray(['state' => 'read', 'value' => ['r7', 'lapu_lapu']]);
+});
+
 it('reads a page photographed at a tilt exactly as a level one', function (): void {
     $level = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ocrMatchAnswers());
     $tilted = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ocrMatchAnswers(), [], 0.07);
@@ -216,10 +272,11 @@ it('reads the layout off the running head, and tells old paper from a head that 
     $pages = fn (array $options): array => [PrintedPageTypesetter::fromModel($this->model, [], $options)->page()];
     $stamp = strtolower((string) $this->model['schema_stamp']);
 
-    expect($this->matcher->layoutOf($pages([]), $stamp))->toBe(['layout' => 3, 'evidence' => 'token'])
-        // "Layout3" read as one word.
-        ->and($this->matcher->layoutOf($pages(['run_together' => ['runhead']]), $stamp))->toBe(['layout' => 3, 'evidence' => 'token'])
-        // Layout-2 paper, read for what it is; the job and the bake-off refuse it against the current number.
+    expect($this->matcher->layoutOf($pages([]), $stamp))->toBe(['layout' => 4, 'evidence' => 'token'])
+        // "Layout4" read as one word.
+        ->and($this->matcher->layoutOf($pages(['run_together' => ['runhead']]), $stamp))->toBe(['layout' => 4, 'evidence' => 'token'])
+        // Older paper, read for what it is; the job and the bake-off refuse it against the current number.
+        ->and($this->matcher->layoutOf($pages(['layout' => 3]), $stamp))->toBe(['layout' => 3, 'evidence' => 'token'])
         ->and($this->matcher->layoutOf($pages(['layout' => 2]), $stamp))->toBe(['layout' => 2, 'evidence' => 'token'])
         ->and($this->matcher->layoutOf($pages(['layout' => 1]), $stamp))->toBe(['layout' => 1, 'evidence' => 'token'])
         // Layout-1 paper: the stamp's own line was legibly read, and no layout word is on it.

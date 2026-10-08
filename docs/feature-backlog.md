@@ -13216,7 +13216,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (`support.kobotoolbox.org/rest_services.html`). `D93` A orders the work after Oct 12: a condition on each
   automation (the remainder row's Filter) first, then recipients and answers from the form, then a review/approval
   step, then a failure alert and each response's run history. ⚠️ Answers are health data: keep `D82`'s link-first
-  email unless an answer is chosen deliberately. **Live.** Filed by `M137`. **Tier: during-testing.**
+  email unless an answer is chosen deliberately. **Live.** Filed by `M137`. **Tier: during-testing.** `D103` (2026-10-08) keeps it after Oct 12: the user asked how to email the person who answered (smoke test Round 2, `r2-c12`) and chose to test without it; until it lands, *Send to a web address* into Zapier or Power Automate is the workaround.
 
 - ✅ **CLOSED BY `M139` (2026-10-06) — ****`minor` · Keyboard grab cannot move a question into an empty section, and cannot move a section's only question at
   all.** Found by `M139`'s premise probe, a real browser on a fresh form (`.playwright/m139-probe/`). Grab mode steps a
@@ -13505,3 +13505,87 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   precision and about 2% recall. The re-aim fires only where a not-built sentence sits in a document that also claims the
   thing shipped, which needs a build-evidence term joined to prose (`P2d`'s machinery pointed at sentences). **Not live**
   — a weak lint, not a defect in the product. **Tier: after-launch.**
+
+- **`major` · The Print blank prints the gap between a date's groups as a box to write in, and the reader puts whatever is
+  written there into the group beside it.** Found by `M148` from the staging smoke test (Round 2, `r2-print`, a pass with
+  the note *"the date has 10 boxes. 2 for day, 2 for months and 4 for year. i believe the 2 more in between are
+  separators. can we automatically include the value of the separator? … just dont let the user fill that box
+  wrongly"*). The gap is meant to be a borderless spacer, but `.comb td` outranks `.comb__gap` in
+  `_blank-form-styles.blade.php`, so dompdf draws every box-row gap as an 18pt answer box (19.5pt wide with its border,
+  measured through dompdf's `end_frame` callback): a date prints ten boxes, a time five, a datetime sixteen, a duration
+  six, and a cascade one more per level. The reader expects nothing there. `OcrAnswerReader::combSymbols()` keeps a
+  written `/`, `-` or `:`, `assignToCaptions()` gives a gap character to the nearer group, `int()` reads `I`, `l` and
+  `i` as `1`, and no positional parser checks a group against its cells: a `/` read as `1` beside a month of `01`, the
+  other separator unread, made `011` — November, at the recognizer's own confidence (measured by `M148`); most fills
+  fail closed instead, so every date written with slashes is keyed by hand. No test reads rendered geometry (every renderer case
+  asserts the HTML string) and `PrintedPageTypesetter` models the gap as designed, so layouts 2 and 3 both shipped it;
+  `docs/ocr-pipeline-design.md` §2.5.3 says 7pt where the CSS says 10pt. The remedy is layout 4: the gap carries its
+  separator as printed text with no border (`/` in a date, `:` in a time and a duration, a plain gap between a
+  datetime's date and time, nothing on a cascade, whose letters may hold a real hyphen), the reader drops a printed
+  separator for the four positional types and refuses a group longer than its cells, and a renderer case asserts the
+  computed border of every gap. **Live.** Filed by `M148`. **Tier: early-testing.**
+
+- **`minor` · Structure's drag handle is hard to see.** Found by `M148` from the staging smoke test (Round 2, `r2-c18`,
+  a pass with the note *"the icon for the draggable on the left most part of the card is not noticeable"*). Each row's
+  `.canvas__grip` in `BuilderCanvas.vue` is a transparent 28px button with no border until hover, holding
+  `MdsIcon name="grip"` at `sm`: six near-zero-length strokes at 1.5 stroke width in a 24-unit box, about 1px dots at
+  16px, in `--mds-color-text-secondary`. `ScopeTree.vue` uses the same glyph, so the fix belongs to the builder's grip
+  rather than to the design system's icon. Taken before Oct 12 by `D103`. **Live.** Filed by `M148`.
+  **Tier: early-testing.**
+
+- **`minor` · A question jumps from place to place while it is dragged in Structure, instead of gliding.** Found by
+  `M148` from the staging smoke test (Round 2, `r2-c18`: *"if we can make the animation of the drag more smooth"*).
+  `useCanvasReorder.ts` re-sorts the store on every `pointermove` (no animation frame throttle, no drag threshold, no
+  auto-scroll), and `BuilderCanvas.vue` has no `TransitionGroup`, FLIP or transition, so each row snaps to its new slot;
+  every move also re-runs `PreviewPane`'s shape watch and `LogicRail`'s rail. The motion tokens exist
+  (`--mds-duration-base`, `--mds-ease-standard`) and collapse under reduced motion. No pointer-drag test runs in CI.
+  Taken before Oct 12 by `D103`. **Live.** Filed by `M148`. **Tier: early-testing.**
+
+- **`minor` · A question's label cannot be edited in Structure.** Found by `M148` from the staging smoke test (Round 2,
+  `r2-c17`, a pass with the note *"can we also use the middle section (structure and preview) to allow the user to edit
+  the label there already"*). The label is text inside `<button class="canvas__field-main">` in `BuilderCanvas.vue`,
+  where an input cannot sit; it is edited only through the settings pane's Label input (`ConfigPanel.vue`'s `setField`,
+  then the store's 600ms `touch()` and one PATCH and one undo entry per burst), and the server refuses an empty label
+  (`required|max:500`). No inline-edit component exists in the design system. Two E2E locators read
+  `.canvas__field-main`'s text. Taken before Oct 12 by `D103`. **Live.** Filed by `M148`. **Tier: early-testing.**
+
+- **`minor` · A question's label cannot be edited in Preview.** Found by `M148` from the same Round 2 note (`r2-c17`).
+  The preview's label is drawn by the shared respondent component `submissions/FieldInput.vue`, which the builder
+  preview must not edit (`M118`), it shows piped text (`labelFor` resolves `${key}` holes), and a note with content
+  shows its blocks instead of its label; so an inline editor binds `field.label` itself and lives in
+  `PreviewRuntime.vue`'s row wrapper. A label change never moves the engine's shape, so it needs no remount. Taken
+  before Oct 12 by `D103`. **Live.** Filed by `M148`. **Tier: early-testing.**
+
+- **`minor` · Questions cannot be dragged in Preview, to reorder them or to move them into a section.** Found by `M148`
+  from the staging smoke test (Round 2, `r2-c18`: *"please include the preview section to be draggable. i mean,
+  questions or indicators must be draggable to sections, sequencing, etc."*). Moving exists only in Structure. The
+  preview renders the engine's frozen step order, and a reorder changes `shapeOf()`, which remounts `PreviewRuntime`
+  after a 300ms debounce — the row under the pointer is destroyed and preview answers reset. Stepped mode shows one
+  section at a time, rows hold real inputs, and the order on screen is not the store's (hidden, calculated and
+  page-break fields render nothing, an empty section renders at the end, a just-added field sits apart, a repeat group
+  renders through `RepeatGroup`). The riskiest of the four Round 2 builder rows for Oct 12. Taken before Oct 12 by
+  `D103`. **Live.** Filed by `M148`. **Tier: early-testing.**
+
+- **`minor` · An archived form cannot be found from the Forms list.** Found by `M148` from the staging smoke test
+  (Round 2, `r2-archive`, a pass with the note *"but how can i retrieve the responses from that archived form? do we
+  have that feature?"*). `FormPresenter` always leaves archived forms out and offers no filter, and `FormSearchArm`
+  does the same, so the form and its responses are reachable only through Submissions' Form dropdown, a response row's
+  link or the form's own URL — all of which still work, exports included. `D103`: a read-only Archived filter on the
+  Forms list; still no un-archive (`D101`). **Live.** Filed by `M148`. **Tier: during-testing.**
+
+- **`nit` · Structure's drag handles tell a screen reader "Press Enter to grab", though Space grabs too.** Found by
+  `M148` beside the handle row above. Both `aria-label`s in `BuilderCanvas.vue` (a section's and a question's) name only
+  Enter; `useCanvasReorder.ts` grabs on Enter or Space, and the empty section's text says only "Drag one in by its
+  handle". **Live.** Filed by `M148`. **Tier: early-testing.**
+
+- **`nit` · `Builder.vue`'s header comment still says questions are ordered with Move up and Move down.** Found by
+  `M148` beside the handle row above. Pointer and keyboard dragging replaced those buttons (`useCanvasReorder.ts`), so
+  the page's first comment sends the next reader looking for controls that no longer exist. **Not live** — a stale
+  comment, not a defect in the product. Filed by `M148`. **Tier: during-testing.**
+
+- **`nit` · A CSV choice list whose codes start with zero breaks if the file is re-saved in Excel, and nothing says
+  why.** Found by `M148` while writing the sample files the user asked for (Round 2, `r2-c11`: *"give me sample csv for
+  me to check specially for multi levels"*). Excel reads `01` as the number 1 and saves it so, a child file's parent
+  column then names no row, and publish refuses with "option “X” has no valid parent" — true, but silent on the cause.
+  The remedy is one sentence beside the upload in `CascadingEditor.vue` and in Settings → Choice lists (keep codes as
+  text, or use letters), and the same hint on that refusal. **Live.** Filed by `M148`. **Tier: during-testing.**

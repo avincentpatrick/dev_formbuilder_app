@@ -10,7 +10,7 @@ use App\Services\Ocr\OcrWord;
 
 /**
  * Lays out what a recognizer would read off a filled copy of a printed blank form (M128 tests; layout 2 since
- * M143, layout 3 since M144).
+ * M143, layout 3 since M144, layout 4 since M148 — the printed separator in each comb gap).
  *
  * It takes the SAME render model the PDF is typeset from (`BlankFormPrintPresenter::present()`) and places
  * its text where `resources/views/pdf/blank-form.blade.php` puts it: the running head with the layout word
@@ -67,11 +67,14 @@ final class PrintedPageTypesetter
      *                                                       group strings, or for choices the labels marked
      * @param  array{omit_keys?: list<string>, omit_labels?: list<string>, omit_captions?: bool, omit_numbers?: bool,
      *               stamp?: string|null, layout?: int|string|null, run_together?: list<string>,
-     *               confidence?: array<string, float>}  $options
+     *               confidence?: array<string, float>, gap_reads?: array<string, list<string|null>>}  $options
      *                                                   `layout` null prints no layout word (a layout-1 sheet);
      *                                                   a string prints it garbled. `run_together` names the keys
      *                                                   whose first marked option's X is read as one word with the
-     *                                                   label ("XFemale"), or `runhead` for "Layout2".
+     *                                                   label ("XFemale"), or `runhead` for "Layout2". `gap_reads`
+     *                                                   says, per comb key and gap, what the recognizer read where
+     *                                                   the separator is printed (null: nothing) — a misread `/`,
+     *                                                   or a mark a pen made there.
      */
     public static function fromModel(array $model, array $answers, array $options = []): self
     {
@@ -82,6 +85,7 @@ final class PrintedPageTypesetter
         $omitNumbers = $options['omit_numbers'] ?? false;
         $runTogether = $options['run_together'] ?? [];
         $confidence = $options['confidence'] ?? [];
+        $gapReads = $options['gap_reads'] ?? [];
         $stamp = array_key_exists('stamp', $options) ? $options['stamp'] : ($model['schema_stamp'] ?? null);
         $layout = array_key_exists('layout', $options) ? $options['layout'] : ($model['layout'] ?? null);
 
@@ -161,7 +165,7 @@ final class PrintedPageTypesetter
 
                 $answer = $answers[$key] ?? null;
                 match ($row['area']) {
-                    'comb' => $page->comb($row['comb'], $answer, $omitCaptions, $conf),
+                    'comb' => $page->comb($row['comb'], $answer, $omitCaptions, $conf, $gapReads[$key] ?? null),
                     'choices' => $page->choices($row['options'], is_array($answer) ? $answer : [], $conf, in_array($key, $runTogether, true)),
                     'line' => $page->line(is_string($answer) ? $answer : null, $conf),
                     'ruled' => $page->ruled(is_string($answer) ? $answer : null, (int) ($row['lines'] ?? 3), $conf),
@@ -293,10 +297,15 @@ final class PrintedPageTypesetter
     }
 
     /**
-     * @param  list<array{cells: int, caption: string|null}>  $groups
+     * Layout 4: each gap after the first group holds its group's printed `separator`, centred in the gap on the
+     * box row, as printed text the recognizer reads like any other — unless `$gapReads` says what was read there
+     * instead (one entry per gap, in order; null for nothing).
+     *
+     * @param  list<array{cells: int, caption: string|null, separator?: string|null}>  $groups
      * @param  string|list<string>|null  $answer
+     * @param  list<string|null>|null  $gapReads
      */
-    private function comb(array $groups, mixed $answer, bool $omitCaptions, float $confidence): void
+    private function comb(array $groups, mixed $answer, bool $omitCaptions, float $confidence, ?array $gapReads = null): void
     {
         $parts = is_array($answer) ? $answer : [is_string($answer) ? $answer : ''];
         $x = self::LEFT + 0.004;
@@ -304,7 +313,12 @@ final class PrintedPageTypesetter
 
         foreach ($groups as $g => $group) {
             if ($g > 0) {
-                $x += self::GAP; // the borderless spacer cell between groups
+                $read = $gapReads === null ? ($group['separator'] ?? null) : ($gapReads[$g - 1] ?? null);
+                if ($read !== null && $read !== '') {
+                    $center = $x + self::GAP / 2;
+                    $this->words[] = ['text' => $read, 'x0' => $center - self::CHAR / 2, 'y0' => $this->y, 'x1' => $center + self::CHAR / 2, 'y1' => $this->y + self::LINE, 'confidence' => 0.99];
+                }
+                $x += self::GAP; // the borderless gap between groups, holding its separator
             }
             $start = $x;
             $chars = preg_split('//u', $parts[$g] ?? '', -1, PREG_SPLIT_NO_EMPTY) ?: [];

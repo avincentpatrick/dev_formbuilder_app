@@ -13525,29 +13525,29 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   separator for the four positional types and refuses a group longer than its cells, and a renderer case asserts the
   computed border of every gap. **Live.** Filed by `M148`. **Tier: early-testing.** ✅ **CLOSED BY `M148` (2026-10-08), PR #341:** layout 4 — `.comb td.comb__gap` is borderless and prints the `separator` `BlankFormPrintPresenter::combGroups()` gives each group (`/`, `:`, nothing on a datetime's date-to-time gap or a cascade); `LAYOUT` is 4 and a layout-3 sheet is refused; `OcrText::SEPARATORS` are dropped for the four positional types only and `overfills()` refuses a group longer than its cells; `drawnCombCells()` reads every comb cell's computed border, width and text through dompdf's `end_frame` callback. Red first (the geometry case on the old CSS; ten OCR cases after the fixture changed), four mutants caught, and a real render rasterised.
 
-- **`minor` · Structure's drag handle is hard to see.** Found by `M148` from the staging smoke test (Round 2, `r2-c18`,
+- ✅ **CLOSED BY `M150` (2026-10-09) — ****`minor` · Structure's drag handle is hard to see.** Found by `M148` from the staging smoke test (Round 2, `r2-c18`,
   a pass with the note *"the icon for the draggable on the left most part of the card is not noticeable"*). Each row's
   `.canvas__grip` in `BuilderCanvas.vue` is a transparent 28px button with no border until hover, holding
   `MdsIcon name="grip"` at `sm`: six near-zero-length strokes at 1.5 stroke width in a 24-unit box, about 1px dots at
   16px, in `--mds-color-text-secondary`. `ScopeTree.vue` uses the same glyph, so the fix belongs to the builder's grip
   rather than to the design system's icon. Taken before Oct 12 by `D103`. **Live.** Filed by `M148`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** ✅ **CLOSED BY `M150` (2026-10-09):** the grip draws the design system's icon at `md` with its own stroke of 3 (`.canvas__grip :deep(svg)`), about 2.5px dots where they were about one, and shows a grabbing cursor while a drag is on. The colour was never the cause — text-secondary is about 6:1 on the surface — and a resting border or sunken background, measured first, is about 1.2:1 and would not have shown. The glyph itself is shared and is filed against the design system.
 
-- **`minor` · A question jumps from place to place while it is dragged in Structure, instead of gliding.** Found by
+- ✅ **CLOSED BY `M150` (2026-10-09) — ****`minor` · A question jumps from place to place while it is dragged in Structure, instead of gliding.** Found by
   `M148` from the staging smoke test (Round 2, `r2-c18`: *"if we can make the animation of the drag more smooth"*).
   `useCanvasReorder.ts` re-sorts the store on every `pointermove` (no animation frame throttle, no drag threshold, no
   auto-scroll), and `BuilderCanvas.vue` has no `TransitionGroup`, FLIP or transition, so each row snaps to its new slot;
   every move also re-runs `PreviewPane`'s shape watch and `LogicRail`'s rail. The motion tokens exist
   (`--mds-duration-base`, `--mds-ease-standard`) and collapse under reduced motion. No pointer-drag test runs in CI.
-  Taken before Oct 12 by `D103`. **Live.** Filed by `M148`. **Tier: early-testing.**
+  Taken before Oct 12 by `D103`. **Live.** Filed by `M148`. **Tier: early-testing.** ✅ **CLOSED BY `M150` (2026-10-09):** `useFlipReorder.ts` measures every row and section before Vue patches a new order and puts each moved node back where it was, then lets it glide home (`--mds-duration-moderate`, `--mds-ease-standard`; reduced motion collapses it) — a section first, and its rows only by what they moved inside it. `<TransitionGroup>`, the obvious tool, was rejected on reading Vue's runtime: a duplicate row under the pointer on a cross-section move, no glide across lists, and a section's shift counted twice. A press on a grip no longer begins a drag until the pointer has moved 4px; `pointercancel` puts everything back; a second pointer is ignored; and the dragged row is left out of its own hit-test by uid, since the move that begins a drag runs before its flag renders. Proved by a real mouse drag in `builder-structure.spec.ts` that survives a reload; Vitest cases red against nine mutants.
 
-- **`minor` · A question's label cannot be edited in Structure.** Found by `M148` from the staging smoke test (Round 2,
+- ✅ **CLOSED BY `M150` (2026-10-09) — ****`minor` · A question's label cannot be edited in Structure.** Found by `M148` from the staging smoke test (Round 2,
   `r2-c17`, a pass with the note *"can we also use the middle section (structure and preview) to allow the user to edit
   the label there already"*). The label is text inside `<button class="canvas__field-main">` in `BuilderCanvas.vue`,
   where an input cannot sit; it is edited only through the settings pane's Label input (`ConfigPanel.vue`'s `setField`,
   then the store's 600ms `touch()` and one PATCH and one undo entry per burst), and the server refuses an empty label
   (`required|max:500`). No inline-edit component exists in the design system. Two E2E locators read
-  `.canvas__field-main`'s text. Taken before Oct 12 by `D103`. **Live.** Filed by `M148`. **Tier: early-testing.**
+  `.canvas__field-main`'s text. Taken before Oct 12 by `D103`. **Live.** Filed by `M148`. **Tier: early-testing.** ✅ **CLOSED BY `M150` (2026-10-09):** "Edit label" on the row, or a double-click, swaps the row's main button for `InlineLabelEdit.vue` (an `MdsTextInput`, no store knowledge, so Preview reuses it next); Enter or blur commits, Escape cancels, a blank or unchanged label is not an edit. The draft stays local and `useBuilderStore.renameField()` writes it once — one PATCH, one undo entry — through the settings pane's own commit path, rather than one save per pause in typing. Focus returns to the row after Enter or Escape. Proved by a rename that survives a reload in `builder-structure.spec.ts`, an axe scan of the open editor in both themes, and Vitest cases red against eight mutants.
 
 - **`minor` · A question's label cannot be edited in Preview.** Found by `M148` from the same Round 2 note (`r2-c17`).
   The preview's label is drawn by the shared respondent component `submissions/FieldInput.vue`, which the builder
@@ -13573,10 +13573,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   link or the form's own URL — all of which still work, exports included. `D103`: a read-only Archived filter on the
   Forms list; still no un-archive (`D101`). **Live.** Filed by `M148`. **Tier: during-testing.**
 
-- **`nit` · Structure's drag handles tell a screen reader "Press Enter to grab", though Space grabs too.** Found by
+- ✅ **CLOSED BY `M150` (2026-10-09) — ****`nit` · Structure's drag handles tell a screen reader "Press Enter to grab", though Space grabs too.** Found by
   `M148` beside the handle row above. Both `aria-label`s in `BuilderCanvas.vue` (a section's and a question's) name only
   Enter; `useCanvasReorder.ts` grabs on Enter or Space, and the empty section's text says only "Drag one in by its
-  handle". **Live.** Filed by `M148`. **Tier: early-testing.**
+  handle". **Live.** Filed by `M148`. **Tier: early-testing.** ✅ **CLOSED BY `M150` (2026-10-09):** both labels, and `ScopeTree.vue`'s (the same defect beside it), say "Press Enter or Space to grab"; a Vitest case pins both builder labels, red against the reverted string.
 
 - **`nit` · `Builder.vue`'s header comment still says questions are ordered with Move up and Move down.** Found by
   `M148` beside the handle row above. Pointer and keyboard dragging replaced those buttons (`useCanvasReorder.ts`), so
@@ -13662,14 +13662,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   "rey.deguzmanjr@~~pitahc~~.pitahc.gov.ph" read as `rey.deguzmanjr@pital.pitahc.gov.ph`, withheld at 50. The confidence
   rule caught it here; nothing in the reader knows a strike-through. **Live.** Filed by `M149`. **Tier: during-testing.**
 
-- **`minor` · A keyboard reorder that moves a question's row loses focus, so the move is never saved and every later drag is
+- ✅ **CLOSED BY `M150` (2026-10-09) — ****`minor` · A keyboard reorder that moves a question's row loses focus, so the move is never saved and every later drag is
   refused until the page is reloaded.** Found by `M150` while planning the Structure rows. Each group renders its own list in
   `BuilderCanvas.vue`, so an arrow key that steps a question into another section (`useCanvasReorder.ts`, `stepFieldAcross`)
   destroys its row and the focused grip with it, and a step that makes Vue move the grabbed row's node blurs it too. The next
   Enter lands on the page rather than the grip, `commitReorder` never runs, the order is never saved, and `grabbedUid` stays
   set — which `onFieldPointerDown` and `onSectionPointerDown` read as "a keyboard grab is on" and refuse every pointer drag.
   `builder-preview-authoring.spec.ts` passes over it: it asserts the local list, and a saved state that was already true. The
-  remedy re-focuses the moved item's grip after each step. **Live.** Filed by `M150`. **Tier: early-testing.**
+  remedy re-focuses the moved item's grip after each step. **Live.** Filed by `M150`. **Tier: early-testing.** ✅ **CLOSED BY `M150` (2026-10-09):** after each keyboard step, focus is put back on the moved item's grip (`refocusGrip`, fields and sections). Red first in a real browser — `builder-preview-authoring.spec.ts`'s step out of a section left the new grip unfocused — and that spec now also waits for the reorder request and checks the move after a reload; a Vitest case is red against the mutant that drops the refocus.
 
 - **`nit` · The design system's `grip` icon draws six dots about one pixel across at its small size.** Found by `M150` while
   fixing `R-91c1792e`. `icons.ts` draws `grip` as six zero-length strokes at the shared 1.5 stroke width, so each dot is about

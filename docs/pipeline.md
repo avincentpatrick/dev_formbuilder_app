@@ -53,14 +53,14 @@ may touch a hub. The close-out artefacts every increment touches by procedure ar
 
 | # | id | Task | Tier | Source | Phase | State | Blocker | Size |
 |---|---|---|---|---|---|---|---|---|
-| 1 | `R-adce6e14` | A question jumps from place to place while it is dragged in Structure, instead of gliding. | early-testing | `docs/feature-backlog.md:13535` | — | ready | — | — |
-| 2 | `R-34edf1f5` | A question's label cannot be edited in Structure. | early-testing | `docs/feature-backlog.md:13543` | — | ready | — | — |
-| 3 | `R-732e0715` | Structure's drag handles tell a screen reader "Press Enter to grab", though Space grabs too. | early-testing | `docs/feature-backlog.md:13575` | — | ready | — | — |
-| 4 | `R-91c1792e` | Structure's drag handle is hard to see. | early-testing | `docs/feature-backlog.md:13527` | — | ready | — | — |
+| 1 | `R-adce6e14` | A question jumps from place to place while it is dragged in Structure, instead of gliding. | early-testing | `docs/feature-backlog.md:13536` | — | ready | — | — |
+| 2 | `R-34edf1f5` | A question's label cannot be edited in Structure. | early-testing | `docs/feature-backlog.md:13544` | — | ready | — | — |
+| 3 | `R-732e0715` | Structure's drag handles tell a screen reader "Press Enter to grab", though Space grabs too. | early-testing | `docs/feature-backlog.md:13576` | — | ready | — | — |
+| 4 | `R-91c1792e` | Structure's drag handle is hard to see. | early-testing | `docs/feature-backlog.md:13528` | — | ready | — | — |
 | 5 | `R-2ef548ea` | The Print blank prints the gap between a date's groups as a box to write in, and the reader puts whatever is written there into the group beside it. | early-testing | `docs/feature-backlog.md:13509` | — | ready | — | — |
-| 6 | `R-74c3cf35` | A question's label cannot be edited in Preview. | early-testing | `docs/feature-backlog.md:13551` | — | ready | — | — |
-| 7 | `R-2baef8ea` | Questions cannot be dragged in Preview, to reorder them or to move them into a section. | early-testing | `docs/feature-backlog.md:13558` | — | ready | — | — |
-| 8 | `ocr-provider-bakeoff` | H1d — choose the OCR provider on real samples (Cloud Vision first, a vision-language model only if G9 is missed — D97), calibrate the 90/70 threshold… | early-testing | `docs/ocr-pipeline-design.md:330` | 3 | blocked | user: needs about 15 hand-filled Print blank copies printed from layout 4 (M148 or later), scanned and photographed, with correct answers for at leas… | M |
+| 6 | `R-74c3cf35` | A question's label cannot be edited in Preview. | early-testing | `docs/feature-backlog.md:13552` | — | ready | — | — |
+| 7 | `R-2baef8ea` | Questions cannot be dragged in Preview, to reorder them or to move them into a section. | early-testing | `docs/feature-backlog.md:13559` | — | ready | — | — |
+| 8 | `ocr-provider-bakeoff` | H1d — choose the OCR provider on real samples (Cloud Vision first, a vision-language model only if G9 is missed — D97), calibrate the 90/70 threshold… | early-testing | `docs/ocr-pipeline-design.md:343` | 3 | blocked | user: needs about 15 hand-filled Print blank copies printed from layout 4 (M148 or later), scanned and photographed, with correct answers for at leas… | M |
 | 9 | `ocr-staging-scan` | One real scan through the testing server's scans page — the smoke test's OCR check, which the user marked can't-check on 2026-10-06 — then delete C:\… | early-testing | `docs/deployment-infrastructure.md:684` | — | blocked | user: upload one hand-filled Print blank printed from layout 4 (M148 or later - any of the bake-off samples, once staging is deployed at or after M14… | S |
 | 10 | `version-diff-ui` | PRD Feature #8 — the interactive field-by-field version-diff view | during-testing | `docs/form-versioning-schema-migration.md:209` | 3 | ready | — | L |
 | 11 | `deferral-site-disposition` | Give every documented deferral section and deferral sentence a recorded disposition | during-testing | `PROGRESS.md:206` | — | ready | — | L |
@@ -131,8 +131,8 @@ may touch a hub. The close-out artefacts every increment touches by procedure ar
 | 76 | `R-db5a14dd` | An open box's left wall read as the letter `I` or `l` becomes a leading `1` in a number — flagged for review at 89, but shown as a plausible value. | during-testing | `docs/feature-backlog.md:13392` | — | ready | — | — |
 | 77 | `R-565abf19` | The CSV and XLSX export orders rows by `id` ascending, so a response resumed from a draft sits by when it was started while its Submitted column says… | during-testing | `docs/feature-backlog.md:13432` | — | ready | — | — |
 | 78 | `R-1edd6482` | `forms-folders-axe.spec.ts`'s empty-folder case fails about one run in six locally, on a different project each time, waiting five seconds for "No ma… | during-testing | `docs/feature-backlog.md:13440` | — | ready | — | — |
-| 79 | `R-44b17445` | An archived form cannot be found from the Forms list. | during-testing | `docs/feature-backlog.md:13568` | — | ready | — | — |
-| 80 | `R-1059e9bd` | A CSV choice list whose codes start with zero breaks if the file is re-saved in Excel, and nothing says why. | during-testing | `docs/feature-backlog.md:13585` | — | ready | — | — |
+| 79 | `R-44b17445` | An archived form cannot be found from the Forms list. | during-testing | `docs/feature-backlog.md:13569` | — | ready | — | — |
+| 80 | `R-1059e9bd` | A CSV choice list whose codes start with zero breaks if the file is re-saved in Excel, and nothing says why. | during-testing | `docs/feature-backlog.md:13586` | — | ready | — | — |
 | 81 | `R-bee5a083` | The per-item `error.code` is the integrator's real branching key on `/sync/submissions`, and the contract still publishes it as an unconstrained stri… | during-testing | `docs/feature-backlog.md:1835` | — | ready | — | — |
 | 82 | `R-4328a4d9` | The API rate-limit table promises 300 requests/minute per authenticated user and no such limiter is defined. | during-testing | `docs/feature-backlog.md:7769` | — | ready | — | — |
 | 83 | `R-f1312153` | "1 concurrent sync export per form, additional requests 429" — no concurrency guard exists on any export path. | during-testing | `docs/feature-backlog.md:7839` | — | ready | — | — |
@@ -199,7 +199,7 @@ may touch a hub. The close-out artefacts every increment touches by procedure ar
 | 144 | `R-3faef64a` | A question or a choice cannot carry a picture or an audio clip; only a note can show an image. | during-testing | `docs/feature-backlog.md:13206` | — | ready | — | — |
 | 145 | `R-1ceb198f` | An automation cannot send to an address taken from an answer, put answers into its message, ask a reviewer to approve, or say when it failed. | during-testing | `docs/feature-backlog.md:13212` | — | ready | — | — |
 | 146 | `R-66bc91ca` | Nothing tells a tester to look in the spam folder for their invitation, though the first one landed there. | during-testing | `docs/feature-backlog.md:13496` | — | ready | — | — |
-| 147 | `ocr-linelist` | PRD Feature #2 — the linelist OCR channel | during-testing | `docs/ocr-pipeline-design.md:331` | 3 | blocked | user: needs 2–3 scanned linelist sheets and their blank templates (D72 puts it after Oct 12) | L |
+| 147 | `ocr-linelist` | PRD Feature #2 — the linelist OCR channel | during-testing | `docs/ocr-pipeline-design.md:344` | 3 | blocked | user: needs 2–3 scanned linelist sheets and their blank templates (D72 puts it after Oct 12) | L |
 | 148 | `R-352a11c8` | The SSO step-up escape link that `docs/security-threat-model.md` §9 records as owed was never added. | during-testing | `docs/feature-backlog.md:9659` | — | blocked | precondition: row is latent | — |
 | 149 | `R-220caf58` | A background job that waits in the queue longer than six hours is failed without ever running. | during-testing | `docs/feature-backlog.md:9728` | — | blocked | precondition: row is latent | — |
 | 150 | `R-0002c1b9` | `queue:work --timeout` cannot fire on Windows. | during-testing | `docs/feature-backlog.md:9817` | — | blocked | precondition: row is latent | — |
@@ -246,7 +246,7 @@ may touch a hub. The close-out artefacts every increment touches by procedure ar
 | 191 | `R-2011e062` | On the scan review screen a scanned PDF is a download link, not pages shown beside the form. | during-testing | `docs/feature-backlog.md:12786` | — | blocked | precondition: row is not-live | — |
 | 192 | `R-a4dbfc5b` | `docs/xlsform-interop-spec.md` says `likert_scale` round-trips with full fidelity, and its own import notes say it does not. | during-testing | `docs/feature-backlog.md:12873` | — | blocked | precondition: row is not-live | — |
 | 193 | `R-f313b47f` | No test checks the guest schema's real response against `openapi.json`. | during-testing | `docs/feature-backlog.md:12907` | — | blocked | precondition: row is not-live | — |
-| 194 | `R-c4042187` | `Builder.vue`'s header comment still says questions are ordered with Move up and Move down. | during-testing | `docs/feature-backlog.md:13580` | — | blocked | precondition: row is not-live | — |
+| 194 | `R-c4042187` | `Builder.vue`'s header comment still says questions are ordered with Move up and Move down. | during-testing | `docs/feature-backlog.md:13581` | — | blocked | precondition: row is not-live | — |
 | 195 | `R-52a0357b` | The sync surface's read and write are gated on different permission families, so no single non-admin role can complete the offline loop. | during-testing | `docs/feature-backlog.md:1927` | — | blocked | precondition: row is not-live | — |
 | 196 | `R-dccacf64` | The Basics tab's format switch and "Allow negative numbers" have no end-to-end coverage that writes. | during-testing | `docs/feature-backlog.md:12591` | — | blocked | precondition: row is not-live | — |
 | 197 | `R-15b21852` | No OCR upload test proves the upload reads a file's type from its bytes, and one test's comment says it does. | during-testing | `docs/feature-backlog.md:12827` | — | blocked | precondition: row is not-live | — |
@@ -442,9 +442,9 @@ rather than dropped, so that this file and its sources cannot disagree about wha
 
 - `testing-server-notified` — done (`PROGRESS.md:208`)
 - `tier-verdicts` — done (`PROGRESS.md:207`)
-- `ocr-bakeoff-harness` — done (`docs/ocr-pipeline-design.md:333`)
-- `ocr-single-form` — done (`docs/ocr-pipeline-design.md:329`)
-- `ocr-testing-server-key` — done (`docs/ocr-pipeline-design.md:332`)
+- `ocr-bakeoff-harness` — done (`docs/ocr-pipeline-design.md:346`)
+- `ocr-single-form` — done (`docs/ocr-pipeline-design.md:342`)
+- `ocr-testing-server-key` — done (`docs/ocr-pipeline-design.md:345`)
 - `staging-smoke-test` — done (`docs/deployment-infrastructure.md:683`)
 
 ## What this file cannot see

@@ -13506,7 +13506,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   thing shipped, which needs a build-evidence term joined to prose (`P2d`'s machinery pointed at sentences). **Not live**
   — a weak lint, not a defect in the product. **Tier: after-launch.**
 
-- **`major` · The Print blank prints the gap between a date's groups as a box to write in, and the reader puts whatever is
+- ✅ **CLOSED BY `M148` (2026-10-08) — **`major` · The Print blank prints the gap between a date's groups as a box to write in, and the reader puts whatever is
   written there into the group beside it.** Found by `M148` from the staging smoke test (Round 2, `r2-print`, a pass with
   the note *"the date has 10 boxes. 2 for day, 2 for months and 4 for year. i believe the 2 more in between are
   separators. can we automatically include the value of the separator? … just dont let the user fill that box
@@ -13523,7 +13523,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   separator as printed text with no border (`/` in a date, `:` in a time and a duration, a plain gap between a
   datetime's date and time, nothing on a cascade, whose letters may hold a real hyphen), the reader drops a printed
   separator for the four positional types and refuses a group longer than its cells, and a renderer case asserts the
-  computed border of every gap. **Live.** Filed by `M148`. **Tier: early-testing.**
+  computed border of every gap. **Live.** Filed by `M148`. **Tier: early-testing.** ✅ **CLOSED BY `M148` (2026-10-08), PR #341:** layout 4 — `.comb td.comb__gap` is borderless and prints the `separator` `BlankFormPrintPresenter::combGroups()` gives each group (`/`, `:`, nothing on a datetime's date-to-time gap or a cascade); `LAYOUT` is 4 and a layout-3 sheet is refused; `OcrText::SEPARATORS` are dropped for the four positional types only and `overfills()` refuses a group longer than its cells; `drawnCombCells()` reads every comb cell's computed border, width and text through dompdf's `end_frame` callback. Red first (the geometry case on the old CSS; ten OCR cases after the fixture changed), four mutants caught, and a real render rasterised.
 
 - **`minor` · Structure's drag handle is hard to see.** Found by `M148` from the staging smoke test (Round 2, `r2-c18`,
   a pass with the note *"the icon for the draggable on the left most part of the card is not noticeable"*). Each row's

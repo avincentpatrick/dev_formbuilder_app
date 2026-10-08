@@ -16,73 +16,57 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M148`, Print blank layout 4: the gap between a comb's groups stops printing as a writable box and carries its separator (`/` in a date, `:` in a time and a duration), the reader drops a printed separator and refuses a group longer than its boxes; plus the staging smoke test's Round 2 filed with tiers and `D103` recorded (`m148-print-blank-layout-4`)
+## Status: NO ACTIVE CLAIM — `M148` is merged; the next session opens with the user's check of the Layout 4 Print blank (`r3-print`) and the sample CSVs (`r3-c11`) on the smoke-test page, then — once the paper passes — the ~15 layout-4 samples for the bake-off (the laptop key already reads, made by a side session in the `formbuilder-ocr` worktree; its guide is `~/.claude/plans/while-other-session-is-lexical-grove.md`, Part B); the builder rows `D103` put before Oct 12 are `M149` (Structure: the handle, a drag that glides, a label edited in place, the handle's screen-reader text) and `M150` (Preview: a label edited in place, dragging)
 
-Taken 2026-10-08. Branch `m148-print-blank-layout-4`, cut from `origin/main` at `82d6f52c`, PR into `main`. The session opened, as
-`CLAUDE.md`'s comment-fixed rule requires, with the user's check of the Layout 3 Print blank. They marked all ten Round 2 checks
-on the smoke-test page: seven pass, three can't-check. `r2-print` passed with a comment: *"the date has 10 boxes. 2 for day, 2 for
-months and 4 for year. i believe the 2 more in between are separators. can we automatically include the value of the separator? …
-which ever will be applicable and readable for the OCR. just dont let the user fill that box wrongly."* The glyph was delegated to
-Claude: `/` for a date, `:` for a time and a duration, a plain gap between a datetime's date and its time, nothing on a cascade.
-`D103` was put to the user by name in this session and answered in chat: all four builder requests from Round 2 before Oct 12, the
-respondent email stays after Oct 12, and an Archived filter on the Forms list during testing. The OCR samples are printed from this
-paper, so `M148` is layout 4 alone; the builder rows are filed `early-testing` for `M149` (Structure) and `M150` (Preview).
-Row: none exists yet — it is filed in this increment's first work commit, from the comment above, and closed by it.
+## RELEASED — `M148`, Print blank layout 4: each comb gap prints its separator and no box, the reader drops a printed separator and refuses a group longer than its boxes, and a renderer case reads what dompdf draws; the staging smoke test's Round 2 filed with tiers and `D103` recorded (merged as PR #341, `8d67c4a1`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-### Evidence verified
-- **The 10 boxes are a cascade bug, not a design.** `_blank-form-styles.blade.php`: `.comb td` (specificity 0,1,1) sets an 18pt
-  bordered cell, and `.comb__gap` (0,1,0) cannot override it, so dompdf 3.1.6 — which implements specificity — draws every gap cell
-  as an answer box. `_blank-form-comb.blade.php` emits a gap `<td class="comb__gap">` before every group but the first, in the box
-  row and the caption row (`.comb__caption td` ties at 0,1,1 and wins by order, so only the caption-row gap is borderless). A date
-  prints 2+1+2+1+4 = 10 boxes, a time 5, a datetime 16, a duration 6, an N-level cascade N−1 extra. **Measured, not inferred:** a
-  scratch render read through dompdf's `end_frame` callback gives each box-row gap `border-left=0.75`, width 19.5pt; rasterised, it
-  is ten equal boxes.
-- **The reader expects nothing in a gap.** `OcrAnswerReader::combSymbols()` drops only the box-wall characters (`OcrText::
-  isBorderArtefact()`), so a `/`, `-` or `:` survives; `assignToCaptions()` gives a character to the nearest caption centre with a
-  strict `<`, so a gap-1 character lands in DD; `int()` maps `O o D → 0` and `I l i → 1`; `date()`, `time()`, `datetime()` and
-  `duration()` check no group's length against its cells. A slash read as `1` in gap 1 makes DD `031`.
-- **The layout number:** `BlankFormPrintPresenter::LAYOUT = 3`, printed in the running head, refused below it by
-  `OcrScanReader` (`layout_outdated`), named by `OcrScanReviewPresenter` and `OcrBakeoffCommand`; tests pin the literal 3 in
-  `BlankFormPrintPresenterTest`, `BlankFormPrintRendererTest`, `PrintedFormMatcherTest` and `OcrScanReviewTest`.
+Shipped 2026-10-08. Branch `m148-print-blank-layout-4`, cut from `origin/main` at `82d6f52c`. The claim is `10865288`, pushed before
+any file was opened; the work is `97793e68` (Round 2 filed, `D103`), `74662166` (layout 4) and `c2fb033c` (the design doc's results).
+Deployed to the testing server by itself (`D47`): run 37731450255 ran `deploy.ps1` against the live app directory in 1m48s, after the post-merge CI run 37729718188 (6/6). Layout 4 is live there and on the development machine.
 
-### Premise verified
-- **No field paper exists from layout 3** except the user's own dev-machine test sheet; the bake-off samples have not been printed
-  (they wait on this paper), so a bump refuses nothing anyone holds.
-- **The OCR tests never see the PDF:** `tests/Feature/Ocr/Support/PrintedPageTypesetter.php` models the gap as a 10pt spacer with no
-  box and no glyph (`GAP`), so the suite read the paper as designed while the PDF printed something else. No test reads rendered
-  geometry — every renderer assertion is on the HTML string, which is why two layouts shipped with the bug.
-- **The gap is described three ways:** `docs/ocr-pipeline-design.md` §2.5.3 says 7pt, the CSS and the presenter's
-  `MAX_COMB_CELLS` arithmetic say 10pt, the PDF prints 19.5pt.
-- **`/` is also in `OcrText::MARKS`**, which only choice questions read; a separator list must stay apart from it. **A cascade holds
-  letters** where `-` and `/` are real answers (LAPU-LAPU, N/A), so dropping separators is limited to date, time, datetime, duration.
-- **Staging serves layout 3** (`M144`) until the user runs a deploy; the dev machine serves the trunk.
+**What the session was.** It opened, as the comment-fixed rule requires, with the user's check of the Layout 3 Print blank. They
+marked all ten Round 2 checks on the smoke-test page (seven pass, three can't-check), and `r2-print` passed with a comment: the date
+printed ten boxes and two were separators — print the separator, *"which ever will be applicable and readable for the OCR. just dont
+let the user fill that box wrongly."* Three read-only explorers found the cause before the claim: the gap was never meant to be a box
+(`.comb td` outranked `.comb__gap`), and the reader expected nothing in it. `D103` was asked in the session and answered: all four
+builder requests before Oct 12, the respondent email after, an Archived filter during testing. The user's three questions (archived
+responses, emailing the respondent, sample CSVs) were answered in chat and on the page.
 
-### Remedy verdict
-- **Works, measured before any test was written.** `.comb td.comb__gap` (0,2,1) with `border: none` and the separator as the gap's
-  text: the same scratch render reads every box-row gap at `border-left=0.0`, width 10pt, text `/` or `:`, and the caption-row gaps
-  empty; rasterised (pypdfium2), the date reads `[][] / [][] / [][][][]` and the time `[][] : [][]`.
-- **The reader:** drop separators in `combSymbols()` for the four positional types only, and refuse (as `unreadable`, never a guess)
-  any group longer than its printed cells — that closes the `031` path whatever the recognizer reads in a gap.
-- **The gate that would have caught it:** render through dompdf with an `end_frame` callback and assert the computed border and width
-  of every `td.comb__gap` — the frame tree is disposed by the end of `render()`, so the callback is the only reading point.
+**What changed:**
+- **The paper.** `.comb td.comb__gap` (0,2,1) is borderless and holds its group's `separator` from `BlankFormPrintPresenter::combGroups()`:
+  `/` in a date, `:` in a time and a duration, nothing between a datetime's date and time, nothing on a cascade. `LAYOUT = 4`.
+- **The reader.** `OcrText::SEPARATORS` (kept apart from `MARKS`) dropped in `combSymbols()` for the four positional types; `overfills()`
+  refuses a group read with more characters than cells.
+- **The gate.** `drawnCombCells()` in `BlankFormPrintRendererTest` records every comb cell's computed border, width and text through
+  dompdf's `end_frame` callback. The frame tree is disposed by the end of `render()`: the first scratch probe walked it afterwards and
+  found one frame where it expected forty, and a callback that kept frame objects for later read freed ones.
+- **The fixture first.** `PrintedPageTypesetter` prints each gap's separator, and `gap_reads` says what a recognizer read there instead.
+- **Filed** (append-only, one in-place note on `R-1ceb198f`): the `major` closed here; `early-testing` by `D103` — Structure's handle,
+  a drag that glides, a label edited in Structure, a label edited in Preview, dragging in Preview, and the handle's screen-reader nit;
+  `during-testing` — the Archived filter, `Builder.vue`'s stale comment, and a hint that Excel strips a CSV code's leading zero.
+- **Outside the repository:** three sample CSVs and a README in `cascade-csv-samples` on the Desktop (parsed by the real parser, every
+  parent resolved); the smoke-test page gained a Round 3 (`r3-print`, `r3-c11`) and answers the user's three questions.
 
-Files: `resources/views/pdf/_blank-form-styles.blade.php`, `resources/views/pdf/_blank-form-comb.blade.php`,
-`resources/views/pdf/blank-form.blade.php`, `app/Services/Forms/BlankFormPrintPresenter.php`, `app/Services/Ocr/OcrAnswerReader.php`,
-`app/Services/Ocr/OcrText.php`, `tests/Feature/Ocr/Support/PrintedPageTypesetter.php`, `tests/Feature/Ocr/PrintedFormMatcherTest.php`,
-`tests/Feature/Ocr/ReadOcrScanJobTest.php`, `tests/Feature/Ocr/OcrScanReviewTest.php`, `tests/Feature/Forms/BlankFormPrintPresenterTest.php`,
-`tests/Feature/Forms/BlankFormPrintRendererTest.php`, `docs/ocr-pipeline-design.md` (at or below the line four files cite),
-`docs/deployment-infrastructure.md` (the `ocr-staging-scan` marker's blocker); and by procedure `docs/feature-backlog.md`,
-`docs/claims/decisions.md`, `docs/claims/lane-a.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`,
-`PROGRESS.md` (own block).
-Shared artefacts taken: `docs/**`, `PROGRESS.md` (own block).
-Paired files taken: none — 7(b-bis) read at claim time; no design-system, token or notification file is touched.
-Namespaces spent: `D103` (asked and answered in this session). No migration, no ADR — `0010` stays reserved for the bake-off.
-Prediction: the typesetter rewritten FIRST turns red every reader case that writes a date or a time (count measured, not predicted
-from names — `M143` and `M144` both miscounted); the geometry gate red on the unfixed CSS; three `mutate.php` mutants CAUGHT (the
-selector, the separator drop, the length check); Pint clean, PHPStan 0 on the host, the whole Vitest suite green (no TypeScript
-changes), the ledger's citation count unchanged (append-only); no E2E spec reaches Print blank; CI 6/6 on the first run. **Most
-expected wrong: the red count from the typesetter rewrite**, and second, whether a blank comb's printed separators reach the reader as
-an answer line (`isStatic()` treats a line that normalises to empty as printed, so they should not).
+**How the prediction fared:**
+- ✅ The geometry case red on the unfixed CSS; four `mutate.php` mutants CAUGHT, each red set as predicted (the selector reddened only the
+  geometry case, through the border and width, because the separator still printed).
+- ✅ Pint clean, PHPStan 0 on the host, Vitest 205 files and 3397 tests, `tests/Feature/Forms` 903, `tests/Feature/Ocr` 112, CI 6/6 first run.
+- ✅ The second most-expected-wrong held: a blank comb's printed separators never reach the reader as an answer, because a line of
+  separators normalises to nothing and `isStatic()` takes it as printed text.
+- ⚠️ **The one named most likely wrong was over-reached rather than miscounted.** The claim said every reader case writing a date or a
+  time would go red; ten went red (four existing matcher cases, three new, two bake-off cases nobody named, the review page's wording),
+  and the tilt case stayed green because both readings failed alike.
+- ❌ **The row's first mechanism was wrong.** It said a slash read as `1` turns day `03` into the 31st. A gap-1 character sits exactly
+  between DD and MM, and most fills fail closed; the measured silent path is a month — `01` beside a misread `1`, the other separator
+  unread → November. The row was corrected before it closed.
+- ❌ **A premise was wrong:** "staging serves layout 3 until the user runs a deploy". `D47` turned automatic deploys on, so the merge
+  deployed itself.
+- ✅ No E2E spec reaches Print blank; the ledger edit was append-only.
+
+**Lessons.** An HTML-string assertion proves what the template ASKED for; the cascade decides what is DRAWN, and dompdf honours
+specificity — read the computed style through `end_frame`, and read it inside the callback. A fixture that models the design rather than
+the output hides exactly the defect it should catch. Measure a silent-wrong path before writing it into a row: the geometry, not the
+intuition, says which group a gap character joins.
 
 ## RELEASED — `M147`, every open decision answered: thirty recorded (twenty-eight as recommended, `D39` B, `D40` B), `D102` replaces `D66`'s file-silently rule, and every obligation an answer creates filed with a tier (merged as PR #340, `193c6204`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

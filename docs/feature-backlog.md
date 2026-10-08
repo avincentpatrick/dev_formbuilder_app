@@ -717,7 +717,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **Gates:** four lint gates unchanged at **97 / 108 / 30 / 119** (M3 adds no controller, migration or job),
   Pint `passed`, `openapi.json` byte-identical, zero `.vue` / `.ts` / `packages/design-system/` / e2e movement. Filed by `M1`.
 
-- ➡️ **MOVED TO `docs/claims/decisions.md` AS `D1` (2026-08-25) — IT IS A DECISION, NOT A DEFECT, AND NO LANE SHOULD TAKE IT AS A ROW.** An audit of all 62 open merge-gate rows confirmed this as the only genuinely cross-cutting one: the fix cannot avoid `scripts/job-payload-lint.php`, whose pass-1 scan of `app/` trips R1 on any listener implementing `ShouldQueue` and whose only escape is an `EXEMPT_JOBS` entry inside that script (a listener cannot extend `TenantAwareJob` — its `handle()` is `final`), and it must re-pin `tests/Feature/Connectors/ConnectorFanOutTest.php:163`, which **hard-asserts** these listeners are not queued. Nothing has decided that they should be. Original filing follows, kept because its reasoning is intact.
+- ➡️ **MOVED TO `docs/claims/decisions.md` AS `D1` (2026-08-25) — IT IS A DECISION, NOT A DEFECT, AND NO LANE SHOULD TAKE IT AS A ROW.** An audit of all 62 open merge-gate rows confirmed this as the only genuinely cross-cutting one: the fix cannot avoid `scripts/job-payload-lint.php`, whose pass-1 scan of `app/` trips R1 on any listener implementing `ShouldQueue` and whose only escape is an `EXEMPT_JOBS` entry inside that script (a listener cannot extend `TenantAwareJob` — its `handle()` is `final`), and it must re-pin `tests/Feature/Connectors/ConnectorFanOutTest.php:163`, which **hard-asserts** these listeners are not queued. Nothing has decided that they should be. Original filing follows, kept because its reasoning is intact. ✅ **`D1` ANSWERED 2026-10-08 (`M147`) — option 1: the sixteen stay synchronous, and the rationale goes into the fan-out docblocks, filed as the `nit` row *"`WebhookEventDispatcher`'s and `ConnectorEventDispatcher`'s docblocks never say why the fan-out stays synchronous"*.**
 - ~~**`minor` · All sixteen synchronous dispatch listeners could now be `ShouldQueue`, and nothing has
   decided whether they should be.**~~ ⚠️ **The count is SIXTEEN, not the seven this row first said** — eight
   per channel, all synchronous; seven is merely how many carried the docblock sentence M3 retired. Filed by **M3 (2026-08-19)** at the moment the decision was taken, because a
@@ -3716,7 +3716,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   first place the two payload shapes Group B does not contain become live — the three-part
   `'can:create,'.Submission::class.',form'` (5 routes) and two `can:` middlewares on one route (2 routes).
   M63 measured those shape counts and reviewed none of them. **Whoever takes it should split it: land the
-  derived checks first and decide each finding on its own, then take the manifest as its own increment.** Filed by `M63`. **Not live** — a missing gate rather than a defect, which is this corpus's own not-live shape, judged by `M65`. **Tier: after-launch.**
+  derived checks first and decide each finding on its own, then take the manifest as its own increment.** Filed by `M63`. **Not live** — a missing gate rather than a defect, which is this corpus's own not-live shape, judged by `M65`. **Tier: after-launch.** ⚠️ **`D11` ANSWERED A 2026-10-08 (`M147`): when this manifest is taken it asserts the two gates `D11` kept on purpose — the response PDF's read-level gate and the share QR's edit-level gate — as intended, not as residue.**
 
 - ✅ **CLOSED BY `M64` (2026-09-02) — `minor` · ~~`D5`'s exit bar reads MET but is still not OPERABLE on its own terms, and the gap is provenance.~~** Filed by **M63 (2026-09-02)**, measured rather than asserted, and **carrying a user decision of
   record taken the same day: keep going and make the bar real first.** `state.php` counts **zero open
@@ -3856,7 +3856,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   data), so **documentation defect, not a behaviour one** — but the fix is a decision rather than an edit:
   either strike the claim, or hoist `api_access` into the priority list so the comment becomes true. Filed by `M34`. **Live** — the comment still describes an ordering the priority sorter does not produce, and it is what the next reader checks instead of the middleware, judged by `M65`.
 
-- ➡️ **MOVED TO `docs/claims/decisions.md` AS `D11` (2026-09-02, by `M63`) — IT IS A DECISION, NOT A DEFECT, AND NO LANE SHOULD TAKE IT AS A ROW.** Both candidate fixes change **who can do something**, which is a product call; and `M63`'s claim was that it added the first executable assertion about which permission a gate names, so changing a gate inside that diff would have made its own mutation matrix ambiguous about which half caught what. The recommendation on file is **A — leave both and pin the intent** in the `routes/tenant.php` grant manifest when that row is taken.
+- ➡️ **MOVED TO `docs/claims/decisions.md` AS `D11` (2026-09-02, by `M63`) — IT IS A DECISION, NOT A DEFECT, AND NO LANE SHOULD TAKE IT AS A ROW.** Both candidate fixes change **who can do something**, which is a product call; and `M63`'s claim was that it added the first executable assertion about which permission a gate names, so changing a gate inside that diff would have made its own mutation matrix ambiguous about which half caught what. The recommendation on file is **A — leave both and pin the intent** in the `routes/tenant.php` grant manifest when that row is taken. ✅ **`D11` ANSWERED 2026-10-08 (`M147`) — A: no route changes; both gates are pinned as intended when the grant-manifest row (*"`routes/tenant.php`'s ~95 `can:` gates get none of M63's checks"*) is taken, and that row now says so.**
   ⛔ **THE ROW'S OWN CITATION IS WRONG AND IT CHANGES THE ARGUMENT:** the PDF route is **`POST`**, not
   `GET` — deliberately, because it has side effects (an audit row, a metered export, a queued job). A gate
   on a side-effecting write is a different question from a gate on a read, and the row reasoned about the
@@ -5518,7 +5518,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `PROGRESS_ARCHIVE.md` from the filter, which restores an ~18-minute pipeline on every close-out and
   is exactly the cost `M39` measured and removed; **(b)** a second, tiny workflow running only
   `tracker-lint` on `push` to `main` with no filter, ~1 minute. **Promoted to `docs/claims/decisions.md`
-  as a run-cost decision, with (b) recommended.** The row stays open until that decision is answered. Filed by `M48`. **Tier: after-launch.** **Awaits D8.**
+  as a run-cost decision, with (b) recommended.** The row stays open until that decision is answered. Filed by `M48`. **Tier: after-launch.** ✅ **UNBLOCKED 2026-10-08 — `D8` IS ANSWERED (option 1) AND THE `Awaits` TOKEN IS STRUCK.** The remedy is candidate (b): a second, tiny workflow running only `tracker-lint` on `push` to `main` with no path filter, about a minute; it is not a required context, and its checkout is at least two commits deep because `R7` reads the parent.
 
 - ~~**`minor` · Nothing asserts that CI's checkout is deep enough for `R7` to see the commit that
   declares a surgery, and the failure presents as a missing marker rather than as a broken gate.**~~
@@ -5976,7 +5976,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   incomplete rather than to guess their footprints. Filed by `M70`. ✅ **CLOSED BY `M94` (2026-09-14) — NOT LIVE.** `M93` deleted the batch proposal this row describes; `docs/pipeline.md` § Next is the one picker, so the generator proposes no batch that could collide. The cite-set-versus-repair-set finding stays open in the `M83` row.
 
 
-- **`minor` · `scripts/loop.php --assess` does not read `docs/pipeline.md`, so it cannot refuse a row on its PIPELINE state.** Filed 2026-09-06 by `M79`, deliberately unfixed there. `HELD_TOPICS` refuses the five held topics by substring match on the row text, which is a coarser mechanism that happens to cover the same ground today — so this is a redundancy gap rather than a live hole. ⚠️ **The reason to wait is not effort:** making a STOP-LIST depend on a generated file means an incomplete generation makes the stop-list under-refuse, and an under-refusing stop list is unsafe where an over-refusing one is merely annoying. It belongs with the gate that guarantees the pipeline is complete, not before it. **Live.** Filed by `M79`. **Tier: after-launch.** **Awaits D23.**
+- ~~**`minor` · `scripts/loop.php --assess` does not read `docs/pipeline.md`, so it cannot refuse a row on its PIPELINE state.**~~ Filed 2026-09-06 by `M79`, deliberately unfixed there. `HELD_TOPICS` refuses the five held topics by substring match on the row text, which is a coarser mechanism that happens to cover the same ground today — so this is a redundancy gap rather than a live hole. ⚠️ **The reason to wait is not effort:** making a STOP-LIST depend on a generated file means an incomplete generation makes the stop-list under-refuse, and an under-refusing stop list is unsafe where an over-refusing one is merely annoying. It belongs with the gate that guarantees the pipeline is complete, not before it. **Live.** Filed by `M79`. **Tier: after-launch.** ✅ **CLOSED BY `M147` (2026-10-08) — BY `D23` = option 1, WITH NO CODE CHANGE; THAT IS THE ANSWER, NOT A DEFERRAL.** The literal `HELD_TOPICS` list stays, cross-checked both ways by `pipeline-lint` `P4`, and `--assess` is deliberately not made to depend on a generated file, for the reason this row gives.
 
 - **`minor` · A pipeline marker placed mid-document SILENTLY INVALIDATES every `path:N` citation beneath it, and only the ones that land on a blank line are caught.** Filed 2026-09-06 by `M79`, found by its own gate going red. Markers were first placed next to the sentence they govern, as the design said. `citation-liveness-lint` then failed on two citations in `docs/adr/0009-…` pointing at `0008-entitlement-and-metering.md:8`, which a two-line insertion had pushed into a blank. ⛔ **THE CAUGHT CASE IS THE LUCKY ONE.** That gate only sees a citation landing on a blank, a rule, a fence or past EOF — a citation shifted onto a DIFFERENT REAL LINE resolves happily and is wrong, and nothing in the repository can see it. **25 line-numbered citations point into the six files that carry markers**, so the exposure was measured rather than guessed. ✅ **Fixed in the same increment by moving every marker to END OF FILE, which shifts nothing**, with the reason written beside them so the next author does not helpfully move them back. ⚠️ **What is still open, and it is the reason this is a row rather than a closed note:** end-of-file placement costs the adjacency the design wanted — `Source` now names the marker's line, not the obligation's, so a citation can point a hundred lines from the sentence it governs. Two honest repairs exist — an `anchor=` key naming the governed line, or attributing a marker to the nearest preceding heading — and neither belongs in an increment already building the spine. ⚠️ A marker also cannot sit inside a markdown table or list at all, since an HTML comment at column 0 terminates both; that is why the tracker's held-list line could take none. **Live.** Filed by `M79`. **Tier: after-launch.**
 
@@ -6373,8 +6373,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `--claim=` seam. Without one, the control is unfalsifiable and the increment ships a decorative gate.
   **Live.** Filed by `M72`. **Tier: after-launch.**
 
-- **`minor` · The `npm audit` judge makes a REQUIRED context green while nothing was measured, and that
-  is a deliberate trade rather than an oversight.** Recorded by `M72` (2026-09-05) at the moment the
+- ~~**`minor` · The `npm audit` judge makes a REQUIRED context green while nothing was measured, and that
+  is a deliberate trade rather than an oversight.**~~ Recorded by `M72` (2026-09-05) at the moment the
   decision was taken, rather than left as a comment in the workflow. When the advisory endpoint is
   unreachable the judge exits `2`, `ci.yml` renders a `::warning::` and a job summary, and the step exits
   `0` — so `Static analysis, style & security` is green having judged **no dependency at all**. ⛔ **That
@@ -6386,7 +6386,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `npm install`; it was not taken because `D7` fixes the six required contexts by job name and adding one
   is a branch-protection change. ⚠️ **The honest gap is that nobody is obliged to read the annotation.**
   A stronger form would fail the step on N consecutive unreachable runs, which needs state the workflow
-  does not have today. Recorded as `D16`. **Live.** Filed by `M72`. **Awaits D16.** **Tier: after-launch.**
+  does not have today. Recorded as `D16`. **Live.** Filed by `M72`. ✅ **CLOSED BY `M147` (2026-10-08) — BY `D16` = option 1, WITH NO CODE CHANGE; THAT IS THE ANSWER, NOT A DEFERRAL.** The judge stays green with an annotation when the advisory endpoint is unreachable. **Tier: after-launch.**
 - **`minor` · What actually delivers the offline mis-cased render is unknown, and TWO confident models of
   it have now been wrong.** Measured by `M73` (2026-09-05) while closing the `/f/*` opaqueredirect row, and
   filed rather than guessed at because this exact route has already produced two wrong answers that were
@@ -6926,8 +6926,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   does not reach the Pest child — invoke `vendor/bin/pest` directly.
   ➕ **`M115` (2026-09-27) RE-DERIVED THIS ROW FROM SCRATCH ON A DIFF THAT TOUCHED `app/`, WHICH IS THE EVIDENCE THAT THE ROW IS STILL LIVE AND STILL UNREACHABLE FROM WHERE A SESSION LOOKS.** The container now reports **15** phantoms rather than 18 (the tree moved; the mechanism did not), across `FormField`, `FormSection`, `FormVersion` and `FormVersionResource`, and the session spent about an hour disproving them file by file before this row was found by grepping the ledger. ⚠️ **Two things would have cost nothing and saved all of it:** a scoped container run (`analyse <the files the diff touches>`) reports only the pre-existing lines and is enough to clear a diff; and the HOST run matching CI at zero is the comparison worth making first. ⚠️ This session ALSO met the sibling 128M cap twice — `phpstan` crashed before saying anything until `--memory-limit=2G`, and `vendor/bin/pest` over three directories died the same way, pointing at `routes/tenant.php` — both already recorded above.
 
-- **`minor` · PHPUnit's own collector loses 40 test files in the container, and a local run reports green
-  without them.** Measured by `M76` (2026-09-06). `phpunit.xml` declares its suites as `<directory>`
+- ~~**`minor` · PHPUnit's own collector loses 40 test files in the container, and a local run reports green
+  without them.**~~ Measured by `M76` (2026-09-06). `phpunit.xml` declares its suites as `<directory>`
   entries, which PHPUnit expands through `SebastianBergmann\FileIterator\Facade` — an SPL directory
   iterator, and therefore blind on this bind mount. Measured: **385 of 425** `*Test.php` files collected,
   and the 40 missing were the **whole of `tests/Feature/Forms`** — every form lifecycle, policy, publish,
@@ -6940,7 +6940,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   truncate at all; `tests/Feature` holds 41 entries and enumerates perfectly while `tests/Feature/Forms`
   holds 46 and collapses to 6. The next directory to go blind cannot be predicted, which is why this is a
   gate and not a list. 👤 **What is left for the user is `D17`**: whether that permanent local red is
-  wanted, or whether it should be softened. **Live** until `D17` is answered. Filed by `M76`. **Awaits D17.** **Tier: after-launch.**
+  wanted, or whether it should be softened. **Live** until `D17` is answered. Filed by `M76`. ✅ **CLOSED BY `M147` (2026-10-08) — BY `D17` = option 1, WITH NO CODE CHANGE; THAT IS THE ANSWER, NOT A DEFERRAL.** The gate stays red in the container and names the missing files; an increment that touches forms still runs `tests/Feature/Forms` explicitly. **Tier: after-launch.**
 
 - ✅ **CLOSED BY `M77` (2026-09-06) — `minor` · ~~`R7` pins the checkout depth to `PR commits + 1`, so a depth of 50 keeps every gate green
   while blinding the secret scan to 1,100 of 1,181 commits.~~** Measured by `M76`'s read-only fan-out
@@ -7678,7 +7678,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   rows. ⚠️ **Take it with `D14`, not independently**: `D14` recommends leaving the submission
   delete/restore surface unbuilt, decides the surface rather than the grace period, and says nothing about
   forms or attachments. `docs/non-functional-requirements.md:115` is §10 Out of Scope and does not list
-  this. **Live.** Filed by `M80`. **Tier: before-launch.**
+  this. **Live.** Filed by `M80`. **Tier: before-launch.** ⚠️ **`D14` ANSWERED A 2026-10-08 (`M147`): the submissions third is settled — no delete or restore surface is built, so the purge promise for submissions is corrected to say so, with `docs/data-dictionary.md`'s matching line; forms and attachments are still this row's to scope.**
 
 - **`minor` · `docs/api-specification.md:63` states in the present tense that every unsafe request is
   deduplicated against a 24-hour Redis cache keyed on `(tenant_id, endpoint, Idempotency-Key)`, and no
@@ -8321,7 +8321,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   test teaches a reader to skip red"*. The larger cost is that it disarms this repository's mandated
   proof device for that file. `--skip-baseline` is not a way out: the harness itself says such a run
   cannot tell a mutation-caused failure from a pre-existing one, which is no verdict.
-  **Live.** Filed by `M84`. **Tier: after-launch.**
+  **Live.** Filed by `M84`. **Tier: after-launch.** ⚠️ **`D17` ANSWERED option 1 2026-10-08 (`M147`): the container red is kept, so this row's condition is permanent rather than pending.**
 
 - ~~**`minor` · `scripts/pipeline.php` derives a defect row's state from LIVENESS alone, so a row blocked
   on an open USER DECISION is published as `state=ready`.**~~ Measured by `M84`'s fan-out (2026-09-07)
@@ -8385,7 +8385,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `EXPECTED_UNDISPOSITIONED_BULLETS` and its digest, and the question of whether an indented
   continuation may carry a disposition at all is entangled with the open `D24`, whose option 2 retires
   the bullet-level arm outright. Two edits to one constant in one increment, for two different reasons,
-  is how a pinned number stops meaning anything. **Live.** Filed by `M84`. **Tier: after-launch.**
+  is how a pinned number stops meaning anything. **Live.** Filed by `M84`. **Tier: after-launch.** ✅ **`D24` ANSWERED option 1 2026-10-08 (`M147`): the bullet-level arm stays, so this is ready — accept the indented continuation in `p2e_acceptance_residue()` and re-pin the constant with its digest; it can ride with `prd-feature-disposition`, which moves the same constant.**
 
 - **`minor` · `promote()`'s pre-lock shape has two more instances, and one of them is 74 lines above the
   row that named it.** Measured by `M85` (2026-09-07) while closing that row, which named two instances of
@@ -8400,7 +8400,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   weaker still: no row exists to lock yet, so there is nothing to re-assert *under*. ⚠️ **Third, lower
   confidence:** `AttachmentReferenceValidator::validate()` is a DB-backed pre-lock check too, and M12's
   checksum guard covers the answer document rather than the attachments table, so an attachment deleted in
-  the window is not re-detected. Not traced to a reachable race. **Live.** Filed by `M85`. **Tier: during-testing.** **Awaits D27.**
+  the window is not re-detected. Not traced to a reachable race. **Live.** Filed by `M85`. **Tier: during-testing.** ✅ **UNBLOCKED 2026-10-08 — `D27` IS ANSWERED (option 1, the save door only) AND THE `Awaits` TOKEN IS STRUCK.** The remedy: re-read the version under `SubmissionDraftService::updateDraft()`'s existing lock and refuse a republished one; catch the typed `SubmissionException` in `SubmissionDraftController::store()`, which is load-bearing (the global arm is a `back()` redirect the autosave cannot read, so it would retry forever); and stage it with a concurrent-republish helper, since the existing one is hard-wired to `promote()`'s window. The submit door and `AttachmentReferenceValidator` are declined by the same answer.
   ⛔ **CORRECTED BY `M87` (2026-09-08) — THE CENSUS IS FIVE, NOT TWO; ONE CITATION MOVED; AND THE ROW'S
   CENTRAL PREMISE IS HALF WRONG.** Verified by read-only fan-out against the code, then re-opened by hand.
   ⚠️ **Evidence.** `SubmissionDraftService::saveDraft()`'s pre-lock check and `updateDraft()`'s in-lock
@@ -8898,8 +8898,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   "silent"); nobody has applied it to the lock or to the audit read. ⚠️ Filed rather than fixed because
   whether a config setter should serialize against publish is the same §3.4 question the builder rows raise.
   **Live.** Filed by `M88`. **Tier: during-testing.**
-- **`minor` · One `forceFill` writes `closes_at` and `max_responses` together, and the acceptance guard
-  treats one as authoritative-under-lock and the other as ignorable-pre-lock.** Measured by `M88`'s fan-out
+- ~~**`minor` · One `forceFill` writes `closes_at` and `max_responses` together, and the acceptance guard
+  treats one as authoritative-under-lock and the other as ignorable-pre-lock.**~~ Measured by `M88`'s fan-out
   (2026-09-08). `FormAcceptanceGuard::assertCapacity()` does not trust the passed-in `$form`: it re-reads
   under the `forms` lock and explicitly handles the concurrent writer — *"the cap was cleared concurrently
   between load and lock"*. `assertCanStart()` reads `opens_at`/`closes_at` off the caller's model before any
@@ -8909,7 +8909,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ **This is the sharper form of what the closed schedule-window row was reaching for and got wrong**: the
   split is not promote-door versus submit-door, it is two columns of one write inside one guard class.
   ⚠️ Whether that asymmetry is wrong is the `D27` question rather than a separate one.
-  **Live.** Filed by `M88`. **Awaits D27.** **Tier: during-testing.**
+  **Live.** Filed by `M88`. ✅ **CLOSED BY `M147` (2026-10-08) — BY `D27` = option 1 (the save door only), WITH NO CODE CHANGE ON THIS SURFACE; THAT IS THE ANSWER, NOT A DEFERRAL.** `assertCanStart()`'s pre-lock schedule read is the fourth surface `D27`'s `M88` amendment names, and option 1 declines it: H12a's grace window exists so a respondent who started inside the window is not stranded. **Tier: during-testing.**
 - ~~**`minor` · `P2d`'s dormant-column skip is TABLE-BLIND, and a phantom in one table masked a real inert
   column in another.**~~
   ✅ **CORRECTED AND CLOSED BY `M89` (2026-09-10). THE DEFECT IS REAL, THE PRESCRIBED FIX IS MEASURABLY
@@ -9234,7 +9234,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   cross-field validation rule resolving to a null `related_field_key` and being KEPT by the filter that
   exists to drop it. ⛔ **The blocker is the decision, not the code**: `M90` made `saveAsTemplate()` the
   FIRST request-path `set transaction isolation level` in this codebase, and whether that becomes a pattern
-  is `D29` in `docs/claims/decisions.md`. **Latent.** Filed by `M90`. **Awaits D29.** **Tier: during-testing.**
+  is `D29` in `docs/claims/decisions.md`. **Latent.** Filed by `M90`. ✅ **UNBLOCKED 2026-10-08 — `D29` IS ANSWERED (option 1, adopt it as the pattern) AND THE `Awaits` TOKEN IS STRUCK.** The remedy: wrap `XlsformExporter::build()` and `FormBuilderService::saveFieldToLibrary()` in the same `REPEATABLE READ` transaction as `saveAsTemplate()`, and state in `docs/form-versioning-schema-migration.md` that any multi-statement canonical read takes one. The level itself stays untestable from the suite, as `D29` records. **Tier: during-testing.**
 - ~~**`minor` · Four sites cite a tenants column-whitelist guard that has never existed, and the gate that
   could see them is forced to exempt it.**~~ Found by `M90` (2026-09-10). `scripts/test-pointer-lint.php`
   forbids a test file naming a `*Test` class with no file behind it; this one is EXEMPTED rather than
@@ -10227,7 +10227,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `p=none` with a reporting mailbox, both of which DICT must publish as the name-server operator, so the request to
   DICT is a question for the user; record the outcome in §8.2 beside the SMTP settings. The wording that helps
   testers today — send from a Workspace account, tell testers to look in spam — is a checklist edit and not this
-  row, which is why this one waits for launch. **Live.** Filed by `M98`. **Tier: before-launch.**
+  row, which is why this one waits for launch. **Live.** Filed by `M98`. **Tier: before-launch.** ✅ **`D50` ANSWERED B 2026-10-08 (`M147`): the free header read comes first, exactly as above, and the DICT request follows only if the headers show alignment is the cause. Telling testers to look in spam is filed as its own row.**
 - **`minor` · The checklist creates the app, PHP, NSSM and runner folders directly under `C:\` and never restricts their permissions.**
   Found by `M98` (2026-09-17) while reading the checklist's folder steps against the Windows defaults. The Testing
   Server Checklist creates `C:\meridian`, `C:\php` and `C:\nssm` at the drive root, puts two of them on the machine
@@ -13447,3 +13447,61 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and not CI-visible so far. The remedy is the idiom the other cases use: wait for the URL to carry `folder=` before
   asserting the heading, as the "filtered to a folder" case does. **Live** locally, under load. Filed by `M146`.
   **Tier: during-testing.**
+
+- **`nit` · `WebhookEventDispatcher`'s and `ConnectorEventDispatcher`'s docblocks never say why the fan-out stays
+  synchronous, which `D1` decided it should.** Filed by `M147` (2026-10-08) from `D1` option 1 (*"leave them synchronous
+  and say so in writing — add the rationale to the fan-out docblock"*). `app/Services/Webhooks/WebhookEventDispatcher.php`
+  explains tenant scope and says only that it happened to be right because every listener is synchronous;
+  `app/Services/Connectors/ConnectorEventDispatcher.php` says no more, and `ConnectorFanOutTest` pins the behaviour without
+  explaining it. The remedy is the rationale in both docblocks: cheap dispatchers rather than workers, R1's coverage of
+  `app/` kept, and queueing as the right shape only if request latency is ever measured. **Not live** — a missing
+  explanation; no behaviour changes. **Tier: after-launch.**
+
+- **`minor` · No sweep has ever looked for surfaces that render an untrusted value into a context whose default escaper
+  is wrong.** Filed by `M147` (2026-10-08) from `D10` (b): per-surface answers stay, a third unescaped surface makes the
+  forcing device automatic, and the entry says the discovery sweep is worth doing under any option. Both surfaces found
+  so far (Slack `mrkdwn`, markdown-mail attributes) were found because a row pointed at them. The remedy is one
+  read-only census — the PDF templates, Slack formatting, the mail views, the CSV and XLSX path, and what the guest
+  runtime hands to Vue — with each surface cleared or filed. **Latent** — no third surface is known. **Tier: after-launch.**
+
+- **`nit` · The builder's request-layer uniqueness rules say nothing about the publish race `D30` decided to leave.**
+  Filed by `M147` (2026-10-08) from `D30` option 1 (*"leave both rules as they are and say so in a comment"*).
+  `app/Http/Requests/Forms/UpdateFieldRequest.php` and `app/Http/Requests/Forms/UpdateSectionRequest.php` scope their
+  uniqueness rules to the bound version with no comment, so the next reader cannot tell a slightly wrong message inside
+  that race from an oversight. The remedy is the comment in both: the draft guard is the real gate, and the message still
+  tells the author to reload. **Latent** — the race has never been reported. **Tier: during-testing.**
+
+- **`minor` · `deploy.ps1`'s test harness lives in no committed file, while every merge now deploys the testing site
+  through that script.** Filed by `M147` (2026-10-08) from `D45` (C until a production host exists, then B). The harness
+  that proved the script was a scratch copy pinned to a worktree that no longer exists (`D45`'s `M98` annotation), and
+  automatic deploys have run since 2026-09-17, so a regression takes down the site testers use. The remedy is C: commit
+  the harness without a CI job, so the next author starts from it; B, a Windows CI job, joins when `track-b-deployment`
+  stands up a production host. **Live.** **Tier: before-launch.**
+
+- **`minor` · A workspace Owner's two-factor reset still clears the member's second factor in every workspace they
+  belong to, and `D56` revisits a narrower door at launch.** Filed by `M147` (2026-10-08) from `D56` (A now, C revisited at
+  launch). C — refuse a target who belongs to a second workspace — needs a disclosure-safe refusal designed first,
+  because the refusal itself would say the person is a member elsewhere (`ImpersonationController` collapses its refusals
+  into one message for that reason). **Latent** — the testing site is one workspace, so nobody can meet it yet.
+  **Tier: before-launch.**
+
+- **`minor` · Scanned pages go to Google Cloud Vision, and neither the threat model nor the OCR module's description says
+  so.** Filed by `M147` (2026-10-08) from `D73` A. `docs/security-threat-model.md` treats a scan only as an untrusted
+  upload, and the module's description in `app/Support/Entitlements/ToggleableModules.php` says only that it hides
+  scanned-form capture. The remedy is A: a threat-model row for the external processor — what is sent, what is kept, for
+  how long, under which key — and one sentence in the module description: "Scans are read by Google Cloud Vision." B, a
+  printed notice on the blank form, is added only if the deploying agency's privacy officer asks. The reserved ADR the
+  bake-off writes can carry the processor facts. **Live.** **Tier: before-launch.**
+
+- **`nit` · Nothing tells a tester to look in the spam folder for their invitation, though the first one landed there.**
+  Filed by `M147` (2026-10-08) from `D50`, which says the checklist should tell testers this whatever the DNS answer. No
+  document, checklist or invitation text in the repository says it. The remedy is one sentence wherever testers are
+  invited — the tester checklist and the invitation email's own instructions: look in spam, and mark it *Not spam*.
+  **Live.** **Tier: during-testing.**
+
+- **`nit` · `P2c`, the deferral-phrase arm, fires on phrasing rather than on staleness, and `D25` recommends re-aiming
+  it as a follow-up.** Filed by `M147` (2026-10-08) from `D25` option 1, which keeps the arm as bookkeeping and recommends
+  option 3 *"as a follow-up to option 1 rather than instead of it"*. The arm in `scripts/pipeline-lint.php` measured 5%
+  precision and about 2% recall. The re-aim fires only where a not-built sentence sits in a document that also claims the
+  thing shipped, which needs a build-evidence term joined to prose (`P2d`'s machinery pointed at sentences). **Not live**
+  — a weak lint, not a defect in the product. **Tier: after-launch.**

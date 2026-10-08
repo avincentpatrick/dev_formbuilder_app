@@ -176,10 +176,13 @@ function render_line(string $lane, array $state): string
         //    section through state.php and restates no picker of its own. `D13` survives only as the rule for
         //    GROUPING the rows of one tier.
         render_queue($state),
+        // ⛔ M147 — THE USER REPLACED "FILE SILENTLY" WITH "ASK IN THE SESSION THAT FILES IT". Under the old
+        //    wording ("do not re-ask them") thirty decisions accumulated unasked, so an open one is now asked
+        //    first, by name, before the work it could block. The reason lives in PROGRESS.md Standing Rule 7.
         $decisions === []
-            ? 'No open decisions.'
-            : 'Open decisions: '.implode(', ', $decisions).' — do not re-ask them and do not stall; record a'
-                .' recommendation and take the next row in the same turn.',
+            ? 'No open decisions. A decision you file is asked by name before this session ends.'
+            : 'Open decisions: '.implode(', ', $decisions).' — ask each one first, by name, in plain words, with'
+                .' its options and your recommendation; then take the next row and never stall on one.',
         $baselines.'; never restate its figures here.',
         tracker_headroom_warning(),
         'RECENT LESSONS, read from the newest releases in '.$config['claim'].' rather than retyped: '

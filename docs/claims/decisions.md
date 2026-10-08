@@ -6,7 +6,8 @@ and proceed. This is where that becomes mechanical for the cases that genuinely 
 
 **How a lane uses it.** On reaching a real product call: append the question, the two or three
 **real** options, and **your own recommendation** — then take the next row **in the same turn**.
-Never wait. The user answers in batches.
+Never wait — and **ask it by name before the session ends** (`D102`, which replaced `D66`'s
+*file silently*).
 
 **What does NOT belong here.** A residual you simply chose not to fix goes in
 `docs/feature-backlog.md`, filed **the moment you decide not to fix it** — not here, and not in
@@ -23,7 +24,23 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-### D55 — `D31`'s invitation-only stance is enforced by one runtime toggle. Should it also be lockable from configuration? **Tier: during-testing.**
+_None open._ Every decision that was open on 2026-10-08 was answered that day (`M147`). A new one is appended here **and asked by name before its session ends** (`D102`).
+
+
+## ANSWERED
+### D102 — Should a decision be filed silently and asked only when the tier being worked is blocked on it (`D66`), or asked in the session that files it? **Asked in the session that files it — by name, in plain words, with its options and a recommendation; one left unanswered is asked first by the next session.**
+
+**Answered 2026-10-08 (user direction, in chat), recorded by Lane A during `M147`; it supersedes `D66`.** The user, after an interrupted session: *"all open decision that may block the upcoming tasks must be addressed already, no task will be left behind so we will not produce more blocked tasks and more tasks to be left behine. we are going forward. we dont want to work backward here."*
+
+**What was measured first.** Thirty open — eleven `during-testing`, eight `before-launch`, eleven `after-launch`; fourteen internal and sixteen product. Three blocked `during-testing` work rows (`D27` twice, `D29`) and four blocked `after-launch` rows; none blocked the OCR bake-off, the testing server or a builder comment. Under `D66` none of them had been asked, because none blocked the tier being worked. Offered three ways to clear them, the user chose to accept every recommendation in one answer, and answered `D39` and `D40` — which carry none — on their own.
+
+- **What changes:** `CLAUDE.md`'s *Taking a row* imperative, the sentence `scripts/next.php` writes into the hand-off, and PROGRESS.md Standing Rule 7. Recording an answer files the work its option creates, with a tier, in the same push — "accept the recommendation" created eleven rows, markers or notes here.
+- **What does not:** never stall on a question; never re-ask an answered one; never read the board at the user — ask the questions themselves, a few at a time.
+- **The companion rule, from the same session:** a fix to a user's comment is announced by name with the clicks to check it (`CLAUDE.md`, *Closing out*). Layout 3 fixed the user's Print blank comment on 2026-10-07 and three increments closed without saying so.
+
+### D55 — `D31`'s invitation-only stance is enforced by one runtime toggle. Should it also be lockable from configuration? **A — leave it as a runtime toggle.**
+
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — A — leave it as a runtime toggle, the recommendation.** Nothing further is filed, as the entry says.
 
 **Filed 2026-09-19 by `M103`, which closed the accidental path and will not decide the deliberate one.**
 `D31` is recorded as **applied, not built** — *"`SettingKey::RegistrationOpenSignup` defaults to `true` …
@@ -56,9 +73,9 @@ against changing a sparse-table default under existing installs. ⚠️ If the a
 deployment-level lock and say in `docs/deployment-infrastructure.md` §8.2 that the console switch is
 advisory on that host — a disabled control with no stated reason is worse than no control.
 
----
+### D50 — Should DICT be asked to publish DKIM and DMARC records for `pitahc.gov.ph`? **B, then A if the headers show alignment is the cause.**
 
-### D50 — Should DICT be asked to publish DKIM and DMARC records for `pitahc.gov.ph`? **Tier: before-launch.**
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — B, then A if the headers show alignment is the cause, the recommendation.** The DMARC row in `docs/feature-backlog.md` already prescribes the header read first and now records the answer; telling testers to look in spam is filed as its own `during-testing` row.
 
 **Filed 2026-09-17 by `M98`, while checking why an invitation was spam-foldered.** An emailed invitation is the only
 door to an account while the testing server is invitation-only (D31), and the operator reports invitations arriving
@@ -88,7 +105,9 @@ receiver: Google's sender rules make DMARC mandatory only for bulk senders, so a
 be what moved a low-volume invitation to spam — which is precisely why the free measurement comes first. Either way
 the checklist should already tell testers to look in the spam folder, and that does not wait on this answer.
 
-### D39 — What will the product be called? "Meridian" is a working codename. **Tier: before-launch.**
+### D39 — What will the product be called? "Meridian" is a working codename. **B — choose a name before launch, then rename everywhere in one pass.**
+
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — B — choose a name before launch, then rename everywhere in one pass.** Asked on its own, because the entry carries no recommendation. "Meridian" stays through testing. The choice is the user's, queued as the `product-name` marker in `docs/PRD.md` (blocked on the user, `before-launch`), and the PRD's note and §9.4 now say so.
 
 **Filed 2026-09-14 by `M93`, from Decision Board card `product-name` and `docs/PRD.md` §9.4.** The name appears
 across the app, its mail and its documents, and testers will see "Meridian" until this is settled.
@@ -98,9 +117,9 @@ across the app, its mail and its documents, and testers will see "Meridian" unti
 
 **No recommendation** — a product's name is its owner's call.
 
----
+### D40 — Who is the first pilot customer? **B — decide after internal testing.**
 
-### D40 — Who is the first pilot customer? **Tier: before-launch.**
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — B — decide after internal testing.** Asked on its own, because the recommendation presumes a candidate. Queued as the `pilot-customer` marker in `docs/PRD.md` (blocked on the user, `before-launch`); the no-name rule below holds until the repository is private.
 
 **Filed 2026-09-14 by `M93`, from Decision Board card `pilot-customer` and `docs/PRD.md` §9.4.** No pilot is
 named. One early real user makes testing and launch planning far more reliable, and the PRD says so.
@@ -115,9 +134,9 @@ Board's note.
 than an open end: the repository stays public with fake data only through testing and goes private before any real
 data, so the customer's name may be written here only after that flip, and not one commit before it.
 
----
+### D41 — Should collecting data by text message, voice call or USSD ever be planned? **A — keep it a non-goal.**
 
-### D41 — Should collecting data by text message, voice call or USSD ever be planned? **Tier: before-launch.**
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — A — keep it a non-goal, the recommendation.** PRD §9.4 now says so. Nothing is filed.
 
 **Filed 2026-09-14 by `M93`, from Decision Board card `sms-channels` and `docs/PRD.md` §9.4.** A firm non-goal
 today, worth revisiting only for a customer working in very low-connectivity areas.
@@ -127,9 +146,9 @@ today, worth revisiting only for a customer working in very low-connectivity are
 
 **Recommendation: A** — no customer has asked, and it would be a large separate product.
 
----
+### D42 — Should a native mobile app ever be built, instead of the installable web app? **A — keep the web app only.**
 
-### D42 — Should a native mobile app ever be built, instead of the installable web app? **Tier: before-launch.**
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — A — keep the web app only, the recommendation.** PRD §9.4 now says so. Nothing is filed.
 
 **Filed 2026-09-14 by `M93`, from Decision Board card `native-app` and `docs/PRD.md` §9.4.** Deferred
 indefinitely, and needed only for something the web app cannot do, such as background location.
@@ -139,9 +158,9 @@ indefinitely, and needed only for something the web app cannot do, such as backg
 
 **Recommendation: A** — the installable web app already works offline, and no customer has asked for more.
 
----
+### D45 — Should `deploy.ps1` get a committed Windows CI job, so its proof runs on every change? **C until a production host exists, then B.**
 
-### D45 — Should `deploy.ps1` get a committed Windows CI job, so its proof runs on every change? **Tier: before-launch.**
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — C until a production host exists, then B, the recommendation.** C is filed as a `before-launch` row (*"`deploy.ps1`'s test harness lives in no committed file"*); B joins when `track-b-deployment` stands up a production host.
 
 **Filed 2026-09-15 by `M96`, while proving the staging-build deploy.** `deploy.ps1` has no committed test. `M95`
 and `M96` each proved it with a PowerShell 5.1 harness in a session scratchpad, with the trunk script as the negative
@@ -164,9 +183,9 @@ use: not the production host this recommendation named, but the closest thing to
 harness also still exists, pinned to a worktree that no longer does. The tier and the recommendation remain the
 user's to move.
 
----
+### D27 — Should a form republishing mid-request refuse the write under the lock, on the save door, on both doors, or on neither? **Option 1 — the save door only.**
 
-### D27 — Should a form republishing mid-request refuse the write under the lock, on the save door, on both doors, or on neither? **Tier: during-testing.**
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — option 1 — the save door only, the recommendation.** The save-door row (*"`promote()`'s pre-lock shape has two more instances"*) is unblocked with that remedy. The `forceFill` row — the schedule-window surface `M88` added — is closed as declined, and the submit door and `AttachmentReferenceValidator` are declined with it.
 
 **Filed 2026-09-08 by `M87`, as the residue of the pre-lock row it corrected.** `M85` closed the promote
 door by re-reading the `FormVersion` under the existing row lock; the same shape is open on two more doors
@@ -223,9 +242,9 @@ no-code-change and the question lives here instead. ⚠️ **The paragraph above
 lock is NOT affected**: it says the throughput trade was declined *for promote*, which is exactly what the
 code comment says, and it applies it to `submit()`'s republish question rather than to the schedule window.
 
----
+### D25 — `P2c`, the deferral-phrase arm, measures 5% precision and ~2% recall. Keep it, drop it, or re-aim it as a staleness lint? **Option 1 — keep it as shipped, sold as bookkeeping.**
 
-### D25 — `P2c`, the deferral-phrase arm, measures 5% precision and ~2% recall. Keep it, drop it, or re-aim it as a staleness lint? **Tier: after-launch.**
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — option 1 — keep it as shipped, sold as bookkeeping, the recommendation.** The re-aim the entry recommends as a follow-up (option 3, a staleness lint) is filed as an `after-launch` row.
 
 **Filed 2026-09-07 by Lane A, during `M82`, at the moment the arm was written rather than after.**
 The approved design named this arm as one of the things that would make an unqueued obligation
@@ -272,7 +291,9 @@ and it pins those eight against a count and a digest, so a ninth cannot appear u
 
 **Recommendation: option 1**, with the header wording kept exactly as harsh as it is.
 
-### D24 — The coverage rules pin a residue of 134 undischarged obligation sites. Schedule the sweep, or leave the residue pinned indefinitely? **Tier: before-launch.**
+### D24 — The coverage rules pin a residue of 134 undischarged obligation sites. Schedule the sweep, or leave the residue pinned indefinitely? **Option 1 — work the two rows as ordinary increments, `deferral-site-disposition` first.**
+
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — option 1 — work the two rows as ordinary increments, `deferral-site-disposition` first, the recommendation.** Both markers exist. `deferral-site-disposition` is retiered `after-launch` → `during-testing` so it can be taken first beside `prd-feature-disposition`, and the indented-continuation row this answer unblocks is marked ready.
 
 **Filed 2026-09-07 by Lane A, during `M82`.** This is the question `P2e` was designed to make
 answerable rather than to answer, and it is a product call rather than an engineering one.
@@ -309,8 +330,9 @@ and unscheduled; 89 acceptance criteria with no recorded outcome is that conditi
 **Recommendation: option 1, with `deferral-site-disposition` taken first** as the smaller of the two
 and the one whose eight sentences are already known to be half stale.
 
+### D23 — `scripts/loop.php` refuses held work by a hand-written keyword list, and there is now a gate proving the pipeline holds every held row. Keep the list, derive it, or cross-check it? **Option 1 — keep the literal list, cross-checked both ways by `P4`.**
 
-### D23 — `scripts/loop.php` refuses held work by a hand-written keyword list, and there is now a gate proving the pipeline holds every held row. Keep the list, derive it, or cross-check it? **Tier: after-launch.**
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — option 1 — keep the literal list, cross-checked both ways by `P4`, the recommendation.** The row awaiting it (*"`scripts/loop.php --assess` does not read `docs/pipeline.md`"*) is closed as decided, with no code change.
 
 **Filed 2026-09-07 by Lane A, during `M81`, at the moment `P4` was written.** The row that asks for
 this (`R-3401f9b1`, `docs/feature-backlog.md:5969`) explicitly defers itself *to this gate*, so the
@@ -348,9 +370,9 @@ with the expensive kind of failure.
    explicitly: "happens to cover the same ground today" is a measurement with no gate behind it, and
    the whole increment exists because five realignments were caught by audits rather than by gates.
 
----
+### D22 — The pipeline generator's own discovery floor is 40 against a live scan of 869. Ratchet it, leave it, or let the gate carry the only binding floor? **Option 1 — leave the generator's floor where it is; the gate carries the binding one.**
 
-### D22 — The pipeline generator's own discovery floor is 40 against a live scan of 869. Ratchet it, leave it, or let the gate carry the only binding floor? **Tier: after-launch.**
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — option 1 — leave the generator's floor where it is; the gate carries the binding one, the recommendation.** Nothing is filed.
 
 **Filed 2026-09-07 by Lane A, during `M81`, while sizing `P5`.** Not fixed in the increment that found
 it, deliberately — see the last option.
@@ -379,7 +401,9 @@ at **600**, which is the one that now binds, and the gate refuses rather than ru
    numbers. ⛔ Refused unless the user prefers it: it makes a standalone generation silently
    unprotected, and `docs/pipeline.md` is regenerated by hand at every close-out.
 
-### D21 — `docs/pipeline.md` is merge-gated but sits in no `paths-ignore`, so every close-out now triggers a full CI run. Accept the cost, exempt it, or split the file? **Tier: after-launch.**
+### D21 — `docs/pipeline.md` is merge-gated but sits in no `paths-ignore`, so every close-out now triggers a full CI run. Accept the cost, exempt it, or split the file? **Option 1 — leave it outside `paths-ignore` and pay the run.**
+
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — option 1 — leave it outside `paths-ignore` and pay the run, the recommendation.** Nothing is filed; the close-out keeps paying the run.
 
 **Filed 2026-09-06 by Lane A, during `M79`, at the moment the file was created.** Recorded here rather
 than decided in the increment because it changes what a close-out costs on every future increment, and
@@ -425,9 +449,9 @@ and the billable figure is larger: about 38 minutes, six jobs each rounded up to
 the repository is public, so option 1's price becomes about $0.23 a close-out run at the 2-core Linux rate of
 $0.006 a minute once D48's flip happens — which is the moment to re-read this question.
 
----
+### D19 — A Reviewer holds `submissions.create` and can encode on no form. `M77` made every document say so. Should the ROLE now gain encoding, or is documenting the gap the whole answer? **Option 1 — leave the behaviour exactly as it is.**
 
-### D19 — A Reviewer holds `submissions.create` and can encode on no form. `M77` made every document say so. Should the ROLE now gain encoding, or is documenting the gap the whole answer? **Tier: during-testing.**
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — option 1 — leave the behaviour exactly as it is, the recommendation.** The documentation fix `M77` shipped was the whole answer. Nothing is filed.
 
 **Filed 2026-09-06 by Lane A, during `M77`, at the moment the documentation was corrected.** `M13`
 filed this as *"both readings are defensible and choosing between them is an authorization
@@ -473,9 +497,9 @@ Nothing asserted that configuration before `M77`; a case now does.
    replaces it with nothing; a second grant type or a role change would have to be designed. Listed
    because it is `M13`'s stated option and should be refused explicitly rather than ignored.
 
----
+### D18 — The proof-of-work solver yields every 5000 candidates against a 120000 search space, and nothing has ever decided that number. Keep 5000, derive it, or make it configurable? **Option 1 — keep 5000.**
 
-### D18 — The proof-of-work solver yields every 5000 candidates against a 120000 search space, and nothing has ever decided that number. Keep 5000, derive it, or make it configurable? **Tier: after-launch.**
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — option 1 — keep 5000, the recommendation.** Nothing is filed.
 
 **Filed 2026-09-06 by Lane A, during `M77`, alongside the cadence gate that pins everything EXCEPT
 the value.** The row asked for the cadence; the cadence is now asserted
@@ -520,9 +544,9 @@ knob for one deployment shape, not a *fetch-starvation* knob for the outbox drai
    serialised into the challenge payload or the bundle, which adds a wire field and a second copy of
    a fact to solve a problem nobody has reported.
 
----
+### D17 — A local container Pest run silently omits 40 test files. `M76` made that loud, which makes every local run RED. Keep it, soften it, or change how the suite is run? **Option 1 — keep it as shipped.**
 
-### D17 — A local container Pest run silently omits 40 test files. `M76` made that loud, which makes every local run RED. Keep it, soften it, or change how the suite is run? **Tier: after-launch.**
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — option 1 — keep it as shipped, the recommendation.** The row awaiting it is closed as decided, with no code change; the `mutate.php` row that re-priced this now records that its condition is permanent.
 
 **Filed 2026-09-06 by Lane A, during `M76`, at the moment the gate was written.** Recorded here rather than
 decided in the increment because it changes the user's daily development loop, which is not an increment's
@@ -572,8 +596,9 @@ every SPL directory iterator truncates on this mount under every flag combinatio
 go blind **cannot be predicted** — synthetic directories of up to sixty files do not truncate, while a real
 46-entry directory collapses to 6. That is why `M76` shipped a comparison rather than a documented list.
 
----
-### D16 — The `npm audit` judge makes a required status check green when the registry is unreachable. Accept it, isolate it, or keep the hard block? **Tier: after-launch.**
+### D16 — The `npm audit` judge makes a required status check green when the registry is unreachable. Accept it, isolate it, or keep the hard block? **Option 1 — as built: green with an annotation.**
+
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — option 1 — as built: green with an annotation, the recommendation.** The row awaiting it is closed as decided, with no code change.
 
 **Filed 2026-09-05 by Lane A, during `M72`, at the moment the trade was taken rather than after.** It is
 here and not only in the backlog because it deliberately weakens a **merge gate**, and the class it joins
@@ -610,9 +635,9 @@ after *N consecutive* unreachable runs. That distinguishes a blip from an outage
 if this recurs; it wants a cache key or a repository variable, and guessing at one inside this increment
 is how a gate acquires a second thing to get wrong.
 
----
+### D14 — The compliance spec promised audit events for deleting and restoring a submission, and there is no delete or restore surface at all. Build it, or record it as not built? **A — record it as not built, and leave the surface unbuilt.**
 
-### D14 — The compliance spec promised audit events for deleting and restoring a submission, and there is no delete or restore surface at all. Build it, or record it as not built? **Tier: during-testing.**
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — A — record it as not built, and leave the surface unbuilt, the recommendation.** Nothing is built. The purge row that was to be taken with this one now records that its submissions third is settled.
 
 **Filed 2026-09-04 by Lane A, during `M70`, at the moment the row's deciding premise was falsified.**
 Promoted out of `docs/feature-backlog.md` rather than taken as a row, because the row `M46` filed asks
@@ -659,7 +684,9 @@ respondents. That belongs with the held GDPR/legal work and to a deliberate desi
 row closing a documentation over-claim. ⚠️ **If B is ever taken, the uniqueness interaction is the part
 to settle first** — it is the half that is invisible in the ticket and expensive in the code.
 
-### D11 — Two byte-serving routes gate on a subject their own comments question. Leave them, or move one? **Tier: during-testing.**
+### D11 — Two byte-serving routes gate on a subject their own comments question. Leave them, or move one? **A — leave both, and pin the intent instead.**
+
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — A — leave both, and pin the intent instead, the recommendation.** No route changes. The grant-manifest row (*"`routes/tenant.php`'s ~95 `can:` gates get none of M63's checks"*) now carries both gates as intended, and the moved-to line records the answer.
 
 **Filed 2026-09-02 by Lane A, during `M63`, at the moment the scope was decided.** Promoted out of
 `docs/feature-backlog.md` rather than taken as a row, because both candidate fixes change **who can do
@@ -701,7 +728,9 @@ middleware changes nobody can measure. ⚠️ If B is ever taken, it needs the V
 first: either Viewers lose the PDF, or `submissions.export` stops meaning "may move bytes off the
 platform", and those are different products.
 
-### D10 — `§9` item 9's escalation has fired. Adopt the value-object forcing device, or keep answering per surface? **Tier: after-launch.**
+### D10 — `§9` item 9's escalation has fired. Adopt the value-object forcing device, or keep answering per surface? **(b) now — keep answering per surface, mechanically; a third unescaped surface makes (a) automatic.**
+
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — (b) now — keep answering per surface, mechanically; a third unescaped surface makes (a) automatic, the recommendation.** The discovery sweep the entry recommends under any option is filed as an `after-launch` row, and the threat model's §9 no longer calls this open.
 
 **Filed 2026-09-01 by Lane A, during `M57`, at the moment the scope was decided.** Filed rather than
 decided because the escalation is a **repo-wide refactor of every render path**, and it was measured
@@ -751,7 +780,9 @@ problem, not the fixing problem** — `M57` was found because a backlog row poin
 run. **That sweep is worth doing under any of the three options** and is the cheapest next step whichever
 way this is answered.
 
-### D1 — Should the sixteen synchronous dispatch listeners become `ShouldQueue`? **Tier: after-launch.**
+### D1 — Should the sixteen synchronous dispatch listeners become `ShouldQueue`? **Option 1 — leave them synchronous and say so in writing.**
+
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — option 1 — leave them synchronous and say so in writing, the recommendation.** The docblock rationale is filed as an `after-launch` `nit` (*"`WebhookEventDispatcher`'s and `ConnectorEventDispatcher`'s docblocks never say why the fan-out stays synchronous"*), and the moved-to line in the ledger records the answer.
 
 **Filed 2026-08-25.** Moved here out of `docs/feature-backlog.md` § *Connectors & webhooks*, where
 it sat as a `minor` row. It is **not** a defect with a known fix; it is an undecided question, and
@@ -785,9 +816,9 @@ that it is, the sixteen are cheap dispatchers rather than workers, and option 2 
 structural guarantee (R1's coverage of `app/`) to buy something unquantified. If it is ever
 measured and found to matter, option 2 is the right shape — not option 3.
 
----
+### D3 — ADR-0020 §D7 approves *"4th of 12"* for every member. Three other surfaces withhold the twelve. Which moves? **Option 1 — withhold `of` from readers without `dashboard.org.view`.**
 
-### D3 — ADR-0020 §D7 approves *"4th of 12"* for every member. Three other surfaces withhold the twelve. Which moves? **Tier: during-testing.**
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — option 1 — withhold `of` from readers without `dashboard.org.view`, the recommendation.** Option 1 is what Lane B built in `M26` while this waited, so nothing changes and nothing is filed.
 
 **Filed 2026-08-26 by Lane B, during `M26`.** Proceeding on the recommendation below rather than
 waiting — Standing Rule 5. If the answer comes back the other way, the revert is one commit and it
@@ -846,7 +877,9 @@ with no product value, so it is deleted regardless of how D3 is answered.
 `openapi.json`, and open a follow-up row to un-gate `kpis.members` and `team.active_members` — the
 dashboard deletion above still stands.
 
-### D4 — An archived webhook envelope has no form to be scoped to. Which permission reads it? **Tier: during-testing.**
+### D4 — An archived webhook envelope has no form to be scoped to. Which permission reads it? **Option 1 — `webhooks.manage`, Owner and Admin.**
+
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — option 1 — `webhooks.manage`, Owner and Admin, the recommendation.** Option 1 is what is implemented, so nothing changes and nothing is filed.
 
 **Filed 2026-08-26 by Lane B, during `M33`.** Proceeding on the recommendation below rather than
 waiting — Standing Rule 5. The revert is one enum arm and it is named at the bottom.
@@ -898,9 +931,9 @@ envelope to a collaborating form_editor* and its owner-side positive control), a
 paragraph in `docs/adr/0015-feedback-screenshot-capture.md`. No migration, no data, no client
 contract: `openapi.json` is untouched by `M33`.
 
----
+### D8 — A tracker surgery triggers no post-merge run at all. Which way should `ci.yml` regain the trunk observation? **Option 1 — a second, tiny workflow: `tracker-lint` only, on `push` to `main`, no path filter.**
 
-### D8 — A tracker surgery triggers no post-merge run at all. Which way should `ci.yml` regain the trunk observation? **Tier: after-launch.**
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — option 1 — a second, tiny workflow: `tracker-lint` only, on `push` to `main`, no path filter, the recommendation.** The row awaiting it (*"A tracker surgery whose diff touches only `paths-ignore`d files produces no post-merge run"*) is unblocked with that remedy and its `Awaits` token struck.
 
 **Filed 2026-08-31 by Lane A, during `M49`.** Filed rather than decided because every option trades
 **CI minutes against gate coverage**, and `M39` removed those minutes deliberately after measuring
@@ -960,9 +993,9 @@ to owe a ratchet*, exactly as `M48` escaped the same hole *by accident of scope*
 coincidence is not a mechanism**, and a surgery that needs no ratchet still merges with its marker
 unverifiable. The recommendation stands at option 1, and the decision is still not proceeded on.
 
----
+### D9 — Should the legacy client's identity be rewritten out of git history as well? **RECOMMENDED AGAINST.** **Option 1 — leave history alone.**
 
-### D9 — Should the legacy client's identity be rewritten out of git history as well? **RECOMMENDED AGAINST.** **Tier: after-launch.**
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — option 1 — leave history alone, the recommendation.** Nothing is filed.
 
 **Filed 2026-08-31 by Lane A during `M51`, unconditionally and without being asked**, because `D6`'s
 answer redacts the **working tree** and the repository is public. A redaction that reduces an exposure
@@ -1017,9 +1050,9 @@ closing anyway — so this stays open and recommended against.
 
 ---
 
----
+### D29 — `M90` made `saveAsTemplate()` the FIRST request-path isolation-level change in this codebase. Should that become the pattern for the other multi-statement snapshot reads, stay a one-off, or be replaced by a different instrument? **Option 1 — adopt it as the pattern.**
 
-### D29 — `M90` made `saveAsTemplate()` the FIRST request-path isolation-level change in this codebase. Should that become the pattern for the other multi-statement snapshot reads, stay a one-off, or be replaced by a different instrument? **Tier: during-testing.**
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — option 1 — adopt it as the pattern, the recommendation.** The row awaiting it (*"Two more callers of the snapshot serializer still read a torn tree"*) is unblocked: both wrappers, plus the rule stated in `docs/form-versioning-schema-migration.md`.
 
 **Filed 2026-09-10 by Lane A during `M90`, while closing `docs/feature-backlog.md`'s torn-snapshot row.**
 Filed rather than decided because it sets a precedent on the request path, and the alternative to deciding
@@ -1066,9 +1099,9 @@ first statement, so it is guarded on `DB::transactionLevel() === 1` and skipped 
 provable, that is a fourth piece of work (a committing harness or a read-back manifest like
 `TenantExtractService`'s), and `docs/testing-strategy.md` §8 records what it would cost.
 
----
+### D30 — Which version should the builder's request-layer uniqueness rules be scoped to, now that both available answers are wrong inside the race? **Option 1 — leave both rules as they are and say so in a comment.**
 
-### D30 — Which version should the builder's request-layer uniqueness rules be scoped to, now that both available answers are wrong inside the race? **Tier: during-testing.**
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — option 1 — leave both rules as they are and say so in a comment, the recommendation.** The comment is filed as a `during-testing` `nit`.
 
 **Filed 2026-09-10 by Lane A during `M90`.** The backlog row that prompted it said this half "needs its
 own decision", `M90`'s first pass concluded that was wrong, and **the adversarial pass restored the row's
@@ -1103,8 +1136,9 @@ user sees** — a uniqueness complaint about the wrong version, or the draft-gua
 ⚠️ **`D27` is adjacent and does NOT cover this.** That decision is scoped to the submission save/submit
 doors; this is the builder's validation layer. They should not be answered as one.
 
+### D56 — A workspace Owner's two-factor reset clears the member's second factor in EVERY workspace they belong to. Should the Owner surface be narrowed? **A — leave it as built, with C revisited at launch.**
 
-### D56 — A workspace Owner's two-factor reset clears the member's second factor in EVERY workspace they belong to. Should the Owner surface be narrowed? **Tier: during-testing.**
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — A — leave it as built, with C revisited at launch, the recommendation.** The revisit is filed as a `before-launch` row, and the threat model's §9 no longer calls this open.
 
 **Filed 2026-09-20 by `M107` while building `D37`'s answer, which did not consider this.** `D37` chose an
 admin reset performed by *"a workspace owner or the platform operator"*, and `M107` built both. The fact
@@ -1138,8 +1172,9 @@ account is a problem today; a multi-workspace tester is not, because the testing
 honest about it, and the testing site is a single workspace so nobody can meet it yet. `C` is the right
 end state and needs a disclosure-safe refusal designed first, which is a decision rather than a patch.
 
+### D73 — Single-form OCR sends each scanned page, which carries a respondent's handwritten answers, to Google Cloud Vision, and neither the threat model nor any text in the product says so. What does that data flow need before launch? **A — document it.**
 
-### D73 — Single-form OCR sends each scanned page, which carries a respondent's handwritten answers, to Google Cloud Vision, and neither the threat model nor any text in the product says so. What does that data flow need before launch? **Tier: before-launch.**
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — A — document it, the recommendation.** Filed as a `before-launch` row: the threat-model row for the external processor and the module sentence. The reserved ADR the bake-off writes can carry the processor facts.
 
 **Filed 2026-10-03 by `M128`, from building the reading job.** The reading job posts each stored page to `vision.googleapis.com` over TLS, with the workspace's scan in the request body and the API key in a header, and keeps Google's full response privately beside the scan so the matcher can be re-run without a second call. `docs/security-threat-model.md` lists OCR scans only as untrusted uploads; it has no row for a third party that receives respondent data. Nothing on the paper form, in the OCR module's description or in the workspace settings tells anybody that a scan leaves the server. Testing under `D72` uses made-up answers, so nothing real is sent before Oct 12, and this does not block the testing.
 
@@ -1149,7 +1184,9 @@ end state and needs a disclosure-safe refusal designed first, which is a decisio
 
 **Recommendation: A**, with B added if the deploying agency's privacy officer asks for notice at collection. A is what the threat model owes in any case, and B is a printed sentence that can be added without touching the reading path.
 
-### D101 — Archiving is one-way and, since `M146`, closes the public link; there is no un-archive. Should a form be restorable from the archive? **Tier: during-testing.**
+### D101 — Archiving is one-way and, since `M146`, closes the public link; there is no un-archive. Should a form be restorable from the archive? **A — no; archive stays terminal for the testing window.**
+
+**Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M147` — A — no; archive stays terminal for the testing window, the recommendation.** B is taken only if a tester asks, so nothing is filed.
 
 **Filed 2026-10-08 by `M146`, silently under `D66`, from `D99` A's third clause** — "un-archiving reopens the link" — which named a feature that does not exist: no method, route, policy arm or UI un-archives a form, `RestoreService` and the XLSForm importer refuse an archived one, and the state diagram ends at `Archived`. `M146` built the two clauses that exist (the link closes; a queued offline response parks) and made the archive dialog say that archiving cannot be undone. No row is blocked on this; a tester who archives by mistake has no way back today beyond the database.
 
@@ -1159,9 +1196,6 @@ end state and needs a disclosure-safe refusal designed first, which is a decisio
 
 **Recommendation: A** for the testing window; **B** after it if a tester asks, with C's clause if a deliberate reopen is wanted.
 
-
-
-## ANSWERED
 ### D99 — An archived form keeps collecting responses through its public link while the forms list hides it. What does archiving do to the link? **A — archiving closes the link.**
 
 **Answered 2026-10-08 (user decision, in chat), recorded by Lane A during `M146` — A, the recommendation.** Put to the user first thing that session because `R-f6567fc2` was blocked on it, and built in the same increment. ⚠️ **Two of A's three clauses held and one named nothing:** the guest routes answer an archived form as they answer one with guest access off (`Form::allowsGuestAccess()`, one predicate for every route and for `GuestReachability`); a queued offline response parks on its FIRST replay, which is stronger than "refused like any closed form" (a closed form is retried five times, then parked); and **"un-archiving reopens the link" has nothing to attach to — there is no un-archive anywhere**, so the archive dialog now says archiving cannot be undone and the question is `D101`.
@@ -1253,6 +1287,8 @@ end state and needs a disclosure-safe refusal designed first, which is a decisio
 ---
 
 ### D66 — The generated line offers open decisions and decision-blocked rows as work to take, and the raw counts read as a demand to decide all of them at once. When is a filed decision put to the user? **Narrow — only when the tier being worked holds a work row blocked on it.**
+
+⛔ **SUPERSEDED 2026-10-08 BY `D102`** — a decision is now asked in the session that files it, not only when the tier being worked is blocked on it.
 
 **Filed and answered 2026-09-26 (user decision, in chat), recorded by Lane A during `M114`.** Shown the generated line, the user read its `blocked` and `waiting on you` counts as *decide all of this right now* and said *"for future tasks, you will just ask me for decisions when it is already needed."* ⚠️ **That reading was reasonable, and the line is what made it so:** it uses the same two words for a question nobody has ever seen and for a row whose precondition merely does not hold. Measured against this tree, of **132** blocked rows **61** are latent preconditions, **18** are not-live, **37** are decisions and **16** are rows awaiting one — and only **four** of those sixteen sat in the tier being worked.
 

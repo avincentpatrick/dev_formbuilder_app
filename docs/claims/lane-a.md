@@ -16,69 +16,52 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M149`, the OCR bake-off's first round and the three reader defects it found: a phone photo stored on its side is never turned upright, a key stamp read as its own line puts the question's own label (and the next question's key) into the answer, and a tick read as a symbol (☑ ✓ ✗) is swallowed into its option's label; plus the handwriting language hint and the answer sheet's leading-zero file names (`m149-ocr-reader-fixes`)
+## Status: NO ACTIVE CLAIM — `M149` is merged and live on staging; the next session asks `D104` first if the user has not answered it in chat, then opens with the user's staging scan (`ocr-staging-scan`: one of the bake-off photos through the scans page, then the server's `.env` backup deleted), then takes the `D103` builder rows — Structure (the handle, a drag that glides, a label edited in place, the handle's screen-reader text), then Preview (a label edited in place, dragging) — as the next two increments
 
-Taken 2026-10-08 by the bake-off side session, in its own worktree `C:\laragon\www\formbuilder-ocr` (the main checkout is idle on
-`main`). Branch `m149-ocr-reader-fixes`, cut from `origin/main` at `c173721d`, PR into `main`. The user built the OCR Test Form on
-staging (12 questions, Scanning on), printed 15 layout-4 copies, filled them by hand and photographed both pages of each with a
-phone; `ocr:bakeoff-layout` ran on the server and `ocr:bakeoff` on the laptop with the `meridian-laptop-bakeoff` key (30 real
-reads). `D94` puts OCR first the moment its inputs arrive, so this takes the number `M148`'s release gave the `D103` builder rows;
-they move to the next two. Rows: none exist yet — filed in this increment's first work commit from the measurements below, three
-`major` closed by it and the rest filed open with tiers.
+## RELEASED — `M149`, the OCR bake-off's first round and the three reader defects it found: a photo stored on its side is turned upright, a key stamp read as its own line no longer puts the label into the answer, a tick read as a symbol is a mark; plus the handwriting language hint and the answer sheet's numeric file names (merged as PR #342, `49412bb4`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-### Evidence verified
-Measured on the 30 real pages (cached Vision answers beside each photo outside the repository; none is committed, because they carry
-the testers' names and addresses):
-- **Real path: 177 of 180 fields need correction (98.3%), 158 "question not found".** Every photo is 4624×3468 with EXIF
-  orientation 6. Vision reports boxes in the stored frame, and the median baseline angle of each page's long words is −89.5° to
-  −90.9° on 30 of 30 pages, every word within 15° of it. `OcrLineBuilder::tilt()` returns 0 past `MAX_DESKEW` (17°), so the lines
-  are slices across vertical text — its own docblock: "the matcher then finds no anchors and says so per field".
-- **Turned upright** (each cached answer's vertices mapped into the upright frame): 0 not found, 76.1%. Lines dumped through
-  `OcrLineBuilder`: the right-aligned key `field_N` sits about 0.006 of the page above its label and clusters as its own line on
-  about half the photos. `PrintedFormMatcher::anchor()` takes the key first, so `region()` holds the label line — "2. Age 29", which
-  no integer parses — and stops at the next anchor's label line, keeping the next key: "ORLY MARIE M. CABAL field_2".
-- **37 answered choices read blank.** `OcrAnswerReader::labelSpan()` tries the longest span first and `OcrText::similarity()` compares
-  normal forms, which erase symbols, so "☑ Male" and "✓ Male" match "Male" with no lead and the mark is lost; only a letter mark
-  (x, v) survives. Vision returned the marks as ☑ (most often), ✓, ✗ joined to the label, X, x, a Greek Χ and 区; ☑, ☒, χ and 区
-  are not in `OcrText::MARKS`.
-- **The answer sheet:** Excel stored the user's `01`…`09` as numbers, and `OcrAnswerSheet::rowFor()` compares stems literally, so no
-  row matched its folder.
+Shipped 2026-10-08 by the bake-off side session, in its own worktree `C:\laragon\www\formbuilder-ocr`. Branch `m149-ocr-reader-fixes`, cut from
+`origin/main` at `c173721d`. The claim is `836cfb54`, pushed before any file was opened; the work is `255a32d6` (the round filed, `D104`),
+`2b82df07` (the reader) and `e6a56f17` (the design doc's results, the rows closed, the mutants). Deployed to the testing server by itself (`D47`): run 37784215969 ran `deploy.ps1` in 1m51s after the post-merge CI run 37781304516 (6/6, the same step counts).
 
-### Premise verified
-- Every coordinate consumer goes through `OcrLineBuilder::lines()` (`PrintedFormMatcher::layoutOf()`, `match()`, `stampTokens()`),
-  and the review screen draws no box over the page, so turning the page there reaches everything. The stamp and the layout number
-  were found on all 15 sideways scans (they read tokens), so only placement fails.
-- Phone photos are the primary input — the user chose phone only — and a staging upload takes the same JPEG through `ReadOcrScanJob`
-  to the same matcher, so staging fails the same way today; `ocr-staging-scan` should follow this deploy.
-- The thresholds are not the defect: at confidence 90 and above, 54 right and 1 wrong; below 70, about as many wrong as right.
-- G9 stays missed after these fixes (54.4%), which triggers `D97`'s vision-language arm; that, and the threshold write-up and
-  ADR-0010, stay on `ocr-provider-bakeoff` — not this increment.
+**What the session was.** The user built a 12-question OCR Test Form on staging, printed 15 layout-4 copies, filled them by hand and
+photographed both pages of each with a phone; the session exported the layout on the server, created `C:\ocr-samples`, and ran
+`ocr:bakeoff` with the laptop key while the user was out. The real path read 177 of 180 fields as needing correction (98.3%), 158 of them
+"not found". The cause was found by measurement, not guessed: every photo is stored with EXIF orientation 6 (30 of 30), the stamp clusters
+above its label on about half, and a symbol tick normalises to nothing. Experiments on cached answers turned upright (a scratch Python
+transform) and on the reader in the worktree measured each remedy before the claim.
 
-### Remedy verdict
-- **Works, measured on the same cached pages through the real matcher and scorer (`--offline`) before any test was written:**
-  upright frame 98.3% → 76.1%; anchoring on the label line when the key clusters above it AND ending the previous region at the next
-  KEY line → 61.1% (the label anchor alone measured 73.9% and leaked the next key into the names); a whole mark word never starting a
-  label span, with ☑ ☒ χ 区 as marks → 60.0%, blank choices 37 → 27 (the other 27 Vision never returned); `languageHints:
-  ["en-t-i0-handwrit"]` on 30 fresh reads → 54.4%, silent errors 2 → 1, Cyrillic substitutions in Tagalog text 4 → 0.
-- **The product remedy for the turn reads the page's own word angles** — snap their median to a quarter turn, map every box, swap the
-  page's sides — rather than EXIF: Vision's answer carries no orientation and a scanned PDF has none. It is the mapping measured above.
+**What changed:**
+- **The turn.** `OcrLineBuilder::upright()` before the deskew: each multi-character word votes for the quarter turn nearest its baseline,
+  the commonest vote wins (a vote — an upside-down page straddles ±π), every word and character box is mapped and the page's sides
+  swapped on an odd turn.
+- **The anchor.** An anchor is `{line, top}`; a stamp found as its own line looks `STAMP_REACH` (two) lines either side for its label,
+  the answer begins below the lower and the question before ends above the upper.
+- **The mark.** `labelSpan()` never includes a "foreign" mark word (a letter mark only when it IS the label, a symbol only when the label
+  holds it); ☑ ☒ χ 区 join `OcrText::MARKS`.
+- **The hint.** `ocr.google_vision.language_hints = ["en-t-i0-handwrit"]`, sent for a photo and a PDF.
+- **The sheet.** `OcrAnswerSheet::stem()` compares an all-digit name by value.
+- **The fixture.** `PrintedPageTypesetter` gained `turned()`, `key_rise` and `marks`.
+- **Filed:** three `major`s and two `minor`s, closed here; open — a tick's confidence is the glyph's (`early-testing`), ticks Vision never
+  returns (`early-testing`), a one-stroke `1` dropped as a wall and a printed `/` read as a digit, punctuation joined with a space, a
+  crossed-out word (`during-testing`). `D104` filed and asked; the bake-off awaits it, `ocr-staging-scan` waits for this deploy.
+- **Measured on the thirty real pages, untransformed, through the shipped reader:** no hint 57.2%, **with the hint 51.1%, no silent
+  error; 90–100 confidence 57 right and none wrong** (`docs/ocr-pipeline-design.md` §9, Round 1).
 
-Files: `app/Services/Ocr/OcrLineBuilder.php`, `app/Services/Ocr/PrintedFormMatcher.php`, `app/Services/Ocr/OcrAnswerReader.php`,
-`app/Services/Ocr/OcrText.php`, `app/Services/Ocr/GoogleVisionClient.php`, `config/ocr.php`,
-`app/Services/Ocr/Bakeoff/OcrAnswerSheet.php`, `tests/Feature/Ocr/Support/PrintedPageTypesetter.php`,
-`tests/Feature/Ocr/PrintedFormMatcherTest.php`, `tests/Feature/Ocr/GoogleVisionClientTest.php`,
-`tests/Feature/Ocr/Bakeoff/OcrBakeoffCommandTest.php`, `docs/ocr-pipeline-design.md` (§9's results and the end-of-file markers),
-`docs/deployment-infrastructure.md` (the `ocr-staging-scan` marker's blocker); and by procedure `docs/feature-backlog.md`,
-`docs/claims/lane-a.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block).
-Shared artefacts taken: `docs/**`, `PROGRESS.md` (own block).
-Paired files taken: none — no design-system, token or notification file is touched.
-Namespaces spent: nothing from either namespace; ADR `0010` stays reserved for the bake-off's write-up.
-Prediction: each fix's new case red first on the unfixed reader (a sideways page finds no question; a key above its label leaves an
-integer unreadable and a name carrying the next key; "✓ Male" and "☑ Male" read blank); every existing OCR case stays green;
-four `mutate.php` mutants CAUGHT (no turn, no label re-anchor, no mark skip, ☑ out of `MARKS`); and the real cached pages, read
-`--offline` from the ORIGINAL sideways folder with no transform, reproduce 54.4% within two points. **Most likely wrong:** that last
-number — the product turn maps normalised boxes and re-measures the residual tilt, where the measurement mapped pixel vertices, and
-line clustering is sensitive to a few thousandths of a page.
+**How the prediction fared:**
+- ✅ Each fix's new case red first, for the right reason (the stamp case printed the real "1. Patient name JUAN DELA CRUZ"); every existing
+  OCR case green (136).
+- ✅ The mutants were CAUGHT — six, not the four predicted (the hint and the stem got one each), and each reddened exactly its one case.
+- ❌ **The tick fix as claimed was half a fix.** The claim's remedy — a mark word never STARTS a span — still failed the new case: the
+  longest-first search took the tick at the END of the label before it ("Female ✓"), so the second option of a pair read blank. The
+  experiment that measured the remedy had the same gap, which the X-only fixture could not show.
+- ❌ **The number named most likely wrong was wrong — in the better direction.** Predicted 54.4% within two points on the untransformed
+  pages; measured 51.1%, because the completed tick fix recovered more choices than the experiment's half.
+- ⚠️ A process trap, recorded: `mutate.php`'s default container mounts the MAIN checkout; from a second worktree it would report SURVIVED
+  on every mutant. The runs used a container on this worktree's mount.
+
+**Lessons.** A fixture that writes only `X` hides every symbol-mark defect, because the comparison erases symbols. Test a mark on a
+pair where the SECOND option is marked. Re-measure through the shipped code; never quote the experiment.
 
 ## RELEASED — `M148`, Print blank layout 4: each comb gap prints its separator and no box, the reader drops a printed separator and refuses a group longer than its boxes, and a renderer case reads what dompdf draws; the staging smoke test's Round 2 filed with tiers and `D103` recorded (merged as PR #341, `8d67c4a1`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

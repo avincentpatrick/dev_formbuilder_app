@@ -66,8 +66,8 @@ it('sends a PDF inline to files:annotate, naming its first five pages', function
 });
 
 it('asks for handwriting in its language hint, for a photo and a PDF alike (M149)', function (): void {
-    // The bake-off's thirty pages, read again with the hint: 60.0% → 54.4% of fields needing correction, one silent
-    // error fewer, and no more Cyrillic letters in Tagalog answers — the printed labels were all still found.
+    // The bake-off's thirty pages, read again with the hint: 57.2% → 51.1% of fields needing correction, no silent
+    // error left, and no more Cyrillic letters in Tagalog answers — the printed labels were all still found.
     Http::fake(['vision.googleapis.com/*' => Http::response(['responses' => [['fullTextAnnotation' => ['pages' => []], 'responses' => [], 'totalPages' => 1]]])]);
 
     app(GoogleVisionClient::class)->annotate('jpeg-bytes', 'image/jpeg');

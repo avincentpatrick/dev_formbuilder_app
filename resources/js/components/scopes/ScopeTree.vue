@@ -279,7 +279,7 @@ defineExpose({ rememberFocusAnchor, focusRow, expand: (id: string) => expanded.v
                     type="button"
                     class="scopes__grip"
                     :tabindex="row.id === activeId ? 0 : -1"
-                    :aria-label="`Move ${row.name}. Press Enter to grab, then arrow keys; or drag.`"
+                    :aria-label="`Move ${row.name}. Press Enter or Space to grab, then arrow keys; or drag.`"
                     @click.stop
                     @pointerdown="emit('gripPointerDown', $event, row.id)"
                     @keydown.stop="emit('gripKeydown', $event, row.id)"

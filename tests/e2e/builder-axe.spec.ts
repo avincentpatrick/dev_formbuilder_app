@@ -181,6 +181,14 @@ for (const theme of themes) {
         await page.keyboard.press('Enter'); // drop
         await expect(status).toContainText('Dropped');
         await scan(page, 'after keyboard reorder');
+
+        // M150 (`R-34edf1f5`): a question's label edited on its row — opened, scanned, and closed with Escape, so
+        // nothing is written to the shared seeded form.
+        await page.getByRole('button', { name: /^Edit label of Short text/ }).first().click();
+        await expect(page.getByRole('textbox', { name: 'Question label' })).toBeFocused();
+        await scan(page, 'label edited in place');
+        await page.keyboard.press('Escape');
+        await expect(page.getByRole('textbox', { name: 'Question label' })).toHaveCount(0);
     });
 
     // The Share panel (Increment I1) — scanned in BOTH of its states, because they are structurally

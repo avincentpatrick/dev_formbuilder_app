@@ -6,12 +6,18 @@
  * section boundaries → Enter to drop, Escape to cancel), both announced through an assertive aria-live
  * region (see useCanvasReorder). A field can also be reparented from its config panel's Section select
  * (covers empty sections). No third-party DnD library — those inject aria-hidden mirror DOM and fail axe.
+ *
+ * M150 (`D103`, the user's Round 2 notes): the grip is drawn heavier, rows GLIDE to their new places
+ * (useFlipReorder), and a question's label is edited in place — "Edit label" or a double-click swaps the row's
+ * main button for an InlineLabelEdit, since an input cannot live inside a button.
  */
-import { ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { MdsBadge, MdsButton, MdsEmptyState, MdsIcon, MdsIconButton, statusVariant } from '@meridian/design-system';
+import InlineLabelEdit from './InlineLabelEdit.vue';
 import type { LocalField } from './types';
 import type { BuilderStore } from './useBuilderStore';
 import { useCanvasReorder } from './useCanvasReorder';
+import { useFlipReorder } from './useFlipReorder';
 
 const props = defineProps<{ store: BuilderStore; fieldTypeLabels: Record<string, string> }>();
 // M139 (`R-598b9100`): "Add a question here" on an empty section — the builder selects it and opens the palette.
@@ -22,9 +28,54 @@ const groups = store.groups;
 const selection = store.selection;
 
 const canvasRoot = ref<HTMLElement | null>(null);
-const reorder = useCanvasReorder(store, () => canvasRoot.value);
-const { draggingUid, grabbedUid, announcement, onFieldPointerDown, onFieldKeydown, onSectionPointerDown, onSectionKeydown } =
-    reorder;
+
+// ── A label edited in place (M150, `R-34edf1f5`) ────────────────────────────────────────────────────────────────────
+const editingUid = ref<string | null>(null);
+const editor = ref<InstanceType<typeof InlineLabelEdit> | null>(null);
+
+function setEditor(instance: unknown): void {
+    editor.value = (instance as InstanceType<typeof InlineLabelEdit> | null) ?? null;
+}
+
+const reorder = useCanvasReorder(store, () => canvasRoot.value, {
+    // A drag's pointerdown is cancelled, so it never blurs an open editor: end the edit as a blur would.
+    onDragStart: () => editor.value?.commit('blur'),
+});
+const {
+    draggingUid,
+    grabbedUid,
+    announcement,
+    isReordering,
+    onFieldPointerDown,
+    onFieldKeydown,
+    onSectionPointerDown,
+    onSectionKeydown,
+} = reorder;
+
+function startEdit(uid: string): void {
+    if (isReordering.value) return;
+    // Selecting first flushes a pending settings-pane edit, and puts a refused save where its message shows.
+    store.select({ kind: 'field', uid });
+    editingUid.value = uid;
+}
+
+function endEdit(uid: string, refocus: boolean): void {
+    editingUid.value = null;
+    if (!refocus) return;
+    void nextTick(() => canvasRoot.value?.querySelector<HTMLElement>(`[data-field-uid="${uid}"] .canvas__field-main`)?.focus());
+}
+
+function commitLabel(uid: string, value: string, via: 'key' | 'blur'): void {
+    store.renameField(uid, value);
+    // Enter keeps the keyboard on the row; a blur went somewhere the user chose, and focus stays there.
+    endEdit(uid, via === 'key');
+}
+
+// ── The glide (M150, `R-adce6e14`) ──────────────────────────────────────────────────────────────────────────────────
+const order = computed(() =>
+    groups.value.map((group) => `${group.section?.uid ?? '-'}:${group.fields.map((field) => field.uid).join(',')}`).join('|'),
+);
+useFlipReorder(() => canvasRoot.value, order);
 
 function isSelectedField(uid: string): boolean {
     return selection.value?.kind === 'field' && selection.value.uid === uid;
@@ -64,7 +115,12 @@ const hasContent = (): boolean => groups.value.some((g) => g.fields.length > 0) 
         </div>
 
         <template v-else>
-            <div v-for="group in groups" :key="group.section?.uid ?? 'ungrouped'" class="canvas__group">
+            <div
+                v-for="group in groups"
+                :key="group.section?.uid ?? 'ungrouped'"
+                class="canvas__group"
+                :data-group-key="group.section?.uid ?? 'ungrouped'"
+            >
                 <!-- Section header (skip the implicit ungrouped bucket) -->
                 <div
                     v-if="group.section"
@@ -75,11 +131,11 @@ const hasContent = (): boolean => groups.value.some((g) => g.fields.length > 0) 
                     <button
                         type="button"
                         class="canvas__grip"
-                        :aria-label="`Reorder section ${group.section.label}. Press Enter to grab, then arrow keys; or drag.`"
+                        :aria-label="`Reorder section ${group.section.label}. Press Enter or Space to grab, then arrow keys; or drag.`"
                         @pointerdown="onSectionPointerDown($event, group.section.uid)"
                         @keydown="onSectionKeydown($event, group.section.uid)"
                     >
-                        <MdsIcon name="grip" size="sm" />
+                        <MdsIcon name="grip" size="md" />
                     </button>
                     <button
                         type="button"
@@ -114,17 +170,29 @@ const hasContent = (): boolean => groups.value.some((g) => g.fields.length > 0) 
                             <button
                                 type="button"
                                 class="canvas__grip"
-                                :aria-label="`Reorder ${field.label || 'field'}. Press Enter to grab, then arrow keys; or drag.`"
+                                :aria-label="`Reorder ${field.label || 'field'}. Press Enter or Space to grab, then arrow keys; or drag.`"
                                 @pointerdown="onFieldPointerDown($event, field.uid)"
                                 @keydown="onFieldKeydown($event, field.uid)"
                             >
-                                <MdsIcon name="grip" size="sm" />
+                                <MdsIcon name="grip" size="md" />
                             </button>
+                            <!-- No type caption while editing: at 375px its 84px floor left the input about 50px wide. -->
+                            <div v-if="editingUid === field.uid" class="canvas__field-editing">
+                                <InlineLabelEdit
+                                    :ref="setEditor"
+                                    :value="field.label"
+                                    label="Question label"
+                                    @commit="(value, via) => commitLabel(field.uid, value, via)"
+                                    @cancel="endEdit(field.uid, true)"
+                                />
+                            </div>
                             <button
+                                v-else
                                 type="button"
                                 class="canvas__field-main"
                                 :aria-pressed="isSelectedField(field.uid)"
                                 @click="store.select({ kind: 'field', uid: field.uid })"
+                                @dblclick="startEdit(field.uid)"
                             >
                                 <span class="canvas__field-type">{{ typeLabel(field) }}</span>
                                 <span class="canvas__field-label">{{ field.label || '(untitled)' }}</span>
@@ -135,6 +203,14 @@ const hasContent = (): boolean => groups.value.some((g) => g.fields.length > 0) 
                                 />
                             </button>
                             <div class="canvas__field-actions">
+                                <MdsIconButton
+                                    v-if="editingUid !== field.uid"
+                                    icon="edit"
+                                    :label="`Edit label of ${field.label || 'this question'}`"
+                                    size="sm"
+                                    :disabled="isReordering"
+                                    @click="startEdit(field.uid)"
+                                />
                                 <MdsIconButton icon="copy" label="Duplicate field" size="sm" @click="store.duplicateField(field.uid)" />
                                 <MdsIconButton
                                     icon="trash"
@@ -220,6 +296,10 @@ const hasContent = (): boolean => groups.value.some((g) => g.fields.length > 0) 
 
 /* Drag grip — the reorder affordance for both pointer and keyboard. touch-action:none keeps a
    touch-drag from scrolling the canvas. */
+/* M150 (`R-91c1792e`, "the icon for the draggable … is not noticeable"): the colour was never the problem
+   (text-secondary is about 6:1 on the surface) — the design system's grip is six zero-length strokes at 1.5,
+   dots about a pixel across. The builder draws it at md with its own stroke of 3, about 2.5px dots. The glyph
+   itself is shared (ScopeTree, the scopes page) and is filed against the design system rather than changed here. */
 .canvas__grip {
     display: inline-flex;
     align-items: center;
@@ -235,9 +315,16 @@ const hasContent = (): boolean => groups.value.some((g) => g.fields.length > 0) 
     cursor: grab;
     touch-action: none;
 }
+.canvas__grip :deep(svg) {
+    stroke-width: 3;
+}
 .canvas__grip:hover {
     background-color: var(--mds-color-bg-sunken);
     color: var(--mds-color-text-body);
+}
+.canvas--dragging,
+.canvas--dragging .canvas__grip {
+    cursor: grabbing;
 }
 .canvas__grip:focus-visible {
     outline: 2px solid var(--mds-color-focus-ring);
@@ -329,6 +416,14 @@ li[data-dragging='true'] .canvas__field {
     font-family: var(--mds-font-family-body);
     text-align: left;
     cursor: pointer;
+}
+
+/* The row while its label is edited: the main button's footprint, all of it given to the input. */
+.canvas__field-editing {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
 }
 
 .canvas__field-type {

@@ -454,6 +454,12 @@ final class OcrAnswerReader
      * close to the text, is tried BEFORE the plain comparison at each position: "xfemale" is within the plain
      * tolerance of "female", and taking it that way would lose the mark.
      *
+     * ⚠️ A WORD THAT IS WHOLLY A MARK IS NEVER PART OF A SPAN (M149), unless the label itself holds that character
+     * ("N/A", an option called "X"). The comparison is on normal forms, which erase symbols, so "✓ Male" read as
+     * "male" and the longest-first search took the tick into the label — at its start, losing it from the walk back,
+     * or at the END of the label before it ("Female ✓ Male" made "Female ✓" one span). Only a letter mark (x, v)
+     * survived, which is why an `X` fixture never showed it, and 37 of the bake-off's answered choices read blank.
+     *
      * @param  list<OcrWord>  $words
      * @return array{start: int, length: int, lead: OcrSymbol|null}|null
      */
@@ -462,10 +468,17 @@ final class OcrAnswerReader
         $n = count($words);
         $labelWords = count(preg_split('/\s+/', trim($label)) ?: []);
         $longest = max(1, $labelWords + 1);
+        // A letter mark belongs to the label only when it IS the label ("X"); a symbol, when the label holds it ("N/A").
+        $foreignMark = static fn (OcrWord $w): bool => OcrText::isMark($w->text) && (OcrText::normal($w->text) !== ''
+            ? OcrText::normal($w->text) !== OcrText::normal($label)
+            : mb_stripos($label, trim($w->text)) === false);
 
         for ($k = $from; $k < $n; $k++) {
             for ($length = min($longest, $n - $k); $length >= 1; $length--) {
                 $slice = array_slice($words, $k, $length);
+                if (array_filter($slice, $foreignMark) !== []) {
+                    continue;
+                }
                 $text = implode(' ', array_map(static fn (OcrWord $w): string => $w->text, $slice));
 
                 $first = $slice[0]->symbols[0] ?? null;

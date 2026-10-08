@@ -46,6 +46,9 @@ final class PrintedFormMatcher
      */
     public const array NOT_A_QUESTION = ['prose', 'page_break', 'omitted'];
 
+    /** How many lines either side of a stamp read as its own line its label may sit (M149). */
+    private const int STAMP_REACH = 2;
+
     public function __construct(
         private readonly BlankFormPrintPresenter $presenter,
         private readonly OcrLineBuilder $lines,
@@ -227,9 +230,12 @@ final class PrintedFormMatcher
      * Find each question's label line, in printed order. A question whose key and label are both missed is
      * left unanchored; the search for the next one starts where the last found one was.
      *
+     * Each anchor is a pair (M149): `line`, below which the question's answer begins, and `top`, above which the
+     * question before it ends. They are one line unless the key stamp was read as a line of its own — see below.
+     *
      * @param  list<array<string, mixed>>  $rows
      * @param  list<OcrLine>  $lines
-     * @return array<int, array{line: OcrLine, by: string}|null>
+     * @return array<int, array{line: OcrLine, top: OcrLine, by: string}|null>
      */
     private function anchor(array $rows, array $lines): array
     {
@@ -261,8 +267,26 @@ final class PrintedFormMatcher
                 continue;
             }
 
-            $anchors[$i] = ['line' => $found['line'], 'by' => $found['by']];
-            $from = $found['at'] + 1;
+            // M149: the stamp is smaller than the label and printed at the other margin, and on about half the
+            // bake-off's photos it clustered as a line of its own a few thousandths of the page above its label.
+            // Anchored on the stamp alone, the answer took the question's own label ("2. Age 29") and ran on to the
+            // next label, keeping the next stamp. So the question spans both lines: its answer begins below the
+            // LOWER of the two, and the question before it ends above the UPPER one.
+            $start = $found['at'];
+            $top = $found['at'];
+            if ($found['by'] === 'key' && $label !== '') {
+                $n = count($lines);
+                for ($k = max($from, $found['at'] - self::STAMP_REACH); $k <= $found['at'] + self::STAMP_REACH && $k < $n; $k++) {
+                    if ($k !== $found['at'] && $lines[$k]->page === $found['line']->page && $this->startsWithLabel($lines[$k], $label)) {
+                        $start = max($start, $k);
+                        $top = min($top, $k);
+                        break;
+                    }
+                }
+            }
+
+            $anchors[$i] = ['line' => $lines[$start], 'top' => $lines[$top], 'by' => $found['by']];
+            $from = $start + 1;
         }
 
         return $anchors;
@@ -330,13 +354,15 @@ final class PrintedFormMatcher
     }
 
     /**
-     * @param  array<int, array{line: OcrLine, by: string}|null>  $anchors
+     * Where the next found question begins: its upper line, stamp or label, so neither is read into this answer.
+     *
+     * @param  array<int, array{line: OcrLine, top: OcrLine, by: string}|null>  $anchors
      */
     private function nextAnchor(array $anchors, int $i): ?OcrLine
     {
         foreach ($anchors as $j => $anchor) {
             if ($j > $i && $anchor !== null) {
-                return $anchor['line'];
+                return $anchor['top'];
             }
         }
 

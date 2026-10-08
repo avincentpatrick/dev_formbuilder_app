@@ -42,6 +42,14 @@ return [
         */
         'connect_timeout' => 5,
         'timeout' => 25,
+
+        /*
+        | Sent as `imageContext.languageHints` with every page (M149). `en-t-i0-handwrit` is Google's hint for
+        | handwriting. On the bake-off's thirty phone photos it took fields needing correction from 60.0% to
+        | 54.4%, silent errors from 2 to 1, and Cyrillic letters in Tagalog answers from 4 to 0, while every
+        | printed label was still found. An empty list sends no hint.
+        */
+        'language_hints' => ['en-t-i0-handwrit'],
     ],
 
     /*

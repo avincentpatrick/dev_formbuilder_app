@@ -251,6 +251,19 @@ it('fails, and says why, when an answer cannot be understood or names no scan â€
         ->and(ocrBakeoffFieldsCsv("{$this->dir}/samples/_bakeoff/fields.csv")['sheet1.png/age']['verdict'])->toBe('not scored');
 });
 
+it('matches a scan named 01 to the row a spreadsheet saved as the number 1, and never 1 to 10 (M149)', function (): void {
+    // The user typed 01 to 15 as asked; Excel stored 01 to 09 as the numbers 1 to 9, and a literal comparison matched
+    // none of those folders to its row.
+    $layout = ocrBakeoffExportLayout($this->dir.'/layout', $this->form->id);
+    ocrBakeoffScan("{$this->dir}/samples/01/p1.png", $this->model, ocrBakeoffCleanAnswers());
+    ocrBakeoffScan("{$this->dir}/samples/10/p1.png", $this->model, ocrBakeoffCleanAnswers());
+    $answers = ocrBakeoffSheet("{$this->dir}/answers.csv", [ocrBakeoffCleanRow('1', 'photo'), ocrBakeoffCleanRow('10', 'photo')]);
+
+    $this->artisan('ocr:bakeoff', ['folder' => $this->dir.'/samples', '--layout' => $layout, '--answers' => $answers, '--offline' => true])
+        ->expectsOutputToContain('G9: 0 of 14 scored fields need correction (0.0%)')
+        ->assertExitCode(0);
+});
+
 it('calls the provider once per page, caches the answer beside it, and never pays for that page again', function (): void {
     $layout = ocrBakeoffExportLayout($this->dir.'/layout', $this->form->id);
     $samples = $this->dir.'/samples';

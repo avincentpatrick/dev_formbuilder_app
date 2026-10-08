@@ -116,7 +116,8 @@ final class OcrAnswerSheet
     }
 
     /**
-     * The answer row for a scan, matched by name with case and extension ignored.
+     * The answer row for a scan, matched by name with case and extension ignored — and a name that is only digits by
+     * its value (M149): a spreadsheet stores a typed `01` as the number 1, which named none of folders `01` to `09`.
      *
      * @return array{row: int, scan: string, condition: string|null, cells: array<string, mixed>}|null
      */
@@ -136,8 +137,9 @@ final class OcrAnswerSheet
     {
         $base = basename(str_replace('\\', '/', $name));
         $dot = strrpos($base, '.');
+        $stem = mb_strtolower($dot === false || $dot === 0 ? $base : substr($base, 0, $dot));
 
-        return mb_strtolower($dot === false || $dot === 0 ? $base : substr($base, 0, $dot));
+        return ctype_digit($stem) ? (ltrim($stem, '0') === '' ? '0' : ltrim($stem, '0')) : $stem;
     }
 
     /** @param  list<OcrBakeoffQuestion>  $questions */

@@ -50,4 +50,9 @@ describe('ScanPages', () => {
         expect(wrapper.find('img').exists()).toBe(false);
         expect(wrapper.text()).toContain('Page 1 is being checked for viruses.');
     });
+
+    it('calls itself the paper on the review screen unless told otherwise (M153: "Scanned pages" on a response)', () => {
+        expect(mount(ScanPages, { props: { pages: [PNG] } }).find('h2').text()).toBe('The paper');
+        expect(mount(ScanPages, { props: { pages: [PNG], title: 'Scanned pages' } }).find('h2').text()).toBe('Scanned pages');
+    });
 });

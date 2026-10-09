@@ -10,12 +10,15 @@
  * ⚠️ A PDF IS A LINK, NOT A FRAME. Tenant pages forbid framing (`X-Frame-Options: DENY`), the file route sends a
  * PDF as a download, and nothing here renders PDF pages — so a PDF scan offers its file. Showing PDF pages
  * inline is a filed row.
+ *
+ * M153: the same pages on a saved response (`Pages/submissions/Show.vue`), where the heading reads "Scanned pages"
+ * — on the review screen the paper is the thing being read, on the response it is one record among several.
  */
 import { computed, ref } from 'vue';
 import { MdsButton } from '@meridian/design-system';
 import type { ScanPage } from './scan-review';
 
-const props = defineProps<{ pages: ScanPage[] }>();
+const props = withDefaults(defineProps<{ pages: ScanPage[]; title?: string }>(), { title: 'The paper' });
 
 /** Zoom steps: 1 fits the page to the panel's width. */
 const ZOOM_STEPS = [1, 1.5, 2, 3] as const;
@@ -41,7 +44,7 @@ const hasImage = computed(() => props.pages.some(isImage));
 <template>
     <section class="scan-pages" aria-labelledby="scan-pages-title">
         <div class="scan-pages__head">
-            <h2 id="scan-pages-title" class="scan-pages__title">The paper</h2>
+            <h2 id="scan-pages-title" class="scan-pages__title">{{ title }}</h2>
             <div v-if="hasImage" class="scan-pages__zoom" role="group" aria-label="Zoom">
                 <MdsButton size="sm" variant="secondary" :disabled="zoomIndex === 0" @click="zoomOut">Zoom out</MdsButton>
                 <span class="scan-pages__zoom-level" aria-live="polite">{{ zoomLabel }}</span>

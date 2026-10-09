@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Tenant;
 
+use App\Enums\FormStatus;
 use App\Http\Controllers\Concerns\ReadsKeywordFilter;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Submissions\ExportSubmissionsRequest;
@@ -95,10 +96,14 @@ final class SubmissionInboxController extends Controller
      * them — AND the form accepts scans. The page itself renders for a form that does not, to say why; the
      * entry does not, because a button leading to "this form does not accept scans" is a dead end on the one
      * screen where responses are counted.
+     *
+     * Never on an archived form (M155, `R-aaf36122`): its page adds nothing to it. A page mask only — the
+     * create gate itself still admits an archived form so queued offline responses arrive (`D107` A).
      */
     private function scanUrl(User $user, Form $form, EntitlementService $entitlements, TenantSettingRegistry $settings): ?string
     {
         $offered = $form->allow_ocr_single === true
+            && $form->status !== FormStatus::Archived
             && $user->can('create', [Submission::class, $form])
             && $settings->moduleEnabled('ocr_single')
             && FeatureAdmission::admits($entitlements, 'ocr_single');

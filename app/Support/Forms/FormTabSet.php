@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Forms;
 
+use App\Enums\FormStatus;
 use App\Http\Controllers\Tenant\FormAnalyticsController;
 use App\Models\Form;
 use App\Models\Submission;
@@ -79,7 +80,11 @@ final class FormTabSet
             ];
         }
 
-        if ($user->can('update', $form)) {
+        // M155 (`R-aaf36122`): an archived form is read-only on every page this strip is drawn on — no Builder
+        // and no Settings, while Overview, Responses and Analytics stay. The routes keep their own gates.
+        $archived = $form->status === FormStatus::Archived;
+
+        if (! $archived && $user->can('update', $form)) {
             $tabs[] = ['key' => 'builder', 'label' => 'Builder', 'href' => $base.'/builder', 'icon' => 'edit'];
         }
 
@@ -92,7 +97,7 @@ final class FormTabSet
         // M129 — the hub half of `D63`. `can:update,form` is the gate on every settings section's own route, so
         // the tab is offered exactly where its saves would be accepted. The icon is the builder's Form settings
         // button's, so the two entry points read as one place.
-        if ($user->can('update', $form)) {
+        if (! $archived && $user->can('update', $form)) {
             $tabs[] = ['key' => 'settings', 'label' => 'Settings', 'href' => $base.'/settings', 'icon' => 'sliders'];
         }
 

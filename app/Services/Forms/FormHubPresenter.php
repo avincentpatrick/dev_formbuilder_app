@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Forms;
 
+use App\Enums\FormStatus;
 use App\Enums\SubmissionStatus;
 use App\Models\Form;
 use App\Models\FormVersion;
@@ -44,6 +45,12 @@ use Illuminate\Support\Collection;
  * this reader" in one place and makes it assertable in Pest rather than only in Vitest. A refused tab is
  * ABSENT from the array; nothing renders a disabled destination. It was a private method here until the
  * analytics page needed the identical strip — see that class for why one encoding rather than two.
+ *
+ * ── AN ARCHIVED FORM'S PAGE OFFERS NOTHING THAT CHANGES IT OR ADDS TO IT (M155, `R-aaf36122`) ──────────
+ * No Edit form, Publish, New response or Share, and the tile reads `closed`. A PAGE mask, the Forms list's own
+ * shape (M154): `SubmissionPolicy::create()` still admits an archived form, because the same check gates the
+ * offline sync API and a tablet's responses queued before the archive must still arrive (`D107` A). The
+ * schedule override is the hub's alone — `FormSchedule::acceptance()` also feeds the encode and guest pages.
  */
 final class FormHubPresenter
 {
@@ -57,7 +64,9 @@ final class FormHubPresenter
      */
     public function show(Form $form, User $user): array
     {
-        $canUpdate = $user->can('update', $form);
+        // Archived ⇒ read-only here, whatever the reader may do elsewhere — see the class docblock.
+        $archived = $form->status === FormStatus::Archived;
+        $canUpdate = ! $archived && $user->can('update', $form);
 
         /** @var Collection<int, FormVersion> $versions */
         $versions = $form->versions()->orderByDesc('version_number')->get();
@@ -85,8 +94,8 @@ final class FormHubPresenter
             'tabs' => FormTabSet::for($form, $user),
             'can' => [
                 'edit' => $canUpdate,
-                'publish' => $user->can('publish', $form),
-                'encode' => $user->can('create', [Submission::class, $form]),
+                'publish' => ! $archived && $user->can('publish', $form),
+                'encode' => ! $archived && $user->can('create', [Submission::class, $form]),
                 // A read/derive of the form, so it gates on view like the XLSForm export does — NOT on
                 // `viewOverview`. The two differ for exactly the roles this page was widened for, and a
                 // Reviewer must not be offered a button that 403s.
@@ -151,7 +160,14 @@ final class FormHubPresenter
             ? null
             : Submission::query()->where('form_id', $form->id)->consumesCapacity()->count();
 
-        return FormScheduleView::present($form, $consumed);
+        $schedule = FormScheduleView::present($form, $consumed);
+
+        // An archived form takes no more responses here, whatever its window says (the class docblock).
+        if ($form->status === FormStatus::Archived) {
+            $schedule['acceptance'] = 'closed';
+        }
+
+        return $schedule;
     }
 
     /**

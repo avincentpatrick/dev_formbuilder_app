@@ -383,6 +383,24 @@ describe('form hub — the schedule tile speaks the shared vocabulary', () => {
 
         wrapper.unmount();
     });
+
+    it('says an archived form takes no more responses, never "Closed" on a date still ahead (M155)', () => {
+        // The presenter reads an archived form as `closed` whatever its window says; the window can still close a
+        // week from now, and "Closed <next week>" would be false.
+        const wrapper = render({
+            form: { ...props().form, status: 'archived' },
+            schedule: { ...props().schedule, acceptance: 'closed', closes_at: '2099-01-01T00:00:00+00:00' },
+        });
+
+        const tile = wrapper
+            .findAllComponents({ name: 'StatTile' })
+            .find((t) => t.props('label') === 'Accepting responses');
+
+        expect(tile?.props('value')).toBe('Closed');
+        expect(tile?.props('caption')).toBe('No longer accepting responses');
+
+        wrapper.unmount();
+    });
 });
 
 describe('form hub — every payload key has a reader', () => {

@@ -11,6 +11,9 @@ use App\Models\User;
 use App\Services\Forms\BlankFormPrintPresenter;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
+use App\Services\Ocr\OcrPage;
+use App\Services\Ocr\OcrText;
+use App\Services\Ocr\OcrWord;
 use App\Services\Ocr\PrintedFormMatcher;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
@@ -120,8 +123,45 @@ it('reads every printed area of a cleanly filled page, each anchored on its key 
         expect($field['state'])->toBe('read', $key)
             ->and($field['tier'])->toBe('auto', $key)
             ->and($field['anchored_by'])->toBe('key', $key)
-            ->and($field['page'])->toBe(0, $key);
+            ->and($field['page'])->toBe(1, $key);
     }
+});
+
+/**
+ * One typeset page cut into two at the top of the question keyed `$key`, the way the template breaks a long form: a question
+ * never splits across pages (`.q { page-break-inside: avoid }`).
+ *
+ * @return array{0: OcrPage, 1: OcrPage}
+ */
+function ocrMatchSplit(OcrPage $page, string $key): array
+{
+    $tops = array_map(static fn (OcrWord $w): float => $w->y0, array_filter($page->words, static fn (OcrWord $w): bool => OcrText::key($w->text) === $key));
+    $cut = min($tops) - 0.002;
+    $above = array_values(array_filter($page->words, static fn (OcrWord $w): bool => $w->centerY() < $cut));
+    $below = array_values(array_filter($page->words, static fn (OcrWord $w): bool => $w->centerY() >= $cut));
+
+    return [new OcrPage($page->width, $page->height, $above), new OcrPage($page->width, $page->height, $below)];
+}
+
+it('reads a scan whose pages were uploaded out of order as if they were in order, and names each page by its upload place (R-4aaf3b6f)', function (): void {
+    // M152, measured before this case: with each Round 1 form's two photos uploaded in reverse, the questions on its second
+    // sheet were looked for only after the first sheet's, and all thirty came back "not found". The running head prints no page
+    // number (§2.5), so the order is taken from what each page holds.
+    [$first, $second] = ocrMatchSplit(PrintedPageTypesetter::fromModel($this->model, ocrMatchAnswers())->page(), 'sex');
+    $values = static fn (array $fields): array => array_map(static fn (array $f): mixed => $f['value'], $fields);
+
+    $inOrder = $this->matcher->match($this->form, $this->version, [$first, $second])['fields'];
+    $swapped = $this->matcher->match($this->form, $this->version, [$second, $first])['fields'];
+    $blankFirst = $this->matcher->match($this->form, $this->version, [new OcrPage(1.0, 1.0, []), $second, $first])['fields'];
+
+    expect(array_unique(array_column($inOrder, 'state')))->toBe(['read'])
+        ->and($values($swapped))->toBe($values($inOrder))
+        ->and($values($blankFirst))->toBe($values($inOrder));
+
+    // The page a note names is the one the review screen shows under that number: its place in the upload, counted from 1.
+    expect([$inOrder['patient_name']['page'], $inOrder['consent']['page'], $inOrder['sex']['page'], $inOrder['notes']['page']])->toBe([1, 1, 2, 2])
+        ->and([$swapped['patient_name']['page'], $swapped['consent']['page'], $swapped['sex']['page'], $swapped['notes']['page']])->toBe([2, 2, 1, 1])
+        ->and([$blankFirst['patient_name']['page'], $blankFirst['sex']['page']])->toBe([3, 2]);
 });
 
 it('splits a date by WHERE each digit sits under its caption, never by counting digits', function (): void {

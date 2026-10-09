@@ -191,9 +191,14 @@ final class PrintedFormMatcher
         $this->addStatic($static, 'Scanning is switched off for this form, so responses must be keyed in.');
         $this->addStatic($static, 'Scans of this form cannot be read automatically; responses must be keyed in.');
 
-        $lines = [];
+        $perPage = [];
         foreach ($pages as $index => $page) {
-            array_push($lines, ...$this->lines->lines($page, $index));
+            $perPage[$index] = $this->lines->lines($page, $index);
+        }
+
+        $lines = [];
+        foreach ($this->printedOrder($rows, $perPage) as $index) {
+            array_push($lines, ...$perPage[$index]);
         }
 
         $anchors = $this->anchor($rows, $lines);
@@ -224,6 +229,40 @@ final class PrintedFormMatcher
         }
 
         return ['fields' => $fields, 'counts' => $counts, 'pages' => count($pages)];
+    }
+
+    /**
+     * The pages in the order they were printed, whatever order they were uploaded in (M152, `R-4aaf3b6f`).
+     *
+     * {@see anchor()} looks for each question only after the one before it, so a second sheet uploaded first had every
+     * question on it looked for after the first sheet's, and all of them came back "not found" — measured on the bake-off's
+     * fifteen forms with their pages reversed: thirty. The running head prints no page number (§2.5), so a page is placed by
+     * the first question it holds when searched on its own. A page holding none (a blank back, an unread photo) keeps its
+     * upload place after the rest; `usort` is stable, so ties do too.
+     *
+     * Each line keeps its UPLOAD index as its page, so a result still names the page the review screen shows under that number.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @param  array<int, list<OcrLine>>  $perPage  upload index => that page's lines
+     * @return list<int> upload indexes, in printed order
+     */
+    private function printedOrder(array $rows, array $perPage): array
+    {
+        $first = [];
+        foreach ($perPage as $index => $lines) {
+            $first[$index] = PHP_INT_MAX;
+            foreach ($this->anchor($rows, $lines) as $i => $anchor) {
+                if ($anchor !== null) {
+                    $first[$index] = $i;
+                    break;
+                }
+            }
+        }
+
+        $order = array_keys($perPage);
+        usort($order, static fn (int $a, int $b): int => $first[$a] <=> $first[$b]);
+
+        return $order;
     }
 
     /**
@@ -399,7 +438,9 @@ final class PrintedFormMatcher
             'text' => $read['text'],
             'confidence' => $read['confidence'],
             'tier' => $tier,
-            'page' => $page,
+            // Counted from 1, as the review screen numbers its images and every fixture writes it (M152): a line's page is its
+            // index in the upload, from 0, and the review note printed "(page 0)" beside the image labelled "Page 1".
+            'page' => $page === null ? null : $page + 1,
             'anchored_by' => $anchoredBy,
         ];
     }

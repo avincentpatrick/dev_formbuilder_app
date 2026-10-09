@@ -130,7 +130,9 @@ provide(ContentHeadingBaseKey, 3);
 
 const steps = computed(() => runtime.visibleSteps.value);
 const step = computed(() => runtime.currentStep.value);
-const pending = computed(() => previewPendingFields(steps.value, props.model));
+// M151: only what the engine has not met yet. A question in a section its condition hides is in no shown step either, and
+// was listed here as "just added" — under a note promising it would appear, which it never would.
+const pending = computed(() => previewPendingFields(steps.value, props.model).filter((field) => !engineKnows(runtime, field.key)));
 
 /**
  * ⛔ THE MODE COMES FROM THE LIVE RENDER MODEL AND NEVER FROM `runtime.singlePageMode`, AND THAT IS A

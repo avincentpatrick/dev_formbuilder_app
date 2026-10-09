@@ -13731,3 +13731,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `usePreviewReorder.ts` reads the place under the pointer and never scrolls `.builder-preview`, so on a long page a question
   can reach a place off screen only by scrolling with the wheel while dragging, or by keyboard, which scrolls each place into
   view. Structure's drag has the same gap. **Live.** Filed by `M151`. **Tier: during-testing.**
+
+- **`minor` · Preview lists a question in a section its condition hides as "Just added".** Found by `M151` in a real-browser
+  look at the seeded `Logic Notices Demo`: `previewPendingFields()` (`resources/js/components/builder/preview-model.ts`) treats
+  every question in no SHOWN step as pending, and a hidden section is no shown step, so its questions sat under "These appear
+  on a page as soon as the preview catches up with your edit" — which they never do, a respondent being unable to see them.
+  Present since the pending block shipped (`M118`). The remedy lists only a question the engine has not met yet
+  (`engineKnows`). **Live.** Filed by `M151`. **Tier: early-testing.**

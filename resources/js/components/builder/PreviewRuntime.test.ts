@@ -266,3 +266,38 @@ describe('PreviewRuntime — the label edit on a question’s row (M151)', () =>
         wrapper.unmount();
     });
 });
+
+/**
+ * M151 — the "Just added" list is for questions the engine has not met yet. A question in a section its condition hides
+ * is in no shown step either, and until M151 it was listed there too, under "These appear on a page as soon as the preview
+ * catches up with your edit" — which they never do, since a respondent would not see them.
+ */
+describe('PreviewRuntime — a hidden section’s questions are not "just added" (M151)', () => {
+    it('lists only a question the engine has not met, never one its section’s condition hides', async () => {
+        const snap = schemaResponse({
+            sections: [
+                section({ key: 's1', label: 'About you' }),
+                section({ key: 's2', label: 'Only for Sam', relevant_expression: "${name} = 'Sam'" }),
+            ],
+            fields: [
+                field({ key: 'name', label: 'Your name', section_key: 's1', sequence: 0, section_sequence: 0 }),
+                field({ key: 'hidden_q', label: 'Asked of Sam', section_key: 's2', sequence: 1, section_sequence: 0 }),
+            ],
+        });
+        // The live model also holds a question added since this engine was built.
+        const live = schemaResponse({
+            sections: snap.version.schema.sections,
+            fields: [...snap.version.schema.fields, field({ key: 'fresh', label: 'Brand new', section_key: 's1', sequence: 2, section_sequence: 1 })],
+        });
+
+        const wrapper = mount(PreviewRuntime, {
+            props: { snapshot: snap, model: buildRenderModel(live), issuesByKey: {}, selectedKey: null, initialStepKey: null },
+        });
+        await flushPromises();
+
+        const pending = wrapper.findAll('[data-preview-pending-field]').map((li) => li.attributes('data-preview-pending-field'));
+        expect(pending).toEqual(['fresh']);
+
+        wrapper.unmount();
+    });
+});

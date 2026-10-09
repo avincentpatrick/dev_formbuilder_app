@@ -13493,11 +13493,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   printed notice on the blank form, is added only if the deploying agency's privacy officer asks. The reserved ADR the
   bake-off writes can carry the processor facts. **Live.** **Tier: before-launch.**
 
-- **`nit` · Nothing tells a tester to look in the spam folder for their invitation, though the first one landed there.**
+- ✅ **CLOSED BY `M154` (2026-10-09) — ****`nit` · Nothing tells a tester to look in the spam folder for their invitation, though the first one landed there.**
   Filed by `M147` (2026-10-08) from `D50`, which says the checklist should tell testers this whatever the DNS answer. No
   document, checklist or invitation text in the repository says it. The remedy is one sentence wherever testers are
   invited — the tester checklist and the invitation email's own instructions: look in spam, and mark it *Not spam*.
-  **Live.** **Tier: during-testing.**
+  **Live.** **Tier: during-testing.** ✅ **CLOSED BY `M154` (2026-10-09):** the invitation email ends *"If this email landed in your spam or junk folder, mark it "Not spam" so the next ones reach your inbox."*; the inviter's confirmation adds *"If it does not arrive, ask them to check their spam or junk folder."*, and the "Invite a member" dialog carries the same hint under its email field — testers are invited from the Members page, so its inviter is the person a tester asks. Two Pest cases and one Vitest case red first. **The checklist half needed nothing — and the row's premise was wrong about it:** the off-repo Testing Server Checklist's invite step (I3) already warns *"Tell testers to look in their spam folder … Ask them to mark the first one 'not spam'"* (read from its live version on 2026-10-09). "No … checklist … says it" was true of the repository, which cannot read that page (`R-e6e340c0`), and of nothing else.
 
 - **`nit` · `P2c`, the deferral-phrase arm, fires on phrasing rather than on staleness, and `D25` recommends re-aiming
   it as a follow-up.** Filed by `M147` (2026-10-08) from `D25` option 1, which keeps the arm as bookkeeping and recommends
@@ -13566,12 +13566,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   renders through `RepeatGroup`). The riskiest of the four Round 2 builder rows for Oct 12. Taken before Oct 12 by
   `D103`. **Live.** Filed by `M148`. **Tier: early-testing.** ✅ **CLOSED BY `M151` (2026-10-09):** each shown question carries a grip; `usePreviewReorder.ts` writes nothing while a question moves, decides a target read off the page — above or below a shown question, a section's "Add a question" area, an empty section's placeholder, and while a move is on every page in the strip (`D105`: the end of that page, the author staying on theirs) — and draws it; the drop writes once (`placeField` + `commitReorder`) and rebuilds at once, carrying the preview's answers (`carryAnswers`), so the question is in place on the next frame and glides there (`useFlipReorder`, now keyed by attribute). `previewPlacement` counts every question of the section, drawn or not, so a page break, a hidden question or a temporary section key cannot misplace a drop, and an unchanged place writes nothing. Keyboard: Enter or Space grabs, the arrows step over the places that would move it, Enter drops and focus lands on the moved question's new grip; Escape, or the grip losing focus, writes nothing. A repeatable section's members and a question its condition hides stay movable in Structure only (listed in the pane). Proved by a real mouse drag within a page, onto a new section's placeholder and onto a page in the strip plus a keyboard move with focus kept, all checked after a reload (`builder-preview-authoring.spec.ts`), an axe scan of a keyboard grab, and Vitest cases red against eleven mutants.
 
-- **`minor` · An archived form cannot be found from the Forms list.** Found by `M148` from the staging smoke test
+- ✅ **CLOSED BY `M154` (2026-10-09) — ****`minor` · An archived form cannot be found from the Forms list.** Found by `M148` from the staging smoke test
   (Round 2, `r2-archive`, a pass with the note *"but how can i retrieve the responses from that archived form? do we
   have that feature?"*). `FormPresenter` always leaves archived forms out and offers no filter, and `FormSearchArm`
   does the same, so the form and its responses are reachable only through Submissions' Form dropdown, a response row's
   link or the form's own URL — all of which still work, exports included. `D103`: a read-only Archived filter on the
-  Forms list; still no un-archive (`D101`). **Live.** Filed by `M148`. **Tier: during-testing.**
+  Forms list; still no un-archive (`D101`). **Live.** Filed by `M148`. **Tier: during-testing.** ✅ **CLOSED BY `M154` (2026-10-09):** an **Archived** chip, last in the state bar. `FormPresenter::list()` takes the archived forms only when the forms list asks (`withArchived`, default unchanged, so `FormSearchArm` and every other caller still never see one), and `FormListFacets` keeps them out of "All", its count and every folder count — the default arm used to return every row it was given, which would have leaked them back. An archived row is read-only: edit, publish, archive and new submission masked in the presenter, "Save as template" only while a published version is left (one archived as a draft has none, and the route would 404), "Set form scope" hidden on the row; its card says "No longer accepting responses" where a meter or "Not published" was, the table drops "live" from its version, and an empty version history says so. A workspace whose every form is archived is told none matches rather than offered its first form. Four Pest cases and four Vitest cases red first; `forms-folders-axe.spec.ts` makes and archives its own form and finds it under the chip. **Found beside it and filed below:** the form's own page is not read-only for an archived form.
 
 - ✅ **CLOSED BY `M150` (2026-10-09) — ****`nit` · Structure's drag handles tell a screen reader "Press Enter to grab", though Space grabs too.** Found by
   `M148` beside the handle row above. Both `aria-label`s in `BuilderCanvas.vue` (a section's and a question's) name only
@@ -13758,12 +13758,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `OcrAnswerCarryTest`) writes 1 for a one-page scan, which is why nothing saw it. A scan read before the fix keeps its stored 0;
   it changes only a review note, so there is no backfill. **Live.** Filed by `M152`. **Tier: early-testing.** ✅ **CLOSED BY `M152` (2026-10-09):** `result()` reports the upload place counted from 1, folded into `R-4aaf3b6f` because it is the same line of the same file; the existing one-page assertion moved to 1 and the two-page case pins 1 and 2 in both orders; a mutant restoring the 0 base CAUGHT.
 
-- **`nit` · The scans page shows none of the files chosen before "Read this scan", and a read scan cannot be read again or removed.**
+- ✅ **CLOSED BY `M154` (2026-10-09) — ****`nit` · The scans page shows none of the files chosen before "Read this scan", and a read scan cannot be read again or removed.**
   Found by `M152` while tracing `R-4aaf3b6f`: `Scans.vue` is a native file input and a button, so a wrong photo or a wrong
   order is seen only on the review screen, and the routes (`routes/tenant.php`, the `forms.ocr.scans.*` group) are store, show,
   index, review, page and confirm — a mistaken upload is redone as a new scan and the unsaved one stays in the list. Since
   `M152` the order no longer matters to the reading; the remedy lists the chosen pages (name, thumbnail, remove) before the read,
-  and lets an unsaved scan be discarded. **Live.** Filed by `M152`. **Tier: during-testing.**
+  and lets an unsaved scan be discarded. **Live.** Filed by `M152`. **Tier: during-testing.** ✅ **CLOSED BY `M154` (2026-10-09), on its first half — the second is re-filed:** `components/ocr/ChosenPages.vue` lists every chosen file before "Read this scan" (a preview by object URL, or the file's kind for a PDF; the name; "Page N · size"; "Remove {name}"), a pick adds to the list and empties the input, the file check runs on every change so a refusal names the culprit before anything is sent, and previews are revoked on removal and when the page is left. Five page cases and four component cases red first; a new `ocr-scans-upload.spec.ts` chooses three in-memory photos, scans the page and removes one, never sending. **Discarding an unsaved scan, and reading one again, need a route in `routes/tenant.php` — a second hub beside `Encode.vue` in `M154` — so they are their own row below**, with the failed scan's pages that are shown nowhere. Also found and fixed beside it: the empty list said scans show "until each is saved as a response", but saved scans stay listed.
 
 - ✅ **CLOSED BY `M153` (2026-10-09) — ****`minor` · A response made from a scan does not show the scanned pages, so nobody can check its answers against the paper.**
   Found by the user on staging during `M152`'s scan: *"i did not see the 2 photos when i click the submitted response"*.
@@ -13783,9 +13783,31 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Answered first at claim time: who sees an unsaved guest scan, what the respondent is told, and how the public endpoint is
   kept from spending the provider's pages. **Live.** Filed by `M152`. **Tier: during-testing.**
 
-- **`minor` · Correcting a scanned response's answers shows no scanned pages beside the form.**
+- ✅ **CLOSED BY `M154` (2026-10-09) — ****`minor` · Correcting a scanned response's answers shows no scanned pages beside the form.**
   Found by `M153` closing `R-1e00f872`: the response page now shows "Scanned pages", but its "Edit answers" button opens
   `Pages/submissions/Encode.vue` in edit mode (`SubmissionEditController`), which shows the paper only in scan-review mode, so a
   reviewer who finds a misread answer loses the page the moment they go to fix it. The remedy reuses what exists: the edit page's
   presenter sends the same `scan_pages` (`SubmissionInboxPresenter::scanPages()`, moved where both can call it) and `Encode.vue`
-  lays them out as its scan mode does. **Live.** Filed by `M153`. **Tier: during-testing.**
+  lays them out as its scan mode does. **Live.** Filed by `M153`. **Tier: during-testing.** ✅ **CLOSED BY `M154` (2026-10-09):** `scanPages()` moved word for word into `ResponseScanPages::for()`, which the response page and `SubmissionEditController::edit()` both call — the edit page only for an editor who may read the response, since `update` does not need `submissions.view` and the file route does. `Encode.vue` lays the pages out with its scan grid, keyed on `hasPaper` so no scan-review behaviour reaches edit mode, under "Scanned pages"; the sticky paper column is now capped to the window and scrolls on its own, as the response page's is, which also stops the review screen stranding page 2. Three Pest cases and two Vitest cases red first; an E2E case opens "Edit answers" on a seeded scanned response.
+
+- **`minor` · An unsaved scan cannot be discarded or read again, and a failed scan's pages are shown nowhere.**
+  Found by `M154` taking `R-c84e4f12`, whose title named this half and whose remedy did not reach it. The scans routes
+  (`routes/tenant.php`, the `forms.ocr.scans.*` group) are store, show, index, review, page and confirm: no route deletes a
+  scan, and `OcrScanReader::step()` returns `Done` for any read or failed scan, so a wrong upload is redone as a new scan and the
+  unsaved one stays in "Recent scans" for good. A scan that failed renders `ocr/ScanStatus.vue`, which shows no image, so its
+  pages are seen nowhere at all. The remedy is a Discard on an unsaved scan (soft-deleting its page attachments, which frees
+  their storage quota, plus the provider's `.vision.json` beside each page, which no quota counts) and a "Read again" on a
+  failed one, both behind the routes' existing gate; it overlaps `R-92ba6b65` (*nothing ever deletes an OCR scan*), whose reaper
+  should share the deletion. **Live.** Filed by `M154`. **Tier: during-testing.**
+
+- **`minor` · An archived form's own page still offers Edit form, Share, New response and the Builder and Settings tabs, and says it is accepting responses.**
+  Found by `M154` taking `R-44b17445`, whose list is now read-only for an archived form while the page its title links to is
+  not. `FormHubPresenter::show()` and `FormTabSet` never read the form's status, so the hub offers "Edit form" (a builder with no
+  draft, where every edit is refused), Share (whose guest-link switch reports the stored value, though `D99` closed the link) and
+  "New response"; its "Accepting responses" tile comes from `FormSchedule::acceptance()`, which ignores status, so an archived form
+  with no schedule reads "Accepting". `FormService::archive()` has no status guard either, so archiving again re-stamps
+  `archived_at` and writes a second audit entry. And `SubmissionPolicy::create()` admits an archived form (it checks only for a
+  published version), so staff can still enter a response — `M154` masked the list's row only, because the same policy gates the
+  offline sync API (`SyncSubmissionController`), staff drafts and attachment uploads, and refusing there would strand a field
+  device's responses queued before the archive. Answered first at claim time: whether those queued responses are accepted.
+  **Live.** Filed by `M154`. **Tier: during-testing.**

@@ -29,10 +29,12 @@ import { computed, h, nextTick, onBeforeUnmount, provide, ref, watch, type Funct
 import { ContentImageRetryKey } from '../submissions/note-content';
 import PreviewRuntime from './PreviewRuntime.vue';
 import { PRESET_PREVIEW_ATTR, presetScopeCss } from './preset-scope';
-import { PREVIEW_REBUILD_DEBOUNCE_MS, buildPreviewModel, previewLimitations } from './preview-model';
+import { PREVIEW_REBUILD_DEBOUNCE_MS, buildPreviewModel, carryAnswers, previewLimitations, previewPlacement } from './preview-model';
 import type { BuilderStore } from './useBuilderStore';
 import type { BuilderPageProps } from './types';
-import type { SchemaResponse } from '../../../public-runtime/lib/types';
+import { useFlipReorder } from './useFlipReorder';
+import { usePreviewReorder } from './usePreviewReorder';
+import type { AnswerMap, SchemaResponse } from '../../../public-runtime/lib/types';
 
 const props = defineProps<{
     store: BuilderStore;
@@ -73,7 +75,35 @@ const engine = ref<{ shape: string; schema: SchemaResponse } | null>(null);
 const root = ref<HTMLElement | null>(null);
 const runtimeHost = ref<InstanceType<typeof PreviewRuntime> | null>(null);
 
+/** The answers handed to the next engine, so a rebuild does not wipe what the author typed to try the form out (M151). */
+const carried = ref<AnswerMap>({});
+
 let timer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * M151 (`R-2baef8ea`): a question moved in the preview. Nothing is written while it moves; the drop writes it once — one
+ * request, one undo entry, as Structure's drag does — and rebuilds AT ONCE rather than after the debounce, so the
+ * question is where it was dropped on the next frame, gliding there (`useFlipReorder`, below).
+ */
+const reorder = usePreviewReorder({
+    getRoot: () => root.value,
+    labelOf: (key) => model.value.renderModel.fields.find((field) => field.key === key)?.label ?? 'question',
+    place: (key, target) =>
+        previewPlacement(target, key, {
+            fields: props.store.fields.value,
+            uidByKey: model.value.projection.uidByKey,
+            sectionIdByKey: model.value.projection.sectionIdByKey,
+        }),
+    commit: (key, placement) => {
+        const uid = model.value.projection.uidByKey[key];
+        if (uid === undefined) return;
+        props.store.beginReorder();
+        props.store.placeField(uid, placement.group, placement.index);
+        void props.store.commitReorder('Move field');
+        rebuild();
+    },
+    onDragStart: () => runtimeHost.value?.commitEdit(),
+});
 
 /**
  * M151 (`R-74c3cf35`): the question whose label is being edited in place, held HERE because `PreviewRuntime` remounts.
@@ -82,7 +112,8 @@ let timer: ReturnType<typeof setTimeout> | null = null;
  * discarding the draft; so a rebuild that falls due while an edit is open waits for it to end (`held`).
  */
 const editingKey = ref<string | null>(null);
-const held = computed(() => editingKey.value !== null);
+// And none lands under a moving question either: it would destroy the row under the pointer, or the grip with focus.
+const held = computed(() => editingKey.value !== null || reorder.isReordering.value);
 let heldRebuild = false;
 
 function clearPending(): void {
@@ -95,8 +126,14 @@ function clearPending(): void {
 function rebuild(): void {
     clearPending();
     heldRebuild = false;
-    engine.value = { shape: model.value.projection.shape, schema: model.value.projection.schema };
+    const next = { shape: model.value.projection.shape, schema: model.value.projection.schema };
+    const previous = engine.value;
+    carried.value = previous === null ? {} : carryAnswers(runtimeHost.value?.answersSnapshot() ?? {}, previous.schema, next.schema);
+    engine.value = next;
 }
+
+// The glide: rows and sections measured before the rebuilt engine host replaces them, matched by key after.
+useFlipReorder(() => root.value, () => engine.value?.shape ?? '', { rowAttr: 'data-preview-field', groupAttr: 'data-section-key' });
 
 /** The debounced rebuild, unless an edit is open — then it waits for the edit to end. */
 function settle(): void {
@@ -190,17 +227,24 @@ const PresetStyle: FunctionalComponent<{ css: string }> = (p) => h('style', p.cs
 // builder's own path — select the section, open the palette — so there is no second way to add one.
 const emit = defineEmits<{ 'add-question': [sectionUid: string | null] }>();
 
-/** Sections with no question yet, in order — read off the LIVE store, because the engine never makes them a step. */
+/**
+ * Sections with no question yet, in order — read off the LIVE store, because the engine never makes them a step. Keyed by
+ * the PROJECTED key (M151): a section with no key yet has a temporary one there, which is what a drop into it names.
+ */
 const emptySections = computed(() =>
     props.store.sections.value
         .slice()
         .sort((a, b) => a.sequence - b.sequence)
         .filter((section) => !props.store.fields.value.some((field) => field.form_section_id === section.id))
-        .map((section) => ({ key: section.key, label: section.label || section.key })),
+        .map((section) => ({
+            key: model.value.projection.sectionKeyById[section.id] ?? section.key,
+            label: section.label || section.key,
+        })),
 );
 
 function onAddQuestion(sectionKey: string | null): void {
-    const section = sectionKey === null ? undefined : props.store.sections.value.find((s) => s.key === sectionKey);
+    const id = sectionKey === null ? undefined : model.value.projection.sectionIdByKey[sectionKey];
+    const section = id === undefined ? undefined : props.store.sections.value.find((s) => s.id === id);
     emit('add-question', section?.uid ?? null);
 }
 
@@ -230,6 +274,7 @@ const editingValue = computed(() => {
 // No select here: the click that asks for the edit bubbles to the row, whose own click selects the question — a mutant
 // that deleted a second select survived every case, because there was nothing left for it to do.
 function onEdit(key: string): void {
+    if (reorder.isReordering.value) return;
     editingKey.value = key;
 }
 
@@ -268,6 +313,10 @@ function onRename(key: string, value: string, via: 'key' | 'blur'): void {
             :empty-sections="emptySections"
             :editing-key="editingKey"
             :editing-value="editingValue"
+            :initial-answers="carried"
+            :reordering="reorder.isReordering.value"
+            :dragging-key="reorder.draggingKey.value ?? reorder.grabbedKey.value"
+            :drop-id="reorder.dropId.value"
             @select="onSelect"
             @step="stepKey = $event"
             @add-question="onAddQuestion"
@@ -275,7 +324,11 @@ function onRename(key: string, value: string, via: 'key' | 'blur'): void {
             @edit="onEdit"
             @rename="onRename"
             @edit-cancel="endEdit($event, true)"
+            @grip-pointerdown="reorder.onGripPointerDown"
+            @grip-keydown="reorder.onGripKeydown"
+            @grip-blur="reorder.onGripBlur"
         />
+        <div class="builder-preview__sr" role="status" aria-live="assertive">{{ reorder.announcement.value }}</div>
 
         <footer class="builder-preview__limits">
             <h3 class="builder-preview__limits-title">What this preview does not do</h3>
@@ -288,6 +341,9 @@ function onRename(key: string, value: string, via: 'key' | 'blur'): void {
 
 <style scoped>
 .builder-preview {
+    /* M151: the containing block of the announcement region below, so it is clipped inside this pane rather than adding
+       to the page's scroll (`clipped-node-containment.test.ts`). */
+    position: relative;
     display: flex;
     flex: 1;
     flex-direction: column;
@@ -298,6 +354,18 @@ function onRename(key: string, value: string, via: 'key' | 'blur'): void {
     height: 100%;
     /* Each centre view owns its own scroll — `.builder__centre-body` sets none. */
     overflow-y: auto;
+}
+
+.builder-preview__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 .builder-preview__limits {

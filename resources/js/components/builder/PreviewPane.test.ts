@@ -41,6 +41,8 @@ vi.mock('../../../public-runtime/composables/useFormRuntime', () => ({
 
         return {
             currentStepKey,
+            // M151: the pane reads the answers before a rebuild, to carry them to the next engine.
+            answers: {},
             visibleSteps: computed(() => STEPS.slice(0, stepCount.value)),
             currentStep: computed(
                 () => STEPS.slice(0, stepCount.value).find((s) => s.key === currentStepKey.value) ?? null,

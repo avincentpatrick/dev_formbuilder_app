@@ -13720,3 +13720,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   harness never meets it because it takes pages in file-name order. Reasoned from the code, not yet measured — the harness on
   form 14 with its two pages swapped measures it. The remedy orders the pages before matching (by the page on which the
   first question is read) or says so on the review page. **Live.** Filed by `M151`. **Tier: early-testing.**
+
+- **`nit` · The pointer-drag core is written twice.** Found by `M151`, which wrote the Preview's drag
+  (`resources/js/components/builder/usePreviewReorder.ts`) beside Structure's (`useCanvasReorder.ts`) rather than rework
+  Structure's three days before testing: both hold the 4px threshold, the window listeners, the one-pointer rule, Escape and
+  `pointercancel`. A fix to one will be missed in the other. The remedy is one helper both call. **Latent.** Filed by `M151`.
+  **Tier: during-testing.**
+
+- **`minor` · A question dragged in the Preview does not scroll the pane when the pointer nears its edge.** Found by `M151`:
+  `usePreviewReorder.ts` reads the place under the pointer and never scrolls `.builder-preview`, so on a long page a question
+  can reach a place off screen only by scrolling with the wheel while dragging, or by keyboard, which scrolls each place into
+  view. Structure's drag has the same gap. **Live.** Filed by `M151`. **Tier: during-testing.**

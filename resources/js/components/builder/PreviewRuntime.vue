@@ -33,13 +33,13 @@
  * assertion the comment explained. A rule about a forbidden string cannot be documented by quoting it.
  */
 import { computed, provide, ref, watch } from 'vue';
-import { MdsButton, MdsIconButton } from '@meridian/design-system';
+import { MdsButton, MdsIcon, MdsIconButton } from '@meridian/design-system';
 import FieldRow from '../../../public-runtime/components/FieldRow.vue';
 import RepeatGroup from '../../../public-runtime/components/RepeatGroup.vue';
 import { AnnouncerKey, RuntimeKey } from '../../../public-runtime/composables/context';
 import { createFormRuntime } from '../../../public-runtime/composables/useFormRuntime';
 import type { RuntimeStep } from '../../../public-runtime/composables/useFormRuntime';
-import type { RenderField, RenderModel, RenderSection, SchemaResponse } from '../../../public-runtime/lib/types';
+import type { AnswerMap, RenderField, RenderModel, RenderSection, SchemaResponse } from '../../../public-runtime/lib/types';
 import { ContentHeadingBaseKey } from '../submissions/note-content';
 import type { ProjectionIssue } from './draft-snapshot';
 import InlineLabelEdit from './InlineLabelEdit.vue';
@@ -51,9 +51,11 @@ import {
     previewRenderedSteps,
     previewSectionFor,
     previewShowsLabel,
+    previewStepEndTarget,
     previewStepLabels,
 } from './preview-model';
 import PreviewStepStrip from './PreviewStepStrip.vue';
+import { dropIdOf } from './usePreviewReorder';
 
 const props = defineProps<{
     /** The frozen snapshot this engine was built from. Never mutated; a new one arrives as a remount. */
@@ -82,6 +84,14 @@ const props = defineProps<{
      */
     editingKey?: string | null;
     editingValue?: string;
+    /**
+     * M151 (`R-2baef8ea`): the answers the previous engine held, carried across the remount a move causes — the author
+     * was trying their conditions out — and the move in progress, which `usePreviewReorder` in the pane owns.
+     */
+    initialAnswers?: AnswerMap;
+    reordering?: boolean;
+    draggingKey?: string | null;
+    dropId?: string | null;
 }>();
 
 // M139: the author's own controls in the preview. The pane turns them into a selection and an opened palette.
@@ -94,6 +104,9 @@ const emit = defineEmits<{
     edit: [key: string];
     rename: [key: string, value: string, via: 'key' | 'blur'];
     'edit-cancel': [key: string];
+    'grip-pointerdown': [event: PointerEvent, key: string];
+    'grip-keydown': [event: KeyboardEvent, key: string];
+    'grip-blur': [key: string];
 }>();
 
 const runtime = createFormRuntime(props.snapshot, {
@@ -106,6 +119,7 @@ const runtime = createFormRuntime(props.snapshot, {
     // re-run the step list on every keystroke, while this invalidates only when the mode itself flips — and it
     // follows that flip with no remount (the same live channel `singlePage` below reads, for the same reason).
     paginateAtPageBreaks: computed(() => !props.model.form.single_page_mode),
+    initialAnswers: props.initialAnswers,
 });
 
 provide(RuntimeKey, runtime);
@@ -239,8 +253,22 @@ function setEditor(instance: unknown): void {
     editor.value = (instance as InstanceType<typeof InlineLabelEdit> | null) ?? null;
 }
 
-// The pane ends an open edit itself when the view is left — a hidden input never blurs.
-defineExpose({ commitEdit: () => editor.value?.commit('blur') });
+// The pane ends an open edit itself when the view is left — a hidden input never blurs. And it reads the answers before a
+// rebuild replaces this engine, to hand them to the next one (M151).
+defineExpose({
+    commitEdit: () => editor.value?.commit('blur'),
+    answersSnapshot: (): AnswerMap => JSON.parse(JSON.stringify(runtime.answers)) as AnswerMap,
+});
+
+/** Where a drop on a page's own "Add a question" area — or on the page in the strip — puts a question: its end (D105). */
+function pageEndId(s: RuntimeStep): string {
+    return dropIdOf(previewStepEndTarget(s));
+}
+
+/** While a question is moving, the strip offers every page as a place to drop it, under the page's own label. */
+const stripDropZones = computed(() =>
+    props.reordering ? steps.value.map((s, i) => ({ id: pageEndId(s), label: stripOptions.value[i]?.label ?? '' })) : null,
+);
 
 /**
  * The required marker, or null when the engine has not caught up.
@@ -280,6 +308,8 @@ function go(delta: number): void {
             v-if="!singlePage && stripOptions.length > 1"
             :options="stripOptions"
             :current-key="step?.key ?? null"
+            :drop-zones="stripDropZones"
+            :drop-id="dropId ?? null"
             @go="runtime.goToStep($event)"
         />
 
@@ -332,13 +362,30 @@ function go(delta: number): void {
                         v-for="field in block.fields"
                         :key="field.key"
                         class="preview__row"
-                        :class="{ 'preview__row--selected': field.key === selectedKey }"
+                        :class="{
+                            'preview__row--selected': field.key === selectedKey,
+                            'preview__row--moving': field.key === draggingKey,
+                            'preview__row--drop-before': dropId === `before:${field.key}`,
+                            'preview__row--drop-after': dropId === `after:${field.key}`,
+                        }"
                         :data-preview-field="field.key"
+                        v-bind="showsTools(field) ? { 'data-drop-row': '', 'data-drop-id': `before:${field.key}`, 'data-drop-label': `above ${field.label}` } : {}"
                         @click="emit('select', field.key)"
                         @focusin="emit('select', field.key)"
                         @dblclick="onRowDblclick($event, field)"
                     >
                         <div v-if="showsTools(field)" class="preview__tools" data-preview-tools>
+                            <button
+                                type="button"
+                                class="preview__grip"
+                                data-preview-grip
+                                :aria-label="`Reorder ${field.label}. Press Enter or Space to grab, then arrow keys; or drag.`"
+                                @pointerdown="emit('grip-pointerdown', $event, field.key)"
+                                @keydown="emit('grip-keydown', $event, field.key)"
+                                @blur="emit('grip-blur', field.key)"
+                            >
+                                <MdsIcon name="grip" size="md" />
+                            </button>
                             <InlineLabelEdit
                                 v-if="editingKey === field.key"
                                 :ref="setEditor"
@@ -352,6 +399,7 @@ function go(delta: number): void {
                                 icon="edit"
                                 :label="`Edit label of ${field.label}`"
                                 size="sm"
+                                :disabled="reordering"
                                 data-preview-edit-label
                                 @click="emit('edit', field.key)"
                             />
@@ -374,7 +422,14 @@ function go(delta: number): void {
                     </div>
                 </div>
 
-                <div class="preview__author" data-preview-author>
+                <div
+                    class="preview__author"
+                    :class="{ 'preview__drop--active': dropId === pageEndId(block.step) }"
+                    data-preview-author
+                    data-drop-zone
+                    :data-drop-id="pageEndId(block.step)"
+                    :data-drop-label="`at the end of ${block.title ?? 'the first questions'}`"
+                >
                     <MdsButton
                         type="button"
                         variant="tertiary"
@@ -405,8 +460,12 @@ function go(delta: number): void {
             v-for="empty in emptySections ?? []"
             :key="`empty-${empty.key}`"
             class="preview__step preview__step--empty"
+            :class="{ 'preview__drop--active': dropId === `end:${empty.key}` }"
             data-preview-empty-section
             :data-empty-section-key="empty.key"
+            data-drop-zone
+            :data-drop-id="`end:${empty.key}`"
+            :data-drop-label="`into ${empty.label}`"
         >
             <header class="preview__head">
                 <h3 class="preview__title">{{ empty.label }}</h3>
@@ -511,6 +570,56 @@ function go(delta: number): void {
 }
 
 /* M151: the author's tools above a question, set off from the respondent's control by sitting outside it. */
+.preview__grip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--mds-radius-sm);
+    background: transparent;
+    color: var(--mds-color-text-secondary);
+    cursor: grab;
+    touch-action: none;
+}
+
+/* Structure's grip, drawn the same heavier way (M150, `R-91c1792e`). */
+.preview__grip :deep(svg) {
+    stroke-width: 3;
+}
+
+.preview__grip:hover {
+    background-color: var(--mds-color-bg-sunken);
+    color: var(--mds-color-text-body);
+}
+
+.preview__grip:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 1px;
+}
+
+/* Where a moving question would land: a rule above or below a row — a shadow, so nothing shifts under the pointer — or
+   an outlined zone. The question itself stays in place, dimmed, until the drop. */
+.preview__row--moving {
+    opacity: 0.5;
+}
+
+.preview__row--drop-before {
+    box-shadow: 0 -3px 0 0 var(--mds-color-action-primary-bg);
+}
+
+.preview__row--drop-after {
+    box-shadow: 0 3px 0 0 var(--mds-color-action-primary-bg);
+}
+
+.preview__drop--active {
+    outline: 2px dashed var(--mds-color-action-primary-bg);
+    outline-offset: 2px;
+}
+
 .preview__tools {
     display: flex;
     flex-wrap: wrap;

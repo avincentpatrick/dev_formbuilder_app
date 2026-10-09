@@ -115,6 +115,12 @@ export interface DraftProjection {
     /** uid → key, the inverse, so a selection in the panel can scroll the preview. */
     keyByUid: Record<Uid, string>;
     /**
+     * M151 (`R-2baef8ea`): a section's PROJECTED key — the engine's `sectionKey`, a temporary `__draft_…` one for a section
+     * with no key yet — to its stored id, and back, so a drop in the preview lands in the section the author saw.
+     */
+    sectionIdByKey: Record<string, string>;
+    sectionKeyById: Record<string, string>;
+    /**
      * A structural identity over ONLY the columns the engine reads. Labels, hints, placeholders and
      * translations are excluded by construction, so typing a label does not change it — which is what
      * lets `B7` rebuild the runtime on `shape` change rather than on every keystroke.
@@ -469,7 +475,15 @@ export function projectDraft(input: DraftProjectionInput): DraftProjection {
     const shape = shapeOf(schemaSnapshot);
     schema.version.checksum = shape;
 
-    return { schema, issues, uidByKey, keyByUid, shape };
+    return {
+        schema,
+        issues,
+        uidByKey,
+        keyByUid,
+        sectionIdByKey: Object.fromEntries([...sectionKeyById].map(([id, key]) => [key, id])),
+        sectionKeyById: Object.fromEntries(sectionKeyById),
+        shape,
+    };
 }
 
 /**

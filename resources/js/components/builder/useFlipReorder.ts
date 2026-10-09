@@ -11,6 +11,10 @@
 // The "first" positions are VISUAL (`getBoundingClientRect` includes a transform in flight), so a row that moves again
 // mid-glide starts from where the eye sees it. Reduced motion needs nothing here: the design system collapses every
 // duration token to 1ms.
+//
+// M151 (`R-2baef8ea`): the preview names its rows and sections by other attributes, and its rows are NEW ELEMENTS after a
+// move — the engine host is remounted — which this handles as it handles a question moved into another section: a row is
+// matched by its key, never by its node.
 
 import { watch, type WatchSource } from 'vue';
 
@@ -18,11 +22,19 @@ const TRANSITION = 'transform var(--mds-duration-moderate) var(--mds-ease-standa
 
 type Positions = { rows: Map<string, number>; groups: Map<string, number> };
 
-function measure(root: HTMLElement): Positions {
+/** The attributes that name a row and the group it moves inside. Structure's are the defaults. */
+export interface FlipAttributes {
+    rowAttr: string;
+    groupAttr: string;
+}
+
+const CANVAS: FlipAttributes = { rowAttr: 'data-field-uid', groupAttr: 'data-group-key' };
+
+function measure(root: HTMLElement, { rowAttr, groupAttr }: FlipAttributes): Positions {
     const rows = new Map<string, number>();
     const groups = new Map<string, number>();
-    root.querySelectorAll<HTMLElement>('[data-field-uid]').forEach((el) => rows.set(el.dataset.fieldUid ?? '', el.getBoundingClientRect().top));
-    root.querySelectorAll<HTMLElement>('[data-group-key]').forEach((el) => groups.set(el.dataset.groupKey ?? '', el.getBoundingClientRect().top));
+    root.querySelectorAll<HTMLElement>(`[${rowAttr}]`).forEach((el) => rows.set(el.getAttribute(rowAttr) ?? '', el.getBoundingClientRect().top));
+    root.querySelectorAll<HTMLElement>(`[${groupAttr}]`).forEach((el) => groups.set(el.getAttribute(groupAttr) ?? '', el.getBoundingClientRect().top));
     return { rows, groups };
 }
 
@@ -31,7 +43,8 @@ export function flipOffset(first: number | undefined, last: number, groupDelta =
     return first === undefined ? 0 : first - last - groupDelta;
 }
 
-export function useFlipReorder(getRoot: () => HTMLElement | null, order: WatchSource<string>): void {
+export function useFlipReorder(getRoot: () => HTMLElement | null, order: WatchSource<string>, attributes: FlipAttributes = CANVAS): void {
+    const { rowAttr, groupAttr } = attributes;
     let first: Positions | null = null;
 
     // Before the patch: the DOM still shows the old order.
@@ -39,7 +52,7 @@ export function useFlipReorder(getRoot: () => HTMLElement | null, order: WatchSo
         order,
         () => {
             const root = getRoot();
-            first = root && root.offsetParent !== null ? measure(root) : null;
+            first = root && root.offsetParent !== null ? measure(root, attributes) : null;
         },
         { flush: 'pre' },
     );
@@ -54,8 +67,8 @@ export function useFlipReorder(getRoot: () => HTMLElement | null, order: WatchSo
             // A canvas hidden by `v-show` was not measured before the patch, so there is nothing to put back.
             if (!root || !before) return;
 
-            const groupEls = Array.from(root.querySelectorAll<HTMLElement>('[data-group-key]'));
-            const rowEls = Array.from(root.querySelectorAll<HTMLElement>('[data-field-uid]'));
+            const groupEls = Array.from(root.querySelectorAll<HTMLElement>(`[${groupAttr}]`));
+            const rowEls = Array.from(root.querySelectorAll<HTMLElement>(`[${rowAttr}]`));
             for (const el of [...groupEls, ...rowEls]) {
                 el.style.transition = 'none';
                 el.style.transform = '';
@@ -64,7 +77,7 @@ export function useFlipReorder(getRoot: () => HTMLElement | null, order: WatchSo
             const moved: HTMLElement[] = [];
             const groupDelta = new Map<string, number>();
             for (const el of groupEls) {
-                const key = el.dataset.groupKey ?? '';
+                const key = el.getAttribute(groupAttr) ?? '';
                 const dy = flipOffset(before.groups.get(key), el.getBoundingClientRect().top);
                 groupDelta.set(key, dy);
                 if (dy !== 0) {
@@ -73,8 +86,8 @@ export function useFlipReorder(getRoot: () => HTMLElement | null, order: WatchSo
                 }
             }
             for (const el of rowEls) {
-                const group = el.closest<HTMLElement>('[data-group-key]')?.dataset.groupKey ?? '';
-                const dy = flipOffset(before.rows.get(el.dataset.fieldUid ?? ''), el.getBoundingClientRect().top, groupDelta.get(group));
+                const group = el.closest<HTMLElement>(`[${groupAttr}]`)?.getAttribute(groupAttr) ?? '';
+                const dy = flipOffset(before.rows.get(el.getAttribute(rowAttr) ?? ''), el.getBoundingClientRect().top, groupDelta.get(group));
                 if (dy !== 0) {
                     el.style.transform = `translateY(${dy}px)`;
                     moved.push(el);

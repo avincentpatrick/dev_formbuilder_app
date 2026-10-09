@@ -96,3 +96,56 @@ describe('useFlipReorder', () => {
         expect(released.size).toBe(0);
     });
 });
+
+/**
+ * M151 (`R-2baef8ea`) — the preview names its rows `data-preview-field` and its sections `data-section-key`, and after a
+ * move its rows are NEW ELEMENTS: the engine host is remounted. A row is matched by its key, never by its node.
+ */
+describe('useFlipReorder — the preview’s rows, rebuilt under it (M151)', () => {
+    it('starts a row from its old place even though the row is a new element', async () => {
+        const order = ref('before');
+        const tops = { before: new Map([['a', 120], ['b', 160]]), after: new Map([['a', 160], ['b', 120]]) };
+        const released = new Map<string, string>();
+
+        const Host = defineComponent({
+            setup() {
+                const root = ref<HTMLElement | null>(null);
+                useFlipReorder(() => root.value, order, { rowAttr: 'data-preview-field', groupAttr: 'data-section-key' });
+                // Keyed by the order, so every row and section is replaced rather than moved.
+                return () =>
+                    h('div', { ref: root, 'data-order': order.value }, [
+                        h('section', { key: order.value, 'data-section-key': 's1' }, [
+                            h('div', { 'data-preview-field': order.value === 'after' ? 'b' : 'a' }),
+                            h('div', { 'data-preview-field': order.value === 'after' ? 'a' : 'b' }),
+                        ]),
+                    ]);
+            },
+        });
+
+        vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+            const key = this.getAttribute('data-preview-field') ?? '';
+            const phase = this.closest('[data-order]')?.getAttribute('data-order') === 'after' ? tops.after : tops.before;
+            return { top: phase.get(key) ?? 0 } as DOMRect;
+        });
+
+        const wrapper = mount(Host, { attachTo: document.body });
+        const root = wrapper.element as HTMLElement;
+        Object.defineProperty(root, 'offsetParent', { get: () => document.body });
+        Object.defineProperty(root, 'offsetHeight', {
+            get: () => {
+                root.querySelectorAll<HTMLElement>('[data-preview-field]').forEach((el) =>
+                    released.set(el.getAttribute('data-preview-field') ?? '', el.style.transform),
+                );
+                return 0;
+            },
+        });
+
+        order.value = 'after';
+        await nextTick();
+        await nextTick();
+
+        // a went from 120 to 160 and b the other way: each starts from where it was.
+        expect(released.get('a')).toBe('translateY(-40px)');
+        expect(released.get('b')).toBe('translateY(40px)');
+    });
+});

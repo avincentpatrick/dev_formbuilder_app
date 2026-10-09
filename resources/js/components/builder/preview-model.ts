@@ -34,8 +34,9 @@
 import { projectDraft, type DraftProjection, type DraftProjectionInput, type ProjectionIssue } from './draft-snapshot';
 import { renderableBlocks } from '../submissions/note-content';
 import { buildRenderModel, rendersNothing } from '../../../public-runtime/lib/schema-mapping';
-import type { RenderField, RenderModel, RenderSection } from '../../../public-runtime/lib/types';
+import type { AnswerMap, RenderField, RenderModel, RenderSection, SchemaResponse } from '../../../public-runtime/lib/types';
 import type { FormRuntime, RuntimeStep } from '../../../public-runtime/composables/useFormRuntime';
+import type { LocalField, Uid } from './types';
 
 /**
  * How long the engine rebuild waits after a structural edit settles.
@@ -269,5 +270,110 @@ export function previewLimitations(): string[] {
         // M141 (`R-f69aab42`): a cascade's CSV lists become its choices when the form is published; the draft holds only
         // the lists' names, so the preview has none to show.
         'Choices from CSV files appear on the live form once it is published, not here.',
+        // M151 (`R-2baef8ea`): a repeat's members are drawn by the respondent's own `RepeatGroup`, and a question its
+        // condition hides has an empty row — neither has a place on screen to drag from.
+        'Questions inside a repeatable section, and questions their condition hides, are moved in Structure.',
     ];
 }
+
+// ── Moving a question in the preview (M151, `R-2baef8ea`) ──────────────────────────────────────────────────────────────
+
+/**
+ * Where a question dropped in the preview goes, said the way the author saw it: above a question shown on screen, below
+ * one, or at the end of a section. A NEIGHBOUR rather than an index, because the preview does not show every question
+ * the store orders — a hidden, calculated or page-break question renders nothing, a just-added one sits apart, a later
+ * page is off screen — so only a neighbour means the same thing on screen and in the store.
+ */
+export type PreviewDropTarget =
+    | { kind: 'before'; key: string }
+    | { kind: 'after'; key: string }
+    | { kind: 'end'; sectionKey: string | null };
+
+export interface PreviewPlacementContext {
+    /** The store's questions, in any order. */
+    fields: LocalField[];
+    uidByKey: Record<string, Uid>;
+    /** A section's PROJECTED key to its stored id (`DraftProjection.sectionIdByKey`). */
+    sectionIdByKey: Record<string, string>;
+}
+
+/**
+ * The store move a drop means — `placeField`'s section id and its index among EVERY other question of that section, in
+ * `sequence` order, exactly as `placeField` counts them — or `null` when the drop names nothing or moves nothing.
+ *
+ * Questions the preview does not draw still count in the index; they are simply never a neighbour. So in a section
+ * ordered `[a, page break, b]`, "below a" is index 1, on the first page, and "above b" is index 2, on the second.
+ * An unchanged place is `null`, so a drop where the question already sits writes no request and no undo entry.
+ */
+export function previewPlacement(
+    target: PreviewDropTarget,
+    draggedKey: string,
+    ctx: PreviewPlacementContext,
+): { group: string | null; index: number } | null {
+    const byUid = (uid: Uid | undefined): LocalField | undefined => (uid === undefined ? undefined : ctx.fields.find((f) => f.uid === uid));
+    const dragged = byUid(ctx.uidByKey[draggedKey]);
+    if (dragged === undefined) return null;
+
+    let group: string | null;
+    let anchor: LocalField | undefined;
+    if (target.kind === 'end') {
+        if (target.sectionKey === null) {
+            group = null;
+        } else {
+            const id = ctx.sectionIdByKey[target.sectionKey];
+            if (id === undefined) return null;
+            group = id;
+        }
+    } else {
+        anchor = byUid(ctx.uidByKey[target.key]);
+        if (anchor === undefined || anchor.uid === dragged.uid) return null;
+        group = anchor.form_section_id;
+    }
+
+    const others = ctx.fields
+        .filter((f) => f.form_section_id === group && f.uid !== dragged.uid)
+        .sort((a, b) => a.sequence - b.sequence);
+    const index =
+        anchor === undefined ? others.length : others.indexOf(anchor) + (target.kind === 'after' ? 1 : 0);
+
+    const here = dragged.form_section_id === group ? others.filter((f) => f.sequence < dragged.sequence).length : -1;
+
+    return index === here ? null : { group, index };
+}
+
+/**
+ * What a drop on a page in the section strip means (`D105`): the end of that page — below its last question — or, for a
+ * page with none to stand below (a repeatable section's), the end of its section. Not the end of the SECTION in general:
+ * a section split by page breaks has one entry per page, and "Household" should not land a question on its third page.
+ */
+export function previewStepEndTarget(step: RuntimeStep): PreviewDropTarget {
+    const last = step.fieldKeys[step.fieldKeys.length - 1];
+
+    return step.isRepeat || last === undefined ? { kind: 'end', sectionKey: step.sectionKey } : { kind: 'after', key: last };
+}
+
+/**
+ * The preview's answers that survive a rebuild: those whose question still exists AS THE SAME TYPE, and a repeatable
+ * section's instances while it is still repeatable. Moving a question rebuilds the engine, and until M151 every rebuild
+ * reset every answer the author had typed to try their conditions out.
+ */
+export function carryAnswers(previous: AnswerMap, before: SchemaResponse, after: SchemaResponse): AnswerMap {
+    const typeOf = (schema: SchemaResponse): Map<string, string> => new Map(schema.version.schema.fields.map((f) => [f.key, f.field_type]));
+    const repeatable = (schema: SchemaResponse): Set<string> =>
+        new Set(schema.version.schema.sections.filter((s) => s.is_repeatable).map((s) => s.key));
+
+    const was = typeOf(before);
+    const is = typeOf(after);
+    const repeatsBefore = repeatable(before);
+    const repeatsAfter = repeatable(after);
+
+    const carried: AnswerMap = {};
+    for (const [key, value] of Object.entries(previous)) {
+        const sameQuestion = was.has(key) && was.get(key) === is.get(key);
+        const sameRepeat = repeatsBefore.has(key) && repeatsAfter.has(key);
+        if (sameQuestion || sameRepeat) carried[key] = value;
+    }
+
+    return carried;
+}
+

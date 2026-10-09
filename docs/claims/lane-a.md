@@ -16,7 +16,71 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M151` is merged and live on staging; the next session opens with the user's check of Preview's two fixes on staging (`r2-c17`, `r2-c18`: **Edit label** on a question in Preview, and a question dragged in Preview — within a page, onto a section's placeholder, onto a page in the strip, and by keyboard) and, if it is still not done, the user's staging scan (`ocr-staging-scan`, then the server's `.env` backup deleted); then takes the early-testing line — `ocr-provider-bakeoff` (ADR-0010), `R-39a5388f` (a tick's confidence) and `R-4aaf3b6f` (a scan's page order)
+## Status: ACTIVE CLAIM — `M152`, the early-testing line's last three: a scan's page order (`R-4aaf3b6f`, with a "(page 0)" note folded in), a tick's confidence (`R-39a5388f`) and ADR-0010 (`ocr-provider-bakeoff`) (`m152-ocr-page-order`)
+
+Taken 2026-10-09. Branch `m152-ocr-page-order`, cut from `origin/main` at `31ba8023`, PR into main. The user CONFIRMED `M151`'s Preview
+fixes on staging at the start of this session (label edit, every drag). `ocr-staging-scan` is being walked in chat in parallel; this PR
+does not merge while the user is mid-scan, because a merge deploys (`D47`).
+Rows: `R-4aaf3b6f` ("A scan whose second page is uploaded first reads every question on that page as not found", early-testing),
+`R-39a5388f` ("A tick's confidence is the recognizer's confidence in the glyph, so a choice read right is withheld", early-testing), the
+marker `ocr-provider-bakeoff` (end of `docs/ocr-pipeline-design.md`), and one row found this session and filed in this PR — **a scan's
+"(page N)" note counts from 0**, folded into `R-4aaf3b6f` because its remedy is the same line of the same file.
+
+### Evidence verified
+- `R-4aaf3b6f`: **held, and now MEASURED, not reasoned.** `PrintedFormMatcher::anchor()` sets `$from = $start + 1` after each question,
+  over one list joined in upload order in `match()`. `scan-upload.ts` `uploadScan()` appends the files in `FileList` order, and
+  `Scans.vue` `onChoose()` takes `Array.from(target.files)` unsorted. The harness sorts by name (`OcrBakeoffFolder`, `natcasesort`).
+  Form 14 with its two pages swapped (cached reads, `--offline`): `field_11` and `field_12` come back `not_found`; in name order both
+  read. All fifteen Round 1 forms with their pages reversed: **30 not found, 57.2%** against 51.1% in order.
+- The "(page N)" note: **held.** The matcher's `page` is the `OcrLine` page, the list index counted from 0 (`PrintedFormMatcherTest`
+  asserts `0` for a one-page scan); `OcrAnswerCarry::meta()` copies it; `scanNote()` prints `(page ${meta.page})`; the review images
+  are labelled `$index + 1` (`OcrScanReviewPresenter::pages()`). So a two-page scan's notes say page 0 and page 1 beside Page 1 and Page 2.
+- `R-39a5388f`: **held.** `confidenceOf()` is the lowest symbol confidence × 100 and `choices()` passes it the mark's symbols alone.
+  Recounted on the offline reproduction of Round 1 (51.1%, 0 silent, reproduced exactly): 16 choice reads withheld though right
+  (5 single, 5 multi, 6 yes/no) — the row's 16 holds.
+- `ocr-provider-bakeoff`: **held.** The marker is at the end of `docs/ocr-pipeline-design.md`, `state=ready`; `docs/adr/` has the one
+  reserved gap; `D97` and `D104` are answered.
+
+### Premise verified
+- `R-4aaf3b6f` believes the order cannot be had another way. **True:** the running head prints no page number, deliberately
+  (`docs/ocr-pipeline-design.md` §2.5 — dompdf's counters need `isPhpEnabled`), and there is no re-read, reorder or delete route, so the
+  order must be inferred from what each page holds. It offered "or say so on the review page" as an alternative — not needed, because
+  inference measured clean.
+- **The row understated itself:** the page number it would have reported was wrong in base as well as in order — the folded row above.
+  Every fixture that writes a page (`ReadScanFixture`, `E2eSeeder`, `OcrAnswerCarryTest`) writes `1` for a one-page scan, so the
+  fixtures hold the belief and the matcher is the odd one out; fixing the matcher makes every fixture true unchanged. A scan already
+  read before the deploy keeps its stored 0 — no backfill; it affects only a review note.
+- `R-39a5388f` says calibration "belongs with the bake-off's thresholds". **True:** `config/ocr.php` is still 90/70, and the reads
+  are the same cached ones, so the calibration is measured here, not guessed.
+- `ocr-provider-bakeoff`: writing `0010` **closes the only gap**, so `scripts/state.php` refuses to measure until `ADR_RESERVED` is
+  emptied, and `CLAUDE.md`'s ⚠️ namespace paragraph describes a gap that no longer exists — both are this row's, not close-out. The
+  five ADRs that mention the reservation are dated records and stay.
+
+### Remedy verdict
+- `R-4aaf3b6f` — **works, measured in the scratch worktree before any test:** order the pages by the first question each anchors when
+  searched alone (ties and pages with none keep upload order), join them in that order, and keep each line's upload index as its page.
+  Form 14 swapped then reads identically to in order; all fifteen reversed: **0 not found, 51.1%** — identical to name order; and in
+  name order the score is unchanged (51.1%, 0 silent).
+- The page base — `result()` reports the upload position counted from 1.
+- `R-39a5388f` — **works, measured:** a mark seen in a box is at least review tier, never auto on the mark alone: confidence =
+  max(glyph, 80). Round 1: **51.1% → 42.2%, silent errors 0**, right-but-withheld 35 → 19, wrong-and-flagged 4 → 5. The fifth is form
+  09's multi-select that read Fever and missed Rash — the case that forbids a floor at or above auto: the sweep shows a silent error at
+  auto 85. A test pins the floor inside the configured review band.
+- `ocr-provider-bakeoff` — no remedy prescribed beyond writing the ADR; it records the 42.2% re-measure.
+
+Files: `app/Services/Ocr/PrintedFormMatcher.php`, `tests/Feature/Ocr/PrintedFormMatcherTest.php`,
+`app/Services/Ocr/OcrAnswerReader.php`, `tests/Feature/Ocr/OcrTickConfidenceTest.php` (new — so no two rows share a file, `D13`),
+`docs/adr/0010-ocr-provider-cloud-vision.md` (new), `scripts/state.php`, `CLAUDE.md`, `docs/data-dictionary.md` (the `page` wording,
+line-neutral), and the close-out set.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/ocr-pipeline-design.md`, `docs/data-dictionary.md`, `CLAUDE.md`,
+`docs/adr/`, `PROGRESS.md` (own block), `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`.
+Paired files taken: none.
+Namespaces spent: ADR `0010` — the reservation this row exists to fill. No migration.
+Prediction: the two-page matcher case is red on the trunk (the second page's questions `not_found`) and green after; its mutants
+(no sort; the page base back to 0) are caught; exactly one existing assertion turns red on the base change (`toBe(0)` → `1`). The
+tick case is red on the trunk. `state.php` exits non-zero the moment the ADR file lands, before `ADR_RESERVED` is emptied. Round 1
+offline after all three commits: 42.2%, 0 silent. CI 6/6 on the first run. **Most likely wrong: PHPStan on the ordering's array
+shapes**, or an E2E spec that reads a page note.
 
 ## RELEASED — `M151`, Preview's two `D103` rows — a question's label edited in place and questions dragged (reordered, into a section, onto a page in the strip, by keyboard) — plus an imported form whose order a drag never reached, and a hidden section's questions listed as "Just added"; `D105` recorded (merged as PR #344, `cf5b282b`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

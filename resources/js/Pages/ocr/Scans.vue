@@ -191,7 +191,7 @@ function uploadedAt(iso: string): string {
                 />
                 <p v-if="error !== null" id="scan-pages-error" class="scans__error" role="alert">{{ error }}</p>
                 <ChosenPages :pages="chosenView" :disabled="sending" @remove="remove" />
-                <p class="mds-visually-hidden" aria-live="polite">{{ announce }}</p>
+                <p class="scans__announce" aria-live="polite">{{ announce }}</p>
                 <div class="scans__actions">
                     <MdsButton type="submit" variant="primary" icon-left="upload" :loading="sending">
                         Read this scan
@@ -247,10 +247,27 @@ function uploadedAt(iso: string): string {
     color: var(--mds-color-text-secondary);
 }
 
+/* Positioned so the clipped announcement below resolves its containing block HERE rather than far up the page
+   (`clipped-node-containment.test.ts`). */
 .scans__upload {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--mds-space-2);
+}
+
+/* M154: what a screen reader hears after a pick or a removal, clipped to nothing on screen. Its own rule because
+   this repository has no shared utility for it — the `mds-visually-hidden` class `MediaInput.vue` uses is defined
+   nowhere, which a real-browser look at this page found when the announcement showed as visible text. */
+.scans__announce {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
 }
 
 .scans__label {

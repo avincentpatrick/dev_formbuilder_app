@@ -49,6 +49,13 @@ for (const theme of themes) {
         await expect(chosen.getByRole('listitem')).toHaveCount(3);
         await expect(chosen.getByText('a-photo-taken-by-mistake.png')).toBeVisible();
 
+        // The announcement is for a screen reader only. Its first version used a class defined nowhere and showed
+        // on screen as a second "3 pages chosen." — found by a screenshot, invisible to axe and to happy-dom.
+        const announce = page.locator('[aria-live="polite"]', { hasText: '3 pages chosen.' });
+        await expect(announce).toHaveCount(1);
+        const box = await announce.boundingBox();
+        expect(box === null || (box.width <= 1 && box.height <= 1), `announcement drawn at ${JSON.stringify(box)}`).toBe(true);
+
         await assertClean(page, `scans page with chosen pages ${theme}`);
 
         await page.getByRole('button', { name: 'Remove a-photo-taken-by-mistake.png' }).click();

@@ -162,16 +162,28 @@ it('links each page to a file the response\'s own reader can open', function ():
         ->assertForbidden();
 });
 
-it('shows no scanned pages on a response that was not a scan, even beside a saved scan of the same form', function (): void {
-    ocrPagesSave($this->tenant, $this->admin, $this->form, $this->scan);
-    $typed = seedInboxSubmission($this->form, $this->admin, SubmissionStatus::Submitted, ['patient_name' => 'Jose'], SubmissionSource::Manual);
+it('shows each response its own scan\'s pages, and none on a response that was not a scan', function (): void {
+    // Two saved scans of ONE form: a lookup by form alone would hand both responses the same scan, and the
+    // ownership filter would then quietly empty one of them.
+    $other = ReadScanFixture::make($this->form, $this->admin, [
+        'patient_name' => ReadScanFixture::read('short_text', 'Jose', 'JOSE', 96),
+    ]);
+    $otherFile = $other->pages[0]['attachment_id'];
+    $firstResponse = ocrPagesSave($this->tenant, $this->admin, $this->form, $this->scan);
+    $otherResponse = ocrPagesSave($this->tenant, $this->admin, $this->form, $other);
+    $typed = seedInboxSubmission($this->form, $this->admin, SubmissionStatus::Submitted, ['patient_name' => 'Ana'], SubmissionSource::Manual);
 
-    $this->withoutVite()->actingAs($this->admin)
-        ->get(ocrPagesUrl("/submissions/{$typed->id}"))
-        ->assertOk()
-        ->assertInertia(fn ($page) => $page
-            ->component('submissions/Show', false)
-            ->where('scan_pages', []));
+    foreach ([$firstResponse => [$this->firstFile], $otherResponse => [$otherFile], $typed->id => []] as $response => $files) {
+        $this->withoutVite()->actingAs($this->admin)
+            ->get(ocrPagesUrl("/submissions/{$response}"))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('submissions/Show', false)
+                ->where('scan_pages', array_map(
+                    static fn (string $file): array => ['number' => 1, 'url' => "/attachments/{$file}", 'mime' => 'image/png', 'servable' => true],
+                    $files,
+                )));
+    }
 });
 
 it('marks a page still waiting for its virus check instead of hiding it', function (): void {

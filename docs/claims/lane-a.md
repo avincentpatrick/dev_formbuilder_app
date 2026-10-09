@@ -104,6 +104,8 @@ new Vitest cases are red before their template changes. PHPStan moves by zero on
 the Archived E2E** — it creates and archives its own form through `support/builder.ts` at three viewports in both themes, and I have not
 yet read how that helper names forms or whether the chip's filtered list can hold them all without a stale count.
 
+**Claim extension (pushed before the file is opened):** `docs/TESTING-GUIDE.md` — two sentences the Archived chip makes false, found by a census of the documents for the forms list and archiving: §17.1's table says archived forms are hidden from `/forms` "filter or no filter", and the not-built table says the list loads "every non-archived form". Both are corrected in place, line-neutral. Nothing else in `docs/` says the list hides them (the ledger, the line, the census and the decisions are records, not claims about the product).
+
 ## RELEASED — `M153`, a response saved from a scan shows its scanned pages (`R-1e00f872`, the user's staging comment) (merged as PR #346, `c0762dcc`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
 Shipped 2026-10-09. Branch `m153-scan-pages-on-response`, cut from `origin/main` at `ad8bfebb`. The claim is `7c5d6ca2`, pushed before any file was

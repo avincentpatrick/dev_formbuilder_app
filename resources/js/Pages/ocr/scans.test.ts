@@ -170,10 +170,17 @@ describe('ocr/Scans — the chosen pages, before "Read this scan" (M154, `R-c84e
     it('adds a second pick to the first instead of replacing it, and sends them all', async () => {
         fetchMock.mockResolvedValue(new Response(JSON.stringify({ data: { id: 'scan-9' } }), { status: 202 }));
         const wrapper = mount(Scans, { props: props() as never });
+        // The picker is emptied after each pick, or choosing the file just removed would fire no `change`. Read
+        // through a setter spy: a file input's `value` cannot be set to anything else, so reading it back
+        // proves nothing (the M154 mutant that dropped the reset survived exactly that).
+        const cleared = vi.fn();
+        Object.defineProperty(wrapper.find('input[type="file"]').element, 'value', { configurable: true, get: () => '', set: cleared });
 
         await choose(wrapper, [png('page-1.png')]);
         await choose(wrapper, [png('page-2.png')]);
         expect(wrapper.findAll('.chosen__item')).toHaveLength(2);
+        expect(cleared).toHaveBeenCalledTimes(2);
+        expect(cleared).toHaveBeenCalledWith('');
 
         await wrapper.find('form').trigger('submit');
         await flushPromises();

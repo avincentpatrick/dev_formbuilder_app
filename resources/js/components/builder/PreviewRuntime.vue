@@ -32,8 +32,8 @@
  * side of the glass — there, Vue rendered a template comment into `wrapper.html()` and broke the substring
  * assertion the comment explained. A rule about a forbidden string cannot be documented by quoting it.
  */
-import { computed, provide, watch } from 'vue';
-import { MdsButton } from '@meridian/design-system';
+import { computed, provide, ref, watch } from 'vue';
+import { MdsButton, MdsIconButton } from '@meridian/design-system';
 import FieldRow from '../../../public-runtime/components/FieldRow.vue';
 import RepeatGroup from '../../../public-runtime/components/RepeatGroup.vue';
 import { AnnouncerKey, RuntimeKey } from '../../../public-runtime/composables/context';
@@ -42,7 +42,17 @@ import type { RuntimeStep } from '../../../public-runtime/composables/useFormRun
 import type { RenderField, RenderModel, RenderSection, SchemaResponse } from '../../../public-runtime/lib/types';
 import { ContentHeadingBaseKey } from '../submissions/note-content';
 import type { ProjectionIssue } from './draft-snapshot';
-import { engineKnows, isCaptureField, previewFieldsFor, previewPendingFields, previewRenderedSteps, previewSectionFor, previewStepLabels } from './preview-model';
+import InlineLabelEdit from './InlineLabelEdit.vue';
+import {
+    engineKnows,
+    isCaptureField,
+    previewFieldsFor,
+    previewPendingFields,
+    previewRenderedSteps,
+    previewSectionFor,
+    previewShowsLabel,
+    previewStepLabels,
+} from './preview-model';
 import PreviewStepStrip from './PreviewStepStrip.vue';
 
 const props = defineProps<{
@@ -66,10 +76,25 @@ const props = defineProps<{
      * with nothing to answer is no step, for the respondent too — so the preview shows them to the author only.
      */
     emptySections?: Array<{ key: string; label: string }>;
+    /**
+     * M151 (`R-74c3cf35`): the question whose label is being edited, and the stored label it opens with. Both live in the
+     * pane, which does not remount, so an edit outlives a rebuild of this component.
+     */
+    editingKey?: string | null;
+    editingValue?: string;
 }>();
 
 // M139: the author's own controls in the preview. The pane turns them into a selection and an opened palette.
-const emit = defineEmits<{ select: [key: string]; step: [key: string]; 'add-question': [sectionKey: string | null]; 'add-section': [] }>();
+// M151: and a label edited on its row, which the pane writes through the store.
+const emit = defineEmits<{
+    select: [key: string];
+    step: [key: string];
+    'add-question': [sectionKey: string | null];
+    'add-section': [];
+    edit: [key: string];
+    rename: [key: string, value: string, via: 'key' | 'blur'];
+    'edit-cancel': [key: string];
+}>();
 
 const runtime = createFormRuntime(props.snapshot, {
     initialLocale: props.snapshot.form.default_locale,
@@ -181,6 +206,43 @@ function issuesFor(field: RenderField): ProjectionIssue[] {
 }
 
 /**
+ * Whether a row carries the author's tools (M151, `R-74c3cf35`). They sit ABOVE the respondent's control and never inside
+ * its label, which the shared `FieldInput` draws (as a label, a legend or a note's paragraph) and this pane may not edit;
+ * and the label editor exists only while it is open. A question hidden by its condition renders an empty row — `FieldRow`
+ * keeps its wrapper and drops the control — so it gets none: there is nothing on screen to edit beside. A capture field
+ * is drawn inert whatever its condition, and a question the engine has not met yet errs toward being shown.
+ */
+function showsTools(field: RenderField): boolean {
+    return isCaptureField(field) || !engineKnows(runtime, field.key) || runtime.fieldRelevance.value[field.key] === true;
+}
+
+/**
+ * A double-click on the question's own name opens its label editor, as on Structure's row. Only on the FIRST naming
+ * element in the row — the single control's label or the group's legend, both drawn by `FieldInput` ahead of any choice,
+ * or the inert row's label — so a double-click into an input, on a choice's label or on a cascade level's label keeps
+ * doing what it does for a respondent. Being first is the whole test: narrowing it to `label[for]` was a mutant no case
+ * could kill, because no layout draws a choice before the name. A note without blocks draws its label as a paragraph
+ * and has no such element; its Edit button covers it.
+ */
+function onRowDblclick(event: MouseEvent, field: RenderField): void {
+    if (props.editingKey === field.key || !showsTools(field) || !previewShowsLabel(field)) return;
+
+    const name = (event.currentTarget as HTMLElement).querySelector('legend, label, .preview__inert-label');
+    if (name !== null && event.target instanceof Node && name.contains(event.target)) {
+        emit('edit', field.key);
+    }
+}
+
+const editor = ref<InstanceType<typeof InlineLabelEdit> | null>(null);
+
+function setEditor(instance: unknown): void {
+    editor.value = (instance as InstanceType<typeof InlineLabelEdit> | null) ?? null;
+}
+
+// The pane ends an open edit itself when the view is left — a hidden input never blurs.
+defineExpose({ commitEdit: () => editor.value?.commit('blur') });
+
+/**
  * The required marker, or null when the engine has not caught up.
  *
  * A field in the current step is by construction known to the engine, so this matters for the pending block
@@ -274,7 +336,26 @@ function go(delta: number): void {
                         :data-preview-field="field.key"
                         @click="emit('select', field.key)"
                         @focusin="emit('select', field.key)"
+                        @dblclick="onRowDblclick($event, field)"
                     >
+                        <div v-if="showsTools(field)" class="preview__tools" data-preview-tools>
+                            <InlineLabelEdit
+                                v-if="editingKey === field.key"
+                                :ref="setEditor"
+                                :value="editingValue ?? ''"
+                                label="Question label"
+                                @commit="(value, via) => emit('rename', field.key, value, via)"
+                                @cancel="emit('edit-cancel', field.key)"
+                            />
+                            <MdsIconButton
+                                v-else-if="previewShowsLabel(field)"
+                                icon="edit"
+                                :label="`Edit label of ${field.label}`"
+                                size="sm"
+                                data-preview-edit-label
+                                @click="emit('edit', field.key)"
+                            />
+                        </div>
                         <div v-if="isCaptureField(field)" class="preview__inert" :data-preview-inert="field.key">
                             <p class="preview__inert-label">
                                 {{ runtime.labelFor(field) }}
@@ -427,6 +508,15 @@ function go(delta: number): void {
     font-family: var(--mds-font-family-body);
     font-size: var(--mds-type-body-md-font-size);
     color: var(--mds-color-text-secondary);
+}
+
+/* M151: the author's tools above a question, set off from the respondent's control by sitting outside it. */
+.preview__tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mds-space-2);
+    margin-bottom: var(--mds-space-1);
 }
 
 /* The selected row echoes the config panel's subject. A left rule rather than a fill, so it never competes

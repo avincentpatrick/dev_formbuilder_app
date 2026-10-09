@@ -159,3 +159,40 @@ test('Builder — a half-built rule row leaves the other conditions working, and
         await archive(page, formId);
     }
 });
+
+/*
+ * M151 (`R-74c3cf35`) — Round 2's note `r2-c17`: "can we also use the middle section (structure and preview) to allow the
+ * user to edit the label there already". `M150` gave Structure its half; this is Preview's. The Edit button on a question's
+ * row opens its label in place, Enter saves it once, focus comes back to the button, and a reload keeps it.
+ */
+test('Builder — a question’s label edited in place in the preview, saved once and kept after a reload', async ({ page }, info) => {
+    test.setTimeout(150_000);
+    const formId = await createForm(page, `Preview label ${info.project.name} ${Date.now()}`);
+
+    try {
+        await showBuilderPane(page, 'fields');
+        await page.locator('.palette').getByRole('button', { name: 'Text', exact: true }).click();
+        await settled(page);
+        await openPreview(page);
+
+        const row = page.locator('[data-preview-field]').first();
+        await expect(row).toBeVisible({ timeout: 15_000 });
+        await row.locator('[data-preview-edit-label]').click();
+        const input = row.getByRole('textbox', { name: 'Question label' });
+        await expect(input).toBeFocused();
+        await input.fill('Asked in the preview');
+
+        const patched = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes(`/forms/${formId}/fields/`) && r.ok());
+        await input.press('Enter');
+        await patched;
+        await expect(row.locator('[data-preview-edit-label]')).toBeFocused();
+        await expect(row).toContainText('Asked in the preview');
+        await saved(page);
+
+        await page.reload({ waitUntil: 'networkidle' });
+        await openPreview(page);
+        await expect(page.locator('[data-preview-field]').first()).toContainText('Asked in the preview', { timeout: 15_000 });
+    } finally {
+        await archive(page, formId);
+    }
+});

@@ -45,7 +45,7 @@ vi.mock('../../../public-runtime/composables/useFormRuntime', () => ({
             currentStep: computed(
                 () => STEPS.slice(0, stepCount.value).find((s) => s.key === currentStepKey.value) ?? null,
             ),
-            fieldRelevance: computed(() => ({ q1: true, q2: true, cap: true })),
+            fieldRelevance: computed(() => relevance.value),
             goToStep: (key: string) => (currentStepKey.value = key),
             sectionTitleFor: (s: { label: string }) => s.label,
             sectionDescriptionFor: () => null,
@@ -62,6 +62,9 @@ const STEPS = [
 ];
 
 const currentStepKey = ref('s1');
+
+/** What the mocked engine says is shown. M151: drivable, so a question hidden by its condition is a real case. */
+const relevance = ref<Record<string, boolean>>({ q1: true, q2: true, cap: true });
 
 /**
  * How many of {@link STEPS} the mocked engine currently publishes.
@@ -147,6 +150,11 @@ function makeStore(fields: LocalField[], sections: LocalSection[]): Double {
         }),
         select: (next: Selection) => (selection.value = next),
         addSection: vi.fn(() => Promise.resolve()),
+        // M151: the store's own rename — trim, refuse a blank or unchanged label — so the double moves like the real one.
+        renameField: vi.fn((uid: string, label: string) => {
+            const next = label.trim();
+            fieldsRef.value = fieldsRef.value.map((f) => (f.uid === uid && next !== '' && next !== f.label ? { ...f, label: next } : f));
+        }),
     } as unknown as BuilderStore;
 
     return { store, fields: fieldsRef, sections: sectionsRef, selected: () => selection.value };
@@ -201,6 +209,7 @@ beforeEach(() => {
     created.length = 0;
     currentStepKey.value = 's1';
     stepCount.value = 2;
+    relevance.value = { q1: true, q2: true, cap: true };
     uid = 0;
 });
 
@@ -751,5 +760,152 @@ describe('PreviewPane — the preset theme', () => {
 
         expect(wrapper.attributes('data-form-theme-preview')).toBeUndefined();
         expect(wrapper.find('style').exists()).toBe(false);
+    });
+});
+
+/**
+ * M151 (`R-74c3cf35`) — a question's label edited where Preview shows it. What `PreviewRuntime.test.ts` cannot see: the
+ * pane owns the edit, because `PreviewRuntime` is remounted on every rebuild and an editor inside it would die with it.
+ */
+describe('a label edited in place in Preview (M151, R-74c3cf35)', () => {
+    function editButton(wrapper: ReturnType<typeof mountPane>, key = 'q1') {
+        return wrapper.find(`[data-preview-field="${key}"] [data-preview-edit-label]`);
+    }
+
+    function editor(wrapper: ReturnType<typeof mountPane>) {
+        return wrapper.find('input[aria-label="Question label"]');
+    }
+
+    function mountAttached(double: Double) {
+        return mount(PreviewPane, {
+            props: { store: double.store, form: formProp(), draft: { id: 'ver-1', version_number: 1 }, active: true },
+            global: { stubs: STUBS },
+            attachTo: document.body,
+        });
+    }
+
+    it('opens on the STORED label — an empty one opens empty, not on the "Untitled question" the preview shows', async () => {
+        const double = twoSections();
+        double.fields.value = double.fields.value.map((f) => (f.key === 'q1' ? { ...f, label: '' } : f));
+        const wrapper = mountAttached(double);
+        await flushPromises();
+
+        await editButton(wrapper).trigger('click');
+        await flushPromises();
+
+        expect((editor(wrapper).element as HTMLInputElement).value).toBe('');
+        expect(document.activeElement).toBe(editor(wrapper).element);
+        expect(double.selected()).toEqual({ kind: 'field', uid: double.fields.value[0].uid });
+
+        wrapper.unmount();
+    });
+
+    it('commits once through the store on Enter, closes, and puts focus back on the Edit button', async () => {
+        const double = twoSections();
+        const wrapper = mountAttached(double);
+        await flushPromises();
+
+        await editButton(wrapper).trigger('click');
+        await flushPromises();
+        await editor(wrapper).setValue('Alpha');
+        await editor(wrapper).trigger('keydown', { key: 'Enter' });
+        await flushPromises();
+
+        expect(double.store.renameField).toHaveBeenCalledTimes(1);
+        expect(double.store.renameField).toHaveBeenCalledWith(double.fields.value[0].uid, 'Alpha');
+        expect(editor(wrapper).exists()).toBe(false);
+        expect(document.activeElement).toBe(editButton(wrapper).element);
+        // The live channel carries the new label; the engine is not rebuilt for it.
+        expect(editButton(wrapper).attributes('aria-label')).toBe('Edit label of Alpha');
+        vi.advanceTimersByTime(PREVIEW_REBUILD_DEBOUNCE_MS * 4);
+        await flushPromises();
+        expect(created).toHaveLength(1);
+
+        wrapper.unmount();
+    });
+
+    it('writes nothing on Escape, and puts focus back on the Edit button', async () => {
+        const double = twoSections();
+        const wrapper = mountAttached(double);
+        await flushPromises();
+
+        await editButton(wrapper).trigger('click');
+        await flushPromises();
+        await editor(wrapper).setValue('Discarded');
+        await editor(wrapper).trigger('keydown', { key: 'Escape' });
+        await flushPromises();
+
+        expect(double.store.renameField).not.toHaveBeenCalled();
+        expect(editor(wrapper).exists()).toBe(false);
+        expect(document.activeElement).toBe(editButton(wrapper).element);
+
+        wrapper.unmount();
+    });
+
+    it('commits on a blur and leaves focus where the author put it', async () => {
+        const double = twoSections();
+        const wrapper = mountAttached(double);
+        await flushPromises();
+
+        await editButton(wrapper).trigger('click');
+        await flushPromises();
+        await editor(wrapper).setValue('Beta');
+        await editor(wrapper).trigger('blur');
+        await flushPromises();
+
+        expect(double.store.renameField).toHaveBeenCalledWith(double.fields.value[0].uid, 'Beta');
+        expect(document.activeElement).not.toBe(editButton(wrapper).element);
+
+        wrapper.unmount();
+    });
+
+    it('holds a rebuild that falls due while the editor is open, then makes it when the edit ends', async () => {
+        const double = twoSections();
+        const wrapper = mountAttached(double);
+        await flushPromises();
+
+        await editButton(wrapper).trigger('click');
+        await flushPromises();
+        await editor(wrapper).setValue('Half-typ');
+
+        double.fields.value = double.fields.value.map((f) => (f.key === 'q2' ? { ...f, key: 'renamed' } : f));
+        await flushPromises();
+        vi.advanceTimersByTime(PREVIEW_REBUILD_DEBOUNCE_MS * 4);
+        await flushPromises();
+
+        expect(created).toHaveLength(1);
+        expect((editor(wrapper).element as HTMLInputElement).value).toBe('Half-typ');
+
+        await editor(wrapper).trigger('keydown', { key: 'Escape' });
+        await flushPromises();
+
+        expect(created).toHaveLength(2);
+
+        wrapper.unmount();
+    });
+
+    it('ends an open edit as a blur would when the author leaves Preview, since a hidden input never blurs', async () => {
+        const double = twoSections();
+        const wrapper = mountAttached(double);
+        await flushPromises();
+
+        await editButton(wrapper).trigger('click');
+        await flushPromises();
+        await editor(wrapper).setValue('Gamma');
+        await wrapper.setProps({ active: false });
+        await flushPromises();
+
+        expect(double.store.renameField).toHaveBeenCalledWith(double.fields.value[0].uid, 'Gamma');
+
+        wrapper.unmount();
+    });
+
+    it('offers no edit on a question its condition hides', async () => {
+        relevance.value = { q1: false, q2: true, cap: true };
+        const wrapper = mountPane(twoSections());
+        await flushPromises();
+
+        expect(wrapper.find('[data-preview-field="q1"]').exists()).toBe(true);
+        expect(editButton(wrapper).exists()).toBe(false);
     });
 });

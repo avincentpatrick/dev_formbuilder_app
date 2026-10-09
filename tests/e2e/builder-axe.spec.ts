@@ -415,6 +415,15 @@ for (const theme of themes) {
         await expect(page.locator('[role="tablist"]')).toHaveCount(1);
         await scan(page, 'preview after selecting a field');
 
+        // M151 (`R-74c3cf35`): a question's label edited where the preview shows it, scanned with the editor open.
+        // Escape writes nothing, so the seeded form is left as it was for the next case.
+        const firstRow = page.locator('[data-preview-field]').first();
+        await firstRow.locator('[data-preview-edit-label]').click();
+        await expect(firstRow.getByRole('textbox', { name: 'Question label' })).toBeFocused();
+        await scan(page, 'preview with a label edited in place');
+        await page.keyboard.press('Escape');
+        await expect(firstRow.getByRole('textbox', { name: 'Question label' })).toHaveCount(0);
+
         // The section strip moves the preview, and does it as a RADIOGROUP — so the page-level tablist
         // count must survive the interaction. Clicking the label rather than the input is deliberate:
         // `MdsSegmentedControl` clips its radios to 1x1px, which makes `.check()` an actionability

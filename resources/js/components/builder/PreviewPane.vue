@@ -25,7 +25,7 @@
  * a label edit — the child would mount against a schema newer than the shape that keyed it, which is
  * precisely the class of drift this whole design exists to avoid.
  */
-import { computed, h, onBeforeUnmount, provide, ref, watch, type FunctionalComponent } from 'vue';
+import { computed, h, nextTick, onBeforeUnmount, provide, ref, watch, type FunctionalComponent } from 'vue';
 import { ContentImageRetryKey } from '../submissions/note-content';
 import PreviewRuntime from './PreviewRuntime.vue';
 import { PRESET_PREVIEW_ATTR, presetScopeCss } from './preset-scope';
@@ -70,7 +70,20 @@ const model = computed(() =>
 /** The snapshot the live engine was built from, paired with the shape that keyed it. */
 const engine = ref<{ shape: string; schema: SchemaResponse } | null>(null);
 
+const root = ref<HTMLElement | null>(null);
+const runtimeHost = ref<InstanceType<typeof PreviewRuntime> | null>(null);
+
 let timer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * M151 (`R-74c3cf35`): the question whose label is being edited in place, held HERE because `PreviewRuntime` remounts.
+ *
+ * ⛔ NO REBUILD LANDS UNDER AN OPEN EDITOR. A remount would destroy the input mid-word and reopen it on the stored label,
+ * discarding the draft; so a rebuild that falls due while an edit is open waits for it to end (`held`).
+ */
+const editingKey = ref<string | null>(null);
+const held = computed(() => editingKey.value !== null);
+let heldRebuild = false;
 
 function clearPending(): void {
     if (timer !== null) {
@@ -81,8 +94,27 @@ function clearPending(): void {
 
 function rebuild(): void {
     clearPending();
+    heldRebuild = false;
     engine.value = { shape: model.value.projection.shape, schema: model.value.projection.schema };
 }
+
+/** The debounced rebuild, unless an edit is open — then it waits for the edit to end. */
+function settle(): void {
+    if (held.value) {
+        timer = null;
+        heldRebuild = true;
+
+        return;
+    }
+
+    rebuild();
+}
+
+watch(held, (isHeld) => {
+    if (!isHeld && heldRebuild && props.active) {
+        rebuild();
+    }
+});
 
 // The watch SOURCE is the shape, so this fires only when the shape has actually moved. It carried an
 // additional `engine.value?.shape === shape` guard until a mutation proved the two redundant: deleting
@@ -98,7 +130,7 @@ watch(
         }
 
         clearPending();
-        timer = setTimeout(rebuild, PREVIEW_REBUILD_DEBOUNCE_MS);
+        timer = setTimeout(settle, PREVIEW_REBUILD_DEBOUNCE_MS);
     },
 );
 
@@ -116,6 +148,8 @@ watch(
     () => props.active,
     (active) => {
         if (! active) {
+            // A hidden input never blurs, so leaving the view ends an open edit as a blur would.
+            runtimeHost.value?.commitEdit();
             clearPending();
 
             return;
@@ -181,13 +215,50 @@ function onSelect(key: string): void {
         props.store.select({ kind: 'field', uid });
     }
 }
+
+/**
+ * The label the editor opens with: the STORED one, never the rendered one. What the preview shows is piped (`${key}`
+ * holes filled from the preview's answers), localised, and "Untitled question" when the label is empty — none of which
+ * is the author's text.
+ */
+const editingValue = computed(() => {
+    const uid = editingKey.value === null ? undefined : model.value.projection.uidByKey[editingKey.value];
+
+    return props.store.fields.value.find((field) => field.uid === uid)?.label ?? '';
+});
+
+// No select here: the click that asks for the edit bubbles to the row, whose own click selects the question — a mutant
+// that deleted a second select survived every case, because there was nothing left for it to do.
+function onEdit(key: string): void {
+    editingKey.value = key;
+}
+
+function endEdit(key: string, refocus: boolean): void {
+    editingKey.value = null;
+    if (!refocus) return;
+    // After the next render — which is also when a rebuild the edit held has remounted the rows.
+    void nextTick(() => root.value?.querySelector<HTMLElement>(`[data-preview-field="${key}"] [data-preview-edit-label]`)?.focus());
+}
+
+function onRename(key: string, value: string, via: 'key' | 'blur'): void {
+    const uid = model.value.projection.uidByKey[key];
+
+    if (uid !== undefined) {
+        // One PATCH and one undo entry, through the settings pane's own commit path (`renameField`).
+        props.store.renameField(uid, value);
+    }
+
+    // Enter keeps the keyboard on the row; a blur went somewhere the author chose, and focus stays there.
+    endEdit(key, via === 'key');
+}
 </script>
 
 <template>
-    <div class="builder-preview" v-bind="presetCss === '' ? {} : { [PRESET_PREVIEW_ATTR]: '' }">
+    <div ref="root" class="builder-preview" v-bind="presetCss === '' ? {} : { [PRESET_PREVIEW_ATTR]: '' }">
         <PresetStyle v-if="presetCss !== ''" :css="presetCss" />
         <PreviewRuntime
             v-if="engine"
+            ref="runtimeHost"
             :key="engine.shape"
             :snapshot="engine.schema"
             :model="model.renderModel"
@@ -195,10 +266,15 @@ function onSelect(key: string): void {
             :selected-key="selectedKey"
             :initial-step-key="stepKey"
             :empty-sections="emptySections"
+            :editing-key="editingKey"
+            :editing-value="editingValue"
             @select="onSelect"
             @step="stepKey = $event"
             @add-question="onAddQuestion"
             @add-section="onAddSection"
+            @edit="onEdit"
+            @rename="onRename"
+            @edit-cancel="endEdit($event, true)"
         />
 
         <footer class="builder-preview__limits">

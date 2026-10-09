@@ -32,6 +32,7 @@
  * a test pins it.
  */
 import { projectDraft, type DraftProjection, type DraftProjectionInput, type ProjectionIssue } from './draft-snapshot';
+import { renderableBlocks } from '../submissions/note-content';
 import { buildRenderModel, rendersNothing } from '../../../public-runtime/lib/schema-mapping';
 import type { RenderField, RenderModel, RenderSection } from '../../../public-runtime/lib/types';
 import type { FormRuntime, RuntimeStep } from '../../../public-runtime/composables/useFormRuntime';
@@ -232,6 +233,18 @@ export function engineKnows(runtime: FormRuntime, key: string): boolean {
  */
 export function isCaptureField(field: RenderField): boolean {
     return field.media !== null || field.geo !== null;
+}
+
+/**
+ * Whether the preview shows this question's label at all, so whether there is one to edit where it is shown (M151,
+ * `R-74c3cf35`).
+ *
+ * A note whose content blocks render shows its blocks INSTEAD of its label — the label is the author's alone (`D69`) and
+ * is edited in the settings pane. Read off `content`, which only a note carries, through the same `renderableBlocks` the
+ * renderer uses, so a note whose blocks are all unrenderable still shows its label and still offers the edit.
+ */
+export function previewShowsLabel(field: RenderField): boolean {
+    return renderableBlocks(field.content).length === 0;
 }
 
 /**

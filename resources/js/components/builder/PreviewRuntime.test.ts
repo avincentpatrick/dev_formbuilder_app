@@ -159,3 +159,110 @@ describe('PreviewRuntime — a note with content blocks (M130)', () => {
         wrapper.unmount();
     });
 });
+
+/**
+ * M151 (`R-74c3cf35`) — a question's label edited where the preview shows it. The editor sits in the row's tools, above
+ * the respondent's control, because the label itself is drawn by the shared `FieldInput`, which the preview may not edit.
+ * Through a REAL engine, because which rows are shown is the engine's answer.
+ */
+describe('PreviewRuntime — the label edit on a question’s row (M151)', () => {
+    function snapshot() {
+        return schemaResponse({
+            sections: [section({ key: 's1', label: 'About you' })],
+            fields: [
+                field({ key: 'name', label: 'Your name', section_key: 's1', sequence: 0, section_sequence: 0 }),
+                field({
+                    key: 'intro',
+                    label: 'Intro note (for the team)',
+                    field_type: 'note',
+                    section_key: 's1',
+                    sequence: 1,
+                    section_sequence: 1,
+                    config: { content: [{ type: 'paragraph', spans: [{ text: 'Thank you for coming.' }] }] },
+                }),
+                field({ key: 'plain', label: 'A plain note', field_type: 'note', section_key: 's1', sequence: 2, section_sequence: 2 }),
+                field({
+                    key: 'dep',
+                    label: 'Shown only for Sam',
+                    section_key: 's1',
+                    sequence: 3,
+                    section_sequence: 3,
+                    relevant_expression: "${name} = 'Sam'",
+                }),
+                field({ key: 'agree', label: 'Do you agree?', field_type: 'yes_no', section_key: 's1', sequence: 4, section_sequence: 4 }),
+            ],
+        });
+    }
+
+    function mountRows(extra: Record<string, unknown> = {}) {
+        const snap = snapshot();
+
+        return mount(PreviewRuntime, {
+            props: { snapshot: snap, model: buildRenderModel(snap), issuesByKey: {}, selectedKey: null, initialStepKey: null, ...extra },
+        });
+    }
+
+    function editButton(wrapper: ReturnType<typeof mountRows>, key: string) {
+        return wrapper.find(`[data-preview-field="${key}"] [data-preview-edit-label]`);
+    }
+
+    it('offers it on a question and on a note that shows its label, and not on a note showing its blocks', async () => {
+        const wrapper = mountRows();
+        await flushPromises();
+
+        expect(editButton(wrapper, 'name').attributes('aria-label')).toBe('Edit label of Your name');
+        expect(editButton(wrapper, 'plain').exists()).toBe(true);
+        // The blocks are shown INSTEAD of the label (`D69`), so there is no label on screen to edit beside.
+        expect(editButton(wrapper, 'intro').exists()).toBe(false);
+
+        wrapper.unmount();
+    });
+
+    it('offers no tools at all on a question its condition hides, whose row is empty', async () => {
+        const wrapper = mountRows();
+        await flushPromises();
+
+        expect(wrapper.find('[data-preview-field="dep"]').exists()).toBe(true);
+        expect(wrapper.find('[data-preview-field="dep"] [data-preview-tools]').exists()).toBe(false);
+
+        wrapper.unmount();
+    });
+
+    it('asks the pane to edit, then shows the editor on the stored label and hands back what was typed', async () => {
+        const wrapper = mountRows();
+        await flushPromises();
+
+        await editButton(wrapper, 'name').trigger('click');
+        expect(wrapper.emitted('edit')).toEqual([['name']]);
+
+        await wrapper.setProps({ editingKey: 'name', editingValue: 'Your name' });
+        const input = wrapper.find('[data-preview-field="name"] input[aria-label="Question label"]');
+        expect((input.element as HTMLInputElement).value).toBe('Your name');
+        expect(editButton(wrapper, 'name').exists()).toBe(false);
+
+        await input.setValue('Your full name');
+        await input.trigger('keydown', { key: 'Enter' });
+        expect(wrapper.emitted('rename')).toEqual([['name', 'Your full name', 'key']]);
+
+        wrapper.unmount();
+    });
+
+    it('opens on a double-click of the question’s own name, and never on its input or a choice’s label', async () => {
+        const wrapper = mountRows();
+        await flushPromises();
+
+        await wrapper.find('[data-preview-field="name"] input').trigger('dblclick');
+        await wrapper.find('[data-preview-field="agree"] input').trigger('dblclick');
+        const yes = wrapper.findAll('[data-preview-field="agree"] label').find((label) => label.text().includes('Yes'));
+        expect(yes, 'a yes/no draws its choices as labels').toBeDefined();
+        await yes!.trigger('dblclick');
+        await wrapper.find('[data-preview-field="plain"]').trigger('dblclick');
+        expect(wrapper.emitted('edit')).toBeUndefined();
+
+        await wrapper.find('[data-preview-field="name"] label').trigger('dblclick');
+        await wrapper.find('[data-preview-field="agree"] legend').trigger('dblclick');
+        expect(wrapper.emitted('edit')).toEqual([['name'], ['agree']]);
+
+        wrapper.unmount();
+    });
+});

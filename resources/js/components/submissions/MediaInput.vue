@@ -330,7 +330,7 @@ onBeforeUnmount(revokeAll);
         <legend class="encode-field__legend">
             {{ field.label }}
             <span v-if="showRequiredMarker" class="encode-field__req" aria-hidden="true">*</span>
-            <span v-if="showRequiredMarker" class="mds-visually-hidden">(required)</span>
+            <span v-if="showRequiredMarker" class="media__sr">(required)</span>
             <span v-if="showOptionalMarker" class="encode-field__opt">(optional)</span>
         </legend>
 
@@ -383,19 +383,22 @@ onBeforeUnmount(revokeAll);
                     <MdsButton v-if="item.status === 'error' && item.file" variant="tertiary" size="sm" @click="retry(item)">Retry</MdsButton>
                     <button type="button" class="media__remove" @click="remove(item)">
                         <span aria-hidden="true">✕</span>
-                        <span class="mds-visually-hidden">Remove {{ item.name }}</span>
+                        <span class="media__sr">Remove {{ item.name }}</span>
                     </button>
                 </div>
             </li>
         </ul>
 
         <p v-if="error" :id="`${inputId}-error`" class="media__error" role="alert">{{ error }}</p>
-        <p class="mds-visually-hidden" aria-live="polite">{{ announce }}</p>
+        <p class="media__sr" aria-live="polite">{{ announce }}</p>
     </fieldset>
 </template>
 
 <style scoped>
+/* Positioned so the clipped nodes below resolve their containing block HERE rather than far up the page
+   (`clipped-node-containment.test.ts`'s reason). `.media__input` sets no offsets, so it stays where it was. */
 .encode-field.media {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--mds-space-2);
@@ -450,6 +453,22 @@ onBeforeUnmount(revokeAll);
 .media__picker--disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+/* M155 (`R-77a29731`): what a screen reader hears and no one sees — the "(required)" beside the question, the name
+   inside each ✕, and the announcement after each upload. These used `mds-visually-hidden`, which no stylesheet
+   defines, so all three were drawn on screen on the encode page and in the guest runtime. The design system has no
+   shared rule for it, so the component carries its own, as `Pages/ocr/Scans.vue` does. */
+.media__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 /* The native input drives the (label-triggered) picker but stays keyboard-focusable + screen-reader-labelled. */

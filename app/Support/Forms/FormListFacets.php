@@ -8,7 +8,11 @@ use App\Enums\FormStatus;
 use Carbon\CarbonImmutable;
 
 /**
- * The forms list's counted facet chips (JR3) — Live / Draft / Closing soon.
+ * The forms list's counted facet chips (JR3) — Live / Draft / Closing soon, and since M154 Archived.
+ *
+ * ⛔ ARCHIVED IS THE ONE CHIP THAT ADDS ROWS RATHER THAN NARROWING THEM. The presenter hands this class the
+ * archived forms too (`D103` A), so the DEFAULT arm — "All", its count, and every folder count taken from
+ * {@see apply()} with no facet — must drop them itself. Before M154 "All" was simply every row it was given.
  *
  * ⚠️ THESE RUN OVER THE PRESENTED ROWS, IN PHP, AND THAT IS THE DESIGN RATHER THAN A SHORTCUT. Three
  * consequences follow, all of them wanted:
@@ -35,6 +39,9 @@ final class FormListFacets
 
     public const string CLOSING_SOON = 'closing_soon';
 
+    /** M154 (`D103` A) — the forms put away, read-only. The last chip, because it is the way to the back room. */
+    public const string ARCHIVED = 'archived';
+
     /** A close time inside this window puts a form in the "Closing soon" chip. */
     private const int CLOSING_SOON_DAYS = 7;
 
@@ -44,7 +51,7 @@ final class FormListFacets
      */
     public static function parse(mixed $raw): ?string
     {
-        return is_string($raw) && in_array($raw, [self::LIVE, self::DRAFT, self::CLOSING_SOON], true)
+        return is_string($raw) && in_array($raw, [self::LIVE, self::DRAFT, self::CLOSING_SOON, self::ARCHIVED], true)
             ? $raw
             : null;
     }
@@ -56,13 +63,26 @@ final class FormListFacets
     public static function counts(array $rows): array
     {
         $now = CarbonImmutable::now();
+        $archived = self::countMatching($rows, self::ARCHIVED, $now);
 
         return [
-            ['value' => null, 'label' => 'All', 'count' => count($rows)],
+            ['value' => null, 'label' => 'All', 'count' => count($rows) - $archived],
             ['value' => self::LIVE, 'label' => 'Live', 'count' => self::countMatching($rows, self::LIVE, $now)],
             ['value' => self::DRAFT, 'label' => 'Draft', 'count' => self::countMatching($rows, self::DRAFT, $now)],
             ['value' => self::CLOSING_SOON, 'label' => 'Closing soon', 'count' => self::countMatching($rows, self::CLOSING_SOON, $now)],
+            ['value' => self::ARCHIVED, 'label' => 'Archived', 'count' => $archived],
         ];
+    }
+
+    /**
+     * Whether "All" is hiding anything — the archived forms it leaves out. The forms list's empty state reads it,
+     * so a workspace whose every form is archived is told none matches rather than offered its first form.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     */
+    public static function hidesArchived(array $rows): bool
+    {
+        return self::countMatching($rows, self::ARCHIVED, CarbonImmutable::now()) > 0;
     }
 
     /**
@@ -72,7 +92,8 @@ final class FormListFacets
     public static function apply(array $rows, ?string $facet): array
     {
         if ($facet === null) {
-            return $rows;
+            // "All" is every form that is not archived — see the class docblock for why this arm filters at all.
+            return array_values(array_filter($rows, fn (array $row): bool => ($row['status'] ?? null) !== FormStatus::Archived->value));
         }
 
         $now = CarbonImmutable::now();
@@ -105,6 +126,8 @@ final class FormListFacets
             self::CLOSING_SOON => $isPublished
                 && $acceptance === 'open'
                 && self::closesWithin($schedule['closes_at'] ?? null, $now),
+            // The other three already read `status`, so none of them can ever match an archived form.
+            self::ARCHIVED => ($row['status'] ?? null) === FormStatus::Archived->value,
             default => false,
         };
     }

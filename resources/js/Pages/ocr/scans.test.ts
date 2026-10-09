@@ -46,15 +46,36 @@ function choose(wrapper: VueWrapper, files: File[]): Promise<void> {
 
 const fetchMock = vi.fn();
 
+// M154 — each chosen photo gets a preview by object URL. Stubbed on the real `URL` (a stubbed global `URL` would
+// take `new URL()` away from everything else), and restored after every case.
+const createUrl = vi.fn((file: File) => `blob:${file.name}`);
+const revokeUrl = vi.fn();
+const realCreate = URL.createObjectURL;
+const realRevoke = URL.revokeObjectURL;
+
 beforeEach(() => {
     mocks.visit.mockReset();
     fetchMock.mockReset();
     vi.stubGlobal('fetch', fetchMock);
+    createUrl.mockClear();
+    revokeUrl.mockClear();
+    URL.createObjectURL = createUrl as unknown as typeof URL.createObjectURL;
+    URL.revokeObjectURL = revokeUrl;
 });
 
 afterEach(() => {
     vi.unstubAllGlobals();
+    URL.createObjectURL = realCreate;
+    URL.revokeObjectURL = realRevoke;
 });
+
+const png = (name: string): File => new File(['x'], name, { type: 'image/png' });
+
+/** The names of the files the upload request carried, in the order it carried them. */
+function sentNames(): string[] {
+    const body = fetchMock.mock.calls[0][1].body as FormData;
+    return body.getAll('pages[]').map((file) => (file as File).name);
+}
 
 describe('ocr/Scans', () => {
     it('refuses a PDF sent with photos before any request, and says why', async () => {
@@ -126,5 +147,77 @@ describe('ocr/Scans', () => {
 
         expect(wrapper.text()).toContain('No scans yet');
         expect(wrapper.find('.scans__row').exists()).toBe(false);
+        // M154: a saved scan stays in the list (as "Saved as a response"), so the copy must not promise otherwise.
+        expect(wrapper.text()).not.toContain('until each is saved');
+    });
+});
+
+describe('ocr/Scans — the chosen pages, before "Read this scan" (M154, `R-c84e4f12`)', () => {
+    it('lists each chosen photo with its preview before anything is sent', async () => {
+        const wrapper = mount(Scans, { props: props() as never });
+
+        await choose(wrapper, [png('page-1.png'), png('page-2.png')]);
+
+        const items = wrapper.findAll('.chosen__item');
+        expect(items).toHaveLength(2);
+        expect(items[0].text()).toContain('page-1.png');
+        expect(items[1].text()).toContain('page-2.png');
+        expect(items[0].find('img').attributes('src')).toBe('blob:page-1.png');
+        expect(wrapper.text()).toContain('2 pages chosen');
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('adds a second pick to the first instead of replacing it, and sends them all', async () => {
+        fetchMock.mockResolvedValue(new Response(JSON.stringify({ data: { id: 'scan-9' } }), { status: 202 }));
+        const wrapper = mount(Scans, { props: props() as never });
+
+        await choose(wrapper, [png('page-1.png')]);
+        await choose(wrapper, [png('page-2.png')]);
+        expect(wrapper.findAll('.chosen__item')).toHaveLength(2);
+
+        await wrapper.find('form').trigger('submit');
+        await flushPromises();
+
+        expect(sentNames()).toEqual(['page-1.png', 'page-2.png']);
+    });
+
+    it('leaves a removed photo out of what is sent, and frees its preview', async () => {
+        fetchMock.mockResolvedValue(new Response(JSON.stringify({ data: { id: 'scan-9' } }), { status: 202 }));
+        const wrapper = mount(Scans, { props: props() as never });
+
+        await choose(wrapper, [png('wrong.png'), png('right.png')]);
+        await wrapper.get('button[aria-label="Remove wrong.png"]').trigger('click');
+
+        expect(wrapper.findAll('.chosen__item')).toHaveLength(1);
+        expect(revokeUrl).toHaveBeenCalledWith('blob:wrong.png');
+        expect(wrapper.text()).toContain('wrong.png removed.');
+
+        await wrapper.find('form').trigger('submit');
+        await flushPromises();
+
+        expect(sentNames()).toEqual(['right.png']);
+    });
+
+    it('checks the files as soon as they are chosen, and lifts the refusal once the culprit is removed', async () => {
+        const wrapper = mount(Scans, { props: props() as never });
+
+        await choose(wrapper, [new File(['%PDF'], 'scan.pdf', { type: 'application/pdf' }), png('page-1.png')]);
+        // Refused at the pick, not only at the send — and the list stays, so the wrong file can be taken out.
+        expect(wrapper.find('[role="alert"]').text()).toContain('Upload a PDF scan on its own.');
+        expect(wrapper.findAll('.chosen__item')).toHaveLength(2);
+
+        await wrapper.get('button[aria-label="Remove scan.pdf"]').trigger('click');
+
+        expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+        expect(wrapper.find('input[type="file"]').attributes('aria-invalid')).toBeUndefined();
+    });
+
+    it('frees every preview when the page is left', async () => {
+        const wrapper = mount(Scans, { props: props() as never });
+        await choose(wrapper, [png('page-1.png'), png('page-2.png')]);
+
+        wrapper.unmount();
+
+        expect(revokeUrl.mock.calls.map((call) => call[0]).sort()).toEqual(['blob:page-1.png', 'blob:page-2.png']);
     });
 });

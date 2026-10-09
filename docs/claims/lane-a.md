@@ -72,8 +72,8 @@ Files: `app/Services/Forms/FormHubPresenter.php`, `app/Support/Forms/FormTabSet.
 `app/Http/Controllers/Tenant/SubmissionInboxController.php`, `app/Services/Forms/FormService.php` (the hub),
 `resources/js/Pages/forms/Show.vue`, `resources/js/Pages/forms/show.test.ts`, `tests/Feature/Forms/FormArchivedHubTest.php` (new);
 `resources/js/components/submissions/MediaInput.vue`, `resources/js/components/submissions/MediaInput.test.ts` (new),
-`resources/js/Pages/ocr/Scans.vue` (its comment), an E2E box check in a spec that renders a photo question (named in an extension
-before it is opened if it is not `tests/e2e/ocr-scans-upload.spec.ts`); `resources/js/components/builder/useBuilderStore.ts`,
+`resources/js/Pages/ocr/Scans.vue` (its comment), an E2E box check in `tests/e2e/media-input-hidden-text.spec.ts` (new — **claim extension**: no seeded form
+publishes a photo question, so the spec makes its own, publishes it, opens New response, and archives it again); `resources/js/components/builder/useBuilderStore.ts`,
 `resources/js/components/builder/save-state.test.ts`; and the close-out set.
 Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md` (`D107`), `PROGRESS.md` (own block), `docs/pipeline.md`,
 `docs/backlog-triage.md`, `docs/gate-baselines.md`, the E2E spec above.

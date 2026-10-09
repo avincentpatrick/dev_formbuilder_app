@@ -24,10 +24,20 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D105`, the last one filed, was asked and answered on 2026-10-09 in the session that filed it and recorded in `M151`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D106`, the last one filed, was asked and answered on 2026-10-09 in the session that filed it and recorded in `M152`'s close-out. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D106 — Can a guest respondent upload a photo or scan of a paper form they filled in, rather than only staff? **A — yes, during testing: an "upload a filled paper copy" option on the form's public link, switched on per form, landing in the staff scans list for the mandatory review.**
+
+**Asked and answered 2026-10-09 (user decision, in chat), recorded by Lane A in `M152`'s close-out.** The user asked, during the staging scan, *"is there a page where guest respondents can upload their scanned copy or photos of the form?"* There is not: "Scan paper forms" is on a form's Responses tab behind the manual-encoding gate (`can:create` a submission, `module:ocr_single`, `feature:ocr_single`, `routes/tenant.php`), and neither the PRD nor `docs/ocr-pipeline-design.md` plans a guest path.
+
+- **A — yes, during testing (recommended, chosen).** The public link offers "Upload a filled paper copy" where the form's Scanning switch and a new per-form guest-upload switch are both on. The pages go through the existing upload checks (type, size, virus scan, storage quota) under a guest rate limit, are read by the same job, and wait in the staff scans list; a scan becomes a response only when a staff reviewer saves it (`docs/ocr-pipeline-design.md` §3's mandatory review, unchanged). Built after the Oct 12 session starts (`D90`).
+- **B — yes, before launch.** The same shape, queued after the testing period.
+- **C — no.** Scanning stays staff-only.
+
+**What the answer files, in the same push:** a `during-testing` row in `docs/feature-backlog.md` (*a guest respondent cannot upload a photo or scan of a filled paper form*), which owns the open questions the build answers first: who sees an unsaved guest scan, what the respondent is told after uploading, and how the public endpoint is kept from spending the provider's pages.
+
 ### D105 — In Preview a stepped form shows one section's page at a time, so the sections a dragged question could join are off screen. How does a drag in Preview reach them? **A — while a question is dragged, the page strip's tabs are drop targets: a drop on one moves it to the end of that page, and the preview stays on the page it was on.**
 
 **Asked and answered 2026-10-09 (user decision, in chat), recorded by Lane A in `M151`'s claim.** `R-2baef8ea` (*"please include the preview section to be draggable. i mean, questions or indicators must be draggable to sections, sequencing, etc."*) asks for a question to be dragged into a section, and in a stepped form every section but the one on screen is behind the strip.

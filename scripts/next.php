@@ -165,7 +165,7 @@ function render_line(string $lane, array $state): string
         '⛔ READ CLAUDE.md FIRST. It is the imperative layer and this line deliberately does not restate it.',
         sprintf('Then: php scripts/preflight.php --lane=%s and php scripts/state.php.', $lane),
         'Every number in the block above was derived from the tree by state.php and none of it was typed;'
-            .' the ADR gap is RESERVED, not free, and state.php says so on every run.',
+            .' docs/adr has no gap since ADR-0010 was written, and state.php refuses to measure if one appears.',
         sprintf('main IS THE TRUNK: branch from origin/main, PR into main, self-merge on 6/6 green with each'
             .' job\'s step count read individually. Your claim goes in %s and is PUSHED before you open the'
             .' first file.', $config['claim']),

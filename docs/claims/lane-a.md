@@ -16,95 +16,51 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M154`, four during-testing rows testers touch from Oct 12: the paper beside "Edit answers" on a scanned response (`R-1585698b`), the chosen photos listed before "Read this scan" (`R-c84e4f12`, its pre-read half), an Archived filter on the Forms list (`R-44b17445`), and a spam-folder line wherever testers are invited (`R-66bc91ca`) (`m154-scans-and-archived`)
+## Status: NO ACTIVE CLAIM — `M154` is merged and live on staging; the next session opens with the user's check of the Archived chip (their question, *"how can i retrieve the responses from that archived form?"*) and the other three fixes, then takes the during-testing tier from `docs/pipeline.md`'s Next section
 
-Taken 2026-10-09. Branch `m154-scans-and-archived`, cut from `origin/main` at `5f176243`, PR into main. **The owed check came first:** the
-user confirmed `M153` on staging at the session's start ("Both photos show"). `D94`'s order is used up (`M140`–`M142`), so the user was
-offered three during-testing batches and chose this one ("Scans + forms list"). Rows 1 and 2 are OCR fixes, which `D90` admits; `D106`'s
-guest upload (`R-7173c02c`) is a feature and waits for Oct 12 as its decision says. **`D13`:** one hub — `Encode.vue`; the four remedy
-file sets are disjoint; `routes/tenant.php` is NOT opened, which is why row 2 ships only its pre-read half.
-Rows (`docs/feature-backlog.md`): `R-1585698b` "Correcting a scanned response's answers shows no scanned pages beside the form" (filed by
-`M153`); `R-c84e4f12` "The scans page shows none of the files chosen before 'Read this scan', and a read scan cannot be read again or
-removed" (`M152`); `R-44b17445` "An archived form cannot be found from the Forms list" (`M148`, `D103` A); `R-66bc91ca` "Nothing tells a
-tester to look in the spam folder for their invitation" (`M147`, from `D50`).
+## RELEASED — `M154`, four during-testing rows testers touch from Oct 12: the paper beside "Edit answers" on a scanned response (`R-1585698b`), the chosen photos listed before "Read this scan" (`R-c84e4f12`, its pre-read half), an Archived chip on the Forms list (`R-44b17445`), and a spam-folder line wherever testers are invited (`R-66bc91ca`) (merged as PR #347, `8dc216f7`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-### Evidence verified
-- **`R-1585698b`:** `Show.vue`'s "Edit answers" links `/submissions/{id}/edit` (`submissions.edit`, `can:update,submission`);
-  `SubmissionEditController::edit()` renders `submissions/Encode` from `EncodeFormPresenter::present()` plus `crumbs`/`cancel_url`, and
-  nothing on that path reads a scan: **held.** `Encode.vue` shows `ScanPages` only while `props.scan != null` (`isScanning`): **held.**
-  `SubmissionInboxPresenter::scanPages()` is private, reads no instance state, and `detail()` is its only caller: **held.**
-- **`R-c84e4f12`:** `Pages/ocr/Scans.vue` is a native `input[type=file]` plus "Read this scan"; `onChoose` replaces `chosen`, which is
-  never rendered, and the input is never cleared: **held.** The six `forms.ocr.scans.*` routes are store, show, index, review, page and
-  confirm, with no delete or re-read anywhere (`OcrScanReader::step()` returns `Done` for a read or failed scan): **held.**
-- **`R-44b17445`:** `FormPresenter::list()` drops archived forms (a display filter, pinned by `FormListKeywordTest`) and offers no
-  filter; `FormSearchArm` drops them too: **held.** Submissions' Form dropdown, a response's link and the form's URL still reach an
-  archived form: **held** (`SubmissionInboxPresenter::formOptions` has no status filter; `FormHubLink` resolves).
-- **`R-66bc91ca`:** `TenantInvitationNotification::toMail()` is subject, one line, the button and the expiry — no spam line, and no test
-  pins its copy; a case-insensitive census of `spam`/`junk` finds only backlog and decision prose about invitations: **held.** The
-  tester checklist is off-repo (the Testing Server Checklist artifact, item I3): **held.**
+Shipped 2026-10-10. Branch `m154-scans-and-archived`, cut from `origin/main` at `5f176243`. The claim is `c274eeba`, pushed before any file was
+opened; one claim extension, `bb8293a5` (`docs/TESTING-GUIDE.md`), pushed from a detached worktree before that file was opened. The user
+confirmed `M153` on staging at the session's start ("Both photos show") and chose this batch from three offered. The work is `c8a93e5d` +
+`85de60df` (`R-1585698b`), `0c4aa8a4` + `5645df8f` + `50455b75` (`R-c84e4f12`), `3004545f` + `f5728131` (`R-44b17445`), `c2357077`
+(`R-66bc91ca`), and `f7a00328` + `46f25d4f` + `36ee9b6a` (rows, the line, the guide). Post-merge CI run 37965114404; deployed by itself
+(`D47`), run 37967852309.
 
-### Premise verified
-- **`R-1585698b`:** the row assumes whoever corrects a response may open its pages. **True for every seeded role** — Owner, Admin and
-  a Form Editor with an editor grant all hold `submissions.view`, which `AttachmentPolicy` needs for an `ocr_source_scan`; only a
-  synthetic edit-but-not-view actor (`CrumbTrailGateTest`) would get broken images, so the edit page sends the pages only when the
-  editor can view the response. No other caller renders `Encode` in edit mode (create, resume and scan review never pass a finalized
-  submission). **Found beside it:** scan mode's sticky paper column has no height cap, so on a two-page scan page 2 sits below the fold
-  while the form scrolls — `Show.vue` already caps it; the same cap goes on `Encode.vue` (fixes the review screen too).
-- **`R-c84e4f12`:** the row says order no longer matters — **true since `M152`** (`PrintedFormMatcherTest`'s swapped-pages case). The
-  row's title also says a read scan "cannot be read again", which its remedy does not address; that half and the discard half need a
-  route in `routes/tenant.php` (a second hub) and sit beside `R-92ba6b65` (*nothing ever deletes an OCR scan*), so they are **re-filed
-  as their own row** and this row closes on its pre-read half (the `M117` split). **Found beside it:** the empty-list copy says scans
-  show "until each is saved as a response" — false, saved scans stay listed; corrected here.
-- **`R-44b17445`:** `D103` names the Forms list only, so `FormSearchArm` stays (its own comment keeps it deliberately). **The premise
-  that the list is the only gap is false:** the form's hub offers Edit form, Share, the Builder and Settings tabs and "New response" on
-  an archived form, its "Accepting responses" tile reads Accepting, and `FormService::archive()` re-archives without a guard — filed as
-  their own row (`FormService.php` is a hub). **Measured and NOT taken:** refusing an archived form in `SubmissionPolicy::create` would
-  also refuse `SyncSubmissionController`'s offline sync, staff drafts and attachment uploads, stranding a field device's queued
-  responses for a form archived after they were taken — so the list masks its row's `encode` only, and the server-side question
-  goes into that new row. Two more found beside it: "Save as template" 404s on an archived form that was never published (both version
-  pointers null), and the table's version column says "v2 live" for an archived form.
-- **`R-66bc91ca`:** the row says one sentence "wherever testers are invited". Testers are invited from the Members page, so the
-  inviter's toast and the "Invite a member" dialog carry the hint as well as the email.
+**What changed:**
+- **`R-1585698b`.** `ResponseScanPages::for()` — `M153`'s `scanPages()`, moved word for word — feeds the response page and
+  `SubmissionEditController::edit()`, the latter only for an editor who may read the response (`update` does not need `submissions.view`,
+  the file route does). `Encode.vue` lays the pages out with its scan grid keyed on `hasPaper`, so no scan-review behaviour reaches edit
+  mode, under "Scanned pages"; the sticky paper column is capped to the window, which also stops the review screen stranding page 2.
+- **`R-c84e4f12`, first half.** `components/ocr/ChosenPages.vue` lists every chosen file before the read (preview or kind, name, "Page N ·
+  size", Remove); a pick adds and empties the picker, the file check runs on every change, previews are revoked. Discard and read-again need
+  a route in `routes/tenant.php` — a second hub — and are `R-cfde0d48`.
+- **`R-44b17445`.** An **Archived** chip. `FormPresenter::list()` takes archived forms only when the forms list asks (`withArchived`);
+  `FormListFacets` keeps them out of "All", its count and every folder count. Archived rows are read-only (edit, publish, archive, new
+  submission and scope hidden; template only while a published version is left), the card says "No longer accepting responses", the table
+  drops "live", an empty history says so, and an all-archived workspace is told none matches. The archived form's own page is `R-aaf36122`.
+- **`R-66bc91ca`.** One line in the invitation email, the inviter's confirmation and the invite dialog.
+- **Filed:** `R-cfde0d48`, `R-aaf36122`, and `R-77a29731` (the upload control draws its screen-reader text on screen — below).
 
-### Remedy verdict
-- **`R-1585698b` — works as prescribed.** `scanPages()` moves word for word into `ResponseScanPages::for()` (same namespace, so the
-  inbox presenter needs no new import and drops its `OcrScan` one); the edit controller adds `scan_pages`; `Encode.vue` lays them out
-  with its scan grid, keyed on a new `hasPaper` so no scan-only behaviour (notices, autosave, leave guard, save target) leaks into edit
-  mode, titled "Scanned pages".
-- **`R-c84e4f12` (pre-read half) — works, client only.** A new `components/ocr/ChosenPages.vue` lists each chosen file in upload order
-  (thumbnail by object URL or a PDF label, name, size, "Remove {name}"); a pick appends, the input is cleared, the file check runs on
-  pick, object URLs are revoked.
-- **`R-44b17445` — works, with one change the row did not foresee.** `FormListFacets::apply()` with no facet returns EVERY row and "All"
-  counts them, so letting archived rows into the presenter would leak them into All, its count and every folder count — the default
-  arm must drop archived rows itself. Presenter opt-in `withArchived` (default unchanged), an **Archived** chip, and read-only rows:
-  `edit`/`publish`/`delete`/`encode` masked, `template` masked when no published version is left, "Set form scope" hidden.
-- **`R-66bc91ca` — works:** one line in the email, the toast and the dialog; checklist I3 edited by M98's method at the close-out.
-
-Files: `app/Services/Submissions/ResponseScanPages.php` (new), `app/Services/Submissions/SubmissionInboxPresenter.php`,
-`app/Http/Controllers/Tenant/SubmissionEditController.php`, `resources/js/Pages/submissions/Encode.vue` (the hub),
-`resources/js/Pages/submissions/encode.test.ts`, `tests/Feature/Ocr/OcrScanEditPagesTest.php` (new), `tests/e2e/ocr-review-axe.spec.ts`;
-`resources/js/components/ocr/ChosenPages.vue` (new), `resources/js/components/ocr/ChosenPages.test.ts` (new),
-`resources/js/Pages/ocr/Scans.vue`, `resources/js/Pages/ocr/scans.test.ts`, `tests/e2e/ocr-scans-upload.spec.ts` (new);
-`app/Services/Forms/FormPresenter.php`, `app/Http/Controllers/Tenant/FormController.php`, `app/Support/Forms/FormListFacets.php`,
-`resources/js/Pages/forms/Index.vue`, `resources/js/components/forms/FormRowActions.vue`, `resources/js/components/forms/FormCard.vue`,
-`resources/js/Pages/forms/index.test.ts`, `tests/Feature/Forms/FormListArchivedFilterTest.php` (new), `tests/e2e/forms-folders-axe.spec.ts`;
-`app/Notifications/TenantInvitationNotification.php`, `app/Http/Controllers/Tenant/MemberController.php`,
-`resources/js/Pages/members/Index.vue`, `resources/js/Pages/members/Index.test.ts`, `tests/Feature/Mail/InvitationSpamHintTest.php` (new);
-and the close-out set.
-Shared artefacts taken: `docs/feature-backlog.md`, `tests/e2e/ocr-review-axe.spec.ts`, `tests/e2e/forms-folders-axe.spec.ts`,
-`tests/e2e/ocr-scans-upload.spec.ts` (new), `PROGRESS.md` (own block), `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`.
-Paired files taken: none.
-Namespaces spent: nothing from either namespace.
-Prediction: each new Pest file is red on the trunk in every case that reads what it adds (`scan_pages` absent on the edit page; the
-`archived` facet unparsed, so `state=archived` lists the default rows; no spam line) and green after; the existing `FormListKeywordTest`,
-`FormListCardDataTest`, `FormListFolderFilterTest`, `OcrScanResponsePagesTest` and `SubmissionEditRoutesTest` stay green unedited. Pest
-mutants — the default arm's archived drop removed, "All" counting archived, the `encode` mask removed, the view guard on `scan_pages`
-removed — are each caught by the case written for it, and the first is ALSO caught by `FormListKeywordTest`'s `?q=clinic` case. The
-new Vitest cases are red before their template changes. PHPStan moves by zero on the host. CI 6/6 on the first run. **Most likely wrong:
-the Archived E2E** — it creates and archives its own form through `support/builder.ts` at three viewports in both themes, and I have not
-yet read how that helper names forms or whether the chip's filtered list can hold them all without a stale count.
-
-**Claim extension (pushed before the file is opened):** `docs/TESTING-GUIDE.md` — two sentences the Archived chip makes false, found by a census of the documents for the forms list and archiving: §17.1's table says archived forms are hidden from `/forms` "filter or no filter", and the not-built table says the list loads "every non-archived form". Both are corrected in place, line-neutral. Nothing else in `docs/` says the list hides them (the ledger, the line, the census and the decisions are records, not claims about the product).
+**How the prediction fared:**
+- ✅ Every new Pest file was red on the trunk in every case and green after; `FormListKeywordTest`, `FormListCardDataTest`,
+  `FormListFolderFilterTest`, `OcrScanResponsePagesTest` and `SubmissionEditRoutesTest` stayed green unedited.
+- ✅ **Pest mutants 8/8, every red set exactly as written** — including the default-arm mutant ALSO reddening `FormListKeywordTest`'s
+  `?q=clinic` case, as predicted. Host PHPStan 0. CI 6/6 on the first run.
+- ❌ **Vitest mutants 12/12 — but one only after a new case.** Dropping the picker reset (`input.value = ''`) SURVIVED every case: a file
+  input's `value` cannot be set to anything else, so reading it back proves nothing. A setter-spy case caught it (`5645df8f`). And one new
+  Vitest case first went red for the WRONG reason (it looked the field up by a component name that does not match), fixed before it was
+  allowed to count.
+- ❌ **"Most likely wrong: the Archived E2E" — it was not.** It passed at every viewport first time. **What the claim did not foresee came
+  from looking:** a screenshot of the scans page showed the screen-reader announcement as a visible second line — the
+  `mds-visually-hidden` class it copied from `MediaInput.vue` is defined nowhere, which axe, happy-dom and every test missed. Fixed with the
+  page's own clip rule (`50455b75`, an E2E box check red at 678×24 against the old class); `MediaInput.vue`'s copy filed as `R-77a29731`.
+- ❌ **A premise was wrong in the row, not the code:** `R-66bc91ca` said no checklist told testers about spam — the off-repo Testing Server
+  Checklist's invite step (I3) already did. Nothing was republished.
+- ⚠️ **Measured and not taken:** refusing an archived form in `SubmissionPolicy::create` would also refuse the offline sync API, staff drafts
+  and attachment uploads — the list masks its row only, and the question is `R-aaf36122`'s.
+- ✅ No file was edited beyond the claim and its pushed extension. E2E locally: `ocr-review-axe`, `ocr-scans-upload` (new),
+  `forms-folders-axe` at three viewports — 59/60, the one failure `R-1edd6482`'s known empty-folder wait, 6/6 on rerun.
 
 ## RELEASED — `M153`, a response saved from a scan shows its scanned pages (`R-1e00f872`, the user's staging comment) (merged as PR #346, `c0762dcc`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

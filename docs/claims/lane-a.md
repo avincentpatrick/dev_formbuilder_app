@@ -16,7 +16,59 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M152` is merged and live on staging; the user's staging scan is done and the server's `.env` backup deleted, so the early-testing line holds one row — the response page showing no scanned pages (filed by `M152` from the user's own staging check, early-testing by their choice) — which the next session takes first, as `M153`
+## Status: ACTIVE CLAIM — `M153`, the early-testing line's last row: a response made from a scan shows its scanned pages (`R-1e00f872`) (`m153-scan-pages-on-response`)
+
+Taken 2026-10-09. Branch `m153-scan-pages-on-response`, cut from `origin/main` at `ad8bfebb`, PR into main. No user check was owed first:
+`M151` was confirmed on staging and `M152` fixed no user comment. `D90` holds (fixes only until the Oct 12 session); this row is the fix
+of the user's own comment, *"i did not see the 2 photos when i click the submitted response"*, early-testing by their choice.
+Row: `R-1e00f872` — "A response made from a scan does not show the scanned pages, so nobody can check its answers against the paper."
+(`docs/feature-backlog.md`, the row filed by `M152`).
+
+### Evidence verified
+- `OcrScanConfirmation::link()` re-points the scan's pages (`attachable_type` `ocr_scan` → `submission`, kind `ocr_source_scan`, by the
+  ids in `ocr_scans.pages`) and sets `ocr_scans.submission_id` in the same locked transaction: **held.**
+- `AttachmentPolicy::view()` puts `OcrSourceScan` in the submission-media arm (`submissions.view` and `scopedToSubmission()`, which
+  delegates to `SubmissionPolicy::view` — the response page's own gate): **held.** `OcrScanConfirmTest` "moves the scan's page files to
+  the response" asserts `GET /attachments/{id}` 403 before the save and 200 after.
+- `resources/js/Pages/submissions/Show.vue` takes `submission, blocks, can, pdf, crumbs` and `SubmissionInboxPresenter::detail()` builds
+  all but `crumbs` (the controller adds it): **held** — no pages. Nothing in `app/` reads a submission's `ocr_source_scan` rows.
+- `docs/ocr-pipeline-design.md` §5 says the single-form scan is an attachment of the one resulting submission: **held**; it says nothing
+  about showing it.
+
+### Premise verified
+- The row believes the data is right and only the view is missing. **True, with two corrections to how the view must be built:**
+  1. **Page order lives only on the scan.** `attachments` has no sequence column (the create migration and its one later amendment),
+     and `ocr_scans.pages` is the ordered list — so the page must be read through `ocr_scans.submission_id`, not off the attachments.
+     That column has no index; the lookup adds `form_id` so it rides `(tenant_id, form_id, created_at)`. No migration (`D90`).
+  2. **The review screen's page route is the wrong door.** `forms.ocr.scans.page` is gated `can:create` + `module:ocr_single` +
+     `feature:ocr_single`, so a viewer or reviewer — who may open the response — would get 403, and switching the module off would hide
+     every saved scan's pages. The response page uses `attachments.show`, whose gate is the response's own.
+- One scan per response: the idempotency key is the scan id and `link()` returns early once linked. **True.**
+- **Found beside the citation:** `AttachmentStorageService::storeOcrScanPage()`'s comment says nothing re-points a scan page yet
+  ("the confirmation is groundwork 2") — false since `M129`. Corrected here (comment only).
+
+### Remedy verdict
+- **Works as prescribed.** `resources/js/components/ocr/ScanPages.vue` takes `ScanPage[]` (`number`, `url`, `mime`, `servable`) and already
+  carries zoom, a focusable labelled region per page, a PDF as a download link and a page awaiting its virus check; it gains an optional
+  `title` (default "The paper", so the review screen is unchanged) and the response page shows "Scanned pages". `attachments.show`
+  serves an image inline, a PDF as a download, and 409 until the virus check passes. Encode.vue's scan mode already lays the paper beside
+  the answers at ≥75rem (`.encode--scan`); the response page uses the same grid, stacked with the paper first below it.
+
+Files: `app/Services/Submissions/SubmissionInboxPresenter.php`, `app/Services/Attachments/AttachmentStorageService.php` (comment only),
+`resources/js/components/ocr/ScanPages.vue`, `resources/js/components/ocr/ScanPages.test.ts`, `resources/js/Pages/submissions/Show.vue`,
+`resources/js/Pages/submissions/show.test.ts`, `tests/Feature/Ocr/OcrScanResponsePagesTest.php` (new),
+`database/seeders/E2eSeeder.php` (each seeded `ocr_single` response gets a saved two-page scan; no response is added),
+`tests/e2e/ocr-review-axe.spec.ts`, `docs/ocr-pipeline-design.md` (§5, line-neutral), and the close-out set.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/ocr-pipeline-design.md`, `tests/e2e/ocr-review-axe.spec.ts`, `PROGRESS.md`
+(own block), `docs/pipeline.md`, `docs/backlog-triage.md`, `docs/gate-baselines.md`.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace.
+Prediction: the new Pest file is red on the trunk in every case that reads `scan_pages` (the key is absent) and green after; its
+mutants — the ownership filter dropped, the order taken from the attachments instead of the scan, numbering from 0, `servable` forced
+true — are each caught by exactly the case written for it. The new Vitest cases are red before the template change. PHPStan moves by
+zero on the host. CI 6/6 on the first run. **Most likely wrong: the E2E pair** — the seeded `ocr_single` rows are analytics fixtures whose
+form, version and status I have read only in the seeder, and the first inbox row under `?source=ocr_single` is chosen by the inbox's
+ordering, not by me.
 
 ## RELEASED — `M152`, the early-testing line's OCR rows: a scan's pages read in printed order whatever the upload order (`R-4aaf3b6f`) with page notes counted from 1, a doubtful tick shown for review (`R-39a5388f`), and ADR-0010 (`ocr-provider-bakeoff`); the staging scan done (`ocr-staging-scan`) and `D106` recorded (merged as PR #345, `2922f5d9`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

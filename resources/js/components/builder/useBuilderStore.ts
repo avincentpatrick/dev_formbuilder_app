@@ -563,6 +563,17 @@ export function useBuilderStore(props: BuilderPageProps) {
         return sections.value.slice().sort((a, b) => a.sequence - b.sequence);
     }
 
+    /**
+     * M151 (`R-250b57eb`) — an XLSForm import also numbers each question within its section (`section_sequence`), and
+     * the runtime, Print blank and the export order a section by that number before `sequence`. The import assigns both in
+     * one pass, so they agree until the builder moves something; a move therefore clears them all, leaving `sequence` —
+     * which every reader falls back to — the one order. Clearing only the moved field would compare it on a different scale
+     * from its neighbours.
+     */
+    function forgetSectionPlaces(): void {
+        for (const f of fields.value) f.section_sequence = null;
+    }
+
     /** Move a field into `group` at visual `index` within that group, reflowing all sequences (local). */
     function placeField(uid: Uid, group: string | null, index: number): void {
         const field = findField(uid);
@@ -585,6 +596,7 @@ export function useBuilderStore(props: BuilderPageProps) {
 
         let seq = 0;
         for (const g of order) for (const f of buckets.get(g) ?? []) f.sequence = seq++;
+        forgetSectionPlaces();
     }
 
     /**
@@ -668,6 +680,7 @@ export function useBuilderStore(props: BuilderPageProps) {
             const before = snapshotOrder();
             field.form_section_id = sectionId;
             field.sequence = nextSequence();
+            forgetSectionPlaces();
             const after = snapshotOrder();
             await persistOrder();
             pushHistory('Move field to section', () => applyOrderAndPersist(before), () => applyOrderAndPersist(after));

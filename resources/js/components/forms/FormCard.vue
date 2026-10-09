@@ -44,6 +44,9 @@ const initials = computed(() => {
 const capacity = computed(() => {
     const { max_responses: cap, remaining } = props.row.schedule;
     if (cap === null || remaining === null) return null;
+    // M154: an archived form takes no more responses, so a meter would read as a form still filling up — the
+    // slot says it has stopped instead.
+    if (props.row.status === 'archived') return null;
 
     const used = Math.max(0, cap - remaining);
 
@@ -64,6 +67,8 @@ const scheduleNote = computed(() => {
     // `acceptance: 'open'` and fell through to "Closes in 3 days" — while the Live and Closing-soon chips
     // correctly excluded it, because `FormListFacets::matches()` conjoins `$isPublished`. The card and the
     // chips above it would have contradicted each other about the same form on the same screen.
+    // M154: an archived form is under the Archived chip now, and it was published more often than not.
+    if (props.row.status === 'archived') return 'No longer accepting responses';
     if (props.row.status !== 'published') return 'Not published';
 
     if (acceptance === 'closed') return 'Closed';

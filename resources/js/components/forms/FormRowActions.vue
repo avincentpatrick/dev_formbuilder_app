@@ -132,9 +132,10 @@ const publishing = computed(() => props.publishingId === props.row.id);
         <!-- Gated on manageScopes, not row.can.edit: assigning a form to a scope hands everyone holding a
              grant on that branch access to the form AND its submissions, so it is an Owner/Admin act. The
              route enforces the same thing independently by stacking can:viewAny,ScopeNode on top of
-             can:update,form. -->
+             can:update,form. M154: never on an archived form, which the list offers read-only (`D103` A) —
+             re-scoping it changes who may read its responses, and no row flag carries that, so it is read here. -->
         <MdsIconButton
-            v-if="canManageScopes"
+            v-if="canManageScopes && row.status !== 'archived'"
             icon="building"
             label="Set form scope"
             size="sm"

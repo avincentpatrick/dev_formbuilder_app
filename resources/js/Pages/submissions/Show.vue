@@ -20,6 +20,8 @@ import {
     type BreadcrumbItem,
 } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
+import ScanPages from '@/components/ocr/ScanPages.vue';
+import type { ScanPage } from '@/components/ocr/scan-review';
 
 type FieldRow = { key: string; label: string; value: string };
 /**
@@ -63,6 +65,12 @@ const props = defineProps<{
     // `can.review` would hand every Reviewer the power to rewrite the answers they are meant to be judging.
     can: { review: boolean; update: boolean };
     pdf: PdfArtifact | null;
+    /**
+     * The pages a scanned response was read from (M153), in the scan's order and numbered as the review screen
+     * numbered them; empty for every other response. Each `url` is the shared file route, whose gate is this
+     * page's own — never the review screen's page route, which a viewer or reviewer cannot open.
+     */
+    scan_pages: ScanPage[];
     /**
      * The trail back, resolved SERVER-SIDE by `CrumbTrail` (Increment J2d).
      *
@@ -326,16 +334,32 @@ function formatDate(iso: string | null): string {
             </MdsCard>
         </div>
 
-        <MdsCard v-for="(block, i) in blocks" :key="block.id ?? `ungrouped-${i}`" class="detail__block">
-            <template v-if="block.label" #header><h2 class="detail__card-title">{{ block.label }}</h2></template>
-            <p v-if="block.fields.length === 0" class="detail__empty">No entries.</p>
-            <dl v-else class="detail__answers">
-                <div v-for="field in block.fields" :key="field.key" class="detail__answer">
-                    <dt>{{ field.label }}</dt>
-                    <dd>{{ field.value || '—' }}</dd>
-                </div>
-            </dl>
-        </MdsCard>
+        <!--
+            M153 (`R-1e00f872`). A response saved from a scan shows the paper it was read from, so whoever checks
+            its answers can check them against the page — on a wide screen side by side, the paper held in view
+            while the answers scroll (the review screen's layout, `Encode.vue`'s `.encode--scan`); below that,
+            the paper first. A response that was not a scan renders exactly as before.
+        -->
+        <div class="detail__body" :class="{ 'detail__body--scan': scan_pages.length > 0 }">
+            <div v-if="scan_pages.length > 0" class="detail__scan">
+                <MdsCard>
+                    <ScanPages :pages="scan_pages" title="Scanned pages" />
+                </MdsCard>
+            </div>
+
+            <div class="detail__blocks">
+                <MdsCard v-for="(block, i) in blocks" :key="block.id ?? `ungrouped-${i}`" class="detail__block">
+                    <template v-if="block.label" #header><h2 class="detail__card-title">{{ block.label }}</h2></template>
+                    <p v-if="block.fields.length === 0" class="detail__empty">No entries.</p>
+                    <dl v-else class="detail__answers">
+                        <div v-for="field in block.fields" :key="field.key" class="detail__answer">
+                            <dt>{{ field.label }}</dt>
+                            <dd>{{ field.value || '—' }}</dd>
+                        </div>
+                    </dl>
+                </MdsCard>
+            </div>
+        </div>
 
         <!-- Return with reason -->
         <MdsModal v-model:open="returnModalOpen" title="Return submission" @close="returnModalOpen = false">
@@ -397,6 +421,32 @@ function formatDate(iso: string | null): string {
 
 .detail__block {
     margin-bottom: var(--mds-space-4);
+}
+
+/* M153 — the scanned pages beside the answers. Stacked (paper first) until there is room for both; then the
+   paper column stays in view and scrolls on its own, so a two-page scan's second page is never stranded below
+   the fold while the answers scroll past it. Equal halves, NOT the review screen's `1fr 45rem`: there the form
+   needs its width, here the answers are short label/value rows and it is the handwriting that must be legible —
+   measured at 1440px, `1fr 45rem` left the paper ~390px wide beside 720px of answers. */
+.detail__scan {
+    margin-bottom: var(--mds-space-4);
+}
+
+@media (min-width: 75rem) {
+    .detail__body--scan {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        column-gap: var(--mds-space-6);
+        align-items: start;
+    }
+
+    .detail__body--scan > .detail__scan {
+        position: sticky;
+        top: var(--mds-space-4);
+        max-height: calc(100vh - 2 * var(--mds-space-4));
+        overflow-y: auto;
+        margin-bottom: 0;
+    }
 }
 
 .detail__card-title {

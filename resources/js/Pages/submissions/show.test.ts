@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
+import type { ScanPage } from '@/components/ocr/scan-review';
 
 /**
  * Increment I9a — the submission detail page's action gate.
@@ -76,7 +77,7 @@ const SERVER_ARCHIVABLE = ['submitted', 'under_review', 'approved', 'returned'];
  */
 const SERVER_EDITABLE = ['submitted', 'under_review', 'approved', 'returned'];
 
-function mountAt(status: string, canReview = true, canUpdate = true) {
+function mountAt(status: string, canReview = true, canUpdate = true, scanPages: ScanPage[] = []) {
     return mount(Show, {
         props: {
             submission: {
@@ -97,6 +98,7 @@ function mountAt(status: string, canReview = true, canUpdate = true) {
             blocks: [],
             can: { review: canReview, update: canUpdate },
             pdf: null,
+            scan_pages: scanPages,
             crumbs: [
                 { label: 'Forms', href: '/forms' },
                 { label: 'Survey', href: '/forms/f1' },
@@ -254,6 +256,7 @@ describe('the way back (Increment J2c; server-resolved in J2d)', () => {
                 blocks: [],
                 can: { review: true, update: true },
                 pdf: null,
+                scan_pages: [],
                 crumbs: [
                     { label: 'Forms', href: '/forms' },
                     { label: '—' },
@@ -277,6 +280,41 @@ describe('the way back (Increment J2c; server-resolved in J2d)', () => {
         // Exactly one link in the trail: the root. The two middle crumbs are text, and the tail always is.
         expect(trail.findAll('a')).toHaveLength(1);
         expect(trail.text()).toContain('—');
+
+        wrapper.unmount();
+    });
+});
+
+/**
+ * M153 (`R-1e00f872`) — the user's words on staging: "i did not see the 2 photos when i click the submitted
+ * response". A response saved from a scan shows the pages it was read from; every other response shows nothing
+ * new. The server decides which pages and in what order (`OcrScanResponsePagesTest`); this file pins that the
+ * page renders what it is given, under the heading the announcement names.
+ */
+describe('the scanned pages (M153)', () => {
+    const pages: ScanPage[] = [
+        { number: 1, url: '/attachments/a2', mime: 'image/png', servable: true },
+        { number: 2, url: '/attachments/a1', mime: 'image/jpeg', servable: true },
+    ];
+
+    it('shows a scanned response its pages, in the order given, each from its served address', () => {
+        const wrapper = mountAt('submitted', true, true, pages);
+        const frames = wrapper.findAll('[role="region"]');
+
+        expect(wrapper.find('h2#scan-pages-title').text()).toBe('Scanned pages');
+        expect(frames.map((f) => f.attributes('aria-label'))).toEqual(['Page 1 of the scan', 'Page 2 of the scan']);
+        expect(frames.map((f) => f.find('img').attributes('src'))).toEqual(['/attachments/a2', '/attachments/a1']);
+        expect(wrapper.find('.detail__body').classes()).toContain('detail__body--scan');
+
+        wrapper.unmount();
+    });
+
+    it('shows nothing new on a response that was not a scan', () => {
+        const wrapper = mountAt('submitted');
+
+        expect(wrapper.find('#scan-pages-title').exists()).toBe(false);
+        expect(wrapper.find('[role="region"]').exists()).toBe(false);
+        expect(wrapper.find('.detail__body').classes()).not.toContain('detail__body--scan');
 
         wrapper.unmount();
     });

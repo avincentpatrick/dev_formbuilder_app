@@ -13,17 +13,17 @@ declare(strict_types=1);
 | convention, a dedicated file rather than `config/services.php`, because the credential is PLATFORM-WIDE
 | and never per-tenant (ADR-0009 §D9).
 |
-| >> THE PROVIDER IS GOOGLE CLOUD VISION UNTIL H1d DECIDES OTHERWISE. <<
+| >> THE PROVIDER IS GOOGLE CLOUD VISION (docs/adr/0010-ocr-provider-cloud-vision.md, M152). <<
 |
-| H1d, the bake-off that writes the reserved ADR-0010, chooses between Cloud Vision and Document AI on real
-| samples. Until it does, the reading path is built against Cloud Vision's REST API with an API key, which
-| is what the platform holds. ⚠️ A key whose Google Cloud project has no billing account attached is refused
-| `403 BILLING_DISABLED` on every call, even inside the free tier — measured on 2026-10-03.
+| H1d, the bake-off on fifteen hand-filled forms, chose Cloud Vision's REST API with an API key, which is
+| what the platform holds, and rejected Document AI; a vision-language model is the measured fallback.
+| ⚠️ A key whose Google Cloud project has no billing account attached is refused `403 BILLING_DISABLED` on
+| every call, even inside the free tier — measured on 2026-10-03.
 |
-| >> THE THRESHOLDS ARE THE DESIGN'S DEFAULTS, NOT A CALIBRATION. <<
+| >> THE THRESHOLDS ARE THE DESIGN'S DEFAULTS, AND THE BAKE-OFF CONFIRMED THEM. <<
 |
-| 90 and 70 are `docs/ocr-pipeline-design.md` §3's "tunable-later default". H1d calibrates them on the
-| samples, which is why they are configuration rather than constants.
+| 90 and 70 are `docs/ocr-pipeline-design.md` §3's "tunable-later default". H1d measured them on the
+| samples (ADR-0010 §D3: nothing read at 90 or above was wrong); they stay configuration, not constants.
 |
 */
 

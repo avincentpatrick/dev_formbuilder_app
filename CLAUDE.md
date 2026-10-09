@@ -62,10 +62,10 @@ The increment number comes from the `## RELEASED` headings of both claim files, 
 file's `## Template` heading, and is cross-checked against merged pull-request titles. Reading the
 current maximum is **not** a reservation — claim the number and push it before you use it.
 
-⚠️ **The one namespace fact a directory listing cannot carry:** `docs/adr/` has a single gap, and it is
-**reserved for H1d, the OCR provider bake-off — not free.** `state.php` names it on every run and
-refuses to measure if a second gap appears, because a gap is either a reservation or a deletion and
-nothing on disk can tell them apart.
+⚠️ **The one namespace fact a directory listing cannot carry:** `docs/adr/` has **no gap**. Its one
+reservation — H1d, the OCR provider bake-off — was filled by that ADR. `state.php` refuses to measure if a
+gap appears, because a gap is either a reservation or a deletion and nothing on disk can tell them apart:
+**to hold a number open, record the reservation in `state.php` first.**
 
 Cite an ADR by **filename**, never by bare number, in any document another lane might also edit.
 

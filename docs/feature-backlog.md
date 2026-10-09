@@ -13765,7 +13765,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `M152` the order no longer matters to the reading; the remedy lists the chosen pages (name, thumbnail, remove) before the read,
   and lets an unsaved scan be discarded. **Live.** Filed by `M152`. **Tier: during-testing.**
 
-- **`minor` · A response made from a scan does not show the scanned pages, so nobody can check its answers against the paper.**
+- ✅ **CLOSED BY `M153` (2026-10-09) — ****`minor` · A response made from a scan does not show the scanned pages, so nobody can check its answers against the paper.**
   Found by the user on staging during `M152`'s scan: *"i did not see the 2 photos when i click the submitted response"*.
   `OcrScanConfirmation::link()` re-points the scan's pages to the response (`attachments.attachable_type` `submission`, kind
   `ocr_source_scan`) and `AttachmentPolicy` already lets a `submissions.view` holder in the owner scope open them, but the
@@ -13773,7 +13773,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   PDF, and nothing else reads those rows. `docs/ocr-pipeline-design.md` §5 says the pages belong to the response, so the data
   is right and only the view is missing. The remedy is a "Scanned pages" section on the response page listing each page in
   order, opening it the way the review screen's `ScanPages.vue` does. **Live.** Filed by `M152`. **Tier: early-testing.** The
-  user chose before Oct 12, in chat, because testers will scan on Oct 12 and check the responses against the paper.
+  user chose before Oct 12, in chat, because testers will scan on Oct 12 and check the responses against the paper. ✅ **CLOSED BY `M153` (2026-10-09):** `SubmissionInboxPresenter::detail()` sends `scan_pages` — read through `ocr_scans.submission_id` for their order (an attachment has none), listed only while the response owns each file, linked through `attachments.show` (the review screen's page route refuses a viewer or reviewer) — and the response page shows them under "Scanned pages" with the review screen's `ScanPages.vue`, beside the answers on a wide screen. Five Pest cases and three Vitest cases red first; ten mutants caught, one only after a fifth case of two saved scans on one form; an E2E pair on the seeded scanned responses.
 
 - **`minor` · A guest respondent cannot upload a photo or scan of a paper form they filled in; only staff can (`D106` A).**
   Asked by the user during `M152`'s staging scan. "Scan paper forms" sits behind the manual-encoding gate on a form's
@@ -13782,3 +13782,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   guest rate limit, the same reading job, and the staff scans list as the only way to a response (§3's review, unchanged).
   Answered first at claim time: who sees an unsaved guest scan, what the respondent is told, and how the public endpoint is
   kept from spending the provider's pages. **Live.** Filed by `M152`. **Tier: during-testing.**
+
+- **`minor` · Correcting a scanned response's answers shows no scanned pages beside the form.**
+  Found by `M153` closing `R-1e00f872`: the response page now shows "Scanned pages", but its "Edit answers" button opens
+  `Pages/submissions/Encode.vue` in edit mode (`SubmissionEditController`), which shows the paper only in scan-review mode, so a
+  reviewer who finds a misread answer loses the page the moment they go to fix it. The remedy reuses what exists: the edit page's
+  presenter sends the same `scan_pages` (`SubmissionInboxPresenter::scanPages()`, moved where both can call it) and `Encode.vue`
+  lays them out as its scan mode does. **Live.** Filed by `M153`. **Tier: during-testing.**

@@ -290,9 +290,9 @@ final class AttachmentStorageService
      * ── OWNED BY THE SCAN UNTIL A PERSON CONFIRMS IT ─────────────────────────────────────────────────────
      * The owner is the `ocr_scans` row, under the alias `ocr_scan`, and like `feedback_report` the caller
      * MINTS that row's id first, so both directions agree from the first INSERT. `docs/ocr-pipeline-design.md`
-     * §5 gives the page to the SUBMISSION a confirmed scan becomes; nothing re-points it yet, because the
-     * confirmation is groundwork 2, and {@see SubmissionPipeline} re-points only attachments a media ANSWER
-     * references, which a source scan never is. The alias is stored and not registered in the morph map, for
+     * §5 gives the page to the SUBMISSION a confirmed scan becomes, and `OcrScanConfirmation::link()` re-points
+     * it there when a reviewer saves the scan (M129) — {@see SubmissionPipeline} re-points only attachments a media
+     * ANSWER references, which a source scan never is. The alias is stored and not registered in the morph map, for
      * `storeBrandingLogo()`'s reason.
      *
      * **`is_pii` is TRUE**: a scan is a photograph of a respondent's handwritten answers.

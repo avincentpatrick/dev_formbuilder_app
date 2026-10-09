@@ -13811,3 +13811,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   offline sync API (`SyncSubmissionController`), staff drafts and attachment uploads, and refusing there would strand a field
   device's responses queued before the archive. Answered first at claim time: whether those queued responses are accepted.
   **Live.** Filed by `M154`. **Tier: during-testing.**
+
+- **`minor` · The photo and file upload control draws its screen-reader text on screen: "Remove {name}" beside every ✕, a second "(required)", and each announcement.**
+  Found by `M154`, whose scans page copied the class: `resources/js/components/submissions/MediaInput.vue` hides three
+  things with `mds-visually-hidden`, and no stylesheet in the repository defines that class (a census of every `.vue`,
+  `.css` and `.ts` source finds only its two uses), so all three render as ordinary text — on the staff encode page and in
+  the guest runtime, wherever a question takes a photo, audio, video or file. `M154`'s screenshot of the scans page showed
+  its own copy of the announcement as a visible second line; the scans page now carries its own clipped rule. The remedy is
+  the same for this file: its own clip rule, plus a positioned container, because `clipped-node-containment.test.ts`
+  refuses a clipped node with no positioned ancestor in its component — and a look at the running page first, since a
+  new containing block changes where any other absolutely positioned descendant lands. **Live.** Filed by `M154`.
+  **Tier: during-testing.**

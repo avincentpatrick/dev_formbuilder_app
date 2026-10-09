@@ -204,6 +204,7 @@ test('Builder — a question’s label edited in place in the preview, saved onc
  * which leaves the author on their page; then a keyboard move that keeps focus on the grip. All of it after a reload.
  */
 async function drag(page: Page, from: Locator, to: () => Promise<{ x: number; y: number }>): Promise<void> {
+    await from.locator('[data-preview-grip]').scrollIntoViewIfNeeded();
     const grip = await from.locator('[data-preview-grip]').boundingBox();
     if (grip === null) throw new Error('the grip is not on screen');
     await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
@@ -215,7 +216,9 @@ async function drag(page: Page, from: Locator, to: () => Promise<{ x: number; y:
     await page.mouse.up();
 }
 
+/** Where to release over a target. Scrolled into view first, as an author scrolls mid-drag: on a phone the place is often below the fold. */
 async function centreOf(locator: Locator, down = 0.5): Promise<{ x: number; y: number }> {
+    await locator.scrollIntoViewIfNeeded();
     const box = await locator.boundingBox();
     if (box === null) throw new Error('the target is not on screen');
     return { x: box.x + box.width / 2, y: box.y + box.height * down };

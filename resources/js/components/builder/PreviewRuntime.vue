@@ -602,9 +602,11 @@ function go(delta: number): void {
 }
 
 /* Where a moving question would land: a rule above or below a row — a shadow, so nothing shifts under the pointer — or
-   an outlined zone. The question itself stays in place, dimmed, until the drop. */
+   an outlined zone. The question itself stays in place, outlined, until the drop: dimming it took its label below 4.5:1,
+   which axe measured on the first keyboard grab it scanned. */
 .preview__row--moving {
-    opacity: 0.5;
+    outline: 2px dashed var(--mds-color-border-strong);
+    outline-offset: 2px;
 }
 
 .preview__row--drop-before {

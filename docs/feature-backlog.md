@@ -13697,3 +13697,26 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   only from the settings pane (`ConfigPanel.vue`'s `setSection`), and the server caps it at 255 characters. The same
   `InlineLabelEdit` serves it, through a `renameSection` beside `renameField`. **Live.** Filed by `M150`.
   **Tier: during-testing.**
+
+- **`major` · On a form whose questions carry a place within their section — every XLSForm import — a drag reorders the
+  builder's list but not what respondents, the paper and the export see.** Found by `M151` while planning `R-2baef8ea`.
+  `XlsformImportParser::assignSequences()` numbers each question within its section, and `XlsformImporter.php` stores it as
+  `section_sequence`; the runtime orders a section by it before `sequence` (`sectionFieldsInOrder()` in
+  `resources/public-runtime/composables/useFormRuntime.ts`), and so do the print (`BlankFormPrintPresenter.php`) and the XLSForm
+  export (`XlsformExporter.php`). `useBuilderStore.placeField()` renumbers only `sequence`, `moveFieldToSection()` carries the old
+  section's number into the new one, and `persistOrder()` sends the stale numbers back — so Structure's drag and keyboard move
+  (`M150`) reorder the builder's list while the guest form, Print blank, the export and the builder's own Preview keep the
+  import's order, and a Preview drag would snap back. On the dev database one draft carries them (`Patient Intake`: ten of
+  eleven, and one question added later with none). The import assigns both numbers in one pass, so they agree within a
+  section, and the remedy clears `section_sequence` wherever the builder renumbers, leaving `sequence` — which every reader
+  already falls back to — the one order. A draft dragged on staging between `M150`'s deploy and the fix keeps the mismatch
+  until its next drag. **Live.** Filed by `M151`. **Tier: early-testing.**
+
+- **`minor` · A scan whose second page is uploaded first reads every question on that page as not found.** Found by `M151`
+  while guiding the staging scan. `PrintedFormMatcher::anchor()` joins every page's lines in upload order and looks for each
+  question only after the one before it, so with page 2 first, page 1's questions are found and page 2's are looked for only
+  after them, where nothing is left. The upload sends the files in the order the browser's picker returns them
+  (`resources/js/components/ocr/scan-upload.ts`), which on Windows can put the last-clicked file first, and the bake-off
+  harness never meets it because it takes pages in file-name order. Reasoned from the code, not yet measured — the harness on
+  form 14 with its two pages swapped measures it. The remedy orders the pages before matching (by the page on which the
+  first question is read) or says so on the review page. **Live.** Filed by `M151`. **Tier: early-testing.**

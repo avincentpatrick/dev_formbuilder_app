@@ -24,10 +24,20 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D104`, the last one open, was answered on 2026-10-08 and recorded in `M150`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D105`, the last one filed, was asked and answered on 2026-10-09 in the session that filed it and recorded in `M151`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D105 — In Preview a stepped form shows one section's page at a time, so the sections a dragged question could join are off screen. How does a drag in Preview reach them? **A — while a question is dragged, the page strip's tabs are drop targets: a drop on one moves it to the end of that page, and the preview stays on the page it was on.**
+
+**Asked and answered 2026-10-09 (user decision, in chat), recorded by Lane A in `M151`'s claim.** `R-2baef8ea` (*"please include the preview section to be draggable. i mean, questions or indicators must be draggable to sections, sequencing, etc."*) asks for a question to be dragged into a section, and in a stepped form every section but the one on screen is behind the strip.
+
+- **A — the strip's tabs are drop targets (recommended, chosen).** Within the page shown a drag reorders; while a drag is on, the strip offers each page as a target, and a drop puts the question at the end of that page — the end of its section unless page breaks split it — without leaving the page the author was on. In the single-page view every visible section, its *Add a question to …* area and an empty section's placeholder are targets.
+- **B — reorder within the page shown only.** Moving to another section stays in Structure or the single-page view. The smallest and safest for Oct 12.
+- **C — a tab flips the page while a question hovers over it,** so the question can be dropped at an exact place. The most natural and the most likely to slip past Oct 12.
+
+Whole sections are still moved in Structure only. **What the answer files:** nothing new — it is the shape of `R-2baef8ea`'s remedy, which `M151` takes.
+
 ### D104 — Cloud Vision alone misses G9 on the first real round of samples, even with the reader's three defects fixed (`M149`), and `D97` says a vision-language arm comes next. What does single-form OCR do before and after the Oct 12 testing? **A — Cloud Vision as it is for the Oct 12 testing; the vision-language arm is built and measured during testing, and reaches staging only if it meets G9.**
 
 **Answered 2026-10-08 (user decision, in chat) — A, the recommendation; recorded by Lane A in `M150`'s claim.** The `M149` session asked it before it closed; the answer arrived in the next session, before any row it blocked was opened. **What the answer files, in the same push:** `ocr-provider-bakeoff` drops `decision=D104` and is `ready` — its remaining work is ADR-0010 recording A (Cloud Vision for the testing, 90/70 confirmed by Round 1, the arm measured during testing), taken with `R-39a5388f`; a new `during-testing` marker `ocr-vlm-arm` (`docs/ocr-pipeline-design.md`, end of file) holds the arm itself, blocked on the user for an Anthropic API key and the agency's consent to send scanned pages to a second provider; and `R-a21fa6e8` (ticks Vision never returns) is retiered `during-testing`, because its remedy is that arm. Until it ships, reviewers key a blank tick on the mandatory review screen.

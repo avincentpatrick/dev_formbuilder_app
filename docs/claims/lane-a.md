@@ -16,7 +16,67 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M150` is merged and live on staging; the next session opens with the user's check of the Structure fixes on staging (`r2-c17`, `r2-c18`: the handle, a drag that glides, **Edit label**) and, if it is still not done, the user's staging scan (`ocr-staging-scan`, then the server's `.env` backup deleted); then takes Preview's two `D103` rows — a label edited in place (`R-74c3cf35`, reusing `InlineLabelEdit.vue`) and dragging in Preview (`R-2baef8ea`, the riskiest) — as the next increment
+## Status: ACTIVE CLAIM — `M151`, Preview's two `D103` rows: a question's label cannot be edited in Preview, and questions cannot be dragged in Preview; plus an imported form whose order a drag never reaches (`m151-preview-builder`)
+
+Taken 2026-10-09. Branch `m151-preview-builder`, cut from `origin/main` at `4e194b2e`, PR into `main`. Rows: `R-250b57eb` (`major`,
+filed in this claim), `R-74c3cf35` and `R-2baef8ea` (both `early-testing`, filed by `M148` from Round 2 of the staging smoke test,
+`r2-c17` and `r2-c18`). **The user confirmed `M150`'s Structure fixes on staging at the start of this session** (the handle, the
+glide, **Edit label**), so the check that opened it is discharged. **Batching:** `D103` names both Preview rows for Oct 12 and they
+share `PreviewRuntime.vue`/`PreviewPane.vue`; `R-250b57eb` rides with them because a Preview drag on an imported form would snap
+back without it. Under `D75` each row is its own commits, in the order below, and **the drag's commits come last and can be dropped
+as a set** — the Oct 9 checkpoint names `R-2baef8ea` as the item at risk; if it slips it becomes `M152`. **Recorded in this claim:**
+`D105` (asked and answered in chat — a drag reaches another page through the strip's tabs) and `R-4aaf3b6f` (a scan's page order),
+found guiding the staging scan and not taken here.
+
+### Evidence verified
+Each row against the trunk at `4e194b2e`.
+- **`R-250b57eb` — held, measured on the dev database and by reading.** `Patient Intake`'s draft carries `section_sequence` 0–9 beside
+  `sequence` 0–9 and one later question with none; `sectionFieldsInOrder()` sorts by `sectionSequence ?? sequence`;
+  `placeField()` writes only `sequence`; `persistOrder()` sends `section_sequence` unchanged; `snapshotOrder()`/`applyOrder()` carry
+  only `sequence` and the section. The red-first Vitest case proves it before the fix.
+- **`R-74c3cf35` — held.** The preview's label is drawn inside the shared `FieldInput.vue` (through `FieldRow` → `FieldControl`, as
+  `runtime.labelFor()`, piped and localised); a note whose blocks render shows no label at all (`D69`); `shapeOf()` leaves labels out,
+  so a rename never remounts `PreviewRuntime`.
+- **`R-2baef8ea` — held, and it understates itself.** Rows render in the frozen engine's step order; `shapeOf()` carries `sequence`,
+  `section_sequence` and `section_key`, so any move remounts `PreviewRuntime` after the 300ms debounce, destroying the row under the
+  pointer and resetting every preview answer (no `initialAnswers` is passed). The row does not say that on an imported form the
+  rebuilt order ignores the move — that is `R-250b57eb`.
+
+### Premise verified
+- **The shared respondent components stay untouched** (`M118`): `FieldRow`, `FieldControl` and `FieldInput` are the guest app's, so
+  the editor and the grip live in `PreviewRuntime.vue`'s row wrapper, above the control, never inside its label.
+- **`PreviewPane.vue` never remounts and `PreviewRuntime.vue` does** — so the editing key, the drag's state, the carried answers and
+  the live region live in the pane.
+- **Structure's drag shipped yesterday and the user just passed it** — so `useCanvasReorder.ts` is not generalised under it three
+  days before testing; Preview gets its own composable and the duplicated pointer core is filed when it exists.
+- **The live region is gated:** `clipped-node-containment.test.ts` refuses a clipped node in a `.vue` that positions nothing, so the
+  pane carries `position: relative` with its region and `PreviewRuntime` adds none.
+- **One writer:** one lane (`ADR-0022`); the `formbuilder-ocr` worktree is detached and idle.
+
+### Remedy verdict
+- **`R-250b57eb` — works, and costs no order:** the import assigns both numbers in one pass, so clearing `section_sequence` wherever
+  the builder renumbers leaves the order unchanged and makes `sequence` the one order every reader already falls back to; undo
+  restores `sequence`, which the order then follows.
+- **`R-74c3cf35` — works as amended.** The row puts the editor in the row wrapper bound to `field.label`; it must bind the STORE's raw
+  label (the rendered one is piped, localised and "Untitled question" when empty), its state must sit in `PreviewPane` to survive a
+  remount, and the engine's rebuild is held while it is open.
+- **`R-2baef8ea` — none offered; the remedy here:** a drag computes its target and draws an indicator without touching the store,
+  then on the drop writes once (`placeField` + `commitReorder`) and rebuilds at once, carrying the preview's answers; keyboard moves
+  step over visible places only; the strip's tabs are targets during a drag (`D105`).
+
+Files: `resources/js/components/builder/useBuilderStore.ts`, `PreviewRuntime.vue`, `PreviewPane.vue`, `preview-model.ts`,
+`draft-snapshot.ts`, `PreviewStepStrip.vue`, `useFlipReorder.ts`, a new `usePreviewReorder.ts`, and their tests (`reorder-store`,
+`PreviewPane`, `PreviewRuntime`, `preview-model`, `draft-snapshot`, `PreviewStepStrip`, `useFlipReorder`, a new `usePreviewReorder`),
+all under `resources/js/components/builder/`; `tests/e2e/builder-preview-authoring.spec.ts`, `tests/e2e/builder-axe.spec.ts`.
+No hub: `Builder.vue` and `routes/tenant.php` are untouched; both endpoints exist.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`, the two E2E specs above, and the
+close-out set (`PROGRESS.md` own block, `docs/gate-baselines.md`, `docs/backlog-triage.md`).
+Paired files taken: none — the containment gate reads `resources/js` but its list is not edited.
+Namespaces spent: `D105`; nothing from the ADR or migration namespaces.
+Prediction: the store fix's case red first and green after; every new Vitest case red against its mutant; `vue-tsc` clean;
+PHPStan cannot move (no PHP in the diff); the reached E2E specs green at all three viewports; CI 6/6. **Most likely wrong: the glide
+across the remount** — `useFlipReorder` must measure the old rows before the keyed `PreviewRuntime` is replaced and invert the new
+ones after, with focus landing on the moved row's new grip; it is proved only in a real browser.
 
 ## RELEASED — `M150`, Structure's four builder rows from `D103` and the keyboard focus row beside them: the grip drawn heavier, rows that glide to their new places, a question's label edited on its row, the grips naming Space, and a keyboard step that keeps focus; `D104` recorded as A (merged as PR #343, `fe096004`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

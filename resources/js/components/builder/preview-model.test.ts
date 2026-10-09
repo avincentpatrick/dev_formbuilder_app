@@ -13,13 +13,16 @@ import { describe as group, expect, it } from 'vitest';
 import {
     PREVIEW_REBUILD_DEBOUNCE_MS,
     buildPreviewModel,
+    carryAnswers,
     engineKnows,
     isCaptureField,
     previewFieldsFor,
     previewLimitations,
     previewPendingFields,
+    previewPlacement,
     previewRenderedSteps,
     previewSectionFor,
+    previewStepEndTarget,
     previewStepLabels,
     LEAD_STEP_LABEL,
     PREVIEW_STRIP_MAX_SEGMENTS,
@@ -417,5 +420,95 @@ group('previewRenderedSteps', () => {
         const steps = [s1, s2];
 
         expect(previewRenderedSteps(steps, s1, true)).not.toBe(steps);
+    });
+});
+
+/**
+ * M151 (`R-2baef8ea`) — where a question dropped in the preview goes. The preview does not draw every question the store
+ * orders, so a drop names a NEIGHBOUR the author saw and this turns it into `placeField`'s section and index, counting
+ * every question of that section — the ones the preview draws and the ones it does not.
+ */
+group('a drop in the preview becomes one store move (M151)', () => {
+    /** Section A holds a, b (a page break), c, d (hidden); section B holds e. The lead block holds top. */
+    function ctx() {
+        const fields = [
+            field({ uid: 'u-top', key: 'top', sequence: 0 }),
+            field({ uid: 'u-a', key: 'a', form_section_id: 'sid-A', sequence: 1 }),
+            field({ uid: 'u-pb', key: 'pb', form_section_id: 'sid-A', field_type: 'page_break', sequence: 2 }),
+            field({ uid: 'u-c', key: 'c', form_section_id: 'sid-A', sequence: 3 }),
+            field({ uid: 'u-d', key: 'd', form_section_id: 'sid-A', field_type: 'hidden', sequence: 4 }),
+            field({ uid: 'u-e', key: 'e', form_section_id: 'sid-B', sequence: 5 }),
+        ];
+        const { projection } = buildPreviewModel(
+            input(fields, [section({ uid: 'A', key: 'sec_a', sequence: 0 }), section({ uid: 'B', key: '', label: 'No key yet', sequence: 1 })]),
+        );
+
+        return { fields, uidByKey: projection.uidByKey, sectionIdByKey: projection.sectionIdByKey };
+    }
+
+    it('counts a question the preview does not draw: below a is page 1, above c is page 2', () => {
+        expect(previewPlacement({ kind: 'after', key: 'a' }, 'e', ctx())).toEqual({ group: 'sid-A', index: 1 });
+        expect(previewPlacement({ kind: 'before', key: 'c' }, 'e', ctx())).toEqual({ group: 'sid-A', index: 2 });
+    });
+
+    it('leaves the dragged question out of the count when it moves down its own section', () => {
+        // a moves below c: the others are [pb, c, d], so below c is index 2 — not 3, which counting a itself would give.
+        expect(previewPlacement({ kind: 'after', key: 'c' }, 'a', ctx())).toEqual({ group: 'sid-A', index: 2 });
+    });
+
+    it('puts a question at the end of a section, past one the preview never draws', () => {
+        expect(previewPlacement({ kind: 'end', sectionKey: 'sec_a' }, 'e', ctx())).toEqual({ group: 'sid-A', index: 4 });
+    });
+
+    it('finds a section with no key yet by the temporary key the preview gave it', () => {
+        const c = ctx();
+        const draftKey = Object.keys(c.sectionIdByKey).find((key) => c.sectionIdByKey[key] === 'sid-B');
+        expect(draftKey).toMatch(/^__draft_/);
+        expect(previewPlacement({ kind: 'end', sectionKey: draftKey! }, 'a', c)).toEqual({ group: 'sid-B', index: 1 });
+    });
+
+    it('moves a question into the first questions, which have no section', () => {
+        expect(previewPlacement({ kind: 'before', key: 'top' }, 'e', ctx())).toEqual({ group: null, index: 0 });
+        expect(previewPlacement({ kind: 'end', sectionKey: null }, 'e', ctx())).toEqual({ group: null, index: 1 });
+    });
+
+    it('writes nothing for a drop where the question already is, or one that names nothing', () => {
+        const c = ctx();
+        expect(previewPlacement({ kind: 'before', key: 'pb' }, 'a', c)).toBeNull();
+        expect(previewPlacement({ kind: 'after', key: 'top' }, 'a', c)).not.toBeNull();
+        expect(previewPlacement({ kind: 'before', key: 'a' }, 'a', c)).toBeNull();
+        expect(previewPlacement({ kind: 'end', sectionKey: 'sec_b' }, 'e', c)).toBeNull();
+        expect(previewPlacement({ kind: 'after', key: 'gone' }, 'a', c)).toBeNull();
+        expect(previewPlacement({ kind: 'end', sectionKey: 'no_such_section' }, 'a', c)).toBeNull();
+    });
+
+    it('drops on a page at its end, and on a repeatable page at its section’s end (D105)', () => {
+        expect(previewStepEndTarget(step({ sectionKey: 'sec_a', fieldKeys: ['a', 'pb'] }))).toEqual({ kind: 'after', key: 'pb' });
+        expect(previewStepEndTarget(step({ sectionKey: 'hh', fieldKeys: ['m1'], isRepeat: true }))).toEqual({ kind: 'end', sectionKey: 'hh' });
+    });
+});
+
+group('the preview’s answers outlive a rebuild (M151)', () => {
+    function schemaOf(fields: Array<[string, string, string | null]>, repeats: string[] = []) {
+        return buildPreviewModel(
+            input(
+                fields.map(([key, type, sectionId], i) => field({ uid: `u-${key}`, key, field_type: type, form_section_id: sectionId, sequence: i })),
+                repeats.map((key, i) => section({ uid: key, key, is_repeatable: true, sequence: i })),
+            ),
+        ).projection.schema;
+    }
+
+    it('keeps an answer whose question is still the same type, and a repeat while it repeats', () => {
+        const before = schemaOf([['name', 'short_text', null], ['age', 'integer', null], ['gone', 'short_text', null]], ['hh']);
+        const after = schemaOf([['name', 'short_text', null], ['age', 'short_text', null]], ['hh']);
+
+        expect(carryAnswers({ name: 'Sam', age: 4, gone: 'x', hh: [{ m: 'a' }] }, before, after)).toEqual({ name: 'Sam', hh: [{ m: 'a' }] });
+    });
+
+    it('drops a repeat’s instances once its section stops repeating', () => {
+        const before = schemaOf([], ['hh']);
+        const after = schemaOf([]);
+
+        expect(carryAnswers({ hh: [{ m: 'a' }] }, before, after)).toEqual({});
     });
 });

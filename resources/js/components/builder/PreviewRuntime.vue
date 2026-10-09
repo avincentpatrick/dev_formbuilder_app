@@ -32,18 +32,30 @@
  * side of the glass — there, Vue rendered a template comment into `wrapper.html()` and broke the substring
  * assertion the comment explained. A rule about a forbidden string cannot be documented by quoting it.
  */
-import { computed, provide, watch } from 'vue';
-import { MdsButton } from '@meridian/design-system';
+import { computed, provide, ref, watch } from 'vue';
+import { MdsButton, MdsIcon, MdsIconButton } from '@meridian/design-system';
 import FieldRow from '../../../public-runtime/components/FieldRow.vue';
 import RepeatGroup from '../../../public-runtime/components/RepeatGroup.vue';
 import { AnnouncerKey, RuntimeKey } from '../../../public-runtime/composables/context';
 import { createFormRuntime } from '../../../public-runtime/composables/useFormRuntime';
 import type { RuntimeStep } from '../../../public-runtime/composables/useFormRuntime';
-import type { RenderField, RenderModel, RenderSection, SchemaResponse } from '../../../public-runtime/lib/types';
+import type { AnswerMap, RenderField, RenderModel, RenderSection, SchemaResponse } from '../../../public-runtime/lib/types';
 import { ContentHeadingBaseKey } from '../submissions/note-content';
 import type { ProjectionIssue } from './draft-snapshot';
-import { engineKnows, isCaptureField, previewFieldsFor, previewPendingFields, previewRenderedSteps, previewSectionFor, previewStepLabels } from './preview-model';
+import InlineLabelEdit from './InlineLabelEdit.vue';
+import {
+    engineKnows,
+    isCaptureField,
+    previewFieldsFor,
+    previewPendingFields,
+    previewRenderedSteps,
+    previewSectionFor,
+    previewShowsLabel,
+    previewStepEndTarget,
+    previewStepLabels,
+} from './preview-model';
 import PreviewStepStrip from './PreviewStepStrip.vue';
+import { dropIdOf } from './usePreviewReorder';
 
 const props = defineProps<{
     /** The frozen snapshot this engine was built from. Never mutated; a new one arrives as a remount. */
@@ -66,10 +78,36 @@ const props = defineProps<{
      * with nothing to answer is no step, for the respondent too — so the preview shows them to the author only.
      */
     emptySections?: Array<{ key: string; label: string }>;
+    /**
+     * M151 (`R-74c3cf35`): the question whose label is being edited, and the stored label it opens with. Both live in the
+     * pane, which does not remount, so an edit outlives a rebuild of this component.
+     */
+    editingKey?: string | null;
+    editingValue?: string;
+    /**
+     * M151 (`R-2baef8ea`): the answers the previous engine held, carried across the remount a move causes — the author
+     * was trying their conditions out — and the move in progress, which `usePreviewReorder` in the pane owns.
+     */
+    initialAnswers?: AnswerMap;
+    reordering?: boolean;
+    draggingKey?: string | null;
+    dropId?: string | null;
 }>();
 
 // M139: the author's own controls in the preview. The pane turns them into a selection and an opened palette.
-const emit = defineEmits<{ select: [key: string]; step: [key: string]; 'add-question': [sectionKey: string | null]; 'add-section': [] }>();
+// M151: and a label edited on its row, which the pane writes through the store.
+const emit = defineEmits<{
+    select: [key: string];
+    step: [key: string];
+    'add-question': [sectionKey: string | null];
+    'add-section': [];
+    edit: [key: string];
+    rename: [key: string, value: string, via: 'key' | 'blur'];
+    'edit-cancel': [key: string];
+    'grip-pointerdown': [event: PointerEvent, key: string];
+    'grip-keydown': [event: KeyboardEvent, key: string];
+    'grip-blur': [key: string];
+}>();
 
 const runtime = createFormRuntime(props.snapshot, {
     initialLocale: props.snapshot.form.default_locale,
@@ -81,6 +119,7 @@ const runtime = createFormRuntime(props.snapshot, {
     // re-run the step list on every keystroke, while this invalidates only when the mode itself flips — and it
     // follows that flip with no remount (the same live channel `singlePage` below reads, for the same reason).
     paginateAtPageBreaks: computed(() => !props.model.form.single_page_mode),
+    initialAnswers: props.initialAnswers,
 });
 
 provide(RuntimeKey, runtime);
@@ -91,7 +130,9 @@ provide(ContentHeadingBaseKey, 3);
 
 const steps = computed(() => runtime.visibleSteps.value);
 const step = computed(() => runtime.currentStep.value);
-const pending = computed(() => previewPendingFields(steps.value, props.model));
+// M151: only what the engine has not met yet. A question in a section its condition hides is in no shown step either, and
+// was listed here as "just added" — under a note promising it would appear, which it never would.
+const pending = computed(() => previewPendingFields(steps.value, props.model).filter((field) => !engineKnows(runtime, field.key)));
 
 /**
  * ⛔ THE MODE COMES FROM THE LIVE RENDER MODEL AND NEVER FROM `runtime.singlePageMode`, AND THAT IS A
@@ -181,6 +222,57 @@ function issuesFor(field: RenderField): ProjectionIssue[] {
 }
 
 /**
+ * Whether a row carries the author's tools (M151, `R-74c3cf35`). They sit ABOVE the respondent's control and never inside
+ * its label, which the shared `FieldInput` draws (as a label, a legend or a note's paragraph) and this pane may not edit;
+ * and the label editor exists only while it is open. A question hidden by its condition renders an empty row — `FieldRow`
+ * keeps its wrapper and drops the control — so it gets none: there is nothing on screen to edit beside. A capture field
+ * is drawn inert whatever its condition, and a question the engine has not met yet errs toward being shown.
+ */
+function showsTools(field: RenderField): boolean {
+    return isCaptureField(field) || !engineKnows(runtime, field.key) || runtime.fieldRelevance.value[field.key] === true;
+}
+
+/**
+ * A double-click on the question's own name opens its label editor, as on Structure's row. Only on the FIRST naming
+ * element in the row — the single control's label or the group's legend, both drawn by `FieldInput` ahead of any choice,
+ * or the inert row's label — so a double-click into an input, on a choice's label or on a cascade level's label keeps
+ * doing what it does for a respondent. Being first is the whole test: narrowing it to `label[for]` was a mutant no case
+ * could kill, because no layout draws a choice before the name. A note without blocks draws its label as a paragraph
+ * and has no such element; its Edit button covers it.
+ */
+function onRowDblclick(event: MouseEvent, field: RenderField): void {
+    if (props.editingKey === field.key || !showsTools(field) || !previewShowsLabel(field)) return;
+
+    const name = (event.currentTarget as HTMLElement).querySelector('legend, label, .preview__inert-label');
+    if (name !== null && event.target instanceof Node && name.contains(event.target)) {
+        emit('edit', field.key);
+    }
+}
+
+const editor = ref<InstanceType<typeof InlineLabelEdit> | null>(null);
+
+function setEditor(instance: unknown): void {
+    editor.value = (instance as InstanceType<typeof InlineLabelEdit> | null) ?? null;
+}
+
+// The pane ends an open edit itself when the view is left — a hidden input never blurs. And it reads the answers before a
+// rebuild replaces this engine, to hand them to the next one (M151).
+defineExpose({
+    commitEdit: () => editor.value?.commit('blur'),
+    answersSnapshot: (): AnswerMap => JSON.parse(JSON.stringify(runtime.answers)) as AnswerMap,
+});
+
+/** Where a drop on a page's own "Add a question" area — or on the page in the strip — puts a question: its end (D105). */
+function pageEndId(s: RuntimeStep): string {
+    return dropIdOf(previewStepEndTarget(s));
+}
+
+/** While a question is moving, the strip offers every page as a place to drop it, under the page's own label. */
+const stripDropZones = computed(() =>
+    props.reordering ? steps.value.map((s, i) => ({ id: pageEndId(s), label: stripOptions.value[i]?.label ?? '' })) : null,
+);
+
+/**
  * The required marker, or null when the engine has not caught up.
  *
  * A field in the current step is by construction known to the engine, so this matters for the pending block
@@ -218,6 +310,8 @@ function go(delta: number): void {
             v-if="!singlePage && stripOptions.length > 1"
             :options="stripOptions"
             :current-key="step?.key ?? null"
+            :drop-zones="stripDropZones"
+            :drop-id="dropId ?? null"
             @go="runtime.goToStep($event)"
         />
 
@@ -270,11 +364,48 @@ function go(delta: number): void {
                         v-for="field in block.fields"
                         :key="field.key"
                         class="preview__row"
-                        :class="{ 'preview__row--selected': field.key === selectedKey }"
+                        :class="{
+                            'preview__row--selected': field.key === selectedKey,
+                            'preview__row--moving': field.key === draggingKey,
+                            'preview__row--drop-before': dropId === `before:${field.key}`,
+                            'preview__row--drop-after': dropId === `after:${field.key}`,
+                        }"
                         :data-preview-field="field.key"
+                        v-bind="showsTools(field) ? { 'data-drop-row': '', 'data-drop-id': `before:${field.key}`, 'data-drop-label': `above ${field.label}` } : {}"
                         @click="emit('select', field.key)"
                         @focusin="emit('select', field.key)"
+                        @dblclick="onRowDblclick($event, field)"
                     >
+                        <div v-if="showsTools(field)" class="preview__tools" data-preview-tools>
+                            <button
+                                type="button"
+                                class="preview__grip"
+                                data-preview-grip
+                                :aria-label="`Reorder ${field.label}. Press Enter or Space to grab, then arrow keys; or drag.`"
+                                @pointerdown="emit('grip-pointerdown', $event, field.key)"
+                                @keydown="emit('grip-keydown', $event, field.key)"
+                                @blur="emit('grip-blur', field.key)"
+                            >
+                                <MdsIcon name="grip" size="md" />
+                            </button>
+                            <InlineLabelEdit
+                                v-if="editingKey === field.key"
+                                :ref="setEditor"
+                                :value="editingValue ?? ''"
+                                label="Question label"
+                                @commit="(value, via) => emit('rename', field.key, value, via)"
+                                @cancel="emit('edit-cancel', field.key)"
+                            />
+                            <MdsIconButton
+                                v-else-if="previewShowsLabel(field)"
+                                icon="edit"
+                                :label="`Edit label of ${field.label}`"
+                                size="sm"
+                                :disabled="reordering"
+                                data-preview-edit-label
+                                @click="emit('edit', field.key)"
+                            />
+                        </div>
                         <div v-if="isCaptureField(field)" class="preview__inert" :data-preview-inert="field.key">
                             <p class="preview__inert-label">
                                 {{ runtime.labelFor(field) }}
@@ -293,7 +424,14 @@ function go(delta: number): void {
                     </div>
                 </div>
 
-                <div class="preview__author" data-preview-author>
+                <div
+                    class="preview__author"
+                    :class="{ 'preview__drop--active': dropId === pageEndId(block.step) }"
+                    data-preview-author
+                    data-drop-zone
+                    :data-drop-id="pageEndId(block.step)"
+                    :data-drop-label="`at the end of ${block.title ?? 'the first questions'}`"
+                >
                     <MdsButton
                         type="button"
                         variant="tertiary"
@@ -324,8 +462,12 @@ function go(delta: number): void {
             v-for="empty in emptySections ?? []"
             :key="`empty-${empty.key}`"
             class="preview__step preview__step--empty"
+            :class="{ 'preview__drop--active': dropId === `end:${empty.key}` }"
             data-preview-empty-section
             :data-empty-section-key="empty.key"
+            data-drop-zone
+            :data-drop-id="`end:${empty.key}`"
+            :data-drop-label="`into ${empty.label}`"
         >
             <header class="preview__head">
                 <h3 class="preview__title">{{ empty.label }}</h3>
@@ -427,6 +569,67 @@ function go(delta: number): void {
     font-family: var(--mds-font-family-body);
     font-size: var(--mds-type-body-md-font-size);
     color: var(--mds-color-text-secondary);
+}
+
+/* M151: the author's tools above a question, set off from the respondent's control by sitting outside it. */
+.preview__grip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--mds-radius-sm);
+    background: transparent;
+    color: var(--mds-color-text-secondary);
+    cursor: grab;
+    touch-action: none;
+}
+
+/* Structure's grip, drawn the same heavier way (M150, `R-91c1792e`). */
+.preview__grip :deep(svg) {
+    stroke-width: 3;
+}
+
+.preview__grip:hover {
+    background-color: var(--mds-color-bg-sunken);
+    color: var(--mds-color-text-body);
+}
+
+.preview__grip:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 1px;
+}
+
+/* Where a moving question would land: a rule above or below a row — a shadow, so nothing shifts under the pointer — or
+   an outlined zone. The question itself stays in place, outlined, until the drop: dimming it took its label below 4.5:1,
+   which axe measured on the first keyboard grab it scanned. */
+.preview__row--moving {
+    outline: 2px dashed var(--mds-color-border-strong);
+    outline-offset: 2px;
+}
+
+.preview__row--drop-before {
+    box-shadow: 0 -3px 0 0 var(--mds-color-action-primary-bg);
+}
+
+.preview__row--drop-after {
+    box-shadow: 0 3px 0 0 var(--mds-color-action-primary-bg);
+}
+
+.preview__drop--active {
+    outline: 2px dashed var(--mds-color-action-primary-bg);
+    outline-offset: 2px;
+}
+
+.preview__tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mds-space-2);
+    margin-bottom: var(--mds-space-1);
 }
 
 /* The selected row echoes the config panel's subject. A left rule rather than a fill, so it never competes

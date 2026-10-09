@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { assertClean } from './support/axe';
 import { archive, createForm, reorderSent, saved } from './support/builder';
 import { showBuilderPane } from './support/navigate';
@@ -155,6 +155,145 @@ test('Builder — a half-built rule row leaves the other conditions working, and
         await expect(page.locator('[data-preview-field="dependent"]').getByRole('textbox')).toHaveCount(0);
         await expect(page.locator('[data-preview-field="trigger"] .preview__issue')).toContainText('not finished');
         await assertClean(page, 'builder preview with an ignored half-built rule');
+    } finally {
+        await archive(page, formId);
+    }
+});
+
+/*
+ * M151 (`R-74c3cf35`) — Round 2's note `r2-c17`: "can we also use the middle section (structure and preview) to allow the
+ * user to edit the label there already". `M150` gave Structure its half; this is Preview's. The Edit button on a question's
+ * row opens its label in place, Enter saves it once, focus comes back to the button, and a reload keeps it.
+ */
+test('Builder — a question’s label edited in place in the preview, saved once and kept after a reload', async ({ page }, info) => {
+    test.setTimeout(150_000);
+    const formId = await createForm(page, `Preview label ${info.project.name} ${Date.now()}`);
+
+    try {
+        await showBuilderPane(page, 'fields');
+        await page.locator('.palette').getByRole('button', { name: 'Text', exact: true }).click();
+        await settled(page);
+        await openPreview(page);
+
+        const row = page.locator('[data-preview-field]').first();
+        await expect(row).toBeVisible({ timeout: 15_000 });
+        await row.locator('[data-preview-edit-label]').click();
+        const input = row.getByRole('textbox', { name: 'Question label' });
+        await expect(input).toBeFocused();
+        await input.fill('Asked in the preview');
+
+        const patched = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes(`/forms/${formId}/fields/`) && r.ok());
+        await input.press('Enter');
+        await patched;
+        await expect(row.locator('[data-preview-edit-label]')).toBeFocused();
+        await expect(row).toContainText('Asked in the preview');
+        await saved(page);
+
+        await page.reload({ waitUntil: 'networkidle' });
+        await openPreview(page);
+        await expect(page.locator('[data-preview-field]').first()).toContainText('Asked in the preview', { timeout: 15_000 });
+    } finally {
+        await archive(page, formId);
+    }
+});
+
+/*
+ * M151 (`R-2baef8ea`) — Round 2's note `r2-c18`: "please include the preview section to be draggable. i mean, questions or
+ * indicators must be draggable to sections, sequencing, etc." With a real mouse: a question dragged below another, one
+ * dropped on a new section's placeholder, and — the form being stepped — one dropped on a page in the strip (`D105`),
+ * which leaves the author on their page; then a keyboard move that keeps focus on the grip. All of it after a reload.
+ */
+async function drag(page: Page, from: Locator, to: () => Promise<{ x: number; y: number }>): Promise<void> {
+    await from.locator('[data-preview-grip]').scrollIntoViewIfNeeded();
+    const grip = await from.locator('[data-preview-grip]').boundingBox();
+    if (grip === null) throw new Error('the grip is not on screen');
+    await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2 + 12, { steps: 3 });
+    await expect(page.locator('.builder-preview__sr')).toContainText('Dragging');
+    const target = await to();
+    await page.mouse.move(target.x, target.y, { steps: 8 });
+    await page.mouse.up();
+}
+
+/** Where to release over a target. Scrolled into view first, as an author scrolls mid-drag: on a phone the place is often below the fold. */
+async function centreOf(locator: Locator, down = 0.5): Promise<{ x: number; y: number }> {
+    await locator.scrollIntoViewIfNeeded();
+    const box = await locator.boundingBox();
+    if (box === null) throw new Error('the target is not on screen');
+    return { x: box.x + box.width / 2, y: box.y + box.height * down };
+}
+
+test('Builder — questions dragged in the preview: reordered, into a new section, onto a page in the strip, and by keyboard', async ({ page }, info) => {
+    test.setTimeout(240_000);
+    const formId = await createForm(page, `Preview drag ${info.project.name} ${Date.now()}`);
+
+    try {
+        for (let i = 0; i < 3; i++) {
+            await showBuilderPane(page, 'fields');
+            await page.locator('.palette').getByRole('button', { name: 'Text', exact: true }).click();
+            await settled(page);
+        }
+        await openPreview(page);
+        const rows = page.locator('[data-builder-preview] [data-preview-field]');
+        await expect(rows).toHaveCount(3, { timeout: 15_000 });
+        for (const [i, name] of ['Alpha', 'Beta', 'Gamma'].entries()) {
+            await rows.nth(i).locator('[data-preview-edit-label]').click();
+            const input = rows.nth(i).getByRole('textbox', { name: 'Question label' });
+            await input.fill(name);
+            await input.press('Enter');
+            await expect(rows.nth(i)).toContainText(name);
+        }
+        await settled(page);
+        const row = (name: string) => page.locator('[data-builder-preview] [data-preview-field]', { hasText: name });
+
+        // Within the page: Alpha dropped below Gamma, written once, and shown there without waiting.
+        let sent = reorderSent(page, formId);
+        await drag(page, row('Alpha'), () => centreOf(row('Gamma'), 0.85));
+        await sent;
+        await expect(rows.nth(2)).toContainText('Alpha');
+        await expect(rows.nth(0)).toContainText('Beta');
+
+        // Into a section with no question yet, through its placeholder.
+        await page.locator('[data-preview-add-section]').click();
+        const placeholder = page.locator('[data-preview-empty-section]');
+        await expect(placeholder).toBeVisible({ timeout: 15_000 });
+        await saved(page);
+        sent = reorderSent(page, formId);
+        await drag(page, row('Alpha'), () => centreOf(placeholder));
+        await sent;
+        await expect(placeholder).toHaveCount(0);
+
+        // The form is stepped, so the new section is its own page: dropping Beta on that page in the strip moves it there
+        // and leaves the author where they were.
+        const shownPage = page.locator('[data-builder-preview] [data-section]').first();
+        const pageBefore = await shownPage.getAttribute('data-section-key');
+        sent = reorderSent(page, formId);
+        await drag(page, row('Beta'), () => centreOf(page.locator('[data-preview-drop-strip] li').nth(1)));
+        await sent;
+        await expect(shownPage).toHaveAttribute('data-section-key', pageBefore ?? '');
+        await expect(row('Beta')).toHaveCount(0);
+        await expect(page.locator('.builder-preview__sr')).toContainText('Dropped Beta');
+
+        // On that page, by keyboard: Beta moved above Alpha, and focus stays on its grip through the rebuild.
+        await page.locator('[data-preview-strip] label').nth(1).click();
+        await expect(row('Beta')).toBeVisible();
+        await row('Beta').locator('[data-preview-grip]').focus();
+        await page.keyboard.press('Enter');
+        await page.keyboard.press('ArrowUp');
+        await expect(row('Alpha')).toHaveClass(/preview__row--drop-before/);
+        sent = reorderSent(page, formId);
+        await page.keyboard.press('Enter');
+        await sent;
+        await expect(row('Beta').locator('[data-preview-grip]')).toBeFocused();
+        await saved(page);
+
+        // Saved: Structure shows Gamma alone at the top and the section holding Beta then Alpha.
+        await page.reload({ waitUntil: 'networkidle' });
+        await showBuilderPane(page, 'canvas');
+        await page.locator('.builder__centre-tabs').getByText('Structure').click();
+        await expect(page.locator('[data-drop-group="ungrouped"] .canvas__field-label')).toHaveText(['Gamma']);
+        await expect(page.locator('[data-drop-group]:not([data-drop-group="ungrouped"]) .canvas__field-label')).toHaveText(['Beta', 'Alpha']);
     } finally {
         await archive(page, formId);
     }

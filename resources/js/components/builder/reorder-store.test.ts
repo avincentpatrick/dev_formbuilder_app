@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { pageProps, serverField, serverSection } from './builder-store-fixtures';
+import { createFormRuntime } from '../../../public-runtime/composables/useFormRuntime';
+import { fetchMock, jsonResponse, pageProps, requestLog, serverField, serverSection } from './builder-store-fixtures';
+import { projectDraft } from './draft-snapshot';
 import { useBuilderStore } from './useBuilderStore';
 import type { ServerField } from './types';
 
@@ -66,5 +68,86 @@ describe('keyboard grab steps through places, crossing sections (M139)', () => {
 
         expect(s.stepFieldAcross(uid, 1)).toBe(false);
         expect(s.stepFieldAcross(uid, -1)).toBe(false);
+    });
+});
+
+/**
+ * M151 (`R-250b57eb`) — an XLSForm import stores each question's place within its section as `section_sequence`, and the
+ * engine orders a section by it before `sequence` (as Print blank and the export do). A move that renumbered only
+ * `sequence` reordered the builder's list and left the order a respondent, the paper and the preview see where the import
+ * put it. The import assigns both numbers in one pass, so they agree, and a move clears them all.
+ */
+describe('a move reaches the order the engine reads, on an imported form (M151)', () => {
+    /** Two imported sections: q1-q3 in s1 and q4-q5 in s2, each numbered within its section. */
+    function imported(): ReturnType<typeof store> {
+        return store(
+            [
+                { form_section_id: 's1', section_sequence: 0 },
+                { form_section_id: 's1', section_sequence: 1 },
+                { form_section_id: 's1', section_sequence: 2 },
+                { form_section_id: 's2', section_sequence: 0 },
+                { form_section_id: 's2', section_sequence: 1 },
+            ],
+            ['s1', 's2'],
+        );
+    }
+
+    function engineOrder(s: ReturnType<typeof store>): string[][] {
+        const { schema } = projectDraft({
+            form: { id: 'form-1', title: 'Imported', description: null, default_locale: 'en', supported_locales: ['en'] },
+            version: { id: 'v-1', version_number: 1 },
+            sections: s.sections.value,
+            fields: s.fields.value,
+        });
+
+        return createFormRuntime(schema).visibleSteps.value.map((step) => step.fieldKeys);
+    }
+
+    function uidOf(s: ReturnType<typeof store>, key: string): string {
+        return s.fields.value.find((f) => f.key === key)!.uid;
+    }
+
+    it('starts in the order the import gave it', () => {
+        expect(engineOrder(imported())).toEqual([
+            ['q1', 'q2', 'q3'],
+            ['q4', 'q5'],
+        ]);
+    });
+
+    it('reorders the engine when a question is dragged within its section', () => {
+        const s = imported();
+
+        s.placeField(uidOf(s, 'q3'), 's1', 0);
+
+        expect(where(s)).toEqual(['top:', 's1:q3,q1,q2', 's2:q4,q5']);
+        expect(engineOrder(s)).toEqual([
+            ['q3', 'q1', 'q2'],
+            ['q4', 'q5'],
+        ]);
+    });
+
+    it('puts a question dragged into another section where it was dropped', () => {
+        const s = imported();
+
+        s.placeField(uidOf(s, 'q3'), 's2', 0);
+
+        expect(engineOrder(s)).toEqual([
+            ['q1', 'q2'],
+            ['q3', 'q4', 'q5'],
+        ]);
+    });
+
+    it('moves a question to the end of another section from the settings pane, and saves the order it shows', async () => {
+        const mock = fetchMock().mockResolvedValue(jsonResponse(200, {}));
+        const s = imported();
+
+        await s.moveFieldToSection(uidOf(s, 'q1'), 's2');
+
+        expect(engineOrder(s)).toEqual([
+            ['q2', 'q3'],
+            ['q4', 'q5', 'q1'],
+        ]);
+        const sent = requestLog(mock).find((r) => r.url.endsWith('/reorder'))!.body as { fields: Array<{ section_sequence: number | null }> };
+        expect(sent.fields.map((f) => f.section_sequence)).toEqual([null, null, null, null, null]);
     });
 });

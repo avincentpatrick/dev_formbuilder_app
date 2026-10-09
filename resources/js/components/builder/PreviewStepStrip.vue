@@ -20,6 +20,12 @@
  * control is `inline-flex` and never shrinks a segment below its longest word, so a twenty-section form
  * renders a bar no width can hold; a horizontally scrolling one would also be invisible to every overflow
  * gate in this repository, because `.builder__pane` CLIPS rather than scrolls.
+ *
+ * ⚠️ WHILE A QUESTION IS MOVING IT BECOMES A LIST OF PLACES TO DROP IT (M151, `D105`). In a stepped form every page but
+ * one is off screen, so each page here is a target: a drop puts the question at the end of that page and the preview
+ * stays where it is. A plain list in the same box rather than the control itself — the segments clip their radios and
+ * past seven pages the control is a select, neither of which can sit under a pointer as a target — and nothing in it
+ * takes focus: the keyboard reaches the same places by stepping, and the grip keeps focus throughout.
  */
 import { computed } from 'vue';
 import { MdsSegmentedControl, MdsSelect } from '@meridian/design-system';
@@ -30,6 +36,10 @@ const props = defineProps<{
     options: PreviewStripOption[];
     /** The step currently on screen, or `null` before the engine has settled on one. */
     currentKey: string | null;
+    /** M151: each page as a place to drop a moving question, or `null` when nothing is moving. */
+    dropZones?: Array<{ id: string; label: string }> | null;
+    /** The place a moving question would land, to mark it. */
+    dropId?: string | null;
 }>();
 
 const emit = defineEmits<{ go: [key: string] }>();
@@ -54,8 +64,24 @@ function onChange(value: string): void {
 
 <template>
     <div class="preview__strip" data-preview-strip>
+        <div v-if="dropZones" class="preview__strip-drop" data-preview-drop-strip>
+            <p class="preview__strip-drop-hint">Move to the end of:</p>
+            <ul class="preview__strip-drop-list">
+                <li
+                    v-for="zone in dropZones"
+                    :key="zone.id"
+                    class="preview__strip-drop-item"
+                    :class="{ 'preview__strip-drop-item--active': zone.id === dropId }"
+                    data-drop-zone
+                    :data-drop-id="zone.id"
+                    :data-drop-label="`at the end of ${zone.label}`"
+                >
+                    {{ zone.label }}
+                </li>
+            </ul>
+        </div>
         <MdsSegmentedControl
-            v-if="asSegments"
+            v-else-if="asSegments"
             :model-value="selected"
             :options="options"
             ariaLabel="Jump to section"
@@ -105,5 +131,45 @@ function onChange(value: string): void {
  */
 .preview__strip .mds-segmented {
     flex-wrap: wrap;
+}
+
+/* M151: the pages as drop targets, wrapping like the segments they stand in for so no section name can spill. */
+.preview__strip-drop {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-1);
+}
+
+.preview__strip-drop-hint {
+    margin: 0;
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-sm-font-size);
+    color: var(--mds-color-text-secondary);
+}
+
+.preview__strip-drop-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mds-space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.preview__strip-drop-item {
+    max-width: 100%;
+    padding: var(--mds-space-1) var(--mds-space-3);
+    border: 1px dashed var(--mds-color-border-strong);
+    border-radius: var(--mds-radius-md);
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-label-font-size);
+    color: var(--mds-color-text-body);
+    overflow-wrap: anywhere;
+}
+
+.preview__strip-drop-item--active {
+    border-style: solid;
+    border-color: var(--mds-color-action-primary-bg);
+    background-color: var(--mds-color-bg-sunken);
 }
 </style>

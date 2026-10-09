@@ -23,6 +23,7 @@ use App\Enums\SubmissionStatus;
 use App\Enums\TenantUserStatus;
 use App\Enums\WebhookDeliveryStatus;
 use App\Enums\WebhookEndpointStatus;
+use App\Models\Attachment;
 use App\Models\Audit;
 use App\Models\Connection;
 use App\Models\ConnectionSubscription;
@@ -969,6 +970,7 @@ class E2eSeeder extends Seeder
             // Last, so the ledger it inspects already contains everything the seeders above wrote.
             $this->seedAuditLog($owner, $reviewer);
             $this->seedOcrScan($tenant, $owner); // M129 — after the audit inspection: it writes no audit row
+            $this->seedOcrResponseScans($tenant, $owner); // M153 — likewise
         });
 
         $tenant->forceFill(['owner_user_id' => $owner->id])->save();
@@ -2378,6 +2380,75 @@ class E2eSeeder extends Seeder
         ]);
         $scan->id = self::OCR_SCAN_FIXTURE_ID;
         $scan->save();
+    }
+
+    /**
+     * The scan each seeded `ocr_single` response was saved from (M153, `R-1e00f872`), so `ocr-review-axe.spec.ts`
+     * can scan the response page's "Scanned pages" at every viewport.
+     *
+     * ⛔ IT ADDS NO RESPONSE. The two rows are {@see self::analyticsFixtureRows()} fixtures whose counts several
+     * specs assert, so this gives the EXISTING ones what a real save leaves behind: pages stored through
+     * `storeOcrScanPage()`, an `ocr_scans` row carrying `submission_id`, and the pages re-pointed to the response
+     * the way `OcrScanConfirmation::link()` does it. Two pages each, because the user's own scan had two and the
+     * second page is the one a layout strands. Idempotent by `submission_id`.
+     */
+    private function seedOcrResponseScans(Tenant $tenant, User $owner): void
+    {
+        $responses = Submission::query()
+            ->where('tenant_id', $tenant->id)
+            ->where('source', SubmissionSource::OcrSingle)
+            ->orderBy('id')
+            ->get();
+
+        foreach ($responses as $response) {
+            if (OcrScan::query()->where('submission_id', $response->id)->exists()) {
+                continue;
+            }
+
+            $version = FormVersion::query()->whereKey($response->form_version_id)->first();
+            if (! $version instanceof FormVersion) {
+                continue;
+            }
+
+            $scanId = (string) Str::uuid7();
+            $pages = [];
+            foreach ([1, 2] as $number) {
+                $file = app(AttachmentStorageService::class)->storeOcrScanPage(
+                    UploadedFile::fake()->createWithContent("scanned-response-page-{$number}.png", (string) base64_decode(self::OCR_SCAN_FIXTURE_PNG)),
+                    (string) $tenant->id,
+                    $scanId,
+                    (string) $owner->id,
+                );
+                $pages[] = ['attachment_id' => (string) $file->id, 'response_path' => null];
+            }
+
+            $scan = new OcrScan([
+                'tenant_id' => (string) $tenant->id,
+                'form_id' => $response->form_id,
+                'form_version_id' => $version->id,
+                'uploaded_by' => $owner->id,
+                'status' => OcrScanStatus::Read,
+                'provider' => 'google_vision',
+                'pages' => $pages,
+                'extraction' => [
+                    'version' => ['id' => $version->id, 'number' => $version->version_number, 'stamp' => substr((string) $version->checksum, 0, 8), 'matched_by' => 'stamp'],
+                    'pages' => count($pages),
+                    'counts' => ['read' => 0, 'blank' => 0, 'unreadable' => 0, 'not_found' => 0, 'skipped' => 0],
+                    'fields' => [],
+                    'warnings' => [],
+                ],
+                'read_at' => $response->submitted_at,
+                'submission_id' => $response->id,
+                'confirmed_at' => $response->submitted_at,
+                'confirmed_by' => $owner->id,
+            ]);
+            $scan->id = $scanId;
+            $scan->save();
+
+            Attachment::query()
+                ->whereIn('id', array_column($pages, 'attachment_id'))
+                ->update(['attachable_type' => 'submission', 'attachable_id' => $response->id]);
+        }
     }
 
     /**

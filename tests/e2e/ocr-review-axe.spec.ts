@@ -16,6 +16,10 @@ import { assertClean, forceTheme } from './support/axe';
  *
  * Reached the way a person reaches it — forms list → the form's hub → its Responses tab → "Scan paper
  * forms" — because the entry button is part of what this increment ships.
+ *
+ * M153 adds the third screen: a response saved from a scan, which shows "Scanned pages" beside its answers.
+ * E2eSeeder gives each seeded `ocr_single` response the two-page scan it was saved from (adding no response), so
+ * whichever the inbox lists first carries both pages. Still nothing is created here.
  */
 
 const themes = ['light', 'dark'] as const;
@@ -71,5 +75,19 @@ for (const theme of themes) {
         await expect(page.getByText('200%')).toBeVisible();
 
         await assertClean(page, `scan review zoomed ${theme}`);
+    });
+
+    test(`Response saved from a scan (${theme})`, async ({ page }) => {
+        await page.goto('/submissions?source=ocr_single', { waitUntil: 'networkidle' });
+        await page.getByRole('button', { name: 'View submission' }).first().click();
+        await page.waitForURL(/\/submissions\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+        await forceTheme(page, theme);
+
+        // The user's words on staging: "i did not see the 2 photos when i click the submitted response".
+        await expect(page.getByRole('heading', { name: 'Scanned pages', level: 2 })).toBeVisible();
+        await expect(page.getByRole('region', { name: 'Page 1 of the scan' })).toBeVisible();
+        await expect(page.getByRole('region', { name: 'Page 2 of the scan' })).toBeVisible();
+
+        await assertClean(page, `scanned response ${theme}`);
     });
 }

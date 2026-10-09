@@ -58,12 +58,13 @@ const BASELINES = 'docs/gate-baselines.md';
 const CI_WORKFLOW = '.github/workflows/ci.yml';
 const EXCEPTIONS_LOG = 'docs/ux/exceptions-log.md';
 
-// ⛔ `ls` CANNOT TELL A RESERVATION FROM A DELETION, so the one gap in docs/adr/ is named here rather
-//    than inferred. 0010 is held for H1d, the OCR provider bake-off, and five ADRs say so in their own
-//    Related-ADRs line while declining to fill it. A SECOND gap is therefore not measurable: it means
-//    either a deleted ADR or a second reservation, and guessing between those is how 0017 came to mean
-//    two different documents (133 references across 66 files to repair).
-const ADR_RESERVED = [10];
+// ⛔ `ls` CANNOT TELL A RESERVATION FROM A DELETION, so a gap in docs/adr/ is named here rather than
+//    inferred. There is none: 0010 was held for H1d, the OCR provider bake-off, while 0011–0022 were
+//    written around it, and M152 filled it (`0010-ocr-provider-cloud-vision.md`). A gap that appears is
+//    therefore not measurable: it means either a deleted ADR or an unrecorded reservation, and guessing
+//    between those is how 0017 came to mean two different documents (133 references across 66 files to
+//    repair). A new reservation is recorded here, with its reason, before the number is skipped.
+const ADR_RESERVED = [];
 
 // An empty-scan floor, not a ratchet. A parse that matches nothing must never report "highest 0, so
 // the next free number is M1" — four lint gates gained a floor in M36 for exactly this reason, after
@@ -314,7 +315,7 @@ function derive_adr(): array
         'highest' => pad4($highest),
         'count' => count($numbers),
         'reserved' => array_map('pad4', ADR_RESERVED),
-        'reserved_note' => 'held for H1d, the OCR provider bake-off — a gap in the listing, not an allocation',
+        'reserved_note' => 'a gap in the listing held for a named ADR, not an allocation',
         'source' => 'the contents of '.ADR_DIR,
     ];
 }
@@ -1325,7 +1326,9 @@ function render(array $state): void
 
     section('Namespaces');
     info('next free ADR', $state['adr']['next_free'].'  (highest '.$state['adr']['highest'].', '.$state['adr']['count'].' files)');
-    note('reserved, NOT free: '.implode(', ', $state['adr']['reserved']).' — '.$state['adr']['reserved_note']);
+    if ($state['adr']['reserved'] !== []) {
+        note('reserved, NOT free: '.implode(', ', $state['adr']['reserved']).' — '.$state['adr']['reserved_note']);
+    }
     info('next free migration prefix', (string) $state['migration']['next_free']);
     info('next free exceptions entry', (string) ($state['exceptions']['next_free'] ?? 'NOT FOUND — '.$state['exceptions']['reason']));
     info('migrations', $state['migration']['files'].' files, '.$state['migration']['unique_prefixes'].' unique prefixes');

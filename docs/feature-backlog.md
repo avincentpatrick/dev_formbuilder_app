@@ -13630,11 +13630,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   have scored nothing for them. A purely numeric stem should compare by its value. **Live.** Filed by `M149`.
   **Tier: early-testing.** ✅ **CLOSED BY `M149` (2026-10-08):** `OcrAnswerSheet::stem()` gives an all-digit stem by its value (`01` and `1` are one name, `1` and `10` are not), which `rowFor()` and the orphan check both use; red first, and a mutant restoring the literal stem CAUGHT.
 
-- **`minor` · A tick's confidence is the recognizer's confidence in the glyph, so a choice read right is withheld.** Found
+- ✅ **CLOSED BY `M152` (2026-10-09) — ****`minor` · A tick's confidence is the recognizer's confidence in the glyph, so a choice read right is withheld.** Found
   by `M149` in the same round, with the fixes above and the language hint applied: of 45 answered choices, 16 were read right
   and withheld below the review threshold of 70, and six shown. A ☑ or an X found in the box before an option's label is
   evidence of a tick whatever the recognizer thinks the glyph is; `OcrAnswerReader::confidenceOf()` scores the glyph instead.
-  Calibrating it belongs with the bake-off's thresholds. **Live.** Filed by `M149`. **Tier: early-testing.**
+  Calibrating it belongs with the bake-off's thresholds. **Live.** Filed by `M149`. **Tier: early-testing.** ✅ **CLOSED BY `M152` (2026-10-09):** a mark seen in the box before an option's label has a confidence of at least `OcrAnswerReader::MARK_SEEN` (80) whatever glyph it was read as — inside the review band and never auto, because Round 1's one wrong tick was a multi-select whose second mark Vision never returned. Measured on Round 1's cached reads before any test: 51.1% → 42.2% needing correction, silent errors 0, right-but-withheld 35 → 19. `OcrTickConfidenceTest.php` (four cases, one red first; a case holds the floor between the configured thresholds); three mutants — no floor, the floor at 90, the floor at 69 — all CAUGHT. Recorded in `docs/adr/0010-ocr-provider-cloud-vision.md` §D4.
 
 - **`minor` · Cloud Vision returns no character at all for most ticks in a box, so most ticked choices read blank.** Found by
   `M149` in the same round, with every fix above applied: 22 of 45 answered choices read blank, and on the option lines Vision
@@ -13712,14 +13712,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   already falls back to — the one order. A draft dragged on staging between `M150`'s deploy and the fix keeps the mismatch
   until its next drag. **Live.** Filed by `M151`. **Tier: early-testing.** ✅ **CLOSED BY `M151` (2026-10-09):** `placeField()` and `moveFieldToSection()` clear every question's `section_sequence` (`forgetSectionPlaces()`), so the next reorder request saves `sequence` as the one order the runtime, Print blank and the export already fall back to; clearing only the moved question would compare it on a different scale from its neighbours. Proved by three `reorder-store.test.ts` cases through the real engine — a drag within a section, one into another section, and the settings pane's move, whose request is checked to send no stale number — red against the unfixed store.
 
-- **`minor` · A scan whose second page is uploaded first reads every question on that page as not found.** Found by `M151`
+- ✅ **CLOSED BY `M152` (2026-10-09) — ****`minor` · A scan whose second page is uploaded first reads every question on that page as not found.** Found by `M151`
   while guiding the staging scan. `PrintedFormMatcher::anchor()` joins every page's lines in upload order and looks for each
   question only after the one before it, so with page 2 first, page 1's questions are found and page 2's are looked for only
   after them, where nothing is left. The upload sends the files in the order the browser's picker returns them
   (`resources/js/components/ocr/scan-upload.ts`), which on Windows can put the last-clicked file first, and the bake-off
   harness never meets it because it takes pages in file-name order. Reasoned from the code, not yet measured — the harness on
   form 14 with its two pages swapped measures it. The remedy orders the pages before matching (by the page on which the
-  first question is read) or says so on the review page. **Live.** Filed by `M151`. **Tier: early-testing.**
+  first question is read) or says so on the review page. **Live.** Filed by `M151`. **Tier: early-testing.** ✅ **CLOSED BY `M152` (2026-10-09):** measured first — form 14 with its pages swapped read `field_11` and `field_12` as not found, and all fifteen Round 1 forms reversed gave 30 not found (57.2% against 51.1%). `PrintedFormMatcher::printedOrder()` places each page by the first question it holds when searched alone (a page holding none keeps its upload place after the rest) and joins the pages in that order; each line keeps its upload index, so a note names the page the review screen shows. Reversed after the fix: 0 not found, identical to name order. A two-page case in `PrintedFormMatcherTest.php` (swapped, and a blank page first), red first; a mutant removing the sort CAUGHT. The review-page notice the row offered as an alternative was not needed.
 
 - **`nit` · The pointer-drag core is written twice.** Found by `M151`, which wrote the Preview's drag
   (`resources/js/components/builder/usePreviewReorder.ts`) beside Structure's (`useCanvasReorder.ts`) rather than rework
@@ -13749,3 +13749,18 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   XLSForm-imported draft reordered on staging on 2026-10-09 before `M151` deployed still shows respondents, Print blank and the
   export the import's order. The remedy is one read-only query on the testing server for drafts whose `section_sequence` order
   disagrees with `sequence`, and one drag on each found. **Latent.** Filed by `M151`. **Tier: during-testing.**
+
+- ✅ **CLOSED BY `M152` (2026-10-09) — ****`minor` · A two-page scan's review notes name the pages from 0, beside images labelled from 1.** Found by
+  `M152` while verifying `R-4aaf3b6f`: `PrintedFormMatcher::result()` stored the `OcrLine` page, the page's index in the upload
+  counted from 0 (`PrintedFormMatcherTest` asserted `0`), `OcrAnswerCarry::meta()` copies it, and `scanNote()` in
+  `resources/js/components/ocr/scan-review.ts` prints it as `(page N)`, while `OcrScanReviewPresenter::pages()` labels the images
+  from 1 — so a note on the first sheet said "(page 0)". Every fixture that writes a page (`ReadScanFixture`, `E2eSeeder`,
+  `OcrAnswerCarryTest`) writes 1 for a one-page scan, which is why nothing saw it. A scan read before the fix keeps its stored 0;
+  it changes only a review note, so there is no backfill. **Live.** Filed by `M152`. **Tier: early-testing.** ✅ **CLOSED BY `M152` (2026-10-09):** `result()` reports the upload place counted from 1, folded into `R-4aaf3b6f` because it is the same line of the same file; the existing one-page assertion moved to 1 and the two-page case pins 1 and 2 in both orders; a mutant restoring the 0 base CAUGHT.
+
+- **`nit` · The scans page shows none of the files chosen before "Read this scan", and a read scan cannot be read again or removed.**
+  Found by `M152` while tracing `R-4aaf3b6f`: `Scans.vue` is a native file input and a button, so a wrong photo or a wrong
+  order is seen only on the review screen, and the routes (`routes/tenant.php`, the `forms.ocr.scans.*` group) are store, show,
+  index, review, page and confirm — a mistaken upload is redone as a new scan and the unsaved one stays in the list. Since
+  `M152` the order no longer matters to the reading; the remedy lists the chosen pages (name, thumbnail, remove) before the read,
+  and lets an unsaved scan be discarded. **Live.** Filed by `M152`. **Tier: during-testing.**

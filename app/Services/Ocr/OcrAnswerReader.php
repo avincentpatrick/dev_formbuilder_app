@@ -33,7 +33,7 @@ use App\Services\Expressions\Coercion;
  * §2.5.1: the blank form prints questions a respondent's own branching would have hidden), `unreadable`
  * (something written that does not parse for the type, or two boxes marked on a one-answer question), or
  * `skipped`. `confidence` is the LOWEST character confidence among what was used, on a 0–100 scale: one
- * doubtful character is enough to make a reviewer look.
+ * doubtful character is enough to make a reviewer look. A tick is the exception: at least {@see MARK_SEEN} (M152).
  *
  * Every value is emitted in the shape `StructuralAnswerNormalizer` accepts for the type, so the review
  * screen can hand it to the pipeline unchanged.
@@ -45,6 +45,15 @@ final class OcrAnswerReader
 
     /** A recognised substitution makes the value something a reviewer should see, whatever its confidence. */
     private const int SUBSTITUTION_CEILING = 89;
+
+    /**
+     * The least confidence of a tick seen in the box before an option's label, whatever glyph the recognizer took it for (M152,
+     * `R-39a5388f`). Vision returns a hand-drawn tick as ☑, X, a Greek chi or 区 and is unsure of the GLYPH, which is not the
+     * question: 16 of the bake-off's Round 1 ticks were read right and withheld for it. Inside the review band, never at auto:
+     * Round 1's one wrong tick was a multi-select whose second mark was never returned, so a mark alone cannot vouch for the
+     * whole answer. Public so a test can hold it between `config('ocr.confidence')`'s two thresholds.
+     */
+    public const int MARK_SEEN = 80;
 
     /**
      * @param  array<string, mixed>  $row  one printed row from `BlankFormPrintPresenter::present()`
@@ -430,7 +439,7 @@ final class OcrAnswerReader
             return $this->blank();
         }
 
-        $confidence = $this->confidenceOf($markSymbols);
+        $confidence = max($this->confidenceOf($markSymbols), self::MARK_SEEN);
         $labels = implode(', ', array_map(static fn (array $o): string => $o['label'], $marked));
 
         if ($type === FieldType::MultiSelect) {

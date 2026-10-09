@@ -4,7 +4,7 @@
  *
  * The server sends the FACTS — state, tier, confidence, the text read, the page — and this module turns them
  * into a note. It holds no list of tier thresholds and no reason sentences: the 90 / 70 bounds live in
- * `config/ocr.php`, where H1d calibrates them, and an answer that could not be filled in is explained once, in
+ * `config/ocr.php`, which H1d confirmed (ADR-0010), and an answer that could not be filled in is explained once, in
  * the server's own words, in the notice above the form.
  */
 

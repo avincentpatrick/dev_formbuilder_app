@@ -13738,3 +13738,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   on a page as soon as the preview catches up with your edit" — which they never do, a respondent being unable to see them.
   Present since the pending block shipped (`M118`). The remedy lists only a question the engine has not met yet
   (`engineKnows`). **Live.** Filed by `M151`. **Tier: early-testing.** ✅ **CLOSED BY `M151` (2026-10-09):** the pending list in `PreviewRuntime.vue` keeps only what `engineKnows()` says the engine has not met; a real-engine case in `PreviewRuntime.test.ts` was red on the unfixed code (it listed the hidden section's question beside the new one).
+
+- **`nit` · The page shifts about 24px when a drag begins in a stepped Preview.** Found by `M151` in its real-browser
+  screenshots: while a question moves, `PreviewStepStrip.vue` swaps its segments for a "Move to the end of:" list whose hint
+  line makes it taller, so every row below moves down under the pointer at the moment the drag starts. The remedy keeps the
+  list the strip's own height (the hint beside the pages, or reserved space). **Live.** Filed by `M151`. **Tier: during-testing.**
+
+- **`nit` · A draft on staging dragged between `M150`'s deploy and `M151`'s keeps its import's order until its next move.**
+  Found by `M151` closing `R-250b57eb`: the fix clears `section_sequence` only when the builder next moves a question, so an
+  XLSForm-imported draft reordered on staging on 2026-10-09 before `M151` deployed still shows respondents, Print blank and the
+  export the import's order. The remedy is one read-only query on the testing server for drafts whose `section_sequence` order
+  disagrees with `sequence`, and one drag on each found. **Latent.** Filed by `M151`. **Tier: during-testing.**

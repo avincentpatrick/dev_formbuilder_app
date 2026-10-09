@@ -13549,14 +13549,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (`required|max:500`). No inline-edit component exists in the design system. Two E2E locators read
   `.canvas__field-main`'s text. Taken before Oct 12 by `D103`. **Live.** Filed by `M148`. **Tier: early-testing.** ✅ **CLOSED BY `M150` (2026-10-09):** "Edit label" on the row, or a double-click, swaps the row's main button for `InlineLabelEdit.vue` (an `MdsTextInput`, no store knowledge, so Preview reuses it next); Enter or blur commits, Escape cancels, a blank or unchanged label is not an edit. The draft stays local and `useBuilderStore.renameField()` writes it once — one PATCH, one undo entry — through the settings pane's own commit path, rather than one save per pause in typing. Focus returns to the row after Enter or Escape. Proved by a rename that survives a reload in `builder-structure.spec.ts`, an axe scan of the open editor in both themes, and Vitest cases red against eight mutants.
 
-- **`minor` · A question's label cannot be edited in Preview.** Found by `M148` from the same Round 2 note (`r2-c17`).
+- ✅ **CLOSED BY `M151` (2026-10-09) — ****`minor` · A question's label cannot be edited in Preview.** Found by `M148` from the same Round 2 note (`r2-c17`).
   The preview's label is drawn by the shared respondent component `submissions/FieldInput.vue`, which the builder
   preview must not edit (`M118`), it shows piped text (`labelFor` resolves `${key}` holes), and a note with content
   shows its blocks instead of its label; so an inline editor binds `field.label` itself and lives in
   `PreviewRuntime.vue`'s row wrapper. A label change never moves the engine's shape, so it needs no remount. Taken
-  before Oct 12 by `D103`. **Live.** Filed by `M148`. **Tier: early-testing.**
+  before Oct 12 by `D103`. **Live.** Filed by `M148`. **Tier: early-testing.** ✅ **CLOSED BY `M151` (2026-10-09):** each question the preview shows carries an Edit button above its control — never inside the label, which the shared `FieldInput` draws — and a double-click on the question's own name (the first label or legend in its row) opens the same `InlineLabelEdit` Structure uses. Enter or a blur writes once through `renameField` (one PATCH, one undo entry); Escape writes nothing; Enter and Escape return focus to the button. The editing key lives in `PreviewPane`, which never remounts, and a rebuild that falls due while the editor is open waits for it, so a half-typed label is never lost; the editor opens on the STORED label, not the piped "Untitled question" the preview shows. A note showing its blocks offers no edit (`D69`), and a question its condition hides, whose row is empty, carries no tools. Proved by a rename that survives a reload in `builder-preview-authoring.spec.ts`, an axe scan with the editor open in both themes, and Vitest cases against thirteen mutants: eleven caught, and the two survivors changed the code — a redundant select, removed, and an equivalent selector, simplified.
 
-- **`minor` · Questions cannot be dragged in Preview, to reorder them or to move them into a section.** Found by `M148`
+- ✅ **CLOSED BY `M151` (2026-10-09) — ****`minor` · Questions cannot be dragged in Preview, to reorder them or to move them into a section.** Found by `M148`
   from the staging smoke test (Round 2, `r2-c18`: *"please include the preview section to be draggable. i mean,
   questions or indicators must be draggable to sections, sequencing, etc."*). Moving exists only in Structure. The
   preview renders the engine's frozen step order, and a reorder changes `shapeOf()`, which remounts `PreviewRuntime`
@@ -13564,7 +13564,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   section at a time, rows hold real inputs, and the order on screen is not the store's (hidden, calculated and
   page-break fields render nothing, an empty section renders at the end, a just-added field sits apart, a repeat group
   renders through `RepeatGroup`). The riskiest of the four Round 2 builder rows for Oct 12. Taken before Oct 12 by
-  `D103`. **Live.** Filed by `M148`. **Tier: early-testing.**
+  `D103`. **Live.** Filed by `M148`. **Tier: early-testing.** ✅ **CLOSED BY `M151` (2026-10-09):** each shown question carries a grip; `usePreviewReorder.ts` writes nothing while a question moves, decides a target read off the page — above or below a shown question, a section's "Add a question" area, an empty section's placeholder, and while a move is on every page in the strip (`D105`: the end of that page, the author staying on theirs) — and draws it; the drop writes once (`placeField` + `commitReorder`) and rebuilds at once, carrying the preview's answers (`carryAnswers`), so the question is in place on the next frame and glides there (`useFlipReorder`, now keyed by attribute). `previewPlacement` counts every question of the section, drawn or not, so a page break, a hidden question or a temporary section key cannot misplace a drop, and an unchanged place writes nothing. Keyboard: Enter or Space grabs, the arrows step over the places that would move it, Enter drops and focus lands on the moved question's new grip; Escape, or the grip losing focus, writes nothing. A repeatable section's members and a question its condition hides stay movable in Structure only (listed in the pane). Proved by a real mouse drag within a page, onto a new section's placeholder and onto a page in the strip plus a keyboard move with focus kept, all checked after a reload (`builder-preview-authoring.spec.ts`), an axe scan of a keyboard grab, and Vitest cases red against eleven mutants.
 
 - **`minor` · An archived form cannot be found from the Forms list.** Found by `M148` from the staging smoke test
   (Round 2, `r2-archive`, a pass with the note *"but how can i retrieve the responses from that archived form? do we
@@ -13698,7 +13698,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `InlineLabelEdit` serves it, through a `renameSection` beside `renameField`. **Live.** Filed by `M150`.
   **Tier: during-testing.**
 
-- **`major` · On a form whose questions carry a place within their section — every XLSForm import — a drag reorders the
+- ✅ **CLOSED BY `M151` (2026-10-09) — ****`major` · On a form whose questions carry a place within their section — every XLSForm import — a drag reorders the
   builder's list but not what respondents, the paper and the export see.** Found by `M151` while planning `R-2baef8ea`.
   `XlsformImportParser::assignSequences()` numbers each question within its section, and `XlsformImporter.php` stores it as
   `section_sequence`; the runtime orders a section by it before `sequence` (`sectionFieldsInOrder()` in
@@ -13710,7 +13710,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   eleven, and one question added later with none). The import assigns both numbers in one pass, so they agree within a
   section, and the remedy clears `section_sequence` wherever the builder renumbers, leaving `sequence` — which every reader
   already falls back to — the one order. A draft dragged on staging between `M150`'s deploy and the fix keeps the mismatch
-  until its next drag. **Live.** Filed by `M151`. **Tier: early-testing.**
+  until its next drag. **Live.** Filed by `M151`. **Tier: early-testing.** ✅ **CLOSED BY `M151` (2026-10-09):** `placeField()` and `moveFieldToSection()` clear every question's `section_sequence` (`forgetSectionPlaces()`), so the next reorder request saves `sequence` as the one order the runtime, Print blank and the export already fall back to; clearing only the moved question would compare it on a different scale from its neighbours. Proved by three `reorder-store.test.ts` cases through the real engine — a drag within a section, one into another section, and the settings pane's move, whose request is checked to send no stale number — red against the unfixed store.
 
 - **`minor` · A scan whose second page is uploaded first reads every question on that page as not found.** Found by `M151`
   while guiding the staging scan. `PrintedFormMatcher::anchor()` joins every page's lines in upload order and looks for each
@@ -13732,9 +13732,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   can reach a place off screen only by scrolling with the wheel while dragging, or by keyboard, which scrolls each place into
   view. Structure's drag has the same gap. **Live.** Filed by `M151`. **Tier: during-testing.**
 
-- **`minor` · Preview lists a question in a section its condition hides as "Just added".** Found by `M151` in a real-browser
+- ✅ **CLOSED BY `M151` (2026-10-09) — ****`minor` · Preview lists a question in a section its condition hides as "Just added".** Found by `M151` in a real-browser
   look at the seeded `Logic Notices Demo`: `previewPendingFields()` (`resources/js/components/builder/preview-model.ts`) treats
   every question in no SHOWN step as pending, and a hidden section is no shown step, so its questions sat under "These appear
   on a page as soon as the preview catches up with your edit" — which they never do, a respondent being unable to see them.
   Present since the pending block shipped (`M118`). The remedy lists only a question the engine has not met yet
-  (`engineKnows`). **Live.** Filed by `M151`. **Tier: early-testing.**
+  (`engineKnows`). **Live.** Filed by `M151`. **Tier: early-testing.** ✅ **CLOSED BY `M151` (2026-10-09):** the pending list in `PreviewRuntime.vue` keeps only what `engineKnows()` says the engine has not met; a real-engine case in `PreviewRuntime.test.ts` was red on the unfixed code (it listed the hidden section's question beside the new one).

@@ -342,9 +342,12 @@ function canResetTwoFactor(row: Member): boolean {
         <!-- Invite -->
         <MdsModal v-model:open="inviteOpen" title="Invite a member">
             <form class="members__form" @submit.prevent="submitInvite">
+                <!-- M154 (`R-66bc91ca`): the first invitation to the testing server landed in spam, and the person
+                     who sent it is the one a tester asks. -->
                 <MdsFormField
                     label="Email address"
                     required
+                    help="If it does not arrive within a few minutes, ask them to check their spam or junk folder."
                     :error="invite.errors.email"
                     v-slot="{ id, describedby, invalid }"
                 >

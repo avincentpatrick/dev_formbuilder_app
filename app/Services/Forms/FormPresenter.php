@@ -18,7 +18,8 @@ use Illuminate\Support\Collection;
 
 /**
  * Read model for the forms list page (Increment D3). Presents every non-archived form in the current
- * tenant with its version history and the viewer's per-form abilities (resolved through FormPolicy).
+ * tenant with its version history and the viewer's per-form abilities (resolved through FormPolicy) —
+ * and, when the forms list asks (M154, `D103` A), the archived ones too, read-only, for its Archived chip.
  * Keeps the controller thin, mirroring TenantMembershipService::listMembers.
  */
 final class FormPresenter
@@ -33,9 +34,13 @@ final class FormPresenter
      * proof that evaporates the moment the test has to be touched to accommodate a signature change. The
      * same reasoning made J1c's roster parameter optional.
      *
+     * `$withArchived` (M154) is optional for the same reason, and only the forms list passes it: its chips are
+     * counted in PHP over these rows, so it needs the archived ones to count and show under "Archived" — and
+     * `FormListFacets::apply()` keeps them out of "All". Every other caller still never sees one.
+     *
      * @return list<array<string, mixed>>
      */
-    public function list(User $user, ?SearchTerms $terms = null): array
+    public function list(User $user, ?SearchTerms $terms = null, bool $withArchived = false): array
     {
         $terms ??= SearchTerms::parse(null);
 
@@ -67,7 +72,8 @@ final class FormPresenter
             // A DISPLAY filter, not a visibility rule — which is why it lives here and not in the scope, and
             // why `FormSearchArm` keeps its own copy: a search result must not offer a row this list refuses
             // to show. An archived form whose title matches `?q` therefore stays hidden, which is pinned.
-            ->where('status', '!=', FormStatus::Archived->value)
+            // M154: lifted only for the forms list's Archived chip, and still an AND (a `when`, never an `orWhere`).
+            ->when(! $withArchived, fn (Builder $q) => $q->where('status', '!=', FormStatus::Archived->value))
             // ⚠️ RANK ONLY UNDER A QUERY, AND THE CONDITION IS THE POINT. `ts_rank` over an empty tsquery
             // scores every row 0.0, so an unconditional rank would leave the ordering to whatever the
             // planner did next and silently discard `updated_at` on the ordinary, unfiltered page — the
@@ -100,6 +106,11 @@ final class FormPresenter
     {
         /** @var Collection<int, FormVersion> $versions */
         $versions = $form->versions;
+
+        // M154 (`D103` A, `D101`): an archived form is offered READ-ONLY — its responses and its history, nothing
+        // that changes it. Archiving drops the draft, so the builder, publish and restore would each refuse
+        // anyway, and there is no un-archive. Short-circuited, so an archived row costs no policy check it hides.
+        $archived = $form->status === FormStatus::Archived;
 
         return [
             'id' => $form->id,
@@ -141,14 +152,18 @@ final class FormPresenter
                 'published_at' => $v->published_at?->toIso8601String(),
             ])->all(),
             'can' => [
-                'edit' => $user->can('update', $form),
-                'publish' => $user->can('publish', $form),
-                'delete' => $user->can('delete', $form),
+                'edit' => ! $archived && $user->can('update', $form),
+                'publish' => ! $archived && $user->can('publish', $form),
+                'delete' => ! $archived && $user->can('delete', $form),
                 // Manual-encode entry point (F4b) — the SubmissionPolicy folds in "form is published",
                 // so this is false for a draft-only form and the row action stays hidden until publish.
-                'encode' => $user->can('create', [Submission::class, $form]),
+                // ⚠️ M154: masked HERE for an archived form, not in the policy, which also gates the offline
+                // sync API — refusing there would strand a field device's responses queued before the archive.
+                'encode' => ! $archived && $user->can('create', [Submission::class, $form]),
                 // "Save as template" (G9a) — a read/derive of the form, so it gates on view, not update.
-                'template' => $user->can('view', $form),
+                // An archived form keeps it only while a published version is left: archiving drops the draft,
+                // and the template route reads `draft ?? published`, so one archived as a draft would 404.
+                'template' => (! $archived || $form->current_published_version_id !== null) && $user->can('view', $form),
                 // Per-form response statistics (I10c) — also a read/derive, so also `view`. Named separately
                 // rather than reusing `can.template`: FormPolicy::view and ::update resolve to the same
                 // predicate TODAY, and a row action riding on that coincidence would follow the wrong one the

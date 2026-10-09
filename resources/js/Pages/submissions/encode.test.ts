@@ -1196,6 +1196,39 @@ describe('Encode.vue — edit mode (I9c)', () => {
         await wrapper.find('[data-conflict-keep]').trigger('click');
         expect(wrapper.text()).not.toContain('Discard and reload');
     });
+
+    /* ── The paper beside a corrected scanned response (M154, `R-1585698b`) ───────────────────────── */
+
+    const SCANNED = [
+        { number: 1, url: '/attachments/page-b', mime: 'image/png', servable: true },
+        { number: 2, url: '/attachments/page-a', mime: 'image/png', servable: true },
+    ];
+
+    it('keeps the scanned pages beside the form while a response saved from a scan is corrected', () => {
+        // The user's M153 check found the photos on the response; "Edit answers" then took them away again.
+        const wrapper = mountEncode({ ...editPayload(), scan_pages: SCANNED });
+
+        expect(wrapper.find('.encode').classes()).toContain('encode--scan');
+        const paper = wrapper.find('.encode__scan-pages');
+        expect(paper.exists()).toBe(true);
+        expect(paper.find('h2').text()).toBe('Scanned pages');
+        expect(paper.findAll('img').map((img) => img.attributes('src'))).toEqual(['/attachments/page-b', '/attachments/page-a']);
+        // Still an ordinary correction: the layout is the scan screen's, none of its review behaviour is.
+        expect(wrapper.text()).not.toContain('Compare each answer with the paper');
+        expect(wrapper.text()).toContain('Save changes');
+        expect(wrapper.text()).not.toContain('Save response');
+    });
+
+    it('shows no paper when correcting a typed response, and none outside edit mode', () => {
+        for (const props of [{ ...editPayload(), scan_pages: [] }, editPayload(), { ...createPayload(), scan_pages: SCANNED }]) {
+            const wrapper = mountEncode(props);
+
+            // The non-vacuity partner: the form itself rendered.
+            expect(wrapper.text()).toContain('Comments');
+            expect(wrapper.find('.encode__scan-pages').exists()).toBe(false);
+            expect(wrapper.find('.encode').classes()).not.toContain('encode--scan');
+        }
+    });
 });
 
 /*

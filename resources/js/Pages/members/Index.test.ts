@@ -51,6 +51,7 @@ vi.mock('@inertiajs/vue3', () => ({
         }),
 }));
 
+import { MdsFormField } from '@meridian/design-system';
 import MembersIndex from './Index.vue';
 
 type Member = {
@@ -144,5 +145,28 @@ describe('the two-factor reset row action (M107)', () => {
             {},
             expect.objectContaining({ preserveScroll: true }),
         );
+    });
+});
+
+/**
+ * M154 (`R-66bc91ca`, from `D50`) — the invite dialog says where a missing invitation usually is. The first one
+ * to the testing server landed in spam, and the inviter is the person a tester asks.
+ */
+describe('the invite dialog (M154)', () => {
+    it('tells the inviter to have the invitee check spam if it does not arrive', () => {
+        // The dialog's body is a default slot, which `shallowMount` drops unless told to render it.
+        const wrapper = shallowMount(MembersIndex, {
+            props: {
+                members: [member()],
+                assignableRoles: [{ value: 'reviewer', label: 'Reviewer' }],
+                filters: { applied: { q: null } },
+                empty_reason: null,
+            },
+            global: { renderStubDefaultSlot: true },
+        });
+
+        const email = wrapper.findAllComponents(MdsFormField).find((field) => field.props('label') === 'Email address');
+        expect(email, 'the Email address field').toBeTruthy();
+        expect(email!.props('help')).toBe('If it does not arrive within a few minutes, ask them to check their spam or junk folder.');
     });
 });

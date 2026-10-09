@@ -520,3 +520,65 @@ describe('forms list — folders (M131)', () => {
         loose.unmount();
     });
 });
+
+/**
+ * M154 (`R-44b17445`, `D103` A) — an archived form under the Archived chip, read-only. The server masks the
+ * write flags (`FormPresenter`); the page adds what no row flag carries: the scope action, gated page-wide, the
+ * card's schedule line and the table's version column.
+ */
+describe('forms list — an archived form is shown read-only (M154)', () => {
+    const archived = () => ({
+        ...row(false),
+        status: 'archived',
+        can: { edit: false, publish: false, delete: false, encode: false, template: true, analytics: true },
+    });
+
+    it('offers its responses and history, and nothing that would change it', () => {
+        const wrapper = renderWithScopes({ forms: [archived()], empty_reason: null });
+
+        for (const label of ['Response statistics', 'Version history', 'Save as template']) {
+            expect(wrapper.find(`[aria-label="${label}"]`).exists(), label).toBe(true);
+        }
+        // "Set form scope" is gated on the PAGE's `manageScopes`, which this render grants — so its absence is
+        // the archived check, not a missing permission.
+        for (const label of ['Open builder', 'New submission', 'Rename form', 'Move to folder', 'Set form scope', 'Publish form', 'Archive form']) {
+            expect(wrapper.find(`[aria-label="${label}"]`).exists(), label).toBe(false);
+        }
+        wrapper.unmount();
+
+        // The non-vacuity partner: the same render grants the scope action on a live form.
+        const live = renderWithScopes({ forms: [row(true)], empty_reason: null });
+        expect(live.find('[aria-label="Set form scope"]').exists()).toBe(true);
+        live.unmount();
+    });
+
+    it('says it no longer takes responses, rather than that it was never published', () => {
+        const wrapper = render({ forms: [archived()], empty_reason: null });
+
+        expect(wrapper.text()).toContain('No longer accepting responses');
+        expect(wrapper.text()).not.toContain('Not published');
+
+        wrapper.unmount();
+    });
+
+    it('drops "live" from its version in the table', () => {
+        const wrapper = render({ forms: [archived()], empty_reason: null, view: 'table' });
+        expect(wrapper.text()).toContain('v2');
+        expect(wrapper.text()).not.toContain('v2 live');
+        wrapper.unmount();
+
+        const live = render({ forms: [row(true)], empty_reason: null, view: 'table' });
+        expect(live.text()).toContain('v2 live');
+        live.unmount();
+    });
+
+    it('says a form archived as a draft has no versions, instead of opening an empty history', async () => {
+        const wrapper = render({ forms: [{ ...archived(), current_version: null, versions: [] }], empty_reason: null });
+
+        await wrapper.get('[aria-label="Version history"]').trigger('click');
+
+        expect(wrapper.text()).toContain('This form has no versions to show.');
+
+        wrapper.unmount();
+    });
+});

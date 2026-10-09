@@ -68,7 +68,11 @@ final class MemberController extends Controller
 
         return back()
             ->with('status', 'invitation-sent')
-            ->with('toast', ['type' => 'success', 'message' => "Invitation sent to {$validated['email']}"]);
+            // M154 (`R-66bc91ca`): the inviter is the one asked "it never came" — tell them where it usually is.
+            ->with('toast', [
+                'type' => 'success',
+                'message' => "Invitation sent to {$validated['email']}. If it does not arrive, ask them to check their spam or junk folder.",
+            ]);
     }
 
     /**

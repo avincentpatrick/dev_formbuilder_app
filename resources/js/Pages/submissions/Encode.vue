@@ -37,7 +37,7 @@ import PageHeader from '@/components/shell/PageHeader.vue';
 import { createServerAutosave } from '@/composables/useServerAutosave';
 import FieldInput, { type AnswerValue, type EncodeField } from '@/components/submissions/FieldInput.vue';
 import ScanPages from '@/components/ocr/ScanPages.vue';
-import { scanNote, type ScanNote, type ScanReview } from '@/components/ocr/scan-review';
+import { scanNote, type ScanNote, type ScanPage, type ScanReview } from '@/components/ocr/scan-review';
 import {
     createFormRuntime,
     LEAD_STEP_KEY,
@@ -162,6 +162,11 @@ const props = defineProps<{
      * note, and Save posts the reviewer's answers to `scan.submit_url` rather than to the encode route.
      */
     scan?: ScanReview | null;
+    /**
+     * M154 (`R-1585698b`) — the pages a response was saved from, sent by the edit page only: correcting a scanned
+     * response keeps its paper beside the form. Empty for a typed response, and absent in the other three modes.
+     */
+    scan_pages?: ScanPage[];
 }>();
 
 /**
@@ -178,6 +183,14 @@ const isEditing = computed(() => props.editing != null);
 
 /** M129 — scan mode, by the same `!= null` reading: every existing encode test omits the prop. */
 const isScanning = computed(() => props.scan != null);
+
+/**
+ * M154 — the paper is shown in scan mode, and in edit mode when the response was saved from a scan. This decides
+ * the LAYOUT only: every scan-only behaviour (the notices, the per-answer notes, autosave off, the leave guard,
+ * the save target) keeps reading `isScanning`, so correcting a scanned response is still an ordinary edit.
+ */
+const paperPages = computed<ScanPage[]>(() => (isScanning.value ? props.scan!.pages : isEditing.value ? props.scan_pages ?? [] : []));
+const hasPaper = computed(() => isScanning.value || paperPages.value.length > 0);
 
 
 const page = usePage();
@@ -1094,7 +1107,7 @@ function onConflictKeydown(event: KeyboardEvent): void {
 </script>
 
 <template>
-    <div class="encode" :class="{ 'encode--scan': isScanning }">
+    <div class="encode" :class="{ 'encode--scan': hasPaper }">
         <Head
             :title="isScanning ? `Review a scan — ${form.title}` : isEditing ? `Edit answers — ${form.title}` : `Encode — ${form.title}`"
         />
@@ -1340,9 +1353,11 @@ function onConflictKeydown(event: KeyboardEvent): void {
         </div>
 
         <!-- M129 — the paper, beside the form on a wide screen and above it on a narrow one (the grid lives on
-             `.encode--scan`). Rendered only in scan mode, so the other three modes keep their exact DOM. -->
-        <div v-if="isScanning" class="encode__scan-pages">
-            <ScanPages :pages="scan!.pages" />
+             `.encode--scan`). Rendered in scan mode, and since M154 when correcting a response saved from a scan
+             ("Scanned pages", as on the response page), so create, resume and a typed response's edit keep their
+             exact DOM. -->
+        <div v-if="hasPaper" class="encode__scan-pages">
+            <ScanPages :pages="paperPages" :title="isScanning ? undefined : 'Scanned pages'" />
         </div>
 
         <form class="encode__form" novalidate @submit.prevent="submit">
@@ -1947,10 +1962,14 @@ function onConflictKeydown(event: KeyboardEvent): void {
         grid-column: 1 / -1;
     }
 
+    /* M154: capped to the window and scrolling on its own, as the response page's column is — uncapped, a
+       two-page scan's second page sat below the fold for as long as the form scrolled past it. */
     .encode--scan > .encode__scan-pages {
         grid-column: 1;
         position: sticky;
         top: var(--mds-space-4);
+        max-height: calc(100vh - 2 * var(--mds-space-4));
+        overflow-y: auto;
         margin: 0;
     }
 

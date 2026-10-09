@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { assertClean, forceTheme, settleAnimations } from './support/axe';
+import { archive, createForm } from './support/builder';
 import { formEntry } from './support/navigate';
 
 /*
@@ -11,6 +12,11 @@ import { formEntry } from './support/navigate';
  * each dialog and cancels it rather than creating, renaming or filing anything — a write here would move the
  * counts every later project (and `responsive-axe`'s forms-list scan) reads. The writes are covered by
  * `FormFolderTest` and `FormFolderAssignmentTest`, and by the dialogs' own Vitest files.
+ *
+ * ⚠️ ONE EXCEPTION, AND IT MOVES NO COUNT: M154's Archived case makes an unfiled form of its own and archives it,
+ * as the builder specs do with theirs. An archived form is in no folder count, no Unfiled count and not in
+ * "All", so nothing this spec or `responsive-axe` reads changes — only the Archived chip's own count, which no
+ * spec asserts, because the builder specs archive forms in whatever order the projects run.
  *
  * The page scan is `assertClean` (whole page, overflow included) because `/forms` is already clean there;
  * the dialogs are scanned SCOPED to the dialog, per the G9b lesson, so a pre-existing finding elsewhere on the
@@ -89,5 +95,29 @@ for (const theme of themes) {
         await scanDialog(page, `Move to folder (${theme})`);
         await move.getByRole('button', { name: 'Cancel' }).click();
         await expect(move).toBeHidden();
+    });
+
+    test(`Forms — the Archived chip shows archived forms read-only (${theme})`, async ({ page }, info) => {
+        // M154 (`R-44b17445`): the user asked on staging how to get back to an archived form's responses.
+        // Unique per run as well as per project and theme: a retry, or a second local run, archives another.
+        const title = `Archived check ${theme} ${info.project.name} ${Date.now()}`;
+        const formId = await createForm(page, title);
+        await archive(page, formId);
+
+        await page.goto('/forms', { waitUntil: 'networkidle' });
+        await expect(formEntry(page, title)).toHaveCount(0);
+
+        await page.getByRole('group', { name: 'Filter by state' }).getByRole('button', { name: /^Archived \d+$/ }).click();
+        await expect(page).toHaveURL(/[?&]state=archived/);
+        await forceTheme(page, theme);
+
+        const entry = formEntry(page, title);
+        await expect(entry).toBeVisible();
+        await expect(entry).toContainText('No longer accepting responses');
+        await expect(entry.getByRole('button', { name: 'Version history' })).toBeVisible();
+        await expect(entry.getByRole('button', { name: 'Open builder' })).toHaveCount(0);
+        await expect(entry.getByRole('button', { name: 'Archive form' })).toHaveCount(0);
+
+        await assertClean(page, `forms list, Archived chip (${theme})`);
     });
 }

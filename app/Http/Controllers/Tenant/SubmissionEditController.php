@@ -16,6 +16,7 @@ use App\Models\Submission;
 use App\Models\User;
 use App\Policies\SubmissionPolicy;
 use App\Services\Submissions\EncodeFormPresenter;
+use App\Services\Submissions\ResponseScanPages;
 use App\Services\Submissions\SubmissionAnswerEditService;
 use App\Support\Navigation\CrumbTrail;
 use Illuminate\Http\RedirectResponse;
@@ -95,6 +96,13 @@ final class SubmissionEditController extends Controller
             ...$presenter->present($form, $version, $submission),
             'crumbs' => $crumbs,
             'cancel_url' => CrumbTrail::exitFrom($crumbs),
+            /*
+             * M154 (`R-1585698b`): a response saved from a scan keeps its paper beside the form while its answers
+             * are corrected — the response page shows it, and "Edit answers" used to take it away. Sent only to an
+             * editor who may READ the response: `update` does not require `submissions.view` and the file route
+             * does, so anyone else would be handed links that answer 403.
+             */
+            'scan_pages' => $editor->can('view', $submission) ? ResponseScanPages::for($submission) : [],
         ]);
     }
 

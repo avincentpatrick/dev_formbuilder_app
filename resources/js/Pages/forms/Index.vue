@@ -199,7 +199,8 @@ function capacityLabel(row: FormRow): string {
 }
 
 function versionLabel(row: FormRow): string {
-    if (row.current_version !== null) return `v${row.current_version} live`;
+    // M154: archiving keeps the published version's number but closes the form, so it is not "live".
+    if (row.current_version !== null) return row.status === 'archived' ? `v${row.current_version}` : `v${row.current_version} live`;
     if (row.draft_version !== null) return `v${row.draft_version} draft`;
     return '—';
 }
@@ -593,7 +594,11 @@ function submitRestore(): void {
 
         <!-- Version history -->
         <MdsModal :open="historyTarget !== null" title="Version history" @close="historyTarget = null">
-            <ul v-if="historyTarget" class="forms__versions">
+            <!-- M154: a form archived as a draft has no version left, and an empty dialog reads as broken. -->
+            <p v-if="historyTarget && historyTarget.versions.length === 0" class="forms__prose">
+                This form has no versions to show.
+            </p>
+            <ul v-else-if="historyTarget" class="forms__versions">
                 <li v-for="v in historyTarget.versions" :key="v.id" class="forms__version">
                     <span class="forms__version-label">
                         <strong>v{{ v.version_number }}</strong>
@@ -613,6 +618,9 @@ function submitRestore(): void {
                             has is what keeps the button from ever appearing where the route would
                             403. If FormPolicy::view() is ever narrowed away from update(), this
                             needs a real `can.view` flag from FormPresenter rather than this proxy.
+                            ⚠️ M154: the two sets are NOT identical on an archived row — FormPresenter
+                            masks `can.edit` there (read-only, `D103` A), so both buttons are hidden
+                            although the route would print it; Restore would refuse in any case.
                         -->
                         <MdsButton
                             v-if="historyTarget.can.edit && v.status !== 'draft'"

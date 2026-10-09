@@ -60,6 +60,9 @@ final class TenantInvitationNotification extends Notification implements ShouldQ
                 ->line("You've been invited to join {$this->tenantName}.")
                 ->action('Accept invitation', $this->acceptUrl)
                 ->line('This invitation will expire in 7 days.')
+                // M154 (`R-66bc91ca`, `D50`): the first invitation to the testing server landed in spam. Marking
+                // it "Not spam" is what lets the workspace's next emails reach the inbox.
+                ->line('If this email landed in your spam or junk folder, mark it "Not spam" so the next ones reach your inbox.')
         );
     }
 }

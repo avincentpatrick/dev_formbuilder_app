@@ -666,7 +666,7 @@ something the page *displays* but does not search, which is the case worth knowi
 
 | Page | Matches | Deliberately does **not** match |
 |---|---|---|
-| `/forms` | title, description, slug | archived forms — they are hidden from this list, filter or no filter |
+| `/forms` | title, description, slug | archived forms under any chip but **Archived** — "All" leaves them out, and the Archived chip (`M154`) lists only them, read-only |
 | `/submissions` | reviewer remarks, return reason, the **parent form's title**, a full reference | **answer text** (§18 — the PII rule), respondent name |
 | `/members` | name, email — **including pending invites** | nothing on the page; this box searches everything the roster shows |
 | `/webhooks` | endpoint name, URL | the **Scope** column (which form it listens to) — that wants its own dropdown, not a substring match |
@@ -737,7 +737,7 @@ expected and is not a defect.
 | **Typo tolerance and word stemming** | **Not built, deliberately.** Searching "submission" will not find "submissions" except through the prefix match, and a misspelling finds nothing. Words are indexed literally, which is what lets a form titled "The A Team" be found by "the" — English stemming would strip that title to almost nothing and make it unfindable by its own name. Fuzzy matching needs a database extension and is a later decision. |
 | ~~**The ⌘K command palette**~~ | ✅ Built in J1d — press ⌘K (Ctrl+K on Windows) anywhere in the app. |
 | **Searching a list by a column the list shows** | Partially deliberate. Three refusals are named in §17.1's table — the webhooks **Scope** column, the feedback **reporter**, and a submission's **respondent**. Each wants its own dropdown rather than a substring match that would make one box mean several things; none is a data-access limitation. |
-| **Pagination on the forms list** | Not built. `/forms` loads every non-archived form at once and sorts client-side; the keyword filter narrows that array rather than paging it. Fine at demo scale, and the row to watch if a workspace ever holds hundreds of forms. |
+| **Pagination on the forms list** | Not built. `/forms` loads every form the viewer may see at once — archived ones too since `M154`, for the Archived chip's count — and sorts client-side; the keyword filter narrows that array rather than paging it. Fine at demo scale, and the row to watch if a workspace ever holds hundreds of forms. |
 | **Searching audit rows** | **Not built, deliberately** — not deferred, and not scheduled. A keyword search over an audit diff would read exactly the values redaction exists to remove, and the console-side equivalent was refused for the same reason. |
 | **Finding a pending invitation by search** | **Not built, deliberately.** A person who has been invited but has not accepted is not yet visible to the workspace at the database level — the isolation rule that keeps one workspace's people out of another's search is the same rule that hides them. They are listed on `/members`, which is where you cancel or resend. |
 | **A search index** | There is none, by measurement rather than omission. PostgreSQL will not use a text index on a table protected by row-level security, so one was built, proven unreachable, and removed. Searching is bounded by your workspace instead, which is fast at any realistic size. Recorded in `SearchIndexUsageTest` and the two `2026_08_11_*` migrations. |

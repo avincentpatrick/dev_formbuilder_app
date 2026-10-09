@@ -56,7 +56,8 @@ final class FormController extends Controller
         $facet = FormListFacets::parse($request->query('state'));
         $folders = FormListFolders::load();
         $folder = $folders->parse($request->query('folder'));
-        $rows = $presenter->list($user, $terms);
+        // Archived forms included, for the Archived chip (M154, `D103` A); "All" and the folder counts leave them out.
+        $rows = $presenter->list($user, $terms, withArchived: true);
 
         // Each filter is counted with the OTHER one applied and never its own, so every chip and every folder
         // keeps showing its own total while it is the one selected — a chip that reported 0 for the thing you
@@ -91,8 +92,12 @@ final class FormController extends Controller
             // was `! $terms->isEmpty()` alone; shipping the facet chips without widening it would have
             // reproduced that exact defect one filter over — a tenant clicking "Draft" with no drafts
             // would be told it had never made a form, and offered to make its first.
-            // M131 widened it again, for the folder: an empty folder says "no matches".
-            'empty_reason' => ListEmptyReason::for($forms !== [], ! $terms->isEmpty() || $facet !== null || $folder !== null),
+            // M131 widened it again, for the folder: an empty folder says "no matches". And M154 for "All" itself,
+            // which now hides the archived forms: a workspace whose every form is archived is not a new one.
+            'empty_reason' => ListEmptyReason::for(
+                $forms !== [],
+                ! $terms->isEmpty() || $facet !== null || $folder !== null || FormListFacets::hidesArchived($rows),
+            ),
         ]);
     }
 

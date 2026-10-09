@@ -13,12 +13,18 @@
  * re-create one by one.
  *
  * After a successful upload the reader goes to the scan's review page, which waits for the reading.
+ *
+ * M154 (`R-c84e4f12`): the chosen pages are LISTED before they are sent — a preview, the name, the size and a
+ * Remove — because the native input says only "2 files" and a wrong photo used to be found on the review screen,
+ * after it had been read. A pick ADDS to the list and the input is emptied, so a missed page is picked on its own
+ * and a wrong one removed without starting again; the file check runs on every change, not only on send.
  */
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { MdsAlert, MdsBadge, MdsBreadcrumb, MdsButton, MdsCard, MdsEmptyState, type BreadcrumbItem } from '@meridian/design-system';
 import type { BadgeVariant } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
+import ChosenPages from '@/components/ocr/ChosenPages.vue';
 import { checkScanFiles, uploadScan, type ScanLimits } from '@/components/ocr/scan-upload';
 
 interface ScanRow {
@@ -45,25 +51,73 @@ const props = defineProps<{
     crumbs: BreadcrumbItem[];
 }>();
 
-const chosen = ref<File[]>([]);
+/** A chosen file, with the preview this page made for it and must revoke. */
+interface ChosenPage {
+    id: number;
+    file: File;
+    previewUrl: string | null;
+}
+
+let seq = 0;
+const chosen = ref<ChosenPage[]>([]);
 const error = ref<string | null>(null);
 const sending = ref(false);
+/** What a screen reader hears after a pick or a removal — the list itself changes silently. */
+const announce = ref('');
 
 const accept = computed(() => props.upload.accepted_types.join(','));
 const perFileMegabytes = computed(() => Math.floor(props.upload.max_bytes_per_file / 1_000_000));
+const chosenFiles = computed(() => chosen.value.map((page) => page.file));
+const chosenView = computed(() =>
+    chosen.value.map((page) => ({ id: page.id, name: page.file.name, size: page.file.size, previewUrl: page.previewUrl })),
+);
+
+/** The check on the list as it now stands. An empty list is not refused here — only a send of nothing is. */
+function recheck(): void {
+    error.value = chosen.value.length > 0 ? checkScanFiles(chosenFiles.value, props.upload) : null;
+}
 
 function onChoose(event: Event): void {
     const target = event.target as HTMLInputElement;
-    chosen.value = Array.from(target.files ?? []);
-    error.value = null;
+    const picked = Array.from(target.files ?? []);
+    for (const file of picked) {
+        seq += 1;
+        chosen.value.push({ id: seq, file, previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : null });
+    }
+    // Emptied so the same file can be picked again after a removal; the list above is what was chosen.
+    target.value = '';
+    recheck();
+    const count = chosen.value.length;
+    announce.value = `${count} ${count === 1 ? 'page' : 'pages'} chosen.`;
 }
+
+function remove(id: number): void {
+    const page = chosen.value.find((candidate) => candidate.id === id);
+    if (page === undefined) {
+        return;
+    }
+    if (page.previewUrl !== null) {
+        URL.revokeObjectURL(page.previewUrl);
+    }
+    chosen.value = chosen.value.filter((candidate) => candidate.id !== id);
+    recheck();
+    announce.value = `${page.file.name} removed.`;
+}
+
+onBeforeUnmount(() => {
+    for (const page of chosen.value) {
+        if (page.previewUrl !== null) {
+            URL.revokeObjectURL(page.previewUrl);
+        }
+    }
+});
 
 async function send(): Promise<void> {
     if (sending.value) {
         return;
     }
 
-    const refused = checkScanFiles(chosen.value, props.upload);
+    const refused = checkScanFiles(chosenFiles.value, props.upload);
     if (refused !== null) {
         error.value = refused;
         return;
@@ -72,7 +126,7 @@ async function send(): Promise<void> {
     sending.value = true;
     error.value = null;
     try {
-        const scan = await uploadScan(props.upload.url, chosen.value);
+        const scan = await uploadScan(props.upload.url, chosenFiles.value);
         router.visit(`/forms/${props.form.id}/ocr/scans/${scan.id}/review`);
     } catch (thrown) {
         error.value = thrown instanceof Error ? thrown.message : 'The scan was not accepted. Please try again.';
@@ -136,6 +190,8 @@ function uploadedAt(iso: string): string {
                     @change="onChoose"
                 />
                 <p v-if="error !== null" id="scan-pages-error" class="scans__error" role="alert">{{ error }}</p>
+                <ChosenPages :pages="chosenView" :disabled="sending" @remove="remove" />
+                <p class="scans__announce" aria-live="polite">{{ announce }}</p>
                 <div class="scans__actions">
                     <MdsButton type="submit" variant="primary" icon-left="upload" :loading="sending">
                         Read this scan
@@ -150,7 +206,7 @@ function uploadedAt(iso: string): string {
             <MdsEmptyState
                 v-if="scans.length === 0"
                 headline="No scans yet"
-                description="Scans of this form appear here, newest first, until each is saved as a response."
+                description="Scans of this form appear here, newest first, with where each one stands."
             />
 
             <ol v-else class="scans__list">
@@ -191,10 +247,27 @@ function uploadedAt(iso: string): string {
     color: var(--mds-color-text-secondary);
 }
 
+/* Positioned so the clipped announcement below resolves its containing block HERE rather than far up the page
+   (`clipped-node-containment.test.ts`). */
 .scans__upload {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--mds-space-2);
+}
+
+/* M154: what a screen reader hears after a pick or a removal, clipped to nothing on screen. Its own rule because
+   this repository has no shared utility for it — the `mds-visually-hidden` class `MediaInput.vue` uses is defined
+   nowhere, which a real-browser look at this page found when the announcement showed as visible text. */
+.scans__announce {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
 }
 
 .scans__label {

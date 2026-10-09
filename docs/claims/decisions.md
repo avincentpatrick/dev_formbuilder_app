@@ -24,10 +24,20 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D106`, the last one filed, was asked and answered on 2026-10-09 in the session that filed it and recorded in `M152`'s close-out. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D107`, the last one filed, was asked and answered on 2026-10-10 in the session that filed it and recorded in `M155`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D107 — An archived form's own page is made read-only (`R-aaf36122`). A field device may still hold responses it took offline before the archive. Are those accepted when it syncs? **A — yes: an archived form keeps accepting them; only the page stops offering ways to add a response.**
+
+**Asked and answered 2026-10-10 (user decision, in chat), recorded by Lane A in `M155`'s claim.** `R-aaf36122`'s row asks it first at claim time. One permission, `SubmissionPolicy::create()`, admits an archived form (it checks only for a published version), and the same check gates the offline sync API (`SyncSubmissionController`), staff drafts and attachment uploads — so refusing an archived form there would refuse a tablet's queued responses too. `M154` masked the Forms list's row for the same reason.
+
+- **A — keep accepting (recommended, chosen).** `SubmissionPolicy::create()` is unchanged; queued offline responses still arrive and nothing collected in the field is lost. The form's page, its tab strip and its Responses page stop offering New response, Scan paper forms, Edit form, Share, Builder and Settings.
+- **B — refuse everything.** An archived form takes no response from anywhere; a tablet's queued responses are refused and stay on the device.
+- **C — accept sync, refuse staff entry.** Split the one permission so the offline sync path admits an archived form and the staff paths do not — more work and more risk two days before testing.
+
+**What the answer files:** nothing new — it is the shape of `R-aaf36122`'s remedy, which `M155` takes.
+
 ### D106 — Can a guest respondent upload a photo or scan of a paper form they filled in, rather than only staff? **A — yes, during testing: an "upload a filled paper copy" option on the form's public link, switched on per form, landing in the staff scans list for the mandatory review.**
 
 **Asked and answered 2026-10-09 (user decision, in chat), recorded by Lane A in `M152`'s close-out.** The user asked, during the staging scan, *"is there a page where guest respondents can upload their scanned copy or photos of the form?"* There is not: "Scan paper forms" is on a form's Responses tab behind the manual-encoding gate (`can:create` a submission, `module:ocr_single`, `feature:ocr_single`, `routes/tenant.php`), and neither the PRD nor `docs/ocr-pipeline-design.md` plans a guest path.

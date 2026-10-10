@@ -12651,7 +12651,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `today()` default returns as the text `today()`. Reachable only through undo after converting a question with an
   expression default to a note. **Live.** Filed by `M126`. **Tier: early-testing.** ✅ **CLOSED BY `M134` (2026-10-05) — A FORMULA DEFAULT SURVIVES THE UNDO OF A CONVERSION.** `default_value_is_expression` rides the builder's row both ways: the presenter sends it, `UpdateFieldRequest` takes it (`sometimes|boolean`), `writeField()` writes it only when sent, `FormField::$attributes` defaults it, and the store's `fieldPayload()` sends it — so the undo's restoring PATCH carries `today()` with its flag. Sibling found: typing over the Default value box now clears the flag (an overwritten imported formula stayed flagged). ✅ 8 Pest + 3 Vitest red first (exact); six mutations caught. The builder showing a formula default as plain text is filed.
 
-- **`minor` · A field edit the server refuses still becomes the builder's new baseline and its undo entry, so the
+- ✅ **CLOSED BY `M155` (2026-10-10) — ****`minor` · A field edit the server refuses still becomes the builder's new baseline and its undo entry, so the
   refused value is never sent again.** Found by `M128` while giving the 422 map a reader (`R-d001de0c`).
   `commitFieldEdit` advances the field's saved baseline and pushes an "Edit …" history entry before it learns whether
   the PATCH landed, and only a 409 stops it. After a refusal the rejected value stays on screen, now marked inline, but
@@ -12659,7 +12659,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `M128` keeps the marks until that field's next successful save, which makes the refusal visible; it does not make
   the history honest. The remedy moves the baseline and the history push after the verdict, inside the same queued
   task. Rare in testing, because it needs a server refusal on an autosave. **Live.** Filed by `M128`.
-  **Tier: during-testing.**
+  **Tier: during-testing.** ✅ **CLOSED BY `M155` (2026-10-10):** `persistField()`/`persistSection()` report whether the server holds the edit; `commitFieldEdit()`/`commitSectionEdit()` move the baseline and push the undo entry only then, so a refused edit is sent again on its next commit even unchanged; an undo or redo step the server refuses puts the screen back on what the server holds and stays on its stack (`replayField`/`replaySection`, `restoreSnapshot()`'s shape); a refused "Keep mine" leaves the baseline where the server is. Widened on purpose to the section commit, both undo/redo closures and Keep mine — the same shape in the same file. Eight store cases red on the trunk store, nine mutants each caught; J7's no-op-burst case pinned the defect (a touch after a failure sent nothing) and was moved to a question the server holds, keeping the property it guards. **Found beside it and filed:** the delete-undo paths and a new field's seeded label.
 
 - ✅ **CLOSED BY `M146` (2026-10-08) — **`nit` · A refused builder save names the request path, not the setting, in its message.**
   Found by `M128`. `UpdateFieldRequest` declares no `attributes()` and the app has no `lang/` directory, so Laravel
@@ -13800,7 +13800,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   failed one, both behind the routes' existing gate; it overlaps `R-92ba6b65` (*nothing ever deletes an OCR scan*), whose reaper
   should share the deletion. **Live.** Filed by `M154`. **Tier: during-testing.**
 
-- **`minor` · An archived form's own page still offers Edit form, Share, New response and the Builder and Settings tabs, and says it is accepting responses.**
+- ✅ **CLOSED BY `M155` (2026-10-10) — ****`minor` · An archived form's own page still offers Edit form, Share, New response and the Builder and Settings tabs, and says it is accepting responses.**
   Found by `M154` taking `R-44b17445`, whose list is now read-only for an archived form while the page its title links to is
   not. `FormHubPresenter::show()` and `FormTabSet` never read the form's status, so the hub offers "Edit form" (a builder with no
   draft, where every edit is refused), Share (whose guest-link switch reports the stored value, though `D99` closed the link) and
@@ -13810,9 +13810,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   published version), so staff can still enter a response — `M154` masked the list's row only, because the same policy gates the
   offline sync API (`SyncSubmissionController`), staff drafts and attachment uploads, and refusing there would strand a field
   device's responses queued before the archive. Answered first at claim time: whether those queued responses are accepted.
-  **Live.** Filed by `M154`. **Tier: during-testing.**
+  **Live.** Filed by `M154`. **Tier: during-testing.** ✅ **CLOSED BY `M155` (2026-10-10):** an archived form's page offers nothing that changes or adds to it — `FormHubPresenter` sends `can.edit`/`can.publish`/`can.encode` false and no `share` block, its tile reads `closed` and the page says "No longer accepting responses" whatever the window (`Show.vue`); `FormTabSet` drops Builder and Settings on all four pages that draw the strip; the Responses tab offers no "Scan paper forms"; `FormService::archive()` on an archived form returns it untouched. Overview, Responses, Export and Analytics stay. **Answered first, as the row asked: `D107` A** — `SubmissionPolicy::create()` is unchanged, so a tablet's responses queued before the archive still arrive. `can.template` needed no change (it gates Print blank on a published version only). Seven Pest cases (five red on the trunk, two controls), one Vitest case red first, eight Pest mutants each caught by its own case. **Found beside it and filed:** the Settings address still accepts every save on an archived form.
 
-- **`minor` · The photo and file upload control draws its screen-reader text on screen: "Remove {name}" beside every ✕, a second "(required)", and each announcement.**
+- ✅ **CLOSED BY `M155` (2026-10-10) — ****`minor` · The photo and file upload control draws its screen-reader text on screen: "Remove {name}" beside every ✕, a second "(required)", and each announcement.**
   Found by `M154`, whose scans page copied the class: `resources/js/components/submissions/MediaInput.vue` hides three
   things with `mds-visually-hidden`, and no stylesheet in the repository defines that class (a census of every `.vue`,
   `.css` and `.ts` source finds only its two uses), so all three render as ordinary text — on the staff encode page and in
@@ -13821,4 +13821,32 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the same for this file: its own clip rule, plus a positioned container, because `clipped-node-containment.test.ts`
   refuses a clipped node with no positioned ancestor in its component — and a look at the running page first, since a
   new containing block changes where any other absolutely positioned descendant lands. **Live.** Filed by `M154`.
+  **Tier: during-testing.** ✅ **CLOSED BY `M155` (2026-10-10):** the three nodes carry the component's own clip rule (`.media__sr`) and the fieldset is positioned. Looked at first and after on the encode page at three widths: before, "(required)", a wrapped "Remove site-photo.png" and "site-photo.png uploaded." were all drawn; after, none, and the picker, the file input and the ✕ did not move. Proof: `tests/e2e/media-input-hidden-text.spec.ts` (new; makes, publishes and archives its own form with a required photo question) measures each node's box — red on the trunk at 60×16 — and `MediaInput.test.ts` (new) that each hidden node's class is clipped by the component's own stylesheet (2 of 2 red on the trunk). The guest runtime renders the same component and was not looked at separately. **The row's premise about the guard was wrong:** `clipped-node-containment.test.ts` reads only the `rect(0 0 0 0)` form, and this file already positions `.media__input`, so the guard passes it with or without the positioned fieldset — the E2E box check is the gate. That blind spot is filed.
+
+- **`minor` · An archived form's settings still accept every save from their own address, though its page no longer offers them.**
+  Found by `M155` taking `R-aaf36122`, which hides the Builder and Settings tabs on an archived form's pages. Hiding a tab
+  does not close its route: `FormPolicy::update()` has no status arm, every settings section's route gates on
+  `can:update,form`, and no settings writer in `FormService` refuses an archived form — so `/forms/{form}/settings`, reached
+  by hand or from an old tab, still saves the schedule, the thank-you message, the page mode and the scanning switch on a
+  form that takes no responses. The builder at the same kind of address opens read-only (an archived form has no draft). The
+  remedy is a refusal at the writers, not in `FormPolicy::update()`, which also gates restore and the builder's read — measure
+  which first. Measured by reading, not by a request. **Live.** Filed by `M155`. **Tier: during-testing.**
+
+- **`nit` · The tree-wide clipped-node guard reads only `clip: rect(0 0 0 0)`, so a node clipped with commas is invisible to it.**
+  Found by `M155` taking `R-77a29731`. `packages/design-system/src/theme/__tests__/clipped-node-containment.test.ts`'s
+  `CLIPPED` pattern is `clip:\s*rect\(0 0 0 0\)`; three files write `rect(0, 0, 0, 0)` instead —
+  `resources/js/components/forms/FormCard.vue`, `resources/js/components/forms/ManageFoldersModal.vue` and
+  `resources/js/components/submissions/MediaInput.vue` (`.media__input`) — so the guard has never judged them. The remedy
+  widens the pattern to an optional comma and then reads what it finds: a newly seen file with no positioned ancestor goes
+  into `KNOWN_UNGUARDED` only with a look at the running page, as that list's note requires. The guard's file is a hub.
+  **Live.** Filed by `M155`. **Tier: during-testing.**
+
+- **`nit` · Three builder paths still move a baseline whatever their save returned: undoing a question's delete, undoing a section's delete, and a new question's seeded label.**
+  Found by `M155` taking `R-0aa94dce`, which made `persistField()`/`persistSection()` report whether the server holds the
+  edit and made every edit commit, undo/redo step and "Keep mine" act on it. `restoreFieldServer()` and
+  `restoreSectionServer()` in `resources/js/components/builder/useBuilderStore.ts` re-create the deleted row, PATCH the
+  snapshot onto it and set the baseline to the snapshot whether or not that PATCH landed, and `addField()` does the same for
+  the "Text"/"Number" label it seeds (`M125`). A refusal is unlikely — each restores content the server held before — so
+  the live case is a failed request mid-undo: the server keeps a blank question while the builder believes it holds the
+  restored one, and nothing re-sends it. **Latent** — needs the save to fail during an undo of a delete. Filed by `M155`.
   **Tier: during-testing.**

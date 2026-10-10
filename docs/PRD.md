@@ -167,7 +167,7 @@ Upload a photo or scan of one filled paper form; OCR (Google Cloud Vision or an 
 Acceptance criteria:
 - A user can upload a single-page image or PDF, associated with a specific form and its currently published version.
 - The system extracts a value per field and attaches a 0–100 confidence score to each extracted value.
-- A review screen shows every field with its extracted value (editable inline) and a visible low-confidence indicator (default threshold: below 70%) that must be individually confirmed or corrected before submission — there is no blind "accept all" for low-confidence fields.
+- A review screen shows every field with its extracted value (editable inline) and a visible low-confidence indicator (default threshold: below 70%): a value read below it is filled in all the same and marked "may be wrong" with its confidence (`D108`). The reviewer's one Save confirms the whole form once every mark has been on screen (`D110` — no per-field confirmation), and nothing is submitted without a person passing the review screen.
 - On confirmation, the submission is created through the same `SubmissionPipeline` used by every other channel, tagged `source = ocr_single`, with the original image stored via the shared polymorphic `attachments` table and the raw OCR payload retained for audit/debugging.
 - Availability is gated by a per-form capability flag computed from the form's composition (e.g., a form containing repeat groups or media-capture fields that OCR cannot reliably parse is automatically excluded from this channel in the initial release) and by the tenant's subscription plan.
 - Full confidence-threshold tiers, error handling, and the exact `ocr_compatible` eligibility rule are specified in the OCR Pipeline Design Doc (#17).

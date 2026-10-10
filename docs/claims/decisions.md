@@ -24,7 +24,13 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D109`, the last one filed, was asked and answered on 2026-10-10 in the session that filed it and recorded in `M156`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+### D110 — The PRD says a low-confidence scan answer "must be individually confirmed", and the review screen has never asked for that: Save confirms the whole form. Now that such answers are filled in and marked "may be wrong" (`D108`), does each one need its own confirmation? **Tier: during-testing.**
+
+**Filed 2026-10-10 by Lane A in `M156`, found while amending the documents `D108` changes; asked in the same session (`D102`).** `docs/PRD.md`'s Feature #1 review-screen line asks for *"a visible low-confidence indicator (default threshold: below 70%) that must be individually confirmed"*. Since `M129` the review screen (`Pages/submissions/Encode.vue` in scan mode) shows every note and saves the whole form on one Save; nothing confirms a field on its own, and no row recorded the gap. Under `D108` a wrong value below 70 sits in its box, marked, until someone saves.
+
+- **A — No: Save confirms the whole form (recommended).** The PRD line is amended to say so; each "may be wrong" mark stays beside its answer until the form is saved. Matches the user's reason for `D108`: *"users dont want so much clicks"*.
+- **B — Yes: a tick per marked answer.** Each answer marked "may be wrong" needs an "I checked this" tick before Save is enabled. Guards against clicking through; one more click per marked answer (Round 1: about six per form).
+- **C — One question at Save.** Save says how many answers are still marked "may be wrong" and asks once to save anyway. One click, and the count is named.
 
 
 ## ANSWERED

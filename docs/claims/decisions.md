@@ -24,10 +24,31 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D107`, the last one filed, was asked and answered on 2026-10-10 in the session that filed it and recorded in `M155`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D109`, the last one filed, was asked and answered on 2026-10-10 in the session that filed it and recorded in `M156`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D109 — `M156` puts the OCR fill-in on the testing server two days before the Oct 12 session, and every merge deploys there. Does anything else merge before the session? **A — no: freeze once `M156` is merged and deployed, until the Oct 12 session.**
+
+**Asked and answered 2026-10-10 (user decision, in chat), recorded by Lane A in `M156`'s claim.** `D90` froze everything but fixes until the session; `D94` lifted that for non-OCR work from 2026-10-06, so without a new answer the during-testing tier would keep merging — and deploying — up to and through the session. The user had said "then freeze" earlier the same day, before `M155`'s batch was chosen, so it was asked again rather than assumed.
+
+- **A — freeze after `M156` (recommended, chosen).** Nothing else merges until the Oct 12 session starts; testers meet the app `M156` leaves on the testing server. The next session after it takes the during-testing tier from `docs/pipeline.md` as usual.
+- **B — keep merging fixes.** The during-testing tier continues; each fix deploys to the testing server as it lands, before and during the session.
+
+**What the answer files:** nothing new. It is a pause, not work: no row is held by it, and it expires when the Oct 12 session starts.
+
+### D108 — The review screen leaves an answer read below the review threshold (70) empty and quotes what was read in a note under the box. The user asks for the text in the box. How is a low-confidence answer shown? **B, widened to every type — fill it in, with its confidence and a line that it may be wrong; before the Oct 12 session.**
+
+**Asked and answered 2026-10-10 (user decision, in chat, in a status-only session that made no repo edits), recorded by Lane A in `M156`'s claim.** The user's comment on the staging scan: *"on the text box, it can read properly the remarks but did not put it in the text area. it is just below the text area. can we put the actual text that has been read since it is too close and user can still edit the form and can correct them."* `PrintedFormMatcher::result()` nulls the value of a `manual`-tier read; that is `docs/ocr-pipeline-design.md` §3's rule (*"a wrong auto-fill silently accepted by a reviewer clicking through quickly is worse than an empty, obviously-incomplete field"*), confirmed by `docs/adr/0010-ocr-provider-cloud-vision.md` §D3. Round 1 read 35 right and 25 wrong below 70.
+
+- **A — a "Use this text" button beside the note (recommended).** The box stays empty; one click puts the read text in it. Keeps §3's rule that nothing below 70 is pre-filled.
+- **B — fill it in, marked, for written answers only.** A text answer below 70 goes in the box with a note that it may be wrong; choices and numbers stay empty.
+- **C — keep it as it is.**
+
+**The answer: B, widened to every type.** The user's words: *"just put the value and allow them to know that it may not be accurate … but still put the value in the field"*, and on A, *"users dont want so much clicks"*. Every answer read below the review threshold is filled in with its confidence and a line saying it may be wrong; an unreadable answer (nothing valid to fill, such as letters in a number) keeps its note. The review screen stays mandatory before anything is saved (§3). Corrected by the user the same day: it lands **before** the Oct 12 session (*"my oct request must be before the oct 12"*). Guest paper-copy upload (`D106`) stays during-testing.
+
+**What the answer files, in the same push:** `R-51366b2e` (`early-testing`), which `M156` takes: the matcher keeps the value, the review note says it may be wrong, the bake-off scorer stops counting a withheld value (a wrong one is `wrong_flagged`), and §3 and ADR-0010 §D3 are amended by this decision.
+
 ### D107 — An archived form's own page is made read-only (`R-aaf36122`). A field device may still hold responses it took offline before the archive. Are those accepted when it syncs? **A — yes: an archived form keeps accepting them; only the page stops offering ways to add a response.**
 
 **Asked and answered 2026-10-10 (user decision, in chat), recorded by Lane A in `M155`'s claim.** `R-aaf36122`'s row asks it first at claim time. One permission, `SubmissionPolicy::create()`, admits an archived form (it checks only for a published version), and the same check gates the offline sync API (`SyncSubmissionController`), staff drafts and attachment uploads — so refusing an archived form there would refuse a tablet's queued responses too. `M154` masked the Forms list's row for the same reason.

@@ -16,7 +16,60 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M155` is merged and live on staging; the next session opens with the user's check of an archived form's own page (read-only, its responses still exportable — their question, *"how can i retrieve the responses from that archived form?"*) and of the upload control's hidden text, then takes the during-testing tier from `docs/pipeline.md`'s Next section
+## Status: ACTIVE CLAIM — `M156`, OCR fills every low-confidence answer into its field (`R-51366b2e`, `D108`), then the freeze (`D109`) (m156-ocr-fill-low-confidence)
+
+Taken 2026-10-10. Branch `m156-ocr-fill-low-confidence`, cut from origin/main at `5a5ea051`, PR into main.
+Row: `R-51366b2e` — *A low-confidence scan answer is left empty on the review screen, and the text it read shows only in a note
+below the box* (`docs/feature-backlog.md`, the last row; filed by this claim, `early-testing`). The user queued it on 2026-10-10 for
+the session after `M155`, whatever that hand-off said. At this session's start the user confirmed `M155` on staging (both checks),
+and answered `D109` (freeze after this increment). `D108` was answered in chat earlier the same day and is recorded here.
+
+### Evidence verified
+- `app/Services/Ocr/PrintedFormMatcher.php` `result()`: **held** — `if ($tier === 'manual') { $value = null; }`, with a ⚠️ docblock
+  citing §3; `tier()` calls `manual` "(withheld)".
+- `app/Services/Ocr/OcrAnswerCarry.php`: **held** — `carry()` skips an entry whose state is not `read` or whose value is null, so a
+  `manual` read fills nothing; its docblock says so ("TWO MORE THINGS NEVER CARRY").
+- `resources/js/components/ocr/scan-review.ts` `readNote()`: **held** — the `manual` arm returns the danger note "Needs manual entry:
+  the scan read "…", but not clearly enough to fill it in."
+- `docs/ocr-pipeline-design.md` §3 (the "< 70: left blank" bullet, and the as-built "Below 70 the value is withheld") and
+  `docs/adr/0010-ocr-provider-cloud-vision.md` §D3: **held**.
+
+### Premise verified
+- **"The server change is `result()` alone" — true for the review screen, false for the repository.** A grep of `tier` across `app/`
+  finds three readers: the matcher, the carry (by the null) and `OcrBakeoffScorer`, which holds a SECOND COPY of the withholding rule
+  (`shown()` returns null below the review threshold; `withheld_right`/`withheld_wrong` causes; a review-threshold sweep whose only
+  effect is withholding). The harness runs the matcher at zero thresholds, so the matcher change never reaches it — the scorer has to
+  change on its own or the bake-off goes on measuring a rule the product no longer has.
+- **Two more copies of the old shape:** `tests/Feature/Ocr/Support/ReadScanFixture.php` writes a `manual` value as null, and
+  `database/seeders/E2eSeeder.php`'s seeded scan holds a `manual` multi-select with a null value.
+- **A scan read before the deploy keeps its null** (the `extraction` column is stored). Unsaved scans on staging would then read the
+  new note with nothing in the box, so the review screen must keep the old note for a `manual` entry that was not carried.
+- **Carve-outs, each kept:** `unreadable` (nothing valid to fill) keeps its note; the `review` tier's note is unchanged; a value that
+  cannot be carried (`type_changed`, `option_missing`, …) is still listed, whatever its tier.
+- Lane B is retired; no other worktree holds this branch.
+
+### Remedy verdict
+**Works, and is wider than the row's first sentence.** Removing the null puts the value through `OcrAnswerCarry` unchanged (its
+refusals judge the value, not the tier), so the box fills for every type. Three further changes are needed for the remedy to be
+true end to end: the review note for a filled `manual` answer, the legacy-null note, and the scorer. Measured by reading; the red
+tests below measure it before each change.
+
+Files: `app/Services/Ocr/PrintedFormMatcher.php`, `app/Services/Ocr/OcrAnswerCarry.php` (docblock), `app/Services/Ocr/Bakeoff/OcrBakeoffScorer.php`,
+`app/Services/Ocr/Bakeoff/OcrBakeoffReport.php`, `resources/js/components/ocr/scan-review.ts`, `resources/js/components/ocr/scan-review.test.ts`,
+`tests/Feature/Ocr/PrintedFormMatcherTest.php`, `tests/Feature/Ocr/OcrTickConfidenceTest.php`, `tests/Feature/Ocr/OcrScanReviewTest.php`,
+`tests/Feature/Ocr/OcrAnswerCarryTest.php`, `tests/Feature/Ocr/Support/ReadScanFixture.php`, `tests/Unit/Ocr/OcrBakeoffScorerTest.php`,
+`tests/Feature/Ocr/Bakeoff/OcrBakeoffCommandTest.php`, `database/seeders/E2eSeeder.php`, `tests/e2e/ocr-review-axe.spec.ts`.
+Shared artefacts taken: `docs/ocr-pipeline-design.md`, `docs/adr/0010-ocr-provider-cloud-vision.md`, `docs/data-dictionary.md`,
+`docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `PROGRESS.md` (own block),
+`docs/gate-baselines.md`, the hand-off.
+Paired files taken: none.
+Namespaces spent: `D108`, `D109`; nothing from the ADR or migration namespaces.
+Prediction: Pest — `PrintedFormMatcherTest` red in its three `manual` cases, `OcrTickConfidenceTest` red in the writing case,
+`OcrScanReviewTest` red where it asserts the `manual` answer is NOT filled, once the fixture writes the value; `OcrBakeoffScorerTest`
+red on the causes and the removed sweep; `OcrBakeoffCommandTest` red on the report's withheld line. Vitest — the two new
+`scan-review` cases red. E2E `ocr-review-axe.spec.ts` red on the new "may be wrong" text until the seeder fills the value. Round 1
+re-scored offline: about 32% needing correction (ADR-0010's estimate for "nothing withheld"), still 0 silent. **Most likely wrong:**
+the `OcrBakeoffCommandTest` report fixture — its 3-of-21 headline may move once a withheld right answer stops counting.
 
 ## RELEASED — `M155`, three during-testing rows testers see from Oct 12: an archived form's own page is read-only (`R-aaf36122`), the upload control keeps its screen-reader text off screen (`R-77a29731`), and a builder edit the server refuses is not treated as saved (`R-0aa94dce`); `D107` recorded (merged as PR #348, `0476e9ed`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

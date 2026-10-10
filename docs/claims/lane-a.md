@@ -16,77 +16,51 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M155`, three during-testing rows testers see from Oct 12: an archived form's own page offers editing and says it is accepting responses (`R-aaf36122`), the photo and file upload control draws its screen-reader text on screen (`R-77a29731`), and a builder edit the server refuses still becomes the baseline and an undo entry (`R-0aa94dce`) (`m155-what-testers-see`)
+## Status: NO ACTIVE CLAIM — `M155` is merged and live on staging; the next session opens with the user's check of an archived form's own page (read-only, its responses still exportable — their question, *"how can i retrieve the responses from that archived form?"*) and of the upload control's hidden text, then takes the during-testing tier from `docs/pipeline.md`'s Next section
 
-Taken 2026-10-10. Branch `m155-what-testers-see`, cut from `origin/main` at `c9496cf5`, PR into main. **The owed check came first:** the
-user confirmed all four `M154` fixes on staging at the session's start (archived form → Responses → Export, Edit answers shows the
-paper, the chosen photos listed, the spam hint). The user was offered three verified during-testing batches and chose this one ("What
-testers see"). **`D107` was asked and answered A in this session** (an archived form keeps accepting responses a device queued offline
-before the archive) and is recorded in this push. **`D13`:** one hub — `app/Services/Forms/FormService.php`; the three remedy file sets
-are disjoint. Rows (`docs/feature-backlog.md`): `R-aaf36122` "An archived form's own page still offers Edit form, Share, New response
-and the Builder and Settings tabs, and says it is accepting responses" (filed by `M154`); `R-77a29731` "The photo and file upload control
-draws its screen-reader text on screen" (`M154`); `R-0aa94dce` "A field edit the server refuses still becomes the builder's new baseline
-and its undo entry" (`M128`).
+## RELEASED — `M155`, three during-testing rows testers see from Oct 12: an archived form's own page is read-only (`R-aaf36122`), the upload control keeps its screen-reader text off screen (`R-77a29731`), and a builder edit the server refuses is not treated as saved (`R-0aa94dce`); `D107` recorded (merged as PR #348, `0476e9ed`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-### Evidence verified
-- **`R-aaf36122`:** `FormHubPresenter::show()` never reads `status` — `can.edit`/`can.publish`/`can.encode` are permission-only and
-  `share` is sent to anyone who may update: **held.** `FormTabSet::for()` offers Builder and Settings on `update` alone: **held.**
-  The tile's `acceptance` comes from `FormScheduleView::present()` → `FormSchedule::acceptance()`, which ignores status, so an archived
-  form with no window reads "Accepting": **held.** `FormService::archive()` locks, discards the draft and re-stamps `archived_at` + audits
-  with no status guard: **held.** `SubmissionPolicy::create()` checks only for a published version: **held** (and stays, `D107`).
-- **`R-77a29731`:** `mds-visually-hidden` has three uses in `MediaInput.vue` (the "(required)" marker, "Remove {name}", the polite
-  announcement) and a comment in `Pages/ocr/Scans.vue`; no stylesheet in `resources/js`, `resources/public-runtime` or
-  `packages/design-system` defines it: **held.** The guest runtime reaches this control through `FieldInput.vue`: **held.**
-- **`R-0aa94dce`:** `persistField()` returns nothing; `commitFieldEdit()` stops only on a 409, then advances `baselines` and pushes the
-  history entry whatever `guard()` returned: **held.** The undo/redo closures set the baseline after `persistField()` the same way: **held.**
+Shipped 2026-10-10. Branch `m155-what-testers-see`, cut from `origin/main` at `c9496cf5`. The claim is `6d972917`, pushed before any file was
+opened, with `D107`; one claim extension, `4c3e663e` (`tests/e2e/media-input-hidden-text.spec.ts`), pushed from a detached worktree before
+that file was written. The user confirmed all four `M154` fixes on staging at the session's start and chose this batch from three offered
+("What testers see"). The work is `53fc2951` + `06a3a930` (`R-aaf36122`), `fbcc0d57` + `75adcbbd` (`R-77a29731`), `7736a7fa` + `0939e607`
+(`R-0aa94dce`) and `c4320b18` (rows, the line, the census). Post-merge CI run 38013420069; deployed by itself (`D47`), run 38015346267.
 
-### Premise verified
-- **`R-aaf36122`:** the row believes the page is the gap and the server question is open. **`D107` = A closes the server question:**
-  `SubmissionPolicy::create` stays, so queued offline responses, staff drafts and attachment uploads keep working, and only the page
-  stops offering entry points (the `M154` list's own shape). **Measured beside it:** `FormPolicy::update()` has no status arm and no
-  settings writer refuses an archived form, so the Settings URL (reached by hand) still accepts every save — **filed as its own row**,
-  because this row covers what the page offers. The Responses page's "Scan paper forms" entry (`SubmissionInboxController::scanUrl()`)
-  is offered on an archived form too — **taken here**, the same page mask. `can.template` needs no change: on the hub it gates only
-  "Print blank" on a published version row (`isPrintable`), which an archived form keeps. `FormTabSet` is rendered by the hub, Responses,
-  Analytics and Settings pages, so the strip changes on all four. `FormSchedule::acceptance()` stays as is — the encode and guest pages
-  read it; the hub overrides its own tile only.
-- **`R-77a29731`:** the row says `clipped-node-containment.test.ts` refuses a clipped node with no positioned ancestor. **False for this
-  file today:** that gate matches only `clip: rect(0 0 0 0)`, and `.media__input` writes `rect(0, 0, 0, 0)`, so it is invisible to it.
-  The new rule is written in the form the gate reads, which makes the positioned container load-bearing under an existing gate; the
-  comma-form blind spot is **filed as its own row** (its file is a hub). The design system has no shared visually-hidden utility (three
-  components say so), so this component gets its own rule, as `Scans.vue` did.
-- **`R-0aa94dce`:** since `M150` the inline label edits in Structure and Preview (`renameField`) commit through `commitFieldEdit`, so
-  more of the builder reaches this than when it was filed. `commitSectionEdit()` has the identical shape — **taken here** (same file, same
-  mechanism; a refused section edit is the same defect).
+**What changed:**
+- **`R-aaf36122`.** Archived ⇒ `FormHubPresenter` sends `can.edit`/`can.publish`/`can.encode` false and no `share`, and its tile reads
+  `closed`; `Show.vue` says "No longer accepting responses" for an archived form whatever its window. `FormTabSet` drops Builder and
+  Settings on all four pages that draw the strip; `SubmissionInboxController::scanUrl()` offers no "Scan paper forms"; `FormService::archive()`
+  on an archived form returns it untouched. Overview, Responses, Export and Analytics stay. `D107` A: `SubmissionPolicy::create()` unchanged.
+- **`R-77a29731`.** `MediaInput.vue`'s three hidden nodes carry its own `.media__sr` clip rule; the fieldset is positioned.
+- **`R-0aa94dce`.** `persistField()`/`persistSection()` return whether the server holds the edit; both commits move the baseline and push
+  the undo entry only then; `replayField()`/`replaySection()` put the screen back and throw `HistoryStepFailed` on a refused undo or redo
+  (the entry stays on its stack); a refused "Keep mine" leaves the baseline where the server is.
+- **Filed:** `R-188dd3b1` (an archived form's settings still accept saves from their own address), `R-b1b2b33d` (the clipped-node guard
+  cannot see `rect(0, 0, 0, 0)` — three files write it), `R-d9948190` (the two delete-undo paths and a new question's seeded label still
+  move a baseline whatever their save returned; latent).
 
-### Remedy verdict
-- **`R-aaf36122` — works as prescribed, server-first.** Archived ⇒ the hub sends `can.edit`/`can.publish`/`can.encode` false and no
-  `share`, and its tile reads `closed` with the caption "No longer accepting responses"; `FormTabSet` drops Builder and Settings;
-  `scanUrl()` returns null; `archive()` on an archived form returns it untouched (no second `archived_at`, no second audit row).
-- **`R-77a29731` — works:** the component's own clip rule (copied from `Scans.vue`) on its three hidden nodes and a positioned fieldset.
-  A real-browser look at the encode page and a guest form first and after, because a new containing block moves `.media__input`.
-- **`R-0aa94dce` — works as prescribed:** `persistField()`/`persistSection()` report whether the server holds the edit; the baseline
-  and the history entry move only then, so the refused value is sent again on the field's next commit and undo never replays it.
-
-Files: `app/Services/Forms/FormHubPresenter.php`, `app/Support/Forms/FormTabSet.php`,
-`app/Http/Controllers/Tenant/SubmissionInboxController.php`, `app/Services/Forms/FormService.php` (the hub),
-`resources/js/Pages/forms/Show.vue`, `resources/js/Pages/forms/show.test.ts`, `tests/Feature/Forms/FormArchivedHubTest.php` (new);
-`resources/js/components/submissions/MediaInput.vue`, `resources/js/components/submissions/MediaInput.test.ts` (new),
-`resources/js/Pages/ocr/Scans.vue` (its comment), an E2E box check in `tests/e2e/media-input-hidden-text.spec.ts` (new — **claim extension**: no seeded form
-publishes a photo question, so the spec makes its own, publishes it, opens New response, and archives it again); `resources/js/components/builder/useBuilderStore.ts`,
-`resources/js/components/builder/save-state.test.ts`; and the close-out set.
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md` (`D107`), `PROGRESS.md` (own block), `docs/pipeline.md`,
-`docs/backlog-triage.md`, `docs/gate-baselines.md`, the E2E spec above.
-Paired files taken: none.
-Namespaces spent: `D107` (answered); nothing from the ADR or migration namespaces.
-Prediction: `FormArchivedHubTest` is red on the trunk in every case that reads what it adds (an archived form's hub sends `can.edit`
-true, a `share` block, a Builder and a Settings tab, `acceptance: open`; a second `archive()` writes a second audit row; the Responses
-page carries a `scan_url`) and green after, while every unarchived case stays green; `FormHubPageTest`, `FormTabSetReachabilityTest`
-and `FormListArchivedFilterTest` stay green unedited. Pest mutants — each archived arm removed in turn — are each caught by its own case.
-The new Vitest cases are red before their change (the store cases: a 422 leaves no history entry and the next commit re-sends); a
-mutant moving the baseline back above the verdict is caught. PHPStan moves by zero. CI 6/6 on the first run. **Most likely wrong: the
-upload control's positioned container** — a new containing block moves the absolutely positioned `.media__input` and possibly the
-remove button on the guest page; the real-browser look is there to catch it.
+**How the prediction fared:**
+- ✅ `FormArchivedHubTest` was red on the trunk in exactly the five cases that read what it adds, with its two controls green, and green
+  after; `FormHubPageTest`, `FormHubGateTest`, `FormTabSetReachabilityTest` and `FormListArchivedFilterTest` stayed green unedited.
+  **Pest mutants 8/8**, each caught by its own case. CI 6/6 on the first run.
+- ✅ Every new Vitest case was red before its change (`show.test.ts` +1; `MediaInput.test.ts` 2/2 against the trunk file; `save-state.test.ts`
+  8/8 against the trunk store). **Store mutants 9/9**, each caught — three cases were added for that: a refused section undo, a refused
+  section "Keep mine", and the marks cleared after a refused undo, each a mutant that would otherwise have survived.
+- ❌ **Not foreseen: one green test pinned the defect.** J7's *"reaches no verdict at all when the burst wrote nothing"* touched the refused
+  field and asserted that nothing was sent — the very mechanism this row removes. Its subject is the attempt flag, so its no-op touch moved
+  to a second question the server holds, on purpose and labelled; the property it guards is still asserted.
+- ❌ **A premise in the claim was wrong, and the verification had said so.** The claim said writing the clip as `rect(0 0 0 0)` makes the
+  positioned fieldset load-bearing under `clipped-node-containment.test.ts`. It does not: the file already positions `.media__input`, so
+  the guard passes it either way. The E2E box check is this row's gate; the guard's comma blind spot is `R-b1b2b33d`.
+- ✅ **"Most likely wrong: the positioned container moving `.media__input` or the ✕" — it did not.** Looked at before and after on the encode
+  page at three widths: before, "(required)", a wrapped "Remove site-photo.png" and "site-photo.png uploaded." were drawn; after, none, and
+  nothing else moved. The guest runtime renders the same component and was not looked at separately.
+- ⚠️ PHPStan: host 0. The app container reports 32 `undefined property` errors on model columns, none on a changed line — its schema view,
+  not the code. Pest locally: `SuiteCollectionFloorTest` red in a directory run (the bind mount hid 80 of 528 files); all 79
+  `tests/Feature/Forms` files were then run by explicit path, 914 passed. Full Vitest 210 files / 3485 tests.
+- ✅ No file was edited beyond the claim and its pushed extension. "Keep mine" was widened into mid-build — the same file, the same shape.
+  E2E locally: `media-input-hidden-text` (new, three viewports, red first), `builder-structure`, `builder-preview-authoring` and
+  `forms-folders-axe` — 39/39.
 
 ## RELEASED — `M154`, four during-testing rows testers touch from Oct 12: the paper beside "Edit answers" on a scanned response (`R-1585698b`), the chosen photos listed before "Read this scan" (`R-c84e4f12`, its pre-read half), an Archived chip on the Forms list (`R-44b17445`), and a spam-folder line wherever testers are invited (`R-66bc91ca`) (merged as PR #347, `8dc216f7`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

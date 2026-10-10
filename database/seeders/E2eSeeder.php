@@ -2453,7 +2453,7 @@ class E2eSeeder extends Seeder
 
     /**
      * What the fixture scan "read" for one question, by type — in the reader's own shapes (numbers as text,
-     * a withheld value as null).
+     * a value at every tier, `D108`).
      *
      * @return array{type: string, state: string, value: mixed, text: string|null, confidence: int|null, tier: string|null, page: int|null, anchored_by: string|null}
      */
@@ -2468,7 +2468,7 @@ class E2eSeeder extends Seeder
             'short_text' => $read('Maria Santos', 'MARIA SANTOS', 96, 'auto'),
             'integer' => $read('34', '34', 81, 'review'),
             'single_select' => $read('female', 'X Female', 95, 'auto'),
-            'multi_select' => $read(null, 'X Fever X Cough?', 52, 'manual'),
+            'multi_select' => $read(['fever', 'cough'], 'X Fever X Cough?', 52, 'manual'),
             'date' => $read('1990-04-12', '12 04 1990', 93, 'auto'),
             'long_text' => ['type' => $type, 'state' => 'unreadable', 'value' => null, 'text' => 'ilegible scrawl', 'confidence' => 38, 'tier' => null, 'page' => 1, 'anchored_by' => 'label'],
             default => ['type' => $type, 'state' => 'blank', 'value' => null, 'text' => null, 'confidence' => null, 'tier' => null, 'page' => 1, 'anchored_by' => 'key'],

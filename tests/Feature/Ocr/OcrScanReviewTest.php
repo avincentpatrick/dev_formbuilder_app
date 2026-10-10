@@ -174,17 +174,17 @@ it('starts the reviewer from the answers the scan read, numbers as numbers', fun
         ->and($answers['visit_date'])->toBe('2026-10-01');
 });
 
-it('withholds what the scan was not sure of, and keeps the text it saw for the note', function (): void {
+it('fills in what the scan was not sure of, still marked manual for the note (D108), and nothing it could not read', function (): void {
     $scan = ReadScanFixture::make($this->form, $this->admin, ocrReviewSheet());
 
     $props = $this->actingAs($this->admin)->get(ocrReviewUrl($this->form, $scan))->viewData('page')['props']['scan'];
 
-    expect(array_key_exists('symptoms', $props['answers']))->toBeFalse('a manual-tier answer must not be filled in')
+    expect($props['answers']['symptoms'] ?? null)->toBe(['fever'], 'a manual-tier answer is filled in (D108)')
         ->and(array_key_exists('notes', $props['answers']))->toBeFalse('an unreadable answer must not be filled in')
         ->and(array_key_exists('consent', $props['answers']))->toBeFalse('a blank answer must stay blank')
         ->and($props['fields']['symptoms']['tier'])->toBe('manual')
         ->and($props['fields']['symptoms']['text'])->toBe('X Fever')
-        ->and($props['fields']['symptoms']['carried'])->toBeFalse()
+        ->and($props['fields']['symptoms']['carried'])->toBeTrue()
         ->and($props['fields']['notes']['state'])->toBe('unreadable')
         ->and($props['fields']['consent']['state'])->toBe('blank')
         ->and($props['fields']['age']['tier'])->toBe('review')

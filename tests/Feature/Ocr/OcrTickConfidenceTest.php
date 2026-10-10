@@ -86,15 +86,15 @@ it('keeps a tick read with a confident glyph at the glyph\'s confidence', functi
         ->and($fields['symptoms'])->toMatchArray(['confidence' => 83, 'tier' => 'review', 'value' => ['fever', 'rash']]);
 });
 
-it('raises only a tick: writing read with the same doubt is still withheld', function (): void {
+it('raises only a tick: writing read with the same doubt stays manual, its value filled in (D108)', function (): void {
     $fields = ocrTickFields($this, ['confidence' => ['patient_name' => 0.34]]);
 
-    expect($fields['patient_name'])->toMatchArray(['confidence' => 34, 'tier' => 'manual', 'value' => null, 'text' => 'JUAN DELA CRUZ']);
+    expect($fields['patient_name'])->toMatchArray(['confidence' => 34, 'tier' => 'manual', 'value' => 'JUAN DELA CRUZ', 'text' => 'JUAN DELA CRUZ']);
 });
 
 it('keeps a seen tick inside the configured review band, so a tick is never accepted on the mark alone', function (): void {
     // At or above auto, Round 1's multi-select that lost its second mark would have been a silent error (the sweep shows one
-    // at auto 85). Below review, every doubtful tick is withheld again — the defect this case closes.
+    // at auto 85). Below review, every doubtful tick would be marked "may be wrong" again — the defect this case closes.
     expect(OcrAnswerReader::MARK_SEEN)->toBeGreaterThanOrEqual((int) config('ocr.confidence.review'))
         ->and(OcrAnswerReader::MARK_SEEN)->toBeLessThan((int) config('ocr.confidence.auto'));
 });

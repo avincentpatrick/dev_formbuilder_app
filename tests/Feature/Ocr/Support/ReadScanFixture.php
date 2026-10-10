@@ -18,7 +18,7 @@ use Ramsey\Uuid\Uuid;
 /**
  * A scan that has already been read (M129 — the review screen and the save), without the reading job.
  *
- * The extraction is written in `PrintedFormMatcher`'s own shapes — numbers as text, a withheld value as null —
+ * The extraction is written in `PrintedFormMatcher`'s own shapes — numbers as text, a value at every tier (`D108`) —
  * and the page goes through the real write path, `storeOcrScanPage()`, so the review screen serves a file
  * that was sniffed, keyed and given a virus-check status exactly as an upload's is.
  */
@@ -88,7 +88,7 @@ final class ReadScanFixture
     public static function read(string $type, mixed $value, string $text, int $confidence, string $tier = 'auto'): array
     {
         return [
-            'type' => $type, 'state' => 'read', 'value' => $tier === 'manual' ? null : $value, 'text' => $text,
+            'type' => $type, 'state' => 'read', 'value' => $value, 'text' => $text,
             'confidence' => $confidence, 'tier' => $tier, 'page' => 1, 'anchored_by' => 'key',
         ];
     }

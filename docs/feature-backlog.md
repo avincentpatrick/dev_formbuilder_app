@@ -13851,7 +13851,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   restored one, and nothing re-sends it. **Latent** — needs the save to fail during an undo of a delete. Filed by `M155`.
   **Tier: during-testing.**
 
-- **`minor` · A low-confidence scan answer is left empty on the review screen, and the text it read shows only in a note below the box.**
+- ✅ **CLOSED BY `M156` (2026-10-10) — ****`minor` · A low-confidence scan answer is left empty on the review screen, and the text it read shows only in a note below the box.**
   The user's comment on the staging scan (2026-10-10): *"on the text box, it can read properly the remarks but did not put it
   in the text area. it is just below the text area. can we put the actual text that has been read since it is too close and
   user can still edit the form and can correct them."* `PrintedFormMatcher::result()` (`app/Services/Ocr/PrintedFormMatcher.php`)
@@ -13861,4 +13861,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `docs/adr/0010-ocr-provider-cloud-vision.md` §D3. **`D108` = B, widened to every type (user, in chat):** fill every low-confidence answer in, of
   every type, with its confidence and a line that it may be wrong; §3's below-70 rule and ADR-0010 §D3 are amended by it, and
   the bake-off scorer stops counting a withheld value. A scan read before the change keeps its null and its old note.
-  **Live.** Filed by `M156`. **Tier: early-testing.**
+  **Live.** Filed by `M156`. **Tier: early-testing.** ✅ **CLOSED BY `M156` (2026-10-10):** `PrintedFormMatcher::result()` keeps the value of a `manual`-tier read, so `OcrAnswerCarry` fills it like any other; `readNote()` says *"This may be wrong: it was read at N% confidence. Check it against the paper."* in the danger tone for a filled `manual` answer, and keeps "Needs manual entry: the scan read …" for a scan read before this change (its value is still null). The bake-off scorer counts what the reviewer is shown at every confidence: the two `withheld_*` causes are gone (a wrong `manual` value is `wrong_flagged`), "flagged" is every value below auto, and the review-threshold sweep is gone because it no longer changes what is shown. Round 1 re-scored offline: 57 of 180 (31.7%, was 42.2%), 0 silent. §3, ADR-0010 §D3 and the `ocr_scans.extraction` row amended. Proof: 9 Pest cases and 1 Vitest case red on the trunk; 5 Pest mutants and 2 Vitest mutants, each caught by its own case; `ocr-review-axe.spec.ts` asserts the new note on a seeded `manual` multi-select. **Found beside it and filed:** `D110` — the PRD asked for each low-confidence answer to be confirmed on its own, and the review screen has never done that; answered A in the same session (one Save confirms the whole form) and the PRD line amended in `M156`.
+
+- **`nit` · The root lockfile still records the design system's `vue` dev dependency as `^3.5.39`, so every local `npm` run rewrites it.**
+  Found by `M156` building assets for a local E2E run: `npm run build` in the node container left `package-lock.json` modified
+  in one line — the `packages/design-system` workspace entry's `"vue": "^3.5.39"` became `"^3.5.43"`, which is what
+  `packages/design-system/package.json` has declared since `M137` bumped it (the trunk-wide audit fix) without regenerating that
+  entry. CI is green because `npm ci` tolerates it; locally the stray diff turns up in `git status` after any install or build
+  and can ride into an unrelated commit. The remedy is one `npm install` at the root, committing only that line, with the
+  Frontend and axe jobs as the check. `M156` reverted the line rather than widen its increment. **Live.** Filed by `M156`.
+  **Tier: during-testing.**

@@ -176,7 +176,7 @@ it('reads a folder offline and scores it: corrections, silent errors and the day
 
     ocrBakeoffScan("{$samples}/sheet1.png", $this->model, ocrBakeoffCleanAnswers());
     // A phone photo: the age misread with high confidence, the day and month written the wrong way round, and the
-    // notes read right but too faintly to be shown.
+    // notes read right but faintly — shown all the same, marked may be wrong (D108).
     ocrBakeoffScan("{$samples}/sheet2.png", $this->model, [
         'patient_name' => 'ANA REYES', 'age' => '35', 'visit_date' => ['10', '03', '2026'], 'consent' => ['No'],
         'sex' => ['Male'], 'symptoms' => ['Cough'], 'notes' => 'SORE THROAT',
@@ -203,7 +203,7 @@ it('reads a folder offline and scores it: corrections, silent errors and the day
     Http::fake();
 
     $this->artisan('ocr:bakeoff', ['folder' => $samples, '--layout' => $layout, '--answers' => $answers, '--offline' => true])
-        ->expectsOutputToContain('G9: 3 of 21 scored fields need correction (14.3%) at auto 90 / review 70 — PASS. Silent errors: 2. Flagged: 0.')
+        ->expectsOutputToContain('G9: 2 of 21 scored fields need correction (9.5%) at auto 90 / review 70 — PASS. Silent errors: 2. Flagged: 1.')
         ->assertExitCode(0);
 
     expect($queries)->toBe(0);
@@ -211,12 +211,13 @@ it('reads a folder offline and scores it: corrections, silent errors and the day
 
     $report = (string) file_get_contents("{$samples}/_bakeoff/report.md");
     expect($report)
-        ->toContain('**3 of 21 scored fields (14.3%) across 3 scan(s) needed manual correction — PASS against G9\'s bar of under 15%.**')
+        ->toContain('**2 of 21 scored fields (9.5%) across 3 scan(s) needed manual correction — PASS against G9\'s bar of under 15%.**')
         ->toContain('⚠️ **1 wrong date(s) would be right with the day and month swapped.**')
-        ->toContain('| photo | 1 | 7 | 3 | 42.9% | FAIL | 2 | 0 |')
+        ->toContain('| photo | 1 | 7 | 2 | 28.6% | FAIL | 2 | 1 |')
         ->toContain('| clean | 2 | 14 | 0 | 0.0% | pass | 0 | 0 |')
-        ->toContain('| withheld below the review threshold, though it was right | 1 |')
         ->toContain('| wrong, and NOT flagged (a silent error) | 2 |')
+        ->not->toContain('withheld')
+        ->not->toContain('## The review threshold')
         ->toContain('| two-pages | 2 | clean | read | v1 (stamp) |')
         ->toContain('| old-print.png | 1 |  | old_layout | v1 (stamp) |')
         ->toContain('notes.txt — text/plain is not a type the app takes')
@@ -227,7 +228,7 @@ it('reads a folder offline and scores it: corrections, silent errors and the day
     $fields = ocrBakeoffFieldsCsv("{$samples}/_bakeoff/fields.csv");
     expect($fields['sheet2.png/age'])->toMatchArray(['value_read' => '35', 'correct_answer' => '34', 'confidence' => '95', 'verdict' => 'wrong, and NOT flagged (a silent error)'])
         ->and($fields['sheet2.png/visit_date']['verdict'])->toContain('day and month swapped')
-        ->and($fields['sheet2.png/notes'])->toMatchArray(['value_read' => 'SORE THROAT', 'confidence' => '50', 'verdict' => 'withheld below the review threshold, though it was right'])
+        ->and($fields['sheet2.png/notes'])->toMatchArray(['value_read' => 'SORE THROAT', 'confidence' => '50', 'verdict' => 'right, marked may be wrong'])
         ->and($fields['sheet1.png/consent'])->toMatchArray(['value_read' => 'yes', 'correct_answer' => 'yes', 'verdict' => 'right'])
         ->and($fields['sheet3.png/age']['verdict'])->toBe('not scored');
 });

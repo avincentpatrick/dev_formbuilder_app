@@ -30,8 +30,7 @@ use InvalidArgumentException;
  * {@see PrintedFormMatcher} — the version from the page's stamp, then the match — exactly as the reading job reads an
  * upload. Two things differ, both deliberate. The form comes from a layout FILE (`ocr:bakeoff-layout`) as unsaved
  * models, so no database is needed and the run can happen on whichever machine holds a key that reads. And the match
- * runs with both thresholds at zero, so no value is withheld; the scorer then applies every threshold it sweeps with the
- * matcher's own tier rule.
+ * runs with both thresholds at zero; the scorer then applies every threshold it sweeps with the matcher's own tier rule.
  *
  * ── A PAGE IS PAID FOR ONCE ────────────────────────────────────────────────────────────────────────────────
  * The provider's raw answer is cached beside each page (`<file>.google_vision.json`) and read back on every later run,

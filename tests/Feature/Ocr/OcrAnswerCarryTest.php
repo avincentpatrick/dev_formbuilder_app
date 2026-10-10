@@ -60,7 +60,16 @@ it('carries what was read on the same printing, numbers as numbers', function ()
     ])->and($result['dropped'])->toBe([]);
 });
 
-it('leaves a withheld answer empty without listing it, and keeps what was seen for the note', function (): void {
+it('fills in an answer read below the review threshold and keeps its manual tier for the note (D108)', function (): void {
+    $result = ocrCarry(['name' => ocrCarryRead('short_text', 'Ana', 'manual', 'An?')], ocrCarrySnapshot([ocrCarryField('name', 'short_text')]));
+
+    expect($result['answers'])->toBe(['name' => 'Ana'])
+        ->and($result['dropped'])->toBe([])
+        ->and($result['fields']['name']['tier'])->toBe('manual')
+        ->and($result['fields']['name']['carried'])->toBeTrue();
+});
+
+it('leaves an answer withheld by a scan read before D108 empty without listing it, and keeps what was seen for the note', function (): void {
     $result = ocrCarry(['name' => ocrCarryRead('short_text', null, 'manual', 'An?')], ocrCarrySnapshot([ocrCarryField('name', 'short_text')]));
 
     expect($result['answers'])->toBe([])

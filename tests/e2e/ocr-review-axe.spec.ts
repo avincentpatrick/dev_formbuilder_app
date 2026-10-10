@@ -59,8 +59,13 @@ for (const theme of themes) {
 
         await expect(page.getByRole('heading', { name: 'Review a scanned response', level: 1 })).toBeVisible();
         await expect(page.getByRole('region', { name: 'Page 1 of the scan' })).toBeVisible();
-        // The seeded sheet holds every reviewer-facing note: one to check, two needing manual entry, a blank.
+        // The seeded sheet holds every reviewer-facing note: one to check, one filled in that may be wrong (D108), one
+        // needing manual entry, a blank.
         await expect(page.getByText(/Check this answer: it was read at 81% confidence/)).toBeVisible();
+        await expect(page.getByText(/This may be wrong: it was read at 52% confidence/)).toBeVisible();
+        // …and its answer is IN the box, not only quoted in the note (the user's comment on the staging scan).
+        await expect(page.getByRole('checkbox', { name: 'Fever', exact: true })).toBeChecked();
+        await expect(page.getByRole('checkbox', { name: 'Cough', exact: true })).toBeChecked();
         await expect(page.getByText(/Needs manual entry/).first()).toBeVisible();
 
         await assertClean(page, `scan review ${theme}`);

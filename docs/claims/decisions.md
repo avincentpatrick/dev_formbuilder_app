@@ -24,10 +24,20 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D109`, the last one filed, was asked and answered on 2026-10-10 in the session that filed it and recorded in `M156`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D110`, the last one filed, was asked and answered on 2026-10-10 in the session that filed it and recorded in `M156`. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D110 — The PRD says a low-confidence scan answer "must be individually confirmed", and the review screen has never asked for that: Save confirms the whole form. Now that such answers are filled in and marked "may be wrong" (`D108`), does each one need its own confirmation? **A — no: Save confirms the whole form, and the PRD line is amended to say so.**
+
+**Filed 2026-10-10 by Lane A in `M156`, found while amending the documents `D108` changes; asked and answered in the same session (user decision, in chat — A, the recommendation).** `docs/PRD.md`'s Feature #1 review-screen line asks for *"a visible low-confidence indicator (default threshold: below 70%) that must be individually confirmed"*. Since `M129` the review screen (`Pages/submissions/Encode.vue` in scan mode) shows every note and saves the whole form on one Save; nothing confirms a field on its own, and no row recorded the gap. Under `D108` a wrong value below 70 sits in its box, marked, until someone saves.
+
+- **A — No: Save confirms the whole form (recommended).** The PRD line is amended to say so; each "may be wrong" mark stays beside its answer until the form is saved. Matches the user's reason for `D108`: *"users dont want so much clicks"*.
+- **B — Yes: a tick per marked answer.** Each answer marked "may be wrong" needs an "I checked this" tick before Save is enabled. Guards against clicking through; one more click per marked answer (Round 1: about six per form).
+- **C — One question at Save.** Save says how many answers are still marked "may be wrong" and asks once to save anyway. One click, and the count is named.
+
+**What the answer files, in the same push:** nothing new. `docs/PRD.md`'s review-screen line is amended in `M156` itself, line for line: a low-confidence value is filled in and marked, and the one Save confirms the whole form.
+
 ### D109 — `M156` puts the OCR fill-in on the testing server two days before the Oct 12 session, and every merge deploys there. Does anything else merge before the session? **A — no: freeze once `M156` is merged and deployed, until the Oct 12 session.**
 
 **Asked and answered 2026-10-10 (user decision, in chat), recorded by Lane A in `M156`'s claim.** `D90` froze everything but fixes until the session; `D94` lifted that for non-OCR work from 2026-10-06, so without a new answer the during-testing tier would keep merging — and deploying — up to and through the session. The user had said "then freeze" earlier the same day, before `M155`'s batch was chosen, so it was asked again rather than assumed.

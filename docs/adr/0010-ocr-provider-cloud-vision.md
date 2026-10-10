@@ -6,6 +6,8 @@
 - **Decisions recorded:** `D97` (A — Cloud Vision alone first; a vision-language arm only if G9 is missed; Document AI not
   pursued) and `D104` (A — Cloud Vision as it is for the Oct 12 testing; the arm built and measured during testing), both in
   `docs/claims/decisions.md`
+- **Amended:** §D3 by `D108` (2026-10-10, `M156`) — an answer read below 70 is filled in and marked "may be wrong", no longer
+  withheld
 - **Related:** `docs/ocr-pipeline-design.md` §3 (the 90/70 tiers) and §9 (the harness, and Round 1's figures) · `config/ocr.php` ·
   `app/Services/Ocr/GoogleVisionClient.php` · `app/Services/Ocr/PrintedFormMatcher.php` · `app/Services/Ocr/OcrAnswerReader.php` ·
   `docs/PRD.md` G9 (under 15% of fields needing manual correction on a clear, well-lit single-page scan)
@@ -64,6 +66,15 @@ the Cloud Vision API.**
 - The sweep in the report shows lower auto thresholds producing silent errors (one at 85, four at 80). Raising the review
   threshold only withholds more right answers.
 
+> **Amended by `D108` (user decision, 2026-10-10; built by `M156`).** Below 70 the value is now **filled in**, marked in the
+> danger tone with its confidence and "This may be wrong … check it against the paper"; it is no longer withheld. The user's
+> comment on the staging scan was that the text read sat just below an empty box, and that a reviewer can correct a box. The
+> thresholds themselves do not move: 90 is still where a value goes unflagged, and 70 now separates "check this answer" from
+> "this may be wrong". A wrong value below 70 is still never silent, and the review screen is still passed before anything is
+> saved. Re-scored offline from Round 1's cached reads: **57 of 180 (31.7%) need correction, 0 silent** — the 19 right answers
+> once withheld are filled in, and 24 wrong ones are filled and marked. The bake-off no longer sweeps the review threshold,
+> because it no longer changes what a reviewer is shown.
+
 **§D4 — A tick seen in a box is shown for review, never accepted on the mark alone** (`OcrAnswerReader::MARK_SEEN`, `R-39a5388f`).
 - Vision returns a hand-drawn tick as ☑, X, a Greek chi or 区, with a low confidence in the GLYPH. That is not the question being
   asked: a mark in the box before an option's label is evidence of a tick.
@@ -103,9 +114,11 @@ the matcher and the review screen do not change.
 ## Consequences
 
 - **Testers on Oct 12 will key roughly two answers in five by hand.** The review screen is mandatory in any case (§3), and what it
-  withholds it explains. Silent errors are what this design refuses, and Round 1 has none.
+  withholds it explains. Silent errors are what this design refuses, and Round 1 has none. *(Since `D108`: about one in three, with
+  every answer read below 70 already in its box and marked "may be wrong".)*
 - **G9 is missed, on the record, at 42.2%.** It is not met by lowering the bar or the thresholds. Lowering the review threshold to 0
-  would report about 32%, by showing reviewers wrong values pre-filled: the trade §3 forbids.
+  would report about 32%, by showing reviewers wrong values pre-filled: the trade §3 forbids. *(The user made that trade, marked,
+  by `D108`: 31.7% on the same reads. G9 is still missed.)*
 - **Ticks are now the largest single cause**: 22 marks never returned at all. This is the measurement the arm is judged against,
   together with handwriting misreads in names, emails, phones and remarks.
 - **The figures are slightly pessimistic.** A few cells on the answer sheet differ from the paper itself, such as a comma not

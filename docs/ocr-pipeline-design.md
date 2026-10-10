@@ -210,7 +210,7 @@ The user checked layout 3 on the development machine and passed it with one comm
 - **Confidence thresholds** (a concrete, tunable-later default, not a hard architectural constant):
   - **≥ 90**: auto-filled into the staged draft, not visually flagged — high-confidence enough that flagging every field would create review fatigue defeating the point of automation.
   - **70–89**: auto-filled, but visually highlighted (per the design system's warning-semantic token, `docs/ux/design-system-reference.md`) for the reviewer's attention.
-  - **< 70**: left blank in the staged draft, flagged as "needs manual entry" rather than auto-filled with a low-confidence guess — a wrong auto-fill silently accepted by a reviewer clicking through quickly is worse than an empty, obviously-incomplete field.
+  - **< 70**: auto-filled all the same, marked in the design system's danger-semantic token with its confidence and the words "This may be wrong … check it against the paper". ⚠️ **Amended by `D108` (user decision, 2026-10-10, `M156`).** This bullet used to leave the field blank, flagged "needs manual entry", on the reasoning that a wrong auto-fill silently accepted by a reviewer clicking through quickly is worse than an empty, obviously-incomplete field. The user chose the value in its box: the reviewer, who must pass the review screen before anything is saved, corrects a box faster than they retype it, and Round 1 read 19 of 43 answers right below 70 (§9). A wrong value below 70 is never silent — it is filled and marked. A scan read before `M156` keeps its withheld value and its old note.
 - `attachments.ocr_confidence_avg` (`docs/data-dictionary.md` §10) stores the average across all fields on the source scan — a per-scan summary metric for dashboards/QA, not the authoritative per-field record (which lives transiently in the staged draft until confirmed, then is simply the submission's own answer — no separate confidence-per-answer column exists or is needed, since confidence is a review-time concern, not a permanent property of the confirmed data).
 
 > ✅ **As-built: groundwork 1 (M128, 2026-10-03). The reading path ships; the review screen and the save are groundwork 2.**
@@ -224,7 +224,7 @@ The user checked layout 3 on the development machine and passed it with one comm
 >   - a mark before an option's label is that option's mark — since layout 2 several options share a line, each label is found as a span of words in printed order, and the mark credited to it is the run of mark words immediately before that span (`M143`);
 >   - an open text box (`line`) is read as free text.
 >
->   Confidence is the lowest character confidence, scaled to 0–100. The 90 / 70 thresholds are `config/ocr.php`; H1d confirmed them (`docs/adr/0010-ocr-provider-cloud-vision.md` §D3). Below 70 the value is withheld and the text kept. A blank question is `blank`, not a failure (§2.5.1).
+>   Confidence is the lowest character confidence, scaled to 0–100. The 90 / 70 thresholds are `config/ocr.php`; H1d confirmed them (`docs/adr/0010-ocr-provider-cloud-vision.md` §D3). Below 70 the value was withheld and the text kept until `M156`; since `D108` it is filled in with its tier still `manual`. A blank question is `blank`, not a failure (§2.5.1).
 > - ⚠️ **Departures from this document, each deliberate:**
 >   - **§1's endpoints.** The routes are session web routes, the H14 precedent for a staff surface. The `/api/v1` pair is a filed row.
 >   - **§5's owner.** A source scan is owned by its `ocr_scans` row (alias `ocr_scan`) until a person confirms it. `SubmissionFinalizer` re-points only attachments a media ANSWER names, so groundwork 2 must re-point the scan to its submission itself.
@@ -303,15 +303,15 @@ H1d chose the provider and measured §3's 90/70 thresholds on real samples (`doc
   - A refused credential stops further calls for the run.
   - It writes `report.md` and `fields.csv` (one row per scan and question) into `_bakeoff`.
 
-**What it measures.** Each scan is matched once with nothing withheld. Every threshold is then applied with `PrintedFormMatcher::tier()`, the review screen's own rule.
-- **Needs correction** (G9) means what the reviewer is shown is not the correct answer:
-  - a right answer withheld below the review threshold counts;
-  - a withheld value whose correct answer is blank does not;
+**What it measures.** Each scan is matched once at zero thresholds. Every threshold is then applied with `PrintedFormMatcher::tier()`, the review screen's own rule.
+- **Needs correction** (G9) means what the reviewer is shown is not the correct answer. Since `D108` (`M156`) the reviewer is shown every value read, whatever its confidence:
+  - a wrong value counts, flagged or not;
+  - so does a value read where the correct answer is blank;
   - only scans that were read are scored.
 - **Silent error** means a value filled with no flag (at or above the auto threshold) that is not the answer.
 - **The report shows:**
-  - both measures swept (review 0–100, auto 50–100);
-  - the corrections by cause (not found, unreadable, missed, withheld, unexpected, wrong) and by the sheet's `condition`;
+  - the auto threshold swept (50–100) against silent errors and flagged fields; a review threshold changes only how a value is marked, so since `M156` it is not swept;
+  - the corrections by cause (not found, unreadable, missed, unexpected, wrong) and by the sheet's `condition`;
   - right and wrong values by confidence, in tens.
 - **The comparison's leniency is printed in the report:**
   - text ignores letter case and repeated spaces;
@@ -350,7 +350,7 @@ H1d chose the provider and measured §3's 90/70 thresholds on real samples (`doc
 - **What `M149` fixed:** every photo was stored on its side (EXIF 6) and the boxes arrived in that frame; the key stamp often read as a line of its own above its label, which put the label into the answer and the next stamp into the answer before; and a tick read as a symbol (☑, ✓) was swallowed into an option's label. Rows filed and closed by `M149` in `docs/feature-backlog.md`.
 - **What is left (with the hint):** 22 answered choices on which Vision returned no character for the tick, and 16 ticks read right but withheld because a tick's confidence is the glyph's; 35 right answers and 25 wrong ones withheld below 70; 6 unreadable (a one-stroke `1` dropped as a box wall, a printed `/` read as a digit); 4 wrong and flagged. Each is a filed row.
 - **The thresholds hold.** Read values by confidence: 90–100, 57 right and 0 wrong; 70–89, 28 right and 4 wrong; below 70, 35 right and 25 wrong. 90 / 70 stay as configured.
-- **After `M152`:** a tick's confidence is at least `OcrAnswerReader::MARK_SEEN` (80, review, never auto), so the 16 ticks read right and withheld are shown; pages are matched in printed order whatever order they were uploaded in (30 questions were "not found" with every form's pages reversed). Left: 22 ticks never returned, 19 right and 24 wrong answers withheld, 6 unreadable, 5 wrong and flagged. The provider decision, the rejection and the fallback are `docs/adr/0010-ocr-provider-cloud-vision.md`.
+- **After `M152`:** a tick's confidence is at least `OcrAnswerReader::MARK_SEEN` (80, review, never auto), so the 16 ticks read right and withheld are shown; pages are matched in printed order whatever order they were uploaded in (30 questions were "not found" with every form's pages reversed). Left: 22 ticks never returned, 19 right and 24 wrong answers withheld, 6 unreadable, 5 wrong and flagged. The provider decision, the rejection and the fallback are `docs/adr/0010-ocr-provider-cloud-vision.md`. **After `M156` (`D108`, nothing withheld), re-scored offline from the cached reads: 57 of 180 (31.7%), 0 silent** — 22 ticks never returned, 6 unreadable, 29 wrong and flagged (24 of them below 70, marked "may be wrong"); the 19 right answers once withheld are now filled in.
 - **G9 is missed on Cloud Vision alone**, so `D97`'s vision-language arm is triggered; what happens before and after the Oct 12 testing is `D104`. **`D104` was answered A on 2026-10-08:** Cloud Vision as it is for the Oct 12 testing, with every withheld field keyed on the mandatory review screen; the arm — Claude through the Anthropic API, its output held to the printed options, behind the reviewer — is built into `ocr:bakeoff` and measured on these fifteen forms during testing (`ocr-vlm-arm`), and reaches staging only if it meets G9.
 
 <!-- The pipeline markers below are DELIBERATELY at end-of-file. A marker inserted mid-document

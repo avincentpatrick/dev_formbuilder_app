@@ -24,7 +24,17 @@ describe('scanNote', () => {
         });
     });
 
-    it('asks for manual entry, quoting what was seen, when the value was withheld', () => {
+    it('fills a low-confidence answer in and says it may be wrong, with the confidence (D108)', () => {
+        expect(scanNote(meta({ tier: 'manual', confidence: 52, text: 'fever?' }), false)).toEqual({
+            tone: 'danger',
+            text: 'This may be wrong: it was read at 52% confidence. Check it against the paper.',
+        });
+        expect(scanNote(meta({ tier: 'manual', confidence: 41, page: 2 }), true)?.text).toBe(
+            'This may be wrong: it was read at 41% confidence (page 2). Check it against the paper.',
+        );
+    });
+
+    it('asks for manual entry, quoting what was seen, when a scan read before D108 withheld the value', () => {
         expect(scanNote(meta({ tier: 'manual', text: 'fever?', carried: false }), false)).toEqual({
             tone: 'danger',
             text: 'Needs manual entry: the scan read “fever?”, but not clearly enough to fill it in.',

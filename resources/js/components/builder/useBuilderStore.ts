@@ -226,17 +226,19 @@ export function useBuilderStore(props: BuilderPageProps) {
         return result && !result.conflict ? result.data : null;
     }
 
-    async function persistField(uid: Uid): Promise<void> {
+    /** True once the server holds the field as it is on screen — false on a refusal, a failure or a 409 (M155). */
+    async function persistField(uid: Uid): Promise<boolean> {
         const field = findField(uid);
-        if (!field) return;
+        if (!field) return false;
         const result = await guard(() => builderClient.patch<ServerField>(`${base}/fields/${field.id}`, fieldPayload(field)), { uid });
-        if (!result) return;
+        if (!result) return false;
         if (result.conflict) {
             conflict.value = { kind: 'field', uid, mine: clone(field), theirs: result.current };
-            return;
+            return false;
         }
         field.version = result.data.version;
         delete save.fieldErrors[uid]; // the server holds this field now: its marks are answered
+        return true;
     }
 
     async function deleteFieldServer(uid: Uid): Promise<boolean> {
@@ -270,18 +272,20 @@ export function useBuilderStore(props: BuilderPageProps) {
         selection.value = { kind: 'field', uid };
     }
 
-    async function persistSection(uid: Uid): Promise<void> {
+    /** True once the server holds the section as it is on screen — false on a refusal, a failure or a 409 (M155). */
+    async function persistSection(uid: Uid): Promise<boolean> {
         const section = findSection(uid);
-        if (!section) return;
+        if (!section) return false;
         const result = await guard(() =>
             builderClient.patch<ServerSection>(`${base}/sections/${section.id}`, sectionPayload(section)),
         );
-        if (!result) return;
+        if (!result) return false;
         if (result.conflict) {
             conflict.value = { kind: 'section', uid, mine: clone(section), theirs: result.current };
-            return;
+            return false;
         }
         section.version = result.data.version;
+        return true;
     }
 
     async function deleteSectionServer(uid: Uid): Promise<boolean> {
@@ -732,8 +736,12 @@ export function useBuilderStore(props: BuilderPageProps) {
             const before = baselines.get(uid) as FieldSnapshot | undefined;
             const after = fieldSnapshot(field);
             if (before && snapshotsEqual(before, after)) return;
-            await persistField(uid);
+            const held = await persistField(uid);
             if (conflict.value) return;
+            // M155 (`R-0aa94dce`): the baseline and the undo entry move only once the server holds the edit. A refused
+            // one stays on screen, marked, and its baseline stays where the server is — so its next commit sends it
+            // again, even unchanged, and undo never replays a step the server never took.
+            if (!held) return;
             baselines.set(uid, clone(after));
             if (!before) return;
             pushHistory(
@@ -741,16 +749,12 @@ export function useBuilderStore(props: BuilderPageProps) {
                 async () => {
                     const current = sameTypeField(uid, before, 'undo');
                     if (!current) return;
-                    applyFieldSnapshot(current, before);
-                    await persistField(uid);
-                    baselines.set(uid, clone(before));
+                    await replayField(current, before, after);
                 },
                 async () => {
                     const current = sameTypeField(uid, after, 'redo');
                     if (!current) return;
-                    applyFieldSnapshot(current, after);
-                    await persistField(uid);
-                    baselines.set(uid, clone(after));
+                    await replayField(current, after, before);
                 },
             );
         });
@@ -763,8 +767,9 @@ export function useBuilderStore(props: BuilderPageProps) {
             const before = baselines.get(uid) as SectionSnapshot | undefined;
             const after = sectionSnapshot(section);
             if (before && snapshotsEqual(before, after)) return;
-            await persistSection(uid);
+            const held = await persistSection(uid);
             if (conflict.value) return;
+            if (!held) return; // M155: as `commitFieldEdit()` — only an edit the server holds moves the baseline
             baselines.set(uid, clone(after));
             if (!before) return;
             pushHistory(
@@ -772,19 +777,40 @@ export function useBuilderStore(props: BuilderPageProps) {
                 async () => {
                     const current = findSection(uid);
                     if (!current) return;
-                    applySectionSnapshot(current, before);
-                    await persistSection(uid);
-                    baselines.set(uid, clone(before));
+                    await replaySection(current, before, after);
                 },
                 async () => {
                     const current = findSection(uid);
                     if (!current) return;
-                    applySectionSnapshot(current, after);
-                    await persistSection(uid);
-                    baselines.set(uid, clone(after));
+                    await replaySection(current, after, before);
                 },
             );
         });
+    }
+
+    /**
+     * One undo or redo step of an edit (M155, `R-0aa94dce`): show `to`, save it, and move the baseline only once the
+     * server holds it. A refusal puts the screen back on `from` — what the server still holds — and throws, so the
+     * entry stays on its stack for a retry, as `restoreSnapshot()` does for a type change. A 409 is the conflict
+     * dialog's, as it always was.
+     */
+    async function replayField(current: LocalField, to: FieldSnapshot, from: FieldSnapshot): Promise<void> {
+        applyFieldSnapshot(current, to);
+        if (!(await persistField(current.uid)) && conflict.value === null) {
+            applyFieldSnapshot(current, from);
+            delete save.fieldErrors[current.uid]; // the screen is back on what the server holds: nothing on it is refused
+            throw new HistoryStepFailed(save.error ?? HISTORY_STEP_FAILED);
+        }
+        baselines.set(current.uid, clone(to));
+    }
+
+    async function replaySection(current: LocalSection, to: SectionSnapshot, from: SectionSnapshot): Promise<void> {
+        applySectionSnapshot(current, to);
+        if (!(await persistSection(current.uid)) && conflict.value === null) {
+            applySectionSnapshot(current, from);
+            throw new HistoryStepFailed(save.error ?? HISTORY_STEP_FAILED);
+        }
+        baselines.set(current.uid, clone(to));
     }
 
     // ── Conflict resolution (409) — never silently discard either side ──────────
@@ -802,7 +828,8 @@ export function useBuilderStore(props: BuilderPageProps) {
                 } else {
                     // Keep my in-flight values; adopt THEIR version token so the overwrite is accepted.
                     Object.assign(field, { ...(state.mine as LocalField), version: (state.theirs as ServerField).version });
-                    await persistField(state.uid);
+                    // M155: a refused "Keep mine" leaves the baseline where the server is, so its next commit sends it again.
+                    if (!(await persistField(state.uid))) return;
                 }
                 baselines.set(state.uid, fieldSnapshot(field));
             } else {
@@ -815,7 +842,7 @@ export function useBuilderStore(props: BuilderPageProps) {
                         ...(state.mine as LocalSection),
                         version: (state.theirs as ServerSection).version,
                     });
-                    await persistSection(state.uid);
+                    if (!(await persistSection(state.uid))) return; // M155: as the field arm above
                 }
                 baselines.set(state.uid, sectionSnapshot(section));
             }

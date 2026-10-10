@@ -11,19 +11,19 @@ use App\Services\Ocr\PrintedFormMatcher;
  * Scores what the reader read against the correct answers, at every confidence threshold (M136). Pure: no I/O.
  *
  * ── THE MEASURE IS PRD G9: FIELDS NEEDING MANUAL CORRECTION ──────────────────────────────────────────────
- * A reviewer sees a field's value only when it was read at or above the review threshold; below it the field is empty
- * and marked for manual entry (`docs/ocr-pipeline-design.md` §3). So at a review threshold r a field NEEDS CORRECTION
- * exactly when what the reviewer is shown is not the correct answer:
- *   - a right answer withheld below r needs correction — somebody types it in;
- *   - a value withheld where the correct answer is blank does not — the empty field IS the answer;
- *   - a wrong value shown needs correction, flagged or not;
+ * A reviewer is shown every value read, whatever its confidence (`D108`, M156): below the review threshold it is filled in
+ * and marked "may be wrong" rather than withheld (`docs/ocr-pipeline-design.md` §3). So a field NEEDS CORRECTION exactly
+ * when what was read is not the correct answer:
+ *   - a wrong value needs correction, flagged or not;
+ *   - a value read where the correct answer is blank needs correction — somebody clears it;
  *   - a question not found, unreadable or read as blank when it was answered needs correction.
- * Only scans that were read are scored. G9's bar is under 15% of fields.
+ * Only scans that were read are scored. G9's bar is under 15% of fields. A review threshold no longer changes what is
+ * shown, only how a value is marked, so it is not swept; the confidence histogram is where a threshold is chosen.
  *
  * ── THE SECOND MEASURE IS THE DANGEROUS ONE: A WRONG VALUE NOBODY IS ASKED TO CHECK ──────────────────────
- * At or above the auto threshold a value is filled with no flag. A wrong value there is a SILENT ERROR — the case §3
- * withholds values to avoid. Raising the auto threshold trades silent errors for flagged fields (review fatigue); the
- * auto sweep shows both at the configured review threshold.
+ * At or above the auto threshold a value is filled with no flag. A wrong value there is a SILENT ERROR — the case §3's
+ * flags exist to avoid. Raising the auto threshold trades silent errors for flagged fields (review fatigue); the auto
+ * sweep shows both at the configured review threshold.
  *
  * The tier boundary is {@see PrintedFormMatcher::tier()}, the matcher's own rule, so the sweep and the review screen
  * cannot disagree about which side of a threshold a value falls.
@@ -39,8 +39,6 @@ final class OcrBakeoffScorer
         'unreadable' => 'something written, not readable as the answer',
         'skipped' => 'an area the reader does not read',
         'missed' => 'read as blank, but it was answered',
-        'withheld_right' => 'withheld below the review threshold, though it was right',
-        'withheld_wrong' => 'withheld below the review threshold, and wrong',
         'unexpected' => 'a value read where the answer is blank',
         'wrong_flagged' => 'wrong, and flagged for review',
         'wrong_unflagged' => 'wrong, and NOT flagged (a silent error)',
@@ -53,7 +51,6 @@ final class OcrBakeoffScorer
      *     thresholds: array{auto: int, review: int},
      *     headline: array<string, mixed>,
      *     by_condition: array<string, array<string, mixed>>,
-     *     review_sweep: list<array<string, int|float|null>>,
      *     auto_sweep: list<array<string, int>>,
      *     histogram: array<int, array{right: int, wrong: int}>,
      *     observations: list<array<string, mixed>>,
@@ -129,7 +126,6 @@ final class OcrBakeoffScorer
             'thresholds' => $configured,
             'headline' => $this->headline($scoredObservations, $configured),
             'by_condition' => array_map(fn (array $group): array => $this->headline($group, $configured), $byCondition),
-            'review_sweep' => $this->reviewSweep($scoredObservations, $configured),
             'auto_sweep' => $this->autoSweep($scoredObservations, $configured),
             'histogram' => $this->histogram($scoredObservations),
             'observations' => $observations,
@@ -138,23 +134,23 @@ final class OcrBakeoffScorer
     }
 
     /**
-     * Whether a field needs correction when the reviewer is shown values at or above `$review`.
+     * Whether a field needs correction: whether what the reviewer is shown is not the correct answer.
      *
      * @param  array<string, mixed>  $o
      */
-    public function needsCorrection(array $o, int $review): bool
+    public function needsCorrection(array $o): bool
     {
-        return ! OcrBakeoffAnswers::same($o['type'], $o['expected'], $this->shown($o, $review));
+        return ! OcrBakeoffAnswers::same($o['type'], $o['expected'], $this->shown($o));
     }
 
     /**
-     * What the reviewer is shown at a review threshold: the value when it was read at or above it, otherwise nothing.
+     * What the reviewer is shown: the value whenever one was read, at every confidence (`D108`), otherwise nothing.
      *
      * @param  array<string, mixed>  $o
      */
-    private function shown(array $o, int $review): mixed
+    private function shown(array $o): mixed
     {
-        return $o['state'] === 'read' && $this->tierAt($o, ['auto' => $review, 'review' => $review]) !== 'manual' ? $o['value'] : null;
+        return $o['state'] === 'read' ? $o['value'] : null;
     }
 
     /**
@@ -173,14 +169,15 @@ final class OcrBakeoffScorer
     }
 
     /**
-     * The cause code from {@see CAUSES}, or null when the field needs no correction at the configured thresholds.
+     * The cause code from {@see CAUSES}, or null when the field needs no correction. The configured thresholds decide
+     * only whether a wrong value was flagged.
      *
      * @param  array<string, mixed>  $o
      * @param  array{auto: int, review: int}  $configured
      */
     private function cause(array $o, array $configured): ?string
     {
-        if (! $this->needsCorrection($o, $configured['review'])) {
+        if (! $this->needsCorrection($o)) {
             return null;
         }
 
@@ -191,7 +188,6 @@ final class OcrBakeoffScorer
             'unreadable' => 'unreadable',
             'blank' => 'missed',
             'read' => match (true) {
-                $this->tierAt($o, $configured) === 'manual' => $this->isRight($o) ? 'withheld_right' : 'withheld_wrong',
                 ! $answered => 'unexpected',
                 $this->tierAt($o, $configured) === 'auto' => 'wrong_unflagged',
                 default => 'wrong_flagged',
@@ -215,7 +211,11 @@ final class OcrBakeoffScorer
             return 'right (blank)';
         }
 
-        return $this->tierAt($o, $configured) === 'review' ? 'right, flagged for review' : 'right';
+        return match ($this->tierAt($o, $configured)) {
+            'review' => 'right, flagged for review',
+            'manual' => 'right, marked may be wrong',
+            default => 'right',
+        };
     }
 
     /**
@@ -226,7 +226,7 @@ final class OcrBakeoffScorer
      */
     private function isDaySwapped(array $o): bool
     {
-        return in_array($o['cause'], ['wrong_flagged', 'wrong_unflagged', 'withheld_wrong'], true)
+        return in_array($o['cause'], ['wrong_flagged', 'wrong_unflagged'], true)
             && OcrBakeoffAnswers::daySwapped($o['type'], $o['expected'], $o['value']);
     }
 
@@ -250,9 +250,10 @@ final class OcrBakeoffScorer
                 continue;
             }
             // Counted exactly as the auto sweep counts it, so the headline is that sweep's configured row: any value
-            // filled with no flag that is not the answer — a wrong one, or one read where the answer is blank.
+            // filled with no flag that is not the answer — a wrong one, or one read where the answer is blank. Flagged is
+            // every value below auto: "check this" for review, "may be wrong" below it.
             $tier = $this->tierAt($o, $configured);
-            if ($tier === 'review') {
+            if ($tier !== 'auto') {
                 $flagged++;
             } elseif ($tier === 'auto' && ! $this->isRight($o)) {
                 $silent++;
@@ -277,47 +278,6 @@ final class OcrBakeoffScorer
     }
 
     /**
-     * The review threshold swept from 0 to 100: how many fields need correction, and why.
-     *
-     * @param  list<array<string, mixed>>  $observations
-     * @param  array{auto: int, review: int}  $configured
-     * @return list<array<string, int|float|null>>
-     */
-    private function reviewSweep(array $observations, array $configured): array
-    {
-        $rows = [];
-        foreach ($this->steps(0, $configured['review']) as $review) {
-            $corrections = 0;
-            $withheldRight = 0;
-            $wrongShown = 0;
-            foreach ($observations as $o) {
-                if (! $this->needsCorrection($o, $review)) {
-                    continue;
-                }
-                $corrections++;
-                if ($o['state'] !== 'read') {
-                    continue;
-                }
-                if ($this->shown($o, $review) === null) {
-                    $withheldRight += $this->isRight($o) ? 1 : 0;
-                } else {
-                    $wrongShown++;
-                }
-            }
-            $rows[] = [
-                'review' => $review,
-                'needs_correction' => $corrections,
-                'rate' => $observations === [] ? null : fdiv($corrections, count($observations)),
-                'withheld_right' => $withheldRight,
-                'wrong_shown' => $wrongShown,
-                'other' => $corrections - $withheldRight - $wrongShown,
-            ];
-        }
-
-        return $rows;
-    }
-
-    /**
      * The auto threshold swept from 50 to 100 at the configured review threshold: silent errors against flagged fields.
      *
      * @param  list<array<string, mixed>>  $observations
@@ -337,11 +297,11 @@ final class OcrBakeoffScorer
                     continue;
                 }
                 $tier = $this->tierAt($o, $thresholds);
-                if ($tier === 'review') {
+                if ($tier !== 'auto') {
                     $flagged++;
-                } elseif ($tier === 'auto' && $this->isRight($o)) {
+                } elseif ($this->isRight($o)) {
                     $rightUnflagged++;
-                } elseif ($tier === 'auto') {
+                } else {
                     $silent++;
                 }
             }

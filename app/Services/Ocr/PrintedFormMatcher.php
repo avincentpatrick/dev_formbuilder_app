@@ -146,8 +146,8 @@ final class PrintedFormMatcher
     /**
      * The extraction for one scan against one version.
      *
-     * `$thresholds` defaults to `config/ocr.php`. The bake-off harness (M136) passes zero for both, so that no value is
-     * withheld and it can apply every threshold it sweeps itself, through {@see tier()}.
+     * `$thresholds` defaults to `config/ocr.php`. The bake-off harness (M136) passes zero for both and applies every
+     * threshold it sweeps itself, through {@see tier()}.
      *
      * @param  list<OcrPage>  $pages
      * @param  array{auto: int, review: int}|null  $thresholds
@@ -411,9 +411,11 @@ final class PrintedFormMatcher
     /**
      * One field's entry in the extraction: what was read, and how a reviewer should treat it.
      *
-     * ⚠️ BELOW THE REVIEW THRESHOLD THE VALUE IS WITHHELD, NOT MERELY FLAGGED (`docs/ocr-pipeline-design.md`
-     * §3): a wrong value clicked past is worse than an empty field. The text that was read stays, so the
-     * reviewer can see what the machine saw.
+     * ⚠️ BELOW THE REVIEW THRESHOLD THE VALUE IS FILLED IN AND MARKED, NOT WITHHELD (`D108`, M156). Until then it was
+     * withheld (`docs/ocr-pipeline-design.md` §3: a wrong value clicked past is worse than an empty field); the user
+     * chose the value in its box with a note that it may be wrong, because a reviewer corrects a box faster than they
+     * retype it. The tier still says `manual`, and the review screen, which a person must pass before anything is
+     * saved, says so beside the answer. An extraction stored before `M156` holds null there.
      *
      * @param  array{state: string, value: mixed, text: string|null, confidence: int|null}  $read
      * @param  array{auto: int, review: int}  $thresholds
@@ -421,20 +423,12 @@ final class PrintedFormMatcher
      */
     private function result(?FieldType $type, array $read, ?int $page, ?string $anchoredBy, array $thresholds): array
     {
-        $tier = null;
-        $value = $read['value'];
-
-        if ($read['state'] === 'read') {
-            $tier = self::tier($read['confidence'] ?? 0, $thresholds);
-            if ($tier === 'manual') {
-                $value = null;
-            }
-        }
+        $tier = $read['state'] === 'read' ? self::tier($read['confidence'] ?? 0, $thresholds) : null;
 
         return [
             'type' => $type?->value,
             'state' => $read['state'],
-            'value' => $value,
+            'value' => $read['value'],
             'text' => $read['text'],
             'confidence' => $read['confidence'],
             'tier' => $tier,
@@ -447,8 +441,8 @@ final class PrintedFormMatcher
 
     /**
      * How a reviewer treats a value read at `$confidence`: `auto` at or above the auto threshold, `review` at or above
-     * the review one, `manual` (withheld) below both. The one copy of the rule — the matcher and the bake-off harness's
-     * threshold sweep both call it, so they cannot disagree about a boundary.
+     * the review one, `manual` (filled in, marked "may be wrong" — `D108`) below both. The one copy of the rule — the
+     * matcher and the bake-off harness's threshold sweep both call it, so they cannot disagree about a boundary.
      *
      * @param  array{auto: int, review: int}  $thresholds
      */

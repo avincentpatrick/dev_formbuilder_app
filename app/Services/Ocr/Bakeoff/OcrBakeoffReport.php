@@ -9,7 +9,7 @@ use App\Support\Export\SpreadsheetCell;
 use RuntimeException;
 
 /**
- * Writes the bake-off's result for people (M136): `report.md` (the G9 figure, both threshold sweeps, the confidence
+ * Writes the bake-off's result for people (M136): `report.md` (the G9 figure, the auto threshold's sweep, the confidence
  * picture and every scan) and `fields.csv` (one row per scan and question, to sort and filter in a spreadsheet).
  *
  * The report says what it did NOT score as plainly as what it did — skipped files, unmatched columns, questions with
@@ -73,26 +73,12 @@ final class OcrBakeoffReport
                 $out[] = '| '.$label.' | '.self::int(self::map($headline['causes'] ?? [])[$code] ?? 0).' |';
             }
             $out[] = '';
-            $out[] = '*Not found* and *unreadable* point at the layout and the matcher; *wrong* and *withheld* point at the recognizer and the thresholds.';
-            $out[] = '';
-
-            $out[] = '## The review threshold';
-            $out[] = '';
-            $out[] = 'Below it a value is withheld and the field is left for manual entry. Lower shows more right answers and more wrong ones.';
-            $out[] = '';
-            $out[] = '| Review at | Need correction | Rate | Right answer withheld | Wrong answer shown | Other |';
-            $out[] = '|---:|---:|---:|---:|---:|---:|';
-            foreach (self::list($result['review_sweep']) as $row) {
-                $row = is_array($row) ? $row : [];
-                $mark = ($row['review'] ?? null) === $thresholds['review'] ? ' ← configured' : '';
-                $out[] = '| '.self::int($row['review'] ?? 0).$mark.' | '.self::int($row['needs_correction'] ?? 0).' | '.self::pct($row['rate'] ?? null)
-                    .' | '.self::int($row['withheld_right'] ?? 0).' | '.self::int($row['wrong_shown'] ?? 0).' | '.self::int($row['other'] ?? 0).' |';
-            }
+            $out[] = '*Not found* and *unreadable* point at the layout and the matcher; *wrong* and *unexpected* point at the recognizer.';
             $out[] = '';
 
             $out[] = '## The auto threshold (review held at '.$thresholds['review'].')';
             $out[] = '';
-            $out[] = 'At or above it a value is filled with no flag. A wrong value there is a silent error; below it the value is flagged for a look.';
+            $out[] = 'At or above it a value is filled with no flag. A wrong value there is a silent error; below it the value is filled and flagged for a look ("may be wrong" below the review threshold).';
             $out[] = '';
             $out[] = '| Auto at | Silent errors | Flagged | Right, not flagged |';
             $out[] = '|---:|---:|---:|---:|';
@@ -163,7 +149,7 @@ final class OcrBakeoffReport
         $out[] = '';
         $out[] = 'A typed answer is turned into the value the reader stores for the question\'s type, and both sides are compared in one form. '.OcrBakeoffAnswers::LENIENCY
             .' A date is typed as `2026-10-08` (or day first, `08/10/2026`, the order the paper prints). '
-            .'Each scan is read once with nothing withheld, and every threshold above is applied to that one reading with the review screen\'s own tier rule.';
+            .'Each scan is read once at zero thresholds, and every threshold above is applied to that one reading with the review screen\'s own tier rule.';
         $out[] = '';
 
         return implode("\n", $out);

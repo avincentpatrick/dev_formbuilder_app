@@ -24,10 +24,11 @@ use App\Enums\FieldType;
  * reviewer who never saw it.
  *
  * ── TWO MORE THINGS NEVER CARRY ─────────────────────────────────────────────────────────────────────
- * A value the matcher withheld (the `manual` tier, below the review threshold) is null already and stays
- * empty for a person to enter. A `duration` is read but has no answer control in any channel
- * (`FieldTypeMirrorDriftTest` pins the encode and guest lists together), so it is listed rather than saved
- * unseen.
+ * A null value stays empty for a person to enter: since `D108` (M156) the matcher fills in a value read below
+ * the review threshold too (the `manual` tier, which carries like any other and is marked "may be wrong" on the
+ * review screen), so only an extraction stored before `M156` still holds a withheld null. A `duration` is read
+ * but has no answer control in any channel (`FieldTypeMirrorDriftTest` pins the encode and guest lists
+ * together), so it is listed rather than saved unseen.
  *
  * ⚠️ NUMBERS ARRIVE AS TEXT. The reader returns `'41'` for an integer, and the shared number control displays
  * only a value whose type is number, so a carried number is converted here — or the box would look empty
@@ -87,7 +88,7 @@ final class OcrAnswerCarry
             /** @var array<string, mixed> $entry */
             $placed[$key] = true;
 
-            // Nothing to carry: blank, unreadable, not found, or a value the matcher withheld.
+            // Nothing to carry: blank, unreadable, not found, or a value withheld by a scan read before `D108`.
             if (($entry['state'] ?? null) !== 'read' || ($entry['value'] ?? null) === null) {
                 $fields[$key] = $this->meta($entry, false, null);
 

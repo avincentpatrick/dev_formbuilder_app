@@ -12,10 +12,13 @@
 export interface ScanFieldMeta {
     /** `read`, `blank`, `unreadable`, `not_found`, `skipped`, or `not_on_paper` (a question the paper lacked). */
     state: string;
-    /** `auto` (90 and above), `review` (70–89) or `manual` (below 70, value withheld); null when nothing was read. */
+    /**
+     * `auto` (90 and above), `review` (70–89) or `manual` (below 70: filled in and marked "may be wrong", `D108`; a scan read
+     * before `M156` withheld it); null when nothing was read.
+     */
     tier: string | null;
     confidence: number | null;
-    /** The text the reader saw, kept even when its value was withheld. */
+    /** The text the reader saw, kept even when its value could not be filled in. */
     text: string | null;
     page: number | null;
     /** Whether the answer was filled in. False for a value that could not be carried to this question. */
@@ -51,7 +54,7 @@ export interface ScanReview {
     version: { number: number; current_number: number };
 }
 
-/** `neutral` for a fact, `warning` to check, `danger` to fill in, `info` for context. Never colour alone. */
+/** `neutral` for a fact, `warning` to check, `danger` to fill in or to distrust, `info` for context. Never colour alone. */
 export type ScanNoteTone = 'neutral' | 'info' | 'warning' | 'danger';
 
 export interface ScanNote {
@@ -104,11 +107,18 @@ function readNote(meta: ScanFieldMeta, saw: string | null, where: string): ScanN
         };
     }
 
+    const confidence = meta.confidence === null ? '' : ` at ${meta.confidence}% confidence`;
+
     if (meta.tier === 'review') {
-        const confidence = meta.confidence === null ? '' : ` at ${meta.confidence}% confidence`;
         return { tone: 'warning', text: `Check this answer: it was read${confidence}${where}.` };
     }
 
+    // `D108`: below the review threshold the answer is filled in all the same, and the note says it may be wrong.
+    if (meta.tier === 'manual' && meta.carried) {
+        return { tone: 'danger', text: `This may be wrong: it was read${confidence}${where}. Check it against the paper.` };
+    }
+
+    // A scan read before `M156` withheld the value, so the box is empty and the note quotes what was seen.
     if (meta.tier === 'manual') {
         return {
             tone: 'danger',

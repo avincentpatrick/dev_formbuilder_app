@@ -15,8 +15,7 @@ final readonly class OcrBakeoffScan
 {
     /**
      * @param  list<string>  $files  the page files, in page order
-     * @param  array<string, array<string, mixed>>  $fields  the matcher's fields, matched with zero thresholds so no
-     *                                                       value is withheld
+     * @param  array<string, array<string, mixed>>  $fields  the matcher's fields, matched with zero thresholds
      * @param  array<string, mixed>|null  $expected  field key => the correct answer in stored shape, for the questions
      *                                               the answer sheet has a column for; null when it has no row for this scan
      */

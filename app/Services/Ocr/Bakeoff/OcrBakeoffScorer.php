@@ -255,7 +255,7 @@ final class OcrBakeoffScorer
             $tier = $this->tierAt($o, $configured);
             if ($tier !== 'auto') {
                 $flagged++;
-            } elseif ($tier === 'auto' && ! $this->isRight($o)) {
+            } elseif (! $this->isRight($o)) {
                 $silent++;
             }
         }

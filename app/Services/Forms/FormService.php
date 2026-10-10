@@ -606,6 +606,13 @@ final class FormService
         return DB::transaction(function () use ($form, $actor): Form {
             $locked = Form::query()->whereKey($form->id)->lockForUpdate()->firstOrFail();
 
+            // Already archived ⇒ nothing to do (M155, `R-aaf36122`): a second archive used to re-stamp
+            // `archived_at` and write a second `archived` audit row for a change that never happened. Read off
+            // $locked for the same reason the snapshot below is.
+            if ($locked->status === FormStatus::Archived) {
+                return $locked;
+            }
+
             // Snapshotted off $locked, AFTER the lock — never off the passed-in $form, which may be stale.
             // Re-reading under lockForUpdate is the whole reason that line exists, and an audit built from
             // the stale copy would record a `status` this method never actually saw.

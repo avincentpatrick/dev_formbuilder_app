@@ -205,6 +205,8 @@ const acceptanceCaption = computed(() => {
         case 'opens_soon':
             return s.opens_at ? `Opens ${formatInstant(s.opens_at)}` : 'Opens once its window starts';
         case 'closed':
+            // M155: an archived form reads `closed` whatever its window says, so its date would be beside the point.
+            if (props.form.status === 'archived') return 'No longer accepting responses';
             return s.closes_at ? `Closed ${formatInstant(s.closes_at)}` : 'No longer accepting responses';
         case 'capacity_reached':
             return `Reached its limit of ${s.max_responses?.toLocaleString()} responses`;

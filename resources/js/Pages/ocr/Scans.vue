@@ -257,8 +257,8 @@ function uploadedAt(iso: string): string {
 }
 
 /* M154: what a screen reader hears after a pick or a removal, clipped to nothing on screen. Its own rule because
-   this repository has no shared utility for it — the `mds-visually-hidden` class `MediaInput.vue` uses is defined
-   nowhere, which a real-browser look at this page found when the announcement showed as visible text. */
+   this repository has no shared utility for it — the `mds-visually-hidden` class it first copied is defined nowhere,
+   which a real-browser look at this page found when the announcement showed as visible text (`MediaInput.vue`: M155). */
 .scans__announce {
     position: absolute;
     width: 1px;

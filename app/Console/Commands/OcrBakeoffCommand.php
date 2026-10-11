@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Enums\FieldType;
 use App\Exceptions\Ocr\OcrProviderException;
 use App\Services\Forms\BlankFormPrintPresenter;
 use App\Services\Forms\CapabilityFlags;
@@ -15,7 +16,13 @@ use App\Services\Ocr\Bakeoff\OcrBakeoffQuestion;
 use App\Services\Ocr\Bakeoff\OcrBakeoffReport;
 use App\Services\Ocr\Bakeoff\OcrBakeoffScan;
 use App\Services\Ocr\Bakeoff\OcrBakeoffScorer;
+use App\Services\Ocr\GdInkImage;
 use App\Services\Ocr\GoogleVisionClient;
+use App\Services\Ocr\OcrInkImage;
+use App\Services\Ocr\OcrInkReader;
+use App\Services\Ocr\OcrLineBuilder;
+use App\Services\Ocr\OcrPage;
+use App\Services\Ocr\OcrWord;
 use App\Services\Ocr\PrintedFormMatcher;
 use App\Services\Ocr\VisionDocumentParser;
 use Illuminate\Console\Command;
@@ -39,6 +46,12 @@ use InvalidArgumentException;
  * refused the same way — and each scan says why it was not read. That is `OcrScanReader`'s stance: a provider failure is
  * the scan's state, never a crash.
  *
+ * ── `--ticks=ink`: THE TICKS VISION NEVER RETURNED, FROM THE INK IN THEIR BOXES (M159, `D112`) ─────────────────────
+ * A tick question the reader left blank is read again by {@see OcrInkReader} from the page image beside the cached
+ * answer, and filled at review confidence. Nothing Vision did read is touched, so the figure moves only where ink found
+ * a tick. It needs GD on the machine that runs it — the app image has none — and a page with no image file of its own
+ * (a PDF's) is measured nowhere; both are reported.
+ *
  * ⛔ THE EXIT CODE SAYS WHETHER THE FIGURE CAN BE TRUSTED. It is a failure when no scan was read, when an answer cell
  * could not be understood, when an answer row names no scan in the folder, or when answers were given and nothing was
  * scored — each of those means the G9 figure is measured over fewer fields than the sheet claims, or over none. The
@@ -51,14 +64,27 @@ final class OcrBakeoffCommand extends Command
         {--layout= : The layout file from ocr:bakeoff-layout (default: layout.json in the folder)}
         {--answers= : The sheet of correct answers, .xlsx or .csv (the template ocr:bakeoff-layout writes)}
         {--out= : Where to write report.md and fields.csv (default: _bakeoff in the folder)}
-        {--offline : Never call the provider; read only the answers already cached beside the scans}';
+        {--offline : Never call the provider; read only the answers already cached beside the scans}
+        {--ticks= : "ink" also reads every tick question the provider left blank from the ink in its printed box (D112)}';
 
     protected $description = 'Read a folder of scanned forms with the OCR reader and score it against the correct answers (PRD G9, per confidence threshold)';
 
     /** A refusal that every later page would get too. */
     private const array CREDENTIAL_CODES = ['provider_not_configured', 'provider_billing_disabled', 'provider_unauthorized'];
 
+    /**
+     * The container key a test binds to hand the harness its own page images: a `callable(string): ?OcrInkImage`. Unbound,
+     * a page is decoded with {@see GdInkImage::open()}.
+     */
+    public const string INK_IMAGES = 'ocr.bakeoff.ink_images';
+
     private ?string $refusal = null;
+
+    /** Tick questions the ink filled, over the run. */
+    private int $inkFilled = 0;
+
+    /** @var list<string> pages whose ticks the ink could not measure, and why */
+    private array $inkUnmeasured = [];
 
     public function handle(GoogleVisionClient $client, VisionDocumentParser $parser, PrintedFormMatcher $matcher, BlankFormPrintPresenter $presenter, OcrBakeoffScorer $scorer): int
     {
@@ -73,6 +99,12 @@ final class OcrBakeoffCommand extends Command
         $answersPath = is_string($this->option('answers')) ? $this->option('answers') : null;
         $out = is_string($this->option('out')) ? rtrim($this->option('out'), '/\\') : $folder.DIRECTORY_SEPARATOR.'_bakeoff';
         $offline = $this->option('offline') === true;
+        $ticks = $this->option('ticks');
+        if ($ticks !== null && $ticks !== 'ink') {
+            $this->error('--ticks takes "ink", or nothing.');
+
+            return self::FAILURE;
+        }
 
         try {
             $layout = OcrBakeoffLayout::fromFile($layoutPath);
@@ -110,6 +142,7 @@ final class OcrBakeoffCommand extends Command
             $this->line("  {$entry['name']}");
             $files = array_column($entry['files'], 'path');
             $pages = [];
+            $pageFiles = [];
             $failure = null;
 
             foreach ($entry['files'] as $file) {
@@ -117,7 +150,10 @@ final class OcrBakeoffCommand extends Command
                 if ($body === null) {
                     break;
                 }
-                array_push($pages, ...$parser->pages($body));
+                foreach ($parser->pages($body) as $page) {
+                    $pages[] = $page;
+                    $pageFiles[] = str_starts_with($file['mime'], 'image/') ? $file['path'] : null;
+                }
             }
 
             if ($failure !== null) {
@@ -142,7 +178,8 @@ final class OcrBakeoffCommand extends Command
                 continue;
             }
 
-            $fields = $matcher->match($layout->form, $version, $pages, ['auto' => 0, 'review' => 0])['fields'];
+            $matched = $matcher->match($layout->form, $version, $pages, ['auto' => 0, 'review' => 0]);
+            $fields = $ticks === 'ink' ? $this->withInk($matched['fields'], $matched['labels'], $pages, $pageFiles) : $matched['fields'];
 
             $row = $sheet?->rowFor($entry['name']);
             $expected = null;
@@ -178,7 +215,7 @@ final class OcrBakeoffCommand extends Command
         $meta = [
             'title' => $layout->form->title,
             'generated_at' => now()->format('Y-m-d H:i T'),
-            'provider' => 'google_vision',
+            'provider' => $ticks === 'ink' ? 'google_vision, with ink for the ticks it left blank' : 'google_vision',
             'folder' => $folder,
             'versions' => array_map(static fn ($v): string => 'v'.$v->version_number, $layout->versions),
             'answers' => $answersPath,
@@ -190,6 +227,13 @@ final class OcrBakeoffCommand extends Command
             'unscored_questions' => $unscored,
             'scans_without_answers' => $withoutAnswers,
         ];
+        if ($ticks === 'ink') {
+            $this->line("Ink: {$this->inkFilled} tick question(s) the provider left blank were read from their boxes.");
+            // A warning, never a failure: a page the ink could not measure keeps what the provider read, which is scored.
+            foreach ($this->inkUnmeasured as $unmeasured) {
+                $this->warn("  not measured: {$unmeasured}");
+            }
+        }
 
         if (! is_dir($out) && ! mkdir($out, 0775, true) && ! is_dir($out)) {
             $this->error("Cannot create {$out}.");
@@ -200,6 +244,54 @@ final class OcrBakeoffCommand extends Command
         OcrBakeoffReport::writeFieldsCsv($out.DIRECTORY_SEPARATOR.'fields.csv', $result['observations']);
 
         return $this->summarise($result, $meta, $out, $sheet !== null);
+    }
+
+    /**
+     * The fields with every tick question the provider left blank read again from the ink in its boxes, page by page.
+     *
+     * @param  array<string, array<string, mixed>>  $fields
+     * @param  array<string, list<array{value: string, label: string, word: OcrWord, page: int}>>  $labels
+     * @param  list<OcrPage>  $pages
+     * @param  list<string|null>  $pageFiles  each page's image file, null for a page of a PDF
+     * @return array<string, array<string, mixed>>
+     */
+    private function withInk(array $fields, array $labels, array $pages, array $pageFiles): array
+    {
+        $byPage = [];
+        foreach ($labels as $key => $options) {
+            $on = array_values(array_unique(array_column($options, 'page')));
+            if (count($on) !== 1 || ($fields[$key]['ticks'] ?? false) !== true) {
+                continue;
+            }
+            $byPage[$on[0]][$key] = [
+                'type' => FieldType::tryFrom((string) ($fields[$key]['type'] ?? '')),
+                'options' => array_map(static fn (array $o): array => ['value' => $o['value'], 'label' => $o['label'], 'word' => $o['word']], $options),
+            ];
+        }
+
+        /** @var callable(string): ?OcrInkImage $open */
+        $open = app()->bound(self::INK_IMAGES) ? app(self::INK_IMAGES) : GdInkImage::open(...);
+        $reader = OcrInkReader::fromConfig();
+        $lines = app(OcrLineBuilder::class);
+
+        foreach ($byPage as $index => $questions) {
+            $path = $pageFiles[$index] ?? null;
+            $image = $path === null ? null : $open($path);
+            if ($image === null) {
+                $this->inkUnmeasured[] = $path === null ? 'a page of a PDF' : "{$path} (GD is not loaded, or the image would not decode)";
+
+                continue;
+            }
+            foreach ($reader->read($questions, $image, $lines->quarterTurns($pages[$index])) as $key => $read) {
+                if (($fields[$key]['state'] ?? null) !== 'blank' || $read['state'] !== 'read') {
+                    continue;
+                }
+                $fields[$key] = ['state' => 'read', 'value' => $read['value'], 'text' => $read['text'], 'confidence' => $read['confidence'], 'read_by' => 'ink'] + $fields[$key];
+                $this->inkFilled++;
+            }
+        }
+
+        return $fields;
     }
 
     /**

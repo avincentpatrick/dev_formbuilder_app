@@ -416,6 +416,25 @@ it('keeps a tick drawn high in its box, which the line builder put on a line of 
     }
 });
 
+it('hands back each tick question\'s option labels where the photo has them, for the ink in their boxes, and never stores them (M159)', function (): void {
+    // The ink is measured in the photo's own pixels, so a label must come back as the provider placed it — not as the line
+    // builder turned and deskewed it. A page photographed on its side is the case where the two differ most.
+    $page = PrintedPageTypesetter::fromModel($this->model, ['age' => '34'])->turned(1);
+    $matched = $this->matcher->match($this->form, $this->version, [$page]);
+
+    $sex = $matched['labels']['sex'];
+    $female = $sex[0]['word'];
+    $provided = array_values(array_filter($page->words, static fn (OcrWord $w): bool => $w->text === 'Female'))[0];
+
+    expect(array_column($sex, 'value'))->toBe(['f', 'm'])
+        ->and(array_column($sex, 'label'))->toBe(['Female', 'Male'])
+        ->and(array_column($sex, 'page'))->toBe([0, 0])
+        ->and(array_keys($matched['labels']))->toBe(['consent', 'sex', 'symptoms'])
+        ->and($female->source)->toBe($provided)
+        ->and([$female->x0, $female->y0])->not->toBe([$provided->x0, $provided->y0])
+        ->and($matched['fields']['sex'])->not->toHaveKey('labels');
+});
+
 it('reads the layout off the running head, and tells old paper from a head that was not read (M143, R-d6546409)', function (): void {
     $pages = fn (array $options): array => [PrintedPageTypesetter::fromModel($this->model, [], $options)->page()];
     $stamp = strtolower((string) $this->model['schema_stamp']);

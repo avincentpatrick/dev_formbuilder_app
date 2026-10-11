@@ -80,60 +80,6 @@ find a label it did not before.
   `version-diff-ui` in chat.
 - All four merge tomorrow in this order, each released after its own post-merge run.
 
-### Claim — `M162`, testers' user manual inside the app: a Help page on creating a form (`R-f9211765`) (`m162-help-manual`)
-
-Taken 2026-10-11 by a **second session**, in the worktree `C:\laragon\www\fb-help` with its own Docker stack (`docker compose -p fb-help`),
-while the OCR session holds the main checkout — a recorded deviation from ADR-0022, for this one increment (`D114`). Branch
-`m162-help-manual`, cut from `origin/main` after this claim's commit, PR into main. ⛔ **Merged TONIGHT, before the Oct 12 session — `D114`
-A, a one-off exception to `D109`** — and released straight after its post-merge run, so the merged-title and RELEASED-heading sources
-disagree for as short a time as possible. Row: `R-f9211765`, filed in this push at the end of `docs/feature-backlog.md` (cited by id).
-
-#### Evidence verified
-- No help destination exists: `routes/tenant.php` has no `/help` route, `nav-model.ts`'s `navGroups` and `DestinationCatalog::ROWS` have no
-  help item, and there is no `resources/js/Pages/help/` — held, read on `origin/main` at `8e6cbde4`.
-- Every label the manual is planned to quote was found verbatim in the file that draws it, by a host grep before any edit: **New form**,
-  **New from template** (`Pages/forms/Index.vue`), **Create form** (`CreateFormModal.vue`), **Add section**, **Add a question here**
-  (`BuilderCanvas.vue`), **Requiredness**, **Choice layout**, "Show this question only when…" (`ConfigPanel.vue`), **Optional**,
-  **Required**, **Conditional** (`BuilderPresenter.php`), **Accept responses from the public link**, **Copy link** (`SharePanel.vue`), the
-  hub's tabs (`FormTabSet.php`) and **Export CSV** (`Inbox.vue`) — held. ❌ Four were NOT where the exploration put them: "Fields" and
-  "Library" are not in `FieldPalette.vue`, "Change type" is not in `ConfigPanel.vue`, and "Add condition" is not in `ConditionEditor.vue`;
-  each is located at build time or left out.
-- `raw-html-sink-census.test.ts` allows exactly one markup sink, so the manual renders text nodes only — held (`NoteContent.vue` is the
-  precedent).
-
-#### Premise verified
-- Owner, Admin and Form editor create forms; Reviewer and Viewer cannot open `/forms` (`docs/ACCESS-MATRIX.md` §4–5) — so the page is
-  open to every signed-in role and says who can do what.
-- `docs/onboarding-template-content-plan.md` refuses a forced TOUR, not a manual — no conflict.
-- The design system is consumed from `src` (`packages/design-system/package.json` exports `./src/index.ts`), so a new glyph needs no
-  package build.
-- Hubs edited, all by this ONE row: `routes/tenant.php`, `packages/design-system/src/components/Icon/icons.ts`,
-  `tests/e2e/responsive-axe.spec.ts`, `docs/ux/design-system-reference.md`, `docs/ACCESS-MATRIX.md`. `Builder.vue` is held by `M161` and
-  only READ here; the builder's own Help link is filed as `R-f7366ac8`.
-- ⚠️ `M161` also names a builder E2E spec (possibly `responsive-axe.spec.ts`) and edits `BuilderCanvas.vue`, whose labels the manual
-  quotes: whichever merges second rebases onto the other.
-
-#### Remedy verdict
-- None prescribed beyond `D114`. Chosen: typed content in `resources/js/components/help/manual.ts`, each on-screen label carried with the
-  file that draws it, and a Vitest case that reads each cited file and fails on a label it no longer contains. Measured before writing:
-  the node container mounts the whole repository, so `app/**/*.php` is readable from Vitest; three of the labels live only in PHP.
-
-Files: `app/Http/Controllers/Tenant/HelpController.php` (new), `routes/tenant.php`, `resources/js/Pages/help/Index.vue` (new),
-`resources/js/Pages/help/index.test.ts` (new), `resources/js/components/help/manual.ts` (new), `resources/js/components/help/manual.test.ts`
-(new), `resources/js/components/help/ManualBlock.vue` (new), `resources/js/components/help/ManualSpans.vue` (new),
-`resources/js/components/shell/nav-model.ts`, `resources/js/components/shell/Sidebar.vue` (a comment), `resources/js/components/shell/Sidebar.test.ts`,
-`app/Support/Search/DestinationCatalog.php`, `packages/design-system/src/components/Icon/icons.ts`, `tests/Feature/Help/HelpPageTest.php` (new),
-`tests/Unit/Navigation/ShellAbilityParityTest.php`, `tests/Feature/Search/DestinationReachabilityTest.php`, `tests/e2e/responsive-axe.spec.ts`,
-`docs/ux/design-system-reference.md` (Appendix B), `docs/ACCESS-MATRIX.md`.
-Shared artefacts taken: `docs/ux/design-system-reference.md`, `docs/ACCESS-MATRIX.md`, `tests/e2e/responsive-axe.spec.ts`, and the close-out
-set — shared tonight with the OCR session's writer, rebased before every push.
-Paired files taken: none in 7(b-bis). The manual's label test reads the files it cites, so a later edit to a quoted label (for one,
-`M161` in `BuilderCanvas.vue`) moves the manual in the same PR — intended.
-Namespaces spent: nothing from either namespace (decision `D114` recorded, derived as the next after `D113`).
-Prediction: the new Pest and Vitest cases red against a missing page; the parity count and the reachability lists red until the item is
-added. **Most likely wrong: the label test's first run**, from a label split across template lines or built at runtime — quoted by its
-static part when it is.
-
 ### Claim extension — `M159`, `ocr-ink-ticks`: the ink in each printed box, in the bake-off (`m159-ocr-ink-ticks`)
 
 Taken 2026-10-11, after `M158`'s PR (#351) was opened. ⚠️ **Branch cut from `origin/m158-ocr-dropped-ticks`, not from `origin/main` — a
@@ -260,6 +206,56 @@ wrong: one of them** asserts which pane shows after an add or a library insert, 
   mounted-flag trap the row records does not arise at all.
 - Files added to the claim: `resources/js/components/builder/BuilderCanvas.vue` (a hub, the same row) and
   `resources/js/components/builder/BuilderCanvas.test.ts`.
+
+## RELEASED — `M162`, testers' user manual inside the app: a Help page on creating a form, start to finish (`R-f9211765`), a one-off exception to the freeze (`D114`) (merged as PR #354, `f03b500e`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+Built 2026-10-11/12 by a **second session**, in the worktree `C:\laragon\www\fb-help` with its own Docker stack (`docker compose -p fb-help`,
+a gitignored override resetting every host port but the app's 8086), while the OCR session held the main checkout — the deviation
+`D114` records. Deployed by run 38159562306; gate baselines from the post-merge run 38157366213.
+
+**Taken, every claimed file edited:**
+- **The page:** `/help`, at `HelpController` → `help/Index`. It is open to every signed-in role, with no gate and no props.
+- **The content:** twelve chapters in `resources/js/components/help/manual.ts`, rendered as text nodes only by `ManualBlock.vue` and
+  `ManualSpans.vue`.
+- **The labels:** 177 bold on-screen labels quoted from 33 files. `manual.test.ts` reads each cited file and fails on a label it no
+  longer contains.
+- **Navigation and search:** a sidebar item under Settings, with a new `help` glyph (DSR Appendix B), and a search destination.
+- **Tests and docs moved with them:** parity 13 → 14, the reachability lists, the sidebar floor (now three items), the
+  `ACCESS-MATRIX.md` row and the Viewer list.
+- **E2E:** `responsive-axe.spec.ts` scans Help.
+
+**The prediction:**
+- **Red-first was not measured on the trunk.** The page was written before its tests ran, so the claim's "new cases red against a
+  missing page" was proved by mutation instead:
+  - 4 Vitest mutants, each caught by its own case: "Copy link" renamed in `SharePanel.vue`, a label drawn as `<span>`, a
+    `quotedLabels()` that walks nothing, and a broken anchor.
+  - 2 Pest mutants (`scripts/mutate.php --container=fb-help-app-1`), each caught (6 of 7 red): `help/Missing`, and a
+    `feature:form_templates` gate on the route.
+- ❌ **"Most likely wrong: the label test's first run" — wrong in the other direction.** The label test passed first time, because
+  every label had been grepped in its file before it was written. What did go red first was a line I added to the sidebar floor
+  case: `toHaveLength(3)` read 10, because `labels()` matches several nodes per item. The line was dropped.
+- ❌ **Unpredicted: the four row ids I computed for the claim were wrong.** I used sha1 of the bare title, which `state.php` does
+  not use. They were caught by reading the generated line before the claim was pushed, and replaced everywhere.
+- ❌ **Unpredicted: the exploration misplaced four labels.** "Fields" and "Library" are in `Builder.vue`, "Change type" is in
+  `FieldTypeControl.vue`, and "Add condition" is in `ConditionRows.vue`. The claim's evidence said so before the build.
+
+**Measured locally in `fb-help`:**
+- Pest: `tests/Feature/Help`, `tests/Unit/Navigation` and `tests/Feature/Search`, 149 passed.
+- Vitest: 117 passed.
+- E2E: `responsive-axe -g "Help|Dashboard"` plus `sidebar-collapse`, 16 passed and 2 skipped (desktop-only).
+- Host gates: Pint bare and the lint gates passed; citation-liveness was unchanged at 1242 / 30, ledger 16 of 17.
+- `vue-tsc`: clean.
+- By eye: screenshots at 1440 and 375 px.
+
+**Bootstrap traps** (for whoever runs a second stack next):
+- `exec app composer install` fails on a fresh worktree, because `php artisan serve` exits with no `vendor/`. Use
+  `run --rm --no-deps app composer install`.
+- The first `npm` build moves the one lockfile line `R-e5716b29` names; revert it.
+
+**Filed, not taken:**
+- `R-5cde8465`: screenshots.
+- `R-248174d6`: `TESTING-GUIDE.md`'s three stale sentences.
+- `R-f7366ac8`: a builder toolbar link. It waits on `Builder.vue`, which `M161` holds.
 
 ## RELEASED — `M157`, a tick question whose mark the scan never saw no longer reads "Left blank on the paper" (`R-d2467239`), a one-off exception to the freeze (`D111`) (merged as PR #350, `3eda9b76`, 6/6 green on its one completed run with real step counts (the first was cancelled by the row-closure push) — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

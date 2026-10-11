@@ -13888,7 +13888,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · The reader drops a tick Vision did return when a stray word sits between the mark and its label, or when the mark and its label land on two lines.** Found by `M158` (2026-10-11) in Round 1's cached reads, measured when the user asked why the ticks are unread. On sheet 06 Vision returned `Male ☑ ☑Fe Female`: `OcrAnswerReader::choices()` walks back from Female's label, stops at `☑Fe` because it is not wholly a mark, and Female reads blank. On sheet 09 `OcrLineBuilder` puts `✓ Fever ☑` on one line and `Cough Headache Rash None` on the next — Rash sits 0.0052078 from the line's running centre against a tolerance of 0.0051903 — so the `☑` before Rash is a foreign mark at the end of a line that no label walks back to, and Symptoms reads `fever` for `fever; rash`. Round 1's one wrong tick is this row, not a second mark Vision never returned, as `OcrAnswerReader::MARK_SEEN`'s docblock, `docs/adr/0010-ocr-provider-cloud-vision.md` and `OcrTickConfidenceTest.php` say. **Live.** Filed by `M158`. **Tier: during-testing.**
 
-- **`minor` · Testers have no guide inside the app to creating a form, from a blank page to an exported response.**
+- ✅ **CLOSED BY `M162` (2026-10-12) — ****`minor` · Testers have no guide inside the app to creating a form, from a blank page to an exported response.**
   The user's request (2026-10-11, in chat): *"create a user manual for the form builder to help our user/tester undrsdatnd
   how to create form. if you can include it in the app itself a separate page to access the manual"*. Measured on
   `origin/main` the same day: `routes/tenant.php` has no help route, neither `resources/js/components/shell/nav-model.ts` nor
@@ -13899,7 +13899,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   linked from the sidebar and from search, holding a user manual on creating a form start to finish — every on-screen label
   it quotes checked by a test against the file that draws it, so a renamed button turns the manual red rather than wrong.
   It is not a product tour: `docs/onboarding-template-content-plan.md`'s "no forced tour" stands. **Live.** Filed by `M162`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** ✅ **CLOSED BY `M162` (2026-10-12):** `/help` (`HelpController`, `resources/js/Pages/help/Index.vue`) holds twelve chapters from who can do what to exporting responses, with a contents list and an address per chapter and section (`/help#publish`); it is open to every signed-in role with no gate and no props, linked from the sidebar under Settings (a new `help` glyph, DSR Appendix B) and from search. The text is `resources/js/components/help/manual.ts`, rendered as text nodes only; every on-screen label is in bold and carries the file that draws it, and `manual.test.ts` reads each cited file and fails on a label it no longer contains. Proof: 4 Vitest mutants and 2 Pest mutants (`scripts/mutate.php`), each caught by its own case; `responsive-axe.spec.ts` scans Help at three widths in both themes. No screenshots (`D114`, filed `R-5cde8465`).
 
 - **`nit` · The in-app user manual shows no screenshots.** `M162`'s manual names every button in bold and shows no picture of
   a screen — `D114`'s choice, because the builder changed on most days of the week before testing (`M150` to `M161`) and a

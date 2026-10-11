@@ -24,6 +24,11 @@ export interface ScanFieldMeta {
     /** Whether the answer was filled in. False for a value that could not be carried to this question. */
     carried: boolean;
     reason: string | null;
+    /**
+     * Whether the paper printed boxes to tick for this question (`R-d2467239`, M157). False for a write-in, and for a scan read
+     * before `M157`, which never recorded it.
+     */
+    ticks: boolean;
 }
 
 export interface ScanPage {
@@ -82,7 +87,11 @@ export function scanNote(meta: ScanFieldMeta | undefined, multiPage: boolean): S
         case 'not_on_paper':
             return { tone: 'info', text: 'This question was not on the printed paper.' };
         case 'blank':
-            return { tone: 'neutral', text: `Left blank on the paper${where}.` };
+            // `R-d2467239`: a tick question read blank is often a tick the recognizer never returned — Cloud Vision gave back 21 of
+            // Round 1's 45 ticked questions with no mark at all — so it is not stated as blank paper, it is sent to the paper.
+            return meta.ticks
+                ? { tone: 'warning', text: `No tick was seen here${where}. The scan can miss a tick, so check the paper.` }
+                : { tone: 'neutral', text: `Left blank on the paper${where}.` };
         case 'not_found':
             return { tone: 'warning', text: 'Not found on the scan. Check the paper and enter it by hand.' };
         case 'unreadable':

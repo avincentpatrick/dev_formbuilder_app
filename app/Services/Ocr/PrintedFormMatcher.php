@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Ocr;
 
 use App\Enums\FieldType;
+use App\Enums\PrintAnswerArea;
 use App\Models\Form;
 use App\Models\FormVersion;
 use App\Services\Forms\BlankFormPrintPresenter;
@@ -216,7 +217,7 @@ final class PrintedFormMatcher
 
             $anchor = $anchors[$i] ?? null;
             if ($anchor === null) {
-                $fields[$key] = $this->result($type, ['state' => 'not_found', 'value' => null, 'text' => null, 'confidence' => null], null, null, $thresholds);
+                $fields[$key] = $this->result($type, $row, ['state' => 'not_found', 'value' => null, 'text' => null, 'confidence' => null], null, null, $thresholds);
                 $counts['not_found']++;
 
                 continue;
@@ -224,7 +225,7 @@ final class PrintedFormMatcher
 
             $region = $this->region($lines, $anchor['line'], $this->nextAnchor($anchors, $i));
             $read = $this->reader->read($row, $type, $config, $region, $static);
-            $fields[$key] = $this->result($type, $read, $anchor['line']->page, $anchor['by'], $thresholds);
+            $fields[$key] = $this->result($type, $row, $read, $anchor['line']->page, $anchor['by'], $thresholds);
             $counts[$read['state']] = ($counts[$read['state']] ?? 0) + 1;
         }
 
@@ -417,11 +418,18 @@ final class PrintedFormMatcher
      * retype it. The tier still says `manual`, and the review screen, which a person must pass before anything is
      * saved, says so beside the answer. An extraction stored before `M156` holds null there.
      *
+     * `ticks` says the paper printed boxes to tick for this question (`R-d2467239`, M157): a `choices` row with options. A single
+     * choice that takes its choices from another form is a `choices` row with none, and the paper gave it a write-in box. The
+     * review screen needs it because a tick question read `blank` is often a tick the recognizer never returned — Cloud Vision
+     * gave back 21 of Round 1's 45 ticked questions with no mark at all — so "left blank on the paper" would be false there.
+     * An extraction stored before `M157` has no `ticks`.
+     *
+     * @param  array<string, mixed>  $row  the question's row in the print model the paper was typeset from
      * @param  array{state: string, value: mixed, text: string|null, confidence: int|null}  $read
      * @param  array{auto: int, review: int}  $thresholds
      * @return array<string, mixed>
      */
-    private function result(?FieldType $type, array $read, ?int $page, ?string $anchoredBy, array $thresholds): array
+    private function result(?FieldType $type, array $row, array $read, ?int $page, ?string $anchoredBy, array $thresholds): array
     {
         $tier = $read['state'] === 'read' ? self::tier($read['confidence'] ?? 0, $thresholds) : null;
 
@@ -436,6 +444,7 @@ final class PrintedFormMatcher
             // index in the upload, from 0, and the review note printed "(page 0)" beside the image labelled "Page 1".
             'page' => $page === null ? null : $page + 1,
             'anchored_by' => $anchoredBy,
+            'ticks' => ($row['area'] ?? null) === PrintAnswerArea::Choices->value && ($row['options'] ?? []) !== [],
         ];
     }
 

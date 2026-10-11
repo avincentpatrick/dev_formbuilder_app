@@ -90,11 +90,11 @@ function scan(overrides: Partial<ScanReview> = {}): ScanReview {
         submit_url: '/forms/form-1/ocr/scans/scan-1/confirm',
         answers: { name: 'Maria Santos', age: 41, details: 'Read from the paper' },
         fields: {
-            name: { state: 'read', tier: 'auto', confidence: 96, text: 'MARIA SANTOS', page: 1, carried: true, reason: null },
-            age: { state: 'read', tier: 'review', confidence: 82, text: '41', page: 1, carried: true, reason: null },
-            symptoms: { state: 'read', tier: 'manual', confidence: 52, text: 'fever?', page: 1, carried: false, reason: null },
-            consent: { state: 'blank', tier: null, confidence: null, text: null, page: 1, carried: false, reason: null },
-            details: { state: 'read', tier: 'auto', confidence: 93, text: 'Read from the paper', page: 1, carried: true, reason: null },
+            name: { state: 'read', tier: 'auto', confidence: 96, text: 'MARIA SANTOS', page: 1, carried: true, reason: null, ticks: false },
+            age: { state: 'read', tier: 'review', confidence: 82, text: '41', page: 1, carried: true, reason: null, ticks: false },
+            symptoms: { state: 'read', tier: 'manual', confidence: 52, text: 'fever?', page: 1, carried: false, reason: null, ticks: false },
+            consent: { state: 'blank', tier: null, confidence: null, text: null, page: 1, carried: false, reason: null, ticks: false },
+            details: { state: 'read', tier: 'auto', confidence: 93, text: 'Read from the paper', page: 1, carried: true, reason: null, ticks: false },
         },
         pages: [{ number: 1, url: '/forms/form-1/ocr/scans/scan-1/pages/1', mime: 'image/png', servable: true }],
         notices: [
@@ -258,6 +258,15 @@ describe('Encode.vue in scan mode', () => {
         expect(rowFor(wrapper, 'name').exists()).toBe(true);
         expect(rowFor(wrapper, 'name').classes()).not.toContain('encode__scan-row');
         expect(rowFor(wrapper, 'name').find('.encode__scan-note').exists()).toBe(false);
+    });
+
+    it('says a tick question read blank may hold a tick the scan missed (R-d2467239)', () => {
+        const blank = { state: 'blank', tier: null, confidence: null, text: null, page: 1, carried: false, reason: null };
+        const wrapper = mountScan(payload(scan({ fields: { ...scan().fields, consent: { ...blank, ticks: true } } })));
+
+        expect(rowFor(wrapper, 'consent').classes()).toContain('encode__scan-row--warning');
+        expect(rowFor(wrapper, 'consent').text()).toContain('No tick was seen here. The scan can miss a tick, so check the paper.');
+        expect(rowFor(wrapper, 'consent').text()).not.toContain('Left blank on the paper.');
     });
 
     it('lists every answer that could not be filled in, in the server\'s words', () => {

@@ -70,7 +70,7 @@ function ocrInkImage(int $width, int $height, array $rects): OcrInkImage
  * @param  list<string>  $ticked
  * @return array{0: array<string, array{type: FieldType, options: list<array{value: string, label: string, word: OcrWord}>}>, 1: OcrInkImage}
  */
-function ocrInkPage(array $questions, array $ticked, int $turns = 0): array
+function ocrInkPage(array $questions, array $ticked, int $turns = 0, bool $dust = false): array
 {
     [$uw, $uh] = [1000, 1400];
     [$sw, $sh] = $turns === 1 ? [$uh, $uw] : [$uw, $uh];
@@ -89,6 +89,9 @@ function ocrInkPage(array $questions, array $ticked, int $turns = 0): array
             }
             if (in_array("{$key}:{$value}", $ticked, true)) {
                 $rects[] = [...$place($x + 6, $y + 2, $x + 22, $y + 18), 30];
+            } elseif ($dust) {
+                // A speck in every box — dust on the lens, a dot of the photocopier — and no tick.
+                $rects[] = [...$place($x + 10, $y + 8, $x + 16, $y + 14), 30];
             }
 
             // A tick run into the label's first letter ("☑No") sits in the box, before the label.
@@ -147,6 +150,18 @@ it('leaves a one-answer question blank when its two darkest boxes are too close 
     expect($read['sex'])->toMatchArray(['state' => 'blank', 'value' => null])
         ->and($read['sex']['ink']['f'])->toBe($read['sex']['ink']['m'])
         ->and($read['symptoms']['value'])->toBe(['cough']);
+});
+
+it('judges each box against the page\'s own boxes, so a speck in every box is not a tick', function (): void {
+    // Every box carries the same speck, so each window holds some ink: measured against nothing, every box of the
+    // multi-select would read as ticked. Against the page's median box only the ticked ones stand out.
+    [$questions, $image] = ocrInkPage(ocrInkQuestions(), ['sex:f', 'symptoms:cough'], 0, true);
+
+    $read = (new OcrInkReader(OCR_INK_SETTINGS))->read($questions, $image, 0);
+
+    expect($read['sex'])->toMatchArray(['state' => 'read', 'value' => 'f'])
+        ->and($read['symptoms'])->toMatchArray(['state' => 'read', 'value' => ['cough']])
+        ->and($read['pain']['state'])->toBe('blank');
 });
 
 it('measures from the label\'s first letter, never from a tick the recognizer ran into the word ("☑No")', function (): void {

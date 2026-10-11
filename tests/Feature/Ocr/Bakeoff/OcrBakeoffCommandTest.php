@@ -287,11 +287,12 @@ it('reads a tick question the provider left blank from the ink in its box, and t
     $layout = ocrBakeoffExportLayout($this->dir.'/layout', $this->form->id);
     $samples = $this->dir.'/samples';
 
-    // Ticked Male and Yes on the paper, and Fever — but the provider returned only Fever's X, as Round 1's sheet 08 did.
+    // Ticked Male and Yes on the paper, and Fever — but the provider returned only Fever's X, as Round 1's sheet 08 did. The
+    // photo also shows ink before Cough, which the provider read as unticked: what the provider read is never re-read.
     ocrBakeoffScan("{$samples}/sheet1.png", $this->model, ['age' => '34', 'symptoms' => ['Fever']]);
     ocrBakeoffScan("{$samples}/sheet2.png", $this->model, ['age' => '34', 'symptoms' => ['Fever']]);
     $cache = "{$samples}/sheet1.png".OcrBakeoffFolder::CACHE_SUFFIX;
-    $image = ocrBakeoffInkImage([ocrBakeoffStrokeBefore($cache, 'Male'), ocrBakeoffStrokeBefore($cache, 'Yes')]);
+    $image = ocrBakeoffInkImage([ocrBakeoffStrokeBefore($cache, 'Male'), ocrBakeoffStrokeBefore($cache, 'Yes'), ocrBakeoffStrokeBefore($cache, 'Cough')]);
     // The second sheet's image cannot be opened — GD missing, say — so its ticks are measured nowhere, and it says so.
     app()->instance(OcrBakeoffCommand::INK_IMAGES, static fn (string $path): ?OcrInkImage => str_contains($path, 'sheet1') ? $image : null);
     $answers = ocrBakeoffSheet("{$this->dir}/answers.csv", [

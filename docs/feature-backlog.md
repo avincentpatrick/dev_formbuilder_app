@@ -13887,3 +13887,37 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **Tier: early-testing.** ✅ **CLOSED BY `M157` (2026-10-11):** `PrintedFormMatcher::result()` records `ticks` on each extraction entry — the paper printed boxes to tick for the question, a `choices` row with options, read off the print-model row the matcher already holds (a linked choice's write-in box has none) — and `OcrAnswerCarry::meta()` passes it to the review screen, where `scanNote()` says *"No tick was seen here. The scan can miss a tick, so check the paper."* in the warning tone for a blank tick question. A write-in question, and a scan read before this change (no `ticks`), keep "Left blank on the paper." The `ocr_scans.extraction` row of `docs/data-dictionary.md` names the key. Proof: 3 Pest cases and 2 Vitest cases red on the trunk; 3 Pest mutants (`scripts/mutate.php`) and 1 Vitest mutant, each caught; `ocr-review-axe.spec.ts` 30/30 locally.
 
 - **`minor` · The reader drops a tick Vision did return when a stray word sits between the mark and its label, or when the mark and its label land on two lines.** Found by `M158` (2026-10-11) in Round 1's cached reads, measured when the user asked why the ticks are unread. On sheet 06 Vision returned `Male ☑ ☑Fe Female`: `OcrAnswerReader::choices()` walks back from Female's label, stops at `☑Fe` because it is not wholly a mark, and Female reads blank. On sheet 09 `OcrLineBuilder` puts `✓ Fever ☑` on one line and `Cough Headache Rash None` on the next — Rash sits 0.0052078 from the line's running centre against a tolerance of 0.0051903 — so the `☑` before Rash is a foreign mark at the end of a line that no label walks back to, and Symptoms reads `fever` for `fever; rash`. Round 1's one wrong tick is this row, not a second mark Vision never returned, as `OcrAnswerReader::MARK_SEEN`'s docblock, `docs/adr/0010-ocr-provider-cloud-vision.md` and `OcrTickConfidenceTest.php` say. **Live.** Filed by `M158`. **Tier: during-testing.**
+
+- **`minor` · Testers have no guide inside the app to creating a form, from a blank page to an exported response.**
+  The user's request (2026-10-11, in chat): *"create a user manual for the form builder to help our user/tester undrsdatnd
+  how to create form. if you can include it in the app itself a separate page to access the manual"*. Measured on
+  `origin/main` the same day: `routes/tenant.php` has no help route, neither `resources/js/components/shell/nav-model.ts` nor
+  `app/Support/Search/DestinationCatalog.php` has a help destination, and no page under `resources/js/Pages/` explains how
+  anything works. The dashboard's getting-started checklist (`app/Services/Onboarding/GettingStartedChecklist.php`) names
+  four steps and explains none of them, and `docs/TESTING-GUIDE.md` is a repository document written for the local stack,
+  which a tester on the testing server never sees. The remedy, `D114` A: a Help page at `/help` for every signed-in role,
+  linked from the sidebar and from search, holding a user manual on creating a form start to finish — every on-screen label
+  it quotes checked by a test against the file that draws it, so a renamed button turns the manual red rather than wrong.
+  It is not a product tour: `docs/onboarding-template-content-plan.md`'s "no forced tour" stands. **Live.** Filed by `M162`.
+  **Tier: early-testing.**
+
+- **`nit` · The in-app user manual shows no screenshots.** `M162`'s manual names every button in bold and shows no picture of
+  a screen — `D114`'s choice, because the builder changed on most days of the week before testing (`M150` to `M161`) and a
+  screenshot is wrong the day its screen moves. A first-time user may still find a picture faster than a label. The remedy is
+  screenshots captured by a Playwright spec from the seeded E2E stack, so retaking them is one command, with the manual's label
+  test extended to name the screen each image shows. **Latent.** The manual reaches the trunk only when `M162` merges.
+  Filed by `M162`. **Tier: during-testing.**
+
+- **`nit` · `docs/TESTING-GUIDE.md` still sends its reader to two buttons that have moved, and says single-form OCR is not built.**
+  Found by `M162` while checking which labels the in-app manual may quote. §2 step 2 reads *Open **Quarterly Report (draft)** →
+  **Edit***: the forms list's icon is now **Open builder** and the hub's button **Edit form**. §3 step 5 reads *→ **Schedule***:
+  there is no Schedule button any more; the schedule is a section of **Form settings** and of the hub's **Settings** tab. §18's
+  table says single-form OCR is *"Not built"*: it has been on the testing server since `M135`. The remedy is those three
+  sentences, plus a pointer to the in-app Help page for the steps a tester follows. **Live.** Filed by `M162`.
+  **Tier: during-testing.**
+
+- **`nit` · The builder has no link to the Help page.** The builder is where a new author gets stuck, and `M162`'s manual is
+  one sidebar click away from it but not linked from it. The remedy is a **Help** link in the builder's toolbar to
+  `/help#builder`, the builder chapter's anchor. It edits `resources/js/Pages/forms/Builder.vue`, a hub `M161` holds tonight,
+  which is why `M162` did not take it. **Latent.** The Help page reaches the trunk only when `M162` merges. Filed by `M162`.
+  **Tier: during-testing.**

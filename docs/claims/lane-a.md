@@ -80,6 +80,60 @@ find a label it did not before.
   `version-diff-ui` in chat.
 - All four merge tomorrow in this order, each released after its own post-merge run.
 
+### Claim — `M162`, testers' user manual inside the app: a Help page on creating a form (`R-f9211765`) (`m162-help-manual`)
+
+Taken 2026-10-11 by a **second session**, in the worktree `C:\laragon\www\fb-help` with its own Docker stack (`docker compose -p fb-help`),
+while the OCR session holds the main checkout — a recorded deviation from ADR-0022, for this one increment (`D114`). Branch
+`m162-help-manual`, cut from `origin/main` after this claim's commit, PR into main. ⛔ **Merged TONIGHT, before the Oct 12 session — `D114`
+A, a one-off exception to `D109`** — and released straight after its post-merge run, so the merged-title and RELEASED-heading sources
+disagree for as short a time as possible. Row: `R-f9211765`, filed in this push at the end of `docs/feature-backlog.md` (cited by id).
+
+#### Evidence verified
+- No help destination exists: `routes/tenant.php` has no `/help` route, `nav-model.ts`'s `navGroups` and `DestinationCatalog::ROWS` have no
+  help item, and there is no `resources/js/Pages/help/` — held, read on `origin/main` at `8e6cbde4`.
+- Every label the manual is planned to quote was found verbatim in the file that draws it, by a host grep before any edit: **New form**,
+  **New from template** (`Pages/forms/Index.vue`), **Create form** (`CreateFormModal.vue`), **Add section**, **Add a question here**
+  (`BuilderCanvas.vue`), **Requiredness**, **Choice layout**, "Show this question only when…" (`ConfigPanel.vue`), **Optional**,
+  **Required**, **Conditional** (`BuilderPresenter.php`), **Accept responses from the public link**, **Copy link** (`SharePanel.vue`), the
+  hub's tabs (`FormTabSet.php`) and **Export CSV** (`Inbox.vue`) — held. ❌ Four were NOT where the exploration put them: "Fields" and
+  "Library" are not in `FieldPalette.vue`, "Change type" is not in `ConfigPanel.vue`, and "Add condition" is not in `ConditionEditor.vue`;
+  each is located at build time or left out.
+- `raw-html-sink-census.test.ts` allows exactly one markup sink, so the manual renders text nodes only — held (`NoteContent.vue` is the
+  precedent).
+
+#### Premise verified
+- Owner, Admin and Form editor create forms; Reviewer and Viewer cannot open `/forms` (`docs/ACCESS-MATRIX.md` §4–5) — so the page is
+  open to every signed-in role and says who can do what.
+- `docs/onboarding-template-content-plan.md` refuses a forced TOUR, not a manual — no conflict.
+- The design system is consumed from `src` (`packages/design-system/package.json` exports `./src/index.ts`), so a new glyph needs no
+  package build.
+- Hubs edited, all by this ONE row: `routes/tenant.php`, `packages/design-system/src/components/Icon/icons.ts`,
+  `tests/e2e/responsive-axe.spec.ts`, `docs/ux/design-system-reference.md`, `docs/ACCESS-MATRIX.md`. `Builder.vue` is held by `M161` and
+  only READ here; the builder's own Help link is filed as `R-f7366ac8`.
+- ⚠️ `M161` also names a builder E2E spec (possibly `responsive-axe.spec.ts`) and edits `BuilderCanvas.vue`, whose labels the manual
+  quotes: whichever merges second rebases onto the other.
+
+#### Remedy verdict
+- None prescribed beyond `D114`. Chosen: typed content in `resources/js/components/help/manual.ts`, each on-screen label carried with the
+  file that draws it, and a Vitest case that reads each cited file and fails on a label it no longer contains. Measured before writing:
+  the node container mounts the whole repository, so `app/**/*.php` is readable from Vitest; three of the labels live only in PHP.
+
+Files: `app/Http/Controllers/Tenant/HelpController.php` (new), `routes/tenant.php`, `resources/js/Pages/help/Index.vue` (new),
+`resources/js/Pages/help/index.test.ts` (new), `resources/js/components/help/manual.ts` (new), `resources/js/components/help/manual.test.ts`
+(new), `resources/js/components/help/ManualBlock.vue` (new), `resources/js/components/help/ManualSpans.vue` (new),
+`resources/js/components/shell/nav-model.ts`, `resources/js/components/shell/Sidebar.vue` (a comment), `resources/js/components/shell/Sidebar.test.ts`,
+`app/Support/Search/DestinationCatalog.php`, `packages/design-system/src/components/Icon/icons.ts`, `tests/Feature/Help/HelpPageTest.php` (new),
+`tests/Unit/Navigation/ShellAbilityParityTest.php`, `tests/Feature/Search/DestinationReachabilityTest.php`, `tests/e2e/responsive-axe.spec.ts`,
+`docs/ux/design-system-reference.md` (Appendix B), `docs/ACCESS-MATRIX.md`.
+Shared artefacts taken: `docs/ux/design-system-reference.md`, `docs/ACCESS-MATRIX.md`, `tests/e2e/responsive-axe.spec.ts`, and the close-out
+set — shared tonight with the OCR session's writer, rebased before every push.
+Paired files taken: none in 7(b-bis). The manual's label test reads the files it cites, so a later edit to a quoted label (for one,
+`M161` in `BuilderCanvas.vue`) moves the manual in the same PR — intended.
+Namespaces spent: nothing from either namespace (decision `D114` recorded, derived as the next after `D113`).
+Prediction: the new Pest and Vitest cases red against a missing page; the parity count and the reachability lists red until the item is
+added. **Most likely wrong: the label test's first run**, from a label split across template lines or built at runtime — quoted by its
+static part when it is.
+
 ### Claim extension — `M159`, `ocr-ink-ticks`: the ink in each printed box, in the bake-off (`m159-ocr-ink-ticks`)
 
 Taken 2026-10-11, after `M158`'s PR (#351) was opened. ⚠️ **Branch cut from `origin/m158-ocr-dropped-ticks`, not from `origin/main` — a

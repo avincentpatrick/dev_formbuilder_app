@@ -24,10 +24,22 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D113`, the last one filed, was asked and answered on 2026-10-11 in the session that filed it and recorded in `M160`'s claim extension. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D114`, the last one filed, was asked and answered on 2026-10-11 in the session that filed it and recorded in `M162`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D114 — Testers start on Oct 12 and the app has no guide to creating a form; the user asked for a user manual inside the app, on a page of its own. `D109` holds every merge until the Oct 12 session. When does it go live, and what does it cover? **A — tonight, before the session, as a one-off exception to `D109`: a Help page on creating a form from start to finish, with no screenshots.**
+
+**Asked and answered 2026-10-11 (user decision, in chat), recorded by Lane A in `M162`'s claim.** The request: *"create a user manual for the form builder to help our user/tester undrsdatnd how to create form. if you can include it in the app itself a separate page to access the manual"*. Three questions were put together, each with a recommendation, and all three were answered as recommended.
+
+- **When — A, tonight, a one-off exception to `D109` (recommended, chosen).** A new page and one sidebar item; nothing existing changes. **B** — first thing once the session starts, before the OCR fixes. **C** — after `M158` to `M161`, a few hours into testing.
+- **Scope — creating a form, start to finish (recommended, chosen):** starting a form, the builder, a question's settings, logic, the preview, form settings, publishing, sharing, and seeing and exporting responses, with a "who can do what" chapter and a problems chapter. The other options were the builder alone, or everything a tester might touch; review, paper scanning, members and automations get a pointer each.
+- **Screenshots — none in v1 (recommended, chosen).** Each step names its on-screen label in bold, and a test checks each label against the file that draws it. The other option was real screenshots, retaken whenever a screen moves; filed as `R-5cde8465`.
+
+**A recorded deviation, told to the user in plain words before the build:** `M162` is built in a second worktree (`C:\laragon\www\fb-help`, with its own Docker stack `fb-help`) while the OCR session holds the main checkout — against `docs/adr/0022-single-lane-development.md`'s one worktree and one writer, for this one increment. Both sessions write `lane-a.md`, this file, `PROGRESS.md` and the end of `docs/feature-backlog.md`; each rebases before it pushes, keeps the other's prose, and regenerates the generated files rather than merging them.
+
+**What the answer files, in the same push:** `R-f9211765` (`early-testing`), which `M162` takes; `R-5cde8465`, `R-248174d6` and `R-f7366ac8` (`during-testing`). `D109` is otherwise unchanged: nothing else merges until the Oct 12 session starts.
+
 ### D113 — `M159` measured the ink reader on Round 1 — all 21 tick questions Vision left blank read right, with the settings tuned on those same fifteen forms — and `D112` put the server change to the user before it is built. Should testers' scans be read with ink during the testing session, which adds `gd` to the testing server's PHP? **A — yes: `M160` puts the ink on the reading path, merged after `M158` and `M159`, and the user enables `gd` on the server, guided in chat.**
 
 **Asked and answered 2026-10-11 (user decision, in chat), recorded by Lane A in `M160`'s claim extension.** Asked with the measurement and its caveat stated: tuned and scored on the same forms. The testing server runs PHP for Windows directly (`C:\php`), so the change is one line in its `php.ini` (`extension=gd`, a file the PHP build already ships) and a restart of its php-cgi services and its worker; `docs/deployment-infrastructure.md` §8 step 1 said "not `gd`", which `M160` amends.

@@ -71,14 +71,57 @@ field moves** — the one I most expect to be wrong, because a lone mark word el
 find a label it did not before.
 
 ### Forward queue — claims taken now, each extended with its three fields in a pushed commit before its first file is opened
-- **`M159` — `ocr-ink-ticks`** (branch `m159-ocr-ink-ticks`): `app/Services/Ocr/OcrInkReader.php` (new), `app/Services/Ocr/GdPageImage.php`
-  (new), `app/Console/Commands/OcrBakeoffCommand.php`, `config/ocr.php`, new tests under `tests/Unit/Ocr/` and
-  `tests/Feature/Ocr/Bakeoff/`, `docs/ocr-pipeline-design.md` §9. No hub.
+- **`M159` — `ocr-ink-ticks`** — ✅ **EXTENDED (its three fields below), pushed before its first file was opened.**
+- **`M160` / `M161`** as below.
 - **`M160` — `ocr-ink-live`**, only if `M159` meets `D112`'s bar and the user OKs `gd` in the app image; files named at its extension.
 - **`M161` — `R-313c232d` + `R-a53755f5` + `R-d285b9a3`** (branch `m161-builder-compact-select`): `resources/js/Pages/forms/Builder.vue`
   (the hub), `resources/js/Pages/forms/builder-layout.test.ts`, `docs/claims/TEMPLATE.md`. The user chose `R-313c232d` over
   `version-diff-ui` in chat.
 - All four merge tomorrow in this order, each released after its own post-merge run.
+
+### Claim extension — `M159`, `ocr-ink-ticks`: the ink in each printed box, in the bake-off (`m159-ocr-ink-ticks`)
+
+Taken 2026-10-11, after `M158`'s PR (#351) was opened. ⚠️ **Branch cut from `origin/m158-ocr-dropped-ticks`, not from `origin/main` — a
+recorded deviation:** the ink reader needs the option labels `M158`'s `choices()` now finds (`$labelStarts`), `M158` cannot merge before
+the Oct 12 session (`D109`), and a branch from the trunk would rebuild the same lines in conflict. Tomorrow `M158` merges first and this
+branch rebases onto the trunk with nothing of `M158` left in its diff. Row: the marker `ocr-ink-ticks`, the end of `docs/ocr-pipeline-design.md`.
+
+#### Evidence verified
+- The marker's premise — Vision returns nothing for 20 of Round 1's 22 blank tick questions — measured in `M158` (held).
+- `OcrLineBuilder` turns a page upright and deskews it, so a region's words are NOT in the photo's pixel frame (held: `upright()`,
+  `rotate()`); the provider's own boxes are, in the stored frame (the raw JPEG's, EXIF orientation not applied) — measured: the
+  prototype reads raw pixels at Vision's boxes and finds the printed boxes.
+- `PrintedFormMatcher::result()` copies named keys only, so a read's extra key never reaches the stored extraction (held).
+- Host PHP has `gd` and `exif`; the app container and CI's `setup-php` list do not name `gd` (held — `ci.yml` extension lists).
+
+#### Premise verified
+- The ink arm is harness-only: nothing on the reading path changes, so nothing testers see moves (`ocr-ink-live` is that, and waits on
+  the bar and the user's OK for `gd`).
+- `OcrAnswerReader.php` is a hub — this increment's one hub row; `PrintedFormMatcher.php`, `OcrLineBuilder.php`, `OcrWord.php`,
+  `config/ocr.php` and the bake-off command are not.
+- ⚠️ The settings are tuned on the same fifteen forms they are scored on — the bar is measured on its own training set. Reported as
+  such; the first fresh scans are the real test.
+
+#### Remedy verdict
+- Measured BEFORE any PHP, by a Python prototype over Round 1's photos and cached reads (scratchpad, not committed):
+  - a window before each option's label, sized by the PAGE's median letter height (a label word's own box inflates when a tick
+    touches it — the first prototype's every miss), counting pixels darker than 0.6 of the window's 90th-percentile grey;
+  - judged against the page's own median box (most boxes are empty): a single answer is the darkest box only when it clears that
+    median by 0.03 and the next box by 0.03, else left blank; a multi-select takes every box 0.02 over the median.
+  - **Single answers and yes/no: 28 right, 0 wrong, 2 left blank. Multi-select boxes: 74 of 75. Tick questions Vision left blank: 21 of
+    22** — over `D112`'s 9 in 10. Stable across every neighbouring setting tried (26–29 right, never a wrong single answer).
+  - Finding the printed walls was tried first and abandoned: a photo blurs a thin printed wall to grey, so walls were found mostly
+    where a tick darkened them.
+
+Files: `app/Services/Ocr/OcrWord.php`, `app/Services/Ocr/OcrLineBuilder.php`, `app/Services/Ocr/OcrAnswerReader.php`,
+`app/Services/Ocr/PrintedFormMatcher.php`, `app/Services/Ocr/OcrInkReader.php` (new), `app/Services/Ocr/OcrInkImage.php` (new),
+`app/Services/Ocr/GdInkImage.php` (new), `app/Console/Commands/OcrBakeoffCommand.php`, `config/ocr.php`, `tests/Unit/Ocr/OcrInkReaderTest.php`
+(new), `tests/Feature/Ocr/PrintedFormMatcherTest.php`, `tests/Feature/Ocr/Bakeoff/OcrBakeoffCommandTest.php`, `docs/ocr-pipeline-design.md`.
+Shared artefacts taken: `docs/ocr-pipeline-design.md` and the close-out set. Paired files taken: none.
+Namespaces spent: nothing from either namespace.
+Prediction: the PHP port reproduces the prototype's numbers on Round 1 to within one box (PIL pads a crop past the image edge with black;
+the port clamps instead). The ink reader's unit cases red first against an empty class. **Most likely wrong:** the bake-off total — the
+ink answers are scored by the unchanged scorer, and a fill at review confidence may land in a verdict I have not predicted.
 
 ## RELEASED — `M157`, a tick question whose mark the scan never saw no longer reads "Left blank on the paper" (`R-d2467239`), a one-off exception to the freeze (`D111`) (merged as PR #350, `3eda9b76`, 6/6 green on its one completed run with real step counts (the first was cancelled by the row-closure push) — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

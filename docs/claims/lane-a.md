@@ -16,7 +16,69 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — ⛔ FREEZE (`D109`, back on after `D111`'s one exception): `M157` is merged and live on staging, and nothing else merges until the Oct 12 testing session starts. The next session opens with the user's check of the tick note (their report, *"the sex and vaccinated is not read even though it has a response on the paper"*), and takes the during-testing tier from `docs/pipeline.md`'s Next section only once the session has started
+## Status: ACTIVE CLAIM — `M158`, the reader keeps every tick Vision returns (`R-b2d00ba2`) (`m158-ocr-dropped-ticks`)
+
+Taken 2026-10-11. Branch `m158-ocr-dropped-ticks`, cut from `origin/main` at this claim's commit, PR into main.
+⛔ **Built today, merged only once the Oct 12 testing session starts (`D109`; the user chose "build now, merge tomorrow" in chat).**
+Row: `R-b2d00ba2` — *"The reader drops a tick Vision did return when a stray word sits between the mark and its label, or when
+the mark and its label land on two lines."* Filed in this push, the last row of `docs/feature-backlog.md` (cited by id, not by line).
+Recorded in the same push: `D112` (ink in the box, free, over the Claude arm) with `ocr-ink-ticks` and `ocr-ink-live`.
+The session opened with the user's check of `M157`: ✅ confirmed on staging ("the note show below the field").
+
+### Evidence verified
+- `OcrAnswerReader::choices()`'s walk-back `break`s on the first word that is not wholly a mark — held, read on `origin/main` today.
+- `labelSpan()`'s `$foreignMark` rule keeps a wholly-mark word out of every label span — held; a lone `☑` at a line's end is
+  therefore never looked at unless a label follows it on the same line.
+- `OcrLineBuilder`'s grouping: tolerance 0.5 × the page's median word height, a running-mean centre, words sorted by centre — held.
+- Sheet 06 (`C:/ocr-samples-hint/06/20261008_191026.jpg.google_vision.json`): `Male ☑ ☑Fe Female` — held, measured.
+- Sheet 09 (`…/09/20261008_191106.jpg.google_vision.json`): `✓ Fever ☑` | `Cough Headache Rash None`, Rash 0.0052078 off the
+  running centre against 0.0051903 — held, measured by replaying the builder's arithmetic on the cached words.
+- Round 1's `fields.csv` (`C:/ocr-samples/_work/m149-with-hint`): 06 field_8 "read as blank, but it was answered"; 09 field_9 `fever`
+  for `fever; rash` — held.
+
+### Premise verified
+- ❌ **The tree says the opposite of the measurement in four places**: `OcrAnswerReader::MARK_SEEN`'s docblock, ADR-0010
+  (`docs/adr/0010-ocr-provider-cloud-vision.md`), `OcrTickConfidenceTest.php`'s comments, and §9 of `docs/ocr-pipeline-design.md`
+  all call Round 1's one wrong tick "a second mark Vision never returned" and every blank tick "never returned". Vision returned
+  that mark (`☑` at 0.935) and one of the 22 blanks. **The 80 floor itself stands** — its own measurement (16 ticks read right and
+  withheld) is independent of the misattributed sentence; only the reasoning is corrected.
+- `OcrAnswerReader.php` is a **hub** (four open rows cite it) — this increment's one hub; no other row in this batch edits it, and
+  none of the four citing rows is taken. `OcrText.php` and the typesetter are not hubs.
+- Single-form OCR is on staging (`M135`), so the defect is live there today; the forward queue's `M160` also reaches the reading
+  path but not this file's `choices()`.
+- Fixing shape B in `OcrLineBuilder` instead was weighed and rejected: it moves the lines of EVERY question type (combs, captions,
+  anchors); the reader-side fix moves only choice questions.
+
+### Remedy verdict
+- No remedy was offered by the row beyond its mechanism; the prescribed fix is this claim's, measured by hand before any test:
+  - **Shape A:** the walk-back continues through a word whose LEADING characters are symbol marks (normal form empty: ☑ ☒ ✓ ✔ ✗ ✘
+    × / \ * +), crediting those characters. On 06: `☑Fe` gives `☑`, then `☑` — Female marked. A letter mark (x, v, χ, 区)
+    still counts only as a whole word, so a written "Xavier" in the gap never reads as a tick.
+  - **Shape B:** a mark word that no option consumed is credited to the found option whose label begins nearest to its right,
+    within 1.5 median word heights along the line and one line height across; two candidates credit none. On 09: `☑` ends at
+    x 0.472, Rash begins at 0.479 (median word height 0.0104), centres 0.0049 apart — credited to Rash.
+- Offline re-score of Round 1 (`ocr:bakeoff … --offline`, host PHP) before and after is the measurement of record.
+
+Files: `app/Services/Ocr/OcrAnswerReader.php`, `app/Services/Ocr/OcrText.php`, `tests/Feature/Ocr/PrintedFormMatcherTest.php`,
+`tests/Feature/Ocr/Support/PrintedPageTypesetter.php`, `tests/Feature/Ocr/OcrTickConfidenceTest.php`,
+`docs/ocr-pipeline-design.md` (§9), `docs/adr/0010-ocr-provider-cloud-vision.md`.
+Shared artefacts taken: `docs/ocr-pipeline-design.md`, `docs/adr/0010-ocr-provider-cloud-vision.md`, and the close-out set.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace (decision `D112` is recorded, derived as the next after `D111`).
+Prediction: the two new matcher cases red on the trunk, one per shape, plus the letter-mark guard green on both sides (it guards,
+it does not reproduce). Round 1 re-scored: 06 field_8 → `f` and 09 field_9 → `fever; rash`, both in the review band; **no other
+field moves** — the one I most expect to be wrong, because a lone mark word elsewhere on a page (22 such near option lines) may now
+find a label it did not before.
+
+### Forward queue — claims taken now, each extended with its three fields in a pushed commit before its first file is opened
+- **`M159` — `ocr-ink-ticks`** (branch `m159-ocr-ink-ticks`): `app/Services/Ocr/OcrInkReader.php` (new), `app/Services/Ocr/GdPageImage.php`
+  (new), `app/Console/Commands/OcrBakeoffCommand.php`, `config/ocr.php`, new tests under `tests/Unit/Ocr/` and
+  `tests/Feature/Ocr/Bakeoff/`, `docs/ocr-pipeline-design.md` §9. No hub.
+- **`M160` — `ocr-ink-live`**, only if `M159` meets `D112`'s bar and the user OKs `gd` in the app image; files named at its extension.
+- **`M161` — `R-313c232d` + `R-a53755f5` + `R-d285b9a3`** (branch `m161-builder-compact-select`): `resources/js/Pages/forms/Builder.vue`
+  (the hub), `resources/js/Pages/forms/builder-layout.test.ts`, `docs/claims/TEMPLATE.md`. The user chose `R-313c232d` over
+  `version-diff-ui` in chat.
+- All four merge tomorrow in this order, each released after its own post-merge run.
 
 ## RELEASED — `M157`, a tick question whose mark the scan never saw no longer reads "Left blank on the paper" (`R-d2467239`), a one-off exception to the freeze (`D111`) (merged as PR #350, `3eda9b76`, 6/6 green on its one completed run with real step counts (the first was cancelled by the row-closure push) — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

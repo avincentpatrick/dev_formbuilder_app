@@ -24,10 +24,22 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D111`, the last one filed, was asked and answered on 2026-10-11 in the session that filed it and recorded in `M157`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D112`, the last one filed, was asked and answered on 2026-10-11 in the session that filed it and recorded in `M158`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D112 — Vision returns no mark at all for most ticks standing alone in a box (20 of the 22 answered tick questions Round 1 reads blank, measured by `M158`), and `D104` A queued Claude through the Anthropic API to read them, which is billed apart from a Claude subscription. How are the ticks Vision never returns read? **B — measure the ink inside each printed box: free, no second provider, scored in the bake-off before it goes live.**
+
+**Asked and answered 2026-10-11 (user decision, in chat), recorded by Lane A in `M158`'s claim.** The user asked why the ticks on sample sheet 08 are not read *"even though it has value in the paper"*, then whether the Claude arm is covered by their subscription (it is not), then chose: *"as much as possible, we will choose the free one. the measure ink in the box. is that reliable?"*. Measured the same session from Round 1's cached reads and photos, read-only: a crude window before each option's label, darkest box wins, picks the right box on 25 of 30 single-answer and yes/no questions and on 16 of the 17 that Vision left blank (sheet 08's Male and Yes among them); every miss had its window on bare paper, which a box-finder can detect and leave blank. A multi-select is harder (57 of 76 boxes in the crude form). The agency's consent to send the fifteen made-up samples to Anthropic was given in the same session and is unused. `D104` is amended, not reversed: the vision-language arm is set aside, kept as the fallback.
+
+- **A — Claude reads the page (`D104` A as answered).** Likely the most accurate on phone photos; needs API credit paid separately (about US$2–4 a Round 1 run, about US$0.10 a two-page form live) and the agency's consent before a real scan is sent.
+- **B — measure the ink in each printed box (chosen).** Free, and no page leaves for a second provider. The box is found from where Vision places the option's label; the server image needs `gd` to run it live.
+- **C — neither for now.** Reviewers key every blank tick, as today.
+
+**The bar, part of the answer:** the ink reader goes live only when, on Round 1's fifteen forms, it answers at least 9 in 10 of the tick questions Vision left blank correctly, and every ink answer lands in the review band (never auto). Adding `gd` to the app image is put to the user in chat before it is built.
+
+**What the answer files, in the same push:** `ocr-ink-ticks` (`during-testing`, ready — the arm in `ocr:bakeoff`, `M159`) and `ocr-ink-live` (`during-testing`, blocked on that measurement), both at the end of `docs/ocr-pipeline-design.md`; `ocr-vlm-arm`'s blocker now names this decision; `R-a21fa6e8`'s remedy is retargeted to the ink rows.
+
 ### D111 — Sample sheet 08 scanned on staging showed Sex and Vaccinated empty though both were ticked: Vision never returned those two marks, and the review screen calls such a question "Left blank on the paper". `D109` holds every merge until the Oct 12 session. When does the note's fix go live? **A — today, before the session, as a one-off exception to `D109`.**
 
 **Asked and answered 2026-10-11 (user decision, in chat), recorded by Lane A in `M157`'s claim.** The user's report: *"i uploaded the no 8 oct. and the sex and vaccinated is not read even though it has a response on the paper"*. Measured from the same photos' cached Vision answer: no mark symbol was returned for either box, and Round 1 reads 21 of 45 tick questions as blank though answered. Reading those ticks is `ocr-vlm-arm`'s (`D104` A, not re-asked); the false note is `R-d2467239`.

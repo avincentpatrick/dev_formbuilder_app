@@ -123,6 +123,13 @@ export const icons = {
     // `activity` is Webhooks'. The ribbon V is the part that survives 16px -- the disc alone would read as
     // `user` with its shoulders cropped.
     award: 'M7 9a5 5 0 1 0 10 0a5 5 0 1 0-10 0 M9.4 13.3L8.5 21l3.5-2.1 3.5 2.1-.9-7.7',
+
+    // ── Help (M162) ───────────────────────────────────────────────────────────
+    // The user manual's destination: a circle with a question mark. Its own glyph rather than `info`, which
+    // shares the circle but is MdsCallout's "note" mark — a sidebar item wearing it would read as a notice,
+    // and the manual's own pages put callouts on screen beside the header icon. The hook and dot are drawn
+    // as `info`'s stem and dot are, so the two read as one family without being the same mark.
+    help: 'M12 3a9 9 0 1 0 0 18a9 9 0 0 0 0-18 M9.5 9.5a2.5 2.5 0 1 1 3.6 2.24c-.66.33-1.1 1-1.1 1.76v.5 M12 17v.5',
 } as const;
 
 export type IconName = keyof typeof icons;

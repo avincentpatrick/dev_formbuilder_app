@@ -264,6 +264,7 @@ All URLs are relative to a workspace host, e.g. `http://demo.localhost:8080/form
 | `/integrations` | `manageIntegrations` | `ConnectionPolicy::viewAny` = `integrations.manage` | `native_connectors` | ✅ | ✅ | — | — | — |
 | `/domains` | `manageDomains` | `tenant.settings.manage` | `custom_domain` (nav only) | ✅ | ✅ | — | — | — |
 | `/settings` | — | (authenticated; panels gate on `tenant.settings.manage`) | — | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `/help` | — | (authenticated; the user manual, M162 `D114` — no gate, so a Reviewer or Viewer reads why Forms is absent) | — | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `/search`, `/notifications` | — | (authenticated) | — | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 Three ability keys have no nav item of their own and gate in-page controls instead:
@@ -482,7 +483,7 @@ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/auth/google/redir
    platform host — corrected by Increment M46 (2026-08-29), which found this step sending the reader to
    `localhost:8080/login`, the exact dead end the warning block at the top of this document measures.**
    Step 5 below already used a workspace host, so the inconsistency read as intentional. The sidebar must
-   show exactly Submissions, Dashboard, **Achievements**, Analytics and Settings — no Forms, Members,
+   show exactly Submissions, Dashboard, **Achievements**, Analytics, Settings and Help — no Forms, Members,
    Scopes, Audit log, Feedback, Webhooks, Integrations or Domains (§5). ⚠️ **Achievements is on this list
    because it is the one
    destination with no permission gate at all** — it is keyed on the `gamification` module switch only, by

@@ -69,6 +69,10 @@ final readonly class DestinationCatalog
         // bell itself is a shell affordance with no URL, and a catalog of URLs cannot honestly offer it.
         // `DestinationReachabilityTest` now drives every row and would redden if the row came back.
         ['key' => 'settings', 'label' => 'Settings', 'url' => '/settings', 'keywords' => 'preferences workspace configuration options notifications alerts bell activity', 'ability' => null, 'feature' => null],
+        // The user manual (M162, `D114`) — ungated, mirroring the sidebar item. ⚠️ Its keywords avoid every word a
+        // search test pins to another destination or to zero results (members, people, inbox, history, dns, clinic,
+        // health): a manual about everything would otherwise answer every query.
+        ['key' => 'help', 'label' => 'Help', 'url' => '/help', 'keywords' => 'manual guide tutorial instructions faq getting started how create build form questions', 'ability' => null, 'feature' => null],
     ];
 
     public function __construct(private EntitlementService $entitlements) {}

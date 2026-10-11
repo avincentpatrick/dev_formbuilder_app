@@ -105,6 +105,10 @@ const pages = [
     // `admin-console-axe.spec.ts` (I10e), which carries its own session; the TOTP the old note blamed
     // turned out not to be needed at all.
     { name: 'Settings', path: '/settings' },
+    // The user manual (M162, `D114`) — the longest page of running text in the app: twelve cards of
+    // headings, numbered steps, bold labels and underlined links, with a contents grid that must reflow to
+    // one column at 375px rather than scroll sideways.
+    { name: 'Help', path: '/help' },
     // The workspace's own feedback (I7a, PRD Feature #11). `E2eSeeder::seedFeedback()` puts one row in
     // each of the four FeedbackStatus states, which is what makes this scan worth running: the four map
     // to four DIFFERENT badge variants, and a table where every pill is the same colour proves nothing

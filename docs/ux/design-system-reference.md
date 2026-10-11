@@ -1652,6 +1652,11 @@ The rationale is also captured in `exceptions-log.md` #2.
   Webhooks'. The **ribbon V is the part that survives 16px** — the disc alone reads as `user` with its
   shoulders cropped, which is the same "does it still say what it means at 16px" test `qr` was drawn
   against.
+- **Glyph added in M162** (the in-app user manual, `/help`, `D114`): **`help`** — a circle with a question
+  mark, under the same *Registry growth* rule and the I1/K1e precedent. Its own glyph rather than `info`,
+  which shares the circle but is `MdsCallout`'s "note" mark: a sidebar item wearing it would read as a notice,
+  and the manual puts callouts on screen beside its header icon. The hook and dot are drawn the way `info`'s
+  stem and dot are, so the two read as one family without being the same mark at 16px.
 
 **Components added in C2** (implementing existing sections, with stories + this doc updated per §7.3):
 `MdsCard` (§3.5), `MdsEmptyState` (§3.10), `MdsSpinner` (§3.9 indeterminate; determinate bar still

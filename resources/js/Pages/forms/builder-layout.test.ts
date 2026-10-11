@@ -184,6 +184,18 @@ describe('forms/Builder — the compact-layout threshold', () => {
         );
     });
 
+    it('brings a tapped question’s settings on screen at compact widths, and only a tap on a Structure row (R-313c232d)', () => {
+        // Below the pane-switch width, tapping a question highlighted it while its settings stayed off screen. The row's recorded
+        // remedy was a `watch(selection, …)`, but `selection` also moves when the Preview's rows are tapped (to try the form)
+        // and when a label is edited in place — both in the CENTRE pane — so a watcher would throw a phone user out of the Preview
+        // and hide the inline editor as it opened (`M161`). The canvas says when a row was picked; only that moves the pane.
+        expect(source, 'a picked Structure row must pull the settings pane on screen').toMatch(
+            /<BuilderCanvas[\s\S]{0,300}?@picked="pane = 'settings'"/,
+        );
+        // Anchored to a line of CODE: the comment in `Builder.vue` that explains this spells the watcher out.
+        expect(source, 'never a watcher on the selection, which the Preview and the inline editor move too').not.toMatch(/^\s*watch\(\s*selection\b/m);
+    });
+
     it('does not publish over a save that failed', () => {
         // ⛔ `whenIdle()` RESOLVES ON FAILURE, DELIBERATELY AND UNCHANGEABLY. `enqueue()` ends with
         // `queue = run.catch(() => undefined)`, so the promise it returns can never reject, and two

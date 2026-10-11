@@ -526,3 +526,20 @@ test('Builder — the preview scrolls when its questions are taller than the win
     // `[data-preview-field]` (`age`) stayed at viewport ratio 0 after a full scroll, so it is not a row on screen.
     await expect.poll(() => pane.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop)).toBeLessThanOrEqual(1);
 });
+
+// M161 (`R-313c232d`) — at a phone's width the settings are a pane of their own: a tap on a question's row in Structure brings them
+// on screen, and opening its label for editing in place leaves the author in the form (the remedy the row recorded, a watcher on
+// the selection, would have moved the pane for both). At wider widths every pane is on screen and both hold trivially.
+test('Builder — a tapped question brings its settings on screen; a label opened for editing stays in the form', async ({ page }) => {
+    await openBuilder(page, 'Field Visit Referral');
+    await showBuilderPane(page, 'canvas');
+    await page.locator('.canvas__field-main', { hasText: 'District visited' }).click();
+    await expect(page.locator('.builder__pane--config')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('tab', { name: 'Options' })).toBeVisible();
+
+    await showBuilderPane(page, 'canvas');
+    await page.getByRole('button', { name: 'Edit label of District visited' }).click();
+    await expect(page.getByLabel('Question label')).toBeVisible();
+    await expect(page.locator('.builder__pane--canvas')).toBeVisible();
+    await page.keyboard.press('Escape');
+});

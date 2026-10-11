@@ -73,7 +73,7 @@ find a label it did not before.
 ### Forward queue — claims taken now, each extended with its three fields in a pushed commit before its first file is opened
 - **`M159` — `ocr-ink-ticks`** — ✅ **EXTENDED (its three fields below), pushed before its first file was opened.**
 - **`M160` — `ocr-ink-live`** — ✅ **EXTENDED (its three fields below), pushed before its first file was opened.**
-- **`M161`** as below.
+- **`M161`** — ✅ **EXTENDED (its three fields below), pushed before its first file was opened.**
 - **`M160` — `ocr-ink-live`**, only if `M159` meets `D112`'s bar and the user OKs `gd` in the app image; files named at its extension.
 - **`M161` — `R-313c232d` + `R-a53755f5` + `R-d285b9a3`** (branch `m161-builder-compact-select`): `resources/js/Pages/forms/Builder.vue`
   (the hub), `resources/js/Pages/forms/builder-layout.test.ts`, `docs/claims/TEMPLATE.md`. The user chose `R-313c232d` over
@@ -161,6 +161,40 @@ Namespaces spent: nothing from either namespace (decision `D113` recorded).
 Prediction: the live-path case red first (a blank tick stays blank on the trunk of this branch); the review-note Vitest case red first;
 the gd adapter test cannot run in the app container until the image is rebuilt — **most likely wrong: the CI image** — `setup-php` may
 already ship `gd` by default, in which case the `ci.yml` edit is redundant but harmless.
+
+### Claim extension — `M161`, `R-313c232d` + `R-a53755f5` + `R-d285b9a3`: the builder's settings follow a selection at compact widths (`m161-builder-compact-select`)
+
+Taken 2026-10-11, after `M160`'s work was committed. Branch cut from `origin/main` (no OCR file in it). The user chose `R-313c232d` over
+`version-diff-ui` in chat ("Builder fix on small screens"). Rows cited by id: `R-313c232d`, `R-a53755f5`, `R-d285b9a3`.
+
+#### Evidence verified
+- `R-313c232d`: in `resources/js/Pages/forms/Builder.vue`, `pane` defaults to `'canvas'`, `onMounted` selects the first field, and the
+  comment above the `saveError` watcher records that a `watch(selection, …)` was rejected for firing on load — all held today.
+- `R-a53755f5`: `docs/claims/TEMPLATE.md`'s opening block still asks for "the backlog row … with its file:line" — held; it is the
+  instruction that produces the defect.
+- `R-d285b9a3`: the two ledger sentences it names now cite "the closed-vocabulary row" by name, not by line (reworded by `M120`) — the
+  ledger half is already fixed; what remains are line citations inside RELEASED claim blocks.
+
+#### Premise verified
+- `R-313c232d`'s premise holds, and `M103`'s note sharpens it: `flush: 'post'` alone is inert — the watcher is active when `onMounted`
+  selects, so the MOUNTED FLAG suppresses the load-time fire and must be set only after `nextTick()`. `selection` also moves on add-field,
+  add-section, duplicate and insert-from-library, so the pane follows those too (wanted: each lands on the new item's settings).
+- `R-d285b9a3`'s remaining citations sit in dated RELEASED blocks: rewriting them falsifies the log (`M40`), and repairing them by a
+  delta is exactly what `R-a53755f5` forbids — so it closes on the ledger half being done and the claim-file half being `R-a53755f5`'s class.
+- `Builder.vue` and `builder-layout.test.ts` are hubs, edited by the one row `R-313c232d`; `TEMPLATE.md` is not a hub.
+
+#### Remedy verdict
+- `R-313c232d`: the row's own remedy — a post-flush `watch(selection)` behind a mounted flag set after `nextTick()` in `onMounted` —
+  measured against Vue's scheduling by reading it, to be proved in a real browser at phone width before the PR.
+- `R-a53755f5`: the row's remedy — cite the row by id or heading, never a claim file or a document the same push edits by line — goes
+  into the template's opening block.
+
+Files: `resources/js/Pages/forms/Builder.vue`, `resources/js/Pages/forms/builder-layout.test.ts`, `docs/claims/TEMPLATE.md`, and one
+builder E2E spec for a compact-width selection case (`tests/e2e/responsive-axe.spec.ts` or `builder-axe.spec.ts`, whichever drives the
+builder at phone width). Shared artefacts taken: the E2E spec and the close-out set. Paired files taken: none.
+Namespaces spent: nothing from either namespace.
+Prediction: the layout test's new assertion red first; `builder-axe`, `field-library-axe` and `responsive-axe` locally — **most likely
+wrong: one of them** asserts which pane shows after an add or a library insert, and now sees Settings.
 
 ## RELEASED — `M157`, a tick question whose mark the scan never saw no longer reads "Left blank on the paper" (`R-d2467239`), a one-off exception to the freeze (`D111`) (merged as PR #350, `3eda9b76`, 6/6 green on its one completed run with real step counts (the first was cancelled by the row-closure push) — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

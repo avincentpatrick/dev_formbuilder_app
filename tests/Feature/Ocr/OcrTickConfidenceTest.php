@@ -22,8 +22,10 @@ uses(RefreshDatabase::class);
 |--------------------------------------------------------------------------
 | The bake-off's Round 1 read 16 ticks right and withheld every one: Vision returns a hand-drawn tick as ☑, X, a Greek chi
 | or 区 with a low confidence in the GLYPH, and the reader scored the glyph. A mark in the box before a label is evidence of a
-| tick whatever it was read as, so it is shown for review — and never accepted on the mark alone, because the one wrong tick
-| in Round 1 was a multi-select whose second mark Vision never returned at all (51.1% → 42.2% needing correction, 0 silent).
+| tick whatever it was read as, so it is shown for review — and never accepted on the mark alone, because a multi-select's
+| other boxes may hold ticks Vision never returned (51.1% → 42.2% needing correction, 0 silent). `M158` found that Round 1's
+| one wrong tick, given here as that case, was a mark Vision DID return and the reader dropped (`R-b2d00ba2`); the floor
+| stands on the 20 tick questions Vision returned nothing for.
 |
 | ⚠️ Helpers are prefixed `ocrTick*`: Pest loads every test file into one process.
 */
@@ -93,8 +95,8 @@ it('raises only a tick: writing read with the same doubt stays manual, its value
 });
 
 it('keeps a seen tick inside the configured review band, so a tick is never accepted on the mark alone', function (): void {
-    // At or above auto, Round 1's multi-select that lost its second mark would have been a silent error (the sweep shows one
-    // at auto 85). Below review, every doubtful tick would be marked "may be wrong" again — the defect this case closes.
+    // At or above auto, a multi-select whose other ticks Vision never returned would be a silent error (Round 1's sweep showed
+    // one at auto 85 before `M158` recovered that tick). Below review, every doubtful tick would be marked "may be wrong" again — the defect this case closes.
     expect(OcrAnswerReader::MARK_SEEN)->toBeGreaterThanOrEqual((int) config('ocr.confidence.review'))
         ->and(OcrAnswerReader::MARK_SEEN)->toBeLessThan((int) config('ocr.confidence.auto'));
 });

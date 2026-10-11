@@ -79,8 +79,8 @@ the Cloud Vision API.**
 - Vision returns a hand-drawn tick as ☑, X, a Greek chi or 区, with a low confidence in the GLYPH. That is not the question being
   asked: a mark in the box before an option's label is evidence of a tick.
 - So a tick's confidence is at least 80, inside the review band.
-- It is never auto: Round 1's one wrong tick was a multi-select whose second mark Vision never returned, and only a reviewer
-  looking at the page can see that.
+- It is never auto on the mark alone: a multi-select's other boxes may hold ticks Vision never returned (20 of Round 1's 22
+  blank tick questions), and only a reviewer looking at the page can see that. (`M158`: Round 1's one wrong tick was a mark the reader dropped.)
 - A test holds the floor between the two configured thresholds.
 
 **§D5 — Pages are matched in printed order, whatever order they were uploaded in** (`PrintedFormMatcher::printedOrder()`,
@@ -119,7 +119,7 @@ the matcher and the review screen do not change.
 - **G9 is missed, on the record, at 42.2%.** It is not met by lowering the bar or the thresholds. Lowering the review threshold to 0
   would report about 32%, by showing reviewers wrong values pre-filled: the trade §3 forbids. *(The user made that trade, marked,
   by `D108`: 31.7% on the same reads. G9 is still missed.)*
-- **Ticks are now the largest single cause**: 22 marks never returned at all. This is the measurement the arm is judged against,
+- **Ticks are now the largest single cause**: 22 tick questions read blank — 20 with no mark returned, one an empty box, one a mark the reader dropped (`M158`, `R-b2d00ba2`). This is the measurement the ink in each box (`D112`) and then the arm are judged against,
   together with handwriting misreads in names, emails, phones and remarks.
 - **The figures are slightly pessimistic.** A few cells on the answer sheet differ from the paper itself, such as a comma not
   written and a typo.

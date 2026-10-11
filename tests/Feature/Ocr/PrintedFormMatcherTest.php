@@ -369,6 +369,53 @@ it('reads a mark run together with its label as that label\'s mark, on a shared 
         ->and($male['sex'])->toMatchArray(['state' => 'read', 'value' => 'm']);
 });
 
+it('keeps a tick when the recognizer reads a stray word between it and its label (R-b2d00ba2, sheet 06)', function (): void {
+    // Round 1's sheet 06 came back `Male ☑ ☑Fe Female`: Vision returned the tick, then the tick again run into the label's
+    // first letters. The walk back from "Female" stopped at "☑Fe", because it is not wholly a mark, and a tick Vision had
+    // returned at 0.92 was read as a blank answer.
+    $fields = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, [
+        'sex' => ['Male'],
+        'symptoms' => ['Cough'],
+    ], ['marks' => ['sex' => '☑', 'symptoms' => '✓'], 'gap_words' => ['sex' => ['Male' => '☑Ma'], 'symptoms' => ['Cough' => '✓Co']]]);
+
+    expect($fields['sex'])->toMatchArray(['state' => 'read', 'value' => 'm'])
+        ->and($fields['symptoms'])->toMatchArray(['state' => 'read', 'value' => ['cough']]);
+});
+
+it('never takes a written word that begins with a letter mark for a tick, nor reaches a stray mark across writing (R-b2d00ba2)', function (): void {
+    // The guards on the two fixes: a word that merely STARTS with x or v ("Xavier" written beside a box) is writing, and only
+    // a symbol (☑, ✓, ×…) leading a word is a tick run into it — an x or a v still counts when it is the whole word. And a
+    // mark no label took is not credited past writing that sits between it and the label.
+    $fields = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['consent' => ['Yes']], [
+        'gap_words' => ['sex' => ['Male' => 'Xavier'], 'symptoms' => ['Fatigue' => 'vague'], 'consent' => ['Yes' => 'Ye']],
+        'mark_rise' => ['consent' => 0.5],
+    ]);
+
+    expect($fields['sex']['state'])->toBe('blank')
+        ->and($fields['symptoms']['state'])->toBe('blank')
+        ->and($fields['consent']['state'])->toBe('blank');
+});
+
+it('keeps a tick drawn high in its box, which the line builder put on a line of its own (R-b2d00ba2, sheet 09)', function (): void {
+    // Round 1's sheet 09 came back with `✓ Fever ☑` on one line and `Cough Headache Rash None` on the next: the ☑ before
+    // "Rash" sat 0.08 px past the line builder's tolerance, so no label followed it on its line, and "fever; rash" was read as
+    // "fever". A mark no option took is credited to the label that begins just to its right, on whichever line it landed —
+    // and shown to a reviewer, because geometry placed it, however sure the recognizer was of the glyph.
+    $fields = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, [
+        'sex' => ['Male'],
+        'symptoms' => ['Fever', 'Fatigue'],
+        'consent' => ['No'],
+    ], ['marks' => ['sex' => '☑', 'symptoms' => '☑', 'consent' => 'X'], 'mark_rise' => ['sex' => 0.5, 'symptoms' => 0.5, 'consent' => 0.5]]);
+
+    expect($fields['sex'])->toMatchArray(['state' => 'read', 'value' => 'm'])
+        ->and($fields['symptoms'])->toMatchArray(['state' => 'read', 'value' => ['fever', 'fatigue']])
+        ->and($fields['consent'])->toMatchArray(['state' => 'read', 'value' => false]);
+
+    foreach (['sex', 'symptoms', 'consent'] as $key) {
+        expect($fields[$key]['confidence'])->toBeLessThan(config('ocr.confidence.auto'), $key);
+    }
+});
+
 it('reads the layout off the running head, and tells old paper from a head that was not read (M143, R-d6546409)', function (): void {
     $pages = fn (array $options): array => [PrintedPageTypesetter::fromModel($this->model, [], $options)->page()];
     $stamp = strtolower((string) $this->model['schema_stamp']);

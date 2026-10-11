@@ -78,6 +78,16 @@ final class OcrText
     }
 
     /**
+     * Whether a character is a mark that cannot be a letter of writing — ☑, ✓, × and the rest, never x, v, χ or 区
+     * (`M158`). A recognizer runs a tick into the next word ("☑Fe" for a tick before "Female"), and only a symbol says
+     * so: a word that merely begins with an x or a v is writing.
+     */
+    public static function isSymbolMark(string $char): bool
+    {
+        return self::isMark($char) && self::normal($char) === '';
+    }
+
+    /**
      * Whether a recognised character is a box border rather than ink. A comb cell's walls are thin vertical
      * rules, and a recognizer reads a rule as `|`. Only that one is dropped: an `I` or a `1` written INSIDE
      * a cell is an answer, and the geometry cannot tell them apart from here.

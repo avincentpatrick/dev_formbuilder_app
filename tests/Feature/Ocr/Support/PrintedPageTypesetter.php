@@ -68,7 +68,8 @@ final class PrintedPageTypesetter
      * @param  array{omit_keys?: list<string>, omit_labels?: list<string>, omit_captions?: bool, omit_numbers?: bool,
      *               stamp?: string|null, layout?: int|string|null, run_together?: list<string>,
      *               confidence?: array<string, float>, gap_reads?: array<string, list<string|null>>,
-     *               key_rise?: float, marks?: array<string, string>}  $options
+     *               key_rise?: float, marks?: array<string, string>, mark_rise?: array<string, float>,
+     *               gap_words?: array<string, array<string, string>>}  $options
      *                                                   `layout` null prints no layout word (a layout-1 sheet);
      *                                                   a string prints it garbled. `run_together` names the keys
      *                                                   whose first marked option's X is read as one word with the
@@ -79,6 +80,12 @@ final class PrintedPageTypesetter
      *                                                   stamp that many lines above its label, as the bake-off's
      *                                                   photos read it (M149); `marks` says, per choice key, what
      *                                                   the recognizer read a tick as instead of `X`.
+     *                                                   `mark_rise` lifts a choice key's marks that many lines
+     *                                                   above their labels — a tick drawn high in its box, which
+     *                                                   the line builder can put on a line of its own (sheet 09,
+     *                                                   `M158`); `gap_words` puts a word the recognizer read
+     *                                                   between an option's box and its label, keyed by label
+     *                                                   ("☑Fe" before "Female" on sheet 06, `M158`).
      */
     public static function fromModel(array $model, array $answers, array $options = []): self
     {
@@ -92,6 +99,8 @@ final class PrintedPageTypesetter
         $gapReads = $options['gap_reads'] ?? [];
         $keyRise = $options['key_rise'] ?? 0.0;
         $marks = $options['marks'] ?? [];
+        $markRise = $options['mark_rise'] ?? [];
+        $gapWords = $options['gap_words'] ?? [];
         $stamp = array_key_exists('stamp', $options) ? $options['stamp'] : ($model['schema_stamp'] ?? null);
         $layout = array_key_exists('layout', $options) ? $options['layout'] : ($model['layout'] ?? null);
 
@@ -172,7 +181,7 @@ final class PrintedPageTypesetter
                 $answer = $answers[$key] ?? null;
                 match ($row['area']) {
                     'comb' => $page->comb($row['comb'], $answer, $omitCaptions, $conf, $gapReads[$key] ?? null),
-                    'choices' => $page->choices($row['options'], is_array($answer) ? $answer : [], $conf, in_array($key, $runTogether, true), $marks[$key] ?? 'X'),
+                    'choices' => $page->choices($row['options'], is_array($answer) ? $answer : [], $conf, in_array($key, $runTogether, true), $marks[$key] ?? 'X', $markRise[$key] ?? 0.0, $gapWords[$key] ?? []),
                     'line' => $page->line(is_string($answer) ? $answer : null, $conf),
                     'ruled' => $page->ruled(is_string($answer) ? $answer : null, (int) ($row['lines'] ?? 3), $conf),
                     default => $page->advance(),
@@ -395,8 +404,10 @@ final class PrintedPageTypesetter
      * @param  list<string>  $marked  labels whose box holds an X
      * @param  bool  $runTogether  read the first marked option's X and the label's first word as ONE word
      * @param  string  $mark  what the recognizer read the tick as — `X` unless a case says otherwise
+     * @param  float  $rise  how many lines above its label a mark sits
+     * @param  array<string, string>  $gapWords  label => a word read between that option's box and its label
      */
-    private function choices(array $options, array $marked, float $confidence, bool $runTogether, string $mark = 'X'): void
+    private function choices(array $options, array $marked, float $confidence, bool $runTogether, string $mark = 'X', float $rise = 0.0, array $gapWords = []): void
     {
         $x = self::LEFT + 0.004;
         $joined = false;
@@ -422,7 +433,10 @@ final class PrintedPageTypesetter
                 $joined = true;
             } else {
                 if ($isMarked) {
-                    $this->word($mark, $x + 0.004, $this->y, $confidence);
+                    $this->word($mark, $x + 0.004, $this->y - $rise * self::LINE, $confidence);
+                }
+                if (isset($gapWords[$option['label']])) {
+                    $this->word($gapWords[$option['label']], $x + 0.014, $this->y, $confidence);
                 }
                 $this->text($option['label'], $labelX);
             }

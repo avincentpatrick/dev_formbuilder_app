@@ -20,8 +20,8 @@ export interface NavGroup {
     /**
      * `null` renders the run with NO label element and NO `aria-labelledby` — never an empty heading, and
      * never a dangling idref. The lead run and the Settings tail are both null deliberately: the floor is
-     * two items off-tenant (Dashboard and Settings, the only two that are ungated), and a category name
-     * over a single item is noise rather than structure.
+     * three items off-tenant (Dashboard, Settings and Help, the only three that are ungated), and a category
+     * name over the one or two items of a run is noise rather than structure.
      */
     label: string | null;
     items: NavItem[];
@@ -134,6 +134,10 @@ export const navGroups: NavGroup[] = [
         label: null,
         items: [
             { key: 'settings', label: 'Settings', icon: 'settings', href: '/settings' },
+            // The user manual (M162, `D114`) — ungated like Settings: its first chapter says who may create a form,
+            // so a Reviewer or a Viewer is told why Forms is not in their menu rather than refused the page that
+            // says so. Its own `help` glyph, not `info`, which is the callout's note mark (DSR Appendix B).
+            { key: 'help', label: 'Help', icon: 'help', href: '/help' },
         ],
     },
 ];

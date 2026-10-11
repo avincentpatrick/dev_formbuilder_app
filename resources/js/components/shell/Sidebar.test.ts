@@ -288,7 +288,7 @@ describe('Sidebar — grouping', () => {
             'forms', 'submissions', 'dashboard', 'achievements', 'analytics',
             'members', 'scopes', 'audit', 'feedback',
             'webhooks', 'integrations', 'domains',
-            'settings',
+            'settings', 'help',
         ]);
         expect(navGroups.flatMap((g) => g.items.map((i) => i.key))).toEqual(navItems.map((i) => i.key));
     });
@@ -382,16 +382,17 @@ describe('Sidebar — grouping', () => {
         wrapper.unmount();
     });
 
-    it('renders no headings at all at the two-item floor', () => {
-        // ⭐ Off-tenant chrome resolves every ability false and every feature absent, leaving only the two
-        // ungated destinations. Two runs, two items, zero labels — a heading over one item is noise, and a
-        // heading over none is a defect.
+    it('renders no headings at all at the three-item floor', () => {
+        // ⭐ Off-tenant chrome resolves every ability false and every feature absent, leaving only the three
+        // ungated destinations (Help joined Dashboard and Settings in M162). Two runs, three items, zero labels —
+        // a heading over one or two items is noise, and a heading over none is a defect.
         const wrapper = render({}, {});
 
         expect(groupLabels(wrapper)).toEqual([]);
         expect(wrapper.findAll('.sidebar__group')).toHaveLength(2);
         expect(labels(wrapper).join(' ')).toContain('Dashboard');
         expect(labels(wrapper).join(' ')).toContain('Settings');
+        expect(labels(wrapper).join(' ')).toContain('Help');
         wrapper.unmount();
     });
 });

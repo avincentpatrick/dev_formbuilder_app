@@ -38,6 +38,7 @@ use App\Http\Controllers\Tenant\FormTemplateController;
 use App\Http\Controllers\Tenant\FormThemeController;
 use App\Http\Controllers\Tenant\FormXlsformController;
 use App\Http\Controllers\Tenant\GoogleCompleteController;
+use App\Http\Controllers\Tenant\HelpController;
 use App\Http\Controllers\Tenant\ImpersonationSessionController;
 use App\Http\Controllers\Tenant\InvitationController;
 use App\Http\Controllers\Tenant\MemberController;
@@ -266,6 +267,9 @@ Route::middleware([
         ->middleware('module:gamification')->name('achievements');
     Route::get('/achievements/streak', [AchievementsController::class, 'streak'])
         ->middleware('module:gamification')->name('achievements.streak');
+
+    // The user manual (M162, `D114`) — every signed-in member, no gate and no props; see HelpController.
+    Route::get('/help', HelpController::class)->name('help');
 
     // Settings — the current appearance reaches the page via the shared `ui.theme` prop (no controller
     // needed for the read). The appearance write persists the four personalization axes to

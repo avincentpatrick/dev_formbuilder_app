@@ -297,8 +297,8 @@ describe('the parsers themselves', function (): void {
         // file; this catches a RENAMED symbol.
         $items = shellNavItems();
 
-        expect($items)->toHaveCount(13);
-        expect(array_unique(array_column($items, 'key')))->toHaveCount(13);
+        expect($items)->toHaveCount(14);
+        expect(array_unique(array_column($items, 'key')))->toHaveCount(14);
     });
 
     it('parses gate and feature as genuinely optional rather than uniformly absent', function (): void {

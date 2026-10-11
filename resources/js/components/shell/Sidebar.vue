@@ -48,9 +48,9 @@ function isVisible(item: NavItem): boolean {
 
 /**
  * ⚠️ A GROUP WHOSE ITEMS ARE ALL GATED AWAY RENDERS NOTHING — no label, no empty list, no separator. This
- * is not defensive: the filter above is aggressive enough that the floor is TWO items (Dashboard and
- * Settings are the only ungated ones, so off-tenant chrome shows just those), a viewer on any plan below
- * Business sees three, and an Owner on Free loses the whole Connections run because all three of its items
+ * is not defensive: the filter above is aggressive enough that the floor is THREE items (Dashboard,
+ * Settings and Help are the only ungated ones, so off-tenant chrome shows just those), a viewer on any plan
+ * below Business sees four, and an Owner on Free loses the whole Connections run because all three of its items
  * are plan-gated. An unconditional heading would print a category over nothing in every one of those cases.
  */
 const visibleGroups = computed(() =>

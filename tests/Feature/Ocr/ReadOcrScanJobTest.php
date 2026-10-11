@@ -181,9 +181,17 @@ it('reads a tick Vision never returned from the ink in its box, marked so the re
 
         return $image;
     });
-    $limit = ini_get('memory_limit');
+    // The worker's limit is below the step's, so the step raises it for itself — and must give it back. (The test runner's own
+    // limit is above 512M, where nothing would be raised, so the case sets a worker-like one first.)
+    $original = (string) ini_get('memory_limit');
+    expect(ini_set('memory_limit', '256M'))->not->toBeFalse();
 
-    ocrJobRun($scan);
+    try {
+        ocrJobRun($scan);
+        $limit = ini_get('memory_limit');
+    } finally {
+        ini_set('memory_limit', $original);
+    }
     $scan->refresh();
 
     expect($scan->extraction['fields']['consent'])->toMatchArray([
@@ -192,8 +200,7 @@ it('reads a tick Vision never returned from the ink in its box, marked so the re
         ->and($scan->extraction['fields']['patient_name'])->not->toHaveKey('read_by')
         ->and($scan->extraction['counts'])->toMatchArray(['read' => 3, 'blank' => 0])
         ->and($opened)->toBe(1)
-        // The step raised the memory limit for itself and gave it back.
-        ->and(ini_get('memory_limit'))->toBe($limit);
+        ->and($limit)->toBe('256M');
 });
 
 it('decodes no page at all when Vision left no tick question blank (M160)', function (): void {

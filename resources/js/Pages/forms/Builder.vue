@@ -108,11 +108,8 @@ function onPaneChange(value: string): void {
 // duplicating a field, adding a section, inserting from the library, and undo/redo from the toolbar.
 // (WCAG 3.3.1 Error Identification, 4.1.3 Status Messages.)
 //
-// ⚠️ WHY THIS WATCHER IS ACCEPTABLE WHERE A `watch(selection, …)` IS NOT. That one would fire on load — `onMounted` below
-// auto-selects the first field — and, worse (`M161`, `R-313c232d`), on every tap in the Preview and every label opened for
-// editing in place, both in the centre pane, so a phone user would be thrown out of the pane they were using. A tap on a
-// Structure row is the one selection that asks for its settings: `BuilderCanvas` emits `picked`, and the template below
-// answers it with the settings pane.
+// ⚠️ WHY THIS WATCHER IS ACCEPTABLE WHERE A `watch(selection, …)` IS NOT: that one fires on load (`onMounted` selects the first field) and, at a
+// phone's width, on every Preview tap and inline label edit (`M161`), so only a Structure row tap moves the pane (`BuilderCanvas`'s `picked`).
 // `saveError` starts null and only becomes truthy on a real failure, so nothing fires on mount. And above
 // the threshold all three panes are on screen and `pane` is inert, so this is a no-op on desktop rather
 // than a layout surprise.
@@ -581,8 +578,7 @@ function submitImport(): void {
                         v-show="centreView === 'structure'"
                         :store="store"
                         :field-type-labels="fieldTypeLabels"
-                        @add-question="openPaletteFor"
-                        @picked="pane = 'settings'"
+                        @add-question="openPaletteFor" @picked="pane = 'settings'"
                     />
                     <PreviewPane
                         v-show="centreView === 'preview'"

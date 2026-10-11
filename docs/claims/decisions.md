@@ -24,10 +24,20 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D112`, the last one filed, was asked and answered on 2026-10-11 in the session that filed it and recorded in `M158`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D113`, the last one filed, was asked and answered on 2026-10-11 in the session that filed it and recorded in `M160`'s claim extension. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D113 — `M159` measured the ink reader on Round 1 — all 21 tick questions Vision left blank read right, with the settings tuned on those same fifteen forms — and `D112` put the server change to the user before it is built. Should testers' scans be read with ink during the testing session, which adds `gd` to the testing server's PHP? **A — yes: `M160` puts the ink on the reading path, merged after `M158` and `M159`, and the user enables `gd` on the server, guided in chat.**
+
+**Asked and answered 2026-10-11 (user decision, in chat), recorded by Lane A in `M160`'s claim extension.** Asked with the measurement and its caveat stated: tuned and scored on the same forms. The testing server runs PHP for Windows directly (`C:\php`), so the change is one line in its `php.ini` (`extension=gd`, a file the PHP build already ships) and a restart of its php-cgi services and its worker; `docs/deployment-infrastructure.md` §8 step 1 said "not `gd`", which `M160` amends.
+
+- **A — yes, turn it on (recommended, chosen).** Every ink answer is filled in and marked to check against the paper, so a wrong one is visible, never silent; testers stop typing about half of all ticks.
+- **B — test on fresh sheets first.** The user photographs three to five new filled sheets, the harness scores them, then this is asked again.
+- **C — not during testing.** The ink stays in the harness until the session ends.
+
+**What the answer files, in the same push:** nothing new — `ocr-ink-live` (`during-testing`) is taken as `M160`; its marker closes on `M160`'s branch.
+
 ### D112 — Vision returns no mark at all for most ticks standing alone in a box (20 of the 22 answered tick questions Round 1 reads blank, measured by `M158`), and `D104` A queued Claude through the Anthropic API to read them, which is billed apart from a Claude subscription. How are the ticks Vision never returns read? **B — measure the ink inside each printed box: free, no second provider, scored in the bake-off before it goes live.**
 
 **Asked and answered 2026-10-11 (user decision, in chat), recorded by Lane A in `M158`'s claim.** The user asked why the ticks on sample sheet 08 are not read *"even though it has value in the paper"*, then whether the Claude arm is covered by their subscription (it is not), then chose: *"as much as possible, we will choose the free one. the measure ink in the box. is that reliable?"*. Measured the same session from Round 1's cached reads and photos, read-only: a crude window before each option's label, darkest box wins, picks the right box on 25 of 30 single-answer and yes/no questions and on 16 of the 17 that Vision left blank (sheet 08's Male and Yes among them); every miss had its window on bare paper, which a box-finder can detect and leave blank. A multi-select is harder (57 of 76 boxes in the crude form). The agency's consent to send the fifteen made-up samples to Anthropic was given in the same session and is unused. `D104` is amended, not reversed: the vision-language arm is set aside, kept as the fallback.

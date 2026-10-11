@@ -72,7 +72,8 @@ find a label it did not before.
 
 ### Forward queue — claims taken now, each extended with its three fields in a pushed commit before its first file is opened
 - **`M159` — `ocr-ink-ticks`** — ✅ **EXTENDED (its three fields below), pushed before its first file was opened.**
-- **`M160` / `M161`** as below.
+- **`M160` — `ocr-ink-live`** — ✅ **EXTENDED (its three fields below), pushed before its first file was opened.**
+- **`M161`** as below.
 - **`M160` — `ocr-ink-live`**, only if `M159` meets `D112`'s bar and the user OKs `gd` in the app image; files named at its extension.
 - **`M161` — `R-313c232d` + `R-a53755f5` + `R-d285b9a3`** (branch `m161-builder-compact-select`): `resources/js/Pages/forms/Builder.vue`
   (the hub), `resources/js/Pages/forms/builder-layout.test.ts`, `docs/claims/TEMPLATE.md`. The user chose `R-313c232d` over
@@ -122,6 +123,44 @@ Namespaces spent: nothing from either namespace.
 Prediction: the PHP port reproduces the prototype's numbers on Round 1 to within one box (PIL pads a crop past the image edge with black;
 the port clamps instead). The ink reader's unit cases red first against an empty class. **Most likely wrong:** the bake-off total — the
 ink answers are scored by the unchanged scorer, and a fill at review confidence may land in a verdict I have not predicted.
+
+### Claim extension — `M160`, `ocr-ink-live`: the ink on the reading path (`m160-ocr-ink-live`)
+
+Taken 2026-10-11, after `M159`'s PR (#352) was opened and `D113` was answered (A: on during testing; `gd` on the server, guided).
+⚠️ **Branch cut from `origin/m159-ocr-ink-ticks`** — the same recorded deviation as `M159`, for the same reason: it moves `M159`'s
+harness fill into one place both paths share. Merges after #351 and #352, rebased onto the trunk each time.
+
+#### Evidence verified
+- `OcrScanReader::match()` parses every page and calls the matcher once; the page images are the scan's attachments, read off their
+  disk by path (held). The extraction is written from `$matched['fields']` alone (held), so the matcher's `labels` stay out of it.
+- `OcrAnswerCarry::meta()` builds the review screen's per-answer note input from named keys (held); `scan-review.ts` `readNote()`
+  turns a `review` tier into "Check this answer: it was read at N% confidence" (held) — false for an ink answer, whose 80 is a floor.
+- GD on host PHP decodes a 4624×3468 Round 1 photo at a 72 MB peak, back to 4 MB once released (measured).
+- The testing server's `php.ini` keeps `memory_limit` at 128M (§8 step 1) and enables no `gd` (held, by the document).
+
+#### Premise verified
+- The testing server runs PHP for Windows, not the Docker image: there `gd` is a `php.ini` line, done by the user in chat; the
+  Docker image and CI's `setup-php` lists need it for the gd adapter's test, and are this increment's to change.
+- `.github/workflows/ci.yml`, `docs/deployment-infrastructure.md` and `docs/data-dictionary.md` are hubs — all three edited by this ONE
+  row, which D13 allows (at most one row may touch hubs).
+- Without `gd` the reading path is unchanged: the opener answers null, the ink is skipped, and the scan reads as it does today.
+
+#### Remedy verdict
+- The marker's remedy holds as measured in `M159` (21 of 21 on Round 1). Its two live-path risks, measured: memory (a 72 MB decode under
+  a 128M limit — the ink step raises the limit only for its own run and refuses a page over 40 million pixels) and the review note
+  (a separate "read from the ink" note, never the confidence sentence).
+
+Files: `app/Services/Ocr/OcrInkReader.php`, `app/Services/Ocr/GdInkImage.php`, `app/Services/Ocr/OcrScanReader.php`,
+`app/Services/Ocr/OcrAnswerCarry.php`, `app/Console/Commands/OcrBakeoffCommand.php`, `resources/js/components/ocr/scan-review.ts`,
+`resources/js/components/ocr/scan-review.test.ts`, `docker/Dockerfile`, `.github/workflows/ci.yml`,
+`docs/deployment-infrastructure.md`, `docs/data-dictionary.md`, `docs/ocr-pipeline-design.md`, `tests/Unit/Ocr/OcrInkReaderTest.php`,
+`tests/Feature/Ocr/ReadOcrScanJobTest.php`, `tests/Feature/Ocr/OcrAnswerCarryTest.php`, `tests/Feature/Ocr/GdInkImageTest.php` (new),
+`tests/Feature/Ocr/Bakeoff/OcrBakeoffCommandTest.php`.
+Shared artefacts taken: the three hub documents above, `docs/ocr-pipeline-design.md`, and the close-out set. Paired files taken: none.
+Namespaces spent: nothing from either namespace (decision `D113` recorded).
+Prediction: the live-path case red first (a blank tick stays blank on the trunk of this branch); the review-note Vitest case red first;
+the gd adapter test cannot run in the app container until the image is rebuilt — **most likely wrong: the CI image** — `setup-php` may
+already ship `gd` by default, in which case the `ci.yml` edit is redundant but harmless.
 
 ## RELEASED — `M157`, a tick question whose mark the scan never saw no longer reads "Left blank on the paper" (`R-d2467239`), a one-off exception to the freeze (`D111`) (merged as PR #350, `3eda9b76`, 6/6 green on its one completed run with real step counts (the first was cancelled by the row-closure push) — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

@@ -29,6 +29,11 @@ export interface ScanFieldMeta {
      * before `M157`, which never recorded it.
      */
     ticks: boolean;
+    /**
+     * Whether the answer was read from the ink in its printed box rather than from text (M160, `D113`): Cloud Vision returns no
+     * mark for most ticks standing alone in a box. False for a scan read before `M160`.
+     */
+    inked: boolean;
 }
 
 export interface ScanPage {
@@ -113,6 +118,15 @@ function readNote(meta: ScanFieldMeta, saw: string | null, where: string): ScanN
         return {
             tone: 'warning',
             text: `The scan read ${saw ?? 'an answer'} here${where}, but it could not be filled in. See the list above the form.`,
+        };
+    }
+
+    // `D113`: an answer read from the ink in its box has no recognizer confidence — its 80 is a floor — so the note says how
+    // it was read, and never quotes a confidence it does not have.
+    if (meta.inked) {
+        return {
+            tone: 'warning',
+            text: `No tick was read as text here${where}, so this was read from the ink in the box. Check it against the paper.`,
         };
     }
 

@@ -132,7 +132,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ env.PHP_VERSION }}
-          extensions: pdo_pgsql, redis, intl, zip, bcmath, pcntl
+          extensions: pdo_pgsql, redis, intl, zip, bcmath, pcntl, gd
           coverage: none
 
       - name: Install PHP dependencies
@@ -511,7 +511,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ env.PHP_VERSION }}
-          extensions: pdo_pgsql, redis, intl, zip, bcmath, pcntl
+          extensions: pdo_pgsql, redis, intl, zip, bcmath, pcntl, gd
           coverage: none
 
       - name: Install PHP dependencies
@@ -634,7 +634,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ env.PHP_VERSION }}
-          extensions: pdo_pgsql, redis, intl, zip, bcmath, pcntl
+          extensions: pdo_pgsql, redis, intl, zip, bcmath, pcntl, gd
           coverage: none
 
       - name: Install PHP dependencies
@@ -739,7 +739,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ env.PHP_VERSION }}
-          extensions: pdo_pgsql, redis, intl, zip, bcmath, pcntl
+          extensions: pdo_pgsql, redis, intl, zip, bcmath, pcntl, gd
           coverage: none
 
       - name: Install PHP dependencies

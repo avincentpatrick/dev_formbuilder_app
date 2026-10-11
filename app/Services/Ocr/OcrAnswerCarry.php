@@ -54,7 +54,7 @@ final class OcrAnswerCarry
      * @param  array<string, mixed>  $current  the schema snapshot of the current published version
      * @return array{
      *     answers: array<string, mixed>,
-     *     fields: array<string, array{state: string, tier: string|null, confidence: int|null, text: string|null, page: int|null, carried: bool, reason: string|null, ticks: bool}>,
+     *     fields: array<string, array{state: string, tier: string|null, confidence: int|null, text: string|null, page: int|null, carried: bool, reason: string|null, ticks: bool, inked: bool}>,
      *     dropped: list<array{key: string, label: string, text: string|null, reason: string, message: string}>
      * }
      */
@@ -268,7 +268,7 @@ final class OcrAnswerCarry
 
     /**
      * @param  array<string, mixed>  $entry
-     * @return array{state: string, tier: string|null, confidence: int|null, text: string|null, page: int|null, carried: bool, reason: string|null, ticks: bool}
+     * @return array{state: string, tier: string|null, confidence: int|null, text: string|null, page: int|null, carried: bool, reason: string|null, ticks: bool, inked: bool}
      */
     private function meta(array $entry, bool $carried, ?string $reason): array
     {
@@ -283,6 +283,9 @@ final class OcrAnswerCarry
             // Whether the paper printed boxes to tick (`R-d2467239`, M157), so a blank one can be told from a blank write-in. An
             // extraction stored before `M157` has no such key and reads as false: its note stays "left blank on the paper".
             'ticks' => ($entry['ticks'] ?? null) === true,
+            // Whether the answer was read from the ink in its printed box, not from text (M160, `D113`): its 80 is a floor, not a
+            // measured confidence, so the review screen names how it was read instead.
+            'inked' => ($entry['read_by'] ?? null) === 'ink',
         ];
     }
 

@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Console\Commands\OcrBakeoffCommand;
 use App\Enums\FieldType;
 use App\Models\FormField;
 use App\Models\Tenant;
@@ -13,6 +12,7 @@ use App\Services\Forms\PublishService;
 use App\Services\Ocr\Bakeoff\OcrBakeoffFolder;
 use App\Services\Ocr\OcrAnswerReader;
 use App\Services\Ocr\OcrInkImage;
+use App\Services\Ocr\OcrInkReader;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -293,8 +293,10 @@ it('reads a tick question the provider left blank from the ink in its box, and t
     ocrBakeoffScan("{$samples}/sheet2.png", $this->model, ['age' => '34', 'symptoms' => ['Fever']]);
     $cache = "{$samples}/sheet1.png".OcrBakeoffFolder::CACHE_SUFFIX;
     $image = ocrBakeoffInkImage([ocrBakeoffStrokeBefore($cache, 'Male'), ocrBakeoffStrokeBefore($cache, 'Yes'), ocrBakeoffStrokeBefore($cache, 'Cough')]);
-    // The second sheet's image cannot be opened — GD missing, say — so its ticks are measured nowhere, and it says so.
-    app()->instance(OcrBakeoffCommand::INK_IMAGES, static fn (string $path): ?OcrInkImage => str_contains($path, 'sheet1') ? $image : null);
+    // The second sheet's image cannot be opened — GD missing, say — so its ticks are measured nowhere, and it says so. Its
+    // file is told apart by its bytes, which is all the opener is given.
+    file_put_contents("{$samples}/sheet2.png", (string) file_get_contents("{$samples}/sheet2.png")."\0sheet2");
+    app()->instance(OcrInkReader::IMAGES, static fn (string $bytes): ?OcrInkImage => str_ends_with($bytes, "\0sheet2") ? null : $image);
     $answers = ocrBakeoffSheet("{$this->dir}/answers.csv", [
         ['sheet1', 'photo', '', '34', '', 'yes', 'Male', 'Fever', '', ''],
         ['sheet2', 'photo', '', '34', '', 'yes', 'Male', 'Fever', '', ''],

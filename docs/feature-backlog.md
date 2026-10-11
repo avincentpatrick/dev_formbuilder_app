@@ -13871,3 +13871,16 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and can ride into an unrelated commit. The remedy is one `npm install` at the root, committing only that line, with the
   Frontend and axe jobs as the check. `M156` reverted the line rather than widen its increment. **Live.** Filed by `M156`.
   **Tier: during-testing.**
+
+- **`minor` · A tick question whose mark the scan never saw is shown on the review screen as "Left blank on the paper".**
+  The user's report on the staging scan of sample sheet 08 (2026-10-11): *"i uploaded the no 8 oct. and the sex and vaccinated
+  is not read even though it has a response on the paper"*. Measured from the same photos' cached Vision answer (the bake-off's
+  hinted folder, the production `en-t-i0-handwrit` hint): Vision returned the printed words "Male" and "Yes" with no mark symbol
+  at all, while "XCough" and "☑Rash" on the same sheet carried theirs, so `OcrAnswerReader::choices()`
+  (`app/Services/Ocr/OcrAnswerReader.php`) found the labels, found no mark, and returned `blank`. It is not one sheet: Round 1's
+  scored run reads 21 of 45 tick questions (Sex, Symptoms and Vaccinated on 15 sheets) as "read as blank, but it was answered".
+  `scanNote()` (`resources/js/components/ocr/scan-review.ts`) states every `blank` in a neutral tone as "Left blank on the
+  paper." — true of a write-in box, false about half the time for a box to tick, and a reviewer who trusts it saves an empty
+  answer. Reading the missed ticks is `ocr-vlm-arm`'s work (`D104` A); this row is the note alone. **`D111` = A (user, in
+  chat):** fixed before the Oct 12 session as a one-off exception to the `D109` freeze. **Live.** Filed by `M157`.
+  **Tier: early-testing.**

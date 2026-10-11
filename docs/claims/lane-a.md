@@ -16,7 +16,56 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — ⛔ FREEZE (`D109`): `M156` is merged and live on staging, and nothing else merges until the Oct 12 testing session starts. The next session opens with the user's check of the OCR fill-in (their comment, *"on the text box, it can read properly the remarks but did not put it in the text area"*), and takes the during-testing tier from `docs/pipeline.md`'s Next section only once the session has started
+## Status: ACTIVE CLAIM — `M157`, a tick question whose mark the scan never saw no longer reads "Left blank on the paper" (`R-d2467239`), a one-off exception to the freeze (`D111`) (m157-ocr-unseen-tick-note)
+
+Taken 2026-10-11. Branch `m157-ocr-unseen-tick-note`, cut from origin/main at `ea3042f0`, PR into main.
+Row: `R-d2467239` — *A tick question whose mark the scan never saw is shown on the review screen as "Left blank on the paper"*
+(`docs/feature-backlog.md`, the last row; filed by this claim, `early-testing`). At this session's start the user confirmed `M156` on
+staging, then reported sample sheet 08's Sex and Vaccinated unread; `D111` (A: fix it today, a one-off exception to `D109`) was
+answered in chat and is recorded here. After this merges and deploys, the freeze resumes until the Oct 12 session starts.
+
+### Evidence verified
+- Sheet 08's cached Vision answer (the bake-off's hinted folder, page 1): **held** — the words "Male" and "Yes" arrive with no mark
+  symbol in the word list or the symbol list, while "XCough" (`X` at 0.41) and "☑Rash" (`☑` at 0.65) carry theirs.
+- Round 1's scored `fields.csv` (with the hint): **held** — sheet 08's `field_8` and `field_10` read "read as blank, but it was
+  answered"; 21 of 45 tick questions across the 15 sheets read so.
+- `app/Services/Ocr/OcrAnswerReader.php` `choices()`: **held** — labels found and none marked returns `blank()`; labels not found
+  falls to `blankOrUnreadable()` over the region's writing.
+- `resources/js/components/ocr/scan-review.ts` `scanNote()`: **held** — `case 'blank'` returns the neutral "Left blank on the
+  paper" for every type.
+
+### Premise verified
+- **"The note cannot tell a tick question from a write-in" — true.** `ScanFieldMeta` carries state, tier, confidence, text, page,
+  carried and reason; no type, no printed area. The module's docblock says the server sends the FACTS and the module holds no rule
+  of its own, so a client list of tick types would be a second copy of `PrintAnswerArea::for()` — refused.
+- **Which questions print boxes to tick is decided once, by the print presenter's row:** `area` is `choices`
+  (`PrintAnswerArea::for()`: single, multi, dropdown, yes/no, Likert) AND its `options` are not empty — a single choice that takes
+  its choices from another form (`M133`) prints a write-in box with no options, and the reader reads it as writing. The matcher
+  holds that row when it writes each entry (`result()`), so the fact is recorded there, from the one source, not re-derived.
+- **A scan read before this change has no such key** (the `extraction` column is stored); it keeps the old note, as `M156` did
+  for its null.
+- **Readers of the entry shape:** `OcrAnswerCarry` (the review meta), the bake-off scorer and report (read named keys only), the
+  `ocr_scans.extraction` row of `docs/data-dictionary.md`; `openapi.json` does not describe it. Lane B is retired; no other
+  worktree holds this branch.
+
+### Remedy verdict
+**Works, server fact plus client note.** `PrintedFormMatcher::result()` records `ticks` (the paper printed boxes to tick);
+`OcrAnswerCarry::meta()` passes it to the review screen; `scanNote()` says, in the warning tone, that no tick was seen and the scan
+can miss one, so check the paper — for a `blank` tick question only. A write-in question and a legacy scan keep "Left blank on the
+paper". Measured by reading; the red tests below measure it before each change.
+
+Files: `app/Services/Ocr/PrintedFormMatcher.php`, `app/Services/Ocr/OcrAnswerCarry.php`, `resources/js/components/ocr/scan-review.ts`,
+`resources/js/components/ocr/scan-review.test.ts`, `resources/js/Pages/submissions/encode-scan.test.ts`,
+`tests/Feature/Ocr/PrintedFormMatcherTest.php`, `tests/Feature/Ocr/OcrAnswerCarryTest.php`.
+Shared artefacts taken: `docs/data-dictionary.md` (the `ocr_scans.extraction` row), `docs/feature-backlog.md`,
+`docs/claims/decisions.md`, `docs/pipeline.md`, `docs/backlog-triage.md`, `PROGRESS.md` (own block), `docs/gate-baselines.md`,
+the hand-off.
+Paired files taken: none.
+Namespaces spent: `D111`; nothing from the ADR or migration namespaces.
+Prediction: Pest — a new `PrintedFormMatcherTest` case red (no `ticks` key) and a new `OcrAnswerCarryTest` case red (meta lacks
+it); Vitest — the new `scan-review` tick case red, and an `encode-scan` case red on the page. PHPStan moves only if a shape
+annotation disagrees. E2E `ocr-review-axe.spec.ts` unchanged (its seeded scan predates the key, so it keeps the old note).
+**Most likely wrong:** `vue-tsc` — adding a required `ticks` to `ScanFieldMeta` breaks every inline fixture that omits it.
 
 ## RELEASED — `M156`, OCR fills every low-confidence answer into its field, marked "This may be wrong" (`R-51366b2e`, `D108`), then ⛔ THE FREEZE until the Oct 12 session (`D109`) (merged as PR #349, `1de60dd4`, 6/6 green on both of its runs with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

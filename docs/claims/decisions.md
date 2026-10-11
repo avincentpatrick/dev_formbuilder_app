@@ -24,10 +24,20 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D110`, the last one filed, was asked and answered on 2026-10-10 in the session that filed it and recorded in `M156`. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D111`, the last one filed, was asked and answered on 2026-10-11 in the session that filed it and recorded in `M157`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D111 — Sample sheet 08 scanned on staging showed Sex and Vaccinated empty though both were ticked: Vision never returned those two marks, and the review screen calls such a question "Left blank on the paper". `D109` holds every merge until the Oct 12 session. When does the note's fix go live? **A — today, before the session, as a one-off exception to `D109`.**
+
+**Asked and answered 2026-10-11 (user decision, in chat), recorded by Lane A in `M157`'s claim.** The user's report: *"i uploaded the no 8 oct. and the sex and vaccinated is not read even though it has a response on the paper"*. Measured from the same photos' cached Vision answer: no mark symbol was returned for either box, and Round 1 reads 21 of 45 tick questions as blank though answered. Reading those ticks is `ocr-vlm-arm`'s (`D104` A, not re-asked); the false note is `R-d2467239`.
+
+- **A — today, a one-off exception to the freeze (recommended, chosen).** One note on the review screen; testers otherwise meet a false "Left blank on the paper" on about half of their tick questions. The freeze resumes once it is deployed.
+- **B — build it today, merge once the session starts.** The freeze holds; testers see the false note until the fix lands mid-session.
+- **C — later in testing.** Filed with the during-testing tier.
+
+**What the answer files, in the same push:** `R-d2467239` (`early-testing`), which `M157` takes. `D109` is otherwise unchanged: nothing else merges until the Oct 12 session starts.
+
 ### D110 — The PRD says a low-confidence scan answer "must be individually confirmed", and the review screen has never asked for that: Save confirms the whole form. Now that such answers are filled in and marked "may be wrong" (`D108`), does each one need its own confirmation? **A — no: Save confirms the whole form, and the PRD line is amended to say so.**
 
 **Filed 2026-10-10 by Lane A in `M156`, found while amending the documents `D108` changes; asked and answered in the same session (user decision, in chat — A, the recommendation).** `docs/PRD.md`'s Feature #1 review-screen line asks for *"a visible low-confidence indicator (default threshold: below 70%) that must be individually confirmed"*. Since `M129` the review screen (`Pages/submissions/Encode.vue` in scan mode) shows every note and saves the whole form on one Save; nothing confirms a field on its own, and no row recorded the gap. Under `D108` a wrong value below 70 sits in its box, marked, until someone saves.

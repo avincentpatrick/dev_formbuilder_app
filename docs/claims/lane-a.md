@@ -196,6 +196,17 @@ Namespaces spent: nothing from either namespace.
 Prediction: the layout test's new assertion red first; `builder-axe`, `field-library-axe` and `responsive-axe` locally — **most likely
 wrong: one of them** asserts which pane shows after an add or a library insert, and now sees Settings.
 
+#### Remedy verdict, amended before the first edit (pushed as its own commit)
+- ❌ **The row's remedy is WRONG for this tree, measured by reading the callers before writing it.** `selection` is also set by the
+  Preview's row click (`PreviewPane.vue` `onSelect`, which the Preview's own Edit button bubbles to) and by `BuilderCanvas.vue`'s
+  `startEdit()` (the Edit label button and a double-click). Both live in the CENTRE pane, so a `watch(selection)` would, at a phone's
+  width, throw an author out of the Preview to Settings on every tap and hide the inline label editor the moment it opened.
+- **The fix is an explicit signal instead:** a tap on a question or section row in the Structure canvas emits `picked`, and only that
+  brings the settings pane on screen. The load-time select, the Preview, the inline edit, adds and undo leave the pane alone — so the
+  mounted-flag trap the row records does not arise at all.
+- Files added to the claim: `resources/js/components/builder/BuilderCanvas.vue` (a hub, the same row) and
+  `resources/js/components/builder/BuilderCanvas.test.ts`.
+
 ## RELEASED — `M157`, a tick question whose mark the scan never saw no longer reads "Left blank on the paper" (`R-d2467239`), a one-off exception to the freeze (`D111`) (merged as PR #350, `3eda9b76`, 6/6 green on its one completed run with real step counts (the first was cancelled by the row-closure push) — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
 Shipped 2026-10-11. Branch `m157-ocr-unseen-tick-note`, cut from `origin/main` at `ea3042f0`. The claim is `8231512e`, pushed before any

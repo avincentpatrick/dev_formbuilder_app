@@ -322,6 +322,18 @@ it('reports an empty question as blank, not as a failure', function (): void {
         ->and($fields['age']['state'])->toBe('read');
 });
 
+it('records which questions the paper asked to be ticked, so a box nobody saw ticked is not called blank paper (R-d2467239)', function (): void {
+    // Cloud Vision returned no mark at all for 21 of Round 1's 45 ticked questions — sheet 08's "Male" and "Yes" came back bare —
+    // so a tick question read blank is often a tick the recognizer missed. The review screen can say so only if the entry says
+    // the paper printed boxes to tick: the presenter's `choices` area with options, read off the row the matcher already holds.
+    $fields = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['age' => '34']);
+
+    expect(array_map(static fn (array $f): mixed => $f['ticks'], $fields))->toBe([
+        'patient_name' => false, 'age' => false, 'visit_date' => false, 'visit_time' => false,
+        'consent' => true, 'sex' => true, 'symptoms' => true, 'mobile' => false, 'notes' => false,
+    ])->and($fields['sex']['state'])->toBe('blank');
+});
+
 it('refuses two marked boxes on a one-answer question, and keeps both on a many-answer one', function (): void {
     $fields = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, [
         'sex' => ['Female', 'Male'],
@@ -525,5 +537,6 @@ it('reads what was written for a question that takes its choices from another fo
 
     $fields = ocrMatchFields($this->matcher, $form->refresh(), $version, $printed, ['patient_name' => 'ANA REYES', 'facility' => 'SAN JOSE RHU']);
 
-    expect($fields['facility'])->toMatchArray(['state' => 'read', 'value' => 'SAN JOSE RHU']);
+    // Its row is a `choices` area with no options, and the paper gave it a write-in box: nothing there was ticked (R-d2467239).
+    expect($fields['facility'])->toMatchArray(['state' => 'read', 'value' => 'SAN JOSE RHU', 'ticks' => false]);
 });

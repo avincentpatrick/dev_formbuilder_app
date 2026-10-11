@@ -7,7 +7,7 @@ import { scanNote, type ScanFieldMeta } from './scan-review';
  */
 
 function meta(overrides: Partial<ScanFieldMeta>): ScanFieldMeta {
-    return { state: 'read', tier: 'auto', confidence: 96, text: 'Maria', page: 1, carried: true, reason: null, ...overrides };
+    return { state: 'read', tier: 'auto', confidence: 96, text: 'Maria', page: 1, carried: true, reason: null, ticks: false, ...overrides };
 }
 
 describe('scanNote', () => {
@@ -58,6 +58,18 @@ describe('scanNote', () => {
             tone: 'info',
             text: 'This question was not on the printed paper.',
         });
+    });
+
+    it('says a tick question read blank may hold a tick the scan missed, and keeps a written one "left blank" (R-d2467239)', () => {
+        // Round 1: Cloud Vision returned no mark at all for 21 of 45 ticked questions, so "left blank" was false about half the time.
+        expect(scanNote(meta({ state: 'blank', tier: null, text: null, ticks: true }), false)).toEqual({
+            tone: 'warning',
+            text: 'No tick was seen here. The scan can miss a tick, so check the paper.',
+        });
+        expect(scanNote(meta({ state: 'blank', tier: null, text: null, ticks: true, page: 2 }), true)?.text).toBe(
+            'No tick was seen here (page 2). The scan can miss a tick, so check the paper.',
+        );
+        expect(scanNote(meta({ state: 'blank', tier: null, text: null, ticks: false }), false)).toEqual({ tone: 'neutral', text: 'Left blank on the paper.' });
     });
 
     it('points at the list above the form for an answer that could not be filled in', () => {

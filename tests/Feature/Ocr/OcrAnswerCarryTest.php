@@ -147,6 +147,18 @@ it('lists a question the current version dropped — a value or text the reader 
         ->and($result['dropped'][0]['label'])->toBe('Gone');
 });
 
+it('tells the review screen which questions the paper asked to be ticked, and a scan read before M157 as none (R-d2467239)', function (): void {
+    $paper = ocrCarrySnapshot([ocrCarryField('pick', 'single_select', OCR_CARRY_CHOICES), ocrCarryField('name', 'short_text'), ocrCarryField('old', 'yes_no')]);
+    $blank = static fn (string $type, ?bool $ticks): array => [
+        'type' => $type, 'state' => 'blank', 'value' => null, 'text' => null, 'confidence' => null, 'tier' => null, 'page' => 1, 'anchored_by' => 'key',
+        ...($ticks === null ? [] : ['ticks' => $ticks]),
+    ];
+
+    $result = ocrCarry(['pick' => $blank('single_select', true), 'name' => $blank('short_text', false), 'old' => $blank('yes_no', null)], $paper);
+
+    expect(array_map(static fn (array $f): bool => $f['ticks'], $result['fields']))->toBe(['pick' => true, 'name' => false, 'old' => false]);
+});
+
 it('marks a question the paper never printed, and takes nothing into a display-only one', function (): void {
     $result = ocrCarry(
         ['name' => ocrCarryRead('short_text', 'Ana')],

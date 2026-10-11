@@ -13872,7 +13872,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Frontend and axe jobs as the check. `M156` reverted the line rather than widen its increment. **Live.** Filed by `M156`.
   **Tier: during-testing.**
 
-- **`minor` · A tick question whose mark the scan never saw is shown on the review screen as "Left blank on the paper".**
+- ✅ **CLOSED BY `M157` (2026-10-11) — ****`minor` · A tick question whose mark the scan never saw is shown on the review screen as "Left blank on the paper".**
   The user's report on the staging scan of sample sheet 08 (2026-10-11): *"i uploaded the no 8 oct. and the sex and vaccinated
   is not read even though it has a response on the paper"*. Measured from the same photos' cached Vision answer (the bake-off's
   hinted folder, the production `en-t-i0-handwrit` hint): Vision returned the printed words "Male" and "Yes" with no mark symbol
@@ -13883,4 +13883,4 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   paper." — true of a write-in box, false about half the time for a box to tick, and a reviewer who trusts it saves an empty
   answer. Reading the missed ticks is `ocr-vlm-arm`'s work (`D104` A); this row is the note alone. **`D111` = A (user, in
   chat):** fixed before the Oct 12 session as a one-off exception to the `D109` freeze. **Live.** Filed by `M157`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** ✅ **CLOSED BY `M157` (2026-10-11):** `PrintedFormMatcher::result()` records `ticks` on each extraction entry — the paper printed boxes to tick for the question, a `choices` row with options, read off the print-model row the matcher already holds (a linked choice's write-in box has none) — and `OcrAnswerCarry::meta()` passes it to the review screen, where `scanNote()` says *"No tick was seen here. The scan can miss a tick, so check the paper."* in the warning tone for a blank tick question. A write-in question, and a scan read before this change (no `ticks`), keep "Left blank on the paper." The `ocr_scans.extraction` row of `docs/data-dictionary.md` names the key. Proof: 3 Pest cases and 2 Vitest cases red on the trunk; 3 Pest mutants (`scripts/mutate.php`) and 1 Vitest mutant, each caught; `ocr-review-axe.spec.ts` 30/30 locally.

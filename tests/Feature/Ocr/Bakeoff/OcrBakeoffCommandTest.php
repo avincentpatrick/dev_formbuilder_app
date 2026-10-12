@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Console\Commands\OcrBakeoffCommand;
 use App\Enums\FieldType;
 use App\Models\FormField;
 use App\Models\Tenant;
@@ -10,6 +11,8 @@ use App\Services\Forms\BlankFormPrintPresenter;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
 use App\Services\Ocr\Bakeoff\OcrBakeoffFolder;
+use App\Services\Ocr\OcrAnswerReader;
+use App\Services\Ocr\OcrInkImage;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -231,6 +234,91 @@ it('reads a folder offline and scores it: corrections, silent errors and the day
         ->and($fields['sheet2.png/notes'])->toMatchArray(['value_read' => 'SORE THROAT', 'confidence' => '50', 'verdict' => 'right, marked may be wrong'])
         ->and($fields['sheet1.png/consent'])->toMatchArray(['value_read' => 'yes', 'correct_answer' => 'yes', 'verdict' => 'right'])
         ->and($fields['sheet3.png/age']['verdict'])->toBe('not scored');
+});
+
+/** A page of paper (230) with pen strokes (30) in the given rectangles, the size the typesetter's provider answer gives. */
+function ocrBakeoffInkImage(array $strokes): OcrInkImage
+{
+    return new class($strokes) implements OcrInkImage
+    {
+        /** @param  list<array{0: int, 1: int, 2: int, 3: int}>  $strokes */
+        public function __construct(private readonly array $strokes) {}
+
+        public function width(): int
+        {
+            return 1000;
+        }
+
+        public function height(): int
+        {
+            return 1414;
+        }
+
+        public function histogram(int $x0, int $y0, int $x1, int $y1): array
+        {
+            [$x0, $y0, $x1, $y1] = [max(0, $x0), max(0, $y0), min(1000, $x1), min(1414, $y1)];
+            $counts = array_fill(0, 256, 0);
+            foreach ($this->strokes as [$sx0, $sy0, $sx1, $sy1]) {
+                $counts[30] += max(0, min($x1, $sx1) - max($x0, $sx0)) * max(0, min($y1, $sy1) - max($y0, $sy0));
+            }
+            $counts[230] += max(0, $x1 - $x0) * max(0, $y1 - $y0) - $counts[30];
+
+            return $counts;
+        }
+    };
+}
+
+/** A pen stroke in the box before the first word reading `$label` in a cached provider answer, in its pixels. */
+function ocrBakeoffStrokeBefore(string $cache, string $label): array
+{
+    foreach (json_decode((string) file_get_contents($cache), true)['responses'][0]['fullTextAnnotation']['pages'][0]['blocks'][0]['paragraphs'][0]['words'] as $word) {
+        if (implode('', array_column($word['symbols'], 'text')) === $label) {
+            $xs = array_column($word['boundingBox']['vertices'], 'x');
+            $ys = array_column($word['boundingBox']['vertices'], 'y');
+
+            return [(int) min($xs) - 28, (int) min($ys) + 2, (int) min($xs) - 10, (int) max($ys) - 2];
+        }
+    }
+
+    throw new RuntimeException("No {$label} in {$cache}.");
+}
+
+it('reads a tick question the provider left blank from the ink in its box, and touches nothing it did read (M159, D112)', function (): void {
+    $layout = ocrBakeoffExportLayout($this->dir.'/layout', $this->form->id);
+    $samples = $this->dir.'/samples';
+
+    // Ticked Male and Yes on the paper, and Fever — but the provider returned only Fever's X, as Round 1's sheet 08 did. The
+    // photo also shows ink before Cough, which the provider read as unticked: what the provider read is never re-read.
+    ocrBakeoffScan("{$samples}/sheet1.png", $this->model, ['age' => '34', 'symptoms' => ['Fever']]);
+    ocrBakeoffScan("{$samples}/sheet2.png", $this->model, ['age' => '34', 'symptoms' => ['Fever']]);
+    $cache = "{$samples}/sheet1.png".OcrBakeoffFolder::CACHE_SUFFIX;
+    $image = ocrBakeoffInkImage([ocrBakeoffStrokeBefore($cache, 'Male'), ocrBakeoffStrokeBefore($cache, 'Yes'), ocrBakeoffStrokeBefore($cache, 'Cough')]);
+    // The second sheet's image cannot be opened — GD missing, say — so its ticks are measured nowhere, and it says so.
+    app()->instance(OcrBakeoffCommand::INK_IMAGES, static fn (string $path): ?OcrInkImage => str_contains($path, 'sheet1') ? $image : null);
+    $answers = ocrBakeoffSheet("{$this->dir}/answers.csv", [
+        ['sheet1', 'photo', '', '34', '', 'yes', 'Male', 'Fever', '', ''],
+        ['sheet2', 'photo', '', '34', '', 'yes', 'Male', 'Fever', '', ''],
+    ]);
+
+    $this->artisan('ocr:bakeoff', ['folder' => $samples, '--layout' => $layout, '--answers' => $answers, '--offline' => true, '--ticks' => 'ink'])
+        ->expectsOutputToContain('Ink: 2 tick question(s) the provider left blank were read from their boxes.')
+        ->expectsOutputToContain('not measured: '.str_replace('/', DIRECTORY_SEPARATOR, "{$samples}/sheet2.png").' (GD is not loaded')
+        ->assertExitCode(0);
+
+    $fields = ocrBakeoffFieldsCsv("{$samples}/_bakeoff/fields.csv");
+    expect($fields['sheet1.png/sex'])->toMatchArray(['state' => 'read', 'value_read' => 'm', 'confidence' => (string) OcrAnswerReader::MARK_SEEN, 'verdict' => 'right, flagged for review'])
+        ->and($fields['sheet1.png/consent'])->toMatchArray(['state' => 'read', 'value_read' => 'yes', 'verdict' => 'right, flagged for review'])
+        ->and($fields['sheet1.png/symptoms'])->toMatchArray(['value_read' => 'fever', 'verdict' => 'right'])
+        ->and($fields['sheet2.png/sex'])->toMatchArray(['state' => 'blank', 'verdict' => 'read as blank, but it was answered'])
+        ->and((string) file_get_contents("{$samples}/_bakeoff/report.md"))->toContain('google_vision, with ink for the ticks it left blank');
+
+    // Without the option nothing is measured, and the report says the provider alone.
+    $this->artisan('ocr:bakeoff', ['folder' => $samples, '--layout' => $layout, '--answers' => $answers, '--offline' => true])->assertExitCode(0);
+    expect(ocrBakeoffFieldsCsv("{$samples}/_bakeoff/fields.csv")['sheet1.png/sex']['state'])->toBe('blank');
+
+    $this->artisan('ocr:bakeoff', ['folder' => $samples, '--layout' => $layout, '--offline' => true, '--ticks' => 'claude'])
+        ->expectsOutputToContain('--ticks takes "ink", or nothing.')
+        ->assertExitCode(1);
 });
 
 it('fails, and says why, when an answer cannot be understood or names no scan — and leaves that field unscored', function (): void {

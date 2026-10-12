@@ -152,7 +152,9 @@ final class PrintedFormMatcher
      *
      * @param  list<OcrPage>  $pages
      * @param  array{auto: int, review: int}|null  $thresholds
-     * @return array{fields: array<string, array<string, mixed>>, counts: array<string, int>, pages: int}
+     *                                                          `labels` holds, per tick question whose boxes were found, each option's label word and page (M159) — where the ink in
+     *                                                          its box is measured. It is the caller's to use or drop: it is never part of `fields`, which is what a scan stores.
+     * @return array{fields: array<string, array<string, mixed>>, counts: array<string, int>, pages: int, labels: array<string, list<array{value: string, label: string, word: OcrWord, page: int}>>}
      */
     public function match(Form $form, FormVersion $version, array $pages, ?array $thresholds = null): array
     {
@@ -205,6 +207,7 @@ final class PrintedFormMatcher
         $anchors = $this->anchor($rows, $lines);
 
         $fields = [];
+        $labels = [];
         $counts = ['read' => 0, 'blank' => 0, 'unreadable' => 0, 'not_found' => 0, 'skipped' => 0];
         $thresholds ??= self::configuredThresholds();
 
@@ -226,10 +229,13 @@ final class PrintedFormMatcher
             $region = $this->region($lines, $anchor['line'], $this->nextAnchor($anchors, $i));
             $read = $this->reader->read($row, $type, $config, $region, $static);
             $fields[$key] = $this->result($type, $row, $read, $anchor['line']->page, $anchor['by'], $thresholds);
+            if (isset($read['labels'])) {
+                $labels[$key] = $read['labels'];
+            }
             $counts[$read['state']] = ($counts[$read['state']] ?? 0) + 1;
         }
 
-        return ['fields' => $fields, 'counts' => $counts, 'pages' => count($pages)];
+        return ['fields' => $fields, 'counts' => $counts, 'pages' => count($pages), 'labels' => $labels];
     }
 
     /**

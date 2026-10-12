@@ -69,7 +69,9 @@ final class OcrAnswerReader
      * @param  array<string, mixed>  $config  the field's `config` from the version snapshot
      * @param  list<OcrLine>  $lines  the question's region, top to bottom
      * @param  list<string>  $static  normalised printed text that may sit in a region and is not an answer
-     * @return array{state: string, value: mixed, text: string|null, confidence: int|null}
+     * @return array{state: string, value: mixed, text: string|null, confidence: int|null, labels?: list<array{value: string, label: string, word: OcrWord, page: int}>}
+     *                                                                                                                                                                   `labels`, on a question whose boxes were found, is each option's label as found — its first word and its
+     *                                                                                                                                                                   page (M159) — for the ink in its box to be measured beside it; nothing stores it
      */
     public function read(array $row, ?FieldType $type, array $config, array $lines, array $static): array
     {
@@ -371,7 +373,7 @@ final class OcrAnswerReader
      * @param  array<string, mixed>  $row
      * @param  list<OcrLine>  $lines
      * @param  list<string>  $static
-     * @return array{state: string, value: mixed, text: string|null, confidence: int|null}
+     * @return array{state: string, value: mixed, text: string|null, confidence: int|null, labels?: list<array{value: string, label: string, word: OcrWord, page: int}>}
      */
     private function choices(array $row, ?FieldType $type, array $lines, array $static): array
     {
@@ -391,6 +393,8 @@ final class OcrAnswerReader
         $found = [];
         /** @var array<int, OcrWord> $labelStarts option index => the first word of its label */
         $labelStarts = [];
+        /** @var array<int, int> $labelPages option index => the page its label was found on */
+        $labelPages = [];
         /** @var array<int, true> $taken spl_object_id of every word a label or its walk back used */
         $taken = [];
         foreach ($lines as $line) {
@@ -430,6 +434,7 @@ final class OcrAnswerReader
                 }
                 $found[$i] = $marks;
                 $labelStarts[$i] = $words[$span['start']];
+                $labelPages[$i] = $line->page;
                 $end = $span['start'] + $span['length'];
             }
         }
@@ -480,8 +485,13 @@ final class OcrAnswerReader
             return $this->blankOrUnreadable($this->answerLines($lines, $static, []));
         }
 
+        $labels = [];
+        foreach ($labelStarts as $i => $word) {
+            $labels[] = ['value' => $options[$i]['value'], 'label' => $options[$i]['label'], 'word' => $word, 'page' => $labelPages[$i]];
+        }
+
         if ($marked === []) {
-            return $this->blank();
+            return $this->blank() + ['labels' => $labels];
         }
 
         $confidence = max($this->confidenceOf($markSymbols), self::MARK_SEEN);
@@ -489,19 +499,19 @@ final class OcrAnswerReader
         if ($orphaned) {
             $confidence = min($confidence, self::SUBSTITUTION_CEILING);
         }
-        $labels = implode(', ', array_map(static fn (array $o): string => $o['label'], $marked));
+        $text = implode(', ', array_map(static fn (array $o): string => $o['label'], $marked));
 
         if ($type === FieldType::MultiSelect) {
-            return $this->found(array_map(static fn (array $o): string => $o['value'], $marked), $labels, $confidence);
+            return $this->found(array_map(static fn (array $o): string => $o['value'], $marked), $text, $confidence) + ['labels' => $labels];
         }
 
         if (count($marked) > 1) {
-            return $this->unreadable($labels, $confidence);
+            return $this->unreadable($text, $confidence) + ['labels' => $labels];
         }
 
         $value = $marked[0]['value'];
 
-        return $this->found($type === FieldType::YesNo ? Coercion::yesNoAnswer($value) : $value, $labels, $confidence);
+        return $this->found($type === FieldType::YesNo ? Coercion::yesNoAnswer($value) : $value, $text, $confidence) + ['labels' => $labels];
     }
 
     /**

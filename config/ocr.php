@@ -71,6 +71,27 @@ return [
     ],
 
     /*
+    | Reading a tick from the ink in its printed box (`OcrInkReader`, M159, `D112`) — for the ticks the
+    | recognizer never returns. Lengths are in the page's letter heights: the window runs from `window_from`
+    | to `window_to` letters before an option's label, `across` letters either side of its line. Ink is a
+    | pixel darker than `dark_share` of the window's paper grey (its `paper_quantile` grey). A box is judged
+    | against the page's median box: a one-answer question's darkest box must clear it by `single_floor` and
+    | the next box by `margin`, else nothing is read; a multi-select takes every box `multi_floor` clear of it.
+    | Tuned on Round 1's fifteen phone photos (docs/ocr-pipeline-design.md §9) — on those same forms, so the
+    | first fresh scans are the real test.
+    */
+    'ink' => [
+        'window_from' => 0.2,
+        'window_to' => 2.2,
+        'across' => 1.0,
+        'paper_quantile' => 0.9,
+        'dark_share' => 0.6,
+        'margin' => 0.03,
+        'single_floor' => 0.03,
+        'multi_floor' => 0.02,
+    ],
+
+    /*
     | What one scan may be. The type allowlist is checked against the CONTENT-SNIFFED type, never the
     | client's header. A page is sent to the provider base64-encoded inside JSON, whose request cap is
     | 10 MB, so one file stays under 7,000,000 bytes. A whole scan stays under 25,000,000 bytes because the

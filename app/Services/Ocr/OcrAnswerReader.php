@@ -50,10 +50,19 @@ final class OcrAnswerReader
      * The least confidence of a tick seen in the box before an option's label, whatever glyph the recognizer took it for (M152,
      * `R-39a5388f`). Vision returns a hand-drawn tick as ☑, X, a Greek chi or 区 and is unsure of the GLYPH, which is not the
      * question: 16 of the bake-off's Round 1 ticks were read right and withheld for it. Inside the review band, never at auto:
-     * Round 1's one wrong tick was a multi-select whose second mark was never returned, so a mark alone cannot vouch for the
-     * whole answer. Public so a test can hold it between `config('ocr.confidence')`'s two thresholds.
+     * a multi-select's other boxes may hold ticks Vision never returned (20 of Round 1's 22 blank tick questions), so a mark
+     * alone cannot vouch for the whole answer. (`M152` gave Round 1's one wrong tick as that case; `M158` measured it as a mark
+     * Vision DID return and the reader dropped, `R-b2d00ba2` — the floor stands on the 20.) Public so a test can hold it
+     * between `config('ocr.confidence')`'s two thresholds.
      */
     public const int MARK_SEEN = 80;
+
+    /**
+     * How far right of a stray mark, as a fraction of the page's width, an option's label may begin and still own it (M158,
+     * `R-b2d00ba2`): about a centimetre on A4. The paper prints a label 19pt after its box starts (3% of a 595pt page); a
+     * phone photo shows the page smaller than the frame, so this is generous, and the nearest label with nothing between wins.
+     */
+    private const float ORPHAN_REACH = 0.05;
 
     /**
      * @param  array<string, mixed>  $row  one printed row from `BlankFormPrintPresenter::present()`
@@ -380,6 +389,10 @@ final class OcrAnswerReader
         // TAIL of a line to one label and took every mark to its left, which credited the first case to Male.
         /** @var array<int, list<OcrSymbol>> $found option index => the mark's characters (empty: box seen, unmarked) */
         $found = [];
+        /** @var array<int, OcrWord> $labelStarts option index => the first word of its label */
+        $labelStarts = [];
+        /** @var array<int, true> $taken spl_object_id of every word a label or its walk back used */
+        $taken = [];
         foreach ($lines as $line) {
             if ($this->isStatic($line, $static)) {
                 continue;
@@ -395,14 +408,46 @@ final class OcrAnswerReader
                     continue;
                 }
                 $marks = $span['lead'] === null ? [] : [$span['lead']];
+                for ($w = $span['start'] + $span['length'] - 1; $w >= $span['start']; $w--) {
+                    $taken[spl_object_id($words[$w])] = true;
+                }
+                // ⚠️ A WORD LED BY A SYMBOL MARK DOES NOT END THE WALK (M158, `R-b2d00ba2`). Round 1's sheet 06 came back
+                // `Male ☑ ☑Fe Female` — the tick, then the tick again run into the label's first letters — and the walk
+                // stopped at "☑Fe", losing a tick Vision had returned. Only a SYMBOL leading a word counts: a word that
+                // begins with an x or a v is writing.
                 for ($w = $span['start'] - 1; $w >= $end; $w--) {
-                    if (! OcrText::isMark($words[$w]->text)) {
-                        break;
+                    $word = $words[$w];
+                    if (OcrText::isMark($word->text)) {
+                        $marks = [...$word->symbols, ...$marks];
+                    } else {
+                        $lead = $this->leadingSymbolMarks($word);
+                        if ($lead === []) {
+                            break;
+                        }
+                        $marks = [...$lead, ...$marks];
                     }
-                    $marks = [...$words[$w]->symbols, ...$marks];
+                    $taken[spl_object_id($word)] = true;
                 }
                 $found[$i] = $marks;
+                $labelStarts[$i] = $words[$span['start']];
                 $end = $span['start'] + $span['length'];
+            }
+        }
+
+        // ⚠️ A MARK NO OPTION TOOK IS CREDITED TO THE LABEL JUST TO ITS RIGHT, ON WHICHEVER LINE IT LANDED (M158,
+        // `R-b2d00ba2`). Round 1's sheet 09 came back with `✓ Fever ☑` on one line and `Cough Headache Rash None` on the
+        // next: the ☑ before "Rash" sat 0.08 px past the line builder's tolerance, so no label followed it on its line.
+        // Fixed here rather than in `OcrLineBuilder`, whose lines every other question type is read from.
+        $regionWords = array_merge(...array_map(static fn (OcrLine $l): array => $l->words, $lines));
+        $orphaned = false;
+        foreach ($regionWords as $word) {
+            if (isset($taken[spl_object_id($word)]) || ! OcrText::isMark($word->text)) {
+                continue;
+            }
+            $i = $this->orphanOwner($word, $labelStarts, $regionWords);
+            if ($i !== null) {
+                $found[$i] = [...$found[$i], ...$word->symbols];
+                $orphaned = true;
             }
         }
 
@@ -440,6 +485,10 @@ final class OcrAnswerReader
         }
 
         $confidence = max($this->confidenceOf($markSymbols), self::MARK_SEEN);
+        // A mark placed by geometry rather than read before its label is shown to a reviewer, however sure the glyph.
+        if ($orphaned) {
+            $confidence = min($confidence, self::SUBSTITUTION_CEILING);
+        }
         $labels = implode(', ', array_map(static fn (array $o): string => $o['label'], $marked));
 
         if ($type === FieldType::MultiSelect) {
@@ -505,6 +554,61 @@ final class OcrAnswerReader
         }
 
         return null;
+    }
+
+    /**
+     * The symbol marks a word begins with — the tick a recognizer ran into the next word ("☑Fe") — or none.
+     *
+     * @return list<OcrSymbol>
+     */
+    private function leadingSymbolMarks(OcrWord $word): array
+    {
+        $lead = [];
+        foreach ($word->symbols as $symbol) {
+            if (! OcrText::isSymbolMark($symbol->text)) {
+                break;
+            }
+            $lead[] = $symbol;
+        }
+
+        return $lead;
+    }
+
+    /**
+     * Which found option a mark no label took belongs to: the one whose label begins nearest to the mark's right, at a
+     * height the mark shares, within {@see ORPHAN_REACH}, with no word between them — or none.
+     *
+     * @param  array<int, OcrWord>  $labelStarts
+     * @param  list<OcrWord>  $regionWords
+     */
+    private function orphanOwner(OcrWord $mark, array $labelStarts, array $regionWords): ?int
+    {
+        $owner = null;
+        $nearest = INF;
+        foreach ($labelStarts as $i => $start) {
+            $gap = $start->x0 - $mark->x1;
+            if ($start->x0 < $mark->centerX() || $gap > self::ORPHAN_REACH || ! $this->shareHeight($mark, $start)) {
+                continue;
+            }
+            foreach ($regionWords as $other) {
+                if ($other !== $mark && $other !== $start && $this->shareHeight($mark, $other)
+                    && $other->centerX() > $mark->x1 && $other->centerX() < $start->x0) {
+                    continue 2;
+                }
+            }
+            if ($gap < $nearest) {
+                $owner = $i;
+                $nearest = $gap;
+            }
+        }
+
+        return $owner;
+    }
+
+    /** Whether two words' boxes overlap in height — they sit on one printed line, whatever line the builder put them on. */
+    private function shareHeight(OcrWord $a, OcrWord $b): bool
+    {
+        return min($a->y1, $b->y1) > max($a->y0, $b->y0);
     }
 
     // ── shared ────────────────────────────────────────────────────────────────────────────────────

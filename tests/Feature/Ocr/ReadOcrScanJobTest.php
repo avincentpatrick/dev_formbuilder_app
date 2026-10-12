@@ -17,6 +17,7 @@ use App\Services\Forms\PublishService;
 use App\Services\Ocr\OcrAnswerReader;
 use App\Services\Ocr\OcrInkImage;
 use App\Services\Ocr\OcrInkReader;
+use App\Services\Ocr\OcrScanReader;
 use App\Services\Ocr\OcrScanService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -181,10 +182,14 @@ it('reads a tick Vision never returned from the ink in its box, marked so the re
 
         return $image;
     });
-    // The worker's limit is below the step's, so the step raises it for itself — and must give it back. (The test runner's own
-    // limit is above 512M, where nothing would be raised, so the case sets a worker-like one first.)
+    // The worker's limit is below the step's, so the step raises it for itself — and must give it back. The test runner's own
+    // limit is above the step's, where nothing would be raised, so the case sets a worker-like one first: just above what this
+    // process already uses (CI's full suite is past 350 MB by here, and PHP refuses a limit below the usage) and below the step's.
+    $step = (int) (new ReflectionClassConstant(OcrScanReader::class, 'INK_MEMORY'))->getValue();
+    $workerLike = max(256 * 1024 * 1024, memory_get_usage(true) + 64 * 1024 * 1024);
+    expect($workerLike)->toBeLessThan($step, 'this process already uses too much memory to sit below the limit of the ink step');
     $original = (string) ini_get('memory_limit');
-    expect(ini_set('memory_limit', '256M'))->not->toBeFalse();
+    expect(ini_set('memory_limit', (string) $workerLike))->not->toBeFalse();
 
     try {
         ocrJobRun($scan);
@@ -200,7 +205,7 @@ it('reads a tick Vision never returned from the ink in its box, marked so the re
         ->and($scan->extraction['fields']['patient_name'])->not->toHaveKey('read_by')
         ->and($scan->extraction['counts'])->toMatchArray(['read' => 3, 'blank' => 0])
         ->and($opened)->toBe(1)
-        ->and($limit)->toBe('256M');
+        ->and($limit)->toBe((string) $workerLike);
 });
 
 it('decodes no page at all when Vision left no tick question blank (M160)', function (): void {

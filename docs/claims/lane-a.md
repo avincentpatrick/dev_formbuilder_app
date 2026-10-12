@@ -75,6 +75,10 @@ is a new `use` line in `routes/api.php`, whose lines about 35 citations name, an
 `git status` that followed, and pushed before any further file was opened. Also taken: the Vitest file beside `Scans.vue`,
 `tests/Feature/Auth/RateLimiterBindingTest.php` and `tests/Feature/Ocr/*` (the existing OCR feature tests a refactor of
 `OcrScanService::store()` reaches).
+**Extension 2 (2026-10-12), pushed before either file is opened:** `resources/public-runtime/__tests__/paper-copy.test.ts` (new —
+the runtime's tests live in `__tests__`, not beside the component, so the original "Vitest files beside the components" did
+not reach it) and `resources/public-runtime/__tests__/api-client-challenge.test.ts` (the client's spam-check file, which the new
+`uploadPaperCopy()` belongs beside).
 Shared artefacts taken: `openapi.json`, `docs/ocr-pipeline-design.md`, `docs/security-threat-model.md`, `docs/data-dictionary.md`,
 `docs/feature-backlog.md`, `docs/claims/decisions.md` (`D106`'s answers), `PROGRESS.md` (own block), `docs/pipeline.md`.
 Paired files taken: `openapi.json` with `routes/api.php`; `docs/data-dictionary.md` with the two migrations.

@@ -84,8 +84,8 @@ find a label it did not before.
 
 Taken 2026-10-12 by the session that built `M162`, again in the worktree `C:\laragon\www\fb-help` with its own Docker stack
 (`docker compose -p fb-help`) — the OCR session keeps the main checkout and its four open PRs (#351–#353, #355). Branch
-`m163-builder-reference`, cut from `origin/main` after this claim's commit, PR into main. **Live as soon as it is ready (`D115` A)**,
-in or out of order with `M158`–`M161`. Row: `R-ccc0be00`, filed in this push at the end of `docs/feature-backlog.md` (cited by id).
+`m163-builder-reference`, cut from `origin/main` after this claim's commit, PR into main. **Live tonight, after the Oct 12 building session (`D115`, its
+"when" amended)**, after `M158`–`M161`. Row: `R-ccc0be00`, filed in this push at the end of `docs/feature-backlog.md` (cited by id).
 The session opened with the user's check of `M162`: seen on staging ("i already saw the help page"), with this row as the answer.
 
 #### Evidence verified

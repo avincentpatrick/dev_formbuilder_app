@@ -159,6 +159,16 @@ it('tells the review screen which questions the paper asked to be ticked, and a 
     expect(array_map(static fn (array $f): bool => $f['ticks'], $result['fields']))->toBe(['pick' => true, 'name' => false, 'old' => false]);
 });
 
+it('tells the review screen which answers were read from the ink in their boxes, and an older scan as none (M160, D113)', function (): void {
+    $paper = ocrCarrySnapshot([ocrCarryField('pick', 'single_select', OCR_CARRY_CHOICES), ocrCarryField('old', 'yes_no')]);
+    $inked = ['type' => 'single_select', 'state' => 'read', 'value' => 'a', 'text' => 'Alpha', 'confidence' => 80, 'tier' => 'review', 'page' => 1, 'anchored_by' => 'key', 'ticks' => true, 'read_by' => 'ink'];
+    $older = ['type' => 'yes_no', 'state' => 'read', 'value' => true, 'text' => 'Yes', 'confidence' => 80, 'tier' => 'review', 'page' => 1, 'anchored_by' => 'key', 'ticks' => true];
+
+    $result = ocrCarry(['pick' => $inked, 'old' => $older], $paper);
+
+    expect(array_map(static fn (array $f): bool => $f['inked'], $result['fields']))->toBe(['pick' => true, 'old' => false]);
+});
+
 it('marks a question the paper never printed, and takes nothing into a display-only one', function (): void {
     $result = ocrCarry(
         ['name' => ocrCarryRead('short_text', 'Ana')],

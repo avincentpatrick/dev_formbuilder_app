@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Enums\FieldType;
 use App\Exceptions\Ocr\OcrProviderException;
 use App\Services\Forms\BlankFormPrintPresenter;
 use App\Services\Forms\CapabilityFlags;
@@ -16,7 +15,6 @@ use App\Services\Ocr\Bakeoff\OcrBakeoffQuestion;
 use App\Services\Ocr\Bakeoff\OcrBakeoffReport;
 use App\Services\Ocr\Bakeoff\OcrBakeoffScan;
 use App\Services\Ocr\Bakeoff\OcrBakeoffScorer;
-use App\Services\Ocr\GdInkImage;
 use App\Services\Ocr\GoogleVisionClient;
 use App\Services\Ocr\OcrInkImage;
 use App\Services\Ocr\OcrInkReader;
@@ -71,12 +69,6 @@ final class OcrBakeoffCommand extends Command
 
     /** A refusal that every later page would get too. */
     private const array CREDENTIAL_CODES = ['provider_not_configured', 'provider_billing_disabled', 'provider_unauthorized'];
-
-    /**
-     * The container key a test binds to hand the harness its own page images: a `callable(string): ?OcrInkImage`. Unbound,
-     * a page is decoded with {@see GdInkImage::open()}.
-     */
-    public const string INK_IMAGES = 'ocr.bakeoff.ink_images';
 
     private ?string $refusal = null;
 
@@ -247,7 +239,7 @@ final class OcrBakeoffCommand extends Command
     }
 
     /**
-     * The fields with every tick question the provider left blank read again from the ink in its boxes, page by page.
+     * The fields with every tick question the provider left blank read again from the ink in its boxes ({@see OcrInkReader::fillBlanks()}).
      *
      * @param  array<string, array<string, mixed>>  $fields
      * @param  array<string, list<array{value: string, label: string, word: OcrWord, page: int}>>  $labels
@@ -257,41 +249,22 @@ final class OcrBakeoffCommand extends Command
      */
     private function withInk(array $fields, array $labels, array $pages, array $pageFiles): array
     {
-        $byPage = [];
-        foreach ($labels as $key => $options) {
-            $on = array_values(array_unique(array_column($options, 'page')));
-            if (count($on) !== 1 || ($fields[$key]['ticks'] ?? false) !== true) {
-                continue;
-            }
-            $byPage[$on[0]][$key] = [
-                'type' => FieldType::tryFrom((string) ($fields[$key]['type'] ?? '')),
-                'options' => array_map(static fn (array $o): array => ['value' => $o['value'], 'label' => $o['label'], 'word' => $o['word']], $options),
-            ];
-        }
+        $open = OcrInkReader::opener();
+        $imageFor = static function (int $index) use ($pageFiles, $open): ?OcrInkImage {
+            $bytes = isset($pageFiles[$index]) ? @file_get_contents($pageFiles[$index]) : false;
 
-        /** @var callable(string): ?OcrInkImage $open */
-        $open = app()->bound(self::INK_IMAGES) ? app(self::INK_IMAGES) : GdInkImage::open(...);
-        $reader = OcrInkReader::fromConfig();
-        $lines = app(OcrLineBuilder::class);
+            return $bytes === false ? null : $open($bytes);
+        };
 
-        foreach ($byPage as $index => $questions) {
+        // The harness scores at zero thresholds and applies its own, so the tier written here is never read.
+        $result = OcrInkReader::fromConfig()->fillBlanks($fields, $labels, $pages, $imageFor, app(OcrLineBuilder::class), ['auto' => 0, 'review' => 0]);
+        $this->inkFilled += count($result['filled']);
+        foreach ($result['unmeasured'] as $index) {
             $path = $pageFiles[$index] ?? null;
-            $image = $path === null ? null : $open($path);
-            if ($image === null) {
-                $this->inkUnmeasured[] = $path === null ? 'a page of a PDF' : "{$path} (GD is not loaded, or the image would not decode)";
-
-                continue;
-            }
-            foreach ($reader->read($questions, $image, $lines->quarterTurns($pages[$index])) as $key => $read) {
-                if (($fields[$key]['state'] ?? null) !== 'blank' || $read['state'] !== 'read') {
-                    continue;
-                }
-                $fields[$key] = ['state' => 'read', 'value' => $read['value'], 'text' => $read['text'], 'confidence' => $read['confidence'], 'read_by' => 'ink'] + $fields[$key];
-                $this->inkFilled++;
-            }
+            $this->inkUnmeasured[] = $path === null ? 'a page of a PDF' : "{$path} (GD is not loaded, or the image would not decode)";
         }
 
-        return $fields;
+        return $result['fields'];
     }
 
     /**

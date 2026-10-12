@@ -41,10 +41,14 @@ use Illuminate\Support\Facades\Storage;
  */
 final class OcrScanReader
 {
+    /** The memory limit while the ink is measured, in bytes ({@see withInk()}). */
+    private const int INK_MEMORY = 512 * 1024 * 1024;
+
     public function __construct(
         private readonly GoogleVisionClient $client,
         private readonly VisionDocumentParser $parser,
         private readonly PrintedFormMatcher $matcher,
+        private readonly OcrLineBuilder $lines,
     ) {}
 
     public function step(OcrScan $scan): OcrReadStep
@@ -137,6 +141,7 @@ final class OcrScanReader
         }
 
         $pages = [];
+        $pageImages = [];
         $totalPages = 0;
         foreach ($scan->pages as $page) {
             $attachment = Attachment::query()->whereKey($page['attachment_id'])->first();
@@ -144,7 +149,12 @@ final class OcrScanReader
             $body = is_string($raw) ? json_decode($raw, true) : null;
             $body = is_array($body) ? $body : [];
             /** @var array<string, mixed> $body */
-            array_push($pages, ...$this->parser->pages($body));
+            $parsedPages = $this->parser->pages($body);
+            foreach ($parsedPages as $parsed) {
+                $pages[] = $parsed;
+                // A photo is one page with an image to measure the ink in; a PDF's pages have none of their own.
+                $pageImages[] = $attachment !== null && str_starts_with((string) $attachment->mime_type, 'image/') ? $attachment : null;
+            }
             $totalPages += $this->parser->totalPages($body);
         }
 
@@ -188,6 +198,7 @@ final class OcrScanReader
         }
 
         $matched = $this->matcher->match($form, $version, $pages);
+        $matched = $this->withInk($matched, $pages, $pageImages);
 
         $warnings = [];
         if ($resolved['matched_by'] === 'unconfirmed') {
@@ -223,6 +234,48 @@ final class OcrScanReader
         foreach ($scan->pages as $page) {
             Attachment::query()->whereKey($page['attachment_id'])->update(['ocr_confidence_avg' => $average]);
         }
+    }
+
+    /**
+     * The match with every tick question Vision left blank read again from the ink in its printed boxes (M160, `D112`,
+     * `D113`): Cloud Vision returns no mark at all for most ticks standing alone in a box. Each such answer is filled at
+     * review confidence with `read_by` = `ink`, which the review screen names. Without GD nothing changes.
+     *
+     * ⚠️ THE MEMORY LIMIT IS RAISED FOR THIS STEP ONLY. GD holds a 16-megapixel photo in 72 MB (measured), and the worker
+     * runs under a 128M `memory_limit` (`docs/deployment-infrastructure.md` §8 step 1); a page over
+     * {@see GdInkImage::MAX_PIXELS} is not decoded at all. Each image is released before the next, and the limit restored.
+     *
+     * @param  array{fields: array<string, array<string, mixed>>, counts: array<string, int>, pages: int, labels: array<string, list<array{value: string, label: string, word: OcrWord, page: int}>>}  $matched
+     * @param  list<OcrPage>  $pages
+     * @param  list<Attachment|null>  $pageImages
+     * @return array{fields: array<string, array<string, mixed>>, counts: array<string, int>, pages: int, labels: array<string, list<array{value: string, label: string, word: OcrWord, page: int}>>}
+     */
+    private function withInk(array $matched, array $pages, array $pageImages): array
+    {
+        $open = OcrInkReader::opener();
+        $imageFor = static function (int $index) use ($pageImages, $open): ?OcrInkImage {
+            $attachment = $pageImages[$index] ?? null;
+            $bytes = $attachment === null ? null : Storage::disk($attachment->disk)->get($attachment->path);
+
+            return is_string($bytes) ? $open($bytes) : null;
+        };
+
+        $limit = (string) ini_get('memory_limit');
+        $raised = $limit !== '-1' && ini_parse_quantity($limit) < self::INK_MEMORY && ini_set('memory_limit', (string) self::INK_MEMORY) !== false;
+        try {
+            $result = OcrInkReader::fromConfig()->fillBlanks($matched['fields'], $matched['labels'], $pages, $imageFor, $this->lines, PrintedFormMatcher::configuredThresholds());
+        } finally {
+            if ($raised) {
+                ini_set('memory_limit', $limit);
+            }
+        }
+
+        $matched['fields'] = $result['fields'];
+        $filled = count($result['filled']);
+        $matched['counts']['blank'] = ($matched['counts']['blank'] ?? 0) - $filled;
+        $matched['counts']['read'] = ($matched['counts']['read'] ?? 0) + $filled;
+
+        return $matched;
     }
 
     /**

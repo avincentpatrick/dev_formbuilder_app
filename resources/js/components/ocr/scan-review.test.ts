@@ -7,7 +7,7 @@ import { scanNote, type ScanFieldMeta } from './scan-review';
  */
 
 function meta(overrides: Partial<ScanFieldMeta>): ScanFieldMeta {
-    return { state: 'read', tier: 'auto', confidence: 96, text: 'Maria', page: 1, carried: true, reason: null, ticks: false, ...overrides };
+    return { state: 'read', tier: 'auto', confidence: 96, text: 'Maria', page: 1, carried: true, reason: null, ticks: false, inked: false, ...overrides };
 }
 
 describe('scanNote', () => {
@@ -70,6 +70,18 @@ describe('scanNote', () => {
             'No tick was seen here (page 2). The scan can miss a tick, so check the paper.',
         );
         expect(scanNote(meta({ state: 'blank', tier: null, text: null, ticks: false }), false)).toEqual({ tone: 'neutral', text: 'Left blank on the paper.' });
+    });
+
+    it('says an answer read from the ink in its box was read that way, never at a confidence it does not have (M160, D113)', () => {
+        // Round 1's sheet 08: Vision returned no mark for Male and Yes; the ink in their boxes filled both at the review floor.
+        expect(scanNote(meta({ tier: 'review', confidence: 80, text: 'Male', inked: true, ticks: true }), false)).toEqual({
+            tone: 'warning',
+            text: 'No tick was read as text here, so this was read from the ink in the box. Check it against the paper.',
+        });
+        expect(scanNote(meta({ tier: 'review', confidence: 80, text: 'Yes', inked: true, ticks: true, page: 1 }), true)?.text).toBe(
+            'No tick was read as text here (page 1), so this was read from the ink in the box. Check it against the paper.',
+        );
+        expect(scanNote(meta({ tier: 'review', confidence: 80, inked: false }), false)?.text).toBe('Check this answer: it was read at 80% confidence.');
     });
 
     it('points at the list above the form for an answer that could not be filled in', () => {

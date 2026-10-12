@@ -10,21 +10,39 @@ use GdImage;
  * A page image decoded with GD (M159), for {@see OcrInkReader}. GD does not apply a photo's EXIF orientation, which is
  * what is wanted: the provider's word boxes are in the stored frame too.
  *
- * ⚠️ GD IS ON THE MACHINE THAT RUNS `ocr:bakeoff`, NOT IN THE APP IMAGE. {@see open()} answers null without it, and the
+ * ⚠️ GD IS IN THE APP IMAGE AND THE TESTING SERVER'S WORKER ONLY — never its php.ini. {@see open()} answers null without it, and the
  * harness says so; putting the ink on the reading path adds GD to the image first (`ocr-ink-live`).
  */
 class GdInkImage implements OcrInkImage
 {
+    /**
+     * The most pixels a page may have to be decoded (M160): GD holds four bytes a pixel, so a 16-megapixel phone photo peaks
+     * at 72 MB (measured on Round 1's) and this cap at about 160 MB — inside the reading job's raised limit, never the
+     * worker's 128M. A larger page is not measured, and its blank ticks stay for the reviewer.
+     */
+    public const int MAX_PIXELS = 40_000_000;
+
     private function __construct(private readonly GdImage $image) {}
 
     /** The image in the file at `$path`, or null when GD is missing or cannot decode it (a PDF page has no file of its own). */
     public static function open(string $path): ?self
     {
-        if (! function_exists('imagecreatefromstring')) {
+        $bytes = @file_get_contents($path);
+
+        return $bytes === false ? null : self::fromBytes($bytes);
+    }
+
+    /** The image these bytes encode, or null when GD is missing, cannot decode them, or the page exceeds {@see MAX_PIXELS}. */
+    public static function fromBytes(string $bytes): ?self
+    {
+        if ($bytes === '' || ! function_exists('imagecreatefromstring')) {
             return null;
         }
-        $bytes = @file_get_contents($path);
-        $image = $bytes === false || $bytes === '' ? false : @imagecreatefromstring($bytes);
+        $size = @getimagesizefromstring($bytes);
+        if ($size === false || $size[0] * $size[1] > self::MAX_PIXELS) {
+            return null;
+        }
+        $image = @imagecreatefromstring($bytes);
 
         return $image instanceof GdImage ? new self($image) : null;
     }

@@ -30,12 +30,23 @@ use App\Services\Expressions\Coercion;
  * and otherwise says nothing: a tick it cannot tell apart stays blank, for a reviewer, rather than guessed. A multi-select
  * takes every box clear of the median.
  *
+ * ── WHERE IT RUNS ─────────────────────────────────────────────────────────────────────────────────────────
+ * {@see fillBlanks()} is the one place a matched scan's blank tick questions are read again, for the reading job
+ * (`OcrScanReader`, M160, `D113`) and the bake-off harness alike. It needs GD: without it the opener answers null, the
+ * page is reported unmeasured, and the scan reads as it would have without ink.
+ *
  * Measured on Round 1's fifteen phone-photographed forms (`ocr-ink-ticks`, docs/ocr-pipeline-design.md §9) — the settings
  * in `config/ocr.php` were tuned on those same forms, so the first fresh scans are the real test. Every answer is offered
  * for review ({@see OcrAnswerReader::MARK_SEEN}), never accepted on the ink alone.
  */
 final class OcrInkReader
 {
+    /**
+     * The container key a test binds to hand the reader its own page images: a `callable(string): ?OcrInkImage` taking the
+     * image file's bytes. Unbound, a page is decoded with {@see GdInkImage::fromBytes()}.
+     */
+    public const string IMAGES = 'ocr.ink.images';
+
     /** The reading direction of a page's text in its stored frame, by how many quarter turns bring it upright. */
     private const array DIRECTIONS = [0 => [1, 0], 1 => [0, -1], 2 => [-1, 0], 3 => [0, 1]];
 
@@ -51,6 +62,76 @@ final class OcrInkReader
         $settings = array_map('floatval', (array) config('ocr.ink'));
 
         return new self($settings);
+    }
+
+    /**
+     * What decodes a page image's bytes: the test's, when one is bound at {@see IMAGES}, else GD.
+     *
+     * @return callable(string): ?OcrInkImage
+     */
+    public static function opener(): callable
+    {
+        /** @var callable(string): ?OcrInkImage $bound */
+        $bound = app()->bound(self::IMAGES) ? app(self::IMAGES) : GdInkImage::fromBytes(...);
+
+        return $bound;
+    }
+
+    /**
+     * A matched scan's fields with every tick question the provider left blank read again from the ink in its boxes, page
+     * by page. A page is decoded only when a question on it is still blank, and released before the next.
+     *
+     * @param  array<string, array<string, mixed>>  $fields  `PrintedFormMatcher::match()`'s fields
+     * @param  array<string, list<array{value: string, label: string, word: OcrWord, page: int}>>  $labels  its labels
+     * @param  list<OcrPage>  $pages  the pages as the provider returned them, in upload order
+     * @param  callable(int): ?OcrInkImage  $imageFor  a page's image by its index, or null when it has none to measure
+     * @param  array{auto: int, review: int}  $thresholds
+     * @return array{fields: array<string, array<string, mixed>>, filled: list<string>, unmeasured: list<int>}
+     *                                                                                                         `unmeasured`: pages with a blank tick question and no image to measure
+     */
+    public function fillBlanks(array $fields, array $labels, array $pages, callable $imageFor, OcrLineBuilder $lines, array $thresholds): array
+    {
+        $byPage = [];
+        foreach ($labels as $key => $options) {
+            $on = array_values(array_unique(array_column($options, 'page')));
+            if (count($on) !== 1 || ($fields[$key]['ticks'] ?? false) !== true) {
+                continue;
+            }
+            $byPage[$on[0]][$key] = [
+                'type' => FieldType::tryFrom((string) ($fields[$key]['type'] ?? '')),
+                'options' => array_map(static fn (array $o): array => ['value' => $o['value'], 'label' => $o['label'], 'word' => $o['word']], $options),
+            ];
+        }
+
+        $filled = [];
+        $unmeasured = [];
+        foreach ($byPage as $index => $questions) {
+            $blank = array_filter(array_keys($questions), static fn (string $key): bool => ($fields[$key]['state'] ?? null) === 'blank');
+            if ($blank === [] || ! isset($pages[$index])) {
+                continue;
+            }
+            $image = $imageFor($index);
+            if ($image === null) {
+                $unmeasured[] = $index;
+
+                continue;
+            }
+            $read = $this->read($questions, $image, $lines->quarterTurns($pages[$index]));
+            unset($image);
+            foreach ($blank as $key) {
+                if (($read[$key]['state'] ?? null) !== 'read') {
+                    continue;
+                }
+                $confidence = (int) $read[$key]['confidence'];
+                $fields[$key] = [
+                    'state' => 'read', 'value' => $read[$key]['value'], 'text' => $read[$key]['text'], 'confidence' => $confidence,
+                    'tier' => PrintedFormMatcher::tier($confidence, $thresholds), 'read_by' => 'ink',
+                ] + $fields[$key];
+                $filled[] = $key;
+            }
+        }
+
+        return ['fields' => $fields, 'filled' => $filled, 'unmeasured' => $unmeasured];
     }
 
     /**

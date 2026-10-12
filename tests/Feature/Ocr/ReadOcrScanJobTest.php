@@ -14,6 +14,10 @@ use App\Models\User;
 use App\Services\Forms\BlankFormPrintPresenter;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
+use App\Services\Ocr\OcrAnswerReader;
+use App\Services\Ocr\OcrInkImage;
+use App\Services\Ocr\OcrInkReader;
+use App\Services\Ocr\OcrScanReader;
 use App\Services\Ocr\OcrScanService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -124,6 +128,115 @@ it('reads a photographed page end to end and records the answers, the version an
 // ⚠️ ONE PROVIDER ANSWER PER CASE. `Http::fake()` STACKS its stubs and the first one that answers wins, so a
 // second fake in the same case is never reached — the second scan would be read off the first case's page, and
 // the assertion on it would pass or fail for the wrong reason (measured: it did both).
+
+/** A page of paper (230) with a pen stroke (30) in the box before each named label, placed from the provider answer itself. */
+function ocrJobInkBefore(array $answer, array $labels): OcrInkImage
+{
+    $strokes = [];
+    foreach ($answer['responses'][0]['fullTextAnnotation']['pages'][0]['blocks'][0]['paragraphs'][0]['words'] as $word) {
+        if (in_array(implode('', array_column($word['symbols'], 'text')), $labels, true)) {
+            $xs = array_column($word['boundingBox']['vertices'], 'x');
+            $ys = array_column($word['boundingBox']['vertices'], 'y');
+            $strokes[] = [(int) min($xs) - 28, (int) min($ys) + 2, (int) min($xs) - 10, (int) max($ys) - 2];
+        }
+    }
+
+    return new class($strokes) implements OcrInkImage
+    {
+        /** @param  list<array{0: int, 1: int, 2: int, 3: int}>  $strokes */
+        public function __construct(private readonly array $strokes) {}
+
+        public function width(): int
+        {
+            return 1000;
+        }
+
+        public function height(): int
+        {
+            return 1414;
+        }
+
+        public function histogram(int $x0, int $y0, int $x1, int $y1): array
+        {
+            [$x0, $y0, $x1, $y1] = [max(0, $x0), max(0, $y0), min(1000, $x1), min(1414, $y1)];
+            $counts = array_fill(0, 256, 0);
+            foreach ($this->strokes as [$sx0, $sy0, $sx1, $sy1]) {
+                $counts[30] += max(0, min($x1, $sx1) - max($x0, $sx0)) * max(0, min($y1, $sy1) - max($y0, $sy0));
+            }
+            $counts[230] += max(0, $x1 - $x0) * max(0, $y1 - $y0) - $counts[30];
+
+            return $counts;
+        }
+    };
+}
+
+it('reads a tick Vision never returned from the ink in its box, marked so the review screen can say how (M160, D113)', function (): void {
+    // Round 1's sheet 08: the paper says Yes, and Vision returned the word with no mark beside it.
+    $answer = ocrJobAnswer($this->form, ['patient_name' => 'ANA REYES', 'age' => '41']);
+    $scan = ocrJobScan($this->form, $this->user);
+    Http::fake(['vision.googleapis.com/*' => Http::response($answer)]);
+    $opened = 0;
+    $image = ocrJobInkBefore($answer, ['Yes']);
+    app()->instance(OcrInkReader::IMAGES, static function (string $bytes) use (&$opened, $image): OcrInkImage {
+        $opened++;
+
+        return $image;
+    });
+    // The worker's limit is below the step's, so the step raises it for itself — and must give it back. The test runner's own
+    // limit is above the step's, where nothing would be raised, so the case sets a worker-like one first: just above what this
+    // process already uses (CI's full suite is past 350 MB by here, and PHP refuses a limit below the usage) and below the step's.
+    $step = (int) (new ReflectionClassConstant(OcrScanReader::class, 'INK_MEMORY'))->getValue();
+    $workerLike = max(256 * 1024 * 1024, memory_get_usage(true) + 64 * 1024 * 1024);
+    expect($workerLike)->toBeLessThan($step, 'this process already uses too much memory to sit below the limit of the ink step');
+    $original = (string) ini_get('memory_limit');
+    expect(ini_set('memory_limit', (string) $workerLike))->not->toBeFalse();
+
+    try {
+        ocrJobRun($scan);
+        $limit = ini_get('memory_limit');
+    } finally {
+        ini_set('memory_limit', $original);
+    }
+    $scan->refresh();
+
+    expect($scan->extraction['fields']['consent'])->toMatchArray([
+        'state' => 'read', 'value' => true, 'text' => 'Yes', 'confidence' => OcrAnswerReader::MARK_SEEN, 'tier' => 'review', 'read_by' => 'ink', 'ticks' => true,
+    ])
+        ->and($scan->extraction['fields']['patient_name'])->not->toHaveKey('read_by')
+        ->and($scan->extraction['counts'])->toMatchArray(['read' => 3, 'blank' => 0])
+        ->and($opened)->toBe(1)
+        ->and($limit)->toBe((string) $workerLike);
+});
+
+it('decodes no page at all when Vision left no tick question blank (M160)', function (): void {
+    // A photo costs 72 MB to decode; it is opened only for a tick the recognizer did not return.
+    $scan = ocrJobScan($this->form, $this->user);
+    Http::fake(['vision.googleapis.com/*' => Http::response(ocrJobAnswer($this->form, ['patient_name' => 'ANA REYES', 'age' => '41', 'consent' => ['Yes']]))]);
+    $opened = 0;
+    app()->instance(OcrInkReader::IMAGES, static function (string $bytes) use (&$opened): ?OcrInkImage {
+        $opened++;
+
+        return null;
+    });
+
+    ocrJobRun($scan);
+
+    expect($scan->refresh()->extraction['fields']['consent'])->toMatchArray(['state' => 'read', 'value' => true])
+        ->and($opened)->toBe(0);
+});
+
+it('reads a scan as it always did when its page cannot be decoded — GD missing, say (M160)', function (): void {
+    $scan = ocrJobScan($this->form, $this->user);
+    Http::fake(['vision.googleapis.com/*' => Http::response(ocrJobAnswer($this->form, ['patient_name' => 'ANA REYES', 'age' => '41']))]);
+    app()->instance(OcrInkReader::IMAGES, static fn (string $bytes): ?OcrInkImage => null);
+
+    ocrJobRun($scan);
+    $scan->refresh();
+
+    expect($scan->status)->toBe(OcrScanStatus::Read)
+        ->and($scan->extraction['fields']['consent'])->toMatchArray(['state' => 'blank', 'ticks' => true])
+        ->and($scan->extraction['fields']['consent'])->not->toHaveKey('read_by');
+});
 
 it('refuses a sheet printed from an older layout, with the reason and the way out (M143, R-d6546409)', function (): void {
     // The stamp names the schema; "Layout N" beside it names the template. A sheet whose running head was

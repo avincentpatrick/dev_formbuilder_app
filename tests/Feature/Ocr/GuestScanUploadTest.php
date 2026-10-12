@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia;
+use Ramsey\Uuid\Uuid;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
@@ -391,4 +392,27 @@ it('offers the upload on the public page exactly where the upload route would ta
     $this->form->forceFill(['allow_guest_ocr' => true])->save();
     app(TenantSettingRegistry::class)->put($this->tenant, ['modules.ocr_single' => false], $this->owner);
     expect($schema()->json('data.form.paper_upload'))->toBeNull();
+});
+
+it('keeps the list newest first when two scans share a second, whatever order they were stored in', function (): void {
+    // CI met this by accident: `created_at` is kept to the second, so a tie came back in either order. Here the later
+    // scan (the higher uuid7) is stored FIRST, so only the id tie-break can put it on top.
+    $earlier = Uuid::uuid7()->toString();
+    $later = Uuid::uuid7()->toString();
+    expect(strcmp($later, $earlier))->toBeGreaterThan(0);
+
+    enterTenant($this->tenant->id, $this->owner->id);
+    foreach ([$later, $earlier] as $id) {
+        $scan = new OcrScan(['tenant_id' => $this->tenant->id, 'form_id' => $this->form->id, 'provider' => 'google_vision', 'pages' => []]);
+        $scan->id = $id;
+        $scan->save();
+    }
+    OcrScan::query()->update(['created_at' => now()->startOfSecond()]);
+
+    $this->actingAs($this->owner)->withoutVite()
+        ->get("http://acme.meridian.test/forms/{$this->form->id}/ocr/scans")
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $inertia) => $inertia
+            ->where('scans.0.id', $later)
+            ->where('scans.1.id', $earlier));
 });

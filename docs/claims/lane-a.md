@@ -58,8 +58,8 @@ Files: `database/migrations/2026_08_17_000129_add_guest_scan_settings_to_forms_t
 `app/Http/Controllers/Tenant/FormController.php`, `app/Http/Controllers/Tenant/OcrScanController.php`,
 `app/Services/Ocr/OcrScanService.php`, `app/Services/Ocr/OcrScanListPresenter.php`,
 `app/Services/Attachments/AttachmentStorageService.php`, `app/Exceptions/Ocr/OcrException.php`, `config/ocr.php`,
-`app/Http/Middleware/VerifyGuestBotChallenge.php`, `app/Http/Middleware/EnforceGuestScanWindow.php` (new),
-`app/Http/Controllers/Public/GuestAttachmentController.php`, `app/Http/Requests/Public/StoreGuestScanRequest.php` (new),
+`app/Http/Middleware/VerifyGuestBotChallenge.php`, `app/Http/Middleware/EnforceGuestFormRateLimit.php`,
+`app/Http/Controllers/Public/GuestAttachmentController.php`, `app/Http/Requests/Ocr/StoreOcrScanRequest.php`,
 `app/Services/Submissions/PublicFormPresenter.php`, `routes/api.php`, `resources/js/components/forms/ScanningPanel.vue`,
 `resources/js/components/forms/types.ts`, `resources/js/Pages/ocr/Scans.vue`, `resources/js/components/ocr/scan-upload.ts`,
 `resources/public-runtime/lib/types.ts`, `resources/public-runtime/lib/api-client.ts`,
@@ -68,6 +68,13 @@ Files: `database/migrations/2026_08_17_000129_add_guest_scan_settings_to_forms_t
 `tests/Feature/Ocr/GuestScanUploadTest.php` (new), `tests/Feature/Tenant/FormOcrScanningSettingsTest.php`,
 `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php`, `tests/Feature/Api/OpenApiContractTest.php`, the Vitest files beside the
 components above, and `tests/e2e/ocr-guest-upload.spec.ts` (new).
+**Extension 1 (2026-10-12), and a deviation recorded:** the device window moved from a new middleware class into a `paper` mode
+of `EnforceGuestFormRateLimit.php`, and the guest upload reuses `StoreOcrScanRequest.php` instead of a new request — a new class
+is a new `use` line in `routes/api.php`, whose lines about 35 citations name, and Pint imports a class written in full. ⚠️
+`EnforceGuestFormRateLimit.php` was edited BEFORE this extension was pushed, the shape `M126` and `M127` recorded; caught at the
+`git status` that followed, and pushed before any further file was opened. Also taken: the Vitest file beside `Scans.vue`,
+`tests/Feature/Auth/RateLimiterBindingTest.php` and `tests/Feature/Ocr/*` (the existing OCR feature tests a refactor of
+`OcrScanService::store()` reaches).
 Shared artefacts taken: `openapi.json`, `docs/ocr-pipeline-design.md`, `docs/security-threat-model.md`, `docs/data-dictionary.md`,
 `docs/feature-backlog.md`, `docs/claims/decisions.md` (`D106`'s answers), `PROGRESS.md` (own block), `docs/pipeline.md`.
 Paired files taken: `openapi.json` with `routes/api.php`; `docs/data-dictionary.md` with the two migrations.

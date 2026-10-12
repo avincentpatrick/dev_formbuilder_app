@@ -16,46 +16,40 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M164`, the Help page's contents stay on screen (`m164-help-contents`) — the other session's; `M158`–`M161` released below
+## Status: NO ACTIVE CLAIM — `M164` is merged and live on staging (released below). The next claim is written here. Both sessions ask the user before every merge, and never merge while the other's deploy is in flight.
 
-### Claim — `M164`, the Help page's contents stay on screen: a sticky contents column on wide screens, a Contents button and back links on narrow ones (`m164-help-contents`)
+## RELEASED — `M164`, the Help page's contents stay within reach: a sticky contents column on wide screens, a Contents button and back links on narrow ones (`R-b1ffa90b`) (merged as PR #357, `975ee348`, 6/6 green on BOTH its runs with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-Taken 2026-10-12 by the session that built `M162` and `M163`, again in `C:\laragon\www\fb-help` with its own stack. Branch
-`m164-help-contents`, cut from `origin/main` at `c502757a`, PR into main; **merged only after the user is asked**, and never while the
-OCR session's `M158`–`M161` deploys are in flight (its standing request, and the user's rule for both sessions). The user's comment on
-`M163` (2026-10-12, in chat): *"I saw it. but i am having a hard time scrolling up and down checking the contents, is there another way
-that contents are always seen? can we have the contents on the elft side? or anything you can recommend so users wont have difficulty
-on getting back to the content"* — `M163` confirmed seen. ⚠️ **A recorded deviation:** the backlog row for this comment is filed IN THIS
-PR, not in this claim's push, because the OCR session asked that nothing outside `paths-ignore` reach `main` while its merges are in
-flight, and `docs/feature-backlog.md` and `docs/pipeline.md` are not ignored. This push touches `lane-a.md` alone.
+Built 2026-10-12 in `C:\laragon\www\fb-help`, beside the OCR session's `M158`–`M161` merges. Held until they had all finished, then rebased.
+The rebase regenerated `docs/pipeline.md` rather than merging it, and re-appended this row after the other session's rows. CI was rerun
+on the rebased head `f340f628`, and the PR was merged with the user's go-ahead. Deployed by run 38237868783; gate baselines from the
+post-merge run 38234652698.
 
-### Evidence verified
-- `resources/js/Pages/help/Index.vue` on `origin/main` renders the contents list once, above the first chapter; nothing else on the page
-  links back to it, and with `M163` the page holds twenty-three chapters — held.
-- The page scrolls inside `.app-shell__content` (`AppLayout.vue`: `overflow-y: auto`), not the window; `.app-shell` uses `overflow-x: clip`,
-  which keeps `position: sticky` working — held, read in the layout's own comment.
+**Taken, every claimed file edited:**
+- **Wide screens (`Index.vue`):** from 1024px the contents are a sticky column inside `.app-shell__content`. It scrolls on its own; the
+  chapter being read is marked `aria-current="location"`, drawn apart with a bar, and kept in the column's view.
+- **Narrow screens:** below 1024px a fixed **Contents** button, and **Back to contents** after every chapter.
+- **Tests:** `index.test.ts` gained four cases, and `tests/e2e/help-contents.spec.ts` is new.
+- **The row** was filed in the PR, as the claim recorded.
 
-### Premise verified
-- The remedy the user suggested — "contents on the left side" — fits a wide screen only: below 1024px the app sidebar collapses to icons
-  and a second column would squeeze the text. Narrow screens keep the list on top and get a way back to it instead.
-- `Index.vue`, `index.test.ts` and `tests/e2e/responsive-axe.spec.ts` are this session's own recent files; no open PR of the OCR session
-  touches them (`M161`'s spec edit is `builder-axe.spec.ts`).
-- `IntersectionObserver` does not exist in happy-dom, so the highlight of the current chapter must degrade to "no highlight", not throw.
+**The prediction:**
+- **"The new cases red against the current page": held.** On the trunk's page, 2 Vitest cases and all 3 E2E cases went red. The desktop
+  E2E case was red only on "element not found", so it was proved again by a mutation: with `position: sticky` removed, it reddened on
+  "contents in viewport".
+- ❌ **"Most likely wrong: the sticky column": wrong in the other direction.** It held at its first real run. What was wrong was the
+  CURRENT-CHAPTER mark:
+  - An `IntersectionObserver` never marked the short closing chapter, which cannot reach the 40% line. A real browser showed it, so the
+    mark is now read from the scroll position, with an end-of-page rule.
+  - A screenshot then showed the marked chapter below the column's fold at 1440×900. The column now scrolls itself to keep it in view,
+    and the E2E case asserts it; the assertion was red before that fix.
+- **Unpredicted:** the rebase conflicted in `docs/feature-backlog.md` as well as `docs/pipeline.md`, because both sessions had appended
+  rows. It was resolved by taking the trunk's file and re-appending this one row.
 
-### Remedy verdict
-- Measured by reading the layout, not yet in a browser: a two-column grid inside the page (contents ~240px, sticky with its own scroll,
-  current chapter marked `aria-current`), collapsing to one column below 1024px with a fixed "Contents" button and a "Back to contents"
-  link at the end of each chapter. Proved in a real browser by a new E2E case: after scrolling to the last chapter, the contents column is
-  still on screen at desktop width, and the button brings the list back at phone width.
-
-Files: `resources/js/Pages/help/Index.vue`, `resources/js/Pages/help/index.test.ts`, `tests/e2e/help-contents.spec.ts` (new),
-`docs/feature-backlog.md` (the row, filed in the PR — see above), `docs/pipeline.md` (regenerated).
-Shared artefacts taken: the close-out set — shared with the OCR session's writer, rebased before every push.
-Paired files taken: none.
-Namespaces spent: nothing from either namespace.
-Prediction: the new Vitest cases red against the current page (no back links, no button, no highlight); the new E2E case red on the
-trunk at desktop width (the list scrolls away). **Most likely wrong: the sticky column** — a scroll container or `overflow` between it and
-`.app-shell__content` that I have not read would pin it to the page instead of the viewport.
+**Proof:**
+- Mutants, each caught by its own case: `position: static` (E2E desktop), the end-of-page rule removed (Vitest), and the
+  keep-in-view behaviour absent (E2E desktop).
+- Locally: Vitest 122 passed (help and shell); `vue-tsc` clean; responsive-axe Help 6/6 and help-contents 3 passed (3 skipped by
+  width), both on fresh builds.
 
 ## RELEASED — `M161`, a tap on a Structure row brings the question's settings on screen at compact widths (`R-313c232d`, `R-a53755f5`, `R-d285b9a3`) (merged as PR #355, `7ac9c46e`, 6/6 green with real step counts on every run — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

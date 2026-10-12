@@ -16,69 +16,7 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M158`, the reader keeps every tick Vision returns (`R-b2d00ba2`) (`m158-ocr-dropped-ticks`)
-
-Taken 2026-10-11. Branch `m158-ocr-dropped-ticks`, cut from `origin/main` at this claim's commit, PR into main.
-⛔ **Built today, merged only once the Oct 12 testing session starts (`D109`; the user chose "build now, merge tomorrow" in chat).**
-Row: `R-b2d00ba2` — *"The reader drops a tick Vision did return when a stray word sits between the mark and its label, or when
-the mark and its label land on two lines."* Filed in this push, the last row of `docs/feature-backlog.md` (cited by id, not by line).
-Recorded in the same push: `D112` (ink in the box, free, over the Claude arm) with `ocr-ink-ticks` and `ocr-ink-live`.
-The session opened with the user's check of `M157`: ✅ confirmed on staging ("the note show below the field").
-
-### Evidence verified
-- `OcrAnswerReader::choices()`'s walk-back `break`s on the first word that is not wholly a mark — held, read on `origin/main` today.
-- `labelSpan()`'s `$foreignMark` rule keeps a wholly-mark word out of every label span — held; a lone `☑` at a line's end is
-  therefore never looked at unless a label follows it on the same line.
-- `OcrLineBuilder`'s grouping: tolerance 0.5 × the page's median word height, a running-mean centre, words sorted by centre — held.
-- Sheet 06 (`C:/ocr-samples-hint/06/20261008_191026.jpg.google_vision.json`): `Male ☑ ☑Fe Female` — held, measured.
-- Sheet 09 (`…/09/20261008_191106.jpg.google_vision.json`): `✓ Fever ☑` | `Cough Headache Rash None`, Rash 0.0052078 off the
-  running centre against 0.0051903 — held, measured by replaying the builder's arithmetic on the cached words.
-- Round 1's `fields.csv` (`C:/ocr-samples/_work/m149-with-hint`): 06 field_8 "read as blank, but it was answered"; 09 field_9 `fever`
-  for `fever; rash` — held.
-
-### Premise verified
-- ❌ **The tree says the opposite of the measurement in four places**: `OcrAnswerReader::MARK_SEEN`'s docblock, ADR-0010
-  (`docs/adr/0010-ocr-provider-cloud-vision.md`), `OcrTickConfidenceTest.php`'s comments, and §9 of `docs/ocr-pipeline-design.md`
-  all call Round 1's one wrong tick "a second mark Vision never returned" and every blank tick "never returned". Vision returned
-  that mark (`☑` at 0.935) and one of the 22 blanks. **The 80 floor itself stands** — its own measurement (16 ticks read right and
-  withheld) is independent of the misattributed sentence; only the reasoning is corrected.
-- `OcrAnswerReader.php` is a **hub** (four open rows cite it) — this increment's one hub; no other row in this batch edits it, and
-  none of the four citing rows is taken. `OcrText.php` and the typesetter are not hubs.
-- Single-form OCR is on staging (`M135`), so the defect is live there today; the forward queue's `M160` also reaches the reading
-  path but not this file's `choices()`.
-- Fixing shape B in `OcrLineBuilder` instead was weighed and rejected: it moves the lines of EVERY question type (combs, captions,
-  anchors); the reader-side fix moves only choice questions.
-
-### Remedy verdict
-- No remedy was offered by the row beyond its mechanism; the prescribed fix is this claim's, measured by hand before any test:
-  - **Shape A:** the walk-back continues through a word whose LEADING characters are symbol marks (normal form empty: ☑ ☒ ✓ ✔ ✗ ✘
-    × / \ * +), crediting those characters. On 06: `☑Fe` gives `☑`, then `☑` — Female marked. A letter mark (x, v, χ, 区)
-    still counts only as a whole word, so a written "Xavier" in the gap never reads as a tick.
-  - **Shape B:** a mark word that no option consumed is credited to the found option whose label begins nearest to its right,
-    within 1.5 median word heights along the line and one line height across; two candidates credit none. On 09: `☑` ends at
-    x 0.472, Rash begins at 0.479 (median word height 0.0104), centres 0.0049 apart — credited to Rash.
-- Offline re-score of Round 1 (`ocr:bakeoff … --offline`, host PHP) before and after is the measurement of record.
-
-Files: `app/Services/Ocr/OcrAnswerReader.php`, `app/Services/Ocr/OcrText.php`, `tests/Feature/Ocr/PrintedFormMatcherTest.php`,
-`tests/Feature/Ocr/Support/PrintedPageTypesetter.php`, `tests/Feature/Ocr/OcrTickConfidenceTest.php`,
-`docs/ocr-pipeline-design.md` (§9), `docs/adr/0010-ocr-provider-cloud-vision.md`.
-Shared artefacts taken: `docs/ocr-pipeline-design.md`, `docs/adr/0010-ocr-provider-cloud-vision.md`, and the close-out set.
-Paired files taken: none.
-Namespaces spent: nothing from either namespace (decision `D112` is recorded, derived as the next after `D111`).
-Prediction: the two new matcher cases red on the trunk, one per shape, plus the letter-mark guard green on both sides (it guards,
-it does not reproduce). Round 1 re-scored: 06 field_8 → `f` and 09 field_9 → `fever; rash`, both in the review band; **no other
-field moves** — the one I most expect to be wrong, because a lone mark word elsewhere on a page (22 such near option lines) may now
-find a label it did not before.
-
-### Forward queue — claims taken now, each extended with its three fields in a pushed commit before its first file is opened
-- **`M159` — `ocr-ink-ticks`** — ✅ **EXTENDED (its three fields below), pushed before its first file was opened.**
-- **`M160` — `ocr-ink-live`** — ✅ **EXTENDED (its three fields below), pushed before its first file was opened.**
-- **`M161`** — ✅ **EXTENDED (its three fields below), pushed before its first file was opened.**
-- **`M160` — `ocr-ink-live`**, only if `M159` meets `D112`'s bar and the user OKs `gd` in the app image; files named at its extension.
-- **`M161` — `R-313c232d` + `R-a53755f5` + `R-d285b9a3`** (branch `m161-builder-compact-select`): `resources/js/Pages/forms/Builder.vue`
-  (the hub), `resources/js/Pages/forms/builder-layout.test.ts`, `docs/claims/TEMPLATE.md`. The user chose `R-313c232d` over
-  `version-diff-ui` in chat.
-- All four merge tomorrow in this order, each released after its own post-merge run.
+## Status: ACTIVE CLAIM — `M164`, the Help page's contents stay on screen (`m164-help-contents`) — the other session's; `M158`–`M161` released below
 
 ### Claim — `M164`, the Help page's contents stay on screen: a sticky contents column on wide screens, a Contents button and back links on narrow ones (`m164-help-contents`)
 
@@ -91,20 +29,20 @@ on getting back to the content"* — `M163` confirmed seen. ⚠️ **A recorded 
 PR, not in this claim's push, because the OCR session asked that nothing outside `paths-ignore` reach `main` while its merges are in
 flight, and `docs/feature-backlog.md` and `docs/pipeline.md` are not ignored. This push touches `lane-a.md` alone.
 
-#### Evidence verified
+### Evidence verified
 - `resources/js/Pages/help/Index.vue` on `origin/main` renders the contents list once, above the first chapter; nothing else on the page
   links back to it, and with `M163` the page holds twenty-three chapters — held.
 - The page scrolls inside `.app-shell__content` (`AppLayout.vue`: `overflow-y: auto`), not the window; `.app-shell` uses `overflow-x: clip`,
   which keeps `position: sticky` working — held, read in the layout's own comment.
 
-#### Premise verified
+### Premise verified
 - The remedy the user suggested — "contents on the left side" — fits a wide screen only: below 1024px the app sidebar collapses to icons
   and a second column would squeeze the text. Narrow screens keep the list on top and get a way back to it instead.
 - `Index.vue`, `index.test.ts` and `tests/e2e/responsive-axe.spec.ts` are this session's own recent files; no open PR of the OCR session
   touches them (`M161`'s spec edit is `builder-axe.spec.ts`).
 - `IntersectionObserver` does not exist in happy-dom, so the highlight of the current chapter must degrade to "no highlight", not throw.
 
-#### Remedy verdict
+### Remedy verdict
 - Measured by reading the layout, not yet in a browser: a two-column grid inside the page (contents ~240px, sticky with its own scroll,
   current chapter marked `aria-current`), collapsing to one column below 1024px with a fixed "Contents" button and a "Back to contents"
   link at the end of each chapter. Proved in a real browser by a new E2E case: after scrolling to the last chapter, the contents column is
@@ -119,132 +57,89 @@ Prediction: the new Vitest cases red against the current page (no back links, no
 trunk at desktop width (the list scrolls away). **Most likely wrong: the sticky column** — a scroll container or `overflow` between it and
 `.app-shell__content` that I have not read would pin it to the page instead of the viewport.
 
-### Claim extension — `M159`, `ocr-ink-ticks`: the ink in each printed box, in the bake-off (`m159-ocr-ink-ticks`)
+## RELEASED — `M161`, a tap on a Structure row brings the question's settings on screen at compact widths (`R-313c232d`, `R-a53755f5`, `R-d285b9a3`) (merged as PR #355, `7ac9c46e`, 6/6 green with real step counts on every run — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-Taken 2026-10-11, after `M158`'s PR (#351) was opened. ⚠️ **Branch cut from `origin/m158-ocr-dropped-ticks`, not from `origin/main` — a
-recorded deviation:** the ink reader needs the option labels `M158`'s `choices()` now finds (`$labelStarts`), `M158` cannot merge before
-the Oct 12 session (`D109`), and a branch from the trunk would rebuild the same lines in conflict. Tomorrow `M158` merges first and this
-branch rebases onto the trunk with nothing of `M158` left in its diff. Row: the marker `ocr-ink-ticks`, the end of `docs/ocr-pipeline-design.md`.
+Built 2026-10-11/12, merged 2026-10-12 with the user's go-ahead (asked before the merge, the user's rule for both sessions), fourth of
+four. Claim extension `4e7c0b2d`, and the remedy amended in its own pushed commit (`8e6cbde4`) before either new file was opened.
+Post-merge CI run 38220300362; deployed by run 38223373171. The user chose `R-313c232d` over `version-diff-ui` in chat.
 
-#### Evidence verified
-- The marker's premise — Vision returns nothing for 20 of Round 1's 22 blank tick questions — measured in `M158` (held).
-- `OcrLineBuilder` turns a page upright and deskews it, so a region's words are NOT in the photo's pixel frame (held: `upright()`,
-  `rotate()`); the provider's own boxes are, in the stored frame (the raw JPEG's, EXIF orientation not applied) — measured: the
-  prototype reads raw pixels at Vision's boxes and finds the printed boxes.
-- `PrintedFormMatcher::result()` copies named keys only, so a read's extra key never reaches the stored extraction (held).
-- Host PHP has `gd` and `exif`; the app container and CI's `setup-php` list do not name `gd` (held — `ci.yml` extension lists).
+**What changed:** `BuilderCanvas.vue` emits `picked` for a tap on a question or section row, and `Builder.vue` answers it with the settings
+pane. `docs/claims/TEMPLATE.md` asks for a row's id, never its `file:line` (`R-a53755f5`). `R-d285b9a3` closed on its premise (its ledger
+half fixed by `M120`; the rest is released history). Filed `R-a5c57fc6` (a preview-drag E2E flake).
 
-#### Premise verified
-- The ink arm is harness-only: nothing on the reading path changes, so nothing testers see moves (`ocr-ink-live` is that, and waits on
-  the bar and the user's OK for `gd`).
-- `OcrAnswerReader.php` is a hub — this increment's one hub row; `PrintedFormMatcher.php`, `OcrLineBuilder.php`, `OcrWord.php`,
-  `config/ocr.php` and the bake-off command are not.
-- ⚠️ The settings are tuned on the same fifteen forms they are scored on — the bar is measured on its own training set. Reported as
-  such; the first fresh scans are the real test.
+**How the prediction fared:**
+- ❌ **The row's remedy was wrong for this tree** — `watch(selection)` would also fire on every Preview tap and inline label edit, both in
+  the centre pane, and throw a phone user out of the pane they were using; measured by reading the callers, before any edit.
+- ✅ Both new Vitest cases red on the trunk; the "Edit label stays quiet" guard green on both sides.
+- ❌ "Most likely wrong: an E2E spec asserts which pane shows after an add" — none did. Local E2E (the reached specs, three viewports):
+  32/33; the miss (tablet, preview drag) passed alone on the same build and is unrelated — `R-a5c57fc6`.
+- ⚠️ The citation linter caught two shifts my `Builder.vue` edit made (+3 lines, then +1 at the template), each of which killed a ledger
+  citation; both edits were made line-neutral.
 
-#### Remedy verdict
-- Measured BEFORE any PHP, by a Python prototype over Round 1's photos and cached reads (scratchpad, not committed):
-  - a window before each option's label, sized by the PAGE's median letter height (a label word's own box inflates when a tick
-    touches it — the first prototype's every miss), counting pixels darker than 0.6 of the window's 90th-percentile grey;
-  - judged against the page's own median box (most boxes are empty): a single answer is the darkest box only when it clears that
-    median by 0.03 and the next box by 0.03, else left blank; a multi-select takes every box 0.02 over the median.
-  - **Single answers and yes/no: 28 right, 0 wrong, 2 left blank. Multi-select boxes: 74 of 75. Tick questions Vision left blank: 21 of
-    22** — over `D112`'s 9 in 10. Stable across every neighbouring setting tried (26–29 right, never a wrong single answer).
-  - Finding the printed walls was tried first and abandoned: a photo blurs a thin printed wall to grey, so walls were found mostly
-    where a tick darkened them.
+## RELEASED — `M160`, the reading job reads every tick Vision left blank from the ink in its box (`ocr-ink-live`, `D113`) (merged as PR #353, `7a6d4bcd`, 6/6 green with real step counts on its final run — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-Files: `app/Services/Ocr/OcrWord.php`, `app/Services/Ocr/OcrLineBuilder.php`, `app/Services/Ocr/OcrAnswerReader.php`,
-`app/Services/Ocr/PrintedFormMatcher.php`, `app/Services/Ocr/OcrInkReader.php` (new), `app/Services/Ocr/OcrInkImage.php` (new),
-`app/Services/Ocr/GdInkImage.php` (new), `app/Console/Commands/OcrBakeoffCommand.php`, `config/ocr.php`, `tests/Unit/Ocr/OcrInkReaderTest.php`
-(new), `tests/Feature/Ocr/PrintedFormMatcherTest.php`, `tests/Feature/Ocr/Bakeoff/OcrBakeoffCommandTest.php`, `docs/ocr-pipeline-design.md`.
-Shared artefacts taken: `docs/ocr-pipeline-design.md` and the close-out set. Paired files taken: none.
-Namespaces spent: nothing from either namespace.
-Prediction: the PHP port reproduces the prototype's numbers on Round 1 to within one box (PIL pads a crop past the image edge with black;
-the port clamps instead). The ink reader's unit cases red first against an empty class. **Most likely wrong:** the bake-off total — the
-ink answers are scored by the unchanged scorer, and a fill at review confidence may land in a verdict I have not predicted.
+Built 2026-10-11/12, merged 2026-10-12, third of four. `D113` = A (in chat): ink on during testing. Claim extension `8a045929`. Post-merge
+CI run 38215947125; deployed by run 38218776627.
 
-### Claim extension — `M160`, `ocr-ink-live`: the ink on the reading path (`m160-ocr-ink-live`)
+**What changed:** `OcrInkReader::fillBlanks()` is the one fill for the reading job and `ocr:bakeoff`; `OcrScanReader` raises
+`memory_limit` to 512M for the step and restores it; `GdInkImage` refuses a page over 40 MP from its header; an ink answer carries
+`read_by` = `ink`, and the review screen says it was read from the ink in the box, never a confidence it does not have. `gd` joins the
+app image and CI's `setup-php` lists.
 
-Taken 2026-10-11, after `M159`'s PR (#352) was opened and `D113` was answered (A: on during testing; `gd` on the server, guided).
-⚠️ **Branch cut from `origin/m159-ocr-ink-ticks`** — the same recorded deviation as `M159`, for the same reason: it moves `M159`'s
-harness fill into one place both paths share. Merges after #351 and #352, rebased onto the trunk each time.
+**⛔ The premise "on the testing server `gd` is a `php.ini` line" was WRONG, and it cost an outage on the testing day.** With
+`opcache.enable=1`, `extension=gd` in `C:\php\php.ini` made every php-cgi request a PHP fatal (*Declaration of
+Carbon\CarbonPeriod::getIterator(): Generator must be compatible with DatePeriod::getIterator(): Iterator*) from the restart at ~10:32
+until `php.ini` was restored from its backup (CLI, without opcache, loaded Carbon fine with `gd`). `gd` is now the worker's alone: NSSM
+`AppParameters` start `-d extension=gd` (read from the registry — `nssm get` prints UTF-16 that PowerShell spaces out, and the guard
+refused it), which `deploy.ps1`'s `queue:restart` keeps. The runbook (§8 steps 1 and 6), the Dockerfile, `GdInkImage` and §9 say so,
+line-neutral; recorded at `D113`.
 
-#### Evidence verified
-- `OcrScanReader::match()` parses every page and calls the matcher once; the page images are the scan's attachments, read off their
-  disk by path (held). The extraction is written from `$matched['fields']` alone (held), so the matcher's `labels` stay out of it.
-- `OcrAnswerCarry::meta()` builds the review screen's per-answer note input from named keys (held); `scan-review.ts` `readNote()`
-  turns a `review` tier into "Check this answer: it was read at N% confidence" (held) — false for an ink answer, whose 80 is a floor.
-- GD on host PHP decodes a 4624×3468 Round 1 photo at a 72 MB peak, back to 4 MB once released (measured).
-- The testing server's `php.ini` keeps `memory_limit` at 128M (§8 step 1) and enables no `gd` (held, by the document).
+**The same day, for the user's "make sure that no record will be deleted during our development in the staging":** no PR here carries a
+migration; a deploy never seeds and never touches uploaded files; the only nightly deletion is the 30-day draft reaper. A full `pg_dump`
+was taken before the merges (a PHP helper reading Laravel's own config — parsing `.env` in PowerShell got the privileged password wrong),
+and, with the user's yes, a nightly backup task (`meridian-test-db-backup`, 01:30, keeps 14). There is no off-box copy — `R-4bda047a`.
 
-#### Premise verified
-- The testing server runs PHP for Windows, not the Docker image: there `gd` is a `php.ini` line, done by the user in chat; the
-  Docker image and CI's `setup-php` lists need it for the gd adapter's test, and are this increment's to change.
-- `.github/workflows/ci.yml`, `docs/deployment-infrastructure.md` and `docs/data-dictionary.md` are hubs — all three edited by this ONE
-  row, which D13 allows (at most one row may touch hubs).
-- Without `gd` the reading path is unchanged: the opener answers null, the ink is skipped, and the scan reads as it does today.
+**How the prediction fared:**
+- ✅ The live-path case and the review-note Vitest case red first. Mutants 5/5 by `scripts/mutate.php`, Vitest 1/1 by hand.
+- ❌ **The memory-limit restore mutant first SURVIVED** — the runner's limit sat above the step's, so nothing was raised; the case set 256M.
+  ❌ **Then CI's Pest went red on that case:** by the OCR tests the full suite holds ~366 MB, and PHP refused a limit below it. The case now
+  sets its limit just above the run's own usage; the mutant is caught again.
+- ❌ "Most likely wrong: the CI image" — not established either way; `gd` is listed explicitly now.
 
-#### Remedy verdict
-- The marker's remedy holds as measured in `M159` (21 of 21 on Round 1). Its two live-path risks, measured: memory (a 72 MB decode under
-  a 128M limit — the ink step raises the limit only for its own run and refuses a page over 40 million pixels) and the review note
-  (a separate "read from the ink" note, never the confidence sentence).
+## RELEASED — `M159`, the ticks Vision never returns, read from the ink in their boxes, in the bake-off (`ocr-ink-ticks`, `D112`) (merged as PR #352, `c502757a`, 6/6 green with real step counts on every run — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-Files: `app/Services/Ocr/OcrInkReader.php`, `app/Services/Ocr/GdInkImage.php`, `app/Services/Ocr/OcrScanReader.php`,
-`app/Services/Ocr/OcrAnswerCarry.php`, `app/Console/Commands/OcrBakeoffCommand.php`, `resources/js/components/ocr/scan-review.ts`,
-`resources/js/components/ocr/scan-review.test.ts`, `docker/Dockerfile`, `.github/workflows/ci.yml`,
-`docs/deployment-infrastructure.md`, `docs/data-dictionary.md`, `docs/ocr-pipeline-design.md`, `tests/Unit/Ocr/OcrInkReaderTest.php`,
-`tests/Feature/Ocr/ReadOcrScanJobTest.php`, `tests/Feature/Ocr/OcrAnswerCarryTest.php`, `tests/Feature/Ocr/GdInkImageTest.php` (new),
-`tests/Feature/Ocr/Bakeoff/OcrBakeoffCommandTest.php`.
-Shared artefacts taken: the three hub documents above, `docs/ocr-pipeline-design.md`, and the close-out set. Paired files taken: none.
-Namespaces spent: nothing from either namespace (decision `D113` recorded).
-Prediction: the live-path case red first (a blank tick stays blank on the trunk of this branch); the review-note Vitest case red first;
-the gd adapter test cannot run in the app container until the image is rebuilt — **most likely wrong: the CI image** — `setup-php` may
-already ship `gd` by default, in which case the `ci.yml` edit is redundant but harmless.
+Built 2026-10-11, merged 2026-10-12, second of four. `D112` = B (in chat, the user's "as much as possible, we will choose the free one"):
+the ink in each printed box over the Claude arm. Claim extension `58a094a2`; the branch was cut from `M158`'s (a recorded deviation) and
+rebased onto the trunk once `M158` merged. Post-merge CI run 38208992351; deployed by run 38211013099.
 
-### Claim extension — `M161`, `R-313c232d` + `R-a53755f5` + `R-d285b9a3`: the builder's settings follow a selection at compact widths (`m161-builder-compact-select`)
+**What changed:** `OcrInkReader` (a window before each option's label sized by the PAGE's letter height; ink a pixel darker than 0.6 of the
+window's paper grey; each box judged against the page's median box), `GdInkImage`, `OcrWord::$source` carried by the line builder, the
+reader's `labels` (never stored), and `ocr:bakeoff --ticks=ink`. **Round 1: all 21 tick questions Vision left blank read right, 55 → 34
+of 180 needing correction (18.9%), 0 silent** — tuned on the same fifteen forms, so the first fresh scans are the real test.
 
-Taken 2026-10-11, after `M160`'s work was committed. Branch cut from `origin/main` (no OCR file in it). The user chose `R-313c232d` over
-`version-diff-ui` in chat ("Builder fix on small screens"). Rows cited by id: `R-313c232d`, `R-a53755f5`, `R-d285b9a3`.
+**How the prediction fared:**
+- ✅ The PHP port reproduced the Python prototype — better than predicted: 21 of 21, where the prototype's one miss was its own artefact (a
+  handwritten "NONE" on page 2 found by text search; the reader's labels come from the question's own region).
+- ❌ "The unit cases red first against an empty class" — the class was written before its tests; proved instead by 7 mutants (one aborted
+  because Pint had reflowed its token; re-run and caught).
+- ❌ "Most likely wrong: the bake-off total" — no unpredicted verdict appeared.
 
-#### Evidence verified
-- `R-313c232d`: in `resources/js/Pages/forms/Builder.vue`, `pane` defaults to `'canvas'`, `onMounted` selects the first field, and the
-  comment above the `saveError` watcher records that a `watch(selection, …)` was rejected for firing on load — all held today.
-- `R-a53755f5`: `docs/claims/TEMPLATE.md`'s opening block still asks for "the backlog row … with its file:line" — held; it is the
-  instruction that produces the defect.
-- `R-d285b9a3`: the two ledger sentences it names now cite "the closed-vocabulary row" by name, not by line (reworded by `M120`) — the
-  ledger half is already fixed; what remains are line citations inside RELEASED claim blocks.
+## RELEASED — `M158`, the reader keeps every tick Vision returns (`R-b2d00ba2`) (merged as PR #351, `7b42b998`, 6/6 green with real step counts on every run — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-#### Premise verified
-- `R-313c232d`'s premise holds, and `M103`'s note sharpens it: `flush: 'post'` alone is inert — the watcher is active when `onMounted`
-  selects, so the MOUNTED FLAG suppresses the load-time fire and must be set only after `nextTick()`. `selection` also moves on add-field,
-  add-section, duplicate and insert-from-library, so the pane follows those too (wanted: each lands on the new item's settings).
-- `R-d285b9a3`'s remaining citations sit in dated RELEASED blocks: rewriting them falsifies the log (`M40`), and repairing them by a
-  delta is exactly what `R-a53755f5` forbids — so it closes on the ledger half being done and the claim-file half being `R-a53755f5`'s class.
-- `Builder.vue` and `builder-layout.test.ts` are hubs, edited by the one row `R-313c232d`; `TEMPLATE.md` is not a hub.
+Built 2026-10-11 under `D109`'s freeze — the user chose "build now, merge tomorrow" — and merged 2026-10-12, the testing day, first of four,
+after the second session's `M163` and a fresh staging backup, with the user's go-ahead before each merge. Claim `c6b658ea`, pushed before
+any file was opened, with `D112` and the forward queue. Post-merge CI run 38206212147; deployed by run 38208368563. All four branches were
+rebased five times onto a trunk the second session (`M162`–`M164`, in its own worktree) kept moving; the line and the census were
+regenerated each time, never hand-merged.
 
-#### Remedy verdict
-- `R-313c232d`: the row's own remedy — a post-flush `watch(selection)` behind a mounted flag set after `nextTick()` in `onMounted` —
-  measured against Vue's scheduling by reading it, to be proved in a real browser at phone width before the PR.
-- `R-a53755f5`: the row's remedy — cite the row by id or heading, never a claim file or a document the same push edits by line — goes
-  into the template's opening block.
+**What changed:** the walk back from a label continues through a word led by a SYMBOL mark ("☑Fe"; never x, v, χ or 区), and a mark no
+option took is credited to the label just to its right on whichever line it landed, capped at the review band. Round 1: 57 → 55 of 180, 0
+silent; only sheet 06's Sex and sheet 09's Symptoms moved. The four sentences that called Round 1's one wrong tick "never returned" corrected.
 
-Files: `resources/js/Pages/forms/Builder.vue`, `resources/js/Pages/forms/builder-layout.test.ts`, `docs/claims/TEMPLATE.md`, and one
-builder E2E spec for a compact-width selection case (`tests/e2e/responsive-axe.spec.ts` or `builder-axe.spec.ts`, whichever drives the
-builder at phone width). Shared artefacts taken: the E2E spec and the close-out set. Paired files taken: none.
-Namespaces spent: nothing from either namespace.
-Prediction: the layout test's new assertion red first; `builder-axe`, `field-library-axe` and `responsive-axe` locally — **most likely
-wrong: one of them** asserts which pane shows after an add or a library insert, and now sees Settings.
-
-#### Remedy verdict, amended before the first edit (pushed as its own commit)
-- ❌ **The row's remedy is WRONG for this tree, measured by reading the callers before writing it.** `selection` is also set by the
-  Preview's row click (`PreviewPane.vue` `onSelect`, which the Preview's own Edit button bubbles to) and by `BuilderCanvas.vue`'s
-  `startEdit()` (the Edit label button and a double-click). Both live in the CENTRE pane, so a `watch(selection)` would, at a phone's
-  width, throw an author out of the Preview to Settings on every tap and hide the inline label editor the moment it opened.
-- **The fix is an explicit signal instead:** a tap on a question or section row in the Structure canvas emits `picked`, and only that
-  brings the settings pane on screen. The load-time select, the Preview, the inline edit, adds and undo leave the pane alone — so the
-  mounted-flag trap the row records does not arise at all.
-- Files added to the claim: `resources/js/components/builder/BuilderCanvas.vue` (a hub, the same row) and
-  `resources/js/components/builder/BuilderCanvas.test.ts`.
+**How the prediction fared:**
+- ✅ Two cases red on the trunk, the letter-mark guard green on both sides; ✅ only the two predicted fields moved; mutants 5/5.
+- ❌ "Both in the review band" — sheet 06's tick reads at 91, auto: a mark before its label already passes at the glyph's own confidence. The
+  cap was added for the geometric credit only.
 
 ## RELEASED — `M163`, the Help page's "Builder reference": every question type, its settings, and the builder's left and right panels, with a numbered picture of each panel (`R-ccc0be00`, `D115`) (merged as PR #356, `84a3223a`, 6/6 green on its FIRST run with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

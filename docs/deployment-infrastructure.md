@@ -421,7 +421,7 @@ measured against it, and the measurement is named wherever one was taken.
 `conf\extra\meridian.conf`. `CENTRAL_DOMAIN=pitahc.gov.ph`, and `pitahc.gov.ph` itself is the agency
 website on a different machine — so **no wildcard, no subdomain workspaces, and no path-prefixed deploy**.
 App at `C:\meridian\test-app`, PHP 8.4.25 x64 NTS at `C:\php` behind `php-cgi-9000`/`9001`, PostgreSQL 15
-+ PostGIS, worker `meridian-test-worker`, scheduler `meridian-test-scheduler` (every minute).
++ PostGIS, worker `meridian-test-worker`, scheduler `meridian-test-scheduler` (every minute). Nightly database backup `meridian-test-db-backup` (Task Scheduler, SYSTEM, 01:30): `C:\php\php.exe C:\meridian\backups\nightly-dump.php` boots the app to read the privileged connection's login and `pg_dump`s to `C:\meridian\backups\nightly\`, keeping the newest 14 (2026-10-12; no off-box copy — `R-4bda047a`).
 Main `ErrorLog` is `logs\error_log` — **no extension** — and the vhost writes
 `logs\meridian-{access,error}.log`. `openssl.exe` ships at `C:\Apache24\bin\`.
 

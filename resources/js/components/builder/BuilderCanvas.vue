@@ -14,14 +14,14 @@
 import { computed, nextTick, ref } from 'vue';
 import { MdsBadge, MdsButton, MdsEmptyState, MdsIcon, MdsIconButton, statusVariant } from '@meridian/design-system';
 import InlineLabelEdit from './InlineLabelEdit.vue';
-import type { LocalField } from './types';
+import type { LocalField, Selection } from './types';
 import type { BuilderStore } from './useBuilderStore';
 import { useCanvasReorder } from './useCanvasReorder';
 import { useFlipReorder } from './useFlipReorder';
 
 const props = defineProps<{ store: BuilderStore; fieldTypeLabels: Record<string, string> }>();
 // M139 (`R-598b9100`): "Add a question here" on an empty section — the builder selects it and opens the palette.
-const emit = defineEmits<{ 'add-question': [sectionUid: string | null] }>();
+const emit = defineEmits<{ 'add-question': [sectionUid: string | null]; picked: [] }>();
 
 const store = props.store;
 const groups = store.groups;
@@ -51,6 +51,15 @@ const {
     onSectionPointerDown,
     onSectionKeydown,
 } = reorder;
+
+/**
+ * A question or section row tapped (M161, `R-313c232d`): selected, and the builder told, so that at a phone's width it can bring the
+ * settings pane on screen. Only a tap says so — {@see startEdit()} selects too, and its editor lives in THIS pane.
+ */
+function pick(next: Selection): void {
+    store.select(next);
+    emit('picked');
+}
 
 function startEdit(uid: string): void {
     if (isReordering.value) return;
@@ -141,7 +150,7 @@ const hasContent = (): boolean => groups.value.some((g) => g.fields.length > 0) 
                         type="button"
                         class="canvas__section-head"
                         :aria-pressed="isSelectedSection(group.section.uid)"
-                        @click="store.select({ kind: 'section', uid: group.section.uid })"
+                        @click="pick({ kind: 'section', uid: group.section.uid })"
                     >
                         <MdsIcon name="layout" size="sm" />
                         <span class="canvas__section-label">{{ group.section.label }}</span>
@@ -191,7 +200,7 @@ const hasContent = (): boolean => groups.value.some((g) => g.fields.length > 0) 
                                 type="button"
                                 class="canvas__field-main"
                                 :aria-pressed="isSelectedField(field.uid)"
-                                @click="store.select({ kind: 'field', uid: field.uid })"
+                                @click="pick({ kind: 'field', uid: field.uid })"
                                 @dblclick="startEdit(field.uid)"
                             >
                                 <span class="canvas__field-type">{{ typeLabel(field) }}</span>

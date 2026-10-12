@@ -23,6 +23,31 @@ function canvas() {
     return { store, wrapper: mount(BuilderCanvas, { props: { store, fieldTypeLabels: { short_text: 'Text' } } }) };
 }
 
+/**
+ * M161 (`R-313c232d`) — at a phone's width the settings sit in a pane of their own, so a tap on a question or section row tells
+ * the builder to bring them on screen. Only the tap: editing a label in place selects the question too, and must stay put.
+ */
+describe('BuilderCanvas — a row picked (M161)', () => {
+    it('says so when a question row or a section row is tapped', async () => {
+        const { store, wrapper } = canvas();
+
+        await wrapper.find('.canvas__field-main').trigger('click');
+        await wrapper.findAll('.canvas__section-head')[1].trigger('click');
+
+        expect(wrapper.emitted('picked')).toHaveLength(2);
+        expect(store.selection.value).toMatchObject({ kind: 'section' });
+    });
+
+    it('stays quiet when a label is opened for editing, by its button or a double-click', async () => {
+        const { store, wrapper } = canvas();
+
+        await wrapper.find('button[aria-label^="Edit label of"]').trigger('click');
+
+        expect(store.selection.value).toMatchObject({ kind: 'field' });
+        expect(wrapper.emitted('picked')).toBeUndefined();
+    });
+});
+
 describe('BuilderCanvas — an empty section (M139)', () => {
     it('says a question can be dragged in, and only where a section has none', () => {
         const { wrapper } = canvas();

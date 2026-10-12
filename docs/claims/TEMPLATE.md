@@ -25,7 +25,7 @@ anchor stays and the edit is provably neutral to the numbering — measured befo
 ## Status: ACTIVE CLAIM — <row name> (<branch>)
 
 Taken <date>. Branch <branch>, cut from origin/main at <sha>, PR into main.
-Row: <the backlog row, quoted enough to identify it, with its file:line>.
+Row: <the backlog row's id, quoted enough to identify it — never its file:line, which the next edit to that file moves>.
 
 ### Evidence verified
 <each file:line citation in the row, checked against the MERGED tree — held / moved to X / false.
@@ -47,6 +47,10 @@ Namespaces spent: <migration prefix / ADR number / §D<n> — or "nothing from e
 Prediction: <what you expect the gates to do, written BEFORE the run so it can be measured
              against rather than explained afterwards. Name the one you most expect to be wrong.>
 ```
+
+⚠️ **Cite a row by its id, and a claim by its heading — never by line** (`R-a53755f5`, `M161`). A claim file moves its own contents at
+every release, and a citation into a file the same push edits is wrong on arrival; `scripts/citation-liveness-lint.php` excludes
+`docs/claims/` outright, so nothing would ever report it. Repairing such a citation by adding the delta is the same defect again.
 
 ## Releasing it
 

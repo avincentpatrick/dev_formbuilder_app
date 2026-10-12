@@ -30,7 +30,7 @@ vi.mock('@/components/shell/PageHeader.vue', () => ({
     },
 }));
 
-const { manual, quotedLabels } = await import('@/components/help/manual');
+const { MANUAL_PARTS, manual, manualFigures, quotedLabels } = await import('@/components/help/manual');
 const Help = (await import('./Index.vue')).default;
 
 function render(): VueWrapper {
@@ -75,7 +75,8 @@ describe('the Help page', () => {
         expect(wrapper.findAll('h1')).toHaveLength(1);
         // The contents heading plus one per chapter.
         expect(wrapper.findAll('h2')).toHaveLength(manual.length + 1);
-        expect(wrapper.findAll('h3')).toHaveLength(manual.flatMap((c) => c.sections).length);
+        // One per section, plus one per part in the contents list (M163).
+        expect(wrapper.findAll('h3')).toHaveLength(manual.flatMap((c) => c.sections).length + MANUAL_PARTS.length);
         expect(wrapper.findAll('h4, h5, h6')).toHaveLength(0);
         wrapper.unmount();
     });
@@ -85,6 +86,37 @@ describe('the Help page', () => {
         const ids = wrapper.findAll('[id]').map((n) => n.attributes('id'));
 
         expect(new Set(ids).size).toBe(ids.length);
+        wrapper.unmount();
+    });
+
+    it('groups the contents by part, the walk-through first, and names the part of each chapter on its card', () => {
+        const wrapper = render();
+        const groups = wrapper.findAll('.manual__contents-group');
+
+        expect(groups.map((g) => g.find('h3').text())).toEqual(MANUAL_PARTS.map((part) => part.title));
+        for (const [i, part] of MANUAL_PARTS.entries()) {
+            expect(groups[i].findAll('a').map((a) => a.attributes('href'))).toEqual(
+                manual.filter((c) => c.part === part.key).map((c) => `#${c.id}`),
+            );
+        }
+        for (const chapter of manual) {
+            const title = MANUAL_PARTS.find((part) => part.key === chapter.part)?.title;
+            expect(wrapper.find(`section#${chapter.id} .manual__chapter-part`).text(), chapter.id).toBe(title);
+        }
+        wrapper.unmount();
+    });
+
+    it('shows each picture with its description, at its own size', () => {
+        const wrapper = render();
+        const images = wrapper.findAll('figure img');
+
+        expect(images.map((img) => img.attributes('src'))).toEqual(manualFigures().map((f) => f.src));
+        for (const [i, figure] of manualFigures().entries()) {
+            expect(images[i].attributes('alt')).toBe(figure.alt);
+            expect(images[i].attributes('width')).toBe(String(figure.width));
+            expect(images[i].attributes('height')).toBe(String(figure.height));
+        }
+        expect(wrapper.findAll('figure figcaption')).toHaveLength(manualFigures().length);
         wrapper.unmount();
     });
 

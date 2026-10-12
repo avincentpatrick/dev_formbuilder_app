@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { manual, manualLinks, quotedLabels } from './manual';
+import { MANUAL_PARTS, manual, manualFigures, manualLinks, quotedLabels } from './manual';
 import { navItems } from '@/components/shell/nav-model';
 
 /**
@@ -109,5 +109,56 @@ describe('the manual is one well-formed page', () => {
         const navHrefs = new Set(navItems.map((item) => item.href));
         const broken = manualLinks().filter((l) => (l.href.startsWith('#') ? !ids.includes(l.href.slice(1)) : !navHrefs.has(l.href)));
         expect(broken.map((l) => `${l.at}: ${l.href}`)).toEqual([]);
+    });
+});
+
+describe('the Builder reference covers the whole builder (M163, `R-ccc0be00`, `D115`)', () => {
+    const reference = manual.filter((chapter) => chapter.part === 'reference');
+    const referenceLabels = quotedLabels(reference);
+
+    it('puts every chapter in a known part, the walk-through first', () => {
+        const keys = MANUAL_PARTS.map((part) => part.key);
+        expect(manual.filter((chapter) => !keys.includes(chapter.part)).map((c) => c.id)).toEqual([]);
+        const order = manual.map((chapter) => keys.indexOf(chapter.part));
+        expect(order).toEqual([...order].sort((a, b) => a - b));
+        expect(reference.length).toBeGreaterThanOrEqual(8);
+    });
+
+    it('names every question type the builder offers', () => {
+        // ⛔ The user asked for "each input type". The types are read from the enum that defines them, so a type
+        // added to the builder and left out of the reference reddens this case rather than going unexplained.
+        const enumSource = readFileSync(join(process.cwd(), 'app/Enums/FieldType.php'), 'utf8');
+        // Only `label()`'s own match — the enum has other `self::X => '…'` arms (its config editors, for one).
+        const labelBody = enumSource.split('public function label(): string')[1]?.split('};')[0] ?? '';
+        const types = [...labelBody.matchAll(/self::\w+ => '([^']+)',/g)].map((m) => m[1]);
+        // Anti-vacuity: a renamed method or a changed arm shape would otherwise leave nothing to check.
+        expect(types.length).toBeGreaterThanOrEqual(31);
+        const named = new Set(referenceLabels.filter((l) => l.from === 'app/Enums/FieldType.php').map((l) => l.label));
+        expect([...new Set(types)].filter((type) => !named.has(type))).toEqual([]);
+    });
+
+    it('names every tab the right panel can show', () => {
+        const panel = readFileSync(join(process.cwd(), 'resources/js/components/builder/ConfigPanel.vue'), 'utf8');
+        const tabs = [...panel.matchAll(/\{ key: '[a-z_]+', label: '([^']+)' \}/g)].map((m) => m[1]);
+        expect(new Set(tabs).size).toBeGreaterThanOrEqual(10);
+        const named = new Set(referenceLabels.filter((l) => l.from === 'resources/js/components/builder/ConfigPanel.vue').map((l) => l.label));
+        expect([...new Set(tabs)].filter((tab) => !named.has(tab))).toEqual([]);
+    });
+
+    it('shows each panel in a picture that exists, at half its pixel size', () => {
+        // The pictures are written by `tests/e2e/capture/help-pictures.capture.ts` at a device scale of 2. A re-capture
+        // that changes a picture's size reddens this until `manual.ts` follows — the cue to re-read the numbered list
+        // beside it, whose numbers are the picture's badges.
+        const figures = manualFigures();
+        expect(figures.map((f) => f.src).sort()).toEqual(['/images/help/left-panel.png', '/images/help/right-panel.png']);
+        for (const figure of figures) {
+            const full = join(process.cwd(), 'public', figure.src);
+            expect(existsSync(full), figure.src).toBe(true);
+            const png = readFileSync(full);
+            expect(png.subarray(1, 4).toString('latin1'), `${figure.src} is not a PNG`).toBe('PNG');
+            // IHDR: width and height are big-endian 32-bit integers at bytes 16 and 20.
+            expect({ width: png.readUInt32BE(16) / 2, height: png.readUInt32BE(20) / 2 }, figure.src).toEqual({ width: figure.width, height: figure.height });
+            expect(figure.alt.length, `${figure.src} needs a description`).toBeGreaterThan(40);
+        }
     });
 });

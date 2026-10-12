@@ -137,6 +137,11 @@ _None open._ `D115`, the last one filed, was asked and answered on 2026-10-12 in
 
 **What the answer files, in the same push:** a `during-testing` row in `docs/feature-backlog.md` (*a guest respondent cannot upload a photo or scan of a filled paper form*), which owns the open questions the build answers first: who sees an unsaved guest scan, what the respondent is told after uploading, and how the public endpoint is kept from spending the provider's pages.
 
+**The three build questions, answered 2026-10-12 (user decision, in chat), recorded by Lane A in `M165`'s claim:**
+1. **Who sees an unsaved guest scan — the same staff as now.** Anyone who may scan for the form (`can:create` a submission for it) sees it in "Recent scans", marked "From the public link". No new notification.
+2. **What the guest is told — a thank-you and a reference.** *"Your paper form was received. Staff will check it and enter your answers."* with a reference code. The guest never sees what was read.
+3. **The spend guard — the anti-bot check plus limits the form's owner can set.** The proof-of-work challenge on every guest upload, whatever the form's own spam-check setting; a per-device window (3 uploads per device per window; 10 minutes by default, settable shorter); and a daily cap of guest scans per form (20 by default, settable). Over a limit the upload is refused politely. The user's words: *"anti-bot + limits but limits can be configurable. default is 10 minutes. it can be configured shorter time"*.
+
 ### D105 — In Preview a stepped form shows one section's page at a time, so the sections a dragged question could join are off screen. How does a drag in Preview reach them? **A — while a question is dragged, the page strip's tabs are drop targets: a drop on one moves it to the end of that page, and the preview stays on the page it was on.**
 
 **Asked and answered 2026-10-09 (user decision, in chat), recorded by Lane A in `M151`'s claim.** `R-2baef8ea` (*"please include the preview section to be draggable. i mean, questions or indicators must be draggable to sections, sequencing, etc."*) asks for a question to be dragged into a section, and in a stepped form every section but the one on screen is behind the strip.

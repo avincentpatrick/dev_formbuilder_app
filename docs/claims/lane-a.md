@@ -16,7 +16,65 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M164` is merged and live on staging (released below). The next claim is written here. Both sessions ask the user before every merge, and never merge while the other's deploy is in flight.
+## Status: ACTIVE CLAIM — `M165`, a guest uploads a photo or scan of a filled paper form from the public link (`R-7173c02c`, `D106` A) (m165-guest-paper-upload)
+
+Taken 2026-10-12. Branch `m165-guest-paper-upload`, cut from origin/main at `5affb7d6`, PR into main.
+Row: `R-7173c02c` — *"A guest respondent cannot upload a photo or scan of a paper form they filled in; only staff can (`D106` A)."*
+The user chose it in chat over two other batches, after confirming `M158`–`M161` on staging, and answered `D106`'s three claim-time
+questions (recorded at `D106` in the same push): the same staff as today see an unsaved guest scan, marked "From the public link"; the
+guest is told the form was received and given a reference; and the spend guard is the anti-bot check plus per-form limits the owner can
+set — a per-device window of 10 minutes by default, settable shorter, and a daily cap.
+
+### Evidence verified
+- `routes/tenant.php`, `forms.ocr.scans.store` — **held**: `can:create` on a submission for the form, `module:ocr_single`,
+  `feature:ocr_single`, `throttle:20,1`; every other `forms.ocr.scans.*` route carries the first three.
+- "behind the manual-encoding gate on a form's Responses tab" — **held** (`SubmissionPolicy::create`; the button is
+  `SubmissionInboxController`'s scan URL). `forms.allow_manual_encoding` itself is read by nothing (`R-6fd624b5`, already filed).
+
+### Premise verified
+- **The upload checks exist and are reusable — held, with one carve-out the row does not name.** `OcrScanService::store()` takes a
+  `User` and `AttachmentStorageService::storeOcrScanPage()` a non-null uploader id, while `ocr_scans.uploaded_by` and
+  `attachments.uploaded_by` are both nullable. A guest attachment SKIPS the storage quota today (never-block, `AttachmentStorageService::store()`
+  with a null uploader, and `docs/security-threat-model.md` says so); `D106` says a guest scan goes through the storage quota. `D106`
+  wins: a guest scan is a staff intake channel, not a respondent's answer, and the threat model's sentence is amended in this PR.
+- **"under a guest rate limit" — the premise is thinner than it reads.** Nothing meters or caps the OCR provider's pages per workspace
+  (`R-e5bd776f`, before-launch), so the per-form limits the user chose are the only spend guard on a public endpoint until that row
+  lands. The challenge is NOT on today's attachment route (deliberately, `VerifyGuestBotChallenge`'s docblock) and is skipped for any
+  form whose `bot_challenge` is off — the user's "anti-bot" answer needs it forced on for this route.
+- **A daily cap per form is form-wide**, which `EnforceGuestFormRateLimit`'s docblock calls a self-DoS lever for SUBMISSIONS. Here it
+  bounds only paper uploads — never a guest's online submit — and it is the shape the user picked; recorded in the threat model.
+- **No second copy:** no guest upload path for scans exists anywhere (`docs/ocr-pipeline-design.md` has no guest section).
+
+### Remedy verdict
+**Works, with the build questions answered by the user.** Measured against the tree: the guest group in `routes/api.php` already
+resolves the tenant from the share token, `feature:`/`module:` work inside it (`feature:save_and_resume` is the precedent), the
+challenge client half already solves a puzzle for any form (`solveChallengeHeader()`), and `SubmissionReference` mints the kind of code
+the guest is shown. It needs an ADDITIVE migration (new columns only — nothing on staging is deleted or rewritten).
+
+Files: `database/migrations/2026_08_17_000129_add_guest_scan_settings_to_forms_table.php` (new),
+`database/migrations/2026_08_17_000130_add_source_and_reference_to_ocr_scans_table.php` (new), `app/Enums/OcrScanSource.php` (new),
+`app/Enums/FormBotChallenge.php`, `app/Models/Form.php`, `app/Models/OcrScan.php`, `app/Services/Forms/FormService.php`,
+`app/Services/Forms/FormSettingsPresenter.php`, `app/Http/Requests/Forms/UpdateOcrScanningRequest.php`,
+`app/Http/Controllers/Tenant/FormController.php`, `app/Http/Controllers/Tenant/OcrScanController.php`,
+`app/Services/Ocr/OcrScanService.php`, `app/Services/Ocr/OcrScanListPresenter.php`,
+`app/Services/Attachments/AttachmentStorageService.php`, `app/Exceptions/Ocr/OcrException.php`, `config/ocr.php`,
+`app/Http/Middleware/VerifyGuestBotChallenge.php`, `app/Http/Middleware/EnforceGuestScanWindow.php` (new),
+`app/Http/Controllers/Public/GuestAttachmentController.php`, `app/Http/Requests/Public/StoreGuestScanRequest.php` (new),
+`app/Services/Submissions/PublicFormPresenter.php`, `routes/api.php`, `resources/js/components/forms/ScanningPanel.vue`,
+`resources/js/components/forms/types.ts`, `resources/js/Pages/ocr/Scans.vue`, `resources/js/components/ocr/scan-upload.ts`,
+`resources/public-runtime/lib/types.ts`, `resources/public-runtime/lib/api-client.ts`,
+`resources/public-runtime/components/PaperCopyUpload.vue` (new), `resources/public-runtime/components/RuntimeSession.vue`,
+`resources/public-runtime/App.vue`, `resources/js/components/help/manual.ts`, `database/seeders/E2eSeeder.php`, and the tests for each:
+`tests/Feature/Ocr/GuestScanUploadTest.php` (new), `tests/Feature/Tenant/FormOcrScanningSettingsTest.php`,
+`tests/Feature/Tenancy/TenantExtractColumnDriftTest.php`, `tests/Feature/Api/OpenApiContractTest.php`, the Vitest files beside the
+components above, and `tests/e2e/ocr-guest-upload.spec.ts` (new).
+Shared artefacts taken: `openapi.json`, `docs/ocr-pipeline-design.md`, `docs/security-threat-model.md`, `docs/data-dictionary.md`,
+`docs/feature-backlog.md`, `docs/claims/decisions.md` (`D106`'s answers), `PROGRESS.md` (own block), `docs/pipeline.md`.
+Paired files taken: `openapi.json` with `routes/api.php`; `docs/data-dictionary.md` with the two migrations.
+Namespaces spent: migration prefixes `2026_08_17_000129` and `2026_08_17_000130`; no ADR.
+Prediction: Pest and Vitest red first on every new case, then green; CI 6/6 on the first run is **the one I most expect to be wrong** —
+`openapi.json`'s drift check and `TenantExtractColumnDriftTest`'s census are the two gates a new public route and four new columns trip
+most often, and the E2E job must never send a real upload (its queue is synchronous and would call the provider), so the spec mocks it.
 
 ## RELEASED — `M164`, the Help page's contents stay within reach: a sticky contents column on wide screens, a Contents button and back links on narrow ones (`R-b1ffa90b`) (merged as PR #357, `975ee348`, 6/6 green on BOTH its runs with real step counts — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

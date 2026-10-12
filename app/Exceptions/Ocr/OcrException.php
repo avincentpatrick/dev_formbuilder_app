@@ -55,6 +55,22 @@ final class OcrException extends RuntimeException
         return new self(409, 'ocr_scan_not_reviewable', 'This scan has not been read, so there is nothing to save yet.');
     }
 
+    /**
+     * A guest upload (M165, `D106`) to a form whose public link does not take a paper copy: the Scanning switch, the
+     * guest-upload switch or guest access is off, or the current version cannot be read. One neutral refusal for all
+     * of them, because a stranger is owed no account of the form's settings.
+     */
+    public static function guestUploadOff(): self
+    {
+        return new self(403, 'paper_upload_unavailable', 'This form is not taking paper copies right now.');
+    }
+
+    /** The form has taken its daily number of paper copies from the public link (`forms.guest_ocr_daily_cap`). */
+    public static function guestDailyCapReached(): self
+    {
+        return new self(429, 'paper_upload_limit_reached', 'This form has received as many paper copies as it can take today. Please try again tomorrow.');
+    }
+
     public static function pdfNotAlone(): self
     {
         return new self(422, 'ocr_pdf_not_alone', 'Upload a PDF scan on its own. Photos of one form can be uploaded together, one photo per page.');

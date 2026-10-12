@@ -601,6 +601,19 @@ Route::prefix('api/v1/public')
             ->withoutMiddleware('throttle:guest')
             ->middleware('throttle:guest-content-image')
             ->name('choice-lists.show');
+
+        // A filled paper copy (M165, `R-7173c02c`, `D106`): photos or a scan of the printed form, read by the same job as a
+        // staff scan and saved as a response only by a staff reviewer. The module before the plan, as on the staff scan
+        // routes; then the user's spend guard, cheapest first — the device's window (one cache read), then a spam check
+        // required whatever the form's own setting. Regenerate openapi.json after touching this route.
+        Route::post('f/{shareToken}/scans', [GuestAttachmentController::class, 'storePaperCopy'])
+            ->middleware([
+                'module:ocr_single',
+                'feature:ocr_single',
+                EnforceGuestFormRateLimit::class.':'.EnforceGuestFormRateLimit::PAPER,
+                VerifyGuestBotChallenge::class.':'.VerifyGuestBotChallenge::ALWAYS,
+            ])
+            ->name('scans.store');
     });
 
 // ── Group C (resume): guest draft RESUME — UNAUTHENTICATED; tenant + the target draft submissions.id resolved ─

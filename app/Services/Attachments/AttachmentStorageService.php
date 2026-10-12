@@ -300,9 +300,14 @@ final class AttachmentStorageService
      * The type and size checks repeat the request's on purpose. The request refuses with a field-addressed
      * 422; this is the write path's own guard, so no other caller can store a page the reader cannot send.
      *
+     * ⚠️ THE STORAGE QUOTA IS ASSERTED EVEN WITH NO UPLOADER (M165, `D106`). A guest's media answer is never
+     * blocked by the quota ({@see store()}), because that answer IS the respondent's response. A filled paper copy
+     * from the public link is not: it is a staff intake channel that a person reviews later, and `D106` puts it
+     * through the storage quota like any staff scan.
+     *
      * @throws AttachmentException on a rejected type or an over-size page
      */
-    public function storeOcrScanPage(UploadedFile $file, string $tenantId, string $ocrScanId, string $uploadedBy): Attachment
+    public function storeOcrScanPage(UploadedFile $file, string $tenantId, string $ocrScanId, ?string $uploadedBy): Attachment
     {
         $mime = $file->getMimeType() ?? 'application/octet-stream';
 

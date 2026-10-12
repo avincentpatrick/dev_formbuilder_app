@@ -19,12 +19,18 @@ use Symfony\Component\HttpFoundation\Response;
  * Requires a solved proof-of-work challenge before a guest submission is accepted (Increment I8b) — the
  * "bot-challenge" half of PRD Feature #3's last acceptance criterion.
  *
- * ── ⚠️ ATTACHED TO `submissions.store` ONLY ───────────────────────────────────────────────────────────
+ * ── ⚠️ ATTACHED TO `submissions.store` AND `scans.store` ONLY ──────────────────────────────────────────
  * Not to the schema read (the service worker caches it, and a cached challenge is a broken one), not to
  * attachments (one puzzle per uploaded file is a hostile experience for the field worker photographing
  * three documents), not to draft autosave (which fires repeatedly while someone types), and not to the
  * mint route (it creates nothing, and `throttle:guest-mint` already bounds it per IP). Submit is the only
  * write that creates a finalized response, so it is the only place the cost is proportionate.
+ *
+ * The one other place is a filled paper copy (M165, `D106`), with the parameter `always`: one upload of up to
+ * five pages, read by a provider the platform pays per page. There the check is required WHATEVER the form's
+ * own `bot_challenge` says — the user's spend guard, not the author's opt-in — because the author's switch
+ * protects responses, and an author who left it off for trusted staff devices has not opted into paying for
+ * strangers' scans.
  *
  * ── Why middleware rather than a guard inside the controller ──────────────────────────────────────────
  * It runs BEFORE {@see GuestSubmissionRequest} validates anything and before
@@ -55,14 +61,17 @@ final class VerifyGuestBotChallenge
 
     public const HEADER = 'X-Meridian-Challenge';
 
+    /** The route parameter that requires a solution whatever the form's own setting (M165's paper copies). */
+    public const ALWAYS = 'always';
+
     public function __construct(private readonly GuestChallengeService $challenges) {}
 
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next, string $mode = 'form'): Response
     {
         $form = $this->guestForm($request);
 
         // The branch every form created before I8b takes, and every form whose author has not opted in.
-        if (! $this->challenges->required($form->bot_challenge ?? FormBotChallenge::Off)) {
+        if ($mode !== self::ALWAYS && ! $this->challenges->required($form->bot_challenge ?? FormBotChallenge::Off)) {
             return $next($request);
         }
 

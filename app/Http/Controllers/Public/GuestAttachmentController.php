@@ -7,10 +7,13 @@ namespace App\Http\Controllers\Public;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Public\Concerns\ReadsGuestShareToken;
 use App\Http\Requests\Attachments\StoreAttachmentRequest;
+use App\Http\Requests\Ocr\StoreOcrScanRequest;
 use App\Models\Form;
 use App\Models\FormVersion;
 use App\Services\Attachments\AttachmentStorageService;
+use App\Services\Ocr\OcrScanService;
 use App\Support\Api\ApiErrorResponse;
+use App\Support\Submissions\SubmissionReference;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -21,6 +24,9 @@ use Illuminate\Http\JsonResponse;
  * {@see AttachmentStorageService} the authenticated channel uses, with a null uploader.
  *
  * No guest read-back of an upload: a `blob:` URL previews it. (A note's image is {@see GuestContentImageController}.)
+ *
+ * A filled paper copy is the second guest upload here (M165, `D106`, {@see storePaperCopy()}) — on this class
+ * because a new controller is a new `use` line in `routes/api.php`, which moves the lines documents cite.
  */
 final class GuestAttachmentController extends Controller
 {
@@ -50,5 +56,26 @@ final class GuestAttachmentController extends Controller
         $attachment = $service->store($request->uploadedFile(), $version, $request->fieldKey(), null);
 
         return response()->json(['data' => $attachment->toAnswerRef()], 201);
+    }
+
+    /**
+     * Upload a filled paper copy of the form — photos or a scan of its printed pages — for staff to check.
+     *
+     * The pages are read automatically and wait in the form's scans list until a staff member reviews and saves
+     * them as a response. The answer carries only a reference to quote: nothing that was read is ever sent back.
+     * The token's version is not checked against the current one, because the paper names its own version and
+     * paper printed before a republish is still a valid copy.
+     *
+     * @unauthenticated
+     */
+    public function storePaperCopy(StoreOcrScanRequest $request, OcrScanService $scans): JsonResponse
+    {
+        $token = $this->shareToken($request);
+
+        $form = Form::query()->whereKey($token->formId)->firstOrFail();
+
+        $scan = $scans->storeFromGuest($form, $request->pages());
+
+        return response()->json(['data' => ['reference' => SubmissionReference::format((string) $scan->reference)]], 202);
     }
 }

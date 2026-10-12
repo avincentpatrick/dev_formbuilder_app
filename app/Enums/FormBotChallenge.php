@@ -44,6 +44,10 @@ enum FormBotChallenge: string
      * Deliberately NOT on schema reads (the service worker caches them), attachments (one puzzle per file)
      * or draft autosave (which fires repeatedly). Submit is the only write that creates a finalized
      * response, so it is the only place the cost belongs.
+     *
+     * This setting governs submit only. A filled paper copy from the public link (M165, `D106`) is checked
+     * whatever this says — `VerifyGuestBotChallenge`'s `always` mode — because it spends the reading provider's
+     * pages, which is the platform's cost and not the author's choice.
      */
     case ProofOfWork = 'proof_of_work';
 

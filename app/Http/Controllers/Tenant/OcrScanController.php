@@ -68,14 +68,16 @@ final class OcrScanController extends Controller
         return response()->json(['data' => $this->present($this->scan($form, $scan))]);
     }
 
-    /** The scans page: the upload, and this form's newest scans. */
+    /** The scans page: the upload, and this form's newest scans — or the one a guest's reference names (M165). */
     public function index(Request $request, Form $form, OcrScanListPresenter $presenter): Response
     {
         $user = $request->user();
         assert($user instanceof User);
 
+        $reference = $request->query('reference');
+
         return Inertia::render('ocr/Scans', [
-            ...$presenter->present($form),
+            ...$presenter->present($form, is_string($reference) ? $reference : null),
             'crumbs' => CrumbTrail::forms($user)->form($form)->formSubmissions($form)->current('Scanned forms'),
         ]);
     }

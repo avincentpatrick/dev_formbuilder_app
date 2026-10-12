@@ -7433,7 +7433,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   unfiled **and** undecided — then attacked by a refuter that did not overturn it. ⛔ **NO WRITER OUTSIDE
   SEEDERS.** Declared at `app/Models/Form.php:41`, `:88` and `:120`, read at
   `app/Services/Submissions/EncodeFormPresenter.php:210` and
-  `app/Services/Submissions/PublicFormPresenter.php:39` — and every assignment in the tree is a seeder or a
+  `app/Services/Submissions/PublicFormPresenter.php` (its `single_page_mode` key) — and every assignment in the tree is a seeder or a
   test (`database/seeders/DemoSeeder.php:535`, `database/seeders/E2eSeeder.php` (three fixtures),
   `tests/Feature/Submissions/EncodeStepPayloadTest.php:76`). The sole creation path,
   `app/Services/Forms/FormService.php`, opens a `Form::create([` whose six explicit keys on the lines
@@ -7521,7 +7521,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   never the per-form column. ⚠️ **The AND-both contract is implemented for the sibling**, which is why the
   omission reads as a gap: `app/Http/Controllers/Tenant/SubmissionDraftController.php:41` states the
   doctrine, `app/Http/Controllers/Public/GuestDraftController.php:73` enforces the per-form half and
-  `app/Services/Submissions/PublicFormPresenter.php:44` ANDs the two. ⚠️ **Calibration, so this is not
+  `app/Services/Submissions/PublicFormPresenter.php`'s `save_and_resume` key ANDs the two. ⚠️ **Calibration, so this is not
   over-filed:** it is one of the family of **five** inert flags the row above enumerates. It earns its own
   row only because offline sync **shipped** — the sync routes, the PWA manifest,
   `tests/Feature/Entitlements/OfflineSyncGateTest.php` — whereas the OCR flags are parked ahead of held
@@ -11514,7 +11514,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M114` (2026-09-26) — `minor` · `forms.single_page_mode` drives real, tested runtime behaviour in both renderers and has no write
   path anywhere outside the seeders.** Filed 2026-09-25 by `M110`, from the report asking for a section strip under
   the preview and a choice of how sections are presented. The column exists (migration
-  `..._000201_create_forms_table.php:46`), is read by `PublicFormPresenter.php:38-39` and
+  `..._000201_create_forms_table.php:46`), is read by `PublicFormPresenter.php` (`single_page_mode`) and
   `EncodeFormPresenter.php:210`, and branches the runtime at `RuntimeSession.vue`'s `PageView`/`StepView` switch — but a grep of
   `app/Http/`, `app/Services/Forms/` and `app/Http/Requests/` for `single_page_mode` returns **zero hits**, so the
   only way to make a form multi-step today is a direct database write. ✅ **`D35` already answered the shape**

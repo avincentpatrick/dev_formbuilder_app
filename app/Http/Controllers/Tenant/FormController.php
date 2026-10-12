@@ -151,15 +151,19 @@ final class FormController extends Controller
     public function updateOcrScanning(UpdateOcrScanningRequest $request, Form $form): RedirectResponse
     {
         $enabled = $request->boolean('allow_ocr_single');
+        $guest = $request->guestSettings();
 
         /** @var User $user */
         $user = $request->user();
-        $this->forms->setOcrScanning($form, $enabled, $user);
+        $this->forms->setOcrScanning($form, $enabled, $user, $guest);
 
-        return back()->with('toast', [
-            'type' => 'success',
-            'message' => $enabled ? 'This form now accepts scans of its paper copies.' : 'This form no longer accepts scans.',
-        ]);
+        $message = match (true) {
+            $guest === null => $enabled ? 'This form now accepts scans of its paper copies.' : 'This form no longer accepts scans.',
+            $guest['allow_guest_ocr'] => 'The public link now takes filled paper copies.',
+            default => 'The public link no longer takes paper copies.',
+        };
+
+        return back()->with('toast', ['type' => 'success', 'message' => $message]);
     }
 
     /**

@@ -150,6 +150,11 @@ class Form extends Model implements TenantScoped
             'data_sharing_field_keys' => 'array',
             // M138 (`R-df7f4b62`, `D91`): written only by setConfirmationMessage(), like the redirect it times.
             'redirect_delay_seconds' => 'integer',
+            // M165 (`R-7173c02c`, `D106`): a filled paper copy from the public link, and its two limits. Deliberately
+            // NOT in $fillable: the only writer is FormService::setOcrScanning(), behind the Scanning section's gate.
+            'allow_guest_ocr' => 'boolean',
+            'guest_ocr_window_minutes' => 'integer',
+            'guest_ocr_daily_cap' => 'integer',
         ];
     }
 
@@ -163,6 +168,9 @@ class Form extends Model implements TenantScoped
     protected $attributes = [
         'data_sharing_enabled' => false,
         'redirect_delay_seconds' => 20,
+        'allow_guest_ocr' => false,
+        'guest_ocr_window_minutes' => 10,
+        'guest_ocr_daily_cap' => 20,
     ];
 
     /**

@@ -50,6 +50,8 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         '/public/linked-choices/{shareToken}/{version}',
         // M141 — a form's CSV choice lists, beside the schema and frozen per version.
         '/public/choice-lists/{shareToken}/{version}',
+        // M165 — a filled paper copy, uploaded from the public link for staff to check (`D106`).
+        '/public/f/{shareToken}/scans',
         '/submissions/{submission}/promote',
         // Increment G8b — the authenticated offline-sync surface.
         '/sync/manifest',
@@ -142,7 +144,11 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         // M133: the linked-choices read likewise.
         ->and($spec['paths']['/public/linked-choices/{shareToken}/{version}']['get']['security'])->toBe([])
         // M141: the choice-list read likewise.
-        ->and($spec['paths']['/public/choice-lists/{shareToken}/{version}']['get']['security'])->toBe([]);
+        ->and($spec['paths']['/public/choice-lists/{shareToken}/{version}']['get']['security'])->toBe([])
+        // M165: a paper copy is sent on the share token too, and answers nothing but a reference.
+        ->and($spec['paths']['/public/f/{shareToken}/scans']['post']['security'])->toBe([])
+        ->and(array_keys($spec['paths']['/public/f/{shareToken}/scans']['post']['responses']['202']['content']['application/json']['schema']['properties']['data']['properties']))
+        ->toBe(['reference']);
 });
 
 it('keeps the published event_types enum in step with DomainEventType', function (): void {

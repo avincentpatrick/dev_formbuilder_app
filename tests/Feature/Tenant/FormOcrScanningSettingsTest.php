@@ -5,14 +5,17 @@ declare(strict_types=1);
 use App\Enums\FieldType;
 use App\Enums\PlanTier;
 use App\Exceptions\Entitlements\ModuleDisabledException;
+use App\Models\Audit;
 use App\Models\Form;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\FormService;
+use App\Services\Forms\FormSettingsPresenter;
 use App\Services\Forms\PublishService;
 use App\Services\Settings\TenantSettingRegistry;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
@@ -155,4 +158,93 @@ it('refuses a workspace whose plan does not include scanning, and admits one who
 
     enterTenant($this->tenant->id, $this->admin->id);
     expect(Form::findOrFail($this->form->id)->allow_ocr_single)->toBeTrue();
+});
+
+/*
+| M165 (`R-7173c02c`, `D106`) — the same section lets the public link take a filled paper copy, with the two limits
+| the user chose: a per-device window of 1, 2, 5 or 10 minutes (10 by default, never longer) and a daily cap.
+*/
+
+it('starts every new form with paper copies off, a 10-minute window and a cap of 20, in the model AND in the row', function (): void {
+    $form = app(FormService::class)->create($this->tenant, $this->admin, 'Fresh');
+
+    expect([$form->allow_guest_ocr, $form->guest_ocr_window_minutes, $form->guest_ocr_daily_cap])->toBe([false, 10, 20]);
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    $row = Form::findOrFail($form->id);
+    expect([$row->allow_guest_ocr, $row->guest_ocr_window_minutes, $row->guest_ocr_daily_cap])->toBe([false, 10, 20]);
+});
+
+it('saves the public link\'s paper copies with their limits, in one audit row, and the switch alone still saves alone', function (): void {
+    $this->withoutVite()->actingAs($this->admin)->patch(ocrSettingUrl($this->form), [
+        'allow_ocr_single' => true,
+        'allow_guest_ocr' => true,
+        'guest_ocr_window_minutes' => 5,
+        'guest_ocr_daily_cap' => 40,
+    ])->assertRedirect()->assertSessionHas('toast.message', 'The public link now takes filled paper copies.');
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    $row = Form::findOrFail($this->form->id);
+    expect([$row->allow_ocr_single, $row->allow_guest_ocr, $row->guest_ocr_window_minutes, $row->guest_ocr_daily_cap])
+        ->toBe([true, true, 5, 40]);
+
+    $audit = Audit::query()->where('auditable_type', 'form')->where('auditable_id', $this->form->id)->orderByDesc('id')->firstOrFail();
+    expect($audit->old_values)->toEqual(['allow_ocr_single' => false, 'allow_guest_ocr' => false, 'guest_ocr_window_minutes' => 10, 'guest_ocr_daily_cap' => 20])
+        ->and($audit->new_values)->toEqual(['allow_ocr_single' => true, 'allow_guest_ocr' => true, 'guest_ocr_window_minutes' => 5, 'guest_ocr_daily_cap' => 40]);
+
+    // The scanning switch alone leaves the paper-copy settings as they are.
+    $this->withoutVite()->actingAs($this->admin)->patch(ocrSettingUrl($this->form), ['allow_ocr_single' => false])->assertRedirect();
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    $row = Form::findOrFail($this->form->id);
+    expect([$row->allow_ocr_single, $row->allow_guest_ocr, $row->guest_ocr_window_minutes, $row->guest_ocr_daily_cap])
+        ->toBe([false, true, 5, 40]);
+});
+
+it('refuses a window longer than 10 minutes or not on the list, a cap outside 1 to 100, and half a set', function (): void {
+    $valid = ['allow_ocr_single' => true, 'allow_guest_ocr' => true, 'guest_ocr_window_minutes' => 1, 'guest_ocr_daily_cap' => 100];
+    $this->withoutVite()->actingAs($this->admin)->patch(ocrSettingUrl($this->form), $valid)->assertSessionHasNoErrors();
+
+    foreach ([
+        ['guest_ocr_window_minutes', 15],
+        ['guest_ocr_window_minutes', 3],
+        ['guest_ocr_daily_cap', 0],
+        ['guest_ocr_daily_cap', 101],
+    ] as [$key, $value]) {
+        $this->withoutVite()->actingAs($this->admin)->patch(ocrSettingUrl($this->form), [...$valid, $key => $value])
+            ->assertSessionHasErrors($key);
+    }
+
+    $this->withoutVite()->actingAs($this->admin)
+        ->patch(ocrSettingUrl($this->form), ['allow_ocr_single' => true, 'allow_guest_ocr' => true])
+        ->assertSessionHasErrors(['guest_ocr_window_minutes', 'guest_ocr_daily_cap']);
+    $this->withoutVite()->actingAs($this->admin)
+        ->patch(ocrSettingUrl($this->form), ['allow_ocr_single' => true, 'guest_ocr_window_minutes' => 5])
+        ->assertSessionHasErrors('allow_guest_ocr');
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    expect(Form::findOrFail($this->form->id)->guest_ocr_window_minutes)->toBe(1);
+});
+
+it('refuses a window the database would not hold, whatever wrote it', function (): void {
+    enterTenant($this->tenant->id, $this->admin->id);
+
+    expect(fn () => $this->form->forceFill(['guest_ocr_window_minutes' => 30])->save())->toThrow(QueryException::class);
+});
+
+it('tells the Scanning section the paper-copy settings, the values it may offer, and whether the link opens', function (): void {
+    $guest = fn (): array => app(FormSettingsPresenter::class)->ocrScanning(Form::findOrFail($this->form->id))['guest'];
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    expect($guest())->toBe([
+        'enabled' => false,
+        'window_minutes' => 10,
+        'daily_cap' => 20,
+        'windows' => [1, 2, 5, 10],
+        'daily_cap_max' => 100,
+        'link_live' => false,
+    ]);
+
+    $this->form->forceFill(['public_slug' => 'clinic', 'allow_guest_submissions' => true])->save();
+    expect($guest()['link_live'])->toBeTrue();
 });

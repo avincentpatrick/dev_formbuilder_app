@@ -7,6 +7,7 @@ namespace App\Services\Forms;
 use App\Enums\FormStatus;
 use App\Enums\FormThemePreset;
 use App\Exceptions\Ocr\OcrException;
+use App\Http\Requests\Forms\UpdateOcrScanningRequest;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormVersion;
@@ -130,7 +131,11 @@ final class FormSettingsPresenter
      * can carry (`docs/ocr-pipeline-design.md` §2). An author may switch scanning on for a form that is not
      * eligible yet; the upload refuses until it is, and the section says why in the upload's own words.
      *
-     * @return array{enabled: bool, eligible: bool, reason: string|null}|null
+     * `guest` (M165, `D106`) is the public link's paper copies: the switch, its two limits with the values the
+     * request accepts, and whether the public link opens at all ({@see GuestReachability}), so the section can say
+     * plainly when nobody can upload yet.
+     *
+     * @return array{enabled: bool, eligible: bool, reason: string|null, guest: array{enabled: bool, window_minutes: int, daily_cap: int, windows: list<int>, daily_cap_max: int, link_live: bool}}|null
      */
     public function ocrScanning(Form $form): ?array
     {
@@ -151,6 +156,14 @@ final class FormSettingsPresenter
                 $version === null => 'Scans can be read once this form is published.',
                 default => OcrException::formNotEligible()->getMessage(),
             },
+            'guest' => [
+                'enabled' => $form->allow_guest_ocr === true,
+                'window_minutes' => $form->guest_ocr_window_minutes,
+                'daily_cap' => $form->guest_ocr_daily_cap,
+                'windows' => UpdateOcrScanningRequest::GUEST_WINDOWS,
+                'daily_cap_max' => UpdateOcrScanningRequest::GUEST_DAILY_CAP_MAX,
+                'link_live' => GuestReachability::reachable($form),
+            ],
         ];
     }
 

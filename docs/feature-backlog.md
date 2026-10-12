@@ -13922,7 +13922,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   which is why `M162` did not take it. **Latent.** The Help page reaches the trunk only when `M162` merges. Filed by `M162`.
   **Tier: during-testing.**
 
-- **`minor` · The in-app manual walks through creating a form but does not explain each question type, its settings, or the builder's left and right panels.**
+- ✅ **CLOSED BY `M163` (2026-10-12) — ****`minor` · The in-app manual walks through creating a form but does not explain each question type, its settings, or the builder's left and right panels.**
   The user's comment on `M162`'s Help page (2026-10-12, in chat): *"i already saw the help page. but i am expecting a user manual
   for the form builder, each input type and its settings/configurations. the left and right panels"*. Measured on `origin/main`
   at `d4a81d94`: `resources/js/components/help/manual.ts` gives eighteen of the thirty-one question types one line each and describes
@@ -13931,4 +13931,4 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   explained anywhere a tester can read. The remedy, `D115`: a second part of the same Help page, "Builder reference" — the left
   panel, the right panel (question and section), and one entry per question type with its settings — every label checked by
   `manual.test.ts` like the first part, plus one picture of each panel with numbered callouts, captured by a Playwright script from
-  the seeded E2E stack so retaking them is one command. **Live.** Filed by `M163`. **Tier: early-testing.**
+  the seeded E2E stack so retaking them is one command. **Live.** Filed by `M163`. **Tier: early-testing.** ✅ **CLOSED BY `M163` (2026-10-12):** `/help` has a second part, "Builder reference" — eleven chapters: the left panel (with the question library), the right panel (every tab, changing a type, Validation's rule kinds by answer kind, Advanced, a section's settings), one entry per question type in eight chapters each through its own tab, and "Why Publish can say no" — plus a picture of each panel with numbered badges (`public/images/help/`, re-shot by `tests/e2e/capture/help-pictures.capture.ts` through `playwright.capture.config.ts`, which CI never runs). `manual.test.ts` now also proves every `FieldType::label()` and every `ConfigPanel` tab is named in the reference and each picture exists at half its pixel size. Duration and Signature are stated as not answerable yet. Proof: 4 Vitest mutants, each caught by its own case; responsive-axe Help 6/6 on a fresh build.

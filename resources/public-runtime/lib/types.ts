@@ -139,6 +139,10 @@ export interface SchemaResponse {
         // called fetchSchema(). Optional for the usual reason — the service worker can serve a manifest
         // cached before I8b shipped, and absent must mean "off", which is what every form defaults to.
         bot_challenge?: 'off' | 'proof_of_work';
+        // M165 (`R-7173c02c`, `D106`) — whether to offer "Upload a filled paper copy", with the limits the picker
+        // checks before sending. A HINT: `POST f/{shareToken}/scans` decides every upload. Optional for the usual
+        // reason — a manifest cached before M165 has none, and absent means the upload is not offered.
+        paper_upload?: PaperUploadLimits | null;
     };
     version: {
         id: string;
@@ -146,6 +150,19 @@ export interface SchemaResponse {
         checksum: string;
         schema: RawSchemaSnapshot; reference_files?: GuestReferenceFile[]; // M132 — optional: an older cached schema has none
     };
+}
+
+/** M165 — a paper copy's limits, the staff scan upload's: pages, the types a page may be, and the sizes. */
+export interface PaperUploadLimits {
+    max_pages: number;
+    accepted_types: string[];
+    max_bytes_per_file: number;
+    max_bytes_per_scan: number;
+}
+
+/** M165 — what the server answers a paper copy with: only a reference to quote, never what was read. */
+export interface PaperCopyReceipt {
+    reference: string;
 }
 
 /** The mint JSON re-fetched by the SPA (`Accept: application/json` on `GET /f/{slug}`). */

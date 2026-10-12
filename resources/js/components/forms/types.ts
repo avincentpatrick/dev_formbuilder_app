@@ -99,6 +99,21 @@ export interface OcrScanningProps {
     eligible: boolean;
     /** Why the current version cannot be read, in the upload's own words; null when it can. */
     reason: string | null;
+    /** M165 (`D106`): filled paper copies from the public link, and the two limits on them. */
+    guest: {
+        enabled: boolean;
+        /** One device's window, in minutes: one of `windows`. */
+        window_minutes: number;
+        /** The most paper copies the form takes in any 24 hours. */
+        daily_cap: number;
+        /** How many uploads one device may send inside its window. */
+        uploads_per_window: number;
+        /** The windows the server accepts, shortest first. */
+        windows: number[];
+        daily_cap_max: number;
+        /** Whether the public link opens at all — guest access on, a link name, a published version. */
+        link_live: boolean;
+    };
 }
 
 /** One node of the scope picker (G10b2). */

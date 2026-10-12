@@ -14,6 +14,7 @@ import RuntimeShell from './RuntimeShell.vue';
 import PageView from './PageView.vue';
 import StepView from './StepView.vue';
 import WelcomeBackBanner from './WelcomeBackBanner.vue';
+import PaperCopyUpload from './PaperCopyUpload.vue';
 import { createAnnouncer } from '../composables/useAnnouncer';
 import { createAutosave } from '../composables/useAutosave';
 import { createFormRuntime, type StepResolution } from '../composables/useFormRuntime';
@@ -108,6 +109,8 @@ const emit = defineEmits<{
     discard: [];
     // Increment H12b — a submit rejected because the form closed / filled mid-fill; App shows the full-screen state.
     unavailable: [acceptance: ScheduleAcceptance];
+    // M165 (`D106`) — a filled paper copy was sent instead of answering here; App shows the thank-you with its reference.
+    'paper-received': [reference: string];
 }>();
 
 const runtime = createFormRuntime(props.schema, {
@@ -652,6 +655,14 @@ const description = computed(() => runtime.renderModel.form.description);
             >
                 Discard this response instead
             </button>
+            <!-- M165: never while a parked response is being reviewed — that respondent is finishing an answer. -->
+            <PaperCopyUpload
+                v-if="schema.form.paper_upload && !resolving"
+                :limits="schema.form.paper_upload"
+                :client="client"
+                :online="online"
+                @received="(reference) => emit('paper-received', reference)"
+            />
         </template>
         <PageView v-if="runtime.singlePageMode" />
         <StepView v-else />

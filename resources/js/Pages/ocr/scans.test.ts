@@ -6,12 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  * the upload before any request, and an acceptance must send it and move on to the review.
  */
 
-const mocks = vi.hoisted(() => ({ visit: vi.fn() }));
+const mocks = vi.hoisted(() => ({ visit: vi.fn(), get: vi.fn() }));
 
 vi.mock('@inertiajs/vue3', () => ({
     Head: { name: 'Head', render: () => null },
     Link: { name: 'Link', props: ['href'], template: '<a :href="href"><slot /></a>' },
-    router: { visit: mocks.visit },
+    router: { visit: mocks.visit, get: mocks.get },
 }));
 
 vi.mock('@/components/shell/PageHeader.vue', () => ({
@@ -33,6 +33,7 @@ function props(overrides: Record<string, unknown> = {}): Record<string, unknown>
             max_bytes_per_scan: 25_000_000,
         },
         scans: [],
+        search: { reference: null },
         crumbs: [{ label: 'Forms', href: '/forms' }, { label: 'Scanned forms' }],
         ...overrides,
     };
@@ -55,6 +56,7 @@ const realRevoke = URL.revokeObjectURL;
 
 beforeEach(() => {
     mocks.visit.mockReset();
+    mocks.get.mockReset();
     fetchMock.mockReset();
     vi.stubGlobal('fetch', fetchMock);
     createUrl.mockClear();
@@ -149,6 +151,64 @@ describe('ocr/Scans', () => {
         expect(wrapper.find('.scans__row').exists()).toBe(false);
         // M154: a saved scan stays in the list (as "Saved as a response"), so the copy must not promise otherwise.
         expect(wrapper.text()).not.toContain('until each is saved');
+    });
+});
+
+describe('ocr/Scans — a paper copy from the public link (M165, `D106`)', () => {
+    const row = (overrides: Record<string, unknown>): Record<string, unknown> => ({
+        id: 'a',
+        status: 'read',
+        status_label: 'Ready to review',
+        pages: 1,
+        uploaded_by: null,
+        from_public_link: false,
+        reference: null,
+        created_at: '2026-10-12T09:00:00Z',
+        review_url: '/r/a',
+        submission_url: null,
+        error_message: null,
+        ...overrides,
+    });
+
+    it("marks a guest's scan as from the public link with its reference, and a staff scan with neither", () => {
+        const wrapper = mount(Scans, {
+            props: props({
+                scans: [
+                    row({ id: 'g', from_public_link: true, reference: '7K4M-2QXB' }),
+                    row({ id: 's', uploaded_by: 'Ana' }),
+                ],
+            }) as never,
+        });
+        const [guest, staff] = wrapper.findAll('.scans__row');
+
+        expect(guest.text()).toContain('From the public link');
+        expect(guest.text()).toContain('Reference 7K4M-2QXB');
+        expect(staff.text()).not.toContain('From the public link');
+        expect(staff.text()).not.toContain('Reference');
+        expect(staff.text()).toContain('Ana');
+    });
+
+    it('asks the server for one reference on Enter, and for the newest scans when the box is emptied', async () => {
+        const wrapper = mount(Scans, { props: props() as never });
+        const box = wrapper.get('input[type="search"]');
+
+        await box.setValue('7k4m 2qxb');
+        await box.trigger('keyup', { key: 'Enter' });
+        expect(mocks.get).toHaveBeenLastCalledWith('/forms/form-1/ocr/scans', { reference: '7k4m 2qxb' }, expect.objectContaining({ preserveState: true }));
+
+        await box.setValue('');
+        await box.trigger('keyup', { key: 'Enter' });
+        expect(mocks.get).toHaveBeenLastCalledWith('/forms/form-1/ocr/scans', {}, expect.anything());
+    });
+
+    it('says no scan has a searched reference rather than that there are no scans, and offers the whole list back', async () => {
+        const wrapper = mount(Scans, { props: props({ search: { reference: 'NOPE' } }) as never });
+
+        expect(wrapper.text()).toContain('No scan has that reference');
+        expect(wrapper.text()).not.toContain('No scans yet');
+
+        await wrapper.findAll('button').find((button) => button.text() === 'Show all scans')!.trigger('click');
+        expect(mocks.get).toHaveBeenLastCalledWith('/forms/form-1/ocr/scans', {}, expect.anything());
     });
 });
 

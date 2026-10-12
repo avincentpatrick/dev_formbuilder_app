@@ -135,7 +135,7 @@ final class FormSettingsPresenter
      * request accepts, and whether the public link opens at all ({@see GuestReachability}), so the section can say
      * plainly when nobody can upload yet.
      *
-     * @return array{enabled: bool, eligible: bool, reason: string|null, guest: array{enabled: bool, window_minutes: int, daily_cap: int, windows: list<int>, daily_cap_max: int, link_live: bool}}|null
+     * @return array{enabled: bool, eligible: bool, reason: string|null, guest: array{enabled: bool, window_minutes: int, daily_cap: int, uploads_per_window: int, windows: list<int>, daily_cap_max: int, link_live: bool}}|null
      */
     public function ocrScanning(Form $form): ?array
     {
@@ -160,6 +160,7 @@ final class FormSettingsPresenter
                 'enabled' => $form->allow_guest_ocr === true,
                 'window_minutes' => $form->guest_ocr_window_minutes,
                 'daily_cap' => $form->guest_ocr_daily_cap,
+                'uploads_per_window' => (int) config('ocr.guest.uploads_per_window', 3),
                 'windows' => UpdateOcrScanningRequest::GUEST_WINDOWS,
                 'daily_cap_max' => UpdateOcrScanningRequest::GUEST_DAILY_CAP_MAX,
                 'link_live' => GuestReachability::reachable($form),

@@ -18,10 +18,24 @@
  * Remove — because the native input says only "2 files" and a wrong photo used to be found on the review screen,
  * after it had been read. A pick ADDS to the list and the input is emptied, so a missed page is picked on its own
  * and a wrong one removed without starting again; the file check runs on every change, not only on send.
+ *
+ * M165 (`R-7173c02c`, `D106`): a filled paper copy a guest sent from the public link is listed here like any scan,
+ * marked "From the public link" with the reference its sender was given, and the search above the list finds a
+ * scan by that reference — what a guest who calls about their paper copy can quote. The server normalizes what is
+ * typed (any case, with or without the hyphen) and finds nothing for text that cannot be a reference.
  */
 import { computed, onBeforeUnmount, ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { MdsAlert, MdsBadge, MdsBreadcrumb, MdsButton, MdsCard, MdsEmptyState, type BreadcrumbItem } from '@meridian/design-system';
+import {
+    MdsAlert,
+    MdsBadge,
+    MdsBreadcrumb,
+    MdsButton,
+    MdsCard,
+    MdsEmptyState,
+    MdsSearchField,
+    type BreadcrumbItem,
+} from '@meridian/design-system';
 import type { BadgeVariant } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
 import ChosenPages from '@/components/ocr/ChosenPages.vue';
@@ -35,6 +49,10 @@ interface ScanRow {
     status_label: string;
     pages: number;
     uploaded_by: string | null;
+    /** M165: a guest sent it from the form's public link. */
+    from_public_link: boolean;
+    /** The code a guest was given (`7K4M-2QXB`); null for a staff upload. */
+    reference: string | null;
     created_at: string;
     review_url: string | null;
     submission_url: string | null;
@@ -48,8 +66,27 @@ const props = defineProps<{
     refusal: string | null;
     upload: ScanLimits & { url: string };
     scans: ScanRow[];
+    /** M165: the reference the list is narrowed to, as it was typed; null for the newest scans. */
+    search: { reference: string | null };
     crumbs: BreadcrumbItem[];
 }>();
+
+const referenceQuery = ref(props.search.reference ?? '');
+
+/** Narrow the list to one reference, or back to the newest scans when the box is emptied. */
+function findByReference(): void {
+    const reference = referenceQuery.value.trim();
+    router.get(`/forms/${props.form.id}/ocr/scans`, reference === '' ? {} : { reference }, {
+        preserveScroll: true,
+        preserveState: true,
+        replace: true,
+    });
+}
+
+function showAll(): void {
+    referenceQuery.value = '';
+    findByReference();
+}
 
 /** A chosen file, with the preview this page made for it and must revoke. */
 interface ChosenPage {
@@ -203,8 +240,27 @@ function uploadedAt(iso: string): string {
         <section class="scans__recent" aria-labelledby="scans-recent-title">
             <h2 id="scans-recent-title" class="scans__title">Recent scans</h2>
 
+            <div class="scans__search">
+                <MdsSearchField
+                    v-model="referenceQuery"
+                    :applied="search.reference ?? ''"
+                    label="Find a scan by its reference"
+                    placeholder="For example 7K4M-2QXB"
+                    @submit="findByReference"
+                />
+                <MdsButton v-if="search.reference !== null" variant="tertiary" size="sm" @click="showAll">
+                    Show all scans
+                </MdsButton>
+            </div>
+
             <MdsEmptyState
-                v-if="scans.length === 0"
+                v-if="scans.length === 0 && search.reference !== null"
+                headline="No scan has that reference"
+                description="Check the reference against what the sender was given. A reference is eight letters and digits, like 7K4M-2QXB."
+            />
+
+            <MdsEmptyState
+                v-else-if="scans.length === 0"
                 headline="No scans yet"
                 description="Scans of this form appear here, newest first, with where each one stands."
             />
@@ -213,6 +269,8 @@ function uploadedAt(iso: string): string {
                 <li v-for="scan in scans" :key="scan.id" class="scans__row">
                     <div class="scans__row-main">
                         <MdsBadge :variant="badgeVariant(scan.status)" :label="scan.status_label" dot />
+                        <MdsBadge v-if="scan.from_public_link" variant="neutral" label="From the public link" />
+                        <span v-if="scan.reference" class="scans__reference">Reference {{ scan.reference }}</span>
                         <span class="scans__meta">
                             {{ uploadedAt(scan.created_at) }} ·
                             {{ scan.pages }} {{ scan.pages === 1 ? 'page' : 'pages' }}<template v-if="scan.uploaded_by">
@@ -311,6 +369,19 @@ function uploadedAt(iso: string): string {
     display: flex;
     flex-direction: column;
     gap: var(--mds-space-3);
+}
+
+.scans__search {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--mds-space-2);
+}
+
+.scans__reference {
+    font-family: var(--mds-font-family-mono);
+    font-size: var(--mds-type-body-sm-font-size);
+    color: var(--mds-color-text-body);
 }
 
 .scans__title {

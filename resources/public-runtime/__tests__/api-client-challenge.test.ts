@@ -171,3 +171,73 @@ describe('bot challenge', () => {
         expect(urlsOf(fetchImpl as never, '/challenge')).toHaveLength(0);
     });
 });
+
+/*
+ * M165 (`R-7173c02c`, `D106`) — a filled paper copy. The server requires a solved check on EVERY upload whatever the
+ * form's `bot_challenge` says, so the client must solve one without waiting for a schema hint or a 403.
+ */
+describe('a paper copy (M165)', () => {
+    type UploadCall = [string, { method?: string; headers: Record<string, string>; body?: FormData }];
+
+    function scansOf(fetchImpl: { mock: { calls: UploadCall[] } }): UploadCall[] {
+        return fetchImpl.mock.calls.filter(([url]) => String(url).endsWith('/scans'));
+    }
+
+    const page = (name: string): File => new File(['x'], name, { type: 'image/png' });
+
+    it('solves a check for the upload on a form whose own check is off, and sends every page as pages[]', async () => {
+        const fetchImpl = vi.fn(async (url: string) => {
+            const path = String(url);
+            if (path.endsWith('/challenge')) return res(200, { data: challengeBody(3) });
+            if (path.endsWith('/scans')) return res(202, { data: { reference: '7K4M-2QXB' } });
+
+            return res(200, { data: { form: { id: 'f', bot_challenge: 'off' }, version: { id: 'v' } } });
+        });
+        const client = createApiClient({ token: 't', slug: 's', fetch: fetchImpl as unknown as typeof fetch });
+
+        await client.fetchSchema();
+        const receipt = await client.uploadPaperCopy([page('one.png'), page('two.png')]);
+
+        expect(receipt).toEqual({ reference: '7K4M-2QXB' });
+        const [url, init] = scansOf(fetchImpl as never)[0];
+        expect(url).toBe('/api/v1/public/f/t/scans');
+        expect(init.method).toBe('POST');
+        expect(JSON.parse(atob(init.headers['X-Meridian-Challenge'])).number).toBe(3);
+        expect((init.body as FormData).getAll('pages[]').map((file) => (file as File).name)).toEqual(['one.png', 'two.png']);
+    });
+
+    it('re-mints an expired token and sends again with a NEW solution for the new token', async () => {
+        let uploads = 0;
+        let challenges = 0;
+        const fetchImpl = vi.fn(async (url: string) => {
+            const path = String(url);
+            if (path.endsWith('/challenge')) return res(200, { data: challengeBody(++challenges) });
+            if (path === '/f/s') return res(200, { shareToken: 't2', expiresAt: 'x', form: { id: 'f', title: 'F' } });
+            uploads++;
+
+            return uploads === 1
+                ? res(401, { error: { code: 'share_token_expired', message: 'expired' } })
+                : res(202, { data: { reference: 'ABCD-EF12' } });
+        });
+        const client = createApiClient({ token: 't1', slug: 's', fetch: fetchImpl as unknown as typeof fetch });
+
+        await expect(client.uploadPaperCopy([page('one.png')])).resolves.toEqual({ reference: 'ABCD-EF12' });
+
+        const calls = scansOf(fetchImpl as never);
+        expect(calls.map(([url]) => url)).toEqual(['/api/v1/public/f/t1/scans', '/api/v1/public/f/t2/scans']);
+        expect(JSON.parse(atob(calls[1][1].headers['X-Meridian-Challenge'])).number).toBe(2);
+    });
+
+    it('throws the server’s refusal for the caller to show', async () => {
+        const fetchImpl = vi.fn(async (url: string) =>
+            String(url).endsWith('/challenge')
+                ? res(200, { data: challengeBody(1) })
+                : res(429, { error: { code: 'paper_upload_limit_reached', message: 'Try again tomorrow.' } }),
+        );
+        const client = createApiClient({ token: 't', slug: 's', fetch: fetchImpl as unknown as typeof fetch });
+
+        await expect(client.uploadPaperCopy([page('one.png')])).rejects.toMatchObject({
+            normalized: { kind: 'rate_limited', code: 'paper_upload_limit_reached', message: 'Try again tomorrow.' },
+        });
+    });
+});

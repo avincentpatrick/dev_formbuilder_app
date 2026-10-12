@@ -80,6 +80,45 @@ find a label it did not before.
   `version-diff-ui` in chat.
 - All four merge tomorrow in this order, each released after its own post-merge run.
 
+### Claim — `M164`, the Help page's contents stay on screen: a sticky contents column on wide screens, a Contents button and back links on narrow ones (`m164-help-contents`)
+
+Taken 2026-10-12 by the session that built `M162` and `M163`, again in `C:\laragon\www\fb-help` with its own stack. Branch
+`m164-help-contents`, cut from `origin/main` at `c502757a`, PR into main; **merged only after the user is asked**, and never while the
+OCR session's `M158`–`M161` deploys are in flight (its standing request, and the user's rule for both sessions). The user's comment on
+`M163` (2026-10-12, in chat): *"I saw it. but i am having a hard time scrolling up and down checking the contents, is there another way
+that contents are always seen? can we have the contents on the elft side? or anything you can recommend so users wont have difficulty
+on getting back to the content"* — `M163` confirmed seen. ⚠️ **A recorded deviation:** the backlog row for this comment is filed IN THIS
+PR, not in this claim's push, because the OCR session asked that nothing outside `paths-ignore` reach `main` while its merges are in
+flight, and `docs/feature-backlog.md` and `docs/pipeline.md` are not ignored. This push touches `lane-a.md` alone.
+
+#### Evidence verified
+- `resources/js/Pages/help/Index.vue` on `origin/main` renders the contents list once, above the first chapter; nothing else on the page
+  links back to it, and with `M163` the page holds twenty-three chapters — held.
+- The page scrolls inside `.app-shell__content` (`AppLayout.vue`: `overflow-y: auto`), not the window; `.app-shell` uses `overflow-x: clip`,
+  which keeps `position: sticky` working — held, read in the layout's own comment.
+
+#### Premise verified
+- The remedy the user suggested — "contents on the left side" — fits a wide screen only: below 1024px the app sidebar collapses to icons
+  and a second column would squeeze the text. Narrow screens keep the list on top and get a way back to it instead.
+- `Index.vue`, `index.test.ts` and `tests/e2e/responsive-axe.spec.ts` are this session's own recent files; no open PR of the OCR session
+  touches them (`M161`'s spec edit is `builder-axe.spec.ts`).
+- `IntersectionObserver` does not exist in happy-dom, so the highlight of the current chapter must degrade to "no highlight", not throw.
+
+#### Remedy verdict
+- Measured by reading the layout, not yet in a browser: a two-column grid inside the page (contents ~240px, sticky with its own scroll,
+  current chapter marked `aria-current`), collapsing to one column below 1024px with a fixed "Contents" button and a "Back to contents"
+  link at the end of each chapter. Proved in a real browser by a new E2E case: after scrolling to the last chapter, the contents column is
+  still on screen at desktop width, and the button brings the list back at phone width.
+
+Files: `resources/js/Pages/help/Index.vue`, `resources/js/Pages/help/index.test.ts`, `tests/e2e/help-contents.spec.ts` (new),
+`docs/feature-backlog.md` (the row, filed in the PR — see above), `docs/pipeline.md` (regenerated).
+Shared artefacts taken: the close-out set — shared with the OCR session's writer, rebased before every push.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace.
+Prediction: the new Vitest cases red against the current page (no back links, no button, no highlight); the new E2E case red on the
+trunk at desktop width (the list scrolls away). **Most likely wrong: the sticky column** — a scroll container or `overflow` between it and
+`.app-shell__content` that I have not read would pin it to the page instead of the viewport.
+
 ### Claim extension — `M159`, `ocr-ink-ticks`: the ink in each printed box, in the bake-off (`m159-ocr-ink-ticks`)
 
 Taken 2026-10-11, after `M158`'s PR (#351) was opened. ⚠️ **Branch cut from `origin/m158-ocr-dropped-ticks`, not from `origin/main` — a

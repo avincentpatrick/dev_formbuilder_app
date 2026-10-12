@@ -82,6 +82,9 @@ not reach it) and `resources/public-runtime/__tests__/api-client-challenge.test.
 **Extension 3 (2026-10-12), pushed before it is opened:** `tests/Feature/Forms/FormSettingsPageTest.php` — its "same Scanning
 facts" case pins the Scanning props' exact shape, which the new `guest` block widens; found by running `tests/Feature/Forms`
 explicitly, a folder the container's collector does not reach.
+**Extension 4 (2026-10-12), pushed before it is opened:** `resources/js/components/builder/FormSettingsModal.test.ts` — its
+Scanning case mounts the panel with the pre-M165 props and CI's Vitest went red on it; found because only the files beside the
+changed components were run locally, not the whole suite.
 Shared artefacts taken: `openapi.json`, `docs/ocr-pipeline-design.md`, `docs/security-threat-model.md`, `docs/data-dictionary.md`,
 `docs/feature-backlog.md`, `docs/claims/decisions.md` (`D106`'s answers), `PROGRESS.md` (own block), `docs/pipeline.md`.
 Paired files taken: `openapi.json` with `routes/api.php`; `docs/data-dictionary.md` with the two migrations.

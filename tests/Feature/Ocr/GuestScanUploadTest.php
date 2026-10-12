@@ -344,6 +344,10 @@ it('lists a guest scan as from the public link with its reference, and finds it 
         ->post("http://acme.meridian.test/forms/{$this->form->id}/ocr/scans", ['pages' => [paperCopyPng()]], ['Accept' => 'application/json'])
         ->assertStatus(202);
 
+    // Both in the same second, as CI produced by accident: newest-first must still put the later upload first.
+    enterTenant($this->tenant->id, $this->owner->id);
+    OcrScan::query()->update(['created_at' => now()->startOfSecond()]);
+
     $page = fn (string $query = '') => $this->actingAs($this->owner)->withoutVite()
         ->get("http://acme.meridian.test/forms/{$this->form->id}/ocr/scans{$query}")
         ->assertOk();

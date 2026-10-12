@@ -51,6 +51,9 @@ final class OcrScanListPresenter
                 ->when($code !== null, fn ($query) => $query->where('ocr_scans.reference', $code))
                 ->with('uploader:id,name')
                 ->latest()
+                // `created_at` is kept to the second, so two scans sent in one second tied and came back in either
+                // order (measured on CI, M165). The id is a uuid7, minted in time order, so it settles the tie.
+                ->orderByDesc('id')
                 ->limit(self::LISTED)
                 ->get();
 

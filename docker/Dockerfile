@@ -1,7 +1,7 @@
 # Meridian dev/app image. Gives the app container the Postgres + Redis PHP extensions the
 # Windows/Laragon host lacks (host PHP ships only pdo_mysql). Mirrors the CI PHP version (8.4).
 # gd (jpeg, png, webp — the scan types the app takes) is for the ink reader that reads a tick from its printed box
-# (OcrInkReader, M160, D113); the testing server enables the same extension in its php.ini.
+# (OcrInkReader, M160, D113); the testing server gives it to its queue worker only (-d extension=gd), never php.ini.
 FROM php:8.4-fpm-alpine
 
 # Build deps for the PHP extensions below (removed from the final layer where possible).

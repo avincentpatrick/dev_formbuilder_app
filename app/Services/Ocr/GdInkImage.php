@@ -10,7 +10,7 @@ use GdImage;
  * A page image decoded with GD (M159), for {@see OcrInkReader}. GD does not apply a photo's EXIF orientation, which is
  * what is wanted: the provider's word boxes are in the stored frame too.
  *
- * ⚠️ GD IS ON THE MACHINE THAT RUNS `ocr:bakeoff`, NOT IN THE APP IMAGE. {@see open()} answers null without it, and the
+ * ⚠️ GD IS IN THE APP IMAGE AND THE TESTING SERVER'S WORKER ONLY — never its php.ini. {@see open()} answers null without it, and the
  * harness says so; putting the ink on the reading path adds GD to the image first (`ocr-ink-live`).
  */
 class GdInkImage implements OcrInkImage

@@ -13906,7 +13906,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   screenshot is wrong the day its screen moves. A first-time user may still find a picture faster than a label. The remedy is
   screenshots captured by a Playwright spec from the seeded E2E stack, so retaking them is one command, with the manual's label
   test extended to name the screen each image shows. **Latent.** The manual reaches the trunk only when `M162` merges.
-  Filed by `M162`. **Tier: during-testing.**
+  Filed by `M162`. **Tier: during-testing.** **Narrowed by `D115` (2026-10-12):** `M163` adds a picture of each builder panel and the capture script; what remains is a picture for the other screens the manual walks through.
 
 - **`nit` · `docs/TESTING-GUIDE.md` still sends its reader to two buttons that have moved, and says single-form OCR is not built.**
   Found by `M162` while checking which labels the in-app manual may quote. §2 step 2 reads *Open **Quarterly Report (draft)** →
@@ -13921,3 +13921,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `/help#builder`, the builder chapter's anchor. It edits `resources/js/Pages/forms/Builder.vue`, a hub `M161` holds tonight,
   which is why `M162` did not take it. **Latent.** The Help page reaches the trunk only when `M162` merges. Filed by `M162`.
   **Tier: during-testing.**
+
+- **`minor` · The in-app manual walks through creating a form but does not explain each question type, its settings, or the builder's left and right panels.**
+  The user's comment on `M162`'s Help page (2026-10-12, in chat): *"i already saw the help page. but i am expecting a user manual
+  for the form builder, each input type and its settings/configurations. the left and right panels"*. Measured on `origin/main`
+  at `d4a81d94`: `resources/js/components/help/manual.ts` gives eighteen of the thirty-one question types one line each and describes
+  the right panel's four common tabs in a sentence each; the type-specific tabs (`Levels`, `Grid`, `Map`, `Media`, `Prefill`,
+  `Content`), the validation rule kinds, the Advanced tab's flags, a section's own settings and the left panel's library are not
+  explained anywhere a tester can read. The remedy, `D115`: a second part of the same Help page, "Builder reference" — the left
+  panel, the right panel (question and section), and one entry per question type with its settings — every label checked by
+  `manual.test.ts` like the first part, plus one picture of each panel with numbered callouts, captured by a Playwright script from
+  the seeded E2E stack so retaking them is one command. **Live.** Filed by `M163`. **Tier: early-testing.**

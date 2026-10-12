@@ -24,10 +24,20 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D114`, the last one filed, was asked and answered on 2026-10-11 in the session that filed it and recorded in `M162`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D115`, the last one filed, was asked and answered on 2026-10-12 in the session that filed it and recorded in `M163`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D115 — The user saw `M162`'s Help page and asked for more: "a user manual for the form builder, each input type and its settings/configurations. the left and right panels". Where does that reference go, does it show the panels, and when does it go live? **A, A, A — a second part of the same Help page ("Builder reference"), with one picture of each panel and numbered callouts, live as soon as it is ready.**
+
+**Asked and answered 2026-10-12 (user decision, in chat), recorded by Lane A in `M163`'s claim.** The comment: *"i already saw the help page. but i am expecting a user manual for the form builder, each input type and its settings/configurations. the left and right panels"*. Three questions were put together, each with a recommendation, and all three were answered as recommended.
+
+- **Where — A, a second part of the Help page (recommended, chosen).** The contents split into "Step by step" (what `M162` shipped) and "Builder reference" (the left panel, the right panel, then one entry per question type); one page, searched with the browser's find. **B** — its own page linked from Help.
+- **Pictures — A, one of each panel with numbered callouts (recommended, chosen),** captured by a Playwright script from the seeded E2E stack so retaking them is one command. **B** — text only. This narrows `D114`'s "no screenshots" to the two panels; `R-5cde8465` keeps the rest.
+- **When — A, as soon as it is ready (recommended, chosen).** It only adds to the Help page, so it cannot break what testers use; it goes live in or out of order with `M158`–`M161`. **B** — after those four.
+
+**What the answer files, in the same push:** `R-ccc0be00` (`early-testing`), which `M163` takes. `R-5cde8465` is narrowed in place, not taken. `D109`'s freeze, if the Oct 12 session has not started when `M163` is ready, takes this one exception.
+
 ### D114 — Testers start on Oct 12 and the app has no guide to creating a form; the user asked for a user manual inside the app, on a page of its own. `D109` holds every merge until the Oct 12 session. When does it go live, and what does it cover? **A — tonight, before the session, as a one-off exception to `D109`: a Help page on creating a form from start to finish, with no screenshots.**
 
 **Asked and answered 2026-10-11 (user decision, in chat), recorded by Lane A in `M162`'s claim.** The request: *"create a user manual for the form builder to help our user/tester undrsdatnd how to create form. if you can include it in the app itself a separate page to access the manual"*. Three questions were put together, each with a recommendation, and all three were answered as recommended.

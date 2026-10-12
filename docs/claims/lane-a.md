@@ -80,6 +80,45 @@ find a label it did not before.
   `version-diff-ui` in chat.
 - All four merge tomorrow in this order, each released after its own post-merge run.
 
+### Claim — `M163`, the Help page's "Builder reference": every question type, its settings, and the builder's left and right panels (`R-ccc0be00`) (`m163-builder-reference`)
+
+Taken 2026-10-12 by the session that built `M162`, again in the worktree `C:\laragon\www\fb-help` with its own Docker stack
+(`docker compose -p fb-help`) — the OCR session keeps the main checkout and its four open PRs (#351–#353, #355). Branch
+`m163-builder-reference`, cut from `origin/main` after this claim's commit, PR into main. **Live as soon as it is ready (`D115` A)**,
+in or out of order with `M158`–`M161`. Row: `R-ccc0be00`, filed in this push at the end of `docs/feature-backlog.md` (cited by id).
+The session opened with the user's check of `M162`: seen on staging ("i already saw the help page"), with this row as the answer.
+
+#### Evidence verified
+- `manual.ts` on `origin/main` at `d4a81d94` gives eighteen of the thirty-one `FieldType` labels one line each, and names the right
+  panel's `Basics`, `Options`, `Validation` and `Advanced` tabs only — held. `ConfigPanel.vue`'s tab list also holds `Levels`, `Grid`,
+  `Map`, `Media`, `Prefill` and `Content`, each for its own types — held.
+- The left panel is `FieldPalette.vue` (heading "Add a field", one group per `FieldCategory`, an "Adv" badge) plus the Fields/Library
+  toggle in `Builder.vue`, shown only with the `field_library` plan feature — held.
+
+#### Premise verified
+- `M161` (PR #355) edits `Builder.vue` and `BuilderCanvas.vue`, both read-only here; the OCR session confirmed it renames no label the
+  manual quotes, so its merge cannot redden `manual.test.ts`. It changes which pane shows at compact widths — the pictures are taken at
+  desktop width, where all three panes show.
+- `public/` holds only `icons/`, `fonts/` and `build/` today, and `vite.config.ts` leaves absolute `/images/...` URLs alone, so a
+  picture under `public/images/help/` is served as a plain file. The app's security headers block no same-origin image.
+- `playwright.config.ts`'s default `testMatch` would run a `*.spec.ts` capture inside CI's E2E job and overwrite committed pictures;
+  the capture therefore gets its own config and file suffix, so CI never runs it.
+
+#### Remedy verdict
+- `D115` prescribes the shape and nothing else. Chosen: the same typed content (`manual.ts` gains a `part` on each chapter and a
+  `figure` block), the same text-only renderers, the contents list grouped by part; pictures as PNG files with numbered badges injected
+  into the page before an element screenshot, the badge numbers matching an ordered list beside each picture.
+
+Files: `resources/js/components/help/manual.ts`, `resources/js/components/help/manual.test.ts`, `resources/js/components/help/ManualBlock.vue`,
+`resources/js/Pages/help/Index.vue`, `resources/js/Pages/help/index.test.ts`, `public/images/help/left-panel.png` (new),
+`public/images/help/right-panel.png` (new), `tests/e2e/capture/help-pictures.capture.ts` (new), `playwright.capture.config.ts` (new).
+Shared artefacts taken: the close-out set — shared with the OCR session's writer, rebased before every push.
+Paired files taken: none in 7(b-bis). The label test reads every file it cites, now including most of `resources/js/components/builder/`.
+Namespaces spent: nothing from either namespace (decision `D115` recorded, derived as the next after `D114`).
+Prediction: the new label citations green on their first run (every label grepped before it is written — `M162`'s lesson); the page
+test's heading and bold counts red until updated for the second part; the capture script's first run is **the one I most expect to be
+wrong** — a selector or a wait in a builder I have never driven from Playwright.
+
 ### Claim extension — `M159`, `ocr-ink-ticks`: the ink in each printed box, in the bake-off (`m159-ocr-ink-ticks`)
 
 Taken 2026-10-11, after `M158`'s PR (#351) was opened. ⚠️ **Branch cut from `origin/m158-ocr-dropped-ticks`, not from `origin/main` — a

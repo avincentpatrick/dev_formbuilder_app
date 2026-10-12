@@ -307,7 +307,13 @@ group('the Scanning section (M129)', () => {
     });
 
     it('sits beside Share when offered, and opens the Scanning panel', async () => {
-        const wrapper = mountWith({ enabled: false, eligible: true, reason: null });
+        // M165 (`D106`): the server sends the public link's paper copies with the section.
+        const wrapper = mountWith({
+            enabled: false,
+            eligible: true,
+            reason: null,
+            guest: { enabled: false, window_minutes: 10, daily_cap: 20, uploads_per_window: 3, windows: [1, 2, 5, 10], daily_cap_max: 100, link_live: false },
+        });
 
         expect(railLabels(wrapper)).toEqual([
             'Details', 'Pages', 'Theme', 'Share', 'Scanning', 'Schedule', 'Thank-you message', 'Save and finish later',

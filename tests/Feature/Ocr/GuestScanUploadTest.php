@@ -349,7 +349,7 @@ it('lists a guest scan as from the public link with its reference, and finds it 
         ->assertOk();
 
     $page()->assertInertia(fn (AssertableInertia $inertia) => $inertia
-        ->component('ocr/Scans')
+        ->component('ocr/Scans', false)
         ->has('scans', 2)
         ->where('scans.0.from_public_link', false)
         ->where('scans.0.reference', null)

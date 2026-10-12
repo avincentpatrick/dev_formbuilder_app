@@ -130,3 +130,86 @@ describe('the Help page', () => {
         wrapper.unmount();
     });
 });
+
+/**
+ * M164 — the contents stay within reach (the user's comment on `M163`: *"is there another way that contents are always
+ * seen? can we have the contents on the left side?"*). The sticky column itself is CSS and is proved in a real browser
+ * by `tests/e2e/help-contents.spec.ts`; these cases pin what the markup owes it.
+ */
+describe('the Help page keeps its contents within reach', () => {
+    it('ends every chapter with a way back to the contents, and offers one fixed button', () => {
+        const wrapper = render();
+
+        expect(wrapper.find('nav#manual-contents').exists()).toBe(true);
+        for (const chapter of manual) {
+            expect(wrapper.find(`section#${chapter.id} a.manual__back-link`).attributes('href'), chapter.id).toBe('#manual-contents');
+        }
+        expect(wrapper.findAll('a.manual__to-contents').map((a) => a.attributes('href'))).toEqual(['#manual-contents']);
+        wrapper.unmount();
+    });
+
+    describe('marks the chapter being read', () => {
+        const ids = manual.map((c) => c.id);
+        let offset = 0;
+        let lastHeight = 900;
+
+        /** Chapter i sits 1000px below chapter i-1; `offset` is how far the page has scrolled. */
+        function place(scrolled: number, lastChapterHeight = 900): void {
+            offset = scrolled;
+            lastHeight = lastChapterHeight;
+        }
+
+        function box(top: number, height: number): DOMRect {
+            return { top, bottom: top + height, left: 0, right: 800, width: 800, height, x: 0, y: top, toJSON: () => ({}) } as DOMRect;
+        }
+
+        async function scroll(wrapper: VueWrapper): Promise<string[]> {
+            document.dispatchEvent(new Event('scroll'));
+            await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+            await wrapper.vm.$nextTick();
+            return wrapper.findAll('nav#manual-contents [aria-current="location"]').map((a) => a.attributes('href') ?? '');
+        }
+
+        it('as the reader scrolls, and the last one at the foot of the page', async () => {
+            vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+                const i = ids.indexOf(this.id);
+                if (i < 0) return box(0, 0);
+                return box(i * 1000 - offset, i === ids.length - 1 ? lastHeight : 900);
+            });
+            const line = window.innerHeight * 0.4;
+
+            place(-2 * line); // the top of the page: no chapter has reached the line yet
+            const wrapper = render();
+            expect(await scroll(wrapper)).toEqual([]);
+
+            place(0); // the first chapter at the top
+            expect(await scroll(wrapper)).toEqual([`#${ids[0]}`]);
+
+            place(2500); // the third chapter has passed the line, the fourth has not
+            expect(await scroll(wrapper)).toEqual([`#${ids[2]}`]);
+
+            // The foot of the page: a short last chapter wholly on screen, its top still below the line.
+            const lastIndex = ids.length - 1;
+            place(lastIndex * 1000 - (window.innerHeight - 200), 150);
+            expect(await scroll(wrapper)).toEqual([`#${ids[lastIndex]}`]);
+
+            wrapper.unmount();
+            vi.restoreAllMocks();
+        });
+
+        it('draws the current chapter apart, never by colour alone', async () => {
+            vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+                const i = ids.indexOf(this.id);
+                return i < 0 ? box(0, 0) : box(i * 1000 - offset, 900);
+            });
+            place(0);
+            const wrapper = render();
+            await scroll(wrapper);
+
+            const current = wrapper.findAll('nav#manual-contents a.manual__contents-link--current');
+            expect(current.map((a) => a.attributes('aria-current'))).toEqual(['location']);
+            wrapper.unmount();
+            vi.restoreAllMocks();
+        });
+    });
+});

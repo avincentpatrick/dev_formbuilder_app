@@ -4701,7 +4701,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   with the note that it is generated from the enum once, at the migration that creates it, so widening it
   needs its own migration. Original filing follows.
   **`major` · The data dictionary states "No CHECK pairs the two" for `audits.user_id` /
-  `acting_as_user_id`.** `docs/data-dictionary.md:630`, refuted by
+  `acting_as_user_id`.** `docs/data-dictionary.md` §13, refuted by
   `2026_08_09_000001_add_acting_as_user_id_to_audits.php:98-101`
   (`audits_acting_as_not_self_check`). The doc recorded the migration's reasoning for the **rejected**
   constraint (`:34`) rather than the one that shipped (`:40`), so a backfill or fixture setting
@@ -7433,7 +7433,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   unfiled **and** undecided — then attacked by a refuter that did not overturn it. ⛔ **NO WRITER OUTSIDE
   SEEDERS.** Declared at `app/Models/Form.php:41`, `:88` and `:120`, read at
   `app/Services/Submissions/EncodeFormPresenter.php:210` and
-  `app/Services/Submissions/PublicFormPresenter.php:39` — and every assignment in the tree is a seeder or a
+  `app/Services/Submissions/PublicFormPresenter.php` (its `single_page_mode` key) — and every assignment in the tree is a seeder or a
   test (`database/seeders/DemoSeeder.php:535`, `database/seeders/E2eSeeder.php` (three fixtures),
   `tests/Feature/Submissions/EncodeStepPayloadTest.php:76`). The sole creation path,
   `app/Services/Forms/FormService.php`, opens a `Form::create([` whose six explicit keys on the lines
@@ -7521,7 +7521,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   never the per-form column. ⚠️ **The AND-both contract is implemented for the sibling**, which is why the
   omission reads as a gap: `app/Http/Controllers/Tenant/SubmissionDraftController.php:41` states the
   doctrine, `app/Http/Controllers/Public/GuestDraftController.php:73` enforces the per-form half and
-  `app/Services/Submissions/PublicFormPresenter.php:44` ANDs the two. ⚠️ **Calibration, so this is not
+  `app/Services/Submissions/PublicFormPresenter.php`'s `save_and_resume` key ANDs the two. ⚠️ **Calibration, so this is not
   over-filed:** it is one of the family of **five** inert flags the row above enumerates. It earns its own
   row only because offline sync **shipped** — the sync routes, the PWA manifest,
   `tests/Feature/Entitlements/OfflineSyncGateTest.php` — whereas the OCR flags are parked ahead of held
@@ -7673,7 +7673,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/Services/Connectors/ConnectionSubscriptionService.php:114` each soft-delete and say so in a trailing
   comment — so a taker should settle whether §8 is scoped to its three named entities before sizing the
   job. ⚠️ **Two more places in one further document promise the same unbuilt jobs** —
-  `docs/data-dictionary.md:131` and `docs/data-dictionary.md:542`, the latter an S3 object-deletion job
+  `docs/data-dictionary.md:131` and `docs/data-dictionary.md` §10, the latter an S3 object-deletion job
   that does not exist, which is the half carrying real future cost since orphaned objects outlive their
   rows. ⚠️ **Take it with `D14`, not independently**: `D14` recommends leaving the submission
   delete/restore surface unbuilt, decides the surface rather than the grace period, and says nothing about
@@ -11514,7 +11514,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M114` (2026-09-26) — `minor` · `forms.single_page_mode` drives real, tested runtime behaviour in both renderers and has no write
   path anywhere outside the seeders.** Filed 2026-09-25 by `M110`, from the report asking for a section strip under
   the preview and a choice of how sections are presented. The column exists (migration
-  `..._000201_create_forms_table.php:46`), is read by `PublicFormPresenter.php:38-39` and
+  `..._000201_create_forms_table.php:46`), is read by `PublicFormPresenter.php` (`single_page_mode`) and
   `EncodeFormPresenter.php:210`, and branches the runtime at `RuntimeSession.vue`'s `PageView`/`StepView` switch — but a grep of
   `app/Http/`, `app/Services/Forms/` and `app/Http/Requests/` for `single_page_mode` returns **zero hits**, so the
   only way to make a form multi-step today is a direct database write. ✅ **`D35` already answered the shape**
@@ -13776,13 +13776,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   order, opening it the way the review screen's `ScanPages.vue` does. **Live.** Filed by `M152`. **Tier: early-testing.** The
   user chose before Oct 12, in chat, because testers will scan on Oct 12 and check the responses against the paper. ✅ **CLOSED BY `M153` (2026-10-09):** `SubmissionInboxPresenter::detail()` sends `scan_pages` — read through `ocr_scans.submission_id` for their order (an attachment has none), listed only while the response owns each file, linked through `attachments.show` (the review screen's page route refuses a viewer or reviewer) — and the response page shows them under "Scanned pages" with the review screen's `ScanPages.vue`, beside the answers on a wide screen. Five Pest cases and three Vitest cases red first; ten mutants caught, one only after a fifth case of two saved scans on one form; an E2E pair on the seeded scanned responses.
 
-- **`minor` · A guest respondent cannot upload a photo or scan of a paper form they filled in; only staff can (`D106` A).**
+- ✅ **CLOSED BY `M165` (2026-10-12) — ****`minor` · A guest respondent cannot upload a photo or scan of a paper form they filled in; only staff can (`D106` A).**
   Asked by the user during `M152`'s staging scan. "Scan paper forms" sits behind the manual-encoding gate on a form's
   Responses tab (`routes/tenant.php`, `forms.ocr.scans.store`). The remedy is an "Upload a filled paper copy" option on the
   public link where the form's Scanning switch and a new guest-upload switch are both on: the existing upload checks under a
   guest rate limit, the same reading job, and the staff scans list as the only way to a response (§3's review, unchanged).
   Answered first at claim time: who sees an unsaved guest scan, what the respondent is told, and how the public endpoint is
-  kept from spending the provider's pages. **Live.** Filed by `M152`. **Tier: during-testing.**
+  kept from spending the provider's pages. **Live.** Filed by `M152`. **Tier: during-testing.** ✅ **CLOSED BY `M165` (2026-10-12):** the three questions were answered by the user in chat and recorded at `D106` — the same staff see an unsaved guest scan, marked "From the public link"; the guest is told *"Your paper form was received. Staff will check it and enter your answers."* with a reference; and the spend guard is a spam check plus limits the owner sets. `POST /api/v1/public/f/{shareToken}/scans` (on `GuestAttachmentController`, so `routes/api.php` gained no `use` line) runs the module, the plan, `EnforceGuestFormRateLimit` in a new `paper` mode (3 uploads per address per `forms.guest_ocr_window_minutes`: 1, 2, 5 or 10, 10 by default) and `VerifyGuestBotChallenge` in a new `always` mode; `OcrScanService::storeFromGuest()` then checks guest access, both switches, a readable current version, an open form and `forms.guest_ocr_daily_cap` over a rolling 24 hours, and stores the scan with no uploader, `source` = `guest` and a `SubmissionReference` code. A full storage quota answers the same neutral 403 as a form that takes no copies. The Scanning section saves the switch and both limits together; the scans list marks a guest scan and finds it by its reference however it is typed; the public form offers "Filled in a paper copy? Upload it instead" from the schema's `paper_upload` hint and ends on the thank-you screen with the reference. Additive migrations `2026_08_17_000129` and `_000130`. Proof: 13 Pest cases in `GuestScanUploadTest`, 5 settings cases, 16 Vitest cases (the panel 5, the scans page 3, the upload 5, the client 3), and `ocr-guest-upload.spec.ts` (the upload answered in the browser, never by the provider) 12/12 at three widths in both themes.
+
+- **`minor` · A guest's paper-copy reference is not the reference of the response a reviewer saves from it.** Found by `M165`. The guest is given the scan's code (`ocr_scans.reference`); when a reviewer saves the scan, `SubmissionPipeline` mints the response its own `submissions.reference`, and nothing carries the guest's code across, so a guest who quotes it later can be found on the scans page (the saved scan links to its response) but not in the responses inbox's search. The remedy is to let `OcrScanConfirmation` hand the scan's code to the pipeline as the response's reference, or to show the scan's code on the response page. **Live.** Filed by `M165`. **Tier: during-testing.**
+
+- **`minor` · Phones that share one internet address share one paper-copy window.** Found by `M165`. `EnforceGuestFormRateLimit`'s `paper` mode keys the window by address, the one key the server can trust, so a clinic whose phones reach the internet through one router can send 3 paper copies per window between them, not each. The owner can shorten the window to one minute today; a fairer key would need a per-device signal the server can trust. **Latent** — nobody has sent paper copies from a shared network yet. Filed by `M165`. **Tier: during-testing.**
+
+- **`nit` · The scans page lists the newest 25 scans, so a burst of paper copies from the public link pushes staff scans off it.** Found by `M165`. `OcrScanListPresenter::LISTED` caps the list with no paging; the reference search finds a guest's scan, but a staff scan has no reference to search by. The remedy is paging, or a filter by source. **Latent** — no form has had more than a handful of scans. Filed by `M165`. **Tier: before-launch.**
 
 - ✅ **CLOSED BY `M154` (2026-10-09) — ****`minor` · Correcting a scanned response's answers shows no scanned pages beside the form.**
   Found by `M153` closing `R-1e00f872`: the response page now shows "Scanned pages", but its "Edit answers" button opens

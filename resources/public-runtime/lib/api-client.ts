@@ -15,6 +15,7 @@ import { ApiError, normalizeError } from './error-normalizer'; import { hasLinke
 import type {
     AnswerMap,
     MintResponse,
+    PaperCopyReceipt,
     ResumeDraftResult,
     SaveDraftPayload,
     SaveDraftResult,
@@ -71,6 +72,13 @@ export interface ApiClient {
      * cost a round trip on the next submit.
      */
     adoptToken(token: string): void;
+    /**
+     * Send a filled paper copy of the form — photos or one PDF of its printed pages — for staff to check (M165,
+     * `D106`). ONLINE ONLY and never queued: the pages are files the outbox does not hold, and the answer is a
+     * reference the respondent must see. A spam check is solved for EVERY upload, whatever `bot_challenge` says,
+     * because the server requires one here regardless of the form's own setting.
+     */
+    uploadPaperCopy(files: File[]): Promise<PaperCopyReceipt>;
 }
 
 async function parseBody(response: Response): Promise<unknown> {
@@ -309,6 +317,25 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
                 created: response.status === 201,
                 ...(redirect !== null ? { redirect } : {}),
             };
+        },
+
+        async uploadPaperCopy(files: File[]): Promise<PaperCopyReceipt> {
+            // A fresh solution per attempt, inside `run`: a re-mint after an expired token retries with a new token,
+            // and a solution is bound to the form and spent once.
+            const body = await withFreshToken<{ data: PaperCopyReceipt }>(async (token) => {
+                const pages = new FormData();
+                for (const file of files) {
+                    pages.append('pages[]', file);
+                }
+
+                return doFetch(`/api/v1/public/f/${encodeURIComponent(token)}/scans`, {
+                    method: 'POST',
+                    headers: { Accept: 'application/json', 'X-Meridian-Challenge': await solveChallengeHeader(token) },
+                    body: pages,
+                });
+            });
+
+            return { reference: body.data.reference };
         },
 
         async saveDraft(payload: SaveDraftPayload): Promise<SaveDraftResult> {

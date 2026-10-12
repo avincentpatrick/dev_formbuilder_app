@@ -195,7 +195,21 @@ it('offers Scope only to a holder of scopes.manage', function (): void {
 it('hands the builder the same Scanning facts, so both entry points show one section', function (): void {
     $builder = app(BuilderPresenter::class)->present($this->form);
 
-    expect($builder['ocr_scanning'])->toBe(['enabled' => false, 'eligible' => true, 'reason' => null]);
+    // M165 (`D106`): the public link's paper copies ride in the same section, so the builder gets them too.
+    expect($builder['ocr_scanning'])->toBe([
+        'enabled' => false,
+        'eligible' => true,
+        'reason' => null,
+        'guest' => [
+            'enabled' => false,
+            'window_minutes' => 10,
+            'daily_cap' => 20,
+            'uploads_per_window' => 3,
+            'windows' => [1, 2, 5, 10],
+            'daily_cap_max' => 100,
+            'link_live' => false,
+        ],
+    ]);
 });
 
 it('offers as destinations the other forms the author may open, each marked live or not (M130)', function (): void {

@@ -105,4 +105,14 @@ return [
         'max_pages' => 5,
     ],
 
+    /*
+    | A filled paper copy uploaded from a form's public link (M165, `R-7173c02c`, `D106`). The form's owner sets
+    | the per-device window (`forms.guest_ocr_window_minutes`) and the daily cap (`forms.guest_ocr_daily_cap`);
+    | this is how many uploads one device may send inside that window. Every upload also needs a solved spam
+    | check, whatever the form's own spam-check setting says.
+    */
+    'guest' => [
+        'uploads_per_window' => 3,
+    ],
+
 ];

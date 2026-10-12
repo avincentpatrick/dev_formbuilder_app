@@ -353,12 +353,27 @@ final class FormService
      * never be a side effect of an unrelated edit. The workspace half of the gate — the `ocr_single` module and
      * the plan — lives at the route; this method writes the form's half. Like save-and-resume, no version or
      * pipeline effect: it decides only whether this form's scans are taken in.
+     *
+     * `$guest` (M165, `D106`) also sets whether the public link takes a filled paper copy and its two limits. Its
+     * keys enter the audit row only when they were sent, so the scanning switch alone records exactly what it always
+     * has, and one save of the section is still one audit row.
+     *
+     * @param  array{allow_guest_ocr: bool, guest_ocr_window_minutes: int, guest_ocr_daily_cap: int}|null  $guest
      */
-    public function setOcrScanning(Form $form, bool $enabled, ?User $actor = null): Form
+    public function setOcrScanning(Form $form, bool $enabled, ?User $actor = null, ?array $guest = null): Form
     {
-        return DB::transaction(function () use ($form, $enabled, $actor): Form {
+        return DB::transaction(function () use ($form, $enabled, $actor, $guest): Form {
             $old = ['allow_ocr_single' => $form->allow_ocr_single];
             $new = ['allow_ocr_single' => $enabled];
+
+            if ($guest !== null) {
+                $old += [
+                    'allow_guest_ocr' => $form->allow_guest_ocr,
+                    'guest_ocr_window_minutes' => $form->guest_ocr_window_minutes,
+                    'guest_ocr_daily_cap' => $form->guest_ocr_daily_cap,
+                ];
+                $new += $guest;
+            }
 
             $form->forceFill($new)->save();
 

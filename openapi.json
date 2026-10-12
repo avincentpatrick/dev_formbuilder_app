@@ -3203,6 +3203,100 @@
                 "security": []
             }
         },
+        "/public/f/{shareToken}/scans": {
+            "post": {
+                "operationId": "v1.public.scans.store",
+                "description": "The pages are read automatically and wait in the form's scans list until a staff member reviews and saves\nthem as a response. The answer carries only a reference to quote: nothing that was read is ever sent back.\nThe token's version is not checked against the current one, because the paper names its own version and\npaper printed before a republish is still a valid copy.",
+                "summary": "Upload a filled paper copy of the form \u2014 photos or a scan of its printed pages \u2014 for staff to check",
+                "tags": [
+                    "GuestAttachment"
+                ],
+                "parameters": [
+                    {
+                        "name": "shareToken",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreOcrScanRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "reference": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "reference"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "description": "The workspace has switched this module off. Not a plan limit: nothing needs buying, and an administrator inside the workspace can re-enable it.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "object",
+                                            "properties": {
+                                                "code": {
+                                                    "type": "string",
+                                                    "description": "Stable machine-readable code: `module_disabled`."
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "description": "Error overview."
+                                                }
+                                            },
+                                            "required": [
+                                                "code",
+                                                "message"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "error"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
         "/public/f/{shareToken}/challenge": {
             "post": {
                 "operationId": "v1.public.challenges.store",
@@ -4032,6 +4126,34 @@
                                                                 "acceptance",
                                                                 "remaining"
                                                             ]
+                                                        },
+                                                        "paper_upload": {
+                                                            "type": [
+                                                                "object",
+                                                                "null"
+                                                            ],
+                                                            "description": "Whether to offer \"Upload a filled paper copy\" (M165, `D106`), with the limits the picker checks\nbefore sending; null when the form does not take one. A HINT, like `bot_challenge`: the schema is\ncached by the service worker, so `POST f/{shareToken}/scans` decides every upload afresh.",
+                                                            "properties": {
+                                                                "max_pages": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "accepted_types": {
+                                                                    "type": "array",
+                                                                    "items": {}
+                                                                },
+                                                                "max_bytes_per_file": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "max_bytes_per_scan": {
+                                                                    "type": "integer"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "max_pages",
+                                                                "accepted_types",
+                                                                "max_bytes_per_file",
+                                                                "max_bytes_per_scan"
+                                                            ]
                                                         }
                                                     },
                                                     "required": [
@@ -4045,7 +4167,8 @@
                                                         "bot_challenge",
                                                         "confirmation_message",
                                                         "confirmation_message_translations",
-                                                        "schedule"
+                                                        "schedule",
+                                                        "paper_upload"
                                                     ]
                                                 },
                                                 "version": {
@@ -7370,6 +7493,27 @@
                     "name"
                 ],
                 "title": "StoreFormTemplateRequest"
+            },
+            "StoreOcrScanRequest": {
+                "type": "object",
+                "description": "Shape-checks one scan upload (M128 \u2014 single-form OCR groundwork 1): one to `ocr.upload.max_pages` files,\neach an image or a PDF of the allowed size. The rest \u2014 a PDF on its own, the scan's total, the storage\nquota, and whether this FORM may be scanned at all \u2014 is {@see OcrScanService}'s, because it needs the\nform and all the files together. Authorization is the route's \u2014 on the staff upload `can:create` on a\nsubmission for this form, then the module and plan gates; on a guest's paper copy (M165, `D106`) the share\ntoken, the module and plan, the device's window and a spam check \u2014 so this only shapes.\n\n`mimetypes` reads the CONTENT-SNIFFED type, as the write path does, so a renamed file is refused here\nwith a 422 that names the page.",
+                "properties": {
+                    "pages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "format": "binary",
+                            "contentMediaType": "application/octet-stream",
+                            "maxLength": 6835
+                        },
+                        "minItems": 1,
+                        "maxItems": 5
+                    }
+                },
+                "required": [
+                    "pages"
+                ],
+                "title": "StoreOcrScanRequest"
             },
             "StoreResourceGrantRequest": {
                 "type": "object",

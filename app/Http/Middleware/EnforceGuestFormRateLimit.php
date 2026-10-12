@@ -57,13 +57,38 @@ use Symfony\Component\HttpFoundation\Response;
  * bootstrap/app.php; `error-normalizer.ts` already classifies 429; `RuntimeSession.handleSubmitError`
  * already shows the notice; and `replay.ts` already backs off and keeps the row pending. Nothing
  * downstream of this class needed a line.
+ *
+ * ── THE PAPER-COPY WINDOW (M165, `R-7173c02c`, `D106`) ────────────────────────────────────────────────
+ * With the parameter `paper`, the same per-address-within-one-form bucket bounds a form's filled paper copies
+ * instead: at most `ocr.guest.uploads_per_window` uploads per `forms.guest_ocr_window_minutes` from one address —
+ * 10 minutes by default, and the form's owner may set it shorter (the user's answer, 2026-10-12). Its own key,
+ * so a respondent's submits and paper copies never spend each other's slots, and always on, because a paper copy
+ * spends the reading provider's pages while the responses dial above may be left unlimited. ⚠️ THE ADDRESS IS THE
+ * DEVICE: a device id would be the client's own word. A clinic whose phones share one address shares one window.
+ * A mode here rather than a class of its own because a new class is a new `use` line in `routes/api.php`, which
+ * moves the lines documents cite.
  */
 final class EnforceGuestFormRateLimit
 {
     use ResolvesGuestForm;
 
-    public function handle(Request $request, Closure $next): Response
+    /** The route parameter for a form's paper-copy uploads (M165). */
+    public const PAPER = 'paper';
+
+    public function handle(Request $request, Closure $next, string $mode = 'responses'): Response
     {
+        if ($mode === self::PAPER) {
+            $form = $this->guestForm($request);
+
+            $this->spend(
+                'gscan:'.$form->getKey().':'.$request->ip(),
+                (int) config('ocr.guest.uploads_per_window', 3),
+                $form->guest_ocr_window_minutes * 60,
+            );
+
+            return $next($request);
+        }
+
         $limit = $this->guestForm($request)->guest_rate_limit_per_minute;
 
         // NULL is "no per-form ceiling", and it is the branch every form created before I8b takes. Note
@@ -73,9 +98,15 @@ final class EnforceGuestFormRateLimit
             return $next($request);
         }
 
-        $key = 'gform:'.$this->guestForm($request)->getKey().':'.$request->ip();
+        $this->spend('gform:'.$this->guestForm($request)->getKey().':'.$request->ip(), $limit, 60);
 
-        if (RateLimiter::tooManyAttempts($key, $limit)) {
+        return $next($request);
+    }
+
+    /** Take one slot from `$key`'s bucket of `$max` per `$decaySeconds`, or refuse with 429 and when to retry. */
+    private function spend(string $key, int $max, int $decaySeconds): void
+    {
+        if (RateLimiter::tooManyAttempts($key, $max)) {
             throw new ThrottleRequestsException(
                 'Too Many Attempts.',
                 null,
@@ -83,8 +114,6 @@ final class EnforceGuestFormRateLimit
             );
         }
 
-        RateLimiter::hit($key, 60);
-
-        return $next($request);
+        RateLimiter::hit($key, $decaySeconds);
     }
 }

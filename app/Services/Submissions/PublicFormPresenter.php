@@ -9,6 +9,9 @@ use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Services\Entitlements\EntitlementService;
+use App\Services\Forms\CapabilityFlags;
+use App\Services\Settings\TenantSettingRegistry;
+use App\Support\Entitlements\FeatureAdmission;
 use App\Support\Forms\FormScheduleView;
 
 /**
@@ -20,7 +23,10 @@ use App\Support\Forms\FormScheduleView;
  */
 final class PublicFormPresenter
 {
-    public function __construct(private readonly EntitlementService $entitlements) {}
+    public function __construct(
+        private readonly EntitlementService $entitlements,
+        private readonly TenantSettingRegistry $settings,
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -65,6 +71,10 @@ final class PublicFormPresenter
                 // Enforcement is authoritative in the write path ({@see FormAcceptanceGuard}); the schema is
                 // still returned for a closed form so the runtime can render the closed state.
                 'schedule' => $this->schedule($form),
+                // Whether to offer "Upload a filled paper copy" (M165, `D106`), with the limits the picker checks
+                // before sending; null when the form does not take one. A HINT, like `bot_challenge`: the schema is
+                // cached by the service worker, so `POST f/{shareToken}/scans` decides every upload afresh.
+                'paper_upload' => $this->paperUpload($form),
             ],
             'version' => [
                 'id' => $version->id,
@@ -112,6 +122,39 @@ final class PublicFormPresenter
     private function tenantAllowsSaveResume(): bool
     {
         return $this->entitlements->currentPlan() === null || $this->entitlements->feature('save_and_resume');
+    }
+
+    /**
+     * The paper-copy block (M165), offered exactly where the upload route would take one: the form's Scanning and
+     * guest-upload switches, the workspace's `ocr_single` module, the plan as the route's `feature:` gate reads it
+     * ({@see FeatureAdmission}), and a current version paper can carry. The limits are the staff upload's.
+     *
+     * @return array{max_pages: int, accepted_types: list<string>, max_bytes_per_file: int, max_bytes_per_scan: int}|null
+     */
+    private function paperUpload(Form $form): ?array
+    {
+        if ($form->allow_ocr_single !== true || $form->allow_guest_ocr !== true) {
+            return null;
+        }
+
+        if (! $this->settings->moduleEnabled('ocr_single') || ! FeatureAdmission::admits($this->entitlements, 'ocr_single')) {
+            return null;
+        }
+
+        $current = $form->currentPublishedVersion;
+        if ($current === null || ! CapabilityFlags::isOcrCompatible($current)) {
+            return null;
+        }
+
+        /** @var list<string> $types */
+        $types = array_values((array) config('ocr.upload.accepted_types', []));
+
+        return [
+            'max_pages' => (int) config('ocr.upload.max_pages', 5),
+            'accepted_types' => $types,
+            'max_bytes_per_file' => (int) config('ocr.upload.max_bytes_per_file'),
+            'max_bytes_per_scan' => (int) config('ocr.upload.max_bytes_per_scan'),
+        ];
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\OcrScanSource;
 use App\Enums\OcrScanStatus;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\HasUuidv7;
@@ -23,6 +24,9 @@ use Illuminate\Support\Carbon;
  * is read. Once a reviewer saves the scan (M129, groundwork 2), `submission_id`, `confirmed_at` and
  * `confirmed_by` record the response it became, and its page files belong to that response.
  *
+ * `source` and `reference` (M165, `D106`) say whether a guest sent the scan from the public link, and the code that
+ * guest was given. Both are written once, at upload, by `OcrScanService` — never mass-assigned.
+ *
  * @property string $id
  * @property string $tenant_id
  * @property string $form_id
@@ -39,6 +43,8 @@ use Illuminate\Support\Carbon;
  * @property string|null $submission_id
  * @property Carbon|null $confirmed_at
  * @property string|null $confirmed_by
+ * @property OcrScanSource $source
+ * @property string|null $reference
  * @property Carbon $created_at
  * @property Carbon $updated_at
  */
@@ -77,6 +83,7 @@ class OcrScan extends Model implements TenantScoped
     protected $attributes = [
         'status' => 'queued',
         'attempts' => 0,
+        'source' => 'staff',
     ];
 
     /**
@@ -86,6 +93,7 @@ class OcrScan extends Model implements TenantScoped
     {
         return [
             'status' => OcrScanStatus::class,
+            'source' => OcrScanSource::class,
             'pages' => 'array',
             'extraction' => 'array',
             'attempts' => 'integer',

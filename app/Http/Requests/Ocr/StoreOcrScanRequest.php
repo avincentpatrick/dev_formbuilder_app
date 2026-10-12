@@ -12,8 +12,9 @@ use Illuminate\Http\UploadedFile;
  * Shape-checks one scan upload (M128 — single-form OCR groundwork 1): one to `ocr.upload.max_pages` files,
  * each an image or a PDF of the allowed size. The rest — a PDF on its own, the scan's total, the storage
  * quota, and whether this FORM may be scanned at all — is {@see OcrScanService}'s, because it needs the
- * form and all the files together. Authorization is the route's (`can:create` on a submission for this
- * form, then the module and plan gates), so this only shapes.
+ * form and all the files together. Authorization is the route's — on the staff upload `can:create` on a
+ * submission for this form, then the module and plan gates; on a guest's paper copy (M165, `D106`) the share
+ * token, the module and plan, the device's window and a spam check — so this only shapes.
  *
  * `mimetypes` reads the CONTENT-SNIFFED type, as the write path does, so a renamed file is refused here
  * with a 422 that names the page.

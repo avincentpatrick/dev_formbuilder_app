@@ -44,6 +44,8 @@ type Phase = 'loading' | 'ready' | 'confirmation' | 'error' | 'unavailable';
 const CONFIRM_MESSAGE = 'Thanks — your response has been recorded.';
 const QUEUED_MESSAGE = "Saved on this device — we'll submit it automatically when you're back online.";
 const RESOLVED_MESSAGE = 'Thanks — your reviewed response has been submitted.';
+// M165 (`D106`) — the user's own sentence for a paper copy sent from the public link.
+const PAPER_RECEIVED_MESSAGE = 'Your paper form was received. Staff will check it and enter your answers.';
 
 // Increment G8c — the resolve-mode banner, keyed by which 409 parked the row. ⚠️ INCREMENT M14 MOVED THE
 // COPY ITSELF OUT TO `lib/conflict-notice.ts` AND LEFT THE LOOKUP HERE, because `outbox-status.ts` held a
@@ -357,6 +359,16 @@ function onSubmitted(id: string, submittedReference: string, authored: string | 
     phase.value = 'confirmation';
 }
 
+// M165 (`R-7173c02c`, `D106`) — a filled paper copy was sent instead of an answer. The user's words for what the
+// respondent is told, with the server's reference and nowhere to go next: the response does not exist until staff save it.
+function onPaperReceived(paperReference: string): void {
+    reference.value = paperReference;
+    queueTag.value = null;
+    redirectTarget.value = null;
+    confirmationMessage.value = PAPER_RECEIVED_MESSAGE;
+    phase.value = 'confirmation';
+}
+
 // Increment G8b — an offline (or dropped-mid-submit) finalize: the answers are safely queued, so show a
 // "saved on this device" confirmation with a local QUEUE TAG derived from the client submission id — not a
 // reference, because no server row exists yet and a code the tenant cannot find is worse than none (J2e).
@@ -597,6 +609,7 @@ function onRestart(): void {
             @redraft="onRedraft"
             @discard="onDiscard"
             @unavailable="onUnavailable"
+            @paper-received="onPaperReceived"
         />
     </div>
 </template>

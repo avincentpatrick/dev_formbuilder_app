@@ -2298,6 +2298,11 @@ class E2eSeeder extends Seeder
     /** Deterministic id for the seeded scan (M129), so re-seeding finds it rather than adding a second. */
     private const OCR_SCAN_FIXTURE_ID = '0192e2e0-0000-7000-8000-00000000c501';
 
+    /** The seeded paper copy from the public link (M165), and the reference its sender was given. */
+    private const OCR_GUEST_SCAN_FIXTURE_ID = '0192e2e0-0000-7000-8000-00000000c502';
+
+    private const OCR_GUEST_SCAN_REFERENCE = 'GQ7K4M2X';
+
     /** Where "Before Your Visit" sends a respondent after the thank-you (M130, `D76`); the E2E spec intercepts it. */
     private const VISIT_GUIDE_NEXT = 'https://visit.example.org/next';
 
@@ -2335,7 +2340,10 @@ class E2eSeeder extends Seeder
             return;
         }
 
-        $intake->forceFill(['allow_ocr_single' => true])->save();
+        // M165 (`D106`): its public link takes a filled paper copy too, so the public page offers the upload.
+        $intake->forceFill(['allow_ocr_single' => true, 'allow_guest_ocr' => true])->save();
+
+        $this->seedOcrGuestScan($tenant, $intake);
 
         if (OcrScan::query()->whereKey(self::OCR_SCAN_FIXTURE_ID)->exists()) {
             return;
@@ -2379,6 +2387,39 @@ class E2eSeeder extends Seeder
             'read_at' => now(),
         ]);
         $scan->id = self::OCR_SCAN_FIXTURE_ID;
+        $scan->save();
+    }
+
+    /**
+     * One paper copy a guest sent from Clinic Intake's public link (M165, `R-7173c02c`, `D106`), waiting to be read,
+     * so the scans page shows "From the public link" with its reference and `ocr-guest-upload.spec.ts` can search
+     * for it. Through the real write path with NO uploader, as the guest route stores it; never read, so it costs
+     * no provider call. The source is written as its stored value rather than through the enum, so this file
+     * gains no `use` line — three of its lines are cited by number. Idempotent by id.
+     */
+    private function seedOcrGuestScan(Tenant $tenant, Form $intake): void
+    {
+        if (OcrScan::query()->whereKey(self::OCR_GUEST_SCAN_FIXTURE_ID)->exists()) {
+            return;
+        }
+
+        $page = app(AttachmentStorageService::class)->storeOcrScanPage(
+            UploadedFile::fake()->createWithContent('paper-copy-page-1.png', (string) base64_decode(self::OCR_SCAN_FIXTURE_PNG)),
+            (string) $tenant->id,
+            self::OCR_GUEST_SCAN_FIXTURE_ID,
+            null,
+        );
+
+        $scan = new OcrScan([
+            'tenant_id' => (string) $tenant->id,
+            'form_id' => $intake->id,
+            'uploaded_by' => null,
+            'status' => OcrScanStatus::Queued,
+            'provider' => 'google_vision',
+            'pages' => [['attachment_id' => (string) $page->id, 'response_path' => null]],
+        ]);
+        $scan->id = self::OCR_GUEST_SCAN_FIXTURE_ID;
+        $scan->forceFill(['source' => 'guest', 'reference' => self::OCR_GUEST_SCAN_REFERENCE]);
         $scan->save();
     }
 

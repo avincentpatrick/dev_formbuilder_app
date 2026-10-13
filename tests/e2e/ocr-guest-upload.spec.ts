@@ -96,7 +96,7 @@ test.describe('the public link', () => {
             const name = fields.find((field) => field.field_type === 'short_text')!.key;
             const age = fields.find((field) => field.field_type === 'integer')!.key;
 
-            const meta = { tier: null, confidence: null, text: null, page: 1, reason: null, ticks: false, inked: false };
+            const meta = { tier: null, confidence: null, text: null, page: 1, reason: null, ticks: false, inked: false, repaired: false };
             await page.route('**/api/v1/public/paper/*/*/pages/*', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: PNG }));
             await page.route('**/api/v1/public/paper/*/paper-e2e', (route) =>
                 route.fulfill({

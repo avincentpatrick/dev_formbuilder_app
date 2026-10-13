@@ -34,6 +34,11 @@ export interface ScanFieldMeta {
      * mark for most ticks standing alone in a box. False for a scan read before `M160`.
      */
     inked: boolean;
+    /**
+     * Whether the answer is the nearest value the box can hold, filled in because what was seen did not parse as written
+     * (M167, `D117`): "72 ." is 72, a year read "190" is 0190. False for a scan read before `M167`.
+     */
+    repaired: boolean;
 }
 
 export interface ScanPage {
@@ -99,6 +104,7 @@ export function scanNote(meta: ScanFieldMeta | undefined, multiPage: boolean): S
                 : { tone: 'neutral', text: `Left blank on the paper${where}.` };
         case 'not_found':
             return { tone: 'warning', text: 'Not found on the scan. Check the paper and enter it by hand.' };
+        // Since `D117` (M167) only an answer in which nothing usable was seen, or one from a scan read before M167.
         case 'unreadable':
             return {
                 tone: 'danger',
@@ -118,6 +124,17 @@ function readNote(meta: ScanFieldMeta, saw: string | null, where: string): ScanN
         return {
             tone: 'warning',
             text: `The scan read ${saw ?? 'an answer'} here${where}, but it could not be filled in. See the list above the form.`,
+        };
+    }
+
+    // `D117`: what was seen did not parse as written, so the box holds the nearest answer it can, and the note quotes what was
+    // seen — the reviewer corrects a value rather than typing one from nothing.
+    if (meta.repaired && meta.carried) {
+        return {
+            tone: 'danger',
+            text: saw === null
+                ? `This may be wrong: the scan filled in the nearest answer to what it saw${where}. Check it against the paper.`
+                : `This may be wrong: the scan saw ${saw}${where} and filled in the nearest answer. Check it against the paper.`,
         };
     }
 

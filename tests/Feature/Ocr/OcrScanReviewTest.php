@@ -191,6 +191,24 @@ it('fills in what the scan was not sure of, still marked manual for the note (D1
         ->and($props['fields']['age']['carried'])->toBeTrue();
 });
 
+it('fills in the nearest value to writing that did not parse and tells the screen so, for the note that quotes it (M167, D117)', function (): void {
+    // Round 1's sheet 01, the user's screenshot: the weight read "72 ." and the date "12 11 190". Both boxes were empty with
+    // "Needs manual entry"; now each holds the nearest value it can, and its meta says repaired.
+    $scan = ReadScanFixture::make($this->form, $this->admin, [
+        ...ocrReviewSheet(),
+        'weight' => [...ReadScanFixture::read('decimal', '72', '72 .', 82, 'review'), 'repaired' => true],
+        'visit_date' => [...ReadScanFixture::read('date', '0190-11-12', '12 11 190', 76, 'review'), 'repaired' => true],
+    ]);
+
+    $props = $this->actingAs($this->admin)->get(ocrReviewUrl($this->form, $scan))->viewData('page')['props']['scan'];
+
+    expect($props['answers']['weight'])->toBe(72.0)
+        ->and($props['answers']['visit_date'])->toBe('0190-11-12')
+        ->and($props['fields']['weight'])->toMatchArray(['repaired' => true, 'carried' => true, 'text' => '72 .'])
+        ->and($props['fields']['visit_date'])->toMatchArray(['repaired' => true, 'carried' => true, 'text' => '12 11 190'])
+        ->and($props['fields']['patient_name']['repaired'])->toBeFalse();
+});
+
 it('lists a duration rather than saving it, because no channel can show one', function (): void {
     $scan = ReadScanFixture::make($this->form, $this->admin, ocrReviewSheet());
 

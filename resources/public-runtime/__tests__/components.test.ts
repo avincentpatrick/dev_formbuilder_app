@@ -1885,8 +1885,8 @@ describe('RuntimeSession — a paper copy its sender is checking (M166)', () => 
     const PAPER = {
         token: 'paper-token-1',
         fields: {
-            name: { state: 'read', tier: 'review', confidence: 78, text: 'Ada', page: 1, carried: true, reason: null, ticks: false, inked: false },
-            age: { state: 'unreadable', tier: null, confidence: null, text: null, page: 1, carried: false, reason: null, ticks: false, inked: false },
+            name: { state: 'read', tier: 'review', confidence: 78, text: 'Ada', page: 1, carried: true, reason: null, ticks: false, inked: false, repaired: false },
+            age: { state: 'unreadable', tier: null, confidence: null, text: null, page: 1, carried: false, reason: null, ticks: false, inked: false, repaired: false },
         },
         pages: [{ number: 1, url: '/api/v1/public/paper/t1/paper-token-1/pages/1', mime: 'image/png', servable: true }],
     };

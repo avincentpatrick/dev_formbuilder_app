@@ -9,7 +9,7 @@ import type { PaperFieldMeta } from '../lib/types';
  */
 
 function meta(overrides: Partial<PaperFieldMeta>): PaperFieldMeta {
-    return { state: 'read', tier: 'auto', confidence: 95, text: 'x', page: 1, carried: true, reason: null, ticks: false, inked: false, ...overrides };
+    return { state: 'read', tier: 'auto', confidence: 95, text: 'x', page: 1, carried: true, reason: null, ticks: false, inked: false, repaired: false, ...overrides };
 }
 
 describe('paperNote', () => {
@@ -24,6 +24,8 @@ describe('paperNote', () => {
         expect(paperNote(meta({ tier: 'review' }))?.kind).toBe('check');
         expect(paperNote(meta({ tier: 'manual' }))?.kind).toBe('check');
         expect(paperNote(meta({ inked: true }))?.kind).toBe('check');
+        // M167 (`D117`): the nearest answer to writing that did not fit as written ("72 ." is 72) is one to check, whatever its tier.
+        expect(paperNote(meta({ repaired: true, text: '72 .' }))).toEqual({ kind: 'check', text: 'Please check this answer. We may have read it wrong.' });
         expect(paperNote(meta({ state: 'blank', tier: null, carried: false, ticks: true }))).toEqual({
             kind: 'check',
             text: 'We did not see a tick here. If you ticked one, please choose it.',

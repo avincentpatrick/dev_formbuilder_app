@@ -185,6 +185,8 @@ export interface PaperFieldMeta {
     ticks: boolean;
     /** Whether a tick was read from the ink in its box rather than as text. */
     inked: boolean;
+    /** M167, `D117` — whether the value is the nearest one the question can hold, because what was read did not fit as written. */
+    repaired: boolean;
 }
 
 /** M166 — one scanned page, served to its sender while they check it. */

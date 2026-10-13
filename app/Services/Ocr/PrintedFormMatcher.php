@@ -430,8 +430,13 @@ final class PrintedFormMatcher
      * gave back 21 of Round 1's 45 ticked questions with no mark at all — so "left blank on the paper" would be false there.
      * An extraction stored before `M157` has no `ticks`.
      *
+     * `repaired` is present, and true, only on a value the reader filled in as the nearest one the box can hold (`D117`, M167):
+     * what was seen did not parse for the type as written. Its confidence is capped below auto, so its tier is never `auto`.
+     * The review screen quotes the text beside it. An extraction stored before `M167` has none, and held such an answer as
+     * `unreadable`.
+     *
      * @param  array<string, mixed>  $row  the question's row in the print model the paper was typeset from
-     * @param  array{state: string, value: mixed, text: string|null, confidence: int|null}  $read
+     * @param  array{state: string, value: mixed, text: string|null, confidence: int|null, repaired?: true}  $read
      * @param  array{auto: int, review: int}  $thresholds
      * @return array<string, mixed>
      */
@@ -451,7 +456,7 @@ final class PrintedFormMatcher
             'page' => $page === null ? null : $page + 1,
             'anchored_by' => $anchoredBy,
             'ticks' => ($row['area'] ?? null) === PrintAnswerArea::Choices->value && ($row['options'] ?? []) !== [],
-        ];
+        ] + (($read['repaired'] ?? false) === true ? ['repaired' => true] : []);
     }
 
     /**

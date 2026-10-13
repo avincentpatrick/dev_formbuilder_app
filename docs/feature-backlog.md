@@ -13398,6 +13398,15 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   box sits at the region's left edge, or refuse a number that starts with one). **Live.** Filed by `M144`.
   **Tier: during-testing.**
 
+- **`nit` · A phone number read with a letter for a digit keeps the letter.**
+  Found by `M168` verifying `R-db5a14dd`. `OcrAnswerReader`'s class docblock says a phone written in an open box is "parsed out
+  of the text with the same letter-for-digit fixes a comb got", but `parsed()` has no `FieldType::Phone` arm, so a phone falls
+  to `found()` exactly as read: an `O` for a 0 or an `l` for a 1 is stored in the phone, with no note that anything was changed
+  or doubtful. The bake-off cannot see it, because `OcrBakeoffAnswers` compares phones by their digits alone. The remedy is a
+  phone arm that applies `DIGIT_LOOKALIKES` to the characters of the number, keeps `+`, spaces and dashes, and marks the answer
+  repaired when it changed anything (`D117`). **Latent** — none of Round 1's 15 phones carried a letter. Filed by `M168`.
+  **Tier: during-testing.**
+
 - **`minor` · Deleting or re-keying a question that another question's rule compares with leaves that rule pointing
   at a key that no longer exists, and the owner's next autosave saves it with no compared question at all.** Found by
   `M145` while measuring `R-551873af`'s reachability. `useBuilderStore.removeFieldLocal()` drops only the deleted field,
@@ -13636,7 +13645,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   evidence of a tick whatever the recognizer thinks the glyph is; `OcrAnswerReader::confidenceOf()` scores the glyph instead.
   Calibrating it belongs with the bake-off's thresholds. **Live.** Filed by `M149`. **Tier: early-testing.** ✅ **CLOSED BY `M152` (2026-10-09):** a mark seen in the box before an option's label has a confidence of at least `OcrAnswerReader::MARK_SEEN` (80) whatever glyph it was read as — inside the review band and never auto, because Round 1's one wrong tick was a multi-select whose second mark Vision never returned. Measured on Round 1's cached reads before any test: 51.1% → 42.2% needing correction, silent errors 0, right-but-withheld 35 → 19. `OcrTickConfidenceTest.php` (four cases, one red first; a case holds the floor between the configured thresholds); three mutants — no floor, the floor at 90, the floor at 69 — all CAUGHT. Recorded in `docs/adr/0010-ocr-provider-cloud-vision.md` §D4.
 
-- **`minor` · Cloud Vision returns no character at all for most ticks in a box, so most ticked choices read blank.** Found by
+- ✅ **CLOSED BY `M168` (2026-10-13) — ****`minor` · Cloud Vision returns no character at all for most ticks in a box, so most ticked choices read blank.** Found by
   `M149` in the same round, with every fix above applied: 22 of 45 answered choices read blank, and on the option lines Vision
   returned nothing between the printed labels, or a letter (`Y`, `H`, `F`) the reader rightly does not take as a mark. A text
   recognizer is the wrong instrument for a tick: measuring the ink inside each printed box, or `D97`'s vision-language arm,
@@ -13644,14 +13653,25 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-08 by `M150`: `D104` answered A — this row's remedy is
   the vision-language arm (`ocr-vlm-arm`), which is built and measured during testing; until then a reviewer keys a blank tick on
   the mandatory review screen.** **Retargeted 2026-10-11 by `D112` (`M158`): the remedy is now the ink in each printed box —
-  `ocr-ink-ticks` measures it in the bake-off, `ocr-ink-live` puts it on the reading path if it meets the bar; the arm is the fallback.**
+  `ocr-ink-ticks` measures it in the bake-off, `ocr-ink-live` puts it on the reading path if it meets the bar; the arm is the fallback.** ✅ **CLOSED BY `M168` (2026-10-13), verified rather than built — the remedy shipped and the row was never closed:** `M159` measured the ink in the bake-off (21 of 21 Vision-blank ticks right) and `M160` put it on the reading path: `OcrScanReader::withInk()` calls `OcrInkReader::fillBlanks()` for every read scan, a filled tick carries `read_by` = `ink`, and the review screen says "No tick was read as text here, so this was read from the ink in the box." Both markers are `done`. What the ink does not reach is filed as its own row (a PDF scan, a partly-read multi-answer question, options split across two pages).
 
 - **`minor` · A `1` written as one stroke in a date or time box is dropped as the box's wall, and a printed `/` is sometimes
   read as `1` or `0`.** Found by `M149` in the same round: "12 / 11 / 1981" read as `122111 190`, "21 / 10 / 2025" as
   `2111012025`, "09 / 06 / 2024" as `09 006 2024`. `OcrText::isBorderArtefact()` drops `|`, which is also how a recognizer
   reads a one-stroke 1 inside a cell; a separator misread as a digit makes a group longer than its cells, which `M148`'s
   `overfills()` correctly refuses, so these fail closed rather than wrong. With the hint, 2 of 15 dates were unreadable.
-  **Live.** Filed by `M149`. **Tier: during-testing.**
+  **Latent** — re-measured by `M168` on Round 1's hinted reads after `M167`: 28 of the 30 date and time answers read right, and
+  the two wrong ones are flagged — sheet 01's year (`12 11 190`; its pages returned no bar at all, so the digit was lost by Vision,
+  not dropped as a wall) and sheet 07's day and month, swapped. `M167` also re-places an over-full group rather than refusing it,
+  so "fail closed" no longer holds either. The precondition is a one-stroke 1 returned as `|` inside a date or time box, which the
+  handwriting hint has not produced. Filed by `M149`. **Tier: during-testing.**
+
+- **`nit` · A tick Vision misses is read from the ink only on a photo, only on a question it returned no tick for at all, and only when the question's options sit on one page.**
+  Found by `M168` closing `R-a21fa6e8`. `OcrScanReader` hands `OcrInkReader` an image only for an image attachment, so a PDF's
+  pages have none and its missed ticks still read "No tick was seen here"; `OcrInkReader::fillBlanks()` measures only a question
+  whose state is `blank`, so a multi-answer question where Vision returned one of two ticks is never re-checked; and it skips a
+  question whose options span two pages. **Latent** — every Round 1 and staging scan so far was a phone photo, and no partly-read
+  multi-answer question has been seen. Filed by `M168`. **Tier: during-testing.**
 
 - **`minor` · The reader joins a recognized word's punctuation with a space, so a name reads "DE GUZMAN JR ." and an address
   "STA MESA".** Found by `M149` in the same round. `OcrAnswerReader` joins Vision's words with spaces, and Vision returns `.`
@@ -13691,7 +13711,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`nit` · Every question's Duplicate and Delete buttons share one name, "Duplicate field" and "Delete field".** Found by
   `M150` in `BuilderCanvas.vue`: a screen reader listing the buttons hears the same two names on every row, and the builder
   says "question" everywhere else. The remedy names the question, as the grip does ("Reorder Age …").
-  **Live.** Filed by `M150`. **Tier: during-testing.**
+  **Live.** Filed by `M150`. **Tier: during-testing.** ⚠️ **Verified by `M168`, not taken:** the two labels are also cited by
+  `resources/js/components/help/manual.ts` from `BuilderCanvas.vue` (the copy and delete lines of the Structure chapter), so
+  `manual.test.ts` fails unless the manual moves in the same change. The premise "the builder says 'question' everywhere else"
+  is short: the grip's fallback, `useCanvasReorder.ts`'s `fieldLabel` and "Move field", "Add a field from the left" and the
+  undo entry for an edit still say "field".
 
 - **`minor` · A section's title cannot be edited in Structure.** Found by `M150` beside `R-34edf1f5`, which gives a question's
   label an in-place editor: a section's title is still text inside `button.canvas__section-head` in `BuilderCanvas.vue`, edited
@@ -13784,7 +13808,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Answered first at claim time: who sees an unsaved guest scan, what the respondent is told, and how the public endpoint is
   kept from spending the provider's pages. **Live.** Filed by `M152`. **Tier: during-testing.** ✅ **CLOSED BY `M165` (2026-10-12):** the three questions were answered by the user in chat and recorded at `D106` — the same staff see an unsaved guest scan, marked "From the public link"; the guest is told *"Your paper form was received. Staff will check it and enter your answers."* with a reference; and the spend guard is a spam check plus limits the owner sets. `POST /api/v1/public/f/{shareToken}/scans` (on `GuestAttachmentController`, so `routes/api.php` gained no `use` line) runs the module, the plan, `EnforceGuestFormRateLimit` in a new `paper` mode (3 uploads per address per `forms.guest_ocr_window_minutes`: 1, 2, 5 or 10, 10 by default) and `VerifyGuestBotChallenge` in a new `always` mode; `OcrScanService::storeFromGuest()` then checks guest access, both switches, a readable current version, an open form and `forms.guest_ocr_daily_cap` over a rolling 24 hours, and stores the scan with no uploader, `source` = `guest` and a `SubmissionReference` code. A full storage quota answers the same neutral 403 as a form that takes no copies. The Scanning section saves the switch and both limits together; the scans list marks a guest scan and finds it by its reference however it is typed; the public form offers "Filled in a paper copy? Upload it instead" from the schema's `paper_upload` hint and ends on the thank-you screen with the reference. Additive migrations `2026_08_17_000129` and `_000130`. Proof: 14 Pest cases in `GuestScanUploadTest`, 5 settings cases, 27 mutants caught (18 Pest, 9 Vitest), 16 Vitest cases (the panel 5, the scans page 3, the upload 5, the client 3), and `ocr-guest-upload.spec.ts` (the upload answered in the browser, never by the provider) 12/12 at three widths in both themes. Merged as PR #358 (`0ec14400`); the scans list now also breaks a same-second tie by id, which CI found.
 
-- **`minor` · A guest's paper-copy reference is not the reference of the response a reviewer saves from it.** Found by `M165`. The guest is given the scan's code (`ocr_scans.reference`); when a reviewer saves the scan, `SubmissionPipeline` mints the response its own `submissions.reference`, and nothing carries the guest's code across, so a guest who quotes it later can be found on the scans page (the saved scan links to its response) but not in the responses inbox's search. The remedy is to let `OcrScanConfirmation` hand the scan's code to the pipeline as the response's reference, or to show the scan's code on the response page. **Live.** Filed by `M165`. **Tier: during-testing.**
+- **`minor` · A guest's paper-copy reference is not the reference of the response a reviewer saves from it.** Found by `M165`. The guest is given the scan's code (`ocr_scans.reference`); when a reviewer saves the scan, `SubmissionPipeline` mints the response its own `submissions.reference`, and nothing carries the guest's code across, so a guest who quotes it later can be found on the scans page (the saved scan links to its response) but not in the responses inbox's search. The remedy is to let `OcrScanConfirmation` hand the scan's code to the pipeline as the response's reference, or to show the scan's code on the response page. **Live.** Filed by `M165`. **Tier: during-testing.** ⚠️ **Verified by `M168`, not taken:** since `M166` a guest who checks and submits their copy is shown the response's own reference, so only a copy left for staff carries the scan's code. Showing the code on the response page alone would still leave the inbox search blind to it; a remedy that touches no hub is to match `ocr_scans.reference` to its saved response in `Submission::scopeMatchingKeyword()`. Handing the code to the pipeline instead must set `reference` on the model (it is not mass-assignable, and `Submission` mints it, not `SubmissionPipeline`) and fall back to a fresh code on a collision, since a scan's code is unique only among scans.
 
 - **`minor` · Phones that share one internet address share one paper-copy window.** Found by `M165`. `EnforceGuestFormRateLimit`'s `paper` mode keys the window by address, the one key the server can trust, so a clinic whose phones reach the internet through one router can send 3 paper copies per window between them, not each. The owner can shorten the window to one minute today; a fairer key would need a per-device signal the server can trust. **Latent** — nobody has sent paper copies from a shared network yet. Filed by `M165`. **Tier: during-testing.**
 
@@ -13803,6 +13827,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`nit` · Recent scans does not say that a guest is checking a scan, so a staff member can start keying it at the same time.** Found by `M166`. While the sender checks a read copy (`D116`) the staff list still says "Ready to review"; whoever saves first wins (`submission_uuid_claimed`), so nothing is saved twice, but a reviewer's work is thrown away when the guest gets there first. The remedy is a "Being checked by the sender" state while a paper token for the scan has been read and not expired. **Latent** — no copy has been checked from the public link yet. Filed by `M166`. **Tier: during-testing.**
 
 - **`nit` · A reload while checking a paper copy loses the check, and the copy falls back to staff.** Found by `M166`. The paper token lives only in the page's memory, and review mode keeps no device draft (it cannot carry the token), so a reload returns the sender to the empty form; the scan waits for staff as `M165` left it, and nothing is lost but the guest's corrections. The remedy is to keep the token for the visit (`respondent_session`), so a reload reopens the check. **Latent.** Filed by `M166`. **Tier: during-testing.**
+
+- **`minor` · A guest checking a paper copy sees the scanned pages folded above the form rather than beside it, and the staff review gives the paper well under half the width.**
+  Found by the user at `M166`'s check on staging (2026-10-13): *"its better if the preview is on the left sife. so they are side
+  by side. its easier for the user to validate and correct the values if they are looking on it side by side."* Clarified in chat
+  the same turn: the scanned copy on the left, as on the logged-in review, and bigger — *"make it 50/50 for both guest and logged
+  id upload"*; confirmed against a mockup, with the pages first on a phone. `M166`'s own row prescribed "the scanned pages beside
+  it", but the build put them in `RuntimeSession.vue`'s notice slot inside a closed `<details>` ("Show your scanned pages")
+  above the form, in `RuntimeShell.vue`'s 44rem column. The staff scan review and `M154`'s edit mode (`Encode.vue`) put the paper
+  on the left from 75rem, but give the form `minmax(0, 45rem)`, so beside the 240px sidebar the paper gets about 390px at 1440.
+  The remedy: on the guest page, the paper on the left and the form on the right in equal halves from 64rem (the column widens
+  to 90rem only then), the paper sticky with its own scroll as on `Show.vue`; below that, the pages open above the form. The
+  staff grid becomes equal halves at its existing 75rem, which leaves it about the room the guest page has at 64rem.
+  **Live.** Filed by `M168`. **Tier: during-testing.**
 
 - ✅ **CLOSED BY `M167` (2026-10-13) — ****`minor` · A scanned answer the reader could not turn into its question's type is left empty, with only a note quoting what was seen (`D117` A).**
   Found by the user on Round 1's sheet 01: Weight read "72 ." and Date of visit read "12 11 190" came back `unreadable` with no value,
@@ -13863,7 +13900,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   by hand or from an old tab, still saves the schedule, the thank-you message, the page mode and the scanning switch on a
   form that takes no responses. The builder at the same kind of address opens read-only (an archived form has no draft). The
   remedy is a refusal at the writers, not in `FormPolicy::update()`, which also gates restore and the builder's read — measure
-  which first. Measured by reading, not by a request. **Live.** Filed by `M155`. **Tier: during-testing.**
+  which first. Measured by reading, not by a request. **Live.** Filed by `M155`. **Tier: during-testing.** ⚠️ **Verified by
+  `M168`, not taken — the remedy as written does not work:** `bootstrap/app.php` renders a `FormException` only for `/api/v1`
+  (its web arm returns null), so a refusal thrown from a settings writer reaches these Inertia routes as a 500. Refuse in each
+  settings controller as `FormPublishController` does, or with a `ValidationException`. The list is short as well: automations,
+  data sharing, scope, theme, share and the title and description also still save, while reference files and choice lists
+  already refuse, because an archived form has no draft.
 
 - **`nit` · The tree-wide clipped-node guard reads only `clip: rect(0 0 0 0)`, so a node clipped with commas is invisible to it.**
   Found by `M155` taking `R-77a29731`. `packages/design-system/src/theme/__tests__/clipped-node-containment.test.ts`'s

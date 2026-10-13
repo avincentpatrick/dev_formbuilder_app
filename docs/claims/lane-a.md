@@ -16,7 +16,61 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M167` is merged and live on staging (released below). The next claim is written here. Ask the user before every merge, and never merge while another session's deploy is in flight.
+## Status: ACTIVE CLAIM — `M168`, the scanned copy beside the form, 50/50, on the guest check and the staff review (`m168-paper-beside-form`)
+
+Taken 2026-10-13, the response-submission testing day. Branch `m168-paper-beside-form`, cut from origin/main at `94c08f60`, PR into
+main. Row: `R-17caf80e` — "A guest checking a paper copy sees the scanned pages folded above the form rather than beside it, and the
+staff review gives the paper well under half the width." Filed by this claim's push, from the user's comment at `M166`'s check.
+
+At the session's start the user confirmed all three owed checks on staging — `M167`, `M166` and `M165`, each "Yes, it works" — and
+`M166`'s answer carried the comment: *"its better if the preview is on the left sife. so they are side by side. its easier for the
+user to validate and correct the values if they are looking on it side by side."* Clarified in chat: the scanned copy on the left
+"just like the interface when logged in", bigger, "50/50 for both guest and logged id upload"; confirmed against a mockup (paper
+left, form right, from 1024px; on a phone the pages first, then the form). The user chose this row alone for `M168` over a
+four-row batch, so it can merge today; `R-27049032` (punctuation joined with a space) is `M169`.
+
+### Evidence verified
+- `RuntimeSession.vue` renders the pages in `RuntimeShell`'s `#notice` slot, inside `<details class="session-paper">` with the
+  summary "Show your scanned pages", above `PageView`/`StepView` — held.
+- `RuntimeShell.vue`'s `.runtime__column` is `max-width: 44rem`; `App.vue`'s `.app-shell__banner` copies the 44rem — held.
+- `Encode.vue`'s scan grid is `minmax(0, 1fr) minmax(0, 45rem)` from `@media (min-width: 75rem)`, `max-width: 90rem`, the paper
+  sticky with its own scroll — held. `M154`'s edit mode uses the same grid (`hasPaper`) — held.
+- `Show.vue` (`M153`) splits `minmax(0, 1fr) minmax(0, 1fr)` with the same sticky rule — held; its comment names the review
+  screen's `1fr 45rem`, which this change falsifies.
+- `ScanPages.vue` is already imported by the public runtime through `@/` (`RuntimeSession.vue`'s import) — held; no edit to it.
+
+### Premise verified
+- `M166`'s own row prescribed "the scanned pages beside it"; the build folded them, with no decision recorded anywhere — so this
+  is the row's remedy finally built, not a new design.
+- The staff page sits beside a 240px sidebar (`AppLayout.vue`: content = viewport − 240), so its 75rem switch already leaves about
+  the room the guest page has at 64rem. The staff breakpoint stays; only its columns change.
+- `clipped-node-containment.test.ts` lists `RuntimeShell.vue` in `KNOWN_UNGUARDED` and asserts the list exactly: any `position`
+  rule in that file reddens it. The sticky rule therefore lives in `RuntimeSession.vue`, on its own element.
+- The public runtime has no breakpoint anywhere today and can be framed (`SharePanel.vue`'s snippet): a viewport query inside an
+  iframe resolves against the iframe's width, which is the right answer here.
+- One session only (the user, 2026-10-13); nobody else is building.
+
+### Remedy verdict
+The row's remedy (written by this claim from the measurements above) works as stated: equal halves are `Show.vue`'s proven rule,
+sticky inside a grid needs the grid item itself sticky (so the item is `RuntimeSession`'s element), and the 64rem guest switch at
+1024px leaves each half ~483px. Measured red-first by the new Vitest case and two E2E geometry assertions before the CSS moves.
+
+Files: `resources/public-runtime/components/RuntimeShell.vue`, `resources/public-runtime/components/RuntimeSession.vue`,
+`resources/public-runtime/App.vue`, `resources/js/Pages/submissions/Encode.vue` (the one hub), `resources/js/Pages/submissions/Show.vue`
+(comment only), `resources/public-runtime/__tests__/components.test.ts`, `tests/e2e/ocr-guest-upload.spec.ts`,
+`tests/e2e/ocr-review-axe.spec.ts`; close-out: `docs/feature-backlog.md`, `docs/claims/lane-a.md`, `PROGRESS.md`, `docs/pipeline.md`,
+`docs/gate-baselines.md`.
+Shared artefacts taken: `docs/feature-backlog.md`, `tests/e2e/ocr-guest-upload.spec.ts`, `tests/e2e/ocr-review-axe.spec.ts`, `PROGRESS.md`.
+Paired files taken: none — `clipped-node-containment.test.ts` is deliberately not touched (see the premise).
+Namespaces spent: nothing from either namespace.
+Prediction: the Vitest case goes red on the current code on two assertions (no `[data-paper-pages]`, a `<details>` present); the
+guest E2E geometry red at 1440 only (375 and 834 stack today and keep stacking); the staff geometry red at 1440 on both scan
+screens (paper ≈ 390px beside 720px). No PHP moves, so Pest, PHPStan and the contract gate cannot move. **Most likely wrong:**
+horizontal overflow on the guest page at 834px or 1440px once the column can widen — `assertClean` measures it.
+
+**Filed by this claim's push** (each verified in code first): `R-a21fa6e8` closed (the ink reader shipped in `M159`/`M160`) and its
+remainder filed as `R-db64a016`; `R-611075a9` re-measured to latent on Round 1's hinted reads; `R-0257b869` (a phone keeps a
+letter read for a digit); notes on `R-188dd3b1`, `R-20c53379` and `R-0c3d17f0`, which were verified for a batch and not taken.
 
 ## RELEASED — `M167`, every question the scan saw anything in is filled with the nearest answer its box can hold, and marked (`R-af4a31fd`, `D117` A) (merged as PR #360, `eb648636`, 6/6 green with real step counts on its first run and on the post-merge run — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

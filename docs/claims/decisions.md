@@ -24,10 +24,19 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D115`, the last one filed, was asked and answered on 2026-10-12 in the session that filed it and recorded in `M163`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D117`, the last one filed, was asked and answered on 2026-10-13 in the session that filed it and recorded in `M167`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D117 — A scan saw writing it could not turn into the question's type — a weight written "72.", a date whose year was read as "190" — and the review screens left the box empty with "Needs manual entry … It saw …". Should the box be filled with the nearest answer it can hold? **A — yes: every question the scan saw anything in is filled with the nearest answer its box can hold, and marked that it may be wrong.**
+
+**Asked and answered 2026-10-13 (user decision, in chat), recorded by Lane A in `M167`'s claim.** The comment, with a screenshot of the staff review of Round 1's sheet 01: *"previously, i commented on the ocr reader that it whenever a value is read even if the confidence is low, it must be reflected in the field and just notify that it may be wrong. and i also tested that and it is functioning well before. but now i tried testing an upload now and its back to not reflecting the read value and just telling what is read."* Not a regression of `D108`: in the same screenshot Full name (66%) and Email (46%) are filled in and marked. Weight and Date of visit took the other path — the reader could not make the text into a number or a date, so it returned `unreadable` with no value, which `D108` never touched. The question put: the date boxes read 12 / 11 / 190 — fill it as read (11/12/0190) and mark it, or leave it empty with the note. The answer widened it to every type: *"fill as read and let the user correct it. its better than the user will type everyhting. also for the decimal. fill it in and let the user correct it. actually all the fields must be fields based on what is read and let the user correct it. its always better to have an initial value rather than user will type everything from 0."*
+
+- **A — fill in the nearest answer the box can hold, marked (recommended for the date, chosen, and widened by the user to every type).** A number keeps the number it found ("72 ." → 72, "50 kg" → 50); a date or a time keeps what was read and is brought to the nearest one that exists (a year read short is kept as read, 0190); a word or a choice takes the nearest option. The note quotes what was seen and says it may be wrong. Only a question where nothing usable was seen stays empty. It extends `D108` to the `unreadable` path and reverses `M148`'s "refused for a person to read, never guessed" for a comb group read with one character too many.
+- **B — leave a value the type cannot hold empty and quote what was seen (as built).**
+
+**What the answer files, in the same push:** a `during-testing` row in `docs/feature-backlog.md` (*a scanned answer the reader could not turn into its question's type is left empty*), taken at once by `M167`.
+
 ### D116 — `M165` lets a guest send a photo or scan of a filled paper copy from the public link, and the guest never sees what was read: staff check every answer against the photo. Should the guest be able to check and correct what was read? **A — yes: the guest checks the read answers in the form, corrects them, and submits them as their own response, with the photos attached.**
 
 **Asked and answered 2026-10-13 (user decision, in chat), recorded by Lane A after `M165`'s close-out.** The user asked: *"when the guest user uploads the scanned copy, there is no way for them to validate and correct incase there is discrepancy in the results?"* — correct as built, by `D106`'s second answer (*the guest never sees what was read*). Round 1 measured about a third of fields needing a correction (`docs/ocr-pipeline-design.md` §9), and the person who wrote the paper knows the answers best.

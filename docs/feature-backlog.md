@@ -13804,6 +13804,16 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`nit` · A reload while checking a paper copy loses the check, and the copy falls back to staff.** Found by `M166`. The paper token lives only in the page's memory, and review mode keeps no device draft (it cannot carry the token), so a reload returns the sender to the empty form; the scan waits for staff as `M165` left it, and nothing is lost but the guest's corrections. The remedy is to keep the token for the visit (`respondent_session`), so a reload reopens the check. **Latent.** Filed by `M166`. **Tier: during-testing.**
 
+- **`minor` · A scanned answer the reader could not turn into its question's type is left empty, with only a note quoting what was seen (`D117` A).**
+  Found by the user on Round 1's sheet 01: Weight read "72 ." and Date of visit read "12 11 190" came back `unreadable` with no value,
+  so both review screens showed an empty box and "Needs manual entry … It saw …" (staff) or "We could not read this answer" (guest).
+  `OcrAnswerReader` returns `unreadable` wherever the text does not parse for the type — a number with a stray mark or a unit, a date or
+  a time that does not exist or whose groups were not read cleanly, a yes/no or a cascade level that matches no option, two ticks on a
+  one-answer question — and `OcrAnswerCarry::carry()` carries only a `read` value. Measured offline on Round 1 at `a88e6618`: six such
+  answers, all numbers and dates (`72 .`, `12 11 190`, `081002026`, `35 YEARS OLD`, `65 KILOS`, `50 kg`). The remedy, `D117`: the reader
+  fills the nearest value the question can hold, keeps the text as seen, caps the confidence below auto and marks the entry repaired, and
+  both screens say it may be wrong. **Live.** Filed by `M167`. **Tier: during-testing.**
+
 - ✅ **CLOSED BY `M154` (2026-10-09) — ****`minor` · Correcting a scanned response's answers shows no scanned pages beside the form.**
   Found by `M153` closing `R-1e00f872`: the response page now shows "Scanned pages", but its "Edit answers" button opens
   `Pages/submissions/Encode.vue` in edit mode (`SubmissionEditController`), which shows the paper only in scan-review mode, so a

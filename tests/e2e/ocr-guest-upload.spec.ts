@@ -129,7 +129,18 @@ test.describe('the public link', () => {
             // Neither the upload nor a second way to keep the answers is offered on the copy being checked.
             await expect(page.getByRole('button', { name: 'Filled in a paper copy? Upload it instead' })).toHaveCount(0);
 
-            await page.getByText('Show your scanned pages').click();
+            // M168 (`R-17caf80e`, the user at M166's check: "its better if the preview is on the left … side by side"): the
+            // scanned pages are shown, never folded — the LEFT half beside the form once both have room (64rem), at equal
+            // widths ("50/50"), and above the form below that. Read from the boxes the browser drew.
+            await expect(page.getByRole('region', { name: 'Page 1 of the scan' })).toBeVisible();
+            const paper = (await page.locator('[data-paper-pages]').boundingBox())!;
+            const form = (await page.locator('.session-body__form').boundingBox())!;
+            if (page.viewportSize()!.width >= 1024) {
+                expect(paper.x + paper.width, 'the paper is left of the form').toBeLessThanOrEqual(form.x);
+                expect(Math.abs(paper.width - form.width) / form.width, 'the paper and the form are equal halves').toBeLessThan(0.1);
+            } else {
+                expect(paper.y + paper.height, 'the paper stacks above the form').toBeLessThanOrEqual(form.y);
+            }
             await assertClean(page, `public paper copy, being checked (${theme})`);
         });
     }

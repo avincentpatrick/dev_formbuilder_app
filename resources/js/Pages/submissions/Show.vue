@@ -425,9 +425,9 @@ function formatDate(iso: string | null): string {
 
 /* M153 — the scanned pages beside the answers. Stacked (paper first) until there is room for both; then the
    paper column stays in view and scrolls on its own, so a two-page scan's second page is never stranded below
-   the fold while the answers scroll past it. Equal halves, NOT the review screen's `1fr 45rem`: there the form
-   needs its width, here the answers are short label/value rows and it is the handwriting that must be legible —
-   measured at 1440px, `1fr 45rem` left the paper ~390px wide beside 720px of answers. */
+   the fold while the answers scroll past it. Equal halves: it is the handwriting that must be legible — measured
+   at 1440px, `1fr 45rem` left the paper ~390px wide beside 720px of answers. Since M168 the review screen
+   (`Encode.vue`) and the guest's own check split the same way, at the user's request. */
 .detail__scan {
     margin-bottom: var(--mds-space-4);
 }

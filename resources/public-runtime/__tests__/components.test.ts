@@ -1957,4 +1957,35 @@ describe('RuntimeSession — a paper copy its sender is checking (M166)', () => 
         await settle();
         expect(wrapper.text()).toContain('Our staff have already entered this paper copy');
     });
+
+    /*
+     * M168 (`R-17caf80e`, the user at M166's check: "its better if the preview is on the left … side by side"): the scanned
+     * pages are shown, never folded, and come FIRST — the left half beside the form on a wide screen, above it on a phone — in
+     * a column allowed to widen for them. The CSS that splits the halves is measured in a browser by
+     * `tests/e2e/ocr-guest-upload.spec.ts`; this pins the structure that CSS depends on.
+     */
+    it('shows the scanned pages first, beside the form, in a column allowed to widen (M168)', () => {
+        const wrapper = mount(RuntimeSession, {
+            props: { schema: paperSchema(), bootstrap, client: fakeClient(), initialAnswers: { name: 'Ada' }, paperReview: PAPER },
+        });
+
+        const body = wrapper.find('.session-body');
+        const paper = body.find('[data-paper-pages]');
+        expect(paper.exists()).toBe(true);
+        expect(paper.find('img').attributes('src')).toBe(PAPER.pages[0].url);
+        expect(wrapper.find('details').exists()).toBe(false);
+        expect(wrapper.text()).not.toContain('Show your scanned pages');
+        // The paper before the form, side by side in one body.
+        expect(body.element.children[0]).toBe(paper.element);
+        expect(body.element.children[1]).toBe(wrapper.find('form').element);
+        expect(wrapper.find('.runtime__column--wide').exists()).toBe(true);
+
+        // The controls: no review, or a review with no page to show, keeps today's form and its reading width.
+        for (const props of [{}, { initialAnswers: { name: 'Ada' }, paperReview: { ...PAPER, pages: [] } }]) {
+            const plain = mount(RuntimeSession, { props: { schema: paperSchema(), bootstrap, client: fakeClient(), ...props } });
+            expect(plain.find('[data-paper-pages]').exists()).toBe(false);
+            expect(plain.find('.session-body').exists()).toBe(false);
+            expect(plain.find('.runtime__column--wide').exists()).toBe(false);
+        }
+    });
 });

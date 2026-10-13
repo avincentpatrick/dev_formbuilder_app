@@ -16,51 +16,62 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M167`, every question the scan saw anything in is filled with the nearest answer its box can hold, and marked (`R-af4a31fd`, `D117` A) (m167-ocr-fill-every-read)
+## Status: NO ACTIVE CLAIM — `M167` is merged and live on staging (released below). The next claim is written here. Ask the user before every merge, and never merge while another session's deploy is in flight.
 
-Taken 2026-10-13. Branch `m167-ocr-fill-every-read`, cut from origin/main at `a88e6618`, PR into main.
-Row: `R-af4a31fd` — *"A scanned answer the reader could not turn into its question's type is left empty, with only a note quoting what was seen (`D117` A)."*
-The user's comment came with a screenshot of sheet 01's staff review; `D117` was asked and answered in chat the same turn, widened by
-the user to every type. The other session (`M166`) had released lane A at `a88e6618` and was idle when this was taken.
+## RELEASED — `M167`, every question the scan saw anything in is filled with the nearest answer its box can hold, and marked (`R-af4a31fd`, `D117` A) (merged as PR #360, `eb648636`, 6/6 green with real step counts on its first run and on the post-merge run — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-### Evidence verified
-- `OcrAnswerReader` returns `unreadable` (value null, text kept) from `number()`, `date()`, `time()`, `datetime()`, `duration()`,
-  `cascade()`, `yesNo()`, a comb whose groups could not be placed or are over-full (`comb()`), two ticks on a one-answer question and
-  writing with no labels found (`choices()`/`blankOrUnreadable()`) — **held**, every site opened.
-- `OcrAnswerCarry::carry()` carries only `state: read` with a non-null value; anything else becomes meta with `carried: false` — **held**.
-- `scan-review.ts` `scanNote()`'s `unreadable` arm writes "Needs manual entry: the scan could not read this answer … It saw …", the
-  screenshot's exact words; `paper-notes.ts` turns `unreadable` into "We could not read this answer. Please fill it in." — **held**.
+Built and merged 2026-10-13, the response-submission testing day. The user's comment came with a screenshot of sheet 01's staff review;
+`D117` was asked and answered in chat in the same turn, and the user widened it to every type ("all the fields must be filled based on
+what is read"). Taken after the other session released `M166` and went idle. Merged on "Merge now, backup first": the user's guided
+block ran `meridian-test-db-backup` (Result 0, `staging-2026-10-13-050359.dump`, 414,480 B). Post-merge CI run 38349565162; deployed by
+run 38352185734; gate baselines from 38349565162.
 
-### Premise verified
-- **Not a regression of `D108` — held:** the screenshot's Full name (66%) and Email (46%) are filled and marked; `PrintedFormMatcher::result()`
-  keeps a `manual` value. The withheld answers are the reader's `unreadable` path, which `D108` never reached.
-- **The reader is the one place a seen answer is dropped — held:** the matcher stores what the reader returns, carry passes a `read`
-  value through, and both screens render it; no second parser sits between them.
-- **`M148` refused an over-full comb group on purpose ("refused for a person to read, never guessed") — reversed by `D117`**, at the
-  user's word; the repaired value is capped below auto so a person always sees it.
-- **A scan read before the deploy keeps its stored `unreadable` entries** — the fix reaches a new read only, as `D108`'s did.
-- **The bake-off scorer judges by tier, not by state** — a repaired wrong value at `review`/`manual` counts as flagged, never silent.
+**Taken:**
+- **The reader fills the nearest value it can.** Every `unreadable` site in `OcrAnswerReader` now goes through `repaired()` first: `state:
+  read`, the text exactly as seen, `repaired: true`, and confidence capped at `SUBSTITUTION_CEILING` (89), so it is never auto. Covered:
+  - `number()`: the first number written, a whole number's whole part.
+  - `positional()` for a date, time or datetime: a short year kept as read, a month over 12 swapped with the day, a day or an hour
+    brought back to its last, an empty group at its lowest, a missing year this year's.
+  - `placedAgain()` for an over-full or unplaced comb (`M148`'s refusal): cut back from the side facing a neighbour, or re-split into
+    the printed groups, one dropped character allowed.
+  - `nearestOption()` at 0.5 for a yes/no word, a cascade level and writing with no labels found.
+  - The first of two ticks on a one-answer question.
 
-### Remedy verdict
-**Measured before any test, offline on Round 1 at `a88e6618`** (the detached bake-off worktree, `ocr:bakeoff --offline`): 55 of 180
-need correction, 0 silent, and **six answers come back `unreadable` — all numbers and dates**: `72 .` (01 weight), `12 11 190` (01
-date, truth 1981-11-12), `081002026` (02 date, truth 2026-10-08), `35 YEARS OLD`, `65 KILOS`, `50 kg`. The remedy fills the first
-number found (four right), keeps a short year as read (0190, wrong and flagged), and for a comb group read one character too long
-prefers the trim that makes a real date. **Works in shape**; the 02 date is the one whose refusal I have not yet traced.
+  Duration is left alone: no control shows it.
+- **Passed through.** `PrintedFormMatcher::result()` stores `repaired` only when true, as `read_by` is. `OcrAnswerCarry::meta()` passes
+  it as a boolean. `scan-review.ts` says "This may be wrong: the scan saw “…” and filled in the nearest answer. Check it against the
+  paper." `paper-notes.ts` makes it a check.
+- **The owed tracker surgery, the eleventh:** `M148` down to `M134`, 15 lines, 20,146 bytes. It was proved on the first run by
+  `tracker-surgery.php`, and its marker landed at line start on the trunk through an explicit squash body.
+- **Docs.** `docs/ocr-pipeline-design.md` §3 and the layout-4 note, and ADR `0010-ocr-provider-cloud-vision.md` §D3, amended by `D117`.
+  The class docblocks were rewritten where they stated the old rule.
 
-Files: `app/Services/Ocr/OcrAnswerReader.php`, `app/Services/Ocr/PrintedFormMatcher.php`, `app/Services/Ocr/OcrAnswerCarry.php`,
-`resources/js/components/ocr/scan-review.ts`, `resources/js/components/ocr/scan-review.test.ts`,
-`resources/js/Pages/submissions/encode-scan.test.ts`, `resources/public-runtime/lib/types.ts`, `resources/public-runtime/lib/paper-notes.ts`,
-`resources/public-runtime/__tests__/paper-notes.test.ts`, `tests/Feature/Ocr/PrintedFormMatcherTest.php`,
-`tests/Feature/Ocr/OcrAnswerCarryTest.php`, `tests/Feature/Ocr/OcrScanReviewTest.php`, `tests/Feature/Ocr/Support/ReadScanFixture.php`,
-`tests/Unit/Ocr/OcrBakeoffScorerTest.php`, `tests/e2e/ocr-review-axe.spec.ts` (only if its "Needs manual entry" fixture is repaired).
-Shared artefacts taken: `docs/ocr-pipeline-design.md`, `docs/adr/0010-ocr-provider-cloud-vision.md`, `docs/feature-backlog.md`,
-`docs/claims/decisions.md`, `docs/pipeline.md`, `docs/gate-baselines.md`, `PROGRESS.md` and `PROGRESS_ARCHIVE.md` (the owed tracker surgery).
-Paired files taken: `scan-review.ts` ↔ `paper-notes.ts` (one meta, two wordings).
-Namespaces spent: `D117`; nothing from the ADR or migration namespaces.
-Prediction: Round 1 re-scored offline goes 55 → 50 needing correction, silent stays 0, and no `unreadable` is left. The Pest OCR files
-go red on their old `unreadable` assertions until rewritten; PHPStan, Pint and the lint gates green first time. **Most likely wrong:**
-the 02 date — its text has no gaps, so it may be a caption-placement failure rather than an over-full year, and the trim may not reach it.
+**Every claimed file was edited**, except `tests/Feature/Ocr/Support/ReadScanFixture.php` and `tests/Unit/Ocr/OcrBakeoffScorerTest.php`.
+- The fixture: the review-page case spreads `repaired` onto `ReadScanFixture::read()`, so no new helper was needed.
+- The scorer test: a scorer case would have re-proved `tier()`. The confidence cap is pinned instead by the matcher case that expects
+  89 where the recognizer said 98, and the cap mutant turned five matcher cases red.
+
+`tests/e2e/ocr-review-axe.spec.ts` needed no change: its stored fixture still shows the old note.
+
+**Prediction, measured.** Round 1 re-scored offline went **55 → 50 of 180, 0 silent, no `unreadable` left**, exactly as predicted. The
+case I named most likely wrong, sheet 02's `081002026`, came out **right** (2026-10-08) through the one-dropped-character re-split.
+Wrong elsewhere:
+- **My own example "Yse".** I wrote it into the code and a test, and it scored 0.33: Levenshtein counts a swap as two edits. The first
+  OCR run went 192/193. The example became "YEB", and the swap is filed.
+- **The mutation harness refused uncommitted targets.** The first batch aborted all four, as it should, and ran after the commit.
+- **Local PHPStan reported 44 "undefined property" errors on models,** none in a touched file. CI's Static analysis passed: they are
+  local-environment noise.
+
+**Proof.**
+- Pest: the OCR suites, 193/193.
+  - 7 new or rewritten matcher cases: number, short year, swap, clamp, over-full, re-split, two ticks, cascade, yes/no.
+  - 1 carry case and 1 review-page case.
+- Vitest: 89/89 over the four touched files.
+- Mutants: 4 Pest mutants through `mutate.php` caught (the cap, the matcher flag, the carry flag, the number repair). 2 Vitest mutants
+  caught by hand (both notes), with each file restored and its sha verified.
+- Local E2E: `ocr-review-axe.spec.ts` and `ocr-guest-upload.spec.ts`, 48/48 at three widths in both themes.
+
+**Filed:** `R-b06af9c4` (two swapped letters are not taken as the nearest option; nit, before-launch).
 
 ## RELEASED — `M166`, a guest checks and corrects what their paper copy was read as, then submits it as their own response (`R-309e4dfa`, `D116` A) (merged as PR #359, `e3b68f32`, 6/6 green with real step counts on its second run and on the post-merge run — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

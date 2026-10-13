@@ -77,4 +77,13 @@ return [
         // deployment that expects embedded use, and see challenge.ts for why the fallback must exist.
         'max_number' => (int) env('GUEST_CHALLENGE_MAX_NUMBER', 120000),
     ],
+
+    /*
+    | A paper token (M166, `D116`): the handle a guest who sent a filled paper copy holds on that one scan, to wait for
+    | its reading, see what was read and submit their corrections. Short-lived: it covers one sitting at the form.
+    | Its reads share the `guest-content-image` limiter, the one a page's own images use.
+    */
+    'paper_token' => [
+        'ttl' => (int) env('GUEST_PAPER_TOKEN_TTL', 7200),
+    ],
 ];

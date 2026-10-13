@@ -160,9 +160,60 @@ export interface PaperUploadLimits {
     max_bytes_per_scan: number;
 }
 
-/** M165 — what the server answers a paper copy with: only a reference to quote, never what was read. */
+/**
+ * M165 — what the server answers a paper copy with: a reference to quote and (M166, `D116`) a short-lived paper token, the
+ * sender's only way to wait for the reading and check what was read. Never the read answers themselves.
+ */
 export interface PaperCopyReceipt {
     reference: string;
+    paperToken: string;
+}
+
+/** M166 — what the reader made of one question, as `OcrAnswerCarry` describes it; the page words it for the guest. */
+export interface PaperFieldMeta {
+    /** `read`, `blank`, `unreadable`, `not_found`, `skipped`, or `not_on_paper`. */
+    state: string;
+    /** `auto`, `review` or `manual`; null when nothing was read. */
+    tier: string | null;
+    confidence: number | null;
+    text: string | null;
+    page: number | null;
+    /** Whether the read value was filled into the question. */
+    carried: boolean;
+    reason: string | null;
+    /** Whether the paper printed boxes to tick for it. */
+    ticks: boolean;
+    /** Whether a tick was read from the ink in its box rather than as text. */
+    inked: boolean;
+}
+
+/** M166 — one scanned page, served to its sender while they check it. */
+export interface PaperPage {
+    number: number;
+    url: string;
+    mime: string;
+    /** False while the file waits for its virus check. */
+    servable: boolean;
+}
+
+/** M166 — where a sent paper copy stands (`GET /api/v1/public/paper/{shareToken}/{paperToken}`). */
+export type PaperStatus =
+    | { status: 'reading' }
+    | { status: 'failed' }
+    | { status: 'submitted' }
+    | {
+          status: 'read';
+          version_id: string;
+          answers: AnswerMap;
+          fields: Record<string, PaperFieldMeta>;
+          pages: PaperPage[];
+      };
+
+/** M166 — what a session checking a read paper copy needs: the token its Submit carries, the notes, and the pages. */
+export interface PaperReview {
+    token: string;
+    fields: Record<string, PaperFieldMeta>;
+    pages: PaperPage[];
 }
 
 /** The mint JSON re-fetched by the SPA (`Accept: application/json` on `GET /f/{slug}`). */

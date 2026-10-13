@@ -236,6 +236,24 @@ describe('sw.ts route matchers — which URLs enter a cache at all', () => {
         expect(matcherFor('guest-choice-lists')(resumeRead)).toBe(false);
     });
 
+    it('keeps a sent paper copy, read back by its sender, out of every cache (M166)', () => {
+        // The answers as read and the scanned pages are a respondent's handwriting, reached with a paper token in the path.
+        // They escape caching for the resume read's reason — a prefix (`paper/`) no route claims — and this arm is the gate.
+        for (const read of [
+            apiGet('/api/v1/public/paper/share-token/paper-token'),
+            apiGet('/api/v1/public/paper/share-token/paper-token/pages/1'),
+        ]) {
+            expect(matcherFor('guest-schema')(read)).toBe(false);
+            expect(matcherFor('guest-shell-html')(read)).toBe(false);
+            expect(resumeRoute().match(read)).toBe(false);
+            expect(matcherFor('guest-shell-assets')(read)).toBe(false);
+            expect(matcherFor('guest-content-images')(read)).toBe(false);
+            expect(matcherFor('guest-reference-files')(read)).toBe(false);
+            expect(matcherFor('guest-linked-choices')(read)).toBe(false);
+            expect(matcherFor('guest-choice-lists')(read)).toBe(false);
+        }
+    });
+
     it('claims a content image for the image cache only, and keys it without the share token (M130)', async () => {
         const image = apiGet('/api/v1/public/content-images/token-a/att-1');
 

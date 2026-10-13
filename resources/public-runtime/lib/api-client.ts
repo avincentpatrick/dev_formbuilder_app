@@ -16,6 +16,7 @@ import type {
     AnswerMap,
     MintResponse,
     PaperCopyReceipt,
+    PaperStatus,
     ResumeDraftResult,
     SaveDraftPayload,
     SaveDraftResult,
@@ -41,6 +42,11 @@ export interface SubmitPayload {
      * the ordinary fill: the server has no draft to overwrite and the check does not run.
      */
     baseContentChecksum?: string | null;
+    /**
+     * M166 (`D116`) — the paper token of a filled paper copy whose read answers the guest checked. The server then saves
+     * this response under the scan's id and links the scan to it. Never on an outbox row: a paper review submits online.
+     */
+    paperToken?: string | null;
 }
 
 export interface ApiClient {
@@ -79,6 +85,11 @@ export interface ApiClient {
      * because the server requires one here regardless of the form's own setting.
      */
     uploadPaperCopy(files: File[]): Promise<PaperCopyReceipt>;
+    /**
+     * Where a sent paper copy stands, and once it is read, the form's answers as read (M166, `D116`). Read with the paper
+     * token the upload returned, under the current share token, never through the service worker's schema cache.
+     */
+    fetchPaper(paperToken: string): Promise<PaperStatus>;
 }
 
 async function parseBody(response: Response): Promise<unknown> {
@@ -275,6 +286,8 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
                         // replays instead of being refused. Sending an explicit null here would be a claim
                         // of "the server holds nothing", which is a different and wrong assertion.
                         ...(payload.baseContentChecksum ? { base_content_checksum: payload.baseContentChecksum } : {}),
+                        // M166 — only on a paper review's Submit; the server verifies it and links the scan.
+                        ...(payload.paperToken ? { paper_token: payload.paperToken } : {}),
                     }),
                 });
 
@@ -322,7 +335,7 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
         async uploadPaperCopy(files: File[]): Promise<PaperCopyReceipt> {
             // A fresh solution per attempt, inside `run`: a re-mint after an expired token retries with a new token,
             // and a solution is bound to the form and spent once.
-            const body = await withFreshToken<{ data: PaperCopyReceipt }>(async (token) => {
+            const body = await withFreshToken<{ data: { reference: string; paper_token: string } }>(async (token) => {
                 const pages = new FormData();
                 for (const file of files) {
                     pages.append('pages[]', file);
@@ -335,7 +348,18 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
                 });
             });
 
-            return { reference: body.data.reference };
+            return { reference: body.data.reference, paperToken: body.data.paper_token };
+        },
+
+        async fetchPaper(paperToken: string): Promise<PaperStatus> {
+            const body = await withFreshToken<{ data: PaperStatus }>((token) =>
+                doFetch(`/api/v1/public/paper/${encodeURIComponent(token)}/${encodeURIComponent(paperToken)}`, {
+                    headers: { Accept: 'application/json' },
+                    cache: 'no-store',
+                }),
+            );
+
+            return body.data;
         },
 
         async saveDraft(payload: SaveDraftPayload): Promise<SaveDraftResult> {

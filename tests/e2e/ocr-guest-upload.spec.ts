@@ -10,6 +10,10 @@ import { assertClean, forceTheme } from './support/axe';
  * `ocr-review-axe.spec.ts` and `ocr-scans-upload.spec.ts` never send one either. The spam check before it IS real:
  * the browser mints and solves one, which is the half of the path a mock would hide. The staff half reads the guest
  * scan `E2eSeeder::seedOcrGuestScan()` wrote, so this spec creates nothing.
+ *
+ * M166 (`D116`): the read-back the sender's page polls is answered in the browser too — a copy that stays "reading", and
+ * one read from the seeded form's own question keys — so the wait screen and the checking screen are scanned without a
+ * reading job ever running.
  */
 
 const themes = ['light', 'dark'] as const;
@@ -25,41 +29,108 @@ test.describe('the public link', () => {
         await page.getByRole('heading', { name: 'Clinic Intake', level: 1 }).waitFor({ state: 'visible', timeout: 15_000 });
     }
 
-    for (const theme of themes) {
-        test(`a filled paper copy, chosen and sent, and the thank-you with its reference (${theme})`, async ({ page }) => {
-            const sent: string[] = [];
-            await page.route('**/api/v1/public/f/*/scans', async (route) => {
-                sent.push(route.request().headers()['x-meridian-challenge'] ?? '');
-                await route.fulfill({ status: 202, contentType: 'application/json', body: JSON.stringify({ data: { reference: 'AB12-CD34' } }) });
+    /** Answer the upload in the browser with a reference and a paper token, and record the spam-check header it carried. */
+    async function answerUpload(page: Page, sent: string[]): Promise<void> {
+        await page.route('**/api/v1/public/f/*/scans', async (route) => {
+            sent.push(route.request().headers()['x-meridian-challenge'] ?? '');
+            await route.fulfill({
+                status: 202,
+                contentType: 'application/json',
+                body: JSON.stringify({ data: { reference: 'AB12-CD34', paper_token: 'paper-e2e' } }),
             });
+        });
+    }
+
+    async function chooseAndSend(page: Page, theme: string): Promise<void> {
+        const open = page.getByRole('button', { name: 'Filled in a paper copy? Upload it instead' });
+        await expect(open).toHaveAttribute('aria-expanded', 'false');
+        await open.click();
+        await expect(open).toHaveAttribute('aria-expanded', 'true');
+
+        await page.getByLabel('Pages of your paper form').setInputFiles([
+            { name: 'paper-page-1.png', mimeType: 'image/png', buffer: PNG },
+            { name: 'paper-page-2.png', mimeType: 'image/png', buffer: PNG },
+        ]);
+        await expect(page.getByRole('list', { name: '2 pages chosen' }).getByRole('listitem')).toHaveCount(2);
+
+        await assertClean(page, `public paper copy, chosen (${theme})`);
+        await page.getByRole('button', { name: 'Send paper copy' }).click();
+    }
+
+    for (const theme of themes) {
+        test(`a filled paper copy, sent, waited on and left for staff, with its reference (${theme})`, async ({ page }) => {
+            const sent: string[] = [];
+            await answerUpload(page, sent);
+            // M166 — the copy never finishes reading here, so the sender takes the way out the wait always offers.
+            await page.route('**/api/v1/public/paper/**', (route) =>
+                route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { status: 'reading' } }) }),
+            );
 
             await openForm(page);
             await forceTheme(page, theme);
+            await chooseAndSend(page, theme);
 
-            const open = page.getByRole('button', { name: 'Filled in a paper copy? Upload it instead' });
-            await expect(open).toHaveAttribute('aria-expanded', 'false');
-            await open.click();
-            await expect(open).toHaveAttribute('aria-expanded', 'true');
+            await expect(page.getByRole('heading', { name: 'Reading your paper form…' })).toBeVisible({ timeout: 30_000 });
+            await assertClean(page, `public paper copy, being read (${theme})`);
+            await page.getByRole('button', { name: 'Leave it for our staff instead' }).click();
 
-            await page.getByLabel('Pages of your paper form').setInputFiles([
-                { name: 'paper-page-1.png', mimeType: 'image/png', buffer: PNG },
-                { name: 'paper-page-2.png', mimeType: 'image/png', buffer: PNG },
-            ]);
-            await expect(page.getByRole('list', { name: '2 pages chosen' }).getByRole('listitem')).toHaveCount(2);
-
-            await assertClean(page, `public paper copy, chosen (${theme})`);
-
-            await page.getByRole('button', { name: 'Send paper copy' }).click();
-
-            await expect(page.getByRole('heading', { name: 'Your paper form was received. Staff will check it and enter your answers.' })).toBeVisible({
-                timeout: 30_000,
-            });
+            await expect(page.getByRole('heading', { name: 'Your paper form was received. Staff will check it and enter your answers.' })).toBeVisible();
             await expect(page.getByText('Reference: AB12-CD34')).toBeVisible();
             // The check was minted and solved for real, and travelled as the header the server requires.
             expect(sent).toHaveLength(1);
             expect(JSON.parse(Buffer.from(sent[0], 'base64').toString()).signature).toBeTruthy();
 
             await assertClean(page, `public paper copy, received (${theme})`);
+        });
+
+        test(`a read paper copy reopens the form filled in, each unsure answer noted, for its sender to check (${theme})`, async ({ page }) => {
+            // The keys are the seeded form's own, read from the real schema rather than written here.
+            const schemaRead = page.waitForResponse(
+                (response) => /\/api\/v1\/public\/f\/[^/]+$/.test(new URL(response.url()).pathname) && response.request().method() === 'GET',
+            );
+            await answerUpload(page, []);
+
+            await openForm(page);
+            const schema = (await (await schemaRead).json()) as { data: { version: { schema: { fields: { key: string; field_type: string }[] } } } };
+            const fields = schema.data.version.schema.fields;
+            const name = fields.find((field) => field.field_type === 'short_text')!.key;
+            const age = fields.find((field) => field.field_type === 'integer')!.key;
+
+            const meta = { tier: null, confidence: null, text: null, page: 1, reason: null, ticks: false, inked: false };
+            await page.route('**/api/v1/public/paper/*/*/pages/*', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: PNG }));
+            await page.route('**/api/v1/public/paper/*/paper-e2e', (route) =>
+                route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify({
+                        data: {
+                            status: 'read',
+                            version_id: 'any',
+                            answers: { [name]: 'Ada Lovelace' },
+                            fields: {
+                                [name]: { ...meta, state: 'read', tier: 'review', confidence: 78, text: 'Ada Lovelace', carried: true },
+                                [age]: { ...meta, state: 'unreadable', carried: false },
+                            },
+                            pages: [{ number: 1, url: '/api/v1/public/paper/s/paper-e2e/pages/1', mime: 'image/png', servable: true }],
+                        },
+                    }),
+                }),
+            );
+
+            await forceTheme(page, theme);
+            await chooseAndSend(page, theme);
+
+            await expect(page.locator('[data-paper-review]')).toBeVisible({ timeout: 30_000 });
+            await expect(page.locator('[data-paper-note]')).toHaveText([
+                'Please check this answer. We may have read it wrong.',
+                'We could not read this answer. Please fill it in.',
+            ]);
+            await expect(page.locator(`#field-${name} input`).first()).toHaveValue('Ada Lovelace');
+            // Neither the upload nor a second way to keep the answers is offered on the copy being checked.
+            await expect(page.getByRole('button', { name: 'Filled in a paper copy? Upload it instead' })).toHaveCount(0);
+
+            await page.getByText('Show your scanned pages').click();
+            await assertClean(page, `public paper copy, being checked (${theme})`);
         });
     }
 });

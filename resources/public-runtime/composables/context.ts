@@ -4,6 +4,7 @@ import type { Announcer } from './useAnnouncer';
 import type { FormRuntime } from './useFormRuntime';
 import type { SyncOutbox } from './useSyncOutbox';
 import type { MeridianDb } from '../lib/db';
+import type { PaperNote } from '../lib/paper-notes';
 
 /** Increment G8b — stash a picked media file offline (guest SPA), returning a `local:` placeholder ref. */
 export type OfflineMediaStash = (file: File, fieldKey: string) => Promise<MediaAttachmentRef>;
@@ -101,4 +102,15 @@ export function useSubmitFlow(): SubmitFlow {
 /** The draft flow if a save-and-resume-enabled session provided one; null when the form has it disabled. */
 export function useDraftFlow(): DraftFlow | null {
     return inject(DraftFlowKey, null);
+}
+
+/**
+ * M166 (`D116`) — the notes on a paper copy whose sender is checking what it was read as, keyed by question. Provided
+ * only by a session opened on a read paper copy; every `FieldRow` reads it and shows the note under its question.
+ */
+export const PaperNotesKey: InjectionKey<Record<string, PaperNote>> = Symbol('PaperNotes');
+
+/** The notes of the paper copy being checked, or null in an ordinary session. */
+export function usePaperNotes(): Record<string, PaperNote> | null {
+    return inject(PaperNotesKey, null);
 }

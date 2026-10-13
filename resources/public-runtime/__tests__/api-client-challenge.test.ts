@@ -189,7 +189,7 @@ describe('a paper copy (M165)', () => {
         const fetchImpl = vi.fn(async (url: string) => {
             const path = String(url);
             if (path.endsWith('/challenge')) return res(200, { data: challengeBody(3) });
-            if (path.endsWith('/scans')) return res(202, { data: { reference: '7K4M-2QXB' } });
+            if (path.endsWith('/scans')) return res(202, { data: { reference: '7K4M-2QXB', paper_token: 'paper-1' } });
 
             return res(200, { data: { form: { id: 'f', bot_challenge: 'off' }, version: { id: 'v' } } });
         });
@@ -198,7 +198,7 @@ describe('a paper copy (M165)', () => {
         await client.fetchSchema();
         const receipt = await client.uploadPaperCopy([page('one.png'), page('two.png')]);
 
-        expect(receipt).toEqual({ reference: '7K4M-2QXB' });
+        expect(receipt).toEqual({ reference: '7K4M-2QXB', paperToken: 'paper-1' });
         const [url, init] = scansOf(fetchImpl as never)[0];
         expect(url).toBe('/api/v1/public/f/t/scans');
         expect(init.method).toBe('POST');
@@ -217,11 +217,11 @@ describe('a paper copy (M165)', () => {
 
             return uploads === 1
                 ? res(401, { error: { code: 'share_token_expired', message: 'expired' } })
-                : res(202, { data: { reference: 'ABCD-EF12' } });
+                : res(202, { data: { reference: 'ABCD-EF12', paper_token: 'paper-2' } });
         });
         const client = createApiClient({ token: 't1', slug: 's', fetch: fetchImpl as unknown as typeof fetch });
 
-        await expect(client.uploadPaperCopy([page('one.png')])).resolves.toEqual({ reference: 'ABCD-EF12' });
+        await expect(client.uploadPaperCopy([page('one.png')])).resolves.toEqual({ reference: 'ABCD-EF12', paperToken: 'paper-2' });
 
         const calls = scansOf(fetchImpl as never);
         expect(calls.map(([url]) => url)).toEqual(['/api/v1/public/f/t1/scans', '/api/v1/public/f/t2/scans']);
@@ -239,5 +239,35 @@ describe('a paper copy (M165)', () => {
         await expect(client.uploadPaperCopy([page('one.png')])).rejects.toMatchObject({
             normalized: { kind: 'rate_limited', code: 'paper_upload_limit_reached', message: 'Try again tomorrow.' },
         });
+    });
+});
+
+/*
+ * M166 (`D116`) — the sender reads their copy back with the paper token, under the current share token and off the
+ * schema cache's prefix, and a checked copy's Submit carries the token.
+ */
+describe('a checked paper copy (M166)', () => {
+    it('reads the copy back under the current share token, off the cached prefix and never from the HTTP cache', async () => {
+        const fetchImpl = vi.fn(async () => res(200, { data: { status: 'reading' } }));
+        const client = createApiClient({ token: 't', slug: 's', fetch: fetchImpl as unknown as typeof fetch });
+
+        await expect(client.fetchPaper('paper-1')).resolves.toEqual({ status: 'reading' });
+
+        const [url, init] = (fetchImpl.mock.calls[0] as unknown as [string, RequestInit]);
+        expect(url).toBe('/api/v1/public/paper/t/paper-1');
+        expect(url.startsWith('/api/v1/public/f/')).toBe(false);
+        expect(init.cache).toBe('no-store');
+    });
+
+    it('sends the paper token with a checked copy, and no such key with an ordinary response', async () => {
+        const fetchImpl = vi.fn(async () => res(201, { data: { id: 'a', reference: 'R', status: 'submitted' } }));
+        const client = createApiClient({ token: 't', slug: 's', fetch: fetchImpl as unknown as typeof fetch });
+
+        await client.submit({ ...payload, paperToken: 'paper-1' });
+        await client.submit(payload);
+
+        const bodies = fetchImpl.mock.calls.map((call) => JSON.parse(String((call as unknown as [string, RequestInit])[1].body)));
+        expect(bodies[0].paper_token).toBe('paper-1');
+        expect(bodies[1]).not.toHaveProperty('paper_token');
     });
 });

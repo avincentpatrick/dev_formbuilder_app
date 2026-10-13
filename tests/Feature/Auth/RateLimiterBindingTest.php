@@ -191,6 +191,9 @@ it('binds the content-image limiter to the image, reference-file, linked-choices
             'api/v1/public/reference-files/{shareToken}/{file}',
             'api/v1/public/linked-choices/{shareToken}/{version}',
             'api/v1/public/choice-lists/{shareToken}/{version}',
+            // M166 (`D116`): the sender of a paper copy reads it back — a wait screen's poll and its pages.
+            'api/v1/public/paper/{shareToken}/{paperToken}',
+            'api/v1/public/paper/{shareToken}/{paperToken}/pages/{page}',
         ])
         ->and(array_map(static fn (RoutingRoute $r): string => $r->uri(), routesThrottledBy('guest')))
         ->not->toContain('api/v1/public/content-images/{shareToken}/{image}')
@@ -204,6 +207,10 @@ it('binds the content-image limiter to the image, reference-file, linked-choices
     // Per token on the linked-choices route as well.
     expect(limiterKeysFor('guest-content-image', $routes[2], 'token-aaaaaaaaaaaaaaaa'))
         ->not->toBe(limiterKeysFor('guest-content-image', $routes[2], 'token-bbbbbbbbbbbbbbbb'));
+
+    // And on the paper read-back: one sender's polling never spends another's bucket.
+    expect(limiterKeysFor('guest-content-image', $routes[4], 'token-aaaaaaaaaaaaaaaa'))
+        ->not->toBe(limiterKeysFor('guest-content-image', $routes[4], 'token-bbbbbbbbbbbbbbbb'));
 
     // The bucket is per token on the reference-file route too: it declares the `shareToken` the limiter keys on.
     $files = $routes[1];

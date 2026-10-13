@@ -15,6 +15,8 @@ use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Services\Forms\FormRedirectResolver;
+use App\Services\Ocr\GuestPaperReview;
+use App\Services\Ocr\OcrScanConfirmation;
 use App\Services\Submissions\ClientUuidResolver;
 use App\Services\Submissions\SubmissionDraftService;
 use App\Services\Submissions\SubmissionPayload;
@@ -81,6 +83,8 @@ final class GuestSubmissionController extends Controller
         SubmissionDraftService $drafts,
         GuestShareTokenService $tokens,
         FormRedirectResolver $redirects,
+        GuestPaperReview $papers,
+        OcrScanConfirmation $confirmations,
     ): JsonResponse {
         $token = $this->shareToken($request);
 
@@ -90,10 +94,15 @@ final class GuestSubmissionController extends Controller
             return ApiErrorResponse::make(403, 'guest_disabled', 'Guest submissions are disabled for this form.');
         }
 
-        $version = FormVersion::query()->whereKey($token->formVersionId)->firstOrFail();
-        $payload = $this->payload($request, $version, $token, $tokens);
+        // M166 (`D116`): the sender of a filled paper copy submitting the answers it was read as, checked. The scan's id
+        // becomes this response's idempotency key — never a uuid from the body — so one scan makes at most one response,
+        // and a staff member who saved it first wins with `uuid_claimed`. It is never a draft, so it skips the draft branch.
+        $paperScan = $request->paperToken() === null ? null : $papers->scan($token, (string) $request->paperToken());
 
-        $draft = $this->existingDraft($request->clientSubmissionUuid(), $token->formId);
+        $version = FormVersion::query()->whereKey($token->formVersionId)->firstOrFail();
+        $payload = $this->payload($request, $version, $token, $tokens, $paperScan?->id);
+
+        $draft = $paperScan === null ? $this->existingDraft($request->clientSubmissionUuid(), $token->formId) : null;
 
         if ($draft !== null) {
             // Capture any final edits (Stage-1), then finalize the SAME row via promote() (full Stage-3, in
@@ -114,6 +123,10 @@ final class GuestSubmissionController extends Controller
             }
 
             $result = $pipeline->submit($payload);
+        }
+
+        if ($paperScan !== null) {
+            $confirmations->linkFromGuest($paperScan->id, (string) $result->submission->id);
         }
 
         return response()->json([
@@ -169,13 +182,14 @@ final class GuestSubmissionController extends Controller
         FormVersion $version,
         GuestShareToken $token,
         GuestShareTokenService $tokens,
+        ?string $paperScanId = null,
     ): SubmissionPayload {
         return new SubmissionPayload(
             version: $version,
             answers: $request->answers(),
             source: SubmissionSource::Guest,
             respondentUserId: null,
-            clientSubmissionUuid: $request->clientSubmissionUuid(),
+            clientSubmissionUuid: $paperScanId ?? $request->clientSubmissionUuid(),
             locale: $request->localeInput(),
             guestToken: $tokens->fingerprint($token->rawToken),
             guestIp: $request->ip(),

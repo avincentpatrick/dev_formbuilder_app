@@ -1,9 +1,10 @@
 <script setup lang="ts">
 /**
  * "Filled in a paper copy? Upload it instead" (M165, `R-7173c02c`, `D106`) — above the form, for a respondent who
- * already answered on the printed form. They send photos or one PDF of its pages; staff check it and enter the
- * answers, and the respondent is told only that it was received, with a reference to quote (the user's answer,
- * 2026-10-12). Nothing that was read ever comes back to this page.
+ * already answered on the printed form. They send photos or one PDF of its pages, and the page passes up the reference to
+ * quote and the paper token the server answered with. Since M166 (`D116`) the page then waits for the reading and shows
+ * the sender the form filled in as read, to correct and submit; `PaperReading` is that wait, and leaving the copy for
+ * staff — `M165`'s whole behaviour — is always one button away.
  *
  * Shown only where the schema's `paper_upload` hint says the form takes one — a HINT: the service worker can serve
  * an older schema, so the server decides each upload and its refusals are shown here in its own words.
@@ -32,7 +33,7 @@ const props = defineProps<{
     online: boolean;
 }>();
 
-const emit = defineEmits<{ received: [reference: string] }>();
+const emit = defineEmits<{ received: [reference: string, paperToken: string] }>();
 
 const panelId = useId();
 const inputId = useId();
@@ -128,7 +129,7 @@ async function send(): Promise<void> {
     error.value = null;
     try {
         const receipt = await props.client.uploadPaperCopy(chosenFiles.value);
-        emit('received', receipt.reference);
+        emit('received', receipt.reference, receipt.paperToken);
     } catch (thrown) {
         error.value = refusalMessage(thrown);
     } finally {

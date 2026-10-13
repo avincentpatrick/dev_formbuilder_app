@@ -188,3 +188,49 @@ it('rejects a resume token signed with a different resume key', function (): voi
     expect(fn () => shareTokens('shared', 'resume-b')->verifyResume($minted->token, now: 1_000))
         ->toThrow(InvalidShareTokenException::class);
 });
+
+/*
+| M166 (`D116`) — the PAPER token: the sender's handle on one scan they sent from the public link. Signed under a key
+| derived from the share key with its own label, so it is a fifth kind no other verify path accepts.
+*/
+
+it('round-trips a paper token carrying the scan id, and expires it one second past its TTL', function (): void {
+    $tenant = Uuid::uuid7()->toString();
+    $form = Uuid::uuid7()->toString();
+    $version = Uuid::uuid7()->toString();
+    $scan = Uuid::uuid7()->toString();
+    $now = 1_800_000_000;
+
+    $minted = shareTokens()->mintPaper($tenant, $form, $version, $scan, $now, 600);
+    $verified = shareTokens()->verifyPaper($minted->token, $now + 600);
+
+    expect([$verified->tenantId, $verified->formId, $verified->formVersionId, $verified->scanId, $verified->submissionId])
+        ->toBe([$tenant, $form, $version, $scan, null])
+        ->and($minted->expiresAt)->toBe($now + 600);
+
+    expect(fn () => shareTokens()->verifyPaper($minted->token, $now + 601))->toThrow(ExpiredShareTokenException::class);
+});
+
+it('keeps paper, share and resume tokens apart in both directions', function (): void {
+    $ids = [Uuid::uuid7()->toString(), Uuid::uuid7()->toString(), Uuid::uuid7()->toString()];
+    $now = 1_800_000_000;
+
+    $paper = shareTokens()->mintPaper(...[...$ids, Uuid::uuid7()->toString(), $now, 600])->token;
+    $share = shareTokens()->mint(...[...$ids, $now])->token;
+    $resume = shareTokens()->mintResume(...[...$ids, Uuid::uuid7()->toString(), $now])->token;
+
+    expect(fn () => shareTokens()->verify($paper, $now))->toThrow(InvalidShareTokenException::class)
+        ->and(fn () => shareTokens()->verifyResume($paper, $now))->toThrow(InvalidShareTokenException::class)
+        ->and(fn () => shareTokens()->verifyPaper($share, $now))->toThrow(InvalidShareTokenException::class)
+        ->and(fn () => shareTokens()->verifyPaper($resume, $now))->toThrow(InvalidShareTokenException::class);
+});
+
+it('rejects a paper token whose signature was tampered with, or minted under another share key', function (): void {
+    $ids = [Uuid::uuid7()->toString(), Uuid::uuid7()->toString(), Uuid::uuid7()->toString(), Uuid::uuid7()->toString()];
+    $now = 1_800_000_000;
+    $paper = shareTokens()->mintPaper(...[...$ids, $now, 600])->token;
+
+    expect(shareTokens()->verifyPaper($paper, $now)->scanId)->toBe($ids[3]);
+    expect(fn () => shareTokens()->verifyPaper(tamperSegment($paper, 2), $now))->toThrow(InvalidShareTokenException::class)
+        ->and(fn () => shareTokens('another-share-key')->verifyPaper($paper, $now))->toThrow(InvalidShareTokenException::class);
+});

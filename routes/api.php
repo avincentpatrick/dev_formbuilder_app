@@ -614,6 +614,20 @@ Route::prefix('api/v1/public')
                 VerifyGuestBotChallenge::class.':'.VerifyGuestBotChallenge::ALWAYS,
             ])
             ->name('scans.store');
+
+        // The sender's own paper copy (M166, `R-309e4dfa`, `D116`): whether it has been read, then the answers as read and
+        // the pages, for the guest to check and submit — reached only with the paper token the upload returned. Off `f/`
+        // (the schema cache's prefix: a respondent's handwriting is never cached) and off `throttle:guest` (a wait screen
+        // polls), sharing the image limiter a page's own pictures use. Regenerate openapi.json after touching these.
+        Route::get('paper/{shareToken}/{paperToken}', [GuestAttachmentController::class, 'paperStatus'])
+            ->withoutMiddleware('throttle:guest')
+            ->middleware('throttle:guest-content-image')
+            ->name('paper.show');
+        Route::get('paper/{shareToken}/{paperToken}/pages/{page}', [GuestAttachmentController::class, 'paperPage'])
+            ->withoutMiddleware('throttle:guest')
+            ->middleware('throttle:guest-content-image')
+            ->whereNumber('page')
+            ->name('paper.page');
     });
 
 // ── Group C (resume): guest draft RESUME — UNAUTHENTICATED; tenant + the target draft submissions.id resolved ─

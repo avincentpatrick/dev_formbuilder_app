@@ -11,10 +11,15 @@ use App\Http\Requests\Ocr\StoreOcrScanRequest;
 use App\Models\Form;
 use App\Models\FormVersion;
 use App\Services\Attachments\AttachmentStorageService;
+use App\Services\Ocr\GuestPaperReview;
 use App\Services\Ocr\OcrScanService;
 use App\Support\Api\ApiErrorResponse;
+use App\Support\Attachments\InlineAttachmentResponse;
+use App\Support\Guest\GuestShareTokenService;
 use App\Support\Submissions\SubmissionReference;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * The guest media write path (Increment G6): a respondent's upload from the public form runtime
@@ -59,23 +64,60 @@ final class GuestAttachmentController extends Controller
     }
 
     /**
-     * Upload a filled paper copy of the form — photos or a scan of its printed pages — for staff to check.
+     * Upload a filled paper copy of the form — photos or a scan of its printed pages.
      *
-     * The pages are read automatically and wait in the form's scans list until a staff member reviews and saves
-     * them as a response. The answer carries only a reference to quote: nothing that was read is ever sent back.
-     * The token's version is not checked against the current one, because the paper names its own version and
-     * paper printed before a republish is still a valid copy.
+     * The pages are read automatically. The answer carries a reference to quote and a short-lived `paper_token`: with
+     * it the sender's page waits for the reading, shows them the form filled in as read, and submits their corrections
+     * as their own response; without it, the scan waits in the form's scans list for a staff member, as before. The
+     * token's version is not checked against the current one, because the paper names its own version and paper
+     * printed before a republish is still a valid copy.
      *
      * @unauthenticated
      */
-    public function storePaperCopy(StoreOcrScanRequest $request, OcrScanService $scans): JsonResponse
+    public function storePaperCopy(StoreOcrScanRequest $request, OcrScanService $scans, GuestShareTokenService $tokens): JsonResponse
     {
         $token = $this->shareToken($request);
 
         $form = Form::query()->whereKey($token->formId)->firstOrFail();
 
         $scan = $scans->storeFromGuest($form, $request->pages());
+        $paper = $tokens->mintPaper($token->tenantId, $token->formId, $token->formVersionId, $scan->id);
 
-        return response()->json(['data' => ['reference' => SubmissionReference::format((string) $scan->reference)]], 202);
+        return response()->json(['data' => [
+            'reference' => SubmissionReference::format((string) $scan->reference),
+            'paper_token' => $paper->token,
+        ]], 202);
+    }
+
+    /**
+     * Where a sent paper copy stands: still being read, unreadable, already submitted, or read — with the form's
+     * answers as read, a note on each the reader was unsure of, and the scanned pages.
+     *
+     * @unauthenticated
+     */
+    public function paperStatus(Request $request, GuestPaperReview $review, string $shareToken, string $paperToken): JsonResponse
+    {
+        $share = $this->shareToken($request);
+        $scan = $review->scan($share, $paperToken);
+
+        return response()
+            ->json(['data' => $review->present($scan, $share, $paperToken)])
+            ->header('Cache-Control', 'private, no-store');
+    }
+
+    /**
+     * One page of a sent paper copy, while its sender is checking it.
+     *
+     * @unauthenticated
+     */
+    public function paperPage(Request $request, GuestPaperReview $review, string $shareToken, string $paperToken, string $page): Response
+    {
+        $file = $review->page($review->scan($this->shareToken($request), $paperToken), (int) $page);
+
+        $response = InlineAttachmentResponse::for($file);
+        // A respondent's handwriting: never kept by the browser or anything between.
+        $response->headers->set('Cache-Control', 'private, no-store');
+
+        return $response;
     }
 }

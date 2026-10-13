@@ -158,7 +158,7 @@ export async function assertNoHorizontalOverflow(page: Page, label: string): Pro
         // IT WERE WRONG — each in a way worth keeping, because both are easy to write again.
         //
         // v1 asked "is `.app-shell` present without `.app-shell__content`?" and reddened **48 tests** on
-        // the GUEST RUNTIME, which has an `.app-shell` of its own (`resources/public-runtime/App.vue:457`)
+        // the GUEST RUNTIME, which has an `.app-shell` of its own (in `resources/public-runtime/App.vue`'s template)
         // that is a plain flex column with no clip at all. A pure class-name collision across two trees,
         // invisible from `resources/js/` — the only place a Lane A grep would have looked.
         //

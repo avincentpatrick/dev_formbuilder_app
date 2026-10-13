@@ -248,4 +248,60 @@ final class GuestShareTokenService
         return is_string($value)
             && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $value) === 1;
     }
+
+    /**
+     * Mint a PAPER token (M166, `D116`): the uploader's handle on the one scan they just sent from the public link,
+     * so their page can wait for the reading, show them what was read, and submit their corrections as that scan's
+     * response. Carries `sid` = the scan's id and `typ: 'paper'`, short-lived (`guest.paper_token.ttl`), and signed
+     * under a key DERIVED from the share key with its own label — so it cannot validate as a share or a resume token
+     * without a fifth configured secret. ⚠️ Below the private helpers deliberately: `decodeAndVerify()` is cited by
+     * line from an ADR, and a method inserted above it would move that line.
+     */
+    public function mintPaper(
+        string $tenantId,
+        string $formId,
+        string $formVersionId,
+        string $scanId,
+        ?int $now = null,
+        ?int $ttlSeconds = null,
+    ): MintedShareToken {
+        $now ??= time();
+        $expiresAt = $now + ($ttlSeconds ?? (int) config('guest.paper_token.ttl', 7200));
+
+        return $this->encode(
+            ['tid' => $tenantId, 'fid' => $formId, 'vid' => $formVersionId, 'sid' => $scanId, 'typ' => 'paper', 'exp' => $expiresAt],
+            $this->paperKey(),
+            $expiresAt,
+        );
+    }
+
+    /**
+     * Verify a PAPER token: the signature under the derived paper key, then expiry, then `typ === 'paper'` and a
+     * well-formed scan id. Returns the payload with `scanId` populated.
+     *
+     * @throws InvalidShareTokenException malformed structure, a bad/forged signature, or another kind of token
+     * @throws ExpiredShareTokenException authentic but past its `exp`
+     */
+    public function verifyPaper(string $token, ?int $now = null): GuestShareToken
+    {
+        $payload = $this->decodeAndVerify($token, $this->paperKey(), $now);
+
+        if (($payload['typ'] ?? null) !== 'paper' || ! self::isUuid($payload['sid'] ?? null)) {
+            throw InvalidShareTokenException::malformed();
+        }
+
+        return new GuestShareToken(
+            (string) $payload['tid'],
+            (string) $payload['fid'],
+            (string) $payload['vid'],
+            (int) $payload['exp'],
+            $token,
+            scanId: (string) $payload['sid'],
+        );
+    }
+
+    private function paperKey(): string
+    {
+        return hash_hmac('sha256', 'guest-paper-scan-token.v1', $this->key);
+    }
 }

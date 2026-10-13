@@ -1,6 +1,7 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PaperCopyUpload from '../components/PaperCopyUpload.vue';
+import PaperReading from '../components/PaperReading.vue';
 import { ApiError } from '../lib/error-normalizer';
 import type { ApiClient } from '../lib/api-client';
 import type { NormalizedError } from '../lib/types';
@@ -82,7 +83,7 @@ describe('PaperCopyUpload', () => {
     });
 
     it('sends the chosen pages and passes the server\'s reference up', async () => {
-        uploadPaperCopy.mockResolvedValue({ reference: '7K4M-2QXB' });
+        uploadPaperCopy.mockResolvedValue({ reference: '7K4M-2QXB', paperToken: 'paper-1' });
         const wrapper = mountUpload();
         await toggle(wrapper).trigger('click');
         await choose(wrapper, [png('one.png'), png('two.png')]);
@@ -91,7 +92,7 @@ describe('PaperCopyUpload', () => {
 
         expect(uploadPaperCopy).toHaveBeenCalledTimes(1);
         expect((uploadPaperCopy.mock.calls[0][0] as File[]).map((file) => file.name)).toEqual(['one.png', 'two.png']);
-        expect(wrapper.emitted('received')).toEqual([['7K4M-2QXB']]);
+        expect(wrapper.emitted('received')).toEqual([['7K4M-2QXB', 'paper-1']]);
     });
 
     it('sends nothing offline, and says why', async () => {
@@ -119,5 +120,71 @@ describe('PaperCopyUpload', () => {
         await flushPromises();
         expect(wrapper.find('[role="alert"]').text()).toBe('Please try again tomorrow.');
         expect(wrapper.emitted('received')).toBeUndefined();
+    });
+});
+
+/*
+ * M166 (`D116`) — the wait while the copy is read. It asks the server where the scan stands until it is read, then hands
+ * up the answers; a failure offers filling in by hand or leaving it for staff, and leaving is possible from the start.
+ */
+describe('PaperReading', () => {
+    const fetchPaper = vi.fn();
+    const paperClient = { fetchPaper } as unknown as ApiClient;
+
+    beforeEach(() => {
+        fetchPaper.mockReset();
+    });
+
+    function mountReading(): VueWrapper {
+        return mount(PaperReading, { props: { client: paperClient, paperToken: 'paper-1', intervalMs: 5 } });
+    }
+
+    function button(wrapper: VueWrapper, name: string) {
+        return wrapper.findAll('button').find((candidate) => candidate.text() === name)!;
+    }
+
+    it('asks until the copy is read, then hands up its answers, notes and pages', async () => {
+        const read = { status: 'read', version_id: 'v1', answers: { name: 'Ada' }, fields: {}, pages: [] };
+        fetchPaper.mockResolvedValueOnce({ status: 'reading' }).mockResolvedValueOnce({ status: 'reading' }).mockResolvedValueOnce(read);
+        const wrapper = mountReading();
+
+        await vi.waitFor(() => expect(wrapper.emitted('read')).toBeDefined());
+        expect(fetchPaper).toHaveBeenCalledTimes(3);
+        expect(fetchPaper).toHaveBeenCalledWith('paper-1');
+        expect(wrapper.emitted('read')?.[0]).toEqual([{ answers: { name: 'Ada' }, fields: {}, pages: [] }]);
+    });
+
+    it('offers filling in by hand or leaving it for staff when the copy cannot be read', async () => {
+        fetchPaper.mockResolvedValue({ status: 'failed' });
+        const wrapper = mountReading();
+        await vi.waitFor(() => expect(wrapper.text()).toContain('We could not read your pages'));
+
+        await button(wrapper, 'Fill in the form myself').trigger('click');
+        expect(wrapper.emitted('fillByHand')).toHaveLength(1);
+        await button(wrapper, 'Leave it for our staff').trigger('click');
+        expect(wrapper.emitted('leave')).toHaveLength(1);
+    });
+
+    it('lets the sender leave it for staff while it is read, and stops asking', async () => {
+        fetchPaper.mockResolvedValue({ status: 'reading' });
+        const wrapper = mountReading();
+        await flushPromises();
+
+        await button(wrapper, 'Leave it for our staff instead').trigger('click');
+        expect(wrapper.emitted('leave')).toHaveLength(1);
+        const asked = fetchPaper.mock.calls.length;
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        expect(fetchPaper.mock.calls.length).toBe(asked);
+    });
+
+    it('treats a copy already submitted, and a refused token, as done with', async () => {
+        fetchPaper.mockResolvedValue({ status: 'submitted' });
+        const submitted = mountReading();
+        await vi.waitFor(() => expect(submitted.emitted('leave')).toHaveLength(1));
+
+        fetchPaper.mockReset();
+        fetchPaper.mockRejectedValue(refusal({ httpStatus: 403, code: 'paper_token_expired', kind: 'terminal', message: 'expired' }));
+        const refused = mountReading();
+        await vi.waitFor(() => expect(refused.text()).toContain('We could not read your pages'));
     });
 });

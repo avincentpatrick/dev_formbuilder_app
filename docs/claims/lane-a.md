@@ -16,65 +16,53 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M166`, a guest checks and corrects what their paper copy was read as, then submits it as their own response (`R-309e4dfa`, `D116` A) (m166-guest-paper-review)
+## Status: NO ACTIVE CLAIM — `M166` is merged and live on staging (released below). The next claim is written here. Ask the user before every merge, and never merge while another session's deploy is in flight. ⚠️ `PROGRESS.md` is under one close-out of byte headroom: the next increment owes the tracker surgery BEFORE its close-out push.
 
-Taken 2026-10-13. Branch `m166-guest-paper-review`, cut from origin/main at `c30c8031`, PR into main.
-Row: `R-309e4dfa` — *"A guest who sends a paper copy cannot check or correct what was read; staff must key every correction (`D116` A)."*
-The user asked it the morning `M165` went live and chose `D116` A in chat. The three claim-time questions have obvious answers and were
-decided here and told to the user: while the pages are read the guest sees a wait with "Leave it for our staff"; if reading fails or
-takes too long they may fill the form in by hand or leave it for staff (`M165`'s behaviour); an answer the scan could not read is blank and
-marked "please fill this in"; and the staff list shows the scan "Saved as a response", as after a staff save.
+## RELEASED — `M166`, a guest checks and corrects what their paper copy was read as, then submits it as their own response (`R-309e4dfa`, `D116` A) (merged as PR #359, `e3b68f32`, 6/6 green with real step counts on its second run and on the post-merge run — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 
-### Evidence verified
-- `GuestAttachmentController::storePaperCopy()` answers only `{data:{reference}}` — **held** (`M165`).
-- `OcrScanConfirmation` saves a scan through `SubmissionPipeline` with the scan's id as the idempotency key, then `link()` re-points the
-  pages and writes `submission_id`/`confirmed_at`/`confirmed_by` — **held**; `link()` is private and takes a non-null reviewer id.
-- `RuntimeSession`'s `initialAnswers` seeds the guest runtime and skips the device draft — **held**.
+Built and merged 2026-10-13, the response-submission testing day, on the user's "Merge now, fresh backup first": the guided block ran
+`meridian-test-db-backup` (Result 0, `staging-2026-10-13-030308.dump`, 412,024 B; the previous dump kept as `.pre-M166.bak`). The user
+asked the question the morning `M165` went live and chose `D116` A in chat; the three claim-time answers were obvious, decided here and
+told to the user. Post-merge CI run 38339886619; deployed by run 38342353925; gate baselines from 38339886619.
 
-### Premise verified
-- **The read-to-answer logic is reusable — held:** `OcrAnswerCarry::carry()` is pure (two snapshots and the extraction in, answers and
-  per-field meta out); only the wording (`scan-review.ts`) speaks to a reviewer, so the guest gets its own wording.
-- **A guest has no credential to read a scan back — a new capability is owed.** The reference is a display handle, never a key
-  (`SubmissionReferenceDisclosureTest`); the guest gets a signed, short-lived paper token from the upload, scoped to that scan.
-- **Offline submit cannot carry it:** the outbox row holds no paper token and `replay.ts` would drop it, so paper review submits online only.
-- **Staff can save the same scan at the same time:** the pipeline's per-uuid claim already makes the first save win (`uuid_claimed`); the
-  guest is told plainly. `link()` already returns early once a scan is linked.
-- **`M165` moved lines other files cite, and the citation lint cannot see it:** `docs/feature-backlog.md` cites `RuntimeSession.vue:160`
-  and `:172-205` and `tests/e2e/support/axe.ts` cites `public-runtime/App.vue:457`, all shifted by `M165`'s inserts. Repaired here, as
-  names rather than numbers, because this increment edits both files again.
+**Taken:**
+- **The paper token.** `GuestShareTokenService::mintPaper()`/`verifyPaper()` — `typ: 'paper'`, `sid` = the scan, 2 hours
+  (`guest.paper_token.ttl`), signed under `hash_hmac('guest-paper-scan-token.v1', share key)`: no new secret and `AppServiceProvider`
+  untouched. Added BELOW the private helpers, because `decodeAndVerify()` is cited by line from ADR-0009 — Pint accepted the order.
+- **The read-back.** `GET /api/v1/public/paper/{shareToken}/{paperToken}` and `…/pages/{page}` on `GuestAttachmentController`, inside
+  the share-token group, off the `f/` prefix the service worker caches, on the `guest-content-image` limiter, `private, no-store`.
+  `GuestPaperReview` verifies the token, requires the same workspace and form as the share token and a guest-uploaded scan, and carries
+  the answers onto the share token's version with `OcrAnswerCarry`. A failed scan answers only `failed` — never the staff wording.
+- **The Submit.** `GuestSubmissionRequest` takes `paper_token`; `GuestSubmissionController` verifies it, uses the scan's id as the
+  idempotency key (never the body's uuid), skips the draft branch, and calls `OcrScanConfirmation::linkFromGuest()` (`link()` now takes a
+  nullable reviewer). A staff save that came first wins with `submission_uuid_claimed`.
+- **The page.** `PaperReading.vue` (polls every 3 s; "Leave it for our staff instead" at once; fill in by hand or leave it on a failure
+  or after two minutes), `paper-notes.ts` (fill / check, no numbers), a note under each `FieldRow` (code at the END of its script so
+  `FieldRow.vue:61` stays put), and a review mode in `RuntimeSession` with autosave, the draft flow, the upload and the OUTBOX off.
+- **Docs and citations.** `docs/ocr-pipeline-design.md` §4, the threat model's guest-upload row and `ocr_scans.confirmed_by`, all
+  line-neutral; five by-line citations into files `M165` and this edited were repointed to names.
+- **Not edited, though claimed:** `OcrScanService.php`, `ServiceWorkerCachePrefixRouteTest.php`, `api-client.test.ts` — nothing in
+  them needed to move.
 
-### Remedy verdict
-**Works, with the shape measured:** the poll and the page reads live OFF the `f/` prefix the service worker caches (`paper/{shareToken}/
-{paperToken}`), inside the share-token group so the tenant comes from the share token and no new middleware or `use` line is needed, on
-their own limiter so a minute of polling does not spend the submit budget. The paper key is derived inside `GuestShareTokenService`
-(domain-separated from the share key), so `AppServiceProvider.php`, whose lines are cited, is not edited. The guest's Submit carries the
-paper token; the controller verifies it, uses the scan's id as the submission's idempotency key, and links the scan after the save.
+**Premise, measured — half wrong.** The claim said `M165`'s inserts had shifted the runtime citations. They had, but every one was ALREADY
+stale before `M165` (`RuntimeSession.vue:172-205` named `handleSubmitError()`, long since moved; `App.vue:457` an unrelated line). The
+repair — names instead of numbers — was right either way.
 
-Files: `app/Support/Guest/GuestShareTokenService.php`, `app/Support/Guest/GuestShareToken.php`, `config/guest.php`,
-`app/Http/Controllers/Public/GuestAttachmentController.php`, `app/Http/Controllers/Public/GuestSubmissionController.php`,
-`app/Http/Requests/Public/GuestSubmissionRequest.php`, `app/Services/Ocr/GuestPaperReview.php` (new),
-`app/Services/Ocr/OcrScanConfirmation.php`, `app/Services/Ocr/OcrScanService.php`, `routes/api.php`,
-`resources/public-runtime/lib/api-client.ts`, `resources/public-runtime/lib/types.ts`, `resources/public-runtime/lib/paper-notes.ts` (new),
-`resources/public-runtime/components/PaperCopyUpload.vue`, `resources/public-runtime/components/PaperReading.vue` (new),
-`resources/public-runtime/components/RuntimeSession.vue`, `resources/public-runtime/components/FieldRow.vue`,
-`resources/public-runtime/composables/context.ts`, `resources/public-runtime/App.vue`, and the tests:
-`tests/Feature/Ocr/GuestPaperReviewTest.php` (new), `tests/Feature/Ocr/GuestScanUploadTest.php`, `tests/Feature/Ocr/OcrScanConfirmTest.php`,
-`tests/Feature/Api/OpenApiContractTest.php`, `tests/Feature/Http/ServiceWorkerCachePrefixRouteTest.php`,
-`tests/Feature/Auth/RateLimiterBindingTest.php`, `resources/public-runtime/__tests__/paper-copy.test.ts`,
-`resources/public-runtime/__tests__/paper-notes.test.ts` (new), `resources/public-runtime/__tests__/api-client-challenge.test.ts`,
-`resources/public-runtime/__tests__/api-client.test.ts`, `resources/public-runtime/__tests__/components.test.ts`,
-`resources/public-runtime/__tests__/sw.test.ts`, `tests/e2e/ocr-guest-upload.spec.ts`, `tests/e2e/support/axe.ts` (a citation).
-**Extension 1 (2026-10-13), and a deviation recorded:** `app/Exceptions/Ocr/OcrException.php` (the two paper-token refusals) —
-⚠️ edited BEFORE this extension was pushed, the shape `M165`'s extension 1 recorded the day before; caught at the next file list. Also
-taken: `tests/Unit/Guest/GuestShareTokenServiceTest.php` (the paper token's mint and verify cases). `config/guest.php` gains only the
-token's lifetime: the poll reuses the `guest-content-image` limiter, so `AppServiceProvider.php` stays untouched.
-Shared artefacts taken: `openapi.json`, `docs/ocr-pipeline-design.md`, `docs/security-threat-model.md`, `docs/data-dictionary.md`,
-`docs/feature-backlog.md`, `PROGRESS.md` (own block), `docs/pipeline.md`.
-Paired files taken: `openapi.json` with `routes/api.php`.
-Namespaces spent: nothing from either namespace (no migration, no ADR).
-Prediction: Pest and Vitest red first, then green; the server half lands cleanly. **Most likely wrong: the guest review screen in a real
-browser** — a per-field note inside `FieldRow` at the narrowest width, axe on the filled form in both themes, and the wait screen's poll
-under the e2e job's synchronous queue, which I will mock rather than run.
+**Extension 1**, a deviation recorded at the time: `OcrException.php` was edited before the extension was pushed — the third time in
+two days (`M165`'s extension 1, then this). It was caught at the next file list each time; the habit to build is to grep the claim's
+file list before the first edit of any file not created by this increment.
+
+**Prediction, measured.** I named the guest review screen in a real browser as the most likely to be wrong. **It was not:** the new
+spec went 18/18 on its first run, and the reached public specs 90/90. CI went red ONCE, on a gate I did not run locally:
+`BacklogProvenanceTest` refused the new row's "Filed after `M165`" — the gated form is "Filed by". `tests/Feature/Docs` is the folder
+to run after any backlog edit.
+
+**Proof.** Pest: `GuestPaperReviewTest` 7 cases, 3 token unit cases, the upload, limiter and contract tests. Vitest 13 new cases, the
+whole suite (214 files) locally before the first push. **22 mutants, all caught** — 12 Pest through `scripts/mutate.php`, 10 Vitest with
+byte restores. Host PHPStan 0, Pint and every lint gate green.
+
+**Filed:** `R-bbe993d1` (Recent scans cannot show that a guest is checking a scan) and `R-eb17f79d` (a reload while checking loses the
+check; the copy falls back to staff), both `nit`, both during-testing.
 
 ## RELEASED — `M165`, a guest uploads a photo or scan of a filled paper form from the public link (`R-7173c02c`, `D106` A) (merged as PR #358, `0ec14400`, 6/6 green with real step counts on its third run and on the post-merge run — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

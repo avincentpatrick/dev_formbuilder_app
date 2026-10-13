@@ -13673,11 +13673,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   question whose options span two pages. **Latent** — every Round 1 and staging scan so far was a phone photo, and no partly-read
   multi-answer question has been seen. Filed by `M168`. **Tier: during-testing.**
 
-- **`minor` · The reader joins a recognized word's punctuation with a space, so a name reads "DE GUZMAN JR ." and an address
+- ✅ **CLOSED BY `M169` (2026-10-13) — ****`minor` · The reader joins a recognized word's punctuation with a space, so a name reads "DE GUZMAN JR ." and an address
   "STA MESA".** Found by `M149` in the same round. `OcrAnswerReader` joins Vision's words with spaces, and Vision returns `.`
   `,` `@` as words of their own; an email and a URL drop spaces and survive, a name, an address and a remark carry the stray
   space or lose the point, and the reviewer has to fix text that was read right. Vision marks each symbol's following break
-  (`property.detectedBreak`), which says where a space really was. **Live.** Filed by `M149`. **Tier: during-testing.**
+  (`property.detectedBreak`), which says where a space really was. **Live.** Filed by `M149`. **Tier: during-testing.** ✅ **CLOSED BY `M169` (2026-10-13), PR #362, built under the testing freeze and merged only on the user's go-ahead:** the row's own remedy. `VisionDocumentParser` records the break Vision marks after a word's last character as `OcrWord::$spaced` (a paragraph's last word always spaced), `OcrLineBuilder` carries it through the quarter turn and the deskew, and `OcrLine::text()` puts a space only after a spaced word — the word join is `OcrLine`'s, not `OcrAnswerReader`'s, so no hub moved. Measured first on Round 1's 30 hinted reads: of 240 `.` `,` `@` words, 238 followed a word with no break (the other 2 were `@` in emails, which strip spaces); the "STA MESA" quoted above is the read without the hint, `STA . MESA` with it. Round 1 re-scored offline: 50 → 48 of 180 (29 → 27 with ink), 0 silent — `STA. MESA` and `BAHALA KA JAN!!!` turn right. `OcrPunctuationSpacingTest.php` (level, tilted, stored on its side) and two parser cases red first; six mutants, all CAUGHT. A scan read before the deploy keeps its old text.
 
 - **`nit` · A crossed-out word is read as part of the answer.** Found by `M149` in the same round: an email written
   "rey.deguzmanjr@~~pitahc~~.pitahc.gov.ph" read as `rey.deguzmanjr@pital.pitahc.gov.ph`, withheld at 50. The confidence

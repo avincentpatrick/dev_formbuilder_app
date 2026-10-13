@@ -13790,6 +13790,16 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`nit` · The scans page lists the newest 25 scans, so a burst of paper copies from the public link pushes staff scans off it.** Found by `M165`. `OcrScanListPresenter::LISTED` caps the list with no paging; the reference search finds a guest's scan, but a staff scan has no reference to search by. The remedy is paging, or a filter by source. **Latent** — no form has had more than a handful of scans. Filed by `M165`. **Tier: before-launch.**
 
+- **`minor` · A guest who sends a paper copy cannot check or correct what was read; staff must key every correction (`D116` A).**
+  Asked by the user after `M165` merged. `M165`'s public door (`GuestAttachmentController::storePaperCopy()`) answers only a reference,
+  and the scan waits in the staff scans list until a reviewer saves it (`OcrScanConfirmation`). The remedy, `D116`: after sending, the
+  public page waits for the reading job, then opens the form filled with what was read — each answer below the review threshold marked
+  to be checked, the scanned pages beside it — and the guest's Submit saves it through the guest submit path as their own response, with
+  the pages re-pointed to it as `OcrScanConfirmation::link()` does for a staff save. Reuse: `RuntimeSession`'s `initialAnswers`, and the
+  staff review's carry of a read value onto the current version. Answered first at claim time: what the guest sees while the pages are
+  read or when reading fails (fill the form by hand, or leave it for staff as today), how an unread answer is shown, and what the scans
+  list shows once a guest has submitted. The spend guard (`D106`) is unchanged. **Live.** Filed after `M165`. **Tier: during-testing.**
+
 - ✅ **CLOSED BY `M154` (2026-10-09) — ****`minor` · Correcting a scanned response's answers shows no scanned pages beside the form.**
   Found by `M153` closing `R-1e00f872`: the response page now shows "Scanned pages", but its "Edit answers" button opens
   `Pages/submissions/Encode.vue` in edit mode (`SubmissionEditController`), which shows the paper only in scan-review mode, so a

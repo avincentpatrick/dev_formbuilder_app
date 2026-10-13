@@ -28,6 +28,16 @@ _None open._ `D115`, the last one filed, was asked and answered on 2026-10-12 in
 
 
 ## ANSWERED
+### D116 — `M165` lets a guest send a photo or scan of a filled paper copy from the public link, and the guest never sees what was read: staff check every answer against the photo. Should the guest be able to check and correct what was read? **A — yes: the guest checks the read answers in the form, corrects them, and submits them as their own response, with the photos attached.**
+
+**Asked and answered 2026-10-13 (user decision, in chat), recorded by Lane A after `M165`'s close-out.** The user asked: *"when the guest user uploads the scanned copy, there is no way for them to validate and correct incase there is discrepancy in the results?"* — correct as built, by `D106`'s second answer (*the guest never sees what was read*). Round 1 measured about a third of fields needing a correction (`docs/ocr-pipeline-design.md` §9), and the person who wrote the paper knows the answers best.
+
+- **A — the guest checks, then submits (recommended, chosen).** After sending, the public page waits while the pages are read (usually under a minute), then shows the form already filled in, each unsure answer marked to be checked. The guest corrects what is wrong and presses Submit, and it is saved as their response, with the scanned pages attached. Staff no longer key it in. It amends `D106`'s second answer: the guest now sees what was read — their own paper — before submitting.
+- **B — the guest checks, staff still confirm.** The same screen, but the corrected answers wait in Recent scans for a staff member to approve.
+- **C — staff only, as built.**
+
+**What the answer files, in the same push:** a `during-testing` row in `docs/feature-backlog.md` (*a guest who sends a paper copy cannot check or correct what was read*), which owns the build questions it answers at claim time: what the guest sees while the pages are read or if reading fails, how an answer the scan could not read is shown, and what the staff scans list shows once a guest has submitted.
+
 ### D115 — The user saw `M162`'s Help page and asked for more: "a user manual for the form builder, each input type and its settings/configurations. the left and right panels". Where does that reference go, does it show the panels, and when does it go live? **A, A, A — a second part of the same Help page ("Builder reference"), with one picture of each panel and numbered callouts, live as soon as it is ready.**
 
 **Asked and answered 2026-10-12 (user decision, in chat), recorded by Lane A in `M163`'s claim.** The comment: *"i already saw the help page. but i am expecting a user manual for the form builder, each input type and its settings/configurations. the left and right panels"*. Three questions were put together, each with a recommendation, and all three were answered as recommended.

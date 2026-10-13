@@ -592,7 +592,7 @@ function onRestart(): void {
         `assertClean` would NOT have caught, since it asserts horizontal overflow only.
     -->
     <div class="app-shell">
-        <div class="app-shell__banner">
+        <div class="app-shell__banner" :class="{ 'app-shell__banner--wide': phase === 'ready' && paperReview !== null && paperReview.pages.length > 0 }">
             <OfflineIndicator v-if="!online" />
             <SyncStatus />
         </div>
@@ -676,6 +676,13 @@ function onRestart(): void {
     display: flex;
     flex-direction: column;
     gap: var(--mds-space-2);
+}
+
+/* M168 — and widens with it while a paper copy is checked beside its scanned pages (`RuntimeShell`'s `wide`). */
+@media (min-width: 64rem) {
+    .app-shell__banner--wide {
+        max-width: 90rem;
+    }
 }
 
 .app-state {

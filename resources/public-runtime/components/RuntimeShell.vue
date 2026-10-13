@@ -12,6 +12,8 @@ defineProps<{
     description: string | null;
     saving: boolean;
     savedAt: string | null;
+    /** M168 — room for the scanned pages beside the form while a paper copy is checked (`RuntimeSession`). */
+    wide?: boolean;
 }>();
 
 const announcer = useAnnouncer();
@@ -19,7 +21,7 @@ const announcer = useAnnouncer();
 
 <template>
     <div class="runtime">
-        <div class="runtime__column">
+        <div class="runtime__column" :class="{ 'runtime__column--wide': wide }">
             <FormHeader
                 :title="title"
                 :description="description"
@@ -53,6 +55,16 @@ const announcer = useAnnouncer();
     width: 100%;
     max-width: 44rem;
     margin: 0 auto;
+}
+
+/* M168 — two halves need two columns' room, and only once there is room for both (`RuntimeSession`'s 64rem split);
+   below that the pages stack above the form at the usual reading width. ⚠️ NO `position` IN THIS FILE: its live region
+   is listed in `clipped-node-containment.test.ts`'s `KNOWN_UNGUARDED`, so the sticky paper column lives in
+   `RuntimeSession.vue`. */
+@media (min-width: 64rem) {
+    .runtime__column--wide {
+        max-width: 90rem;
+    }
 }
 
 .runtime__main {

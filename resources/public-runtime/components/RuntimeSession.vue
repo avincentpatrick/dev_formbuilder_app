@@ -685,6 +685,10 @@ if (props.paperReview) {
     provide(PaperNotesKey, paperNotes(props.paperReview.fields));
 }
 
+// M168 (`R-17caf80e`) — the scanned pages beside the form while their sender checks it. A review is fixed for the life of a
+// session (App.vue remounts it), so a plain constant.
+const paperPages = props.paperReview && props.paperReview.pages.length > 0 ? props.paperReview.pages : null;
+
 const title = computed(() => runtime.renderModel.form.title);
 const description = computed(() => runtime.renderModel.form.description);
 </script>
@@ -695,6 +699,7 @@ const description = computed(() => runtime.renderModel.form.description);
         :description="description"
         :saving="autosave.saving.value"
         :saved-at="autosave.savedAt.value"
+        :wide="paperPages !== null"
     >
         <template #notice>
             <WelcomeBackBanner
@@ -738,21 +743,27 @@ const description = computed(() => runtime.renderModel.form.description);
                 @received="(reference, paperToken) => emit('paper-received', reference, paperToken)"
             />
             <!-- M166 (`D116`): the sender checks what their paper was read as. A standing condition, so a Banner. -->
-            <template v-if="paperReview">
-                <MdsBanner
-                    tone="info"
-                    icon="info"
-                    message="We filled in the form from your paper copy. Check every answer, especially those with a note, correct anything that is wrong, then press Submit."
-                    data-paper-review
-                />
-                <details v-if="paperReview.pages.length > 0" class="session-paper">
-                    <summary class="session-paper__summary">Show your scanned pages</summary>
-                    <ScanPages :pages="paperReview.pages" title="Your scanned pages" />
-                </details>
-            </template>
+            <MdsBanner
+                v-if="paperReview"
+                tone="info"
+                icon="info"
+                message="We filled in the form from your paper copy. Check every answer, especially those with a note, correct anything that is wrong, then press Submit."
+                data-paper-review
+            />
         </template>
-        <PageView v-if="runtime.singlePageMode" />
-        <StepView v-else />
+        <!-- M168 (`R-17caf80e`): the paper FIRST — the left half beside the form on a wide screen, above it on a phone.
+             Every other session keeps the form as the slot's only child. -->
+        <div v-if="paperPages" class="session-body">
+            <section class="session-body__paper" data-paper-pages>
+                <ScanPages :pages="paperPages" title="Your scanned pages" />
+            </section>
+            <PageView v-if="runtime.singlePageMode" class="session-body__form" />
+            <StepView v-else class="session-body__form" />
+        </div>
+        <template v-else>
+            <PageView v-if="runtime.singlePageMode" />
+            <StepView v-else />
+        </template>
     </RuntimeShell>
 </template>
 
@@ -793,23 +804,43 @@ const description = computed(() => runtime.renderModel.form.description);
     cursor: pointer;
 }
 
-.session-paper {
+/* M168 (`R-17caf80e`) — the scanned pages beside the form, in equal halves, as on the staff review and the saved response
+   (`Encode.vue`, `Show.vue`): the user asked for the paper on the left and bigger, "50/50 for both guest and logged in".
+   Stacked, paper first, until both halves have room (64rem; `RuntimeShell` widens its column at the same width); then
+   the paper column stays in view and scrolls on its own, so a second page is never stranded below the fold. The sticky
+   rule is on the grid item itself — a sticky child inside a start-aligned item cannot outlive that item's height. */
+.session-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-6);
+}
+
+.session-body__paper {
+    padding: var(--mds-space-3) var(--mds-space-4);
     border: 1px solid var(--mds-color-border-default);
     border-radius: var(--mds-radius-md);
     background-color: var(--mds-color-bg-surface);
-    padding: var(--mds-space-3) var(--mds-space-4);
 }
 
-.session-paper__summary {
-    cursor: pointer;
-    font-family: var(--mds-font-family-body);
-    font-weight: var(--mds-type-label-font-weight);
-    color: var(--mds-color-text-body);
-}
+@media (min-width: 64rem) {
+    .session-body {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        column-gap: var(--mds-space-6);
+        align-items: start;
+    }
 
-.session-paper__summary:focus-visible {
-    outline: 2px solid var(--mds-color-focus-ring);
-    outline-offset: 2px;
+    .session-body__paper {
+        grid-column: 1;
+        position: sticky;
+        top: var(--mds-space-4);
+        max-height: calc(100vh - 2 * var(--mds-space-4));
+        overflow-y: auto;
+    }
+
+    .session-body__form {
+        grid-column: 2;
+    }
 }
 
 .session-notice__discard:hover {

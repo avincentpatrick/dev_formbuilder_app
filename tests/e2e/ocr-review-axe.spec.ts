@@ -5,8 +5,8 @@ import { assertClean, forceTheme } from './support/axe';
  * Single-form OCR's two screens (M129, groundwork 2): the scans page, and the review screen — the encode page
  * in its scan mode, with the scanned page beside the form and a note on each answer the scan needs a person
  * for. Whole-page `assertClean`, because both pages are new and the overflow check is the one place their
- * layouts meet 375px: the review screen puts the paper beside the form at wide widths and stacks it below
- * that, and the scans page carries a native file input.
+ * layouts meet 375px: the review screen puts the paper beside the form at wide widths and stacks it above the
+ * form below that, and the scans page carries a native file input.
  *
  * ── STATE ──────────────────────────────────────────────────────────────────────────────────────────────
  * This spec CREATES NOTHING. ⛔ IT NEVER UPLOADS: CI's e2e job runs `QUEUE_CONNECTION=sync`, so an upload
@@ -26,6 +26,22 @@ import { assertClean, forceTheme } from './support/axe';
  */
 
 const themes = ['light', 'dark'] as const;
+
+/*
+ * M168 (`R-17caf80e`, the user: "make it 50/50 for both guest and logged in upload") — once the screen has room for both
+ * (`Encode.vue`'s 75rem, beside the sidebar) the paper is the LEFT half and the form the right, at equal widths; below
+ * that the paper stacks above the form. Read from the boxes the browser drew, because no unit test can see a grid.
+ */
+async function expectPaperBeside(page: Page): Promise<void> {
+    const paper = (await page.locator('.encode__scan-pages').boundingBox())!;
+    const form = (await page.locator('.encode__form').boundingBox())!;
+    if (page.viewportSize()!.width >= 1200) {
+        expect(paper.x + paper.width, 'the paper is left of the form').toBeLessThanOrEqual(form.x);
+        expect(Math.abs(paper.width - form.width) / form.width, 'the paper and the form are equal halves').toBeLessThan(0.1);
+    } else {
+        expect(paper.y + paper.height, 'the paper stacks above the form').toBeLessThanOrEqual(form.y);
+    }
+}
 
 async function openScans(page: Page): Promise<void> {
     await page.goto('/forms', { waitUntil: 'networkidle' });
@@ -67,6 +83,7 @@ for (const theme of themes) {
         await expect(page.getByRole('checkbox', { name: 'Fever', exact: true })).toBeChecked();
         await expect(page.getByRole('checkbox', { name: 'Cough', exact: true })).toBeChecked();
         await expect(page.getByText(/Needs manual entry/).first()).toBeVisible();
+        await expectPaperBeside(page);
 
         await assertClean(page, `scan review ${theme}`);
     });
@@ -113,6 +130,7 @@ for (const theme of themes) {
         await expect(page.getByRole('heading', { name: 'Scanned pages', level: 2 })).toBeVisible();
         await expect(page.getByRole('region', { name: 'Page 1 of the scan' })).toBeVisible();
         await expect(page.getByRole('region', { name: 'Page 2 of the scan' })).toBeVisible();
+        await expectPaperBeside(page);
 
         await assertClean(page, `correcting a scanned response ${theme}`);
     });

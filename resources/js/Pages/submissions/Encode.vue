@@ -1944,7 +1944,11 @@ function onConflictKeydown(event: KeyboardEvent): void {
 /* ── M129 — scan mode ───────────────────────────────────────────────────────────────────────────────────
    The paper and the form side by side on a wide screen. Every child of the page spans both columns except the
    paper (left, sticky) and the form (right); auto-placement puts the two on one row because the paper comes
-   first in the DOM. Below the breakpoint nothing changes but the paper's gap: it stacks above the form. */
+   first in the DOM. Below the breakpoint nothing changes but the paper's gap: it stacks above the form.
+   M168 (`R-17caf80e`): EQUAL HALVES, as the saved response (`Show.vue`) and the guest's own check already are. The user
+   asked for the scan bigger, "50/50 for both guest and logged in upload": `1fr 45rem` gave the form 720px and left the
+   paper ~390px at 1440 beside the 240px sidebar. 75rem stays — with the sidebar it is about the room the guest page
+   has at its 64rem split. */
 .encode__scan-pages {
     margin: 0 0 var(--mds-space-6);
 }
@@ -1952,7 +1956,7 @@ function onConflictKeydown(event: KeyboardEvent): void {
 @media (min-width: 75rem) {
     .encode--scan {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 45rem);
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         column-gap: var(--mds-space-6);
         align-items: start;
         max-width: 90rem;

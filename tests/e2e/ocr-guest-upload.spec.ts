@@ -138,6 +138,8 @@ test.describe('the public link', () => {
             if (page.viewportSize()!.width >= 1024) {
                 expect(paper.x + paper.width, 'the paper is left of the form').toBeLessThanOrEqual(form.x);
                 expect(Math.abs(paper.width - form.width) / form.width, 'the paper and the form are equal halves').toBeLessThan(0.1);
+                // …of the screen, not of the 44rem reading column ("increase the size of the preview").
+                expect(paper.width / page.viewportSize()!.width, 'the paper takes about half the screen').toBeGreaterThan(0.4);
             } else {
                 expect(paper.y + paper.height, 'the paper stacks above the form').toBeLessThanOrEqual(form.y);
             }

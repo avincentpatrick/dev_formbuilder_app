@@ -16,7 +16,63 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M168` is merged and live on staging (released below). The next claim is written here. Ask the user before every merge, and never merge while another session's deploy is in flight.
+## Status: ACTIVE CLAIM — `M169`, a point or a comma stays on the word Vision read it after (`m169-ocr-punctuation-spacing`)
+
+Taken 2026-10-13, after the user's "no merge, no deploy while testing is on": this claim builds, opens the PR and gets it green,
+then stops — nothing merges until the user lifts the freeze. Branch `m169-ocr-punctuation-spacing`, cut from origin/main at
+`c0b61b71`, PR into main. Row: `R-27049032` — "The reader joins a recognized word's punctuation with a space, so a name reads
+"DE GUZMAN JR ." and an address "STA MESA"." Named as `M169` by `M168`'s close-out. At the session's start the user confirmed
+`M168` on staging ("Yes, it works": the paper on the left, 50/50, on the guest check and the staff review/edit); nothing is owed.
+
+### Evidence verified
+- "`OcrAnswerReader` joins Vision's words with spaces" — held, and moved: the WORD join is `OcrLine::text()`, which `ruled()` (the
+  `line` and `ruled` areas) and `blankOrUnreadable()` call; `ruled()` itself joins the LINES.
+- "Vision returns `.` `,` `@` as words of their own" — held: 240 such words in Round 1's hinted reads (`C:\ocr-samples-hint`).
+- "an email and a URL drop spaces and survive" — held: `parsed()` strips every space for both types.
+- "a name, an address and a remark carry the stray space or lose the point" — held as the stray space. The row's "STA MESA" is the
+  read WITHOUT the handwriting hint; with it (production since `M149`) sheet 09 reads `STA . MESA`.
+- "Vision marks each symbol's following break (`property.detectedBreak`)" — held, and `VisionDocumentParser` drops it: 2,858 breaks
+  (SPACE 1,909, LINE_BREAK 900, EOL_SURE_SPACE 49), every one on a word's LAST symbol, none mid-word; a symbol with no break carries
+  no `property` at all.
+
+### Premise verified
+- One session only (the user, 2026-10-13); nobody else is building.
+- `OcrLine::text()`'s third caller, `isStatic()`, compares `OcrText::normal()` forms, where punctuation is a space anyway; label
+  matching (`labelSpan()`, `PrintedFormMatcher::startsWithLabel()`) builds its own text and is untouched.
+- `OcrLineBuilder::upright()` and `rotate()` build NEW words — and every Round 1 photo goes through `upright()` (EXIF 6) — so a flag
+  the parser sets is lost on exactly the real pages unless both carry it.
+- `PrintedPageTypesetter` (the only place the OCR tests see the paper) splits nothing off a word and emits no break, so no test can
+  see this defect today; once the parser reads breaks, a fixture with none glues every word. It learns breaks first.
+- The bake-off scorer keeps punctuation (`OcrBakeoffAnswers` ignores only case and repeated spaces), so the change is measurable.
+  Trunk baseline, offline on the hinted reads: 50 of 180 need correction, 0 silent (29 of 180 with `--ticks=ink`, 0 silent).
+- A read scan is never re-matched (`OcrScanReader::step()` stops at a terminal status; `extraction` holds the matched result), so
+  the fix reaches scans read after a deploy only.
+- `R-d4653a0c` (a long text's line breaks lost) is the OTHER join — between lines, in `ruled()` — and is not taken.
+- No hub: `OcrAnswerReader.php`, the only OCR file in the census's hub list, is not edited.
+
+### Remedy verdict
+The row's remedy works, measured on all 30 hinted reads before any test: of 3,293 words, 435 carry no break — 367 are followed by
+punctuation, 67 are an opening mark before a word (`(` `kg`, `/` `v1`, a wall `||` before a digit), 1 is `@` before `pitahc.gov.ph`,
+and none ends a paragraph. No two words of letters or digits would be glued. Of the 240 `.` `,` `@` words, 238 follow a word with no
+break; the other 2 are `@` in emails, which strip spaces anyway. Rule: a word is followed by a space when its last symbol carries any
+break, or when it ends its Vision paragraph — a guard that never fires on Round 1 and is kept because the line builder puts words of
+two paragraphs on one line.
+
+Files: `app/Services/Ocr/OcrWord.php`, `app/Services/Ocr/VisionDocumentParser.php`, `app/Services/Ocr/OcrLineBuilder.php`,
+`app/Services/Ocr/OcrLine.php`, `tests/Feature/Ocr/Support/PrintedPageTypesetter.php`, `tests/Unit/Ocr/VisionDocumentParserTest.php`,
+`tests/Feature/Ocr/OcrPunctuationSpacingTest.php` (new), `docs/ocr-pipeline-design.md`; close-out on the branch:
+`docs/feature-backlog.md`, `PROGRESS.md`, `docs/pipeline.md`; this file on main.
+Shared artefacts taken: `docs/ocr-pipeline-design.md`, `docs/feature-backlog.md`, `PROGRESS.md` (own block), `docs/pipeline.md`.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace.
+Prediction: the new feature cases (a level page and a tilted one through Vision's JSON, a page stored on its side) go red on the
+current code on the stray spaces, and the two parser cases on `spaced`; every existing OCR test stays green while only the fixture
+moves. Six committed mutants, each CAUGHT: `OcrLine` back to always a space (3 feature cases), the parser ignoring breaks (2 parser
++ 3 feature), the paragraph guard removed (1 parser), the break read off the FIRST symbol (the parser case and every Vision-path
+case), `rotate()` dropping the flag (the tilted case only), `upright()` dropping it (the sideways case only). Round 1 offline: 50 →
+49 of 180 and 29 → 28 with ink, 0 silent — sheet 09's `STA. MESA` turns right; 10 more fields change their text and stay wrong for
+other reasons (a comma the answer sheet has and the paper does not, misread letters). Only PHP moves: Pest and PHPStan; Vitest, E2E
+and axe cannot. **Most likely wrong:** a test that builds Vision's JSON by hand without breaks glues its words and goes red.
 
 ## RELEASED — `M168`, the scanned copy beside the form, 50/50, on the guest check and the staff review (`R-17caf80e`) (merged as PR #361, `6b998a37`, 6/6 green with real step counts on its first run and on the post-merge run's second attempt — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

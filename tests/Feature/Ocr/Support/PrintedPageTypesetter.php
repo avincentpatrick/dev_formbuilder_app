@@ -26,7 +26,8 @@ use App\Services\Ocr\OcrWord;
  * FIRST and measured the suite red before touching the reader.
  *
  * It can hand the matcher {@see OcrPage}s directly, or emit a Cloud Vision `images:annotate` answer for the
- * whole page so the parser and the job are exercised end to end.
+ * whole page so the parser and the job are exercised end to end. That answer marks a break after each word's last
+ * character, as Vision does (M169): without one, the parser reads two words as written with no space between.
  */
 final class PrintedPageTypesetter
 {
@@ -55,8 +56,11 @@ final class PrintedPageTypesetter
 
     private const float RIGHT = 0.92;
 
-    /** @var list<array{text: string, x0: float, y0: float, x1: float, y1: float, confidence: float}> */
+    /** @var list<array{text: string, x0: float, y0: float, x1: float, y1: float, confidence: float, spaced: bool}> */
     private array $words = [];
+
+    /** Whether a written `.`, `,` or `@` is read as a word of its own, set per answer by `punctuation_apart`. */
+    private bool $punctuationApart = false;
 
     private float $y = 0.03;
 
@@ -69,7 +73,7 @@ final class PrintedPageTypesetter
      *               stamp?: string|null, layout?: int|string|null, run_together?: list<string>,
      *               confidence?: array<string, float>, gap_reads?: array<string, list<string|null>>,
      *               key_rise?: float, marks?: array<string, string>, mark_rise?: array<string, float>,
-     *               gap_words?: array<string, array<string, string>>}  $options
+     *               gap_words?: array<string, array<string, string>>, punctuation_apart?: list<string>}  $options
      *                                                   `layout` null prints no layout word (a layout-1 sheet);
      *                                                   a string prints it garbled. `run_together` names the keys
      *                                                   whose first marked option's X is read as one word with the
@@ -86,6 +90,10 @@ final class PrintedPageTypesetter
      *                                                   `M158`); `gap_words` puts a word the recognizer read
      *                                                   between an option's box and its label, keyed by label
      *                                                   ("☑Fe" before "Female" on sheet 06, `M158`).
+     *                                                   `punctuation_apart` names the keys whose written `.`, `,`
+     *                                                   and `@` are read the way Vision reads handwriting: each a
+     *                                                   word of its own, with no break between it and the word it
+     *                                                   was written against ("JR" then "." for "JR.", M169).
      */
     public static function fromModel(array $model, array $answers, array $options = []): self
     {
@@ -101,6 +109,7 @@ final class PrintedPageTypesetter
         $marks = $options['marks'] ?? [];
         $markRise = $options['mark_rise'] ?? [];
         $gapWords = $options['gap_words'] ?? [];
+        $punctuationApart = $options['punctuation_apart'] ?? [];
         $stamp = array_key_exists('stamp', $options) ? $options['stamp'] : ($model['schema_stamp'] ?? null);
         $layout = array_key_exists('layout', $options) ? $options['layout'] : ($model['layout'] ?? null);
 
@@ -179,6 +188,7 @@ final class PrintedPageTypesetter
                 }
 
                 $answer = $answers[$key] ?? null;
+                $page->punctuationApart = in_array($key, $punctuationApart, true);
                 match ($row['area']) {
                     'comb' => $page->comb($row['comb'], $answer, $omitCaptions, $conf, $gapReads[$key] ?? null),
                     'choices' => $page->choices($row['options'], is_array($answer) ? $answer : [], $conf, in_array($key, $runTogether, true), $marks[$key] ?? 'X', $markRise[$key] ?? 0.0, $gapWords[$key] ?? []),
@@ -186,6 +196,7 @@ final class PrintedPageTypesetter
                     'ruled' => $page->ruled(is_string($answer) ? $answer : null, (int) ($row['lines'] ?? 3), $conf),
                     default => $page->advance(),
                 };
+                $page->punctuationApart = false;
                 $page->advance(0.6);
             }
         }
@@ -204,11 +215,11 @@ final class PrintedPageTypesetter
         return $page;
     }
 
-    /** One word, its characters spread evenly across it. */
-    public function word(string $text, float $x, float $y, float $confidence = 0.99): self
+    /** One word, its characters spread evenly across it; `$spaced` false when nothing separates it from the next. */
+    public function word(string $text, float $x, float $y, float $confidence = 0.99, bool $spaced = true): self
     {
         $width = max(1, mb_strlen($text)) * self::CHAR;
-        $this->words[] = ['text' => $text, 'x0' => $x, 'y0' => $y, 'x1' => $x + $width, 'y1' => $y + self::LINE * 0.8, 'confidence' => $confidence];
+        $this->words[] = ['text' => $text, 'x0' => $x, 'y0' => $y, 'x1' => $x + $width, 'y1' => $y + self::LINE * 0.8, 'confidence' => $confidence, 'spaced' => $spaced];
 
         return $this;
     }
@@ -228,8 +239,13 @@ final class PrintedPageTypesetter
             if ($word === '') {
                 continue;
             }
-            $this->word($word, $x, $this->y, $confidence);
-            $x += (mb_strlen($word) + 1) * self::CHAR;
+            // Under `punctuation_apart`, "JR." is read as "JR" and "." with no break between them, side by side.
+            $pieces = $this->punctuationApart ? (preg_split('/([.,@])/u', $word, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY) ?: [$word]) : [$word];
+            foreach ($pieces as $i => $piece) {
+                $this->word($piece, $x, $this->y, $confidence, $i === count($pieces) - 1);
+                $x += mb_strlen($piece) * self::CHAR;
+            }
+            $x += self::CHAR;
         }
 
         return $x;
@@ -303,7 +319,8 @@ final class PrintedPageTypesetter
             foreach ($this->symbolBoxes($word) as [$char, $x0, $y0, $x1, $y1]) {
                 $symbols[] = new OcrSymbol($char, $word['confidence'], ...$box($x0, $y0, $x1, $y1));
             }
-            $words[] = new OcrWord($word['text'], $word['confidence'], ...[...$box($word['x0'], $word['y0'], $word['x1'], $word['y1']), $angle, $symbols]);
+            [$x0, $y0, $x1, $y1] = $box($word['x0'], $word['y0'], $word['x1'], $word['y1']);
+            $words[] = new OcrWord($word['text'], $word['confidence'], $x0, $y0, $x1, $y1, $angle, $symbols, spaced: $word['spaced']);
         }
 
         return $quarters % 2 === 1
@@ -322,12 +339,18 @@ final class PrintedPageTypesetter
         $words = [];
         foreach ($this->words as $word) {
             $symbols = [];
-            foreach ($this->symbolBoxes($word) as [$char, $x0, $y0, $x1, $y1]) {
-                $symbols[] = [
+            $boxes = $this->symbolBoxes($word);
+            foreach ($boxes as $i => [$char, $x0, $y0, $x1, $y1]) {
+                $symbol = [
                     'text' => $char,
                     'confidence' => $word['confidence'],
                     'boundingBox' => ['vertices' => $this->vertices($x0, $y0, $x1, $y1, $tilt)],
                 ];
+                // Vision marks a break on a word's LAST character only, and marks none where the next word follows on.
+                if ($word['spaced'] && $i === count($boxes) - 1) {
+                    $symbol['property'] = ['detectedBreak' => ['type' => 'SPACE']];
+                }
+                $symbols[] = $symbol;
             }
             $words[] = [
                 'confidence' => $word['confidence'],
@@ -368,7 +391,7 @@ final class PrintedPageTypesetter
                 $read = $gapReads === null ? ($group['separator'] ?? null) : ($gapReads[$g - 1] ?? null);
                 if ($read !== null && $read !== '') {
                     $center = $x + self::GAP / 2;
-                    $this->words[] = ['text' => $read, 'x0' => $center - self::CHAR / 2, 'y0' => $this->y, 'x1' => $center + self::CHAR / 2, 'y1' => $this->y + self::LINE, 'confidence' => 0.99];
+                    $this->words[] = ['text' => $read, 'x0' => $center - self::CHAR / 2, 'y0' => $this->y, 'x1' => $center + self::CHAR / 2, 'y1' => $this->y + self::LINE, 'confidence' => 0.99, 'spaced' => true];
                 }
                 $x += self::GAP; // the borderless gap between groups, holding its separator
             }
@@ -377,7 +400,7 @@ final class PrintedPageTypesetter
             for ($c = 0; $c < $group['cells']; $c++) {
                 $char = $chars[$c] ?? ' ';
                 if ($char !== ' ') {
-                    $this->words[] = ['text' => $char, 'x0' => $x + 0.008, 'y0' => $this->y, 'x1' => $x + 0.008 + self::CHAR, 'y1' => $this->y + self::LINE, 'confidence' => $confidence];
+                    $this->words[] = ['text' => $char, 'x0' => $x + 0.008, 'y0' => $this->y, 'x1' => $x + 0.008 + self::CHAR, 'y1' => $this->y + self::LINE, 'confidence' => $confidence, 'spaced' => true];
                 }
                 $x += self::PITCH;
             }
@@ -426,7 +449,7 @@ final class PrintedPageTypesetter
                 // The pen came close to the text: the recognizer reads "XFemale" as one word.
                 $words = preg_split('/\s+/', trim($option['label'])) ?: [];
                 $first = array_shift($words) ?? '';
-                $this->words[] = ['text' => $mark.$first, 'x0' => $x, 'y0' => $this->y, 'x1' => $labelX + (mb_strlen($first) + 1) * self::CHAR, 'y1' => $this->y + self::LINE * 0.8, 'confidence' => $confidence];
+                $this->words[] = ['text' => $mark.$first, 'x0' => $x, 'y0' => $this->y, 'x1' => $labelX + (mb_strlen($first) + 1) * self::CHAR, 'y1' => $this->y + self::LINE * 0.8, 'confidence' => $confidence, 'spaced' => true];
                 if ($words !== []) {
                     $this->text(implode(' ', $words), $labelX + (mb_strlen($first) + 1) * self::CHAR);
                 }
@@ -475,7 +498,7 @@ final class PrintedPageTypesetter
     }
 
     /**
-     * @param  array{text: string, x0: float, y0: float, x1: float, y1: float, confidence: float}  $word
+     * @param  array{text: string, x0: float, y0: float, x1: float, y1: float, confidence: float, spaced: bool}  $word
      * @return list<array{0: string, 1: float, 2: float, 3: float, 4: float}>
      */
     private function symbolBoxes(array $word): array
@@ -492,7 +515,7 @@ final class PrintedPageTypesetter
     }
 
     /**
-     * @param  array{text: string, x0: float, y0: float, x1: float, y1: float, confidence: float}  $word
+     * @param  array{text: string, x0: float, y0: float, x1: float, y1: float, confidence: float, spaced: bool}  $word
      */
     private function ocrWord(array $word, float $tilt): OcrWord
     {
@@ -503,7 +526,7 @@ final class PrintedPageTypesetter
         }
         [$x0, $y0, $x1, $y1] = $this->rotatedBox($word['x0'], $word['y0'], $word['x1'], $word['y1'], $tilt);
 
-        return new OcrWord($word['text'], $word['confidence'], $x0, $y0, $x1, $y1, $tilt, $symbols);
+        return new OcrWord($word['text'], $word['confidence'], $x0, $y0, $x1, $y1, $tilt, $symbols, spaced: $word['spaced']);
     }
 
     /**

@@ -66,7 +66,19 @@ final class OcrScanConfirmation
         return $result;
     }
 
-    private function link(string $scanId, string $submissionId, string $reviewerId): void
+    /**
+     * Link a scan to the response its OWN SENDER submitted from the public link (M166, `D116`): the guest checked
+     * what was read and pressed Submit, and `GuestSubmissionController` saved it through the guest path with this
+     * scan's id as the idempotency key. The same link as a staff save, with no reviewer — `confirmed_by` stays null
+     * and the response's `source` (`guest`) says who confirmed it. A staff save that got there first wins, and
+     * this returns without moving anything.
+     */
+    public function linkFromGuest(string $scanId, string $submissionId): void
+    {
+        $this->link($scanId, $submissionId, null);
+    }
+
+    private function link(string $scanId, string $submissionId, ?string $reviewerId): void
     {
         DB::transaction(static function () use ($scanId, $submissionId, $reviewerId): void {
             $scan = OcrScan::query()->whereKey($scanId)->lockForUpdate()->firstOrFail();

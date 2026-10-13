@@ -71,6 +71,21 @@ final class OcrException extends RuntimeException
         return new self(429, 'paper_upload_limit_reached', 'This form has received as many paper copies as it can take today. Please try again tomorrow.');
     }
 
+    /**
+     * A paper token (M166, `D116`) that is forged, for another form, or names no guest scan here. One answer for all of
+     * them: a stranger probing tokens learns nothing about which part failed.
+     */
+    public static function paperTokenInvalid(): self
+    {
+        return new self(403, 'paper_token_invalid', 'This paper copy cannot be opened from here. Please send it again.');
+    }
+
+    /** A paper token past its lifetime (`guest.paper_token.ttl`). */
+    public static function paperTokenExpired(): self
+    {
+        return new self(403, 'paper_token_expired', 'This paper copy was sent too long ago to be checked here. Our staff will check it for you.');
+    }
+
     public static function pdfNotAlone(): self
     {
         return new self(422, 'ocr_pdf_not_alone', 'Upload a PDF scan on its own. Photos of one form can be uploaded together, one photo per page.');

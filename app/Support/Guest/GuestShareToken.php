@@ -16,6 +16,8 @@ namespace App\Support\Guest;
  * `submissionId` is populated ONLY for a resume token (Increment H9b) — the durable variant additionally
  * scoped to one draft `submissions.id`, minted by {@see GuestShareTokenService::mintResume()} and returned
  * by {@see GuestShareTokenService::verifyResume()}. It is null for an ordinary share token.
+ * `scanId` is populated ONLY for a paper token (M166, `D116`) — the uploader's handle on the one `ocr_scans` row
+ * they sent from the public link ({@see GuestShareTokenService::mintPaper()}).
  */
 final readonly class GuestShareToken
 {
@@ -26,5 +28,6 @@ final readonly class GuestShareToken
         public int $expiresAt,
         public string $rawToken,
         public ?string $submissionId = null,
+        public ?string $scanId = null,
     ) {}
 }

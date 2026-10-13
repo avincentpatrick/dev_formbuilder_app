@@ -39,6 +39,9 @@ final class GuestSubmissionRequest extends FormRequest
             // overwrite another device's answers AND finalize the row in one request — the same defect as on
             // the draft channel, but terminal, since no later save can undo a promotion.
             'base_content_checksum' => ['nullable', 'string', 'size:64'],
+            // M166 (`D116`): the paper token of a filled paper copy whose read answers the guest checked. Verified by the
+            // controller, which then uses the scan's id as this response's idempotency key and links the scan to it.
+            'paper_token' => ['nullable', 'string', 'max:2048'],
         ];
     }
 
@@ -101,6 +104,14 @@ final class GuestSubmissionRequest extends FormRequest
     public function guestContactEmail(): ?string
     {
         $value = $this->input('guest_contact_email');
+
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /** M166: the paper token of a sent paper copy whose read answers this guest checked, or null. */
+    public function paperToken(): ?string
+    {
+        $value = $this->input('paper_token');
 
         return is_string($value) && $value !== '' ? $value : null;
     }

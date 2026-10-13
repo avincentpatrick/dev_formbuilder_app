@@ -20,6 +20,7 @@ use App\Services\Entitlements\EntitlementService;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
 use App\Services\Settings\TenantSettingRegistry;
+use App\Support\Guest\GuestShareTokenService;
 use App\Support\Submissions\SubmissionReference;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
@@ -142,19 +143,22 @@ function paperCopyScans(string $tenantId, string $userId): int
 
 // ── The happy path ─────────────────────────────────────────────────────────────────────────────
 
-it('takes a filled paper copy with no uploader, marks it as from the public link, and answers only a reference', function (): void {
+it('takes a filled paper copy with no uploader, marks it as from the public link, and answers a reference and a paper token for its sender', function (): void {
     $response = paperCopyPost($this, $this->token, [paperCopyPng('one.png'), paperCopyPng('two.png')])->assertStatus(202);
 
-    // Nothing that was read, and not even the scan's id: a reference to quote, in the format a response's has.
+    // Nothing that was read, and not the scan's id in the clear: a reference to quote, in the format a response's has, and
+    // (M166, `D116`) the signed paper token with which only this page can wait for the reading and check it.
     $reference = $response->json('data.reference');
-    expect($response->json())->toBe(['data' => ['reference' => $reference]])
+    $paper = $response->json('data.paper_token');
+    expect(array_keys($response->json('data')))->toBe(['reference', 'paper_token'])
         ->and($reference)->toMatch('/^[0-9A-Z]{4}-[0-9A-Z]{4}$/');
 
     enterTenant($this->tenant->id, $this->owner->id);
     $scan = OcrScan::query()->sole();
     $pages = Attachment::query()->whereIn('id', array_column($scan->pages, 'attachment_id'))->get();
 
-    expect($scan->source)->toBe(OcrScanSource::Guest)
+    expect(app(GuestShareTokenService::class)->verifyPaper((string) $paper)->scanId)->toBe($scan->id)
+        ->and($scan->source)->toBe(OcrScanSource::Guest)
         ->and($scan->uploaded_by)->toBeNull()
         ->and($scan->reference)->toBe(SubmissionReference::normalize($reference))
         ->and($scan->status)->toBe(OcrScanStatus::Queued)

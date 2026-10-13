@@ -64,6 +64,10 @@ Files: `app/Support/Guest/GuestShareTokenService.php`, `app/Support/Guest/GuestS
 `resources/public-runtime/__tests__/paper-notes.test.ts` (new), `resources/public-runtime/__tests__/api-client-challenge.test.ts`,
 `resources/public-runtime/__tests__/api-client.test.ts`, `resources/public-runtime/__tests__/components.test.ts`,
 `resources/public-runtime/__tests__/sw.test.ts`, `tests/e2e/ocr-guest-upload.spec.ts`, `tests/e2e/support/axe.ts` (a citation).
+**Extension 1 (2026-10-13), and a deviation recorded:** `app/Exceptions/Ocr/OcrException.php` (the two paper-token refusals) —
+⚠️ edited BEFORE this extension was pushed, the shape `M165`'s extension 1 recorded the day before; caught at the next file list. Also
+taken: `tests/Unit/Guest/GuestShareTokenServiceTest.php` (the paper token's mint and verify cases). `config/guest.php` gains only the
+token's lifetime: the poll reuses the `guest-content-image` limiter, so `AppServiceProvider.php` stays untouched.
 Shared artefacts taken: `openapi.json`, `docs/ocr-pipeline-design.md`, `docs/security-threat-model.md`, `docs/data-dictionary.md`,
 `docs/feature-backlog.md`, `PROGRESS.md` (own block), `docs/pipeline.md`.
 Paired files taken: `openapi.json` with `routes/api.php`.

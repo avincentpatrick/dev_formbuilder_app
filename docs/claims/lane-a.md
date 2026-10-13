@@ -24,6 +24,21 @@ then stops — nothing merges until the user lifts the freeze. Branch `m169-ocr-
 "DE GUZMAN JR ." and an address "STA MESA"." Named as `M169` by `M168`'s close-out. At the session's start the user confirmed
 `M168` on staging ("Yes, it works": the paper on the left, 50/50, on the guest check and the staff review/edit); nothing is owed.
 
+**BUILT — PR #362, CI 6/6 green with real step counts (run 38419380144 at `b52d6d64`: Static analysis 32 · E2E 20 · Contract 16 ·
+Frontend 12 · Pest 11 · axe 11; the only skips are the failure-only report upload and the two main-only staging-header steps) — AND
+NOT MERGED: held by the user's testing freeze.** The branch already carries the row's closure, the status bullet and the regenerated
+line and hand-off. A merge needs the user's word and a fresh staging backup first; then the release below this heading, the gate
+baselines from the post-merge run, and nothing else. Measured against the prediction, before the release is written:
+- Red first exactly as predicted: 5 red (the two parser cases, the three spacing cases), 193 green on the fixture alone; 198 green after.
+- Mutants, all CAUGHT: `OcrLine` always a space 3 (as predicted); the parser ignoring breaks **4, not 5** — the sideways case is built
+  by the typesetter and never meets the parser, my miss; the paragraph guard 1; the break off the first character 7 (the parser case,
+  both Vision-path spacing cases, three bake-off cases, the reading job); `rotate()` 1; `upright()` 1.
+- Round 1 offline: **50 → 48, not 49** (29 → 27 with ink), 0 silent — `BAHALA KA JAN!!!` turned right too; my census counted only
+  `.` `,` `@`. With ink Round 1 now sits at 15.0%, one field short of G9's "under 15%".
+- **Most likely wrong, and it was not:** no test builds Vision's JSON by hand with words to join; every one goes through the typesetter.
+- Host PHPStan 0 (the container's 44 are the recorded model-property phantoms, none in the four files); Pint passed;
+  `preflight --with-gates --with-pint` OK.
+
 ### Evidence verified
 - "`OcrAnswerReader` joins Vision's words with spaces" — held, and moved: the WORD join is `OcrLine::text()`, which `ruled()` (the
   `line` and `ruled` areas) and `blankOrUnreadable()` call; `ruled()` itself joins the LINES.

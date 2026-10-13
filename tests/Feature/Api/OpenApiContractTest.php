@@ -52,6 +52,9 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         '/public/choice-lists/{shareToken}/{version}',
         // M165 — a filled paper copy, uploaded from the public link for staff to check (`D106`).
         '/public/f/{shareToken}/scans',
+        // M166 — its sender reads it back with the paper token, off the schema cache's prefix (`D116`).
+        '/public/paper/{shareToken}/{paperToken}',
+        '/public/paper/{shareToken}/{paperToken}/pages/{page}',
         '/submissions/{submission}/promote',
         // Increment G8b — the authenticated offline-sync surface.
         '/sync/manifest',
@@ -148,7 +151,10 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         // M165: a paper copy is sent on the share token too, and answers nothing but a reference.
         ->and($spec['paths']['/public/f/{shareToken}/scans']['post']['security'])->toBe([])
         ->and(array_keys($spec['paths']['/public/f/{shareToken}/scans']['post']['responses']['202']['content']['application/json']['schema']['properties']['data']['properties']))
-        ->toBe(['reference']);
+        ->toBe(['reference', 'paper_token'])
+        // M166: the read-back is reached with the paper token in its path, never a bearer.
+        ->and($spec['paths']['/public/paper/{shareToken}/{paperToken}']['get']['security'])->toBe([])
+        ->and($spec['paths']['/public/paper/{shareToken}/{paperToken}/pages/{page}']['get']['security'])->toBe([]);
 });
 
 it('keeps the published event_types enum in step with DomainEventType', function (): void {

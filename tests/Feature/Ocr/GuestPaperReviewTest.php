@@ -229,7 +229,7 @@ it('lets a staff save that came first win, and tells the guest so rather than ma
     $this->postJson("http://acme.meridian.test/api/v1/public/f/{$this->token}/submissions", [
         'answers' => ['full_name' => 'Ada King'],
         'paper_token' => $paper,
-    ])->assertStatus(409);
+    ])->assertStatus(409)->assertJsonPath('error.code', 'submission_uuid_claimed');
 
     enterTenant($this->tenant->id, $this->owner->id);
     expect(Submission::query()->count())->toBe(1)

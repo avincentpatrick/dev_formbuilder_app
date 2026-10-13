@@ -1875,3 +1875,86 @@ describe('RuntimeSession — the destination after the thank-you (M130, D76)', (
         wrapper.unmount();
     });
 });
+
+/*
+ * M166 (`D116`) — a session opened on a filled paper copy as it was read: its sender sees a note under each question the
+ * reader was unsure of, the upload and "Save and finish later" are gone, and Submit carries the paper token straight to
+ * the server — online only, because no queued row can carry the token.
+ */
+describe('RuntimeSession — a paper copy its sender is checking (M166)', () => {
+    const PAPER = {
+        token: 'paper-token-1',
+        fields: {
+            name: { state: 'read', tier: 'review', confidence: 78, text: 'Ada', page: 1, carried: true, reason: null, ticks: false, inked: false },
+            age: { state: 'unreadable', tier: null, confidence: null, text: null, page: 1, carried: false, reason: null, ticks: false, inked: false },
+        },
+        pages: [{ number: 1, url: '/api/v1/public/paper/t1/paper-token-1/pages/1', mime: 'image/png', servable: true }],
+    };
+
+    function paperSchema() {
+        const schema = schemaResponse({
+            fields: [field({ key: 'name', label: 'Full name' }), field({ key: 'age', label: 'Age' })],
+            form: { save_and_resume: true },
+        });
+        schema.form.paper_upload = { max_pages: 5, accepted_types: ['image/png'], max_bytes_per_file: 7_000_000, max_bytes_per_scan: 25_000_000 };
+
+        return schema;
+    }
+
+    it('notes each unsure question under it, and offers neither the upload nor a save for later', () => {
+        const wrapper = mount(RuntimeSession, {
+            props: { schema: paperSchema(), bootstrap, client: fakeClient(), initialAnswers: { name: 'Ada' }, paperReview: PAPER },
+        });
+
+        const notes = wrapper.findAll('[data-paper-note]').map((note) => note.text());
+        expect(notes).toEqual(['Please check this answer. We may have read it wrong.', 'We could not read this answer. Please fill it in.']);
+        expect(wrapper.find('[data-paper-review]').exists()).toBe(true);
+        expect(wrapper.find('[data-paper-copy]').exists()).toBe(false);
+        expect(wrapper.text()).not.toContain('Save and finish later');
+
+        // The control: the same form without a review offers the upload and carries no note.
+        const plain = mount(RuntimeSession, { props: { schema: paperSchema(), bootstrap, client: fakeClient() } });
+        expect(plain.find('[data-paper-copy]').exists()).toBe(true);
+        expect(plain.find('[data-paper-note]').exists()).toBe(false);
+    });
+
+    it('submits the checked answers with the paper token, straight to the server', async () => {
+        const client = fakeClient();
+        const wrapper = mount(RuntimeSession, {
+            props: { schema: paperSchema(), bootstrap, client, initialAnswers: { name: 'Ada' }, paperReview: PAPER },
+        });
+
+        await wrapper.find('form').trigger('submit');
+        await settle();
+
+        expect(client.submit).toHaveBeenCalledWith(expect.objectContaining({ answers: { name: 'Ada' }, paperToken: 'paper-token-1' }));
+        expect(wrapper.emitted('submitted')?.[0]?.[0]).toBe(SUBMISSION_ID);
+        expect(wrapper.emitted('queued')).toBeUndefined();
+    });
+
+    it('says so and waits when offline, and tells the sender when staff entered the copy first', async () => {
+        const onLine = vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+        const client = fakeClient();
+        const offline = mount(RuntimeSession, {
+            props: { schema: paperSchema(), bootstrap, client, initialAnswers: { name: 'Ada' }, paperReview: PAPER },
+        });
+        await offline.find('form').trigger('submit');
+        await settle();
+        expect(client.submit).not.toHaveBeenCalled();
+        expect(offline.text()).toContain('Connect to the internet to submit your checked answers.');
+        expect(offline.emitted('queued')).toBeUndefined();
+        onLine.mockRestore();
+
+        const claimed = fakeClient({
+            submit: vi.fn(async () => {
+                throw new ApiError(normalizeError(409, { error: { code: 'submission_uuid_claimed', message: 'claimed' } }, null));
+            }),
+        });
+        const wrapper = mount(RuntimeSession, {
+            props: { schema: paperSchema(), bootstrap, client: claimed, initialAnswers: { name: 'Ada' }, paperReview: PAPER },
+        });
+        await wrapper.find('form').trigger('submit');
+        await settle();
+        expect(wrapper.text()).toContain('Our staff have already entered this paper copy');
+    });
+});

@@ -10,6 +10,7 @@
  */
 import { computed, inject, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
 import { MdsBanner } from '@meridian/design-system';
+import ScanPages from '@/components/ocr/ScanPages.vue';
 import RuntimeShell from './RuntimeShell.vue';
 import PageView from './PageView.vue';
 import StepView from './StepView.vue';
@@ -23,6 +24,7 @@ import {
     AnnouncerKey,
     DbKey,
     DraftFlowKey,
+    PaperNotesKey,
     RespondentSessionKey,
     RuntimeKey,
     SubmitFlowKey,
@@ -45,7 +47,8 @@ import { getDeviceId } from '../lib/device';
 import { touchRespondentSession } from '../lib/respondent-session';
 import { APP_VERSION } from '../lib/app-version';
 import type { ApiClient } from '../lib/api-client';
-import type { AnswerMap, Bootstrap, ScheduleAcceptance, SchemaResponse, SubmitRedirect } from '../lib/types';
+import type { AnswerMap, Bootstrap, PaperReview, ScheduleAcceptance, SchemaResponse, SubmitRedirect } from '../lib/types';
+import { paperNotes } from '../lib/paper-notes';
 
 const props = defineProps<{
     schema: SchemaResponse;
@@ -86,6 +89,12 @@ const props = defineProps<{
     /** Increment H21a — the session clock `today()`/`now()` evaluate against, in PHP's exact ISO-8601 shape.
      *  Threaded from App.vue for the same reason `search` is (Doc #27 §3.4). */
     now?: string | null;
+    /**
+     * M166 (`D116`) — this session shows a filled paper copy as it was read, for its sender to check and submit. Its
+     * Submit carries the paper token and goes straight to the server: autosave, the server draft, the offline outbox and
+     * the upload are all off, because none of them can carry the token.
+     */
+    paperReview?: PaperReview | null;
 }>();
 
 const emit = defineEmits<{
@@ -110,7 +119,7 @@ const emit = defineEmits<{
     // Increment H12b — a submit rejected because the form closed / filled mid-fill; App shows the full-screen state.
     unavailable: [acceptance: ScheduleAcceptance];
     // M165 (`D106`) — a filled paper copy was sent instead of answering here; App shows the thank-you with its reference.
-    'paper-received': [reference: string];
+    'paper-received': [reference: string, paperToken: string];
 }>();
 
 const runtime = createFormRuntime(props.schema, {
@@ -170,7 +179,7 @@ const autosave = createAutosave({
     // Increment M124 — the BLOCK, never a page of it: what a saved draft records (`resumeStepKey`).
     currentStepKey: runtime.resumeStepKey,
     // A conflict-review session must not autosave — the durable copy is the parked outbox row (Increment G8c).
-    enabled: !props.resolving,
+    enabled: !props.resolving && !props.paperReview,
     // Increment M21 — the visit `respondentSessionId` reads, so an abandoned draft is never restored into the next
     // respondent's form. `undefined` (a bare test mount, where the inject falls back to null) keeps the
     // pre-M21 unscoped behaviour, which is M15's convention for this argument throughout the runtime.
@@ -418,10 +427,70 @@ async function handleSubmitError(error: unknown, uuid: string): Promise<SubmitOu
     return 'queued';
 }
 
+/**
+ * M166 (`D116`) — the Submit of a paper copy its sender checked. Straight to the server with the paper token, never through
+ * the outbox: a queued row cannot carry the token, so a replay would save the answers without the scan, and staff would
+ * key the same paper again. Offline it says so and waits.
+ */
+async function submitPaperReview(paperToken: string): Promise<SubmitOutcome> {
+    if (!online.value) {
+        notice.value = { type: 'error', message: 'Connect to the internet to submit your checked answers.' };
+        return 'blocked';
+    }
+
+    submitting.value = true;
+    notice.value = null;
+    try {
+        const result = await props.client.submit({
+            answers: runtime.effectiveAnswers.value,
+            clientSubmissionUuid: runtime.clientSubmissionUuid,
+            locale: runtime.locale.value,
+            deviceId,
+            appVersion: APP_VERSION,
+            paperToken,
+        });
+        emit('submitted', result.id, result.reference, authoredConfirmation(), result.redirect ?? null);
+        return 'success';
+    } catch (error) {
+        if (!(error instanceof ApiError)) {
+            notice.value = { type: 'error', message: 'We could not reach the server. Check your connection and press Submit again.' };
+            return 'blocked';
+        }
+        const normalized = error.normalized;
+        if (normalized.kind === 'field') {
+            runtime.setServerErrors(normalized.fieldErrors);
+            runtime.markSubmitAttempted();
+            return 'field-errors';
+        }
+        if (normalized.kind === 'refresh') {
+            void handleDrift();
+            return 'blocked';
+        }
+        if (normalized.kind === 'schedule') {
+            emit('unavailable', acceptanceForReasonCode(normalized.code) ?? 'closed');
+            return 'blocked';
+        }
+        notice.value = {
+            type: normalized.kind === 'rate_limited' ? 'rate-limited' : 'error',
+            message:
+                normalized.kind === 'uuid_claimed'
+                    ? 'Our staff have already entered this paper copy, so there is nothing more to submit. Thank you.'
+                    : normalized.message,
+        };
+        return 'blocked';
+    } finally {
+        submitting.value = false;
+    }
+}
+
 async function submit(): Promise<SubmitOutcome> {
     runtime.markSubmitAttempted();
     if (!runtime.passed.value) {
         return 'field-errors';
+    }
+
+    if (props.paperReview) {
+        return await submitPaperReview(props.paperReview.token);
     }
 
     // Increment H12b — fail CLOSED offline for a scheduled/capped form. Its `acceptance` was computed
@@ -608,8 +677,12 @@ async function saveDraftAction(options: { email?: string | null; finishLater: bo
     }
 }
 
-if (props.schema.form.save_and_resume && !props.resolving) {
+if (props.schema.form.save_and_resume && !props.resolving && !props.paperReview) {
     provide(DraftFlowKey, { saving: draftSaving, completeness: draftCompleteness, saveDraft: saveDraftAction });
+}
+
+if (props.paperReview) {
+    provide(PaperNotesKey, paperNotes(props.paperReview.fields));
 }
 
 const title = computed(() => runtime.renderModel.form.title);
@@ -655,14 +728,28 @@ const description = computed(() => runtime.renderModel.form.description);
             >
                 Discard this response instead
             </button>
-            <!-- M165: never while a parked response is being reviewed — that respondent is finishing an answer. -->
+            <!-- M165: never while a parked response is being reviewed — that respondent is finishing an answer — and never on
+                 the paper copy being checked (M166). -->
             <PaperCopyUpload
-                v-if="schema.form.paper_upload && !resolving"
+                v-if="schema.form.paper_upload && !resolving && !paperReview"
                 :limits="schema.form.paper_upload"
                 :client="client"
                 :online="online"
-                @received="(reference) => emit('paper-received', reference)"
+                @received="(reference, paperToken) => emit('paper-received', reference, paperToken)"
             />
+            <!-- M166 (`D116`): the sender checks what their paper was read as. A standing condition, so a Banner. -->
+            <template v-if="paperReview">
+                <MdsBanner
+                    tone="info"
+                    icon="info"
+                    message="We filled in the form from your paper copy. Check every answer, especially those with a note, correct anything that is wrong, then press Submit."
+                    data-paper-review
+                />
+                <details v-if="paperReview.pages.length > 0" class="session-paper">
+                    <summary class="session-paper__summary">Show your scanned pages</summary>
+                    <ScanPages :pages="paperReview.pages" title="Your scanned pages" />
+                </details>
+            </template>
         </template>
         <PageView v-if="runtime.singlePageMode" />
         <StepView v-else />
@@ -704,6 +791,25 @@ const description = computed(() => runtime.renderModel.form.description);
     font-size: var(--mds-type-body-sm-font-size, var(--mds-type-caption-font-size));
     text-decoration: underline;
     cursor: pointer;
+}
+
+.session-paper {
+    border: 1px solid var(--mds-color-border-default);
+    border-radius: var(--mds-radius-md);
+    background-color: var(--mds-color-bg-surface);
+    padding: var(--mds-space-3) var(--mds-space-4);
+}
+
+.session-paper__summary {
+    cursor: pointer;
+    font-family: var(--mds-font-family-body);
+    font-weight: var(--mds-type-label-font-weight);
+    color: var(--mds-color-text-body);
+}
+
+.session-paper__summary:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 2px;
 }
 
 .session-notice__discard:hover {

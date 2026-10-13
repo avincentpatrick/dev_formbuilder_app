@@ -3206,8 +3206,8 @@
         "/public/f/{shareToken}/scans": {
             "post": {
                 "operationId": "v1.public.scans.store",
-                "description": "The pages are read automatically and wait in the form's scans list until a staff member reviews and saves\nthem as a response. The answer carries only a reference to quote: nothing that was read is ever sent back.\nThe token's version is not checked against the current one, because the paper names its own version and\npaper printed before a republish is still a valid copy.",
-                "summary": "Upload a filled paper copy of the form \u2014 photos or a scan of its printed pages \u2014 for staff to check",
+                "description": "The pages are read automatically. The answer carries a reference to quote and a short-lived `paper_token`: with\nit the sender's page waits for the reading, shows them the form filled in as read, and submits their corrections\nas their own response; without it, the scan waits in the form's scans list for a staff member, as before. The\ntoken's version is not checked against the current one, because the paper names its own version and paper\nprinted before a republish is still a valid copy.",
+                "summary": "Upload a filled paper copy of the form \u2014 photos or a scan of its printed pages",
                 "tags": [
                     "GuestAttachment"
                 ],
@@ -3244,10 +3244,14 @@
                                             "properties": {
                                                 "reference": {
                                                     "type": "string"
+                                                },
+                                                "paper_token": {
+                                                    "type": "string"
                                                 }
                                             },
                                             "required": [
-                                                "reference"
+                                                "reference",
+                                                "paper_token"
                                             ]
                                         }
                                     },
@@ -3289,6 +3293,201 @@
                                     "required": [
                                         "error"
                                     ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
+        "/public/paper/{shareToken}/{paperToken}": {
+            "get": {
+                "operationId": "v1.public.paper.show",
+                "summary": "Where a sent paper copy stands: still being read, unreadable, already submitted, or read \u2014 with the form's\nanswers as read, a note on each the reader was unsure of, and the scanned pages",
+                "tags": [
+                    "GuestAttachment"
+                ],
+                "parameters": [
+                    {
+                        "name": "shareToken",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "paperToken",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "status": {
+                                                            "type": "string",
+                                                            "const": "read"
+                                                        },
+                                                        "version_id": {
+                                                            "type": "string"
+                                                        },
+                                                        "answers": {
+                                                            "type": "string",
+                                                            "description": "The form's answers as read, by question key; always an object, never a list."
+                                                        },
+                                                        "fields": {
+                                                            "type": "string"
+                                                        },
+                                                        "pages": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                    "number": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "url": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "mime": {
+                                                                        "anyOf": [
+                                                                            {
+                                                                                "type": "string"
+                                                                            },
+                                                                            {
+                                                                                "type": "string",
+                                                                                "enum": [
+                                                                                    "application/octet-stream"
+                                                                                ]
+                                                                            }
+                                                                        ]
+                                                                    },
+                                                                    "servable": {
+                                                                        "type": "string"
+                                                                    }
+                                                                },
+                                                                "required": [
+                                                                    "number",
+                                                                    "url",
+                                                                    "mime",
+                                                                    "servable"
+                                                                ]
+                                                            }
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "status",
+                                                        "version_id",
+                                                        "answers",
+                                                        "fields",
+                                                        "pages"
+                                                    ]
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "status": {
+                                                            "type": "string",
+                                                            "const": "reading"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "status"
+                                                    ]
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "status": {
+                                                            "type": "string",
+                                                            "const": "failed"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "status"
+                                                    ]
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "status": {
+                                                            "type": "string",
+                                                            "const": "submitted"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "status"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
+        "/public/paper/{shareToken}/{paperToken}/pages/{page}": {
+            "get": {
+                "operationId": "v1.public.paper.page",
+                "summary": "One page of a sent paper copy, while its sender is checking it",
+                "tags": [
+                    "GuestAttachment"
+                ],
+                "parameters": [
+                    {
+                        "name": "shareToken",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "paperToken",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
                                 }
                             }
                         }
@@ -6806,6 +7005,14 @@
                         "description": "Increment P3a \u2014 the lost-update baseline, carried on SUBMIT because a submit against an\nexisting draft performs a draft SAVE first (see GuestSubmissionController: capture final edits,\nthen promote). That save is a whole-document replace, so without this a stale device could\noverwrite another device's answers AND finalize the row in one request \u2014 the same defect as on\nthe draft channel, but terminal, since no later save can undo a promotion.",
                         "minLength": 64,
                         "maxLength": 64
+                    },
+                    "paper_token": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "The `paper_token` a paper-copy upload returned, when these are that copy's answers as read and checked by its\nsender. The response is then saved as that copy's: one copy makes at most one response.",
+                        "maxLength": 2048
                     }
                 },
                 "required": [

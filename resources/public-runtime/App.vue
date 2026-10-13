@@ -33,13 +33,16 @@ import { ApiError } from './lib/error-normalizer';
 import { deriveReference } from './lib/reference-number';
 import { formatInstantInZone, scheduleStateCopy, type ScheduleStateCopy } from './lib/schedule';
 import { isoClock } from './lib/schema-mapping';
-import type { AnswerMap, Bootstrap, ScheduleAcceptance, ScheduleBlock, SchemaResponse, SubmitRedirect } from './lib/types';
+import type { AnswerMap, Bootstrap, PaperFieldMeta, PaperPage, PaperReview, ScheduleAcceptance, ScheduleBlock, SchemaResponse, SubmitRedirect } from './lib/types';
+// M166 — below the other imports on purpose: `App.vue:29-31` is cited by line, and an import above would move it.
+import PaperReading from './components/PaperReading.vue';
 
 const props = defineProps<{ bootstrap: Bootstrap }>();
 
 // 'unavailable' = a scheduled form the runtime refuses to render for filling (opens-soon / closed / full),
 // computed from the server-side `acceptance` label (Increment H12b). It REPLACES the form.
-type Phase = 'loading' | 'ready' | 'confirmation' | 'error' | 'unavailable';
+// 'reading' = a sent paper copy being read, before its sender checks it (M166, `D116`). It REPLACES the form too.
+type Phase = 'loading' | 'ready' | 'reading' | 'confirmation' | 'error' | 'unavailable';
 
 const CONFIRM_MESSAGE = 'Thanks — your response has been recorded.';
 const QUEUED_MESSAGE = "Saved on this device — we'll submit it automatically when you're back online.";
@@ -339,6 +342,8 @@ async function loadResume(resumeToken: string): Promise<void> {
 }
 
 function onSubmitted(id: string, submittedReference: string, authored: string | null = null, redirect: SubmitRedirect | null = null): void {
+    // M166 — a checked paper copy is now a response like any other; nothing of the review outlives it.
+    paperReview.value = null;
     // Increment G8c — a resolved conflict: drop the parked row now that its reviewed answers are recorded.
     const resolved = resolvingUuid.value !== null;
     if (resolved) {
@@ -361,12 +366,38 @@ function onSubmitted(id: string, submittedReference: string, authored: string | 
 
 // M165 (`R-7173c02c`, `D106`) — a filled paper copy was sent instead of an answer. The user's words for what the
 // respondent is told, with the server's reference and nowhere to go next: the response does not exist until staff save it.
-function onPaperReceived(paperReference: string): void {
-    reference.value = paperReference;
+function onPaperLeave(): void {
+    reference.value = paperReference.value;
     queueTag.value = null;
     redirectTarget.value = null;
     confirmationMessage.value = PAPER_RECEIVED_MESSAGE;
+    paperReview.value = null;
     phase.value = 'confirmation';
+}
+
+// M166 (`D116`) — the copy was sent: wait for its reading, then reopen the form filled in with what was read, for its sender
+// to check and submit. Leaving it for staff (`M165`'s whole flow, above) stays one button away throughout.
+const paperReference = ref<string | null>(null);
+const paperToken = ref<string | null>(null);
+const paperReview = shallowRef<PaperReview | null>(null);
+
+function onPaperReceived(sentReference: string, sentPaperToken: string): void {
+    paperReference.value = sentReference;
+    paperToken.value = sentPaperToken;
+    phase.value = 'reading';
+}
+
+function onPaperRead(result: { answers: AnswerMap; fields: Record<string, PaperFieldMeta>; pages: PaperPage[] }): void {
+    retainedAnswers.value = result.answers;
+    paperReview.value = { token: paperToken.value ?? '', fields: result.fields, pages: result.pages };
+    sessionKey.value += 1;
+    phase.value = 'ready';
+}
+
+function onPaperFillByHand(): void {
+    paperReview.value = null;
+    sessionKey.value += 1;
+    phase.value = 'ready';
 }
 
 // Increment G8b — an offline (or dropped-mid-submit) finalize: the answers are safely queued, so show a
@@ -590,6 +621,14 @@ function onRestart(): void {
             @leave="rotateRespondentSession"
             @restart="onRestart"
         />
+        <PaperReading
+            v-else-if="phase === 'reading' && paperToken"
+            :client="client"
+            :paper-token="paperToken"
+            @read="onPaperRead"
+            @fill-by-hand="onPaperFillByHand"
+            @leave="onPaperLeave"
+        />
         <RuntimeSession
             v-else-if="schema"
             :key="sessionKey"
@@ -603,6 +642,7 @@ function onRestart(): void {
             :resume="resumeSeed"
             :search="initialSearch"
             :now="sessionNow"
+            :paper-review="paperReview"
             @submitted="onSubmitted"
             @queued="onQueued"
             @reschema="onReschema"

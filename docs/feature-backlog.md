@@ -1102,10 +1102,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   mechanism in one component**, and shipping them apart would have written the same fold twice. Every
   `file:line` in both rows verified against the code first; all true in substance, three carrying line drift
   (the classifier's 409 arm is `error-normalizer.ts:101-103`, not `:93`, which is a comment inside the I8b
-  `challenge` block; the submit fold is `handleSubmitError()` at `RuntimeSession.vue:172-205`, not the
+  `challenge` block; the submit fold is `handleSubmitError()` in `RuntimeSession.vue`, not the
   `:275-282` call site).
   ⚠️ **THE ROWS NAME TWO FOLD SITES AND A SWEEP OF `resources/public-runtime/` FOUND TWELVE** — nine on the
-  409 path (`error-normalizer.ts:101` · `RuntimeSession.vue:160/182/354` · `replay.ts:223/291` ·
+  409 path (`error-normalizer.ts:101` · `RuntimeSession.vue` (three sites) · `replay.ts:223/291` ·
   `App.vue` · `outbox-status.ts:130` · `outbox.ts:160`) plus three consumers. **Grepping the shape rather
   than trusting the row's count is six-for-six** (M8, M9, M11, M12, M13, M14).
   **As built:** the classifier reads `error.code` on a 409 exactly as it has read it on a 403 since I8b, and
@@ -7599,7 +7599,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   PATH WRITES THE CHANNEL.** The only `SubmissionSource::` writers under `app/` are
   `app/Http/Controllers/Api/V1/SyncSubmissionController.php:140`,
   `app/Http/Controllers/Public/GuestDraftController.php:93`,
-  `app/Http/Controllers/Public/GuestSubmissionController.php:170`,
+  `app/Http/Controllers/Public/GuestSubmissionController.php` (`payload()`),
   `app/Http/Controllers/Tenant/SubmissionController.php:117` and
   `app/Http/Controllers/Tenant/SubmissionDraftController.php:97` — never `ApiImport`. ⚠️ **Scope that
   precisely, because the pipeline DOES accept the value**: `database/seeders/DemoSeeder.php` and
@@ -12210,7 +12210,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M123` (2026-10-02) — `minor` · `ExpressionException` escapes four single-response submission paths, which answer a generic 422
   with no field and no code a client can branch on.** Found 2026-09-28 by `M117` beside the `major` it closed.
-  The batch loop is fixed; these are not. `GuestSubmissionController.php:114` has **zero `catch` statements in
+  The batch loop is fixed; these are not. `GuestSubmissionController::store()` has **zero `catch` statements in
   the whole file** — and it is the path `replay.ts` actually uses; `Tenant/SubmissionController.php:133` guards
   only the draft race at `:143-145`; `SubmissionDraftController.php:108-129` catches three of the same four
   submission exceptions and misses the expression types identically; and

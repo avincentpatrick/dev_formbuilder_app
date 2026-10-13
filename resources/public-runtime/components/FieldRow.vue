@@ -11,7 +11,7 @@ import { announcementFor } from '@/components/submissions/note-content';
 import { Coercion, type EngineValue } from '../engine';
 import FieldControl from './FieldControl.vue';
 import RelevanceNote from './RelevanceNote.vue';
-import { useAnnouncer, useRuntime } from '../composables/context';
+import { useAnnouncer, usePaperNotes, useRuntime } from '../composables/context';
 import type { RenderField } from '../lib/types';
 
 const props = defineProps<{ field: RenderField }>();
@@ -75,6 +75,11 @@ function rescueFocus(): void {
 function onFocusout(): void {
     runtime.markTouched(props.field.key);
 }
+
+// M166 (`D116`) — on a paper copy its sender is checking, what to look at in this question. Null in every other session.
+// At the end of the script on purpose: a line above moves `FieldRow.vue:61`, which the backlog cites.
+const paperNotes = usePaperNotes();
+const paperNote = computed(() => paperNotes?.[props.field.key] ?? null);
 </script>
 
 <template>
@@ -82,6 +87,9 @@ function onFocusout(): void {
         <Transition name="field-collapse">
             <FieldControl v-if="relevant" :field="field" />
         </Transition>
+        <p v-if="relevant && paperNote" class="field-row__paper" :class="`field-row__paper--${paperNote.kind}`" data-paper-note>
+            {{ paperNote.text }}
+        </p>
         <Transition name="field-collapse">
             <RelevanceNote v-if="showNote" :label="runtime.labelFor(field)" @dismiss="dismissNote" />
         </Transition>
@@ -91,6 +99,22 @@ function onFocusout(): void {
 <style scoped>
 .field-row {
     display: block;
+}
+
+/* M166 — a note from the reading of the guest's own paper, under the question it is about. The words carry the meaning; the edge
+   only draws the eye (`fill` the stronger of the two). */
+.field-row__paper {
+    margin: var(--mds-space-2) 0 0;
+    padding-left: var(--mds-space-3);
+    border-left: 4px solid var(--mds-color-status-warning-fg);
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+    color: var(--mds-color-text-body);
+}
+
+.field-row__paper--fill {
+    border-left-color: var(--mds-color-danger-text);
 }
 
 /* Smooth expand/collapse so surrounding content doesn't visibly jump (UX §4.1). */

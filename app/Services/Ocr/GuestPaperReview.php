@@ -104,7 +104,7 @@ final class GuestPaperReview
         return [
             'status' => 'read',
             'version_id' => $target->id,
-            // An object even when empty, so the page never reads a list where it expects answers by key.
+            // The form's answers as read, by question key; always an object, never a list.
             'answers' => (object) $carried['answers'],
             'fields' => (object) $carried['fields'],
             'pages' => $this->pages($scan, $share, $paperToken),

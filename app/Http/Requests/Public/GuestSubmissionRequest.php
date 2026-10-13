@@ -39,8 +39,8 @@ final class GuestSubmissionRequest extends FormRequest
             // overwrite another device's answers AND finalize the row in one request — the same defect as on
             // the draft channel, but terminal, since no later save can undo a promotion.
             'base_content_checksum' => ['nullable', 'string', 'size:64'],
-            // M166 (`D116`): the paper token of a filled paper copy whose read answers the guest checked. Verified by the
-            // controller, which then uses the scan's id as this response's idempotency key and links the scan to it.
+            // The `paper_token` a paper-copy upload returned, when these are that copy's answers as read and checked by its
+            // sender. The response is then saved as that copy's: one copy makes at most one response.
             'paper_token' => ['nullable', 'string', 'max:2048'],
         ];
     }

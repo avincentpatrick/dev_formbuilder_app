@@ -16,7 +16,61 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M165` is merged and live on staging (released below). The next claim is written here. Ask the user before every merge, and never merge while another session's deploy is in flight.
+## Status: ACTIVE CLAIM — `M166`, a guest checks and corrects what their paper copy was read as, then submits it as their own response (`R-309e4dfa`, `D116` A) (m166-guest-paper-review)
+
+Taken 2026-10-13. Branch `m166-guest-paper-review`, cut from origin/main at `c30c8031`, PR into main.
+Row: `R-309e4dfa` — *"A guest who sends a paper copy cannot check or correct what was read; staff must key every correction (`D116` A)."*
+The user asked it the morning `M165` went live and chose `D116` A in chat. The three claim-time questions have obvious answers and were
+decided here and told to the user: while the pages are read the guest sees a wait with "Leave it for our staff"; if reading fails or
+takes too long they may fill the form in by hand or leave it for staff (`M165`'s behaviour); an answer the scan could not read is blank and
+marked "please fill this in"; and the staff list shows the scan "Saved as a response", as after a staff save.
+
+### Evidence verified
+- `GuestAttachmentController::storePaperCopy()` answers only `{data:{reference}}` — **held** (`M165`).
+- `OcrScanConfirmation` saves a scan through `SubmissionPipeline` with the scan's id as the idempotency key, then `link()` re-points the
+  pages and writes `submission_id`/`confirmed_at`/`confirmed_by` — **held**; `link()` is private and takes a non-null reviewer id.
+- `RuntimeSession`'s `initialAnswers` seeds the guest runtime and skips the device draft — **held**.
+
+### Premise verified
+- **The read-to-answer logic is reusable — held:** `OcrAnswerCarry::carry()` is pure (two snapshots and the extraction in, answers and
+  per-field meta out); only the wording (`scan-review.ts`) speaks to a reviewer, so the guest gets its own wording.
+- **A guest has no credential to read a scan back — a new capability is owed.** The reference is a display handle, never a key
+  (`SubmissionReferenceDisclosureTest`); the guest gets a signed, short-lived paper token from the upload, scoped to that scan.
+- **Offline submit cannot carry it:** the outbox row holds no paper token and `replay.ts` would drop it, so paper review submits online only.
+- **Staff can save the same scan at the same time:** the pipeline's per-uuid claim already makes the first save win (`uuid_claimed`); the
+  guest is told plainly. `link()` already returns early once a scan is linked.
+- **`M165` moved lines other files cite, and the citation lint cannot see it:** `docs/feature-backlog.md` cites `RuntimeSession.vue:160`
+  and `:172-205` and `tests/e2e/support/axe.ts` cites `public-runtime/App.vue:457`, all shifted by `M165`'s inserts. Repaired here, as
+  names rather than numbers, because this increment edits both files again.
+
+### Remedy verdict
+**Works, with the shape measured:** the poll and the page reads live OFF the `f/` prefix the service worker caches (`paper/{shareToken}/
+{paperToken}`), inside the share-token group so the tenant comes from the share token and no new middleware or `use` line is needed, on
+their own limiter so a minute of polling does not spend the submit budget. The paper key is derived inside `GuestShareTokenService`
+(domain-separated from the share key), so `AppServiceProvider.php`, whose lines are cited, is not edited. The guest's Submit carries the
+paper token; the controller verifies it, uses the scan's id as the submission's idempotency key, and links the scan after the save.
+
+Files: `app/Support/Guest/GuestShareTokenService.php`, `app/Support/Guest/GuestShareToken.php`, `config/guest.php`,
+`app/Http/Controllers/Public/GuestAttachmentController.php`, `app/Http/Controllers/Public/GuestSubmissionController.php`,
+`app/Http/Requests/Public/GuestSubmissionRequest.php`, `app/Services/Ocr/GuestPaperReview.php` (new),
+`app/Services/Ocr/OcrScanConfirmation.php`, `app/Services/Ocr/OcrScanService.php`, `routes/api.php`,
+`resources/public-runtime/lib/api-client.ts`, `resources/public-runtime/lib/types.ts`, `resources/public-runtime/lib/paper-notes.ts` (new),
+`resources/public-runtime/components/PaperCopyUpload.vue`, `resources/public-runtime/components/PaperReading.vue` (new),
+`resources/public-runtime/components/RuntimeSession.vue`, `resources/public-runtime/components/FieldRow.vue`,
+`resources/public-runtime/composables/context.ts`, `resources/public-runtime/App.vue`, and the tests:
+`tests/Feature/Ocr/GuestPaperReviewTest.php` (new), `tests/Feature/Ocr/GuestScanUploadTest.php`, `tests/Feature/Ocr/OcrScanConfirmTest.php`,
+`tests/Feature/Api/OpenApiContractTest.php`, `tests/Feature/Http/ServiceWorkerCachePrefixRouteTest.php`,
+`tests/Feature/Auth/RateLimiterBindingTest.php`, `resources/public-runtime/__tests__/paper-copy.test.ts`,
+`resources/public-runtime/__tests__/paper-notes.test.ts` (new), `resources/public-runtime/__tests__/api-client-challenge.test.ts`,
+`resources/public-runtime/__tests__/api-client.test.ts`, `resources/public-runtime/__tests__/components.test.ts`,
+`resources/public-runtime/__tests__/sw.test.ts`, `tests/e2e/ocr-guest-upload.spec.ts`, `tests/e2e/support/axe.ts` (a citation).
+Shared artefacts taken: `openapi.json`, `docs/ocr-pipeline-design.md`, `docs/security-threat-model.md`, `docs/data-dictionary.md`,
+`docs/feature-backlog.md`, `PROGRESS.md` (own block), `docs/pipeline.md`.
+Paired files taken: `openapi.json` with `routes/api.php`.
+Namespaces spent: nothing from either namespace (no migration, no ADR).
+Prediction: Pest and Vitest red first, then green; the server half lands cleanly. **Most likely wrong: the guest review screen in a real
+browser** — a per-field note inside `FieldRow` at the narrowest width, axe on the filled form in both themes, and the wait screen's poll
+under the e2e job's synchronous queue, which I will mock rather than run.
 
 ## RELEASED — `M165`, a guest uploads a photo or scan of a filled paper form from the public link (`R-7173c02c`, `D106` A) (merged as PR #358, `0ec14400`, 6/6 green with real step counts on its third run and on the post-merge run — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

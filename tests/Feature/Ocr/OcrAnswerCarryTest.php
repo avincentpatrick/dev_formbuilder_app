@@ -169,6 +169,20 @@ it('tells the review screen which answers were read from the ink in their boxes,
     expect(array_map(static fn (array $f): bool => $f['inked'], $result['fields']))->toBe(['pick' => true, 'old' => false]);
 });
 
+it('carries the nearest value filled in for writing that did not parse, and tells the review screen it was (M167, D117)', function (): void {
+    // Round 1's sheet 01: "72 ." filled in as 72. It carries like any read value, converted for the number box, and its meta
+    // says repaired so the screen quotes what was seen. A scan read before M167 has no such key and reads as false.
+    $paper = ocrCarrySnapshot([ocrCarryField('weight', 'integer'), ocrCarryField('name', 'short_text')]);
+    $repaired = ['type' => 'integer', 'state' => 'read', 'value' => '72', 'text' => '72 .', 'confidence' => 89, 'tier' => 'review', 'page' => 1, 'anchored_by' => 'key', 'ticks' => false, 'repaired' => true];
+
+    $result = ocrCarry(['weight' => $repaired, 'name' => ocrCarryRead('short_text', 'Ana')], $paper);
+
+    expect($result['answers'])->toBe(['weight' => 72, 'name' => 'Ana'])
+        ->and(array_map(static fn (array $f): bool => $f['repaired'], $result['fields']))->toBe(['weight' => true, 'name' => false])
+        ->and($result['fields']['weight'])->toMatchArray(['carried' => true, 'text' => '72 .'])
+        ->and($result['dropped'])->toBe([]);
+});
+
 it('marks a question the paper never printed, and takes nothing into a display-only one', function (): void {
     $result = ocrCarry(
         ['name' => ocrCarryRead('short_text', 'Ana')],

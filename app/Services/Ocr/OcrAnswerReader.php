@@ -31,9 +31,17 @@ use App\Services\Expressions\Coercion;
  * ── WHAT A RESULT IS ───────────────────────────────────────────────────────────────────────────────
  * `state` is one of `read` (a value in the field's stored shape), `blank` (nothing written — not a failure,
  * §2.5.1: the blank form prints questions a respondent's own branching would have hidden), `unreadable`
- * (something written that does not parse for the type, or two boxes marked on a one-answer question), or
- * `skipped`. `confidence` is the LOWEST character confidence among what was used, on a 0–100 scale: one
- * doubtful character is enough to make a reviewer look. A tick is the exception: at least {@see MARK_SEEN} (M152).
+ * (something written in which nothing usable was found), or `skipped`. `confidence` is the LOWEST character
+ * confidence among what was used, on a 0–100 scale: one doubtful character is enough to make a reviewer look.
+ * A tick is the exception: at least {@see MARK_SEEN} (M152).
+ *
+ * ⚠️ WHAT DOES NOT PARSE IS FILLED IN WITH THE NEAREST ANSWER THE BOX CAN HOLD, AND MARKED (`D117`, M167). A weight
+ * written "72." read as `72 .`, a year read one digit short (`12 11 190`), "50 kg", a date whose groups were not
+ * placed cleanly, two ticks on a one-answer question: until M167 each came back `unreadable` with no value, and
+ * the reviewer typed it from nothing. The user: "its always better to have an initial value rather than user
+ * will type everything from 0." Such a result is `read`, carries `repaired: true`, keeps the text exactly as
+ * seen, and its confidence is capped at {@see SUBSTITUTION_CEILING} so it is never auto-accepted: the review
+ * screen quotes what was seen beside it. Only an answer in which nothing usable was found stays `unreadable`.
  *
  * Every value is emitted in the shape `StructuralAnswerNormalizer` accepts for the type, so the review
  * screen can hand it to the pipeline unchanged.
@@ -43,8 +51,23 @@ final class OcrAnswerReader
     /** OCR's usual letter-for-digit confusions, applied to a digit answer — combed, or in an open box since layout 3. */
     private const array DIGIT_LOOKALIKES = ['O' => '0', 'o' => '0', 'D' => '0', 'I' => '1', 'l' => '1', 'i' => '1'];
 
-    /** A recognised substitution makes the value something a reviewer should see, whatever its confidence. */
+    /**
+     * A recognised substitution makes the value something a reviewer should see, whatever its confidence — and so does a
+     * value filled in as the nearest one the box can hold (`D117`).
+     */
     private const int SUBSTITUTION_CEILING = 89;
+
+    /**
+     * The least likeness ({@see OcrText::similarity()}) at which a written word is taken as the nearest option (`D117`): a
+     * yes/no read "YEB", a cascade level one letter off. Two letters swapped are two edits, so "Yse" (0.33) is not. Below it nothing usable was seen, and the answer stays unreadable.
+     */
+    private const float NEAREST_OPTION = 0.5;
+
+    /** The words a yes/no answer is written as, with the value each means. */
+    private const array YES_NO_WORDS = ['yes' => true, 'y' => true, 'oo' => true, 'true' => true, 'no' => false, 'n' => false, 'hindi' => false, 'false' => false];
+
+    /** The date, time and datetime: groups of digits under captions, which {@see positional()} brings to a real value. */
+    private const array POSITIONAL_VALUES = [FieldType::Date, FieldType::Time, FieldType::Datetime];
 
     /**
      * The least confidence of a tick seen in the box before an option's label, whatever glyph the recognizer took it for (M152,
@@ -69,9 +92,9 @@ final class OcrAnswerReader
      * @param  array<string, mixed>  $config  the field's `config` from the version snapshot
      * @param  list<OcrLine>  $lines  the question's region, top to bottom
      * @param  list<string>  $static  normalised printed text that may sit in a region and is not an answer
-     * @return array{state: string, value: mixed, text: string|null, confidence: int|null, labels?: list<array{value: string, label: string, word: OcrWord, page: int}>}
-     *                                                                                                                                                                   `labels`, on a question whose boxes were found, is each option's label as found — its first word and its
-     *                                                                                                                                                                   page (M159) — for the ink in its box to be measured beside it; nothing stores it
+     * @return array{state: string, value: mixed, text: string|null, confidence: int|null, repaired?: true, labels?: list<array{value: string, label: string, word: OcrWord, page: int}>}
+     *                                                                                                                                                                                    `labels`, on a question whose boxes were found, is each option's label as found — its first word and its
+     *                                                                                                                                                                                    page (M159) — for the ink in its box to be measured beside it; nothing stores it
      */
     public function read(array $row, ?FieldType $type, array $config, array $lines, array $static): array
     {
@@ -90,7 +113,7 @@ final class OcrAnswerReader
      * @param  array<string, mixed>  $config
      * @param  list<OcrLine>  $lines
      * @param  list<string>  $static
-     * @return array{state: string, value: mixed, text: string|null, confidence: int|null}
+     * @return array{state: string, value: mixed, text: string|null, confidence: int|null, repaired?: true}
      */
     private function comb(array $row, ?FieldType $type, array $config, array $lines, array $static): array
     {
@@ -130,14 +153,20 @@ final class OcrAnswerReader
             ? $this->assignToCaptions($symbols, $captionLine, $groups)
             : $this->splitByCells($symbols, $groups);
 
-        if ($parts === null) {
-            return $this->unreadable($this->joinWithGaps($symbols), $confidence);
-        }
-
         // A group can never hold more digits than it has boxes. More means something in a gap was read as a digit —
         // a separator misread as `1`, or a pen's mark — and the nearer group took it: `01` became `011`, November,
-        // at the recognizer's own confidence (`M148`). Refused for a person to read, never guessed.
-        if ($positional && $this->overfills($parts, $groups)) {
+        // at the recognizer's own confidence (`M148`). M148 refused it; since `D117` the box gets the nearest real
+        // value instead ({@see placedAgain()}), marked, and never at the recognizer's own confidence.
+        if (in_array($type, self::POSITIONAL_VALUES, true) && ($parts === null || $this->overfills($parts, $groups))) {
+            return $this->placedAgain($type, $parts, $symbols, $groups, $confidence);
+        }
+
+        // A cascade whose levels could not be placed: its written words, split where the boxes were left empty.
+        if ($parts === null && $type === FieldType::CascadingSelect) {
+            $parts = array_pad(explode(' ', $this->joinWithGaps($symbols)), count($groups), null);
+        }
+
+        if ($parts === null || ($positional && $this->overfills($parts, $groups))) {
             return $this->unreadable($this->joinWithGaps($symbols), $confidence);
         }
 
@@ -229,6 +258,118 @@ final class OcrAnswerReader
         }
 
         return false;
+    }
+
+    /**
+     * The nearest real value for a date, a time or a datetime whose groups could not be placed, or were read with more
+     * characters than they have boxes (`D117`). The candidates, in order — the first that makes a value that exists as
+     * it stands wins:
+     *   1. the groups as placed, each over-full one cut back to its boxes ({@see cutBack()});
+     *   2. every way of cutting the characters read into the printed groups ({@see splits()}) — and, when there is one
+     *      character more than there are boxes, the same with each character left out in turn.
+     * When none exists as it stands, the first that can be brought to one is ({@see nearest()}).
+     *
+     * @param  list<string|null>|null  $parts
+     * @param  list<OcrSymbol>  $symbols
+     * @param  list<array{cells: int, caption: string|null}>  $groups
+     * @return array{state: string, value: mixed, text: string|null, confidence: int|null, repaired?: true}
+     */
+    private function placedAgain(FieldType $type, ?array $parts, array $symbols, array $groups, int $confidence): array
+    {
+        $text = $this->joinWithGaps($symbols);
+        $cells = array_column($groups, 'cells');
+
+        $candidates = $parts === null ? [] : $this->cutBack($parts, $cells);
+        $characters = implode('', array_map(static fn (OcrSymbol $s): string => $s->text, $symbols));
+        $splits = $this->splits($characters, $cells);
+        if ($splits === [] && mb_strlen($characters) === array_sum($cells) + 1) {
+            for ($i = 0, $n = mb_strlen($characters); $i < $n; $i++) {
+                array_push($splits, ...$this->splits(mb_substr($characters, 0, $i).mb_substr($characters, $i + 1), $cells));
+            }
+        }
+        array_push($candidates, ...$splits);
+
+        foreach ($candidates as $candidate) {
+            $value = $this->exact($type, $candidate);
+            if ($value !== null) {
+                return $this->repaired($value, $text, $confidence);
+            }
+        }
+
+        foreach ($candidates as $candidate) {
+            $value = $this->nearest($type, $candidate);
+            if ($value !== null) {
+                return $this->repaired($value, $text, $confidence);
+            }
+        }
+
+        return $this->unreadable($text, $confidence);
+    }
+
+    /**
+     * The groups as placed, each over-full one cut back to its boxes from the side that faces a neighbouring group: a gap's
+     * character goes to the NEARER group (`M148`), so the first group's extra is at its end and the last group's at its
+     * start. A middle group is cut at its end first, then at its start.
+     *
+     * @param  list<string|null>  $parts
+     * @param  list<int>  $cells
+     * @return list<list<string|null>>
+     */
+    private function cutBack(array $parts, array $cells): array
+    {
+        $variants = [[]];
+        $last = count($parts) - 1;
+
+        foreach ($parts as $i => $part) {
+            $part = $part === null ? null : str_replace(' ', '', $part);
+            $boxes = $cells[$i] ?? 0;
+            $extra = $part === null ? 0 : mb_strlen($part) - $boxes;
+
+            $options = [$part];
+            if ($part !== null && $extra > 0) {
+                // How many characters go from the start: none for the first group, all for the last, any for a middle one.
+                $leading = $i === 0 ? [0] : ($i === $last ? [$extra] : range(0, $extra));
+                $options = array_map(static fn (int $drop): string => mb_substr($part, $drop, $boxes), $leading);
+            }
+
+            $next = [];
+            foreach ($variants as $variant) {
+                foreach ($options as $option) {
+                    $next[] = [...$variant, $option];
+                }
+            }
+            $variants = $next;
+        }
+
+        return $variants;
+    }
+
+    /**
+     * Every way of cutting `$characters` into the printed groups, in order, each group holding one character at least and
+     * no more than its boxes — longest first.
+     *
+     * @param  list<int>  $cells
+     * @return list<list<string>>
+     */
+    private function splits(string $characters, array $cells): array
+    {
+        $length = mb_strlen($characters);
+        if ($cells === []) {
+            return $length === 0 ? [[]] : [];
+        }
+        if ($length < count($cells) || $length > array_sum($cells)) {
+            return [];
+        }
+
+        $out = [];
+        $rest = array_slice($cells, 1);
+        for ($take = min($cells[0], $length); $take >= 1; $take--) {
+            foreach ($this->splits(mb_substr($characters, $take), $rest) as $tail) {
+                $out[] = [mb_substr($characters, 0, $take), ...$tail];
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -340,7 +481,7 @@ final class OcrAnswerReader
 
     /**
      * @param  list<OcrLine>  $answer
-     * @return array{state: string, value: mixed, text: string|null, confidence: int|null}
+     * @return array{state: string, value: mixed, text: string|null, confidence: int|null, repaired?: true}
      */
     private function ruled(?FieldType $type, array $answer): array
     {
@@ -373,7 +514,7 @@ final class OcrAnswerReader
      * @param  array<string, mixed>  $row
      * @param  list<OcrLine>  $lines
      * @param  list<string>  $static
-     * @return array{state: string, value: mixed, text: string|null, confidence: int|null, labels?: list<array{value: string, label: string, word: OcrWord, page: int}>}
+     * @return array{state: string, value: mixed, text: string|null, confidence: int|null, repaired?: true, labels?: list<array{value: string, label: string, word: OcrWord, page: int}>}
      */
     private function choices(array $row, ?FieldType $type, array $lines, array $static): array
     {
@@ -482,7 +623,7 @@ final class OcrAnswerReader
         }
 
         if ($found === []) {
-            return $this->blankOrUnreadable($this->answerLines($lines, $static, []));
+            return $this->blankOrUnreadable($this->answerLines($lines, $static, []), $type, $options);
         }
 
         $labels = [];
@@ -505,13 +646,16 @@ final class OcrAnswerReader
             return $this->found(array_map(static fn (array $o): string => $o['value'], $marked), $text, $confidence) + ['labels' => $labels];
         }
 
+        $value = $marked[0]['value'];
+        $value = $type === FieldType::YesNo ? Coercion::yesNoAnswer($value) : $value;
+
+        // `D117`: two boxes ticked on a one-answer question fill in the first, in printed order, and the text names every tick
+        // seen — the reviewer changes one choice rather than making it from nothing.
         if (count($marked) > 1) {
-            return $this->unreadable($text, $confidence) + ['labels' => $labels];
+            return $this->repaired($value, $text, $confidence) + ['labels' => $labels];
         }
 
-        $value = $marked[0]['value'];
-
-        return $this->found($type === FieldType::YesNo ? Coercion::yesNoAnswer($value) : $value, $text, $confidence) + ['labels' => $labels];
+        return $this->found($value, $text, $confidence) + ['labels' => $labels];
     }
 
     /**
@@ -675,7 +819,7 @@ final class OcrAnswerReader
      *
      * @param  array<string, mixed>  $config
      * @param  list<string|null>|null  $parts  the captioned groups, for the positional types
-     * @return array{state: string, value: mixed, text: string|null, confidence: int|null}
+     * @return array{state: string, value: mixed, text: string|null, confidence: int|null, repaired?: true}
      */
     private function parsed(?FieldType $type, array $config, string $text, ?array $parts, int $confidence): array
     {
@@ -699,7 +843,7 @@ final class OcrAnswerReader
         };
     }
 
-    /** @return array{state: string, value: mixed, text: string|null, confidence: int|null} */
+    /** @return array{state: string, value: mixed, text: string|null, confidence: int|null, repaired?: true} */
     private function number(string $text, int $confidence, bool $decimal): array
     {
         $raw = str_replace(' ', '', $text);
@@ -709,58 +853,158 @@ final class OcrAnswerReader
         }
 
         $pattern = $decimal ? '/^-?\d+(\.\d+)?$/' : '/^-?\d+$/';
-        if (preg_match($pattern, $digits) !== 1) {
-            return $this->unreadable($text, $confidence);
+        if (preg_match($pattern, $digits) === 1) {
+            return $this->found($digits, $text, $digits === $raw ? $confidence : min($confidence, self::SUBSTITUTION_CEILING));
         }
 
-        return $this->found($digits, $text, $digits === $raw ? $confidence : min($confidence, self::SUBSTITUTION_CEILING));
+        // `D117`: the first number written, whatever was written with it — "72 ." is 72, "65 KILOS" is 65 — and for a whole
+        // number its whole part. Unreadable only when no digit was written at all.
+        if (preg_match('/-?\d+(?:[.,]\d+)?/', $digits, $number) !== 1) {
+            return $this->unreadable($text, $confidence);
+        }
+        $value = str_replace(',', '.', $number[0]);
+
+        return $this->repaired($decimal ? $value : explode('.', $value)[0], $text, $confidence);
     }
 
     /**
      * @param  list<string|null>|null  $parts  DD, MM, YYYY
-     * @return array{state: string, value: mixed, text: string|null, confidence: int|null}
+     * @return array{state: string, value: mixed, text: string|null, confidence: int|null, repaired?: true}
      */
     private function date(?array $parts, string $text, int $confidence): array
     {
-        [$day, $month, $year] = $this->ints($parts, 3);
-        if ($day === null || $month === null || $year === null || $year < 1000 || ! checkdate($month, $day, $year)) {
-            return $this->unreadable($text, $confidence);
-        }
-
-        return $this->found(sprintf('%04d-%02d-%02d', $year, $month, $day), $text, $confidence);
+        return $this->positional(FieldType::Date, $parts, $text, $confidence);
     }
 
     /**
      * @param  list<string|null>|null  $parts  HH, MM
-     * @return array{state: string, value: mixed, text: string|null, confidence: int|null}
+     * @return array{state: string, value: mixed, text: string|null, confidence: int|null, repaired?: true}
      */
     private function time(?array $parts, string $text, int $confidence): array
     {
-        [$hour, $minute] = $this->ints($parts, 2);
-        if ($hour === null || $minute === null || $hour > 23 || $minute > 59) {
-            return $this->unreadable($text, $confidence);
-        }
-
-        return $this->found(sprintf('%02d:%02d', $hour, $minute), $text, $confidence);
+        return $this->positional(FieldType::Time, $parts, $text, $confidence);
     }
 
     /**
      * @param  list<string|null>|null  $parts  DD, MM, YYYY, HH, MM
-     * @return array{state: string, value: mixed, text: string|null, confidence: int|null}
+     * @return array{state: string, value: mixed, text: string|null, confidence: int|null, repaired?: true}
      */
     private function datetime(?array $parts, string $text, int $confidence): array
     {
-        [$day, $month, $year, $hour, $minute] = $this->ints($parts, 5);
-        if ($day === null || $month === null || $year === null || $hour === null || $minute === null
-            || $year < 1000 || ! checkdate($month, $day, $year) || $hour > 23 || $minute > 59) {
-            return $this->unreadable($text, $confidence);
-        }
-
-        return $this->found(sprintf('%04d-%02d-%02dT%02d:%02d', $year, $month, $day, $hour, $minute), $text, $confidence);
+        return $this->positional(FieldType::Datetime, $parts, $text, $confidence);
     }
 
     /**
-     * A duration is stored as a number of seconds (`docs/xlsform-interop-spec.md`'s `duration` row).
+     * A date, a time or a datetime from its groups: as written when that exists, and otherwise the nearest that does
+     * (`D117`) — a year read short kept as read (`190` is 0190), a month over 12 swapped with a day that can be one, a day
+     * past its month's end brought back to it, an hour or a minute past its last brought back to it, a group with nothing
+     * read in it at its lowest (a missing year is this year's). Unreadable only when no group holds a digit.
+     *
+     * Groups that were not placed under captions — an answer in an open box, a sheet printed before layout 3 — are cut
+     * wherever a character is not a digit, and the value is always marked: nothing placed them.
+     *
+     * @param  list<string|null>|null  $parts
+     * @return array{state: string, value: mixed, text: string|null, confidence: int|null, repaired?: true}
+     */
+    private function positional(FieldType $type, ?array $parts, string $text, int $confidence): array
+    {
+        $placed = $parts !== null;
+        $parts ??= preg_split('/[^\dOoDIli]+/u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        $value = $this->exact($type, $parts);
+        if ($value !== null) {
+            return $placed ? $this->found($value, $text, $confidence) : $this->repaired($value, $text, $confidence);
+        }
+
+        $value = $this->nearest($type, $parts);
+
+        return $value === null ? $this->unreadable($text, $confidence) : $this->repaired($value, $text, $confidence);
+    }
+
+    /**
+     * The value the groups make exactly as written, or null when they make none that exists.
+     *
+     * @param  list<string|null>|null  $parts
+     */
+    private function exact(FieldType $type, ?array $parts): ?string
+    {
+        if ($type === FieldType::Time) {
+            [$hour, $minute] = $this->ints($parts, 2);
+
+            return $hour === null || $minute === null || $hour > 23 || $minute > 59 ? null : sprintf('%02d:%02d', $hour, $minute);
+        }
+
+        [$day, $month, $year, $hour, $minute] = $this->ints($parts, 5);
+        if ($day === null || $month === null || $year === null || $year < 1000 || ! checkdate($month, $day, $year)) {
+            return null;
+        }
+        $date = sprintf('%04d-%02d-%02d', $year, $month, $day);
+        if ($type === FieldType::Date) {
+            return $date;
+        }
+
+        return $hour === null || $minute === null || $hour > 23 || $minute > 59 ? null : sprintf('%sT%02d:%02d', $date, $hour, $minute);
+    }
+
+    /**
+     * The nearest value that exists to what the groups hold, reading only their digits (`8)` is 8) — or null when no
+     * group holds one.
+     *
+     * @param  list<string|null>|null  $parts
+     */
+    private function nearest(FieldType $type, ?array $parts): ?string
+    {
+        if ($type === FieldType::Time) {
+            [$hour, $minute] = $this->looseInts($parts, 2);
+
+            return $this->nearestTime($hour, $minute);
+        }
+
+        [$day, $month, $year, $hour, $minute] = $this->looseInts($parts, 5);
+        $date = $this->nearestDate($day, $month, $year);
+        if ($type === FieldType::Date) {
+            return $date;
+        }
+
+        $time = $this->nearestTime($hour, $minute);
+        if ($date === null && $time === null) {
+            return null;
+        }
+
+        return ($date ?? now()->format('Y-m-d')).'T'.($time ?? '00:00');
+    }
+
+    private function nearestDate(?int $day, ?int $month, ?int $year): ?string
+    {
+        if ($day === null && $month === null && $year === null) {
+            return null;
+        }
+
+        if ($month !== null && $month > 12 && $day !== null && $day <= 12) {
+            [$day, $month] = [$month, $day];
+        }
+        $year = max(1, min(9999, $year ?? now()->year));
+        $month = max(1, min(12, $month ?? 1));
+        $day = max(1, min(31, $day ?? 1));
+        while (! checkdate($month, $day, $year)) {
+            $day--;
+        }
+
+        return sprintf('%04d-%02d-%02d', $year, $month, $day);
+    }
+
+    private function nearestTime(?int $hour, ?int $minute): ?string
+    {
+        if ($hour === null && $minute === null) {
+            return null;
+        }
+
+        return sprintf('%02d:%02d', min(23, $hour ?? 0), min(59, $minute ?? 0));
+    }
+
+    /**
+     * A duration is stored as a number of seconds (`docs/xlsform-interop-spec.md`'s `duration` row). Not filled in by
+     * `D117`: no answer control shows a duration, so `OcrAnswerCarry` lists it rather than carrying it.
      *
      * @param  list<string|null>|null  $parts  HRS, MIN
      * @return array{state: string, value: mixed, text: string|null, confidence: int|null}
@@ -778,11 +1022,13 @@ final class OcrAnswerReader
     }
 
     /**
-     * Each written level matched to an option at that level, under the option chosen one level up.
+     * Each written level matched to an option at that level, under the option chosen one level up — or, since `D117`,
+     * to the nearest such option when a level matches none exactly. A level near none ends the answer at the levels
+     * already matched, as the screen control allows a shorter answer.
      *
      * @param  list<string|null>|null  $parts
      * @param  array<string, mixed>  $config
-     * @return array{state: string, value: mixed, text: string|null, confidence: int|null}
+     * @return array{state: string, value: mixed, text: string|null, confidence: int|null, repaired?: true}
      */
     private function cascade(?array $parts, array $config, string $text, int $confidence): array
     {
@@ -796,13 +1042,15 @@ final class OcrAnswerReader
 
         $chosen = [];
         $parent = null;
+        $repaired = false;
         foreach ($levels as $i => $level) {
             $written = $parts[$i] ?? null;
             if ($written === null) {
                 break; // a deeper level left empty ends the answer, as the screen control allows
             }
 
-            $match = null;
+            /** @var array<string, string> $offered value => label, at this level under the one chosen above */
+            $offered = [];
             foreach ((array) ($config['options'] ?? []) as $option) {
                 if (! is_array($option) || ($option['level'] ?? null) !== $level) {
                     continue;
@@ -811,35 +1059,90 @@ final class OcrAnswerReader
                     continue;
                 }
                 $value = $option['value'] ?? null;
-                $label = $option['label'] ?? null;
-                if (is_string($value) && (OcrText::normal($written) === OcrText::normal($value)
-                    || (is_string($label) && OcrText::normal($written) === OcrText::normal($label)))) {
-                    $match = $value;
+                if (is_string($value)) {
+                    $label = $option['label'] ?? null;
+                    $offered[$value] = is_string($label) ? $label : $value;
+                }
+            }
+
+            $match = null;
+            foreach ($offered as $value => $label) {
+                if (OcrText::normal($written) === OcrText::normal((string) $value) || OcrText::normal($written) === OcrText::normal($label)) {
+                    $match = (string) $value;
                     break;
                 }
             }
 
             if ($match === null) {
-                return $this->unreadable($text, $confidence);
+                $repaired = true;
+                $match = $this->nearestOption($written, $offered);
+                if ($match === null) {
+                    break;
+                }
             }
 
             $chosen[] = $match;
             $parent = $match;
         }
 
-        return $chosen === [] ? $this->blank() : $this->found($chosen, $text, $confidence);
+        if ($chosen === []) {
+            return $repaired ? $this->unreadable($text, $confidence) : $this->blank();
+        }
+
+        return $repaired ? $this->repaired($chosen, $text, $confidence) : $this->found($chosen, $text, $confidence);
     }
 
-    /** @return array{state: string, value: mixed, text: string|null, confidence: int|null} */
+    /** @return array{state: string, value: mixed, text: string|null, confidence: int|null, repaired?: true} */
     private function yesNo(string $text, int $confidence): array
     {
         $word = OcrText::normal($text);
+        if (array_key_exists($word, self::YES_NO_WORDS)) {
+            return $this->found(self::YES_NO_WORDS[$word], $text, $confidence);
+        }
 
-        return match ($word) {
-            'yes', 'y', 'oo', 'true' => $this->found(true, $text, $confidence),
-            'no', 'n', 'hindi', 'false' => $this->found(false, $text, $confidence),
-            default => $this->unreadable($text, $confidence),
-        };
+        // `D117`: a word one letter off — "YEB", "N0" — is the nearest of them.
+        $words = array_keys(self::YES_NO_WORDS);
+        $nearest = $this->nearestOption($text, array_combine($words, $words));
+
+        return $nearest === null ? $this->unreadable($text, $confidence) : $this->repaired(self::YES_NO_WORDS[$nearest], $text, $confidence);
+    }
+
+    /**
+     * The option whose value or label is likest to what was written, at {@see NEAREST_OPTION} or more — the first on a tie
+     * — or null when none is that close.
+     *
+     * @param  array<string, string>  $offered  value => label
+     */
+    private function nearestOption(string $written, array $offered): ?string
+    {
+        $best = null;
+        $likeness = self::NEAREST_OPTION;
+        foreach ($offered as $value => $label) {
+            $score = max(OcrText::similarity($written, (string) $value), OcrText::similarity($written, $label));
+            if ($score > $likeness || ($best === null && $score >= $likeness)) {
+                $best = (string) $value;
+                $likeness = $score;
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * Each group's digits, whatever else was read with them, or null for a group with no digit.
+     *
+     * @param  list<string|null>|null  $parts
+     * @return list<int|null>
+     */
+    private function looseInts(?array $parts, int $count): array
+    {
+        $out = [];
+        for ($i = 0; $i < $count; $i++) {
+            $digits = (string) preg_replace('/\D/', '', strtr((string) ($parts[$i] ?? ''), self::DIGIT_LOOKALIKES));
+            $out[] = $digits === '' ? null : (int) substr($digits, 0, 9);
+        }
+
+        return $out;
     }
 
     /**
@@ -875,10 +1178,15 @@ final class OcrAnswerReader
     }
 
     /**
+     * Writing in a tick question whose printed labels were not found at all. Since `D117` it is taken as the option whose
+     * label it is likest to, when one is close enough ({@see nearestOption()}): the whole of what was written is compared,
+     * so a region that holds every label misread reads as near none of them, and stays unreadable.
+     *
      * @param  list<OcrLine>  $answer
-     * @return array{state: string, value: mixed, text: string|null, confidence: int|null}
+     * @param  list<array{value: string, label: string}>  $options
+     * @return array{state: string, value: mixed, text: string|null, confidence: int|null, repaired?: true}
      */
-    private function blankOrUnreadable(array $answer): array
+    private function blankOrUnreadable(array $answer, ?FieldType $type, array $options): array
     {
         if ($answer === []) {
             return $this->blank();
@@ -890,14 +1198,36 @@ final class OcrAnswerReader
                 array_push($symbols, ...$word->symbols);
             }
         }
+        $text = implode(' ', array_map(static fn (OcrLine $l): string => $l->text(), $answer));
+        $confidence = $this->confidenceOf($symbols);
 
-        return $this->unreadable(implode(' ', array_map(static fn (OcrLine $l): string => $l->text(), $answer)), $this->confidenceOf($symbols));
+        $nearest = $this->nearestOption($text, array_column($options, 'label', 'value'));
+        if ($nearest === null) {
+            return $this->unreadable($text, $confidence);
+        }
+
+        return $this->repaired(match ($type) {
+            FieldType::MultiSelect => [$nearest],
+            FieldType::YesNo => Coercion::yesNoAnswer($nearest),
+            default => $nearest,
+        }, $text, $confidence);
     }
 
     /** @return array{state: string, value: mixed, text: string|null, confidence: int|null} */
     private function found(mixed $value, string $text, int $confidence): array
     {
         return ['state' => 'read', 'value' => $value, 'text' => $text, 'confidence' => $confidence];
+    }
+
+    /**
+     * A value filled in as the nearest one the box can hold (`D117`): read, marked, kept with the text exactly as seen, and
+     * never at a confidence that would accept it unseen.
+     *
+     * @return array{state: string, value: mixed, text: string|null, confidence: int|null, repaired: true}
+     */
+    private function repaired(mixed $value, string $text, int $confidence): array
+    {
+        return ['state' => 'read', 'value' => $value, 'text' => $text, 'confidence' => min($confidence, self::SUBSTITUTION_CEILING), 'repaired' => true];
     }
 
     /** @return array{state: string, value: mixed, text: string|null, confidence: int|null} */

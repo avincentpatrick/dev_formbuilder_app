@@ -173,20 +173,26 @@ it('splits a date by WHERE each digit sits under its caption, never by counting 
         ->and($fields['visit_date']['value'])->toBe('2026-10-03');
 });
 
-it('falls back to the printed cell counts only when the captions were not read and every box is filled', function (): void {
+it('falls back to the printed cell counts when the captions were not read, and fills a short read with the cut that makes a real date (D117)', function (): void {
+    // Every box filled: the cell counts place it exactly. One box empty and no captions: seven digits for eight boxes is
+    // ambiguous, so until M167 it was refused. Since `D117` the first cut into the printed groups that makes a date that
+    // exists — 3 / 10 / 2026 — fills the box, marked and never auto, for a person to check against the paper.
     $full = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['visit_date' => ['03', '10', '2026']], ['omit_captions' => true]);
     $short = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['visit_date' => ['3', '10', '2026']], ['omit_captions' => true]);
 
     expect($full['visit_date']['value'])->toBe('2026-10-03')
-        ->and($short['visit_date']['state'])->toBe('unreadable')
-        ->and($short['visit_date']['value'])->toBeNull();
+        ->and(array_key_exists('repaired', $full['visit_date']))->toBeFalse()
+        ->and($short['visit_date'])->toMatchArray(['state' => 'read', 'value' => '2026-10-03', 'repaired' => true])
+        ->and($short['visit_date']['tier'])->not->toBe('auto');
 });
 
-it('refuses a date that does not exist rather than rolling it over', function (): void {
+it('fills a date that does not exist with the nearest one that does, marked, rather than rolling it over (D117)', function (): void {
+    // 31 February rolled over would be 3 March — a different month, at the recognizer's own confidence. The nearest date that
+    // exists keeps the month and the year the respondent wrote, and the note quotes what was seen.
     $fields = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['visit_date' => ['31', '02', '2026']]);
 
-    expect($fields['visit_date']['state'])->toBe('unreadable')
-        ->and($fields['visit_date']['text'])->toBe('31 02 2026');
+    expect($fields['visit_date'])->toMatchArray(['state' => 'read', 'value' => '2026-02-28', 'text' => '31 02 2026', 'repaired' => true])
+        ->and($fields['visit_date']['tier'])->not->toBe('auto');
 });
 
 it('reads a date and a time through their printed separators, and a comb holding only its separators as blank (layout 4, M148)', function (): void {
@@ -201,10 +207,11 @@ it('reads a date and a time through their printed separators, and a comb holding
         ->and($empty['visit_time']['state'])->toBe('blank');
 });
 
-it('refuses a day or a month longer than its boxes, rather than reading a separator as one more digit (M148)', function (): void {
+it('cuts a day or a month read longer than its boxes back to them, marked, never reading a separator as one more digit (M148, D117)', function (): void {
     // The user's comment on layout 3 found the gaps printed as boxes, which invited a pen. A gap character goes to the
     // nearer group, and a `/` misread as `1` beside a month of `01` made `011` — November, at the recognizer's own
-    // confidence — whenever the other separator was not read. No group may hold more characters than it has boxes.
+    // confidence — whenever the other separator was not read. No group may hold more characters than it has boxes: M148
+    // refused the answer; since `D117` the group is cut back from the side facing its neighbour, and the value is marked.
     $misread = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['visit_date' => ['03', '01', '2026']], [
         'gap_reads' => ['visit_date' => [null, '1']],
     ]);
@@ -212,10 +219,11 @@ it('refuses a day or a month longer than its boxes, rather than reading a separa
         'gap_reads' => ['visit_date' => ['1', '1']],
     ]);
 
-    expect($misread['visit_date']['state'])->toBe('unreadable')
-        ->and($misread['visit_date']['value'])->toBeNull()
-        ->and($bothMisread['visit_date']['state'])->toBe('unreadable')
-        ->and($bothMisread['visit_date']['value'])->toBeNull();
+    expect($misread['visit_date'])->toMatchArray(['state' => 'read', 'value' => '2026-01-03', 'repaired' => true])
+        ->and($misread['visit_date']['tier'])->not->toBe('auto')
+        ->and($bothMisread['visit_date'])->toMatchArray(['state' => 'read', 'repaired' => true])
+        ->and($bothMisread['visit_date']['value'])->not->toBe('2026-11-03')
+        ->and($bothMisread['visit_date']['tier'])->not->toBe('auto');
 });
 
 it('reads a datetime and a duration through their separators, and keeps the hyphen a cascade level was written with (M148)', function (): void {
@@ -243,6 +251,19 @@ it('reads a datetime and a duration through their separators, and keeps the hyph
     expect($fields['seen_at'])->toMatchArray(['state' => 'read', 'value' => '2026-10-03T14:05'])
         ->and($fields['travel'])->toMatchArray(['state' => 'read', 'value' => 9000])
         ->and($fields['address'])->toMatchArray(['state' => 'read', 'value' => ['r7', 'lapu_lapu']]);
+
+    // `D117`: an hour past the last is brought back to it, and a level a letter off is its nearest option under the one
+    // chosen above — both marked. A first level near no option leaves nothing usable, and stays unreadable.
+    $near = ocrMatchFields($this->matcher, $form, $version, $model, [
+        'seen_at' => ['03', '10', '2026', '25', '05'],
+        'address' => ['R7', 'LAPU-LAPO'],
+    ]);
+    $far = ocrMatchFields($this->matcher, $form, $version, $model, ['address' => ['ZZ', 'LAPU-LAPU']]);
+
+    expect($near['seen_at'])->toMatchArray(['state' => 'read', 'value' => '2026-10-03T23:05', 'repaired' => true])
+        ->and($near['address'])->toMatchArray(['state' => 'read', 'value' => ['r7', 'lapu_lapu'], 'repaired' => true])
+        ->and($near['address']['tier'])->not->toBe('auto')
+        ->and($far['address'])->toMatchArray(['state' => 'unreadable', 'value' => null]);
 });
 
 it('reads a page photographed at a tilt exactly as a level one', function (): void {
@@ -334,15 +355,18 @@ it('records which questions the paper asked to be ticked, so a box nobody saw ti
     ])->and($fields['sex']['state'])->toBe('blank');
 });
 
-it('refuses two marked boxes on a one-answer question, and keeps both on a many-answer one', function (): void {
+it('fills the first of two marked boxes on a one-answer question, marked, and keeps both on a many-answer one (D117)', function (): void {
+    // Until M167 two ticks on a one-answer question left it empty. Since `D117` the first in printed order fills the box and
+    // the text names every tick seen, so the reviewer changes one choice rather than making it from nothing.
     $fields = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, [
         'sex' => ['Female', 'Male'],
         'symptoms' => ['Fever', 'Cough', 'Fatigue'],
     ]);
 
-    expect($fields['sex']['state'])->toBe('unreadable')
-        ->and($fields['sex']['value'])->toBeNull()
-        ->and($fields['symptoms']['value'])->toBe(['fever', 'cough', 'fatigue']);
+    expect($fields['sex'])->toMatchArray(['state' => 'read', 'value' => 'f', 'text' => 'Female, Male', 'repaired' => true])
+        ->and($fields['sex']['tier'])->not->toBe('auto')
+        ->and($fields['symptoms']['value'])->toBe(['fever', 'cough', 'fatigue'])
+        ->and(array_key_exists('repaired', $fields['symptoms']))->toBeFalse();
 });
 
 it('credits a mark to the option it precedes on a shared line, never to the last label on it (M143, layout 2)', function (): void {
@@ -508,6 +532,34 @@ it('reads a letter O in a number box as a zero, and flags it for review whatever
     expect($fields['age'])->toMatchArray(['state' => 'read', 'value' => '30', 'tier' => 'review', 'confidence' => 89]);
 });
 
+it('fills a number written with something beside it with the number it found, marked — Round 1 sheet 01 (D117)', function (): void {
+    // The user's comment: a weight written "72." came back "72 .", not a number as it stands, and the box was left empty with
+    // "Needs manual entry". Since `D117` the box gets the number, marked and never auto; only writing with no digit at all
+    // stays unreadable. A whole-number question keeps the whole part of a decimal written in it.
+    $stray = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['age' => '72 .']);
+    $unit = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['age' => '35 YEARS OLD']);
+    $part = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['age' => '41.5']);
+    $none = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['age' => 'ABC']);
+
+    expect($stray['age'])->toMatchArray(['state' => 'read', 'value' => '72', 'text' => '72 .', 'repaired' => true, 'tier' => 'review', 'confidence' => 89])
+        ->and($unit['age'])->toMatchArray(['state' => 'read', 'value' => '35', 'repaired' => true])
+        ->and($part['age'])->toMatchArray(['state' => 'read', 'value' => '41', 'repaired' => true])
+        ->and($none['age'])->toMatchArray(['state' => 'unreadable', 'value' => null, 'text' => 'ABC'])
+        ->and(array_key_exists('repaired', $none['age']))->toBeFalse();
+});
+
+it('fills a year read a digit short as it was read, and a time or a month past its last with the nearest, marked — Round 1 sheet 01 (D117)', function (): void {
+    // The user chose it: "fill as read and let the user correct it". 12 / 11 / 190 is 0190-11-12 — the day and the month were
+    // right, so only the year is retyped. A month over 12 beside a day that can be a month is the two written the other way.
+    $short = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['visit_date' => ['12', '11', '190'], 'visit_time' => ['25', '61']]);
+    $swapped = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, ['visit_date' => ['05', '13', '2026']]);
+
+    expect($short['visit_date'])->toMatchArray(['state' => 'read', 'value' => '0190-11-12', 'text' => '12 11 190', 'repaired' => true])
+        ->and($short['visit_date']['tier'])->not->toBe('auto')
+        ->and($short['visit_time'])->toMatchArray(['state' => 'read', 'value' => '23:59', 'text' => '25 61', 'repaired' => true])
+        ->and($swapped['visit_date'])->toMatchArray(['state' => 'read', 'value' => '2026-05-13', 'repaired' => true]);
+});
+
 it('drops a box wall read as a bar from an open-box answer, so a number or a phone written against the edge still reads (layout 3, D98)', function (): void {
     // A comb always dropped the wall glyphs; an open box's single left wall is new ink beside a digit string.
     // Without the drop the number would be unreadable and the phone would be STORED with its bar.
@@ -549,9 +601,15 @@ it('reads a yes/no written as a word, the shape of a sheet printed before this i
 
     $yes = ocrMatchFields($this->matcher, $this->form, $this->version, $old, [...ocrMatchAnswers(), 'consent' => 'YES']);
     $no = ocrMatchFields($this->matcher, $this->form, $this->version, $old, [...ocrMatchAnswers(), 'consent' => 'NO']);
+    // `D117`: a word a letter off is the nearest of them, marked; a word near none of them stays unreadable.
+    $near = ocrMatchFields($this->matcher, $this->form, $this->version, $old, [...ocrMatchAnswers(), 'consent' => 'YEB']);
+    $far = ocrMatchFields($this->matcher, $this->form, $this->version, $old, [...ocrMatchAnswers(), 'consent' => 'MAYBE']);
 
     expect($yes['consent'])->toMatchArray(['state' => 'read', 'value' => true])
-        ->and($no['consent'])->toMatchArray(['state' => 'read', 'value' => false]);
+        ->and(array_key_exists('repaired', $yes['consent']))->toBeFalse()
+        ->and($no['consent'])->toMatchArray(['state' => 'read', 'value' => false])
+        ->and($near['consent'])->toMatchArray(['state' => 'read', 'value' => true, 'text' => 'YEB', 'repaired' => true])
+        ->and($far['consent'])->toMatchArray(['state' => 'unreadable', 'value' => null]);
 });
 
 it('reads the version off the page stamp, a superseded one included, and says when it could not', function (): void {

@@ -7,7 +7,8 @@
   pursued) and `D104` (A — Cloud Vision as it is for the Oct 12 testing; the arm built and measured during testing), both in
   `docs/claims/decisions.md`
 - **Amended:** §D3 by `D108` (2026-10-10, `M156`) — an answer read below 70 is filled in and marked "may be wrong", no longer
-  withheld
+  withheld; and by `D117` (2026-10-13, `M167`) — writing that does not parse for the type is filled in with the nearest value
+  its box can hold, marked, no longer left unreadable
 - **Related:** `docs/ocr-pipeline-design.md` §3 (the 90/70 tiers) and §9 (the harness, and Round 1's figures) · `config/ocr.php` ·
   `app/Services/Ocr/GoogleVisionClient.php` · `app/Services/Ocr/PrintedFormMatcher.php` · `app/Services/Ocr/OcrAnswerReader.php` ·
   `docs/PRD.md` G9 (under 15% of fields needing manual correction on a clear, well-lit single-page scan)
@@ -74,6 +75,13 @@ the Cloud Vision API.**
 > saved. Re-scored offline from Round 1's cached reads: **57 of 180 (31.7%) need correction, 0 silent** — the 19 right answers
 > once withheld are filled in, and 24 wrong ones are filled and marked. The bake-off no longer sweeps the review threshold,
 > because it no longer changes what a reviewer is shown.
+>
+> **Amended by `D117` (user decision, 2026-10-13; built by `M167`).** `D108` filled in only a value that parsed. Writing that did not
+> parse for its type — "72 ." in a number box, a year read "190", a date that does not exist, a word a letter off an option, two
+> ticks on a one-answer question — still came back unreadable and left the box empty. It is now filled in with the nearest value the
+> box can hold (`OcrAnswerReader`, `repaired`), its confidence capped at 89 so it is never accepted unseen, and the review screen
+> quotes what was seen beside it. Round 1 re-scored offline: **50 of 180 (27.8%) need correction, 0 silent**. The six answers once
+> unreadable are all filled in, and five of them are right.
 
 **§D4 — A tick seen in a box is shown for review, never accepted on the mark alone** (`OcrAnswerReader::MARK_SEEN`, `R-39a5388f`).
 - Vision returns a hand-drawn tick as ☑, X, a Greek chi or 区, with a low confidence in the GLYPH. That is not the question being

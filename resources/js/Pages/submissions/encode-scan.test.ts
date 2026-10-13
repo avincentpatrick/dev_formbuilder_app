@@ -269,6 +269,18 @@ describe('Encode.vue in scan mode', () => {
         expect(rowFor(wrapper, 'consent').text()).not.toContain('Left blank on the paper.');
     });
 
+    it('shows the nearest answer to what the scan saw in its box, and quotes what it saw (M167, D117)', () => {
+        // Round 1's sheet 01: a weight written "72." came back "72 .", not a number as it stands. It used to leave the box
+        // empty with "Needs manual entry"; the user asked for the value in the box, to correct rather than type.
+        const repaired = { state: 'read', tier: 'review', confidence: 82, text: '72 .', page: 1, carried: true, reason: null, ticks: false, inked: false, repaired: true };
+        const wrapper = mountScan(payload(scan({ answers: { ...scan().answers, age: 72 }, fields: { ...scan().fields, age: repaired } })));
+
+        expect(inputFor(wrapper, 'Age').value).toBe('72');
+        expect(rowFor(wrapper, 'age').classes()).toContain('encode__scan-row--danger');
+        expect(rowFor(wrapper, 'age').text()).toContain('This may be wrong: the scan saw “72 .” and filled in the nearest answer. Check it against the paper.');
+        expect(rowFor(wrapper, 'age').text()).not.toContain('Needs manual entry');
+    });
+
     it('lists every answer that could not be filled in, in the server\'s words', () => {
         const wrapper = mountScan(payload(scan()));
         const notice = wrapper.find('[data-notice="not_carried"]');

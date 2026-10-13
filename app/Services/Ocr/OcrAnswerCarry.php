@@ -26,7 +26,9 @@ use App\Enums\FieldType;
  * ── TWO MORE THINGS NEVER CARRY ─────────────────────────────────────────────────────────────────────
  * A null value stays empty for a person to enter: since `D108` (M156) the matcher fills in a value read below
  * the review threshold too (the `manual` tier, which carries like any other and is marked "may be wrong" on the
- * review screen), so only an extraction stored before `M156` still holds a withheld null. A `duration` is read
+ * review screen), so only an extraction stored before `M156` still holds a withheld null. Since `D117` (M167) the
+ * reader also fills in the nearest value for writing it could not parse (`repaired`), so `unreadable` now means
+ * nothing usable was seen — or an extraction stored before `M167`. A `duration` is read
  * but has no answer control in any channel (`FieldTypeMirrorDriftTest` pins the encode and guest lists
  * together), so it is listed rather than saved unseen.
  *
@@ -54,7 +56,7 @@ final class OcrAnswerCarry
      * @param  array<string, mixed>  $current  the schema snapshot of the current published version
      * @return array{
      *     answers: array<string, mixed>,
-     *     fields: array<string, array{state: string, tier: string|null, confidence: int|null, text: string|null, page: int|null, carried: bool, reason: string|null, ticks: bool, inked: bool}>,
+     *     fields: array<string, array{state: string, tier: string|null, confidence: int|null, text: string|null, page: int|null, carried: bool, reason: string|null, ticks: bool, inked: bool, repaired: bool}>,
      *     dropped: list<array{key: string, label: string, text: string|null, reason: string, message: string}>
      * }
      */
@@ -268,7 +270,7 @@ final class OcrAnswerCarry
 
     /**
      * @param  array<string, mixed>  $entry
-     * @return array{state: string, tier: string|null, confidence: int|null, text: string|null, page: int|null, carried: bool, reason: string|null, ticks: bool, inked: bool}
+     * @return array{state: string, tier: string|null, confidence: int|null, text: string|null, page: int|null, carried: bool, reason: string|null, ticks: bool, inked: bool, repaired: bool}
      */
     private function meta(array $entry, bool $carried, ?string $reason): array
     {
@@ -286,6 +288,9 @@ final class OcrAnswerCarry
             // Whether the answer was read from the ink in its printed box, not from text (M160, `D113`): its 80 is a floor, not a
             // measured confidence, so the review screen names how it was read instead.
             'inked' => ($entry['read_by'] ?? null) === 'ink',
+            // Whether the reader filled in the nearest value the box can hold because what it saw did not parse (`D117`, M167),
+            // so the review screen says what was seen and that it may be wrong. False for a scan read before `M167`.
+            'repaired' => ($entry['repaired'] ?? null) === true,
         ];
     }
 

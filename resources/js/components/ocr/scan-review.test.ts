@@ -7,7 +7,7 @@ import { scanNote, type ScanFieldMeta } from './scan-review';
  */
 
 function meta(overrides: Partial<ScanFieldMeta>): ScanFieldMeta {
-    return { state: 'read', tier: 'auto', confidence: 96, text: 'Maria', page: 1, carried: true, reason: null, ticks: false, inked: false, ...overrides };
+    return { state: 'read', tier: 'auto', confidence: 96, text: 'Maria', page: 1, carried: true, reason: null, ticks: false, inked: false, repaired: false, ...overrides };
 }
 
 describe('scanNote', () => {
@@ -82,6 +82,24 @@ describe('scanNote', () => {
             'No tick was read as text here (page 1), so this was read from the ink in the box. Check it against the paper.',
         );
         expect(scanNote(meta({ tier: 'review', confidence: 80, inked: false }), false)?.text).toBe('Check this answer: it was read at 80% confidence.');
+    });
+
+    it('quotes what was seen beside the nearest answer filled in for it, and says it may be wrong (M167, D117)', () => {
+        // Round 1's sheet 01: the year boxes read "190", so the box holds 0190-11-12 for the reviewer to correct.
+        expect(scanNote(meta({ tier: 'review', confidence: 76, text: '12 11 190', repaired: true }), false)).toEqual({
+            tone: 'danger',
+            text: 'This may be wrong: the scan saw “12 11 190” and filled in the nearest answer. Check it against the paper.',
+        });
+        expect(scanNote(meta({ tier: 'manual', confidence: 40, text: '72 .', repaired: true, page: 2 }), true)?.text).toBe(
+            'This may be wrong: the scan saw “72 .” (page 2) and filled in the nearest answer. Check it against the paper.',
+        );
+        expect(scanNote(meta({ tier: 'review', confidence: 80, text: null, repaired: true }), false)?.text).toBe(
+            'This may be wrong: the scan filled in the nearest answer to what it saw. Check it against the paper.',
+        );
+        // A repaired value that could not be carried is still listed above the form, as any other.
+        expect(scanNote(meta({ carried: false, reason: 'type_changed', text: '72 .', repaired: true }), false)?.text).toBe(
+            'The scan read “72 .” here, but it could not be filled in. See the list above the form.',
+        );
     });
 
     it('points at the list above the form for an answer that could not be filled in', () => {

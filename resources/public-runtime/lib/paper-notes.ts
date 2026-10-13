@@ -7,7 +7,8 @@
  *
  *   - `fill`  — nothing could be filled in: the reader could not make the answer out, or what it read does not fit
  *               this question. The guest is asked to fill it in, and shown what was read when there was something.
- *   - `check` — something was filled in, but the reader was not sure, or read a tick from the ink in its box.
+ *   - `check` — something was filled in, but the reader was not sure, read a tick from the ink in its box, or filled in
+ *               the nearest answer to writing that did not fit as written (`D117`: "72 ." is 72).
  *   - none    — read with confidence, or left blank on a question that is not a box to tick.
  *
  * A blank TICK question is a `check`: the reader can miss a light tick (`M157`), so "you left this blank" would be a
@@ -46,7 +47,8 @@ export function paperNote(meta: PaperFieldMeta | undefined): PaperNote | null {
         return meta.ticks ? { kind: 'check', text: 'We did not see a tick here. If you ticked one, please choose it.' } : null;
     }
 
-    if (meta.state === 'read' && (meta.inked || meta.tier === 'review' || meta.tier === 'manual')) {
+    // `D117`: a value filled in as the nearest one the question can hold is always one to check; its tier says so too.
+    if (meta.state === 'read' && (meta.repaired || meta.inked || meta.tier === 'review' || meta.tier === 'manual')) {
         return { kind: 'check', text: 'Please check this answer. We may have read it wrong.' };
     }
 

@@ -18,6 +18,13 @@ namespace App\Services\Ocr;
  * every coordinate defaults to 0 rather than being required. A parser that insisted on both keys would drop
  * exactly the words that touch the page edge.
  *
+ * ⚠️ A SPACE IS A BREAK VISION MARKED, NOT A GAP BETWEEN WORDS (M169, `R-27049032`). Vision returns a written `.` `,` or
+ * `@` as a word of its own, and marks on a word's last character the break that follows it (`property.detectedBreak`:
+ * a space, a sure space at a line's end, a line break). Where no break is marked the next word was written against it:
+ * "JR" then "." is "JR.". Each word records it as `spaced`. A paragraph's last word is always spaced, because the line
+ * builder can put two paragraphs on one line and a missing break says nothing across them. Round 1's thirty reads
+ * (`M149`): 2,858 breaks, every one on a last character; of 240 such punctuation words, 238 carried none before them.
+ *
  * Nothing here judges the reading. It only re-states it; the matcher decides what any of it means.
  */
 final class VisionDocumentParser
@@ -75,8 +82,10 @@ final class VisionDocumentParser
         $words = [];
         foreach ($this->listAt($page, 'blocks') as $block) {
             foreach ($this->listAt($block, 'paragraphs') as $paragraph) {
-                foreach ($this->listAt($paragraph, 'words') as $word) {
-                    $parsed = $this->word($word, $width, $height);
+                $paragraphWords = $this->listAt($paragraph, 'words');
+                $last = array_key_last($paragraphWords);
+                foreach ($paragraphWords as $i => $word) {
+                    $parsed = $this->word($word, $width, $height, $i === $last);
                     if ($parsed !== null) {
                         $words[] = $parsed;
                     }
@@ -90,9 +99,10 @@ final class VisionDocumentParser
     /**
      * @param  array<string, mixed>  $word
      */
-    private function word(array $word, float $width, float $height): ?OcrWord
+    private function word(array $word, float $width, float $height, bool $endsParagraph): ?OcrWord
     {
         $symbols = [];
+        $broken = false;
         foreach ($this->listAt($word, 'symbols') as $symbol) {
             $text = $symbol['text'] ?? null;
             if (! is_string($text) || $text === '') {
@@ -100,6 +110,8 @@ final class VisionDocumentParser
             }
             [$x0, $y0, $x1, $y1] = $this->box($symbol, $width, $height);
             $symbols[] = new OcrSymbol($text, $this->confidence($symbol), $x0, $y0, $x1, $y1);
+            // The break after a character is marked on that character, so the word's is its LAST character's.
+            $broken = $this->hasBreak($symbol);
         }
 
         if ($symbols === []) {
@@ -109,7 +121,20 @@ final class VisionDocumentParser
         [$x0, $y0, $x1, $y1] = $this->box($word, $width, $height);
         $text = implode('', array_map(static fn (OcrSymbol $s): string => $s->text, $symbols));
 
-        return new OcrWord($text, $this->confidence($word), $x0, $y0, $x1, $y1, $this->angle($word, $width, $height), $symbols);
+        return new OcrWord($text, $this->confidence($word), $x0, $y0, $x1, $y1, $this->angle($word, $width, $height), $symbols, spaced: $broken || $endsParagraph);
+    }
+
+    /**
+     * Whether Vision marked a break after this character — any kind: a space, a line's end, a line break. Protobuf JSON
+     * omits an empty message, so a character followed by nothing carries no `property` at all.
+     *
+     * @param  array<string, mixed>  $symbol
+     */
+    private function hasBreak(array $symbol): bool
+    {
+        $property = $symbol['property'] ?? null;
+
+        return is_array($property) && is_array($property['detectedBreak'] ?? null);
     }
 
     /**

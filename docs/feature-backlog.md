@@ -13828,7 +13828,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`nit` · A reload while checking a paper copy loses the check, and the copy falls back to staff.** Found by `M166`. The paper token lives only in the page's memory, and review mode keeps no device draft (it cannot carry the token), so a reload returns the sender to the empty form; the scan waits for staff as `M165` left it, and nothing is lost but the guest's corrections. The remedy is to keep the token for the visit (`respondent_session`), so a reload reopens the check. **Latent.** Filed by `M166`. **Tier: during-testing.**
 
-- **`minor` · A guest checking a paper copy sees the scanned pages folded above the form rather than beside it, and the staff review gives the paper well under half the width.**
+- ✅ **CLOSED BY `M168` (2026-10-13) — ****`minor` · A guest checking a paper copy sees the scanned pages folded above the form rather than beside it, and the staff review gives the paper well under half the width.**
   Found by the user at `M166`'s check on staging (2026-10-13): *"its better if the preview is on the left sife. so they are side
   by side. its easier for the user to validate and correct the values if they are looking on it side by side."* Clarified in chat
   the same turn: the scanned copy on the left, as on the logged-in review, and bigger — *"make it 50/50 for both guest and logged
@@ -13839,7 +13839,15 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy: on the guest page, the paper on the left and the form on the right in equal halves from 64rem (the column widens
   to 90rem only then), the paper sticky with its own scroll as on `Show.vue`; below that, the pages open above the form. The
   staff grid becomes equal halves at its existing 75rem, which leaves it about the room the guest page has at 64rem.
-  **Live.** Filed by `M168`. **Tier: during-testing.**
+  **Live.** Filed by `M168`. **Tier: during-testing.** ✅ **CLOSED BY `M168` (2026-10-13):** `RuntimeSession.vue` shows the pages first in a `.session-body` beside the form — equal halves from 64rem with the paper sticky and scrolling on its own, stacked (paper first) below that — and the folded `<details>` is gone; `RuntimeShell.vue`'s `wide` column (and `App.vue`'s banner) grows to 90rem only from 64rem, with no `position` rule in that file, so `KNOWN_UNGUARDED` is unchanged; every other session keeps the form as the slot's only child. `Encode.vue`'s scan grid (review and `M154`'s edit mode) is `minmax(0,1fr) minmax(0,1fr)` at 75rem. Proof: a Vitest case red on the old code; geometry read from the drawn boxes in `ocr-guest-upload.spec.ts` and on two `ocr-review-axe.spec.ts` screens (left of the form, equal halves, the guest paper over 0.4 of the screen, stacked above below the breakpoint), 48/48 locally at three widths in both themes; two committed mutations turned exactly the predicted desktop cases red (8 in all). Merged as PR #361 (`6b998a37`).
+
+- **`nit` · `SubmissionPdfRendererTest`'s all-hidden case fails whenever the random reference reads `…X-1…`, about one run in a thousand.**
+  Found by `M168`'s post-merge run (38392310965), which went red on `main` and so held the staging deploy until a rerun: "renders a
+  form with nothing visible in it" asserts that the hidden answer `X-1` is absent from the HTML, but the PDF prints the submission's
+  reference as `XXXX-XXXX` (`SubmissionReference::format()`, alphabet `0123456789ABCDEFGHJKMNPQRSTVWXYZ`), so a reference whose 4th
+  character is `X` and 5th is `1` puts `X-1` on the page — a 1-in-1,024 chance on every run. The remedy is a hidden value no reference
+  can contain (lowercase or with an underscore), so the assertion can only see the answer. **Live.** Filed by `M168`.
+  **Tier: during-testing.**
 
 - ✅ **CLOSED BY `M167` (2026-10-13) — ****`minor` · A scanned answer the reader could not turn into its question's type is left empty, with only a note quoting what was seen (`D117` A).**
   Found by the user on Round 1's sheet 01: Weight read "72 ." and Date of visit read "12 11 190" came back `unreadable` with no value,

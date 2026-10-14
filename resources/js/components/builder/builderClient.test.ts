@@ -19,7 +19,7 @@
 import { flushPromises } from '@vue/test-utils';
 import { afterEach, beforeEach, describe as group, expect, it, vi } from 'vitest';
 
-import { BuilderRequestError, builderClient } from './builderClient';
+import { BuilderRequestError, SIGNED_OUT_MESSAGE, builderClient } from './builderClient';
 import { useBuilderStore } from './useBuilderStore';
 import type { BuilderPageProps, ServerField, ServerSection } from './types';
 
@@ -74,16 +74,31 @@ group('builderClient surfaces a 409 as a value, never as a throw', () => {
         expect((error as BuilderRequestError).errors).toEqual({ key: ['taken'] });
     });
 
-    it('keeps a generic message when the error body is not JSON (a 419 CSRF page)', async () => {
+    it('keeps a generic message when the error body is not JSON (a proxy error page)', async () => {
         fetchMock().mockResolvedValue({
-            status: 419,
+            status: 502,
             ok: false,
             json: () => Promise.reject(new Error('not json')),
         } as unknown as Response);
 
         const error = await builderClient.patch('/forms/x/fields/f1', {}).catch((e: unknown) => e);
 
-        expect((error as BuilderRequestError).message).toBe('Request failed (419).');
+        expect((error as BuilderRequestError).message).toBe('Request failed (502).');
+    });
+
+    it('says the author was signed out on a 419 CSRF page or a 401, never "Request failed (419)." (M170)', async () => {
+        for (const status of [419, 401]) {
+            fetchMock().mockResolvedValue({
+                status,
+                ok: false,
+                json: () => Promise.reject(new Error('not json')),
+            } as unknown as Response);
+
+            const error = await builderClient.patch('/forms/x/fields/f1', {}).catch((e: unknown) => e);
+
+            expect((error as BuilderRequestError).status).toBe(status);
+            expect((error as BuilderRequestError).message).toBe(SIGNED_OUT_MESSAGE);
+        }
     });
 
     it('sends the CSRF token, the credentials and the JSON accept header Laravel’s web group expects', async () => {

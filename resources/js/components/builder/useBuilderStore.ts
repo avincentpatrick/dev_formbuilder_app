@@ -11,6 +11,7 @@
 
 import { computed, reactive, ref, type Ref } from 'vue';
 import { builderClient, BuilderRequestError, type BuilderResult } from './builderClient';
+import { editJournal } from './edit-journal';
 import type {
     BuilderPageProps,
     CanvasGroup,
@@ -88,7 +89,13 @@ export function useBuilderStore(props: BuilderPageProps) {
         error: string | null;
         wrote: boolean;
         fieldErrors: Record<Uid, Record<string, string[]>>;
-    }>({ inFlight: 0, error: null, wrote: false, fieldErrors: {} });
+        pending: boolean;
+        unsaved: Record<Uid, 'field' | 'section'>;
+    }>({ inFlight: 0, error: null, wrote: false, fieldErrors: {}, pending: false, unsaved: {} });
+
+    // M170 (`R-bfa3eb93`) — every edit the server has not confirmed, kept for this tab so a refresh puts it back. A
+    // read-only builder (an archived form has no draft) edits nothing, so it keeps nothing. See `edit-journal.ts`.
+    const journal = props.draft === null ? null : editJournal(props.draft.id);
 
     // Per-BURST bookkeeping, deliberately plain closure variables rather than reactive state: nothing renders
     // from them, and a reactive flag flipping mid-burst would make the indicator flicker between two verdicts
@@ -123,7 +130,10 @@ export function useBuilderStore(props: BuilderPageProps) {
             // Cleared only on POSITIVE evidence: everything this burst attempted, landed. This replaces the two
             // `saveError` clears that used to sit on the success path of persistField and persistSection, which
             // let a LATER success in the same burst erase an EARLIER row's failure.
-            if (!burstFailed) save.error = null;
+            // ⚠️ M170 (`R-fdc743ab`) — AND NOTHING FROM AN EARLIER BURST IS STILL UNSAVED. The rule above stopped one
+            // burst erasing its own failure and left the NEXT burst free to: a save of question A failed on the
+            // network, a save of question B landed, and the toolbar said "All changes saved" over A's lost edit.
+            if (!burstFailed && Object.keys(save.unsaved).length === 0) save.error = null;
         });
 
         queue = run.catch(() => undefined);
@@ -139,12 +149,20 @@ export function useBuilderStore(props: BuilderPageProps) {
      * 'failed' for the same reason: the server does not hold what is on screen, whatever the dialog says.
      */
     const saveState = computed<SaveState>(() => {
-        if (save.inFlight > 0) return 'saving';
-        // A field still holding a refusal is a change the server does not have, whatever saved since (M128).
-        if (save.error !== null || conflict.value !== null || Object.keys(save.fieldErrors).length > 0) return 'failed';
+        // M170 (`R-bfa3eb93`): a change waiting out the debounce is not saved either — "All changes saved" there was
+        // the sentence that let an author refresh away an edit the server never received.
+        if (save.inFlight > 0 || save.pending) return 'saving';
+        // A field still holding a refusal is a change the server does not have, whatever saved since (M128) — and so is
+        // one whose save failed with no refusal to mark it, a network failure or an ended session (M170, `R-fdc743ab`).
+        if (save.error !== null || conflict.value !== null || Object.keys(save.fieldErrors).length > 0 || Object.keys(save.unsaved).length > 0) {
+            return 'failed';
+        }
 
         return save.wrote ? 'saved' : 'idle';
     });
+
+    /** M170 — whether any edit failed to save in a way only sending it again can fix: what the alert's Retry offers. */
+    const hasUnsaved = computed(() => Object.keys(save.unsaved).length > 0);
 
     // Read-only by design: the only writers are `guard()`, `reportFailure()` and the burst verdict above. The
     // narrowing from Ref to ComputedRef is itself the guarantee that nothing else can ever set it.
@@ -159,7 +177,9 @@ export function useBuilderStore(props: BuilderPageProps) {
      */
     const saveFieldErrors = computed(() => save.fieldErrors);
 
-    const saving = computed(() => saveState.value === 'saving');
+    // ⚠️ M170 — A REQUEST IN FLIGHT, NOT `saveState === 'saving'`. The buttons this disables (Save to library, the
+    // toolbar's) must stay usable while an edit only waits out its debounce: each sends that edit first.
+    const saving = computed(() => save.inFlight > 0);
     const canUndo = computed(() => undoStack.value.length > 0);
     const canRedo = computed(() => redoStack.value.length > 0);
 
@@ -232,6 +252,15 @@ export function useBuilderStore(props: BuilderPageProps) {
         if (!field) return false;
         const result = await guard(() => builderClient.patch<ServerField>(`${base}/fields/${field.id}`, fieldPayload(field)), { uid });
         if (!result) return false;
+        // M170 — a 409 whose question already holds exactly this edit is not a conflict. It is how the put-back after a
+        // refresh meets the save sent as the page went, when that save landed after the server rendered the reload: the
+        // token moved, the content did not. Take the token and say saved; a dialog asking "mine or theirs" between two
+        // identical sides would be noise.
+        if (result.conflict && samePayload(fieldPayload(result.current as unknown as LocalField), fieldPayload(field))) {
+            field.version = result.current.version;
+            delete save.fieldErrors[uid];
+            return true;
+        }
         if (result.conflict) {
             conflict.value = { kind: 'field', uid, mine: clone(field), theirs: result.current };
             return false;
@@ -280,6 +309,10 @@ export function useBuilderStore(props: BuilderPageProps) {
             builderClient.patch<ServerSection>(`${base}/sections/${section.id}`, sectionPayload(section)),
         );
         if (!result) return false;
+        if (result.conflict && samePayload(sectionPayload(result.current as unknown as LocalSection), sectionPayload(section))) {
+            section.version = result.current.version; // M170: as `persistField()` — the same edit, landed twice
+            return true;
+        }
         if (result.conflict) {
             conflict.value = { kind: 'section', uid, mine: clone(section), theirs: result.current };
             return false;
@@ -299,6 +332,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         });
         sections.value = sections.value.filter((s) => s.uid !== uid);
         if (selection.value?.kind === 'section' && selection.value.uid === uid) selection.value = null;
+        forget(uid, 'section', section.id); // M170: a deleted section has no edit left to put back or retry
         return true;
     }
 
@@ -483,6 +517,9 @@ export function useBuilderStore(props: BuilderPageProps) {
 
     /** Save the given field to the tenant's library (one-click: no name prompt; server names it from the label). */
     function saveFieldToLibrary(uid: Uid): Promise<void> {
+        // M170 (`R-4d50e3c8`): the server copies the question AS STORED, so an edit still waiting out its debounce is
+        // queued ahead of the copy rather than after it.
+        flushCommit();
         return enqueue(async () => {
             const field = findField(uid);
             if (!field) return;
@@ -699,6 +736,9 @@ export function useBuilderStore(props: BuilderPageProps) {
     function touch(uid: Uid, kind: 'field' | 'section'): void {
         if (pendingCommit && (pendingCommit.uid !== uid || pendingCommit.kind !== kind)) flushCommit();
         pendingCommit = { uid, kind };
+        save.pending = true;
+        // M170 (`R-bfa3eb93`): written NOW, not when the debounce runs out — a refresh inside the wait is the case.
+        remember(uid, kind);
         if (commitTimer) clearTimeout(commitTimer);
         commitTimer = setTimeout(flushCommit, 600);
     }
@@ -710,6 +750,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         }
         const target = pendingCommit;
         pendingCommit = null;
+        save.pending = false;
         if (!target) return;
         if (target.kind === 'field') void commitFieldEdit(target.uid);
         else void commitSectionEdit(target.uid);
@@ -735,9 +776,13 @@ export function useBuilderStore(props: BuilderPageProps) {
             if (!field) return;
             const before = baselines.get(uid) as FieldSnapshot | undefined;
             const after = fieldSnapshot(field);
-            if (before && snapshotsEqual(before, after)) return;
+            if (before && snapshotsEqual(before, after)) {
+                settled(uid, 'field', field.id, true); // M170: typed back to what the server holds — nothing is owed
+                return;
+            }
             const held = await persistField(uid);
             if (conflict.value) return;
+            settled(uid, 'field', field.id, held, snapshotsEqual(fieldSnapshot(field), after));
             // M155 (`R-0aa94dce`): the baseline and the undo entry move only once the server holds the edit. A refused
             // one stays on screen, marked, and its baseline stays where the server is — so its next commit sends it
             // again, even unchanged, and undo never replays a step the server never took.
@@ -766,9 +811,13 @@ export function useBuilderStore(props: BuilderPageProps) {
             if (!section) return;
             const before = baselines.get(uid) as SectionSnapshot | undefined;
             const after = sectionSnapshot(section);
-            if (before && snapshotsEqual(before, after)) return;
+            if (before && snapshotsEqual(before, after)) {
+                settled(uid, 'section', section.id, true);
+                return;
+            }
             const held = await persistSection(uid);
             if (conflict.value) return;
+            settled(uid, 'section', section.id, held, snapshotsEqual(sectionSnapshot(section), after));
             if (!held) return; // M155: as `commitFieldEdit()` — only an edit the server holds moves the baseline
             baselines.set(uid, clone(after));
             if (!before) return;
@@ -832,6 +881,7 @@ export function useBuilderStore(props: BuilderPageProps) {
                     if (!(await persistField(state.uid))) return;
                 }
                 baselines.set(state.uid, fieldSnapshot(field));
+                forget(state.uid, 'field', field.id); // M170: resolved either way, so nothing is left to put back
             } else {
                 const section = findSection(state.uid);
                 if (!section) return;
@@ -845,6 +895,7 @@ export function useBuilderStore(props: BuilderPageProps) {
                     if (!(await persistSection(state.uid))) return; // M155: as the field arm above
                 }
                 baselines.set(state.uid, sectionSnapshot(section));
+                forget(state.uid, 'section', section.id);
             }
         });
     }
@@ -859,6 +910,93 @@ export function useBuilderStore(props: BuilderPageProps) {
     function whenIdle(): Promise<unknown> {
         flushCommit();
         return queue;
+    }
+
+    // ── M170: an edit is never lost to a refresh, a closed tab or a failed request ─────────────────────────────
+    // (`R-bfa3eb93`, `R-fdc743ab`, `R-76474e31`.) Three pieces, each covering what the others cannot:
+    //   - the JOURNAL (`edit-journal.ts`) keeps every unconfirmed edit for the tab, and the store puts it back on load —
+    //     the only one that makes a plain refresh keep the edit EVERY time, because a reload can be served before any
+    //     save sent as the page went has landed;
+    //   - `flushForLeave()` sends a waiting edit at once as the page goes — the only one that helps a CLOSED tab;
+    //   - `save.unsaved` keeps a failed edit reported, and `retryUnsaved()` sends it again.
+
+    /** Keep the row's current content as the edit the server has not confirmed yet. */
+    function remember(uid: Uid, kind: 'field' | 'section'): void {
+        if (journal === null) return;
+        const row = kind === 'field' ? findField(uid) : findSection(uid);
+        if (!row) return;
+        const snapshot = kind === 'field' ? fieldSnapshot(row as LocalField) : sectionSnapshot(row as LocalSection);
+        journal.put({ kind, id: row.id, base: row.version, snapshot: snapshot as unknown as Record<string, unknown> });
+    }
+
+    /**
+     * What one commit's outcome means for the row. `held` — the server has the edit; `current` — nothing was typed into
+     * the row since the edit was sent, so the kept copy describes exactly what the server now holds and can go. A
+     * failure that left no refusal to mark (network, an ended session, a 500) is recorded as unsaved, so no later burst
+     * can report it saved; a refused one is already marked through `fieldErrors`.
+     */
+    function settled(uid: Uid, kind: 'field' | 'section', id: string, held: boolean, current = true): void {
+        if (held) {
+            delete save.unsaved[uid];
+            if (current) journal?.drop(kind, id);
+            return;
+        }
+        if (!(uid in save.fieldErrors)) save.unsaved[uid] = kind;
+    }
+
+    function forget(uid: Uid, kind: 'field' | 'section', id: string): void {
+        delete save.unsaved[uid];
+        journal?.drop(kind, id);
+    }
+
+    /**
+     * The page is going (`beforeunload`, `pagehide`, the tab hidden, an in-app visit away): send a waiting edit now
+     * rather than when the debounce runs out. The client marks the request `keepalive`, so it outlives the page.
+     */
+    function flushForLeave(): void {
+        flushCommit();
+    }
+
+    /** Send every edit whose save failed again — the alert's Retry, a reconnect, or the tab coming back. */
+    function retryUnsaved(): Promise<unknown> {
+        flushCommit();
+        for (const [uid, kind] of Object.entries(save.unsaved)) {
+            if (kind === 'field') void commitFieldEdit(uid);
+            else void commitSectionEdit(uid);
+        }
+
+        return queue;
+    }
+
+    /**
+     * On load: put back every kept edit the server does not hold, and save it. An entry is dropped instead when the
+     * server already holds its content (the save sent as the page went landed first), or when the row's token moved
+     * since the edit was made — someone, or this author's own landed save, wrote the row after it, and a put-back
+     * would write over that.
+     */
+    function restoreJournal(): void {
+        if (journal === null) return;
+        for (const entry of journal.read()) {
+            if (entry.kind === 'field') {
+                const row = fields.value.find((f) => f.id === entry.id);
+                const kept = row ? ({ ...row, ...entry.snapshot } as LocalField) : null;
+                if (!row || !kept || row.version !== entry.base || samePayload(fieldPayload(kept), fieldPayload(row))) {
+                    journal.drop(entry.kind, entry.id);
+                    continue;
+                }
+                applyFieldSnapshot(row, entry.snapshot as unknown as FieldSnapshot);
+                void commitFieldEdit(row.uid);
+            } else {
+                const row = sections.value.find((s) => s.id === entry.id);
+                const kept = row ? ({ ...row, ...entry.snapshot } as LocalSection) : null;
+                if (!row || !kept || row.version !== entry.base || samePayload(sectionPayload(kept), sectionPayload(row))) {
+                    journal.drop(entry.kind, entry.id);
+                    continue;
+                }
+                applySectionSnapshot(row, entry.snapshot as unknown as SectionSnapshot);
+                void commitSectionEdit(row.uid);
+            }
+        }
     }
 
     // ── Changing a question's type (Increment M123, `B5b`) ─────────────────────────────────────────
@@ -1093,10 +1231,15 @@ export function useBuilderStore(props: BuilderPageProps) {
 
     // ── Local mutation helpers ───────────────────────────────────────────────────
     function removeFieldLocal(uid: Uid): void {
+        const gone = findField(uid);
+        if (gone) forget(uid, 'field', gone.id); // M170: a deleted question has no edit left to put back or retry
         fields.value = fields.value.filter((f) => f.uid !== uid);
         baselines.delete(uid);
         if (selection.value?.kind === 'field' && selection.value.uid === uid) selection.value = null;
     }
+
+    // M170 — last, so every `let` the commit path reads (the queue, the debounce) is initialised before it runs.
+    restoreJournal();
 
     return {
         // state
@@ -1110,6 +1253,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         saveState,
         saveError,
         saveFieldErrors,
+        hasUnsaved,
         conflict,
         canUndo,
         canRedo,
@@ -1151,6 +1295,8 @@ export function useBuilderStore(props: BuilderPageProps) {
         redo,
         resolveConflict,
         whenIdle,
+        flushForLeave,
+        retryUnsaved,
     };
 }
 
@@ -1181,6 +1327,39 @@ function snapshotsEqual(a: unknown, b: unknown): boolean {
     return JSON.stringify(a) === JSON.stringify(b);
 }
 
+/** Keys sorted at every depth: Postgres `jsonb` hands a config back in its own key order, not the one it was sent in. */
+function canonical(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(canonical);
+    if (value !== null && typeof value === 'object') {
+        const object = value as Record<string, unknown>;
+
+        return Object.fromEntries(Object.keys(object).sort().map((key) => [key, canonical(object[key])]));
+    }
+
+    return value;
+}
+
+/**
+ * M170 — whether two saves would write the same row: their payloads, the version token aside. Compared as the PAYLOAD
+ * rather than the snapshot because that is all the server ever stores of a save, so a key the page sends and the store
+ * never does cannot make two identical edits look different.
+ */
+function samePayload(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+    const { version: _a, ...left } = a;
+    const { version: _b, ...right } = b;
+
+    return JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
+}
+
+/**
+ * M170 (`R-7ebfb08e`) — a rule with neither a check nor an expression is a row still being written: switching a rule to
+ * Expression makes one, and the server refuses it ("not both, not neither"). Sent, it refused the WHOLE question — every
+ * Basics and Advanced edit with it — until the row was finished. It stays on screen and is sent once it is a rule.
+ */
+function isUnfinishedRule(rule: { rule_type: string | null; expression: string | null }): boolean {
+    return rule.rule_type === null && (rule.expression ?? '').trim() === '';
+}
+
 function fieldPayload(field: LocalField): Record<string, unknown> {
     return {
         key: field.key,
@@ -1198,7 +1377,7 @@ function fieldPayload(field: LocalField): Record<string, unknown> {
         is_queryable: field.is_queryable,
         indexed_data_type: field.indexed_data_type,
         version: field.version,
-        validations: field.validations.map((v) => ({
+        validations: field.validations.filter((v) => !isUnfinishedRule(v)).map((v) => ({
             rule_type: v.rule_type,
             operator: v.operator,
             rule_value: v.rule_value,

@@ -24,10 +24,25 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D117`, the last one filed, was asked and answered on 2026-10-13 in the session that filed it and recorded in `M167`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+### D119 — A staff member who opens a colleague's saved draft on the encoding page ("Continue this draft") has every save refused. Should they be able to keep editing and saving it? **Tier: during-testing.**
+
+**Filed 2026-10-14 by Lane A in `M170`**, while checking every autosave for the user's report (`R-ae57cf6f`). The inbox offers "Continue this draft" to anyone allowed to submit the draft (`SubmissionPolicy::promote()`, which has no author check), but the draft save looks the draft up by its author (`ClientUuidResolver::resolve()`, scoped that way since `M11`), so for anyone else every autosave is refused and saving stops with a red message.
+
+- **A — yes: anyone allowed to continue a draft can save into it (recommended).** The draft keeps its original author and records who last saved it. It matches what the resume page was built for: a supervisor or a co-encoder finishing someone else's entry.
+- **B — no: only the author continues a draft.** "Continue this draft" is hidden from everyone else, who can still open it read-only and submit it as it stands.
+
 
 
 ## ANSWERED
+### D118 — Someone filling a public form closes it, then opens the link again on the same phone or computer. It starts blank, because the form keeps answers only for the same tab. Should their answers come back? **A — yes, after asking: "Continue where you left off" or "Start over", shown before any answer appears.**
+
+**Asked and answered 2026-10-14 (user decision, in chat), recorded by Lane A in `M170`.** Asked while checking every autosave for the user's report *"the autosave feature is not working on other clients"*. Since `M21` the guest autosave restores answers only in the same tab and visit (`resources/public-runtime/composables/useAutosave.ts`), on purpose, so the next person at a shared device never sees them.
+
+- **A — yes, ask first (recommended, chosen).** The cost, accepted: on a shared phone or a kiosk, the next person could press Continue and see the answers. A kiosk mode is where to switch it off.
+- **B — no, same tab only (as built).** Only the defect where a long pause loses the answers on a reload is fixed.
+- **C — only through "Save and finish later".** The emailed link, which each form has to switch on.
+
+**What the answer files, in the same push:** a `during-testing` row in `docs/feature-backlog.md` (`R-8881210a`, *reopening a public form's link on the same device starts a blank form*).
 ### D117 — A scan saw writing it could not turn into the question's type — a weight written "72.", a date whose year was read as "190" — and the review screens left the box empty with "Needs manual entry … It saw …". Should the box be filled with the nearest answer it can hold? **A — yes: every question the scan saw anything in is filled with the nearest answer its box can hold, and marked that it may be wrong.**
 
 **Asked and answered 2026-10-13 (user decision, in chat), recorded by Lane A in `M167`'s claim.** The comment, with a screenshot of the staff review of Round 1's sheet 01: *"previously, i commented on the ocr reader that it whenever a value is read even if the confidence is low, it must be reflected in the field and just notify that it may be wrong. and i also tested that and it is functioning well before. but now i tried testing an upload now and its back to not reflecting the read value and just telling what is read."* Not a regression of `D108`: in the same screenshot Full name (66%) and Email (46%) are filled in and marked. Weight and Date of visit took the other path — the reader could not make the text into a number or a date, so it returned `unreadable` with no value, which `D108` never touched. The question put: the date boxes read 12 / 11 / 190 — fill it as read (11/12/0190) and mark it, or leave it empty with the note. The answer widened it to every type: *"fill as read and let the user correct it. its better than the user will type everyhting. also for the decimal. fill it in and let the user correct it. actually all the fields must be fields based on what is read and let the user correct it. its always better to have an initial value rather than user will type everything from 0."*

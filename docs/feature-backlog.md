@@ -14093,7 +14093,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   colleague save into the draft, or stop offering them "Continue" — `D119`, answered A (the user, 2026-10-14): a permitted
   colleague saves into the draft, which keeps its original author. **Live.** Filed by `M170`. **Tier: during-testing.**
 
-- **`minor` · The form hub's stat tiles break "Accepting" in the middle of the word and wrap the last-response date onto three lines.**
+- ✅ **CLOSED BY `M171` (2026-10-15) — ****`minor` · The form hub's stat tiles break "Accepting" in the middle of the word and wrap the last-response date onto three lines.**
   The user's comment (2026-10-14): *"there are some large words in the form overview specially the accepting responses and last
   response date is being wraped making the word cut in half"*. Measured on `origin/main` at `0dc971b6`:
   `packages/design-system/src/components/StatTile/StatTile.vue:187` sets the value in the heading-1 role (38px) and `:225` gives it
@@ -14102,9 +14102,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   date-time value (`:386`) wraps to three lines. `resources/js/Pages/admin/TenantDetail.vue:342-349` passes `row.display` into the same
   role. The remedy is a `valueSize` prop on `MdsStatTile` — `compact` sets the heading-3 role with the same gradient, `anywhere` kept
   as the escape — used by the hub's two prose tiles and the console's usage tiles, with the hub grid's floor raised to
-  `min(100%, 240px)`; a story and a `StatTile.test.ts` case, red first. **Live.** Filed by `M171`. **Tier: during-testing.**
+  `min(100%, 240px)`; a story and a `StatTile.test.ts` case, red first. **Live.** Filed by `M171`. **Tier: during-testing.** ✅ **CLOSED BY `M171` (2026-10-15):** `MdsStatTile` takes `valueSize="compact"` — the value in the heading-2 role whole (size, leading, weight) with the base tracking, the gradient and the `anywhere` escape kept — and ALL FOUR hub tiles use it (the user chose one even row over two sizes); the last response shows its date with the time on the caption line, because a compact date-and-time still wrapped at 1440px; the hub grid's floor is `min(100%, 240px)`; the console's usage tiles are compact too. `list-layout.spec.ts` measures every word of every hub tile value in one line box (red on the trunk at 834 and 1440 — "Accepting" — green at 375), and one line per value at 1440.
 
-- **`minor` · The audit log's actor avatar stretches to the width of its cell.**
+- ✅ **CLOSED BY `M171` (2026-10-15) — ****`minor` · The audit log's actor avatar stretches to the width of its cell.**
   The user's comment (2026-10-14): *"the initial avatar size in the audit log is so large under the actor column"*. Measured on
   `origin/main` at `0dc971b6`: `resources/js/Pages/audit/Index.vue:406` makes `.audit__actor` a column flex container, whose default
   `align-items: stretch` hands the chip the column's inline size, and `packages/design-system/src/components/Avatar/Avatar.vue:83`
@@ -14113,9 +14113,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (`resources/js/Pages/members/Index.vue:503`) and the inbox (`resources/js/Pages/submissions/Inbox.vue:511`) use inline-flex rows and
   are unaffected. The remedy is the avatar beside the name in an inline-flex row (`align-items: center`, `gap: --mds-space-2`) with
   the "via …" line under the name, pinned by `resources/js/Pages/audit/index.test.ts`. **Live.** Filed by `M171`.
-  **Tier: during-testing.**
+  **Tier: during-testing.** ✅ **CLOSED BY `M171` (2026-10-15):** the chip sits beside a text block that stacks the name over the "via …" line (`.audit__actor-text`), in an inline-flex row with `align-items: center` — load-bearing, because a row's default `stretch` hands the chip the text's two-line height on a "via" row (a 24×40 oval, measured with a `stretch` mutant). `list-layout.spec.ts` measures every chip at most 32px (82px at 375 and 834, 99px at 1440 on the trunk), and again on a cell given a second line, since no seeded row has one.
 
-- **`minor` · On Integrations the Connect button sits flush under the provider's warning, and the description and permissions lines are laid out as flex rows.**
+- ✅ **CLOSED BY `M171` (2026-10-15) — ****`minor` · On Integrations the Connect button sits flush under the provider's warning, and the description and permissions lines are laid out as flex rows.**
   The user's comment (2026-10-14): *"in the integration sites page, the button connect google sheets is too close from the object
   above it"*. Measured on `origin/main` at `0dc971b6`: `resources/js/Pages/integrations/Index.vue:361-363` leaves the selector list
   `.provider__description, .provider__scopes,` dangling across two comments, so it joins `.provider__actions, .connection__actions`
@@ -14125,7 +14125,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   of any width. The remedy restores the two paragraph rules, makes the card body a column with a gap, gives the caution a bottom
   margin, puts `margin-top: auto` on the actions so buttons align across cards, and switches the grid to `auto-fill` with a
   `min(100%, 20rem)` floor; `resources/js/Pages/integrations/index.test.ts` pins the rules. **Live.** Filed by `M171`.
-  **Tier: during-testing.**
+  **Tier: during-testing.** ✅ **CLOSED BY `M171` (2026-10-15):** H15b's paragraph rule is restored (the dangling list was left by J4a's `74a0e1f6`); the Connect button moved into `MdsCard`'s footer slot and the card became a column whose body grows (gap `--mds-space-3`), so every button sits on one line across a row of cards with the footer's 16px above it. Not the remedy's `margin-top: auto`: an auto margin is zero in the tallest card of a row, which is the Google card with the warning. The grid is `auto-fill`, floor `min(100%, 20rem)`. `list-layout.spec.ts` measures the warning-to-button gap (0px on the trunk at all three widths) and one line of buttons at 1440.
 
 - **`minor` · Every tenant page sits in a centred 1200px column (1600px for ten list pages) and the console in 1100px, leaving dead space either side of a wide screen.**
   The user's comment (2026-10-14): *"some pages only occupies the middle part of the page specially when screen is wide. can we make
@@ -14140,7 +14140,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the `--wide` class deleted, the builder's `--fluid` kept; the Vitest set rewritten; the e2e case made a 1920px case asserting a
   list page AND `/settings` fill the region (red today); the two stories; DSR §3.0 and the §6 bullet amended — and the same edit
   records the page-level `dl` collapse at 480px that ten pages author (`resources/js/Pages/scopes/Index.vue:387`,
-  `resources/js/Pages/forms/Show.vue:574`) against §6's "pages never add breakpoint logic" sentence, which today contradicts them.
+  `resources/js/Pages/forms/Show.vue:594`) against §6's "pages never add breakpoint logic" sentence, which today contradicts them.
   **Live.** Filed by `M171`. **Tier: during-testing.**
 
 - **`minor` · The settings pages stack 640px cards in one column, so a wide screen shows one narrow column and the rest of the page empty.**
@@ -14174,7 +14174,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `resources/js/Pages/forms/builder-layout.test.ts` pins the builder's. **Live.** Filed by `M171`. **Tier: during-testing.**
 
 - **`minor` · The form hub and the submission page stack their facts above their tables, so on a wide screen every row runs from one edge of the glass to the other.**
-  `resources/js/Pages/forms/Show.vue:338-361` (identity and facts), `:363-388` (tiles), `:396-468` (two full-width tables);
+  `resources/js/Pages/forms/Show.vue:343-366` (identity and facts), `:368-407` (tiles), `:415-487` (two full-width tables);
   `resources/js/Pages/submissions/Show.vue:415-420` three fact cards in `auto-fit minmax(18rem, 1fr)` and `:350-361` the answer blocks
   one under the other, each row `10rem 1fr` (`:495-501`), so a value sits 2,000px from its label on a 2560px screen. `D120` A. The
   remedy is a page grid from a 75rem container — main content (tables, answers) in `minmax(0, 1fr)`, the facts, versions, review and
@@ -14184,11 +14184,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · The webhook, integration-rule and console workspace pages stack two fact cards over a full-width log, and the console's dialogs rely on browser-default paragraph margins.**
   `resources/js/Pages/webhooks/Show.vue:358-363` and `resources/js/Pages/integrations/RuleShow.vue:326-331` put two cards in
-  `auto-fit minmax(18rem, 1fr)` above the log (`:259` in each); `resources/js/Pages/admin/TenantDetail.vue:540-544` the same with
+  `auto-fit minmax(18rem, 1fr)` above the log (`:259` in each); `resources/js/Pages/admin/TenantDetail.vue:542-546` the same with
   `:546-548` stacking every section under it. On that page `:491-498` and `:513-519` are paragraphs with no class in two dialogs
   (every tenant dialog styles a `__prose` rule), and `:562` hard-codes `letter-spacing: 0.04em` where `--mds-tracking-wide` exists.
-  `D120` A. The remedy is the hub's page grid (cards aside, log main, from 75rem), a `__prose` rule, and the token. **Live.** Filed by
-  `M171`. **Tier: during-testing.**
+  `D120` A. The remedy is the hub's page grid (cards aside, log main, from 75rem), a `__prose` rule, and the token. **Live.**
+  Filed by `M171`. **Tier: during-testing.**
 
 - **`minor` · Domains, search results and the achievements leaderboard are single columns of full-width rows.**
   `resources/js/Pages/domains/Index.vue:212-216` (`.domains__list`, a column of `DomainCard`s), `resources/js/Pages/search/Index.vue:210-214`
@@ -14265,7 +14265,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   not built is queued rather than left in prose. **Live.** Filed by `M171`. **Tier: after-launch.**
 
 - **`minor` · Fifteen files set small error text in `--mds-color-danger-text`, which resolves to `danger-300` in dark and measures 4.22:1 on the surface.**
-  The repository's own notes say so (`resources/js/Pages/admin/AuditLog.vue:287`, `resources/js/Pages/admin/TenantDetail.vue:537`,
+  The repository's own notes say so (`resources/js/Pages/admin/AuditLog.vue:287`, `resources/js/Pages/admin/TenantDetail.vue:539`,
   `resources/js/components/builder/LogicRail.vue:228`, `resources/js/components/shell/FeedbackButton.vue:295`) and the uses remain:
   `resources/js/Pages/forms/Builder.vue:857`, `resources/js/components/webhooks/WebhookFormModal.vue:197`,
   `resources/js/components/scopes/GrantModal.vue:256`, `resources/js/components/scopes/DeleteNodeModal.vue:120`,
@@ -14287,7 +14287,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   their own rows). The remedy is the token. **Live.** Filed by `M171`. **Tier: during-testing.**
 
 - **`nit` · Three truncated values offer no way to read the whole text where they are shown.**
-  `resources/js/Pages/webhooks/Index.vue:224-236` (`.webhooks__url`), `resources/js/Pages/integrations/Index.vue:436-448`
+  `resources/js/Pages/webhooks/Index.vue:224-236` (`.webhooks__url`), `resources/js/Pages/integrations/Index.vue:456-468`
   (`.connection__channel`) and `resources/js/Pages/integrations/RuleShow.vue:421-431` (`.detail__result`) clip with an ellipsis and
   carry no `title`. The remedy is a `title` with the full value — allowed because the same text is on the row's detail page, so no
   tooltip component is owed. **Live.** Filed by `M171`. **Tier: during-testing.**
+
+- **`nit` · The root lockfile records the design system's `vue` range as `^3.5.39` while its `package.json` says `^3.5.43`, so the node container's `npm install` rewrites `package-lock.json` and dirties the working tree.**
+  Found by `M171`: after the stack started, `git status` showed `package-lock.json` changed by one line — the `packages/design-system`
+  entry's `"vue": "^3.5.39"` became `"^3.5.43"`. `M137` raised the design system's range (`packages/design-system/package.json:37`) and
+  the root lock was never regenerated. Harmless to the build (CI runs `npm install`, not `npm ci`), but a session that stages
+  everything ships an unrelated lockfile line, and one that does not keeps reverting it. The remedy is the one-line lock update in a
+  PR of its own. **Live.** Filed by `M171`. **Tier: during-testing.**

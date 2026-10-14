@@ -14028,3 +14028,67 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the left with the chapter being read marked; below that, a fixed "Contents" button and a "Back to contents" link at the end of each
   chapter. ⚠️ Filed in `M164`'s PR rather than its claim push, because the OCR session asked that nothing outside `paths-ignore`
   reach `main` while its merges were in flight. **Live.** Filed by `M164`. **Tier: early-testing.** ✅ **CLOSED BY `M164` (2026-10-12):** from 1024px the contents are a sticky column on the left of `/help` that scrolls on its own and marks the chapter being read (`aria-current="location"`, a bar, kept in the column's view); below that a fixed **Contents** button and **Back to contents** after every chapter. The current chapter is read from the scroll position, with an end-of-page rule for the short closing chapter. Proof: `tests/e2e/help-contents.spec.ts` at desktop and phone width (red on the trunk; red again with `position: static`), four Vitest cases (the end-of-page rule mutated, caught), responsive-axe Help 6/6.
+
+- ✅ **CLOSED BY `M170` (2026-10-14) — ****`major` · A setting changed in the form builder just before a refresh is lost, while the toolbar already says "All changes saved".**
+  The user's urgent report (2026-10-14): *"the autosave feature is not working on other clients. though i tested it and it work
+  for me"*, narrowed in the same session to *"The autosave problem is in the form builder. For a Whole Number question, the
+  settings on the Basic, Validation and Advanced tabs don't save. Please check every field type and every setting on every tab.
+  For each one, confirm that changing it starts a save, that the server keeps the value, and that it's still there after a plain
+  page refresh without clicking anything else first."* `touch()` in `resources/js/components/builder/useBuilderStore.ts` waits
+  600 ms after the last change before it saves, nothing sends a waiting change when the page goes (no `beforeunload`, `pagehide`
+  or `visibilitychange` handler in the store or in `Pages/forms/Builder.vue`), and `builderClient.ts` sends without `keepalive`.
+  While the change waits, `saveState` is `idle`/`saved`, so `save-label.ts` says "All changes saved". Measured in a real browser
+  on the trunk: Help text typed and refreshed at once came back empty at 375px. ⚠️ A flush on leaving cannot close it alone —
+  Chrome asks for the new page before the old one's `pagehide`, and even a save sent from `beforeunload` races the reload's
+  request — so the remedy also keeps each unconfirmed edit for the tab and puts it back on load. Not specific to Whole Number:
+  every setting of every type takes this path. **Live.** Filed by `M170`. **Tier: during-testing.** ✅ **CLOSED BY `M170` (2026-10-14):** each unconfirmed edit is kept for the tab the moment it is made (`resources/js/components/builder/edit-journal.ts`, `sessionStorage`), and on load the store puts back any edit the server does not hold and saves it — dropped instead when the server already holds it or the row moved on since; a waiting edit is sent at once on `beforeunload`, `pagehide`, a hidden tab or an in-app visit away, as a `keepalive` write; a 409 whose question already holds the same edit is taken as saved; the toolbar says "Saving…" while a change waits. Proof: `tests/e2e/builder-settings-refresh.spec.ts` — all 13 Whole Number settings on Basics, Validation and Advanced lost by a refresh straight after the change on the trunk build, kept with the fix — `settings-save-matrix.test.ts` (every Basics, Validation and Advanced control on a Whole Number and every type's own tab starts a save carrying its value; the pending label, the leave flush, the put-back and the identical 409 red on the trunk), and `BuilderSettingsRoundTripTest.php` (the server keeps every setting of all 31 types and of a section and sends each back on the builder page). ⚠️ **Three defects the real browser found after the first fix, all closed before merge** — a 409 over this tab's own landed save was judged against the field as it was NOW (the next setting already typed into it) rather than against what the request sent, and the minimum "Allow negative numbers" writes carries no `logic_group` while the server sends it back as null, so after that toggle no comparison matched — and two races: an edit made while an earlier save of the same question was still in flight, and a page going while a `keepalive` save was in flight — it fails on the page's side yet still reaches the server, so the next edit went at the old token and was refused. A timed probe measured both; the kept edit now remembers every content this tab sent since its base, and a move of the row to one of those is taken as this tab's own. Each has a Vitest case that a committed-and-restored mutant turns red.
+
+- ✅ **CLOSED BY `M170` (2026-10-14) — ****`minor` · A builder save that failed reads "All changes saved" once a later save on another question lands.**
+  Found by `M170` beside `R-bfa3eb93`. `enqueue()`'s burst verdict in `useBuilderStore.ts` clears `save.error` whenever a burst
+  succeeds, and `guard()` marks a question only when the failure carries a field error map — so a network failure (a laptop
+  waking from sleep), a 419 or a 500 on question A, followed by a successful save of question B, leaves nothing standing: the
+  toolbar says "All changes saved", A's edit stays on screen, and a refresh shows it was never stored. **Live.** Filed by `M170`.
+  **Tier: during-testing.** ✅ **CLOSED BY `M170` (2026-10-14):** a failure with nothing to mark is recorded per question (`save.unsaved`), the toolbar reads "Not saved" and the alert stays until that question saves, and the alert offers Retry; a reconnect or the tab coming back retries too. `save-state.test.ts`'s retry case had pinned the defect — it "retried" by adding a section — and now retries the failed edit. Proof: `settings-save-matrix.test.ts`, red on the trunk.
+
+- ✅ **CLOSED BY `M170` (2026-10-14) — ****`minor` · An expired session stops every builder save with "Request failed (419).", and nothing sends the edits again after signing back in.**
+  Found by `M170` beside `R-bfa3eb93`: the testers lost settings "after a break". The session expires after 120 minutes idle
+  (`config/session.php`), and the builder's poll stops on purpose so it can. Every save after that returns 419 with an HTML body,
+  which `BuilderRequestError` reports as "Request failed (419)." — a message nobody can act on — and nothing retries once the
+  author signs in again. **Live.** Filed by `M170`. **Tier: during-testing.** ✅ **CLOSED BY `M170` (2026-10-14):** a 419 or 401 now reads "You were signed out, so your latest changes are not saved yet. Sign in again in a new tab, then press Retry.", the edit stays on screen and in the tab's journal, and Retry sends it again. Proof: `settings-save-matrix.test.ts` and `builderClient.test.ts`, red on the trunk.
+
+- ✅ **CLOSED BY `M170` (2026-10-14) — ****`minor` · Switching a validation rule to Expression builds a rule the server refuses, and every other setting on that question stops saving.**
+  Found by `M170` reading every control on the Validation tab. `setMode()` in `resources/js/components/builder/ValidationEditor.vue`
+  writes `expression: ''` and `rule_type: null`; `mode()` reads `''` as rule mode, so the expression box never appears; and
+  `UpdateFieldRequest::withValidator()` refuses a rule with neither a check nor an expression. Each save sends the whole question,
+  so the 422 also refuses every Basics and Advanced edit on it until the rule is removed. **Live.** Filed by `M170`.
+  **Tier: during-testing.** ✅ **CLOSED BY `M170` (2026-10-14):** an empty expression is still Expression mode, so the box shows at once, and a save leaves out a rule with neither a check nor an expression, so the question's other settings still save. Proof: `settings-save-matrix.test.ts` and the E2E expression case, red on the trunk.
+
+- ✅ **CLOSED BY `M170` (2026-10-14) — ****`nit` · "Save to library" copies a question without the edit made in the 600 ms before the click.**
+  Found by `M170`. `saveFieldToLibrary()` in `useBuilderStore.ts` queues its request without sending the waiting edit first, and
+  the server copies the question as it is stored, so the library item misses the last change. **Live.** Filed by `M170`.
+  **Tier: during-testing.** ✅ **CLOSED BY `M170` (2026-10-14):** `saveFieldToLibrary()` sends the waiting edit before the copy. Proof: `settings-save-matrix.test.ts`, red on the trunk.
+
+- **`minor` · A respondent who pauses for more than ten minutes and then keeps typing loses every answer on the next reload.**
+  Found by `M170` checking the public form's autosave for the user's report. `touchRespondentSession()` in
+  `resources/public-runtime/lib/respondent-session.ts` never revives an expired visit, by design for kiosks, so after a pause past
+  `IDLE_MS` every later keystroke leaves the visit expired while `useAutosave` keeps stamping the old visit on the saved answers.
+  The next reload mints a new visit, `draftBelongsToVisit()` refuses the respondent's own answers, and their first keystroke
+  overwrites them. A person filling a long form who leaves to find a document is the case. The remedy has to keep the kiosk
+  protection: tell an expired visit that is still on screen and typing from a new person at the device. **Live.** Filed by `M170`.
+  **Tier: during-testing.**
+
+- **`minor` · Reopening a public form's link on the same device starts a blank form; it should offer "Continue where you left off" or "Start over".**
+  `D118` A (the user, 2026-10-14). Since `M21` the guest autosave restores answers only in the same tab and visit
+  (`resources/public-runtime/composables/useAutosave.ts`, `lib/respondent-session.ts`), so a respondent who closes the tab, or opens
+  the link again from a messaging app, starts blank. The user chose to offer the answers back on the same device behind a choice
+  shown before any answer appears, accepting that on a shared phone the next person could choose Continue. The kiosk-mode row this
+  file already parks is the place to switch it off for a shared device. **Live.** Filed by `M170`. **Tier: during-testing.**
+
+- **`minor` · A staff member who continues a colleague's draft on the encoding page has every autosave refused, and saving stops for good.**
+  Found by `M170` checking the staff autosave for the user's report. The resume page is gated on `SubmissionPolicy::promote()`, which
+  has no author check, and the inbox offers "Continue this draft" to anyone who passes it; but `SubmissionDraftController::store()`
+  looks the draft up through `ClientUuidResolver::resolve()` scoped to the CURRENT user, finds nothing, and returns 409
+  `submission_uuid_claimed`, which `useServerAutosave.ts` treats as permanent. `EncodeDraftTest` pins the refusal on purpose, and
+  nothing reconciles it with the resume page being open to non-authors. Decide which way it goes before fixing: let a permitted
+  colleague save into the draft, or stop offering them "Continue" — `D119`, answered A (the user, 2026-10-14): a permitted
+  colleague saves into the draft, which keeps its original author. **Live.** Filed by `M170`. **Tier: during-testing.**

@@ -117,6 +117,11 @@ function formatDate(iso: string | null): string {
     return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+/** M171 — the Last response tile's caption line: the date is its value, so the value never wraps at 1440px. */
+function formatTime(iso: string): string {
+    return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
 function formatDateTime(iso: string | null): string {
     if (!iso) return '—';
 
@@ -360,17 +365,29 @@ function isPrintable(version: VersionRow): boolean {
             </dl>
         </div>
 
+        <!--
+            M171 — EVERY TILE COMPACT, NOT JUST THE TWO WORD TILES. The user saw "Accepting" cut in half and the last
+            response wrapped onto three lines; the compact size fixes both, and the user chose one even row over large
+            figures beside small words.
+        -->
         <div class="hub__tiles">
             <MdsStatTile
                 label="Responses"
                 icon="submissions"
+                value-size="compact"
                 :value="stats.responses.toLocaleString()"
                 :href="responsesHref"
             />
-            <MdsStatTile label="Drafts in progress" icon="edit" :value="stats.drafts.toLocaleString()" />
+            <MdsStatTile
+                label="Drafts in progress"
+                icon="edit"
+                value-size="compact"
+                :value="stats.drafts.toLocaleString()"
+            />
             <MdsStatTile
                 label="Accepting responses"
                 icon="calendar"
+                value-size="compact"
                 :value="ACCEPTANCE_LABEL[schedule.acceptance]"
                 :caption="acceptanceCaption"
             />
@@ -383,7 +400,9 @@ function isPrintable(version: VersionRow): boolean {
             <MdsStatTile
                 label="Last response"
                 icon="clock"
-                :value="stats.last_response_at ? formatDateTime(stats.last_response_at) : null"
+                value-size="compact"
+                :value="stats.last_response_at ? formatDate(stats.last_response_at) : null"
+                :caption="stats.last_response_at ? `at ${formatTime(stats.last_response_at)}` : undefined"
             />
         </div>
 
@@ -527,7 +546,8 @@ function isPrintable(version: VersionRow): boolean {
 
 .hub__tiles {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    /* M171 — a 240px floor, so at 834px the four tiles take two columns rather than three ~122px text columns. */
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
     gap: var(--mds-space-4);
     margin-top: var(--mds-space-6);
 }

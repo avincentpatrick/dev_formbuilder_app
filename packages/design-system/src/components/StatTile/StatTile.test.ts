@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
 import StatTile from './StatTile.vue';
@@ -204,5 +206,54 @@ describe('MdsStatTile — the optional link', () => {
         // while sighted readers keep seeing it.
         expect(link.attributes('aria-label')).toBeUndefined();
         wrapper.unmount();
+    });
+});
+
+/**
+ * M171 — the user's comment, verbatim: *"there are some large words in the form overview specially the accepting responses
+ * and last response date is being wraped making the word cut in half"*. The value is the heading-1 role (38px) and carries
+ * `overflow-wrap: anywhere`, so "Accepting" in a ~170px text column broke mid-word. A smaller size for the tiles whose
+ * value is a word or a date, opt-in so the dashboard's figures keep their size.
+ */
+describe('MdsStatTile — the compact value (M171)', () => {
+    it('keeps the display size unless a caller asks for compact', () => {
+        const plain = mount(StatTile, { props: { label: 'Forms', value: 3, icon: 'forms' } });
+        expect(plain.classes()).not.toContain('mds-stat-tile--compact');
+        plain.unmount();
+
+        const compact = mount(StatTile, {
+            props: { label: 'Accepting responses', value: 'Accepting', icon: 'calendar', valueSize: 'compact' },
+        });
+        expect(compact.classes()).toContain('mds-stat-tile--compact');
+        // The SAME value element, so the gradient, the forced-colors restore and the `anywhere` escape still apply to it.
+        expect(compact.get('.mds-stat-tile__value').text()).toBe('Accepting');
+        compact.unmount();
+    });
+
+    it('stays compact on a linked tile', () => {
+        const wrapper = mount(StatTile, {
+            props: { label: 'Responses', value: '142', icon: 'submissions', href: '/forms/x/submissions', valueSize: 'compact' },
+        });
+        expect(wrapper.classes()).toEqual(expect.arrayContaining(['mds-stat-tile--link', 'mds-stat-tile--compact']));
+        wrapper.unmount();
+    });
+
+    // Source text, for the reason `DataTable.test.ts` gives: happy-dom computes no styles. Anchored to column 0 so the
+    // comment that names the rule cannot satisfy it.
+    const source = readFileSync(
+        join(process.cwd(), 'packages/design-system/src/components/StatTile/StatTile.vue'),
+        'utf8',
+    );
+    const rule = source.match(/^\.mds-stat-tile--compact \.mds-stat-tile__value\s*\{([^}]*)\}/m)?.[1];
+
+    it('sets the compact value in the heading-2 role, its leading included', () => {
+        expect(rule, 'the compact value rule was not found — was it renamed?').toBeDefined();
+        // The whole role, never a size alone: §2.9 keeps leading per ROLE so `[data-font-size]` re-derives it, and the
+        // note on `.mds-stat-tile__value` records what a size without its leading did to the gradient's descenders.
+        expect(rule).toMatch(/font-size:\s*var\(--mds-type-heading-2-font-size\)/);
+        expect(rule).toMatch(/line-height:\s*var\(--mds-type-heading-2-line-height\)/);
+        expect(rule).toMatch(/font-weight:\s*var\(--mds-type-heading-2-font-weight\)/);
+        // heading-1's tight display tracking is for 38px; at 24px it crowds the letters.
+        expect(rule).toMatch(/letter-spacing:\s*var\(--mds-tracking-base\)/);
     });
 });

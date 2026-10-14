@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { settlePaint } from './support/axe';
-import { openBuilder } from './support/navigate';
+import { formEntry, openBuilder } from './support/navigate';
 
 /**
  * Increment JR4 — the two properties this increment adds, neither of which any existing gate can see.
@@ -152,4 +152,48 @@ test('the builder shows exactly one pane below its threshold, and three above', 
     expect(compact, `${info.project.name} landed on the wrong side of 60em`).toBe(
         info.project.name !== 'desktop',
     );
+});
+
+// ── M171 — THE USER'S THREE COMPLAINTS, MEASURED ────────────────────────────────────────────────────────────────
+// Each is a property of laid-out boxes, so no Vitest case can see it (happy-dom lays out nothing) and neither can axe or
+// `assertClean`. Each case was run red against the unfixed pages first.
+
+// *"there are some large words in the form overview specially the accepting responses and last response date is being
+// wraped making the word cut in half"*. A word cut in half is a word whose text spans two line boxes, which a Range over
+// that word reports as two rects — so this asserts exactly the complaint, whatever the font or the viewport.
+test('Form hub — no stat tile breaks a word across two lines', async ({ page }, info) => {
+    await page.goto('/forms', { waitUntil: 'networkidle' });
+    await formEntry(page, 'Community Health Survey').getByRole('link', { name: 'Community Health Survey' }).click();
+    await page.waitForURL(/\/forms\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+    const values = page.locator('.hub__tiles .mds-stat-tile__value');
+    await values.first().waitFor({ state: 'visible', timeout: 10_000 });
+    await settlePaint(page);
+
+    const measured = await values.evaluateAll((els) =>
+        els.map((el) => {
+            const node = el.firstChild;
+            const text = node?.textContent ?? '';
+            const lines = (range: Range) => new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size;
+            const broken: string[] = [];
+            for (const m of text.matchAll(/\S+/g)) {
+                const range = document.createRange();
+                range.setStart(node!, m.index!);
+                range.setEnd(node!, m.index! + m[0].length);
+                if (lines(range) > 1) broken.push(m[0]);
+            }
+            const whole = document.createRange();
+            whole.selectNodeContents(el);
+
+            return { text: text.trim(), broken, lines: lines(whole) };
+        }),
+    );
+
+    // Not vacuous: the seeded form has no schedule, so it is open — "Accepting" is the word the user saw broken.
+    expect(measured.map((m) => m.text)).toContain('Accepting');
+    expect(measured.flatMap((m) => m.broken), 'a stat tile cut a word in half').toEqual([]);
+
+    if (info.project.name === 'desktop') {
+        // The last response wrapped onto three lines at 1440px; it now fits on one.
+        expect(measured.every((m) => m.lines === 1), JSON.stringify(measured)).toBe(true);
+    }
 });

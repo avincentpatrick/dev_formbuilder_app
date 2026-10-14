@@ -35,6 +35,11 @@
  * `href: ''` — the obvious shape of a `row.can.view ? url : ''` call site — bound `href=""` onto the DIV:
  * invalid HTML, not a link, and no `--link` class, so it rendered as the inert tile it used to be while
  * carrying a bogus attribute. Found by the J2a adversarial review, not by a gate.
+ *
+ * M171 added `valueSize`. `compact` sets the value in the heading-2 role instead of heading-1, for a tile whose value
+ * is a WORD or a DATE rather than a figure: the user saw "Accepting" cut in half on the form hub, where four tiles at
+ * 1440px leave a ~170px text column and the 38px word is 204px wide. Opt-in, so the dashboard's figures keep their size;
+ * a caller uses it for a whole row of tiles, never one tile in a row, or the row reads unevenly.
  */
 import { computed } from 'vue';
 import Badge from '../Badge/Badge.vue';
@@ -57,6 +62,8 @@ const props = withDefaults(
         caption?: string;
         /** When set the whole tile becomes a link to this destination (J2a). */
         href?: string;
+        /** `compact` for a row of tiles whose values are words or dates (M171); `display` is the dashboard figure. */
+        valueSize?: 'display' | 'compact';
     }>(),
     {
         value: null,
@@ -66,6 +73,7 @@ const props = withDefaults(
         unavailableNote: undefined,
         caption: undefined,
         href: undefined,
+        valueSize: 'display',
     },
 );
 
@@ -99,7 +107,7 @@ const deltaText = computed(() => {
     <component
         :is="href ? 'a' : 'div'"
         class="mds-stat-tile"
-        :class="{ 'mds-stat-tile--link': href }"
+        :class="{ 'mds-stat-tile--link': href, 'mds-stat-tile--compact': valueSize === 'compact' }"
         :href="href || undefined"
     >
         <span class="mds-stat-tile__badge" aria-hidden="true">
@@ -223,6 +231,16 @@ const deltaText = computed(() => {
        personalization at all. `anywhere` rather than `break-word` because only `anywhere` reduces
        min-content, and the text column is a flex item sized from it. */
     overflow-wrap: anywhere;
+}
+
+/* M171 — the heading-2 role WHOLE (size, leading, weight), never a size alone, for the leading reason the note above
+   gives. The tracking returns to the base: heading-1's tight display tracking is drawn for 38px and crowds a 24px word.
+   The gradient, the forced-colors restore and the `anywhere` escape all key off `.mds-stat-tile__value`, so they hold. */
+.mds-stat-tile--compact .mds-stat-tile__value {
+    font-size: var(--mds-type-heading-2-font-size);
+    line-height: var(--mds-type-heading-2-line-height);
+    font-weight: var(--mds-type-heading-2-font-weight);
+    letter-spacing: var(--mds-tracking-base);
 }
 
 /* JR2 — the approved direction's signature, and the one place in the system a text colour does not

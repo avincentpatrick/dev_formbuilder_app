@@ -100,3 +100,17 @@ export const UnavailableDark: Story = {
     args: Unavailable.args,
     decorators: [dark],
 };
+
+/* ── M171: the compact value ────────────────────────────────────────────────────────────── */
+
+/** A word in a quarter-width tile — the form hub's "Accepting", which the display size cut in half. */
+export const Compact: Story = {
+    args: { label: 'Accepting responses', value: 'Accepting', icon: 'calendar', valueSize: 'compact', caption: '358 of 500 remaining' },
+};
+
+/** A date, with its time on the caption line rather than in the value. */
+export const CompactDate: Story = {
+    args: { label: 'Last response', value: 'Oct 14, 2026', icon: 'clock', valueSize: 'compact', caption: 'at 3:04 PM' },
+};
+
+export const CompactDark: Story = { args: Compact.args, decorators: [dark] };

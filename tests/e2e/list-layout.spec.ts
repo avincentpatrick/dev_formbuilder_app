@@ -234,3 +234,31 @@ test('Audit log — the actor chip stays a small disc beside the name', async ({
     expect(twoLine.width, JSON.stringify(twoLine)).toBeLessThanOrEqual(32);
     expect(twoLine.height, JSON.stringify(twoLine)).toBeLessThanOrEqual(32);
 });
+
+// *"in the integration sites page, the button connect google sheets is too close from the object above it"*. The object is
+// the Google warning (shown while the Google app is in testing — the e2e default). Measured edge to edge, because the
+// defect was a missing margin and only boxes can show one.
+test('Integrations — the Connect button keeps its distance from the warning above it', async ({ page }, info) => {
+    await page.goto('/integrations', { waitUntil: 'networkidle' });
+    await settlePaint(page);
+
+    const card = page.locator('.provider').filter({ has: page.locator('.provider__caution') });
+    await expect(card, 'the Google warning is not on the page').toHaveCount(1);
+
+    const gap = await card.evaluate((el) => {
+        const caution = el.querySelector('.provider__caution')!.getBoundingClientRect();
+        const button = el.querySelector('.mds-button')!.getBoundingClientRect();
+
+        return Math.round(button.top - caution.bottom);
+    });
+    expect(gap, 'the Connect button sits on the warning').toBeGreaterThanOrEqual(12);
+
+    if (info.project.name === 'desktop') {
+        // One row of cards at 1440px, so one line of buttons rather than a ragged one.
+        const tops = await page
+            .locator('.provider .mds-button')
+            .evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
+        expect(tops.length).toBeGreaterThan(1);
+        expect(new Set(tops).size, `button tops: ${tops.join(', ')}`).toBe(1);
+    }
+});

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { mount, type VueWrapper } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConnectionWithRules, ProviderCard, RuleRow } from '@/components/integrations/types';
@@ -266,5 +268,54 @@ describe('opening the rule modal', () => {
         expect(modal.props('provider')).toBe('airtable');
         expect(modal.props('destinationKind')).toBe('tabular');
         wrapper.unmount();
+    });
+});
+
+/**
+ * M171 — the user's comment: *"in the integration sites page, the button connect google sheets is too close from the object
+ * above it"*. J4a (`74a0e1f6`) turned the hand-built notices into `MdsAlert` and deleted their rule bodies, but left
+ * `.provider__description, .provider__scopes,` dangling — so the two paragraphs joined the ACTION ROW's rule and became
+ * `display: flex` rows, and nothing put any space under the Google warning, the last thing above the button.
+ * `list-layout.spec.ts` measures the gap in a real browser; these pin the structure and the rules that make it.
+ */
+describe('the provider card (M171)', () => {
+    it('puts the Connect button in the card footer, never in the body under the warning', () => {
+        const wrapper = render({ providers: [provider({ connected: false })] });
+        const card = wrapper.get('.provider');
+
+        expect(card.get('.mds-card__body').find('.provider__caution').exists()).toBe(true);
+        expect(card.get('.mds-card__body').findAll('.mds-button')).toHaveLength(0);
+        expect(card.get('.mds-card__footer .mds-button').text()).toBe('Connect Google Sheets');
+
+        wrapper.unmount();
+    });
+
+    // Source text, comments stripped first: the defect WAS a comment sitting inside a selector list, and happy-dom
+    // computes no styles. Each rule is split into its selectors, so a dangling list shows up as the paragraphs sharing a rule.
+    const style = readFileSync(join(process.cwd(), 'resources/js/Pages/integrations/Index.vue'), 'utf8')
+        .split('<style scoped>')[1]
+        .replace(/\/\*[\s\S]*?\*\//g, '');
+    const rules = [...style.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({
+        selectors: m[1].split(',').map((x) => x.trim()),
+        body: m[2],
+    }));
+
+    it('gives the two paragraphs a rule of their own, never the flex of the action row', () => {
+        const paragraphs = rules.filter(
+            (r) => r.selectors.includes('.provider__description') || r.selectors.includes('.provider__scopes'),
+        );
+
+        expect(paragraphs.length, 'no rule names the provider paragraphs').toBeGreaterThan(0);
+        for (const r of paragraphs) {
+            expect(r.selectors.join(', ')).not.toContain('actions');
+            expect(r.body).not.toMatch(/display\s*:/);
+        }
+        expect(paragraphs.some((r) => /margin:\s*0;/.test(r.body)), 'the paragraphs own their margin').toBe(true);
+    });
+
+    it('lays the cards out with auto-fill, so a wide screen gets more columns rather than wider cards', () => {
+        const grid = rules.find((r) => r.selectors.includes('.integrations__providers'));
+
+        expect(grid?.body).toMatch(/repeat\(auto-fill,\s*minmax\(min\(100%,\s*20rem\),\s*1fr\)\)/);
     });
 });

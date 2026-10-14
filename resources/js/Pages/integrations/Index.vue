@@ -166,20 +166,23 @@ function providerNotice(providerKey: string): string | null {
                     tone="warning"
                     :message="provider.notice"
                 />
-                <div class="provider__actions">
-                    <!-- A real anchor, not router.visit: the next hop is Slack's origin, and Inertia would
-                         try to parse a consent page as a JSON page response. -->
-                    <MdsButton
-                        v-if="can.create"
-                        as="a"
-                        variant="primary"
-                        icon-left="external-link"
-                        :disabled="!provider.configured"
-                        :href="provider.connect_url"
-                    >
-                        {{ provider.connected ? `Reconnect ${provider.label}` : `Connect ${provider.label}` }}
-                    </MdsButton>
-                </div>
+                <!-- M171 — in the card's FOOTER, the design system's own action row, rather than the last thing in the
+                     body: the user found the button "too close from the object above it", which is the warning. -->
+                <template v-if="can.create" #footer>
+                    <div class="provider__actions">
+                        <!-- A real anchor, not router.visit: the next hop is Slack's origin, and Inertia would
+                             try to parse a consent page as a JSON page response. -->
+                        <MdsButton
+                            as="a"
+                            variant="primary"
+                            icon-left="external-link"
+                            :disabled="!provider.configured"
+                            :href="provider.connect_url"
+                        >
+                            {{ provider.connected ? `Reconnect ${provider.label}` : `Connect ${provider.label}` }}
+                        </MdsButton>
+                    </div>
+                </template>
             </MdsCard>
         </section>
 
@@ -338,7 +341,8 @@ function providerNotice(providerKey: string): string | null {
 
 .integrations__providers {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
+    /* M171 — `auto-fill`, so a wide screen gets more columns rather than three cards each a third of it wide. */
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
     gap: var(--mds-space-4);
     margin-bottom: var(--mds-space-5);
 }
@@ -358,15 +362,31 @@ function providerNotice(providerKey: string): string | null {
     color: var(--mds-color-text-heading);
 }
 
+/* M171 — the card is a column whose body grows, so every card's footer (the Connect button) sits on one line across a
+   row of cards and keeps the footer's own `--mds-space-4` above it. NOT `margin-top: auto` on the button: an auto margin
+   is zero in the TALLEST card of a row, which is the Google card with the warning — the button would touch it again. */
+.provider {
+    display: flex;
+    flex-direction: column;
+}
+
+.provider :deep(.mds-card__body) {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--mds-space-3);
+}
+
+/* H15b's paragraph rule, restored. J4a (`74a0e1f6`) deleted the notice rules below this list and left the list itself
+   dangling into the action row's rule, so both paragraphs were laid out as wrapping flex rows with no margin of their own. */
 .provider__description,
-.provider__scopes,
-
-
-/* H16b — the standing 7-day caveat. A surface of its own rather than the same grey as every other hint,
-   for the reason DomainCard's `--wait` note gives: this is the state a tenant is most likely to misread,
-   and the misreading here is "this product's token handling is broken". `status-warning-{bg,fg}` is one of
-   the few pairs in the token set with a measured contrast guarantee, and the icon carries the meaning
-   alongside the colour (WCAG 1.4.1). */
+.provider__scopes {
+    margin: 0;
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+    color: var(--mds-color-text-secondary);
+}
 
 
 /* Wrap rather than overflow — the standing 375px rule for any row of actions. */
@@ -483,14 +503,8 @@ function providerNotice(providerKey: string): string | null {
     outline-offset: 2px;
     border-radius: var(--mds-radius-sm);
 }
-/* J4a — the alerts own tint, padding, radius and type now; only the spacing they contributed to the
-   card's vertical rhythm survives. ⚠️ `.provider__notice` was declared TWICE in this stylesheet, the
-   second block existing only to override the first's colour — a pre-existing smell that disappears with
-   the hand-rolled markup rather than being carried forward. */
-.provider__notice {
-    margin-bottom: var(--mds-space-3);
-}
-
+/* J4a — the alerts own tint, padding, radius and type now. Their spacing in the provider card is the body's `gap`
+   (M171), so `.provider__notice` needs no margin of its own; the connection notice below still does. */
 .connection__notice {
     margin-bottom: var(--mds-space-4);
 }

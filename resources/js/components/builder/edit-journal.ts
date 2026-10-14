@@ -30,6 +30,13 @@ export interface JournalEntry {
     base: string | null;
     /** The edited content, as the store's own snapshot of it. */
     snapshot: Record<string, unknown>;
+    /**
+     * What this tab last SENT for the row and has not yet seen confirmed. ⚠️ THE ENTRY IS NOT DROPPED WHEN THE TOKEN MOVED IF
+     * THE SERVER NOW HOLDS EXACTLY THIS — measured in a real browser: an earlier edit was still on its way when the next
+     * one was made and the page refreshed, so the new edit's `base` predated a save of this tab's own, and the
+     * put-back threw away the newer edit as "changed elsewhere". A move to what this tab sent is this tab's move.
+     */
+    sent?: Record<string, unknown> | null;
     /** When it was last written, so an abandoned entry expires rather than replaying forever. */
     at: number;
 }
@@ -57,6 +64,7 @@ function isEntry(value: unknown): value is JournalEntry {
         && (entry.base === null || typeof entry.base === 'string')
         && typeof entry.snapshot === 'object'
         && entry.snapshot !== null
+        && (entry.sent === undefined || entry.sent === null || typeof entry.sent === 'object')
         && typeof entry.at === 'number'
     );
 }
@@ -64,7 +72,10 @@ function isEntry(value: unknown): value is JournalEntry {
 export interface EditJournal {
     /** Every live entry; expired and malformed ones are dropped as they are read. */
     read(): JournalEntry[];
-    put(entry: Omit<JournalEntry, 'at'>): void;
+    /** Keep the row's edit. An entry's `sent` survives a newer edit unless the caller says what it now is. */
+    put(entry: Omit<JournalEntry, 'at' | 'sent'> & { sent?: Record<string, unknown> | null }): void;
+    /** Record what is being sent for the row, if an edit of it is kept. */
+    markSent(kind: JournalKind, id: string, sent: Record<string, unknown>): void;
     drop(kind: JournalKind, id: string): void;
 }
 
@@ -106,8 +117,17 @@ export function editJournal(draftId: string, storage: Storage | null = defaultSt
             return live;
         },
         put(entry) {
-            const rest = load().filter((other) => !(other.kind === entry.kind && other.id === entry.id));
-            save([...rest, { ...entry, at: now() }]);
+            const all = load();
+            const previous = all.find((other) => other.kind === entry.kind && other.id === entry.id);
+            const rest = all.filter((other) => other !== previous);
+            save([...rest, { ...entry, sent: entry.sent === undefined ? (previous?.sent ?? null) : entry.sent, at: now() }]);
+        },
+        markSent(kind, id, sent) {
+            const all = load();
+            const entry = all.find((other) => other.kind === kind && other.id === id);
+            if (!entry) return;
+            entry.sent = sent;
+            save(all);
         },
         drop(kind, id) {
             const all = load();

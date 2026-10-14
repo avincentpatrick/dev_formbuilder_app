@@ -309,6 +309,30 @@ describe('a refresh straight after a change keeps it (R-bfa3eb93)', () => {
         expect(patches()).toHaveLength(1);
     });
 
+    it('puts back an edit made while an earlier save of the same question was still on its way', async () => {
+        // Measured in a real browser before this case existed: Placeholder typed while the previous setting's save was in
+        // flight, then a refresh. That save landed AFTER the page went, so the reload saw the question's token move and
+        // threw the newer edit away as "changed elsewhere" — the move was this tab's own.
+        const before = makeStore();
+        const wrapper = await mountOn(before);
+        mock.mockImplementationOnce(() => new Promise<Response>(() => undefined)); // on its way when the page goes
+
+        await labelled(wrapper, 'Label').setValue('People here');
+        await vi.advanceTimersByTimeAsync(600);
+        await labelled(wrapper, 'Placeholder').setValue('e.g. 4');
+        wrapper.unmount();
+
+        // The reload: the first save landed after all, at a token the second edit was not made against.
+        const after = makeStore(serverField({ ...WHOLE_NUMBER, label: 'People here', version: 'v7' }));
+        expect(after.fields.value[0].placeholder).toBe('e.g. 4');
+        await after.whenIdle();
+        await flushPromises();
+
+        const last = patches().at(-1)!;
+        expect(last).toMatchObject({ label: 'People here', placeholder: 'e.g. 4', version: 'v7' });
+        expect(after.saveState.value).toBe('saved');
+    });
+
     it('drops a kept edit when the question moved on the server since, rather than writing over it', async () => {
         const before = makeStore();
         const wrapper = await mountOn(before);

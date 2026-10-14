@@ -780,6 +780,7 @@ export function useBuilderStore(props: BuilderPageProps) {
                 settled(uid, 'field', field.id, true); // M170: typed back to what the server holds — nothing is owed
                 return;
             }
+            journal?.markSent('field', field.id, after as unknown as Record<string, unknown>);
             const held = await persistField(uid);
             if (conflict.value) return;
             settled(uid, 'field', field.id, held, snapshotsEqual(fieldSnapshot(field), after));
@@ -815,6 +816,7 @@ export function useBuilderStore(props: BuilderPageProps) {
                 settled(uid, 'section', section.id, true);
                 return;
             }
+            journal?.markSent('section', section.id, after as unknown as Record<string, unknown>);
             const held = await persistSection(uid);
             if (conflict.value) return;
             settled(uid, 'section', section.id, held, snapshotsEqual(sectionSnapshot(section), after));
@@ -920,13 +922,17 @@ export function useBuilderStore(props: BuilderPageProps) {
     //   - `flushForLeave()` sends a waiting edit at once as the page goes — the only one that helps a CLOSED tab;
     //   - `save.unsaved` keeps a failed edit reported, and `retryUnsaved()` sends it again.
 
-    /** Keep the row's current content as the edit the server has not confirmed yet. */
-    function remember(uid: Uid, kind: 'field' | 'section'): void {
+    /**
+     * Keep the row's current content as the edit the server has not confirmed yet. `confirmed` — a save of this row just
+     * landed and the row was edited again meanwhile: the kept edit is now based on the token that save returned, and
+     * nothing is on its way.
+     */
+    function remember(uid: Uid, kind: 'field' | 'section', confirmed = false): void {
         if (journal === null) return;
         const row = kind === 'field' ? findField(uid) : findSection(uid);
         if (!row) return;
         const snapshot = kind === 'field' ? fieldSnapshot(row as LocalField) : sectionSnapshot(row as LocalSection);
-        journal.put({ kind, id: row.id, base: row.version, snapshot: snapshot as unknown as Record<string, unknown> });
+        journal.put({ kind, id: row.id, base: row.version, snapshot: snapshot as unknown as Record<string, unknown>, ...(confirmed ? { sent: null } : {}) });
     }
 
     /**
@@ -939,6 +945,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         if (held) {
             delete save.unsaved[uid];
             if (current) journal?.drop(kind, id);
+            else remember(uid, kind, true);
             return;
         }
         if (!(uid in save.fieldErrors)) save.unsaved[uid] = kind;
@@ -970,30 +977,31 @@ export function useBuilderStore(props: BuilderPageProps) {
 
     /**
      * On load: put back every kept edit the server does not hold, and save it. An entry is dropped instead when the
-     * server already holds its content (the save sent as the page went landed first), or when the row's token moved
-     * since the edit was made — someone, or this author's own landed save, wrote the row after it, and a put-back
-     * would write over that.
+     * server already holds its content (the save sent as the page went landed first), or when the row was written
+     * since the edit was made by anyone but this tab — the token moved to something other than what this tab last
+     * sent — because a put-back would write over that.
      */
     function restoreJournal(): void {
         if (journal === null) return;
         for (const entry of journal.read()) {
+            const row = entry.kind === 'field' ? fields.value.find((f) => f.id === entry.id) : sections.value.find((s) => s.id === entry.id);
+            if (!row) {
+                journal.drop(entry.kind, entry.id);
+                continue;
+            }
+            const payload = (content: Record<string, unknown>) =>
+                entry.kind === 'field' ? fieldPayload({ ...row, ...content } as LocalField) : sectionPayload({ ...row, ...content } as LocalSection);
+            const onServer = payload({});
+            const ours = row.version === entry.base || (entry.sent != null && samePayload(payload(entry.sent), onServer));
+            if (!ours || samePayload(payload(entry.snapshot), onServer)) {
+                journal.drop(entry.kind, entry.id);
+                continue;
+            }
             if (entry.kind === 'field') {
-                const row = fields.value.find((f) => f.id === entry.id);
-                const kept = row ? ({ ...row, ...entry.snapshot } as LocalField) : null;
-                if (!row || !kept || row.version !== entry.base || samePayload(fieldPayload(kept), fieldPayload(row))) {
-                    journal.drop(entry.kind, entry.id);
-                    continue;
-                }
-                applyFieldSnapshot(row, entry.snapshot as unknown as FieldSnapshot);
+                applyFieldSnapshot(row as LocalField, entry.snapshot as unknown as FieldSnapshot);
                 void commitFieldEdit(row.uid);
             } else {
-                const row = sections.value.find((s) => s.id === entry.id);
-                const kept = row ? ({ ...row, ...entry.snapshot } as LocalSection) : null;
-                if (!row || !kept || row.version !== entry.base || samePayload(sectionPayload(kept), sectionPayload(row))) {
-                    journal.drop(entry.kind, entry.id);
-                    continue;
-                }
-                applySectionSnapshot(row, entry.snapshot as unknown as SectionSnapshot);
+                applySectionSnapshot(row as LocalSection, entry.snapshot as unknown as SectionSnapshot);
                 void commitSectionEdit(row.uid);
             }
         }

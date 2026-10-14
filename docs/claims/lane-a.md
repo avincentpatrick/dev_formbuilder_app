@@ -16,72 +16,7 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M170`, every builder setting survives a plain refresh, and the toolbar never says "saved" for an edit the server does not hold (`m170-builder-autosave`)
-
-Taken 2026-10-14 on the user's urgent report: *"the autosave feature is not working on other clients. though i tested it and it
-work for me"*, narrowed in the same session to *"The autosave problem is in the form builder. For a Whole Number question, the
-settings on the Basic, Validation and Advanced tabs don't save. Please check every field type and every setting on every tab …
-confirm that changing it starts a save, that the server keeps the value, and that it's still there after a plain page refresh
-without clicking anything else first."* Testers hit it on staging after a break, then a refresh. Branch `m170-builder-autosave`,
-cut from origin/main at `28be0bc5`, PR into main. **The user lifted the freeze for THIS PR only** (*"if fix is applied, merge this
-asap"*): merge at 6/6 green after a fresh staging backup; `M169` (PR #362) stays held.
-
-Rows, filed on the branch by this increment (ids are the title hashes): `R-bfa3eb93` (major — a setting changed just before a
-refresh is lost while the toolbar says "All changes saved"), `R-fdc743ab` (a failed save reads "All changes saved" once a later
-save lands), `R-76474e31` (an expired session stops every save with "Request failed (419)." and nothing resends), `R-7ebfb08e`
-(Expression mode builds a rule the server refuses and blocks every other setting on the question), `R-4d50e3c8` (nit — "Save to
-library" without the pending edit). Filed and NOT taken: `R-d37a38f9` and `R-8881210a` (public form; the second is the user's
-answer to `D118`, asked in this session) and `R-ae57cf6f` (staff encoding, a colleague's draft).
-
-### Evidence verified
-- Read on the trunk at `28be0bc5`, by name: `touch()` in `resources/js/components/builder/useBuilderStore.ts` waits 600 ms and
-  `flushCommit()` is called only by `touch()`, `select()`, `renameField()` and `whenIdle()` — held. Neither `useBuilderStore.ts` nor
-  `Pages/forms/Builder.vue` registers `beforeunload`, `pagehide` or `visibilitychange` — held. `builderClient.ts` `request()`
-  calls `fetch` with no `keepalive` — held.
-- `saveState` is `saving` only while `save.inFlight > 0`, and `save-label.ts` maps `idle` and `saved` alike to "All changes saved",
-  so the 600 ms wait reads as saved — held.
-- `enqueue()`'s `.finally` clears `save.error` on any burst that did not fail; `guard()` records `fieldErrors` only when the error
-  carries a map, so a network failure, a 419 or a 500 leaves nothing standing once another burst lands — held.
-- `BuilderRequestError` keeps "Request failed (419)." for a non-JSON 419 body — held.
-- `ValidationEditor.vue` `setMode()` writes `expression: ''` and `rule_type: null`; `mode()` reads `''` as rule mode;
-  `UpdateFieldRequest::withValidator()` refuses a row with neither — held.
-- Server side for `integer`: `UpdateFieldRequest` rules every Basic, Validation and Advanced key, `FormBuilderService::writeField()`
-  writes each, `BuilderPresenter::field()` hydrates each — held by reading; no test PATCHes a field and then loads the builder page.
-
-### Premise verified
-- One session only (the user, 2026-10-13); nobody else is building. The M169 branch is left exactly as it is.
-- The builder's store is the only writer of a field's settings; an Inertia visit does not unload the page, so the pending timer
-  survives in-app navigation and only a refresh, a closed tab or a typed address loses it.
-- Every settings control calls `touch()` through `setField`, `setConfig`, `setContent`, `setValidations` or its own emit — checked
-  control by control on Basics, Validation and Advanced; the type change and the section move are separate endpoints by design.
-- A browser caps a `keepalive` body at 64 KiB; a cascading list or a large matrix can exceed it, so the leave path cannot rely on
-  `keepalive` alone.
-- The session expires on 120 minutes of inactivity and the bell's poll stops when idle on purpose (`useNotificationFeed.ts`), so
-  the fix must not keep a session alive.
-- Publish already waits for the queue (`whenIdle()`, M113) and is untouched.
-
-### Remedy verdict
-No row prescribes a fix: they are filed here. The remedy was measured by reading, not yet by a run. The first run — the red-first
-E2E spec on a Whole Number — is the measurement, and the claim is extended if it shows a cause not listed above.
-
-Files: `resources/js/components/builder/useBuilderStore.ts`, `resources/js/components/builder/builderClient.ts`,
-`resources/js/components/builder/save-label.ts`, `resources/js/components/builder/types.ts`,
-`resources/js/components/builder/ValidationEditor.vue`, `resources/js/components/builder/ConfigPanel.vue`,
-`resources/js/Pages/forms/Builder.vue`, and their tests: `resources/js/components/builder/*.test.ts` (new
-`settings-save-matrix.test.ts`), `tests/Feature/Forms/BuilderSettingsRoundTripTest.php` (new),
-`tests/e2e/builder-settings-refresh.spec.ts` (new); close-out on the branch: `docs/feature-backlog.md`,
-`docs/claims/decisions.md`, `PROGRESS.md`, `docs/pipeline.md`; this file on main.
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `PROGRESS.md` (own block), `docs/pipeline.md`,
-`tests/e2e/builder-settings-refresh.spec.ts`.
-Paired files taken: none.
-Namespaces spent: `D118` (asked and answered in this session); nothing from the ADR or migration namespaces.
-Prediction: on the trunk, the E2E Whole Number spec is red on every "refresh straight after the change" case and green on every
-"refresh after the save returned" case on Basics, Validation and Advanced; the Expression-mode case is red. The Pest round trip
-across all 31 types is green on the trunk. The Vitest per-control matrix is green; its pending-label, leave-flush,
-failure-then-success, 419 and Expression cases are red. **Most likely wrong: the all-green Pest round trip** — I expect at least
-one type whose stored value comes back different from what was sent.
-
-## HELD — `M169`, a point or a comma stays on the word Vision read it after (`m169-ocr-punctuation-spacing`)
+## Status: ACTIVE CLAIM — `M169`, a point or a comma stays on the word Vision read it after (`m169-ocr-punctuation-spacing`)
 
 Taken 2026-10-13, after the user's "no merge, no deploy while testing is on": this claim builds, opens the PR and gets it green,
 then stops — nothing merges until the user lifts the freeze. Branch `m169-ocr-punctuation-spacing`, cut from origin/main at
@@ -153,6 +88,69 @@ case), `rotate()` dropping the flag (the tilted case only), `upright()` dropping
 49 of 180 and 29 → 28 with ink, 0 silent — sheet 09's `STA. MESA` turns right; 10 more fields change their text and stay wrong for
 other reasons (a comma the answer sheet has and the paper does not, misread letters). Only PHP moves: Pest and PHPStan; Vitest, E2E
 and axe cannot. **Most likely wrong:** a test that builds Vision's JSON by hand without breaks glues its words and goes red.
+
+## RELEASED — `M170`, every form builder setting survives a plain refresh, and the toolbar never says "saved" for an edit the server does not hold (`R-bfa3eb93`, `R-fdc743ab`, `R-76474e31`, `R-7ebfb08e`, `R-4d50e3c8`) (merged as PR #363, `d8ebe97f`, 6/6 green with real step counts on its final run — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+Built and merged 2026-10-14 from the user's urgent report: *"the autosave feature is not working on other clients. though i tested
+it and it work for me"*, narrowed in the same session to the form builder and a Whole Number question whose Basic, Validation and
+Advanced settings did not save, with the instruction to check every type, every setting and every tab for three things — a save
+starts, the server keeps it, and it survives a plain refresh with no other click. The user lifted the testing freeze for this PR only
+(*"if fix is applied, merge this asap"*) and ran the guided `meridian-test-db-backup` block first (`Result: 0`,
+`staging-2026-10-14-074828.dump`, 426,835 bytes). `M169` (PR #362) stays held. `D118` (public form: "Continue where you left off /
+Start over", `R-8881210a`) and `D119` (a permitted colleague may keep saving a draft someone else started, `R-ae57cf6f`) were asked and
+answered in chat; `R-d37a38f9` (the public form's ten-minute pause) was filed. All three are during-testing and untaken.
+
+**Measured on the trunk build before any fix:** all 13 Whole Number settings were lost by a refresh straight after the change, and the
+cause was shared by every type. The server was never at fault: `BuilderSettingsRoundTripTest.php` (new) shows all 31 types and a
+section keep every setting and send it back on the builder page (32 green, 190 assertions).
+
+**Taken:**
+- `edit-journal.ts` (new): each unconfirmed edit is kept for the tab (`sessionStorage`) the moment it is made, with the token it was
+  based on and every content this tab has sent since. On load the store puts back whatever the server does not hold and saves it. It
+  drops the edit instead when the server already holds it, or when the row moved to something this tab never sent.
+- `useBuilderStore.ts`: "Saving…" while an edit waits out the debounce; `flushForLeave()`; a 409 over exactly what that request sent
+  is taken as saved; a failure with nothing to mark stays failed (`save.unsaved`) until it saves, with `retryUnsaved()`; an unfinished
+  rule is not sent; Save to library sends the waiting edit first. Comparisons are made as the server stores a save (an absent
+  `logic_group` reads as null).
+- `builderClient.ts`: writes are `keepalive` under 60 KB; a 419 or 401 says the author was signed out and to press Retry.
+- `ValidationEditor.vue`: an empty expression is still Expression mode. `ConfigPanel.vue`: a Retry button in the save alert.
+  `Builder.vue`: a flush on `beforeunload`, `pagehide`, a hidden tab and an in-app visit away; a retry on `online` and when the tab
+  comes back.
+- Tests: `settings-save-matrix.test.ts` (35: every Basics/Validation/Advanced control on a Whole Number and every type's own tab starts
+  a save carrying its value, plus each defect and each race); `tests/e2e/builder-settings-refresh.spec.ts` (all 13 settings, a refresh
+  straight after each, desktop; one at 375px); `save-state.test.ts`'s retry case now retries the failed edit (it had pinned the defect
+  by "retrying" with a new section); `builderClient.test.ts`'s generic-message case uses a 502; `sessionStorage` is cleared after
+  every Vitest case (`resources/public-runtime/__tests__/setup.ts`).
+
+**Files beyond the claim, recorded rather than pushed as an extension first:** `edit-journal.ts` and
+`resources/public-runtime/__tests__/setup.ts` were edited without a pushed claim extension. That is the protocol's miss, recorded here.
+`save-label.ts` and `types.ts` were claimed and not edited.
+
+**Three defects the real browser found after the first fix, all closed before merge.** A timed throwaway probe
+(`.playwright/m170-probe/`, gitignored) measured each one, after reasoning about the first two had failed twice:
+- A 409 over this tab's own landed save was compared with the field as it was NOW — the next setting already typed in — so it never
+  matched. A conflict was raised over nothing, and the next save went out at a spent token.
+- `withNegativesAllowed()` writes its minimum with no `logic_group`, while the server sends it back as null. So once "Allow negative
+  numbers" was used, no comparison of that question ever matched again, and the put-back dropped the edit as someone else's.
+- A `keepalive` save in flight when the page goes FAILS on the page's side yet still reaches the server. The queue then sent the next
+  edit at the old token, the server refused it (409), and only the earlier write landed. The kept edit therefore remembers every write
+  sent since its base, not just the last one.
+
+Each has a Vitest case that a byte-restored mutant turns red. 14 mutants in all; 13 caught. One SURVIVED: the save verdict's second
+test of `save.unsaved`, which `save.error` already carries. It was removed as redundant.
+
+**Prediction, measured.**
+- The E2E "refresh straight after" cases were red on the trunk, as predicted: all 13. The three Validation ones fell by knock-on, since
+  the minimum written by "Allow negative numbers" was lost first and the rule numbers moved. I never built the separate "after the save
+  returned" variant I predicted would be green; the Pest round trip carries that half instead.
+- The Vitest per-control matrix was green on the trunk (23) and its 8 defect cases red, as predicted.
+- **Most likely wrong — the all-green Pest round trip — was not wrong:** it was green across all 31 types on its first real run. Its
+  first run had errored on my own test (the page sends `config` as an object).
+- **Not predicted at all:** Chrome serves the reload before the old page's `pagehide` (so a flush alone could never satisfy the user's
+  check); the three defects above; 11 existing Vitest cases sharing one `sessionStorage`; a citation in `docs/feature-backlog.md` moved
+  onto a blank line by my `ConfigPanel.vue` insertion (moved below the cited lines instead); and the local stack running 25–50× slower
+  than CI (the refresh spec's desktop case took more than 300 s locally and 12.4 s on CI), which is what exposed the races.
+  `builder-structure.spec.ts` timed out locally on that slowness and passed on CI on both runs.
 
 ## RELEASED — `M168`, the scanned copy beside the form, 50/50, on the guest check and the staff review (`R-17caf80e`) (merged as PR #361, `6b998a37`, 6/6 green with real step counts on its first run and on the post-merge run's second attempt — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

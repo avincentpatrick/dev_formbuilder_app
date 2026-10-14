@@ -472,3 +472,46 @@ describe('form hub — every payload key has a reader', () => {
         wrapper.unmount();
     });
 });
+
+/**
+ * M171 — the user's comment: *"there are some large words in the form overview specially the accepting responses and last
+ * response date is being wraped making the word cut in half"*. Every tile takes the compact value so the row reads evenly
+ * (the user's choice), and the last response shows its date with the time on the caption line: a compact date AND time is
+ * about 230px against a ~170px text column at 1440px, so it would still wrap. `list-layout.spec.ts` measures the result.
+ */
+describe('form hub — the stat tiles never break a word (M171)', () => {
+    const tile = (wrapper: ReturnType<typeof render>, label: string) =>
+        wrapper.findAllComponents({ name: 'StatTile' }).find((t) => t.props('label') === label);
+
+    it('sets all four tiles compact, so the row reads as one', () => {
+        const wrapper = render();
+        const tiles = wrapper.findAllComponents({ name: 'StatTile' });
+
+        expect(tiles).toHaveLength(4);
+        for (const t of tiles) {
+            expect(t.props('valueSize'), t.props('label')).toBe('compact');
+        }
+
+        wrapper.unmount();
+    });
+
+    it('shows the last response as a date, with its time on the caption line', () => {
+        const wrapper = render();
+        const last = tile(wrapper, 'Last response');
+
+        expect(last?.props('value')).toEqual(expect.stringContaining('2026'));
+        // No clock in the value — whatever the runner's locale writes for 14:30, it has an h:mm in it.
+        expect(last?.props('value')).not.toMatch(/\d{1,2}:\d{2}/);
+        expect(last?.props('caption')).toMatch(/^at .*\d{1,2}:\d{2}/);
+
+        wrapper.unmount();
+    });
+
+    it('carries no caption when there has been no response yet', () => {
+        const wrapper = render({ stats: { responses: 0, drafts: 0, last_response_at: null } });
+
+        expect(tile(wrapper, 'Last response')?.props('caption')).toBeUndefined();
+
+        wrapper.unmount();
+    });
+});

@@ -152,11 +152,11 @@ export function useBuilderStore(props: BuilderPageProps) {
         // M170 (`R-bfa3eb93`): a change waiting out the debounce is not saved either — "All changes saved" there was
         // the sentence that let an author refresh away an edit the server never received.
         if (save.inFlight > 0 || save.pending) return 'saving';
-        // A field still holding a refusal is a change the server does not have, whatever saved since (M128) — and so is
-        // one whose save failed with no refusal to mark it, a network failure or an ended session (M170, `R-fdc743ab`).
-        if (save.error !== null || conflict.value !== null || Object.keys(save.fieldErrors).length > 0 || Object.keys(save.unsaved).length > 0) {
-            return 'failed';
-        }
+        // A field still holding a refusal is a change the server does not have, whatever saved since (M128). One whose save
+        // failed with no refusal to mark it — the network, an ended session — reads failed through `save.error`, which the
+        // burst verdict above keeps while anything is unsaved (M170, `R-fdc743ab`); a second test of `save.unsaved` here
+        // was measured redundant by mutation and removed.
+        if (save.error !== null || conflict.value !== null || Object.keys(save.fieldErrors).length > 0) return 'failed';
 
         return save.wrote ? 'saved' : 'idle';
     });

@@ -89,6 +89,27 @@ caution margin each turn exactly one case red. The responsive-axe sweep stays gr
 likely wrong:** the integrations source-text case — a rule asserted by regular expression over a scoped stylesheet is the shape that
 has passed over the wrong thing before (`builder-layout.test.ts`'s note); it may need to assert the computed style in a mount instead.
 
+### Extension 1 — three files, three remedy changes, and the merge (pushed before any of the three files is opened)
+
+At the build start (2026-10-15) the user said *"merge approved in this session when finished"*: this PR merges in this session after
+6/6 and a fresh staging backup, and nothing else is lifted — `M169` stays held. The same exchange answered three questions: the `M170`
+check is not done yet (still owed), `D125` changed to C (the notes saved in a `releases` table by every deploy — recorded on the branch,
+it shapes `R-c7247dbf` only), and the form hub's four tiles all take the compact size.
+
+Files added: `resources/js/Pages/forms/show.test.ts` (which hub tiles are compact, and the last-response time on the caption line);
+`tests/e2e/list-layout.spec.ts` (shared — the only gate that can see layout: happy-dom computes none, so the three fixes are measured
+there, red on the trunk first); `docs/ux/design-system-reference.md` (one as-built paragraph for the new `MdsStatTile` prop — **the
+increment's one hub, on `R-0a504679`**).
+
+Remedy changes, each measured by reading the code:
+- **All four hub tiles compact, not the two word tiles** — the user's choice for an even row. The last-response tile shows the date and
+  puts the time on its caption line: at 1440px the text column is about 170px, and a compact date-and-time (about 230px) would still wrap.
+- **The compact value takes the heading-2 role, not heading-3** — a 20px figure sits small under the 44px medallion. heading-3 stays the
+  fallback if heading-2 still breaks a word at 834px or 1440px at the extra-large type setting.
+- **Integrations: the Connect button moves into `MdsCard`'s footer slot instead of `margin-top: auto`.** An auto margin is zero in the
+  tallest card of a row, and the tallest is the Google card with the warning — the button would touch it again. The card becomes a flex
+  column whose body grows, so the buttons line up across cards and the footer keeps its own 16px.
+
 ## HELD — `M169`, a point or a comma stays on the word Vision read it after (`m169-ocr-punctuation-spacing`)
 
 Taken 2026-10-13, after the user's "no merge, no deploy while testing is on": this claim builds, opens the PR and gets it green,

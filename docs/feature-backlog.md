@@ -14090,5 +14090,5 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   looks the draft up through `ClientUuidResolver::resolve()` scoped to the CURRENT user, finds nothing, and returns 409
   `submission_uuid_claimed`, which `useServerAutosave.ts` treats as permanent. `EncodeDraftTest` pins the refusal on purpose, and
   nothing reconciles it with the resume page being open to non-authors. Decide which way it goes before fixing: let a permitted
-  colleague save into the draft, or stop offering them "Continue" — `D119`. **Live.** Filed by `M170`. **Tier: during-testing.**
-  **Awaits D119.**
+  colleague save into the draft, or stop offering them "Continue" — `D119`, answered A (the user, 2026-10-14): a permitted
+  colleague saves into the draft, which keeps its original author. **Live.** Filed by `M170`. **Tier: during-testing.**

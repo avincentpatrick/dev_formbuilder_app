@@ -24,16 +24,19 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-### D119 — A staff member who opens a colleague's saved draft on the encoding page ("Continue this draft") has every save refused. Should they be able to keep editing and saving it? **Tier: during-testing.**
-
-**Filed 2026-10-14 by Lane A in `M170`**, while checking every autosave for the user's report (`R-ae57cf6f`). The inbox offers "Continue this draft" to anyone allowed to submit the draft (`SubmissionPolicy::promote()`, which has no author check), but the draft save looks the draft up by its author (`ClientUuidResolver::resolve()`, scoped that way since `M11`), so for anyone else every autosave is refused and saving stops with a red message.
-
-- **A — yes: anyone allowed to continue a draft can save into it (recommended).** The draft keeps its original author and records who last saved it. It matches what the resume page was built for: a supervisor or a co-encoder finishing someone else's entry.
-- **B — no: only the author continues a draft.** "Continue this draft" is hidden from everyone else, who can still open it read-only and submit it as it stands.
-
+_None open._ `D119`, the last one filed, was asked and answered on 2026-10-14 in the session that filed it and recorded in `M170`. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D119 — A staff member who opens a colleague's saved draft on the encoding page ("Continue this draft") has every save refused. Should they be able to keep editing and saving it? **A — yes: anyone allowed to continue a draft can save into it; the draft keeps its original author and records who saved it last.**
+
+**Asked and answered 2026-10-14 (user decision, in chat), filed and recorded by Lane A in `M170`**, while checking every autosave for the user's report (`R-ae57cf6f`). The inbox offers "Continue this draft" to anyone allowed to submit the draft (`SubmissionPolicy::promote()`, which has no author check), but the draft save looks the draft up by its author (`ClientUuidResolver::resolve()`, scoped that way since `M11`), so for anyone else every autosave is refused and saving stops with a red message.
+
+- **A — yes: anyone allowed to continue a draft can save into it (recommended, chosen).** The draft keeps its original author and records who last saved it. It matches what the resume page was built for: a supervisor or a co-encoder finishing someone else's entry.
+- **B — no: only the author continues a draft.** "Continue this draft" is hidden from everyone else, who can still open it read-only and submit it as it stands.
+
+**What the answer files, in the same push:** nothing new — `R-ae57cf6f` (filed in the same increment) is the work, and its Awaits token is stripped.
+
 ### D118 — Someone filling a public form closes it, then opens the link again on the same phone or computer. It starts blank, because the form keeps answers only for the same tab. Should their answers come back? **A — yes, after asking: "Continue where you left off" or "Start over", shown before any answer appears.**
 
 **Asked and answered 2026-10-14 (user decision, in chat), recorded by Lane A in `M170`.** Asked while checking every autosave for the user's report *"the autosave feature is not working on other clients"*. Since `M21` the guest autosave restores answers only in the same tab and visit (`resources/public-runtime/composables/useAutosave.ts`), on purpose, so the next person at a shared device never sees them.

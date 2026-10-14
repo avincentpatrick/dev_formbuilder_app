@@ -333,6 +333,39 @@ describe('a refresh straight after a change keeps it (R-bfa3eb93)', () => {
         expect(after.saveState.value).toBe('saved');
     });
 
+    it('puts back an edit whose save the server refused because the page went while an earlier save was on its way', async () => {
+        // Measured with a timed probe in a real browser: as a page goes, an in-flight `keepalive` request FAILS on the page's
+        // side yet still reaches the server. The queue then sent the next edit at the old token, the server refused it
+        // (409), and only the earlier write landed — not the last one this tab sent.
+        const first = makeStore();
+        first.fields.value[0].hint = 'Help one.';
+        first.touch(first.fields.value[0].uid, 'field');
+        mock.mockImplementationOnce(() => new Promise<Response>(() => undefined));
+        first.flushForLeave(); // sent as the page goes; it lands after the next page was served
+        await flushPromises();
+
+        let fail: (reason: unknown) => void = () => {};
+        mock.mockImplementationOnce(() => new Promise<Response>((_resolve, reject) => (fail = reject)));
+        const second = makeStore(); // served before the help text landed: it is put back and sent again
+        expect(second.fields.value[0].hint).toBe('Help one.');
+        await flushPromises();
+        second.fields.value[0].placeholder = 'e.g. 4';
+        second.touch(second.fields.value[0].uid, 'field');
+        mock.mockImplementationOnce(() =>
+            Promise.resolve(jsonResponse(409, { current: { ...WHOLE_NUMBER, hint: 'Help one.', version: 'v8' }, message: 'Changed elsewhere.' })),
+        );
+        second.flushForLeave();
+        fail(new TypeError('Failed to fetch')); // the page is going
+        await flushPromises();
+
+        // The third page: the help text landed (the first page's write), the placeholder did not.
+        const third = makeStore(serverField({ ...WHOLE_NUMBER, hint: 'Help one.', version: 'v8' }));
+        expect(third.fields.value[0].placeholder).toBe('e.g. 4');
+        await third.whenIdle();
+        await flushPromises();
+        expect(patches().at(-1)).toMatchObject({ hint: 'Help one.', placeholder: 'e.g. 4', version: 'v8' });
+    });
+
     it('drops a kept edit when the question moved on the server since, rather than writing over it', async () => {
         const before = makeStore();
         const wrapper = await mountOn(before);

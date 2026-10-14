@@ -932,7 +932,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         const row = kind === 'field' ? findField(uid) : findSection(uid);
         if (!row) return;
         const snapshot = kind === 'field' ? fieldSnapshot(row as LocalField) : sectionSnapshot(row as LocalSection);
-        journal.put({ kind, id: row.id, base: row.version, snapshot: snapshot as unknown as Record<string, unknown>, ...(confirmed ? { sent: null } : {}) });
+        journal.put({ kind, id: row.id, base: row.version, snapshot: snapshot as unknown as Record<string, unknown>, ...(confirmed ? { sent: [] } : {}) });
     }
 
     /**
@@ -978,8 +978,8 @@ export function useBuilderStore(props: BuilderPageProps) {
     /**
      * On load: put back every kept edit the server does not hold, and save it. An entry is dropped instead when the
      * server already holds its content (the save sent as the page went landed first), or when the row was written
-     * since the edit was made by anyone but this tab — the token moved to something other than what this tab last
-     * sent — because a put-back would write over that.
+     * since the edit was made by anyone but this tab — the token moved to something this tab never sent — because a
+     * put-back would write over that.
      */
     function restoreJournal(): void {
         if (journal === null) return;
@@ -992,7 +992,7 @@ export function useBuilderStore(props: BuilderPageProps) {
             const payload = (content: Record<string, unknown>) =>
                 entry.kind === 'field' ? fieldPayload({ ...row, ...content } as LocalField) : sectionPayload({ ...row, ...content } as LocalSection);
             const onServer = payload({});
-            const ours = row.version === entry.base || (entry.sent != null && samePayload(payload(entry.sent), onServer));
+            const ours = row.version === entry.base || (entry.sent ?? []).some((sent) => samePayload(payload(sent), onServer));
             if (!ours || samePayload(payload(entry.snapshot), onServer)) {
                 journal.drop(entry.kind, entry.id);
                 continue;

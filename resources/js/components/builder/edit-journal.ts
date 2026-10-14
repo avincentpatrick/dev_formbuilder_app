@@ -31,12 +31,15 @@ export interface JournalEntry {
     /** The edited content, as the store's own snapshot of it. */
     snapshot: Record<string, unknown>;
     /**
-     * What this tab last SENT for the row and has not yet seen confirmed. ⚠️ THE ENTRY IS NOT DROPPED WHEN THE TOKEN MOVED IF
-     * THE SERVER NOW HOLDS EXACTLY THIS — measured in a real browser: an earlier edit was still on its way when the next
-     * one was made and the page refreshed, so the new edit's `base` predated a save of this tab's own, and the
-     * put-back threw away the newer edit as "changed elsewhere". A move to what this tab sent is this tab's move.
+     * EVERY content this tab has SENT for the row since `base`. ⚠️ THE ENTRY IS NOT DROPPED WHEN THE TOKEN MOVED IF THE
+     * SERVER NOW HOLDS ONE OF THESE — a move to something this tab sent is this tab's own move. Measured in a real browser,
+     * twice: (1) an earlier edit was still on its way when the next one was made and the page refreshed, so the newer
+     * edit's `base` predated a save of this tab's own; (2) a page going makes its in-flight `keepalive` request FAIL on the
+     * page's side while it still reaches the server, so the queue sent the next edit at the old token, the server refused
+     * it with a 409, and only the earlier write landed. A list, because (2) means the write that lands need not be the
+     * last one sent.
      */
-    sent?: Record<string, unknown> | null;
+    sent?: Record<string, unknown>[];
     /** When it was last written, so an abandoned entry expires rather than replaying forever. */
     at: number;
 }
@@ -45,6 +48,9 @@ const PREFIX = 'meridian:builder-edits:';
 
 /** A day. An edit older than that is not one an author is waiting to see come back. */
 export const JOURNAL_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** How many sent contents an entry remembers. */
+const SENT_KEPT = 10;
 
 function defaultStorage(): Storage | null {
     try {
@@ -64,7 +70,7 @@ function isEntry(value: unknown): value is JournalEntry {
         && (entry.base === null || typeof entry.base === 'string')
         && typeof entry.snapshot === 'object'
         && entry.snapshot !== null
-        && (entry.sent === undefined || entry.sent === null || typeof entry.sent === 'object')
+        && (entry.sent === undefined || Array.isArray(entry.sent))
         && typeof entry.at === 'number'
     );
 }
@@ -73,8 +79,8 @@ export interface EditJournal {
     /** Every live entry; expired and malformed ones are dropped as they are read. */
     read(): JournalEntry[];
     /** Keep the row's edit. An entry's `sent` survives a newer edit unless the caller says what it now is. */
-    put(entry: Omit<JournalEntry, 'at' | 'sent'> & { sent?: Record<string, unknown> | null }): void;
-    /** Record what is being sent for the row, if an edit of it is kept. */
+    put(entry: Omit<JournalEntry, 'at' | 'sent'> & { sent?: Record<string, unknown>[] }): void;
+    /** Add what is being sent for the row to its `sent`, if an edit of it is kept. */
     markSent(kind: JournalKind, id: string, sent: Record<string, unknown>): void;
     drop(kind: JournalKind, id: string): void;
 }
@@ -120,13 +126,16 @@ export function editJournal(draftId: string, storage: Storage | null = defaultSt
             const all = load();
             const previous = all.find((other) => other.kind === entry.kind && other.id === entry.id);
             const rest = all.filter((other) => other !== previous);
-            save([...rest, { ...entry, sent: entry.sent === undefined ? (previous?.sent ?? null) : entry.sent, at: now() }]);
+            save([...rest, { ...entry, sent: entry.sent ?? previous?.sent ?? [], at: now() }]);
         },
         markSent(kind, id, sent) {
             const all = load();
             const entry = all.find((other) => other.kind === kind && other.id === id);
             if (!entry) return;
-            entry.sent = sent;
+            const written = JSON.stringify(sent);
+            // The newest last, each content once, and a bounded list: a row edited for an hour without a save landing is
+            // not one whose fifteenth-oldest attempt is going to be what the server holds.
+            entry.sent = [...(entry.sent ?? []).filter((other) => JSON.stringify(other) !== written), sent].slice(-SENT_KEPT);
             save(all);
         },
         drop(kind, id) {

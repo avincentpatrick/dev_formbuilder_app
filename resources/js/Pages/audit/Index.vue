@@ -275,9 +275,11 @@ function summarize(row: AuditRow): string {
                          list inside the component, because "which of my actors are people" is this page's
                          knowledge, not the design system's. -->
                     <MdsAvatar v-if="!(row as AuditRow).is_system" :name="(row as AuditRow).actor" />
-                    <span>{{ (row as AuditRow).actor }}</span>
-                    <span v-if="(row as AuditRow).acting_as" class="audit__acting-as">
-                        via {{ (row as AuditRow).acting_as }}
+                    <span class="audit__actor-text">
+                        <span>{{ (row as AuditRow).actor }}</span>
+                        <span v-if="(row as AuditRow).acting_as" class="audit__acting-as">
+                            via {{ (row as AuditRow).acting_as }}
+                        </span>
                     </span>
                 </div>
             </template>
@@ -403,9 +405,24 @@ function summarize(row: AuditRow): string {
  * WCAG 1.4.1: a reader who cannot distinguish the two greys must still be able to tell the operator line
  * from the actor line. Do not "tidy" this into a colour-only or icon-only treatment.
  */
+/*
+ * M171 — the chip BESIDE the text, the name and the "via …" line stacked inside the text block. This cell was a column
+ * flex container, whose default `align-items: stretch` handed the chip the column's whole width, and the chip's
+ * `aspect-ratio: 1` made that width a disc as wide as the column (the user: "the initial avatar size in the audit log is
+ * so large"). ⚠️ `align-items: center` IS LOAD-BEARING HERE TOO: in a ROW the default `stretch` hands the chip the text
+ * block's two-line HEIGHT on a "via" row — measured as a 24×40 oval, and `list-layout.spec.ts` checks a two-line cell.
+ */
 .audit__actor {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mds-space-2);
+    min-width: 0;
+}
+
+.audit__actor-text {
     display: flex;
     flex-direction: column;
+    min-width: 0;
 }
 
 .audit__acting-as {

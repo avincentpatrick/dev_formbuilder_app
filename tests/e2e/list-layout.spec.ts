@@ -197,3 +197,40 @@ test('Form hub — no stat tile breaks a word across two lines', async ({ page }
         expect(measured.every((m) => m.lines === 1), JSON.stringify(measured)).toBe(true);
     }
 });
+
+// *"the initial avatar size in the audit log is so large under the actor column"*. The chip is `min-inline-size: 24px`
+// with `aspect-ratio: 1`, so any width handed to it becomes a disc that tall. 32px leaves room for the extra-large type
+// setting's caption size and is still far below the ~100px+ disc a stretched cell produced.
+test('Audit log — the actor chip stays a small disc beside the name', async ({ page }) => {
+    await page.goto('/audit-log', { waitUntil: 'networkidle' });
+    await settlePaint(page);
+
+    const chips = await page.locator('.audit__actor .mds-avatar').evaluateAll((els) =>
+        els.map((el) => {
+            const r = el.getBoundingClientRect();
+
+            return { width: Math.round(r.width), height: Math.round(r.height) };
+        }),
+    );
+
+    // Not vacuous: the seeded owner's own changes are in the ledger, and a person's row carries a chip.
+    expect(chips.length, 'no actor chip rendered on /audit-log').toBeGreaterThan(0);
+    for (const chip of chips) {
+        expect(chip.width, JSON.stringify(chip)).toBeLessThanOrEqual(32);
+        expect(chip.height, JSON.stringify(chip)).toBeLessThanOrEqual(32);
+    }
+
+    // A row an operator drove has a second line ("via …"), and no seeded row does — so one is added to the first cell's text
+    // block exactly as the page stacks it. A two-line cell is where a row's default `align-items: stretch` would hand the chip
+    // the text's height; measured without this, a `stretch` mutant passed.
+    const twoLine = await page.locator('.audit__actor').first().evaluate((cell) => {
+        const line = document.createElement('span');
+        line.textContent = 'via Platform operator';
+        cell.querySelector('.audit__actor-text')!.appendChild(line);
+        const r = cell.querySelector('.mds-avatar')!.getBoundingClientRect();
+
+        return { width: Math.round(r.width), height: Math.round(r.height) };
+    });
+    expect(twoLine.width, JSON.stringify(twoLine)).toBeLessThanOrEqual(32);
+    expect(twoLine.height, JSON.stringify(twoLine)).toBeLessThanOrEqual(32);
+});

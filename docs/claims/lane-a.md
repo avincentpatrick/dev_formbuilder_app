@@ -16,7 +16,72 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M169`, a point or a comma stays on the word Vision read it after (`m169-ocr-punctuation-spacing`)
+## Status: ACTIVE CLAIM — `M170`, every builder setting survives a plain refresh, and the toolbar never says "saved" for an edit the server does not hold (`m170-builder-autosave`)
+
+Taken 2026-10-14 on the user's urgent report: *"the autosave feature is not working on other clients. though i tested it and it
+work for me"*, narrowed in the same session to *"The autosave problem is in the form builder. For a Whole Number question, the
+settings on the Basic, Validation and Advanced tabs don't save. Please check every field type and every setting on every tab …
+confirm that changing it starts a save, that the server keeps the value, and that it's still there after a plain page refresh
+without clicking anything else first."* Testers hit it on staging after a break, then a refresh. Branch `m170-builder-autosave`,
+cut from origin/main at `28be0bc5`, PR into main. **The user lifted the freeze for THIS PR only** (*"if fix is applied, merge this
+asap"*): merge at 6/6 green after a fresh staging backup; `M169` (PR #362) stays held.
+
+Rows, filed on the branch by this increment (ids are the title hashes): `R-bfa3eb93` (major — a setting changed just before a
+refresh is lost while the toolbar says "All changes saved"), `R-fdc743ab` (a failed save reads "All changes saved" once a later
+save lands), `R-76474e31` (an expired session stops every save with "Request failed (419)." and nothing resends), `R-7ebfb08e`
+(Expression mode builds a rule the server refuses and blocks every other setting on the question), `R-4d50e3c8` (nit — "Save to
+library" without the pending edit). Filed and NOT taken: `R-d37a38f9` and `R-8881210a` (public form; the second is the user's
+answer to `D118`, asked in this session) and `R-ae57cf6f` (staff encoding, a colleague's draft).
+
+### Evidence verified
+- Read on the trunk at `28be0bc5`, by name: `touch()` in `resources/js/components/builder/useBuilderStore.ts` waits 600 ms and
+  `flushCommit()` is called only by `touch()`, `select()`, `renameField()` and `whenIdle()` — held. Neither `useBuilderStore.ts` nor
+  `Pages/forms/Builder.vue` registers `beforeunload`, `pagehide` or `visibilitychange` — held. `builderClient.ts` `request()`
+  calls `fetch` with no `keepalive` — held.
+- `saveState` is `saving` only while `save.inFlight > 0`, and `save-label.ts` maps `idle` and `saved` alike to "All changes saved",
+  so the 600 ms wait reads as saved — held.
+- `enqueue()`'s `.finally` clears `save.error` on any burst that did not fail; `guard()` records `fieldErrors` only when the error
+  carries a map, so a network failure, a 419 or a 500 leaves nothing standing once another burst lands — held.
+- `BuilderRequestError` keeps "Request failed (419)." for a non-JSON 419 body — held.
+- `ValidationEditor.vue` `setMode()` writes `expression: ''` and `rule_type: null`; `mode()` reads `''` as rule mode;
+  `UpdateFieldRequest::withValidator()` refuses a row with neither — held.
+- Server side for `integer`: `UpdateFieldRequest` rules every Basic, Validation and Advanced key, `FormBuilderService::writeField()`
+  writes each, `BuilderPresenter::field()` hydrates each — held by reading; no test PATCHes a field and then loads the builder page.
+
+### Premise verified
+- One session only (the user, 2026-10-13); nobody else is building. The M169 branch is left exactly as it is.
+- The builder's store is the only writer of a field's settings; an Inertia visit does not unload the page, so the pending timer
+  survives in-app navigation and only a refresh, a closed tab or a typed address loses it.
+- Every settings control calls `touch()` through `setField`, `setConfig`, `setContent`, `setValidations` or its own emit — checked
+  control by control on Basics, Validation and Advanced; the type change and the section move are separate endpoints by design.
+- A browser caps a `keepalive` body at 64 KiB; a cascading list or a large matrix can exceed it, so the leave path cannot rely on
+  `keepalive` alone.
+- The session expires on 120 minutes of inactivity and the bell's poll stops when idle on purpose (`useNotificationFeed.ts`), so
+  the fix must not keep a session alive.
+- Publish already waits for the queue (`whenIdle()`, M113) and is untouched.
+
+### Remedy verdict
+No row prescribes a fix: they are filed here. The remedy was measured by reading, not yet by a run. The first run — the red-first
+E2E spec on a Whole Number — is the measurement, and the claim is extended if it shows a cause not listed above.
+
+Files: `resources/js/components/builder/useBuilderStore.ts`, `resources/js/components/builder/builderClient.ts`,
+`resources/js/components/builder/save-label.ts`, `resources/js/components/builder/types.ts`,
+`resources/js/components/builder/ValidationEditor.vue`, `resources/js/components/builder/ConfigPanel.vue`,
+`resources/js/Pages/forms/Builder.vue`, and their tests: `resources/js/components/builder/*.test.ts` (new
+`settings-save-matrix.test.ts`), `tests/Feature/Forms/BuilderSettingsRoundTripTest.php` (new),
+`tests/e2e/builder-settings-refresh.spec.ts` (new); close-out on the branch: `docs/feature-backlog.md`,
+`docs/claims/decisions.md`, `PROGRESS.md`, `docs/pipeline.md`; this file on main.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `PROGRESS.md` (own block), `docs/pipeline.md`,
+`tests/e2e/builder-settings-refresh.spec.ts`.
+Paired files taken: none.
+Namespaces spent: `D118` (asked and answered in this session); nothing from the ADR or migration namespaces.
+Prediction: on the trunk, the E2E Whole Number spec is red on every "refresh straight after the change" case and green on every
+"refresh after the save returned" case on Basics, Validation and Advanced; the Expression-mode case is red. The Pest round trip
+across all 31 types is green on the trunk. The Vitest per-control matrix is green; its pending-label, leave-flush,
+failure-then-success, 419 and Expression cases are red. **Most likely wrong: the all-green Pest round trip** — I expect at least
+one type whose stored value comes back different from what was sent.
+
+## HELD — `M169`, a point or a comma stays on the word Vision read it after (`m169-ocr-punctuation-spacing`)
 
 Taken 2026-10-13, after the user's "no merge, no deploy while testing is on": this claim builds, opens the PR and gets it green,
 then stops — nothing merges until the user lifts the freeze. Branch `m169-ocr-punctuation-spacing`, cut from origin/main at

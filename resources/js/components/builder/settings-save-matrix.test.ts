@@ -395,6 +395,50 @@ describe('a refresh straight after a change keeps it (R-bfa3eb93)', () => {
     });
 });
 
+describe('a 409 over an edit the server already holds is judged on what was SENT, as the server stores it', () => {
+    it('is saved, not a conflict, though the author typed the next setting while the request was out', async () => {
+        // Measured in a real browser: the 409 was compared with the field as it was NOW — the next setting already in it —
+        // so it never matched, a conflict was raised over nothing, and the next save went at a spent token.
+        const store = makeStore();
+        let answer: (value: Response) => void = () => {};
+        mock.mockImplementationOnce(() => new Promise<Response>((resolve) => (answer = resolve)));
+        const [field] = store.fields.value;
+
+        field.label = 'People here';
+        store.touch(field.uid, 'field');
+        await vi.advanceTimersByTimeAsync(600);
+        field.placeholder = 'e.g. 4'; // typed while the label's save is out
+        store.touch(field.uid, 'field');
+        answer(jsonResponse(409, { current: { ...WHOLE_NUMBER, label: 'People here', version: 'v9' }, message: 'Changed elsewhere.' }));
+        await debounceElapses(store);
+
+        expect(store.conflict.value).toBeNull();
+        expect(patches().at(-1)).toMatchObject({ label: 'People here', placeholder: 'e.g. 4', version: 'v9' });
+        expect(store.saveState.value).toBe('saved');
+    });
+
+    it('takes the minimum "Allow negative numbers" writes as the same rule the server sends back with an empty group', async () => {
+        const store = makeStore();
+        const [field] = store.fields.value;
+        // Exactly the row `withNegativesAllowed()` writes: no `logic_group`, so `fieldPayload()` leaves the key out.
+        field.validations = [{ rule_type: 'min_value', operator: null, rule_value: '0', expression: null, error_message: null, related_field_key: null, sequence: 0 }];
+        store.touch(field.uid, 'field');
+        mock.mockImplementationOnce(() =>
+            Promise.resolve(
+                jsonResponse(409, {
+                    current: { ...WHOLE_NUMBER, version: 'v9', validations: [{ rule_type: 'min_value', operator: null, rule_value: '0', expression: null, error_message: null, related_field_key: null, logic_group: null, logic_operator: null, sequence: 0 }] },
+                    message: 'Changed elsewhere.',
+                }),
+            ),
+        );
+        await debounceElapses(store);
+
+        expect(store.conflict.value).toBeNull();
+        expect(store.fields.value[0].version).toBe('v9');
+        expect(store.saveState.value).toBe('saved');
+    });
+});
+
 describe('a save that failed is never reported as saved (R-fdc743ab, R-76474e31)', () => {
     it('still reads "Not saved" after a later save of another question lands', async () => {
         const store = useBuilderStore(

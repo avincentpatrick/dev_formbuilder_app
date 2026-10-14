@@ -250,13 +250,16 @@ export function useBuilderStore(props: BuilderPageProps) {
     async function persistField(uid: Uid): Promise<boolean> {
         const field = findField(uid);
         if (!field) return false;
-        const result = await guard(() => builderClient.patch<ServerField>(`${base}/fields/${field.id}`, fieldPayload(field)), { uid });
+        const sent = fieldPayload(field);
+        const result = await guard(() => builderClient.patch<ServerField>(`${base}/fields/${field.id}`, sent), { uid });
         if (!result) return false;
         // M170 — a 409 whose question already holds exactly this edit is not a conflict. It is how the put-back after a
         // refresh meets the save sent as the page went, when that save landed after the server rendered the reload: the
         // token moved, the content did not. Take the token and say saved; a dialog asking "mine or theirs" between two
-        // identical sides would be noise.
-        if (result.conflict && samePayload(fieldPayload(result.current as unknown as LocalField), fieldPayload(field))) {
+        // identical sides would be noise. ⚠️ Compared with what THIS REQUEST SENT, never with the field as it is now:
+        // measured in a real browser, the author had typed the next setting while the request was out, so "now" never
+        // matched, a conflict was raised over nothing, and the next save went at a token already spent.
+        if (result.conflict && samePayload(fieldPayload(result.current as unknown as LocalField), sent)) {
             field.version = result.current.version;
             delete save.fieldErrors[uid];
             return true;
@@ -305,11 +308,10 @@ export function useBuilderStore(props: BuilderPageProps) {
     async function persistSection(uid: Uid): Promise<boolean> {
         const section = findSection(uid);
         if (!section) return false;
-        const result = await guard(() =>
-            builderClient.patch<ServerSection>(`${base}/sections/${section.id}`, sectionPayload(section)),
-        );
+        const sent = sectionPayload(section);
+        const result = await guard(() => builderClient.patch<ServerSection>(`${base}/sections/${section.id}`, sent));
         if (!result) return false;
-        if (result.conflict && samePayload(sectionPayload(result.current as unknown as LocalSection), sectionPayload(section))) {
+        if (result.conflict && samePayload(sectionPayload(result.current as unknown as LocalSection), sent)) {
             section.version = result.current.version; // M170: as `persistField()` — the same edit, landed twice
             return true;
         }
@@ -1351,12 +1353,28 @@ function canonical(value: unknown): unknown {
  * M170 — whether two saves would write the same row: their payloads, the version token aside. Compared as the PAYLOAD
  * rather than the snapshot because that is all the server ever stores of a save, so a key the page sends and the store
  * never does cannot make two identical edits look different.
+ *
+ * ⚠️ AND AS THE SERVER WOULD STORE THEM, measured in a real browser: "Allow negative numbers" writes its minimum with no
+ * `logic_group` key, which `fieldPayload()` then leaves out ("keep what is stored"), while the server sends the same rule
+ * back with `logic_group: null` — so once that toggle was used, no comparison of the question ever matched again. An
+ * absent group reads as null, and an index type the server clears when indexing is off reads as cleared.
  */
 function samePayload(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
-    const { version: _a, ...left } = a;
-    const { version: _b, ...right } = b;
+    return JSON.stringify(canonical(asStored(a))) === JSON.stringify(canonical(asStored(b)));
+}
 
-    return JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
+function asStored(payload: Record<string, unknown>): Record<string, unknown> {
+    const { version: _version, ...rest } = payload;
+    if (Array.isArray(rest.validations)) {
+        rest.validations = (rest.validations as Record<string, unknown>[]).map((rule) => ({
+            ...rule,
+            logic_group: rule.logic_group ?? null,
+            logic_operator: rule.logic_operator ?? null,
+        }));
+    }
+    if ('is_queryable' in rest && !rest.is_queryable) rest.indexed_data_type = null;
+
+    return rest;
 }
 
 /**

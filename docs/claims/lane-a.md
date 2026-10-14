@@ -16,7 +16,80 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M169`, a point or a comma stays on the word Vision read it after (`m169-ocr-punctuation-spacing`)
+## Status: ACTIVE CLAIM — `M171`, the user's three UI complaints: the stat tile's broken word, the audit log's stretched avatar, the Integrations button with no room (`m171-ui-three-complaints`)
+
+Taken 2026-10-15 under the testing freeze of 2026-10-13: this claim builds, opens the PR and gets it green, then stops — nothing
+merges until the user says so, after a fresh staging backup (`D123`). Branch `m171-ui-three-complaints`, cut from origin/main at
+`0dc971b6`, PR into main. It is the first of the six themed increments of the UI programme the user approved on 2026-10-15 (the plan at
+`~/.claude/plans/hi-let-s-conduct-a-mutable-goose.md`; the eight decisions `D120`–`D127` asked and answered in that session).
+⚠️ The user's check of `M170` (builder autosave, PR #363) is still owed and opens the build session before any step that depends on it.
+
+Rows taken (filed on the branch by this increment; ids are the title hashes): `R-0a504679` (the form hub's stat tiles break
+"Accepting" mid-word and wrap the last-response date), `R-88a6c81a` (the audit log's actor avatar stretches to the cell's width),
+`R-61992abf` (the Connect button flush under the provider's warning, two paragraphs laid out as flex rows, the provider grid on
+`auto-fit`). Filed and NOT taken — the programme's later increments, in order: full width, shell and settings (`R-fd7b8879`,
+`R-ba9d6349`, `R-8ee7d2dc`, `R-14971e37`); full width, detail pages, stacks and sign-in (`R-348f997c`, `R-7b8a74ae`, `R-fb647b5e`,
+`R-10b38d6d`, `R-3d51f0ae`, `R-66952d33`); feedback (`R-2ce2f274`); versioning and What's new (`R-c7247dbf`, with `R-3f887956`
+`after-launch`); consistency (`R-49813d21`, `R-3ca62317`, `R-f724595b`, `R-9d3c2439`).
+
+### Evidence verified
+- Read on the trunk at `0dc971b6`, by name, in a planning session with no running stack (Docker down), so every citation is a
+  static reading and the first real-browser look is part of this increment's proof.
+- `StatTile.vue:187` — the value is the heading-1 role; `:225` — `overflow-wrap: anywhere`, with `M19`'s own note naming "Accepting"
+  at 38px in a 123px column as the case it was added for. `forms/Show.vue:530` — `repeat(auto-fit, minmax(200px, 1fr))` over four
+  tiles; `:374` passes `ACCEPTANCE_LABEL[...]` ("Accepting", "Not open yet", "Closed", "Full") and `:386` a formatted date-time as the
+  value. Held. `admin/TenantDetail.vue:342-349` passes `row.display` into the same role — held, the only other prose consumer; the
+  other fifteen call sites (dashboard, analytics, achievements, webhooks, integrations) pass numbers or short quotas.
+- `audit/Index.vue:406-409` — `.audit__actor { display: flex; flex-direction: column }` and nothing sets `align-items`; the cell
+  renders `MdsAvatar` (`:277`) then two spans. `Avatar.vue:83-89` — `min-inline-size: 24px; min-block-size: 24px; aspect-ratio: 1`.
+  Held: a stretched inline size is the cell's width and the aspect ratio squares it. `admin/AuditLog.vue:305` has the same rule and
+  `:220-222` renders text only — not affected. `members/Index.vue:503` and `submissions/Inbox.vue:511` are `inline-flex` rows — fine.
+- `integrations/Index.vue:361-363` — `.provider__description,` newline `.provider__scopes,` newline, then two comment blocks, then
+  `.provider__actions,` `.connection__actions {` at `:373-378`: one selector list, so both paragraphs are `display: flex; flex-wrap:
+  wrap; gap` and own no margin rule. `:163-168` — the caution `MdsAlert` carries class `provider__caution`, whose only rule is
+  absent (`.provider__notice` at `:490` has `margin-bottom`; `.provider__caution` appears in no rule). `:169-182` — the actions `div`
+  follows it directly. Held. A multiline search for a selector line ending in a comma followed by a blank line finds this one place
+  in `resources/js`. `:341` — `repeat(auto-fit, minmax(min(18rem, 100%), 1fr))`: held.
+
+### Premise verified
+- One session only (the user, 2026-10-13); the `M169` branch is left exactly as it is, held below.
+- `MdsStatTile` is a design-system primitive with its own story and test; a new prop defaults to today's rendering, so the fifteen
+  numeric call sites change nothing. The gradient fill (exceptions-log #11) and the uppercase label are kept — they are the Vivid
+  direction, not the defect.
+- `audit/index.test.ts` mounts the page; the actor cell's markup is reached by it, so a structural change is pinned there rather
+  than by a new file. `/audit-log` is in the responsive-axe sweep at 375/834/1440; the console's `/admin/audit-log` is scanned by
+  `admin-console-axe.spec.ts` and is untouched.
+- `integrations/Index.vue` is not in the hub list and has its own Vitest file; `/integrations` is in the responsive-axe sweep.
+  The `list-layout.spec.ts` header deliberately leaves `/integrations` out of the stackable-table check — unchanged by this.
+- None of the three files is a hub (`docs/backlog-triage.md`, Hub files); `StatTile.vue`'s stories run under the axe job.
+
+### Remedy verdict
+Measured by reading; the first real-browser look at 1200px, 1440px and 834px on the form hub is the measurement for the tile, and
+the claim is extended if `compact` still breaks at 834px (then the tile grid's floor moves first).
+- Tile: a `valueSize` prop (`display` default, `compact` = heading-3 size and leading, same gradient, `anywhere` kept) — works; the
+  hub's two prose tiles and the console's usage tiles take it; the hub grid floor `min(100%, 240px)`.
+- Avatar: an `inline-flex` row with the name, `align-items: center`, the "via …" line stacked under the name — works and keeps
+  I11a's second-line rule.
+- Integrations: restore `.provider__description` / `.provider__scopes` as margin-zero paragraphs (the card body a column with
+  `gap: --mds-space-3`), `.provider__caution { margin-bottom }`, `.provider__actions { margin-top: auto }`, the grid on `auto-fill`
+  with a `min(100%, 20rem)` floor — works.
+
+Files: `packages/design-system/src/components/StatTile/StatTile.vue`, `StatTile.test.ts`, `StatTile.stories.ts`,
+`resources/js/Pages/forms/Show.vue`, `resources/js/Pages/admin/TenantDetail.vue`, `resources/js/Pages/audit/Index.vue`,
+`resources/js/Pages/audit/index.test.ts`, `resources/js/Pages/integrations/Index.vue`, `resources/js/Pages/integrations/index.test.ts`;
+on the branch already: `docs/feature-backlog.md` (twenty rows and the gap-table tag), `docs/claims/decisions.md` (`D120`–`D127`),
+`docs/pipeline.md`; close-out on the branch: `PROGRESS.md`, `docs/pipeline.md`; this file on main.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`, `PROGRESS.md` (own block).
+Paired files taken: none.
+Namespaces spent: `D120`–`D127` (asked and answered in the planning session, 2026-10-14); nothing from the ADR or migration namespaces.
+Prediction: `StatTile.test.ts`'s new case is red on the trunk (no `compact` class) and green after; the audit page test's new case is
+red on the trunk (the avatar is a direct child of a column) and green after; the integrations test's new case is red on the trunk
+(the caution has no bottom margin in the source) and green after. Mutations: dropping the `compact` branch, the row wrapper and the
+caution margin each turn exactly one case red. The responsive-axe sweep stays green at all three viewports in both themes. **Most
+likely wrong:** the integrations source-text case — a rule asserted by regular expression over a scoped stylesheet is the shape that
+has passed over the wrong thing before (`builder-layout.test.ts`'s note); it may need to assert the computed style in a mount instead.
+
+## HELD — `M169`, a point or a comma stays on the word Vision read it after (`m169-ocr-punctuation-spacing`)
 
 Taken 2026-10-13, after the user's "no merge, no deploy while testing is on": this claim builds, opens the PR and gets it green,
 then stops — nothing merges until the user lifts the freeze. Branch `m169-ocr-punctuation-spacing`, cut from origin/main at

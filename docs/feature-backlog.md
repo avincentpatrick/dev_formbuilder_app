@@ -14246,11 +14246,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   blank and `deploy.ps1` never sets it. The shell has no footer (`resources/js/Layouts/AppLayout.vue:110-116`), the sidebar ends at Help
   (`resources/js/components/shell/nav-model.ts:140`), the account menu lists Settings and Log out
   (`resources/js/components/shell/AccountMenu.vue:27-30`), and the gap-table row at `docs/feature-backlog.md:160` names a What's new
-  feed that nothing queues. `D124` A (0.9.0 now, 1.0.0 at launch), `D125` A (the notes in a repository file; the prompt opens on the
-  first page after sign-in), `D126` A (any close marks it seen), all the user's on 2026-10-14. The remedy: a committed `VERSION` file
+  feed that nothing queues. `D124` A (0.9.0 now, 1.0.0 at launch), `D125` C (changed by the user on 2026-10-15: the notes written
+  with each change and saved in the database by every deploy; the prompt opens on the first page after sign-in), `D126` A (any close
+  marks it seen). The remedy: a committed `VERSION` file
   read by `BuildInfo` under the env override and shared to every page; the version in the sidebar foot, a slim footer under every
-  page, the sign-in card, the console bar and the landing page; `releases.ts` with a test that the top entry matches `VERSION`;
-  a `/whats-new` page and a modal opened on the first page after sign-in for a user whose `users.whats_new_seen_version` (new,
+  page, the sign-in card, the console bar and the landing page; the notes in one repository file (JSON, so PHP and the tests both read
+  it) with a test that the top entry matches `VERSION` and versions descend; a central `releases` table (version unique, released_at,
+  title, items) filled by an idempotent `releases:sync` command that `deploy.ps1` runs after `migrate --force` (upsert by version,
+  never a delete), and the page and the prompt reading the table; a `/whats-new` page and a modal opened on the first page after sign-in for a user whose `users.whats_new_seen_version` (new,
   nullable, no backfill, withheld from tenant extracts like `welcomed_at`) is older, marked seen by any close through
   `POST /whats-new/seen`; one close-out sentence in `CLAUDE.md` and the RBAC §6 users row. **Live.** Filed by `M171`.
   **Tier: during-testing.**

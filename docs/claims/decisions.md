@@ -48,14 +48,17 @@ _None open._ `D127`, the last one filed, was asked and answered on 2026-10-14 in
 
 **What the answer files, in the same push:** nothing new — it shapes `R-c7247dbf`.
 
-### D125 — Where do the What's new notes live, and when is the prompt shown? **A — in a repository file (`releases.ts`, the Help manual's shape), each increment adding its entry in the same PR, with a test that the top entry matches `VERSION`; and the prompt opens right after logging in, on the first page the user lands on.**
+### D125 — Where do the What's new notes live, and when is the prompt shown? **C — written with each change in a repository file and copied into a `releases` table by every deploy, so the database holds every release's version, date and changes; and the prompt opens right after logging in, on the first page the user lands on.**
 
 **Asked and answered 2026-10-14 (user decision, in chat), recorded by Lane A in `M171`'s claim.** The user answered the source question with the trigger: *"i want the whats new to be seen right after logging in."* The recommended option already opened the prompt on the first page after sign-in, so that is recorded as the user's firm requirement — the post-login landing, before anything else — and the source stays the recommended repository file, which the user did not object to. ⚠️ If the user asks for an admin-editable screen instead, the build session records the change here before touching `R-c7247dbf`.
 
 - **A — a file in the repository (recommended, chosen by default).** No admin screen, no table; a test refuses a release whose notes and version disagree.
 - **B — an admin-editable table.** Platform admins write entries in the console; a new table and screens, and entries can drift from what shipped.
+- **C — written with the change, saved by every deploy (chosen 2026-10-15).** Each change brings its notes in one repository file; an idempotent deploy step upserts them into a `releases` table by version and never deletes, so the database is the release history and what the app reads, and the test that refuses notes disagreeing with `VERSION` stays.
 
-**What the answer files, in the same push:** nothing new — it shapes `R-c7247dbf`; the half not built (the notification-centre feed) is `R-3f887956`.
+**Changed 2026-10-15 (user decision, in chat, at `M171`'s build start), when the build session confirmed the source as the entry above required.** The user: *"actually, i want it saved in the databse. so everybrelease, we know what changed, qhqt version it is etc"* — and, asked who writes each release's notes (written with the change and saved by every deploy / typed on a console screen / both), *"Written with the change"*. That is neither A (no table) nor B (typed by an admin), so it is recorded as C. The trigger half is unchanged: the prompt opens on the first page after sign-in.
+
+**What the answer files, in the same push:** nothing new — it amends `R-c7247dbf`'s remedy (the table, the sync step in the deploy, the page reading the table); the half not built (the notification-centre feed) is `R-3f887956`.
 
 ### D124 — Which version scheme, and what is the first number shown to users? **A — a committed `VERSION` file, semantic: 0.9.0 now, a user-visible fix bumps the last number, a new feature the middle one, and launch is 1.0.0.**
 

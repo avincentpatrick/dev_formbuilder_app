@@ -1235,10 +1235,11 @@ Contrast, colour-channel and text-alternative obligations are in §4.1.
 >
 > **As-built (M171) — `valueSize="compact"`, for a row of tiles whose values are words or dates.** The user saw the form hub
 > cut "Accepting" in half: four tiles at 1440px leave a ~170px text column, and the heading-1 value is 204px wide. `compact`
-> sets the value in the **heading-2 role whole** — size, leading and weight, per §2.9 — with the base tracking; the gradient,
+> sets the value in the **heading-3 role whole** — size, leading and weight, per §2.9 — with the base tracking; the gradient,
 > the forced-colors restore and the `overflow-wrap: anywhere` escape are unchanged. It is opt-in so the dashboard's figures
 > keep their size, and a page sets it on a **whole row** (the hub's four tiles, the console's usage tiles), never one tile in
-> a row. A date-and-time value puts the time on the caption line rather than in the value.
+> a row. A date-and-time value puts the time on the caption line rather than in the value. heading-2 was tried first and CI's
+> browser wrapped "Oct 11, 2026" in that column, so the size is heading-3 and `list-layout.spec.ts` tries every month.
 
 > **As-built (H24b2) — the first page assembled from these primitives.** `/analytics` is the Business-gated
 > cross-form surface (ADR-0011), and five shapes it settled are page-level rather than primitive-level, so

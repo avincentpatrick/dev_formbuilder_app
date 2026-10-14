@@ -246,14 +246,14 @@ describe('MdsStatTile — the compact value (M171)', () => {
     );
     const rule = source.match(/^\.mds-stat-tile--compact \.mds-stat-tile__value\s*\{([^}]*)\}/m)?.[1];
 
-    it('sets the compact value in the heading-2 role, its leading included', () => {
+    it('sets the compact value in the heading-3 role, its leading included', () => {
         expect(rule, 'the compact value rule was not found — was it renamed?').toBeDefined();
         // The whole role, never a size alone: §2.9 keeps leading per ROLE so `[data-font-size]` re-derives it, and the
         // note on `.mds-stat-tile__value` records what a size without its leading did to the gradient's descenders.
-        expect(rule).toMatch(/font-size:\s*var\(--mds-type-heading-2-font-size\)/);
-        expect(rule).toMatch(/line-height:\s*var\(--mds-type-heading-2-line-height\)/);
-        expect(rule).toMatch(/font-weight:\s*var\(--mds-type-heading-2-font-weight\)/);
-        // heading-1's tight display tracking is for 38px; at 24px it crowds the letters.
+        expect(rule).toMatch(/font-size:\s*var\(--mds-type-heading-3-font-size\)/);
+        expect(rule).toMatch(/line-height:\s*var\(--mds-type-heading-3-line-height\)/);
+        expect(rule).toMatch(/font-weight:\s*var\(--mds-type-heading-3-font-weight\)/);
+        // heading-1's tight display tracking is for 38px; at 20px it crowds the letters.
         expect(rule).toMatch(/letter-spacing:\s*var\(--mds-tracking-base\)/);
     });
 });

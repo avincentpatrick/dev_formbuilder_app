@@ -195,6 +195,29 @@ test('Form hub — no stat tile breaks a word across two lines', async ({ page }
     if (info.project.name === 'desktop') {
         // The last response wrapped onto three lines at 1440px; it now fits on one.
         expect(measured.every((m) => m.lines === 1), JSON.stringify(measured)).toBe(true);
+
+        // ...and not by the luck of the seeded date: CI's seed gave "Oct 11, 2026", a digit longer than the local one, and the
+        // first compact size wrapped it. Every month with a two-digit day, written into the tile as the page formats a date.
+        const wrapped = await page
+            .locator('.hub__tiles .mds-stat-tile')
+            .filter({ hasText: 'Last response' })
+            .locator('.mds-stat-tile__value')
+            .evaluate((el) => {
+                const out: string[] = [];
+                for (let month = 0; month < 12; month++) {
+                    el.textContent = new Date(2026, month, 28).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                    });
+                    const range = document.createRange();
+                    range.selectNodeContents(el);
+                    if (new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size > 1) out.push(el.textContent);
+                }
+
+                return out;
+            });
+        expect(wrapped, 'a date wrapped onto two lines in the Last response tile').toEqual([]);
     }
 });
 

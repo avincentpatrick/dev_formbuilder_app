@@ -36,9 +36,10 @@
  * invalid HTML, not a link, and no `--link` class, so it rendered as the inert tile it used to be while
  * carrying a bogus attribute. Found by the J2a adversarial review, not by a gate.
  *
- * M171 added `valueSize`. `compact` sets the value in the heading-2 role instead of heading-1, for a tile whose value
+ * M171 added `valueSize`. `compact` sets the value in the heading-3 role instead of heading-1, for a tile whose value
  * is a WORD or a DATE rather than a figure: the user saw "Accepting" cut in half on the form hub, where four tiles at
- * 1440px leave a ~170px text column and the 38px word is 204px wide. Opt-in, so the dashboard's figures keep their size;
+ * 1440px leave a ~170px text column and the 38px word is 204px wide. ⚠️ heading-3, NOT heading-2, MEASURED: at heading-2
+ * CI's browser wrapped "Oct 11, 2026" onto two lines in that column — a date the local seed happened to make one digit shorter. Opt-in, so the dashboard's figures keep their size;
  * a caller uses it for a whole row of tiles, never one tile in a row, or the row reads unevenly.
  */
 import { computed } from 'vue';
@@ -233,13 +234,13 @@ const deltaText = computed(() => {
     overflow-wrap: anywhere;
 }
 
-/* M171 — the heading-2 role WHOLE (size, leading, weight), never a size alone, for the leading reason the note above
-   gives. The tracking returns to the base: heading-1's tight display tracking is drawn for 38px and crowds a 24px word.
+/* M171 — the heading-3 role WHOLE (size, leading, weight), never a size alone, for the leading reason the note above
+   gives. The tracking returns to the base: heading-1's tight display tracking is drawn for 38px and crowds a 20px word.
    The gradient, the forced-colors restore and the `anywhere` escape all key off `.mds-stat-tile__value`, so they hold. */
 .mds-stat-tile--compact .mds-stat-tile__value {
-    font-size: var(--mds-type-heading-2-font-size);
-    line-height: var(--mds-type-heading-2-line-height);
-    font-weight: var(--mds-type-heading-2-font-weight);
+    font-size: var(--mds-type-heading-3-font-size);
+    line-height: var(--mds-type-heading-3-line-height);
+    font-weight: var(--mds-type-heading-3-font-weight);
     letter-spacing: var(--mds-tracking-base);
 }
 

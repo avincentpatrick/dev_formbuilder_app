@@ -74,13 +74,6 @@ const props = defineProps<{ store: BuilderStore }>();
 const field = props.store.selectedField;
 const section = props.store.selectedSection;
 const saveError = props.store.saveError;
-// M170 (`R-fdc743ab`, `R-76474e31`): an edit whose save failed with nothing to correct — the network, an ended session — is
-// sent again from the alert. Absent from a test double, which reads as nothing to retry.
-const hasUnsaved = props.store.hasUnsaved;
-
-function retry(): void {
-    void props.store.retryUnsaved();
-}
 const saveFieldErrors = props.store.saveFieldErrors;
 // M128 (`R-d001de0c`): a refused save, marked ON the selected field's controls; every other key in words, and a line per OTHER refused field.
 const fieldSaveErrors = computed(() => sortFieldSaveErrors(field.value ? saveFieldErrors.value[field.value.uid] : undefined));
@@ -386,6 +379,14 @@ function reparent(sectionId: string): void {
 // One-click save to the question library (Increment G9b): the server names the item from the field label.
 function saveToLibrary(): void {
     if (field.value) void props.store.saveFieldToLibrary(field.value.uid);
+}
+
+// M170 (`R-fdc743ab`, `R-76474e31`): an edit whose save failed with nothing to correct — the network, an ended session — is
+// sent again from the alert. Absent from a test double, which reads as nothing to retry.
+const hasUnsaved = props.store.hasUnsaved;
+
+function retry(): void {
+    void props.store.retryUnsaved();
 }
 
 watch(librarySaved, (value) => {

@@ -126,6 +126,55 @@ red), the retired note dropped (Pest red). PHPStan moves (new `app/` code) and i
 likely wrong:** the Back-button mechanism — Inertia may already re-fetch a page whose component sets no `preserveState`, in which
 case the history case is green on the trunk and the remedy shrinks to the 409.
 
+### Extension 1 — the build session's files and twelve premise corrections (pushed before any added file is opened)
+
+Taken 2026-10-15 by the build session (Opus) on the same branch; plan `~/.claude/plans/pasted-content-id-1fb2-read-claude-md-hidden-creek.md`.
+**The user confirmed both owed checks on staging at this session's start: `M170` (Help text, a Maximum value rule and a Default value
+all survived F5, "All changes saved") and `M171` (four even tiles, the audit circles, the Connect buttons).** Nothing else is owed.
+
+Premise corrections, each read in the code by this session's exploration:
+1. Five builder writes take no FormRequest (store/destroy section, destroy field, duplicate, reorder), so the check before validation
+   is a route middleware on the builder's write routes; `FormFieldConversionController` holds its own copy of `respond()`.
+2. The client dereferences `result.current` on every 409 outside its error guard (`useBuilderStore.ts:262`, `:314`), counts a 409 on
+   delete as success, and ignores the result of a reorder — so the new 409 is THROWN by `builderClient.ts` as its own error type.
+3. Inertia 3.6's `router.reload()` keeps component state and the store never re-reads props, so the reload is a visit with
+   `preserveState: false` (the XLSForm import's own precedent in `Builder.vue`).
+4. Inertia 3.6 restores Back from cached props, and re-visits the server only when an encrypted entry cannot be decrypted
+   (`@inertiajs/core` `handlePopstateEvent`, `onMissingHistoryItem`) — so the remedy is history encryption on the builder page and
+   `clearHistory` on the publish response, measured in a real browser before its test is written.
+5. No delete confirmation exists today (`BuilderCanvas.vue`'s trash button calls the store directly; undo is the only recovery).
+6. Answers are counted in `submission_answers.answers` by key, not in `submission_answer_index` (queryable scalar fields only).
+7. The inbox has no per-answer columns, so the retired note lives on the response page and in the CSV/XLSX headers.
+8. `change_summary` holds keys only and is frozen after publish (`PublishedVersionGuard`), so the Versions panel derives labels from
+   adjacent `schema_snapshot`s when it is read.
+9. The design system's tabs carry no badge (`TabItem` is key and label only) — an optional `alert` flag is added there.
+10. `PreviewRuntime.vue` is built for authoring (grips, pencil, add buttons) — a `readOnly` prop gates them for the version view.
+11. `D30` is honoured, not re-opened: it chose a comment because both scopes ended in a dead 422; once the guard's refusal is a
+    recoverable 409, scoping each uniqueness rule to the bound row's own version gives the right answer inside the race.
+12. The required draft header reaches 13 Pest files and one e2e spec that write to the builder directly; nothing else under
+    `resources/js` writes there (every write goes through the store, `fetch` with `keepalive`, never `sendBeacon`).
+
+Files added: `app/Http/Middleware/EnsureBuilderDraftCurrent.php` (new), `bootstrap/app.php` (its alias),
+`app/Http/Controllers/Tenant/FormFieldConversionController.php`, `app/Http/Controllers/Tenant/FormPublishController.php`,
+`app/Http/Controllers/Tenant/FormVersionViewController.php` (new), `app/Exceptions/Forms/ChildNotInDraftException.php` (new),
+`app/Services/Forms/RetiredFieldKeys.php` (new), `app/Services/Forms/VersionChangeSummary.php` (new),
+`app/Services/Submissions/SubmissionExporter.php`; `resources/js/components/builder/BuilderCanvas.vue`, `PreviewRuntime.vue` (a hub),
+`types.ts`, `builder-store-fixtures.ts`, `DraftSupersededDialog.vue` (new), `DeleteFieldDialog.vue` (new) and their tests;
+`resources/js/Pages/forms/VersionView.vue` (new), `resources/js/Pages/forms/show.test.ts`, `resources/js/Pages/submissions/Show.vue`;
+`packages/design-system/src/components/Tabs/Tabs.vue`, `Tabs.test.ts`, `Tabs.stories.ts`; `resources/js/components/help/manual.ts`
+and `manual.test.ts`; `tests/Pest.php` (a `builderHeaders()` helper) and the Pest files that write to the builder
+(`tests/Feature/Forms/BuilderRoutesTest.php`, `BuilderSettingsRoundTripTest.php`, `FieldAppearanceSaveTest.php`,
+`FieldConfigRetentionTest.php`, `FieldConversionRoutesTest.php`, `FieldCreateRoundTripTest.php`, `FieldDefaultExpressionTest.php`,
+`FieldSaveAttributeNamesTest.php`, `FieldValidationRetentionTest.php`, `LinkedChoicePublishGateTest.php`, `NoteContentShapeTest.php`,
+`tests/Feature/Xlsform/XlsformAppearanceRoundTripTest.php`, and any further one a run finds), `tests/Feature/Forms/FormHubPageTest.php`,
+`tests/Feature/Forms/FormVersionViewTest.php` (new), `tests/Feature/Submissions/SubmissionExportTest.php`,
+`tests/Feature/Submissions/SubmissionInboxTest.php`; `tests/e2e/media-input-hidden-text.spec.ts`,
+`tests/e2e/builder-draft-superseded.spec.ts` (new); `docs/feature-backlog.md` (one row filed: a key edit leaves conditions, formulas
+and piping naming the old key).
+E2E specs this diff reaches, run locally and named here: `builder-draft-superseded`, `builder-settings-refresh`, `builder-structure`,
+`builder-preview-authoring`, `builder-axe`, `media-input-hidden-text`, `list-layout`, `responsive-axe`.
+Paired files taken: none. Namespaces: none (no migration, no ADR, no decision).
+
 ## HELD — `M169`, a point or a comma stays on the word Vision read it after (`m169-ocr-punctuation-spacing`)
 
 Taken 2026-10-13, after the user's "no merge, no deploy while testing is on": this claim builds, opens the PR and gets it green,

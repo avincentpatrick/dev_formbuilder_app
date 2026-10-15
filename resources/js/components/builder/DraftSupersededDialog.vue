@@ -15,7 +15,7 @@ const emit = defineEmits<{ reload: [] }>();
 </script>
 
 <template>
-    <MdsModal :open="open" title="This form was published" close-label="Reload" @close="emit('reload')">
+    <MdsModal :open="open" title="This form was published" close-label="Close and reload" @close="emit('reload')">
         <div class="superseded">
             <p class="superseded__lead">This form was published since this page loaded. Reload to keep editing.</p>
             <p class="superseded__note">

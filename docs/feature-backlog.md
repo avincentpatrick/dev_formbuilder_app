@@ -9702,16 +9702,16 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (2026-09-14). `Builder.vue` sets its grid to `260px minmax(0, 1fr) 340px`; in `em` the two side panes and the
   canvas minimum add up to the 60em threshold at every scale and the palette stops being cramped. ⚠️ The current
   direction is safe rather than wrong: it wastes canvas instead of overflowing. **Live.** Filed by `M94`. **Tier: during-testing.**
-- **`minor` · A later successful builder save clears the unsaved warning for an earlier field that still failed.**
+- ✅ **CLOSED BY `M172` (2026-10-15) — ****`minor` · A later successful builder save clears the unsaved warning for an earlier field that still failed.**
   Carried out of this ledger's §3 table by `M94` (2026-09-14). The save verdict covers a burst of work rather than
   a field, so an unrelated later burst that lands clears an earlier burst's failure while that field still differs
   from the server. ⚠️ `save-state.test.ts` pins the burst behaviour on purpose, so whoever takes this changes that
   assertion deliberately, and exactness needs a per-field dirty set threaded through every guarded action. The
-  author has already been shown the alert once. **Live.** Filed by `M94`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: taken with the blockers increment's rewrite of the builder's refusal alert, where the files coincide (`D132`, `D128`).**
-- **`minor` · A repeated identical builder save failure is announced to a screen reader only once.** Carried out
+  author has already been shown the alert once. **Live.** Filed by `M94`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: taken with the blockers increment's rewrite of the builder's refusal alert, where the files coincide (`D132`, `D128`).** ✅ **CLOSED BY `M172` (2026-10-15):** measured already closed by `M170` (`R-fdc743ab`): the burst verdict clears `save.error` only when nothing from ANY burst is still unsaved, and a refusal's marks clear only on that field's own success — pinned by `resources/js/components/builder/settings-save-matrix.test.ts` ("still reads Not saved after a later save of another question lands"). Nothing more owed.
+- ✅ **CLOSED BY `M172` (2026-10-15) — ****`minor` · A repeated identical builder save failure is announced to a screen reader only once.** Carried out
   of this ledger's §3 table by `M94` (2026-09-14). Setting the save error to the same string is not a reactive
   change, so the config panel's alert never re-mounts and never re-announces. The fix is a per-failure key on that
-  alert, with its own test. **Live.** Filed by `M94`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: taken with the blockers increment's rewrite of the builder's refusal alert, where the files coincide (`D132`, `D128`).**
+  alert, with its own test. **Live.** Filed by `M94`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: taken with the blockers increment's rewrite of the builder's refusal alert, where the files coincide (`D132`, `D128`).** ✅ **CLOSED BY `M172` (2026-10-15):** the pane's alert is keyed by a per-failure counter (`save.failures`, exported as `saveFailures`), so an identical refusal re-mounts it and is announced again — `resources/js/components/builder/key-clash.test.ts` ("announces an identical refusal again, as a new alert"), red on the committed panel.
 - **`minor` · The builder toolbar says "All changes saved" on a form that cannot be edited.** Carried out of this
   ledger's §3 table by `M94` (2026-09-14). With no draft the panes are replaced by an empty state and nothing can
   be written, yet the save status still renders. Hiding it on a read-only form is the fix, in a state the builder
@@ -13407,7 +13407,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   repaired when it changed anything (`D117`). **Latent** — none of Round 1's 15 phones carried a letter. Filed by `M168`.
   **Tier: during-testing.**
 
-- **`minor` · Deleting or re-keying a question that another question's rule compares with leaves that rule pointing
+- ✅ **CLOSED BY `M172` (2026-10-15) — ****`minor` · Deleting or re-keying a question that another question's rule compares with leaves that rule pointing
   at a key that no longer exists, and the owner's next autosave saves it with no compared question at all.** Found by
   `M145` while measuring `R-551873af`'s reachability. `useBuilderStore.removeFieldLocal()` drops only the deleted field,
   and nothing in the store rewrites another field's `related_field_key` on a delete or a key edit — so the rule names a
@@ -13419,7 +13419,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   on a delete, clear or repoint every dependent rule and say so in the undo entry; on a key edit, carry the new key into
   every `related_field_key` that held the old one — or refuse to delete a compared question while a rule names it.
   Not one of the 19 comments (`D72`), so filed below the testing line. **Live.** Filed by `M145`.
-  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: taken by the blockers increment — the delete half with the retired-question dialog (`D133`), the key half with the auto-adjusted key (`D132`, `D128`).**
+  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: taken by the blockers increment — the delete half with the retired-question dialog (`D133`), the key half with the auto-adjusted key (`D132`, `D128`).** ✅ **CLOSED BY `M172` (2026-10-15):** both halves: a key change (typed, or kept by the server) carries the new key into every other question's comparison rule on screen and in its baseline (`repointRules()`), and a delete drops the rules comparing with it the same way and brings them back with undo (`dropRulesComparingWith()`, `restoreRules()`; `resources/js/components/builder/delete-field.test.ts`). Expression TEXT naming a key — conditions, formulas, piping — is not rewritten: filed as `R-ade0b598`.
 
 - **`nit` · `PreviewRuntime.vue` keys a question's issue chips by `issue.code`, so two issues of one code on one
   question would collide in the render.** Found by `M145` while adding `incomplete_rule`: the `<li>` under a field is
@@ -13473,12 +13473,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   read-only census — the PDF templates, Slack formatting, the mail views, the CSV and XLSX path, and what the guest
   runtime hands to Vue — with each surface cleared or filed. **Latent** — no third surface is known. **Tier: after-launch.**
 
-- **`nit` · The builder's request-layer uniqueness rules say nothing about the publish race `D30` decided to leave.**
+- ✅ **CLOSED BY `M172` (2026-10-15) — ****`nit` · The builder's request-layer uniqueness rules say nothing about the publish race `D30` decided to leave.**
   Filed by `M147` (2026-10-08) from `D30` option 1 (*"leave both rules as they are and say so in a comment"*).
   `app/Http/Requests/Forms/UpdateFieldRequest.php` and `app/Http/Requests/Forms/UpdateSectionRequest.php` scope their
   uniqueness rules to the bound version with no comment, so the next reader cannot tell a slightly wrong message inside
   that race from an oversight. The remedy is the comment in both: the draft guard is the real gate, and the message still
-  tells the author to reload. **Latent** — the race has never been reported. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: folded into the blockers increment — the uniqueness rules scope to the bound row's own version, which is the rule the comment would have described (`D132`, `D128`).**
+  tells the author to reload. **Latent** — the race has never been reported. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: folded into the blockers increment — the uniqueness rules scope to the bound row's own version, which is the rule the comment would have described (`D132`, `D128`).** ✅ **CLOSED BY `M172` (2026-10-15):** folded into `R-733eff09`: the request layer no longer judges key uniqueness at all — `FormBuilderService::freeKey()` suffixes a clash under the write (`D132`) — so the race `D30` left has no refusal left to word wrongly, and a stale page is refused 409 by `builder.draft` before validation.
 
 - **`minor` · `deploy.ps1`'s test harness lives in no committed file, while every merge now deploys the testing site
   through that script.** Filed by `M147` (2026-10-08) from `D45` (C until a production host exists, then B). The harness
@@ -14299,7 +14299,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   everything ships an unrelated lockfile line, and one that does not keeps reverting it. The remedy is the one-line lock update in a
   PR of its own. **Live.** Filed by `M171`. **Tier: during-testing.**
 
-- **`major` · A builder tab left open across a publish refuses every edit with "The key has already been taken", then "That item belongs to a published version" once the key is changed, and a reload loses the unsaved edits.**
+- ✅ **CLOSED BY `M172` (2026-10-15) — ****`major` · A builder tab left open across a publish refuses every edit with "The key has already been taken", then "That item belongs to a published version" once the key is changed, and a reload loses the unsaved edits.**
   The testers' report (2026-10-14, relayed 2026-10-15): *"The key has already been taken. ************ has a change that was not saved.
   Select it to see why"*, and on a delete *"That item belongs to a published version and can no longer be edited"*. Measured on
   `0432d03b`: `app/Http/Requests/Forms/UpdateFieldRequest.php:53-58` checks the key against the form's CURRENT draft, ignoring only
@@ -14323,9 +14323,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   reorder answers the same 409; both uniqueness rules scope to the bound row's own version; `respond()`'s docblock claim of a
   refetch (`FormBuilderController.php:225`) becomes true; the publish refusal says why. Red first: a Pest case sending the
   UNCHANGED key against a published field's id, a Vitest case replaying by key, an e2e two-tab case. **Live.** Filed by `M172`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** ✅ **CLOSED BY `M172` (2026-10-15):** every builder write carries the draft the page was loaded with (`X-Builder-Draft`, `builderFor()` in `resources/js/components/builder/builderClient.ts`), and `app/Http/Middleware/EnsureBuilderDraftCurrent.php` (`builder.draft`, after `can:update,form`) refuses a superseded page 409 `draft_superseded` with the draft to reload into, before any FormRequest validates it (428 when absent). The publish race it cannot see answers the same 409 from the service guard, which now tells a row of an earlier version of THIS form (`FormException::childSuperseded()`) from another form's row (still 422); reorder refuses instead of a silent 200. The client throws `DraftSupersededError` (it carries no `current` row, which every 409 path dereferenced), shows `DraftSupersededDialog.vue` once, sends nothing more, offers no Retry, and Reload remounts the page (`router.reload()` keeps component state); the edit journal is keyed by the FORM and its entries carry the key the server held, so the kept edits come back into the new draft by key, and an M170 page's draft-keyed entries are folded in once. The builder page's history is encrypted and cleared on publish and restore, so Back re-visits the server; Publish says why it did nothing. Measured red first on the trunk: the testers' exact 422 "The key has already been taken." (Pest), four Vitest cases, and `tests/e2e/builder-draft-superseded.spec.ts` on a pre-M172 build — the two-tab case 422, and Back restored the builder as it was FIRST loaded, with no question at all. Mutations caught: the draft-id comparison (the stale create), the replay by key, the superseded-code check.
 
-- **`minor` · A key clash is refused instead of avoided, the refusal shows only on a tab that selecting the question never opens, and an undo or a journal replay can bring a taken key back.**
+- ✅ **CLOSED BY `M172` (2026-10-15) — ****`minor` · A key clash is refused instead of avoided, the refusal shows only on a tab that selecting the question never opens, and an undo or a journal replay can bring a taken key back.**
   The clash the testers can still hit after the stale-tab row above is fixed: an author types a key another question holds, or an
   undo (`resources/js/components/builder/useBuilderStore.ts:287-305`) or the journal's put-back (`:986-1010`) re-sends a key freed
   and retaken meanwhile. The server's own keys never clash (`app/Services/Forms/FormBuilderService.php:903-928`, `uniqueKey()` and
@@ -14342,9 +14342,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   question with its reason inline, selecting one opens the tab holding the error, and the tab carries a badge. Folds
   `R-4c4e35ae` (the uniqueness rules scope to the bound row's own version, the rule its comment would have described); takes
   `R-31ff7ade` and `R-d85d51d2` with the alert rewrite where the files coincide — verified at the build. **Live.** Filed by `M172`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** ✅ **CLOSED BY `M172` (2026-10-15):** neither key rule refuses a key another row holds any more; `FormBuilderService::freeKey()` keeps the lowest free `{key}_{n}` (n from 2, inside 150 characters) for a question or a section and the response carries it (`D132`). The panel warns AS a clashing key is typed ("Used by … It will be saved as age_2", with a button taking that key), says under Field key which key the server kept, and every other question's comparison rule naming the old key follows (`repointRules()`). The alert names each other refused question with its reasons as a button that opens it on the tab holding the error; a question holding a refusal opens on that tab, which carries a dot (`MdsTabs`' new `alert` flag, decorative to a screen reader so every tab keeps its exact name); a refusal on another tab of the selected question is said with the tab's name (`tabForSavePath()`). `docs/form-versioning-schema-migration.md` gained the as-built suffix rule. Red first: two Pest cases (422 on the row-1 server) and four Vitest cases; mutations caught: the suffix (two Pest cases), the inline warning.
 
-- **`minor` · Deleting a question that a published version with responses still uses gives no warning, and nothing on a response or an export says the question was removed from the form.**
+- ✅ **CLOSED BY `M172` (2026-10-15) — ****`minor` · Deleting a question that a published version with responses still uses gives no warning, and nothing on a response or an export says the question was removed from the form.**
   The testers' request (2026-10-15): delete when the published form has no responses; otherwise ask, retire the question, keep the
   submitted answers with a note, and keep the history. Measured: a delete hard-deletes the row from the draft and nothing else
   (`app/Services/Forms/FormBuilderService.php:308-320`); older responses keep their answers under their own version
@@ -14360,9 +14360,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `R-9ea69e29`, `useBuilderStore.removeFieldLocal()`); the response page, the inbox's columns and the CSV/XLSX headers tag a key
   present in a submission's version but absent from the current published version with "removed from the form in version N",
   read from `change_summary` (`app/Services/Forms/SchemaChangeClassifier.php`). The version-history half is the row below.
-  **Live.** Filed by `M172`. **Tier: early-testing.**
+  **Live.** Filed by `M172`. **Tier: early-testing.** ✅ **CLOSED BY `M172` (2026-10-15):** `GET /forms/{form}/fields/{field}/answers` counts the non-draft, non-deleted responses of the form, in ANY version, holding a non-empty answer under the question's key in `submission_answers.answers` (each instance of a repeatable section looked into); the canvas's trash asks first only when that count is above zero or unreadable (`DeleteFieldDialog.vue`: "N responses hold answers to this question. They keep them, marked as removed from the form."), and a form never published asks nothing. Other questions' comparison rules leave with the deleted one and come back with undo. `app/Services/Forms/RetiredFieldKeys.php` names each key the current published version no longer holds with the version that removed it: the response page tags the answer "Removed from the form in version N" and the CSV/XLSX header carries the note — in the exporter only, so the connectors' column catalog keeps its names. ⚠️ Premise corrected: the inbox has no per-answer columns, so there was nothing to tag there. Red first: three Pest cases, four Vitest cases; mutation caught: the retired note (the inbox and export cases).
 
-- **`minor` · An author cannot see what changed between a form's versions or open an old version: the hub's Versions panel shows version, status and date only, and the change summary is shown nowhere.**
+- ✅ **CLOSED BY `M172` (2026-10-15) — ****`minor` · An author cannot see what changed between a form's versions or open an old version: the hub's Versions panel shows version, status and date only, and the change summary is shown nowhere.**
   The testers' request (2026-10-15): *"there must also a way to check the older version for history"*. `app/Services/Forms/FormHubPresenter.php:87-92`
   sends each version's id, number, status and published date; `resources/js/Pages/forms/Show.vue:444-487` draws the panel with
   Print blank and Restore as the only actions; `form_versions.change_summary` (`app/Services/Forms/SchemaChangeClassifier.php`,
@@ -14370,7 +14370,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (`:554`) or `GET /api/v1/forms/{form}/versions/{version}`. The remedy: the panel lists each version's summary (added, removed and
   changed questions by label) and a View that opens the old version read-only through the preview runtime from `schema_snapshot`
   (a tenant route beside the Print blank one). The interactive field-by-field diff stays `version-diff-ui`
-  (`docs/form-versioning-schema-migration.md:209`). **Live.** Filed by `M172`. **Tier: early-testing.**
+  (`docs/form-versioning-schema-migration.md:209`). **Live.** Filed by `M172`. **Tier: early-testing.** ✅ **CLOSED BY `M172` (2026-10-15):** the hub's Versions panel has a "What changed" column — added, removed and changed questions by their own labels with the publisher's note, derived when read from the snapshots the hub already loads (`app/Services/Forms/VersionChangeSummary.php`; `change_summary` holds keys only and a published row is frozen) — and View beside Print blank: `GET /forms/{form}/versions/{version}/view` (`FormVersionViewController`, Print blank's shape and gate, a draft 404s) draws the version through the builder's preview with `readOnly`, no author control offered, nothing saved. Help says so. Red first: two Pest cases, two Vitest cases; mutation caught: the view route serving a draft.
 
 - **`minor` · A grid's cells are all single choices from one shared list: no column can have its own type or its own choices, so a table of names, numbers, dates and ticks cannot be built.**
   The testers' comment (2026-10-15): *"it can only have a single set of options and also there is also 1 type of question unlike in

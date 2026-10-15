@@ -26,6 +26,12 @@ export interface JournalEntry {
     kind: JournalKind;
     /** The server id — a refresh mints new client uids, so the uid cannot be the key. */
     id: string;
+    /**
+     * M172 (`R-81756e95`) — the key the SERVER held for the row when the edit was made (not a key typed in the edit). A
+     * publish clones the draft with new ids and the same keys, so after the reload a stale page is sent to, this is the
+     * only way back to the row. Absent on an entry written before M172.
+     */
+    key?: string;
     /** The server's version token the edit was made against. A different one on load means the row moved on since. */
     base: string | null;
     /** The edited content, as the store's own snapshot of it. */
@@ -67,6 +73,7 @@ function isEntry(value: unknown): value is JournalEntry {
     return (
         (entry.kind === 'field' || entry.kind === 'section')
         && typeof entry.id === 'string'
+        && (entry.key === undefined || typeof entry.key === 'string')
         && (entry.base === null || typeof entry.base === 'string')
         && typeof entry.snapshot === 'object'
         && entry.snapshot !== null
@@ -86,11 +93,25 @@ export interface EditJournal {
 }
 
 /**
- * The journal of one draft. Keyed by the DRAFT, not the form: a publish starts a new draft whose rows have new ids, so
- * an entry from the old one could never match anything and would only linger.
+ * The journal of one FORM in this tab.
+ *
+ * ⛔ M172 (`R-81756e95`) — KEYED BY THE FORM, NO LONGER BY THE DRAFT, AND THE DRAFT KEY WAS DELIBERATE. It was chosen
+ * because a publish starts a new draft whose rows have new ids, so an old entry "could never match anything". That
+ * became the defect the testers met: a page left open while the form was published elsewhere is refused (409
+ * `draft_superseded`) and reloads into the NEW draft — and a draft-keyed journal threw away every edit it was holding.
+ * Each entry now carries the row's server `key`, which a publish keeps, and the store's put-back finds the row by it
+ * when the id is gone. An entry that matches nothing by either is dropped as it is read back, so nothing lingers.
+ *
+ * `legacyDraftId` folds in, once, the entries an M170 page wrote under the draft's key, so a tab open across this
+ * deploy loses nothing.
  */
-export function editJournal(draftId: string, storage: Storage | null = defaultStorage(), now: () => number = () => Date.now()): EditJournal {
-    const key = `${PREFIX}${draftId}`;
+export function editJournal(
+    formId: string,
+    storage: Storage | null = defaultStorage(),
+    now: () => number = () => Date.now(),
+    legacyDraftId: string | null = null,
+): EditJournal {
+    const key = `${PREFIX}${formId}`;
 
     function load(): JournalEntry[] {
         if (storage === null) return [];
@@ -111,6 +132,23 @@ export function editJournal(draftId: string, storage: Storage | null = defaultSt
             else storage.setItem(key, JSON.stringify(entries));
         } catch {
             // Quota or a refused store: the edit still saves the ordinary way, it just cannot be put back.
+        }
+    }
+
+    if (legacyDraftId !== null && legacyDraftId !== formId && storage !== null) {
+        try {
+            const legacyKey = `${PREFIX}${legacyDraftId}`;
+            const raw = storage.getItem(legacyKey);
+            if (raw !== null) {
+                const parsed: unknown = JSON.parse(raw);
+                const legacy = Array.isArray(parsed) ? parsed.filter(isEntry) : [];
+                const current = load();
+                const missing = legacy.filter((old) => !current.some((entry) => entry.kind === old.kind && entry.id === old.id));
+                if (missing.length > 0) save([...current, ...missing]);
+                storage.removeItem(legacyKey);
+            }
+        } catch {
+            // A refused or corrupt store: the legacy entries are lost, exactly as they would have been without this.
         }
     }
 

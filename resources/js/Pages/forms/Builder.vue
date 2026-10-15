@@ -25,6 +25,7 @@ import LogicRail from '@/components/builder/LogicRail.vue';
 import PreviewPane from '@/components/builder/PreviewPane.vue';
 import ConfigPanel from '@/components/builder/ConfigPanel.vue';
 import ConflictDialog from '@/components/builder/ConflictDialog.vue';
+import DraftSupersededDialog from '@/components/builder/DraftSupersededDialog.vue';
 import FormSettingsModal from '@/components/builder/FormSettingsModal.vue';
 import SaveAsTemplateModal from '@/components/forms/SaveAsTemplateModal.vue';
 import { useBuilderStore } from '@/components/builder/useBuilderStore';
@@ -34,7 +35,7 @@ import { useEntitlements } from '@/composables/useEntitlements';
 
 const props = defineProps<BuilderPageProps>();
 const store = useBuilderStore(props);
-const { selection, saving, saveState, canUndo, canRedo, conflict, library, saveError } = store;
+const { selection, saving, saveState, canUndo, canRedo, conflict, library, saveError, superseded } = store;
 
 // The toolbar's polite live region. Reads the store's EXPLICIT verdict rather than inferring success
 // from an idle queue -- see `save-label.ts` for why the failed state renders a string at all.
@@ -214,11 +215,34 @@ function publish(): void {
         // those into unhandled rejections. The watcher above already pulls the pane carrying the alert on
         // screen, so refusing to POST is all this needs to do for the author to see why.
         if (saveState.value === 'failed') {
+            publishHeld.value = heldReason(); // M172: no longer silent — see heldReason()
             return;
         }
 
+        publishHeld.value = null;
         router.post(`/forms/${props.form.id}/publish`, {}, { preserveScroll: true });
     });
+}
+
+/** M172 (`R-81756e95`) — why the last Publish press did nothing; gone as soon as everything is saved again. */
+const publishHeld = ref<string | null>(null);
+function heldReason(): string {
+    return superseded.value !== null
+        ? 'This form was published since this page loaded. Reload, then publish again.'
+        : 'Some changes are not saved yet. The settings panel shows why; fix or undo them, then publish again.';
+}
+watch(saveState, (state) => {
+    if (state !== 'failed') publishHeld.value = null;
+});
+
+/**
+ * M172 (`R-81756e95`) — leave a page whose draft a publish moved past for the new one. A REMOUNT, not
+ * `router.reload()`: Inertia's reload preserves component state and the store never re-reads its props, so only a
+ * visit with `preserveState: false` builds a store from the new draft — whose put-back then finds each kept edit by key.
+ */
+function reloadIntoNewDraft(): void {
+    store.flushForLeave();
+    router.visit(window.location.href, { preserveState: false, preserveScroll: true, replace: true });
 }
 
 // ── Form settings (Increment M117, decision `D63`) ──────────────────────────────────────────────────
@@ -471,6 +495,10 @@ function submitImport(): void {
             </ul>
         </MdsAlert>
 
+        <MdsAlert v-if="publishHeld !== null" class="builder__violations" tone="danger" title="Not published">
+            {{ publishHeld }}
+        </MdsAlert>
+
         <MdsAlert
             v-if="publishViolations.length > 0 && !publishViolationsDismissed"
             class="builder__violations"
@@ -634,6 +662,11 @@ function submitImport(): void {
         </div>
 
         <ConflictDialog :conflict="conflict" @resolve="store.resolveConflict" />
+        <DraftSupersededDialog
+            :open="superseded !== null"
+            :version-number="superseded?.draft?.version_number ?? null"
+            @reload="reloadIntoNewDraft"
+        />
 
         <!-- Save as template (G9a) — snapshots the current draft into a tenant-owned private template. -->
         <SaveAsTemplateModal v-model:open="templateOpen" :form-id="form.id" :default-name="form.title" />

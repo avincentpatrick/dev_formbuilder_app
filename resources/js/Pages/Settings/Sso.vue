@@ -148,16 +148,14 @@ function remove(): void {
     gap: var(--mds-space-5);
 }
 
+/* M173 (`R-ba9d6349`, `D120`) — the settings page's grid: the cards two across at 1440, three at 1920, top-aligned.
+   DOM order is reading order, so the failures card is still last. The notice above the stack spans the page. */
 .sso__stack {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 30rem), 1fr));
     gap: var(--mds-space-5);
+    align-items: start;
 }
-
-.sso__notice {
-    max-width: 640px;
-}
-
 
 .sso__confirm {
     margin: 0 0 var(--mds-space-3);

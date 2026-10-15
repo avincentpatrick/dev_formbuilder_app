@@ -173,10 +173,6 @@ const hintId = (type: string): string => `notification-pref-${type}-locked`;
 }
 
 /* Re-declared, not inherited — see the header note about scoped CSS and child SFCs. */
-.settings-card {
-    max-width: 640px;
-}
-
 .settings-card__head {
     display: flex;
     align-items: center;

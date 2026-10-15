@@ -93,10 +93,6 @@ const hasFailures = computed<boolean>(() => props.failures.length > 0);
 
 <style scoped>
 /* Re-declared, not inherited — scoped CSS reaches a child SFC's root node only (the ModulesCard note). */
-.settings-card {
-    max-width: 640px;
-}
-
 .settings-card__head {
     display: flex;
     align-items: center;

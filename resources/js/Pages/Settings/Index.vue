@@ -173,301 +173,303 @@ function savePassword(): void {
     <div class="settings">
         <PageHeader title="Settings" icon="settings" />
 
-        <!-- Profile -->
-        <MdsCard class="settings-card">
-            <template #header>
-                <div class="settings-card__head">
-                    <MdsIcon name="user" size="sm" aria-hidden="true" />
-                    <h2 class="settings-card__title">Profile</h2>
-                </div>
-            </template>
-            <form class="settings-form" @submit.prevent="saveProfile">
-                <MdsFormField label="Name" required :error="profile.errors.name" v-slot="{ id, describedby, invalid }">
-                    <MdsTextInput
-                        :id="id"
-                        v-model="profile.name"
-                        name="name"
-                        autocomplete="name"
-                        :describedby="describedby"
-                        :invalid="invalid"
-                    />
-                </MdsFormField>
-                <MdsFormField label="Email" required :error="profile.errors.email" v-slot="{ id, describedby, invalid }">
-                    <MdsTextInput
-                        :id="id"
-                        v-model="profile.email"
-                        type="email"
-                        name="email"
-                        autocomplete="email"
-                        :describedby="describedby"
-                        :invalid="invalid"
-                    />
-                </MdsFormField>
-                <div class="settings-form__foot">
-                    <MdsButton variant="primary" type="submit" :loading="profile.processing">Save</MdsButton>
-                    <span v-if="profile.recentlySuccessful" class="settings-form__saved" role="status">Saved</span>
-                </div>
-            </form>
-        </MdsCard>
-
-        <!-- Appearance -->
-        <MdsCard class="settings-card">
-            <template #header>
-                <div class="settings-card__head">
-                    <MdsIcon name="sun" size="sm" aria-hidden="true" />
-                    <h2 class="settings-card__title">Appearance</h2>
-                </div>
-            </template>
-            <div class="settings-row">
-                <div class="settings-row__text">
-                    <p class="settings-row__label">Theme</p>
-                    <p class="settings-row__hint">
-                        Choose how Meridian looks. "Match System" follows your device setting.
-                    </p>
-                </div>
-                <MdsSegmentedControl
-                    :model-value="mode"
-                    :options="themeOptions"
-                    ariaLabel="Theme"
-                    @update:model-value="(v: string) => setMode(v as ThemeMode)"
-                />
-            </div>
-
-            <div class="settings-row">
-                <div class="settings-row__text">
-                    <p class="settings-row__label">Accent colour</p>
-                    <p class="settings-row__hint">
-                        Recolours primary buttons, links, and focus rings. Status colours are unaffected.
-                    </p>
-                </div>
-                <MdsSegmentedControl
-                    :model-value="accentChoice"
-                    :options="accentOptions"
-                    ariaLabel="Accent colour"
-                    @update:model-value="chooseAccent"
-                />
-            </div>
-
-            <div class="settings-row">
-                <div class="settings-row__text">
-                    <p class="settings-row__label">Text size</p>
-                    <p class="settings-row__hint">
-                        Scales all text across Meridian. Public forms your respondents see are not
-                        affected.
-                    </p>
-                </div>
-                <MdsSegmentedControl
-                    :model-value="fontSize"
-                    :options="fontSizeOptions"
-                    ariaLabel="Text size"
-                    @update:model-value="(v: string) => setFontSize(v as FontSizeScale)"
-                />
-            </div>
-
-            <div class="settings-row">
-                <div class="settings-row__text">
-                    <p class="settings-row__label">Dyslexia-friendly font</p>
-                    <p class="settings-row__hint">
-                        Switches body text to OpenDyslexic. Headings and code stay as they are.
-                    </p>
-                </div>
-                <!-- A switch since I5. DSR §3.2 argued for a checkbox here while no switch existed; now
-                     that one does, this is the only on/off preference on the page that would have looked
-                     different from the eighteen around it. -->
-                <MdsSwitch
-                    :model-value="dyslexiaFont"
-                    label="Use a dyslexia-friendly font"
-                    @update:model-value="setDyslexiaFont"
-                />
-            </div>
-        </MdsCard>
-
-        <!-- Notifications (Increment I4, PRD Feature #13b) — placed here, after Appearance and before
-             Drafts, because Appearance and Notifications are the two PERSONAL preference cards, while
-             Drafts, Branding and Custom domains below are org-wide Owner/Admin settings. -->
-        <NotificationPreferencesCard :preferences="notificationPreferences" />
-
-        <!-- App Settings (Increment I5, PRD Feature #10). PRD #10 asks for the area to be "organized by
-             section (Access, Maintenance, Modules) rather than as one long unstructured list of switches",
-             so the three stay CONTIGUOUS and in that order, and they open the org-wide block: everything
-             above is a personal preference, everything from here down is a decision for the whole
-             workspace. About is deliberately not among them — see the bottom of the page. -->
-        <template v-if="appSettings.can_manage">
-            <AccessCard :access="appSettings.access" />
-            <MaintenanceCard :maintenance="appSettings.maintenance" />
-            <ModulesCard :modules="appSettings.modules" />
-        </template>
-
-        <!-- Drafts (Increment H10) — Owner/Admin only tenant-level setting -->
-        <MdsCard v-if="draftSettings.can_manage" class="settings-card">
-            <template #header>
-                <div class="settings-card__head">
-                    <MdsIcon name="clock" size="sm" aria-hidden="true" />
-                    <h2 class="settings-card__title">Drafts</h2>
-                </div>
-            </template>
-            <form class="settings-form" @submit.prevent="saveDraftSettings">
-                <MdsFormField
-                    label="Save &amp; resume link expiry (days)"
-                    help="How long a respondent's “Save and finish later” link stays valid. Applies to drafts started after this change."
-                    :error="draftForm.errors.draft_ttl_days"
-                    v-slot="{ id, describedby, invalid }"
-                >
-                    <MdsNumberInput
-                        :id="id"
-                        v-model="draftForm.draft_ttl_days"
-                        :min="1"
-                        :max="365"
-                        :describedby="describedby"
-                        :invalid="invalid"
-                    />
-                </MdsFormField>
-                <div class="settings-form__foot">
-                    <MdsButton variant="primary" type="submit" :loading="draftForm.processing">Save</MdsButton>
-                    <span v-if="draftForm.recentlySuccessful" class="settings-form__saved" role="status">Saved</span>
-                </div>
-            </form>
-        </MdsCard>
-
-        <!-- Branding (Increment H23a2, ADR-0014). Placed after Drafts and before the custom-domain
-             signpost: both are org-wide Owner/Admin settings, and this one is a control. -->
-        <BrandingCard :branding="branding" />
-
-        <!-- Custom domains (Increment H22b) — a signpost, not a control. Only rendered once the tenant
-             holds a domain, so it never advertises a Business feature to a tenant that cannot buy it. -->
-        <MdsCard v-if="customDomains.count > 0" class="settings-card">
-            <template #header>
-                <div class="settings-card__head">
-                    <MdsIcon name="globe" size="sm" aria-hidden="true" />
-                    <h2 class="settings-card__title">Custom domains</h2>
-                </div>
-            </template>
-            <div class="settings-row">
-                <div class="settings-row__text">
-                    <p class="settings-row__label">
-                        {{ customDomains.count }} domain{{ customDomains.count === 1 ? '' : 's' }}
-                    </p>
-                    <p class="settings-row__hint">
-                        Serve your public forms on your own hostname, with the DNS records and setup status.
-                    </p>
-                </div>
-                <MdsButton variant="secondary" icon-left="globe" @click="router.visit('/domains')">
-                    Manage domains
-                </MdsButton>
-            </div>
-        </MdsCard>
-
-        <!-- Single sign-on (P1a) — a signpost, not a control, exactly like custom domains above. The
-             condition is deliberately WIDER than that card's: `visible` is entitled OR configured, because
-             SSO has no sidebar entry to cover the entitled-but-empty case (ADR-0016 §D6). It still never
-             advertises an unbuyable plan, since an unentitled tenant with nothing configured sees nothing. -->
-        <MdsCard v-if="sso.visible" class="settings-card">
-            <template #header>
-                <div class="settings-card__head">
-                    <MdsIcon name="shield" size="sm" aria-hidden="true" />
-                    <h2 class="settings-card__title">Single sign-on</h2>
-                </div>
-            </template>
-            <div class="settings-row">
-                <div class="settings-row__text">
-                    <p class="settings-row__label">
-                        {{ sso.configured ? `SAML 2.0 · ${sso.status_label}` : 'Not set up' }}
-                    </p>
-                    <p class="settings-row__hint">
-                        Let members sign in with your organisation’s own identity provider instead of an email
-                        address and password.
-                    </p>
-                </div>
-                <MdsButton variant="secondary" icon-left="shield" @click="router.visit('/settings/sso')">
-                    {{ sso.configured ? 'Manage single sign-on' : 'Set up single sign-on' }}
-                </MdsButton>
-            </div>
-        </MdsCard>
-
-        <!-- Security -->
-        <MdsCard class="settings-card">
-            <template #header>
-                <div class="settings-card__head">
-                    <MdsIcon name="shield" size="sm" aria-hidden="true" />
-                    <h2 class="settings-card__title">Security</h2>
-                </div>
-            </template>
-
-            <section class="settings-sub">
-                <h3 class="settings-sub__title">Password</h3>
-                <form class="settings-form" @submit.prevent="savePassword">
-                    <MdsFormField
-                        label="Current password"
-                        required
-                        :error="password.errors.current_password"
-                        v-slot="{ id, describedby, invalid }"
-                    >
-                        <MdsPasswordInput
+        <div class="settings__cards">
+            <!-- Profile -->
+            <MdsCard class="settings-card">
+                <template #header>
+                    <div class="settings-card__head">
+                        <MdsIcon name="user" size="sm" aria-hidden="true" />
+                        <h2 class="settings-card__title">Profile</h2>
+                    </div>
+                </template>
+                <form class="settings-form" @submit.prevent="saveProfile">
+                    <MdsFormField label="Name" required :error="profile.errors.name" v-slot="{ id, describedby, invalid }">
+                        <MdsTextInput
                             :id="id"
-                            v-model="password.current_password"
-                            name="current_password"
-                            autocomplete="current-password"
+                            v-model="profile.name"
+                            name="name"
+                            autocomplete="name"
                             :describedby="describedby"
                             :invalid="invalid"
                         />
                     </MdsFormField>
-                    <MdsFormField
-                        label="New password"
-                        required
-                        :error="password.errors.password"
-                        v-slot="{ id, describedby, invalid }"
-                    >
-                        <MdsPasswordInput
+                    <MdsFormField label="Email" required :error="profile.errors.email" v-slot="{ id, describedby, invalid }">
+                        <MdsTextInput
                             :id="id"
-                            v-model="password.password"
-                            name="password"
-                            autocomplete="new-password"
-                            :describedby="describedByWithStrength(id, describedby)"
-                            :invalid="invalid"
-                        />
-                        <MdsPasswordStrength
-                            :input-id="id"
-                            :password="password.password"
-                            :requirements="props.passwordPolicy"
-                        />
-                    </MdsFormField>
-                    <MdsFormField label="Confirm new password" required v-slot="{ id, describedby, invalid }">
-                        <MdsPasswordInput
-                            :id="id"
-                            v-model="password.password_confirmation"
-                            name="password_confirmation"
-                            autocomplete="new-password"
+                            v-model="profile.email"
+                            type="email"
+                            name="email"
+                            autocomplete="email"
                             :describedby="describedby"
                             :invalid="invalid"
                         />
                     </MdsFormField>
                     <div class="settings-form__foot">
-                        <MdsButton variant="primary" type="submit" :loading="password.processing">
-                            Update password
-                        </MdsButton>
-                        <span v-if="password.recentlySuccessful" class="settings-form__saved" role="status">
-                            Updated
-                        </span>
+                        <MdsButton variant="primary" type="submit" :loading="profile.processing">Save</MdsButton>
+                        <span v-if="profile.recentlySuccessful" class="settings-form__saved" role="status">Saved</span>
                     </div>
                 </form>
-            </section>
+            </MdsCard>
 
-            <hr class="settings-divider" />
+            <!-- Appearance -->
+            <MdsCard class="settings-card">
+                <template #header>
+                    <div class="settings-card__head">
+                        <MdsIcon name="sun" size="sm" aria-hidden="true" />
+                        <h2 class="settings-card__title">Appearance</h2>
+                    </div>
+                </template>
+                <div class="settings-row">
+                    <div class="settings-row__text">
+                        <p class="settings-row__label">Theme</p>
+                        <p class="settings-row__hint">
+                            Choose how Meridian looks. "Match System" follows your device setting.
+                        </p>
+                    </div>
+                    <MdsSegmentedControl
+                        :model-value="mode"
+                        :options="themeOptions"
+                        ariaLabel="Theme"
+                        @update:model-value="(v: string) => setMode(v as ThemeMode)"
+                    />
+                </div>
 
-            <section class="settings-sub">
-                <h3 class="settings-sub__title">Two-factor authentication</h3>
-                <TwoFactorSetup
-                    :enabled="twoFactor.enabled"
-                    :confirmed="twoFactor.confirmed"
-                    :needs-password-confirmation="twoFactor.needs_password_confirmation"
-                    :recovery-codes-remaining="twoFactor.recovery_codes_remaining"
-                />
-            </section>
-        </MdsCard>
+                <div class="settings-row">
+                    <div class="settings-row__text">
+                        <p class="settings-row__label">Accent colour</p>
+                        <p class="settings-row__hint">
+                            Recolours primary buttons, links, and focus rings. Status colours are unaffected.
+                        </p>
+                    </div>
+                    <MdsSegmentedControl
+                        :model-value="accentChoice"
+                        :options="accentOptions"
+                        ariaLabel="Accent colour"
+                        @update:model-value="chooseAccent"
+                    />
+                </div>
 
-        <!-- About (Increment I5, PRD Feature #10). Last, and OUTSIDE the can_manage block above: it is a
-             support aid rather than a control, and the person who files a bug report is rarely the Owner. -->
-        <AboutCard :about="appSettings.about" />
+                <div class="settings-row">
+                    <div class="settings-row__text">
+                        <p class="settings-row__label">Text size</p>
+                        <p class="settings-row__hint">
+                            Scales all text across Meridian. Public forms your respondents see are not
+                            affected.
+                        </p>
+                    </div>
+                    <MdsSegmentedControl
+                        :model-value="fontSize"
+                        :options="fontSizeOptions"
+                        ariaLabel="Text size"
+                        @update:model-value="(v: string) => setFontSize(v as FontSizeScale)"
+                    />
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-row__text">
+                        <p class="settings-row__label">Dyslexia-friendly font</p>
+                        <p class="settings-row__hint">
+                            Switches body text to OpenDyslexic. Headings and code stay as they are.
+                        </p>
+                    </div>
+                    <!-- A switch since I5. DSR §3.2 argued for a checkbox here while no switch existed; now
+                         that one does, this is the only on/off preference on the page that would have looked
+                         different from the eighteen around it. -->
+                    <MdsSwitch
+                        :model-value="dyslexiaFont"
+                        label="Use a dyslexia-friendly font"
+                        @update:model-value="setDyslexiaFont"
+                    />
+                </div>
+            </MdsCard>
+
+            <!-- Notifications (Increment I4, PRD Feature #13b) — placed here, after Appearance and before
+                 Drafts, because Appearance and Notifications are the two PERSONAL preference cards, while
+                 Drafts, Branding and Custom domains below are org-wide Owner/Admin settings. -->
+            <NotificationPreferencesCard :preferences="notificationPreferences" />
+
+            <!-- App Settings (Increment I5, PRD Feature #10). PRD #10 asks for the area to be "organized by
+                 section (Access, Maintenance, Modules) rather than as one long unstructured list of switches",
+                 so the three stay CONTIGUOUS and in that order, and they open the org-wide block: everything
+                 above is a personal preference, everything from here down is a decision for the whole
+                 workspace. About is deliberately not among them — see the bottom of the page. -->
+            <template v-if="appSettings.can_manage">
+                <AccessCard :access="appSettings.access" />
+                <MaintenanceCard :maintenance="appSettings.maintenance" />
+                <ModulesCard :modules="appSettings.modules" />
+            </template>
+
+            <!-- Drafts (Increment H10) — Owner/Admin only tenant-level setting -->
+            <MdsCard v-if="draftSettings.can_manage" class="settings-card">
+                <template #header>
+                    <div class="settings-card__head">
+                        <MdsIcon name="clock" size="sm" aria-hidden="true" />
+                        <h2 class="settings-card__title">Drafts</h2>
+                    </div>
+                </template>
+                <form class="settings-form" @submit.prevent="saveDraftSettings">
+                    <MdsFormField
+                        label="Save &amp; resume link expiry (days)"
+                        help="How long a respondent's “Save and finish later” link stays valid. Applies to drafts started after this change."
+                        :error="draftForm.errors.draft_ttl_days"
+                        v-slot="{ id, describedby, invalid }"
+                    >
+                        <MdsNumberInput
+                            :id="id"
+                            v-model="draftForm.draft_ttl_days"
+                            :min="1"
+                            :max="365"
+                            :describedby="describedby"
+                            :invalid="invalid"
+                        />
+                    </MdsFormField>
+                    <div class="settings-form__foot">
+                        <MdsButton variant="primary" type="submit" :loading="draftForm.processing">Save</MdsButton>
+                        <span v-if="draftForm.recentlySuccessful" class="settings-form__saved" role="status">Saved</span>
+                    </div>
+                </form>
+            </MdsCard>
+
+            <!-- Branding (Increment H23a2, ADR-0014). Placed after Drafts and before the custom-domain
+                 signpost: both are org-wide Owner/Admin settings, and this one is a control. -->
+            <BrandingCard :branding="branding" />
+
+            <!-- Custom domains (Increment H22b) — a signpost, not a control. Only rendered once the tenant
+                 holds a domain, so it never advertises a Business feature to a tenant that cannot buy it. -->
+            <MdsCard v-if="customDomains.count > 0" class="settings-card">
+                <template #header>
+                    <div class="settings-card__head">
+                        <MdsIcon name="globe" size="sm" aria-hidden="true" />
+                        <h2 class="settings-card__title">Custom domains</h2>
+                    </div>
+                </template>
+                <div class="settings-row">
+                    <div class="settings-row__text">
+                        <p class="settings-row__label">
+                            {{ customDomains.count }} domain{{ customDomains.count === 1 ? '' : 's' }}
+                        </p>
+                        <p class="settings-row__hint">
+                            Serve your public forms on your own hostname, with the DNS records and setup status.
+                        </p>
+                    </div>
+                    <MdsButton variant="secondary" icon-left="globe" @click="router.visit('/domains')">
+                        Manage domains
+                    </MdsButton>
+                </div>
+            </MdsCard>
+
+            <!-- Single sign-on (P1a) — a signpost, not a control, exactly like custom domains above. The
+                 condition is deliberately WIDER than that card's: `visible` is entitled OR configured, because
+                 SSO has no sidebar entry to cover the entitled-but-empty case (ADR-0016 §D6). It still never
+                 advertises an unbuyable plan, since an unentitled tenant with nothing configured sees nothing. -->
+            <MdsCard v-if="sso.visible" class="settings-card">
+                <template #header>
+                    <div class="settings-card__head">
+                        <MdsIcon name="shield" size="sm" aria-hidden="true" />
+                        <h2 class="settings-card__title">Single sign-on</h2>
+                    </div>
+                </template>
+                <div class="settings-row">
+                    <div class="settings-row__text">
+                        <p class="settings-row__label">
+                            {{ sso.configured ? `SAML 2.0 · ${sso.status_label}` : 'Not set up' }}
+                        </p>
+                        <p class="settings-row__hint">
+                            Let members sign in with your organisation’s own identity provider instead of an email
+                            address and password.
+                        </p>
+                    </div>
+                    <MdsButton variant="secondary" icon-left="shield" @click="router.visit('/settings/sso')">
+                        {{ sso.configured ? 'Manage single sign-on' : 'Set up single sign-on' }}
+                    </MdsButton>
+                </div>
+            </MdsCard>
+
+            <!-- Security -->
+            <MdsCard class="settings-card">
+                <template #header>
+                    <div class="settings-card__head">
+                        <MdsIcon name="shield" size="sm" aria-hidden="true" />
+                        <h2 class="settings-card__title">Security</h2>
+                    </div>
+                </template>
+
+                <section class="settings-sub">
+                    <h3 class="settings-sub__title">Password</h3>
+                    <form class="settings-form" @submit.prevent="savePassword">
+                        <MdsFormField
+                            label="Current password"
+                            required
+                            :error="password.errors.current_password"
+                            v-slot="{ id, describedby, invalid }"
+                        >
+                            <MdsPasswordInput
+                                :id="id"
+                                v-model="password.current_password"
+                                name="current_password"
+                                autocomplete="current-password"
+                                :describedby="describedby"
+                                :invalid="invalid"
+                            />
+                        </MdsFormField>
+                        <MdsFormField
+                            label="New password"
+                            required
+                            :error="password.errors.password"
+                            v-slot="{ id, describedby, invalid }"
+                        >
+                            <MdsPasswordInput
+                                :id="id"
+                                v-model="password.password"
+                                name="password"
+                                autocomplete="new-password"
+                                :describedby="describedByWithStrength(id, describedby)"
+                                :invalid="invalid"
+                            />
+                            <MdsPasswordStrength
+                                :input-id="id"
+                                :password="password.password"
+                                :requirements="props.passwordPolicy"
+                            />
+                        </MdsFormField>
+                        <MdsFormField label="Confirm new password" required v-slot="{ id, describedby, invalid }">
+                            <MdsPasswordInput
+                                :id="id"
+                                v-model="password.password_confirmation"
+                                name="password_confirmation"
+                                autocomplete="new-password"
+                                :describedby="describedby"
+                                :invalid="invalid"
+                            />
+                        </MdsFormField>
+                        <div class="settings-form__foot">
+                            <MdsButton variant="primary" type="submit" :loading="password.processing">
+                                Update password
+                            </MdsButton>
+                            <span v-if="password.recentlySuccessful" class="settings-form__saved" role="status">
+                                Updated
+                            </span>
+                        </div>
+                    </form>
+                </section>
+
+                <hr class="settings-divider" />
+
+                <section class="settings-sub">
+                    <h3 class="settings-sub__title">Two-factor authentication</h3>
+                    <TwoFactorSetup
+                        :enabled="twoFactor.enabled"
+                        :confirmed="twoFactor.confirmed"
+                        :needs-password-confirmation="twoFactor.needs_password_confirmation"
+                        :recovery-codes-remaining="twoFactor.recovery_codes_remaining"
+                    />
+                </section>
+            </MdsCard>
+
+            <!-- About (Increment I5, PRD Feature #10). Last, and OUTSIDE the can_manage block above: it is a
+                 support aid rather than a control, and the person who files a bug report is rarely the Owner. -->
+            <AboutCard :about="appSettings.about" />
+        </div>
     </div>
 </template>
 
@@ -478,8 +480,16 @@ function savePassword(): void {
     gap: var(--mds-space-5);
 }
 
-.settings-card {
-    max-width: 640px;
+/* M173 (`R-ba9d6349`, `D120`) — the cards fill the width: two across at 1440, three at 1920, one on a phone.
+   Each card was a 640px column before, which left most of a wide screen empty. `auto-fill`, so a card never
+   stretches past its track; top-aligned, because the cards are of very different heights. The forms inside a
+   card keep their 380px measure (below). DOM order is reading order, so PRD #10's Access → Maintenance →
+   Modules run stays contiguous. */
+.settings__cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 30rem), 1fr));
+    gap: var(--mds-space-5);
+    align-items: start;
 }
 
 .settings-card__head {

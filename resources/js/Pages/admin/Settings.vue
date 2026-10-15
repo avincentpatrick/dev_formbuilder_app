@@ -178,14 +178,14 @@ function save(): void {
 </template>
 
 <style scoped>
+/* M173 (`R-ba9d6349`, `D120`) — the tenant settings page's grid: the cards two across at 1440, top-aligned,
+   where each was a 640px column. The refusal alert and the Save foot are the form's, not a card's, so they
+   take the whole row; DOM order keeps the foot between the editable cards and the read-only About card. */
 .platform {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 30rem), 1fr));
     gap: var(--mds-space-5);
-}
-
-.platform__card {
-    max-width: 640px;
+    align-items: start;
 }
 
 .platform__head {
@@ -205,7 +205,8 @@ function save(): void {
 }
 
 .platform__conflict {
-    margin: 0 0 var(--mds-space-4);
+    grid-column: 1 / -1;
+    margin: 0;
 }
 
 .platform__notice {
@@ -267,6 +268,7 @@ function save(): void {
 }
 
 .platform__foot {
+    grid-column: 1 / -1;
     display: flex;
     align-items: center;
     gap: var(--mds-space-3);

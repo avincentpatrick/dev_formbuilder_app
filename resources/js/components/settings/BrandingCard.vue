@@ -308,10 +308,6 @@ function removeLogo(): void {
    it — which is why this card's header rendered unstyled beside five identically-marked-up siblings from
    H23a2 until now. `NotificationPreferencesCard.vue` carried the same block from the start and named this
    file as the counter-example; every card on the page now declares it. */
-.settings-card {
-    max-width: 640px;
-}
-
 .settings-card__head {
     display: flex;
     align-items: center;

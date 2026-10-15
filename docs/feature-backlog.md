@@ -14171,7 +14171,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `D120` A and `D121` A: inputs keep a reading-width column. The remedy: from a 60em container the sections lay two-up
   (`auto-fill minmax(min(100%, 32rem), 1fr)`, `align-items: start`), each section's controls at a 36rem measure; the 880px settings
   modal stays one column because its container never reaches 60em; a new Vitest case on the source pins the query, the way
-  `resources/js/Pages/forms/builder-layout.test.ts` pins the builder's. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
+  `resources/js/Pages/forms/builder-layout.test.ts` pins the builder's. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Remedy amended 2026-10-15 by `M173` (`D135` A, the user):** the two-up layout above cannot work — `FormSettingsSections.vue` shows one section at a time behind its rail, so two sections are never on screen together. The rail stays; one rule holds every `MdsFormField` (`.mds-field`) inside a section at 48rem, so the boxes keep a reading width while a section's lists and tables fill; the pop-up and the 420px query are unchanged; the pin is a source-text Vitest case plus a browser measurement in `tests/e2e/list-layout.spec.ts`.
 
 - **`minor` · The form hub and the submission page stack their facts above their tables, so on a wide screen every row runs from one edge of the glass to the other.**
   `resources/js/Pages/forms/Show.vue:343-366` (identity and facts), `:368-407` (tiles), `:415-487` (two full-width tables);
@@ -14284,7 +14284,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `resources/js/Pages/help/Index.vue:223` (0.04em), `resources/js/components/shell/Sidebar.vue:338` (0.06em) and
   `resources/js/Layouts/AdminLayout.vue:130` (0.04em); `packages/design-system/src/components/FilterBar/FilterBar.vue:58-61` records the
   token as the one letting for the product's micro-labels (the console workspace page's and the landing page's literals are taken by
-  their own rows). The remedy is the token. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
+  their own rows). The remedy is the token. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Narrowed 2026-10-15 by `M173`:** `M173` edits `resources/js/Layouts/AdminLayout.vue` for the shell row and takes its literal there, as the UI programme's plan intended; this row's remainder is `help/Index.vue` and `Sidebar.vue`.
 
 - **`nit` · Three truncated values offer no way to read the whole text where they are shown.**
   `resources/js/Pages/webhooks/Index.vue:224-236` (`.webhooks__url`), `resources/js/Pages/integrations/Index.vue:456-468`

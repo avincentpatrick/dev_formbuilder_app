@@ -14545,3 +14545,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   running `psgc:build`, because the PSA site blocks scripted reads; the publication held is recorded in the table, and no check,
   notice or scheduled task compares it with the quarter. A dated note in Settings → About ("Philippine places: 3Q 2026") and a
   reminder a few weeks after each quarter end would close it. **Live.** Filed by `M172`. **Tier: after-launch.**
+
+- **`minor` · A key edited in the builder leaves conditions, formulas and piping that name the old key pointing at nothing until publish refuses them.**
+  Found by `M172` while building the auto-adjusted key (`D132`): a comparison rule follows a key change — it is stored by id, and
+  the store now carries the new key into the copy it re-sends — but expression TEXT does not. `relevant_expression`,
+  `config.calculated_formula`, a validation's `expression`, the `${key}` holes in labels, hints and placeholders, and the form's
+  confirmation message all name keys as text, and `app/Services/Forms/ConversionCensus.php` (`referencesTo()`) already lists every
+  such use. After a key edit the preview shows the broken reference and publish refuses it (`ExpressionValidationGate`); nothing
+  offers to carry the new key into them. The remedy: on a key change, rewrite the references `referencesTo()` finds — token-aware,
+  never a text replace — and say so in the undo entry. **Live.** Filed by `M172`. **Tier: during-testing.**

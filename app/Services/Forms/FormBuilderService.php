@@ -94,7 +94,7 @@ final class FormBuilderService
             $this->assertStillDraftChild($form, $section);
 
             $section->fill([
-                'key' => $data['key'],
+                'key' => $this->freeKey(FormSection::query(), $section, (string) $data['key']),
                 'label' => $data['label'],
                 'description' => $data['description'] ?? null,
                 'is_repeatable' => (bool) ($data['is_repeatable'] ?? false),
@@ -282,7 +282,7 @@ final class FormBuilderService
             }
 
             $field->fill([
-                'key' => $data['key'],
+                'key' => $this->freeKey(FormField::query(), $field, (string) $data['key']),
                 'label' => $data['label'],
                 'hint' => $data['hint'] ?? null,
                 'placeholder' => $data['placeholder'] ?? null,
@@ -947,6 +947,33 @@ final class FormBuilderService
         }
 
         return $candidate;
+    }
+
+    /**
+     * M172 (`R-733eff09`, `D132`) — the key an edit asked for or, when another row of the same version already holds it,
+     * the lowest free `{key}_{n}` with n from 2 (the numbering {@see self::copyKey()} gives a duplicate). A clash is
+     * adjusted, never refused: the response carries the key kept, and the builder says so under Field key. The request
+     * no longer checks uniqueness at all — the user's words were *"auto adjust the key naming to avoid conflicts"*.
+     * Kept inside the column's 150 characters by shortening the requested part, never the suffix.
+     *
+     * @param  Builder<FormSection>|Builder<FormField>  $query
+     */
+    private function freeKey(Builder $query, FormSection|FormField $row, string $wanted): string
+    {
+        $taken = $query->where('form_version_id', $row->form_version_id)->whereKeyNot($row->getKey())->pluck('key')->flip();
+
+        if (! $taken->has($wanted)) {
+            return $wanted;
+        }
+
+        for ($n = 2; ; $n++) {
+            $suffix = "_{$n}";
+            $candidate = substr($wanted, 0, 150 - strlen($suffix)).$suffix;
+
+            if (! $taken->has($candidate)) {
+                return $candidate;
+            }
+        }
     }
 
     private function copyKey(FormVersion $draft, string $sourceKey): string

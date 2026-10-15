@@ -188,7 +188,7 @@ it('accepts an edit that carries no concurrency token (overwrite)', function ():
         ->assertOk()->assertJsonPath('key', 'forced');
 });
 
-it('validates the key format and per-version uniqueness', function (): void {
+it('validates the key format, and saves a key another question holds under the next free number (D132)', function (): void {
     $tenant = builderTenant();
     $admin = User::factory()->create();
     enterTenant($tenant->id, $admin->id);
@@ -200,12 +200,31 @@ it('validates the key format and per-version uniqueness', function (): void {
         ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => 'short_text'])->assertOk();
     $b = $this->actingAs($admin)
         ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => 'short_text'])->assertOk();
+    $c = $this->actingAs($admin)
+        ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => 'short_text'])->assertOk();
 
-    // Rename b to a's key → duplicate rejected (422).
+    // M172 (`R-733eff09`, `D132`): b renamed to a's key is no longer refused "The key has already been taken" — it is
+    // saved as a's key with the next free number, and the response says which key was kept.
     $this->actingAs($admin)->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$b->json('id')}", [
         'key' => $a->json('key'),
         'label' => 'Dup', 'is_required' => 'optional', 'config' => [], 'validations' => [], 'version' => null,
-    ])->assertStatus(422);
+    ])->assertOk()->assertJsonPath('key', $a->json('key').'_2');
+
+    // The next clash takes the next number, and the question already holding a key keeps it.
+    $this->actingAs($admin)->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$c->json('id')}", [
+        'key' => $a->json('key'),
+        'label' => 'Dup again', 'is_required' => 'optional', 'config' => [], 'validations' => [], 'version' => null,
+    ])->assertOk()->assertJsonPath('key', $a->json('key').'_3');
+
+    // A field saved with its OWN key unchanged keeps it — no suffix against itself.
+    $this->actingAs($admin)->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$a->json('id')}", [
+        'key' => $a->json('key'),
+        'label' => 'Original', 'is_required' => 'optional', 'config' => [], 'validations' => [], 'version' => null,
+    ])->assertOk()->assertJsonPath('key', $a->json('key'));
+
+    enterTenant($tenant->id, $admin->id);
+    expect(FormField::query()->where('form_version_id', $form->draft_version_id)->pluck('key')->sort()->values()->all())
+        ->toBe([$a->json('key'), $a->json('key').'_2', $a->json('key').'_3']);
 
     // A bad key format is rejected too.
     $this->actingAs($admin)->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$b->json('id')}", [
@@ -369,4 +388,21 @@ it('refuses the reserved lead-step key on both authoring routes that accept a ke
             'version' => null,
         ])
         ->assertOk()->assertJsonPath('key', 'respondent_age');
+});
+
+it('saves a section key another section holds under the next free number, as for a question (D132)', function (): void {
+    $tenant = builderTenant();
+    $admin = User::factory()->create();
+    enterTenant($tenant->id, $admin->id);
+    makeActiveMember($admin, 'admin');
+    $form = app(FormService::class)->create($tenant, $admin, 'Two Sections');
+    test()->withHeaders(builderHeaders($form));
+
+    $a = $this->actingAs($admin)->postJson("http://acme.meridian.test/forms/{$form->id}/sections")->assertOk();
+    $b = $this->actingAs($admin)->postJson("http://acme.meridian.test/forms/{$form->id}/sections")->assertOk();
+
+    $this->actingAs($admin)
+        ->patchJson("http://acme.meridian.test/forms/{$form->id}/sections/{$b->json('id')}", ['key' => $a->json('key'), 'label' => 'Second'])
+        ->assertOk()
+        ->assertJsonPath('key', $a->json('key').'_2');
 });

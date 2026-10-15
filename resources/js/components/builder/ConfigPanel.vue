@@ -52,7 +52,7 @@ import MediaEditor from './MediaEditor.vue';
 import PrefillEditor from './PrefillEditor.vue';
 import ValidationEditor from './ValidationEditor.vue';
 import type { ContentBlock } from './content-blocks';
-import { sortFieldSaveErrors } from './field-save-errors';
+import { describeSavePath, freeKeyFor, sortFieldSaveErrors, tabForSavePath } from './field-save-errors';
 import type { BuilderStore } from './useBuilderStore';
 import type { BuilderValidation, ComparableField, ConditionCatalogue, EnumOption, LocalField, LocalSection } from './types';
 interface Choice {
@@ -77,8 +77,20 @@ const saveError = props.store.saveError;
 const saveFieldErrors = props.store.saveFieldErrors;
 // M128 (`R-d001de0c`): a refused save, marked ON the selected field's controls; every other key in words, and a line per OTHER refused field.
 const fieldSaveErrors = computed(() => sortFieldSaveErrors(field.value ? saveFieldErrors.value[field.value.uid] : undefined));
-const otherRefusals = computed<string[]>(() => props.store.fields.value.filter((f) => f.uid !== field.value?.uid && saveFieldErrors.value[f.uid] !== undefined).map((f) => `“${f.label || f.key}” has a change that was not saved. Select it to see why.`));
-const saveIssues = computed<string[]>(() => [...fieldSaveErrors.value.listed.map((issue) => issue.text), ...otherRefusals.value]);
+// M172 (`R-733eff09`): every other refused question by name WITH its reasons, as a button that selects it on the tab holding
+// the error. The line it replaced — "has a change that was not saved. Select it to see why" — said neither, and selecting
+// the question opened Basics, where the testers' key refusal was not shown.
+interface OtherRefusal {
+    uid: string;
+    name: string;
+    reasons: string;
+}
+const otherRefusals = computed<OtherRefusal[]>(() =>
+    props.store.fields.value
+        .filter((f) => f.uid !== field.value?.uid && saveFieldErrors.value[f.uid] !== undefined)
+        .map((f) => ({ uid: f.uid, name: f.label || f.key, reasons: describeRefusal(saveFieldErrors.value[f.uid]) })),
+);
+const saveIssues = computed<string[]>(() => [...fieldSaveErrors.value.listed.map((issue) => issue.text), ...inlineElsewhere.value]);
 const enums = props.store.enums;
 const saving = props.store.saving;
 // Transient "Saved to library" confirmation (Increment G9b), cleared after a beat.
@@ -133,7 +145,14 @@ const valueShape = computed<string>(() =>
     field.value ? shapeByType.get(field.value.field_type) ?? '' : '',
 );
 
-const tabs = computed<{ key: string; label: string }[]>(() => {
+/** M172 (`R-733eff09`): the tabs holding a control the selected question's last refused save marked. */
+const errorTabs = computed<Set<string>>(() => {
+    const errors = field.value ? saveFieldErrors.value[field.value.uid] ?? {} : {};
+
+    return new Set(Object.keys(errors).map((path) => tabForSavePath(path)).filter((tab): tab is string => tab !== null));
+});
+
+const tabs = computed<{ key: string; label: string; alert?: boolean }[]>(() => {
     if (field.value) {
         const list = [{ key: 'basics', label: 'Basics' }];
         if (optionTypes.has(field.value.field_type)) list.push({ key: 'options', label: 'Options' });
@@ -149,7 +168,8 @@ const tabs = computed<{ key: string; label: string }[]>(() => {
         // types where it can never do anything.
         if (valueShape.value !== SHAPE_NO_ANSWER) list.push({ key: 'validation', label: 'Validation' });
         list.push({ key: 'advanced', label: 'Advanced' });
-        return list;
+        // M172: a tab holding a refusal carries a dot (the design system's tab `alert`); the alert says it in words.
+        return list.map((tab) => ({ ...tab, alert: errorTabs.value.has(tab.key) }));
     }
     if (section.value) {
         return [
@@ -165,9 +185,61 @@ const activeTab = ref('basics');
 watch(
     () => field.value?.uid ?? section.value?.uid ?? null,
     () => {
-        activeTab.value = 'basics';
+        // M172 (`R-733eff09`): a question that holds a refusal opens on the tab showing it, not on Basics.
+        activeTab.value = tabs.value.find((tab) => tab.alert === true)?.key ?? 'basics';
     },
 );
+
+/** M172: the selected question's refusals marked on a control of ANOTHER tab — said in the alert too, naming the tab. */
+const inlineElsewhere = computed<string[]>(() =>
+    Object.entries(fieldSaveErrors.value.inline)
+        .filter(([path]) => {
+            const tab = tabForSavePath(path);
+            return tab !== null && tab !== activeTab.value && tabs.value.some((candidate) => candidate.key === tab);
+        })
+        .map(([path, message]) => {
+            const tab = tabs.value.find((candidate) => candidate.key === tabForSavePath(path));
+            return `${describeSavePath(path)} (${tab?.label ?? ''} tab): ${message}`;
+        }),
+);
+
+function describeRefusal(errors: Record<string, string[]> | undefined): string {
+    const reasons = Object.entries(errors ?? {})
+        .filter(([, messages]) => messages[0] !== undefined)
+        .map(([path, messages]) => `${describeSavePath(path)}: ${messages[0]}`);
+
+    return reasons.length > 0 ? reasons.join(' ') : 'A change was not saved.';
+}
+
+function openRefusal(uid: string): void {
+    props.store.select({ kind: 'field', uid });
+}
+
+/**
+ * M172 (`R-733eff09`, `D132`) — the key being typed is another question's, said AS IT IS TYPED with the key the save will
+ * keep (the server's own rule, `freeKeyFor()`), and a button to take that key now. The save is never refused for it.
+ */
+const keyClash = computed<{ holder: string; free: string } | null>(() => {
+    const target = field.value;
+    if (!target || target.key === '') return null;
+    const others = props.store.fields.value.filter((f) => f.uid !== target.uid);
+    const holder = others.find((f) => f.key === target.key);
+
+    return holder ? { holder: holder.label || holder.key, free: freeKeyFor(target.key, others.map((f) => f.key)) } : null;
+});
+/** M172: the server kept a different key than the one sent — said under Field key until the key is saved as typed. */
+const keyNotice = computed(() => (field.value ? props.store.keyNotices?.value[field.value.uid] ?? null : null));
+/** M172: the same as `keyClash`, among the form's sections. */
+const sectionKeyClash = computed<{ holder: string; free: string } | null>(() => {
+    const target = section.value;
+    if (!target || target.key === '') return null;
+    const others = props.store.sections.value.filter((s) => s.uid !== target.uid);
+    const holder = others.find((s) => s.key === target.key);
+
+    return holder ? { holder: holder.label || holder.key, free: freeKeyFor(target.key, others.map((s) => s.key)) } : null;
+});
+/** M172 (`R-d85d51d2`): one per failure, so a refusal identical to the last one re-mounts the alert and is announced again. */
+const failureKey = computed(() => props.store.saveFailures?.value ?? 0);
 watch(tabs, (list) => {
     if (!list.some((t) => t.key === activeTab.value)) activeTab.value = list[0]?.key ?? 'basics';
 });
@@ -410,10 +482,16 @@ watch(librarySaved, (value) => {
              Above the strip, not between the strip and its own panel. A save failure is about the pane
              rather than about the selected tab, and wedging it into the tab-to-panel gap was the one
              place it could not belong. -->
-        <div v-if="saveError || saveIssues.length > 0" class="config__error" role="alert">
+        <div v-if="saveError || saveIssues.length > 0 || otherRefusals.length > 0" :key="failureKey" class="config__error" role="alert">
             <p v-if="saveError">{{ saveError }}</p>
             <MdsButton v-if="hasUnsaved" class="config__retry" size="sm" variant="secondary" @click="retry">Retry</MdsButton>
-            <ul v-if="saveIssues.length > 0"><li v-for="issue in saveIssues" :key="issue">{{ issue }}</li></ul>
+            <ul v-if="saveIssues.length > 0 || otherRefusals.length > 0">
+                <li v-for="issue in saveIssues" :key="issue">{{ issue }}</li>
+                <li v-for="other in otherRefusals" :key="other.uid" data-other-refusal>
+                    <MdsButton size="sm" variant="tertiary" @click="openRefusal(other.uid)">“{{ other.name }}”</MdsButton>
+                    was not saved. {{ other.reasons }}
+                </li>
+            </ul>
         </div>
 
         <div v-if="!field && !section" class="config__empty">
@@ -610,6 +688,15 @@ watch(librarySaved, (value) => {
                                 @update:model-value="setField('key', $event)"
                             />
                         </MdsFormField>
+                        <div v-if="keyClash" class="config__kept" data-key-clash role="status">
+                            <p class="config__kept-text">
+                                Used by “{{ keyClash.holder }}”. It will be saved as <code>{{ keyClash.free }}</code>.
+                            </p>
+                            <MdsButton size="sm" variant="secondary" @click="setField('key', keyClash.free)">Use {{ keyClash.free }}</MdsButton>
+                        </div>
+                        <p v-else-if="keyNotice" class="config__kept-text" data-key-notice role="status">
+                            “{{ keyNotice.wanted }}” is used by another question, so this one was saved as “{{ keyNotice.kept }}”.
+                        </p>
                         <MdsFormField label="Section" v-slot="{ id }">
                             <MdsSelect
                                 :id="id"
@@ -700,6 +787,12 @@ watch(librarySaved, (value) => {
                                 @update:model-value="setSection('key', $event)"
                             />
                         </MdsFormField>
+                        <div v-if="sectionKeyClash" class="config__kept" data-key-clash role="status">
+                            <p class="config__kept-text">
+                                Used by “{{ sectionKeyClash.holder }}”. It will be saved as <code>{{ sectionKeyClash.free }}</code>.
+                            </p>
+                            <MdsButton size="sm" variant="secondary" @click="setSection('key', sectionKeyClash.free)">Use {{ sectionKeyClash.free }}</MdsButton>
+                        </div>
                         <MdsFormField label="Description" v-slot="{ id }">
                             <MdsTextarea
                                 :id="id"

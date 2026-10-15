@@ -68,6 +68,8 @@ export function useBuilderStore(props: BuilderPageProps) {
     // M172 (`R-81756e95`): the form was published since this page loaded. Every id the page holds is the old draft's, so
     // nothing more is sent; the dialog offers the reload, and the journal puts each kept edit back into the new draft.
     const superseded = ref<{ draft: SupersedingDraft | null } | null>(null);
+    // M172 (`R-733eff09`, `D132`): the key a save asked for and the one the server kept instead, per row, while they differ.
+    const keyNotices = ref<Record<Uid, { wanted: string; kept: string }>>({});
     const undoStack = ref<HistoryEntry[]>([]);
     const redoStack = ref<HistoryEntry[]>([]);
 
@@ -97,7 +99,9 @@ export function useBuilderStore(props: BuilderPageProps) {
         fieldErrors: Record<Uid, Record<string, string[]>>;
         pending: boolean;
         unsaved: Record<Uid, 'field' | 'section'>;
-    }>({ inFlight: 0, error: null, wrote: false, fieldErrors: {}, pending: false, unsaved: {} });
+        /** M172 (`R-d85d51d2`): one per failure, so the panel can re-announce a refusal identical to the last. */
+        failures: number;
+    }>({ inFlight: 0, error: null, wrote: false, fieldErrors: {}, pending: false, unsaved: {}, failures: 0 });
 
     // M170 (`R-bfa3eb93`) — every edit the server has not confirmed, kept for this tab so a refresh puts it back. A
     // read-only builder (an archived form has no draft) edits nothing, so it keeps nothing. See `edit-journal.ts`.
@@ -243,6 +247,7 @@ export function useBuilderStore(props: BuilderPageProps) {
                 return null;
             }
             burstFailed = true;
+            save.failures++;
             save.error =
                 error instanceof BuilderRequestError ? error.message : 'Something went wrong saving your change.';
             // Only a field's own PATCH names an owner. Its marks describe THIS refusal: one without a map (a
@@ -288,7 +293,41 @@ export function useBuilderStore(props: BuilderPageProps) {
         }
         field.version = result.data.version;
         delete save.fieldErrors[uid]; // the server holds this field now: its marks are answered
+        adoptKeptKey(uid, field, String(sent.key), result.data.key);
         return true;
+    }
+
+    /**
+     * M172 (`R-733eff09`, `D132`) — the server keeps a free key (`{key}_2` …) when the one sent is another row's; a clash is
+     * never refused. The screen takes the kept key unless the author has typed on since, the panel says so, and every rule
+     * of another question that compared with the row's previous key now names the kept one (the key half of `R-9ea69e29`).
+     */
+    function adoptKeptKey(uid: Uid, row: LocalField | LocalSection, sentKey: string, keptKey: string): void {
+        if (keptKey !== sentKey) {
+            keyNotices.value[uid] = { wanted: sentKey, kept: keptKey };
+            if (row.key === sentKey) row.key = keptKey;
+        } else {
+            delete keyNotices.value[uid];
+        }
+        const previous = (baselines.get(uid) as { key?: string } | undefined)?.key;
+        if ('validations' in row && previous !== undefined && previous !== keptKey) repointRules(uid, previous, keptKey);
+    }
+
+    /**
+     * M172 (the key half of `R-9ea69e29`) — a question's key moved on the server: every OTHER question's rule comparing with
+     * it names the new key, on screen and in its baseline. The server stores those rules by id, so it already agrees; what
+     * was stale is the key the next save of those questions would send, which then resolved to no question at all.
+     */
+    function repointRules(uid: Uid, oldKey: string, newKey: string): void {
+        for (const other of fields.value) {
+            if (other.uid === uid) continue;
+            const base = baselines.get(other.uid) as FieldSnapshot | undefined;
+            for (const rules of [other.validations, base?.validations ?? []]) {
+                rules.forEach((rule) => {
+                    if (rule.related_field_key === oldKey) rule.related_field_key = newKey;
+                });
+            }
+        }
     }
 
     async function deleteFieldServer(uid: Uid): Promise<boolean> {
@@ -338,6 +377,7 @@ export function useBuilderStore(props: BuilderPageProps) {
             return false;
         }
         section.version = result.data.version;
+        adoptKeptKey(uid, section, String(sent.key), result.data.key); // M172: as `persistField()`
         return true;
     }
 
@@ -803,6 +843,7 @@ export function useBuilderStore(props: BuilderPageProps) {
             journal?.markSent('field', field.id, after as unknown as Record<string, unknown>);
             const held = await persistField(uid);
             if (conflict.value) return;
+            if (held && keyNotices.value[uid]?.wanted === after.key) after.key = keyNotices.value[uid].kept; // M172: the kept key is what the server holds
             settled(uid, 'field', field.id, held, snapshotsEqual(fieldSnapshot(field), after));
             // M155 (`R-0aa94dce`): the baseline and the undo entry move only once the server holds the edit. A refused
             // one stays on screen, marked, and its baseline stays where the server is — so its next commit sends it
@@ -839,6 +880,7 @@ export function useBuilderStore(props: BuilderPageProps) {
             journal?.markSent('section', section.id, after as unknown as Record<string, unknown>);
             const held = await persistSection(uid);
             if (conflict.value) return;
+            if (held && keyNotices.value[uid]?.wanted === after.key) after.key = keyNotices.value[uid].kept; // M172: as for a field
             settled(uid, 'section', section.id, held, snapshotsEqual(sectionSnapshot(section), after));
             if (!held) return; // M155: as `commitFieldEdit()` — only an edit the server holds moves the baseline
             baselines.set(uid, clone(after));
@@ -1071,6 +1113,7 @@ export function useBuilderStore(props: BuilderPageProps) {
     function reportFailure(message: string): void {
         burstAttempted = true;
         burstFailed = true;
+        save.failures++;
         save.error = message;
     }
 
@@ -1328,6 +1371,9 @@ export function useBuilderStore(props: BuilderPageProps) {
         conflict,
         // M172: the form was published since this page loaded (read-only; the page offers the reload)
         superseded: computed(() => superseded.value),
+        // M172 (`R-733eff09`): a key the server kept instead of the one typed, per row; and one per failure (`R-d85d51d2`)
+        keyNotices: computed(() => keyNotices.value),
+        saveFailures: computed(() => save.failures),
         canUndo,
         canRedo,
         palette: props.palette,

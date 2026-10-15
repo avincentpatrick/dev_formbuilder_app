@@ -18,8 +18,8 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * A full field content edit from the config panel (Increment D4a). Validates SHAPE only — `key` format +
- * per-version uniqueness, the config jsonb is an object, enum members, and the validation-rows'
+ * A full field content edit from the config panel (Increment D4a). Validates SHAPE only — `key` format (a key
+ * another question holds is suffixed by the service since M172, never refused), the config jsonb is an object, enum members, and the validation-rows'
  * expression-XOR-rule_type invariant (a friendly mirror of the DB CHECK). Expressions are NOT semantically
  * validated (the expression engine is deferred ADR-0004 work). Authorization is `can:update,form`; the
  * optimistic-concurrency token (`version`) is checked in the service, not here.
@@ -47,17 +47,12 @@ final class UpdateFieldRequest extends FormRequest
 
         return [
             ...$this->configRules($field->field_type),
-            // M172 (`R-81756e95`, folding `R-4c4e35ae`): scoped to the BOUND ROW'S OWN version, not the form's current
-            // draft. Scoped on the draft, a page left open across a publish sent its unchanged key against the clone
-            // and read "The key has already been taken". `builder.draft` now refuses that page 409 before this runs;
-            // inside the race it cannot see, this rule passes and the service's draft guard answers the same 409 — the
-            // outcome `D30` lacked when both scopes ended in a dead 422.
-            'key' => [
-                'required', 'string', 'max:150', 'regex:/^[a-z][a-z0-9_]*$/',
-                Rule::unique('form_fields', 'key')
-                    ->where('form_version_id', $field->form_version_id)
-                    ->ignore($field->id),
-            ],
+            // M172 (`R-733eff09`, `D132`, closing `R-4c4e35ae`): NO uniqueness rule. A key another question holds is
+            // adjusted by the service (`FormBuilderService::freeKey()`, a numbered suffix), never refused — the user's
+            // "auto adjust the key naming to avoid conflicts". The rule this replaced read the form's CURRENT draft, so
+            // a page left open across a publish was told "The key has already been taken" about its own unchanged key;
+            // that page is now refused 409 by `builder.draft` before anything here runs.
+            'key' => ['required', 'string', 'max:150', 'regex:/^[a-z][a-z0-9_]*$/'],
             'label' => ['required', 'string', 'max:500'],
             'hint' => ['nullable', 'string', 'max:2000'],
             'placeholder' => ['nullable', 'string', 'max:255'],

@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Forms;
 
-use App\Models\FormSection;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 /**
- * A section content edit from the config panel (Increment D4a). Validates shape only — `key` format +
- * per-version uniqueness, and the repeat-instance sanity the DB CHECK also enforces (min ≤ max).
+ * A section content edit from the config panel (Increment D4a). Validates shape only — `key` format (a key another
+ * section holds is suffixed by the service since M172, never refused), and the repeat-instance sanity the DB CHECK also enforces (min ≤ max).
  * Authorization is `can:update,form`; the optimistic-concurrency token is checked in the service.
  */
 final class UpdateSectionRequest extends FormRequest
@@ -21,18 +19,10 @@ final class UpdateSectionRequest extends FormRequest
      */
     public function rules(): array
     {
-        /** @var FormSection $section */
-        $section = $this->route('section');
-
         return [
-            // M172 (`R-81756e95`, folding `R-4c4e35ae`): scoped to the bound row's own version — the reason is on
-            // UpdateFieldRequest's identical rule.
-            'key' => [
-                'required', 'string', 'max:150', 'regex:/^[a-z][a-z0-9_]*$/',
-                Rule::unique('form_sections', 'key')
-                    ->where('form_version_id', $section->form_version_id)
-                    ->ignore($section->id),
-            ],
+            // M172 (`R-733eff09`, `D132`): no uniqueness rule — a clash is suffixed by the service, as for a question
+            // (the reason is on UpdateFieldRequest's key rule).
+            'key' => ['required', 'string', 'max:150', 'regex:/^[a-z][a-z0-9_]*$/'],
             'label' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:2000'],
             'is_repeatable' => ['boolean'],

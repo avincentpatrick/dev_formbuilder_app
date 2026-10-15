@@ -16,7 +16,118 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M171`, the user's three UI complaints: the stat tile's broken word, the audit log's stretched avatar, the Integrations button with no room (`m171-ui-three-complaints`)
+## Status: ACTIVE CLAIM — `M169`, a point or a comma stays on the word Vision read it after (`m169-ocr-punctuation-spacing`)
+
+Taken 2026-10-13, after the user's "no merge, no deploy while testing is on": this claim builds, opens the PR and gets it green,
+then stops — nothing merges until the user lifts the freeze. Branch `m169-ocr-punctuation-spacing`, cut from origin/main at
+`c0b61b71`, PR into main. Row: `R-27049032` — "The reader joins a recognized word's punctuation with a space, so a name reads
+"DE GUZMAN JR ." and an address "STA MESA"." Named as `M169` by `M168`'s close-out. At the session's start the user confirmed
+`M168` on staging ("Yes, it works": the paper on the left, 50/50, on the guest check and the staff review/edit); nothing is owed.
+
+**BUILT — PR #362, CI 6/6 green with real step counts (run 38419380144 at `b52d6d64`: Static analysis 32 · E2E 20 · Contract 16 ·
+Frontend 12 · Pest 11 · axe 11; the only skips are the failure-only report upload and the two main-only staging-header steps) — AND
+NOT MERGED: held by the user's testing freeze.** The branch already carries the row's closure, the status bullet and the regenerated
+line and hand-off. A merge needs the user's word and a fresh staging backup first; then the release below this heading, the gate
+baselines from the post-merge run, and nothing else. Measured against the prediction, before the release is written:
+- Red first exactly as predicted: 5 red (the two parser cases, the three spacing cases), 193 green on the fixture alone; 198 green after.
+- Mutants, all CAUGHT: `OcrLine` always a space 3 (as predicted); the parser ignoring breaks **4, not 5** — the sideways case is built
+  by the typesetter and never meets the parser, my miss; the paragraph guard 1; the break off the first character 7 (the parser case,
+  both Vision-path spacing cases, three bake-off cases, the reading job); `rotate()` 1; `upright()` 1.
+- Round 1 offline: **50 → 48, not 49** (29 → 27 with ink), 0 silent — `BAHALA KA JAN!!!` turned right too; my census counted only
+  `.` `,` `@`. With ink Round 1 now sits at 15.0%, one field short of G9's "under 15%".
+- **Most likely wrong, and it was not:** no test builds Vision's JSON by hand with words to join; every one goes through the typesetter.
+- Host PHPStan 0 (the container's 44 are the recorded model-property phantoms, none in the four files); Pint passed;
+  `preflight --with-gates --with-pint` OK.
+
+### Evidence verified
+- "`OcrAnswerReader` joins Vision's words with spaces" — held, and moved: the WORD join is `OcrLine::text()`, which `ruled()` (the
+  `line` and `ruled` areas) and `blankOrUnreadable()` call; `ruled()` itself joins the LINES.
+- "Vision returns `.` `,` `@` as words of their own" — held: 240 such words in Round 1's hinted reads (`C:\ocr-samples-hint`).
+- "an email and a URL drop spaces and survive" — held: `parsed()` strips every space for both types.
+- "a name, an address and a remark carry the stray space or lose the point" — held as the stray space. The row's "STA MESA" is the
+  read WITHOUT the handwriting hint; with it (production since `M149`) sheet 09 reads `STA . MESA`.
+- "Vision marks each symbol's following break (`property.detectedBreak`)" — held, and `VisionDocumentParser` drops it: 2,858 breaks
+  (SPACE 1,909, LINE_BREAK 900, EOL_SURE_SPACE 49), every one on a word's LAST symbol, none mid-word; a symbol with no break carries
+  no `property` at all.
+
+### Premise verified
+- One session only (the user, 2026-10-13); nobody else is building.
+- `OcrLine::text()`'s third caller, `isStatic()`, compares `OcrText::normal()` forms, where punctuation is a space anyway; label
+  matching (`labelSpan()`, `PrintedFormMatcher::startsWithLabel()`) builds its own text and is untouched.
+- `OcrLineBuilder::upright()` and `rotate()` build NEW words — and every Round 1 photo goes through `upright()` (EXIF 6) — so a flag
+  the parser sets is lost on exactly the real pages unless both carry it.
+- `PrintedPageTypesetter` (the only place the OCR tests see the paper) splits nothing off a word and emits no break, so no test can
+  see this defect today; once the parser reads breaks, a fixture with none glues every word. It learns breaks first.
+- The bake-off scorer keeps punctuation (`OcrBakeoffAnswers` ignores only case and repeated spaces), so the change is measurable.
+  Trunk baseline, offline on the hinted reads: 50 of 180 need correction, 0 silent (29 of 180 with `--ticks=ink`, 0 silent).
+- A read scan is never re-matched (`OcrScanReader::step()` stops at a terminal status; `extraction` holds the matched result), so
+  the fix reaches scans read after a deploy only.
+- `R-d4653a0c` (a long text's line breaks lost) is the OTHER join — between lines, in `ruled()` — and is not taken.
+- No hub: `OcrAnswerReader.php`, the only OCR file in the census's hub list, is not edited.
+
+### Remedy verdict
+The row's remedy works, measured on all 30 hinted reads before any test: of 3,293 words, 435 carry no break — 367 are followed by
+punctuation, 67 are an opening mark before a word (`(` `kg`, `/` `v1`, a wall `||` before a digit), 1 is `@` before `pitahc.gov.ph`,
+and none ends a paragraph. No two words of letters or digits would be glued. Of the 240 `.` `,` `@` words, 238 follow a word with no
+break; the other 2 are `@` in emails, which strip spaces anyway. Rule: a word is followed by a space when its last symbol carries any
+break, or when it ends its Vision paragraph — a guard that never fires on Round 1 and is kept because the line builder puts words of
+two paragraphs on one line.
+
+Files: `app/Services/Ocr/OcrWord.php`, `app/Services/Ocr/VisionDocumentParser.php`, `app/Services/Ocr/OcrLineBuilder.php`,
+`app/Services/Ocr/OcrLine.php`, `tests/Feature/Ocr/Support/PrintedPageTypesetter.php`, `tests/Unit/Ocr/VisionDocumentParserTest.php`,
+`tests/Feature/Ocr/OcrPunctuationSpacingTest.php` (new), `docs/ocr-pipeline-design.md`; close-out on the branch:
+`docs/feature-backlog.md`, `PROGRESS.md`, `docs/pipeline.md`; this file on main.
+Shared artefacts taken: `docs/ocr-pipeline-design.md`, `docs/feature-backlog.md`, `PROGRESS.md` (own block), `docs/pipeline.md`.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace.
+Prediction: the new feature cases (a level page and a tilted one through Vision's JSON, a page stored on its side) go red on the
+current code on the stray spaces, and the two parser cases on `spaced`; every existing OCR test stays green while only the fixture
+moves. Six committed mutants, each CAUGHT: `OcrLine` back to always a space (3 feature cases), the parser ignoring breaks (2 parser
++ 3 feature), the paragraph guard removed (1 parser), the break read off the FIRST symbol (the parser case and every Vision-path
+case), `rotate()` dropping the flag (the tilted case only), `upright()` dropping it (the sideways case only). Round 1 offline: 50 →
+49 of 180 and 29 → 28 with ink, 0 silent — sheet 09's `STA. MESA` turns right; 10 more fields change their text and stay wrong for
+other reasons (a comma the answer sheet has and the paper does not, misread letters). Only PHP moves: Pest and PHPStan; Vitest, E2E
+and axe cannot. **Most likely wrong:** a test that builds Vision's JSON by hand without breaks glues its words and goes red.
+
+## RELEASED — `M171`, the user's three UI complaints: no stat tile cuts a word in half, the audit log's chip beside the name, room above the Connect button (`R-0a504679`, `R-88a6c81a`, `R-61992abf`) (merged as PR #364, `635ffc52`, 6/6 green with real step counts on its second run — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+Built and merged 2026-10-15 from the user's three comments of 2026-10-14 (quoted at each row). At the build start the user said
+*"merge approved in this session when finished"*, and before the merge ran the guided `meridian-test-db-backup` block (`Result: 0`,
+`staging-2026-10-14-234408.dump`, 429,867 bytes). `M169` (PR #362) stays held. The same start answered three questions: `M170` is
+**not checked yet** (still owed); `D125` changed to C — the What's new notes written with each change and saved in a `releases` table
+by every deploy (recorded on the branch; it shapes `R-c7247dbf` only); and all four hub tiles take the compact size.
+
+**Measured against the prediction:**
+- **Red first, as predicted and wider.** Ten new Vitest cases were red on the trunk (StatTile 3, the hub 2, the audit page 2,
+  Integrations 3), and the three new `list-layout.spec.ts` cases were red in a real browser: "Accepting" cut at 834 and 1440 (whole
+  at 375), the audit chip 82 / 82 / 99px wide, the warning-to-button gap 0px at all three widths.
+- **Mutants:** six Vitest mutants, all caught — the compact class binding (2 cases, not the predicted 1: the linked-tile case too), the
+  compact rule (1), one hub tile not compact (1), the date with its time (1), the name moved out of the text block (2, not 1), the
+  paragraph margin (1). The predicted caution-margin mutant has nothing to mutate: the remedy changed (below).
+- **The responsive-axe sweep stayed green** for the hub, the audit log and Integrations, both themes, all three viewports (18/18).
+- **Most likely wrong — partly right.** I named the Integrations source-text case. It holds as a structural pin, but the proof that
+  mattered for all three fixes is a browser measurement in `list-layout.spec.ts`; happy-dom lays out nothing.
+- **Not predicted:**
+  - **CI went red once, on my own new case.** I chose heading-2 over the row's heading-3; CI's seed made the last response "Oct 11,
+    2026", one digit longer than the local "Oct 9, 2026", and it wrapped onto two lines at 1440. The size went back to heading-3, and
+    the case now writes every month with a two-digit day into the tile — 9 of 12 wrap at heading-2, none at heading-3. A measurement
+    of seeded data is a measurement of one date; probe the range.
+  - **An e2e `align-items: stretch` mutant SURVIVED** — no seeded audit row has a "via" line, so every cell is one line tall. The case
+    now gives one cell a second line; the mutant then made the chip a 24×40 oval, not the wider disc my first comment claimed (corrected).
+  - **The row's `margin-top: auto` would have failed in the one card that mattered:** an auto margin is zero in the tallest card of a
+    row, and the tallest is the Google card with the warning. Reasoned, not measured; the shipped footer-slot remedy is what the
+    browser measured (one line of buttons at 1440, at least 12px under the warning).
+  - **A planning-session row split "Filed by" from `M171` across two lines,** and `BacklogProvenanceTest` refused it — the planning
+    session ran the host gates but not `tests/Feature/Docs`. Rejoined.
+  - **The node container's `npm install` dirtied `package-lock.json`** (a stale vue range for the design system). Not committed; filed
+    as a nit.
+  - `SuiteCollectionFloorTest` was red in the container — the recorded bind-mount artefact; CI ran the whole suite green.
+- Pint passed; PHPStan cannot move (no `app`, `database` or `routes` change); `vue-tsc`, the host lint gates and the docs tests passed.
+- **The real-browser look** (375, 834, 1440, 1920; light and dark; the extra-large type setting on the hub; the console tenant page,
+  which no e2e spec visits): every value on one line at 1440 including extra-large, the chip a small disc beside the name, one line of
+  Connect buttons with clear space under the warning, and the console's usage tiles compact.
+
+The claim as it was taken, and its extension, follow unchanged.
 
 Taken 2026-10-15 under the testing freeze of 2026-10-13: this claim builds, opens the PR and gets it green, then stops — nothing
 merges until the user says so, after a fresh staging backup (`D123`). Branch `m171-ui-three-complaints`, cut from origin/main at
@@ -109,79 +220,6 @@ Remedy changes, each measured by reading the code:
 - **Integrations: the Connect button moves into `MdsCard`'s footer slot instead of `margin-top: auto`.** An auto margin is zero in the
   tallest card of a row, and the tallest is the Google card with the warning — the button would touch it again. The card becomes a flex
   column whose body grows, so the buttons line up across cards and the footer keeps its own 16px.
-
-## HELD — `M169`, a point or a comma stays on the word Vision read it after (`m169-ocr-punctuation-spacing`)
-
-Taken 2026-10-13, after the user's "no merge, no deploy while testing is on": this claim builds, opens the PR and gets it green,
-then stops — nothing merges until the user lifts the freeze. Branch `m169-ocr-punctuation-spacing`, cut from origin/main at
-`c0b61b71`, PR into main. Row: `R-27049032` — "The reader joins a recognized word's punctuation with a space, so a name reads
-"DE GUZMAN JR ." and an address "STA MESA"." Named as `M169` by `M168`'s close-out. At the session's start the user confirmed
-`M168` on staging ("Yes, it works": the paper on the left, 50/50, on the guest check and the staff review/edit); nothing is owed.
-
-**BUILT — PR #362, CI 6/6 green with real step counts (run 38419380144 at `b52d6d64`: Static analysis 32 · E2E 20 · Contract 16 ·
-Frontend 12 · Pest 11 · axe 11; the only skips are the failure-only report upload and the two main-only staging-header steps) — AND
-NOT MERGED: held by the user's testing freeze.** The branch already carries the row's closure, the status bullet and the regenerated
-line and hand-off. A merge needs the user's word and a fresh staging backup first; then the release below this heading, the gate
-baselines from the post-merge run, and nothing else. Measured against the prediction, before the release is written:
-- Red first exactly as predicted: 5 red (the two parser cases, the three spacing cases), 193 green on the fixture alone; 198 green after.
-- Mutants, all CAUGHT: `OcrLine` always a space 3 (as predicted); the parser ignoring breaks **4, not 5** — the sideways case is built
-  by the typesetter and never meets the parser, my miss; the paragraph guard 1; the break off the first character 7 (the parser case,
-  both Vision-path spacing cases, three bake-off cases, the reading job); `rotate()` 1; `upright()` 1.
-- Round 1 offline: **50 → 48, not 49** (29 → 27 with ink), 0 silent — `BAHALA KA JAN!!!` turned right too; my census counted only
-  `.` `,` `@`. With ink Round 1 now sits at 15.0%, one field short of G9's "under 15%".
-- **Most likely wrong, and it was not:** no test builds Vision's JSON by hand with words to join; every one goes through the typesetter.
-- Host PHPStan 0 (the container's 44 are the recorded model-property phantoms, none in the four files); Pint passed;
-  `preflight --with-gates --with-pint` OK.
-
-### Evidence verified
-- "`OcrAnswerReader` joins Vision's words with spaces" — held, and moved: the WORD join is `OcrLine::text()`, which `ruled()` (the
-  `line` and `ruled` areas) and `blankOrUnreadable()` call; `ruled()` itself joins the LINES.
-- "Vision returns `.` `,` `@` as words of their own" — held: 240 such words in Round 1's hinted reads (`C:\ocr-samples-hint`).
-- "an email and a URL drop spaces and survive" — held: `parsed()` strips every space for both types.
-- "a name, an address and a remark carry the stray space or lose the point" — held as the stray space. The row's "STA MESA" is the
-  read WITHOUT the handwriting hint; with it (production since `M149`) sheet 09 reads `STA . MESA`.
-- "Vision marks each symbol's following break (`property.detectedBreak`)" — held, and `VisionDocumentParser` drops it: 2,858 breaks
-  (SPACE 1,909, LINE_BREAK 900, EOL_SURE_SPACE 49), every one on a word's LAST symbol, none mid-word; a symbol with no break carries
-  no `property` at all.
-
-### Premise verified
-- One session only (the user, 2026-10-13); nobody else is building.
-- `OcrLine::text()`'s third caller, `isStatic()`, compares `OcrText::normal()` forms, where punctuation is a space anyway; label
-  matching (`labelSpan()`, `PrintedFormMatcher::startsWithLabel()`) builds its own text and is untouched.
-- `OcrLineBuilder::upright()` and `rotate()` build NEW words — and every Round 1 photo goes through `upright()` (EXIF 6) — so a flag
-  the parser sets is lost on exactly the real pages unless both carry it.
-- `PrintedPageTypesetter` (the only place the OCR tests see the paper) splits nothing off a word and emits no break, so no test can
-  see this defect today; once the parser reads breaks, a fixture with none glues every word. It learns breaks first.
-- The bake-off scorer keeps punctuation (`OcrBakeoffAnswers` ignores only case and repeated spaces), so the change is measurable.
-  Trunk baseline, offline on the hinted reads: 50 of 180 need correction, 0 silent (29 of 180 with `--ticks=ink`, 0 silent).
-- A read scan is never re-matched (`OcrScanReader::step()` stops at a terminal status; `extraction` holds the matched result), so
-  the fix reaches scans read after a deploy only.
-- `R-d4653a0c` (a long text's line breaks lost) is the OTHER join — between lines, in `ruled()` — and is not taken.
-- No hub: `OcrAnswerReader.php`, the only OCR file in the census's hub list, is not edited.
-
-### Remedy verdict
-The row's remedy works, measured on all 30 hinted reads before any test: of 3,293 words, 435 carry no break — 367 are followed by
-punctuation, 67 are an opening mark before a word (`(` `kg`, `/` `v1`, a wall `||` before a digit), 1 is `@` before `pitahc.gov.ph`,
-and none ends a paragraph. No two words of letters or digits would be glued. Of the 240 `.` `,` `@` words, 238 follow a word with no
-break; the other 2 are `@` in emails, which strip spaces anyway. Rule: a word is followed by a space when its last symbol carries any
-break, or when it ends its Vision paragraph — a guard that never fires on Round 1 and is kept because the line builder puts words of
-two paragraphs on one line.
-
-Files: `app/Services/Ocr/OcrWord.php`, `app/Services/Ocr/VisionDocumentParser.php`, `app/Services/Ocr/OcrLineBuilder.php`,
-`app/Services/Ocr/OcrLine.php`, `tests/Feature/Ocr/Support/PrintedPageTypesetter.php`, `tests/Unit/Ocr/VisionDocumentParserTest.php`,
-`tests/Feature/Ocr/OcrPunctuationSpacingTest.php` (new), `docs/ocr-pipeline-design.md`; close-out on the branch:
-`docs/feature-backlog.md`, `PROGRESS.md`, `docs/pipeline.md`; this file on main.
-Shared artefacts taken: `docs/ocr-pipeline-design.md`, `docs/feature-backlog.md`, `PROGRESS.md` (own block), `docs/pipeline.md`.
-Paired files taken: none.
-Namespaces spent: nothing from either namespace.
-Prediction: the new feature cases (a level page and a tilted one through Vision's JSON, a page stored on its side) go red on the
-current code on the stray spaces, and the two parser cases on `spaced`; every existing OCR test stays green while only the fixture
-moves. Six committed mutants, each CAUGHT: `OcrLine` back to always a space (3 feature cases), the parser ignoring breaks (2 parser
-+ 3 feature), the paragraph guard removed (1 parser), the break read off the FIRST symbol (the parser case and every Vision-path
-case), `rotate()` dropping the flag (the tilted case only), `upright()` dropping it (the sideways case only). Round 1 offline: 50 →
-49 of 180 and 29 → 28 with ink, 0 silent — sheet 09's `STA. MESA` turns right; 10 more fields change their text and stay wrong for
-other reasons (a comma the answer sheet has and the paper does not, misread letters). Only PHP moves: Pest and PHPStan; Vitest, E2E
-and axe cannot. **Most likely wrong:** a test that builds Vision's JSON by hand without breaks glues its words and goes red.
 
 ## RELEASED — `M170`, every form builder setting survives a plain refresh, and the toolbar never says "saved" for an edit the server does not hold (`R-bfa3eb93`, `R-fdc743ab`, `R-76474e31`, `R-7ebfb08e`, `R-4d50e3c8`) (merged as PR #363, `d8ebe97f`, 6/6 green with real step counts on its final run — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

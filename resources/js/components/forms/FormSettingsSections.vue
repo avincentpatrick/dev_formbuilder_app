@@ -350,9 +350,15 @@ watch(
 
 /* M173 (`D135`, the user's choice) — on the hub's Settings tab the body is as wide as the page, which no longer
    has a cap, so every labelled box in a section keeps a reading width while the section's lists, tables and
-   preset grids fill. Every panel builds its boxes from `MdsFormField`, whose root is `.mds-field`. In the
-   builder's 880px pop-up the body is narrower than this, so nothing there changes. */
-.form-settings__section :deep(.mds-field) {
+   preset grids fill. Every panel builds its boxes from `MdsFormField`, whose root is `.mds-field`. The rows
+   that hold a panel's Save button take the same measure, so the button ends where the boxes it saves end —
+   right-aligned in a full-width row it sat 600px away at 1920 and 1,500px at 2560 (the real-browser look). In
+   the builder's 880px pop-up the body is narrower than this, so nothing there changes. */
+.form-settings__section :deep(.mds-field),
+.form-settings__section :deep(.settings-panel__actions),
+.form-settings__section :deep(.data-sharing__actions),
+.form-settings__section :deep(.scope-panel__actions),
+.form-settings__section :deep(.share__slug-actions) {
     max-inline-size: 48rem;
 }
 

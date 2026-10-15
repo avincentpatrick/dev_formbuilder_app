@@ -17,8 +17,19 @@ const source = readFileSync(join(process.cwd(), 'resources/js/components/forms/F
 const style = source.slice(source.indexOf('<style'));
 
 describe('FormSettingsSections — the boxes keep a reading width', () => {
-    it('holds every labelled box inside a section at 48rem', () => {
-        expect(style).toMatch(/^\.form-settings__section :deep\(\.mds-field\) \{\s*max-inline-size: 48rem;\s*\}/m);
+    it('holds every labelled box inside a section at 48rem, and the rows holding its Save buttons with them', () => {
+        const rule = style.match(/^(\.form-settings__section :deep\([^)]+\)(?:,\s*\.form-settings__section :deep\([^)]+\))*) \{\s*max-inline-size: 48rem;\s*\}/m);
+
+        expect(rule, 'the 48rem rule').not.toBeNull();
+        const targets = [...rule![1].matchAll(/:deep\(([^)]+)\)/g)].map((m) => m[1]);
+        // Every save row the thirteen panels render: a Save button right-aligned in a full-width row ends far from its boxes.
+        expect(targets).toEqual([
+            '.mds-field',
+            '.settings-panel__actions',
+            '.data-sharing__actions',
+            '.scope-panel__actions',
+            '.share__slug-actions',
+        ]);
     });
 
     it('keeps the rail beside the body, and the narrow-container query that stacks them', () => {

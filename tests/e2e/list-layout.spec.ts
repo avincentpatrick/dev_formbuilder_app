@@ -379,17 +379,25 @@ test('Form settings tab — the boxes keep a reading width while the section fil
     await page.locator('.form-settings__section[data-section="general"] .mds-field').first().waitFor({ state: 'visible' });
     await settlePaint(page);
 
-    const m = await page.evaluate(() => ({
-        body: Math.round(document.querySelector('.form-settings__body')!.getBoundingClientRect().width),
-        fields: [...document.querySelectorAll('.form-settings__section[data-section="general"] .mds-field')].map((el) =>
-            Math.round(el.getBoundingClientRect().width),
-        ),
-    }));
+    const m = await page.evaluate(() => {
+        const section = document.querySelector('.form-settings__section[data-section="general"]')!;
+        const fields = [...section.querySelectorAll('.mds-field')].map((el) => el.getBoundingClientRect());
+
+        return {
+            body: Math.round(document.querySelector('.form-settings__body')!.getBoundingClientRect().width),
+            fields: fields.map((r) => Math.round(r.width)),
+            fieldsRight: Math.round(Math.max(...fields.map((r) => r.right))),
+            saveRight: Math.round(section.querySelector('.mds-button')!.getBoundingClientRect().right),
+        };
+    });
 
     expect(m.fields.length, 'the Details section rendered no labelled box').toBeGreaterThan(0);
     // 48rem = 768px, plus a pixel of rounding either way.
     expect(Math.max(...m.fields), JSON.stringify(m)).toBeLessThanOrEqual(770);
     expect(m.body, JSON.stringify(m)).toBeGreaterThan(1200);
+    // The Save button belongs to the boxes it saves: it ends where they end, not at the far edge of a wide page (found by
+    // M173's real-browser look — at 1920 it sat about 600px to the right of the boxes, at 2560 about 1,500px).
+    expect(m.saveRight, JSON.stringify(m)).toBeLessThanOrEqual(m.fieldsRight + 2);
 });
 
 test('Scanned forms — the upload card keeps a measure beside a grid of scans', async ({ page }, info) => {

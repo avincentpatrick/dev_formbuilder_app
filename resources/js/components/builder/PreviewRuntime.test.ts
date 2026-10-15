@@ -301,3 +301,39 @@ describe('PreviewRuntime — a hidden section’s questions are not "just added"
         wrapper.unmount();
     });
 });
+
+/*
+ * M172 (`R-52f5ad93`) — a published version opened read-only from the hub draws through this component, and none of the
+ * author's controls may come with it: they edit the DRAFT. The same snapshot without the flag is the control — it
+ * proves each control is there to be withheld.
+ */
+describe('PreviewRuntime — a published version, read-only (M172)', () => {
+    const snapshot = schemaResponse({
+        sections: [section({ key: 'hh', label: 'Household' })],
+        fields: [field({ key: 'q1', label: 'First question', section_key: 'hh', sequence: 0, section_sequence: 0 })],
+    });
+    const controls = ['[data-preview-tools]', '[data-preview-grip]', '[data-preview-edit-label]', '[data-preview-add-question]', '[data-preview-add-section]'];
+
+    function mountWith(readOnly: boolean) {
+        return mount(PreviewRuntime, {
+            props: { snapshot, model: buildRenderModel(snapshot), issuesByKey: {}, selectedKey: null, initialStepKey: null, readOnly },
+        });
+    }
+
+    it('offers every author control while editing the draft (the control)', async () => {
+        const wrapper = mountWith(false);
+        await flushPromises();
+
+        expect(controls.filter((selector) => wrapper.find(selector).exists())).toEqual(controls);
+        wrapper.unmount();
+    });
+
+    it('draws the questions and none of the author controls', async () => {
+        const wrapper = mountWith(true);
+        await flushPromises();
+
+        expect(wrapper.text()).toContain('First question');
+        expect(controls.filter((selector) => wrapper.find(selector).exists())).toEqual([]);
+        wrapper.unmount();
+    });
+});

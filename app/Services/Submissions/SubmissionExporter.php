@@ -10,6 +10,7 @@ use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Services\Entitlements\UsageMeter;
+use App\Services\Forms\RetiredFieldKeys;
 use App\Support\Export\SpreadsheetCell;
 use App\Support\Search\SearchTerms;
 use App\Support\Tenancy\TenantContext;
@@ -48,6 +49,7 @@ final class SubmissionExporter
     public function __construct(
         private readonly UsageMeter $meter,
         private readonly SubmissionRowProjector $projector,
+        private readonly RetiredFieldKeys $retiredKeys,
     ) {}
 
     /**
@@ -69,6 +71,15 @@ final class SubmissionExporter
             ->sortByDesc('version_number');
 
         [$columns, $fieldMeta] = $this->projector->resolveColumns($versions, $locale);
+
+        // M172 (`R-a44638b6`, `D133`): a question the current version no longer asks keeps its column and its answers,
+        // headed with the version that removed it. Here and not in resolveColumns(): the connectors' column catalog reads
+        // that too, and a mapped column must not change its name.
+        foreach ($this->retiredKeys->for($form) as $key => $removedIn) {
+            if (isset($columns[$key])) {
+                $columns[$key] .= " (removed from the form in version {$removedIn})";
+            }
+        }
         $headerRow = array_merge(array_values(SubmissionRowProjector::metaLabels()), array_values($columns));
         $keys = array_keys($columns);
 

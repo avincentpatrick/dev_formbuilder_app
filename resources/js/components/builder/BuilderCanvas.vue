@@ -13,6 +13,7 @@
  */
 import { computed, nextTick, ref } from 'vue';
 import { MdsBadge, MdsButton, MdsEmptyState, MdsIcon, MdsIconButton, statusVariant } from '@meridian/design-system';
+import DeleteFieldDialog from './DeleteFieldDialog.vue';
 import InlineLabelEdit from './InlineLabelEdit.vue';
 import type { LocalField, Selection } from './types';
 import type { BuilderStore } from './useBuilderStore';
@@ -103,6 +104,27 @@ function requiredBadge(field: LocalField): string | null {
 }
 
 const hasContent = (): boolean => groups.value.some((g) => g.fields.length > 0) || groups.value.length > 1;
+
+/**
+ * M172 (`R-a44638b6`, `D133`) — a delete asks first only when responses hold answers to the question, and says how many
+ * and that they keep them. With none it deletes at once, as it always has (undo still brings it back).
+ */
+const pendingDelete = ref<{ uid: string; label: string; count: number | null } | null>(null);
+
+async function requestDelete(field: LocalField): Promise<void> {
+    const count = await props.store.answersFor(field.uid);
+    if (count === 0) {
+        void props.store.deleteField(field.uid);
+        return;
+    }
+    pendingDelete.value = { uid: field.uid, label: field.label || field.key, count };
+}
+
+function confirmDelete(): void {
+    const target = pendingDelete.value;
+    pendingDelete.value = null;
+    if (target) void props.store.deleteField(target.uid);
+}
 </script>
 
 <template>
@@ -226,7 +248,7 @@ const hasContent = (): boolean => groups.value.some((g) => g.fields.length > 0) 
                                     label="Delete field"
                                     variant="danger"
                                     size="sm"
-                                    @click="store.deleteField(field.uid)"
+                                    @click="requestDelete(field)"
                                 />
                             </div>
                         </div>
@@ -245,6 +267,13 @@ const hasContent = (): boolean => groups.value.some((g) => g.fields.length > 0) 
                 <MdsButton variant="tertiary" icon-left="layout" @click="store.addSection()">Add section</MdsButton>
             </div>
         </template>
+        <DeleteFieldDialog
+            :open="pendingDelete !== null"
+            :label="pendingDelete?.label ?? ''"
+            :count="pendingDelete?.count ?? null"
+            @confirm="confirmDelete"
+            @cancel="pendingDelete = null"
+        />
     </div>
 </template>
 

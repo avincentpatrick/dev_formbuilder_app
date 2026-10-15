@@ -248,3 +248,20 @@ describe('MdsTabs — the selected indicator is a non-text UI component', () => 
         expect(selectedRule?.[1] ?? '').toContain('font-weight');
     });
 });
+
+describe('MdsTabs — a tab whose panel needs attention (M172)', () => {
+    it('draws a dot after the label of a flagged tab only, and keeps every accessible name its label', () => {
+        const wrapper = mountTabs({
+            items: [
+                { key: 'basics', label: 'Basics' },
+                { key: 'advanced', label: 'Advanced', alert: true },
+            ],
+        });
+
+        const tabs = wrapper.findAll('[role="tab"]');
+        expect(tabs.map((tab) => tab.find('[data-mds-tab-alert]').exists())).toEqual([false, true]);
+        expect(tabs[1]!.find('[data-mds-tab-alert]').attributes('aria-hidden')).toBe('true');
+        // The name end-to-end locators match exactly: the dot adds nothing to it.
+        expect(tabs.map((tab) => tab.text())).toEqual(['Basics', 'Advanced']);
+    });
+});

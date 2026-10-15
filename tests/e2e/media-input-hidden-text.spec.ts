@@ -25,19 +25,34 @@ async function xsrf(page: Page): Promise<Record<string, string>> {
     return { 'X-XSRF-TOKEN': decodeURIComponent(token), Accept: 'application/json' };
 }
 
+/**
+ * M172 (`R-81756e95`) — the draft the builder page was loaded with, which every builder write must name
+ * (`X-Builder-Draft`). Read from a full load of the page: the initial page's JSON is in `script[data-page]`, and the
+ * in-app visit `createForm()` ends with leaves the forms list's there.
+ */
+async function draftHeader(page: Page, formId: string): Promise<Record<string, string>> {
+    await page.goto(`/forms/${formId}/builder`, { waitUntil: 'load' });
+    const json = await page.locator('script[data-page]').first().textContent();
+    const draftId = (JSON.parse(json ?? '{}') as { props?: { draft?: { id?: string } } }).props?.draft?.id ?? '';
+    expect(draftId, 'the builder page names its draft').not.toBe('');
+
+    return { 'X-Builder-Draft': draftId };
+}
+
 /** A published form whose one question is a required photo — made through the routes the builder itself calls. */
 async function publishedPhotoForm(page: Page, title: string): Promise<string> {
     const formId = await createForm(page, title);
+    const draft = await draftHeader(page, formId);
 
     const created = await page.request.post(`/forms/${formId}/fields`, {
-        headers: await xsrf(page),
+        headers: { ...(await xsrf(page)), ...draft },
         data: { field_type: 'image_capture', section_id: null },
     });
     expect(created.status(), 'the photo question is added').toBeLessThan(400);
     const field = await created.json();
 
     const saved = await page.request.patch(`/forms/${formId}/fields/${field.id}`, {
-        headers: await xsrf(page),
+        headers: { ...(await xsrf(page)), ...draft },
         data: {
             key: field.key,
             label: 'Photo of the site',

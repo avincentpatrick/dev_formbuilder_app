@@ -104,3 +104,55 @@ export function sortFieldSaveErrors(errors: Record<string, string[]> | undefined
 
     return { inline, listed };
 }
+
+const TAB_BY_PATH: Record<string, string> = {
+    label: 'basics',
+    hint: 'basics',
+    placeholder: 'basics',
+    is_required: 'basics',
+    'config.calculated_formula': 'basics',
+    key: 'advanced',
+    default_value: 'advanced',
+    indexed_data_type: 'advanced',
+    relevant_expression: 'advanced',
+    is_pii: 'advanced',
+    is_sensitive: 'advanced',
+    is_queryable: 'advanced',
+    appearance: 'options',
+};
+
+/**
+ * M172 (`R-733eff09`) — the config tab holding the control a refused path names, so the panel opens THAT tab when the
+ * question is selected and marks it, instead of always opening Basics. The testers met a key refusal shown only under
+ * Field key on Advanced, while the alert said "Select it to see why" and selecting it opened Basics. Null for a path
+ * no tab owns; the panel then keeps its own choice and the alert says the refusal in words.
+ */
+export function tabForSavePath(path: string): string | null {
+    if (TAB_BY_PATH[path] !== undefined) return TAB_BY_PATH[path];
+    if (path.startsWith('validations')) return 'validation';
+    if (path.startsWith('config.options')) return 'options';
+    if (path.startsWith('config.levels')) return 'cascading';
+    if (/^config\.(rows|columns|cells)/.test(path)) return 'grid';
+    if (path.startsWith('config.content')) return 'content';
+    if (path.startsWith('config.accepted_types')) return 'media';
+
+    return null;
+}
+
+/** The column's length, and so the longest key the server keeps (`UpdateFieldRequest`'s `max:150`). */
+const KEY_MAX = 150;
+
+/**
+ * M172 (`R-733eff09`, `D132`) — the key the server will keep for `wanted` when another question (or section) already
+ * holds it: the lowest free `{key}_{n}` with n from 2, shortened before the suffix to stay inside 150 characters. The
+ * same rule as `FormBuilderService::freeKey()`, so the panel can say BEFORE the save what the save will do.
+ */
+export function freeKeyFor(wanted: string, taken: readonly string[]): string {
+    const used = new Set(taken);
+    if (!used.has(wanted)) return wanted;
+    for (let n = 2; ; n++) {
+        const suffix = `_${n}`;
+        const candidate = `${wanted.slice(0, KEY_MAX - suffix.length)}${suffix}`;
+        if (!used.has(candidate)) return candidate;
+    }
+}

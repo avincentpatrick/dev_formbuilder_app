@@ -51,6 +51,7 @@ function appearanceSaveQuestion(string $type): array
     enterTenant($tenant->id, $admin->id);
     makeActiveMember($admin, 'admin');
     $form = app(FormService::class)->create($tenant, $admin, 'Layouts');
+    test()->withHeaders(builderHeaders($form));
 
     $row = test()->actingAs($admin)
         ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => $type])

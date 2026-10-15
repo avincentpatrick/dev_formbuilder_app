@@ -6618,7 +6618,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   cost hiding in it** — a mapped column that changes identity is a broken sync, not a re-render, and that is
   why it is a row rather than a refinement. ⚠️ **Also unresolved and cheaper:** the grid arms render row and
   column VALUES, not their author-defined LABELS, because resolving those needs the field's `config` threaded
-  into `displayValue()`. **Live.** Filed by `M74`. **Tier: during-testing.**
+  into `displayValue()`. **Live.** Filed by `M74`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: `D130` answers question (2) — one column per cell beside today's summary — and the grid's first increment takes it; question (1), the signed link, stays open here (`D128`).**
 
 - ✅ **CLOSED BY `M75` (2026-09-06) — `minor` · ~~`gate-baselines.php` writes the file BEFORE it judges
   whether every metric was found, so a NOT FOUND row ships and is reported afterwards.~~** ✅ **The mechanism
@@ -7552,7 +7552,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (2026-09-06), joined and refuted by `M80`. Not one of the 68 route registrations in `routes/api.php`
   contains `users` or `roles`; `app/Http/Controllers/Api/V1/` holds 22 controllers and none is a user, role
   or member controller; no `read:users` / `write:roles` Sanctum ability exists. The capability ships on the
-  web surface only — `routes/tenant.php:409`, `:411`, `:417`, `:419`, `:421`. ⛔ **THE CODE ALREADY NAMES
+  web surface only — `routes/tenant.php:410`, `:411`, `:417`, `:419`, `:421`. ⛔ **THE CODE ALREADY NAMES
   THE CONSEQUENCE:** `app/Http/Resources/Api/V1/AuditResource.php:28` says in as many words that there is
   no `/api/v1/users` endpoint, so an API-only consumer of `GET /api/v1/audits` receives `user_id` and
   `acting_as_user_id` UUIDs it cannot resolve. ⛔ **AND THE ENDPOINT WAS NEVER RETRACTED — IT SHAPED THE
@@ -8991,7 +8991,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   actually about and the one nothing could see before. Closed by `M89`. Filed by `M88`.
 - ~~**`minor` · An entitlement denial on three builder routes answers a JSON `fetch` with a 302 to HTML, and
   a shipped test pins it that way.**~~ Found by `M89`'s fan-out (2026-09-10) while closing the 23503 row.
-  `bootstrap/app.php:333-339` renders a `feature:` denial as `back()` on its non-API arm, and the
+  `bootstrap/app.php:337-343` renders a `feature:` denial as `back()` on its non-API arm, and the
   `feature:field_library` routes — `forms.fields.from-library`, `forms.fields.save-to-library`,
   `forms.library-items` (`routes/tenant.php:576-585`) — are driven by `builderClient.ts`, which sends
   `Accept: application/json`. ⛔ **So the client follows the redirect, receives HTML, falls into its own
@@ -9702,16 +9702,16 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (2026-09-14). `Builder.vue` sets its grid to `260px minmax(0, 1fr) 340px`; in `em` the two side panes and the
   canvas minimum add up to the 60em threshold at every scale and the palette stops being cramped. ⚠️ The current
   direction is safe rather than wrong: it wastes canvas instead of overflowing. **Live.** Filed by `M94`. **Tier: during-testing.**
-- **`minor` · A later successful builder save clears the unsaved warning for an earlier field that still failed.**
+- ✅ **CLOSED BY `M172` (2026-10-15) — ****`minor` · A later successful builder save clears the unsaved warning for an earlier field that still failed.**
   Carried out of this ledger's §3 table by `M94` (2026-09-14). The save verdict covers a burst of work rather than
   a field, so an unrelated later burst that lands clears an earlier burst's failure while that field still differs
   from the server. ⚠️ `save-state.test.ts` pins the burst behaviour on purpose, so whoever takes this changes that
   assertion deliberately, and exactness needs a per-field dirty set threaded through every guarded action. The
-  author has already been shown the alert once. **Live.** Filed by `M94`. **Tier: during-testing.**
-- **`minor` · A repeated identical builder save failure is announced to a screen reader only once.** Carried out
+  author has already been shown the alert once. **Live.** Filed by `M94`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: taken with the blockers increment's rewrite of the builder's refusal alert, where the files coincide (`D132`, `D128`).** ✅ **CLOSED BY `M172` (2026-10-15):** measured already closed by `M170` (`R-fdc743ab`): the burst verdict clears `save.error` only when nothing from ANY burst is still unsaved, and a refusal's marks clear only on that field's own success — pinned by `resources/js/components/builder/settings-save-matrix.test.ts` ("still reads Not saved after a later save of another question lands"). Nothing more owed.
+- ✅ **CLOSED BY `M172` (2026-10-15) — ****`minor` · A repeated identical builder save failure is announced to a screen reader only once.** Carried out
   of this ledger's §3 table by `M94` (2026-09-14). Setting the save error to the same string is not a reactive
   change, so the config panel's alert never re-mounts and never re-announces. The fix is a per-failure key on that
-  alert, with its own test. **Live.** Filed by `M94`. **Tier: during-testing.**
+  alert, with its own test. **Live.** Filed by `M94`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: taken with the blockers increment's rewrite of the builder's refusal alert, where the files coincide (`D132`, `D128`).** ✅ **CLOSED BY `M172` (2026-10-15):** the pane's alert is keyed by a per-failure counter (`save.failures`, exported as `saveFailures`), so an identical refusal re-mounts it and is announced again — `resources/js/components/builder/key-clash.test.ts` ("announces an identical refusal again, as a new alert"), red on the committed panel.
 - **`minor` · The builder toolbar says "All changes saved" on a form that cannot be edited.** Carried out of this
   ledger's §3 table by `M94` (2026-09-14). With no draft the panes are replaced by an empty state and nothing can
   be written, yet the save status still renders. Hiding it on a read-only form is the fix, in a state the builder
@@ -10894,7 +10894,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M109` (2026-09-25) — `minor` · ~~`docs/ACCESS-MATRIX.md:105` tells its reader the central host answers a workspace route with a 404,
   and it does not — it redirects.~~** Filed 2026-09-20 by `M105`, which found the same false symptom in two places
   while verifying `D51`. The sentence reads *"a direct sign-in there lands on `/dashboard`, a workspace-only route
-  the central host answers with a 404"*. `bootstrap/app.php:613-621` renders `NotASubdomainException` for a **web**
+  the central host answers with a 404"*. `bootstrap/app.php:617-625` renders `NotASubdomainException` for a **web**
   request as `redirect(config('app.url'))`; only the `/api/v1` arm returns 404, and
   `tests/Feature/Tenancy/CentralHostFallbackTest.php:25` and `:32` both pin `assertRedirect`. ⚠️ **`M98` named this
   exact sentence on 2026-09-18 and it is untouched four increments later**, which is the reason it is a row rather
@@ -11274,14 +11274,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the uncertain part:** `$excludeUnvalidatedArrayKeys` may not be settable per-instance in Laravel 12, so the
   reliable route is an explicit `payload()` that merges the raw `config` over `validated()` — measure it before
   writing the test, and write the test against the current code first to watch it fail. **Live.**
-  Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M111` (2026-09-25) — BOTH HALVES SHIPPED, AND THE ROW'S OWN REASON FOR ITS REMEDY WAS WRONG WHILE THE REMEDY WAS RIGHT.** This is `B0` in the form-builder overhaul and it went first because `B2a`'s per-type default validations, `B5a`'s config transfer and `B11a`'s content blocks all write keys `configRules()` does not enumerate — every one would have been eaten on the next save. ⚠️ **EVERY CITATION HELD. TWO PREMISE CLAUSES DID NOT.** (a) The row says **Laravel 12**; `composer.lock:1575-1576` says `laravel/framework` **v13.18.1**. The mechanism is identical between them, so the conclusion survived — but a remedy chosen by reading Laravel 12's source would have been chosen against the wrong tree. (b) The row says `$excludeUnvalidatedArrayKeys` *"may not be settable per-instance"*. **It is** — `Validator.php:162-167` declares it `public`, defaulting to `false` on the class, with the `true` coming from `Factory.php:69-74`. **The prescribed explicit merge was still the right route, for two reasons the row does not give:** the property is instance-WIDE, so setting it would also stop pruning `validations` at `:69`, a behaviour change outside the defect's blast radius; and `withValidator()` at `:170` receives the CONTRACT, which does not declare the property, so the poke needs an `instanceof` narrowing to survive PHPStan. ✅ **TWO HALVES, AND THE MUTATIONS PROVED THEY ARE NOT THE SAME FIX.** `UpdateFieldRequest::payload()` overlays the validated tree onto the RAW request config and `FormBuilderController::updateField()` calls it instead of `validated()`, which fixes the CLASS; and `label_translations` gained real rules on all four arms carrying option or grid lists — `options`, `levels`, `rows`, `columns`, `cells` — which validates the reachable loss rather than merely preserving it. ⛔ **THE MERGE BASE IS THE REQUEST, NEVER THE STORED ROW, AND THAT IS THE WHOLE SAFETY ARGUMENT.** Merging the existing column over the payload — the shape the word *merge* first suggests — would make clearing a key impossible, because deleting the last choice row would leave the old `options` in place. The builder sends the whole config on every save (`useBuilderStore.ts:883`), so raw-over-validated preserves what the author sent and leaves a removal a removal. A test pins that direction explicitly, and it is the one test that had to be **green before the fix and after** — which it was. ✅ **Five tests in `tests/Feature/Forms/FieldConfigRetentionTest.php`, all written against the unchanged code and watched to fail first: four red, the clearing case green throughout, exactly as the claim predicted.** ✅ **Both mutations CAUGHT, and their kill sets are DISJOINT, which is the finding worth more than either:** reverting `payload()` to `validated()` reddens ONLY the un-enumerated-key test, and stripping the new rules from the choices arm reddens ONLY the shape-validation test. **Neither single mutation reddens the `label_translations` tests, because the reachable case is now defended twice** — the rules keep it inside `validated()` and the accessor would restore it anyway. That is double defence measured rather than assumed, and it is also why a one-mutation proof would have read as a gap. ⚠️ **THE ROW UNDERSTATED ITSELF IN THREE WAYS AND TWO ARE NOW FILED.** `matrix` and `likert_matrix` grid-entry `label_translations`, and `config.levels[].label_translations`, have live READ and EXPORT paths (`XlsformExporter.php:543-562` via `:196-199`/`:224-226`, `schema-mapping.ts:265`/`:368`, `BlankFormPrintPresenter.php`) against a write path that only the builder has; and **three sibling request paths share the identical pruning mechanism on other keys**. Both are filed below rather than absorbed here. ⚠️ **A TEST DEFECT FOUND BY ITS OWN FIRST GREEN RUN, AND IT IS A TRAP THIS PROJECT WILL MEET AGAIN:** a `toBe()` on a `label_translations` map asserts **POSTGRES's** key ordering, not the application's — `config` is `jsonb` and jsonb normalises object keys alphabetically, so the assertion failed on wholly correct data with every value present (`es` sorts before `fil`). Asserted per locale now. ⚠️ A direct model read after an HTTP request needs `enterTenant()` again, because the request leaves the test's own connection without the GUCs the RLS policies read — the pattern `BuilderDraftGuardTest.php:198` already follows, and the first run's `ModelNotFoundException` was that and not the defect. ⚠️ **`BuilderRoutesTest.php:262-272` sends an empty config to a field with a full geo block and asserts only `assertOk()`**, so it could not have failed either way; the new clearing test is what covers that behaviour now. ✅ Measured: **441 passed / 1,801 assertions** across `tests/Feature/Forms` and `tests/Feature/Xlsform`. PHPStan reports 15 locally and **none of them in either changed file** — stated as an attribution rather than as a claim about movement, since this diff does touch `app/`.
+  Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M111` (2026-09-25) — BOTH HALVES SHIPPED, AND THE ROW'S OWN REASON FOR ITS REMEDY WAS WRONG WHILE THE REMEDY WAS RIGHT.** This is `B0` in the form-builder overhaul and it went first because `B2a`'s per-type default validations, `B5a`'s config transfer and `B11a`'s content blocks all write keys `configRules()` does not enumerate — every one would have been eaten on the next save. ⚠️ **EVERY CITATION HELD. TWO PREMISE CLAUSES DID NOT.** (a) The row says **Laravel 12**; `composer.lock:1575-1576` says `laravel/framework` **v13.18.1**. The mechanism is identical between them, so the conclusion survived — but a remedy chosen by reading Laravel 12's source would have been chosen against the wrong tree. (b) The row says `$excludeUnvalidatedArrayKeys` *"may not be settable per-instance"*. **It is** — `Validator.php:162-167` declares it `public`, defaulting to `false` on the class, with the `true` coming from `Factory.php:69-74`. **The prescribed explicit merge was still the right route, for two reasons the row does not give:** the property is instance-WIDE, so setting it would also stop pruning `validations` at `:69`, a behaviour change outside the defect's blast radius; and `withValidator()` at `:170` receives the CONTRACT, which does not declare the property, so the poke needs an `instanceof` narrowing to survive PHPStan. ✅ **TWO HALVES, AND THE MUTATIONS PROVED THEY ARE NOT THE SAME FIX.** `UpdateFieldRequest::payload()` overlays the validated tree onto the RAW request config and `FormBuilderController::updateField()` calls it instead of `validated()`, which fixes the CLASS; and `label_translations` gained real rules on all four arms carrying option or grid lists — `options`, `levels`, `rows`, `columns`, `cells` — which validates the reachable loss rather than merely preserving it. ⛔ **THE MERGE BASE IS THE REQUEST, NEVER THE STORED ROW, AND THAT IS THE WHOLE SAFETY ARGUMENT.** Merging the existing column over the payload — the shape the word *merge* first suggests — would make clearing a key impossible, because deleting the last choice row would leave the old `options` in place. The builder sends the whole config on every save (`useBuilderStore.ts:883`), so raw-over-validated preserves what the author sent and leaves a removal a removal. A test pins that direction explicitly, and it is the one test that had to be **green before the fix and after** — which it was. ✅ **Five tests in `tests/Feature/Forms/FieldConfigRetentionTest.php`, all written against the unchanged code and watched to fail first: four red, the clearing case green throughout, exactly as the claim predicted.** ✅ **Both mutations CAUGHT, and their kill sets are DISJOINT, which is the finding worth more than either:** reverting `payload()` to `validated()` reddens ONLY the un-enumerated-key test, and stripping the new rules from the choices arm reddens ONLY the shape-validation test. **Neither single mutation reddens the `label_translations` tests, because the reachable case is now defended twice** — the rules keep it inside `validated()` and the accessor would restore it anyway. That is double defence measured rather than assumed, and it is also why a one-mutation proof would have read as a gap. ⚠️ **THE ROW UNDERSTATED ITSELF IN THREE WAYS AND TWO ARE NOW FILED.** `matrix` and `likert_matrix` grid-entry `label_translations`, and `config.levels[].label_translations`, have live READ and EXPORT paths (`XlsformExporter.php:543-562` via `:196-199`/`:224-226`, `schema-mapping.ts:265`/`:368`, `BlankFormPrintPresenter.php`) against a write path that only the builder has; and **three sibling request paths share the identical pruning mechanism on other keys**. Both are filed below rather than absorbed here. ⚠️ **A TEST DEFECT FOUND BY ITS OWN FIRST GREEN RUN, AND IT IS A TRAP THIS PROJECT WILL MEET AGAIN:** a `toBe()` on a `label_translations` map asserts **POSTGRES's** key ordering, not the application's — `config` is `jsonb` and jsonb normalises object keys alphabetically, so the assertion failed on wholly correct data with every value present (`es` sorts before `fil`). Asserted per locale now. ⚠️ A direct model read after an HTTP request needs `enterTenant()` again, because the request leaves the test's own connection without the GUCs the RLS policies read — the pattern `BuilderDraftGuardTest.php:203` already follows, and the first run's `ModelNotFoundException` was that and not the defect. ⚠️ **`BuilderRoutesTest.php:262-272` sends an empty config to a field with a full geo block and asserts only `assertOk()`**, so it could not have failed either way; the new clearing test is what covers that behaviour now. ✅ Measured: **441 passed / 1,801 assertions** across `tests/Feature/Forms` and `tests/Feature/Xlsform`. PHPStan reports 15 locally and **none of them in either changed file** — stated as an attribution rather than as a claim about movement, since this diff does touch `app/`.
 
 - ✅ **CLOSED BY `M112` (2026-09-26) — `minor` · Publish refuses on the first violation only, as a message-only toast, while the warnings path beside
   it gets a proper banner.** Filed 2026-09-25 by `M110` from the same exploration, and this is the half of *"or if
   we can show what is wrong to the user so the user can correct it"* that the server owns.
   `StructuralValidationGate.php:39-91` throws inside its `foreach`, so one mis-configured field aborts the whole
   transaction and the author is told about exactly one of however many problems exist.
-  `FormPublishController.php:32-36` renders `PublishValidationException` — which is prose, carrying no structured
+  `FormPublishController.php:33-37` renders `PublishValidationException` — which is prose, carrying no structured
   `field` or `code` — as a transient flash toast. ⚠️ **The contrast is in the same controller:** `:42-61` flashes
   `publishWarnings`, which `Builder.vue:425-435` renders as a dismissible banner. The refusal path got none of
   that treatment. ⛔ **AND THE GATE IS ASYMMETRIC IN A WAY THAT EXPLAINS THE WHOLE REPORT:**
@@ -11299,9 +11299,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   failure**, and `Builder.vue:144-148` posts to `/publish` regardless. Because the POST re-renders the page, the
   `saveError` alert at `ConfigPanel.vue` is torn down with the store: the author sees a publish outcome and
   never sees that their last edit did not save. ⚠️ **A second surface is built and unused:** `builderClient.ts:61-72`
-  parses the 422 body into an `errors` map, and `useBuilderStore.ts:196-198` keeps only `.message` — a grep finds
+  parses the 422 body into an `errors` map, and `useBuilderStore.ts:207-209` keeps only `.message` — a grep finds
   no consumer of `errors` anywhere outside the file that builds it. Per-field save errors are already on the wire
-  and are being discarded. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AND THE ROW'S PREMISE WAS FALSE IN ITS MOST LOAD-BEARING HALF, WHICH IS THE FINDING OF THIS INCREMENT.** ✅ Every citation held; one is off by one (`:127` is blank, the `.catch(() => undefined)` is at **`:128`**). ⛔ **THE STRUCTURED VIOLATION LIST WAS NEVER ON THE INERTIA WIRE.** The row, and `M112`'s own close-out, both read as though `B1a` had already put it there and only the rendering was left. `M112` rendered it for **`/api/v1/*` only**: `bootstrap/app.php:324` returns `null` for the web arm deliberately — **and it never even gets the chance**, because `FormPublishController.php:32-36` catches `PublishValidationException` *before* the render handler could fire and flashes `getMessage()` alone, with the violations in scope and discarded. **No builder page could render a per-field refusal at any cost.** The controller now flashes it under its own key, and `HandleInertiaRequests` + `inertia.d.ts` carry it. ⚠️ **A NEW KEY, NOT `publishWarnings`:** that payload is `list<string>` prose whose banner is titled *"Published, with …"* — untrue over a refusal — and two existing assertions pin it absent on this path. Modelling the refusal on it would have reproduced the defect being filed, which `M112` warned about in the abstract and is concrete here. ⛔ **THE GUARD CANNOT LIVE IN THE STORE, MEASURED RATHER THAN CHOSEN.** `whenIdle()` resolves on failure by construction — `enqueue()` ends with `queue = run.catch(() => undefined)` — and **two existing Vitest cases await it after a deliberately failed burst** (`save-state.test.ts`, `builderClient.test.ts-263`), so making it reject turns both into unhandled rejections. The verdict is therefore **read** after the await, in `Builder.vue`. ✅ **And the row's teardown claim is structural, not incidental:** `router.post` passes `preserveScroll` but **no `preserveState`**, so Inertia's non-GET default remounts the page, re-runs `useBuilderStore(props)` and resets the save error. ✅ **`ConfigPanel.vue` was NOT edited** — its alert at `:260` is already correct and already hoisted out of the selection branch; the defect is the remount, so the repair belongs at the call site. That kept this row at **one** hub file. ✅ **The banner copies `builder__warnings` for markup and geometry ONLY**, including the doubled-class specificity fix at `:756-761`, which it now shares. `MdsAlert` renders `role="status"`, so the one-tablist invariant, the thirteen `[role="tab"]` locators and `list-layout`'s three-pane count cannot see it, and **no spec clicks Publish** — `templates-axe.spec.ts:36` only asserts it visible, so the Publish button keeps its plain slot text. ⚠️ **The 422 `errors` map is still unconsumed and is filed as its own row** — it is built at `builderClient.ts:61-72`, typed on `BuilderRequestError:32`, and its only reader anywhere is its own test at `builderClient.test.ts:74`. ✅ **Mutation `m113-violations-not-flashed` CAUGHT** (the controller flashes an empty list — only the two flash cases redden, the success case stays green). ⚠️ **The client guard's control has NO HARNESS LANE and was run by hand, said plainly rather than implied:** `mutate.php` drives Pest only, so the guard was removed from `Builder.vue` with the sha256 recorded before and after and confirmed moved, Vitest run (1 failed / 11 passed — the guard case alone), then restored from a pre-write byte copy with the sha256 confirmed back and `git status` clean.
+  and are being discarded. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AND THE ROW'S PREMISE WAS FALSE IN ITS MOST LOAD-BEARING HALF, WHICH IS THE FINDING OF THIS INCREMENT.** ✅ Every citation held; one is off by one (`:127` is blank, the `.catch(() => undefined)` is at **`:128`**). ⛔ **THE STRUCTURED VIOLATION LIST WAS NEVER ON THE INERTIA WIRE.** The row, and `M112`'s own close-out, both read as though `B1a` had already put it there and only the rendering was left. `M112` rendered it for **`/api/v1/*` only**: `bootstrap/app.php:324` returns `null` for the web arm deliberately — **and it never even gets the chance**, because `FormPublishController.php:33-37` catches `PublishValidationException` *before* the render handler could fire and flashes `getMessage()` alone, with the violations in scope and discarded. **No builder page could render a per-field refusal at any cost.** The controller now flashes it under its own key, and `HandleInertiaRequests` + `inertia.d.ts` carry it. ⚠️ **A NEW KEY, NOT `publishWarnings`:** that payload is `list<string>` prose whose banner is titled *"Published, with …"* — untrue over a refusal — and two existing assertions pin it absent on this path. Modelling the refusal on it would have reproduced the defect being filed, which `M112` warned about in the abstract and is concrete here. ⛔ **THE GUARD CANNOT LIVE IN THE STORE, MEASURED RATHER THAN CHOSEN.** `whenIdle()` resolves on failure by construction — `enqueue()` ends with `queue = run.catch(() => undefined)` — and **two existing Vitest cases await it after a deliberately failed burst** (`save-state.test.ts`, `builderClient.test.ts-263`), so making it reject turns both into unhandled rejections. The verdict is therefore **read** after the await, in `Builder.vue`. ✅ **And the row's teardown claim is structural, not incidental:** `router.post` passes `preserveScroll` but **no `preserveState`**, so Inertia's non-GET default remounts the page, re-runs `useBuilderStore(props)` and resets the save error. ✅ **`ConfigPanel.vue` was NOT edited** — its alert at `:260` is already correct and already hoisted out of the selection branch; the defect is the remount, so the repair belongs at the call site. That kept this row at **one** hub file. ✅ **The banner copies `builder__warnings` for markup and geometry ONLY**, including the doubled-class specificity fix at `:756-761`, which it now shares. `MdsAlert` renders `role="status"`, so the one-tablist invariant, the thirteen `[role="tab"]` locators and `list-layout`'s three-pane count cannot see it, and **no spec clicks Publish** — `templates-axe.spec.ts:36` only asserts it visible, so the Publish button keeps its plain slot text. ⚠️ **The 422 `errors` map is still unconsumed and is filed as its own row** — it is built at `builderClient.ts:61-72`, typed on `BuilderRequestError:32`, and its only reader anywhere is its own test at `builderClient.test.ts:74`. ✅ **Mutation `m113-violations-not-flashed` CAUGHT** (the controller flashes an empty list — only the two flash cases redden, the success case stays green). ⚠️ **The client guard's control has NO HARNESS LANE and was run by hand, said plainly rather than implied:** `mutate.php` drives Pest only, so the guard was removed from `Builder.vue` with the sha256 recorded before and after and confirmed moved, Vitest run (1 failed / 11 passed — the guard case alone), then restored from a pre-write byte copy with the sha256 confirmed back and `git status` clean.
 
 - ✅ **CLOSED BY `M112` (2026-09-26) — `minor` · Per-type knowledge — which validation rules apply to which field type, and what a new field of each
   type should already validate — exists nowhere in the system.** Filed 2026-09-25 by `M110`, from the report
@@ -11677,7 +11677,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   which trims that row to a v1 for the Oct 12 testing: a linked form feeds a `single_select`/`dropdown`'s options.
   Left here: pulldata-style lookups and calculations over linked data, and whatever of `D60`'s separate freshness
   channel (answered A — beside the schema checksum) v1 does not need.
-  **Live.** Filed by `M127`. **Tier: during-testing.** **Also left by `M133`'s v1:** the linked list in the builder preview (it says the choices show on the live form), `select_one_from_file` in the XLSForm export, the sync manifest's empty `choice_lists`, linked choices for multi-select and Likert questions, a source question inside a repeat group, more than 1,000 choices, and a server-side cache of the list.
+  **Live.** Filed by `M127`. **Tier: during-testing.** **Also left by `M133`'s v1:** the linked list in the builder preview (it says the choices show on the live form), `select_one_from_file` in the XLSForm export, the sync manifest's empty `choice_lists`, linked choices for multi-select and Likert questions, a source question inside a repeat group, more than 1,000 choices, and a server-side cache of the list. **Split 2026-10-15 by `M172` (`D128`):** the multi-select half and the builder-preview half are their own `early-testing` rows now (R-f655f9b1, R-d8c2ce84, the options-from-anywhere increment); the grid's rows from another form and the cascade filter are R-bb79aec0 and R-ed7f3127. Left here, unchanged in tier: lookups and calculations over linked data, a source inside a repeat, more than 1,000 choices, a server-side cache, `select_one_from_file` in the XLSForm export and the sync manifest's `choice_lists`.
 
 - ✅ **CLOSED BY `M132` (2026-10-05) — ****`minor` · An author cannot attach a reference file to a form, and the attachment model has no form-level kind
   to hang one on.** Filed 2026-09-25 by `M110` from the report *"there is also a attachments in kobotoolbox that
@@ -12002,7 +12002,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (`app/Services/Expressions/StructuredRuleLowering.php:73`) and `conditionForOperator()`'s default arm throws
   for a null operator on `required_if`/`skip_if` — and `StructuredRuleEvaluator::conditionHolds()` (`:113-116`)
   does **not** catch, so it propagates out of `SemanticValidator::requiredState()` (`:1403-1420`) and out of the
-  submission pipeline to `bootstrap/app.php:595`'s renderable, which answers a generic failure. ⚠️ **The end of
+  submission pipeline to `bootstrap/app.php:599`'s renderable, which answers a generic failure. ⚠️ **The end of
   that chain is INFERRED from the throw path and the renderable, not yet driven end to end** — a submission
   through a published form carrying such a row is the first thing to write, and it decides whether the answer is
   a 422-shaped refusal or a dead form. ✅ **`M115` removed the easiest way to CREATE one** (the editor now offers
@@ -12093,7 +12093,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   prospective, and a version already published with such a row keeps throwing forever. ⚠️ **A fifth catch arm
   is the cheap half; the question the row must answer is what the per-item `error.code` should be**, since
   `expression_error` is currently a server-fault slug that `error-normalizer.ts:77-80` deliberately does not
-  classify as a validation refusal. **Live.** Filed by `M116`. **Tier: early-testing.** ✅ **CLOSED BY `M117` — AND THE ROW'S HEADLINE CHAIN WAS WRONG IN ITS PREMISE, IN BOTH DIRECTIONS.** `replayOne()` now catches the abstract `ExpressionException`, reporting `expression_error` per item as `SyncResultStatus::Error` inside a 200, so one bad row no longer replaces the per-item result list. ⛔ **(a) `replay.ts` IS NOT A CLIENT OF THE BATCH ENDPOINT AT ALL** — it posts one row at a time to the *guest* endpoint (`api-client.ts:174`), which this controller's own docblock states at `:33-34`. So "re-sends all twenty, five times, and parks the lot" described neither channel: the batch endpoint has **no in-repo client**, and on the guest channel each row parks independently. Both halves were still real defects and both are fixed — the guest half by classifying `expression_error` as `terminal` in `error-normalizer.ts`, which `REPLAY_OUTCOME` already parks, so it no longer burns five attempts on a failure no retry can change. ⛔ **(b) A SECOND UNCAUGHT TYPE HAD THE IDENTICAL ESCAPE:** `ExpressionSyntaxException` shares `bootstrap/app.php:595`'s union arm and is reachable from the same path because `ExpressionEvaluator::evaluate()` PARSES its argument — hence the arm names the BASE class. ⚠️ **One claim corrected:** the 422 branch was a two-code allowlist with no comment, so `expression_error` fell to `unknown` **by omission, not by a recorded decision** — there was no decision to overturn. ⛔ **AND THE GATE IS STRUCTURAL, WHICH IS A MEASURED VERDICT RATHER THAN A SHORTCUT: THE TRIGGERING STATE IS NO LONGER CONSTRUCTIBLE BY ANYONE.** `M116`'s publish gate refuses the authoring shapes; the three content child tables are `draft_child` under **FORCE ROW LEVEL SECURITY**, so a published version is immutable to *every* role — an Eloquent insert raised the RLS violation, the same write on `pgsql_privileged` matched **zero rows**, and an `update()` matched zero rows and **reported success**; the parser rejects both under-arity and unknown functions (`selected(consent)` and `nosuchfn(consent)` both measured as parse failures), so no authored expression reaches the remaining `unevaluable` sites; and `SubmissionPipeline`, `SemanticValidator`, `ExpressionEvaluator`, `ExpressionParser` and `StructuralValidationGate` are all `final`, so there is no mocking seam either. The arm is therefore defence for versions published BEFORE that gate, which a test database cannot hold — so `SyncApiTest` pins that the arm and the renderable cover the same set, with a completeness arm over the exception directory. Four mutations CAUGHT (two Pest via `mutate.php`, two Vitest hand-run).
+  classify as a validation refusal. **Live.** Filed by `M116`. **Tier: early-testing.** ✅ **CLOSED BY `M117` — AND THE ROW'S HEADLINE CHAIN WAS WRONG IN ITS PREMISE, IN BOTH DIRECTIONS.** `replayOne()` now catches the abstract `ExpressionException`, reporting `expression_error` per item as `SyncResultStatus::Error` inside a 200, so one bad row no longer replaces the per-item result list. ⛔ **(a) `replay.ts` IS NOT A CLIENT OF THE BATCH ENDPOINT AT ALL** — it posts one row at a time to the *guest* endpoint (`api-client.ts:174`), which this controller's own docblock states at `:33-34`. So "re-sends all twenty, five times, and parks the lot" described neither channel: the batch endpoint has **no in-repo client**, and on the guest channel each row parks independently. Both halves were still real defects and both are fixed — the guest half by classifying `expression_error` as `terminal` in `error-normalizer.ts`, which `REPLAY_OUTCOME` already parks, so it no longer burns five attempts on a failure no retry can change. ⛔ **(b) A SECOND UNCAUGHT TYPE HAD THE IDENTICAL ESCAPE:** `ExpressionSyntaxException` shares `bootstrap/app.php:599`'s union arm and is reachable from the same path because `ExpressionEvaluator::evaluate()` PARSES its argument — hence the arm names the BASE class. ⚠️ **One claim corrected:** the 422 branch was a two-code allowlist with no comment, so `expression_error` fell to `unknown` **by omission, not by a recorded decision** — there was no decision to overturn. ⛔ **AND THE GATE IS STRUCTURAL, WHICH IS A MEASURED VERDICT RATHER THAN A SHORTCUT: THE TRIGGERING STATE IS NO LONGER CONSTRUCTIBLE BY ANYONE.** `M116`'s publish gate refuses the authoring shapes; the three content child tables are `draft_child` under **FORCE ROW LEVEL SECURITY**, so a published version is immutable to *every* role — an Eloquent insert raised the RLS violation, the same write on `pgsql_privileged` matched **zero rows**, and an `update()` matched zero rows and **reported success**; the parser rejects both under-arity and unknown functions (`selected(consent)` and `nosuchfn(consent)` both measured as parse failures), so no authored expression reaches the remaining `unevaluable` sites; and `SubmissionPipeline`, `SemanticValidator`, `ExpressionEvaluator`, `ExpressionParser` and `StructuralValidationGate` are all `final`, so there is no mocking seam either. The arm is therefore defence for versions published BEFORE that gate, which a test database cannot hold — so `SyncApiTest` pins that the arm and the renderable cover the same set, with a completeness arm over the exception directory. Four mutations CAUGHT (two Pest via `mutate.php`, two Vitest hand-run).
 
 - ✅ **CLOSED BY `M121` (2026-10-01) — `minor` · A respondent is never told the rule engine failed — every conditional question is shown with no
   conditions applied, and the submit guard lets them submit anyway.** Found by `M116` (2026-09-28), beside
@@ -12215,7 +12215,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   only the draft race at `:143-145`; `SubmissionDraftController.php:108-129` catches three of the same four
   submission exceptions and misses the expression types identically; and
   `SubmissionEditController.php:135` catches only `SubmissionEditException`, with `:104` recording that
-  `SubmissionValidationException` is *deliberately* uncaught. Each escapes to `bootstrap/app.php:595-608`'s
+  `SubmissionValidationException` is *deliberately* uncaught. Each escapes to `bootstrap/app.php:599-612`'s
   renderable, so a respondent reads *"A form expression could not be evaluated."* ⚠️ **Blast radius is one
   response rather than a destroyed per-item contract, which is why `M117` did not widen its claim to cover
   them** — but `M117` also measured that the guest channel is the one with real users on it. ⚠️ The
@@ -12773,7 +12773,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   available for manual entry yet". The builder offers both types, and `CapabilityFlags` counts `duration` as
   extractable, so a scanned sheet carries a duration answer that `M129`'s review lists as not carried rather than
   saving a value the reviewer cannot see. The remedy is a control in both channels at once, which the mirror test
-  makes one change. **Live.** Filed by `M129`. **Tier: during-testing.**
+  makes one change. **Live.** Filed by `M129`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the testers asked whether the advanced types are ready (item 6, 2026-10-15); `D134` builds both controls in the testers' programme's last increment, after the UI programme (`D128`).**
 
 - **`minor` · A note copied with its content-block images, by save as template, a template or the field library,
   points at images another form owns, so the copy cannot publish until each image is uploaded again.** Found by
@@ -13136,7 +13136,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the last — step by step, one page, and page breaks — and its option A said to *file "tabular" as a product idea*, which
   no row did until now. `D57`'s recommendation also says a tabular mode should be asked for again on its own evidence,
   because nothing has described what it would show; the first step is that description from the user. **Live.**
-  Filed by `M135`. **Tier: during-testing.**
+  Filed by `M135`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: `D129` is the description `D57` asked for — a repeatable section laid out as a table where respondents add rows, Fillout's shape — and the grid's second increment builds it (`D128`).**
 
 - ✅ **CLOSED BY `M137` (2026-10-06) — ****`minor` · An image added to a note does not appear in the builder's preview until the page is reloaded.** Found by
   `M137` from the staging smoke test (comment 17, marked fail: *"image did not reflect in the preview instantly, i
@@ -13271,7 +13271,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   correct. `EncodeFormPresenter` renders a cascade from the published field's options (`cascade()`), so a 42,000-row
   barangay list rides in the Inertia props on every encode load (a few MB). `M141` strips the engine's copy of the
   schema and leaves the render copy, which the page needs. The fix is the guest runtime's: fetch the lists beside the
-  page, by version. **Live.** **Tier: during-testing.**
+  page, by version. **Live.** **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: taken by the Philippine-places increment (`D131`), whose built-in list would otherwise put a few MB of props on every manual-entry page (`D128`).**
 
 - **`minor` · A typed cascade publishes a first-level choice that carries a parent, which no respondent is ever shown,
   and a value repeated within a level, whose later parent silently wins.** Found by `M141`.
@@ -13280,7 +13280,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   validation engines key a level's options by value. A CSV list cannot reach either: the parser refuses a repeated name,
   and the materializer writes a null parent. So `M141` left the gate alone, because tightening it would refuse a
   republish of any live form that already carries such an option. Count those forms before tightening.
-  **Live.** Filed by `M141`. **Tier: during-testing.**
+  **Live.** Filed by `M141`. **Tier: during-testing.** **Noted 2026-10-15 by `M172`:** the Philippine-places increment (`D131`, R-70c7673a) counts the live forms carrying the shape and takes this row only if the count is zero; otherwise it stays here.
 
 - **`minor` · A form automation has no Slack, Delay or Branch action and no form-abandoned trigger — what is left of
   form automations after their condition (`M142`).** Split from `R-b65bafca` by `M142`, which built that row's Filter
@@ -13407,7 +13407,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   repaired when it changed anything (`D117`). **Latent** — none of Round 1's 15 phones carried a letter. Filed by `M168`.
   **Tier: during-testing.**
 
-- **`minor` · Deleting or re-keying a question that another question's rule compares with leaves that rule pointing
+- ✅ **CLOSED BY `M172` (2026-10-15) — ****`minor` · Deleting or re-keying a question that another question's rule compares with leaves that rule pointing
   at a key that no longer exists, and the owner's next autosave saves it with no compared question at all.** Found by
   `M145` while measuring `R-551873af`'s reachability. `useBuilderStore.removeFieldLocal()` drops only the deleted field,
   and nothing in the store rewrites another field's `related_field_key` on a delete or a key edit — so the rule names a
@@ -13419,7 +13419,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   on a delete, clear or repoint every dependent rule and say so in the undo entry; on a key edit, carry the new key into
   every `related_field_key` that held the old one — or refuse to delete a compared question while a rule names it.
   Not one of the 19 comments (`D72`), so filed below the testing line. **Live.** Filed by `M145`.
-  **Tier: during-testing.**
+  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: taken by the blockers increment — the delete half with the retired-question dialog (`D133`), the key half with the auto-adjusted key (`D132`, `D128`).** ✅ **CLOSED BY `M172` (2026-10-15):** both halves: a key change (typed, or kept by the server) carries the new key into every other question's comparison rule on screen and in its baseline (`repointRules()`), and a delete drops the rules comparing with it the same way and brings them back with undo (`dropRulesComparingWith()`, `restoreRules()`; `resources/js/components/builder/delete-field.test.ts`). Expression TEXT naming a key — conditions, formulas, piping — is not rewritten: filed as `R-ade0b598`.
 
 - **`nit` · `PreviewRuntime.vue` keys a question's issue chips by `issue.code`, so two issues of one code on one
   question would collide in the render.** Found by `M145` while adding `incomplete_rule`: the `<li>` under a field is
@@ -13473,12 +13473,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   read-only census — the PDF templates, Slack formatting, the mail views, the CSV and XLSX path, and what the guest
   runtime hands to Vue — with each surface cleared or filed. **Latent** — no third surface is known. **Tier: after-launch.**
 
-- **`nit` · The builder's request-layer uniqueness rules say nothing about the publish race `D30` decided to leave.**
+- ✅ **CLOSED BY `M172` (2026-10-15) — ****`nit` · The builder's request-layer uniqueness rules say nothing about the publish race `D30` decided to leave.**
   Filed by `M147` (2026-10-08) from `D30` option 1 (*"leave both rules as they are and say so in a comment"*).
   `app/Http/Requests/Forms/UpdateFieldRequest.php` and `app/Http/Requests/Forms/UpdateSectionRequest.php` scope their
   uniqueness rules to the bound version with no comment, so the next reader cannot tell a slightly wrong message inside
   that race from an oversight. The remedy is the comment in both: the draft guard is the real gate, and the message still
-  tells the author to reload. **Latent** — the race has never been reported. **Tier: during-testing.**
+  tells the author to reload. **Latent** — the race has never been reported. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: folded into the blockers increment — the uniqueness rules scope to the bound row's own version, which is the rule the comment would have described (`D132`, `D128`).** ✅ **CLOSED BY `M172` (2026-10-15):** folded into `R-733eff09`: the request layer no longer judges key uniqueness at all — `FormBuilderService::freeKey()` suffixes a clash under the write (`D132`) — so the race `D30` left has no refusal left to word wrongly, and a stale page is refused 409 by `builder.draft` before validation.
 
 - **`minor` · `deploy.ps1`'s test harness lives in no committed file, while every merge now deploys the testing site
   through that script.** Filed by `M147` (2026-10-08) from `D45` (C until a production host exists, then B). The harness
@@ -13597,7 +13597,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   me to check specially for multi levels"*). Excel reads `01` as the number 1 and saves it so, a child file's parent
   column then names no row, and publish refuses with "option “X” has no valid parent" — true, but silent on the cause.
   The remedy is one sentence beside the upload in `CascadingEditor.vue` and in Settings → Choice lists (keep codes as
-  text, or use letters), and the same hint on that refusal. **Live.** Filed by `M148`. **Tier: during-testing.**
+  text, or use letters), and the same hint on that refusal. **Live.** Filed by `M148`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: taken by the options-from-anywhere increment, which rewrites the same upload control and accepts Excel (`D128`).**
 
 - ✅ **CLOSED BY `M149` (2026-10-08) — ****`major` · A phone photo stored on its side is read without being turned upright, so every question on it is "not
   found".** Found by `M149` in the OCR bake-off's first round (15 hand-filled layout-4 forms, both pages photographed with a
@@ -14141,7 +14141,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   list page AND `/settings` fill the region (red today); the two stories; DSR §3.0 and the §6 bullet amended — and the same edit
   records the page-level `dl` collapse at 480px that ten pages author (`resources/js/Pages/scopes/Index.vue:387`,
   `resources/js/Pages/forms/Show.vue:594`) against §6's "pages never add breakpoint logic" sentence, which today contradicts them.
-  **Live.** Filed by `M171`. **Tier: during-testing.**
+  **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`minor` · The settings pages stack 640px cards in one column, so a wide screen shows one narrow column and the rest of the page empty.**
   `resources/js/Pages/Settings/Index.vue:482` (`.settings-card { max-width: 640px }`) with `:475` a column; `resources/js/Pages/Settings/Sso.vue:158`
@@ -14154,7 +14154,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `resources/js/components/sso/IdpMetadataCard.vue:223`. `D120` A. The remedy: the caps go; the cards sit in
   `repeat(auto-fill, minmax(min(100%, 36rem), 1fr))` with `align-items: start` (two columns at 1440, three from 1920); the console
   page's Save foot spans the row; the 380px input measure inside a card (`resources/js/Pages/Settings/Index.vue:505`) stays, since
-  `D120` keeps a measure for inputs. **Live.** Filed by `M171`. **Tier: during-testing.**
+  `D120` keeps a measure for inputs. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`minor` · The scanned-forms and scan-status pages cap themselves at 720px, and the recent-scans list runs each row from one edge to the other.**
   `resources/js/Pages/ocr/Scans.vue:300` and `resources/js/Pages/ocr/ScanStatus.vue:135` (`max-width: 720px`); `Scans.vue:395-414` lays
@@ -14163,7 +14163,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `ScanStatus.vue:150`), which resolves to `danger-300` in dark and fails 4.5:1 on the surface; they take `--mds-color-status-danger-fg`
   with this row so the consistency row never edits these files. `D120` A and `D121` A (the upload form keeps a measure as a form; the
   list fills). The remedy: the caps go; the list becomes a card grid (`auto-fill minmax(min(100%, 28rem), 1fr)`); from 75rem the
-  upload card keeps a 36rem measure beside the list. **Live.** Filed by `M171`. **Tier: during-testing.**
+  upload card keeps a 36rem measure beside the list. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`minor` · The form's Settings tab stretches every section's inputs across the whole width.**
   `resources/js/Pages/forms/Settings.vue:67` mounts `FormSettingsSections` in one `MdsCard` with no measure, and
@@ -14171,7 +14171,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `D120` A and `D121` A: inputs keep a reading-width column. The remedy: from a 60em container the sections lay two-up
   (`auto-fill minmax(min(100%, 32rem), 1fr)`, `align-items: start`), each section's controls at a 36rem measure; the 880px settings
   modal stays one column because its container never reaches 60em; a new Vitest case on the source pins the query, the way
-  `resources/js/Pages/forms/builder-layout.test.ts` pins the builder's. **Live.** Filed by `M171`. **Tier: during-testing.**
+  `resources/js/Pages/forms/builder-layout.test.ts` pins the builder's. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`minor` · The form hub and the submission page stack their facts above their tables, so on a wide screen every row runs from one edge of the glass to the other.**
   `resources/js/Pages/forms/Show.vue:343-366` (identity and facts), `:368-407` (tiles), `:415-487` (two full-width tables);
@@ -14180,7 +14180,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   remedy is a page grid from a 75rem container — main content (tables, answers) in `minmax(0, 1fr)`, the facts, versions, review and
   PDF cards in a `minmax(18rem, 26rem)` aside — with the submission's answer blocks two-up (`auto-fill minmax(min(100%, 36rem), 1fr)`)
   and the scan split (`:435-450`) unchanged; `resources/js/Pages/forms/show.test.ts` keeps its every-prop-has-a-reader rule. **Live.**
-  Filed by `M171`. **Tier: during-testing.**
+  Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`minor` · The webhook, integration-rule and console workspace pages stack two fact cards over a full-width log, and the console's dialogs rely on browser-default paragraph margins.**
   `resources/js/Pages/webhooks/Show.vue:358-363` and `resources/js/Pages/integrations/RuleShow.vue:326-331` put two cards in
@@ -14188,7 +14188,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `:546-548` stacking every section under it. On that page `:491-498` and `:513-519` are paragraphs with no class in two dialogs
   (every tenant dialog styles a `__prose` rule), and `:562` hard-codes `letter-spacing: 0.04em` where `--mds-tracking-wide` exists.
   `D120` A. The remedy is the hub's page grid (cards aside, log main, from 75rem), a `__prose` rule, and the token. **Live.**
-  Filed by `M171`. **Tier: during-testing.**
+  Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`minor` · Domains, search results and the achievements leaderboard are single columns of full-width rows.**
   `resources/js/Pages/domains/Index.vue:212-216` (`.domains__list`, a column of `DomainCard`s), `resources/js/Pages/search/Index.vue:210-214`
@@ -14196,12 +14196,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   column) with `:485-492` giving the name `flex: 1`, so the rank sits at the left edge and the points at the far right of a 2560px
   row. `D120` A. The remedy: domain cards in `auto-fill minmax(min(100%, 26rem), 1fr)`; search groups side by side from 64rem with
   their rows inside each group; the leaderboard beside the team tiles and the note in a two-column section grid from 75rem.
-  **Live.** Filed by `M171`. **Tier: during-testing.**
+  **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`nit` · Template cards' "Use this template" buttons sit at different heights across a row.**
   `resources/js/Pages/forms/Templates.vue:128-132` makes each card a flex column but never pushes the footer to the bottom;
   `resources/js/components/forms/FormCard.vue:225` does it with `margin-top: auto` on the card footer. The remedy is the same rule,
-  `:deep(.mds-card__footer) { margin-top: auto }`. **Live.** Filed by `M171`. **Tier: during-testing.**
+  `:deep(.mds-card__footer) { margin-top: auto }`. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`minor` · The sign-in and register pages centre a 400px card and a pitch panel in the middle of a wide screen, and the landing page caps itself at 64rem.**
   `resources/js/Layouts/AuthLayout.vue:83-91` centres `.auth__frame`, `:122-134` is the 400px card, and `:220-247` makes the split
@@ -14212,7 +14212,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   utility pages keep the card; the landing hero stays centred but its grid fills with `auto-fill` and bounded cards, and the tracking
   takes `--mds-tracking-wide`. The layout docblock's two CI constraints hold: no second control whose name contains "Sign in", and
   the panel's headline stays a paragraph. `tests/e2e/auth-axe.spec.ts` gains the two-pane case. **Live.** Filed by `M171`.
-  **Tier: during-testing.**
+  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`minor` · The staff encode page caps itself at 720px and leaves the rest of a wide screen empty.**
   `resources/js/Pages/submissions/Encode.vue:1575-1577` (`.encode { max-width: 720px }`) and `:1962` (`max-width: 90rem` in scan mode).
@@ -14220,7 +14220,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   panel. The remedy: from 75rem a two-column grid — the form at a 45rem measure and an aside holding the facts that today sit above
   it (the form's status and version, the schedule notice, the reference files, the autosave state); scan mode's equal halves
   (`M168`) unchanged. The page's two `--mds-color-danger-text` uses (`:1921`, `:2029`) take `--mds-color-status-danger-fg` with this
-  row, so the consistency row never edits this hub. **Live.** Filed by `M171`. **Tier: during-testing.**
+  row, so the consistency row never edits this hub. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`minor` · The feedback panel is in every captured screenshot, a report carries no type, and only the page's path is recorded.**
   The user's comment (2026-10-14): *"when i click capture screen, the modal for the feedback is always included. i think there is a
@@ -14237,7 +14237,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   app version in `browser_info`, the title shown as a link on both lists and matched by the keyword filter; `docs/data-dictionary.md`
   §21 and the enum catalog row (gated by `tests/Feature/Docs/DocumentedEnumCatalogDriftTest.php`). Mutations: the hide dropped → Vitest
   red; `type` dropped from the payload → Pest red; the CHECK dropped → the drift test red. **Live.** Filed by `M171`.
-  **Tier: during-testing.**
+  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`minor` · The product shows no user-facing version and has no "What's new": Settings → About reads "dev" on the testing server, and a user learns of a change only by noticing it.**
   The user's request (2026-10-14): *"lets also have a what's new prompt to users for new login so users are aware for every changes.
@@ -14256,7 +14256,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   never a delete), and the page and the prompt reading the table; a `/whats-new` page and a modal opened on the first page after sign-in for a user whose `users.whats_new_seen_version` (new,
   nullable, no backfill, withheld from tenant extracts like `welcomed_at`) is older, marked seen by any close through
   `POST /whats-new/seen`; one close-out sentence in `CLAUDE.md` and the RBAC §6 users row. **Live.** Filed by `M171`.
-  **Tier: during-testing.**
+  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`nit` · What's new entries do not reach the notification centre.**
   The gap-table row at `docs/feature-backlog.md:160` asks for a changelog "feeding the notification center"; the versioning row above
@@ -14274,23 +14274,23 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `resources/js/components/submissions/FieldInput.vue:706`, `resources/js/components/integrations/RuleFormModal.vue:448`,
   `resources/js/components/builder/PreviewRuntime.vue:665` (the OCR pages' and the encode page's uses are taken by their own rows).
   Only the dark axe sweep can see it, and `/admin/*` is outside the sweep. The remedy is `--mds-color-status-danger-fg`, the
-  on-surface pair with a measured ratio, in every one. **Live.** Filed by `M171`. **Tier: during-testing.**
+  on-surface pair with a measured ratio, in every one. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`nit` · The console's "Reset two-step sign-in" dialog relies on browser-default paragraph margins.**
   `resources/js/Pages/admin/Users.vue:91-97` renders three paragraphs with no class, while every tenant dialog styles a `__prose` rule
-  (`resources/js/Pages/members/Index.vue:497`). The remedy is the same rule. **Live.** Filed by `M171`. **Tier: during-testing.**
+  (`resources/js/Pages/members/Index.vue:497`). The remedy is the same rule. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`nit` · Three uppercase micro-labels hard-code their tracking where `--mds-tracking-wide` exists.**
   `resources/js/Pages/help/Index.vue:223` (0.04em), `resources/js/components/shell/Sidebar.vue:338` (0.06em) and
   `resources/js/Layouts/AdminLayout.vue:130` (0.04em); `packages/design-system/src/components/FilterBar/FilterBar.vue:58-61` records the
   token as the one letting for the product's micro-labels (the console workspace page's and the landing page's literals are taken by
-  their own rows). The remedy is the token. **Live.** Filed by `M171`. **Tier: during-testing.**
+  their own rows). The remedy is the token. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`nit` · Three truncated values offer no way to read the whole text where they are shown.**
   `resources/js/Pages/webhooks/Index.vue:224-236` (`.webhooks__url`), `resources/js/Pages/integrations/Index.vue:456-468`
   (`.connection__channel`) and `resources/js/Pages/integrations/RuleShow.vue:421-431` (`.detail__result`) clip with an ellipsis and
   carry no `title`. The remedy is a `title` with the full value — allowed because the same text is on the row's detail page, so no
-  tooltip component is owed. **Live.** Filed by `M171`. **Tier: during-testing.**
+  tooltip component is owed. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`nit` · The root lockfile records the design system's `vue` range as `^3.5.39` while its `package.json` says `^3.5.43`, so the node container's `npm install` rewrites `package-lock.json` and dirties the working tree.**
   Found by `M171`: after the stack started, `git status` showed `package-lock.json` changed by one line — the `packages/design-system`
@@ -14298,3 +14298,268 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the root lock was never regenerated. Harmless to the build (CI runs `npm install`, not `npm ci`), but a session that stages
   everything ships an unrelated lockfile line, and one that does not keeps reverting it. The remedy is the one-line lock update in a
   PR of its own. **Live.** Filed by `M171`. **Tier: during-testing.**
+
+- ✅ **CLOSED BY `M172` (2026-10-15) — ****`major` · A builder tab left open across a publish refuses every edit with "The key has already been taken", then "That item belongs to a published version" once the key is changed, and a reload loses the unsaved edits.**
+  The testers' report (2026-10-14, relayed 2026-10-15): *"The key has already been taken. ************ has a change that was not saved.
+  Select it to see why"*, and on a delete *"That item belongs to a published version and can no longer be edited"*. Measured on
+  `0432d03b`: `app/Http/Requests/Forms/UpdateFieldRequest.php:53-58` checks the key against the form's CURRENT draft, ignoring only
+  the bound field's id, and a FormRequest runs before `FormBuilderService::assertDraftChild()`
+  (`app/Services/Forms/FormBuilderService.php:652-657`); a publish clones the draft into a new one with new ids and the same keys
+  (`app/Services/Forms/PublishService.php:175-186`). So a tab still holding the old ids — a publish from the hub
+  (`resources/js/Pages/forms/Show.vue:246-253`), the forms list, another tab, the API, or the browser's Back button, which Inertia
+  serves from history without asking the server (`docs/feature-backlog.md:2974-2976`; nothing under `resources/js` handles
+  `popstate` or encrypts history) — finds the clone and is refused on the key. Changing the key passes the request and the service
+  refuses with `FormException::childNotInDraft()` (`app/Exceptions/Forms/FormException.php:67-70`), mapped to 422 with no `errors`
+  map (`app/Http/Controllers/Tenant/FormBuilderController.php:259-261`) and so given a Retry that can never succeed; reorder with
+  stale ids is a silent 200 (`FormBuilderService.php:551-575`); publish from the builder does nothing while a refusal stands
+  (`resources/js/Pages/forms/Builder.vue:216-218`); a reload loses the edits because the journal is keyed by the draft id
+  (`resources/js/components/builder/edit-journal.ts:88-93`). The only HTTP test of the path sends a NEW key
+  (`tests/Feature/Forms/BuilderDraftGuardTest.php:66-84`). The remedy: the page already holds `draft.id`
+  (`app/Services/Forms/BuilderPresenter.php:83-86`) — `resources/js/components/builder/builderClient.ts` sends it with every builder
+  write, the controller compares it with `forms.draft_version_id` BEFORE validation and answers 409 `draft_superseded` with the new
+  draft's id and number; the store shows one dialog ("This form was published since this page loaded. Reload to keep editing."),
+  reloads the page's props and replays the unsaved edits by field KEY (the journal re-keyed by form, its entries carrying the key,
+  which a publish keeps while ids change); the builder re-fetches its props on history restoration so Back never shows a stale page;
+  reorder answers the same 409; both uniqueness rules scope to the bound row's own version; `respond()`'s docblock claim of a
+  refetch (`FormBuilderController.php:225`) becomes true; the publish refusal says why. Red first: a Pest case sending the
+  UNCHANGED key against a published field's id, a Vitest case replaying by key, an e2e two-tab case. **Live.** Filed by `M172`.
+  **Tier: early-testing.** ✅ **CLOSED BY `M172` (2026-10-15):** every builder write carries the draft the page was loaded with (`X-Builder-Draft`, `builderFor()` in `resources/js/components/builder/builderClient.ts`), and `app/Http/Middleware/EnsureBuilderDraftCurrent.php` (`builder.draft`, after `can:update,form`) refuses a superseded page 409 `draft_superseded` with the draft to reload into, before any FormRequest validates it (428 when absent). The publish race it cannot see answers the same 409 from the service guard, which now tells a row of an earlier version of THIS form (`FormException::childSuperseded()`) from another form's row (still 422); reorder refuses instead of a silent 200. The client throws `DraftSupersededError` (it carries no `current` row, which every 409 path dereferenced), shows `DraftSupersededDialog.vue` once, sends nothing more, offers no Retry, and Reload remounts the page (`router.reload()` keeps component state); the edit journal is keyed by the FORM and its entries carry the key the server held, so the kept edits come back into the new draft by key, and an M170 page's draft-keyed entries are folded in once. The builder page's history is encrypted and cleared on publish and restore, so Back re-visits the server; Publish says why it did nothing. Measured red first on the trunk: the testers' exact 422 "The key has already been taken." (Pest), four Vitest cases, and `tests/e2e/builder-draft-superseded.spec.ts` on a pre-M172 build — the two-tab case 422, and Back restored the builder as it was FIRST loaded, with no question at all. Mutations caught: the draft-id comparison (the stale create), the replay by key, the superseded-code check.
+
+- ✅ **CLOSED BY `M172` (2026-10-15) — ****`minor` · A key clash is refused instead of avoided, the refusal shows only on a tab that selecting the question never opens, and an undo or a journal replay can bring a taken key back.**
+  The clash the testers can still hit after the stale-tab row above is fixed: an author types a key another question holds, or an
+  undo (`resources/js/components/builder/useBuilderStore.ts:287-305`) or the journal's put-back (`:986-1010`) re-sends a key freed
+  and retaken meanwhile. The server's own keys never clash (`app/Services/Forms/FormBuilderService.php:903-928`, `uniqueKey()` and
+  `copyKey()`); the client never creates one. The refusal is shown under Field key on the Advanced tab only
+  (`resources/js/components/builder/ConfigPanel.vue:605-612`), while selecting a question always opens Basics (`:165-170`); the
+  alert names every other refused question as "has a change that was not saved. Select it to see why" (`:80`) with no reason and
+  no badge on the tab; a validation refusal is not counted as unsaved, so there is no Retry (`useBuilderStore.ts:946-954`).
+  `docs/form-versioning-schema-migration.md:129` says a key is never renamed, and nothing enforces it. `D132` (the user,
+  2026-10-15): *"if we can already help the user avoid the errors, notify them or the app auto adjust the key naming to avoid
+  conflicts"*. The remedy: the store knows every key in the draft — as the author types a key in use the panel says so inline
+  ("used by “Age (years)”") and offers the free form; a clash that still reaches the server takes a numbered suffix (the
+  `copyKey()` shape), the response carries the key kept and a notice shown under Field key, and every rule naming the old key
+  follows (the key-edit half of `R-9ea69e29`); undo and journal replays go through the same path; the alert lists each refused
+  question with its reason inline, selecting one opens the tab holding the error, and the tab carries a badge. Folds
+  `R-4c4e35ae` (the uniqueness rules scope to the bound row's own version, the rule its comment would have described); takes
+  `R-31ff7ade` and `R-d85d51d2` with the alert rewrite where the files coincide — verified at the build. **Live.** Filed by `M172`.
+  **Tier: early-testing.** ✅ **CLOSED BY `M172` (2026-10-15):** neither key rule refuses a key another row holds any more; `FormBuilderService::freeKey()` keeps the lowest free `{key}_{n}` (n from 2, inside 150 characters) for a question or a section and the response carries it (`D132`). The panel warns AS a clashing key is typed ("Used by … It will be saved as age_2", with a button taking that key), says under Field key which key the server kept, and every other question's comparison rule naming the old key follows (`repointRules()`). The alert names each other refused question with its reasons as a button that opens it on the tab holding the error; a question holding a refusal opens on that tab, which carries a dot (`MdsTabs`' new `alert` flag, decorative to a screen reader so every tab keeps its exact name); a refusal on another tab of the selected question is said with the tab's name (`tabForSavePath()`). `docs/form-versioning-schema-migration.md` gained the as-built suffix rule. Red first: two Pest cases (422 on the row-1 server) and four Vitest cases; mutations caught: the suffix (two Pest cases), the inline warning.
+
+- ✅ **CLOSED BY `M172` (2026-10-15) — ****`minor` · Deleting a question that a published version with responses still uses gives no warning, and nothing on a response or an export says the question was removed from the form.**
+  The testers' request (2026-10-15): delete when the published form has no responses; otherwise ask, retire the question, keep the
+  submitted answers with a note, and keep the history. Measured: a delete hard-deletes the row from the draft and nothing else
+  (`app/Services/Forms/FormBuilderService.php:308-320`); older responses keep their answers under their own version
+  (`submission_answers.answers` keyed by field key, `database/migrations/2026_07_09_000302_create_submission_answers_table.php:28`;
+  shown against the submission's version by `app/Services/Submissions/SubmissionInboxPresenter.php:251-295`; exports union keys
+  across versions, `app/Services/Submissions/SubmissionRowProjector.php:82`), so no answer is lost today — but no response page,
+  inbox column or export header says the question is gone, and the delete dialog says nothing about the answers it leaves behind.
+  `D133` (the user's design, 2026-10-15): the delete works in the draft; with no responses nothing more is said; with responses
+  the dialog says how many hold answers and that the question is retired, kept on every response and export as "removed from the
+  form in version N". The remedy: the delete path counts, in the current published version, the responses holding an answer to the
+  key (`submission_answer_index.field_key`, `database/migrations/2026_07_09_000303_create_submission_answer_index_table.php:31-32`)
+  and the dialog says so; the delete clears or repoints dependent rules and the undo entry says so (the delete half of
+  `R-9ea69e29`, `useBuilderStore.removeFieldLocal()`); the response page, the inbox's columns and the CSV/XLSX headers tag a key
+  present in a submission's version but absent from the current published version with "removed from the form in version N",
+  read from `change_summary` (`app/Services/Forms/SchemaChangeClassifier.php`). The version-history half is the row below.
+  **Live.** Filed by `M172`. **Tier: early-testing.** ✅ **CLOSED BY `M172` (2026-10-15):** `GET /forms/{form}/fields/{field}/answers` counts the non-draft, non-deleted responses of the form, in ANY version, holding a non-empty answer under the question's key in `submission_answers.answers` (each instance of a repeatable section looked into); the canvas's trash asks first only when that count is above zero or unreadable (`DeleteFieldDialog.vue`: "N responses hold answers to this question. They keep them, marked as removed from the form."), and a form never published asks nothing. Other questions' comparison rules leave with the deleted one and come back with undo. `app/Services/Forms/RetiredFieldKeys.php` names each key the current published version no longer holds with the version that removed it: the response page tags the answer "Removed from the form in version N" and the CSV/XLSX header carries the note — in the exporter only, so the connectors' column catalog keeps its names. ⚠️ Premise corrected: the inbox has no per-answer columns, so there was nothing to tag there. Red first: three Pest cases, four Vitest cases; mutation caught: the retired note (the inbox and export cases).
+
+- ✅ **CLOSED BY `M172` (2026-10-15) — ****`minor` · An author cannot see what changed between a form's versions or open an old version: the hub's Versions panel shows version, status and date only, and the change summary is shown nowhere.**
+  The testers' request (2026-10-15): *"there must also a way to check the older version for history"*. `app/Services/Forms/FormHubPresenter.php:87-92`
+  sends each version's id, number, status and published date; `resources/js/Pages/forms/Show.vue:444-487` draws the panel with
+  Print blank and Restore as the only actions; `form_versions.change_summary` (`app/Services/Forms/SchemaChangeClassifier.php`,
+  by key) reaches no page; an old version is reachable only as the Print blank PDF (`routes/tenant.php:576`), the XLSForm download
+  (`:554`) or `GET /api/v1/forms/{form}/versions/{version}`. The remedy: the panel lists each version's summary (added, removed and
+  changed questions by label) and a View that opens the old version read-only through the preview runtime from `schema_snapshot`
+  (a tenant route beside the Print blank one). The interactive field-by-field diff stays `version-diff-ui`
+  (`docs/form-versioning-schema-migration.md:209`). **Live.** Filed by `M172`. **Tier: early-testing.** ✅ **CLOSED BY `M172` (2026-10-15):** the hub's Versions panel has a "What changed" column — added, removed and changed questions by their own labels with the publisher's note, derived when read from the snapshots the hub already loads (`app/Services/Forms/VersionChangeSummary.php`; `change_summary` holds keys only and a published row is frozen) — and View beside Print blank: `GET /forms/{form}/versions/{version}/view` (`FormVersionViewController`, Print blank's shape and gate, a draft 404s) draws the version through the builder's preview with `readOnly`, no author control offered, nothing saved. Help says so. Red first: two Pest cases, two Vitest cases; mutation caught: the view route serving a draft.
+
+- **`minor` · A grid's cells are all single choices from one shared list: no column can have its own type or its own choices, so a table of names, numbers, dates and ticks cannot be built.**
+  The testers' comment (2026-10-15): *"it can only have a single set of options and also there is also 1 type of question unlike in
+  kobo, every cell can be configured separately, it can pick different type of questions and different set of options for each"*.
+  Measured: `resources/js/components/builder/MatrixEditor.vue:46` says "Each cell is a single choice from this shared list";
+  `config.cells` is that list (`docs/data-dictionary.md:377`), the request validates rows, columns and cells as value/label lists
+  only (`app/Http/Requests/Forms/UpdateFieldRequest.php:274-306`), the normalizer rejects unknown rows or columns and nothing else
+  (`app/Services/Submissions/StructuralAnswerNormalizer.php:548-593`), publish checks the three lists non-empty and distinct
+  (`app/Services/Forms/StructuralValidationGate.php:532-562`), and `app/Enums/FieldType.php:12` claims each cell is
+  "independently typed", which is false. KoboToolbox's Question Matrix gives every column its own response type (Select One,
+  Select Many, Text, Number) and its own choices (`support.kobotoolbox.org/matrix_response.html`). `D129` (the user, 2026-10-15):
+  the Matrix gains typed columns. The remedy, additive: `config.columns[]` gains `type` (single_select, multi_select, short_text,
+  integer, decimal, date, yes_no), its own `options` (or `options_list` / `options_source`, the options-from-anywhere rows) and
+  `required`; `config.cells` stays as the default choices of a column with no type, so every existing grid loads unchanged; the
+  answer keeps `{row:{col:value}}` with the value typed by its column; the normalizer coerces per column and both validation
+  engines (`app/Services/Validation/SemanticValidator.php` and its TypeScript twin, the golden vectors in
+  `docs/architecture/technical-architecture.md`) check membership per column list; `ValueShape` (`app/Enums/ValueShape.php:171-191`)
+  and the gates learn the column shape; the Grid tab's editor gains the per-column type; the data dictionary and the enum
+  docblock say what is true. **Live.** Filed by `M172`. **Tier: early-testing.**
+
+- **`minor` · A grid is drawn as a stack of row cards, never as a table, on the web form, manual entry and the builder preview.**
+  `resources/js/components/submissions/MatrixGrid.vue:9-13` states "NO `<table>` — each row is its own nested `<fieldset>`", and
+  `:118-135` lays one card per row with a labelled select per column; the same component serves the public form, the encode page
+  and the preview (`resources/js/components/submissions/FieldInput.vue:260-261`). Only the printed PDF draws a table
+  (`app/Enums/PrintAnswerArea.php:92`). The testers want "a grid"; Kobo's matrix is a table in the Grid theme. The remedy: a real
+  `<table>` (`<th scope="col">`, `<th scope="row">`, one control per cell by column type from the design system's inputs) from
+  48em, the existing stacked fieldsets below it, `config.layout = table | stacked` for an author who wants cards everywhere;
+  `likert_matrix` takes the same table. **Live.** Filed by `M172`. **Tier: early-testing.**
+
+- **`minor` · A grid answer reaches a spreadsheet as one cell, so a Sheets or Airtable column cannot map a single cell of it.**
+  `app/Services/Submissions/SchemaValueFormatter.php:304-342` renders a matrix into one cell as `row: col=cell; …`, the header union
+  in `app/Services/Submissions/SubmissionRowProjector.php:82` carries one column per grid question, and
+  `app/Services/Connectors/MappableColumnCatalog.php` offers only that column to Google Sheets and Airtable; the XLSForm export
+  already flattens a grid to one question per cell (`docs/xlsform-interop-spec.md:71`), as Kobo does ("Each cell in the matrix
+  becomes an individual variable"). `D130` (the user, 2026-10-15): one column per cell, keeping today's summary. The remedy: a
+  `<question>.<row>.<column>` column per cell joins the header union and the catalog beside the summary column, so no existing
+  mapping changes identity; the XLSForm export emits typed per-cell questions under the existing `{row_key}_{column_key}` names;
+  the PDF and the printed form draw typed cells (a write-in box for text and number cells, tick boxes for choices). Closes
+  `R-c64d0afd`'s second question; its first, a signed link in a cell, stays there. **Live.** Filed by `M172`. **Tier: early-testing.**
+
+- **`minor` · Only a Single choice or Dropdown can take its choices from another form's answers; a Multiple choice cannot.**
+  `app/Services/Forms/LinkedChoiceService.php:39` limits a link to single choice and dropdown, and
+  `app/Http/Requests/Forms/UpdateFieldRequest.php:319-331` accepts `config.options_source` for those two only; the Options tab
+  offers the link through `resources/js/components/builder/LinkedChoicesEditor.vue` (`ConfigPanel.vue:499-515`). The testers'
+  comment (2026-10-15): *"All input forms that has options like radio button, checkboxes, select options … must have an option to
+  populate options thru the connection to responses from other forms"*. Split out of `R-5fdbc47c`, which named multi-select as
+  the remainder's. The remedy: `multi_select` joins `LINKABLE_TYPES`, the request accepts the source for it, and the link is
+  offered through the one "Options come from" chooser (Typed here · A list file · Another form's answers) that replaces the
+  editor for every choice question. **Live.** Filed by `M172`. **Tier: early-testing.**
+
+- **`minor` · A list file can feed a cascade's levels but not a plain choice question, and only CSV is accepted, so a list in Excel must be converted first.**
+  `app/Services/Forms/ChoiceListMaterializer.php:136-146` materialises a version's choice lists for `cascading_select` levels only
+  (every level or none); `app/Services/Forms/ChoiceListCsvParser.php:33` reads CSV alone; the upload sits in the Levels tab
+  (`resources/js/components/builder/CascadingEditor.vue:58-102`) and Settings → Choice lists
+  (`resources/js/components/forms/ChoiceListsPanel.vue:80`). The testers' comment (2026-10-15): *"or utilize the uploaded references
+  and use that to create options"*. The remedy: `config.options_list = <name>` binds a Single, Multiple choice or Dropdown to a
+  list (`name,label` columns, the parent column optional), materialised at publish exactly as a cascade's so every server-side
+  reader stays plain; the upload accepts Excel (`.xlsx`, first sheet) through the spreadsheet reader the XLSForm importer already
+  uses (`app/Services/Xlsform/XlsformImporter.php`), reading codes as text; the chooser's "A list file" arm offers the version's
+  lists. Takes `R-1059e9bd` (its sentence lands beside the same upload control). **Live.** Filed by `M172`. **Tier: early-testing.**
+
+- **`minor` · A text box cannot offer suggestions from a list file or another form's answers.**
+  The testers' comment (2026-10-15): *"sometimes even the textbox must have an option to populate options thru the connection to
+  responses from other forms"*. `resources/js/components/submissions/FieldInput.vue:217-265` renders a text question as a plain
+  input, and `app/Http/Requests/Forms/UpdateFieldRequest.php:319-331` accepts no source on it. The remedy: `config.suggestions_source
+  = {kind: list | form, …}` on Short text gives a type-ahead (a `<datalist>`-backed combobox) on the web form, the encode page
+  (`app/Services/Submissions/EncodeFormPresenter.php:606-632` already serves linked lists there) and the preview, while free text
+  stays accepted and the server never checks it; the chooser reads "Suggestions come from" on a text question. **Live.** Filed by `M172`.
+  **Tier: early-testing.**
+
+- **`minor` · The builder preview shows neither a list-backed cascade's choices nor a list taken from another form; it says the choices show on the live form.**
+  Left by `M133`'s v1 and `M141` and recorded on `R-5fdbc47c`: the preview runtime (`resources/js/components/builder/PreviewRuntime.vue`)
+  is built from the draft's props, which carry `linkable_sources` (`app/Services/Forms/BuilderPresenter.php:105-107`) but never a
+  list's rows or a link's answers, so an author checks a PSGC cascade or a linked list only on the published form. The remedy: a
+  tenant route beside the choice-list routes (`routes/tenant.php:1098-1107`) returns the draft's linked lists and the first 200 rows
+  of each list-bound question with "showing 200 of N", and the preview merges them the way the guest runtime does
+  (`resources/public-runtime/lib/linked-choices.ts:89-112`). **Live.** Filed by `M172`. **Tier: early-testing.** **Amended 2026-10-15 by `M172`:** an old version opened read-only from the hub (`resources/js/Pages/forms/VersionView.vue`) draws `schemaWithoutListOptions()` through the same preview, so a list-backed cascade shows no choices there either; the same route closes both.
+
+- **`minor` · A grid's rows, columns and choices must be typed by hand: none can come from a list file or another form's answers, so a grid of barangays or facilities is retyped on every form.**
+  The testers' comment (2026-10-15): *"rows can be determined thru the list from the shared responses from other form or uploaded
+  reference"*, and every column's options likewise. `resources/js/components/builder/MatrixEditor.vue:42-49` takes three typed
+  lists; `app/Services/Forms/LinkedChoiceService.php:258-275` builds a linked list for one question key only, served by
+  `routes/api.php:591`. The remedy: `config.rows_source = {kind: list, name} | {kind: form, form_id, field_key}` and, per column,
+  the "Options come from" chooser (`options_list` / `options_source`); a list resolves at publish through the materialiser, a form
+  on serve through the linked-choices endpoint keyed `<key>.rows` and `<key>.<column>`, gated at publish by `LinkedChoiceGate`;
+  with the cascade filter row, a row set can be "the barangays with a response in form X". **Live.** Filed by `M172`.
+  **Tier: early-testing.**
+
+- **`minor` · Rows and columns cannot be added or renamed in the builder preview; the Grid tab is the only editor.**
+  The testers' comment (2026-10-15): *"if the grid can be manipulated in the preview like in kobo, it can add rows and columns in
+  the preview for easier visualization"*. The Structure canvas shows a grid's label and type only
+  (`resources/js/components/builder/BuilderCanvas.vue:206`); the preview renders the respondent control with no author
+  affordance; `M150` and `M151` gave the preview an in-place label edit (`resources/js/components/builder/InlineLabelEdit.vue`).
+  The remedy: the preview's table shows "+ Add row" and "+ Add column" and an in-place edit on every row and column header, each
+  writing through `useBuilderStore.setConfig` as the Grid tab does, with the same undo entry. **Live.** Filed by `M172`.
+  **Tier: early-testing.**
+
+- **`minor` · The Philippine Standard Geographic Code is not in the app: an author must build and upload four CSV files per form, and nothing keeps them current with the PSA's quarterly publication.**
+  The testers' question (2026-10-15): *"Does the platform support cascading options linked to the Philippine Standard Geographic
+  code (PSGC)?"*. `M141` made a PSGC-sized cascade work from uploaded CSV files (measured at 43,739 options), but no PSGC data
+  exists in the repository, each form re-uploads its own lists (`app/Services/Forms/ChoiceListMaterializer.php:148` reads them by
+  version), `docs/PRD.md:442` declined a national geography, and `docs/data-dictionary.md:370` says a reference-dataset table is
+  "deliberately not introduced here". The Philippine Statistics Authority publishes the PSGC Publication Datafile each quarter
+  (3Q 2026 released 2026-10-12; ten-digit codes kept as text; region, province or independent city, city or municipality,
+  barangay). `D131` (the user, 2026-10-15): built in, free. The remedy: a platform-wide read-only `psgc_places` table (code, name,
+  level, parent code, publication) exempt from row-level security under the shared-lookup rule
+  (`docs/adr/0002-multi-tenancy-shared-db-rls.md:73`; the platform list in `app/Support/Tenancy/TenantScopedTables.php:131`); a
+  repository CSV built from the PSA file by `psgc:build` (downloaded in a browser — the PSA site blocks scripts — PSA credited),
+  loaded idempotently by `psgc:sync` on every deploy and refusing a build whose per-level totals differ from the PSA summary; a
+  "Philippine places (PSGC)" preset in the Levels tab (`resources/js/components/builder/CascadingEditor.vue:58-102`) binding four
+  levels to platform lists that the materialiser reads at publish, so a published version stays frozen as today and a later quarter
+  changes the next publish only; a level with exactly one choice filled in and shown read-only; the dictionary sentence and the
+  PRD line amended; the operator step in `deploy.ps1`. **Live.** Filed by `M172`. **Tier: early-testing.**
+
+- **`minor` · A cascade level or a choice list cannot be filtered by what another form has recorded, so "only the barangays with a report in form X" cannot be built.**
+  The testers' question (2026-10-15): *"can options in a target form dynamically filter based on whether a specific barangay has
+  recorded value in a source form?"*. `app/Support/Forms/ShareableQuestions.php:31-39` never offers a `cascading_select` for
+  sharing; a link feeds a flat list of answers for one key (`app/Services/Forms/LinkedChoiceService.php:258-275`, served by
+  `app/Http/Controllers/Public/PublicFormSchemaController.php:60-77`) and nothing filters an existing option list by it; the
+  cascade control shows every child of the chosen parent (`resources/js/components/submissions/FieldInput.vue:331-368`). The
+  remedy: `config.levels[i].filter` and, on a list- or form-sourced choice question, `config.options_filter = {form_id, field_key,
+  mode: present | absent}`; `ShareableQuestions` admits the cascade (its shared value set is per level); the linked-choices
+  endpoint gains `sets` beside the schema with their own stamp (`D60` A), cached by the worker per version
+  (`resources/public-runtime/lib/linked-choices.ts:89-112`); the web form, manual entry and the preview filter the options
+  client-side and the server never refuses an answer outside the set (`M133`'s offline rule); `LinkedChoiceGate` refuses at
+  publish a filter whose source does not share the question or whose values are not comparable. **Live.** Filed by `M172`.
+  **Tier: early-testing.**
+
+- **`nit` · The palette's "Adv" tooltip promises an advanced editor "coming with the form engine", and the settings panel carries a baseline note no type can reach any more.**
+  `resources/js/components/builder/FieldPalette.vue:102` titles every advanced type "baseline settings (advanced editor coming
+  with the form engine)" beside the badge at `:106`; `resources/js/components/builder/ConfigPanel.vue:432-435` shows "Baseline
+  settings for this advanced field type" only when an advanced type has no editor, and every one has had its editor since the
+  form engine landed; `app/Enums/FieldType.php:120-122` says the same. The testers asked whether the Adv types are ready
+  (2026-10-15); they are, and the tooltip says otherwise. The remedy: the tooltip says what the Help page says
+  (`resources/js/components/help/manual.ts:649`), the note and the docblock go. **Live.** Filed by `M172`. **Tier: early-testing.**
+
+- **`minor` · Nothing tells an author what each question type can do on each surface, and the testers asked whether the advanced types are ready to use.**
+  The testers' question (2026-10-15): *"are the adv questions ready to use?"*. The answer lives only in code: the eleven badged
+  types (`app/Enums/FieldType.php:123-131`) render everywhere, while `duration` and `signature` are placed by the palette and
+  refused by both channels (`resources/public-runtime/lib/schema-mapping.ts:48-60`, pinned to the encode presenter by
+  `tests/Unit/Forms/FieldTypeMirrorDriftTest.php` — `R-af2d278b`), grids are excluded from conditions, piping, OCR and analytics,
+  and the Help page says only that an Adv type's settings are more technical (`resources/js/components/help/manual.ts:299`). The
+  remedy: a readiness table in Help → Builder reference, one row per type across the builder, the preview, the web form, manual
+  entry, paper and scan, the PDF, the spreadsheet export, Sheets and Airtable, analytics and conditions — pinned by the mirror
+  drift test and `manual.test.ts` so it cannot rot — written with the two controls `D134` builds. **Live.** Filed by `M172`.
+  **Tier: early-testing.**
+
+- **`minor` · A condition, a calculation or answer piping cannot read a grid cell.**
+  `docs/data-dictionary.md:378` records that no expression may reference a grid (`app/Services/Forms/ExpressionValidationGate.php`),
+  `app/Enums/PipingEligibility.php:110` excludes it from piping, and `resources/js/components/help/manual.ts:1122` tells authors so.
+  With typed cells (the grid rows above) a cell becomes a scalar an expression could read as `${grid.row.column}`; both engines
+  and their golden vectors would learn it together. Filed so the gap the typed grid opens is queued rather than left in prose.
+  **Live.** Filed by `M172`. **Tier: during-testing.**
+
+- **`minor` · A grid cannot sit inside a repeatable section.**
+  `app/Services/Forms/StructuralValidationGate.php:147-154` refuses it at publish, and `docs/data-dictionary.md:378` records the
+  rule. A table of tables is rare; a grid per household member is not. Needs the repeat-group answer shape to carry an object per
+  instance in both engines and in every export. **Live.** Filed by `M172`. **Tier: during-testing.**
+
+- **`nit` · OCR does not read a grid, typed or not, and the printed form draws it as a table nobody scans.**
+  `app/Enums/OcrFieldEligibility.php:85` excludes both grid types from reading while `app/Enums/PrintAnswerArea.php:92` prints a
+  table for them, so a scanned sheet's grid answers are always keyed by hand. With typed cells a text or number cell is a box the
+  reader already knows how to read; a choice cell is a tick. **Live.** Filed by `M172`. **Tier: during-testing.**
+
+- **`nit` · A grid is absent from analytics.**
+  `app/Enums/AnalyticsFieldEligibility.php:107` leaves both grid types out of the analytics index, so a typed grid's numbers and
+  ticks cannot be charted or counted. One column per cell in the exports (the grid export row above) is the shape the index would
+  take. **Live.** Filed by `M172`. **Tier: after-launch.**
+
+- **`nit` · The PSGC file is loaded by hand each quarter, and nothing tells the operator a new quarter is out.**
+  The built-in Philippine places (the PSGC row above, `D131`) are refreshed by downloading the PSA's quarterly file in a browser and
+  running `psgc:build`, because the PSA site blocks scripted reads; the publication held is recorded in the table, and no check,
+  notice or scheduled task compares it with the quarter. A dated note in Settings → About ("Philippine places: 3Q 2026") and a
+  reminder a few weeks after each quarter end would close it. **Live.** Filed by `M172`. **Tier: after-launch.**
+
+- **`minor` · A key edited in the builder leaves conditions, formulas and piping that name the old key pointing at nothing until publish refuses them.**
+  Found by `M172` while building the auto-adjusted key (`D132`): a comparison rule follows a key change — it is stored by id, and
+  the store now carries the new key into the copy it re-sends — but expression TEXT does not. `relevant_expression`,
+  `config.calculated_formula`, a validation's `expression`, the `${key}` holes in labels, hints and placeholders, and the form's
+  confirmation message all name keys as text, and `app/Services/Forms/ConversionCensus.php` (`referencesTo()`) already lists every
+  such use. After a key edit the preview shows the broken reference and publish refuses it (`ExpressionValidationGate`); nothing
+  offers to carry the new key into them. The remedy: on a key change, rewrite the references `referencesTo()` finds — token-aware,
+  never a text replace — and say so in the undo entry. **Live.** Filed by `M172`. **Tier: during-testing.**
+
+- **`nit` · The builder's Undo and Redo never say what they will undo or redo.**
+  Found by `M172`: every history entry carries a label (`resources/js/components/builder/useBuilderStore.ts`, `pushHistory()` — "Edit
+  Age", "Change Age to Long text", and since `M172` "Delete Age and 1 rule that compared with it"), and nothing reads it. The toolbar
+  buttons are named and titled "Undo" and "Redo" (`resources/js/Pages/forms/Builder.vue`), and `builder-layout.test.ts` pins the
+  title to the visible text for the compact toolbar's label-in-name rule, so an author cannot tell what a press will reverse —
+  including that undoing a delete also brings back the comparison rules it cleared. The remedy: the label as the buttons'
+  accessible description and in a polite status after each undo or redo, keeping the name and the title the visible text.
+  **Live.** Filed by `M172`. **Tier: during-testing.**

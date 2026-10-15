@@ -6,6 +6,7 @@ namespace App\Services\Forms;
 
 use App\Enums\FieldType;
 use App\Enums\RequiredMode;
+use App\Enums\SubmissionStatus;
 use App\Exceptions\Forms\BuilderConflictException;
 use App\Exceptions\Forms\FormException;
 use App\Models\FieldLibrary;
@@ -20,6 +21,7 @@ use App\Support\Forms\DefaultFieldRules;
 use App\Support\Forms\FieldTypeConversion;
 use App\Support\Tenancy\PlatformRowCounter;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
@@ -93,7 +95,7 @@ final class FormBuilderService
             $this->assertStillDraftChild($form, $section);
 
             $section->fill([
-                'key' => $data['key'],
+                'key' => $this->freeKey(FormSection::query(), $section, (string) $data['key']),
                 'label' => $data['label'],
                 'description' => $data['description'] ?? null,
                 'is_repeatable' => (bool) ($data['is_repeatable'] ?? false),
@@ -281,7 +283,7 @@ final class FormBuilderService
             }
 
             $field->fill([
-                'key' => $data['key'],
+                'key' => $this->freeKey(FormField::query(), $field, (string) $data['key']),
                 'label' => $data['label'],
                 'hint' => $data['hint'] ?? null,
                 'placeholder' => $data['placeholder'] ?? null,
@@ -303,6 +305,41 @@ final class FormBuilderService
 
             return $field->refresh();
         });
+    }
+
+    /**
+     * M172 (`R-a44638b6`, `D133`) — how many responses to this form, in ANY version, hold an answer to this question's key:
+     * the number the builder's delete dialog states ("N responses hold answers to this question. They keep them, marked as
+     * removed from the form."). Counted by key in `submission_answers.answers` — ids change at every publish and the key
+     * is what every version shares — not in `submission_answer_index`, which holds only the queryable scalar questions. A
+     * draft response is not one yet (`Submission::scopeCountable()`), a deleted one is gone, and an answer left empty is no
+     * answer. A question inside a repeatable section is looked for in each of its instances.
+     */
+    public function answeredCount(Form $form, FormField $field): int
+    {
+        $section = $field->form_section_id === null
+            ? null
+            : FormSection::query()->whereKey($field->form_section_id)->first(['key', 'is_repeatable']);
+        $empty = "('null'::jsonb, '\"\"'::jsonb, '[]'::jsonb, '{}'::jsonb)";
+
+        $query = DB::table('submissions')
+            ->join('submission_answers', 'submission_answers.submission_id', '=', 'submissions.id')
+            ->where('submissions.form_id', $form->id)
+            ->whereNull('submissions.deleted_at')
+            ->where('submissions.status', '!=', SubmissionStatus::Draft->value);
+
+        if ($section !== null && $section->is_repeatable === true) {
+            $query->whereRaw(
+                'exists (select 1 from jsonb_array_elements(case when jsonb_typeof(submission_answers.answers -> ?) = \'array\' '
+                ."then submission_answers.answers -> ? else '[]'::jsonb end) as instance "
+                ."where coalesce(instance -> ?, 'null'::jsonb) not in {$empty})",
+                [$section->key, $section->key, $field->key],
+            );
+        } else {
+            $query->whereRaw("coalesce(submission_answers.answers -> ?, 'null'::jsonb) not in {$empty}", [$field->key]);
+        }
+
+        return $query->count();
     }
 
     public function deleteField(Form $form, FormField $field): void
@@ -552,6 +589,13 @@ final class FormBuilderService
     {
         DB::transaction(function () use ($form, $sections, $fields): void {
             $draft = $this->lockDraft($form);
+
+            // M172 (`R-81756e95`): an id from a version a publish has moved past matched nothing below and answered a
+            // silent 200, so the order the author saw was never saved. It is refused like every other builder write
+            // from a superseded page; an id that exists NOWHERE (a concurrent delete) is still skipped, as before.
+            $this->assertNoSupersededIds(FormSection::query(), $draft, array_column($sections, 'id'));
+            $this->assertNoSupersededIds(FormField::query(), $draft, array_column($fields, 'id'));
+
             $validSections = FormSection::query()->where('form_version_id', $draft->id)->pluck('id')->flip();
 
             foreach ($sections as $row) {
@@ -588,12 +632,40 @@ final class FormBuilderService
         return FormVersion::query()->whereKey($locked->draft_version_id)->firstOrFail();
     }
 
+    /**
+     * @param  Builder<FormSection>|Builder<FormField>  $query
+     * @param  list<string>  $ids
+     */
+    private function assertNoSupersededIds(Builder $query, FormVersion $draft, array $ids): void
+    {
+        $superseded = $ids !== [] && $query->whereIn('id', $ids)
+            ->where('form_version_id', '!=', $draft->id)
+            ->whereIn('form_version_id', FormVersion::query()->select('id')->where('form_id', $draft->form_id))
+            ->exists();
+
+        if ($superseded) {
+            throw FormException::childSuperseded();
+        }
+    }
+
     /** A section/field must belong to the form's current draft version — else it is immutable (§2/§4). */
     private function assertDraftChild(Form $form, FormSection|FormField $child): void
     {
         if ($form->draft_version_id === null || $child->form_version_id !== $form->draft_version_id) {
-            throw FormException::childNotInDraft();
+            throw $this->notInDraft($form, $child);
         }
+    }
+
+    /**
+     * M172 (`R-81756e95`) — WHICH refusal a row outside the draft earns. A row of an earlier version of THIS form (or a
+     * form with no draft left) means the page was loaded before a publish moved the form on: the recoverable 409 the
+     * builder reloads from. A row of ANOTHER form keeps the plain refusal — reloading this form's page fixes nothing.
+     */
+    private function notInDraft(Form $form, FormSection|FormField $child): FormException
+    {
+        $ofThisForm = FormVersion::query()->whereKey($child->form_version_id)->where('form_id', $form->id)->exists();
+
+        return $ofThisForm ? FormException::childSuperseded() : FormException::childNotInDraft();
     }
 
     /**
@@ -647,7 +719,7 @@ final class FormBuilderService
         $current = Form::query()->whereKey($form->id)->first();
 
         if ($current === null || $current->draft_version_id === null) {
-            throw FormException::childNotInDraft();
+            throw $this->notInDraft($form, $child);
         }
 
         // The child is re-read too, and not only the form: a restore, an import or a delete removes
@@ -661,7 +733,7 @@ final class FormBuilderService
         }
 
         if ($live->form_version_id !== $current->draft_version_id) {
-            throw FormException::childNotInDraft();
+            throw $this->notInDraft($form, $live);
         }
     }
 
@@ -911,6 +983,33 @@ final class FormBuilderService
         }
 
         return $candidate;
+    }
+
+    /**
+     * M172 (`R-733eff09`, `D132`) — the key an edit asked for or, when another row of the same version already holds it,
+     * the lowest free `{key}_{n}` with n from 2 (the numbering {@see self::copyKey()} gives a duplicate). A clash is
+     * adjusted, never refused: the response carries the key kept, and the builder says so under Field key. The request
+     * no longer checks uniqueness at all — the user's words were *"auto adjust the key naming to avoid conflicts"*.
+     * Kept inside the column's 150 characters by shortening the requested part, never the suffix.
+     *
+     * @param  Builder<FormSection>|Builder<FormField>  $query
+     */
+    private function freeKey(Builder $query, FormSection|FormField $row, string $wanted): string
+    {
+        $taken = $query->where('form_version_id', $row->form_version_id)->whereKeyNot($row->getKey())->pluck('key')->flip();
+
+        if (! $taken->has($wanted)) {
+            return $wanted;
+        }
+
+        for ($n = 2; ; $n++) {
+            $suffix = "_{$n}";
+            $candidate = substr($wanted, 0, 150 - strlen($suffix)).$suffix;
+
+            if (! $taken->has($candidate)) {
+                return $candidate;
+            }
+        }
     }
 
     private function copyKey(FormVersion $draft, string $sourceKey): string

@@ -45,6 +45,7 @@ beforeEach(function (): void {
     enterTenant($this->tenant->id, $this->admin->id);
     makeActiveMember($this->admin, 'admin');
     $this->form = app(FormService::class)->create($this->tenant, $this->admin, 'Survey')->refresh();
+    $this->withHeaders(builderHeaders($this->form));
     $this->builder = app(FormBuilderService::class);
 });
 
@@ -138,15 +139,18 @@ it('refuses a field that is not in this form draft with a 422, on both the read 
     expect(conversionRouteFresh($foreign, $this->tenant, $this->admin)->field_type)->toBe(FieldType::ShortText);
 });
 
-it('refuses a field on a published version with a 422', function (): void {
+it('refuses a field on a published version with the 409 the builder reloads from (M172)', function (): void {
     $field = $this->builder->addField($this->form, $this->admin, FieldType::ShortText, null);
     app(PublishService::class)->publish($this->form->refresh(), $this->admin);
     // Publishing freezes the draft in place, so this id now belongs to the PUBLISHED version.
     $published = FormField::query()->whereKey($field->id)->firstOrFail();
     expect($published->form_version_id)->not->toBe($this->form->refresh()->draft_version_id);
 
+    // M172 (`R-81756e95`): a row of an earlier version of THIS form means the page is stale — the recoverable 409,
+    // where it used to be a 422 no Retry could clear. A field of ANOTHER form (the case above) keeps its 422.
     $this->actingAs($this->admin)->getJson(conversionRouteUrl($this->form->refresh(), $published, 'conversions'))
-        ->assertStatus(422);
+        ->assertStatus(409)
+        ->assertJsonPath('code', 'draft_superseded');
 });
 
 // ── The write ────────────────────────────────────────────────────────────────────────────────────────

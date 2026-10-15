@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 use App\Enums\ResourceCapacity;
 use App\Enums\SubmissionStatus;
+use App\Models\FormField;
 use App\Models\Submission;
 use App\Models\User;
 use App\Services\Authorization\ResourceGrantResolver;
+use App\Services\Forms\PublishService;
 use App\Services\Submissions\SubmissionInboxPresenter;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
@@ -474,4 +476,24 @@ it('forbids a non-collaborating Form Editor from opening a submission detail', f
     $this->actingAs($editor)
         ->get("http://acme.meridian.test/submissions/{$submission->id}")
         ->assertForbidden();
+});
+
+it('marks an answer to a question the current version no longer asks, and keeps it (M172, D133)', function (): void {
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    $form = publishedInboxForm($tenant, $owner); // v1 asks `color`
+    $submission = seedInboxSubmission($form, $owner, SubmissionStatus::Submitted, ['full_name' => 'Ada', 'color' => 'r']);
+
+    // v2: `color` deleted from the draft, and the draft published.
+    FormField::query()->where('form_version_id', $form->draft_version_id)->where('key', 'color')->firstOrFail()->delete();
+    app(PublishService::class)->publish($form->refresh(), $owner);
+
+    $rows = collect(app(SubmissionInboxPresenter::class)->detail($owner, $submission->refresh())['blocks'])
+        ->flatMap(fn (array $b): array => $b['fields'])
+        ->keyBy('key');
+
+    expect($rows['color']['value'])->toBe('Red')              // the answer is kept, as it was given
+        ->and($rows['color']['removed_in'])->toBe(2)           // and marked: removed from the form in version 2
+        ->and($rows['full_name']['removed_in'])->toBeNull();   // a question still asked carries no mark
 });

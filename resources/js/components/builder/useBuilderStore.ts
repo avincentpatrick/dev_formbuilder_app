@@ -10,7 +10,7 @@
 // Structural edits (add/delete/move) are serialized server-side by the form-row lock and carry no token.
 
 import { computed, reactive, ref, type Ref } from 'vue';
-import { builderClient, BuilderRequestError, type BuilderResult } from './builderClient';
+import { builderFor, BuilderRequestError, DraftSupersededError, type BuilderResult, type SupersedingDraft } from './builderClient';
 import { editJournal } from './edit-journal';
 import type {
     BuilderPageProps,
@@ -57,11 +57,19 @@ function clone<T>(value: T): T {
 
 export function useBuilderStore(props: BuilderPageProps) {
     const base = `/forms/${props.form.id}`;
+    // M172 (`R-81756e95`): every write names the draft this page was loaded with, so a page left open across a publish
+    // is refused (409 `draft_superseded`) instead of being told "The key has already been taken".
+    const client = builderFor(props.draft?.id ?? null);
 
     const fields = ref<LocalField[]>(props.fields.map(toLocalField));
     const sections = ref<LocalSection[]>(props.sections.map(toLocalSection));
     const selection = ref<Selection>(null);
     const conflict = ref<ConflictState | null>(null);
+    // M172 (`R-81756e95`): the form was published since this page loaded. Every id the page holds is the old draft's, so
+    // nothing more is sent; the dialog offers the reload, and the journal puts each kept edit back into the new draft.
+    const superseded = ref<{ draft: SupersedingDraft | null } | null>(null);
+    // M172 (`R-733eff09`, `D132`): the key a save asked for and the one the server kept instead, per row, while they differ.
+    const keyNotices = ref<Record<Uid, { wanted: string; kept: string }>>({});
     const undoStack = ref<HistoryEntry[]>([]);
     const redoStack = ref<HistoryEntry[]>([]);
 
@@ -91,11 +99,14 @@ export function useBuilderStore(props: BuilderPageProps) {
         fieldErrors: Record<Uid, Record<string, string[]>>;
         pending: boolean;
         unsaved: Record<Uid, 'field' | 'section'>;
-    }>({ inFlight: 0, error: null, wrote: false, fieldErrors: {}, pending: false, unsaved: {} });
+        /** M172 (`R-d85d51d2`): one per failure, so the panel can re-announce a refusal identical to the last. */
+        failures: number;
+    }>({ inFlight: 0, error: null, wrote: false, fieldErrors: {}, pending: false, unsaved: {}, failures: 0 });
 
     // M170 (`R-bfa3eb93`) — every edit the server has not confirmed, kept for this tab so a refresh puts it back. A
     // read-only builder (an archived form has no draft) edits nothing, so it keeps nothing. See `edit-journal.ts`.
-    const journal = props.draft === null ? null : editJournal(props.draft.id);
+    // M172: keyed by the FORM, so the edits of a page reloaded into a newer draft come back (see `edit-journal.ts`).
+    const journal = props.draft === null ? null : editJournal(props.form.id, undefined, undefined, props.draft.id);
 
     // Per-BURST bookkeeping, deliberately plain closure variables rather than reactive state: nothing renders
     // from them, and a reactive flag flipping mid-burst would make the indicator flicker between two verdicts
@@ -162,7 +173,7 @@ export function useBuilderStore(props: BuilderPageProps) {
     });
 
     /** M170 — whether any edit failed to save in a way only sending it again can fix: what the alert's Retry offers. */
-    const hasUnsaved = computed(() => Object.keys(save.unsaved).length > 0);
+    const hasUnsaved = computed(() => superseded.value === null && Object.keys(save.unsaved).length > 0);
 
     // Read-only by design: the only writers are `guard()`, `reportFailure()` and the burst verdict above. The
     // narrowing from Ref to ComputedRef is itself the guarantee that nothing else can ever set it.
@@ -221,10 +232,22 @@ export function useBuilderStore(props: BuilderPageProps) {
         // was a no-op", and a request that throws immediately must still count as an attempt.
         burstAttempted = true;
 
+        // M172: a page known to be stale sends nothing more — each write would be refused again, and the journal already
+        // holds every edit for the reload the dialog offers.
+        if (superseded.value !== null) {
+            burstFailed = true;
+            return null;
+        }
+
         try {
             return await fn();
         } catch (error) {
+            if (error instanceof DraftSupersededError) {
+                noteSuperseded(error);
+                return null;
+            }
             burstFailed = true;
+            save.failures++;
             save.error =
                 error instanceof BuilderRequestError ? error.message : 'Something went wrong saving your change.';
             // Only a field's own PATCH names an owner. Its marks describe THIS refusal: one without a map (a
@@ -241,7 +264,7 @@ export function useBuilderStore(props: BuilderPageProps) {
     // ── Server helpers (low-level; NOT enqueued — always called inside an enqueued action) ──────
     async function createFieldServer(typeValue: string, sectionId: string | null): Promise<ServerField | null> {
         const result = await guard(() =>
-            builderClient.post<ServerField>(`${base}/fields`, { field_type: typeValue, section_id: sectionId }),
+            client.post<ServerField>(`${base}/fields`, { field_type: typeValue, section_id: sectionId }),
         );
         return result && !result.conflict ? result.data : null;
     }
@@ -251,7 +274,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         const field = findField(uid);
         if (!field) return false;
         const sent = fieldPayload(field);
-        const result = await guard(() => builderClient.patch<ServerField>(`${base}/fields/${field.id}`, sent), { uid });
+        const result = await guard(() => client.patch<ServerField>(`${base}/fields/${field.id}`, sent), { uid });
         if (!result) return false;
         // M170 — a 409 whose question already holds exactly this edit is not a conflict. It is how the put-back after a
         // refresh meets the save sent as the page went, when that save landed after the server rendered the reload: the
@@ -270,13 +293,47 @@ export function useBuilderStore(props: BuilderPageProps) {
         }
         field.version = result.data.version;
         delete save.fieldErrors[uid]; // the server holds this field now: its marks are answered
+        adoptKeptKey(uid, field, String(sent.key), result.data.key);
         return true;
+    }
+
+    /**
+     * M172 (`R-733eff09`, `D132`) — the server keeps a free key (`{key}_2` …) when the one sent is another row's; a clash is
+     * never refused. The screen takes the kept key unless the author has typed on since, the panel says so, and every rule
+     * of another question that compared with the row's previous key now names the kept one (the key half of `R-9ea69e29`).
+     */
+    function adoptKeptKey(uid: Uid, row: LocalField | LocalSection, sentKey: string, keptKey: string): void {
+        if (keptKey !== sentKey) {
+            keyNotices.value[uid] = { wanted: sentKey, kept: keptKey };
+            if (row.key === sentKey) row.key = keptKey;
+        } else {
+            delete keyNotices.value[uid];
+        }
+        const previous = (baselines.get(uid) as { key?: string } | undefined)?.key;
+        if ('validations' in row && previous !== undefined && previous !== keptKey) repointRules(uid, previous, keptKey);
+    }
+
+    /**
+     * M172 (the key half of `R-9ea69e29`) — a question's key moved on the server: every OTHER question's rule comparing with
+     * it names the new key, on screen and in its baseline. The server stores those rules by id, so it already agrees; what
+     * was stale is the key the next save of those questions would send, which then resolved to no question at all.
+     */
+    function repointRules(uid: Uid, oldKey: string, newKey: string): void {
+        for (const other of fields.value) {
+            if (other.uid === uid) continue;
+            const base = baselines.get(other.uid) as FieldSnapshot | undefined;
+            for (const rules of [other.validations, base?.validations ?? []]) {
+                rules.forEach((rule) => {
+                    if (rule.related_field_key === oldKey) rule.related_field_key = newKey;
+                });
+            }
+        }
     }
 
     async function deleteFieldServer(uid: Uid): Promise<boolean> {
         const field = findField(uid);
         if (!field) return false;
-        const result = await guard(() => builderClient.delete(`${base}/fields/${field.id}`));
+        const result = await guard(() => client.delete(`${base}/fields/${field.id}`));
         if (!result) return false;
         removeFieldLocal(uid);
         delete save.fieldErrors[uid]; // a deleted question has nothing left to mark
@@ -309,7 +366,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         const section = findSection(uid);
         if (!section) return false;
         const sent = sectionPayload(section);
-        const result = await guard(() => builderClient.patch<ServerSection>(`${base}/sections/${section.id}`, sent));
+        const result = await guard(() => client.patch<ServerSection>(`${base}/sections/${section.id}`, sent));
         if (!result) return false;
         if (result.conflict && samePayload(sectionPayload(result.current as unknown as LocalSection), sent)) {
             section.version = result.current.version; // M170: as `persistField()` — the same edit, landed twice
@@ -320,13 +377,14 @@ export function useBuilderStore(props: BuilderPageProps) {
             return false;
         }
         section.version = result.data.version;
+        adoptKeptKey(uid, section, String(sent.key), result.data.key); // M172: as `persistField()`
         return true;
     }
 
     async function deleteSectionServer(uid: Uid): Promise<boolean> {
         const section = findSection(uid);
         if (!section) return false;
-        const result = await guard(() => builderClient.delete(`${base}/sections/${section.id}`));
+        const result = await guard(() => client.delete(`${base}/sections/${section.id}`));
         if (!result) return false;
         // The FK is ON DELETE SET NULL — its fields become ungrouped (mirror that locally).
         fields.value.forEach((f) => {
@@ -344,7 +402,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         sequence: number,
         ownedFieldUids: Uid[],
     ): Promise<void> {
-        const result = await guard(() => builderClient.post<ServerSection>(`${base}/sections`));
+        const result = await guard(() => client.post<ServerSection>(`${base}/sections`));
         if (!result || result.conflict) return;
         const local: LocalSection = { ...result.data, uid };
         applySectionSnapshot(local, snap);
@@ -363,7 +421,7 @@ export function useBuilderStore(props: BuilderPageProps) {
 
     async function persistOrder(): Promise<void> {
         await guard(() =>
-            builderClient.post(`${base}/reorder`, {
+            client.post(`${base}/reorder`, {
                 sections: sections.value.map((s) => ({ id: s.id, sequence: s.sequence })),
                 fields: fields.value.map((f) => ({
                     id: f.id,
@@ -440,23 +498,80 @@ export function useBuilderStore(props: BuilderPageProps) {
             const sectionId = field.form_section_id;
             const seq = field.sequence;
             if (!(await deleteFieldServer(uid))) return;
+            // M172 (the delete half of `R-9ea69e29`): every other question's rule comparing with this one went with it on the
+            // server (its foreign key cascades). The screen drops them too — kept, the next save of those questions sent each
+            // back comparing with nothing — and the undo entry names them and brings them back.
+            let cleared = dropRulesComparingWith(snap.key);
             pushHistory(
-                `Delete ${snap.label}`,
+                cleared.length === 0 ? `Delete ${snap.label}` : `Delete ${snap.label} and ${ruleCount(cleared)} that compared with it`,
                 async () => {
                     await restoreFieldServer(uid, type, sectionId, snap, seq);
+                    await restoreRules(cleared);
                 },
                 async () => {
-                    await deleteFieldServer(uid);
+                    if (await deleteFieldServer(uid)) cleared = dropRulesComparingWith(snap.key);
                 },
             );
         });
+    }
+
+    type ClearedRules = { uid: Uid; rules: LocalField['validations'] }[];
+
+    /** M172 — take every other question's rule naming `key` off the screen and out of its baseline; the server has. */
+    function dropRulesComparingWith(key: string): ClearedRules {
+        const cleared: ClearedRules = [];
+        for (const other of fields.value) {
+            const dropped = other.validations.filter((rule) => rule.related_field_key === key);
+            if (dropped.length === 0) continue;
+            cleared.push({ uid: other.uid, rules: clone(dropped) });
+            other.validations = other.validations.filter((rule) => rule.related_field_key !== key);
+            const base = baselines.get(other.uid) as FieldSnapshot | undefined;
+            if (base) base.validations = base.validations.filter((rule) => rule.related_field_key !== key);
+        }
+
+        return cleared;
+    }
+
+    /** M172 — an undone delete puts the rules it took back, and saves each question that held one. */
+    async function restoreRules(cleared: ClearedRules): Promise<void> {
+        for (const { uid, rules } of cleared) {
+            const other = findField(uid);
+            if (!other) continue;
+            other.validations = [...other.validations, ...clone(rules)];
+            if (await persistField(uid)) baselines.set(uid, fieldSnapshot(other));
+        }
+    }
+
+    function ruleCount(cleared: ClearedRules): string {
+        const count = cleared.reduce((sum, entry) => sum + entry.rules.length, 0);
+
+        return count === 1 ? '1 rule' : `${count} rules`;
+    }
+
+    /**
+     * M172 (`R-a44638b6`, `D133`) — how many responses, in any version, hold an answer to this question: the number the
+     * delete dialog states. Zero without asking when the form was never published, since no response can hold one. A
+     * READ — no burst bookkeeping, so it never moves the save verdict. Null when it could not be read: the dialog then
+     * says answers may exist, rather than the delete going through unexplained.
+     */
+    async function answersFor(uid: Uid): Promise<number | null> {
+        const field = findField(uid);
+        if (!field) return 0;
+        if (!props.share.is_published && (props.draft?.version_number ?? 1) <= 1) return 0;
+        try {
+            const result = await client.get<{ responses: number }>(`${base}/fields/${field.id}/answers`);
+
+            return result.conflict ? null : result.data.responses;
+        } catch {
+            return null;
+        }
     }
 
     function duplicateField(uid: Uid): Promise<void> {
         return enqueue(async () => {
             const field = findField(uid);
             if (!field) return;
-            const result = await guard(() => builderClient.post<ServerField>(`${base}/fields/${field.id}/duplicate`));
+            const result = await guard(() => client.post<ServerField>(`${base}/fields/${field.id}/duplicate`));
             if (!result || result.conflict) return;
             const local = toLocalField(result.data);
             fields.value.push(local);
@@ -485,7 +600,7 @@ export function useBuilderStore(props: BuilderPageProps) {
     function insertFromLibrary(itemId: string, sectionId: string | null = null): Promise<void> {
         return enqueue(async () => {
             const result = await guard(() =>
-                builderClient.post<ServerField>(`${base}/fields/from-library`, {
+                client.post<ServerField>(`${base}/fields/from-library`, {
                     library_item_id: itemId,
                     section_id: sectionId,
                 }),
@@ -526,7 +641,7 @@ export function useBuilderStore(props: BuilderPageProps) {
             const field = findField(uid);
             if (!field) return;
             const result = await guard(() =>
-                builderClient.post<LibraryItem>(`${base}/fields/${field.id}/save-to-library`, {}),
+                client.post<LibraryItem>(`${base}/fields/${field.id}/save-to-library`, {}),
             );
             if (!result || result.conflict) return;
             // Prepend the new item (dedupe by id in case of a double-submit); surface the transient confirmation.
@@ -538,7 +653,7 @@ export function useBuilderStore(props: BuilderPageProps) {
     /** Refetch the picker list (cross-session freshness; the builder's fetch sidecar's only GET). */
     function refreshLibrary(): Promise<void> {
         return enqueue(async () => {
-            const result = await guard(() => builderClient.get<LibraryItem[]>(`${base}/library-items`));
+            const result = await guard(() => client.get<LibraryItem[]>(`${base}/library-items`));
             if (!result || result.conflict) return;
             library.value = result.data;
         });
@@ -546,7 +661,7 @@ export function useBuilderStore(props: BuilderPageProps) {
 
     function addSection(): Promise<void> {
         return enqueue(async () => {
-            const result = await guard(() => builderClient.post<ServerSection>(`${base}/sections`));
+            const result = await guard(() => client.post<ServerSection>(`${base}/sections`));
             if (!result || result.conflict) return;
             const local = toLocalSection(result.data);
             sections.value.push(local);
@@ -785,6 +900,7 @@ export function useBuilderStore(props: BuilderPageProps) {
             journal?.markSent('field', field.id, after as unknown as Record<string, unknown>);
             const held = await persistField(uid);
             if (conflict.value) return;
+            if (held && keyNotices.value[uid]?.wanted === after.key) after.key = keyNotices.value[uid].kept; // M172: the kept key is what the server holds
             settled(uid, 'field', field.id, held, snapshotsEqual(fieldSnapshot(field), after));
             // M155 (`R-0aa94dce`): the baseline and the undo entry move only once the server holds the edit. A refused
             // one stays on screen, marked, and its baseline stays where the server is — so its next commit sends it
@@ -821,6 +937,7 @@ export function useBuilderStore(props: BuilderPageProps) {
             journal?.markSent('section', section.id, after as unknown as Record<string, unknown>);
             const held = await persistSection(uid);
             if (conflict.value) return;
+            if (held && keyNotices.value[uid]?.wanted === after.key) after.key = keyNotices.value[uid].kept; // M172: as for a field
             settled(uid, 'section', section.id, held, snapshotsEqual(sectionSnapshot(section), after));
             if (!held) return; // M155: as `commitFieldEdit()` — only an edit the server holds moves the baseline
             baselines.set(uid, clone(after));
@@ -934,7 +1051,17 @@ export function useBuilderStore(props: BuilderPageProps) {
         const row = kind === 'field' ? findField(uid) : findSection(uid);
         if (!row) return;
         const snapshot = kind === 'field' ? fieldSnapshot(row as LocalField) : sectionSnapshot(row as LocalSection);
-        journal.put({ kind, id: row.id, base: row.version, snapshot: snapshot as unknown as Record<string, unknown>, ...(confirmed ? { sent: [] } : {}) });
+        // M172: the key the SERVER holds (the baseline), never one typed into this very edit — it is how the put-back finds
+        // the row again in a newer draft, where every id is new and every key is kept.
+        const key = (baselines.get(uid) as { key?: string } | undefined)?.key ?? row.key;
+        journal.put({
+            kind,
+            id: row.id,
+            key,
+            base: row.version,
+            snapshot: snapshot as unknown as Record<string, unknown>,
+            ...(confirmed ? { sent: [] } : {}),
+        });
     }
 
     /**
@@ -986,7 +1113,16 @@ export function useBuilderStore(props: BuilderPageProps) {
     function restoreJournal(): void {
         if (journal === null) return;
         for (const entry of journal.read()) {
-            const row = entry.kind === 'field' ? fields.value.find((f) => f.id === entry.id) : sections.value.find((s) => s.id === entry.id);
+            const byId = entry.kind === 'field' ? fields.value.find((f) => f.id === entry.id) : sections.value.find((s) => s.id === entry.id);
+            // M172 (`R-81756e95`): an edit made on a page whose draft a publish moved past names an id the new draft does not
+            // have. Its row is found again by the key the server held for it — a publish keeps every key.
+            const byKey =
+                byId === undefined && entry.key !== undefined
+                    ? entry.kind === 'field'
+                        ? fields.value.find((f) => f.key === entry.key)
+                        : sections.value.find((s) => s.key === entry.key)
+                    : undefined;
+            const row = byId ?? byKey;
             if (!row) {
                 journal.drop(entry.kind, entry.id);
                 continue;
@@ -994,16 +1130,26 @@ export function useBuilderStore(props: BuilderPageProps) {
             const payload = (content: Record<string, unknown>) =>
                 entry.kind === 'field' ? fieldPayload({ ...row, ...content } as LocalField) : sectionPayload({ ...row, ...content } as LocalSection);
             const onServer = payload({});
-            const ours = row.version === entry.base || (entry.sent ?? []).some((sent) => samePayload(payload(sent), onServer));
-            if (!ours || samePayload(payload(entry.snapshot), onServer)) {
+            if (byKey !== undefined) {
+                // A NEW draft's row: its token says nothing about this edit, which was made against the old draft and never
+                // reached the server — so it is put back unless the row already holds it (the author's edit is kept, as
+                // "Keep mine" keeps it). Re-kept under the new id at once, so a second reload still finds it.
                 journal.drop(entry.kind, entry.id);
-                continue;
+                if (samePayload(payload(entry.snapshot), onServer)) continue;
+            } else {
+                const ours = row.version === entry.base || (entry.sent ?? []).some((sent) => samePayload(payload(sent), onServer));
+                if (!ours || samePayload(payload(entry.snapshot), onServer)) {
+                    journal.drop(entry.kind, entry.id);
+                    continue;
+                }
             }
             if (entry.kind === 'field') {
                 applyFieldSnapshot(row as LocalField, entry.snapshot as unknown as FieldSnapshot);
+                if (byKey !== undefined) remember(row.uid, 'field');
                 void commitFieldEdit(row.uid);
             } else {
                 applySectionSnapshot(row as LocalSection, entry.snapshot as unknown as SectionSnapshot);
+                if (byKey !== undefined) remember(row.uid, 'section');
                 void commitSectionEdit(row.uid);
             }
         }
@@ -1024,7 +1170,14 @@ export function useBuilderStore(props: BuilderPageProps) {
     function reportFailure(message: string): void {
         burstAttempted = true;
         burstFailed = true;
+        save.failures++;
         save.error = message;
+    }
+
+    /** M172 — the page's draft was superseded: one dialog, no further writes, the toolbar never "saved". */
+    function noteSuperseded(error: DraftSupersededError): void {
+        superseded.value = { draft: error.draft };
+        reportFailure(error.message);
     }
 
     function blockedReason(): string | null {
@@ -1046,10 +1199,14 @@ export function useBuilderStore(props: BuilderPageProps) {
     /** A READ: no burst bookkeeping, so it can never move the save verdict. */
     async function requestPlans(field: LocalField): Promise<ConversionPlan[] | string> {
         try {
-            const result = await builderClient.get<{ plans: ConversionPlan[] }>(`${base}/fields/${field.id}/conversions`);
+            const result = await client.get<{ plans: ConversionPlan[] }>(`${base}/fields/${field.id}/conversions`);
             // The GET carries no token and never 409s; the narrowing makes that a fact rather than a hope.
             return result.conflict ? result.message : result.data.plans;
         } catch (error) {
+            if (error instanceof DraftSupersededError) {
+                noteSuperseded(error);
+                return error.message;
+            }
             return error instanceof BuilderRequestError ? error.message : PLANS_UNAVAILABLE;
         }
     }
@@ -1082,12 +1239,16 @@ export function useBuilderStore(props: BuilderPageProps) {
             const before = fieldSnapshot(field); // equals the baseline: the flush landed first
             let result: BuilderResult<ServerField>;
             try {
-                result = await builderClient.post<ServerField>(`${base}/fields/${field.id}/convert`, {
+                result = await client.post<ServerField>(`${base}/fields/${field.id}/convert`, {
                     to: plan.to,
                     version: field.version,
                     fingerprint: plan.fingerprint,
                 });
             } catch (error) {
+                if (error instanceof DraftSupersededError) {
+                    noteSuperseded(error);
+                    return { status: 'failed', message: error.message };
+                }
                 // A refused conversion is not a failed save: nothing changed on either side, so the verdict stays.
                 return { status: 'failed', message: error instanceof BuilderRequestError ? error.message : CONVERT_FAILED };
             }
@@ -1149,7 +1310,7 @@ export function useBuilderStore(props: BuilderPageProps) {
             throw new StaleHistoryStep(`${failure} ${TYPE_MOVED_ELSEWHERE}`);
         }
         const result = await guard(() =>
-            builderClient.post<ServerField>(`${base}/fields/${live.id}/convert`, {
+            client.post<ServerField>(`${base}/fields/${live.id}/convert`, {
                 to: target,
                 version: live.version,
                 fingerprint: plan.fingerprint,
@@ -1167,7 +1328,7 @@ export function useBuilderStore(props: BuilderPageProps) {
     async function restoreSnapshot(live: LocalField, snap: FieldSnapshot, failure: string): Promise<void> {
         const onServer = fieldSnapshot(live);
         applyFieldSnapshot(live, snap);
-        const result = await guard(() => builderClient.patch<ServerField>(`${base}/fields/${live.id}`, fieldPayload(live)));
+        const result = await guard(() => client.patch<ServerField>(`${base}/fields/${live.id}`, fieldPayload(live)));
         if (result === null) {
             applyFieldSnapshot(live, onServer); // the screen shows what the server holds; a retry PATCHes again
             throw new HistoryStepFailed(`${failure} ${save.error ?? ''}`.trim());
@@ -1265,6 +1426,11 @@ export function useBuilderStore(props: BuilderPageProps) {
         saveFieldErrors,
         hasUnsaved,
         conflict,
+        // M172: the form was published since this page loaded (read-only; the page offers the reload)
+        superseded: computed(() => superseded.value),
+        // M172 (`R-733eff09`): a key the server kept instead of the one typed, per row; and one per failure (`R-d85d51d2`)
+        keyNotices: computed(() => keyNotices.value),
+        saveFailures: computed(() => save.failures),
         canUndo,
         canRedo,
         palette: props.palette,
@@ -1278,6 +1444,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         // actions
         addField,
         deleteField,
+        answersFor,
         duplicateField,
         insertFromLibrary,
         saveFieldToLibrary,

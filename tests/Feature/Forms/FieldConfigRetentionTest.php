@@ -68,6 +68,7 @@ function configRetentionAuthor(): array
     enterTenant($tenant->id, $admin->id);
     makeActiveMember($admin, 'admin');
     $form = app(FormService::class)->create($tenant, $admin, 'Multilingual Intake');
+    test()->withHeaders(builderHeaders($form));
 
     return [$tenant, $admin, $form];
 }

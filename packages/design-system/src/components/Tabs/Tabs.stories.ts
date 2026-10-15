@@ -66,6 +66,18 @@ export const SecondSelected: Story = {
     render: framed,
 };
 
+/** M172 — a tab whose panel needs attention carries a dot after its label; its accessible name stays the label. */
+export const WithAlert: Story = {
+    args: {
+        items: [
+            { key: 'basics', label: 'Basics' },
+            { key: 'validation', label: 'Validation' },
+            { key: 'advanced', label: 'Advanced', alert: true },
+        ],
+    },
+    render: framed,
+};
+
 /**
  * More tabs than the pane is wide. The strip scrolls rather than wrapping, and takes NO tabindex of its
  * own: `scrollable-region-focusable` fires only on a scroll region with no focusable descendants, and every

@@ -100,6 +100,7 @@ it('brings every offered layout back from its own export as the same type and th
     }
 
     [$target, $draft] = appearanceRoundTripTarget($owner);
+    test()->withHeaders(builderHeaders($target));
     app(XlsformImporter::class)->import($target, appearanceRoundTripUpload($sheets), $owner);
 
     $imported = FormField::query()->where('form_version_id', $draft->id)->get()->keyBy('key');
@@ -134,6 +135,7 @@ it('keeps an imported appearance outside the vocabulary through a builder save a
     ]);
 
     [$target, $draft] = appearanceRoundTripTarget($owner);
+    test()->withHeaders(builderHeaders($target));
     app(XlsformImporter::class)->import($target, $workbook, $owner);
 
     $field = FormField::query()->where('form_version_id', $draft->id)->where('key', 'colours')->firstOrFail();

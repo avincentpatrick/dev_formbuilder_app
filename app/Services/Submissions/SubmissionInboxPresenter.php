@@ -17,6 +17,7 @@ use App\Models\Submission;
 use App\Models\User;
 use App\Policies\SubmissionPolicy;
 use App\Services\Forms\FormPresenter;
+use App\Services\Forms\RetiredFieldKeys;
 use App\Services\Templates\TemplateRenderer;
 use App\Services\Templates\TemplateSources;
 use App\Support\Search\ListEmptyReason;
@@ -45,6 +46,7 @@ final class SubmissionInboxPresenter
     public function __construct(
         private readonly SchemaValueFormatter $formatter,
         private readonly TemplateRenderer $templates,
+        private readonly RetiredFieldKeys $retiredKeys,
     ) {}
 
     /**
@@ -277,7 +279,11 @@ final class SubmissionInboxPresenter
                     'remarks' => $submission->remarks,
                 ],
             ],
-            'blocks' => $version !== null ? $this->answerBlocks($version, $answers, $submission->locale) : [],
+            // M172 (`R-a44638b6`, `D133`): an answer to a question the form's current version no longer asks is kept and
+            // marked with the version that removed it.
+            'blocks' => $version !== null
+                ? $this->answerBlocks($version, $answers, $submission->locale, $submission->form !== null ? $this->retiredKeys->for($submission->form) : [])
+                : [],
             // Two SEPARATE abilities, never one flag. `review` decides a submission's outcome; `update`
             // (I9c) rewrites its answers, and they are held by different roles — a Reviewer has the first
             // and not the second, an Owner/Admin has both, a Form Editor has `update` on forms they
@@ -359,9 +365,10 @@ final class SubmissionInboxPresenter
      * `"{sectionId}#{n}"` so a Vue `:key` over the list stays unique.
      *
      * @param  array<string, mixed>  $answers
+     * @param  array<string, int>  $retired  key ⇒ the version that removed it ({@see RetiredFieldKeys})
      * @return list<array<string, mixed>>
      */
-    private function answerBlocks(FormVersion $version, array $answers, ?string $locale): array
+    private function answerBlocks(FormVersion $version, array $answers, ?string $locale, array $retired = []): array
     {
         $sections = $version->sections()->orderBy('sequence')->get();
         $allFields = $version->fields()->orderBy('sequence')->get();
@@ -379,7 +386,7 @@ final class SubmissionInboxPresenter
 
         $ungrouped = $bySection->get('');
         if ($ungrouped !== null && $ungrouped->isNotEmpty()) {
-            $blocks[] = ['id' => null, 'label' => null, 'fields' => $this->fieldRows($ungrouped, $answers, $sources, $locale)];
+            $blocks[] = ['id' => null, 'label' => null, 'fields' => $this->fieldRows($ungrouped, $answers, $sources, $locale, $retired)];
         }
 
         foreach ($sections as $section) {
@@ -392,7 +399,7 @@ final class SubmissionInboxPresenter
                 $blocks[] = [
                     'id' => $section->id,
                     'label' => $this->templates->render($section->label, $sources, $answers, $locale),
-                    'fields' => $this->fieldRows($sectionFields, $answers, $sources, $locale),
+                    'fields' => $this->fieldRows($sectionFields, $answers, $sources, $locale, $retired),
                 ];
 
                 continue;
@@ -420,7 +427,7 @@ final class SubmissionInboxPresenter
                     // Numbered exactly as the respondent saw it — `RepeatGroup.vue`'s instance legend is
                     // `${label} ${index + 1}`, and the two must not disagree about which entry this is.
                     'label' => $this->templates->render($section->label, $sources, $scoped, $locale).' '.($index + 1),
-                    'fields' => $this->fieldRows($sectionFields, $scoped, $sources, $locale),
+                    'fields' => $this->fieldRows($sectionFields, $scoped, $sources, $locale, $retired),
                 ];
             }
         }
@@ -450,14 +457,16 @@ final class SubmissionInboxPresenter
      * @param  Collection<int, FormField>  $fields
      * @param  array<string, mixed>  $answers  already scoped to one repeat instance where applicable
      * @param  array<string, array{type: FieldType, config: array<string, mixed>}>  $sources
-     * @return list<array{key: string, label: string, value: string}>
+     * @param  array<string, int>  $retired
+     * @return list<array{key: string, label: string, value: string, removed_in: int|null}>
      */
-    private function fieldRows(Collection $fields, array $answers, array $sources, ?string $locale): array
+    private function fieldRows(Collection $fields, array $answers, array $sources, ?string $locale, array $retired = []): array
     {
         return array_values($fields->map(fn (FormField $f): array => [
             'key' => $f->key,
             'label' => $this->templates->render($f->label, $sources, $answers, $locale),
             'value' => $this->formatter->displayValue($f->field_type, $answers[$f->key] ?? null, $f->config ?? [], $locale),
+            'removed_in' => $retired[$f->key] ?? null,
         ])->all());
     }
 

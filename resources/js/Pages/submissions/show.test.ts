@@ -319,3 +319,29 @@ describe('the scanned pages (M153)', () => {
         wrapper.unmount();
     });
 });
+
+describe('submissions/Show — an answer to a question the form no longer asks (M172, R-a44638b6)', () => {
+    it('keeps the answer and marks it with the version that removed the question, and marks nothing else', () => {
+        const wrapper = mountAt('submitted');
+        // The read model's rows for one block: a retired question's answer, kept, and a question still asked.
+        void wrapper.setProps({
+            blocks: [
+                {
+                    id: null,
+                    label: null,
+                    fields: [
+                        { key: 'color', label: 'Color', value: 'Red', removed_in: 2 },
+                        { key: 'full_name', label: 'Full name', value: 'Ada', removed_in: null },
+                    ],
+                },
+            ],
+        });
+
+        return wrapper.vm.$nextTick().then(() => {
+            const marks = wrapper.findAll('[data-removed-in]');
+            expect(marks).toHaveLength(1);
+            expect(marks[0].text()).toBe('Removed from the form in version 2');
+            expect(wrapper.text()).toContain('Red');
+        });
+    });
+});

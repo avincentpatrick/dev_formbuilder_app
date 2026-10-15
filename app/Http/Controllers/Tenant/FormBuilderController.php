@@ -59,11 +59,6 @@ final class FormBuilderController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        // M172 (`R-81756e95`): Inertia restores Back from the props it cached in history, without asking the server, so
-        // a builder page reached by Back after a publish held the old draft's ids. Encrypted, its entry stops decrypting
-        // once a publish or restore clears the key (FormPublishController), and Inertia re-visits the server instead.
-        Inertia::encryptHistory();
-
         return Inertia::render('forms/Builder', [
             ...$this->presenter->present($form, $user),
             'crumbs' => CrumbTrail::forms($user)->form($form)->current('Builder'),

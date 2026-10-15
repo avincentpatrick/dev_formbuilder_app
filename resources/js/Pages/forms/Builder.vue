@@ -29,12 +29,17 @@ import DraftSupersededDialog from '@/components/builder/DraftSupersededDialog.vu
 import FormSettingsModal from '@/components/builder/FormSettingsModal.vue';
 import SaveAsTemplateModal from '@/components/forms/SaveAsTemplateModal.vue';
 import { useBuilderStore } from '@/components/builder/useBuilderStore';
+import { takeHistoryRestore } from '@/components/builder/history-restore';
 import { saveLabel } from '@/components/builder/save-label';
 import type { BuilderPageProps } from '@/components/builder/types';
 import { useEntitlements } from '@/composables/useEntitlements';
 
 const props = defineProps<BuilderPageProps>();
-const store = useBuilderStore(props);
+// M172 (`R-81756e95`): a page Back or Forward restored holds the props of its FIRST visit — see `history-restore.ts`. It
+// re-visits the server at once, and until the fresh page arrives its store is given no draft, so it writes nothing.
+const restoredFromHistory = takeHistoryRestore();
+if (restoredFromHistory) router.visit(window.location.href, { preserveState: false, preserveScroll: true, replace: true });
+const store = useBuilderStore(restoredFromHistory ? { ...props, draft: null } : props);
 const { selection, saving, saveState, canUndo, canRedo, conflict, library, saveError, superseded } = store;
 
 // The toolbar's polite live region. Reads the store's EXPLICIT verdict rather than inferring success
@@ -123,7 +128,7 @@ watch(saveError, (message) => {
     if (message) pane.value = 'settings';
 });
 
-const readOnly = computed(() => props.draft === null);
+const readOnly = computed(() => props.draft === null || restoredFromHistory);
 
 const fieldTypeLabels: Record<string, string> = {};
 props.palette.forEach((group) => group.types.forEach((type) => (fieldTypeLabels[type.value] = type.label)));
@@ -534,7 +539,15 @@ function submitImport(): void {
              `MdsEmptyState` is the shared pattern for one — not an alert. It also had no `role` and no
              illustration: a centred grey paragraph was the entire read-only experience of this page. -->
         <MdsEmptyState
-            v-if="readOnly"
+            v-if="restoredFromHistory"
+            class="builder__blocked"
+            illustration="default"
+            headline="Loading the latest version of this form"
+            description="This page came back from your browser's history, so it is being loaded again."
+            data-builder-refreshing
+        />
+        <MdsEmptyState
+            v-else-if="readOnly"
             class="builder__blocked"
             illustration="default"
             headline="This form has no editable draft"

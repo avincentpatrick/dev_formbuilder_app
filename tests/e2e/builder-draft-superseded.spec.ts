@@ -10,7 +10,8 @@ import { showBuilderPane } from './support/navigate';
  * from the hub in another tab, or the browser's Back button after publishing from the hub — still held the old ids, so its
  * next save sent an unchanged key against the clone and was refused on the key. Now every write names the draft the page
  * was loaded with: a superseded page is told once ("This form was published since this page loaded"), reloads, and the
- * edit it was holding is put back in the new draft by key. Back re-visits the server instead of showing the stale page.
+ * edit it was holding is put back in the new draft by key. A builder brought back by Back re-visits the server at once
+ * (`history-restore.ts`) instead of showing the props of its first visit.
  *
  * Desktop only: the save path is the same at every width. Each case makes its own form and archives it (M139's reason:
  * one seeded database, three projects).
@@ -59,8 +60,7 @@ async function publishFromHub(hub: Page, formId: string): Promise<void> {
     );
     await hub.getByRole('button', { name: 'Publish draft' }).click();
     expect((await published).status(), 'the publish was accepted').toBeLessThan(400);
-    // The hub drawn AFTER the publish (its redirect): only once that page has been applied has this tab's history been
-    // told the draft moved on. Measured: a Back pressed between the POST and that page restored the stale builder.
+    // The hub drawn AFTER the publish (its redirect), so the publish has landed before anything else is done in this tab.
     await expect(hub.getByText(/v\d+ live/)).toBeVisible({ timeout: 30_000 });
 }
 

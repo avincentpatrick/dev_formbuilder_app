@@ -16,7 +16,55 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M172`, the two errors that block the testers: a builder tab left open across a publish, and what a delete says when responses hold the answers (`m172-testers-blockers`)
+## Status: NO ACTIVE CLAIM — `M172` and `M169` are merged and live on staging (released below). The next claim is written here. Ask the user before every merge, and never merge while another session's deploy is in flight.
+
+## RELEASED — `M172`, the two errors that block the testers: a builder tab left open across a publish, and what a delete says when responses hold the answers (`R-81756e95`, `R-733eff09`, `R-a44638b6`, `R-52f5ad93`) (merged as PR #365, `a33fe694`, 6/6 green with real step counts on its fourth run — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+Built and merged 2026-10-15 by the build session (Opus) from the Fable plan (`~/.claude/plans/i-have-intial-comments-quirky-pascal.md`,
+§B4/§B5/§E row 1; build plan `~/.claude/plans/pasted-content-id-1fb2-read-claude-md-hidden-creek.md`). The session opened with the two
+owed checks, and the user confirmed both on staging (`M170`, `M171`). Near the end the user said *"once you are done with all the
+updates based on the comments, please merge everything"*, ran the guided `meridian-test-db-backup` block (`Result: 0`) and chose to
+include `M169` (PR #362). Rows taken besides the four: `R-4c4e35ae` folded, `R-31ff7ade` measured closed by `M170`, `R-d85d51d2`,
+and both halves of `R-9ea69e29`. Filed: `R-ade0b598` (expression text naming a renamed key does not follow it, during-testing) and
+`R-7b52d58b` (Undo and Redo never say what they reverse, during-testing).
+
+**Measured against the prediction:**
+- **Red first, as predicted.** The Pest case sending a published field's UNCHANGED key was red on the trunk with the testers' exact
+  422 "The key has already been taken." and green with 409 `draft_superseded`; the suffix cases 422 on the row-1 server; the dialog,
+  replay-by-key, inline-warning, alert-reason, delete-count, retired-note and read-only cases red on the committed code (Vitest,
+  4 + 4 + 4 + 2 + 1); the e2e two-tab case red on a pre-M172 build with the 422, measured by byte-swapping every server and client
+  file to the trunk and rebuilding.
+- **Mutants, seven, all caught, each red set as predicted:** the draft-id comparison (1 Pest case), the key suffix (2), the retired
+  note (2), the view route serving a draft (1) through `scripts/mutate.php`; the replay by key (1), the superseded-code check (3), the
+  inline clash warning (1) through a scratchpad byte-restore Vitest harness. **Partly wrong:** I predicted the draft-id mutant would
+  turn the UNCHANGED-key case red; it turned only the stale CREATE red, because the service guard answers the same 409 for every
+  request carrying a stale id — defence in depth the prediction did not count.
+- **Most likely wrong — the Back button — was wrong in a direction I did not name.** Inertia does NOT re-fetch: on the trunk the
+  page Back restored was the builder as FIRST loaded, with no question at all (the questions were added by fetch writes after that
+  visit), so the defect was wider than stale ids. My first remedy, Inertia's history encryption with the key cleared on publish,
+  worked in every local browser and **broke every visit to the builder in CI**: CI serves `http://acme.meridian.test:8000`, not a
+  secure context, so `crypto.subtle` is absent and Inertia threw "Unable to encrypt history" (E2E ran past two hours, every builder
+  test failing at `createForm()`'s 30-second wait, twice). Locally `acme.localhost` IS a secure context (probed), which is why every
+  local run passed. Replaced by `resources/js/components/builder/history-restore.ts` — the page remembers the URL a `popstate`
+  restored and re-visits the server as it mounts, writing nothing meanwhile — which needs nothing from the browser; it also covers
+  Back with no publish at all. Created as the fix, outside this claim's file list (recorded here rather than by a third extension).
+- **Not predicted:**
+  - **`FormException` is `final`**, and a row of ANOTHER form must keep its 422 — reloading this form's page fixes nothing — so the
+    superseded refusal is `childSuperseded()` with its own code, decided by whose version the row belongs to.
+  - **A CVE published mid-build** (CVE-2026-108082, `symfony/http-foundation`) turned CI's Composer audit red on the PR's second run;
+    the lock moved v8.1.1 → v8.1.9 under Extension 2, `composer.json` untouched.
+  - **My own e2e spec raced itself**: a Back pressed between the publish's 302 and the page it redirects to restored the stale
+    builder; the spec now waits for the published hub ("v1 live").
+  - **Twelve ledger citations moved onto blank lines** (citation liveness 16 → 28 over its ceiling of 17), repointed by content.
+  - **A container directory run collected 22 of 81 Forms test files** (the bind-mount truncation) and read green; the reached
+    directories were run again as explicit file lists (Forms, Submissions, Docs, Http, Xlsform, Connectors, Rbac, Security, Tenant).
+  - **Undo labels are shown nowhere** — the delete's entry names the rules it cleared, and `builder-layout.test.ts` pins the toolbar
+    title to the visible text — filed as `R-7b52d58b` rather than bending that rule.
+  - **The inbox has no per-answer columns** (premise corrected at the row): the retired note lives on the response page and in exports.
+  - **Local e2e** (337 passed): the only failure was `responsive-axe`'s Sheets drift case, which waits for a seeded blocked delivery
+    the long-lived dev database no longer has — green in CI's fresh seed.
+
+**The claim as it was taken and extended:**
 
 Taken 2026-10-15 by the planning session (Fable) that planned the testers' seven first-round items
 (`~/.claude/plans/i-have-intial-comments-quirky-pascal.md`), under the testing freeze of 2026-10-13: this session writes the claim
@@ -184,7 +232,10 @@ until the lock moves, and nothing in this increment caused it. File added: `comp
 package, `composer update symfony/http-foundation --no-install`, so the vendor a live local E2E run is serving is not touched).
 `composer.json` is not changed. The user approved merging this increment and `M169` in this session, after a fresh staging backup.
 
-## HELD — `M169`, a point or a comma stays on the word Vision read it after (`m169-ocr-punctuation-spacing`)
+## RELEASED — `M169`, a point or a comma stays on the word Vision read it after (`R-27049032`) (merged as PR #362, `fb44bf94`, 6/6 green with real step counts on its final run at `0ffbbb84` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+**MERGED 2026-10-15** on the user's word in the `M172` session ("please merge everything", and asked: yes, `M169` too), after the guided `meridian-test-db-backup` block (`Result: 0`), straight after `M172`. The branch took `main` twice (M170, M171, M172): the line conflicted both times and was regenerated, and the second time CI's `pipeline-lint` read it as DRIFTED — regenerated in a fresh `git worktree` without `vendor/` and `node_modules/`, one row (`R-701d3946`) sorted elsewhere than in CI, which installs both before the lint. Regenerated in a full checkout, it matched; the next run was 6/6. Nothing in the OCR code changed.
+
 
 Taken 2026-10-13, after the user's "no merge, no deploy while testing is on": this claim builds, opens the PR and gets it green,
 then stops — nothing merges until the user lifts the freeze. Branch `m169-ocr-punctuation-spacing`, cut from origin/main at

@@ -1,4 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
@@ -108,5 +110,21 @@ describe('ocr/ScanStatus', () => {
         expect(wrapper.find('h1').text()).toBe('This scan could not be read');
         expect(wrapper.text()).toContain('The reading service could not open this file.');
         expect(wrapper.find('a[href="/forms/form-1/submissions/create"]').text()).toBe('Enter the response by hand');
+    });
+});
+
+/** M173 (`R-8ee7d2dc`, `D120`) — no 720px column, and the error text in the on-surface danger pair. */
+describe('ocr/ScanStatus — the page fills the width', () => {
+    const source = readFileSync(join(process.cwd(), 'resources/js/Pages/ocr/ScanStatus.vue'), 'utf8');
+    const style = source.slice(source.indexOf('<style'));
+
+    it('drops the 720px cap', () => {
+        expect(style).not.toMatch(/^\s+max-width:\s*720px/m);
+    });
+
+    it('sets its error text in the on-surface danger pair', () => {
+        // The other danger token resolves to danger-300 in dark and measures 4.22:1 on the surface.
+        expect(style).not.toContain('--mds-color-danger-text');
+        expect(style).toMatch(/^\.scan-status__check \{[^}]*color: var\(--mds-color-status-danger-fg\);/m);
     });
 });

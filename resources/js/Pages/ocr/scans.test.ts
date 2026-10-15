@@ -1,4 +1,6 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
@@ -286,5 +288,41 @@ describe('ocr/Scans — the chosen pages, before "Read this scan" (M154, `R-c84e
         wrapper.unmount();
 
         expect(revokeUrl.mock.calls.map((call) => call[0]).sort()).toEqual(['blob:page-1.png', 'blob:page-2.png']);
+    });
+});
+
+/**
+ * M173 (`R-8ee7d2dc`, `D120`, `D121`) — the page fills the width: the upload form keeps a measure as a form, the recent
+ * scans become a grid. Pinned as source text because happy-dom lays out nothing; the boxes are measured at 1920 in
+ * `tests/e2e/list-layout.spec.ts`.
+ */
+describe('ocr/Scans — the page fills the width', () => {
+    const source = readFileSync(join(process.cwd(), 'resources/js/Pages/ocr/Scans.vue'), 'utf8');
+    const style = source.slice(source.indexOf('<style'));
+    const rule = (selector: string): string => {
+        const start = style.indexOf(`\n${selector} {`);
+        expect(start, selector).toBeGreaterThan(-1);
+
+        return style.slice(start, style.indexOf('}', start));
+    };
+
+    it('drops the 720px cap and makes the page the container for its own split', () => {
+        expect(style).not.toMatch(/^\s+max-width:\s*720px/m);
+        // The page itself is the container, and an inner wrapper takes the split — an element cannot query itself.
+        expect(rule('.scans')).toMatch(/container-type:\s*inline-size/);
+        expect(source).toContain('class="scans__layout"');
+        expect(style).toMatch(/^@container \(min-width: 75rem\) \{\s*\.scans__layout \{/m);
+    });
+
+    it('lays the recent scans in a grid of rows rather than one full-width column', () => {
+        expect(rule('.scans__list')).toMatch(/display:\s*grid/);
+        expect(rule('.scans__list')).toMatch(/repeat\(auto-fill,\s*minmax\(min\(100%,\s*28rem\),\s*1fr\)\)/);
+    });
+
+    it('sets its error text in the on-surface danger pair', () => {
+        // The other danger token resolves to danger-300 in dark and measures 4.22:1 on the surface.
+        expect(style).not.toContain('--mds-color-danger-text');
+        expect(rule('.scans__error')).toContain('--mds-color-status-danger-fg');
+        expect(rule('.scans__row-error')).toContain('--mds-color-status-danger-fg');
     });
 });

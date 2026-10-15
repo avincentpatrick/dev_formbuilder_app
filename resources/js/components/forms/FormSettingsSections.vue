@@ -348,6 +348,14 @@ watch(
     min-width: 0;
 }
 
+/* M173 (`D135`, the user's choice) — on the hub's Settings tab the body is as wide as the page, which no longer
+   has a cap, so every labelled box in a section keeps a reading width while the section's lists, tables and
+   preset grids fill. Every panel builds its boxes from `MdsFormField`, whose root is `.mds-field`. In the
+   builder's 880px pop-up the body is narrower than this, so nothing there changes. */
+.form-settings__section :deep(.mds-field) {
+    max-inline-size: 48rem;
+}
+
 /* Below the sheet threshold the rail stops being a rail: 140px of it beside a ~215px body is neither. It
    becomes a wrapping row above the content, which is the one place a horizontal set of these is safe —
    `flex-wrap` is precisely what MdsSegmentedControl does not have. */

@@ -257,6 +257,32 @@ describe('form hub — the version panel', () => {
 
         wrapper.unmount();
     });
+
+    it('says what each published version changed, by label, and opens a published one read-only (M172, R-52f5ad93)', async () => {
+        const wrapper = render({
+            versions: [
+                { id: 'v-3', version_number: 3, status: 'draft', published_at: null, changes: null },
+                {
+                    id: 'v-2', version_number: 2, status: 'published', published_at: '2026-07-01T00:00:00+00:00',
+                    changes: { first: false, added: ['Notes'], removed: ['Color'], changed: [], note: 'Shorter form.' },
+                },
+                {
+                    id: 'v-1', version_number: 1, status: 'superseded', published_at: '2026-06-01T00:00:00+00:00',
+                    changes: { first: true, added: [], removed: [], changed: [], note: null },
+                },
+            ] as never,
+        });
+
+        const cells = wrapper.findAll('[data-version-changes]').map((cell) => cell.findAll('p').map((line) => line.text()));
+        expect(cells).toEqual([['Added: Notes', 'Removed: Color', '“Shorter form.”'], ['First version.']]);
+
+        const views = wrapper.findAll('[data-version-view]');
+        expect(views, 'View on the two published versions, never on the draft').toHaveLength(2);
+        await views[0].trigger('click');
+        expect(mocks.visit).toHaveBeenLastCalledWith(expect.stringMatching(/\/versions\/v-2\/view$/));
+
+        wrapper.unmount();
+    });
 });
 
 describe('form hub — links, and the two places one would be a lie', () => {

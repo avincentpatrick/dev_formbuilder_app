@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\SubmissionStatus;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormFieldValidation;
@@ -9,6 +10,7 @@ use App\Models\FormSection;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\FormService;
+use App\Services\Forms\PublishService;
 use App\Support\Forms\StepProjection;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
@@ -54,6 +56,7 @@ it('forbids a Viewer from the builder and its mutations', function (): void {
 
     enterTenant($tenant->id, $owner->id);
     $form = app(FormService::class)->create($tenant, $owner, 'Survey');
+    test()->withHeaders(builderHeaders($form));
 
     enterTenant($tenant->id, $viewer->id);
     makeActiveMember($viewer, 'viewer'); // no forms.* permissions
@@ -70,6 +73,7 @@ it('lets an Admin add, configure, duplicate, reorder and delete through the buil
     enterTenant($tenant->id, $admin->id);
     makeActiveMember($admin, 'admin');
     $form = app(FormService::class)->create($tenant, $admin, 'Household Survey');
+    test()->withHeaders(builderHeaders($form));
 
     // Add a field.
     $add = $this->actingAs($admin)
@@ -132,6 +136,7 @@ it('rejects a stale field edit with 409 and returns the current row', function (
     enterTenant($tenant->id, $admin->id);
     makeActiveMember($admin, 'admin');
     $form = app(FormService::class)->create($tenant, $admin, 'Survey');
+    test()->withHeaders(builderHeaders($form));
 
     $add = $this->actingAs($admin)
         ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => 'short_text'])
@@ -166,6 +171,7 @@ it('accepts an edit that carries no concurrency token (overwrite)', function ():
     enterTenant($tenant->id, $admin->id);
     makeActiveMember($admin, 'admin');
     $form = app(FormService::class)->create($tenant, $admin, 'Survey');
+    test()->withHeaders(builderHeaders($form));
 
     $add = $this->actingAs($admin)
         ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => 'short_text'])
@@ -184,23 +190,43 @@ it('accepts an edit that carries no concurrency token (overwrite)', function ():
         ->assertOk()->assertJsonPath('key', 'forced');
 });
 
-it('validates the key format and per-version uniqueness', function (): void {
+it('validates the key format, and saves a key another question holds under the next free number (D132)', function (): void {
     $tenant = builderTenant();
     $admin = User::factory()->create();
     enterTenant($tenant->id, $admin->id);
     makeActiveMember($admin, 'admin');
     $form = app(FormService::class)->create($tenant, $admin, 'Survey');
+    test()->withHeaders(builderHeaders($form));
 
     $a = $this->actingAs($admin)
         ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => 'short_text'])->assertOk();
     $b = $this->actingAs($admin)
         ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => 'short_text'])->assertOk();
+    $c = $this->actingAs($admin)
+        ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => 'short_text'])->assertOk();
 
-    // Rename b to a's key → duplicate rejected (422).
+    // M172 (`R-733eff09`, `D132`): b renamed to a's key is no longer refused "The key has already been taken" — it is
+    // saved as a's key with the next free number, and the response says which key was kept.
     $this->actingAs($admin)->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$b->json('id')}", [
         'key' => $a->json('key'),
         'label' => 'Dup', 'is_required' => 'optional', 'config' => [], 'validations' => [], 'version' => null,
-    ])->assertStatus(422);
+    ])->assertOk()->assertJsonPath('key', $a->json('key').'_2');
+
+    // The next clash takes the next number, and the question already holding a key keeps it.
+    $this->actingAs($admin)->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$c->json('id')}", [
+        'key' => $a->json('key'),
+        'label' => 'Dup again', 'is_required' => 'optional', 'config' => [], 'validations' => [], 'version' => null,
+    ])->assertOk()->assertJsonPath('key', $a->json('key').'_3');
+
+    // A field saved with its OWN key unchanged keeps it — no suffix against itself.
+    $this->actingAs($admin)->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$a->json('id')}", [
+        'key' => $a->json('key'),
+        'label' => 'Original', 'is_required' => 'optional', 'config' => [], 'validations' => [], 'version' => null,
+    ])->assertOk()->assertJsonPath('key', $a->json('key'));
+
+    enterTenant($tenant->id, $admin->id);
+    expect(FormField::query()->where('form_version_id', $form->draft_version_id)->pluck('key')->sort()->values()->all())
+        ->toBe([$a->json('key'), $a->json('key').'_2', $a->json('key').'_3']);
 
     // A bad key format is rejected too.
     $this->actingAs($admin)->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$b->json('id')}", [
@@ -219,6 +245,7 @@ it('persists a geospatial map config and rejects an out-of-range coordinate', fu
     enterTenant($tenant->id, $admin->id);
     makeActiveMember($admin, 'admin');
     $form = app(FormService::class)->create($tenant, $admin, 'Field Survey');
+    test()->withHeaders(builderHeaders($form));
 
     $add = $this->actingAs($admin)
         ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => 'geopoint'])
@@ -302,6 +329,7 @@ it('refuses the reserved lead-step key on both authoring routes that accept a ke
     enterTenant($tenant->id, $admin->id);
     makeActiveMember($admin, 'admin');
     $form = app(FormService::class)->create($tenant, $admin, 'Reserved Key');
+    test()->withHeaders(builderHeaders($form));
 
     $section = $this->actingAs($admin)
         ->postJson("http://acme.meridian.test/forms/{$form->id}/sections")->assertOk();
@@ -362,4 +390,50 @@ it('refuses the reserved lead-step key on both authoring routes that accept a ke
             'version' => null,
         ])
         ->assertOk()->assertJsonPath('key', 'respondent_age');
+});
+
+it('saves a section key another section holds under the next free number, as for a question (D132)', function (): void {
+    $tenant = builderTenant();
+    $admin = User::factory()->create();
+    enterTenant($tenant->id, $admin->id);
+    makeActiveMember($admin, 'admin');
+    $form = app(FormService::class)->create($tenant, $admin, 'Two Sections');
+    test()->withHeaders(builderHeaders($form));
+
+    $a = $this->actingAs($admin)->postJson("http://acme.meridian.test/forms/{$form->id}/sections")->assertOk();
+    $b = $this->actingAs($admin)->postJson("http://acme.meridian.test/forms/{$form->id}/sections")->assertOk();
+
+    $this->actingAs($admin)
+        ->patchJson("http://acme.meridian.test/forms/{$form->id}/sections/{$b->json('id')}", ['key' => $a->json('key'), 'label' => 'Second'])
+        ->assertOk()
+        ->assertJsonPath('key', $a->json('key').'_2');
+});
+
+it('counts the responses that hold an answer to a question, in any version, for the delete dialog (D133)', function (): void {
+    $tenant = builderTenant();
+    $admin = User::factory()->create();
+    enterTenant($tenant->id, $admin->id);
+    makeActiveMember($admin, 'admin');
+
+    $form = publishedInboxForm($tenant, $admin); // v1 asks full_name, color, hobbies, subscribe
+    seedInboxSubmission($form, $admin, SubmissionStatus::Submitted, ['full_name' => 'Ana', 'color' => 'r']);
+    seedInboxSubmission($form, $admin, SubmissionStatus::Approved, ['full_name' => 'Ben', 'color' => 'g']);
+    seedInboxSubmission($form, $admin, SubmissionStatus::Submitted, ['full_name' => 'Cy', 'color' => '']); // left empty: no answer
+    seedInboxSubmission($form, $admin, SubmissionStatus::Draft, ['full_name' => 'Di', 'color' => 'b']);   // a draft is not a response yet
+
+    app(PublishService::class)->publish($form->refresh(), $admin); // v2 — the count is by key, across versions
+    $form->refresh();
+    seedInboxSubmission($form, $admin, SubmissionStatus::Submitted, ['full_name' => 'Ed', 'color' => 'b']);
+
+    enterTenant($tenant->id, $admin->id);
+    // Every id read BEFORE the first request: a model read after one has lost the tenant context (RLS) and finds nothing.
+    $ids = FormField::query()->where('form_version_id', $form->draft_version_id)->pluck('id', 'key');
+    $count = fn (string $key) => $this->actingAs($admin)
+        ->getJson("http://acme.meridian.test/forms/{$form->id}/fields/{$ids[$key]}/answers")
+        ->assertOk()
+        ->json('responses');
+
+    expect($count('color'))->toBe(3)
+        ->and($count('full_name'))->toBe(4)
+        ->and($count('subscribe'))->toBe(0);
 });

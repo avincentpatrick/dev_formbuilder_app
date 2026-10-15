@@ -16,6 +16,12 @@ use RuntimeException;
  */
 final class FormException extends RuntimeException
 {
+    /**
+     * M172 (`R-81756e95`) — the code {@see self::childSuperseded()} carries, so the builder's `respond()` can answer
+     * the recoverable 409 `draft_superseded` for it without reading the message. Every other factory keeps code 0.
+     */
+    public const CHILD_SUPERSEDED = 1;
+
     public static function noDraftToPublish(): self
     {
         return new self('This form has no draft version to publish.');
@@ -63,10 +69,29 @@ final class FormException extends RuntimeException
      * ⚠ The `403` this docblock claimed until M89 was never what the surface returned: the only caller,
      * FormBuilderController::respond(), has mapped this type to 422 since it was written. The same stale
      * `403` stood in FormBuilderService's header docblock and is corrected there too.
+     *
+     * M172 (`R-81756e95`): kept for a row of ANOTHER form's version. A row of an earlier version of THIS form is
+     * {@see self::childSuperseded()} instead.
      */
     public static function childNotInDraft(): self
     {
         return new self('That item belongs to a published version and can no longer be edited.');
+    }
+
+    /**
+     * M172 (`R-81756e95`) — the builder edit names a row of an earlier version of THIS form, or the form has no draft
+     * left: the page that sent it was loaded before a publish (or an archive) moved the form on. Both builder
+     * controllers answer it with the 409 `draft_superseded` the page reloads from, where it used to be
+     * {@see self::childNotInDraft()}'s 422 with a Retry that could never succeed. Same message for any other caller.
+     */
+    public static function childSuperseded(): self
+    {
+        return new self('That item belongs to a published version and can no longer be edited.', self::CHILD_SUPERSEDED);
+    }
+
+    public function isChildSuperseded(): bool
+    {
+        return $this->getCode() === self::CHILD_SUPERSEDED;
     }
 
     /**

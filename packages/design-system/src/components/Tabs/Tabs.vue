@@ -56,6 +56,16 @@ export interface TabItem {
     /** Matched against `modelValue` to decide the selected tab. Never rendered. */
     key: string;
     label: string;
+    /**
+     * M172 (`R-733eff09`) — the panel behind this tab holds something the reader must act on (the form builder: a
+     * refused save marked on one of its controls). Drawn as a small dot after the label.
+     *
+     * ⚠️ THE DOT IS DECORATIVE TO A SCREEN READER, AND THAT IS DELIBERATE: the tab's accessible name stays its label,
+     * because end-to-end locators across the builder find tabs by exact name, and a consumer that sets this flag must
+     * say the same thing in words elsewhere (the builder's alert names the tab). Colour is not the only channel either:
+     * the dot's presence is.
+     */
+    alert?: boolean;
 }
 
 const props = defineProps<{
@@ -172,7 +182,7 @@ function onKeydown(event: KeyboardEvent, index: number): void {
                 @click="select(index)"
                 @keydown="onKeydown($event, index)"
             >
-                {{ item.label }}
+                {{ item.label }}<span v-if="item.alert" class="mds-tabs__alert" aria-hidden="true" data-mds-tab-alert></span>
             </button>
         </div>
         </div>
@@ -299,6 +309,19 @@ function onKeydown(event: KeyboardEvent, index: number): void {
     color: var(--mds-color-text-heading);
     font-weight: var(--mds-font-weight-semibold);
     border-bottom-color: var(--mds-color-action-primary-fg);
+}
+
+/* M172 — a dot after the label of a tab whose panel needs attention. `danger-text`, the token FormField's error text
+   uses, because a dot is a non-text component owing 3:1 against the surface behind it, and that pair is measured for
+   text at 4.5:1 in both themes. Sized in em so it follows the §2.9 type scale. */
+.mds-tabs__alert {
+    display: inline-block;
+    width: 0.5em;
+    height: 0.5em;
+    margin-inline-start: var(--mds-space-1);
+    border-radius: 50%;
+    background-color: var(--mds-color-danger-text);
+    vertical-align: middle;
 }
 
 /* Inset, like MdsTabNav's and MdsDataTable's scroll regions and for the same reason: the strip is itself

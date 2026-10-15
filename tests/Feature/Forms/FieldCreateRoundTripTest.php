@@ -68,6 +68,7 @@ it('answers a create with real booleans, and takes its own answer straight back'
     enterTenant($tenant->id, $admin->id);
     makeActiveMember($admin, 'admin');
     $form = app(FormService::class)->create($tenant, $admin, 'Fresh Questions');
+    test()->withHeaders(builderHeaders($form));
 
     $created = test()->actingAs($admin)
         ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => $type])

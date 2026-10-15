@@ -5,7 +5,8 @@
 //   - `X-XSRF-TOKEN` read from the (encrypted) XSRF-TOKEN cookie Laravel sets, matching axios/Inertia;
 //   - `credentials: 'same-origin'` (the builder page and the API share the tenant subdomain);
 //   - `Accept: application/json` so validation failures come back as 422 JSON, not an HTML redirect.
-// A 409 (optimistic-concurrency drift) is surfaced as a typed result, not thrown — the caller reconciles.
+// A 409 (optimistic-concurrency drift) is surfaced as a typed result, not thrown — the caller reconciles. A 409
+// `draft_superseded` (M172) is thrown instead: it has no row to reconcile, and the page must reload.
 
 function readCookie(name: string): string | null {
     const match = document.cookie.match(new RegExp('(?:^|;\\s*)' + name + '=([^;]*)'));
@@ -36,6 +37,30 @@ export class BuilderRequestError extends Error {
     }
 }
 
+/** The draft a `draft_superseded` refusal names: the one to reload into, or null when the form has none left. */
+export interface SupersedingDraft {
+    id: string;
+    version_number: number;
+}
+
+/**
+ * M172 (`R-81756e95`) — the page was loaded against a draft a publish has since moved past: every id it holds belongs to
+ * the old version. THROWN, never returned as a conflict — a `draft_superseded` 409 carries no `current` row, and every
+ * caller that reads one would read `undefined`. The store's `guard()` catches it once for every write.
+ */
+export class DraftSupersededError extends Error {
+    constructor(
+        public readonly draft: SupersedingDraft | null,
+        message: string,
+    ) {
+        super(message);
+        this.name = 'DraftSupersededError';
+    }
+}
+
+/** M172 — the header every builder write carries: the draft the page was loaded with (`EnsureBuilderDraftCurrent`). */
+export const DRAFT_HEADER = 'X-Builder-Draft';
+
 type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
 /**
@@ -53,7 +78,7 @@ const KEEPALIVE_LIMIT_BYTES = 60_000;
  */
 export const SIGNED_OUT_MESSAGE = 'You were signed out, so your latest changes are not saved yet. Sign in again in a new tab, then press Retry.';
 
-async function request<T>(method: Method, url: string, body?: unknown): Promise<BuilderResult<T>> {
+async function request<T>(method: Method, url: string, body?: unknown, extra: Record<string, string> = {}): Promise<BuilderResult<T>> {
     const token = readCookie('XSRF-TOKEN');
     const payload = body !== undefined ? JSON.stringify(body) : undefined;
 
@@ -65,13 +90,15 @@ async function request<T>(method: Method, url: string, body?: unknown): Promise<
             Accept: 'application/json',
             'X-Requested-With': 'XMLHttpRequest',
             ...(token ? { 'X-XSRF-TOKEN': token } : {}),
+            ...extra,
         },
         body: payload,
         keepalive: method !== 'GET' && new TextEncoder().encode(payload ?? '').length <= KEEPALIVE_LIMIT_BYTES,
     });
 
     if (response.status === 409) {
-        const payload = (await response.json()) as { current: T; message: string };
+        const payload = (await response.json()) as { current: T; message: string; code?: string; draft?: SupersedingDraft | null };
+        if (payload.code === 'draft_superseded') throw new DraftSupersededError(payload.draft ?? null, payload.message);
         return { conflict: true, current: payload.current, message: payload.message };
     }
 
@@ -102,3 +129,22 @@ export const builderClient = {
     patch: <T>(url: string, body?: unknown): Promise<BuilderResult<T>> => request<T>('PATCH', url, body),
     delete: <T>(url: string, body?: unknown): Promise<BuilderResult<T>> => request<T>('DELETE', url, body),
 };
+
+export type BuilderClient = typeof builderClient;
+
+/**
+ * M172 (`R-81756e95`) — the builder's own client: every WRITE names the draft the page was loaded with, so the server can
+ * refuse a page left open across a publish before it validates anything. Reads carry nothing (no draft check runs on
+ * them). `builderClient` itself stays draft-free: the achievements, integrations, notifications and scopes clients share
+ * its transport for routes that have no draft.
+ */
+export function builderFor(draftId: string | null): BuilderClient {
+    const draft: Record<string, string> = draftId === null ? {} : { [DRAFT_HEADER]: draftId };
+
+    return {
+        get: <T>(url: string): Promise<BuilderResult<T>> => request<T>('GET', url),
+        post: <T>(url: string, body?: unknown): Promise<BuilderResult<T>> => request<T>('POST', url, body, draft),
+        patch: <T>(url: string, body?: unknown): Promise<BuilderResult<T>> => request<T>('PATCH', url, body, draft),
+        delete: <T>(url: string, body?: unknown): Promise<BuilderResult<T>> => request<T>('DELETE', url, body, draft),
+    };
+}

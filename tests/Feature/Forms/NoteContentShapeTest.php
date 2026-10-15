@@ -58,6 +58,7 @@ function noteContentAuthor(): array
     enterTenant($tenant->id, $admin->id);
     makeActiveMember($admin, 'admin');
     $form = app(FormService::class)->create($tenant, $admin, 'Welcome Page');
+    test()->withHeaders(builderHeaders($form));
 
     $add = test()->actingAs($admin)
         ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => 'note'])

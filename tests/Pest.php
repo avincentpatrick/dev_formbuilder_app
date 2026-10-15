@@ -283,6 +283,19 @@ function addFormField(FormVersion $version, User $user, string $key, FieldType $
     ], $extra));
 }
 
+/**
+ * M172 (`R-81756e95`) — the header every builder write carries: the draft the page was loaded with. Read off the
+ * model as the test last loaded it, never re-queried (a read after an HTTP request has lost the tenant context, so a
+ * query would send an empty header and the 428 would hide the case's real subject). A test that publishes in between
+ * refreshes the form first — or keeps the old instance on purpose, to play a stale tab.
+ *
+ * @return array<string, string>
+ */
+function builderHeaders(Form $form): array
+{
+    return ['X-Builder-Draft' => (string) $form->draft_version_id];
+}
+
 /*
 |--------------------------------------------------------------------------
 | Shared expression-engine builders (Increment F2). Unit tests do NOT boot the container (only Feature

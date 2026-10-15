@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Tenant;
 use App\Exceptions\Forms\BuilderConflictException;
 use App\Exceptions\Forms\FormException;
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\EnsureBuilderDraftCurrent;
 use App\Http\Requests\Forms\ConvertFieldRequest;
 use App\Models\Form;
 use App\Models\FormField;
@@ -91,6 +92,14 @@ final class FormFieldConversionController extends Controller
 
             return response()->json(['message' => $e->getMessage(), 'current' => $current], 409);
         } catch (FormException $e) {
+            // M172 (`R-81756e95`): a row a publish has moved past answers the builder's recoverable 409, as in
+            // FormBuilderController::respond().
+            $form = request()->route('form');
+
+            if ($e->isChildSuperseded() && $form instanceof Form) {
+                return EnsureBuilderDraftCurrent::superseded($form);
+            }
+
             return response()->json(['message' => $e->getMessage()], 422);
         }
     }

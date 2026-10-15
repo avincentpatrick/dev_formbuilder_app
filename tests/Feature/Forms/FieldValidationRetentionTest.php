@@ -61,7 +61,10 @@ function ruleRetentionForm(): array
     enterTenant($tenant->id, $admin->id);
     makeActiveMember($admin, 'admin');
 
-    return [$admin, app(FormService::class)->create($tenant, $admin, 'Imported survey')];
+    $form = app(FormService::class)->create($tenant, $admin, 'Imported survey');
+    test()->withHeaders(builderHeaders($form));
+
+    return [$admin, $form];
 }
 
 function ruleRetentionAddField(User $admin, Form $form, string $type): FormField

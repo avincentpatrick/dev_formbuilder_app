@@ -25,6 +25,7 @@ use App\Exceptions\Tenancy\MembershipException;
 use App\Exceptions\Xlsform\XlsformImportException;
 use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\EnforcePlatformMaintenance;
+use App\Http\Middleware\EnsureBuilderDraftCurrent;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureSuperAdminMfa;
 use App\Http\Middleware\EnsureVerifiedEmail;
@@ -174,6 +175,9 @@ return Application::configure(basePath: dirname(__DIR__))
             // could only ever fire on a self-disable and would answer it with "upgrade your plan". See
             // RequireModule / ModuleDisabledException.
             'module' => RequireModule::class,
+            // builder.draft (M172, `R-81756e95`) — a builder write from a page loaded against a superseded draft is refused
+            // 409 before any FormRequest validates it. See EnsureBuilderDraftCurrent.
+            'builder.draft' => EnsureBuilderDraftCurrent::class,
         ]);
 
         // Middleware ordering (ADR-0002 §D3). The tenancy pipeline must ESTABLISH the RLS session

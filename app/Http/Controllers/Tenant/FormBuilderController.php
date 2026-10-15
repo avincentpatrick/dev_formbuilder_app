@@ -8,6 +8,7 @@ use App\Enums\FieldType;
 use App\Exceptions\Forms\BuilderConflictException;
 use App\Exceptions\Forms\FormException;
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\EnsureBuilderDraftCurrent;
 use App\Http\Requests\Forms\SaveFieldToLibraryRequest;
 use App\Http\Requests\Forms\StoreFieldFromLibraryRequest;
 use App\Http\Requests\Forms\StoreFieldRequest;
@@ -125,6 +126,18 @@ final class FormBuilderController extends Controller
         });
     }
 
+    /**
+     * M172 (`R-a44638b6`, `D133`) — the number the delete dialog states before a question responses answered is deleted
+     * from the draft. A READ: no `builder.draft` check and no `respond()` mapping. A question of another form is not this
+     * form's to count.
+     */
+    public function answeredCount(Form $form, FormField $field): JsonResponse
+    {
+        abort_unless($field->version()->where('form_id', $form->id)->exists(), 404);
+
+        return response()->json(['responses' => $this->builder->answeredCount($form, $field)]);
+    }
+
     public function duplicateField(Request $request, Form $form, FormField $field): JsonResponse
     {
         return $this->respond(fn (): array => $this->presenter->field(
@@ -220,9 +233,11 @@ final class FormBuilderController extends Controller
     }
 
     /**
-     * Run a builder mutation and JSON-encode its result, mapping the two builder exceptions to status:
+     * Run a builder mutation and JSON-encode its result, mapping the builder exceptions to status:
      *  - 409 + the fresh row on optimistic-concurrency drift (the ConflictDialog reconciles);
-     *  - 422 + the message on a draft-guard / no-draft violation (the builder shows an error + refetches).
+     *  - 409 `draft_superseded` when the row is in a version a publish has moved past (M172, `R-81756e95`) — the
+     *    race `builder.draft` cannot see; the builder reloads and replays its unsaved edits by key;
+     *  - 422 + the message on any other draft-guard / no-draft violation (the builder shows the error).
      *
      * @param  Closure(): array<string, mixed>  $op
      */
@@ -237,6 +252,12 @@ final class FormBuilderController extends Controller
 
             return response()->json(['message' => $e->getMessage(), 'current' => $current], 409);
         } catch (FormException $e) {
+            $form = request()->route('form');
+
+            if ($e->isChildSuperseded() && $form instanceof Form) {
+                return EnsureBuilderDraftCurrent::superseded($form);
+            }
+
             return response()->json(['message' => $e->getMessage()], 422);
         }
     }

@@ -319,7 +319,7 @@ const guide: ChapterDraft[] = [
                         ['Reorder: drag a question or a section by its handle (the six dots on its left). Without a mouse, focus the handle, press Enter or Space, move with the arrow keys, then press Enter again.'],
                         ['Rename: double-click a question’s label in ', ui('Structure', BUILDER), ' and type. Press Enter to keep it.'],
                         ['Copy: ', ui('Duplicate field', CANVAS), ' adds a copy right below the question.'],
-                        ['Delete: ', ui('Delete field', CANVAS), ' for a question, ', ui('Delete section', CANVAS), ' for a section. ', ui('Undo', BUILDER), ' brings it back.'],
+                        ['Delete: ', ui('Delete field', CANVAS), ' for a question, ', ui('Delete section', CANVAS), ' for a section. ', ui('Undo', BUILDER), ' brings it back. If responses already hold answers to the question, you are told how many first: they keep them, marked as removed from the form.'],
                     ),
                 ],
             },
@@ -493,6 +493,8 @@ const guide: ChapterDraft[] = [
                 blocks: [
                     p('Every publish is kept. On the form’s own page, the ', ui('Versions', HUB), ' panel lists them (in the forms list it is ', ui('Version history', ROW_ACTIONS), '):'),
                     list(
+                        [ui('What changed', HUB), ' — the questions that version added, removed or changed, with the note written when it was published.'],
+                        [ui('View', HUB), ' — open that version read-only, exactly as it asked its questions. You can try them; nothing is saved.'],
                         [ui('Print blank', HUB), ' — a paper copy of that version to print and fill in by hand.'],
                         [ui('Restore', HUB), ' — copy an older version back into your draft (confirm with ', ui('Restore into draft', HUB), '). It changes nothing live until you publish again.'],
                     ),
@@ -791,7 +793,7 @@ const reference: ChapterDraft[] = [
                 title: 'Advanced',
                 blocks: [
                     list(
-                        [ui('Field key', CONFIG), ' — the question’s short name, used in exports, formulas and conditions. Lowercase and unique in the form.'],
+                        [ui('Field key', CONFIG), ' — the question’s short name, used in exports, formulas and conditions. Lowercase and unique in the form: if another question already uses the key you type, the builder says so and saves the next free one (for example age_2).'],
                         [ui('Section', CONFIG), ' — move the question into a section, or to ', ui('No section (top level)', CONFIG), '.'],
                         [
                             '“', ui('Show this question only when…', CONFIG), '” — ask the question only when earlier answers make it relevant. Click ', ui('Add condition', CONDITIONS),

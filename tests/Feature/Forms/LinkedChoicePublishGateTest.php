@@ -176,6 +176,7 @@ it('refuses once the owner is no longer an active member, though their role and 
 
 it('saves a link through the builder, and refuses a link carrying any other key', function (): void {
     $form = app(FormService::class)->create($this->tenant, $this->admin, 'Referral');
+    test()->withHeaders(builderHeaders($form));
     $add = $this->actingAs($this->admin)
         ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => 'dropdown'])->assertOk();
     $patch = fn (array $source) => $this->actingAs($this->admin)

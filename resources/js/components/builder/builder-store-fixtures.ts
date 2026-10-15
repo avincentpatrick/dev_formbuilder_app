@@ -34,6 +34,8 @@ export interface LoggedRequest {
     method: string;
     url: string;
     body: unknown;
+    /** M172 — the headers it carried, so a test can see the draft a write names. */
+    headers: Record<string, string>;
 }
 
 /** Every request the store sent, in order — so a test asserts the exact sequence and bodies, not a count. */
@@ -46,6 +48,7 @@ export function requestLog(mock: ReturnType<typeof vi.fn>): LoggedRequest[] {
             method: init?.method ?? 'GET',
             url,
             body: typeof raw === 'string' ? (JSON.parse(raw) as unknown) : undefined,
+            headers: (init?.headers ?? {}) as Record<string, string>,
         };
     });
 }

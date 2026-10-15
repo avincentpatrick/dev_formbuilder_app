@@ -57,7 +57,10 @@ final class FormHubPresenter
     /** Rows in the "latest responses" panel — a taste, not a list; the Submissions tab is the list. */
     private const int RECENT_LIMIT = 5;
 
-    public function __construct(private readonly FormSharePresenter $share) {}
+    public function __construct(
+        private readonly FormSharePresenter $share,
+        private readonly VersionChangeSummary $changes,
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -70,6 +73,9 @@ final class FormHubPresenter
 
         /** @var Collection<int, FormVersion> $versions */
         $versions = $form->versions()->orderByDesc('version_number')->get();
+        // M172 (`R-52f5ad93`, `D133`): what each published version changed, by the questions' own labels — from the rows
+        // just loaded, so it costs no query of its own.
+        $changes = $this->changes->for($versions);
 
         $payload = [
             'form' => [
@@ -89,6 +95,7 @@ final class FormHubPresenter
                 'version_number' => $v->version_number,
                 'status' => $v->status->value,
                 'published_at' => $v->published_at?->toIso8601String(),
+                'changes' => $changes[(string) $v->id] ?? null,
             ])->all(),
             'recent' => $this->recent($form, $user),
             'tabs' => FormTabSet::for($form, $user),

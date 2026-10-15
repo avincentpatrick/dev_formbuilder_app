@@ -582,7 +582,8 @@ describe('ConfigPanel — a refused save marks the field (M128, R-d001de0c)', ()
         const other = field({ uid: 'f2', id: 'fld-2', key: 'age', label: 'Age' });
         const wrapper = mountPanel(makeStore({ field: selected, fields: [selected, other], errors: { f2: { label: ['Bad.'] } } }));
 
-        expect(wrapper.find('[role="alert"]').text()).toContain('“Age” has a change that was not saved. Select it to see why.');
+        // M172 (`R-733eff09`): named WITH its reason — "Select it to see why" said neither, and opened the wrong tab.
+        expect(wrapper.find('[role="alert"]').text().replace(/\s+/g, ' ')).toContain('“Age” was not saved. Label: Bad.');
         expect(wrapper.find('[aria-invalid="true"]').exists()).toBe(false);
     });
 

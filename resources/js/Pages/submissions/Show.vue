@@ -23,7 +23,7 @@ import PageHeader from '@/components/shell/PageHeader.vue';
 import ScanPages from '@/components/ocr/ScanPages.vue';
 import type { ScanPage } from '@/components/ocr/scan-review';
 
-type FieldRow = { key: string; label: string; value: string };
+type FieldRow = { key: string; label: string; value: string; removed_in?: number | null };
 /**
  * `id` is a stable unique key for the block, not a section id — a repeatable section emits one block per
  * stored instance (Increment H6b) carrying `"{sectionId}#{n}"`, so `fields` can legitimately be empty for
@@ -353,7 +353,11 @@ function formatDate(iso: string | null): string {
                     <p v-if="block.fields.length === 0" class="detail__empty">No entries.</p>
                     <dl v-else class="detail__answers">
                         <div v-for="field in block.fields" :key="field.key" class="detail__answer">
-                            <dt>{{ field.label }}</dt>
+                            <dt>
+                                {{ field.label }}
+                                <!-- M172 (`R-a44638b6`, `D133`): an answer to a question the current version no longer asks, kept and marked. -->
+                                <MdsBadge v-if="field.removed_in" variant="neutral" :label="`Removed from the form in version ${field.removed_in}`" data-removed-in />
+                            </dt>
                             <dd>{{ field.value || '—' }}</dd>
                         </div>
                     </dl>

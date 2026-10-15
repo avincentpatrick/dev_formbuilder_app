@@ -40,6 +40,7 @@ beforeEach(function (): void {
     enterTenant($this->tenant->id, $this->admin->id);
     makeActiveMember($this->admin, 'admin');
     $this->form = app(FormService::class)->create($this->tenant, $this->admin, 'Imported');
+    $this->withHeaders(builderHeaders($this->form));
 });
 
 afterEach(function (): void {

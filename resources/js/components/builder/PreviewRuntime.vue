@@ -92,6 +92,12 @@ const props = defineProps<{
     reordering?: boolean;
     draggingKey?: string | null;
     dropId?: string | null;
+    /**
+     * M172 (`R-52f5ad93`) — a published version opened from the hub's Versions panel: the form exactly as that version
+     * asked it, answerable to try (nothing is saved), and NONE of the author's controls — no grip, no label pencil, no
+     * "Add a question", no "Add section". Those edit the draft, and this is not the draft.
+     */
+    readOnly?: boolean;
 }>();
 
 // M139: the author's own controls in the preview. The pane turns them into a selection and an opened palette.
@@ -229,6 +235,7 @@ function issuesFor(field: RenderField): ProjectionIssue[] {
  * is drawn inert whatever its condition, and a question the engine has not met yet errs toward being shown.
  */
 function showsTools(field: RenderField): boolean {
+    if (props.readOnly === true) return false; // M172: a published version is looked at, never edited
     return isCaptureField(field) || !engineKnows(runtime, field.key) || runtime.fieldRelevance.value[field.key] === true;
 }
 
@@ -338,7 +345,7 @@ function go(delta: number): void {
         </div>
 
         <p v-if="steps.length === 0" class="preview__empty">
-            Nothing to show yet. Add a question, and it appears here as a respondent will see it.
+            {{ readOnly ? 'This version asked no questions.' : 'Nothing to show yet. Add a question, and it appears here as a respondent will see it.' }}
         </p>
 
         <!-- ⛔ `v-else` AND `v-for` MAY NOT SHARE AN ELEMENT — Vue 3 gives `v-if` priority over `v-for`, so
@@ -412,7 +419,7 @@ function go(delta: number): void {
                                 <span v-if="marker(field)" class="preview__req" aria-hidden="true">*</span>
                             </p>
                             <p v-if="runtime.hintFor(field)" class="preview__inert-hint">{{ runtime.hintFor(field) }}</p>
-                            <p class="preview__inert-note">Shown to respondents, but not interactive while you edit.</p>
+                            <p class="preview__inert-note">{{ readOnly ? 'Shown to respondents, but not interactive here.' : 'Shown to respondents, but not interactive while you edit.' }}</p>
                         </div>
                         <FieldRow v-else :field="field" />
 
@@ -425,6 +432,7 @@ function go(delta: number): void {
                 </div>
 
                 <div
+                    v-if="!readOnly"
                     class="preview__author"
                     :class="{ 'preview__drop--active': dropId === pageEndId(block.step) }"
                     data-preview-author
@@ -480,7 +488,7 @@ function go(delta: number): void {
             </div>
         </section>
 
-        <div class="preview__author preview__author--end" data-preview-author-end>
+        <div v-if="!readOnly" class="preview__author preview__author--end" data-preview-author-end>
             <MdsButton v-if="steps.length === 0" type="button" variant="tertiary" size="sm" icon-left="plus" @click="emit('add-question', null)">
                 Add a question
             </MdsButton>

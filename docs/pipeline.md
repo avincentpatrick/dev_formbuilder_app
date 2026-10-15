@@ -50,7 +50,7 @@ may touch a hub. The close-out artefacts every increment touches by procedure ar
 - `R-10b38d6d` — Template cards' "Use this template" buttons sit at different heights across a row. · ready
 - `R-5033e87e` — A grid's cells are all single choices from one shared list: no column can have its own type or its own choices, so a table of names, numbers, dates a… · ready
 - `R-f655f9b1` — Only a Single choice or Dropdown can take its choices from another form's answers; a Multiple choice cannot. · ready
-- `R-d8c2ce84` — The builder preview shows neither a list-backed cascade's choices nor a list taken from another form; it says the choices show on the live form. · ready
+- `R-7418e6bd` — Rows and columns cannot be added or renamed in the builder preview; the Grid tab is the only editor. · ready
 - `R-4c4e35ae` — The builder's request-layer uniqueness rules say nothing about the publish race `D30` decided to leave. · blocked (precondition: row is latent)
 
 ⚠️ **This section is CUT, and the rest of the tier is not shown here.** 29 more ready and 0 more
@@ -72,18 +72,18 @@ grouping a batch.
 | 9 | `R-10b38d6d` | Template cards' "Use this template" buttons sit at different heights across a row. | early-testing | `docs/feature-backlog.md:14201` | — | ready | — | — |
 | 10 | `R-5033e87e` | A grid's cells are all single choices from one shared list: no column can have its own type or its own choices, so a table of names, numbers, dates a… | early-testing | `docs/feature-backlog.md:14375` | — | ready | — | — |
 | 11 | `R-f655f9b1` | Only a Single choice or Dropdown can take its choices from another form's answers; a Multiple choice cannot. | early-testing | `docs/feature-backlog.md:14414` | — | ready | — | — |
-| 12 | `R-d8c2ce84` | The builder preview shows neither a list-backed cascade's choices nor a list taken from another form; it says the choices show on the live form. | early-testing | `docs/feature-backlog.md:14444` | — | ready | — | — |
-| 13 | `R-7418e6bd` | Rows and columns cannot be added or renamed in the builder preview; the Grid tab is the only editor. | early-testing | `docs/feature-backlog.md:14462` | — | ready | — | — |
-| 14 | `R-96127b20` | The palette's "Adv" tooltip promises an advanced editor "coming with the form engine", and the settings panel carries a baseline note no type can rea… | early-testing | `docs/feature-backlog.md:14502` | — | ready | — | — |
-| 15 | `R-3e6358ed` | Nothing tells an author what each question type can do on each surface, and the testers asked whether the advanced types are ready to use. | early-testing | `docs/feature-backlog.md:14510` | — | ready | — | — |
-| 16 | `R-c64d0afd` | What a media cell should SAY beyond a filename, and what shape a grid answer takes in a spreadsheet, are two product questions `M74` deliberately did… | early-testing | `docs/feature-backlog.md:6607` | — | ready | — | — |
-| 17 | `R-8ee7d2dc` | The scanned-forms and scan-status pages cap themselves at 720px, and the recent-scans list runs each row from one edge to the other. | early-testing | `docs/feature-backlog.md:14159` | — | ready | — | — |
-| 18 | `R-14971e37` | The form's Settings tab stretches every section's inputs across the whole width. | early-testing | `docs/feature-backlog.md:14168` | — | ready | — | — |
-| 19 | `R-348f997c` | The form hub and the submission page stack their facts above their tables, so on a wide screen every row runs from one edge of the glass to the other. | early-testing | `docs/feature-backlog.md:14176` | — | ready | — | — |
-| 20 | `R-3ca62317` | The console's "Reset two-step sign-in" dialog relies on browser-default paragraph margins. | early-testing | `docs/feature-backlog.md:14279` | — | ready | — | — |
-| 21 | `R-52f5ad93` | An author cannot see what changed between a form's versions or open an old version: the hub's Versions panel shows version, status and date only, and… | early-testing | `docs/feature-backlog.md:14365` | — | ready | — | — |
-| 22 | `R-1c1d7266` | A grid is drawn as a stack of row cards, never as a table, on the web form, manual entry and the builder preview. | early-testing | `docs/feature-backlog.md:14394` | — | ready | — | — |
-| 23 | `R-51e044a6` | A grid answer reaches a spreadsheet as one cell, so a Sheets or Airtable column cannot map a single cell of it. | early-testing | `docs/feature-backlog.md:14403` | — | ready | — | — |
+| 12 | `R-7418e6bd` | Rows and columns cannot be added or renamed in the builder preview; the Grid tab is the only editor. | early-testing | `docs/feature-backlog.md:14462` | — | ready | — | — |
+| 13 | `R-96127b20` | The palette's "Adv" tooltip promises an advanced editor "coming with the form engine", and the settings panel carries a baseline note no type can rea… | early-testing | `docs/feature-backlog.md:14502` | — | ready | — | — |
+| 14 | `R-3e6358ed` | Nothing tells an author what each question type can do on each surface, and the testers asked whether the advanced types are ready to use. | early-testing | `docs/feature-backlog.md:14510` | — | ready | — | — |
+| 15 | `R-c64d0afd` | What a media cell should SAY beyond a filename, and what shape a grid answer takes in a spreadsheet, are two product questions `M74` deliberately did… | early-testing | `docs/feature-backlog.md:6607` | — | ready | — | — |
+| 16 | `R-8ee7d2dc` | The scanned-forms and scan-status pages cap themselves at 720px, and the recent-scans list runs each row from one edge to the other. | early-testing | `docs/feature-backlog.md:14159` | — | ready | — | — |
+| 17 | `R-14971e37` | The form's Settings tab stretches every section's inputs across the whole width. | early-testing | `docs/feature-backlog.md:14168` | — | ready | — | — |
+| 18 | `R-348f997c` | The form hub and the submission page stack their facts above their tables, so on a wide screen every row runs from one edge of the glass to the other. | early-testing | `docs/feature-backlog.md:14176` | — | ready | — | — |
+| 19 | `R-3ca62317` | The console's "Reset two-step sign-in" dialog relies on browser-default paragraph margins. | early-testing | `docs/feature-backlog.md:14279` | — | ready | — | — |
+| 20 | `R-52f5ad93` | An author cannot see what changed between a form's versions or open an old version: the hub's Versions panel shows version, status and date only, and… | early-testing | `docs/feature-backlog.md:14365` | — | ready | — | — |
+| 21 | `R-1c1d7266` | A grid is drawn as a stack of row cards, never as a table, on the web form, manual entry and the builder preview. | early-testing | `docs/feature-backlog.md:14394` | — | ready | — | — |
+| 22 | `R-51e044a6` | A grid answer reaches a spreadsheet as one cell, so a Sheets or Airtable column cannot map a single cell of it. | early-testing | `docs/feature-backlog.md:14403` | — | ready | — | — |
+| 23 | `R-d8c2ce84` | The builder preview shows neither a list-backed cascade's choices nor a list taken from another form; it says the choices show on the live form. | early-testing | `docs/feature-backlog.md:14444` | — | ready | — | — |
 | 24 | `R-bb79aec0` | A grid's rows, columns and choices must be typed by hand: none can come from a list file or another form's answers, so a grid of barangays or facilit… | early-testing | `docs/feature-backlog.md:14452` | — | ready | — | — |
 | 25 | `R-70c7673a` | The Philippine Standard Geographic Code is not in the app: an author must build and upload four CSV files per form, and nothing keeps them current wi… | early-testing | `docs/feature-backlog.md:14471` | — | ready | — | — |
 | 26 | `R-7b8a74ae` | The webhook, integration-rule and console workspace pages stack two fact cards over a full-width log, and the console's dialogs rely on browser-defau… | early-testing | `docs/feature-backlog.md:14185` | — | ready | — | — |
@@ -523,7 +523,7 @@ rather than dropped, so that this file and its sources cannot disagree about wha
 
 ## What this file cannot see
 
-Scanned **1002 file(s)**, and `scripts/pipeline-lint.php` gates this file on every push. It
+Scanned **1003 file(s)**, and `scripts/pipeline-lint.php` gates this file on every push. It
 refuses a hand edit, a roadmap phase claiming work in flight without naming a live row, a
 second queue, a held row missing from either this line or the stop-list that guards unattended
 work, a documented column that exists, is used by nothing and is scheduled nowhere, a row or

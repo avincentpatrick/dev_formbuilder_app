@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Enums\FieldType;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
 use App\Models\Form;
+use App\Models\FormField;
 use App\Models\User;
+use App\Services\Forms\PublishService;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RolePermissionSeeder;
@@ -317,4 +320,32 @@ it('sends no scope node name for a form that belongs to none', function (): void
         ->get(hubUrl($this->form))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('form.scope_node_name', null)->etc());
+});
+
+it('says what each published version changed, by the questions\' own labels (M172, D133)', function (): void {
+    // v2: `color` removed, `notes` added, `full_name` relabelled — against v1, which asked all four of its questions.
+    enterTenant($this->tenant->id, $this->owner->id);
+    $draft = $this->form->refresh()->draftVersion;
+    FormField::query()->where('form_version_id', $draft->id)->where('key', 'color')->firstOrFail()->delete();
+    FormField::query()->where('form_version_id', $draft->id)->where('key', 'full_name')->firstOrFail()->update(['label' => 'Your name']);
+    addFormField($draft, $this->owner, 'notes', FieldType::ShortText, 4);
+    app(PublishService::class)->publish($this->form->refresh(), $this->owner, 'Shorter form for the field team.');
+
+    $this->withoutVite()
+        ->actingAs($this->owner)
+        ->get(hubUrl($this->form))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('versions', 3)
+            ->where('versions.0.status', 'draft')
+            ->where('versions.0.changes', null)
+            ->where('versions.1.version_number', 2)
+            ->where('versions.1.changes.first', false)
+            ->where('versions.1.changes.added', ['Notes'])
+            ->where('versions.1.changes.removed', ['Color'])
+            ->where('versions.1.changes.changed', ['Your name'])
+            ->where('versions.1.changes.note', 'Shorter form for the field team.')
+            ->where('versions.2.version_number', 1)
+            ->where('versions.2.changes.first', true)
+            ->etc());
 });

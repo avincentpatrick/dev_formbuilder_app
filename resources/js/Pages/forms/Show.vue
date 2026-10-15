@@ -57,6 +57,16 @@ type VersionRow = {
     version_number: number;
     status: string;
     published_at: string | null;
+    /** M172 (`R-52f5ad93`): what a published version changed, by label; null for the draft. */
+    changes: VersionChanges | null;
+};
+
+type VersionChanges = {
+    first: boolean;
+    added: string[];
+    removed: string[];
+    changed: string[];
+    note: string | null;
 };
 
 type RecentRow = {
@@ -235,7 +245,30 @@ const versionColumns: DataTableColumn[] = [
     { key: 'version_number', header: 'Version' },
     { key: 'status', header: 'Status' },
     { key: 'published_at', header: 'Published' },
+    // M172 (`R-52f5ad93`, `D133`): what each version changed, in the questions' own words.
+    { key: 'changes', header: 'What changed' },
 ];
+
+/**
+ * M172 (`R-52f5ad93`) — a version's changes as one line per kind, by the questions' labels. The draft says nothing: what it
+ * changes is decided when it is published.
+ */
+function changeLines(changes: VersionChanges | null): string[] {
+    if (changes === null) return [];
+    if (changes.first) return ['First version.'];
+    const lines = [
+        changes.added.length > 0 ? `Added: ${changes.added.join(', ')}` : null,
+        changes.removed.length > 0 ? `Removed: ${changes.removed.join(', ')}` : null,
+        changes.changed.length > 0 ? `Changed: ${changes.changed.join(', ')}` : null,
+    ].filter((line): line is string => line !== null);
+
+    return lines.length > 0 ? lines : ['No questions changed.'];
+}
+
+/** M172 — an old version opened read-only through the builder's preview (`FormVersionViewController`). */
+function viewVersion(version: VersionRow): void {
+    router.visit(`/forms/${props.form.id}/versions/${version.id}/view`);
+}
 
 // ── Actions ──────────────────────────────────────────────────────────────────────────────────────────────
 const shareOpen = ref(false);
@@ -449,6 +482,13 @@ function isPrintable(version: VersionRow): boolean {
                     <MdsBadge v-bind="statusVariant(String(value))" dot />
                 </template>
                 <template #cell-published_at="{ row }">{{ formatDate(row.published_at) }}</template>
+                <template #cell-changes="{ row }">
+                    <div v-if="row.changes" class="hub__changes" data-version-changes>
+                        <p v-for="line in changeLines(row.changes)" :key="line" class="hub__changes-line">{{ line }}</p>
+                        <p v-if="row.changes.note" class="hub__changes-note">“{{ row.changes.note }}”</p>
+                    </div>
+                    <span v-else>—</span>
+                </template>
                 <template #row-actions="{ row }">
                     <div class="hub__row-actions">
                         <!--
@@ -457,6 +497,16 @@ function isPrintable(version: VersionRow): boolean {
                             own comment that it is a proxy standing in for a view flag it does not have;
                             this page has the real one, so it uses it.
                         -->
+                        <MdsButton
+                            v-if="can.template && isPrintable(row)"
+                            variant="tertiary"
+                            size="sm"
+                            icon-left="monitor"
+                            data-version-view
+                            @click="viewVersion(row)"
+                        >
+                            View
+                        </MdsButton>
                         <MdsButton
                             v-if="can.template && isPrintable(row)"
                             variant="tertiary"
@@ -599,5 +649,24 @@ function isPrintable(version: VersionRow): boolean {
     .hub__meta {
         gap: var(--mds-space-4);
     }
+}
+
+/* M172 (`R-52f5ad93`): what a version changed — one short line per kind, the publisher's note under it. */
+.hub__changes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-1);
+    min-width: 0;
+}
+
+.hub__changes-line,
+.hub__changes-note {
+    margin: 0;
+    font-size: var(--mds-type-body-sm-font-size);
+    overflow-wrap: anywhere;
+}
+
+.hub__changes-note {
+    color: var(--mds-color-text-secondary);
 }
 </style>

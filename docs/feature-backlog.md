@@ -14447,7 +14447,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   list's rows or a link's answers, so an author checks a PSGC cascade or a linked list only on the published form. The remedy: a
   tenant route beside the choice-list routes (`routes/tenant.php:1098-1107`) returns the draft's linked lists and the first 200 rows
   of each list-bound question with "showing 200 of N", and the preview merges them the way the guest runtime does
-  (`resources/public-runtime/lib/linked-choices.ts:89-112`). **Live.** Filed by `M172`. **Tier: early-testing.**
+  (`resources/public-runtime/lib/linked-choices.ts:89-112`). **Live.** Filed by `M172`. **Tier: early-testing.** **Amended 2026-10-15 by `M172`:** an old version opened read-only from the hub (`resources/js/Pages/forms/VersionView.vue`) draws `schemaWithoutListOptions()` through the same preview, so a list-backed cascade shows no choices there either; the same route closes both.
 
 - **`minor` · A grid's rows, columns and choices must be typed by hand: none can come from a list file or another form's answers, so a grid of barangays or facilities is retyped on every form.**
   The testers' comment (2026-10-15): *"rows can be determined thru the list from the shared responses from other form or uploaded

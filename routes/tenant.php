@@ -36,6 +36,7 @@ use App\Http\Controllers\Tenant\FormShareController;
 use App\Http\Controllers\Tenant\FormShareQrController;
 use App\Http\Controllers\Tenant\FormTemplateController;
 use App\Http\Controllers\Tenant\FormThemeController;
+use App\Http\Controllers\Tenant\FormVersionViewController;
 use App\Http\Controllers\Tenant\FormXlsformController;
 use App\Http\Controllers\Tenant\GoogleCompleteController;
 use App\Http\Controllers\Tenant\HelpController;
@@ -576,6 +577,12 @@ Route::middleware([
     Route::get('/forms/{form}/versions/{version}/print', FormPrintController::class)
         ->scopeBindings()
         ->middleware('can:view,form')->name('forms.print');
+
+    // M172 (`R-52f5ad93`, `D133`): an old version opened read-only from the hub's Versions panel — Print blank's shape and
+    // gate, the draft refused in the controller for the same reason.
+    Route::get('/forms/{form}/versions/{version}/view', FormVersionViewController::class)
+        ->scopeBindings()
+        ->middleware('can:view,form')->name('forms.versions.view');
 
     // Interactive builder (Increment D4a) — the three-pane workspace + its fine-grained mutation surface.
     // `show` renders the page; the rest are JSON edits the builder's CSRF fetch sidecar calls directly

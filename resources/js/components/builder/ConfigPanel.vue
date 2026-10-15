@@ -381,6 +381,14 @@ function saveToLibrary(): void {
     if (field.value) void props.store.saveFieldToLibrary(field.value.uid);
 }
 
+// M170 (`R-fdc743ab`, `R-76474e31`): an edit whose save failed with nothing to correct — the network, an ended session — is
+// sent again from the alert. Absent from a test double, which reads as nothing to retry.
+const hasUnsaved = props.store.hasUnsaved;
+
+function retry(): void {
+    void props.store.retryUnsaved();
+}
+
 watch(librarySaved, (value) => {
     if (value !== null) {
         setTimeout(() => {
@@ -404,6 +412,7 @@ watch(librarySaved, (value) => {
              place it could not belong. -->
         <div v-if="saveError || saveIssues.length > 0" class="config__error" role="alert">
             <p v-if="saveError">{{ saveError }}</p>
+            <MdsButton v-if="hasUnsaved" class="config__retry" size="sm" variant="secondary" @click="retry">Retry</MdsButton>
             <ul v-if="saveIssues.length > 0"><li v-for="issue in saveIssues" :key="issue">{{ issue }}</li></ul>
         </div>
 
@@ -876,6 +885,10 @@ watch(librarySaved, (value) => {
 .config__error p,
 .config__error ul {
     margin: 0;
+}
+
+.config__retry {
+    margin-top: var(--mds-space-2);
 }
 
 .config__error ul {

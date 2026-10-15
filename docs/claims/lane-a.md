@@ -16,13 +16,196 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M169`, a point or a comma stays on the word Vision read it after (`m169-ocr-punctuation-spacing`)
+## Status: ACTIVE CLAIM — `M172`, the two errors that block the testers: a builder tab left open across a publish, and what a delete says when responses hold the answers (`m172-testers-blockers`)
+
+Taken 2026-10-15 by the planning session (Fable) that planned the testers' seven first-round items
+(`~/.claude/plans/i-have-intial-comments-quirky-pascal.md`), under the testing freeze of 2026-10-13: this session writes the claim
+and the branch's first commit — the decisions `D128`–`D134`, the rows, the regenerated line — and the next session (Opus) builds
+on the same branch under this claim, extending it before opening any file not listed here. Branch `m172-testers-blockers`, cut from
+origin/main after this claim lands (the trunk read while planning was `0432d03b`), PR into main; nothing merges until the user says
+so, after a fresh staging backup (`D128`, the `D123` shape). The order of record (`D128`): this increment, then the UI programme's
+five remaining increments (`D123`), then the plan's T2–T6. ⚠️ The user's checks of `M170` (builder autosave, PR #363) and `M171`
+(the three UI fixes, PR #364) are still owed and open the build session before any step that depends on them.
+
+Rows taken (filed on the branch by this increment; ids are the title hashes): R-81756e95 (a builder tab left open across a publish is
+refused on the key, then on the published version, and a reload loses the edits), R-733eff09 (a key clash refused instead of avoided,
+shown on a tab the selection never opens — `D132`; folds `R-4c4e35ae`, takes `R-31ff7ade` and `R-d85d51d2` where the files
+coincide), R-a44638b6 (a delete that leaves answers behind says nothing — `D133`; the delete half of `R-9ea69e29`, the key half in
+R-733eff09), R-52f5ad93 (what changed between versions, and an old version opened read-only). Filed and NOT taken — the plan's later
+increments, in order after the UI programme: the grid part 1 (R-5033e87e, R-1c1d7266, R-51e044a6); options from anywhere (R-f655f9b1, R-3e7c81bb,
+R-596d6afd, R-d8c2ce84); the grid part 2 (R-bb79aec0, R-7418e6bd, `R-0a7275ce`); Philippine places (R-70c7673a, R-ed7f3127, `R-7a2f4a13`,
+`R-bbf03029` if its count is zero); every type ready (`R-af2d278b`, R-96127b20, R-3e6358ed); and at lower tiers R-ffd10da2, R-6e807a0e,
+R-d713c3bf, R-9ce9ca4b, R-bffbaa51. The sixteen UI rows (`R-fd7b8879`, `R-ba9d6349`, `R-8ee7d2dc`, `R-14971e37`, `R-348f997c`,
+`R-7b8a74ae`, `R-fb647b5e`, `R-10b38d6d`, `R-3d51f0ae`, `R-66952d33`, `R-2ce2f274`, `R-c7247dbf`, `R-49813d21`, `R-3ca62317`,
+`R-f724595b`, `R-9d3c2439`) are retiered `early-testing` with `D128` as the reason and keep their content.
+
+### Evidence verified
+- Opened on the trunk at `0432d03b` in the planning session (no running probe; the first real-browser two-tab publish is part of
+  the build's proof): `app/Http/Requests/Forms/UpdateFieldRequest.php:53-58` — the key's uniqueness is checked against
+  `$form->draft_version_id` ignoring only `$field->id`: held. `app/Services/Forms/FormBuilderService.php:592-597`
+  (`assertDraftChild()`) and `:645-666` (`assertStillDraftChild()`, which re-reads and tells a removed row from a published one):
+  held. `app/Services/Forms/PublishService.php:175-186` — the just-published draft is cloned into a new draft, "same keys, new
+  ids": held. `app/Exceptions/Forms/FormException.php:67-70` — the message: held, and its docblock already records that the
+  surface returns 422, not 403. `app/Http/Controllers/Tenant/FormBuilderController.php:229-242` — 409 + the fresh row for
+  `BuilderConflictException`, 422 + a bare message for `FormException`: held; `:225`'s docblock says the builder "refetches" on
+  that 422, and no refetch exists under `resources/js/components/builder` (grep: the only `refetch` is the library list).
+  `resources/js/components/builder/useBuilderStore.ts:136` (the burst verdict), `:151-162` (`saveState`), `:946-954`
+  (`settled()`: a refusal is not unsaved, so no Retry): held. `resources/js/components/builder/ConfigPanel.vue:76-81` (the
+  "Select it to see why" line at `:80`), `:163-173` (every selection resets to Basics), `:413-417` (the alert), `:605-612` (the key
+  error inline on Advanced only): held. `resources/js/Pages/forms/Builder.vue:201-222` — publish returns silently when
+  `saveState === 'failed'`: held. `resources/js/components/builder/edit-journal.ts:88-93` — the journal is keyed by the draft id,
+  by design: held. `app/Services/Forms/BuilderPresenter.php:83-86` — `draft: {id, version_number}` already reaches the page: held.
+  `docs/feature-backlog.md:2974-2976` — Inertia serves Back from history without a document load: held; `package.json` pins
+  `@inertiajs/vue3` `^3.6.0` and nothing under `resources/js` names `encryptHistory` or `popstate`.
+- Read by the exploration agent and NOT re-opened by this session — the build session opens each before relying on it:
+  `FormBuilderService.php:308-320` (the hard delete), `:317`, `:332`, `:367`, `:409`, `:523` (the other callers of the draft
+  guard), `:551-575` (reorder's silent no-op), `:903-928` (`uniqueKey()`, `copyKey()`); `useBuilderStore.ts:287-305`, `:986-1010`
+  (undo and the journal re-send kept keys); `tests/Feature/Forms/BuilderDraftGuardTest.php:66-84` (sends a NEW key);
+  `app/Services/Forms/FormHubPresenter.php:87-92` and `resources/js/Pages/forms/Show.vue:444-487` (the Versions panel);
+  `app/Services/Submissions/SubmissionInboxPresenter.php:251-295`; `app/Services/Submissions/SubmissionRowProjector.php:82`
+  (`resolveColumns()` — opened: held); `app/Services/Forms/SchemaChangeClassifier.php` (`change_summary` by key).
+
+### Premise verified
+- One session only (the user, 2026-10-13); this planning session ends before the build session starts, and the build continues
+  this branch rather than cutting a second one.
+- The client never creates a key: every key comes from the server (`uniqueKey()` / `copyKey()`), and every field save re-sends
+  `key` (`useBuilderStore.ts`'s `fieldPayload()`), which is why a stale id reads as a clash on an unchanged key.
+- The builder's writes carry no draft id today: no `draft_version` or `draftVersion` under `resources/js/components/builder`
+  (measured), while the page already holds `draft.id` — the remedy needs no new prop.
+- `M170`'s journal, Retry and "signed out" machinery is the thing to extend, not replace; the journal's per-draft key is a
+  deliberate design (its own comment says why), so re-keying it by form must carry the field key, which a publish keeps.
+- `R-036f3226` records the optimistic-concurrency token as client-optional; the draft id must not be optional, or a client that
+  omits it gets today's behaviour.
+- `D133` is the user's own design, recorded from their message; `D132` the user's words. Both are answered, so no row Awaits them.
+- `routes/tenant.php` is a hub (17 open rows cite it); `FormBuilderService.php`, `FormBuilderController.php`,
+  `UpdateFieldRequest.php`, `ConfigPanel.vue` and `Builder.vue` are hubs too — `D128` allows it inside this programme's increments
+  with every hub named here, each row in its own commits in a stated order.
+
+### Remedy verdict
+Measured by reading; the build session measures each live before writing its test.
+- The 409 before validation: a controller-level comparison of a request field (or header) with `$form->draft_version_id`, thrown
+  as a sibling of `BuilderConflictException` so `respond()`'s existing 409 arm carries it with the new draft's id and number —
+  works. Scoping the two uniqueness rules to the bound row's own version is one line each — works, and ALONE it would only turn the
+  symptom into the draft-guard 422, which is why the 409 comes first.
+- Replay by key: `edit-journal.ts` entries carry kind and id; adding the field key is additive, and the put-back after a reload
+  resolves the new id by key — works; the journal's storage key moves from the draft id to the form id.
+- The Back button: Inertia 3 restores a history entry without a server round trip; the builder page re-fetches its props on that
+  restoration (`router.on('navigate')` with a history-restored visit, or a `popstate` reload) — **most likely wrong in its
+  mechanism**, measured in a real browser before the test is written.
+- The suffix: `copyKey()`'s loop already finds the lowest free suffix — reused on a clash in `updateField()`; the response
+  carries the key kept and a notice. Rules naming the old key follow by the existing `resolveValidationSiblings()` path, which
+  today nulls a missing key (`R-9ea69e29`) — the write-through is the row's remedy.
+- The retired note: `SchemaChangeClassifier` computes `change_summary` by key at publish; the response page needs the current
+  published version's key set — one query — and the projector already unions keys across versions, so the header tag is a label
+  change, not a shape change. Works.
+- The Versions panel's View: the Print blank route already resolves a version's `schema_snapshot` (`routes/tenant.php:576`); a
+  sibling route renders it through the preview runtime read-only — works.
+
+Files: `app/Http/Controllers/Tenant/FormBuilderController.php`, `app/Http/Requests/Forms/UpdateFieldRequest.php`,
+`app/Http/Requests/Forms/UpdateSectionRequest.php`, `app/Services/Forms/FormBuilderService.php`,
+`app/Exceptions/Forms/FormException.php` (and a sibling exception for the superseded draft),
+`app/Services/Forms/FormHubPresenter.php`, `app/Services/Submissions/SubmissionInboxPresenter.php`,
+`app/Services/Submissions/SubmissionRowProjector.php`, `app/Services/Forms/BuilderPresenter.php`, `routes/tenant.php`;
+`resources/js/components/builder/builderClient.ts`, `useBuilderStore.ts`, `edit-journal.ts`, `ConfigPanel.vue`,
+`ConflictDialog.vue` (and a sibling dialog), `field-save-errors.ts`, `resources/js/Pages/forms/Builder.vue`,
+`resources/js/Pages/forms/Show.vue`; `tests/Feature/Forms/BuilderDraftGuardTest.php` and new Pest, Vitest and one new e2e spec;
+`docs/form-versioning-schema-migration.md` ("a key is never renamed" becomes the suffix rule); on the branch's first commit:
+`docs/claims/decisions.md` (`D128`–`D134`), `docs/feature-backlog.md` (twenty-two rows, twenty-seven amendments),
+`docs/pipeline.md`; close-out on the branch: `PROGRESS.md`, `docs/pipeline.md`; this file on main.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`,
+`docs/form-versioning-schema-migration.md`, `PROGRESS.md` (own block), one new `tests/e2e/*.spec.ts`.
+Paired files taken: none.
+Namespaces spent: `D128`–`D134` (asked and answered in the planning session, 2026-10-15; filed on the branch); nothing from the ADR
+or migration namespaces — no schema change.
+Prediction: a Pest case that sends the UNCHANGED key against a published field's id is red on the trunk with "The key has already
+been taken" and green with 409 `draft_superseded`; a Pest case for the server-side suffix is red on the trunk (422) and green
+after; the Vitest cases for the dialog, the replay by key, the inline key warning and the alert's per-question reasons are red on
+the trunk; the e2e two-tab case (tab B publishes from the hub, tab A edits) is red on the trunk with the key message. Mutations,
+each committed: the draft-id comparison dropped (the Pest case red), the replay dropped (Vitest red), the suffix dropped (Pest
+red), the retired note dropped (Pest red). PHPStan moves (new `app/` code) and is run in the container before the push. **Most
+likely wrong:** the Back-button mechanism — Inertia may already re-fetch a page whose component sets no `preserveState`, in which
+case the history case is green on the trunk and the remedy shrinks to the 409.
+
+### Extension 1 — the build session's files and twelve premise corrections (pushed before any added file is opened)
+
+Taken 2026-10-15 by the build session (Opus) on the same branch; plan `~/.claude/plans/pasted-content-id-1fb2-read-claude-md-hidden-creek.md`.
+**The user confirmed both owed checks on staging at this session's start: `M170` (Help text, a Maximum value rule and a Default value
+all survived F5, "All changes saved") and `M171` (four even tiles, the audit circles, the Connect buttons).** Nothing else is owed.
+
+Premise corrections, each read in the code by this session's exploration:
+1. Five builder writes take no FormRequest (store/destroy section, destroy field, duplicate, reorder), so the check before validation
+   is a route middleware on the builder's write routes; `FormFieldConversionController` holds its own copy of `respond()`.
+2. The client dereferences `result.current` on every 409 outside its error guard (`useBuilderStore.ts:262`, `:314`), counts a 409 on
+   delete as success, and ignores the result of a reorder — so the new 409 is THROWN by `builderClient.ts` as its own error type.
+3. Inertia 3.6's `router.reload()` keeps component state and the store never re-reads props, so the reload is a visit with
+   `preserveState: false` (the XLSForm import's own precedent in `Builder.vue`).
+4. Inertia 3.6 restores Back from cached props, and re-visits the server only when an encrypted entry cannot be decrypted
+   (`@inertiajs/core` `handlePopstateEvent`, `onMissingHistoryItem`) — so the remedy is history encryption on the builder page and
+   `clearHistory` on the publish response, measured in a real browser before its test is written.
+5. No delete confirmation exists today (`BuilderCanvas.vue`'s trash button calls the store directly; undo is the only recovery).
+6. Answers are counted in `submission_answers.answers` by key, not in `submission_answer_index` (queryable scalar fields only).
+7. The inbox has no per-answer columns, so the retired note lives on the response page and in the CSV/XLSX headers.
+8. `change_summary` holds keys only and is frozen after publish (`PublishedVersionGuard`), so the Versions panel derives labels from
+   adjacent `schema_snapshot`s when it is read.
+9. The design system's tabs carry no badge (`TabItem` is key and label only) — an optional `alert` flag is added there.
+10. `PreviewRuntime.vue` is built for authoring (grips, pencil, add buttons) — a `readOnly` prop gates them for the version view.
+11. `D30` is honoured, not re-opened: it chose a comment because both scopes ended in a dead 422; once the guard's refusal is a
+    recoverable 409, scoping each uniqueness rule to the bound row's own version gives the right answer inside the race.
+12. The required draft header reaches 13 Pest files and one e2e spec that write to the builder directly; nothing else under
+    `resources/js` writes there (every write goes through the store, `fetch` with `keepalive`, never `sendBeacon`).
+
+Files added: `app/Http/Middleware/EnsureBuilderDraftCurrent.php` (new), `bootstrap/app.php` (its alias),
+`app/Http/Controllers/Tenant/FormFieldConversionController.php`, `app/Http/Controllers/Tenant/FormPublishController.php`,
+`app/Http/Controllers/Tenant/FormVersionViewController.php` (new), `app/Exceptions/Forms/ChildNotInDraftException.php` (new),
+`app/Services/Forms/RetiredFieldKeys.php` (new), `app/Services/Forms/VersionChangeSummary.php` (new),
+`app/Services/Submissions/SubmissionExporter.php`; `resources/js/components/builder/BuilderCanvas.vue`, `PreviewRuntime.vue` (a hub),
+`types.ts`, `builder-store-fixtures.ts`, `DraftSupersededDialog.vue` (new), `DeleteFieldDialog.vue` (new) and their tests;
+`resources/js/Pages/forms/VersionView.vue` (new), `resources/js/Pages/forms/show.test.ts`, `resources/js/Pages/submissions/Show.vue`;
+`packages/design-system/src/components/Tabs/Tabs.vue`, `Tabs.test.ts`, `Tabs.stories.ts`; `resources/js/components/help/manual.ts`
+and `manual.test.ts`; `tests/Pest.php` (a `builderHeaders()` helper) and the Pest files that write to the builder
+(`tests/Feature/Forms/BuilderRoutesTest.php`, `BuilderSettingsRoundTripTest.php`, `FieldAppearanceSaveTest.php`,
+`FieldConfigRetentionTest.php`, `FieldConversionRoutesTest.php`, `FieldCreateRoundTripTest.php`, `FieldDefaultExpressionTest.php`,
+`FieldSaveAttributeNamesTest.php`, `FieldValidationRetentionTest.php`, `LinkedChoicePublishGateTest.php`, `NoteContentShapeTest.php`,
+`tests/Feature/Xlsform/XlsformAppearanceRoundTripTest.php`, and any further one a run finds), `tests/Feature/Forms/FormHubPageTest.php`,
+`tests/Feature/Forms/FormVersionViewTest.php` (new), `tests/Feature/Submissions/SubmissionExportTest.php`,
+`tests/Feature/Submissions/SubmissionInboxTest.php`; `tests/e2e/media-input-hidden-text.spec.ts`,
+`tests/e2e/builder-draft-superseded.spec.ts` (new); `docs/feature-backlog.md` (one row filed: a key edit leaves conditions, formulas
+and piping naming the old key).
+E2E specs this diff reaches, run locally and named here: `builder-draft-superseded`, `builder-settings-refresh`, `builder-structure`,
+`builder-preview-authoring`, `builder-axe`, `media-input-hidden-text`, `list-layout`, `responsive-axe`.
+Paired files taken: none. Namespaces: none (no migration, no ADR, no decision).
+
+### Extension 2 — `composer.lock`, for an advisory published during the build (pushed before the lock is opened)
+
+CI's Composer audit went red on the PR's second run (`38715293587`, Static analysis) and green on its first, 25 minutes earlier: a
+new advisory, CVE-2026-108082 (PKSA-xmwy-rmx5-m7h4, a ReDoS in `HeaderUtils::split()` reachable through the `Cache-Control` request
+header), covers the locked `symfony/http-foundation` v8.1.1 (fixed in 8.1.7). It reds every branch and the trunk's own post-merge run
+until the lock moves, and nothing in this increment caused it. File added: `composer.lock` (a patch-level update of that one
+package, `composer update symfony/http-foundation --no-install`, so the vendor a live local E2E run is serving is not touched).
+`composer.json` is not changed. The user approved merging this increment and `M169` in this session, after a fresh staging backup.
+
+## HELD — `M169`, a point or a comma stays on the word Vision read it after (`m169-ocr-punctuation-spacing`)
 
 Taken 2026-10-13, after the user's "no merge, no deploy while testing is on": this claim builds, opens the PR and gets it green,
 then stops — nothing merges until the user lifts the freeze. Branch `m169-ocr-punctuation-spacing`, cut from origin/main at
 `c0b61b71`, PR into main. Row: `R-27049032` — "The reader joins a recognized word's punctuation with a space, so a name reads
 "DE GUZMAN JR ." and an address "STA MESA"." Named as `M169` by `M168`'s close-out. At the session's start the user confirmed
 `M168` on staging ("Yes, it works": the paper on the left, 50/50, on the guest check and the staff review/edit); nothing is owed.
+
+**BUILT — PR #362, CI 6/6 green with real step counts (run 38419380144 at `b52d6d64`: Static analysis 32 · E2E 20 · Contract 16 ·
+Frontend 12 · Pest 11 · axe 11; the only skips are the failure-only report upload and the two main-only staging-header steps) — AND
+NOT MERGED: held by the user's testing freeze.** The branch already carries the row's closure, the status bullet and the regenerated
+line and hand-off. A merge needs the user's word and a fresh staging backup first; then the release below this heading, the gate
+baselines from the post-merge run, and nothing else. Measured against the prediction, before the release is written:
+- Red first exactly as predicted: 5 red (the two parser cases, the three spacing cases), 193 green on the fixture alone; 198 green after.
+- Mutants, all CAUGHT: `OcrLine` always a space 3 (as predicted); the parser ignoring breaks **4, not 5** — the sideways case is built
+  by the typesetter and never meets the parser, my miss; the paragraph guard 1; the break off the first character 7 (the parser case,
+  both Vision-path spacing cases, three bake-off cases, the reading job); `rotate()` 1; `upright()` 1.
+- Round 1 offline: **50 → 48, not 49** (29 → 27 with ink), 0 silent — `BAHALA KA JAN!!!` turned right too; my census counted only
+  `.` `,` `@`. With ink Round 1 now sits at 15.0%, one field short of G9's "under 15%".
+- **Most likely wrong, and it was not:** no test builds Vision's JSON by hand with words to join; every one goes through the typesetter.
+- Host PHPStan 0 (the container's 44 are the recorded model-property phantoms, none in the four files); Pint passed;
+  `preflight --with-gates --with-pint` OK.
 
 ### Evidence verified
 - "`OcrAnswerReader` joins Vision's words with spaces" — held, and moved: the WORD join is `OcrLine::text()`, which `ruled()` (the
@@ -73,6 +256,201 @@ case), `rotate()` dropping the flag (the tilted case only), `upright()` dropping
 49 of 180 and 29 → 28 with ink, 0 silent — sheet 09's `STA. MESA` turns right; 10 more fields change their text and stay wrong for
 other reasons (a comma the answer sheet has and the paper does not, misread letters). Only PHP moves: Pest and PHPStan; Vitest, E2E
 and axe cannot. **Most likely wrong:** a test that builds Vision's JSON by hand without breaks glues its words and goes red.
+
+## RELEASED — `M171`, the user's three UI complaints: no stat tile cuts a word in half, the audit log's chip beside the name, room above the Connect button (`R-0a504679`, `R-88a6c81a`, `R-61992abf`) (merged as PR #364, `635ffc52`, 6/6 green with real step counts on its second run — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+Built and merged 2026-10-15 from the user's three comments of 2026-10-14 (quoted at each row). At the build start the user said
+*"merge approved in this session when finished"*, and before the merge ran the guided `meridian-test-db-backup` block (`Result: 0`,
+`staging-2026-10-14-234408.dump`, 429,867 bytes). `M169` (PR #362) stays held. The same start answered three questions: `M170` is
+**not checked yet** (still owed); `D125` changed to C — the What's new notes written with each change and saved in a `releases` table
+by every deploy (recorded on the branch; it shapes `R-c7247dbf` only); and all four hub tiles take the compact size.
+
+**Measured against the prediction:**
+- **Red first, as predicted and wider.** Ten new Vitest cases were red on the trunk (StatTile 3, the hub 2, the audit page 2,
+  Integrations 3), and the three new `list-layout.spec.ts` cases were red in a real browser: "Accepting" cut at 834 and 1440 (whole
+  at 375), the audit chip 82 / 82 / 99px wide, the warning-to-button gap 0px at all three widths.
+- **Mutants:** six Vitest mutants, all caught — the compact class binding (2 cases, not the predicted 1: the linked-tile case too), the
+  compact rule (1), one hub tile not compact (1), the date with its time (1), the name moved out of the text block (2, not 1), the
+  paragraph margin (1). The predicted caution-margin mutant has nothing to mutate: the remedy changed (below).
+- **The responsive-axe sweep stayed green** for the hub, the audit log and Integrations, both themes, all three viewports (18/18).
+- **Most likely wrong — partly right.** I named the Integrations source-text case. It holds as a structural pin, but the proof that
+  mattered for all three fixes is a browser measurement in `list-layout.spec.ts`; happy-dom lays out nothing.
+- **Not predicted:**
+  - **CI went red once, on my own new case.** I chose heading-2 over the row's heading-3; CI's seed made the last response "Oct 11,
+    2026", one digit longer than the local "Oct 9, 2026", and it wrapped onto two lines at 1440. The size went back to heading-3, and
+    the case now writes every month with a two-digit day into the tile — 9 of 12 wrap at heading-2, none at heading-3. A measurement
+    of seeded data is a measurement of one date; probe the range.
+  - **An e2e `align-items: stretch` mutant SURVIVED** — no seeded audit row has a "via" line, so every cell is one line tall. The case
+    now gives one cell a second line; the mutant then made the chip a 24×40 oval, not the wider disc my first comment claimed (corrected).
+  - **The row's `margin-top: auto` would have failed in the one card that mattered:** an auto margin is zero in the tallest card of a
+    row, and the tallest is the Google card with the warning. Reasoned, not measured; the shipped footer-slot remedy is what the
+    browser measured (one line of buttons at 1440, at least 12px under the warning).
+  - **A planning-session row split "Filed by" from `M171` across two lines,** and `BacklogProvenanceTest` refused it — the planning
+    session ran the host gates but not `tests/Feature/Docs`. Rejoined.
+  - **The node container's `npm install` dirtied `package-lock.json`** (a stale vue range for the design system). Not committed; filed
+    as a nit.
+  - `SuiteCollectionFloorTest` was red in the container — the recorded bind-mount artefact; CI ran the whole suite green.
+- Pint passed; PHPStan cannot move (no `app`, `database` or `routes` change); `vue-tsc`, the host lint gates and the docs tests passed.
+- **The real-browser look** (375, 834, 1440, 1920; light and dark; the extra-large type setting on the hub; the console tenant page,
+  which no e2e spec visits): every value on one line at 1440 including extra-large, the chip a small disc beside the name, one line of
+  Connect buttons with clear space under the warning, and the console's usage tiles compact.
+
+The claim as it was taken, and its extension, follow unchanged.
+
+Taken 2026-10-15 under the testing freeze of 2026-10-13: this claim builds, opens the PR and gets it green, then stops — nothing
+merges until the user says so, after a fresh staging backup (`D123`). Branch `m171-ui-three-complaints`, cut from origin/main at
+`0dc971b6`, PR into main. It is the first of the six themed increments of the UI programme the user approved on 2026-10-15 (the plan at
+`~/.claude/plans/hi-let-s-conduct-a-mutable-goose.md`; the eight decisions `D120`–`D127` asked and answered in that session).
+⚠️ The user's check of `M170` (builder autosave, PR #363) is still owed and opens the build session before any step that depends on it.
+
+Rows taken (filed on the branch by this increment; ids are the title hashes): `R-0a504679` (the form hub's stat tiles break
+"Accepting" mid-word and wrap the last-response date), `R-88a6c81a` (the audit log's actor avatar stretches to the cell's width),
+`R-61992abf` (the Connect button flush under the provider's warning, two paragraphs laid out as flex rows, the provider grid on
+`auto-fit`). Filed and NOT taken — the programme's later increments, in order: full width, shell and settings (`R-fd7b8879`,
+`R-ba9d6349`, `R-8ee7d2dc`, `R-14971e37`); full width, detail pages, stacks and sign-in (`R-348f997c`, `R-7b8a74ae`, `R-fb647b5e`,
+`R-10b38d6d`, `R-3d51f0ae`, `R-66952d33`); feedback (`R-2ce2f274`); versioning and What's new (`R-c7247dbf`, with `R-3f887956`
+`after-launch`); consistency (`R-49813d21`, `R-3ca62317`, `R-f724595b`, `R-9d3c2439`).
+
+### Evidence verified
+- Read on the trunk at `0dc971b6`, by name, in a planning session with no running stack (Docker down), so every citation is a
+  static reading and the first real-browser look is part of this increment's proof.
+- `StatTile.vue:187` — the value is the heading-1 role; `:225` — `overflow-wrap: anywhere`, with `M19`'s own note naming "Accepting"
+  at 38px in a 123px column as the case it was added for. `forms/Show.vue:530` — `repeat(auto-fit, minmax(200px, 1fr))` over four
+  tiles; `:374` passes `ACCEPTANCE_LABEL[...]` ("Accepting", "Not open yet", "Closed", "Full") and `:386` a formatted date-time as the
+  value. Held. `admin/TenantDetail.vue:342-349` passes `row.display` into the same role — held, the only other prose consumer; the
+  other fifteen call sites (dashboard, analytics, achievements, webhooks, integrations) pass numbers or short quotas.
+- `audit/Index.vue:406-409` — `.audit__actor { display: flex; flex-direction: column }` and nothing sets `align-items`; the cell
+  renders `MdsAvatar` (`:277`) then two spans. `Avatar.vue:83-89` — `min-inline-size: 24px; min-block-size: 24px; aspect-ratio: 1`.
+  Held: a stretched inline size is the cell's width and the aspect ratio squares it. `admin/AuditLog.vue:305` has the same rule and
+  `:220-222` renders text only — not affected. `members/Index.vue:503` and `submissions/Inbox.vue:511` are `inline-flex` rows — fine.
+- `integrations/Index.vue:361-363` — `.provider__description,` newline `.provider__scopes,` newline, then two comment blocks, then
+  `.provider__actions,` `.connection__actions {` at `:373-378`: one selector list, so both paragraphs are `display: flex; flex-wrap:
+  wrap; gap` and own no margin rule. `:163-168` — the caution `MdsAlert` carries class `provider__caution`, whose only rule is
+  absent (`.provider__notice` at `:490` has `margin-bottom`; `.provider__caution` appears in no rule). `:169-182` — the actions `div`
+  follows it directly. Held. A multiline search for a selector line ending in a comma followed by a blank line finds this one place
+  in `resources/js`. `:341` — `repeat(auto-fit, minmax(min(18rem, 100%), 1fr))`: held.
+
+### Premise verified
+- One session only (the user, 2026-10-13); the `M169` branch is left exactly as it is, held below.
+- `MdsStatTile` is a design-system primitive with its own story and test; a new prop defaults to today's rendering, so the fifteen
+  numeric call sites change nothing. The gradient fill (exceptions-log #11) and the uppercase label are kept — they are the Vivid
+  direction, not the defect.
+- `audit/index.test.ts` mounts the page; the actor cell's markup is reached by it, so a structural change is pinned there rather
+  than by a new file. `/audit-log` is in the responsive-axe sweep at 375/834/1440; the console's `/admin/audit-log` is scanned by
+  `admin-console-axe.spec.ts` and is untouched.
+- `integrations/Index.vue` is not in the hub list and has its own Vitest file; `/integrations` is in the responsive-axe sweep.
+  The `list-layout.spec.ts` header deliberately leaves `/integrations` out of the stackable-table check — unchanged by this.
+- None of the three files is a hub (`docs/backlog-triage.md`, Hub files); `StatTile.vue`'s stories run under the axe job.
+
+### Remedy verdict
+Measured by reading; the first real-browser look at 1200px, 1440px and 834px on the form hub is the measurement for the tile, and
+the claim is extended if `compact` still breaks at 834px (then the tile grid's floor moves first).
+- Tile: a `valueSize` prop (`display` default, `compact` = heading-3 size and leading, same gradient, `anywhere` kept) — works; the
+  hub's two prose tiles and the console's usage tiles take it; the hub grid floor `min(100%, 240px)`.
+- Avatar: an `inline-flex` row with the name, `align-items: center`, the "via …" line stacked under the name — works and keeps
+  I11a's second-line rule.
+- Integrations: restore `.provider__description` / `.provider__scopes` as margin-zero paragraphs (the card body a column with
+  `gap: --mds-space-3`), `.provider__caution { margin-bottom }`, `.provider__actions { margin-top: auto }`, the grid on `auto-fill`
+  with a `min(100%, 20rem)` floor — works.
+
+Files: `packages/design-system/src/components/StatTile/StatTile.vue`, `StatTile.test.ts`, `StatTile.stories.ts`,
+`resources/js/Pages/forms/Show.vue`, `resources/js/Pages/admin/TenantDetail.vue`, `resources/js/Pages/audit/Index.vue`,
+`resources/js/Pages/audit/index.test.ts`, `resources/js/Pages/integrations/Index.vue`, `resources/js/Pages/integrations/index.test.ts`;
+on the branch already: `docs/feature-backlog.md` (twenty rows and the gap-table tag), `docs/claims/decisions.md` (`D120`–`D127`),
+`docs/pipeline.md`; close-out on the branch: `PROGRESS.md`, `docs/pipeline.md`; this file on main.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`, `PROGRESS.md` (own block).
+Paired files taken: none.
+Namespaces spent: `D120`–`D127` (asked and answered in the planning session, 2026-10-14); nothing from the ADR or migration namespaces.
+Prediction: `StatTile.test.ts`'s new case is red on the trunk (no `compact` class) and green after; the audit page test's new case is
+red on the trunk (the avatar is a direct child of a column) and green after; the integrations test's new case is red on the trunk
+(the caution has no bottom margin in the source) and green after. Mutations: dropping the `compact` branch, the row wrapper and the
+caution margin each turn exactly one case red. The responsive-axe sweep stays green at all three viewports in both themes. **Most
+likely wrong:** the integrations source-text case — a rule asserted by regular expression over a scoped stylesheet is the shape that
+has passed over the wrong thing before (`builder-layout.test.ts`'s note); it may need to assert the computed style in a mount instead.
+
+### Extension 1 — three files, three remedy changes, and the merge (pushed before any of the three files is opened)
+
+At the build start (2026-10-15) the user said *"merge approved in this session when finished"*: this PR merges in this session after
+6/6 and a fresh staging backup, and nothing else is lifted — `M169` stays held. The same exchange answered three questions: the `M170`
+check is not done yet (still owed), `D125` changed to C (the notes saved in a `releases` table by every deploy — recorded on the branch,
+it shapes `R-c7247dbf` only), and the form hub's four tiles all take the compact size.
+
+Files added: `resources/js/Pages/forms/show.test.ts` (which hub tiles are compact, and the last-response time on the caption line);
+`tests/e2e/list-layout.spec.ts` (shared — the only gate that can see layout: happy-dom computes none, so the three fixes are measured
+there, red on the trunk first); `docs/ux/design-system-reference.md` (one as-built paragraph for the new `MdsStatTile` prop — **the
+increment's one hub, on `R-0a504679`**).
+
+Remedy changes, each measured by reading the code:
+- **All four hub tiles compact, not the two word tiles** — the user's choice for an even row. The last-response tile shows the date and
+  puts the time on its caption line: at 1440px the text column is about 170px, and a compact date-and-time (about 230px) would still wrap.
+- **The compact value takes the heading-2 role, not heading-3** — a 20px figure sits small under the 44px medallion. heading-3 stays the
+  fallback if heading-2 still breaks a word at 834px or 1440px at the extra-large type setting.
+- **Integrations: the Connect button moves into `MdsCard`'s footer slot instead of `margin-top: auto`.** An auto margin is zero in the
+  tallest card of a row, and the tallest is the Google card with the warning — the button would touch it again. The card becomes a flex
+  column whose body grows, so the buttons line up across cards and the footer keeps its own 16px.
+
+## RELEASED — `M170`, every form builder setting survives a plain refresh, and the toolbar never says "saved" for an edit the server does not hold (`R-bfa3eb93`, `R-fdc743ab`, `R-76474e31`, `R-7ebfb08e`, `R-4d50e3c8`) (merged as PR #363, `d8ebe97f`, 6/6 green with real step counts on its final run — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+Built and merged 2026-10-14 from the user's urgent report: *"the autosave feature is not working on other clients. though i tested
+it and it work for me"*, narrowed in the same session to the form builder and a Whole Number question whose Basic, Validation and
+Advanced settings did not save, with the instruction to check every type, every setting and every tab for three things — a save
+starts, the server keeps it, and it survives a plain refresh with no other click. The user lifted the testing freeze for this PR only
+(*"if fix is applied, merge this asap"*) and ran the guided `meridian-test-db-backup` block first (`Result: 0`,
+`staging-2026-10-14-074828.dump`, 426,835 bytes). `M169` (PR #362) stays held. `D118` (public form: "Continue where you left off /
+Start over", `R-8881210a`) and `D119` (a permitted colleague may keep saving a draft someone else started, `R-ae57cf6f`) were asked and
+answered in chat; `R-d37a38f9` (the public form's ten-minute pause) was filed. All three are during-testing and untaken.
+
+**Measured on the trunk build before any fix:** all 13 Whole Number settings were lost by a refresh straight after the change, and the
+cause was shared by every type. The server was never at fault: `BuilderSettingsRoundTripTest.php` (new) shows all 31 types and a
+section keep every setting and send it back on the builder page (32 green, 190 assertions).
+
+**Taken:**
+- `edit-journal.ts` (new): each unconfirmed edit is kept for the tab (`sessionStorage`) the moment it is made, with the token it was
+  based on and every content this tab has sent since. On load the store puts back whatever the server does not hold and saves it. It
+  drops the edit instead when the server already holds it, or when the row moved to something this tab never sent.
+- `useBuilderStore.ts`: "Saving…" while an edit waits out the debounce; `flushForLeave()`; a 409 over exactly what that request sent
+  is taken as saved; a failure with nothing to mark stays failed (`save.unsaved`) until it saves, with `retryUnsaved()`; an unfinished
+  rule is not sent; Save to library sends the waiting edit first. Comparisons are made as the server stores a save (an absent
+  `logic_group` reads as null).
+- `builderClient.ts`: writes are `keepalive` under 60 KB; a 419 or 401 says the author was signed out and to press Retry.
+- `ValidationEditor.vue`: an empty expression is still Expression mode. `ConfigPanel.vue`: a Retry button in the save alert.
+  `Builder.vue`: a flush on `beforeunload`, `pagehide`, a hidden tab and an in-app visit away; a retry on `online` and when the tab
+  comes back.
+- Tests: `settings-save-matrix.test.ts` (35: every Basics/Validation/Advanced control on a Whole Number and every type's own tab starts
+  a save carrying its value, plus each defect and each race); `tests/e2e/builder-settings-refresh.spec.ts` (all 13 settings, a refresh
+  straight after each, desktop; one at 375px); `save-state.test.ts`'s retry case now retries the failed edit (it had pinned the defect
+  by "retrying" with a new section); `builderClient.test.ts`'s generic-message case uses a 502; `sessionStorage` is cleared after
+  every Vitest case (`resources/public-runtime/__tests__/setup.ts`).
+
+**Files beyond the claim, recorded rather than pushed as an extension first:** `edit-journal.ts` and
+`resources/public-runtime/__tests__/setup.ts` were edited without a pushed claim extension. That is the protocol's miss, recorded here.
+`save-label.ts` and `types.ts` were claimed and not edited.
+
+**Three defects the real browser found after the first fix, all closed before merge.** A timed throwaway probe
+(`.playwright/m170-probe/`, gitignored) measured each one, after reasoning about the first two had failed twice:
+- A 409 over this tab's own landed save was compared with the field as it was NOW — the next setting already typed in — so it never
+  matched. A conflict was raised over nothing, and the next save went out at a spent token.
+- `withNegativesAllowed()` writes its minimum with no `logic_group`, while the server sends it back as null. So once "Allow negative
+  numbers" was used, no comparison of that question ever matched again, and the put-back dropped the edit as someone else's.
+- A `keepalive` save in flight when the page goes FAILS on the page's side yet still reaches the server. The queue then sent the next
+  edit at the old token, the server refused it (409), and only the earlier write landed. The kept edit therefore remembers every write
+  sent since its base, not just the last one.
+
+Each has a Vitest case that a byte-restored mutant turns red. 14 mutants in all; 13 caught. One SURVIVED: the save verdict's second
+test of `save.unsaved`, which `save.error` already carries. It was removed as redundant.
+
+**Prediction, measured.**
+- The E2E "refresh straight after" cases were red on the trunk, as predicted: all 13. The three Validation ones fell by knock-on, since
+  the minimum written by "Allow negative numbers" was lost first and the rule numbers moved. I never built the separate "after the save
+  returned" variant I predicted would be green; the Pest round trip carries that half instead.
+- The Vitest per-control matrix was green on the trunk (23) and its 8 defect cases red, as predicted.
+- **Most likely wrong — the all-green Pest round trip — was not wrong:** it was green across all 31 types on its first real run. Its
+  first run had errored on my own test (the page sends `config` as an object).
+- **Not predicted at all:** Chrome serves the reload before the old page's `pagehide` (so a flush alone could never satisfy the user's
+  check); the three defects above; 11 existing Vitest cases sharing one `sessionStorage`; a citation in `docs/feature-backlog.md` moved
+  onto a blank line by my `ConfigPanel.vue` insertion (moved below the cited lines instead); and the local stack running 25–50× slower
+  than CI (the refresh spec's desktop case took more than 300 s locally and 12.4 s on CI), which is what exposed the races.
+  `builder-structure.spec.ts` timed out locally on that slowness and passed on CI on both runs.
 
 ## RELEASED — `M168`, the scanned copy beside the form, 50/50, on the guest check and the staff review (`R-17caf80e`) (merged as PR #361, `6b998a37`, 6/6 green with real step counts on its first run and on the post-merge run's second attempt — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

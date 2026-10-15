@@ -338,10 +338,12 @@ function formatDay(iso: string | null): string {
 
             <template v-else>
                 <h3 class="admin-td__subhead">Current levels</h3>
+                <!-- M171 — compact: `row.display` is "1.2 GB / 5 GB", which at the display size breaks inside a 12rem tile. -->
                 <div class="admin-td__tiles">
                     <MdsStatTile
                         v-for="row in usage.gauges"
                         :key="row.metric"
+                        value-size="compact"
                         :label="row.label"
                         :value="row.display"
                         :icon="metricIcon(row.metric)"

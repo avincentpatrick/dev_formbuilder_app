@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { settlePaint } from './support/axe';
-import { openBuilder } from './support/navigate';
+import { formEntry, openBuilder } from './support/navigate';
 
 /**
  * Increment JR4 — the two properties this increment adds, neither of which any existing gate can see.
@@ -152,4 +152,136 @@ test('the builder shows exactly one pane below its threshold, and three above', 
     expect(compact, `${info.project.name} landed on the wrong side of 60em`).toBe(
         info.project.name !== 'desktop',
     );
+});
+
+// ── M171 — THE USER'S THREE COMPLAINTS, MEASURED ────────────────────────────────────────────────────────────────
+// Each is a property of laid-out boxes, so no Vitest case can see it (happy-dom lays out nothing) and neither can axe or
+// `assertClean`. Each case was run red against the unfixed pages first.
+
+// *"there are some large words in the form overview specially the accepting responses and last response date is being
+// wraped making the word cut in half"*. A word cut in half is a word whose text spans two line boxes, which a Range over
+// that word reports as two rects — so this asserts exactly the complaint, whatever the font or the viewport.
+test('Form hub — no stat tile breaks a word across two lines', async ({ page }, info) => {
+    await page.goto('/forms', { waitUntil: 'networkidle' });
+    await formEntry(page, 'Community Health Survey').getByRole('link', { name: 'Community Health Survey' }).click();
+    await page.waitForURL(/\/forms\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+    const values = page.locator('.hub__tiles .mds-stat-tile__value');
+    await values.first().waitFor({ state: 'visible', timeout: 10_000 });
+    await settlePaint(page);
+
+    const measured = await values.evaluateAll((els) =>
+        els.map((el) => {
+            const node = el.firstChild;
+            const text = node?.textContent ?? '';
+            const lines = (range: Range) => new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size;
+            const broken: string[] = [];
+            for (const m of text.matchAll(/\S+/g)) {
+                const range = document.createRange();
+                range.setStart(node!, m.index!);
+                range.setEnd(node!, m.index! + m[0].length);
+                if (lines(range) > 1) broken.push(m[0]);
+            }
+            const whole = document.createRange();
+            whole.selectNodeContents(el);
+
+            return { text: text.trim(), broken, lines: lines(whole) };
+        }),
+    );
+
+    // Not vacuous: the seeded form has no schedule, so it is open — "Accepting" is the word the user saw broken.
+    expect(measured.map((m) => m.text)).toContain('Accepting');
+    expect(measured.flatMap((m) => m.broken), 'a stat tile cut a word in half').toEqual([]);
+
+    if (info.project.name === 'desktop') {
+        // The last response wrapped onto three lines at 1440px; it now fits on one.
+        expect(measured.every((m) => m.lines === 1), JSON.stringify(measured)).toBe(true);
+
+        // ...and not by the luck of the seeded date: CI's seed gave "Oct 11, 2026", a digit longer than the local one, and the
+        // first compact size wrapped it. Every month with a two-digit day, written into the tile as the page formats a date.
+        const wrapped = await page
+            .locator('.hub__tiles .mds-stat-tile')
+            .filter({ hasText: 'Last response' })
+            .locator('.mds-stat-tile__value')
+            .evaluate((el) => {
+                const out: string[] = [];
+                for (let month = 0; month < 12; month++) {
+                    el.textContent = new Date(2026, month, 28).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                    });
+                    const range = document.createRange();
+                    range.selectNodeContents(el);
+                    if (new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size > 1) out.push(el.textContent);
+                }
+
+                return out;
+            });
+        expect(wrapped, 'a date wrapped onto two lines in the Last response tile').toEqual([]);
+    }
+});
+
+// *"the initial avatar size in the audit log is so large under the actor column"*. The chip is `min-inline-size: 24px`
+// with `aspect-ratio: 1`, so any width handed to it becomes a disc that tall. 32px leaves room for the extra-large type
+// setting's caption size and is still far below the ~100px+ disc a stretched cell produced.
+test('Audit log — the actor chip stays a small disc beside the name', async ({ page }) => {
+    await page.goto('/audit-log', { waitUntil: 'networkidle' });
+    await settlePaint(page);
+
+    const chips = await page.locator('.audit__actor .mds-avatar').evaluateAll((els) =>
+        els.map((el) => {
+            const r = el.getBoundingClientRect();
+
+            return { width: Math.round(r.width), height: Math.round(r.height) };
+        }),
+    );
+
+    // Not vacuous: the seeded owner's own changes are in the ledger, and a person's row carries a chip.
+    expect(chips.length, 'no actor chip rendered on /audit-log').toBeGreaterThan(0);
+    for (const chip of chips) {
+        expect(chip.width, JSON.stringify(chip)).toBeLessThanOrEqual(32);
+        expect(chip.height, JSON.stringify(chip)).toBeLessThanOrEqual(32);
+    }
+
+    // A row an operator drove has a second line ("via …"), and no seeded row does — so one is added to the first cell's text
+    // block exactly as the page stacks it. A two-line cell is where a row's default `align-items: stretch` would hand the chip
+    // the text's height; measured without this, a `stretch` mutant passed.
+    const twoLine = await page.locator('.audit__actor').first().evaluate((cell) => {
+        const line = document.createElement('span');
+        line.textContent = 'via Platform operator';
+        cell.querySelector('.audit__actor-text')!.appendChild(line);
+        const r = cell.querySelector('.mds-avatar')!.getBoundingClientRect();
+
+        return { width: Math.round(r.width), height: Math.round(r.height) };
+    });
+    expect(twoLine.width, JSON.stringify(twoLine)).toBeLessThanOrEqual(32);
+    expect(twoLine.height, JSON.stringify(twoLine)).toBeLessThanOrEqual(32);
+});
+
+// *"in the integration sites page, the button connect google sheets is too close from the object above it"*. The object is
+// the Google warning (shown while the Google app is in testing — the e2e default). Measured edge to edge, because the
+// defect was a missing margin and only boxes can show one.
+test('Integrations — the Connect button keeps its distance from the warning above it', async ({ page }, info) => {
+    await page.goto('/integrations', { waitUntil: 'networkidle' });
+    await settlePaint(page);
+
+    const card = page.locator('.provider').filter({ has: page.locator('.provider__caution') });
+    await expect(card, 'the Google warning is not on the page').toHaveCount(1);
+
+    const gap = await card.evaluate((el) => {
+        const caution = el.querySelector('.provider__caution')!.getBoundingClientRect();
+        const button = el.querySelector('.mds-button')!.getBoundingClientRect();
+
+        return Math.round(button.top - caution.bottom);
+    });
+    expect(gap, 'the Connect button sits on the warning').toBeGreaterThanOrEqual(12);
+
+    if (info.project.name === 'desktop') {
+        // One row of cards at 1440px, so one line of buttons rather than a ragged one.
+        const tops = await page
+            .locator('.provider .mds-button')
+            .evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
+        expect(tops.length).toBeGreaterThan(1);
+        expect(new Set(tops).size, `button tops: ${tops.join(', ')}`).toBe(1);
+    }
 });

@@ -205,6 +205,40 @@ describe('audit log — labels and badges', () => {
     });
 });
 
+/**
+ * M171 — the user's comment: *"the initial avatar size in the audit log is so large under the actor column"*. The actor cell was
+ * a COLUMN flex container, whose default `align-items: stretch` handed the chip the cell's whole width, and the chip's
+ * `aspect-ratio: 1` turned that width into a disc as wide as the column. The chip now sits beside a text block that stacks the
+ * name over the "via …" line, so no width can reach it. `list-layout.spec.ts` measures the chip in a real browser.
+ */
+describe('audit log — the actor cell (M171)', () => {
+    it('puts the chip beside the name, and the name and the "via" line in their own block', () => {
+        const wrapper = render({ data: [row({ actor: 'Demo Owner', acting_as: 'Platform operator' })] });
+        const actor = wrapper.get('.audit__actor');
+        const chip = actor.get('.mds-avatar');
+        const text = actor.get('.audit__actor-text');
+
+        // The chip and the text block are the cell's only two children: a third would be stretched to the column again.
+        expect(chip.element.parentElement).toBe(actor.element);
+        expect(text.element.parentElement).toBe(actor.element);
+        expect(actor.element.children).toHaveLength(2);
+        expect(text.text().replace(/\s+/g, ' ').trim()).toBe('Demo Owner via Platform operator');
+        expect(text.find('.audit__acting-as').exists()).toBe(true);
+
+        wrapper.unmount();
+    });
+
+    it('still renders no chip for a system row, and keeps its name in the text block', () => {
+        const wrapper = render({ data: [row({ actor: 'System', is_system: true })] });
+        const actor = wrapper.get('.audit__actor');
+
+        expect(actor.find('.mds-avatar').exists()).toBe(false);
+        expect(actor.get('.audit__actor-text').text()).toBe('System');
+
+        wrapper.unmount();
+    });
+});
+
 describe('audit log — the target cell', () => {
     it('links a resolved target', () => {
         const wrapper = render();

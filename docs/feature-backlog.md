@@ -157,7 +157,7 @@ No AI appears anywhere in the committed docs; the versioned draft/publish model 
 | Item | Priority | Phase | Note |
 |---|---|---|---|
 | Customer support surface — help center/KB + in-app contact (ticket/chat) with a reply path | should | 1 | Feature #11 feedback is one-way fire-and-forget; a B2B SaaS charging money needs a way to get an answer. A minimal support email is a viable MVP floor |
-| In-app product announcements / changelog ("What's new") feeding the notification center | nice | 3 | The bell/center exist as shells; a changelog feed is how you tell tenants a waited-for feature landed |
+| In-app product announcements / changelog ("What's new") feeding the notification center | nice | 3 | The bell/center exist as shells; a changelog feed is how you tell tenants a waited-for feature landed | ⏸️ **Queued (`M171`, 2026-10-15):** the prompt and the page are the ledger row *the product shows no user-facing version and has no "What's new"*; the feed into the notification centre is the `nit` row filed beside it. |
 
 ---
 
@@ -14028,3 +14028,273 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the left with the chapter being read marked; below that, a fixed "Contents" button and a "Back to contents" link at the end of each
   chapter. ⚠️ Filed in `M164`'s PR rather than its claim push, because the OCR session asked that nothing outside `paths-ignore`
   reach `main` while its merges were in flight. **Live.** Filed by `M164`. **Tier: early-testing.** ✅ **CLOSED BY `M164` (2026-10-12):** from 1024px the contents are a sticky column on the left of `/help` that scrolls on its own and marks the chapter being read (`aria-current="location"`, a bar, kept in the column's view); below that a fixed **Contents** button and **Back to contents** after every chapter. The current chapter is read from the scroll position, with an end-of-page rule for the short closing chapter. Proof: `tests/e2e/help-contents.spec.ts` at desktop and phone width (red on the trunk; red again with `position: static`), four Vitest cases (the end-of-page rule mutated, caught), responsive-axe Help 6/6.
+
+- ✅ **CLOSED BY `M170` (2026-10-14) — ****`major` · A setting changed in the form builder just before a refresh is lost, while the toolbar already says "All changes saved".**
+  The user's urgent report (2026-10-14): *"the autosave feature is not working on other clients. though i tested it and it work
+  for me"*, narrowed in the same session to *"The autosave problem is in the form builder. For a Whole Number question, the
+  settings on the Basic, Validation and Advanced tabs don't save. Please check every field type and every setting on every tab.
+  For each one, confirm that changing it starts a save, that the server keeps the value, and that it's still there after a plain
+  page refresh without clicking anything else first."* `touch()` in `resources/js/components/builder/useBuilderStore.ts` waits
+  600 ms after the last change before it saves, nothing sends a waiting change when the page goes (no `beforeunload`, `pagehide`
+  or `visibilitychange` handler in the store or in `Pages/forms/Builder.vue`), and `builderClient.ts` sends without `keepalive`.
+  While the change waits, `saveState` is `idle`/`saved`, so `save-label.ts` says "All changes saved". Measured in a real browser
+  on the trunk: Help text typed and refreshed at once came back empty at 375px. ⚠️ A flush on leaving cannot close it alone —
+  Chrome asks for the new page before the old one's `pagehide`, and even a save sent from `beforeunload` races the reload's
+  request — so the remedy also keeps each unconfirmed edit for the tab and puts it back on load. Not specific to Whole Number:
+  every setting of every type takes this path. **Live.** Filed by `M170`. **Tier: during-testing.** ✅ **CLOSED BY `M170` (2026-10-14):** each unconfirmed edit is kept for the tab the moment it is made (`resources/js/components/builder/edit-journal.ts`, `sessionStorage`), and on load the store puts back any edit the server does not hold and saves it — dropped instead when the server already holds it or the row moved on since; a waiting edit is sent at once on `beforeunload`, `pagehide`, a hidden tab or an in-app visit away, as a `keepalive` write; a 409 whose question already holds the same edit is taken as saved; the toolbar says "Saving…" while a change waits. Proof: `tests/e2e/builder-settings-refresh.spec.ts` — all 13 Whole Number settings on Basics, Validation and Advanced lost by a refresh straight after the change on the trunk build, kept with the fix — `settings-save-matrix.test.ts` (every Basics, Validation and Advanced control on a Whole Number and every type's own tab starts a save carrying its value; the pending label, the leave flush, the put-back and the identical 409 red on the trunk), and `BuilderSettingsRoundTripTest.php` (the server keeps every setting of all 31 types and of a section and sends each back on the builder page). ⚠️ **Three defects the real browser found after the first fix, all closed before merge** — a 409 over this tab's own landed save was judged against the field as it was NOW (the next setting already typed into it) rather than against what the request sent, and the minimum "Allow negative numbers" writes carries no `logic_group` while the server sends it back as null, so after that toggle no comparison matched — and two races: an edit made while an earlier save of the same question was still in flight, and a page going while a `keepalive` save was in flight — it fails on the page's side yet still reaches the server, so the next edit went at the old token and was refused. A timed probe measured both; the kept edit now remembers every content this tab sent since its base, and a move of the row to one of those is taken as this tab's own. Each has a Vitest case that a committed-and-restored mutant turns red.
+
+- ✅ **CLOSED BY `M170` (2026-10-14) — ****`minor` · A builder save that failed reads "All changes saved" once a later save on another question lands.**
+  Found by `M170` beside `R-bfa3eb93`. `enqueue()`'s burst verdict in `useBuilderStore.ts` clears `save.error` whenever a burst
+  succeeds, and `guard()` marks a question only when the failure carries a field error map — so a network failure (a laptop
+  waking from sleep), a 419 or a 500 on question A, followed by a successful save of question B, leaves nothing standing: the
+  toolbar says "All changes saved", A's edit stays on screen, and a refresh shows it was never stored. **Live.** Filed by `M170`.
+  **Tier: during-testing.** ✅ **CLOSED BY `M170` (2026-10-14):** a failure with nothing to mark is recorded per question (`save.unsaved`), the toolbar reads "Not saved" and the alert stays until that question saves, and the alert offers Retry; a reconnect or the tab coming back retries too. `save-state.test.ts`'s retry case had pinned the defect — it "retried" by adding a section — and now retries the failed edit. Proof: `settings-save-matrix.test.ts`, red on the trunk.
+
+- ✅ **CLOSED BY `M170` (2026-10-14) — ****`minor` · An expired session stops every builder save with "Request failed (419).", and nothing sends the edits again after signing back in.**
+  Found by `M170` beside `R-bfa3eb93`: the testers lost settings "after a break". The session expires after 120 minutes idle
+  (`config/session.php`), and the builder's poll stops on purpose so it can. Every save after that returns 419 with an HTML body,
+  which `BuilderRequestError` reports as "Request failed (419)." — a message nobody can act on — and nothing retries once the
+  author signs in again. **Live.** Filed by `M170`. **Tier: during-testing.** ✅ **CLOSED BY `M170` (2026-10-14):** a 419 or 401 now reads "You were signed out, so your latest changes are not saved yet. Sign in again in a new tab, then press Retry.", the edit stays on screen and in the tab's journal, and Retry sends it again. Proof: `settings-save-matrix.test.ts` and `builderClient.test.ts`, red on the trunk.
+
+- ✅ **CLOSED BY `M170` (2026-10-14) — ****`minor` · Switching a validation rule to Expression builds a rule the server refuses, and every other setting on that question stops saving.**
+  Found by `M170` reading every control on the Validation tab. `setMode()` in `resources/js/components/builder/ValidationEditor.vue`
+  writes `expression: ''` and `rule_type: null`; `mode()` reads `''` as rule mode, so the expression box never appears; and
+  `UpdateFieldRequest::withValidator()` refuses a rule with neither a check nor an expression. Each save sends the whole question,
+  so the 422 also refuses every Basics and Advanced edit on it until the rule is removed. **Live.** Filed by `M170`.
+  **Tier: during-testing.** ✅ **CLOSED BY `M170` (2026-10-14):** an empty expression is still Expression mode, so the box shows at once, and a save leaves out a rule with neither a check nor an expression, so the question's other settings still save. Proof: `settings-save-matrix.test.ts` and the E2E expression case, red on the trunk.
+
+- ✅ **CLOSED BY `M170` (2026-10-14) — ****`nit` · "Save to library" copies a question without the edit made in the 600 ms before the click.**
+  Found by `M170`. `saveFieldToLibrary()` in `useBuilderStore.ts` queues its request without sending the waiting edit first, and
+  the server copies the question as it is stored, so the library item misses the last change. **Live.** Filed by `M170`.
+  **Tier: during-testing.** ✅ **CLOSED BY `M170` (2026-10-14):** `saveFieldToLibrary()` sends the waiting edit before the copy. Proof: `settings-save-matrix.test.ts`, red on the trunk.
+
+- **`minor` · A respondent who pauses for more than ten minutes and then keeps typing loses every answer on the next reload.**
+  Found by `M170` checking the public form's autosave for the user's report. `touchRespondentSession()` in
+  `resources/public-runtime/lib/respondent-session.ts` never revives an expired visit, by design for kiosks, so after a pause past
+  `IDLE_MS` every later keystroke leaves the visit expired while `useAutosave` keeps stamping the old visit on the saved answers.
+  The next reload mints a new visit, `draftBelongsToVisit()` refuses the respondent's own answers, and their first keystroke
+  overwrites them. A person filling a long form who leaves to find a document is the case. The remedy has to keep the kiosk
+  protection: tell an expired visit that is still on screen and typing from a new person at the device. **Live.** Filed by `M170`.
+  **Tier: during-testing.**
+
+- **`minor` · Reopening a public form's link on the same device starts a blank form; it should offer "Continue where you left off" or "Start over".**
+  `D118` A (the user, 2026-10-14). Since `M21` the guest autosave restores answers only in the same tab and visit
+  (`resources/public-runtime/composables/useAutosave.ts`, `lib/respondent-session.ts`), so a respondent who closes the tab, or opens
+  the link again from a messaging app, starts blank. The user chose to offer the answers back on the same device behind a choice
+  shown before any answer appears, accepting that on a shared phone the next person could choose Continue. The kiosk-mode row this
+  file already parks is the place to switch it off for a shared device. **Live.** Filed by `M170`. **Tier: during-testing.**
+
+- **`minor` · A staff member who continues a colleague's draft on the encoding page has every autosave refused, and saving stops for good.**
+  Found by `M170` checking the staff autosave for the user's report. The resume page is gated on `SubmissionPolicy::promote()`, which
+  has no author check, and the inbox offers "Continue this draft" to anyone who passes it; but `SubmissionDraftController::store()`
+  looks the draft up through `ClientUuidResolver::resolve()` scoped to the CURRENT user, finds nothing, and returns 409
+  `submission_uuid_claimed`, which `useServerAutosave.ts` treats as permanent. `EncodeDraftTest` pins the refusal on purpose, and
+  nothing reconciles it with the resume page being open to non-authors. Decide which way it goes before fixing: let a permitted
+  colleague save into the draft, or stop offering them "Continue" — `D119`, answered A (the user, 2026-10-14): a permitted
+  colleague saves into the draft, which keeps its original author. **Live.** Filed by `M170`. **Tier: during-testing.**
+
+- ✅ **CLOSED BY `M171` (2026-10-15) — ****`minor` · The form hub's stat tiles break "Accepting" in the middle of the word and wrap the last-response date onto three lines.**
+  The user's comment (2026-10-14): *"there are some large words in the form overview specially the accepting responses and last
+  response date is being wraped making the word cut in half"*. Measured on `origin/main` at `0dc971b6`:
+  `packages/design-system/src/components/StatTile/StatTile.vue:187` sets the value in the heading-1 role (38px) and `:225` gives it
+  `overflow-wrap: anywhere` (added by `M19` for a 123px column at 834px); `resources/js/Pages/forms/Show.vue:530` lays four tiles in
+  `repeat(auto-fit, minmax(200px, 1fr))`, so at 1200px each text column is about 180px — "Accepting" (`:374`) breaks mid-word and the
+  date-time value (`:386`) wraps to three lines. `resources/js/Pages/admin/TenantDetail.vue:342-349` passes `row.display` into the same
+  role. The remedy is a `valueSize` prop on `MdsStatTile` — `compact` sets the heading-3 role with the same gradient, `anywhere` kept
+  as the escape — used by the hub's two prose tiles and the console's usage tiles, with the hub grid's floor raised to
+  `min(100%, 240px)`; a story and a `StatTile.test.ts` case, red first. **Live.** Filed by `M171`. **Tier: during-testing.** ✅ **CLOSED BY `M171` (2026-10-15):** `MdsStatTile` takes `valueSize="compact"` — the value in the heading-3 role whole (size, leading, weight) with the base tracking, the gradient and the `anywhere` escape kept — and ALL FOUR hub tiles use it (the user chose one even row over two sizes); the last response shows its date with the time on the caption line, because a compact date-and-time still wrapped at 1440px; the hub grid's floor is `min(100%, 240px)`; the console's usage tiles are compact too. `list-layout.spec.ts` measures every word of every hub tile value in one line box (red on the trunk at 834 and 1440 — "Accepting" — green at 375), and one line per value at 1440 — for every month with a two-digit day, because heading-2 was tried first and CI's browser wrapped the seeded "Oct 11, 2026" (9 of 12 months wrap at heading-2, measured).
+
+- ✅ **CLOSED BY `M171` (2026-10-15) — ****`minor` · The audit log's actor avatar stretches to the width of its cell.**
+  The user's comment (2026-10-14): *"the initial avatar size in the audit log is so large under the actor column"*. Measured on
+  `origin/main` at `0dc971b6`: `resources/js/Pages/audit/Index.vue:406` makes `.audit__actor` a column flex container, whose default
+  `align-items: stretch` hands the chip the column's inline size, and `packages/design-system/src/components/Avatar/Avatar.vue:83`
+  sizes the chip by `min-inline-size: 24px` and `aspect-ratio: 1`, so the stretched width becomes a disc as wide as the cell.
+  `resources/js/Pages/admin/AuditLog.vue:305` carries the same rule but renders text only (`:220`); the members roster
+  (`resources/js/Pages/members/Index.vue:503`) and the inbox (`resources/js/Pages/submissions/Inbox.vue:511`) use inline-flex rows and
+  are unaffected. The remedy is the avatar beside the name in an inline-flex row (`align-items: center`, `gap: --mds-space-2`) with
+  the "via …" line under the name, pinned by `resources/js/Pages/audit/index.test.ts`. **Live.** Filed by `M171`.
+  **Tier: during-testing.** ✅ **CLOSED BY `M171` (2026-10-15):** the chip sits beside a text block that stacks the name over the "via …" line (`.audit__actor-text`), in an inline-flex row with `align-items: center` — load-bearing, because a row's default `stretch` hands the chip the text's two-line height on a "via" row (a 24×40 oval, measured with a `stretch` mutant). `list-layout.spec.ts` measures every chip at most 32px (82px at 375 and 834, 99px at 1440 on the trunk), and again on a cell given a second line, since no seeded row has one.
+
+- ✅ **CLOSED BY `M171` (2026-10-15) — ****`minor` · On Integrations the Connect button sits flush under the provider's warning, and the description and permissions lines are laid out as flex rows.**
+  The user's comment (2026-10-14): *"in the integration sites page, the button connect google sheets is too close from the object
+  above it"*. Measured on `origin/main` at `0dc971b6`: `resources/js/Pages/integrations/Index.vue:361-363` leaves the selector list
+  `.provider__description, .provider__scopes,` dangling across two comments, so it joins `.provider__actions, .connection__actions`
+  at `:373` — both paragraphs become `display: flex` rows with no rule of their own — and `.provider__caution` (the Google seven-day
+  warning at `:163`) has no bottom margin, so the Connect button at `:172` touches it. It is the only dangling selector list in the
+  repository (swept with a multiline search). Beside it, `:341` lays the provider cards with `auto-fit`, so two cards each take half
+  of any width. The remedy restores the two paragraph rules, makes the card body a column with a gap, gives the caution a bottom
+  margin, puts `margin-top: auto` on the actions so buttons align across cards, and switches the grid to `auto-fill` with a
+  `min(100%, 20rem)` floor; `resources/js/Pages/integrations/index.test.ts` pins the rules. **Live.** Filed by `M171`.
+  **Tier: during-testing.** ✅ **CLOSED BY `M171` (2026-10-15):** H15b's paragraph rule is restored (the dangling list was left by J4a's `74a0e1f6`); the Connect button moved into `MdsCard`'s footer slot and the card became a column whose body grows (gap `--mds-space-3`), so every button sits on one line across a row of cards with the footer's 16px above it. Not the remedy's `margin-top: auto`: an auto margin is zero in the tallest card of a row, which is the Google card with the warning. The grid is `auto-fill`, floor `min(100%, 20rem)`. `list-layout.spec.ts` measures the warning-to-button gap (0px on the trunk at all three widths) and one line of buttons at 1440.
+
+- **`minor` · Every tenant page sits in a centred 1200px column (1600px for ten list pages) and the console in 1100px, leaving dead space either side of a wide screen.**
+  The user's comment (2026-10-14): *"some pages only occupies the middle part of the page specially when screen is wide. can we make
+  every page occupy the whole width? no content on the middle only"*. `resources/js/Layouts/AppLayout.vue:169` caps
+  `.app-shell__inner` at 1200px, `:192` at 1600px for the `WIDE_PAGES` set (`:48-59`), `:197` none for the builder;
+  `resources/js/Layouts/AdminLayout.vue:199` caps `.admin__inner` at 1100px. `resources/js/Layouts/AppLayout.test.ts:68-90` pins the
+  set, `tests/e2e/list-layout.spec.ts:100-119` asserts `/settings` is exactly 1200px at a 1600px window,
+  `packages/design-system/src/stories/ListPage.stories.ts:37` and `packages/design-system/src/stories/CardGrid.stories.ts:98`
+  hard-code 1600px, and `docs/ux/design-system-reference.md:588` ("a consistent max-width") and `:1541` ("a padded,
+  max-width-constrained column") record the rule being changed. `D120` A (the user, 2026-10-14): fill with layout. The remedy:
+  `max-width: none; margin: 0` on both inners (padding kept, one extra step of horizontal padding above 1920px), `WIDE_PAGES` and
+  the `--wide` class deleted, the builder's `--fluid` kept; the Vitest set rewritten; the e2e case made a 1920px case asserting a
+  list page AND `/settings` fill the region (red today); the two stories; DSR §3.0 and the §6 bullet amended — and the same edit
+  records the page-level `dl` collapse at 480px that ten pages author (`resources/js/Pages/scopes/Index.vue:387`,
+  `resources/js/Pages/forms/Show.vue:594`) against §6's "pages never add breakpoint logic" sentence, which today contradicts them.
+  **Live.** Filed by `M171`. **Tier: during-testing.**
+
+- **`minor` · The settings pages stack 640px cards in one column, so a wide screen shows one narrow column and the rest of the page empty.**
+  `resources/js/Pages/Settings/Index.vue:482` (`.settings-card { max-width: 640px }`) with `:475` a column; `resources/js/Pages/Settings/Sso.vue:158`
+  and `:151`; `resources/js/Pages/admin/Settings.vue:188`; and the same 640px cap re-declared in every card component —
+  `resources/js/components/settings/AboutCard.vue:110`, `resources/js/components/settings/MaintenanceCard.vue:104`,
+  `resources/js/components/settings/ModulesCard.vue:121`, `resources/js/components/settings/AccessCard.vue:159`,
+  `resources/js/components/settings/NotificationPreferencesCard.vue:177`, `resources/js/components/settings/BrandingCard.vue:312`,
+  `resources/js/components/sso/SsoStatusCard.vue:116`, `resources/js/components/sso/SsoPolicyCard.vue:189`,
+  `resources/js/components/sso/SsoFailuresCard.vue:97`, `resources/js/components/sso/SpDetailsCard.vue:118`,
+  `resources/js/components/sso/IdpMetadataCard.vue:223`. `D120` A. The remedy: the caps go; the cards sit in
+  `repeat(auto-fill, minmax(min(100%, 36rem), 1fr))` with `align-items: start` (two columns at 1440, three from 1920); the console
+  page's Save foot spans the row; the 380px input measure inside a card (`resources/js/Pages/Settings/Index.vue:505`) stays, since
+  `D120` keeps a measure for inputs. **Live.** Filed by `M171`. **Tier: during-testing.**
+
+- **`minor` · The scanned-forms and scan-status pages cap themselves at 720px, and the recent-scans list runs each row from one edge to the other.**
+  `resources/js/Pages/ocr/Scans.vue:300` and `resources/js/Pages/ocr/ScanStatus.vue:135` (`max-width: 720px`); `Scans.vue:395-414` lays
+  the recent scans as full-width rows with the status at the left edge and the action link at the right
+  (`justify-content: space-between` at `:408`). Three error texts here read `--mds-color-danger-text` (`Scans.vue:358`, `:433`,
+  `ScanStatus.vue:150`), which resolves to `danger-300` in dark and fails 4.5:1 on the surface; they take `--mds-color-status-danger-fg`
+  with this row so the consistency row never edits these files. `D120` A and `D121` A (the upload form keeps a measure as a form; the
+  list fills). The remedy: the caps go; the list becomes a card grid (`auto-fill minmax(min(100%, 28rem), 1fr)`); from 75rem the
+  upload card keeps a 36rem measure beside the list. **Live.** Filed by `M171`. **Tier: during-testing.**
+
+- **`minor` · The form's Settings tab stretches every section's inputs across the whole width.**
+  `resources/js/Pages/forms/Settings.vue:67` mounts `FormSettingsSections` in one `MdsCard` with no measure, and
+  `resources/js/components/forms/FormSettingsSections.vue:354` is the component's only container query (420px, the narrow side).
+  `D120` A and `D121` A: inputs keep a reading-width column. The remedy: from a 60em container the sections lay two-up
+  (`auto-fill minmax(min(100%, 32rem), 1fr)`, `align-items: start`), each section's controls at a 36rem measure; the 880px settings
+  modal stays one column because its container never reaches 60em; a new Vitest case on the source pins the query, the way
+  `resources/js/Pages/forms/builder-layout.test.ts` pins the builder's. **Live.** Filed by `M171`. **Tier: during-testing.**
+
+- **`minor` · The form hub and the submission page stack their facts above their tables, so on a wide screen every row runs from one edge of the glass to the other.**
+  `resources/js/Pages/forms/Show.vue:343-366` (identity and facts), `:368-407` (tiles), `:415-487` (two full-width tables);
+  `resources/js/Pages/submissions/Show.vue:415-420` three fact cards in `auto-fit minmax(18rem, 1fr)` and `:350-361` the answer blocks
+  one under the other, each row `10rem 1fr` (`:495-501`), so a value sits 2,000px from its label on a 2560px screen. `D120` A. The
+  remedy is a page grid from a 75rem container — main content (tables, answers) in `minmax(0, 1fr)`, the facts, versions, review and
+  PDF cards in a `minmax(18rem, 26rem)` aside — with the submission's answer blocks two-up (`auto-fill minmax(min(100%, 36rem), 1fr)`)
+  and the scan split (`:435-450`) unchanged; `resources/js/Pages/forms/show.test.ts` keeps its every-prop-has-a-reader rule. **Live.**
+  Filed by `M171`. **Tier: during-testing.**
+
+- **`minor` · The webhook, integration-rule and console workspace pages stack two fact cards over a full-width log, and the console's dialogs rely on browser-default paragraph margins.**
+  `resources/js/Pages/webhooks/Show.vue:358-363` and `resources/js/Pages/integrations/RuleShow.vue:326-331` put two cards in
+  `auto-fit minmax(18rem, 1fr)` above the log (`:259` in each); `resources/js/Pages/admin/TenantDetail.vue:542-546` the same with
+  `:546-548` stacking every section under it. On that page `:491-498` and `:513-519` are paragraphs with no class in two dialogs
+  (every tenant dialog styles a `__prose` rule), and `:562` hard-codes `letter-spacing: 0.04em` where `--mds-tracking-wide` exists.
+  `D120` A. The remedy is the hub's page grid (cards aside, log main, from 75rem), a `__prose` rule, and the token. **Live.**
+  Filed by `M171`. **Tier: during-testing.**
+
+- **`minor` · Domains, search results and the achievements leaderboard are single columns of full-width rows.**
+  `resources/js/Pages/domains/Index.vue:212-216` (`.domains__list`, a column of `DomainCard`s), `resources/js/Pages/search/Index.vue:210-214`
+  (the groups) and `:235-247` (one full-width card per result), `resources/js/Pages/achievements/Index.vue:458-465` (`.ach__ladder`, a
+  column) with `:485-492` giving the name `flex: 1`, so the rank sits at the left edge and the points at the far right of a 2560px
+  row. `D120` A. The remedy: domain cards in `auto-fill minmax(min(100%, 26rem), 1fr)`; search groups side by side from 64rem with
+  their rows inside each group; the leaderboard beside the team tiles and the note in a two-column section grid from 75rem.
+  **Live.** Filed by `M171`. **Tier: during-testing.**
+
+- **`nit` · Template cards' "Use this template" buttons sit at different heights across a row.**
+  `resources/js/Pages/forms/Templates.vue:128-132` makes each card a flex column but never pushes the footer to the bottom;
+  `resources/js/components/forms/FormCard.vue:225` does it with `margin-top: auto` on the card footer. The remedy is the same rule,
+  `:deep(.mds-card__footer) { margin-top: auto }`. **Live.** Filed by `M171`. **Tier: during-testing.**
+
+- **`minor` · The sign-in and register pages centre a 400px card and a pitch panel in the middle of a wide screen, and the landing page caps itself at 64rem.**
+  `resources/js/Layouts/AuthLayout.vue:83-91` centres `.auth__frame`, `:122-134` is the 400px card, and `:220-247` makes the split
+  variant's panel a 26rem flex track beside it; `resources/js/Pages/Welcome.vue:117-126` caps the page at 64rem and the hero at 44rem,
+  `:147-153` the lede at 36rem, `:169-173` lays the capability grid with `auto-fit`, and `:134` hard-codes an eyebrow's tracking.
+  `D122` A (the user, 2026-10-14): a two-pane sign-in. The remedy: the split variant becomes a two-pane page — the pitch panel fills
+  the left half on a sunken surface, the card centred in the right half, stacked below the 54em container threshold; the seven
+  utility pages keep the card; the landing hero stays centred but its grid fills with `auto-fill` and bounded cards, and the tracking
+  takes `--mds-tracking-wide`. The layout docblock's two CI constraints hold: no second control whose name contains "Sign in", and
+  the panel's headline stays a paragraph. `tests/e2e/auth-axe.spec.ts` gains the two-pane case. **Live.** Filed by `M171`.
+  **Tier: during-testing.**
+
+- **`minor` · The staff encode page caps itself at 720px and leaves the rest of a wide screen empty.**
+  `resources/js/Pages/submissions/Encode.vue:1575-1577` (`.encode { max-width: 720px }`) and `:1962` (`max-width: 90rem` in scan mode).
+  `D121` A (the user, 2026-10-14): the inputs keep a reading-width column and the rest of the width carries the page's own side
+  panel. The remedy: from 75rem a two-column grid — the form at a 45rem measure and an aside holding the facts that today sit above
+  it (the form's status and version, the schedule notice, the reference files, the autosave state); scan mode's equal halves
+  (`M168`) unchanged. The page's two `--mds-color-danger-text` uses (`:1921`, `:2029`) take `--mds-color-status-danger-fg` with this
+  row, so the consistency row never edits this hub. **Live.** Filed by `M171`. **Tier: during-testing.**
+
+- **`minor` · The feedback panel is in every captured screenshot, a report carries no type, and only the page's path is recorded.**
+  The user's comment (2026-10-14): *"when i click capture screen, the modal for the feedback is always included. i think there is a
+  better way of doing that. and lets tag it if its a bug, recommendation/suggestion or question. and lets capture the url for better
+  logging"*. `resources/js/components/shell/FeedbackButton.vue:70-86` calls `captureScreenshot()`
+  (`resources/js/components/shell/screenshot.ts:39-67`, the native `getDisplayMedia`) while the `MdsModal` at `:121` is open, so the
+  frame holds the panel; `:39` sends `window.location.pathname` as `route` and nothing else about the page;
+  `database/migrations/2026_07_06_000100_create_feedback_reports_table.php:27` has no type column, and
+  `app/Enums/FeedbackStatus.php:12` records that `status` has no CHECK constraint. `D127` A (the user, 2026-10-14): the panel steps
+  aside. The remedy: on Capture the panel closes, waits for the modal's leave transition, captures, and reopens with the text intact
+  (ADR-0015 gains §D11); a `FeedbackType` enum (`bug` Bug, `suggestion` Suggestion, `question` Question) in a nullable `type` column
+  with a CHECK generated from the enum, required on submit, chosen with a radio group at the top of the panel, shown as a badge and a
+  filter on `/feedback` and `/admin/feedback`; `page_url` (the full address) and `page_title` columns, the Inertia page name and the
+  app version in `browser_info`, the title shown as a link on both lists and matched by the keyword filter; `docs/data-dictionary.md`
+  §21 and the enum catalog row (gated by `tests/Feature/Docs/DocumentedEnumCatalogDriftTest.php`). Mutations: the hide dropped → Vitest
+  red; `type` dropped from the payload → Pest red; the CHECK dropped → the drift test red. **Live.** Filed by `M171`.
+  **Tier: during-testing.**
+
+- **`minor` · The product shows no user-facing version and has no "What's new": Settings → About reads "dev" on the testing server, and a user learns of a change only by noticing it.**
+  The user's request (2026-10-14): *"lets also have a what's new prompt to users for new login so users are aware for every changes.
+  versioning must also be included. lets put the current version in the app, footer and login so users are aware."* `config/app.php:32`
+  reads `APP_VERSION` with the default `dev` and `app/Support/Platform/BuildInfo.php:28-33` passes it through; `.env.example:22` leaves it
+  blank and `deploy.ps1` never sets it. The shell has no footer (`resources/js/Layouts/AppLayout.vue:110-116`), the sidebar ends at Help
+  (`resources/js/components/shell/nav-model.ts:140`), the account menu lists Settings and Log out
+  (`resources/js/components/shell/AccountMenu.vue:27-30`), and the gap-table row at `docs/feature-backlog.md:160` names a What's new
+  feed that nothing queues. `D124` A (0.9.0 now, 1.0.0 at launch), `D125` C (changed by the user on 2026-10-15: the notes written
+  with each change and saved in the database by every deploy; the prompt opens on the first page after sign-in), `D126` A (any close
+  marks it seen). The remedy: a committed `VERSION` file
+  read by `BuildInfo` under the env override and shared to every page; the version in the sidebar foot, a slim footer under every
+  page, the sign-in card, the console bar and the landing page; the notes in one repository file (JSON, so PHP and the tests both read
+  it) with a test that the top entry matches `VERSION` and versions descend; a central `releases` table (version unique, released_at,
+  title, items) filled by an idempotent `releases:sync` command that `deploy.ps1` runs after `migrate --force` (upsert by version,
+  never a delete), and the page and the prompt reading the table; a `/whats-new` page and a modal opened on the first page after sign-in for a user whose `users.whats_new_seen_version` (new,
+  nullable, no backfill, withheld from tenant extracts like `welcomed_at`) is older, marked seen by any close through
+  `POST /whats-new/seen`; one close-out sentence in `CLAUDE.md` and the RBAC §6 users row. **Live.** Filed by `M171`.
+  **Tier: during-testing.**
+
+- **`nit` · What's new entries do not reach the notification centre.**
+  The gap-table row at `docs/feature-backlog.md:160` asks for a changelog "feeding the notification center"; the versioning row above
+  builds the prompt and the page and deliberately not the feed, because `resources/js/components/shell/NotificationBell.vue` has no
+  producer for a platform-wide notice and `App\Enums\NotificationType` would need a new case with a catalog row. Filed so the half
+  not built is queued rather than left in prose. **Live.** Filed by `M171`. **Tier: after-launch.**
+
+- **`minor` · Fifteen files set small error text in `--mds-color-danger-text`, which resolves to `danger-300` in dark and measures 4.22:1 on the surface.**
+  The repository's own notes say so (`resources/js/Pages/admin/AuditLog.vue:287`, `resources/js/Pages/admin/TenantDetail.vue:539`,
+  `resources/js/components/builder/LogicRail.vue:228`, `resources/js/components/shell/FeedbackButton.vue:295`) and the uses remain:
+  `resources/js/Pages/forms/Builder.vue:857`, `resources/js/components/webhooks/WebhookFormModal.vue:197`,
+  `resources/js/components/scopes/GrantModal.vue:256`, `resources/js/components/scopes/DeleteNodeModal.vue:120`,
+  `resources/js/components/builder/ConfigPanel.vue:787`, `resources/js/components/submissions/MediaInput.vue:420`, `:557`, `:583`,
+  `:589`, `resources/js/components/submissions/MatrixGrid.vue:290`, `resources/js/components/submissions/GeoInput.vue:637`, `:742`,
+  `resources/js/components/submissions/FieldInput.vue:706`, `resources/js/components/integrations/RuleFormModal.vue:448`,
+  `resources/js/components/builder/PreviewRuntime.vue:665` (the OCR pages' and the encode page's uses are taken by their own rows).
+  Only the dark axe sweep can see it, and `/admin/*` is outside the sweep. The remedy is `--mds-color-status-danger-fg`, the
+  on-surface pair with a measured ratio, in every one. **Live.** Filed by `M171`. **Tier: during-testing.**
+
+- **`nit` · The console's "Reset two-step sign-in" dialog relies on browser-default paragraph margins.**
+  `resources/js/Pages/admin/Users.vue:91-97` renders three paragraphs with no class, while every tenant dialog styles a `__prose` rule
+  (`resources/js/Pages/members/Index.vue:497`). The remedy is the same rule. **Live.** Filed by `M171`. **Tier: during-testing.**
+
+- **`nit` · Three uppercase micro-labels hard-code their tracking where `--mds-tracking-wide` exists.**
+  `resources/js/Pages/help/Index.vue:223` (0.04em), `resources/js/components/shell/Sidebar.vue:338` (0.06em) and
+  `resources/js/Layouts/AdminLayout.vue:130` (0.04em); `packages/design-system/src/components/FilterBar/FilterBar.vue:58-61` records the
+  token as the one letting for the product's micro-labels (the console workspace page's and the landing page's literals are taken by
+  their own rows). The remedy is the token. **Live.** Filed by `M171`. **Tier: during-testing.**
+
+- **`nit` · Three truncated values offer no way to read the whole text where they are shown.**
+  `resources/js/Pages/webhooks/Index.vue:224-236` (`.webhooks__url`), `resources/js/Pages/integrations/Index.vue:456-468`
+  (`.connection__channel`) and `resources/js/Pages/integrations/RuleShow.vue:421-431` (`.detail__result`) clip with an ellipsis and
+  carry no `title`. The remedy is a `title` with the full value — allowed because the same text is on the row's detail page, so no
+  tooltip component is owed. **Live.** Filed by `M171`. **Tier: during-testing.**
+
+- **`nit` · The root lockfile records the design system's `vue` range as `^3.5.39` while its `package.json` says `^3.5.43`, so the node container's `npm install` rewrites `package-lock.json` and dirties the working tree.**
+  Found by `M171`: after the stack started, `git status` showed `package-lock.json` changed by one line — the `packages/design-system`
+  entry's `"vue": "^3.5.39"` became `"^3.5.43"`. `M137` raised the design system's range (`packages/design-system/package.json:37`) and
+  the root lock was never regenerated. Harmless to the build (CI runs `npm install`, not `npm ci`), but a session that stages
+  everything ships an unrelated lockfile line, and one that does not keeps reverting it. The remedy is the one-line lock update in a
+  PR of its own. **Live.** Filed by `M171`. **Tier: during-testing.**

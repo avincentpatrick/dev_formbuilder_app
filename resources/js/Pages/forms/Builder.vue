@@ -8,7 +8,7 @@
  * selector (a fully keyboard-operable path). Rendered full-bleed by AppLayout (forms/Builder is a fluid
  * page). Publishing/versioning stays on the existing Inertia endpoints.
  */
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     MdsAlert,
@@ -137,6 +137,38 @@ onMounted(() => {
     } else if (store.sections.value.length > 0) {
         store.select({ kind: 'section', uid: store.sections.value[0].uid });
     }
+});
+
+// M170 (`R-bfa3eb93`, `R-fdc743ab`) — the page going never strands an edit. A change still waiting out the store's
+// 600 ms debounce is sent at once when the tab is closed, reloaded, hidden or left for another page, as a request the
+// browser keeps alive; and an edit whose save failed is sent again when the connection or the tab comes back. A reload
+// does not rely on the first half — the store also puts back on load any edit the server does not hold (`edit-journal.ts`).
+function onPageLeave(): void {
+    store.flushForLeave();
+}
+
+function onVisibility(): void {
+    if (document.visibilityState === 'hidden') store.flushForLeave();
+    else void store.retryUnsaved();
+}
+
+function onOnline(): void {
+    void store.retryUnsaved();
+}
+
+onMounted(() => {
+    window.addEventListener('beforeunload', onPageLeave);
+    window.addEventListener('pagehide', onPageLeave);
+    window.addEventListener('online', onOnline);
+    document.addEventListener('visibilitychange', onVisibility);
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener('beforeunload', onPageLeave);
+    window.removeEventListener('pagehide', onPageLeave);
+    window.removeEventListener('online', onOnline);
+    document.removeEventListener('visibilitychange', onVisibility);
+    store.flushForLeave(); // an in-app visit away unmounts the page without unloading it
 });
 
 function targetSection(): string | null {

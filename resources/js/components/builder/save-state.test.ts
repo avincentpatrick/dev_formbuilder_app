@@ -254,12 +254,15 @@ group('the save verdict is explicit, never inferred from an idle queue', () => {
         let release: (value: Response) => void = () => {};
         mock.mockReturnValue(new Promise<Response>((resolve) => (release = resolve)));
 
-        const retry = store.addSection();
+        // ⚠️ M170 (`R-fdc743ab`): the retry is the FAILED EDIT sent again. This case used to retry by adding a section and
+        // expect "saved" once that landed — while "First try" had never reached the server. That was the defect M170
+        // closes, pinned as intended behaviour: a success elsewhere is no evidence about this edit.
+        const retry = store.retryUnsaved();
 
         expect(store.saveState.value).toBe('saving');
         expect(store.saveError.value).toBe('Server error.');
 
-        release(jsonResponse(200, serverSection({ id: 's2', key: 'added' })));
+        release(jsonResponse(200, serverField({ label: 'First try', version: 'v2' })));
         await retry;
         await flushPromises();
 

@@ -24,10 +24,109 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D117`, the last one filed, was asked and answered on 2026-10-13 in the session that filed it and recorded in `M167`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D127`, the last one filed, was asked and answered on 2026-10-14 in the planning session that filed it and recorded in `M171`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D127 — The feedback panel's "Capture screen" takes the frame while the panel is open, so every screenshot carries the panel. How should the capture leave it out? **A — the panel steps aside: it closes for the capture, the browser's tab picker opens with this tab first, the frame is taken, and the panel returns with the text intact and the picture attached.**
+
+**Asked and answered 2026-10-14 (user decision, in chat), recorded by Lane A in `M171`'s claim.** The comment: *"when i click capture screen, the modal for the feedback is always included. i think there is a better way of doing that."* `resources/js/components/shell/FeedbackButton.vue` captures through the native Screen Capture API (`docs/adr/0015-feedback-screenshot-capture.md`) with the `MdsModal` still open.
+
+- **A — the panel steps aside (recommended, chosen).** The smallest change; the native-capture decision of ADR-0015 stands and gains a sub-decision recording this sequence (close, wait for the leave transition, capture, reopen).
+- **B — capture first, then the panel.** The Feedback button offers "Report a bug with a screenshot"; the capture happens before any panel exists. Two entry points to maintain.
+- **C — draw the page without a picker.** A DOM-to-image render; re-opens ADR-0015 (the map and signature fields come out blank) and adds a dependency.
+
+**What the answer files, in the same push:** `R-2ce2f274` (`during-testing`): the capture, the type tag and the page URL, one row.
+
+### D126 — When does the What's new prompt stop showing? **A — any close marks it seen: Got it, the close control, Escape or a click outside all record the version; it never nags, and the notes stay a click away in the footer.**
+
+**Asked and answered 2026-10-14 (user decision, in chat), recorded by Lane A in `M171`'s claim.** The prompt opens on the first page after sign-in when the user's last-seen version is older than the current one; a brand-new user sees only the latest entry.
+
+- **A — any close marks it seen (recommended, chosen).**
+- **B — only Got it marks it seen;** any other close shows it again on the next page load.
+- **C — once per sign-in until Got it.**
+
+**What the answer files, in the same push:** nothing new — it shapes `R-c7247dbf`.
+
+### D125 — Where do the What's new notes live, and when is the prompt shown? **C — written with each change in a repository file and copied into a `releases` table by every deploy, so the database holds every release's version, date and changes; and the prompt opens right after logging in, on the first page the user lands on.**
+
+**Asked and answered 2026-10-14 (user decision, in chat), recorded by Lane A in `M171`'s claim.** The user answered the source question with the trigger: *"i want the whats new to be seen right after logging in."* The recommended option already opened the prompt on the first page after sign-in, so that is recorded as the user's firm requirement — the post-login landing, before anything else — and the source stays the recommended repository file, which the user did not object to. ⚠️ If the user asks for an admin-editable screen instead, the build session records the change here before touching `R-c7247dbf`.
+
+- **A — a file in the repository (recommended, chosen by default).** No admin screen, no table; a test refuses a release whose notes and version disagree.
+- **B — an admin-editable table.** Platform admins write entries in the console; a new table and screens, and entries can drift from what shipped.
+- **C — written with the change, saved by every deploy (chosen 2026-10-15).** Each change brings its notes in one repository file; an idempotent deploy step upserts them into a `releases` table by version and never deletes, so the database is the release history and what the app reads, and the test that refuses notes disagreeing with `VERSION` stays.
+
+**Changed 2026-10-15 (user decision, in chat, at `M171`'s build start), when the build session confirmed the source as the entry above required.** The user: *"actually, i want it saved in the databse. so everybrelease, we know what changed, qhqt version it is etc"* — and, asked who writes each release's notes (written with the change and saved by every deploy / typed on a console screen / both), *"Written with the change"*. That is neither A (no table) nor B (typed by an admin), so it is recorded as C. The trigger half is unchanged: the prompt opens on the first page after sign-in.
+
+**What the answer files, in the same push:** nothing new — it amends `R-c7247dbf`'s remedy (the table, the sync step in the deploy, the page reading the table); the half not built (the notification-centre feed) is `R-3f887956`.
+
+### D124 — Which version scheme, and what is the first number shown to users? **A — a committed `VERSION` file, semantic: 0.9.0 now, a user-visible fix bumps the last number, a new feature the middle one, and launch is 1.0.0.**
+
+**Asked and answered 2026-10-14 (user decision, in chat), recorded by Lane A in `M171`'s claim.** The request: *"versioning must also be included. lets put the current version in the app, footer and login so users are aware."* Today `config/app.php` reads `APP_VERSION` with the default `dev`, which is what the testing server's About panel shows.
+
+- **A — 0.9.0 now, 1.0.0 at launch (recommended, chosen).** The version shows in the sidebar foot, a slim footer under every page, the sign-in card, the console bar and the landing page; not on respondents' form pages. A test refuses a release whose notes and version disagree.
+- **B — 1.0.0 now.**
+- **C — date-based (2026.10.14).** Two deploys on one day collide and nothing says how big a change was.
+
+**What the answer files, in the same push:** `R-c7247dbf` (`during-testing`) and `R-3f887956` (`after-launch`).
+
+### D123 — The UI programme is some twenty rows; `D13` batches three or four rows per increment, and the testing freeze says nothing merges without the user's word. How is it batched and merged? **A — six themed increments (the three complaints; full width — shell and settings; full width — detail pages, stacks and sign-in; feedback; versioning and What's new; consistency), each row its own commit, every PR held at 6/6 green until the user says merge, after a fresh staging backup.**
+
+**Asked and answered 2026-10-14 (user decision, in chat), recorded by Lane A in `M171`'s claim.** A one-off widening of `D13`'s three-or-four-row batch for this programme only; `D15`'s file-overlap and one-hub rules hold inside each increment, and `D75`'s one-row-per-commit shape makes a red run bisect to one row. The freeze of 2026-10-13 is unchanged: a PR stops at green and waits.
+
+- **A — themed increments, merge on the user's word (recommended, chosen).**
+- **B — strict `D13` batches,** about ten increments.
+- **C — merge each when green,** lifting the freeze for this work.
+
+**What the answer files, in the same push:** nothing new — it orders the twenty rows filed by `M171`, in the plan at `~/.claude/plans/hi-let-s-conduct-a-mutable-goose.md`.
+
+### D122 — The sign-in and register pages centre a 400px card and a pitch panel. How should they use a wide screen? **A — a two-pane sign-in: the pitch panel fills the left half on a sunken surface and the card sits centred in the right half; the seven utility pages keep the plain card; the landing page's feature grid fills.**
+
+**Asked and answered 2026-10-14 (user decision, in chat), recorded by Lane A in `M171`'s claim.** `resources/js/Layouts/AuthLayout.vue` centres the frame and gives the split variant a 26rem panel beside the card.
+
+- **A — two-pane sign-in (recommended, chosen).** The whole width is used without stretching a form.
+- **B — keep the centred card.**
+- **C — stretch the card** with the window.
+
+**What the answer files, in the same push:** `R-3d51f0ae` (`during-testing`).
+
+### D121 — The staff encode page, the OCR pages and the public form hold inputs; a 2,000px-wide answer box is hard to use. Do form-filling pages keep a reading-width column? **A — yes: the inputs stay in a comfortable column and the rest of the width carries the page's own side panel (form facts, progress, reference files, the scanned paper where there is one); respondents' public form pages are left as they are.**
+
+**Asked and answered 2026-10-14 (user decision, in chat), recorded by Lane A in `M171`'s claim.**
+
+- **A — keep a column, fill the rest (recommended, chosen).**
+- **B — full width everywhere** on the encode and OCR pages; the public form unchanged.
+
+**What the answer files, in the same push:** `R-66952d33` (`during-testing`); it also shapes `R-8ee7d2dc` and `R-14971e37`.
+
+### D120 — Pages sit in a centred 1200px column (1600px for the list pages) with dead space either side of a wide screen. How far does "every page occupies the whole width" go — to reading text and short forms too? **A — fill with layout: no centred column anywhere; settings cards two or three across, detail pages gain a side column, stacks become card grids; only reading text keeps a measure, left-aligned beside its contents column, never centred.**
+
+**Asked and answered 2026-10-14 (user decision, in chat), recorded by Lane A in `M171`'s claim.** The request: *"some pages only occupies the middle part of the page specially when screen is wide. can we make every page occupy the whole width? no content on the middle only. so no blank spaces on the left and right but still make it mobile responsive."* `resources/js/Layouts/AppLayout.vue`'s JR4 comment argues against an unbounded column because a row's title and its date drift to opposite edges of a 32-inch panel; the answer keeps that objection by changing the pages' own layouts rather than only the cap.
+
+- **A — fill with layout (recommended, chosen).**
+- **B — stretch everything,** text and single-input forms edge to edge.
+- **C — lists and grids only;** settings, detail and prose pages keep the centred column.
+
+**What the answer files, in the same push:** `R-fd7b8879`, `R-ba9d6349`, `R-8ee7d2dc`, `R-14971e37`, `R-348f997c`, `R-7b8a74ae`, `R-fb647b5e`, `R-10b38d6d` (all `during-testing`); `R-0a504679`, `R-88a6c81a` and `R-61992abf` are the user's three named complaints, taken by `M171`.
+
+### D119 — A staff member who opens a colleague's saved draft on the encoding page ("Continue this draft") has every save refused. Should they be able to keep editing and saving it? **A — yes: anyone allowed to continue a draft can save into it; the draft keeps its original author and records who saved it last.**
+
+**Asked and answered 2026-10-14 (user decision, in chat), filed and recorded by Lane A in `M170`**, while checking every autosave for the user's report (`R-ae57cf6f`). The inbox offers "Continue this draft" to anyone allowed to submit the draft (`SubmissionPolicy::promote()`, which has no author check), but the draft save looks the draft up by its author (`ClientUuidResolver::resolve()`, scoped that way since `M11`), so for anyone else every autosave is refused and saving stops with a red message.
+
+- **A — yes: anyone allowed to continue a draft can save into it (recommended, chosen).** The draft keeps its original author and records who last saved it. It matches what the resume page was built for: a supervisor or a co-encoder finishing someone else's entry.
+- **B — no: only the author continues a draft.** "Continue this draft" is hidden from everyone else, who can still open it read-only and submit it as it stands.
+
+**What the answer files, in the same push:** nothing new — `R-ae57cf6f` (filed in the same increment) is the work, and its Awaits token is stripped.
+
+### D118 — Someone filling a public form closes it, then opens the link again on the same phone or computer. It starts blank, because the form keeps answers only for the same tab. Should their answers come back? **A — yes, after asking: "Continue where you left off" or "Start over", shown before any answer appears.**
+
+**Asked and answered 2026-10-14 (user decision, in chat), recorded by Lane A in `M170`.** Asked while checking every autosave for the user's report *"the autosave feature is not working on other clients"*. Since `M21` the guest autosave restores answers only in the same tab and visit (`resources/public-runtime/composables/useAutosave.ts`), on purpose, so the next person at a shared device never sees them.
+
+- **A — yes, ask first (recommended, chosen).** The cost, accepted: on a shared phone or a kiosk, the next person could press Continue and see the answers. A kiosk mode is where to switch it off.
+- **B — no, same tab only (as built).** Only the defect where a long pause loses the answers on a reload is fixed.
+- **C — only through "Save and finish later".** The emailed link, which each form has to switch on.
+
+**What the answer files, in the same push:** a `during-testing` row in `docs/feature-backlog.md` (`R-8881210a`, *reopening a public form's link on the same device starts a blank form*).
 ### D117 — A scan saw writing it could not turn into the question's type — a weight written "72.", a date whose year was read as "190" — and the review screens left the box empty with "Needs manual entry … It saw …". Should the box be filled with the nearest answer it can hold? **A — yes: every question the scan saw anything in is filled with the nearest answer its box can hold, and marked that it may be wrong.**
 
 **Asked and answered 2026-10-13 (user decision, in chat), recorded by Lane A in `M167`'s claim.** The comment, with a screenshot of the staff review of Round 1's sheet 01: *"previously, i commented on the ocr reader that it whenever a value is read even if the confidence is low, it must be reflected in the field and just notify that it may be wrong. and i also tested that and it is functioning well before. but now i tried testing an upload now and its back to not reflecting the read value and just telling what is read."* Not a regression of `D108`: in the same screenshot Full name (66%) and Email (46%) are filled in and marked. Weight and Date of visit took the other path — the reader could not make the text into a number or a date, so it returned `unreadable` with no value, which `D108` never touched. The question put: the date boxes read 12 / 11 / 190 — fill it as read (11/12/0190) and mark it, or leave it empty with the note. The answer widened it to every type: *"fill as read and let the user correct it. its better than the user will type everyhting. also for the decimal. fill it in and let the user correct it. actually all the fields must be fields based on what is read and let the user correct it. its always better to have an initial value rather than user will type everything from 0."*

@@ -302,8 +302,14 @@ function takesRuleValue(row: BuilderValidation): boolean {
     return row.operator !== null && row.operator !== OPERATOR_ANSWERED && row.operator !== 'is_null';
 }
 
+/**
+ * ⛔ M170 (`R-7ebfb08e`) — AN EMPTY EXPRESSION IS STILL EXPRESSION MODE. `setMode()` starts a row in that mode as
+ * `expression: ''`, and reading `''` as rule mode hid the very box the author had just asked for, leaving a row with
+ * neither a check nor an expression that refused every save of the question. `null` is the only "not an expression":
+ * the server never stores `''` (it arrives as null), and `addRule()` starts a row with `null`.
+ */
 function mode(row: BuilderValidation): 'rule' | 'expression' {
-    return row.expression !== null && row.expression !== '' ? 'expression' : 'rule';
+    return row.expression !== null ? 'expression' : 'rule';
 }
 
 function update(index: number, patch: Partial<BuilderValidation>): void {

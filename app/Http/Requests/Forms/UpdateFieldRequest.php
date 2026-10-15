@@ -11,7 +11,6 @@ use App\Enums\IndexedDataType;
 use App\Enums\LogicOperator;
 use App\Enums\RequiredMode;
 use App\Enums\ValidationRuleType;
-use App\Models\Form;
 use App\Models\FormField;
 use App\Rules\ContentBlocks;
 use Illuminate\Contracts\Validation\Validator;
@@ -43,17 +42,20 @@ final class UpdateFieldRequest extends FormRequest
      */
     public function rules(): array
     {
-        /** @var Form $form */
-        $form = $this->route('form');
         /** @var FormField $field */
         $field = $this->route('field');
 
         return [
             ...$this->configRules($field->field_type),
+            // M172 (`R-81756e95`, folding `R-4c4e35ae`): scoped to the BOUND ROW'S OWN version, not the form's current
+            // draft. Scoped on the draft, a page left open across a publish sent its unchanged key against the clone
+            // and read "The key has already been taken". `builder.draft` now refuses that page 409 before this runs;
+            // inside the race it cannot see, this rule passes and the service's draft guard answers the same 409 — the
+            // outcome `D30` lacked when both scopes ended in a dead 422.
             'key' => [
                 'required', 'string', 'max:150', 'regex:/^[a-z][a-z0-9_]*$/',
                 Rule::unique('form_fields', 'key')
-                    ->where('form_version_id', $form->draft_version_id)
+                    ->where('form_version_id', $field->form_version_id)
                     ->ignore($field->id),
             ],
             'label' => ['required', 'string', 'max:500'],

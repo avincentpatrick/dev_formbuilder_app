@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Forms;
 
-use App\Models\Form;
 use App\Models\FormSection;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -22,16 +21,16 @@ final class UpdateSectionRequest extends FormRequest
      */
     public function rules(): array
     {
-        /** @var Form $form */
-        $form = $this->route('form');
         /** @var FormSection $section */
         $section = $this->route('section');
 
         return [
+            // M172 (`R-81756e95`, folding `R-4c4e35ae`): scoped to the bound row's own version — the reason is on
+            // UpdateFieldRequest's identical rule.
             'key' => [
                 'required', 'string', 'max:150', 'regex:/^[a-z][a-z0-9_]*$/',
                 Rule::unique('form_sections', 'key')
-                    ->where('form_version_id', $form->draft_version_id)
+                    ->where('form_version_id', $section->form_version_id)
                     ->ignore($section->id),
             ],
             'label' => ['required', 'string', 'max:255'],

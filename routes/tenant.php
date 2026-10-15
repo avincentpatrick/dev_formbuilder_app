@@ -581,41 +581,43 @@ Route::middleware([
     // `show` renders the page; the rest are JSON edits the builder's CSRF fetch sidecar calls directly
     // (not Inertia visits, so the client keeps its undo/redo state). All gated by can:update,form; every
     // mutation edits the form's DRAFT version only (the draft_child RLS guard is the DB backstop, and
-    // FormBuilderService adds the clean 403). Content edits carry an updated_at token → 409 on drift.
+    // FormBuilderService adds a clean refusal). Content edits carry an updated_at token → 409 on drift.
+    // M172 (`R-81756e95`): every WRITE also carries the draft the page was loaded with — `builder.draft` answers a
+    // page left open across a publish 409 `draft_superseded` before any FormRequest validates it. Never on a GET.
     Route::get('/forms/{form}/builder', [FormBuilderController::class, 'show'])
         ->middleware('can:update,form')->name('forms.builder');
     Route::post('/forms/{form}/sections', [FormBuilderController::class, 'storeSection'])
-        ->middleware('can:update,form')->name('forms.sections.store');
+        ->middleware(['can:update,form', 'builder.draft'])->name('forms.sections.store');
     Route::patch('/forms/{form}/sections/{section}', [FormBuilderController::class, 'updateSection'])
-        ->middleware('can:update,form')->name('forms.sections.update');
+        ->middleware(['can:update,form', 'builder.draft'])->name('forms.sections.update');
     Route::delete('/forms/{form}/sections/{section}', [FormBuilderController::class, 'destroySection'])
-        ->middleware('can:update,form')->name('forms.sections.destroy');
+        ->middleware(['can:update,form', 'builder.draft'])->name('forms.sections.destroy');
     Route::post('/forms/{form}/fields', [FormBuilderController::class, 'storeField'])
-        ->middleware('can:update,form')->name('forms.fields.store');
+        ->middleware(['can:update,form', 'builder.draft'])->name('forms.fields.store');
     Route::patch('/forms/{form}/fields/{field}', [FormBuilderController::class, 'updateField'])
-        ->middleware('can:update,form')->name('forms.fields.update');
+        ->middleware(['can:update,form', 'builder.draft'])->name('forms.fields.update');
     Route::delete('/forms/{form}/fields/{field}', [FormBuilderController::class, 'destroyField'])
-        ->middleware('can:update,form')->name('forms.fields.destroy');
+        ->middleware(['can:update,form', 'builder.draft'])->name('forms.fields.destroy');
     Route::post('/forms/{form}/fields/{field}/duplicate', [FormBuilderController::class, 'duplicateField'])
-        ->middleware('can:update,form')->name('forms.fields.duplicate');
+        ->middleware(['can:update,form', 'builder.draft'])->name('forms.fields.duplicate');
     // Type conversion (Increment M122): its own controller and endpoint, never the autosave PATCH, whose
     // configRules() dispatch on the field's CURRENT type. GET reads every plan with its cross-field census;
     // POST applies one under the token and the confirmed plan's fingerprint.
     Route::get('/forms/{form}/fields/{field}/conversions', [FormFieldConversionController::class, 'index'])
         ->middleware('can:update,form')->name('forms.fields.conversions');
     Route::post('/forms/{form}/fields/{field}/convert', [FormFieldConversionController::class, 'store'])
-        ->middleware('can:update,form')->name('forms.fields.convert');
+        ->middleware(['can:update,form', 'builder.draft'])->name('forms.fields.convert');
     Route::post('/forms/{form}/reorder', [FormBuilderController::class, 'reorder'])
-        ->middleware('can:update,form')->name('forms.reorder');
+        ->middleware(['can:update,form', 'builder.draft'])->name('forms.reorder');
 
     // Question library (Increment G9b) — insert a reusable question into the draft, save a draft field back to
     // the library, and refetch the picker list. Draft writes → gated can:update,form like the other builder
     // mutations; insert delegates to SchemaBlueprintMaterializer::materializeField, save to FieldLibrary::fromField.
     // `from-library` is a literal segment (no {field}) so it never collides with the fields/{field} routes above.
     Route::post('/forms/{form}/fields/from-library', [FormBuilderController::class, 'storeFieldFromLibrary'])
-        ->middleware(['can:update,form', 'feature:field_library'])->name('forms.fields.from-library');
+        ->middleware(['can:update,form', 'feature:field_library', 'builder.draft'])->name('forms.fields.from-library');
     Route::post('/forms/{form}/fields/{field}/save-to-library', [FormBuilderController::class, 'saveFieldToLibrary'])
-        ->middleware(['can:update,form', 'feature:field_library'])->name('forms.fields.save-to-library');
+        ->middleware(['can:update,form', 'feature:field_library', 'builder.draft'])->name('forms.fields.save-to-library');
     Route::get('/forms/{form}/library-items', [FormBuilderController::class, 'libraryItems'])
         ->middleware(['can:update,form', 'feature:field_library'])->name('forms.library-items');
 

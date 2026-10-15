@@ -8,6 +8,7 @@ use App\Enums\FieldType;
 use App\Exceptions\Forms\BuilderConflictException;
 use App\Exceptions\Forms\FormException;
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\EnsureBuilderDraftCurrent;
 use App\Http\Requests\Forms\SaveFieldToLibraryRequest;
 use App\Http\Requests\Forms\StoreFieldFromLibraryRequest;
 use App\Http\Requests\Forms\StoreFieldRequest;
@@ -57,6 +58,11 @@ final class FormBuilderController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
+
+        // M172 (`R-81756e95`): Inertia restores Back from the props it cached in history, without asking the server, so
+        // a builder page reached by Back after a publish held the old draft's ids. Encrypted, its entry stops decrypting
+        // once a publish or restore clears the key (FormPublishController), and Inertia re-visits the server instead.
+        Inertia::encryptHistory();
 
         return Inertia::render('forms/Builder', [
             ...$this->presenter->present($form, $user),
@@ -220,9 +226,11 @@ final class FormBuilderController extends Controller
     }
 
     /**
-     * Run a builder mutation and JSON-encode its result, mapping the two builder exceptions to status:
+     * Run a builder mutation and JSON-encode its result, mapping the builder exceptions to status:
      *  - 409 + the fresh row on optimistic-concurrency drift (the ConflictDialog reconciles);
-     *  - 422 + the message on a draft-guard / no-draft violation (the builder shows an error + refetches).
+     *  - 409 `draft_superseded` when the row is in a version a publish has moved past (M172, `R-81756e95`) — the
+     *    race `builder.draft` cannot see; the builder reloads and replays its unsaved edits by key;
+     *  - 422 + the message on any other draft-guard / no-draft violation (the builder shows the error).
      *
      * @param  Closure(): array<string, mixed>  $op
      */
@@ -237,6 +245,12 @@ final class FormBuilderController extends Controller
 
             return response()->json(['message' => $e->getMessage(), 'current' => $current], 409);
         } catch (FormException $e) {
+            $form = request()->route('form');
+
+            if ($e->isChildSuperseded() && $form instanceof Form) {
+                return EnsureBuilderDraftCurrent::superseded($form);
+            }
+
             return response()->json(['message' => $e->getMessage()], 422);
         }
     }

@@ -63,7 +63,7 @@ function publishedFormWithField(Tenant $tenant, User $admin): array
     return [$form, $publishedField, $draftField];
 }
 
-it('rejects editing a field that belongs to a published version (422)', function (): void {
+it('rejects editing a field that belongs to a published version (409 since M172 — the page reloads)', function (): void {
     $tenant = builderTenant();
     $admin = User::factory()->create();
     enterTenant($tenant->id, $admin->id);
@@ -72,18 +72,20 @@ it('rejects editing a field that belongs to a published version (422)', function
     [$form, $publishedField] = publishedFormWithField($tenant, $admin);
 
     $this->actingAs($admin)
+        ->withHeaders(builderHeaders($form))
         ->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$publishedField->id}", [
             'key' => 'hacked', 'label' => 'Hacked', 'is_required' => 'optional',
             'config' => [], 'validations' => [], 'version' => null,
         ])
-        ->assertStatus(422);
+        ->assertStatus(409)
+        ->assertJsonPath('code', 'draft_superseded');
 
     // The published field is untouched.
     enterTenant($tenant->id, $admin->id);
     expect(FormField::query()->whereKey($publishedField->id)->value('key'))->not->toBe('hacked');
 });
 
-it('rejects deleting a field that belongs to a published version (422)', function (): void {
+it('rejects deleting a field that belongs to a published version (409 since M172 — the page reloads)', function (): void {
     $tenant = builderTenant();
     $admin = User::factory()->create();
     enterTenant($tenant->id, $admin->id);
@@ -92,8 +94,10 @@ it('rejects deleting a field that belongs to a published version (422)', functio
     [$form, $publishedField] = publishedFormWithField($tenant, $admin);
 
     $this->actingAs($admin)
+        ->withHeaders(builderHeaders($form))
         ->deleteJson("http://acme.meridian.test/forms/{$form->id}/fields/{$publishedField->id}")
-        ->assertStatus(422);
+        ->assertStatus(409)
+        ->assertJsonPath('code', 'draft_superseded');
 
     enterTenant($tenant->id, $admin->id);
     expect(FormField::query()->whereKey($publishedField->id)->exists())->toBeTrue();
@@ -108,6 +112,7 @@ it('still allows editing the current draft after publishing (positive control)',
     [$form, , $draftField] = publishedFormWithField($tenant, $admin);
 
     $this->actingAs($admin)
+        ->withHeaders(builderHeaders($form))
         ->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$draftField->id}", [
             'key' => 'edited', 'label' => 'Edited', 'is_required' => 'optional',
             'config' => [], 'validations' => [], 'version' => null,
@@ -278,6 +283,7 @@ it('answers 422, not 500, when the edited field is deleted between the guard and
     });
 
     $response = $this->actingAs($admin)
+        ->withHeaders(builderHeaders($form))
         ->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$field->id}", [
             'key' => 'edited', 'label' => 'Edited', 'is_required' => 'optional',
             'config' => [], 'version' => null,

@@ -20,6 +20,7 @@ use App\Support\Forms\DefaultFieldRules;
 use App\Support\Forms\FieldTypeConversion;
 use App\Support\Tenancy\PlatformRowCounter;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
@@ -552,6 +553,13 @@ final class FormBuilderService
     {
         DB::transaction(function () use ($form, $sections, $fields): void {
             $draft = $this->lockDraft($form);
+
+            // M172 (`R-81756e95`): an id from a version a publish has moved past matched nothing below and answered a
+            // silent 200, so the order the author saw was never saved. It is refused like every other builder write
+            // from a superseded page; an id that exists NOWHERE (a concurrent delete) is still skipped, as before.
+            $this->assertNoSupersededIds(FormSection::query(), $draft, array_column($sections, 'id'));
+            $this->assertNoSupersededIds(FormField::query(), $draft, array_column($fields, 'id'));
+
             $validSections = FormSection::query()->where('form_version_id', $draft->id)->pluck('id')->flip();
 
             foreach ($sections as $row) {
@@ -588,12 +596,40 @@ final class FormBuilderService
         return FormVersion::query()->whereKey($locked->draft_version_id)->firstOrFail();
     }
 
+    /**
+     * @param  Builder<FormSection>|Builder<FormField>  $query
+     * @param  list<string>  $ids
+     */
+    private function assertNoSupersededIds(Builder $query, FormVersion $draft, array $ids): void
+    {
+        $superseded = $ids !== [] && $query->whereIn('id', $ids)
+            ->where('form_version_id', '!=', $draft->id)
+            ->whereIn('form_version_id', FormVersion::query()->select('id')->where('form_id', $draft->form_id))
+            ->exists();
+
+        if ($superseded) {
+            throw FormException::childSuperseded();
+        }
+    }
+
     /** A section/field must belong to the form's current draft version — else it is immutable (§2/§4). */
     private function assertDraftChild(Form $form, FormSection|FormField $child): void
     {
         if ($form->draft_version_id === null || $child->form_version_id !== $form->draft_version_id) {
-            throw FormException::childNotInDraft();
+            throw $this->notInDraft($form, $child);
         }
+    }
+
+    /**
+     * M172 (`R-81756e95`) — WHICH refusal a row outside the draft earns. A row of an earlier version of THIS form (or a
+     * form with no draft left) means the page was loaded before a publish moved the form on: the recoverable 409 the
+     * builder reloads from. A row of ANOTHER form keeps the plain refusal — reloading this form's page fixes nothing.
+     */
+    private function notInDraft(Form $form, FormSection|FormField $child): FormException
+    {
+        $ofThisForm = FormVersion::query()->whereKey($child->form_version_id)->where('form_id', $form->id)->exists();
+
+        return $ofThisForm ? FormException::childSuperseded() : FormException::childNotInDraft();
     }
 
     /**
@@ -647,7 +683,7 @@ final class FormBuilderService
         $current = Form::query()->whereKey($form->id)->first();
 
         if ($current === null || $current->draft_version_id === null) {
-            throw FormException::childNotInDraft();
+            throw $this->notInDraft($form, $child);
         }
 
         // The child is re-read too, and not only the form: a restore, an import or a delete removes
@@ -661,7 +697,7 @@ final class FormBuilderService
         }
 
         if ($live->form_version_id !== $current->draft_version_id) {
-            throw FormException::childNotInDraft();
+            throw $this->notInDraft($form, $live);
         }
     }
 

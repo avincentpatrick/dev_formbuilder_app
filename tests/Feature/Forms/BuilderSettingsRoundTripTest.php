@@ -57,7 +57,10 @@ function settingsRoundTripForm(): array
     enterTenant($tenant->id, $admin->id);
     makeActiveMember($admin, 'admin');
 
-    return [$admin, app(FormService::class)->create($tenant, $admin, 'Every Setting')];
+    $form = app(FormService::class)->create($tenant, $admin, 'Every Setting');
+    test()->withHeaders(builderHeaders($form));
+
+    return [$admin, $form];
 }
 
 /** The builder store's `fieldPayload()`, transcribed: every key it sends, read from the row the server gave it. */

@@ -15,6 +15,7 @@ use App\Services\Forms\RestoreService;
 use App\Services\Forms\StepGraphInspector;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 /**
  * Publishing a form's draft and restoring an old version (Increment D3). Authorization is the `can:`
@@ -48,6 +49,11 @@ final class FormPublishController extends Controller
             // A lifecycle refusal (already published, locked, …) carries no per-field structure to show.
             return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
         }
+
+        // M172 (`R-81756e95`): the draft this form had is gone, and a builder page restored from the browser's history
+        // would still hold its ids. The builder page's history entries are encrypted (FormBuilderController::show), so
+        // clearing the key makes Inertia re-visit the server on Back instead of showing the stale page.
+        Inertia::clearHistory();
 
         // Increment H21a (Doc #27 §6) — branching NOTICES, never refusals. Computed HERE rather than inside
         // `PublishService` for two reasons: the service keeps its binary published-or-threw contract, and
@@ -85,6 +91,9 @@ final class FormPublishController extends Controller
         } catch (FormException $e) {
             return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
         }
+
+        // M172: a restore replaces the draft's rows (new ids), so the builder's history is cleared as on publish.
+        Inertia::clearHistory();
 
         return back()->with('toast', [
             'type' => 'success',

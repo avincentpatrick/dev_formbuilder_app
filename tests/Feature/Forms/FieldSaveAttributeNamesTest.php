@@ -57,6 +57,7 @@ function fieldAttrAuthor(): array
     enterTenant($tenant->id, $admin->id);
     makeActiveMember($admin, 'admin');
     $form = app(FormService::class)->create($tenant, $admin, 'Intake');
+    test()->withHeaders(builderHeaders($form));
 
     return [$tenant, $admin, $form];
 }

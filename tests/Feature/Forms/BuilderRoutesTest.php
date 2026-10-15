@@ -54,6 +54,7 @@ it('forbids a Viewer from the builder and its mutations', function (): void {
 
     enterTenant($tenant->id, $owner->id);
     $form = app(FormService::class)->create($tenant, $owner, 'Survey');
+    test()->withHeaders(builderHeaders($form));
 
     enterTenant($tenant->id, $viewer->id);
     makeActiveMember($viewer, 'viewer'); // no forms.* permissions
@@ -70,6 +71,7 @@ it('lets an Admin add, configure, duplicate, reorder and delete through the buil
     enterTenant($tenant->id, $admin->id);
     makeActiveMember($admin, 'admin');
     $form = app(FormService::class)->create($tenant, $admin, 'Household Survey');
+    test()->withHeaders(builderHeaders($form));
 
     // Add a field.
     $add = $this->actingAs($admin)
@@ -132,6 +134,7 @@ it('rejects a stale field edit with 409 and returns the current row', function (
     enterTenant($tenant->id, $admin->id);
     makeActiveMember($admin, 'admin');
     $form = app(FormService::class)->create($tenant, $admin, 'Survey');
+    test()->withHeaders(builderHeaders($form));
 
     $add = $this->actingAs($admin)
         ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => 'short_text'])
@@ -166,6 +169,7 @@ it('accepts an edit that carries no concurrency token (overwrite)', function ():
     enterTenant($tenant->id, $admin->id);
     makeActiveMember($admin, 'admin');
     $form = app(FormService::class)->create($tenant, $admin, 'Survey');
+    test()->withHeaders(builderHeaders($form));
 
     $add = $this->actingAs($admin)
         ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => 'short_text'])
@@ -190,6 +194,7 @@ it('validates the key format and per-version uniqueness', function (): void {
     enterTenant($tenant->id, $admin->id);
     makeActiveMember($admin, 'admin');
     $form = app(FormService::class)->create($tenant, $admin, 'Survey');
+    test()->withHeaders(builderHeaders($form));
 
     $a = $this->actingAs($admin)
         ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => 'short_text'])->assertOk();
@@ -219,6 +224,7 @@ it('persists a geospatial map config and rejects an out-of-range coordinate', fu
     enterTenant($tenant->id, $admin->id);
     makeActiveMember($admin, 'admin');
     $form = app(FormService::class)->create($tenant, $admin, 'Field Survey');
+    test()->withHeaders(builderHeaders($form));
 
     $add = $this->actingAs($admin)
         ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => 'geopoint'])
@@ -302,6 +308,7 @@ it('refuses the reserved lead-step key on both authoring routes that accept a ke
     enterTenant($tenant->id, $admin->id);
     makeActiveMember($admin, 'admin');
     $form = app(FormService::class)->create($tenant, $admin, 'Reserved Key');
+    test()->withHeaders(builderHeaders($form));
 
     $section = $this->actingAs($admin)
         ->postJson("http://acme.meridian.test/forms/{$form->id}/sections")->assertOk();

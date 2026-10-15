@@ -16,7 +16,103 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M172` and `M169` are merged and live on staging (released below). The next claim is written here. Ask the user before every merge, and never merge while another session's deploy is in flight.
+## Status: ACTIVE CLAIM — `M173`, full width: the shell and the settings pages (`R-fd7b8879`, `R-ba9d6349`, `R-14971e37`, `R-8ee7d2dc`) (m173-ui2-full-width-shell-settings)
+
+Taken 2026-10-15 under the testing freeze of 2026-10-13: this claim builds, opens the PR and gets it green, then stops —
+nothing merges until the user says so, after a fresh staging backup (`D123`, `D128`). Branch `m173-ui2-full-width-shell-settings`,
+cut from origin/main at this claim's commit (parent `b017b667`; `M172` and `M169` are merged), PR into main. It is UI2, the
+second of the UI programme's six themed increments (`~/.claude/plans/hi-let-s-conduct-a-mutable-goose.md` §E row 2; the build
+plan `~/.claude/plans/pasted-content-id-280a-read-claude-md-smooth-spark.md`). At this session's start the user confirmed the
+`M172` check (all four passed) and answered one new question, recorded on the branch as `D135`: the form's Settings tab keeps
+its rail, one section at a time; its labelled boxes keep a reading width while lists and tables inside a section fill.
+
+Rows taken, in build order, each its own commits: `R-fd7b8879` (every tenant page in a centred 1200px column, 1600px for ten list
+pages, the console in 1100px), `R-ba9d6349` (the settings pages stack 640px cards in one column), `R-14971e37` (the form's
+Settings tab stretches every section's inputs across the whole width), `R-8ee7d2dc` (the OCR pages cap themselves at 720px and
+the recent-scans list runs edge to edge). Also taken: the `AdminLayout.vue` literal of `R-f724595b` (the micro-label row), as the
+UI plan intended, with that row's tail amended.
+
+### Evidence verified
+Read on the trunk at `b017b667` by three read-only passes plus my own reads, Docker not yet started — every citation is a static
+reading and the browser measurement is part of the build.
+- `R-fd7b8879`: `AppLayout.vue:169` (`max-width: 1200px`), `:192` (1600px `--wide`), `:197` (none, `--fluid`), `:48-59`
+  (`WIDE_PAGES`) — held. `AdminLayout.vue:199` (1100px) — held. `AppLayout.test.ts:68-90` pins the set — held (it mounts the
+  layout and reads classes; happy-dom lays out nothing). `list-layout.spec.ts:100-119` asserts `/settings` is exactly 1200px at a
+  1600px window — held. `ListPage.stories.ts:37`, `CardGrid.stories.ts:98` — held. DSR `:588` — held. **DSR `:1541` — moved:
+  the "max-width-constrained column" sentence is `:1549`**; `:1541` is the JR4 table-collapse note. **"Ten pages author a 480px
+  `dl` collapse" — false:** five pages do (`forms/Show.vue:644`, a gap change only; `integrations/Index.vue:478`;
+  `integrations/RuleShow.vue:433`; `submissions/Show.vue:535`; `webhooks/Show.vue:441`) plus one component
+  (`components/audit/AuditChangeModal.vue:236`). `scopes/Index.vue:387` is a 900px two-pane split, not a collapse, and
+  `forms/Show.vue:594` is the close of a rule. The other page-level width rules: `submissions/Show.vue:439` and
+  `Encode.vue:1956` (75rem), `help/Index.vue:343` (64rem), `Welcome.vue:220` (48rem).
+- `R-ba9d6349`: `Settings/Index.vue:482` and `:475`, `:505` (380px) — held. `Settings/Sso.vue:158` (`.sso__notice`) and `:151` —
+  held. `admin/Settings.vue:188` — held. All eleven card caps — held at the cited lines (`AboutCard.vue:110`,
+  `MaintenanceCard.vue:104`, `ModulesCard.vue:121`, `AccessCard.vue:159`, `NotificationPreferencesCard.vue:177`,
+  `BrandingCard.vue:312`, `SsoStatusCard.vue:116`, `SsoPolicyCard.vue:189`, `SsoFailuresCard.vue:97`, `SpDetailsCard.vue:118`,
+  `IdpMetadataCard.vue:223`); no other card-level cap in either folder.
+- `R-14971e37`: `forms/Settings.vue:67` — held. `FormSettingsSections.vue:354` (the 420px query) — held; the container is the host
+  `.form-settings-host` (`:299-301`).
+- `R-8ee7d2dc`: `ocr/Scans.vue:300`, `ScanStatus.vue:135` (720px) — held. `Scans.vue:395-414` and `:408` — held (an `<ol>` of
+  bordered `li.scans__row`, not cards). `danger-text` at `Scans.vue:358`, `:433`, `ScanStatus.vue:150` — held.
+
+### Premise verified
+- One session only (the user, 2026-10-13). Lane B is retired. No other claim is active.
+- **The row believes a shared layout primitive is the way a page goes multi-column (DSR `:1549`, `TwoColumnLayout`/`Grid`).
+  False: none exists** in `packages/design-system` or the app; every page writes its own `auto-fill` grid. The DSR sentence is
+  corrected in this increment's hub edit rather than a primitive invented.
+- **`R-14971e37` believes the form Settings tab shows its sections together. False:** `FormSettingsSections.vue` shows one section
+  at a time (a rail and `v-show`), the same component as the builder's Settings pop-up (`FormSettingsModal.vue`, an 880px modal).
+  Hence `D135`.
+- Load-bearing selectors kept: `.app-shell__content` (`tests/e2e/support/axe.ts` scans by it), `.scans__row`
+  (`ocr-guest-upload.spec.ts`, `scans.test.ts`), `.scans__upload { position: relative }` (`clipped-node-containment.test.ts`).
+- `AdminLayout.vue:194-197` says to re-derive `DataTable.vue`'s 56em collapse if the console cap moves. The edge that pinned it
+  (the console at 834px, an 802px box) is below 1100px, where the cap never bound, so the threshold is unaffected.
+- Four comments justify themselves by the old cap and go false with it (`DataTable.vue:631-632`, `FilterBar.vue:76-79`,
+  `forms/Index.vue:731`, `FormCard.vue:351`); each is corrected, comment only.
+- **The interim:** the pages UI3 converts (form hub, submission page, webhook and rule detail, console tenant page, domains,
+  search, achievements, templates) lose the 1200px cap with this increment. At 1500px wide and below nothing changes (the cap
+  never bound there); wider screens stretch them until UI3 merges. Put to the user with the merge question.
+- `docs/ux/design-system-reference.md` is the increment's one hub. No other file edited here is a hub.
+
+### Remedy verdict
+- Shell: `max-width` removed from both inners, padding kept, one step (`--mds-space-12`) from 1920px — works by reading.
+- **Settings grids: the row's `minmax(min(100%, 36rem), 1fr)` is wrong for its own stated outcome.** At 1440 the region is
+  1440 − 240 − 64 = 1136px and two 576px tracks plus the gap need 1172px — one column, not two. 30rem gives 2 at 1440, 3 at 1920
+  and 4 at 2560 by arithmetic; the e2e case asserts the outcome and the browser fixes the number. `rem` does not move with the
+  in-app text size (the setting rewrites type tokens only).
+- **Form Settings tab: the row's two-up layout is structurally impossible** (premise above). Replaced by `D135`: one rule holding
+  every `.mds-field` inside a section at 48rem — every labelled box renders in `MdsFormField`'s `.mds-field` (checked in all
+  thirteen panels) — so lists and tables fill.
+- OCR pages: "from 75rem" needs a container no ancestor declares; `.scans` becomes the container and an inner `.scans__layout`
+  carries the split (an element cannot query itself — `FormSettingsSections.vue`'s `M129` note). The list becomes an `auto-fill`
+  grid of the same bordered rows. Works by reading.
+
+Files: `resources/js/Layouts/AppLayout.vue`, `resources/js/Layouts/AppLayout.test.ts`, `resources/js/Layouts/AdminLayout.vue`,
+`tests/e2e/list-layout.spec.ts`, `packages/design-system/src/stories/ListPage.stories.ts`,
+`packages/design-system/src/stories/CardGrid.stories.ts`, `packages/design-system/src/components/DataTable/DataTable.vue` (comment),
+`packages/design-system/src/components/FilterBar/FilterBar.vue` (comment), `resources/js/Pages/forms/Index.vue` (comment),
+`resources/js/components/forms/FormCard.vue` (comment), `docs/ux/design-system-reference.md`;
+`resources/js/Pages/Settings/Index.vue`, `resources/js/Pages/Settings/Sso.vue`, `resources/js/Pages/admin/Settings.vue`, the six
+`resources/js/components/settings/*Card.vue` and five `resources/js/components/sso/*Card.vue` above, a new
+`resources/js/Pages/Settings/settings-layout.test.ts`; `resources/js/components/forms/FormSettingsSections.vue`, a new
+`resources/js/components/forms/FormSettingsSections.layout.test.ts`; `resources/js/Pages/ocr/Scans.vue`,
+`resources/js/Pages/ocr/ScanStatus.vue`, `resources/js/Pages/ocr/scans.test.ts`, `resources/js/Pages/ocr/scan-status.test.ts`;
+on the branch: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`; close-out: `PROGRESS.md`,
+`docs/gate-baselines.md`; this file on main.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`,
+`docs/ux/design-system-reference.md`, `tests/e2e/list-layout.spec.ts`, `PROGRESS.md` (own block).
+Paired files taken: none.
+Namespaces spent: `D135` (asked and answered in this session); nothing from the ADR or migration namespaces.
+E2E specs the diff reaches, run locally: `list-layout`, `responsive-axe`, `personalization-axe`, `admin-console-axe`,
+`form-settings-axe`, `ocr-review-axe`, `ocr-scans-upload`, `ocr-guest-upload`, `sidebar-collapse`; CI runs every spec.
+Prediction: red on the trunk — `AppLayout.test.ts`'s no-modifier case and its source pin; the 1920 `list-layout` case (`/submissions`
+1600px, `/settings` 1200px against more than 1640); `/settings` at 1440 in one column; the form Settings tab's title field near
+936px against 48rem; a scan row at the list's full width; the three new Vitest source pins. All green after. Mutants: the shell
+cap back (the 1920 case and the pin red), the settings track at 36rem (the two-at-1440 case red), one card's 640px back (the pin
+red), the field measure dropped (the field case red), the scans list back to a column (the row case red), one danger-text use
+back (the pin red) — each its named case and nothing else. The responsive and personalization axe sweeps stay green. **Most
+likely wrong:** the 30rem settings track — the scrollbar and the 1920 padding step may leave 1920 at two columns, or the
+Appearance card's text-size control at extra-large may overflow a 30rem card.
 
 ## RELEASED — `M172`, the two errors that block the testers: a builder tab left open across a publish, and what a delete says when responses hold the answers (`R-81756e95`, `R-733eff09`, `R-a44638b6`, `R-52f5ad93`) (merged as PR #365, `a33fe694`, 6/6 green with real step counts on its fourth run — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

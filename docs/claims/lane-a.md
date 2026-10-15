@@ -20,7 +20,10 @@ Standing Rule 7(b-bis).
 
 **BUILT — PR #366, CI 6/6 green with real step counts (run 38779366161 at `0344375a`: Static analysis 32 · E2E 20 · Contract 16 ·
 Frontend 12 · Pest 11 · axe 11; the only skips are the two main-only staging-header steps and the failure-only report upload; the
-first run, at `5370ce3b`, was 6/6 too) — AND NOT MERGED: held for the user's word under the testing freeze.** The branch carries the
+first run, at `5370ce3b`, was 6/6 too) — AND NOT MERGED: held for the user's word under the testing freeze.** ⛔ **Asked at green
+(2026-10-16), the user chose to HOLD it and merge it together with UI3**, so that no wide screen sees the pages UI3 converts without a
+cap: the next increment branches from `m173-ui2-full-width-shell-settings` (stacked), this claim moves under a `## HELD` heading, and
+both PRs merge together on the user's word after a fresh staging backup — this one first, then UI3 rebased onto the trunk. The branch carries the
 four rows' closures, the status bullet and the regenerated line and hand-off. A merge needs the user's word and a fresh staging backup
 first; then the release below this heading and the gate baselines from the post-merge run. Measured against the prediction:
 - **Red first, exactly as predicted.** 34 Vitest cases red on the trunk (AppLayout 11, settings 17, the form tab 1, scans 3, scan status

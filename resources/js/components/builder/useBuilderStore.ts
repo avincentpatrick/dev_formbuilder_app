@@ -498,16 +498,73 @@ export function useBuilderStore(props: BuilderPageProps) {
             const sectionId = field.form_section_id;
             const seq = field.sequence;
             if (!(await deleteFieldServer(uid))) return;
+            // M172 (the delete half of `R-9ea69e29`): every other question's rule comparing with this one went with it on the
+            // server (its foreign key cascades). The screen drops them too — kept, the next save of those questions sent each
+            // back comparing with nothing — and the undo entry names them and brings them back.
+            let cleared = dropRulesComparingWith(snap.key);
             pushHistory(
-                `Delete ${snap.label}`,
+                cleared.length === 0 ? `Delete ${snap.label}` : `Delete ${snap.label} and ${ruleCount(cleared)} that compared with it`,
                 async () => {
                     await restoreFieldServer(uid, type, sectionId, snap, seq);
+                    await restoreRules(cleared);
                 },
                 async () => {
-                    await deleteFieldServer(uid);
+                    if (await deleteFieldServer(uid)) cleared = dropRulesComparingWith(snap.key);
                 },
             );
         });
+    }
+
+    type ClearedRules = { uid: Uid; rules: LocalField['validations'] }[];
+
+    /** M172 — take every other question's rule naming `key` off the screen and out of its baseline; the server has. */
+    function dropRulesComparingWith(key: string): ClearedRules {
+        const cleared: ClearedRules = [];
+        for (const other of fields.value) {
+            const dropped = other.validations.filter((rule) => rule.related_field_key === key);
+            if (dropped.length === 0) continue;
+            cleared.push({ uid: other.uid, rules: clone(dropped) });
+            other.validations = other.validations.filter((rule) => rule.related_field_key !== key);
+            const base = baselines.get(other.uid) as FieldSnapshot | undefined;
+            if (base) base.validations = base.validations.filter((rule) => rule.related_field_key !== key);
+        }
+
+        return cleared;
+    }
+
+    /** M172 — an undone delete puts the rules it took back, and saves each question that held one. */
+    async function restoreRules(cleared: ClearedRules): Promise<void> {
+        for (const { uid, rules } of cleared) {
+            const other = findField(uid);
+            if (!other) continue;
+            other.validations = [...other.validations, ...clone(rules)];
+            if (await persistField(uid)) baselines.set(uid, fieldSnapshot(other));
+        }
+    }
+
+    function ruleCount(cleared: ClearedRules): string {
+        const count = cleared.reduce((sum, entry) => sum + entry.rules.length, 0);
+
+        return count === 1 ? '1 rule' : `${count} rules`;
+    }
+
+    /**
+     * M172 (`R-a44638b6`, `D133`) — how many responses, in any version, hold an answer to this question: the number the
+     * delete dialog states. Zero without asking when the form was never published, since no response can hold one. A
+     * READ — no burst bookkeeping, so it never moves the save verdict. Null when it could not be read: the dialog then
+     * says answers may exist, rather than the delete going through unexplained.
+     */
+    async function answersFor(uid: Uid): Promise<number | null> {
+        const field = findField(uid);
+        if (!field) return 0;
+        if (!props.share.is_published && (props.draft?.version_number ?? 1) <= 1) return 0;
+        try {
+            const result = await client.get<{ responses: number }>(`${base}/fields/${field.id}/answers`);
+
+            return result.conflict ? null : result.data.responses;
+        } catch {
+            return null;
+        }
     }
 
     function duplicateField(uid: Uid): Promise<void> {
@@ -1387,6 +1444,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         // actions
         addField,
         deleteField,
+        answersFor,
         duplicateField,
         insertFromLibrary,
         saveFieldToLibrary,

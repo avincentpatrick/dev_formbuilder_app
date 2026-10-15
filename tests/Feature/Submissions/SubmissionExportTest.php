@@ -7,6 +7,7 @@ use App\Enums\RequiredMode;
 use App\Enums\ResourceCapacity;
 use App\Enums\SubmissionStatus;
 use App\Models\Form;
+use App\Models\FormField;
 use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Models\Submission;
@@ -372,4 +373,32 @@ it('writes an empty cell for a member no instance answered, and for a response w
         ->and($none['Kid hobbies'])->toBe('')
         ->and($quiet['Kid name'])->toBe('Kid A | Kid B')
         ->and($quiet['Kid hobbies'])->toBe('');
+});
+
+it('heads a column the current version no longer asks "removed from the form in version N", and keeps its answers (M172, D133)', function (): void {
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+
+    $form = publishedInboxForm($tenant, $owner); // v1 asks `color`
+    seedInboxSubmission($form, $owner, SubmissionStatus::Submitted, ['full_name' => 'Before', 'color' => 'b']);
+
+    FormField::query()->where('form_version_id', $form->draft_version_id)->where('key', 'color')->firstOrFail()->delete();
+    app(PublishService::class)->publish($form->refresh(), $owner); // v2 no longer asks it
+    $form->refresh();
+    seedInboxSubmission($form, $owner, SubmissionStatus::Submitted, ['full_name' => 'After']);
+
+    $rows = csvRows($this->actingAs($owner)
+        ->get("http://acme.meridian.test/forms/{$form->id}/submissions/export?format=csv")
+        ->streamedContent());
+
+    $header = $rows[0];
+    $retired = array_search('Color (removed from the form in version 2)', $header, true);
+    expect($retired)->not->toBeFalse()
+        ->and(in_array('Full name', $header, true))->toBeTrue(); // a question still asked keeps its plain header
+
+    $byName = collect($rows)->slice(1)->keyBy(fn (array $r): string => $r[array_search('Full name', $header, true)]);
+    expect($byName['Before'][$retired])->toBe('Blue')
+        ->and($byName['After'][$retired])->toBe('');
 });

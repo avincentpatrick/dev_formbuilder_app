@@ -6,6 +6,7 @@ namespace App\Services\Forms;
 
 use App\Enums\FieldType;
 use App\Enums\RequiredMode;
+use App\Enums\SubmissionStatus;
 use App\Exceptions\Forms\BuilderConflictException;
 use App\Exceptions\Forms\FormException;
 use App\Models\FieldLibrary;
@@ -304,6 +305,41 @@ final class FormBuilderService
 
             return $field->refresh();
         });
+    }
+
+    /**
+     * M172 (`R-a44638b6`, `D133`) — how many responses to this form, in ANY version, hold an answer to this question's key:
+     * the number the builder's delete dialog states ("N responses hold answers to this question. They keep them, marked as
+     * removed from the form."). Counted by key in `submission_answers.answers` — ids change at every publish and the key
+     * is what every version shares — not in `submission_answer_index`, which holds only the queryable scalar questions. A
+     * draft response is not one yet (`Submission::scopeCountable()`), a deleted one is gone, and an answer left empty is no
+     * answer. A question inside a repeatable section is looked for in each of its instances.
+     */
+    public function answeredCount(Form $form, FormField $field): int
+    {
+        $section = $field->form_section_id === null
+            ? null
+            : FormSection::query()->whereKey($field->form_section_id)->first(['key', 'is_repeatable']);
+        $empty = "('null'::jsonb, '\"\"'::jsonb, '[]'::jsonb, '{}'::jsonb)";
+
+        $query = DB::table('submissions')
+            ->join('submission_answers', 'submission_answers.submission_id', '=', 'submissions.id')
+            ->where('submissions.form_id', $form->id)
+            ->whereNull('submissions.deleted_at')
+            ->where('submissions.status', '!=', SubmissionStatus::Draft->value);
+
+        if ($section !== null && $section->is_repeatable === true) {
+            $query->whereRaw(
+                'exists (select 1 from jsonb_array_elements(case when jsonb_typeof(submission_answers.answers -> ?) = \'array\' '
+                ."then submission_answers.answers -> ? else '[]'::jsonb end) as instance "
+                ."where coalesce(instance -> ?, 'null'::jsonb) not in {$empty})",
+                [$section->key, $section->key, $field->key],
+            );
+        } else {
+            $query->whereRaw("coalesce(submission_answers.answers -> ?, 'null'::jsonb) not in {$empty}", [$field->key]);
+        }
+
+        return $query->count();
     }
 
     public function deleteField(Form $form, FormField $field): void

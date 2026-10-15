@@ -14554,3 +14554,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   such use. After a key edit the preview shows the broken reference and publish refuses it (`ExpressionValidationGate`); nothing
   offers to carry the new key into them. The remedy: on a key change, rewrite the references `referencesTo()` finds — token-aware,
   never a text replace — and say so in the undo entry. **Live.** Filed by `M172`. **Tier: during-testing.**
+
+- **`nit` · The builder's Undo and Redo never say what they will undo or redo.**
+  Found by `M172`: every history entry carries a label (`resources/js/components/builder/useBuilderStore.ts`, `pushHistory()` — "Edit
+  Age", "Change Age to Long text", and since `M172` "Delete Age and 1 rule that compared with it"), and nothing reads it. The toolbar
+  buttons are named and titled "Undo" and "Redo" (`resources/js/Pages/forms/Builder.vue`), and `builder-layout.test.ts` pins the
+  title to the visible text for the compact toolbar's label-in-name rule, so an author cannot tell what a press will reverse —
+  including that undoing a delete also brings back the comparison rules it cleared. The remedy: the label as the buttons'
+  accessible description and in a polite status after each undo or redo, keeping the name and the title the visible text.
+  **Live.** Filed by `M172`. **Tier: during-testing.**

@@ -131,6 +131,18 @@ final class FormBuilderController extends Controller
         });
     }
 
+    /**
+     * M172 (`R-a44638b6`, `D133`) — the number the delete dialog states before a question responses answered is deleted
+     * from the draft. A READ: no `builder.draft` check and no `respond()` mapping. A question of another form is not this
+     * form's to count.
+     */
+    public function answeredCount(Form $form, FormField $field): JsonResponse
+    {
+        abort_unless($field->version()->where('form_id', $form->id)->exists(), 404);
+
+        return response()->json(['responses' => $this->builder->answeredCount($form, $field)]);
+    }
+
     public function duplicateField(Request $request, Form $form, FormField $field): JsonResponse
     {
         return $this->respond(fn (): array => $this->presenter->field(

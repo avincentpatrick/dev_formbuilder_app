@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\SubmissionStatus;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormFieldValidation;
@@ -9,6 +10,7 @@ use App\Models\FormSection;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\FormService;
+use App\Services\Forms\PublishService;
 use App\Support\Forms\StepProjection;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
@@ -405,4 +407,33 @@ it('saves a section key another section holds under the next free number, as for
         ->patchJson("http://acme.meridian.test/forms/{$form->id}/sections/{$b->json('id')}", ['key' => $a->json('key'), 'label' => 'Second'])
         ->assertOk()
         ->assertJsonPath('key', $a->json('key').'_2');
+});
+
+it('counts the responses that hold an answer to a question, in any version, for the delete dialog (D133)', function (): void {
+    $tenant = builderTenant();
+    $admin = User::factory()->create();
+    enterTenant($tenant->id, $admin->id);
+    makeActiveMember($admin, 'admin');
+
+    $form = publishedInboxForm($tenant, $admin); // v1 asks full_name, color, hobbies, subscribe
+    seedInboxSubmission($form, $admin, SubmissionStatus::Submitted, ['full_name' => 'Ana', 'color' => 'r']);
+    seedInboxSubmission($form, $admin, SubmissionStatus::Approved, ['full_name' => 'Ben', 'color' => 'g']);
+    seedInboxSubmission($form, $admin, SubmissionStatus::Submitted, ['full_name' => 'Cy', 'color' => '']); // left empty: no answer
+    seedInboxSubmission($form, $admin, SubmissionStatus::Draft, ['full_name' => 'Di', 'color' => 'b']);   // a draft is not a response yet
+
+    app(PublishService::class)->publish($form->refresh(), $admin); // v2 — the count is by key, across versions
+    $form->refresh();
+    seedInboxSubmission($form, $admin, SubmissionStatus::Submitted, ['full_name' => 'Ed', 'color' => 'b']);
+
+    enterTenant($tenant->id, $admin->id);
+    // Every id read BEFORE the first request: a model read after one has lost the tenant context (RLS) and finds nothing.
+    $ids = FormField::query()->where('form_version_id', $form->draft_version_id)->pluck('id', 'key');
+    $count = fn (string $key) => $this->actingAs($admin)
+        ->getJson("http://acme.meridian.test/forms/{$form->id}/fields/{$ids[$key]}/answers")
+        ->assertOk()
+        ->json('responses');
+
+    expect($count('color'))->toBe(3)
+        ->and($count('full_name'))->toBe(4)
+        ->and($count('subscribe'))->toBe(0);
 });

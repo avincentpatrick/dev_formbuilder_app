@@ -1,5 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { settlePaint } from './support/axe';
+import { openConsole } from './support/console';
 import { formEntry, openBuilder } from './support/navigate';
 
 /**
@@ -11,8 +12,8 @@ import { formEntry, openBuilder } from './support/navigate';
  * `.app-shell` is `overflow-x: clip` (`AppLayout.vue`), so a table wider than its region is CLIPPED, not
  * scrolled: `document.documentElement.scrollWidth` never grows and the shared overflow assertion stays
  * green over a sideways-scrolling strip. The same blindness is why `search-nav.spec.ts` measures bounding
- * boxes rather than document width. And the gutter the width class closes is exactly 0 at 1440 — the
- * widest project in the matrix — which is why nobody's screen ever showed it.
+ * boxes rather than document width. And a content column's width is invisible at 1440 — the widest project
+ * in the matrix — so every width case below sets its own viewport (M173 removed the column's cap).
  *
  * So this file measures ELEMENTS: the scroll wrapper's own overflow, and the content column's own width.
  */
@@ -97,25 +98,52 @@ test('Forms (table view) — no row action runs past its card below the collapse
     expect(measured, 'no row carried an action cluster to measure').toBeGreaterThan(0);
 });
 
-test('the wide column fills a 1600px window, and a form page still does not', async ({ page }, info) => {
+// ── M173 — NO PAGE IS CAPPED ────────────────────────────────────────────────────────────────────────────────
+// *"some pages only occupies the middle part of the page specially when screen is wide. can we make every page occupy
+// the whole width? no content on the middle only. so no blank spaces on the left and right but still make it mobile
+// responsive."* (the user, 2026-10-14; `D120`). JR4 capped every page at 1200px and ten list pages at 1600px; the shell
+// now caps none, and each page lays its own width out. Measured at 1920 and 2560 because the widest project is 1440,
+// where the old cap never bound (1440 − 240 − 64 = 1136): no project in the matrix could have seen it either way.
+
+/** The shell's scroll region (less its scrollbar) against the column inside it. */
+async function shellFill(page: Page): Promise<{ region: number; inner: number; padding: string }> {
+    return page.evaluate(() => {
+        const region = document.querySelector('.app-shell__content')!;
+        const inner = document.querySelector('.app-shell__inner')!;
+
+        return {
+            region: region.clientWidth,
+            inner: Math.round(inner.getBoundingClientRect().width),
+            padding: getComputedStyle(inner).paddingLeft,
+        };
+    });
+}
+
+test('every page fills the content region at 1920 and 2560 — no centred column', async ({ page }, info) => {
     test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
 
-    // 1600 rather than the project's 1440, deliberately: at 1440 the 1200px cap is not even reached, so the
-    // change under test is invisible. This is the smallest viewport at which it is observable at all.
-    await page.setViewportSize({ width: 1600, height: 900 });
+    await page.setViewportSize({ width: 1920, height: 1080 });
 
-    await page.goto('/submissions', { waitUntil: 'networkidle' });
-    const list = await page.locator('.app-shell__inner').boundingBox();
+    // A list page (1600px under JR4), the settings page (1200px, JR4's worked example of a page it kept narrow) and the
+    // dashboard.
+    for (const path of ['/submissions', '/settings', '/dashboard']) {
+        await page.goto(path, { waitUntil: 'networkidle' });
+        const m = await shellFill(page);
 
-    // Region = 1600 − 240 (sidebar) − a scrollbar, and the 1600px cap does not bind: the column fills it.
-    expect(list!.width, 'a list page should use the whole 1600px window').toBeGreaterThan(1300);
+        expect(Math.abs(m.inner - m.region), `${path} at 1920: ${JSON.stringify(m)}`).toBeLessThanOrEqual(1);
+        // One more step of padding from 1920px, so a page's content never meets the edge of a wide screen.
+        expect(m.padding, `${path} at 1920`).toBe('48px');
+    }
 
-    await page.goto('/settings', { waitUntil: 'networkidle' });
-    const form = await page.locator('.app-shell__inner').boundingBox();
+    await page.setViewportSize({ width: 2560, height: 1440 });
+    await page.goto('/dashboard', { waitUntil: 'networkidle' });
+    const wide = await shellFill(page);
+    expect(Math.abs(wide.inner - wide.region), `/dashboard at 2560: ${JSON.stringify(wide)}`).toBeLessThanOrEqual(1);
 
-    // Unchanged, and that is the point of an opt-in list: 1600px of 640px-wide settings cards would be
-    // 900px of dead canvas beside a column of controls.
-    expect(Math.round(form!.width), 'a form page must keep its measure').toBe(1200);
+    // ...and below 1920 the padding is what it always was.
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/dashboard', { waitUntil: 'networkidle' });
+    expect((await shellFill(page)).padding, '/dashboard at 1440').toBe('32px');
 });
 
 // ── JR5 — THE BUILDER'S COMPACT LAYOUT ──────────────────────────────────────────────────────────────────
@@ -284,4 +312,119 @@ test('Integrations — the Connect button keeps its distance from the warning ab
         expect(tops.length).toBeGreaterThan(1);
         expect(new Set(tops).size, `button tops: ${tops.join(', ')}`).toBe(1);
     }
+});
+
+// ── M173 — EACH PAGE LAYS ITS OWN WIDTH OUT ─────────────────────────────────────────────────────────────────────
+// With the shell's cap gone, a page that stacked narrow cards would leave the rest of a wide screen empty, and a page of
+// inputs would stretch them across it. Each case runs once, on the desktop project, at the widths it names; each was run
+// red against the unchanged pages first.
+
+/** How many columns a set of cards sits in: their distinct left edges. */
+async function columns(page: Page, selector: string): Promise<number> {
+    const lefts = await page
+        .locator(selector)
+        .evaluateAll((els) =>
+            els.filter((el) => (el as HTMLElement).offsetParent !== null).map((el) => Math.round(el.getBoundingClientRect().left)),
+        );
+
+    // Not vacuous: a renamed class must fail here rather than report one column of nothing.
+    expect(lefts.length, `no ${selector} on the page`).toBeGreaterThanOrEqual(3);
+
+    return new Set(lefts).size;
+}
+
+test('Settings — the cards sit two across at 1440 and three at 1920', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+    await page.goto('/settings', { waitUntil: 'networkidle' });
+    await settlePaint(page);
+    expect(await columns(page, '.settings-card'), '/settings at 1440').toBe(2);
+
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await settlePaint(page);
+    expect(await columns(page, '.settings-card'), '/settings at 1920').toBe(3);
+});
+
+test.describe('the console', () => {
+    test.use({ storageState: 'tests/e2e/.auth/admin.json' });
+
+    test('Platform settings — the cards sit two across at 1440, and the console fills a 1920px window', async ({ page }, info) => {
+        test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+        await openConsole(page, '/admin/settings');
+        await settlePaint(page);
+        expect(await columns(page, '.platform__card'), '/admin/settings at 1440').toBe(2);
+
+        await page.setViewportSize({ width: 1920, height: 1080 });
+        await settlePaint(page);
+        const fill = await page.evaluate(() => ({
+            region: document.querySelector('.admin__content')!.clientWidth,
+            inner: Math.round(document.querySelector('.admin__inner')!.getBoundingClientRect().width),
+        }));
+        expect(Math.abs(fill.inner - fill.region), `/admin/settings at 1920: ${JSON.stringify(fill)}`).toBeLessThanOrEqual(1);
+    });
+});
+
+// `D135` (the user, 2026-10-15): the tab keeps its rail, one section at a time; every labelled box keeps a reading width
+// while the section itself fills the page.
+test('Form settings tab — the boxes keep a reading width while the section fills the page', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto('/forms', { waitUntil: 'networkidle' });
+    await page.getByRole('link', { name: 'Clinic Intake', exact: true }).first().click();
+    await page.waitForURL(/\/forms\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+    await page.getByRole('navigation', { name: 'Clinic Intake' }).getByRole('link', { name: 'Settings' }).click();
+    await page.waitForURL(/\/forms\/[0-9a-f-]{36}\/settings$/, { timeout: 30_000 });
+    await page.locator('.form-settings__section[data-section="general"] .mds-field').first().waitFor({ state: 'visible' });
+    await settlePaint(page);
+
+    const m = await page.evaluate(() => ({
+        body: Math.round(document.querySelector('.form-settings__body')!.getBoundingClientRect().width),
+        fields: [...document.querySelectorAll('.form-settings__section[data-section="general"] .mds-field')].map((el) =>
+            Math.round(el.getBoundingClientRect().width),
+        ),
+    }));
+
+    expect(m.fields.length, 'the Details section rendered no labelled box').toBeGreaterThan(0);
+    // 48rem = 768px, plus a pixel of rounding either way.
+    expect(Math.max(...m.fields), JSON.stringify(m)).toBeLessThanOrEqual(770);
+    expect(m.body, JSON.stringify(m)).toBeGreaterThan(1200);
+});
+
+test('Scanned forms — the upload card keeps a measure beside a grid of scans', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto('/forms', { waitUntil: 'networkidle' });
+    await page.getByRole('link', { name: 'Clinic Intake', exact: true }).first().click();
+    await page.waitForURL(/\/forms\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+    await page.getByRole('navigation', { name: 'Clinic Intake' }).getByRole('link', { name: 'Responses' }).click();
+    await page.waitForURL(/\/forms\/[0-9a-f-]{36}\/submissions$/, { timeout: 30_000 });
+    await page.getByRole('button', { name: 'Scan paper forms' }).click();
+    await page.waitForURL(/\/ocr\/scans$/, { timeout: 30_000 });
+    await page.locator('.scans__row').first().waitFor({ state: 'visible' });
+    await settlePaint(page);
+
+    const m = await page.evaluate(() => {
+        const box = (el: Element) => {
+            const r = el.getBoundingClientRect();
+
+            return { left: Math.round(r.left), right: Math.round(r.right), width: Math.round(r.width) };
+        };
+
+        return {
+            upload: box(document.querySelector('.scans__upload')!.closest('.mds-card')!),
+            recent: box(document.querySelector('.scans__recent')!),
+            list: box(document.querySelector('.scans__list')!),
+            row: box(document.querySelector('.scans__row')!),
+        };
+    });
+
+    // 36rem = 576px, plus a pixel of rounding either way; beside the list rather than above it.
+    expect(m.upload.width, JSON.stringify(m)).toBeLessThanOrEqual(578);
+    expect(m.recent.left, JSON.stringify(m)).toBeGreaterThanOrEqual(m.upload.right);
+    // A grid of rows rather than one row per line: at 1920 the list is about 970px and a 28rem track about 480px, so 60%
+    // stays well clear of both a full-width row and two tracks.
+    expect(m.row.width / m.list.width, JSON.stringify(m)).toBeLessThanOrEqual(0.6);
 });

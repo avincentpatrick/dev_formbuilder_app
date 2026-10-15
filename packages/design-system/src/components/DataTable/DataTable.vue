@@ -628,7 +628,7 @@ watch(() => [props.rows, props.columns, props.loading], () => queueMicrotask(mea
    AUTOMATIC 64px RAIL CAN LEAVE (viewport 1024 − 64 rail − 64 padding; a user-collapsed rail, M128, leaves 897
    at 1025 — a table, still continuous). Choosing it makes the switch CONTINUOUS, which no smaller value can do:
 
-       viewport   375   834   1024        1025          1200   1201   1440   1600(wide)
+       viewport   375   834   1024        1025          1200   1201   1440   1600
        box        343   706   896         721           896    897    1136   1296
        result     card  card  card        card          card   TABLE  table  table
                               └── the swap costs 176px and the layout does not flinch ──┘

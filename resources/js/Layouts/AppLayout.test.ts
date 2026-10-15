@@ -1,20 +1,22 @@
 import { mount, type VueWrapper } from '@vue/test-utils';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 /**
- * The shell's two layout modifiers (Increment JR4 — the repo's first AppLayout test).
+ * The shell's content column (Increment JR4 wrote the repo's first AppLayout test; M173 rewrote its first half).
  *
- * ⚠️ THIS EXISTS BECAUSE THE WIDTH CLASS HAS NO OTHER GATE AND FAILS SILENTLY. `.app-shell__inner--wide`
- * raises the content cap from 1200 to 1600, which changes NOTHING at any viewport Playwright runs (its
- * widest project is 1440×900, where the cap is not even reached) and nothing any Pest, PHPStan or axe
- * check can observe. Two ways it could ship as a no-op with all six CI jobs green: a page name typed
- * wrong in `WIDE_PAGES` — the strings are case-sensitive and not obvious (`Dashboard`, `forms/Index`,
- * `submissions/Inbox`) — or the modifier losing to `.app-shell__inner` on a specificity tie. This test
- * covers the first; source order in the stylesheet covers the second.
+ * JR4 capped every page at 1200px and kept a `WIDE_PAGES` set at 1600px. `D120` (the user, 2026-10-14) asked for every
+ * page to fill the width, so M173 removed both caps: no page carries a width modifier, and the column itself declares no
+ * `max-width`. A width is invisible at every viewport Playwright runs (its widest project is 1440×900, where the old cap
+ * never bound), so the stylesheet is pinned here as text and the column is measured at 1920 and 2560 in
+ * `tests/e2e/list-layout.spec.ts`.
  *
- * The both-sets invariant is the other half: `forms/Builder` is full-bleed, and a future editor added to
- * both sets must keep `max-width: none` rather than acquire a 1600px cap.
+ * The builder is the other half: `forms/Builder` stays full-bleed (`--fluid`), padding and all, and owns its own scroll.
  */
+
+const source = readFileSync(join(process.cwd(), 'resources/js/Layouts/AppLayout.vue'), 'utf8');
+const style = source.slice(source.indexOf('<style'));
 
 const mocks = vi.hoisted(() => ({
     page: {
@@ -58,13 +60,9 @@ function innerClasses(wrapper: VueWrapper): string[] {
     return wrapper.find('.app-shell__inner').classes();
 }
 
-describe('AppLayout — the wide list-page column', () => {
-    it('leaves an ordinary page at the default cap', () => {
-        // Settings is the worked example of why this is opt-IN: 640px cards in a 1600px column would be
-        // stranded at the left with 900px of dead canvas.
-        expect(innerClasses(render('Settings/Index'))).not.toContain('app-shell__inner--wide');
-    });
-
+describe('AppLayout — no page is capped (M173, D120)', () => {
+    // Every page JR4's wide set named, every page it deliberately left at 1200px, and the settings page that was its
+    // worked example of a page to keep narrow: all of them now get the one plain column.
     it.each([
         'Dashboard',
         'analytics/Index',
@@ -76,26 +74,34 @@ describe('AppLayout — the wide list-page column', () => {
         'members/Index',
         'submissions/Inbox',
         'webhooks/Index',
-    ])('widens %s', (component) => {
-        expect(innerClasses(render(component))).toContain('app-shell__inner--wide');
+        'domains/Index',
+        'search/Index',
+        'scopes/Index',
+        'forms/Show',
+        'submissions/Encode',
+        'Settings/Index',
+    ])('gives %s the plain column, with no width modifier', (component) => {
+        expect(innerClasses(render(component))).toEqual(['app-shell__inner']);
     });
 
-    it.each(['domains/Index', 'search/Index', 'scopes/Index', 'forms/Show', 'submissions/Encode'])(
-        'leaves %s at the default cap, deliberately',
-        (component) => {
-            // Each of these is a single-column stack, a tree, a detail surface or a form — widening them
-            // CAUSES the "title at one edge, date at the other" defect rather than fixing it.
-            expect(innerClasses(render(component))).not.toContain('app-shell__inner--wide');
-        },
-    );
+    it('declares no max-width on the column, and one more step of padding from 1920px', () => {
+        const rule = style.match(/^\.app-shell__inner \{([^}]*)\}/m);
+
+        expect(rule, 'the .app-shell__inner rule').not.toBeNull();
+        expect(rule![1]).not.toMatch(/max-width/);
+        expect(rule![1]).not.toMatch(/margin:\s*0 auto/);
+        // Declarations only (indented), so a comment or a media query naming a width cannot satisfy or trip this: the one
+        // max-width left in the shell is the builder's `none`.
+        expect([...style.matchAll(/^\s+max-width:\s*([^;]+);/gm)].map((m) => m[1])).toEqual(['none']);
+        expect(style).toMatch(
+            /^@media \(min-width: 1920px\) \{\s*\.app-shell__inner:not\(\.app-shell__inner--fluid\) \{\s*padding-inline: var\(--mds-space-12\);/m,
+        );
+    });
 });
 
 describe('AppLayout — the full-bleed builder still wins', () => {
-    it('keeps the fluid modifiers and takes no width cap', () => {
-        const classes = innerClasses(render('forms/Builder'));
-
-        expect(classes).toContain('app-shell__inner--fluid');
-        expect(classes).not.toContain('app-shell__inner--wide');
+    it('keeps the fluid modifier and nothing else', () => {
+        expect(innerClasses(render('forms/Builder'))).toEqual(['app-shell__inner', 'app-shell__inner--fluid']);
     });
 
     it('drops the content region tabindex for a fluid page and keeps it otherwise', () => {

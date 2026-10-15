@@ -127,7 +127,7 @@ function logout(): void {
     font-size: var(--mds-type-caption-font-size);
     font-weight: var(--mds-font-weight-semibold);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: var(--mds-tracking-wide);
 }
 
 .admin__nav {
@@ -191,13 +191,10 @@ function logout(): void {
     flex: 1;
 }
 
-/* Deliberately NOT the tenant shell's 1600px wide class (JR4, `AppLayout.vue`'s `--wide`): the console
-   has no sidebar, so its gutter grows more slowly, and its own ≤900px bar-wrap block is measured against
-   these numbers. If this ever moves, re-derive `DataTable.vue`'s 56em collapse threshold with it — the
-   console at 834px (an 802px content box) is one of the two edges that pinned it. */
+/* M173 (`D120`) — no cap, as in the tenant shell: the console fills the window less its padding. It was
+   1100px. `DataTable.vue`'s 56em collapse threshold was pinned partly by the console at 834px (an 802px
+   content box); that edge sits below where the old cap ever bound, so removing it moved nothing there. */
 .admin__inner {
-    max-width: 1100px;
-    margin: 0 auto;
     padding: var(--mds-space-8) var(--mds-space-6);
 }
 
@@ -277,6 +274,13 @@ function logout(): void {
     }
     .admin__inner {
         padding: var(--mds-space-6) var(--mds-space-4);
+    }
+}
+
+/* One more step of side padding on a wide screen, as in the tenant shell. */
+@media (min-width: 1920px) {
+    .admin__inner {
+        padding-inline: var(--mds-space-12);
     }
 }
 </style>

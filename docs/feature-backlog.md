@@ -6618,7 +6618,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   cost hiding in it** — a mapped column that changes identity is a broken sync, not a re-render, and that is
   why it is a row rather than a refinement. ⚠️ **Also unresolved and cheaper:** the grid arms render row and
   column VALUES, not their author-defined LABELS, because resolving those needs the field's `config` threaded
-  into `displayValue()`. **Live.** Filed by `M74`. **Tier: during-testing.**
+  into `displayValue()`. **Live.** Filed by `M74`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: `D130` answers question (2) — one column per cell beside today's summary — and the grid's first increment takes it; question (1), the signed link, stays open here (`D128`).**
 
 - ✅ **CLOSED BY `M75` (2026-09-06) — `minor` · ~~`gate-baselines.php` writes the file BEFORE it judges
   whether every metric was found, so a NOT FOUND row ships and is reported afterwards.~~** ✅ **The mechanism
@@ -9707,11 +9707,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   a field, so an unrelated later burst that lands clears an earlier burst's failure while that field still differs
   from the server. ⚠️ `save-state.test.ts` pins the burst behaviour on purpose, so whoever takes this changes that
   assertion deliberately, and exactness needs a per-field dirty set threaded through every guarded action. The
-  author has already been shown the alert once. **Live.** Filed by `M94`. **Tier: during-testing.**
+  author has already been shown the alert once. **Live.** Filed by `M94`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: taken with the blockers increment's rewrite of the builder's refusal alert, where the files coincide (`D132`, `D128`).**
 - **`minor` · A repeated identical builder save failure is announced to a screen reader only once.** Carried out
   of this ledger's §3 table by `M94` (2026-09-14). Setting the save error to the same string is not a reactive
   change, so the config panel's alert never re-mounts and never re-announces. The fix is a per-failure key on that
-  alert, with its own test. **Live.** Filed by `M94`. **Tier: during-testing.**
+  alert, with its own test. **Live.** Filed by `M94`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: taken with the blockers increment's rewrite of the builder's refusal alert, where the files coincide (`D132`, `D128`).**
 - **`minor` · The builder toolbar says "All changes saved" on a form that cannot be edited.** Carried out of this
   ledger's §3 table by `M94` (2026-09-14). With no draft the panes are replaced by an empty state and nothing can
   be written, yet the save status still renders. Hiding it on a read-only form is the fix, in a state the builder
@@ -11677,7 +11677,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   which trims that row to a v1 for the Oct 12 testing: a linked form feeds a `single_select`/`dropdown`'s options.
   Left here: pulldata-style lookups and calculations over linked data, and whatever of `D60`'s separate freshness
   channel (answered A — beside the schema checksum) v1 does not need.
-  **Live.** Filed by `M127`. **Tier: during-testing.** **Also left by `M133`'s v1:** the linked list in the builder preview (it says the choices show on the live form), `select_one_from_file` in the XLSForm export, the sync manifest's empty `choice_lists`, linked choices for multi-select and Likert questions, a source question inside a repeat group, more than 1,000 choices, and a server-side cache of the list.
+  **Live.** Filed by `M127`. **Tier: during-testing.** **Also left by `M133`'s v1:** the linked list in the builder preview (it says the choices show on the live form), `select_one_from_file` in the XLSForm export, the sync manifest's empty `choice_lists`, linked choices for multi-select and Likert questions, a source question inside a repeat group, more than 1,000 choices, and a server-side cache of the list. **Split 2026-10-15 by `M172` (`D128`):** the multi-select half and the builder-preview half are their own `early-testing` rows now (R-f655f9b1, R-d8c2ce84, the options-from-anywhere increment); the grid's rows from another form and the cascade filter are R-bb79aec0 and R-ed7f3127. Left here, unchanged in tier: lookups and calculations over linked data, a source inside a repeat, more than 1,000 choices, a server-side cache, `select_one_from_file` in the XLSForm export and the sync manifest's `choice_lists`.
 
 - ✅ **CLOSED BY `M132` (2026-10-05) — ****`minor` · An author cannot attach a reference file to a form, and the attachment model has no form-level kind
   to hang one on.** Filed 2026-09-25 by `M110` from the report *"there is also a attachments in kobotoolbox that
@@ -12773,7 +12773,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   available for manual entry yet". The builder offers both types, and `CapabilityFlags` counts `duration` as
   extractable, so a scanned sheet carries a duration answer that `M129`'s review lists as not carried rather than
   saving a value the reviewer cannot see. The remedy is a control in both channels at once, which the mirror test
-  makes one change. **Live.** Filed by `M129`. **Tier: during-testing.**
+  makes one change. **Live.** Filed by `M129`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the testers asked whether the advanced types are ready (item 6, 2026-10-15); `D134` builds both controls in the testers' programme's last increment, after the UI programme (`D128`).**
 
 - **`minor` · A note copied with its content-block images, by save as template, a template or the field library,
   points at images another form owns, so the copy cannot publish until each image is uploaded again.** Found by
@@ -13136,7 +13136,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the last — step by step, one page, and page breaks — and its option A said to *file "tabular" as a product idea*, which
   no row did until now. `D57`'s recommendation also says a tabular mode should be asked for again on its own evidence,
   because nothing has described what it would show; the first step is that description from the user. **Live.**
-  Filed by `M135`. **Tier: during-testing.**
+  Filed by `M135`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: `D129` is the description `D57` asked for — a repeatable section laid out as a table where respondents add rows, Fillout's shape — and the grid's second increment builds it (`D128`).**
 
 - ✅ **CLOSED BY `M137` (2026-10-06) — ****`minor` · An image added to a note does not appear in the builder's preview until the page is reloaded.** Found by
   `M137` from the staging smoke test (comment 17, marked fail: *"image did not reflect in the preview instantly, i
@@ -13271,7 +13271,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   correct. `EncodeFormPresenter` renders a cascade from the published field's options (`cascade()`), so a 42,000-row
   barangay list rides in the Inertia props on every encode load (a few MB). `M141` strips the engine's copy of the
   schema and leaves the render copy, which the page needs. The fix is the guest runtime's: fetch the lists beside the
-  page, by version. **Live.** **Tier: during-testing.**
+  page, by version. **Live.** **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: taken by the Philippine-places increment (`D131`), whose built-in list would otherwise put a few MB of props on every manual-entry page (`D128`).**
 
 - **`minor` · A typed cascade publishes a first-level choice that carries a parent, which no respondent is ever shown,
   and a value repeated within a level, whose later parent silently wins.** Found by `M141`.
@@ -13280,7 +13280,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   validation engines key a level's options by value. A CSV list cannot reach either: the parser refuses a repeated name,
   and the materializer writes a null parent. So `M141` left the gate alone, because tightening it would refuse a
   republish of any live form that already carries such an option. Count those forms before tightening.
-  **Live.** Filed by `M141`. **Tier: during-testing.**
+  **Live.** Filed by `M141`. **Tier: during-testing.** **Noted 2026-10-15 by `M172`:** the Philippine-places increment (`D131`, R-70c7673a) counts the live forms carrying the shape and takes this row only if the count is zero; otherwise it stays here.
 
 - **`minor` · A form automation has no Slack, Delay or Branch action and no form-abandoned trigger — what is left of
   form automations after their condition (`M142`).** Split from `R-b65bafca` by `M142`, which built that row's Filter
@@ -13419,7 +13419,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   on a delete, clear or repoint every dependent rule and say so in the undo entry; on a key edit, carry the new key into
   every `related_field_key` that held the old one — or refuse to delete a compared question while a rule names it.
   Not one of the 19 comments (`D72`), so filed below the testing line. **Live.** Filed by `M145`.
-  **Tier: during-testing.**
+  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: taken by the blockers increment — the delete half with the retired-question dialog (`D133`), the key half with the auto-adjusted key (`D132`, `D128`).**
 
 - **`nit` · `PreviewRuntime.vue` keys a question's issue chips by `issue.code`, so two issues of one code on one
   question would collide in the render.** Found by `M145` while adding `incomplete_rule`: the `<li>` under a field is
@@ -13478,7 +13478,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/Http/Requests/Forms/UpdateFieldRequest.php` and `app/Http/Requests/Forms/UpdateSectionRequest.php` scope their
   uniqueness rules to the bound version with no comment, so the next reader cannot tell a slightly wrong message inside
   that race from an oversight. The remedy is the comment in both: the draft guard is the real gate, and the message still
-  tells the author to reload. **Latent** — the race has never been reported. **Tier: during-testing.**
+  tells the author to reload. **Latent** — the race has never been reported. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: folded into the blockers increment — the uniqueness rules scope to the bound row's own version, which is the rule the comment would have described (`D132`, `D128`).**
 
 - **`minor` · `deploy.ps1`'s test harness lives in no committed file, while every merge now deploys the testing site
   through that script.** Filed by `M147` (2026-10-08) from `D45` (C until a production host exists, then B). The harness
@@ -13597,7 +13597,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   me to check specially for multi levels"*). Excel reads `01` as the number 1 and saves it so, a child file's parent
   column then names no row, and publish refuses with "option “X” has no valid parent" — true, but silent on the cause.
   The remedy is one sentence beside the upload in `CascadingEditor.vue` and in Settings → Choice lists (keep codes as
-  text, or use letters), and the same hint on that refusal. **Live.** Filed by `M148`. **Tier: during-testing.**
+  text, or use letters), and the same hint on that refusal. **Live.** Filed by `M148`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: taken by the options-from-anywhere increment, which rewrites the same upload control and accepts Excel (`D128`).**
 
 - ✅ **CLOSED BY `M149` (2026-10-08) — ****`major` · A phone photo stored on its side is read without being turned upright, so every question on it is "not
   found".** Found by `M149` in the OCR bake-off's first round (15 hand-filled layout-4 forms, both pages photographed with a
@@ -14141,7 +14141,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   list page AND `/settings` fill the region (red today); the two stories; DSR §3.0 and the §6 bullet amended — and the same edit
   records the page-level `dl` collapse at 480px that ten pages author (`resources/js/Pages/scopes/Index.vue:387`,
   `resources/js/Pages/forms/Show.vue:594`) against §6's "pages never add breakpoint logic" sentence, which today contradicts them.
-  **Live.** Filed by `M171`. **Tier: during-testing.**
+  **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`minor` · The settings pages stack 640px cards in one column, so a wide screen shows one narrow column and the rest of the page empty.**
   `resources/js/Pages/Settings/Index.vue:482` (`.settings-card { max-width: 640px }`) with `:475` a column; `resources/js/Pages/Settings/Sso.vue:158`
@@ -14154,7 +14154,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `resources/js/components/sso/IdpMetadataCard.vue:223`. `D120` A. The remedy: the caps go; the cards sit in
   `repeat(auto-fill, minmax(min(100%, 36rem), 1fr))` with `align-items: start` (two columns at 1440, three from 1920); the console
   page's Save foot spans the row; the 380px input measure inside a card (`resources/js/Pages/Settings/Index.vue:505`) stays, since
-  `D120` keeps a measure for inputs. **Live.** Filed by `M171`. **Tier: during-testing.**
+  `D120` keeps a measure for inputs. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`minor` · The scanned-forms and scan-status pages cap themselves at 720px, and the recent-scans list runs each row from one edge to the other.**
   `resources/js/Pages/ocr/Scans.vue:300` and `resources/js/Pages/ocr/ScanStatus.vue:135` (`max-width: 720px`); `Scans.vue:395-414` lays
@@ -14163,7 +14163,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `ScanStatus.vue:150`), which resolves to `danger-300` in dark and fails 4.5:1 on the surface; they take `--mds-color-status-danger-fg`
   with this row so the consistency row never edits these files. `D120` A and `D121` A (the upload form keeps a measure as a form; the
   list fills). The remedy: the caps go; the list becomes a card grid (`auto-fill minmax(min(100%, 28rem), 1fr)`); from 75rem the
-  upload card keeps a 36rem measure beside the list. **Live.** Filed by `M171`. **Tier: during-testing.**
+  upload card keeps a 36rem measure beside the list. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`minor` · The form's Settings tab stretches every section's inputs across the whole width.**
   `resources/js/Pages/forms/Settings.vue:67` mounts `FormSettingsSections` in one `MdsCard` with no measure, and
@@ -14171,7 +14171,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `D120` A and `D121` A: inputs keep a reading-width column. The remedy: from a 60em container the sections lay two-up
   (`auto-fill minmax(min(100%, 32rem), 1fr)`, `align-items: start`), each section's controls at a 36rem measure; the 880px settings
   modal stays one column because its container never reaches 60em; a new Vitest case on the source pins the query, the way
-  `resources/js/Pages/forms/builder-layout.test.ts` pins the builder's. **Live.** Filed by `M171`. **Tier: during-testing.**
+  `resources/js/Pages/forms/builder-layout.test.ts` pins the builder's. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`minor` · The form hub and the submission page stack their facts above their tables, so on a wide screen every row runs from one edge of the glass to the other.**
   `resources/js/Pages/forms/Show.vue:343-366` (identity and facts), `:368-407` (tiles), `:415-487` (two full-width tables);
@@ -14180,7 +14180,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   remedy is a page grid from a 75rem container — main content (tables, answers) in `minmax(0, 1fr)`, the facts, versions, review and
   PDF cards in a `minmax(18rem, 26rem)` aside — with the submission's answer blocks two-up (`auto-fill minmax(min(100%, 36rem), 1fr)`)
   and the scan split (`:435-450`) unchanged; `resources/js/Pages/forms/show.test.ts` keeps its every-prop-has-a-reader rule. **Live.**
-  Filed by `M171`. **Tier: during-testing.**
+  Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`minor` · The webhook, integration-rule and console workspace pages stack two fact cards over a full-width log, and the console's dialogs rely on browser-default paragraph margins.**
   `resources/js/Pages/webhooks/Show.vue:358-363` and `resources/js/Pages/integrations/RuleShow.vue:326-331` put two cards in
@@ -14188,7 +14188,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `:546-548` stacking every section under it. On that page `:491-498` and `:513-519` are paragraphs with no class in two dialogs
   (every tenant dialog styles a `__prose` rule), and `:562` hard-codes `letter-spacing: 0.04em` where `--mds-tracking-wide` exists.
   `D120` A. The remedy is the hub's page grid (cards aside, log main, from 75rem), a `__prose` rule, and the token. **Live.**
-  Filed by `M171`. **Tier: during-testing.**
+  Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`minor` · Domains, search results and the achievements leaderboard are single columns of full-width rows.**
   `resources/js/Pages/domains/Index.vue:212-216` (`.domains__list`, a column of `DomainCard`s), `resources/js/Pages/search/Index.vue:210-214`
@@ -14196,12 +14196,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   column) with `:485-492` giving the name `flex: 1`, so the rank sits at the left edge and the points at the far right of a 2560px
   row. `D120` A. The remedy: domain cards in `auto-fill minmax(min(100%, 26rem), 1fr)`; search groups side by side from 64rem with
   their rows inside each group; the leaderboard beside the team tiles and the note in a two-column section grid from 75rem.
-  **Live.** Filed by `M171`. **Tier: during-testing.**
+  **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`nit` · Template cards' "Use this template" buttons sit at different heights across a row.**
   `resources/js/Pages/forms/Templates.vue:128-132` makes each card a flex column but never pushes the footer to the bottom;
   `resources/js/components/forms/FormCard.vue:225` does it with `margin-top: auto` on the card footer. The remedy is the same rule,
-  `:deep(.mds-card__footer) { margin-top: auto }`. **Live.** Filed by `M171`. **Tier: during-testing.**
+  `:deep(.mds-card__footer) { margin-top: auto }`. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`minor` · The sign-in and register pages centre a 400px card and a pitch panel in the middle of a wide screen, and the landing page caps itself at 64rem.**
   `resources/js/Layouts/AuthLayout.vue:83-91` centres `.auth__frame`, `:122-134` is the 400px card, and `:220-247` makes the split
@@ -14212,7 +14212,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   utility pages keep the card; the landing hero stays centred but its grid fills with `auto-fill` and bounded cards, and the tracking
   takes `--mds-tracking-wide`. The layout docblock's two CI constraints hold: no second control whose name contains "Sign in", and
   the panel's headline stays a paragraph. `tests/e2e/auth-axe.spec.ts` gains the two-pane case. **Live.** Filed by `M171`.
-  **Tier: during-testing.**
+  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`minor` · The staff encode page caps itself at 720px and leaves the rest of a wide screen empty.**
   `resources/js/Pages/submissions/Encode.vue:1575-1577` (`.encode { max-width: 720px }`) and `:1962` (`max-width: 90rem` in scan mode).
@@ -14220,7 +14220,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   panel. The remedy: from 75rem a two-column grid — the form at a 45rem measure and an aside holding the facts that today sit above
   it (the form's status and version, the schedule notice, the reference files, the autosave state); scan mode's equal halves
   (`M168`) unchanged. The page's two `--mds-color-danger-text` uses (`:1921`, `:2029`) take `--mds-color-status-danger-fg` with this
-  row, so the consistency row never edits this hub. **Live.** Filed by `M171`. **Tier: during-testing.**
+  row, so the consistency row never edits this hub. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`minor` · The feedback panel is in every captured screenshot, a report carries no type, and only the page's path is recorded.**
   The user's comment (2026-10-14): *"when i click capture screen, the modal for the feedback is always included. i think there is a
@@ -14237,7 +14237,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   app version in `browser_info`, the title shown as a link on both lists and matched by the keyword filter; `docs/data-dictionary.md`
   §21 and the enum catalog row (gated by `tests/Feature/Docs/DocumentedEnumCatalogDriftTest.php`). Mutations: the hide dropped → Vitest
   red; `type` dropped from the payload → Pest red; the CHECK dropped → the drift test red. **Live.** Filed by `M171`.
-  **Tier: during-testing.**
+  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`minor` · The product shows no user-facing version and has no "What's new": Settings → About reads "dev" on the testing server, and a user learns of a change only by noticing it.**
   The user's request (2026-10-14): *"lets also have a what's new prompt to users for new login so users are aware for every changes.
@@ -14256,7 +14256,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   never a delete), and the page and the prompt reading the table; a `/whats-new` page and a modal opened on the first page after sign-in for a user whose `users.whats_new_seen_version` (new,
   nullable, no backfill, withheld from tenant extracts like `welcomed_at`) is older, marked seen by any close through
   `POST /whats-new/seen`; one close-out sentence in `CLAUDE.md` and the RBAC §6 users row. **Live.** Filed by `M171`.
-  **Tier: during-testing.**
+  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`nit` · What's new entries do not reach the notification centre.**
   The gap-table row at `docs/feature-backlog.md:160` asks for a changelog "feeding the notification center"; the versioning row above
@@ -14274,23 +14274,23 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `resources/js/components/submissions/FieldInput.vue:706`, `resources/js/components/integrations/RuleFormModal.vue:448`,
   `resources/js/components/builder/PreviewRuntime.vue:665` (the OCR pages' and the encode page's uses are taken by their own rows).
   Only the dark axe sweep can see it, and `/admin/*` is outside the sweep. The remedy is `--mds-color-status-danger-fg`, the
-  on-surface pair with a measured ratio, in every one. **Live.** Filed by `M171`. **Tier: during-testing.**
+  on-surface pair with a measured ratio, in every one. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`nit` · The console's "Reset two-step sign-in" dialog relies on browser-default paragraph margins.**
   `resources/js/Pages/admin/Users.vue:91-97` renders three paragraphs with no class, while every tenant dialog styles a `__prose` rule
-  (`resources/js/Pages/members/Index.vue:497`). The remedy is the same rule. **Live.** Filed by `M171`. **Tier: during-testing.**
+  (`resources/js/Pages/members/Index.vue:497`). The remedy is the same rule. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`nit` · Three uppercase micro-labels hard-code their tracking where `--mds-tracking-wide` exists.**
   `resources/js/Pages/help/Index.vue:223` (0.04em), `resources/js/components/shell/Sidebar.vue:338` (0.06em) and
   `resources/js/Layouts/AdminLayout.vue:130` (0.04em); `packages/design-system/src/components/FilterBar/FilterBar.vue:58-61` records the
   token as the one letting for the product's micro-labels (the console workspace page's and the landing page's literals are taken by
-  their own rows). The remedy is the token. **Live.** Filed by `M171`. **Tier: during-testing.**
+  their own rows). The remedy is the token. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`nit` · Three truncated values offer no way to read the whole text where they are shown.**
   `resources/js/Pages/webhooks/Index.vue:224-236` (`.webhooks__url`), `resources/js/Pages/integrations/Index.vue:456-468`
   (`.connection__channel`) and `resources/js/Pages/integrations/RuleShow.vue:421-431` (`.detail__result`) clip with an ellipsis and
   carry no `title`. The remedy is a `title` with the full value — allowed because the same text is on the row's detail page, so no
-  tooltip component is owed. **Live.** Filed by `M171`. **Tier: during-testing.**
+  tooltip component is owed. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`nit` · The root lockfile records the design system's `vue` range as `^3.5.39` while its `package.json` says `^3.5.43`, so the node container's `npm install` rewrites `package-lock.json` and dirties the working tree.**
   Found by `M171`: after the stack started, `git status` showed `package-lock.json` changed by one line — the `packages/design-system`
@@ -14298,3 +14298,250 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the root lock was never regenerated. Harmless to the build (CI runs `npm install`, not `npm ci`), but a session that stages
   everything ships an unrelated lockfile line, and one that does not keeps reverting it. The remedy is the one-line lock update in a
   PR of its own. **Live.** Filed by `M171`. **Tier: during-testing.**
+
+- **`major` · A builder tab left open across a publish refuses every edit with "The key has already been taken", then "That item belongs to a published version" once the key is changed, and a reload loses the unsaved edits.**
+  The testers' report (2026-10-14, relayed 2026-10-15): *"The key has already been taken. ************ has a change that was not saved.
+  Select it to see why"*, and on a delete *"That item belongs to a published version and can no longer be edited"*. Measured on
+  `0432d03b`: `app/Http/Requests/Forms/UpdateFieldRequest.php:53-58` checks the key against the form's CURRENT draft, ignoring only
+  the bound field's id, and a FormRequest runs before `FormBuilderService::assertDraftChild()`
+  (`app/Services/Forms/FormBuilderService.php:592-597`); a publish clones the draft into a new one with new ids and the same keys
+  (`app/Services/Forms/PublishService.php:175-186`). So a tab still holding the old ids — a publish from the hub
+  (`resources/js/Pages/forms/Show.vue:246-253`), the forms list, another tab, the API, or the browser's Back button, which Inertia
+  serves from history without asking the server (`docs/feature-backlog.md:2974-2976`; nothing under `resources/js` handles
+  `popstate` or encrypts history) — finds the clone and is refused on the key. Changing the key passes the request and the service
+  refuses with `FormException::childNotInDraft()` (`app/Exceptions/Forms/FormException.php:67-70`), mapped to 422 with no `errors`
+  map (`app/Http/Controllers/Tenant/FormBuilderController.php:239-241`) and so given a Retry that can never succeed; reorder with
+  stale ids is a silent 200 (`FormBuilderService.php:551-575`); publish from the builder does nothing while a refusal stands
+  (`resources/js/Pages/forms/Builder.vue:216-218`); a reload loses the edits because the journal is keyed by the draft id
+  (`resources/js/components/builder/edit-journal.ts:88-93`). The only HTTP test of the path sends a NEW key
+  (`tests/Feature/Forms/BuilderDraftGuardTest.php:66-84`). The remedy: the page already holds `draft.id`
+  (`app/Services/Forms/BuilderPresenter.php:83-86`) — `resources/js/components/builder/builderClient.ts` sends it with every builder
+  write, the controller compares it with `forms.draft_version_id` BEFORE validation and answers 409 `draft_superseded` with the new
+  draft's id and number; the store shows one dialog ("This form was published since this page loaded. Reload to keep editing."),
+  reloads the page's props and replays the unsaved edits by field KEY (the journal re-keyed by form, its entries carrying the key,
+  which a publish keeps while ids change); the builder re-fetches its props on history restoration so Back never shows a stale page;
+  reorder answers the same 409; both uniqueness rules scope to the bound row's own version; `respond()`'s docblock claim of a
+  refetch (`FormBuilderController.php:225`) becomes true; the publish refusal says why. Red first: a Pest case sending the
+  UNCHANGED key against a published field's id, a Vitest case replaying by key, an e2e two-tab case. **Live.** Filed by `M172`.
+  **Tier: early-testing.**
+
+- **`minor` · A key clash is refused instead of avoided, the refusal shows only on a tab that selecting the question never opens, and an undo or a journal replay can bring a taken key back.**
+  The clash the testers can still hit after the stale-tab row above is fixed: an author types a key another question holds, or an
+  undo (`resources/js/components/builder/useBuilderStore.ts:287-305`) or the journal's put-back (`:986-1010`) re-sends a key freed
+  and retaken meanwhile. The server's own keys never clash (`app/Services/Forms/FormBuilderService.php:903-928`, `uniqueKey()` and
+  `copyKey()`); the client never creates one. The refusal is shown under Field key on the Advanced tab only
+  (`resources/js/components/builder/ConfigPanel.vue:605-612`), while selecting a question always opens Basics (`:165-170`); the
+  alert names every other refused question as "has a change that was not saved. Select it to see why" (`:80`) with no reason and
+  no badge on the tab; a validation refusal is not counted as unsaved, so there is no Retry (`useBuilderStore.ts:946-954`).
+  `docs/form-versioning-schema-migration.md:129` says a key is never renamed, and nothing enforces it. `D132` (the user,
+  2026-10-15): *"if we can already help the user avoid the errors, notify them or the app auto adjust the key naming to avoid
+  conflicts"*. The remedy: the store knows every key in the draft — as the author types a key in use the panel says so inline
+  ("used by “Age (years)”") and offers the free form; a clash that still reaches the server takes a numbered suffix (the
+  `copyKey()` shape), the response carries the key kept and a notice shown under Field key, and every rule naming the old key
+  follows (the key-edit half of `R-9ea69e29`); undo and journal replays go through the same path; the alert lists each refused
+  question with its reason inline, selecting one opens the tab holding the error, and the tab carries a badge. Folds
+  `R-4c4e35ae` (the uniqueness rules scope to the bound row's own version, the rule its comment would have described); takes
+  `R-31ff7ade` and `R-d85d51d2` with the alert rewrite where the files coincide — verified at the build. **Live.** Filed by `M172`.
+  **Tier: early-testing.**
+
+- **`minor` · Deleting a question that a published version with responses still uses gives no warning, and nothing on a response or an export says the question was removed from the form.**
+  The testers' request (2026-10-15): delete when the published form has no responses; otherwise ask, retire the question, keep the
+  submitted answers with a note, and keep the history. Measured: a delete hard-deletes the row from the draft and nothing else
+  (`app/Services/Forms/FormBuilderService.php:308-320`); older responses keep their answers under their own version
+  (`submission_answers.answers` keyed by field key, `database/migrations/2026_07_09_000302_create_submission_answers_table.php:28`;
+  shown against the submission's version by `app/Services/Submissions/SubmissionInboxPresenter.php:251-295`; exports union keys
+  across versions, `app/Services/Submissions/SubmissionRowProjector.php:82`), so no answer is lost today — but no response page,
+  inbox column or export header says the question is gone, and the delete dialog says nothing about the answers it leaves behind.
+  `D133` (the user's design, 2026-10-15): the delete works in the draft; with no responses nothing more is said; with responses
+  the dialog says how many hold answers and that the question is retired, kept on every response and export as "removed from the
+  form in version N". The remedy: the delete path counts, in the current published version, the responses holding an answer to the
+  key (`submission_answer_index.field_key`, `database/migrations/2026_07_09_000303_create_submission_answer_index_table.php:31-32`)
+  and the dialog says so; the delete clears or repoints dependent rules and the undo entry says so (the delete half of
+  `R-9ea69e29`, `useBuilderStore.removeFieldLocal()`); the response page, the inbox's columns and the CSV/XLSX headers tag a key
+  present in a submission's version but absent from the current published version with "removed from the form in version N",
+  read from `change_summary` (`app/Services/Forms/SchemaChangeClassifier.php`). The version-history half is the row below.
+  **Live.** Filed by `M172`. **Tier: early-testing.**
+
+- **`minor` · An author cannot see what changed between a form's versions or open an old version: the hub's Versions panel shows version, status and date only, and the change summary is shown nowhere.**
+  The testers' request (2026-10-15): *"there must also a way to check the older version for history"*. `app/Services/Forms/FormHubPresenter.php:87-92`
+  sends each version's id, number, status and published date; `resources/js/Pages/forms/Show.vue:444-487` draws the panel with
+  Print blank and Restore as the only actions; `form_versions.change_summary` (`app/Services/Forms/SchemaChangeClassifier.php`,
+  by key) reaches no page; an old version is reachable only as the Print blank PDF (`routes/tenant.php:576`), the XLSForm download
+  (`:554`) or `GET /api/v1/forms/{form}/versions/{version}`. The remedy: the panel lists each version's summary (added, removed and
+  changed questions by label) and a View that opens the old version read-only through the preview runtime from `schema_snapshot`
+  (a tenant route beside the Print blank one). The interactive field-by-field diff stays `version-diff-ui`
+  (`docs/form-versioning-schema-migration.md:209`). **Live.** Filed by `M172`. **Tier: early-testing.**
+
+- **`minor` · A grid's cells are all single choices from one shared list: no column can have its own type or its own choices, so a table of names, numbers, dates and ticks cannot be built.**
+  The testers' comment (2026-10-15): *"it can only have a single set of options and also there is also 1 type of question unlike in
+  kobo, every cell can be configured separately, it can pick different type of questions and different set of options for each"*.
+  Measured: `resources/js/components/builder/MatrixEditor.vue:46` says "Each cell is a single choice from this shared list";
+  `config.cells` is that list (`docs/data-dictionary.md:377`), the request validates rows, columns and cells as value/label lists
+  only (`app/Http/Requests/Forms/UpdateFieldRequest.php:274-306`), the normalizer rejects unknown rows or columns and nothing else
+  (`app/Services/Submissions/StructuralAnswerNormalizer.php:548-593`), publish checks the three lists non-empty and distinct
+  (`app/Services/Forms/StructuralValidationGate.php:532-562`), and `app/Enums/FieldType.php:12` claims each cell is
+  "independently typed", which is false. KoboToolbox's Question Matrix gives every column its own response type (Select One,
+  Select Many, Text, Number) and its own choices (`support.kobotoolbox.org/matrix_response.html`). `D129` (the user, 2026-10-15):
+  the Matrix gains typed columns. The remedy, additive: `config.columns[]` gains `type` (single_select, multi_select, short_text,
+  integer, decimal, date, yes_no), its own `options` (or `options_list` / `options_source`, the options-from-anywhere rows) and
+  `required`; `config.cells` stays as the default choices of a column with no type, so every existing grid loads unchanged; the
+  answer keeps `{row:{col:value}}` with the value typed by its column; the normalizer coerces per column and both validation
+  engines (`app/Services/Validation/SemanticValidator.php` and its TypeScript twin, the golden vectors in
+  `docs/architecture/technical-architecture.md`) check membership per column list; `ValueShape` (`app/Enums/ValueShape.php:171-191`)
+  and the gates learn the column shape; the Grid tab's editor gains the per-column type; the data dictionary and the enum
+  docblock say what is true. **Live.** Filed by `M172`. **Tier: early-testing.**
+
+- **`minor` · A grid is drawn as a stack of row cards, never as a table, on the web form, manual entry and the builder preview.**
+  `resources/js/components/submissions/MatrixGrid.vue:9-13` states "NO `<table>` — each row is its own nested `<fieldset>`", and
+  `:118-135` lays one card per row with a labelled select per column; the same component serves the public form, the encode page
+  and the preview (`resources/js/components/submissions/FieldInput.vue:260-261`). Only the printed PDF draws a table
+  (`app/Enums/PrintAnswerArea.php:92`). The testers want "a grid"; Kobo's matrix is a table in the Grid theme. The remedy: a real
+  `<table>` (`<th scope="col">`, `<th scope="row">`, one control per cell by column type from the design system's inputs) from
+  48em, the existing stacked fieldsets below it, `config.layout = table | stacked` for an author who wants cards everywhere;
+  `likert_matrix` takes the same table. **Live.** Filed by `M172`. **Tier: early-testing.**
+
+- **`minor` · A grid answer reaches a spreadsheet as one cell, so a Sheets or Airtable column cannot map a single cell of it.**
+  `app/Services/Submissions/SchemaValueFormatter.php:304-342` renders a matrix into one cell as `row: col=cell; …`, the header union
+  in `app/Services/Submissions/SubmissionRowProjector.php:82` carries one column per grid question, and
+  `app/Services/Connectors/MappableColumnCatalog.php` offers only that column to Google Sheets and Airtable; the XLSForm export
+  already flattens a grid to one question per cell (`docs/xlsform-interop-spec.md:71`), as Kobo does ("Each cell in the matrix
+  becomes an individual variable"). `D130` (the user, 2026-10-15): one column per cell, keeping today's summary. The remedy: a
+  `<question>.<row>.<column>` column per cell joins the header union and the catalog beside the summary column, so no existing
+  mapping changes identity; the XLSForm export emits typed per-cell questions under the existing `{row_key}_{column_key}` names;
+  the PDF and the printed form draw typed cells (a write-in box for text and number cells, tick boxes for choices). Closes
+  `R-c64d0afd`'s second question; its first, a signed link in a cell, stays there. **Live.** Filed by `M172`. **Tier: early-testing.**
+
+- **`minor` · Only a Single choice or Dropdown can take its choices from another form's answers; a Multiple choice cannot.**
+  `app/Services/Forms/LinkedChoiceService.php:39` limits a link to single choice and dropdown, and
+  `app/Http/Requests/Forms/UpdateFieldRequest.php:319-331` accepts `config.options_source` for those two only; the Options tab
+  offers the link through `resources/js/components/builder/LinkedChoicesEditor.vue` (`ConfigPanel.vue:499-515`). The testers'
+  comment (2026-10-15): *"All input forms that has options like radio button, checkboxes, select options … must have an option to
+  populate options thru the connection to responses from other forms"*. Split out of `R-5fdbc47c`, which named multi-select as
+  the remainder's. The remedy: `multi_select` joins `LINKABLE_TYPES`, the request accepts the source for it, and the link is
+  offered through the one "Options come from" chooser (Typed here · A list file · Another form's answers) that replaces the
+  editor for every choice question. **Live.** Filed by `M172`. **Tier: early-testing.**
+
+- **`minor` · A list file can feed a cascade's levels but not a plain choice question, and only CSV is accepted, so a list in Excel must be converted first.**
+  `app/Services/Forms/ChoiceListMaterializer.php:136-146` materialises a version's choice lists for `cascading_select` levels only
+  (every level or none); `app/Services/Forms/ChoiceListCsvParser.php:33` reads CSV alone; the upload sits in the Levels tab
+  (`resources/js/components/builder/CascadingEditor.vue:58-102`) and Settings → Choice lists
+  (`resources/js/components/forms/ChoiceListsPanel.vue:80`). The testers' comment (2026-10-15): *"or utilize the uploaded references
+  and use that to create options"*. The remedy: `config.options_list = <name>` binds a Single, Multiple choice or Dropdown to a
+  list (`name,label` columns, the parent column optional), materialised at publish exactly as a cascade's so every server-side
+  reader stays plain; the upload accepts Excel (`.xlsx`, first sheet) through the spreadsheet reader the XLSForm importer already
+  uses (`app/Services/Xlsform/XlsformImporter.php`), reading codes as text; the chooser's "A list file" arm offers the version's
+  lists. Takes `R-1059e9bd` (its sentence lands beside the same upload control). **Live.** Filed by `M172`. **Tier: early-testing.**
+
+- **`minor` · A text box cannot offer suggestions from a list file or another form's answers.**
+  The testers' comment (2026-10-15): *"sometimes even the textbox must have an option to populate options thru the connection to
+  responses from other forms"*. `resources/js/components/submissions/FieldInput.vue:217-265` renders a text question as a plain
+  input, and `app/Http/Requests/Forms/UpdateFieldRequest.php:319-331` accepts no source on it. The remedy: `config.suggestions_source
+  = {kind: list | form, …}` on Short text gives a type-ahead (a `<datalist>`-backed combobox) on the web form, the encode page
+  (`app/Services/Submissions/EncodeFormPresenter.php:606-632` already serves linked lists there) and the preview, while free text
+  stays accepted and the server never checks it; the chooser reads "Suggestions come from" on a text question. **Live.** Filed by `M172`.
+  **Tier: early-testing.**
+
+- **`minor` · The builder preview shows neither a list-backed cascade's choices nor a list taken from another form; it says the choices show on the live form.**
+  Left by `M133`'s v1 and `M141` and recorded on `R-5fdbc47c`: the preview runtime (`resources/js/components/builder/PreviewRuntime.vue`)
+  is built from the draft's props, which carry `linkable_sources` (`app/Services/Forms/BuilderPresenter.php:105-107`) but never a
+  list's rows or a link's answers, so an author checks a PSGC cascade or a linked list only on the published form. The remedy: a
+  tenant route beside the choice-list routes (`routes/tenant.php:1098-1107`) returns the draft's linked lists and the first 200 rows
+  of each list-bound question with "showing 200 of N", and the preview merges them the way the guest runtime does
+  (`resources/public-runtime/lib/linked-choices.ts:89-112`). **Live.** Filed by `M172`. **Tier: early-testing.**
+
+- **`minor` · A grid's rows, columns and choices must be typed by hand: none can come from a list file or another form's answers, so a grid of barangays or facilities is retyped on every form.**
+  The testers' comment (2026-10-15): *"rows can be determined thru the list from the shared responses from other form or uploaded
+  reference"*, and every column's options likewise. `resources/js/components/builder/MatrixEditor.vue:42-49` takes three typed
+  lists; `app/Services/Forms/LinkedChoiceService.php:258-275` builds a linked list for one question key only, served by
+  `routes/api.php:591`. The remedy: `config.rows_source = {kind: list, name} | {kind: form, form_id, field_key}` and, per column,
+  the "Options come from" chooser (`options_list` / `options_source`); a list resolves at publish through the materialiser, a form
+  on serve through the linked-choices endpoint keyed `<key>.rows` and `<key>.<column>`, gated at publish by `LinkedChoiceGate`;
+  with the cascade filter row, a row set can be "the barangays with a response in form X". **Live.** Filed by `M172`.
+  **Tier: early-testing.**
+
+- **`minor` · Rows and columns cannot be added or renamed in the builder preview; the Grid tab is the only editor.**
+  The testers' comment (2026-10-15): *"if the grid can be manipulated in the preview like in kobo, it can add rows and columns in
+  the preview for easier visualization"*. The Structure canvas shows a grid's label and type only
+  (`resources/js/components/builder/BuilderCanvas.vue:206`); the preview renders the respondent control with no author
+  affordance; `M150` and `M151` gave the preview an in-place label edit (`resources/js/components/builder/InlineLabelEdit.vue`).
+  The remedy: the preview's table shows "+ Add row" and "+ Add column" and an in-place edit on every row and column header, each
+  writing through `useBuilderStore.setConfig` as the Grid tab does, with the same undo entry. **Live.** Filed by `M172`.
+  **Tier: early-testing.**
+
+- **`minor` · The Philippine Standard Geographic Code is not in the app: an author must build and upload four CSV files per form, and nothing keeps them current with the PSA's quarterly publication.**
+  The testers' question (2026-10-15): *"Does the platform support cascading options linked to the Philippine Standard Geographic
+  code (PSGC)?"*. `M141` made a PSGC-sized cascade work from uploaded CSV files (measured at 43,739 options), but no PSGC data
+  exists in the repository, each form re-uploads its own lists (`app/Services/Forms/ChoiceListMaterializer.php:148` reads them by
+  version), `docs/PRD.md:442` declined a national geography, and `docs/data-dictionary.md:370` says a reference-dataset table is
+  "deliberately not introduced here". The Philippine Statistics Authority publishes the PSGC Publication Datafile each quarter
+  (3Q 2026 released 2026-10-12; ten-digit codes kept as text; region, province or independent city, city or municipality,
+  barangay). `D131` (the user, 2026-10-15): built in, free. The remedy: a platform-wide read-only `psgc_places` table (code, name,
+  level, parent code, publication) exempt from row-level security under the shared-lookup rule
+  (`docs/adr/0002-multi-tenancy-shared-db-rls.md:73`; the platform list in `app/Support/Tenancy/TenantScopedTables.php:131`); a
+  repository CSV built from the PSA file by `psgc:build` (downloaded in a browser — the PSA site blocks scripts — PSA credited),
+  loaded idempotently by `psgc:sync` on every deploy and refusing a build whose per-level totals differ from the PSA summary; a
+  "Philippine places (PSGC)" preset in the Levels tab (`resources/js/components/builder/CascadingEditor.vue:58-102`) binding four
+  levels to platform lists that the materialiser reads at publish, so a published version stays frozen as today and a later quarter
+  changes the next publish only; a level with exactly one choice filled in and shown read-only; the dictionary sentence and the
+  PRD line amended; the operator step in `deploy.ps1`. **Live.** Filed by `M172`. **Tier: early-testing.**
+
+- **`minor` · A cascade level or a choice list cannot be filtered by what another form has recorded, so "only the barangays with a report in form X" cannot be built.**
+  The testers' question (2026-10-15): *"can options in a target form dynamically filter based on whether a specific barangay has
+  recorded value in a source form?"*. `app/Support/Forms/ShareableQuestions.php:31-39` never offers a `cascading_select` for
+  sharing; a link feeds a flat list of answers for one key (`app/Services/Forms/LinkedChoiceService.php:258-275`, served by
+  `app/Http/Controllers/Public/PublicFormSchemaController.php:60-77`) and nothing filters an existing option list by it; the
+  cascade control shows every child of the chosen parent (`resources/js/components/submissions/FieldInput.vue:331-368`). The
+  remedy: `config.levels[i].filter` and, on a list- or form-sourced choice question, `config.options_filter = {form_id, field_key,
+  mode: present | absent}`; `ShareableQuestions` admits the cascade (its shared value set is per level); the linked-choices
+  endpoint gains `sets` beside the schema with their own stamp (`D60` A), cached by the worker per version
+  (`resources/public-runtime/lib/linked-choices.ts:89-112`); the web form, manual entry and the preview filter the options
+  client-side and the server never refuses an answer outside the set (`M133`'s offline rule); `LinkedChoiceGate` refuses at
+  publish a filter whose source does not share the question or whose values are not comparable. **Live.** Filed by `M172`.
+  **Tier: early-testing.**
+
+- **`nit` · The palette's "Adv" tooltip promises an advanced editor "coming with the form engine", and the settings panel carries a baseline note no type can reach any more.**
+  `resources/js/components/builder/FieldPalette.vue:102` titles every advanced type "baseline settings (advanced editor coming
+  with the form engine)" beside the badge at `:106`; `resources/js/components/builder/ConfigPanel.vue:432-435` shows "Baseline
+  settings for this advanced field type" only when an advanced type has no editor, and every one has had its editor since the
+  form engine landed; `app/Enums/FieldType.php:120-122` says the same. The testers asked whether the Adv types are ready
+  (2026-10-15); they are, and the tooltip says otherwise. The remedy: the tooltip says what the Help page says
+  (`resources/js/components/help/manual.ts:649`), the note and the docblock go. **Live.** Filed by `M172`. **Tier: early-testing.**
+
+- **`minor` · Nothing tells an author what each question type can do on each surface, and the testers asked whether the advanced types are ready to use.**
+  The testers' question (2026-10-15): *"are the adv questions ready to use?"*. The answer lives only in code: the eleven badged
+  types (`app/Enums/FieldType.php:123-131`) render everywhere, while `duration` and `signature` are placed by the palette and
+  refused by both channels (`resources/public-runtime/lib/schema-mapping.ts:48-60`, pinned to the encode presenter by
+  `tests/Unit/Forms/FieldTypeMirrorDriftTest.php` — `R-af2d278b`), grids are excluded from conditions, piping, OCR and analytics,
+  and the Help page says only that an Adv type's settings are more technical (`resources/js/components/help/manual.ts:299`). The
+  remedy: a readiness table in Help → Builder reference, one row per type across the builder, the preview, the web form, manual
+  entry, paper and scan, the PDF, the spreadsheet export, Sheets and Airtable, analytics and conditions — pinned by the mirror
+  drift test and `manual.test.ts` so it cannot rot — written with the two controls `D134` builds. **Live.** Filed by `M172`.
+  **Tier: early-testing.**
+
+- **`minor` · A condition, a calculation or answer piping cannot read a grid cell.**
+  `docs/data-dictionary.md:378` records that no expression may reference a grid (`app/Services/Forms/ExpressionValidationGate.php`),
+  `app/Enums/PipingEligibility.php:110` excludes it from piping, and `resources/js/components/help/manual.ts:1122` tells authors so.
+  With typed cells (the grid rows above) a cell becomes a scalar an expression could read as `${grid.row.column}`; both engines
+  and their golden vectors would learn it together. Filed so the gap the typed grid opens is queued rather than left in prose.
+  **Live.** Filed by `M172`. **Tier: during-testing.**
+
+- **`minor` · A grid cannot sit inside a repeatable section.**
+  `app/Services/Forms/StructuralValidationGate.php:147-154` refuses it at publish, and `docs/data-dictionary.md:378` records the
+  rule. A table of tables is rare; a grid per household member is not. Needs the repeat-group answer shape to carry an object per
+  instance in both engines and in every export. **Live.** Filed by `M172`. **Tier: during-testing.**
+
+- **`nit` · OCR does not read a grid, typed or not, and the printed form draws it as a table nobody scans.**
+  `app/Enums/OcrFieldEligibility.php:85` excludes both grid types from reading while `app/Enums/PrintAnswerArea.php:92` prints a
+  table for them, so a scanned sheet's grid answers are always keyed by hand. With typed cells a text or number cell is a box the
+  reader already knows how to read; a choice cell is a tick. **Live.** Filed by `M172`. **Tier: during-testing.**
+
+- **`nit` · A grid is absent from analytics.**
+  `app/Enums/AnalyticsFieldEligibility.php:107` leaves both grid types out of the analytics index, so a typed grid's numbers and
+  ticks cannot be charted or counted. One column per cell in the exports (the grid export row above) is the shape the index would
+  take. **Live.** Filed by `M172`. **Tier: after-launch.**
+
+- **`nit` · The PSGC file is loaded by hand each quarter, and nothing tells the operator a new quarter is out.**
+  The built-in Philippine places (the PSGC row above, `D131`) are refreshed by downloading the PSA's quarterly file in a browser and
+  running `psgc:build`, because the PSA site blocks scripted reads; the publication held is recorded in the table, and no check,
+  notice or scheduled task compares it with the quarter. A dated note in Settings → About ("Philippine places: 3Q 2026") and a
+  reminder a few weeks after each quarter end would close it. **Live.** Filed by `M172`. **Tier: after-launch.**

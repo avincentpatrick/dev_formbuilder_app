@@ -24,10 +24,80 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D127`, the last one filed, was asked and answered on 2026-10-14 in the planning session that filed it and recorded in `M171`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D134`, the last one filed, was asked and answered on 2026-10-15 in the planning session that filed it and recorded in `M172`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D134 — Duration and Signature questions can be placed on a form and answered on neither the web form nor manual entry (`R-af2d278b`). Build the controls now, or hide the two types until after testing? **A — build both controls, in the testers' programme's last increment.**
+
+**Asked and answered 2026-10-15 (user decision, in chat), recorded by Lane A in `M172`'s claim.** The testers asked whether the "Adv" question types are ready (item 6 of their first round); the eleven badged types are, and the two that are not carry no badge.
+
+- **A — build both (recommended, chosen).** Hours/minutes/seconds boxes for Duration; a draw-to-sign pad for Signature saved as a picture through the attachment path, shown in the PDF and on the response page, a signature box on paper.
+- **B — hide both from the palette** until after testing.
+- **C — build Signature, hide Duration.**
+
+**What the answer files, in the same push:** `R-af2d278b` retiered `early-testing`, and R-96127b20, R-3e6358ed (`early-testing`).
+
+### D133 — A question used by a published version that already holds responses can be deleted from the draft; nothing warns, and nothing on a response or an export says the question was removed. What should a delete do? **A — the user's own design: the delete works in the draft; with no responses nothing more is said; with responses the dialog says how many hold answers and that the question is retired — kept on every response and export, marked "removed from the form in version N" — and the hub's Versions panel shows what changed in each version and opens an old version read-only.**
+
+**Recorded 2026-10-15 from the user's message (item 5 of the testers' first round), by Lane A in `M172`'s claim.** The user: *"there must be a way to delete that if the published form doesnt have a submission or if there is already submitted record, ask and notify the user that it will be removed from the form builder but not totally delete it, its like tagging the item to obsolete (soft delete to retain the submitted responses still available with a codicil this item/question is already removed …) but there must also a way to check the older version for history."* Measured: a delete already touches only the draft, and every response keeps its answers under its own version; what is missing is the warning, the note and the history view.
+
+- **A — the user's design (chosen).**
+- **B — refuse the delete while responses exist** (today's behaviour, with a clearer message).
+- **C — A, plus hard-delete the old version's answers when the author confirms.**
+
+**What the answer files, in the same push:** R-a44638b6 and R-52f5ad93 (`early-testing`); `R-9ea69e29` retiered `early-testing`.
+
+### D132 — When a question's key collides with another question's key — an author typed one in use, or an undo or a journal replay brought one back — what should the builder do? **A — avoid it, then auto-adjust, never refuse: the builder warns as the author types a key in use and offers the free form; a clash that still reaches the server takes a numbered suffix, the panel says so under Field key, and every rule naming the old key follows.**
+
+**Asked and answered 2026-10-15 (user decision, in chat), recorded by Lane A in `M172`'s claim.** The user: *"if we can already help the user avoid the errors, notify them or the app auto adjust the key naming to avoid conflicts"*. The main cause the testers hit — a builder tab left open across a publish — is a separate row with its own remedy (a 409 that reloads and replays the unsaved edits by key).
+
+- **A — avoid, then rename with a numbered suffix and say so (recommended, chosen).**
+- **B — refuse with a plain message that opens the Advanced tab on the key box.**
+- **C — suffix for keys the app generated, refuse for keys the author typed.**
+
+**What the answer files, in the same push:** R-733eff09 (`early-testing`); `R-4c4e35ae`, `R-31ff7ade` and `R-d85d51d2` retiered `early-testing` as folded or taken by it.
+
+### D131 — Philippine places: an author must upload one CSV per level, and the PSA publishes the official PSGC every quarter as an Excel file. Where should the data come from? **A — built in, from the PSA file, free: the quarterly Publication Datafile, downloaded in a browser, is built into a repository CSV and loaded by an operator command on every deploy; one preset in the cascade's Levels tab gives Region → Province → City/Municipality → Barangay; a published form keeps the quarter it was published with.**
+
+**Asked and answered 2026-10-15 (user decision, in chat), recorded by Lane A in `M172`'s claim.** The testers asked whether the platform supports PSGC-linked cascading options (item 2). `M141` made a PSGC-sized cascade work from uploaded files; the data itself was never shipped, because `docs/PRD.md:442` had declined a built-in national geography — this answer reverses that line for a platform-wide read-only list under the shared-lookup exemption of `docs/adr/0002-multi-tenancy-shared-db-rls.md:73`. The PSA site blocks scripted reads, so the file is fetched by hand; PSA is credited (`D112`: the free option first).
+
+- **A — built in, from the PSA file, free (recommended, chosen).**
+- **B — keep per-form uploads and hand testers four prepared PSGC CSV files.**
+- **C — read from a free third-party PSGC web service** — an outside dependency that respondents' browsers and the server would call.
+
+**What the answer files, in the same push:** R-70c7673a and R-ed7f3127 (`early-testing`); `R-7a2f4a13` retiered `early-testing`; R-bffbaa51 (`after-launch`).
+
+### D130 — A whole grid reaches a spreadsheet as one cell (`row: col=cell; …`), and Sheets and Airtable can map only that cell; Kobo gives every cell its own column. What should exports do? **A — one column per cell beside today's summary column, so no existing Sheets or Airtable mapping changes identity.**
+
+**Asked and answered 2026-10-15 (user decision, in chat), recorded by Lane A in `M172`'s claim.** It answers the second of the two questions `R-c64d0afd` recorded in `M74`; the XLSForm export already flattens a grid to one question per cell, so the spreadsheet shape follows the one the ecosystem has.
+
+- **A — one column per cell, keep the summary (recommended, chosen).**
+- **B — one column per cell only;** any existing mapping of the summary breaks.
+- **C — keep the summary only;** no change.
+
+**What the answer files, in the same push:** R-51e044a6 (`early-testing`); `R-c64d0afd` retiered `early-testing` with its first question left open.
+
+### D129 — The testers want a grid whose cells can be configured separately with different question types and option sets, rows taken from lists or shared responses, and rows and columns added in the Preview; KoboToolbox's matrix has fixed rows and typed columns, Fillout's table has typed columns and the respondent adds rows. Which do we build? **A — both: the Matrix gains typed columns, each with its own choices (rows fixed, or from a list or another form's answers); a repeatable section gains a Table layout where respondents add rows; both are drawn as real tables on wide screens.**
+
+**Asked and answered 2026-10-15 (user decision, in chat), recorded by Lane A in `M172`'s claim.** The user called the grid crucial and asked that both approaches be captured. The Table half is the description `D57` asked for before a tabular presentation could be built (`R-0a7275ce`).
+
+- **A — both: a typed Matrix plus a Table layout on repeatable sections (recommended, chosen).**
+- **B — a typed Matrix plus a separate new Table question type** — more code, and two places to answer the same thing.
+- **C — the typed Matrix only;** no respondent-added rows.
+
+**What the answer files, in the same push:** R-5033e87e, R-1c1d7266, R-bb79aec0, R-7418e6bd (`early-testing`); `R-0a7275ce` retiered `early-testing`; R-ffd10da2, R-6e807a0e, R-d713c3bf (`during-testing`), R-9ce9ca4b (`after-launch`).
+
+### D128 — The testers' first-round items (seven, 2026-10-15) and the UI programme's five remaining increments (`D123`) both want the front of the line, and `D13`'s batch and one-hub rules cannot hold a grid rebuilt across both engines. In what order are the two programmes built, and how are they batched? **A — the two errors that block the testers first (one small increment), then the UI programme's five increments, then the rest of the testers' items in five themed increments (the grid in two parts, options from anywhere, Philippine places, every type ready); both programmes in the `early-testing` tier; inside each increment every row its own commits in a stated order (`D75`), file overlap allowed, every hub named at the claim; every PR held at 6/6 green until the user says merge, after a fresh staging backup.**
+
+**Asked and answered 2026-10-15 (user decision, in chat), recorded by Lane A in `M172`'s claim.** Asked first as "the testers' programme ahead of the UI programme, in six themed increments"; the user answered *"insert the ui. complete it then this"*, and then, asked whether the two blocking errors should wait behind five UI increments, chose the blockers first. The tier is the only lever the generated line has for priority and it cannot sequence one row after another (`R-6175d935`), so the order of increments lives in the plan (`~/.claude/plans/i-have-intial-comments-quirky-pascal.md`, section E) and in every hand-off, and the tier carries the priority: the UI programme's sixteen open rows move up to `early-testing` with this entry as their reason.
+
+- **A — blockers, then the UI programme, then the rest (chosen).**
+- **B — the whole testers' programme ahead of the UI programme** (the recommendation as first put).
+- **C — strict `D13` batches** of three or four rows, about twelve increments.
+
+**What the answer files, in the same push:** R-81756e95 (`early-testing`); the sixteen UI rows retiered `early-testing`; the plan's increments T1–T6 and UI2–UI6 in the order above.
+
 ### D127 — The feedback panel's "Capture screen" takes the frame while the panel is open, so every screenshot carries the panel. How should the capture leave it out? **A — the panel steps aside: it closes for the capture, the browser's tab picker opens with this tab first, the frame is taken, and the panel returns with the text intact and the picture attached.**
 
 **Asked and answered 2026-10-14 (user decision, in chat), recorded by Lane A in `M171`'s claim.** The comment: *"when i click capture screen, the modal for the feedback is always included. i think there is a better way of doing that."* `resources/js/components/shell/FeedbackButton.vue` captures through the native Screen Capture API (`docs/adr/0015-feedback-screenshot-capture.md`) with the `MdsModal` still open.

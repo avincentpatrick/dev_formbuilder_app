@@ -443,3 +443,123 @@ it('refuses a library CAPTURE across the version boundary, which is consistency 
     enterTenant($tenant->id, $admin->id);
     expect(DB::table('field_library')->where('tenant_id', $tenant->id)->count())->toBe(0);
 });
+
+/*
+|--------------------------------------------------------------------------
+| M172 (`R-81756e95`) — a builder tab left open across a publish.
+|--------------------------------------------------------------------------
+| The testers' report: "The key has already been taken", then "That item belongs to a published version".
+| A publish clones the draft into a new one with NEW ids and the SAME keys, so a tab still holding the old
+| ids sent its UNCHANGED key against the clone and was refused on the key — the case the first test of this
+| file never reached, because it sends a new key. Every builder write now carries the draft the page was
+| loaded with (`X-Builder-Draft`), and a write from a superseded draft answers 409 `draft_superseded` with
+| the draft to reload into, before a FormRequest ever validates it.
+*/
+
+it('answers 409 draft_superseded when a stale tab saves a published field with its unchanged key', function (): void {
+    $tenant = builderTenant();
+    $admin = User::factory()->create();
+    enterTenant($tenant->id, $admin->id);
+    makeActiveMember($admin, 'admin');
+
+    [$form, $publishedField] = publishedFormWithField($tenant, $admin);
+
+    $response = $this->actingAs($admin)
+        ->withHeaders(['X-Builder-Draft' => $publishedField->form_version_id])
+        ->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$publishedField->id}", [
+            'key' => $publishedField->key, 'label' => 'Edited in a stale tab', 'is_required' => 'optional',
+            'config' => [], 'validations' => [], 'version' => null,
+        ]);
+
+    $response->assertStatus(409)
+        ->assertJsonPath('code', 'draft_superseded')
+        ->assertJsonPath('draft.id', $form->draft_version_id)
+        ->assertJsonPath('draft.version_number', 2);
+    expect($response->json('message'))->toBe('This form was published since this page loaded. Reload to keep editing.');
+
+    enterTenant($tenant->id, $admin->id);
+    expect(FormField::query()->whereKey($publishedField->id)->value('label'))->not->toBe('Edited in a stale tab');
+});
+
+it('answers 409 draft_superseded to every other write a stale tab sends', function (): void {
+    $tenant = builderTenant();
+    $admin = User::factory()->create();
+    enterTenant($tenant->id, $admin->id);
+    makeActiveMember($admin, 'admin');
+
+    [$form, $publishedField, $draftField] = publishedFormWithField($tenant, $admin);
+    $stale = ['X-Builder-Draft' => $publishedField->form_version_id];
+    $base = "http://acme.meridian.test/forms/{$form->id}";
+
+    $this->actingAs($admin)->withHeaders($stale)->deleteJson("{$base}/fields/{$publishedField->id}")
+        ->assertStatus(409)->assertJsonPath('code', 'draft_superseded');
+    $this->actingAs($admin)->withHeaders($stale)->postJson("{$base}/fields", ['field_type' => 'short_text', 'section_id' => null])
+        ->assertStatus(409)->assertJsonPath('code', 'draft_superseded');
+    $this->actingAs($admin)->withHeaders($stale)->postJson("{$base}/sections")
+        ->assertStatus(409)->assertJsonPath('code', 'draft_superseded');
+    $this->actingAs($admin)->withHeaders($stale)->postJson("{$base}/reorder", [
+        'sections' => [], 'fields' => [['id' => $publishedField->id, 'form_section_id' => null, 'sequence' => 3, 'section_sequence' => null]],
+    ])->assertStatus(409)->assertJsonPath('code', 'draft_superseded');
+
+    // Nothing reached the new draft: the stale create made no field there.
+    enterTenant($tenant->id, $admin->id);
+    expect(FormField::query()->where('form_version_id', $draftField->form_version_id)->count())->toBe(1);
+});
+
+it('answers 428 when a builder write carries no draft at all', function (): void {
+    $tenant = builderTenant();
+    $admin = User::factory()->create();
+    enterTenant($tenant->id, $admin->id);
+    makeActiveMember($admin, 'admin');
+
+    [$form, , $draftField] = publishedFormWithField($tenant, $admin);
+
+    $this->actingAs($admin)
+        ->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$draftField->id}", [
+            'key' => $draftField->key, 'label' => 'No header', 'is_required' => 'optional',
+            'config' => [], 'validations' => [], 'version' => null,
+        ])
+        ->assertStatus(428)
+        ->assertJsonPath('code', 'draft_required');
+
+    enterTenant($tenant->id, $admin->id);
+    expect(FormField::query()->whereKey($draftField->id)->value('label'))->not->toBe('No header');
+});
+
+it('answers the same 409 when the header is current but the item is not — the publish race', function (): void {
+    $tenant = builderTenant();
+    $admin = User::factory()->create();
+    enterTenant($tenant->id, $admin->id);
+    makeActiveMember($admin, 'admin');
+
+    [$form, $publishedField] = publishedFormWithField($tenant, $admin);
+
+    // A publish that commits between the header check and the service leaves exactly this request: the draft
+    // the header names IS current by then, and the bound row is not in it.
+    $this->actingAs($admin)
+        ->withHeaders(builderHeaders($form))
+        ->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$publishedField->id}", [
+            'key' => $publishedField->key, 'label' => 'Raced', 'is_required' => 'optional',
+            'config' => [], 'validations' => [], 'version' => null,
+        ])
+        ->assertStatus(409)
+        ->assertJsonPath('code', 'draft_superseded')
+        ->assertJsonPath('draft.id', $form->draft_version_id);
+});
+
+it('refuses a reorder naming an item outside the draft instead of answering a silent 200', function (): void {
+    $tenant = builderTenant();
+    $admin = User::factory()->create();
+    enterTenant($tenant->id, $admin->id);
+    makeActiveMember($admin, 'admin');
+
+    [$form, $publishedField] = publishedFormWithField($tenant, $admin);
+
+    $this->actingAs($admin)
+        ->withHeaders(builderHeaders($form))
+        ->postJson("http://acme.meridian.test/forms/{$form->id}/reorder", [
+            'sections' => [], 'fields' => [['id' => $publishedField->id, 'form_section_id' => null, 'sequence' => 3, 'section_sequence' => null]],
+        ])
+        ->assertStatus(409)
+        ->assertJsonPath('code', 'draft_superseded');
+});

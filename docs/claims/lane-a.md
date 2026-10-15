@@ -16,7 +16,117 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M169`, a point or a comma stays on the word Vision read it after (`m169-ocr-punctuation-spacing`)
+## Status: ACTIVE CLAIM — `M172`, the two errors that block the testers: a builder tab left open across a publish, and what a delete says when responses hold the answers (`m172-testers-blockers`)
+
+Taken 2026-10-15 by the planning session (Fable) that planned the testers' seven first-round items
+(`~/.claude/plans/i-have-intial-comments-quirky-pascal.md`), under the testing freeze of 2026-10-13: this session writes the claim
+and the branch's first commit — the decisions `D128`–`D134`, the rows, the regenerated line — and the next session (Opus) builds
+on the same branch under this claim, extending it before opening any file not listed here. Branch `m172-testers-blockers`, cut from
+origin/main after this claim lands (the trunk read while planning was `0432d03b`), PR into main; nothing merges until the user says
+so, after a fresh staging backup (`D128`, the `D123` shape). The order of record (`D128`): this increment, then the UI programme's
+five remaining increments (`D123`), then the plan's T2–T6. ⚠️ The user's checks of `M170` (builder autosave, PR #363) and `M171`
+(the three UI fixes, PR #364) are still owed and open the build session before any step that depends on them.
+
+Rows taken (filed on the branch by this increment; ids are the title hashes): R-81756e95 (a builder tab left open across a publish is
+refused on the key, then on the published version, and a reload loses the edits), R-733eff09 (a key clash refused instead of avoided,
+shown on a tab the selection never opens — `D132`; folds `R-4c4e35ae`, takes `R-31ff7ade` and `R-d85d51d2` where the files
+coincide), R-a44638b6 (a delete that leaves answers behind says nothing — `D133`; the delete half of `R-9ea69e29`, the key half in
+R-733eff09), R-52f5ad93 (what changed between versions, and an old version opened read-only). Filed and NOT taken — the plan's later
+increments, in order after the UI programme: the grid part 1 (R-5033e87e, R-1c1d7266, R-51e044a6); options from anywhere (R-f655f9b1, R-3e7c81bb,
+R-596d6afd, R-d8c2ce84); the grid part 2 (R-bb79aec0, R-7418e6bd, `R-0a7275ce`); Philippine places (R-70c7673a, R-ed7f3127, `R-7a2f4a13`,
+`R-bbf03029` if its count is zero); every type ready (`R-af2d278b`, R-96127b20, R-3e6358ed); and at lower tiers R-ffd10da2, R-6e807a0e,
+R-d713c3bf, R-9ce9ca4b, R-bffbaa51. The sixteen UI rows (`R-fd7b8879`, `R-ba9d6349`, `R-8ee7d2dc`, `R-14971e37`, `R-348f997c`,
+`R-7b8a74ae`, `R-fb647b5e`, `R-10b38d6d`, `R-3d51f0ae`, `R-66952d33`, `R-2ce2f274`, `R-c7247dbf`, `R-49813d21`, `R-3ca62317`,
+`R-f724595b`, `R-9d3c2439`) are retiered `early-testing` with `D128` as the reason and keep their content.
+
+### Evidence verified
+- Opened on the trunk at `0432d03b` in the planning session (no running probe; the first real-browser two-tab publish is part of
+  the build's proof): `app/Http/Requests/Forms/UpdateFieldRequest.php:53-58` — the key's uniqueness is checked against
+  `$form->draft_version_id` ignoring only `$field->id`: held. `app/Services/Forms/FormBuilderService.php:592-597`
+  (`assertDraftChild()`) and `:645-666` (`assertStillDraftChild()`, which re-reads and tells a removed row from a published one):
+  held. `app/Services/Forms/PublishService.php:175-186` — the just-published draft is cloned into a new draft, "same keys, new
+  ids": held. `app/Exceptions/Forms/FormException.php:67-70` — the message: held, and its docblock already records that the
+  surface returns 422, not 403. `app/Http/Controllers/Tenant/FormBuilderController.php:229-242` — 409 + the fresh row for
+  `BuilderConflictException`, 422 + a bare message for `FormException`: held; `:225`'s docblock says the builder "refetches" on
+  that 422, and no refetch exists under `resources/js/components/builder` (grep: the only `refetch` is the library list).
+  `resources/js/components/builder/useBuilderStore.ts:136` (the burst verdict), `:151-162` (`saveState`), `:946-954`
+  (`settled()`: a refusal is not unsaved, so no Retry): held. `resources/js/components/builder/ConfigPanel.vue:76-81` (the
+  "Select it to see why" line at `:80`), `:163-173` (every selection resets to Basics), `:413-417` (the alert), `:605-612` (the key
+  error inline on Advanced only): held. `resources/js/Pages/forms/Builder.vue:201-222` — publish returns silently when
+  `saveState === 'failed'`: held. `resources/js/components/builder/edit-journal.ts:88-93` — the journal is keyed by the draft id,
+  by design: held. `app/Services/Forms/BuilderPresenter.php:83-86` — `draft: {id, version_number}` already reaches the page: held.
+  `docs/feature-backlog.md:2974-2976` — Inertia serves Back from history without a document load: held; `package.json` pins
+  `@inertiajs/vue3` `^3.6.0` and nothing under `resources/js` names `encryptHistory` or `popstate`.
+- Read by the exploration agent and NOT re-opened by this session — the build session opens each before relying on it:
+  `FormBuilderService.php:308-320` (the hard delete), `:317`, `:332`, `:367`, `:409`, `:523` (the other callers of the draft
+  guard), `:551-575` (reorder's silent no-op), `:903-928` (`uniqueKey()`, `copyKey()`); `useBuilderStore.ts:287-305`, `:986-1010`
+  (undo and the journal re-send kept keys); `tests/Feature/Forms/BuilderDraftGuardTest.php:66-84` (sends a NEW key);
+  `app/Services/Forms/FormHubPresenter.php:87-92` and `resources/js/Pages/forms/Show.vue:444-487` (the Versions panel);
+  `app/Services/Submissions/SubmissionInboxPresenter.php:251-295`; `app/Services/Submissions/SubmissionRowProjector.php:82`
+  (`resolveColumns()` — opened: held); `app/Services/Forms/SchemaChangeClassifier.php` (`change_summary` by key).
+
+### Premise verified
+- One session only (the user, 2026-10-13); this planning session ends before the build session starts, and the build continues
+  this branch rather than cutting a second one.
+- The client never creates a key: every key comes from the server (`uniqueKey()` / `copyKey()`), and every field save re-sends
+  `key` (`useBuilderStore.ts`'s `fieldPayload()`), which is why a stale id reads as a clash on an unchanged key.
+- The builder's writes carry no draft id today: no `draft_version` or `draftVersion` under `resources/js/components/builder`
+  (measured), while the page already holds `draft.id` — the remedy needs no new prop.
+- `M170`'s journal, Retry and "signed out" machinery is the thing to extend, not replace; the journal's per-draft key is a
+  deliberate design (its own comment says why), so re-keying it by form must carry the field key, which a publish keeps.
+- `R-036f3226` records the optimistic-concurrency token as client-optional; the draft id must not be optional, or a client that
+  omits it gets today's behaviour.
+- `D133` is the user's own design, recorded from their message; `D132` the user's words. Both are answered, so no row Awaits them.
+- `routes/tenant.php` is a hub (17 open rows cite it); `FormBuilderService.php`, `FormBuilderController.php`,
+  `UpdateFieldRequest.php`, `ConfigPanel.vue` and `Builder.vue` are hubs too — `D128` allows it inside this programme's increments
+  with every hub named here, each row in its own commits in a stated order.
+
+### Remedy verdict
+Measured by reading; the build session measures each live before writing its test.
+- The 409 before validation: a controller-level comparison of a request field (or header) with `$form->draft_version_id`, thrown
+  as a sibling of `BuilderConflictException` so `respond()`'s existing 409 arm carries it with the new draft's id and number —
+  works. Scoping the two uniqueness rules to the bound row's own version is one line each — works, and ALONE it would only turn the
+  symptom into the draft-guard 422, which is why the 409 comes first.
+- Replay by key: `edit-journal.ts` entries carry kind and id; adding the field key is additive, and the put-back after a reload
+  resolves the new id by key — works; the journal's storage key moves from the draft id to the form id.
+- The Back button: Inertia 3 restores a history entry without a server round trip; the builder page re-fetches its props on that
+  restoration (`router.on('navigate')` with a history-restored visit, or a `popstate` reload) — **most likely wrong in its
+  mechanism**, measured in a real browser before the test is written.
+- The suffix: `copyKey()`'s loop already finds the lowest free suffix — reused on a clash in `updateField()`; the response
+  carries the key kept and a notice. Rules naming the old key follow by the existing `resolveValidationSiblings()` path, which
+  today nulls a missing key (`R-9ea69e29`) — the write-through is the row's remedy.
+- The retired note: `SchemaChangeClassifier` computes `change_summary` by key at publish; the response page needs the current
+  published version's key set — one query — and the projector already unions keys across versions, so the header tag is a label
+  change, not a shape change. Works.
+- The Versions panel's View: the Print blank route already resolves a version's `schema_snapshot` (`routes/tenant.php:576`); a
+  sibling route renders it through the preview runtime read-only — works.
+
+Files: `app/Http/Controllers/Tenant/FormBuilderController.php`, `app/Http/Requests/Forms/UpdateFieldRequest.php`,
+`app/Http/Requests/Forms/UpdateSectionRequest.php`, `app/Services/Forms/FormBuilderService.php`,
+`app/Exceptions/Forms/FormException.php` (and a sibling exception for the superseded draft),
+`app/Services/Forms/FormHubPresenter.php`, `app/Services/Submissions/SubmissionInboxPresenter.php`,
+`app/Services/Submissions/SubmissionRowProjector.php`, `app/Services/Forms/BuilderPresenter.php`, `routes/tenant.php`;
+`resources/js/components/builder/builderClient.ts`, `useBuilderStore.ts`, `edit-journal.ts`, `ConfigPanel.vue`,
+`ConflictDialog.vue` (and a sibling dialog), `field-save-errors.ts`, `resources/js/Pages/forms/Builder.vue`,
+`resources/js/Pages/forms/Show.vue`; `tests/Feature/Forms/BuilderDraftGuardTest.php` and new Pest, Vitest and one new e2e spec;
+`docs/form-versioning-schema-migration.md` ("a key is never renamed" becomes the suffix rule); on the branch's first commit:
+`docs/claims/decisions.md` (`D128`–`D134`), `docs/feature-backlog.md` (twenty-two rows, twenty-seven amendments),
+`docs/pipeline.md`; close-out on the branch: `PROGRESS.md`, `docs/pipeline.md`; this file on main.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`,
+`docs/form-versioning-schema-migration.md`, `PROGRESS.md` (own block), one new `tests/e2e/*.spec.ts`.
+Paired files taken: none.
+Namespaces spent: `D128`–`D134` (asked and answered in the planning session, 2026-10-15; filed on the branch); nothing from the ADR
+or migration namespaces — no schema change.
+Prediction: a Pest case that sends the UNCHANGED key against a published field's id is red on the trunk with "The key has already
+been taken" and green with 409 `draft_superseded`; a Pest case for the server-side suffix is red on the trunk (422) and green
+after; the Vitest cases for the dialog, the replay by key, the inline key warning and the alert's per-question reasons are red on
+the trunk; the e2e two-tab case (tab B publishes from the hub, tab A edits) is red on the trunk with the key message. Mutations,
+each committed: the draft-id comparison dropped (the Pest case red), the replay dropped (Vitest red), the suffix dropped (Pest
+red), the retired note dropped (Pest red). PHPStan moves (new `app/` code) and is run in the container before the push. **Most
+likely wrong:** the Back-button mechanism — Inertia may already re-fetch a page whose component sets no `preserveState`, in which
+case the history case is green on the trunk and the remedy shrinks to the 409.
+
+## HELD — `M169`, a point or a comma stays on the word Vision read it after (`m169-ocr-punctuation-spacing`)
 
 Taken 2026-10-13, after the user's "no merge, no deploy while testing is on": this claim builds, opens the PR and gets it green,
 then stops — nothing merges until the user lifts the freeze. Branch `m169-ocr-punctuation-spacing`, cut from origin/main at

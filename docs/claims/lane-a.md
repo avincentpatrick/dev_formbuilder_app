@@ -175,6 +175,15 @@ E2E specs this diff reaches, run locally and named here: `builder-draft-supersed
 `builder-preview-authoring`, `builder-axe`, `media-input-hidden-text`, `list-layout`, `responsive-axe`.
 Paired files taken: none. Namespaces: none (no migration, no ADR, no decision).
 
+### Extension 2 — `composer.lock`, for an advisory published during the build (pushed before the lock is opened)
+
+CI's Composer audit went red on the PR's second run (`38715293587`, Static analysis) and green on its first, 25 minutes earlier: a
+new advisory, CVE-2026-108082 (PKSA-xmwy-rmx5-m7h4, a ReDoS in `HeaderUtils::split()` reachable through the `Cache-Control` request
+header), covers the locked `symfony/http-foundation` v8.1.1 (fixed in 8.1.7). It reds every branch and the trunk's own post-merge run
+until the lock moves, and nothing in this increment caused it. File added: `composer.lock` (a patch-level update of that one
+package, `composer update symfony/http-foundation --no-install`, so the vendor a live local E2E run is serving is not touched).
+`composer.json` is not changed. The user approved merging this increment and `M169` in this session, after a fresh staging backup.
+
 ## HELD — `M169`, a point or a comma stays on the word Vision read it after (`m169-ocr-punctuation-spacing`)
 
 Taken 2026-10-13, after the user's "no merge, no deploy while testing is on": this claim builds, opens the PR and gets it green,

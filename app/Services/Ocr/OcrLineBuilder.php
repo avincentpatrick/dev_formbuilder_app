@@ -98,7 +98,7 @@ final class OcrLineBuilder
                 return new OcrSymbol($s->text, $s->confidence, $a, $b, $c, $d);
             }, $w->symbols);
 
-            return new OcrWord($w->text, $w->confidence, $x0, $y0, $x1, $y1, $this->wrap($w->angle + $turn), $symbols, $w->source ?? $w);
+            return new OcrWord($w->text, $w->confidence, $x0, $y0, $x1, $y1, $this->wrap($w->angle + $turn), $symbols, $w->source ?? $w, $w->spaced);
         }, $page->words);
 
         return $turns % 2 === 1
@@ -163,7 +163,7 @@ final class OcrLineBuilder
         }, $word->symbols);
 
         // `$angle` arrives already negated (the caller passes minus the tilt), so it is ADDED here.
-        return new OcrWord($word->text, $word->confidence, $x0, $y0, $x1, $y1, $word->angle + $angle, $symbols, $word->source ?? $word);
+        return new OcrWord($word->text, $word->confidence, $x0, $y0, $x1, $y1, $word->angle + $angle, $symbols, $word->source ?? $word, $word->spaced);
     }
 
     /**

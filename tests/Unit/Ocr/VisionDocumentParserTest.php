@@ -12,15 +12,35 @@ use App\Services\Ocr\VisionDocumentParser;
 | a zero coordinate is OMITTED from the JSON, so a word touching the page edge arrives without its `x`.
 */
 
-/** @return array<string, mixed> one word with explicit vertices */
-function visionParserWord(string $text, array $vertices, float $confidence = 0.9, string $kind = 'vertices'): array
+/**
+ * One word with explicit vertices. `$break` is the break Vision marks after the word's LAST character (`SPACE`,
+ * `LINE_BREAK`, …), or null for none — Vision then omits `property` altogether.
+ *
+ * @return array<string, mixed>
+ */
+function visionParserWord(string $text, array $vertices, float $confidence = 0.9, string $kind = 'vertices', ?string $break = null): array
 {
     $symbols = [];
     foreach (mb_str_split($text) as $char) {
         $symbols[] = ['text' => $char, 'confidence' => $confidence, 'boundingBox' => [$kind => $vertices]];
     }
+    if ($break !== null) {
+        $symbols[count($symbols) - 1]['property'] = ['detectedBreak' => ['type' => $break]];
+    }
 
     return ['confidence' => $confidence, 'boundingBox' => [$kind => $vertices], 'symbols' => $symbols];
+}
+
+/** @return list<array<string, mixed>> the words, each `[text, break]`, laid side by side on one line */
+function visionParserRun(array $words): array
+{
+    $out = [];
+    foreach ($words as $i => [$text, $break]) {
+        $x = 100 + 60 * $i;
+        $out[] = visionParserWord($text, [['x' => $x, 'y' => 100], ['x' => $x + 50, 'y' => 100], ['x' => $x + 50, 'y' => 130], ['x' => $x, 'y' => 130]], 0.9, 'vertices', $break);
+    }
+
+    return $out;
 }
 
 it('normalises a photo\'s pixel boxes to the page and keeps each character\'s confidence', function (): void {
@@ -89,6 +109,55 @@ it('measures a tilted word\'s baseline in the page\'s real proportions', functio
     $word = (new VisionDocumentParser)->pages($body)[0]->words[0];
 
     expect(round($word->angle, 6))->toBe(round(atan2(10, 100), 6));
+});
+
+it('spaces a word only where Vision marked a break after its last character (M169, R-27049032)', function (): void {
+    // "STA. MESA" as Vision reads handwriting: the point is a word of its own, and no break is marked between it and
+    // the word it was written against. Every kind of break is a space; a break is only ever on the last character.
+    $body = ['responses' => [['fullTextAnnotation' => ['pages' => [[
+        'width' => 1000,
+        'height' => 1000,
+        'blocks' => [['paragraphs' => [['words' => visionParserRun([
+            ['STA', null],
+            ['.', 'SPACE'],
+            ['MESA', 'EOL_SURE_SPACE'],
+            ['JR', null],
+            ['.', 'LINE_BREAK'],
+            ['END', 'SPACE'],
+        ])]]]],
+    ]]]]]];
+
+    $words = (new VisionDocumentParser)->pages($body)[0]->words;
+
+    expect(array_map(static fn ($w): array => [$w->text, $w->spaced], $words))->toBe([
+        ['STA', false],
+        ['.', true],
+        ['MESA', true],
+        ['JR', false],
+        ['.', true],
+        ['END', true],
+    ]);
+});
+
+it('spaces a paragraph\'s last word whatever its last character says, so two paragraphs are never run together', function (): void {
+    // The line builder puts words of different paragraphs on one line — a label at the margin, a key stamp at the
+    // right — and only within a paragraph does a missing break mean the next word follows on.
+    $body = ['responses' => [['fullTextAnnotation' => ['pages' => [[
+        'width' => 1000,
+        'height' => 1000,
+        'blocks' => [
+            ['paragraphs' => [['words' => visionParserRun([['NAME', null], [':', null]])]]],
+            ['paragraphs' => [['words' => visionParserRun([['field_1', null]])]]],
+        ],
+    ]]]]]];
+
+    $words = (new VisionDocumentParser)->pages($body)[0]->words;
+
+    expect(array_map(static fn ($w): array => [$w->text, $w->spaced], $words))->toBe([
+        ['NAME', false],
+        [':', true],
+        ['field_1', true],
+    ]);
 });
 
 it('keeps a blank page as a page, and degrades a malformed answer to nothing read rather than an exception', function (): void {

@@ -21,9 +21,23 @@ final readonly class OcrLine
         public array $words,
     ) {}
 
+    /**
+     * The line's words, with a space after each the provider spaced (M169, `R-27049032`): a point or a comma written
+     * against a word is read as a word of its own, and "JR" then "." is "JR." rather than "JR .".
+     */
     public function text(): string
     {
-        return implode(' ', array_map(static fn (OcrWord $w): string => $w->text, $this->words));
+        $text = '';
+        $previous = null;
+        foreach ($this->words as $word) {
+            if ($previous !== null && $previous->spaced) {
+                $text .= ' ';
+            }
+            $text .= $word->text;
+            $previous = $word;
+        }
+
+        return $text;
     }
 
     public function centerY(): float

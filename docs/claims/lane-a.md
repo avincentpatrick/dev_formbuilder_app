@@ -18,6 +18,37 @@ Standing Rule 7(b-bis).
 
 ## Status: ACTIVE CLAIM — `M173`, full width: the shell and the settings pages (`R-fd7b8879`, `R-ba9d6349`, `R-14971e37`, `R-8ee7d2dc`) (m173-ui2-full-width-shell-settings)
 
+**BUILT — PR #366, CI 6/6 green with real step counts (run 38779366161 at `0344375a`: Static analysis 32 · E2E 20 · Contract 16 ·
+Frontend 12 · Pest 11 · axe 11; the only skips are the two main-only staging-header steps and the failure-only report upload; the
+first run, at `5370ce3b`, was 6/6 too) — AND NOT MERGED: held for the user's word under the testing freeze.** The branch carries the
+four rows' closures, the status bullet and the regenerated line and hand-off. A merge needs the user's word and a fresh staging backup
+first; then the release below this heading and the gate baselines from the post-merge run. Measured against the prediction:
+- **Red first, exactly as predicted.** 34 Vitest cases red on the trunk (AppLayout 11, settings 17, the form tab 1, scans 3, scan status
+  2); the 5 `list-layout.spec.ts` cases red in a real browser — `/submissions` 1600 in a 1680px region at 1920, `/settings` and
+  `/admin/settings` one column at 1440, the form tab's boxes 934px (predicted about 936), the scans upload card and every row 720px.
+- **Mutants, eight, all caught, each turning only its own case red:** Vitest — the shell cap back, `AccessCard`'s 640px back, a danger
+  token back (1 case each); e2e, each run against all five cases — the shell cap (1600 in 1680), the 36rem floor (one column at 1440),
+  the field measure dropped (1382px boxes), the scans list a column (a row the whole 984px list); and the save-row measure dropped (both
+  the Vitest pin and the e2e case).
+- **Most likely wrong — it held.** The 30rem floor gives 2 columns at 1440, 3 at 1920 and 4 at 2560, measured; nothing overflowed in the
+  personalization sweep.
+- **Not predicted:**
+  - **The real-browser look found a defect the tests did not:** `D135`'s rule held the boxes at 48rem and left each panel's Save button
+    right-aligned in a full-width row — 614px from its boxes at 1920, about 1,500px at 2560. The four save rows the panels render
+    (`.settings-panel__actions`, `.data-sharing__actions`, `.scope-panel__actions`, `.share__slug-actions`) take the same measure; red
+    first (Save at 1851 against boxes ending at 1237), then the eighth mutant.
+  - **My edits rotted four ledger citations past the ceiling (21 against 17).** Re-pointed six by reading and dropped three dead numbers
+    in the rows this increment closes; one shifted citation (`list-layout.spec.ts`'s header, moved one line by an import) pointed at a
+    non-blank line, so the gate could not see it — found by reading every citation into a moved file.
+  - **Local e2e (the specs the diff reaches): 362 passed, 19 skipped, 6 failed** — all six `Sheets rule detail — drift`, on stale local
+    data: the local Sheets connection has been `refresh_failed` since 2026-08-25, so the page shows the reconnect notice and "Review
+    columns" never renders. CI seeds fresh and passed it.
+  - Left as found: `FormCard.vue`'s note records a dated measurement, true as history; the console's platform settings at 1920 leave the
+    first row's third track empty, because the Save foot keeps its place between the editable cards and the read-only About card; the SSO
+    page's grid was not seen in a browser (no e2e seed is entitled to SSO) and is pinned by source.
+- Pint passed; PHPStan cannot move (no `app`, `database` or `routes` change); `vue-tsc` clean; full Vitest 222 files, 3,646 tests;
+  `preflight --with-gates --with-pint` OK; the docs tests green but the recorded bind-mount artefact.
+
 Taken 2026-10-15 under the testing freeze of 2026-10-13: this claim builds, opens the PR and gets it green, then stops —
 nothing merges until the user says so, after a fresh staging backup (`D123`, `D128`). Branch `m173-ui2-full-width-shell-settings`,
 cut from origin/main at this claim's commit (parent `b017b667`; `M172` and `M169` are merged), PR into main. It is UI2, the

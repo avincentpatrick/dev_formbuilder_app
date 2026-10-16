@@ -32,7 +32,7 @@ Several of these are **real XLSForm round-trip import failures today** — a Kob
 
 | Item | Priority | Phase | Note |
 |---|---|---|---|
-| `or_other` "please specify" write-in on select fields | should | 2 (or 1 — additive to `config` jsonb, low cost) | XLSForm `or_other` modifier silently dropped on import today |
+| `or_other` "please specify" write-in on select fields | should | 2 (or 1 — additive to `config` jsonb, low cost) | XLSForm `or_other` modifier silently dropped on import today — queued as `R-71509975` (the testers' round 2, `D138`'s R2) |
 | Slider / range (bounded numeric) field type | should | 2 | XLSForm `range` type; a Kobo form using it fails import |
 | Ranking / ordering (drag-to-rank) field type | should | 2 | XLSForm `rank` type; standard survey question with no workaround |
 | Rating / star scale field type | should | 2 | Distinct from `likert_scale`'s radio rows; expected on CSAT/feedback forms |
@@ -12773,7 +12773,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   available for manual entry yet". The builder offers both types, and `CapabilityFlags` counts `duration` as
   extractable, so a scanned sheet carries a duration answer that `M129`'s review lists as not carried rather than
   saving a value the reviewer cannot see. The remedy is a control in both channels at once, which the mirror test
-  makes one change. **Live.** Filed by `M129`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the testers asked whether the advanced types are ready (item 6, 2026-10-15); `D134` builds both controls in the testers' programme's last increment, after the UI programme (`D128`).**
+  makes one change. **Live.** Filed by `M129`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the testers asked whether the advanced types are ready (item 6, 2026-10-15); `D134` builds both controls in the testers' programme's last increment, after the UI programme (`D128`).** **Narrowed 2026-10-16 by `D140` (which changes `D134`): Duration leaves the palette and is not built — a duration is worked out by a calculation (`R-22011569`, `R-f77aa45d`) — so this row builds the Signature control only; an existing Duration question keeps working as it does today.**
 
 - **`minor` · A note copied with its content-block images, by save as template, a template or the field library,
   points at images another form owns, so the copy cannot publish until each image is uploaded again.** Found by
@@ -13136,7 +13136,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the last — step by step, one page, and page breaks — and its option A said to *file "tabular" as a product idea*, which
   no row did until now. `D57`'s recommendation also says a tabular mode should be asked for again on its own evidence,
   because nothing has described what it would show; the first step is that description from the user. **Live.**
-  Filed by `M135`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: `D129` is the description `D57` asked for — a repeatable section laid out as a table where respondents add rows, Fillout's shape — and the grid's second increment builds it (`D128`).**
+  Filed by `M135`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: `D129` is the description `D57` asked for — a repeatable section laid out as a table where respondents add rows, Fillout's shape — and the grid's second increment builds it (`D128`).** **Amended 2026-10-16 by `D140`: Yes/No leaves the palette, so the table offers no yes/no column type — a Single choice column with the Yes / No options preset takes its place.**
 
 - ✅ **CLOSED BY `M137` (2026-10-06) — ****`minor` · An image added to a note does not appear in the builder's preview until the page is reloaded.** Found by
   `M137` from the staging smoke test (comment 17, marked fail: *"image did not reflect in the preview instantly, i
@@ -14237,7 +14237,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   app version in `browser_info`, the title shown as a link on both lists and matched by the keyword filter; `docs/data-dictionary.md`
   §21 and the enum catalog row (gated by `tests/Feature/Docs/DocumentedEnumCatalogDriftTest.php`). Mutations: the hide dropped → Vitest
   red; `type` dropped from the payload → Pest red; the CHECK dropped → the drift test red. **Live.** Filed by `M171`.
-  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
+  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Taken by F (`M175`), 2026-10-16: `D138` puts the feedback mechanism first and makes `D128`'s UI4 the increment F, with `R-9bfd832e`, `R-78f43f26` and `R-f3fb2522`.**
 
 - **`minor` · The product shows no user-facing version and has no "What's new": Settings → About reads "dev" on the testing server, and a user learns of a change only by noticing it.**
   The user's request (2026-10-14): *"lets also have a what's new prompt to users for new login so users are aware for every changes.
@@ -14389,7 +14389,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   engines (`app/Services/Validation/SemanticValidator.php` and its TypeScript twin, the golden vectors in
   `docs/architecture/technical-architecture.md`) check membership per column list; `ValueShape` (`app/Enums/ValueShape.php:171-191`)
   and the gates learn the column shape; the Grid tab's editor gains the per-column type; the data dictionary and the enum
-  docblock say what is true. **Live.** Filed by `M172`. **Tier: early-testing.**
+  docblock say what is true. **Live.** Filed by `M172`. **Tier: early-testing.** **Amended 2026-10-16 by `D140`: Yes/No leaves the
+  palette, so a column offers no `yes_no` type — a yes/no column is a Single choice column with the Yes / No options preset.**
 
 - **`minor` · A grid is drawn as a stack of row cards, never as a table, on the web form, manual entry and the builder preview.**
   `resources/js/components/submissions/MatrixGrid.vue:9-13` states "NO `<table>` — each row is its own nested `<fieldset>`", and
@@ -14602,7 +14603,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   reads the address and the token from a file outside the repository, downloads New and Ongoing reports with their screenshots into
   the session's scratchpad, prints a digest (id, type, reporter, page address, remarks, screenshot), and pushes back with
   `--ongoing` and `--resolve` and a note. `routes/api.php` and `openapi.json` are hubs. **Live.** Filed by `M174`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** **Re-hosted 2026-10-16 by `D141` (asked while planning F): on the testing server the central host is the
+  agency's website, reachable only from the box through its hosts file, so the API answers on any platform host — the workspace host
+  included, a custom domain refused — opened only by the platform support token; the console stays on the central host.**
 
 - **`minor` · A session starts without looking at the testers' feedback, so a report waits unseen until the user relays it.**
   `CLAUDE.md`'s "Start every session" runs `scripts/preflight.php` and `scripts/state.php`, and neither reads `feedback_reports`.

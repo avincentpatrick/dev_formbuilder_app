@@ -29,7 +29,11 @@ in `composer run quality` — do not "fix" that by registering them.
 ## The trunk
 
 - `main` is the trunk. `git fetch && git checkout -b <branch> origin/main` — **never** from local `HEAD`.
-- PR into `main`. Self-merge on **6/6 green**, with each job's step count parsed individually.
+- PR into `main`. ⛔ **Merge only at a planned merge point, never a lone small PR** — every green run on `main`
+  deploys under the testers. Between merge points a PR waits green. At a merge point, **after the user has run the
+  staging backup block**, merge the batch in order, each PR on **6/6 green** with each job's step count parsed
+  individually, and each only once the previous deploy has finished and the site answers.
+- ⛔ **Migrations are additive only:** no dropped table or column, no truncate, no row delete. Staging data is never removed.
 - One worktree per agent. Never two sessions in one checkout. Never `checkout` a branch another
   worktree holds.
 

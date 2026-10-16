@@ -501,3 +501,37 @@ test('A response — the facts sit beside the answers, and the sections two acro
     expect(tops.length, 'the response rendered fewer than two sections').toBeGreaterThanOrEqual(2);
     expect(tops[1], `two sections side by side: ${JSON.stringify(tops)}`).toBe(tops[0]);
 });
+
+test('Webhook and integration rule — the cards sit beside the delivery log at 1920', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto('/webhooks', { waitUntil: 'networkidle' });
+    await page.locator('tr').filter({ hasText: 'Zapier' }).getByRole('button', { name: 'View endpoint' }).click();
+    await page.waitForURL(/\/webhooks\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+    await settlePaint(page);
+    expectBeside(await box(page.locator('section.detail__log')), await box(page.locator('.detail__grid')), 'the webhook at 1920');
+
+    await page.goto('/integrations', { waitUntil: 'networkidle' });
+    await page.locator('tr').filter({ hasText: 'New submissions' }).getByRole('button', { name: 'View rule' }).click();
+    await page.waitForURL(/\/integrations\/rules\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+    await settlePaint(page);
+    expectBeside(await box(page.locator('section.detail__log')), await box(page.locator('.detail__grid')), 'the rule at 1920');
+});
+
+test.describe('the console workspace page', () => {
+    test.use({ storageState: 'tests/e2e/.auth/admin.json' });
+
+    test('the workspace and plan cards sit beside the sections at 1440', async ({ page }, info) => {
+        test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+        // The console's padding is 24px a side, so a 1440 window already gives the page 1392px — past 75rem.
+        await openConsole(page, '/admin/tenants');
+        await page.getByRole('link', { name: /acme|Acme Research/i }).first().click();
+        await page.waitForURL(/\/admin\/tenants\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+        await settlePaint(page);
+
+        const usage = page.locator('.mds-card').filter({ has: page.getByRole('heading', { name: 'Usage', level: 2 }) });
+        expectBeside(await box(usage), await box(page.locator('.admin-td__grid')), 'the console workspace at 1440');
+    });
+});

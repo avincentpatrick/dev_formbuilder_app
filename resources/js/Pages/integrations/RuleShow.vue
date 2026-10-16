@@ -119,7 +119,7 @@ function formatDate(iso: string | null): string {
 </script>
 
 <template>
-    <div>
+    <div class="detail">
         <Head :title="`Integration rule · ${rule.name}`" />
 
         <PageHeader :title="rule.name" icon="plug">
@@ -144,153 +144,159 @@ function formatDate(iso: string | null): string {
             </template>
         </PageHeader>
 
-        <div class="detail__grid">
-            <MdsCard>
-                <template #header><h2 class="detail__card-title">Routing</h2></template>
-                <dl class="detail__meta">
-                    <div class="detail__meta-row">
-                        <dt>Status</dt>
-                        <dd><MdsBadge v-bind="statusVariant(rule.status)" dot /></dd>
-                    </div>
-                    <div class="detail__meta-row">
-                        <dt>Workspace</dt>
-                        <dd>{{ connection?.external_account_label ?? 'Removed' }}</dd>
-                    </div>
-                    <div class="detail__meta-row">
-                        <!-- "Destination", not "Channel" (H16c). This row read `Channel` and rendered
-                             `channelLabel`, so EVERY tabular rule showed an em dash under a heading naming a
-                             concept its provider does not have — a Sheets defect H16b shipped and Airtable
-                             would have doubled. `destination_label` is server-resolved for all three
-                             providers; the channel pair stays the fallback for a rule stored before it. -->
-                        <dt>Destination</dt>
-                        <dd class="detail__mono">{{ rule.destination_label ?? channelLabel }}</dd>
-                    </div>
-                    <div class="detail__meta-row">
-                        <dt>Events</dt>
-                        <dd>{{ eventLabels.length ? eventLabels.join(', ') : '—' }}</dd>
-                    </div>
-                    <div class="detail__meta-row">
-                        <dt>Scope</dt>
-                        <dd>
-                            <Link v-if="rule.form_url" :href="rule.form_url" class="scope-link">{{ rule.form_title }}</Link>
-                            <template v-else>{{ rule.form_title ?? 'All forms' }}</template>
-                        </dd>
-                    </div>
-                </dl>
-            </MdsCard>
+        <!-- M174 (`R-7b8a74ae`): the cards first in the DOM, as before; from a 75rem container they sit in a column
+             beside the notice and the log (the `<style>` block says how). -->
+        <div class="detail__layout">
+            <div class="detail__grid">
+                <MdsCard>
+                    <template #header><h2 class="detail__card-title">Routing</h2></template>
+                    <dl class="detail__meta">
+                        <div class="detail__meta-row">
+                            <dt>Status</dt>
+                            <dd><MdsBadge v-bind="statusVariant(rule.status)" dot /></dd>
+                        </div>
+                        <div class="detail__meta-row">
+                            <dt>Workspace</dt>
+                            <dd>{{ connection?.external_account_label ?? 'Removed' }}</dd>
+                        </div>
+                        <div class="detail__meta-row">
+                            <!-- "Destination", not "Channel" (H16c). This row read `Channel` and rendered
+                                 `channelLabel`, so EVERY tabular rule showed an em dash under a heading naming a
+                                 concept its provider does not have — a Sheets defect H16b shipped and Airtable
+                                 would have doubled. `destination_label` is server-resolved for all three
+                                 providers; the channel pair stays the fallback for a rule stored before it. -->
+                            <dt>Destination</dt>
+                            <dd class="detail__mono">{{ rule.destination_label ?? channelLabel }}</dd>
+                        </div>
+                        <div class="detail__meta-row">
+                            <dt>Events</dt>
+                            <dd>{{ eventLabels.length ? eventLabels.join(', ') : '—' }}</dd>
+                        </div>
+                        <div class="detail__meta-row">
+                            <dt>Scope</dt>
+                            <dd>
+                                <Link v-if="rule.form_url" :href="rule.form_url" class="scope-link">{{ rule.form_title }}</Link>
+                                <template v-else>{{ rule.form_title ?? 'All forms' }}</template>
+                            </dd>
+                        </div>
+                    </dl>
+                </MdsCard>
 
-            <MdsCard>
-                <template #header><h2 class="detail__card-title">Delivery health</h2></template>
-                <dl class="detail__meta">
-                    <div class="detail__meta-row">
-                        <dt>Consecutive failures</dt>
-                        <dd>{{ rule.consecutive_failure_count }}</dd>
-                    </div>
-                    <div class="detail__meta-row">
-                        <dt>Last success</dt>
-                        <dd>{{ formatDate(rule.last_success_at) }}</dd>
-                    </div>
-                    <div class="detail__meta-row">
-                        <dt>Last failure</dt>
-                        <dd>{{ formatDate(rule.last_failure_at) }}</dd>
-                    </div>
-                    <div class="detail__meta-row">
-                        <dt>Created</dt>
-                        <dd>{{ formatDate(rule.created_at) }}</dd>
-                    </div>
-                </dl>
-            </MdsCard>
-        </div>
-
-        <!-- J4a: an `MdsCard` with no `role` becomes an info `MdsAlert`. The paragraph drops
-             `.detail__prose`, which pins `color: var(--mds-color-text-body)` and would override the alert's
-             tone foreground on a tinted field; that class has two other consumers here and is left alone. -->
-        <MdsAlert v-if="!grantLive" class="detail__notice" tone="info">
-            <p>
-                <template v-if="connection === null || connection.disconnected">
-                    The workspace this rule delivered to was <strong>disconnected</strong>. Reconnect it from
-                    Integrations to resume — this rule is kept and paused until you do.
-                </template>
-                <template v-else>
-                    This workspace needs to be reconnected before anything is delivered.
-                </template>
-            </p>
-        </MdsAlert>
-
-        <!-- The paused-rule twin. `warning` rather than `info`: the rule is configured and expected to be
-             delivering, and is not. Still not `assertive` — it was already true on load. -->
-        <MdsAlert v-else-if="!isActive" class="detail__notice" tone="warning">
-            <p>
-                This rule is <strong>{{ rule.status }}</strong> and isn’t delivering. Resume it to start again —
-                that also clears the failure counter.
-            </p>
-            <!-- H16b — WHY it stopped, not merely that it did. A paused Sheets rule is almost always a
-                 drifted header row or a destination we can no longer reach, and both are things the tenant
-                 fixes in a minute IF they are told which. `paused_reason` is the `[code] sentence` the
-                 adapter itself wrote, so nothing here is the provider's own unreviewed text. -->
-            <p v-if="rule.paused_reason" class="detail__reason">
-                <MdsIcon name="alert" size="sm" class="detail__reason-icon" aria-hidden="true" />
-                <span>{{ rule.paused_reason }}</span>
-            </p>
-            <div v-if="rule.spreadsheet_id && can.update" class="detail__reason-actions">
-                <!-- `spreadsheet_id` is the tabular destination's document id for BOTH providers — a Google
-                     spreadsheet id or an Airtable base id — so this condition needed no widening; only the
-                     button's copy did. -->
-                <!-- Opening the edit modal RE-INSPECTS the destination, so the tenant sees its CURRENT
-                     headings rather than the ones stored when the rule was written — which, on a drifted
-                     rule, is precisely the difference they need to see. -->
-                <MdsButton variant="secondary" icon-left="edit" @click="editOpen = true">
-                    Review columns
-                </MdsButton>
-                <MdsButton
-                    v-if="rule.spreadsheet_url"
-                    as="a"
-                    variant="tertiary"
-                    icon-left="external-link"
-                    :href="rule.spreadsheet_url"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    Open in {{ connection?.provider_label ?? 'the provider' }}
-                </MdsButton>
+                <MdsCard>
+                    <template #header><h2 class="detail__card-title">Delivery health</h2></template>
+                    <dl class="detail__meta">
+                        <div class="detail__meta-row">
+                            <dt>Consecutive failures</dt>
+                            <dd>{{ rule.consecutive_failure_count }}</dd>
+                        </div>
+                        <div class="detail__meta-row">
+                            <dt>Last success</dt>
+                            <dd>{{ formatDate(rule.last_success_at) }}</dd>
+                        </div>
+                        <div class="detail__meta-row">
+                            <dt>Last failure</dt>
+                            <dd>{{ formatDate(rule.last_failure_at) }}</dd>
+                        </div>
+                        <div class="detail__meta-row">
+                            <dt>Created</dt>
+                            <dd>{{ formatDate(rule.created_at) }}</dd>
+                        </div>
+                    </dl>
+                </MdsCard>
             </div>
-        </MdsAlert>
 
-        <section class="detail__log">
-            <h2 class="detail__card-title detail__log-title">Delivery log</h2>
-            <MdsDataTable :columns="columns" :rows="deliveries.data" caption="Connector deliveries" row-key="id">
-                <template #cell-event_type="{ row }">
-                    <span class="detail__mono">{{ (row as DeliveryRow).event_type }}</span>
-                </template>
-                <template #cell-status="{ row }">
-                    <MdsBadge v-bind="statusVariant((row as DeliveryRow).status)" dot />
-                </template>
-                <template #cell-attempt_count="{ row }">
-                    {{ (row as DeliveryRow).attempt_count }} / {{ (row as DeliveryRow).max_attempts }}
-                </template>
-                <template #cell-response_body_excerpt="{ row }">
-                    <span class="detail__result">{{ (row as DeliveryRow).response_body_excerpt ?? '—' }}</span>
-                </template>
-                <template #cell-created_at="{ row }">
-                    {{ formatDate((row as DeliveryRow).created_at) }}
-                </template>
-                <template #empty>
-                    <MdsEmptyState
-                        illustration="default"
-                        headline="No deliveries yet"
-                        description="Deliveries appear here as subscribed events fire. Send a test message to try it out."
+            <div class="detail__main">
+                <!-- J4a: an `MdsCard` with no `role` becomes an info `MdsAlert`. The paragraph drops
+                     `.detail__prose`, which pins `color: var(--mds-color-text-body)` and would override the alert's
+                     tone foreground on a tinted field; that class has two other consumers here and is left alone. -->
+                <MdsAlert v-if="!grantLive" class="detail__notice" tone="info">
+                    <p>
+                        <template v-if="connection === null || connection.disconnected">
+                            The workspace this rule delivered to was <strong>disconnected</strong>. Reconnect it from
+                            Integrations to resume — this rule is kept and paused until you do.
+                        </template>
+                        <template v-else>
+                            This workspace needs to be reconnected before anything is delivered.
+                        </template>
+                    </p>
+                </MdsAlert>
+
+                <!-- The paused-rule twin. `warning` rather than `info`: the rule is configured and expected to be
+                     delivering, and is not. Still not `assertive` — it was already true on load. -->
+                <MdsAlert v-else-if="!isActive" class="detail__notice" tone="warning">
+                    <p>
+                        This rule is <strong>{{ rule.status }}</strong> and isn’t delivering. Resume it to start again —
+                        that also clears the failure counter.
+                    </p>
+                    <!-- H16b — WHY it stopped, not merely that it did. A paused Sheets rule is almost always a
+                         drifted header row or a destination we can no longer reach, and both are things the tenant
+                         fixes in a minute IF they are told which. `paused_reason` is the `[code] sentence` the
+                         adapter itself wrote, so nothing here is the provider's own unreviewed text. -->
+                    <p v-if="rule.paused_reason" class="detail__reason">
+                        <MdsIcon name="alert" size="sm" class="detail__reason-icon" aria-hidden="true" />
+                        <span>{{ rule.paused_reason }}</span>
+                    </p>
+                    <div v-if="rule.spreadsheet_id && can.update" class="detail__reason-actions">
+                        <!-- `spreadsheet_id` is the tabular destination's document id for BOTH providers — a Google
+                             spreadsheet id or an Airtable base id — so this condition needed no widening; only the
+                             button's copy did. -->
+                        <!-- Opening the edit modal RE-INSPECTS the destination, so the tenant sees its CURRENT
+                             headings rather than the ones stored when the rule was written — which, on a drifted
+                             rule, is precisely the difference they need to see. -->
+                        <MdsButton variant="secondary" icon-left="edit" @click="editOpen = true">
+                            Review columns
+                        </MdsButton>
+                        <MdsButton
+                            v-if="rule.spreadsheet_url"
+                            as="a"
+                            variant="tertiary"
+                            icon-left="external-link"
+                            :href="rule.spreadsheet_url"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            Open in {{ connection?.provider_label ?? 'the provider' }}
+                        </MdsButton>
+                    </div>
+                </MdsAlert>
+
+                <section class="detail__log">
+                    <h2 class="detail__card-title detail__log-title">Delivery log</h2>
+                    <MdsDataTable :columns="columns" :rows="deliveries.data" caption="Connector deliveries" row-key="id">
+                        <template #cell-event_type="{ row }">
+                            <span class="detail__mono">{{ (row as DeliveryRow).event_type }}</span>
+                        </template>
+                        <template #cell-status="{ row }">
+                            <MdsBadge v-bind="statusVariant((row as DeliveryRow).status)" dot />
+                        </template>
+                        <template #cell-attempt_count="{ row }">
+                            {{ (row as DeliveryRow).attempt_count }} / {{ (row as DeliveryRow).max_attempts }}
+                        </template>
+                        <template #cell-response_body_excerpt="{ row }">
+                            <span class="detail__result">{{ (row as DeliveryRow).response_body_excerpt ?? '—' }}</span>
+                        </template>
+                        <template #cell-created_at="{ row }">
+                            {{ formatDate((row as DeliveryRow).created_at) }}
+                        </template>
+                        <template #empty>
+                            <MdsEmptyState
+                                illustration="default"
+                                headline="No deliveries yet"
+                                description="Deliveries appear here as subscribed events fire. Send a test message to try it out."
+                            />
+                        </template>
+                    </MdsDataTable>
+
+                    <MdsPagination
+                        :current-page="deliveries.meta.current_page"
+                        :last-page="deliveries.meta.last_page"
+                        :total="deliveries.meta.total"
+                        :per-page="deliveries.meta.per_page"
+                        @update:page="goToPage"
                     />
-                </template>
-            </MdsDataTable>
-
-            <MdsPagination
-                :current-page="deliveries.meta.current_page"
-                :last-page="deliveries.meta.last_page"
-                :total="deliveries.meta.total"
-                :per-page="deliveries.meta.per_page"
-                @update:page="goToPage"
-            />
-        </section>
+                </section>
+            </div>
+        </div>
 
         <RuleFormModal
             v-model:open="editOpen"
@@ -323,6 +329,11 @@ function formatDate(iso: string | null): string {
 </template>
 
 <style scoped>
+/* M174: the container the cards' split reads (an element cannot query its own size). */
+.detail {
+    container-type: inline-size;
+}
+
 .detail__grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
@@ -437,6 +448,40 @@ function formatDate(iso: string | null): string {
     }
 
     .detail__meta dt {
+        margin-top: var(--mds-space-2);
+    }
+}
+
+/* M174 (`R-7b8a74ae`, `D120`): from a 75rem container the two cards sit in a 26rem column beside the notice and the
+   delivery log, one under the other, their label/value rows stacked — a URL or a secret beside a 12rem label would be
+   left about 170px. The DOM keeps the cards first. Below 75rem (a 1440 window beside the expanded sidebar leaves 71rem)
+   the cards sit above the log as before. */
+@container (min-width: 75rem) {
+    .detail__layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(18rem, 26rem);
+        column-gap: var(--mds-space-6);
+        align-items: start;
+    }
+
+    .detail__layout > .detail__grid {
+        grid-column: 2;
+        grid-row: 1;
+        grid-template-columns: minmax(0, 1fr);
+        margin-bottom: 0;
+    }
+
+    .detail__layout > .detail__main {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .detail__grid .detail__meta {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--mds-space-1) 0;
+    }
+
+    .detail__grid .detail__meta dt {
         margin-top: var(--mds-space-2);
     }
 }

@@ -178,7 +178,7 @@ function formatDate(iso: string | null): string {
 </script>
 
 <template>
-    <div>
+    <div class="detail">
         <Head :title="`Webhook · ${endpoint.name}`" />
 
         <PageHeader :title="endpoint.name" icon="activity">
@@ -197,123 +197,129 @@ function formatDate(iso: string | null): string {
             </template>
         </PageHeader>
 
-        <div class="detail__grid">
-            <MdsCard>
-                <dl class="detail__meta">
-                    <div class="detail__meta-row">
-                        <dt>Status</dt>
-                        <dd><MdsBadge v-bind="statusVariant(endpoint.status)" dot /></dd>
-                    </div>
-                    <div class="detail__meta-row"><dt>URL</dt><dd class="detail__mono">{{ endpoint.url }}</dd></div>
-                    <div class="detail__meta-row">
-                        <dt>Events</dt>
-                        <dd>{{ eventLabels.length ? eventLabels.join(', ') : '—' }}</dd>
-                    </div>
-                    <div class="detail__meta-row">
-                        <dt>Scope</dt>
-                        <dd>
-                            <Link v-if="endpoint.form_url" :href="endpoint.form_url" class="scope-link">{{ endpoint.form_title }}</Link>
-                            <template v-else>{{ endpoint.form_title ?? 'All forms' }}</template>
-                        </dd>
-                    </div>
-                    <div class="detail__meta-row"><dt>Signing</dt><dd>{{ endpoint.signing_algorithm }}</dd></div>
-                    <div class="detail__meta-row"><dt>Secret</dt><dd class="detail__mono">{{ endpoint.secret_masked }}</dd></div>
-                    <div v-if="endpoint.secret_previous_expires_at" class="detail__meta-row">
-                        <dt>Old secret valid until</dt><dd>{{ formatDate(endpoint.secret_previous_expires_at) }}</dd>
-                    </div>
-                </dl>
-            </MdsCard>
+        <!-- M174 (`R-7b8a74ae`): the cards first in the DOM, as before; from a 75rem container they sit in a column
+             beside the notice and the log (the `<style>` block says how). -->
+        <div class="detail__layout">
+            <div class="detail__grid">
+                <MdsCard>
+                    <dl class="detail__meta">
+                        <div class="detail__meta-row">
+                            <dt>Status</dt>
+                            <dd><MdsBadge v-bind="statusVariant(endpoint.status)" dot /></dd>
+                        </div>
+                        <div class="detail__meta-row"><dt>URL</dt><dd class="detail__mono">{{ endpoint.url }}</dd></div>
+                        <div class="detail__meta-row">
+                            <dt>Events</dt>
+                            <dd>{{ eventLabels.length ? eventLabels.join(', ') : '—' }}</dd>
+                        </div>
+                        <div class="detail__meta-row">
+                            <dt>Scope</dt>
+                            <dd>
+                                <Link v-if="endpoint.form_url" :href="endpoint.form_url" class="scope-link">{{ endpoint.form_title }}</Link>
+                                <template v-else>{{ endpoint.form_title ?? 'All forms' }}</template>
+                            </dd>
+                        </div>
+                        <div class="detail__meta-row"><dt>Signing</dt><dd>{{ endpoint.signing_algorithm }}</dd></div>
+                        <div class="detail__meta-row"><dt>Secret</dt><dd class="detail__mono">{{ endpoint.secret_masked }}</dd></div>
+                        <div v-if="endpoint.secret_previous_expires_at" class="detail__meta-row">
+                            <dt>Old secret valid until</dt><dd>{{ formatDate(endpoint.secret_previous_expires_at) }}</dd>
+                        </div>
+                    </dl>
+                </MdsCard>
 
-            <MdsCard>
-                <template #header><h2 class="detail__card-title">Delivery health</h2></template>
-                <dl class="detail__meta">
-                    <div class="detail__meta-row">
-                        <dt>Consecutive failures</dt>
-                        <dd>{{ endpoint.consecutive_failure_count }}</dd>
-                    </div>
-                    <div v-if="endpoint.disabled_reason" class="detail__meta-row">
-                        <dt>Paused because</dt>
-                        <dd>{{ endpoint.disabled_reason === 'too_many_failures' ? 'Too many consecutive failures' : 'Manually disabled' }}</dd>
-                    </div>
-                    <div class="detail__meta-row"><dt>Last success</dt><dd>{{ formatDate(endpoint.last_success_at) }}</dd></div>
-                    <div class="detail__meta-row"><dt>Last failure</dt><dd>{{ formatDate(endpoint.last_failure_at) }}</dd></div>
-                    <div class="detail__meta-row"><dt>Created</dt><dd>{{ formatDate(endpoint.created_at) }}</dd></div>
-                </dl>
-            </MdsCard>
+                <MdsCard>
+                    <template #header><h2 class="detail__card-title">Delivery health</h2></template>
+                    <dl class="detail__meta">
+                        <div class="detail__meta-row">
+                            <dt>Consecutive failures</dt>
+                            <dd>{{ endpoint.consecutive_failure_count }}</dd>
+                        </div>
+                        <div v-if="endpoint.disabled_reason" class="detail__meta-row">
+                            <dt>Paused because</dt>
+                            <dd>{{ endpoint.disabled_reason === 'too_many_failures' ? 'Too many consecutive failures' : 'Manually disabled' }}</dd>
+                        </div>
+                        <div class="detail__meta-row"><dt>Last success</dt><dd>{{ formatDate(endpoint.last_success_at) }}</dd></div>
+                        <div class="detail__meta-row"><dt>Last failure</dt><dd>{{ formatDate(endpoint.last_failure_at) }}</dd></div>
+                        <div class="detail__meta-row"><dt>Created</dt><dd>{{ formatDate(endpoint.created_at) }}</dd></div>
+                    </dl>
+                </MdsCard>
+            </div>
+
+            <div class="detail__main">
+                <!-- J4a: was an `MdsCard` with no `role` at all — a statement of the page's current condition that
+                     assistive tech was never told about. `MdsAlert` at the info tone, not `MdsBanner`, because the
+                     body is more than one line and interpolates the status; and NOT `assertive`, because this was
+                     already true when the page loaded. ⚠️ The inner paragraph drops `.detail__prose`: that class
+                     pins `color: var(--mds-color-text-body)`, which would override the alert's tone foreground and
+                     leave text on a tinted field with no measured contrast. It has two other consumers on this
+                     page, so it is left alone rather than edited. -->
+                <MdsAlert v-if="!isActive" class="detail__notice" tone="info">
+                    <p>
+                        This endpoint is <strong>{{ endpoint.status }}</strong> and isn’t delivering. Re-enable it to resume
+                        deliveries — that also clears the failure counter. Existing deliveries can be re-queued once it’s active.
+                    </p>
+                </MdsAlert>
+
+                <section class="detail__log">
+                    <h2 class="detail__card-title detail__log-title">Delivery log</h2>
+                    <p class="detail__hint">Newest first.</p>
+                    <MdsDataTable :columns="columns" :rows="deliveries.data" caption="Webhook deliveries" row-key="id">
+                        <template #cell-event_type="{ row }">
+                            <span class="detail__mono">{{ (row as DeliveryRow).event_type }}</span>
+                        </template>
+                        <template #cell-status="{ row }">
+                            <MdsBadge v-bind="statusVariant((row as DeliveryRow).status)" dot />
+                        </template>
+                        <template #cell-attempt_count="{ row }">
+                            {{ (row as DeliveryRow).attempt_count }} / {{ (row as DeliveryRow).max_attempts }}
+                        </template>
+                        <template #cell-response_status_code="{ row }">
+                            {{ (row as DeliveryRow).response_status_code ?? '—' }}
+                        </template>
+                        <template #cell-response_time_ms="{ row }">
+                            <template v-if="(row as DeliveryRow).response_time_ms !== null">{{ (row as DeliveryRow).response_time_ms }} ms</template>
+                            <template v-else>—</template>
+                        </template>
+                        <template #cell-created_at="{ row }">
+                            {{ formatDate((row as DeliveryRow).created_at) }}
+                        </template>
+                        <template #row-actions="{ row }">
+                            <!-- J4a — the `title` carrying "Re-enable the endpoint to redeliver" is DELETED, not
+                                 replaced by a tooltip. A natively disabled control is not focusable and fires no
+                                 pointer events, so that sentence was unreachable by keyboard and by screen reader,
+                                 and reachable by mouse only if you happened to hover a control you could not press.
+                                 The reason is already on the page — the alert above this table says the endpoint is
+                                 disabled and how to resume it — which is exactly what DSR §3.4a prescribes, and what
+                                 `RuleShow.vue` and `QuestionPicker.vue` already argued for. `label` still names the
+                                 button for assistive tech. -->
+                            <MdsIconButton
+                                v-if="can.update"
+                                icon="redo"
+                                label="Redeliver"
+                                size="sm"
+                                :disabled="!isActive"
+                                @click="redeliver((row as DeliveryRow).id)"
+                            />
+                        </template>
+                        <template #empty>
+                            <MdsEmptyState
+                                illustration="default"
+                                headline="No deliveries yet"
+                                description="Deliveries appear here as subscribed events fire. Send a test ping to try it out."
+                            />
+                        </template>
+                    </MdsDataTable>
+
+                    <MdsPagination
+                        :current-page="deliveries.meta.current_page"
+                        :last-page="deliveries.meta.last_page"
+                        :total="deliveries.meta.total"
+                        :per-page="deliveries.meta.per_page"
+                        @update:page="goToPage"
+                    />
+                </section>
+            </div>
         </div>
-
-        <!-- J4a: was an `MdsCard` with no `role` at all — a statement of the page's current condition that
-             assistive tech was never told about. `MdsAlert` at the info tone, not `MdsBanner`, because the
-             body is more than one line and interpolates the status; and NOT `assertive`, because this was
-             already true when the page loaded. ⚠️ The inner paragraph drops `.detail__prose`: that class
-             pins `color: var(--mds-color-text-body)`, which would override the alert's tone foreground and
-             leave text on a tinted field with no measured contrast. It has two other consumers on this
-             page, so it is left alone rather than edited. -->
-        <MdsAlert v-if="!isActive" class="detail__notice" tone="info">
-            <p>
-                This endpoint is <strong>{{ endpoint.status }}</strong> and isn’t delivering. Re-enable it to resume
-                deliveries — that also clears the failure counter. Existing deliveries can be re-queued once it’s active.
-            </p>
-        </MdsAlert>
-
-        <section class="detail__log">
-            <h2 class="detail__card-title detail__log-title">Delivery log</h2>
-            <p class="detail__hint">Newest first.</p>
-            <MdsDataTable :columns="columns" :rows="deliveries.data" caption="Webhook deliveries" row-key="id">
-                <template #cell-event_type="{ row }">
-                    <span class="detail__mono">{{ (row as DeliveryRow).event_type }}</span>
-                </template>
-                <template #cell-status="{ row }">
-                    <MdsBadge v-bind="statusVariant((row as DeliveryRow).status)" dot />
-                </template>
-                <template #cell-attempt_count="{ row }">
-                    {{ (row as DeliveryRow).attempt_count }} / {{ (row as DeliveryRow).max_attempts }}
-                </template>
-                <template #cell-response_status_code="{ row }">
-                    {{ (row as DeliveryRow).response_status_code ?? '—' }}
-                </template>
-                <template #cell-response_time_ms="{ row }">
-                    <template v-if="(row as DeliveryRow).response_time_ms !== null">{{ (row as DeliveryRow).response_time_ms }} ms</template>
-                    <template v-else>—</template>
-                </template>
-                <template #cell-created_at="{ row }">
-                    {{ formatDate((row as DeliveryRow).created_at) }}
-                </template>
-                <template #row-actions="{ row }">
-                    <!-- J4a — the `title` carrying "Re-enable the endpoint to redeliver" is DELETED, not
-                         replaced by a tooltip. A natively disabled control is not focusable and fires no
-                         pointer events, so that sentence was unreachable by keyboard and by screen reader,
-                         and reachable by mouse only if you happened to hover a control you could not press.
-                         The reason is already on the page — the alert above this table says the endpoint is
-                         disabled and how to resume it — which is exactly what DSR §3.4a prescribes, and what
-                         `RuleShow.vue` and `QuestionPicker.vue` already argued for. `label` still names the
-                         button for assistive tech. -->
-                    <MdsIconButton
-                        v-if="can.update"
-                        icon="redo"
-                        label="Redeliver"
-                        size="sm"
-                        :disabled="!isActive"
-                        @click="redeliver((row as DeliveryRow).id)"
-                    />
-                </template>
-                <template #empty>
-                    <MdsEmptyState
-                        illustration="default"
-                        headline="No deliveries yet"
-                        description="Deliveries appear here as subscribed events fire. Send a test ping to try it out."
-                    />
-                </template>
-            </MdsDataTable>
-
-            <MdsPagination
-                :current-page="deliveries.meta.current_page"
-                :last-page="deliveries.meta.last_page"
-                :total="deliveries.meta.total"
-                :per-page="deliveries.meta.per_page"
-                @update:page="goToPage"
-            />
-        </section>
 
         <!-- Edit -->
         <WebhookFormModal v-model:open="editOpen" :forms="forms" :event-types="eventTypes" :endpoint="editable" />
@@ -355,6 +361,11 @@ function formatDate(iso: string | null): string {
 </template>
 
 <style scoped>
+/* M174: the container the cards' split reads (an element cannot query its own size). */
+.detail {
+    container-type: inline-size;
+}
+
 .detail__grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
@@ -441,6 +452,36 @@ function formatDate(iso: string | null): string {
 @media (max-width: 480px) {
     .detail__meta-row {
         grid-template-columns: 1fr;
+        gap: var(--mds-space-1);
+    }
+}
+
+/* M174 (`R-7b8a74ae`, `D120`): from a 75rem container the two cards sit in a 26rem column beside the notice and the
+   delivery log, one under the other, their label/value rows stacked — a URL or a secret beside a 12rem label would be
+   left about 170px. The DOM keeps the cards first. Below 75rem (a 1440 window beside the expanded sidebar leaves 71rem)
+   the cards sit above the log as before. */
+@container (min-width: 75rem) {
+    .detail__layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(18rem, 26rem);
+        column-gap: var(--mds-space-6);
+        align-items: start;
+    }
+
+    .detail__layout > .detail__grid {
+        grid-column: 2;
+        grid-row: 1;
+        grid-template-columns: minmax(0, 1fr);
+        margin-bottom: 0;
+    }
+
+    .detail__layout > .detail__main {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .detail__grid .detail__meta-row {
+        grid-template-columns: minmax(0, 1fr);
         gap: var(--mds-space-1);
     }
 }

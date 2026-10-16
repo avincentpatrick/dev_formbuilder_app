@@ -132,3 +132,71 @@ describe('submission page — the facts sit beside the answers', () => {
         expect(body).toMatch(/align-items:\s*start/);
     });
 });
+
+const WEBHOOK = 'resources/js/Pages/webhooks/Show.vue';
+const RULE = 'resources/js/Pages/integrations/RuleShow.vue';
+const TENANT = 'resources/js/Pages/admin/TenantDetail.vue';
+
+describe.each([
+    ['webhook', WEBHOOK],
+    ['integration rule', RULE],
+])('%s page — the cards sit beside the delivery log', (_name, path) => {
+    it('declares the page root as the container the split reads', () => {
+        expect(read(path)).toMatch(/^ {4}<div class="detail">$/m);
+        expect(rule(styleOf(path), '.detail')).toMatch(/container-type:\s*inline-size/);
+    });
+
+    it('wraps the cards and the log, cards first, the notice with the log', () => {
+        const source = read(path);
+        const layout = source.indexOf('<div class="detail__layout">');
+        const grid = source.indexOf('<div class="detail__grid">');
+        const main = source.indexOf('<div class="detail__main">');
+
+        expect(layout).toBeGreaterThan(-1);
+        expect(grid).toBeGreaterThan(layout);
+        expect(main).toBeGreaterThan(grid);
+        expect(source.indexOf('class="detail__notice"')).toBeGreaterThan(main);
+        expect(source.indexOf('<section class="detail__log">')).toBeGreaterThan(main);
+    });
+
+    it('places the cards in the bounded column from a 75rem container', () => {
+        const block = containerBlock(styleOf(path), '75rem');
+        const layout = nested(block, '.detail__layout');
+
+        expect(layout, '@container (min-width: 75rem) .detail__layout').not.toBeNull();
+        expect(layout).toMatch(/display:\s*grid/);
+        expect(layout).toMatch(ASIDE_SPLIT);
+        expect(nested(block, '.detail__layout > .detail__grid')).toMatch(/grid-column:\s*2/);
+        expect(nested(block, '.detail__layout > .detail__main')).toMatch(/grid-column:\s*1/);
+    });
+});
+
+describe('console workspace page — the identity and plan cards sit beside the sections', () => {
+    it('wraps the page in its own container, since its root is the console layout', () => {
+        const source = read(TENANT);
+
+        expect(source).toMatch(/^ {8}<div class="admin-td">$/m);
+        expect(rule(styleOf(TENANT), '.admin-td')).toMatch(/container-type:\s*inline-size/);
+        expect(source.indexOf('<div class="admin-td__main">')).toBeGreaterThan(source.indexOf('<div class="admin-td__grid">'));
+    });
+
+    it('places the cards in the bounded column from a 75rem container', () => {
+        const block = containerBlock(styleOf(TENANT), '75rem');
+        const layout = nested(block, '.admin-td__layout');
+
+        expect(layout, '@container (min-width: 75rem) .admin-td__layout').not.toBeNull();
+        expect(layout).toMatch(ASIDE_SPLIT);
+        expect(nested(block, '.admin-td__layout > .admin-td__grid')).toMatch(/grid-column:\s*2/);
+        expect(nested(block, '.admin-td__layout > .admin-td__main')).toMatch(/grid-column:\s*1/);
+    });
+
+    it('styles the dialogs\' paragraphs as every tenant dialog does, and takes the tracking token', () => {
+        const source = read(TENANT);
+        const css = styleOf(TENANT);
+
+        // The two dialogs' three paragraphs: none bare, so none falls back to the browser's default margins.
+        expect(source.slice(source.indexOf('<MdsModal'), source.indexOf('</template>\n\n<style'))).not.toMatch(/<p>/);
+        expect(rule(css, '.admin-td__prose')).toMatch(/margin:\s*0/);
+        expect(rule(css, '.admin-td__subhead')).toMatch(/letter-spacing:\s*var\(--mds-tracking-wide\)/);
+    });
+});

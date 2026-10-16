@@ -215,323 +215,331 @@ function formatDay(iso: string | null): string {
 
 <template>
     <AdminLayout :title="tenant.name" icon="building">
-        <MdsAlert v-if="adminError" tone="danger" assertive :message="adminError" />
+        <!-- M174 (`R-7b8a74ae`): the page's own container — its root is the console layout, whose inner column
+             every console page shares — and inside it the cards first in the DOM, beside the sections from 75rem. -->
+        <div class="admin-td">
+            <MdsAlert v-if="adminError" tone="danger" assertive :message="adminError" />
 
-        <div class="admin-td__grid">
-            <!-- ── Identity ──────────────────────────────────────────────────────────────────────── -->
-            <MdsCard>
-                <template #header>
-                    <h2 class="admin-td__card-title">Workspace</h2>
-                </template>
+            <div class="admin-td__layout">
+                <div class="admin-td__grid">
+                    <!-- ── Identity ──────────────────────────────────────────────────────────────────────── -->
+                    <MdsCard>
+                        <template #header>
+                            <h2 class="admin-td__card-title">Workspace</h2>
+                        </template>
 
-                <dl class="admin-td__meta">
-                    <div>
-                        <dt>Status</dt>
-                        <dd><MdsBadge v-bind="statusVariant(tenant.status)" dot /></dd>
-                    </div>
-                    <div>
-                        <dt>Slug</dt>
-                        <dd class="admin-td__mono">{{ tenant.slug }}</dd>
-                    </div>
-                    <div>
-                        <dt>Owner</dt>
-                        <dd v-if="tenant.owner">{{ tenant.owner.name }} · {{ tenant.owner.email }}</dd>
-                        <!-- Null is honest, not missing: the owner may no longer be an active member. -->
-                        <dd v-else>Owner is not an active member</dd>
-                    </div>
-                    <div>
-                        <dt>Created</dt>
-                        <dd>{{ formatDay(tenant.created_at) }}</dd>
-                    </div>
-                    <div>
-                        <dt>App host</dt>
-                        <dd class="admin-td__mono">{{ tenant.app_host }}</dd>
-                    </div>
-                    <div>
-                        <dt>Respondent host</dt>
-                        <dd class="admin-td__mono">{{ tenant.public_host }}</dd>
-                    </div>
-                    <div>
-                        <dt>Locale</dt>
-                        <dd>{{ tenant.default_locale }}</dd>
-                    </div>
-                    <div v-if="tenant.maintenance_mode">
-                        <dt>Maintenance</dt>
-                        <dd>{{ tenant.maintenance_message ?? 'On' }}</dd>
-                    </div>
-                </dl>
+                        <dl class="admin-td__meta">
+                            <div>
+                                <dt>Status</dt>
+                                <dd><MdsBadge v-bind="statusVariant(tenant.status)" dot /></dd>
+                            </div>
+                            <div>
+                                <dt>Slug</dt>
+                                <dd class="admin-td__mono">{{ tenant.slug }}</dd>
+                            </div>
+                            <div>
+                                <dt>Owner</dt>
+                                <dd v-if="tenant.owner">{{ tenant.owner.name }} · {{ tenant.owner.email }}</dd>
+                                <!-- Null is honest, not missing: the owner may no longer be an active member. -->
+                                <dd v-else>Owner is not an active member</dd>
+                            </div>
+                            <div>
+                                <dt>Created</dt>
+                                <dd>{{ formatDay(tenant.created_at) }}</dd>
+                            </div>
+                            <div>
+                                <dt>App host</dt>
+                                <dd class="admin-td__mono">{{ tenant.app_host }}</dd>
+                            </div>
+                            <div>
+                                <dt>Respondent host</dt>
+                                <dd class="admin-td__mono">{{ tenant.public_host }}</dd>
+                            </div>
+                            <div>
+                                <dt>Locale</dt>
+                                <dd>{{ tenant.default_locale }}</dd>
+                            </div>
+                            <div v-if="tenant.maintenance_mode">
+                                <dt>Maintenance</dt>
+                                <dd>{{ tenant.maintenance_message ?? 'On' }}</dd>
+                            </div>
+                        </dl>
 
-                <template #footer>
-                    <MdsButton
-                        v-if="tenant.is_active"
-                        variant="tertiary"
-                        size="sm"
-                        @click="pendingAction = 'suspend'"
-                    >
-                        Suspend workspace
-                    </MdsButton>
-                    <MdsButton v-else variant="primary" size="sm" @click="pendingAction = 'reactivate'">
-                        Reactivate workspace
-                    </MdsButton>
-                </template>
-            </MdsCard>
+                        <template #footer>
+                            <MdsButton
+                                v-if="tenant.is_active"
+                                variant="tertiary"
+                                size="sm"
+                                @click="pendingAction = 'suspend'"
+                            >
+                                Suspend workspace
+                            </MdsButton>
+                            <MdsButton v-else variant="primary" size="sm" @click="pendingAction = 'reactivate'">
+                                Reactivate workspace
+                            </MdsButton>
+                        </template>
+                    </MdsCard>
 
-            <!-- ── Plan ──────────────────────────────────────────────────────────────────────────── -->
-            <MdsCard>
-                <template #header>
-                    <h2 class="admin-td__card-title">Plan</h2>
-                </template>
+                    <!-- ── Plan ──────────────────────────────────────────────────────────────────────────── -->
+                    <MdsCard>
+                        <template #header>
+                            <h2 class="admin-td__card-title">Plan</h2>
+                        </template>
 
-                <p v-if="plan.current" class="admin-td__current">
-                    <strong>{{ plan.current.name ?? plan.current.code }}</strong>
-                    · {{ plan.current.interval_label }}
-                    · {{ plan.current.stripe_status }}
-                    <span v-if="plan.current.assigned_at"> · assigned {{ formatDay(plan.current.assigned_at) }}</span>
-                </p>
-                <!-- Three distinct states, each with its own copy. An em dash for any of them would hide a
-                     real difference between "on the free default" and "no catalog seeded at all". -->
-                <p v-else-if="plan.effective" class="admin-td__current">
-                    <strong>{{ plan.effective.name }}</strong> — default. No subscription on record.
-                </p>
-                <p v-else class="admin-td__current">No plan catalog seeded.</p>
+                        <p v-if="plan.current" class="admin-td__current">
+                            <strong>{{ plan.current.name ?? plan.current.code }}</strong>
+                            · {{ plan.current.interval_label }}
+                            · {{ plan.current.stripe_status }}
+                            <span v-if="plan.current.assigned_at"> · assigned {{ formatDay(plan.current.assigned_at) }}</span>
+                        </p>
+                        <!-- Three distinct states, each with its own copy. An em dash for any of them would hide a
+                             real difference between "on the free default" and "no catalog seeded at all". -->
+                        <p v-else-if="plan.effective" class="admin-td__current">
+                            <strong>{{ plan.effective.name }}</strong> — default. No subscription on record.
+                        </p>
+                        <p v-else class="admin-td__current">No plan catalog seeded.</p>
 
-                <p
-                    v-if="plan.current && plan.current.subscription_name !== 'default'"
-                    class="admin-td__note"
-                >
-                    Governing subscription is <code>{{ plan.current.subscription_name }}</code
-                    >, not <code>default</code> — assigning below writes the <code>default</code> row.
-                </p>
+                        <p
+                            v-if="plan.current && plan.current.subscription_name !== 'default'"
+                            class="admin-td__note"
+                        >
+                            Governing subscription is <code>{{ plan.current.subscription_name }}</code
+                            >, not <code>default</code> — assigning below writes the <code>default</code> row.
+                        </p>
 
-                <form class="admin-td__form" @submit.prevent="assignPlan">
-                    <MdsFormField label="Assign plan" input-id="tenant-plan" :error="form.errors.plan_id">
-                        <MdsSelect id="tenant-plan" v-model="form.plan_id" :options="planOptions" />
-                    </MdsFormField>
-                    <MdsFormField
-                        label="Billing interval"
-                        input-id="tenant-interval"
-                        :error="form.errors.billing_interval"
-                    >
-                        <MdsSelect
-                            id="tenant-interval"
-                            v-model="form.billing_interval"
-                            :options="intervalOptions"
-                        />
-                    </MdsFormField>
-                    <MdsButton type="submit" :loading="form.processing" :disabled="!form.plan_id">
-                        Assign
-                    </MdsButton>
-                    <p v-if="form.recentlySuccessful" class="admin-td__saved" role="status">Plan assigned.</p>
-                </form>
-            </MdsCard>
-        </div>
-
-        <!-- ── Usage ─────────────────────────────────────────────────────────────────────────────── -->
-        <MdsCard class="admin-td__section">
-            <template #header>
-                <h2 class="admin-td__card-title">Usage</h2>
-            </template>
-
-            <p v-if="!usage.available" class="admin-td__note">
-                No plan resolved for this workspace, so there are no limits to report against.
-            </p>
-
-            <template v-else>
-                <h3 class="admin-td__subhead">Current levels</h3>
-                <!-- M171 — compact: `row.display` is "1.2 GB / 5 GB", which at the display size breaks inside a 12rem tile. -->
-                <div class="admin-td__tiles">
-                    <MdsStatTile
-                        v-for="row in usage.gauges"
-                        :key="row.metric"
-                        value-size="compact"
-                        :label="row.label"
-                        :value="row.display"
-                        :icon="metricIcon(row.metric)"
-                        :caption="metricCaption(row)"
-                    />
+                        <form class="admin-td__form" @submit.prevent="assignPlan">
+                            <MdsFormField label="Assign plan" input-id="tenant-plan" :error="form.errors.plan_id">
+                                <MdsSelect id="tenant-plan" v-model="form.plan_id" :options="planOptions" />
+                            </MdsFormField>
+                            <MdsFormField
+                                label="Billing interval"
+                                input-id="tenant-interval"
+                                :error="form.errors.billing_interval"
+                            >
+                                <MdsSelect
+                                    id="tenant-interval"
+                                    v-model="form.billing_interval"
+                                    :options="intervalOptions"
+                                />
+                            </MdsFormField>
+                            <MdsButton type="submit" :loading="form.processing" :disabled="!form.plan_id">
+                                Assign
+                            </MdsButton>
+                            <p v-if="form.recentlySuccessful" class="admin-td__saved" role="status">Plan assigned.</p>
+                        </form>
+                    </MdsCard>
                 </div>
 
-                <h3 class="admin-td__subhead">This period</h3>
-                <!-- "recorded", not "used": an unmetered flow reads 0, which is indistinguishable from a
-                     genuine zero, and the header is the honest place to say so. -->
-                <p class="admin-td__note">Counters recorded for the current billing period.</p>
-                <MdsDataTable
-                    :columns="flowColumns"
-                    :rows="usage.flows"
-                    caption="Per-period usage counters"
-                    row-key="metric"
-                />
-            </template>
-        </MdsCard>
+                <div class="admin-td__main">
+                    <!-- ── Usage ─────────────────────────────────────────────────────────────────────────────── -->
+                    <MdsCard class="admin-td__section">
+                        <template #header>
+                            <h2 class="admin-td__card-title">Usage</h2>
+                        </template>
 
-        <!-- ── Capabilities ──────────────────────────────────────────────────────────────────────── -->
-        <MdsCard v-if="features.length > 0" class="admin-td__section">
-            <template #header>
-                <h2 class="admin-td__card-title">Capabilities</h2>
-            </template>
+                        <p v-if="!usage.available" class="admin-td__note">
+                            No plan resolved for this workspace, so there are no limits to report against.
+                        </p>
 
-            <p class="admin-td__note">
-                What the plan grants, beside what the workspace effectively has. A difference is either a
-                grandfathered override or the workspace's own module switch.
-            </p>
+                        <template v-else>
+                            <h3 class="admin-td__subhead">Current levels</h3>
+                            <!-- M171 — compact: `row.display` is "1.2 GB / 5 GB", which at the display size breaks inside a 12rem tile. -->
+                            <div class="admin-td__tiles">
+                                <MdsStatTile
+                                    v-for="row in usage.gauges"
+                                    :key="row.metric"
+                                    value-size="compact"
+                                    :label="row.label"
+                                    :value="row.display"
+                                    :icon="metricIcon(row.metric)"
+                                    :caption="metricCaption(row)"
+                                />
+                            </div>
 
-            <MdsDataTable
-                :columns="featureColumns"
-                :rows="features"
-                caption="Plan capabilities versus effective capabilities"
-                row-key="key"
+                            <h3 class="admin-td__subhead">This period</h3>
+                            <!-- "recorded", not "used": an unmetered flow reads 0, which is indistinguishable from a
+                                 genuine zero, and the header is the honest place to say so. -->
+                            <p class="admin-td__note">Counters recorded for the current billing period.</p>
+                            <MdsDataTable
+                                :columns="flowColumns"
+                                :rows="usage.flows"
+                                caption="Per-period usage counters"
+                                row-key="metric"
+                            />
+                        </template>
+                    </MdsCard>
+
+                    <!-- ── Capabilities ──────────────────────────────────────────────────────────────────────── -->
+                    <MdsCard v-if="features.length > 0" class="admin-td__section">
+                        <template #header>
+                            <h2 class="admin-td__card-title">Capabilities</h2>
+                        </template>
+
+                        <p class="admin-td__note">
+                            What the plan grants, beside what the workspace effectively has. A difference is either a
+                            grandfathered override or the workspace's own module switch.
+                        </p>
+
+                        <MdsDataTable
+                            :columns="featureColumns"
+                            :rows="features"
+                            caption="Plan capabilities versus effective capabilities"
+                            row-key="key"
+                        >
+                            <template #cell-plan_grants="{ value }">{{ value ? 'Yes' : 'No' }}</template>
+                            <template #cell-effective="{ value }">{{ value ? 'Yes' : 'No' }}</template>
+                            <template #cell-reason="{ value }">
+                                {{ value ? REASON_COPY[String(value)] : '—' }}
+                            </template>
+                        </MdsDataTable>
+                    </MdsCard>
+
+                    <!-- ── Domains ───────────────────────────────────────────────────────────────────────────── -->
+                    <MdsCard class="admin-td__section">
+                        <template #header>
+                            <h2 class="admin-td__card-title">Custom domains</h2>
+                        </template>
+
+                        <p class="admin-td__note">
+                            Read-only here. Claiming, verifying and removing a hostname happen in the workspace's own
+                            settings, so the action is recorded in its audit log.
+                        </p>
+
+                        <MdsDataTable
+                            :columns="domainColumns"
+                            :rows="domains.rows"
+                            caption="Custom domains"
+                            row-key="domain"
+                        >
+                            <template #cell-domain="{ row }">
+                                <span class="admin-td__mono">{{ (row as ConsoleDomainRow).domain }}</span>
+                                <MdsBadge
+                                    v-if="(row as ConsoleDomainRow).is_public_host"
+                                    variant="info"
+                                    label="Respondent host"
+                                />
+                            </template>
+                            <template #cell-status="{ row }">
+                                <MdsBadge v-bind="statusVariant((row as ConsoleDomainRow).status)" dot />
+                            </template>
+                            <template #cell-last_checked_at="{ row }">
+                                {{ formatDate((row as ConsoleDomainRow).last_checked_at) }}
+                            </template>
+                            <template #empty>
+                                <MdsEmptyState
+                                    illustration="default"
+                                    headline="No custom domains"
+                                    :description="`Respondent links use ${domains.public_host}.`"
+                                />
+                            </template>
+                        </MdsDataTable>
+                    </MdsCard>
+
+                    <!--
+                        I11b — support access (RBAC §9 resolved decision 1).
+
+                        Deliberately the LAST card on the page. It is the highest-consequence control in the console —
+                        it signs the operator in to a customer's workspace with a real member's authority — and putting
+                        it under the read-only cards means an operator has scrolled past what the workspace actually
+                        looks like before reaching for it. Most support questions are answered by the four cards above.
+                    -->
+                    <MdsCard class="admin-td__section">
+                        <template #header>
+                            <h2 class="admin-td__card-title">Support access</h2>
+                        </template>
+
+                        <p class="admin-td__note">
+                            Signing in as a member records an entry in <strong>this workspace's own audit log</strong>,
+                            notifies its owner, and marks everything you do as taken by a platform operator. The session
+                            ends automatically after 30 minutes.
+                        </p>
+
+                        <MdsDataTable
+                            :columns="targetColumns"
+                            :rows="impersonation.targets"
+                            caption="Members you can sign in as"
+                            row-key="id"
+                        >
+                            <template #cell-name="{ row }">
+                                {{ (row as ImpersonationTarget).name }}
+                                <MdsBadge v-if="(row as ImpersonationTarget).is_owner" variant="info" label="Owner" />
+                            </template>
+                            <template #cell-actions="{ row }">
+                                <MdsButton
+                                    variant="secondary"
+                                    size="sm"
+                                    :disabled="impersonating"
+                                    @click="pendingTarget = row as ImpersonationTarget"
+                                >
+                                    Sign in as
+                                </MdsButton>
+                            </template>
+                            <template #empty>
+                                <MdsEmptyState
+                                    illustration="default"
+                                    headline="No one to sign in as"
+                                    description="Support access is limited to active members who are not platform staff, and never to your own account."
+                                />
+                            </template>
+                        </MdsDataTable>
+
+                        <MdsAlert v-if="impersonationError" tone="danger" assertive :message="impersonationError" />
+                    </MdsCard>
+                </div>
+            </div>
+
+            <!-- Confirmation is not ceremony here: the click leaves this origin entirely and lands the operator
+                 inside somebody else's workspace, so the modal is the last point at which "wrong row" is
+                 recoverable. It names the member, which the row already did, and states the two consequences
+                 the operator is accountable for. -->
+            <MdsModal
+                :open="pendingTarget !== null"
+                title="Sign in to this workspace?"
+                @close="pendingTarget = null"
             >
-                <template #cell-plan_grants="{ value }">{{ value ? 'Yes' : 'No' }}</template>
-                <template #cell-effective="{ value }">{{ value ? 'Yes' : 'No' }}</template>
-                <template #cell-reason="{ value }">
-                    {{ value ? REASON_COPY[String(value)] : '—' }}
-                </template>
-            </MdsDataTable>
-        </MdsCard>
+                <p class="admin-td__prose">
+                    You will be signed in to <strong>{{ tenant.name }}</strong> as
+                    <strong>{{ pendingTarget?.name }}</strong> with that member's full permissions.
+                </p>
+                <p class="admin-td__prose">
+                    The workspace owner is notified, and the access is recorded in the workspace's audit log
+                    where its members can see it.
+                </p>
 
-        <!-- ── Domains ───────────────────────────────────────────────────────────────────────────── -->
-        <MdsCard class="admin-td__section">
-            <template #header>
-                <h2 class="admin-td__card-title">Custom domains</h2>
-            </template>
-
-            <p class="admin-td__note">
-                Read-only here. Claiming, verifying and removing a hostname happen in the workspace's own
-                settings, so the action is recorded in its audit log.
-            </p>
-
-            <MdsDataTable
-                :columns="domainColumns"
-                :rows="domains.rows"
-                caption="Custom domains"
-                row-key="domain"
-            >
-                <template #cell-domain="{ row }">
-                    <span class="admin-td__mono">{{ (row as ConsoleDomainRow).domain }}</span>
-                    <MdsBadge
-                        v-if="(row as ConsoleDomainRow).is_public_host"
-                        variant="info"
-                        label="Respondent host"
-                    />
-                </template>
-                <template #cell-status="{ row }">
-                    <MdsBadge v-bind="statusVariant((row as ConsoleDomainRow).status)" dot />
-                </template>
-                <template #cell-last_checked_at="{ row }">
-                    {{ formatDate((row as ConsoleDomainRow).last_checked_at) }}
-                </template>
-                <template #empty>
-                    <MdsEmptyState
-                        illustration="default"
-                        headline="No custom domains"
-                        :description="`Respondent links use ${domains.public_host}.`"
-                    />
-                </template>
-            </MdsDataTable>
-        </MdsCard>
-
-        <!--
-            I11b — support access (RBAC §9 resolved decision 1).
-
-            Deliberately the LAST card on the page. It is the highest-consequence control in the console —
-            it signs the operator in to a customer's workspace with a real member's authority — and putting
-            it under the read-only cards means an operator has scrolled past what the workspace actually
-            looks like before reaching for it. Most support questions are answered by the four cards above.
-        -->
-        <MdsCard class="admin-td__section">
-            <template #header>
-                <h2 class="admin-td__card-title">Support access</h2>
-            </template>
-
-            <p class="admin-td__note">
-                Signing in as a member records an entry in <strong>this workspace's own audit log</strong>,
-                notifies its owner, and marks everything you do as taken by a platform operator. The session
-                ends automatically after 30 minutes.
-            </p>
-
-            <MdsDataTable
-                :columns="targetColumns"
-                :rows="impersonation.targets"
-                caption="Members you can sign in as"
-                row-key="id"
-            >
-                <template #cell-name="{ row }">
-                    {{ (row as ImpersonationTarget).name }}
-                    <MdsBadge v-if="(row as ImpersonationTarget).is_owner" variant="info" label="Owner" />
-                </template>
-                <template #cell-actions="{ row }">
-                    <MdsButton
-                        variant="secondary"
-                        size="sm"
-                        :disabled="impersonating"
-                        @click="pendingTarget = row as ImpersonationTarget"
-                    >
-                        Sign in as
+                <template #actions>
+                    <MdsButton variant="tertiary" @click="pendingTarget = null">Cancel</MdsButton>
+                    <MdsButton variant="primary" :loading="impersonating" @click="startImpersonation">
+                        Sign in as {{ pendingTarget?.name }}
                     </MdsButton>
                 </template>
-                <template #empty>
-                    <MdsEmptyState
-                        illustration="default"
-                        headline="No one to sign in as"
-                        description="Support access is limited to active members who are not platform staff, and never to your own account."
-                    />
+            </MdsModal>
+
+            <MdsModal
+                :open="pendingAction !== null"
+                :title="pendingAction === 'suspend' ? 'Suspend workspace' : 'Reactivate workspace'"
+                @close="pendingAction = null"
+            >
+                <p class="admin-td__prose">
+                    {{
+                        pendingAction === 'suspend'
+                            ? `Members of ${tenant.name} will lose access until it is reactivated.`
+                            : `Members of ${tenant.name} will regain access immediately.`
+                    }}
+                </p>
+                <!-- `#actions`, not `#footer` — MdsModal's slot is `actions` (MdsCard's is `footer`). Getting
+                     this wrong renders the confirm buttons nowhere at all, silently. -->
+                <template #actions>
+                    <MdsButton variant="secondary" @click="pendingAction = null">Cancel</MdsButton>
+                    <MdsButton
+                        :variant="pendingAction === 'suspend' ? 'destructive' : 'primary'"
+                        :loading="busy"
+                        @click="confirmAction"
+                    >
+                        {{ pendingAction === 'suspend' ? 'Suspend' : 'Reactivate' }}
+                    </MdsButton>
                 </template>
-            </MdsDataTable>
-
-            <MdsAlert v-if="impersonationError" tone="danger" assertive :message="impersonationError" />
-        </MdsCard>
-
-        <!-- Confirmation is not ceremony here: the click leaves this origin entirely and lands the operator
-             inside somebody else's workspace, so the modal is the last point at which "wrong row" is
-             recoverable. It names the member, which the row already did, and states the two consequences
-             the operator is accountable for. -->
-        <MdsModal
-            :open="pendingTarget !== null"
-            title="Sign in to this workspace?"
-            @close="pendingTarget = null"
-        >
-            <p>
-                You will be signed in to <strong>{{ tenant.name }}</strong> as
-                <strong>{{ pendingTarget?.name }}</strong> with that member's full permissions.
-            </p>
-            <p>
-                The workspace owner is notified, and the access is recorded in the workspace's audit log
-                where its members can see it.
-            </p>
-
-            <template #actions>
-                <MdsButton variant="tertiary" @click="pendingTarget = null">Cancel</MdsButton>
-                <MdsButton variant="primary" :loading="impersonating" @click="startImpersonation">
-                    Sign in as {{ pendingTarget?.name }}
-                </MdsButton>
-            </template>
-        </MdsModal>
-
-        <MdsModal
-            :open="pendingAction !== null"
-            :title="pendingAction === 'suspend' ? 'Suspend workspace' : 'Reactivate workspace'"
-            @close="pendingAction = null"
-        >
-            <p>
-                {{
-                    pendingAction === 'suspend'
-                        ? `Members of ${tenant.name} will lose access until it is reactivated.`
-                        : `Members of ${tenant.name} will regain access immediately.`
-                }}
-            </p>
-            <!-- `#actions`, not `#footer` — MdsModal's slot is `actions` (MdsCard's is `footer`). Getting
-                 this wrong renders the confirm buttons nowhere at all, silently. -->
-            <template #actions>
-                <MdsButton variant="secondary" @click="pendingAction = null">Cancel</MdsButton>
-                <MdsButton
-                    :variant="pendingAction === 'suspend' ? 'destructive' : 'primary'"
-                    :loading="busy"
-                    @click="confirmAction"
-                >
-                    {{ pendingAction === 'suspend' ? 'Suspend' : 'Reactivate' }}
-                </MdsButton>
-            </template>
-        </MdsModal>
+            </MdsModal>
+        </div>
     </AdminLayout>
 </template>
 
@@ -539,10 +547,42 @@ function formatDay(iso: string | null): string {
 /* `--mds-color-status-danger-fg`, never `--mds-color-danger-text` — the latter resolves to danger-300 in
    dark and fails contrast on bg-surface. /admin/* is outside the axe sweep, so nothing would catch it. */
 
+/* M174: the container the cards' split reads — this page's own, since its root is the console layout's column. */
+.admin-td {
+    container-type: inline-size;
+}
+
 .admin-td__grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
     gap: var(--mds-space-4);
+}
+
+/* M174 (`R-7b8a74ae`, `D120`): from a 75rem container the Workspace and Plan cards sit in a 26rem column beside the
+   usage, capability, domain and support sections, one card under the other. The console pads 24px a side, so a 1440
+   window already gives the page 1392px. */
+@container (min-width: 75rem) {
+    .admin-td__layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(18rem, 26rem);
+        column-gap: var(--mds-space-6);
+        align-items: start;
+    }
+
+    .admin-td__layout > .admin-td__grid {
+        grid-column: 2;
+        grid-row: 1;
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .admin-td__layout > .admin-td__main {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .admin-td__main > .admin-td__section:first-child {
+        margin-top: 0;
+    }
 }
 
 .admin-td__section {
@@ -561,7 +601,7 @@ function formatDay(iso: string | null): string {
     font-size: var(--mds-type-label-font-size);
     font-weight: var(--mds-font-weight-medium);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: var(--mds-tracking-wide);
     color: var(--mds-color-text-secondary);
 }
 
@@ -596,6 +636,19 @@ function formatDay(iso: string | null): string {
 .admin-td__current {
     margin: 0 0 var(--mds-space-3);
     color: var(--mds-color-text-body);
+}
+
+/* M174: the dialogs' paragraphs, as every tenant dialog styles its own (`members__prose`) — bare, they fell back to the
+   browser's default margins. The sign-in dialog holds two, so the second keeps a gap. */
+.admin-td__prose {
+    margin: 0;
+    font-size: var(--mds-type-body-md-font-size);
+    line-height: var(--mds-type-body-md-line-height);
+    color: var(--mds-color-text-body);
+}
+
+.admin-td__prose + .admin-td__prose {
+    margin-top: var(--mds-space-3);
 }
 
 .admin-td__note {

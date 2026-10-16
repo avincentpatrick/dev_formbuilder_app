@@ -14842,3 +14842,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `resources/js/Pages/submissions/encode.test.ts` pin it instead. The remedy: a seeded published form with two ungated sections
   (stepped) and an e2e case at 1920 that reads the list and its current step, then presses Next. **Latent.** Filed by `M174`.
   **Tier: during-testing.**
+
+- **`minor` · The platform support API answers on the public workspace host, so a leaked support token reads every workspace's feedback from anywhere until it expires.**
+  Found by `M175` while building `R-78f43f26`: `D141` put the API on any platform host because the testing server's central host
+  is the agency's website (`routes/platform-api.php`), and `docs/security-threat-model.md` §9 item 35 accepts the exposure for
+  the testing server only. Before real data — beside `D48`'s private-repository step — the exposure is reconsidered: an IP lock
+  on the token, the API on the central host once production has a reachable one, or a shorter ceiling than 90 days (ADR-0023
+  §D2, §D5). **Latent.** Filed by `M175`. **Tier: before-launch.**

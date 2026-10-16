@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Models\PlatformApiToken;
 use App\Services\Admin\PlatformSupportTokenService;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
@@ -29,6 +29,7 @@ uses(RefreshDatabase::class);
 */
 
 beforeEach(function (): void {
+    TenantContext::flush();
     $this->beforeApplicationDestroyed(purgeCommittedFeedbackFixtures(...));
 });
 

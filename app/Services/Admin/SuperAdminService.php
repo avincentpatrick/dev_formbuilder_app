@@ -509,7 +509,10 @@ final class SuperAdminService
      * M175 (`R-2ce2f274`): each row carries its kind and the page's full address and title, and `type` narrows
      * by kind.
      *
-     * @param  array{status?: ?string, tenant_id?: ?string, type?: ?string}  $filters
+     * M175 (`R-78f43f26`) adds the platform support API's two filters: `statuses`, a SET of stored values (the
+     * pull asks for New and Ongoing at once), and `since`, the earliest `submitted_at`.
+     *
+     * @param  array{status?: ?string, statuses?: list<string>, tenant_id?: ?string, type?: ?string, since?: ?CarbonInterface}  $filters
      * @return array{rows: list<array<string, mixed>>, meta: array{current_page: int, last_page: int, total: int, per_page: int}}
      */
     public function listFeedback(array $filters, int $perPage, int $page): array
@@ -519,8 +522,10 @@ final class SuperAdminService
             $query = FeedbackReport::on(SuperAdminContext::CONNECTION)
                 ->withoutGlobalScope(FeedbackReport::$tenantScope)
                 ->when($filters['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
+                ->when(($filters['statuses'] ?? []) !== [], fn ($q) => $q->whereIn('status', $filters['statuses'] ?? []))
                 ->when($filters['tenant_id'] ?? null, fn ($q, $v) => $q->where('tenant_id', $v))
                 ->when($filters['type'] ?? null, fn ($q, $v) => $q->where('type', $v))
+                ->when($filters['since'] ?? null, fn ($q, $v) => $q->where('submitted_at', '>=', $v))
                 ->orderByDesc('submitted_at');
 
             $total = (clone $query)->count();
@@ -533,25 +538,7 @@ final class SuperAdminService
             $names = $this->reporterNames($reports);
 
             return [
-                'rows' => array_values($reports->map(fn (FeedbackReport $r): array => [
-                    'id' => (string) $r->getKey(),
-                    'tenant_id' => $r->tenant_id,
-                    'type' => $r->type?->value,
-                    'route' => $r->route,
-                    'page_url' => $r->page_url,
-                    'page_title' => $r->page_title,
-                    'remarks' => $r->remarks,
-                    'browser_info' => $r->browser_info,
-                    'status' => $r->status->value,
-                    'submitted_at' => $r->submitted_at->toIso8601String(),
-                    'resolved_at' => $r->resolved_at?->toIso8601String(),
-                    'resolution_note' => $r->resolution_note,
-                    'reporter' => $names[$r->user_id] ?? null,
-                    // The role the reporter held when they sent it (M175), snapshotted at submit; null before.
-                    'reporter_role' => $r->reporter_role,
-                    'resolver' => $r->resolved_by === null ? null : ($names[$r->resolved_by] ?? null),
-                    'has_screenshot' => $r->screenshot_attachment_id !== null,
-                ])->all()),
+                'rows' => array_values($reports->map(fn (FeedbackReport $r): array => $this->feedbackRow($r, $names))->all()),
                 'meta' => [
                     'current_page' => $current,
                     'last_page' => $lastPage,
@@ -562,6 +549,49 @@ final class SuperAdminService
         });
 
         return $result;
+    }
+
+    /**
+     * One report in {@see self::listFeedback()}'s row shape, for a report the caller already holds — the platform
+     * support API answers a status change with the row it just wrote (M175). The names come through the
+     * `users` bypass in an elevated transaction of their own; the report itself is never re-read there, because
+     * the caller's write may not be committed yet.
+     *
+     * @return array<string, mixed>
+     */
+    public function describeFeedback(FeedbackReport $report): array
+    {
+        return $this->feedbackRow(
+            $report,
+            $this->userNames(array_values(array_filter([$report->user_id, $report->resolved_by]))),
+        );
+    }
+
+    /**
+     * @param  array<string, array{name: string, email: string}>  $names
+     * @return array<string, mixed>
+     */
+    private function feedbackRow(FeedbackReport $r, array $names): array
+    {
+        return [
+            'id' => (string) $r->getKey(),
+            'tenant_id' => $r->tenant_id,
+            'type' => $r->type?->value,
+            'route' => $r->route,
+            'page_url' => $r->page_url,
+            'page_title' => $r->page_title,
+            'remarks' => $r->remarks,
+            'browser_info' => $r->browser_info,
+            'status' => $r->status->value,
+            'submitted_at' => $r->submitted_at->toIso8601String(),
+            'resolved_at' => $r->resolved_at?->toIso8601String(),
+            'resolution_note' => $r->resolution_note,
+            'reporter' => $names[$r->user_id] ?? null,
+            // The role the reporter held when they sent it (M175), snapshotted at submit; null before.
+            'reporter_role' => $r->reporter_role,
+            'resolver' => $r->resolved_by === null ? null : ($names[$r->resolved_by] ?? null),
+            'has_screenshot' => $r->screenshot_attachment_id !== null,
+        ];
     }
 
     /**
@@ -592,6 +622,66 @@ final class SuperAdminService
         ])->all();
 
         return $map;
+    }
+
+    /**
+     * Names and emails for a set of user ids, read through the `users` SELECT bypass in an elevated transaction
+     * of its own (M175) — for the console's support-token list, whose owners are platform super-admins that
+     * no tenant context would reveal on the ordinary connection.
+     *
+     * @param  list<string>  $ids
+     * @return array<string, array{name: string, email: string}>
+     */
+    public function userNames(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        /** @var array<string, array{name: string, email: string}> $map */
+        $map = $this->elevated(function () use ($ids): array {
+            /** @var Collection<int, User> $users */
+            $users = User::on(SuperAdminContext::CONNECTION)->whereIn('id', $ids)->get(['id', 'name', 'email']);
+
+            return $users->mapWithKeys(fn (User $u): array => [
+                (string) $u->getKey() => ['name' => $u->name, 'email' => $u->email],
+            ])->all();
+        });
+
+        return $map;
+    }
+
+    /**
+     * Write one PLATFORM audit row (`tenant_id` NULL) — M175's support tokens and every call made with one.
+     *
+     * The second caller of {@see AuditLogger::record()}'s `$connection` (the first is
+     * {@see self::updatePlatformSettings()}), for the same reason: a row that belongs to no tenant cannot pass
+     * the strict append-only INSERT policy on the app connection, so it is written on the elevated connection
+     * through `audits_superadmin_insert`, inside {@see self::elevated()} — still the only place elevation opens.
+     * Redaction stays single-sourced: `platform_api_tokens.token_hash` is an unconditional secret.
+     *
+     * @param  ?array<string, mixed>  $old
+     * @param  ?array<string, mixed>  $new
+     */
+    public function recordPlatformAudit(
+        AuditEvent $event,
+        string $auditableType,
+        string $auditableId,
+        ?array $old = null,
+        ?array $new = null,
+        ?string $actorId = null,
+    ): void {
+        $this->elevated(function () use ($event, $auditableType, $auditableId, $old, $new, $actorId): void {
+            $this->audit->record(
+                $event,
+                $auditableType,
+                $auditableId,
+                old: $old,
+                new: $new,
+                actorId: $actorId,
+                connection: SuperAdminContext::CONNECTION,
+            );
+        });
     }
 
     /**
@@ -831,9 +921,12 @@ final class SuperAdminService
      * reaches the email as mail-only context, never `data` ({@see NotificationDispatcher::dispatch()}), and the
      * audit records that it changed without its words ({@see AuditRedactor::PII}).
      *
+     * Returns the row as written, so the platform support API can answer with it without re-reading it on
+     * another connection before the write is committed (M175).
+     *
      * @throws SuperAdminException on a transition the lifecycle does not offer
      */
-    public function transitionFeedback(FeedbackReport $report, FeedbackStatus $to, User $actor, ?string $note = null): void
+    public function transitionFeedback(FeedbackReport $report, FeedbackStatus $to, User $actor, ?string $note = null): FeedbackReport
     {
         $from = $report->status;
 
@@ -843,7 +936,8 @@ final class SuperAdminService
 
         $note = $note === null || trim($note) === '' ? null : trim($note);
 
-        DB::transaction(function () use ($report, $from, $to, $actor, $note): void {
+        /** @var FeedbackReport $written */
+        $written = DB::transaction(function () use ($report, $from, $to, $actor, $note): FeedbackReport {
             $savedTenant = TenantContext::currentTenantId();
             $savedUser = TenantContext::currentUserId();
             TenantContext::applyLocal($report->tenant_id);
@@ -902,10 +996,14 @@ final class SuperAdminService
                         $resolutionNote === null ? [] : ['note' => $resolutionNote],
                     );
                 }
+
+                return $row;
             } finally {
                 TenantContext::applyLocal($savedTenant, $savedUser);
             }
         });
+
+        return $written;
     }
 
     /**

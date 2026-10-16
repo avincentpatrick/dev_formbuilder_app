@@ -17,11 +17,15 @@ import { useForm } from '@inertiajs/vue3';
 import { MdsAlert, MdsButton, MdsCard, MdsFormField, MdsIcon, MdsSwitch, MdsTextarea } from '@meridian/design-system';
 import { watch } from 'vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import SupportTokensCard from '@/components/admin/SupportTokensCard.vue';
+import type { SupportTokenRow } from '@/components/admin/types';
 
 const props = defineProps<{
     settings: { signup_open: boolean; maintenance_enabled: boolean; maintenance_message: string };
     fingerprint: string;
     about: { version: string; commit: string | null; built_at: string | null; environment: string };
+    /** M175 — the platform support tokens, names and dates only; the secret is a one-shot flash. */
+    support_tokens: SupportTokenRow[];
 }>();
 
 const form = useForm({
@@ -174,6 +178,15 @@ function save(): void {
                 </dl>
             </MdsCard>
         </form>
+
+        <!--
+            M175 — OUTSIDE the settings form, in a grid of its own: the card issues and revokes with its own
+            requests, and a form nested in a form is invalid HTML (Enter in the token's name would also submit
+            the settings). Same filling grid, so it lines up under the cards above.
+        -->
+        <div class="platform platform--tokens">
+            <SupportTokensCard :tokens="support_tokens" />
+        </div>
     </AdminLayout>
 </template>
 
@@ -186,6 +199,10 @@ function save(): void {
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 30rem), 1fr));
     gap: var(--mds-space-5);
     align-items: start;
+}
+
+.platform--tokens {
+    margin-top: var(--mds-space-5);
 }
 
 .platform__head {

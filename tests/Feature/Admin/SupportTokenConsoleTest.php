@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\AuditEvent;
 use App\Models\PlatformApiToken;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -25,6 +26,7 @@ uses(RefreshDatabase::class);
 */
 
 beforeEach(function (): void {
+    TenantContext::flush();
     $this->beforeApplicationDestroyed(purgeCommittedFeedbackFixtures(...));
     $this->withoutVite();
     confirmPasswordNow();

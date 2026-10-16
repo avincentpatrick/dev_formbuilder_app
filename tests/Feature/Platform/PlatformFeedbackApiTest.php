@@ -7,6 +7,7 @@ use App\Enums\FeedbackStatus;
 use App\Enums\ScanStatus;
 use App\Models\Audit;
 use App\Models\FeedbackReport;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -29,6 +30,9 @@ uses(RefreshDatabase::class);
 */
 
 beforeEach(function (): void {
+    // A platform audit row takes its tenant from the live context; a context left by an earlier test would
+    // stamp a purged tenant on it. Production has none on this path.
+    TenantContext::flush();
     $this->beforeApplicationDestroyed(purgeCommittedFeedbackFixtures(...));
 });
 

@@ -329,10 +329,12 @@ are **hidden rather than locked with an upgrade CTA** — an upsell would point 
 | `/admin/users` | Platform user list |
 | `/admin/audit-log` | Platform-wide audit ledger |
 | `/admin/feedback` | Feedback reports across tenants |
-| `/admin/settings` | Platform settings |
+| `/admin/settings` | Platform settings, and the **Support tokens** card (M175: `POST /admin/support-tokens`, `DELETE /admin/support-tokens/{token}`) |
 | `/admin/two-factor` | TOTP enrolment — the gate below |
 
 Three middleware stack up: `EnsureSuperAdmin` → `EnsureSuperAdminMfa` → `RequireRecentPassword`.
+
+**The platform support API** (`/api/platform/v1/feedback…`, M175, ADR-0023) is NOT behind these: it answers on any platform host — a workspace subdomain included — and only to a **platform support token** issued on the Support tokens card. Its owner must still be a super-admin with two-factor confirmed on every call. No session, role or tenant API key opens it.
 
 > ## ⚠️ THE SUPER-ADMIN NEEDS A REAL AUTHENTICATOR APP — DO NOT "FIX" THIS
 >

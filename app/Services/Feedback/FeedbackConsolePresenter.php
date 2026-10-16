@@ -44,29 +44,7 @@ final class FeedbackConsolePresenter
         $result = $this->superAdmin->listFeedback($filters, self::PER_PAGE, $page);
 
         $tenants = $this->tenantCatalog();
-        $names = array_column($tenants, 'label', 'value');
-
-        $rows = array_map(function (array $row) use ($names): array {
-            $status = FeedbackStatus::from((string) $row['status']);
-
-            $type = is_string($row['type'] ?? null) ? FeedbackType::tryFrom($row['type']) : null;
-
-            return [
-                ...$row,
-                'status_label' => $status->label(),
-                // Null on a report sent before the kind existed (M175) — the console shows no kind, not a guess.
-                'type_label' => $type?->label(),
-                // The role in words (M175); null on a report sent before the role was recorded.
-                'reporter_role_label' => is_string($row['reporter_role'] ?? null)
-                    ? AssignableRoles::label($row['reporter_role'])
-                    : null,
-                'tenant_name' => $names[$row['tenant_id']] ?? 'Unknown workspace',
-                'transitions' => array_map(
-                    static fn (FeedbackStatus $to): array => ['value' => $to->value, 'label' => $to->label()],
-                    $status->allowedTransitions(),
-                ),
-            ];
-        }, $result['rows']);
+        $rows = $this->decorate($result['rows'], array_column($tenants, 'label', 'value'));
 
         return [
             'data' => $rows,
@@ -89,6 +67,42 @@ final class FeedbackConsolePresenter
                 default => 'no_rows',
             },
         ];
+    }
+
+    /**
+     * The rows of {@see SuperAdminService::listFeedback()} in the shape the console AND the platform support
+     * API both serve (M175): the labels, the workspace name, the role in words and the legal next steps. One
+     * shape on purpose — the pull script and the console then describe a report in the same words.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @param  array<string, string>|null  $tenantNames  id => name; looked up when not given
+     * @return list<array<string, mixed>>
+     */
+    public function decorate(array $rows, ?array $tenantNames = null): array
+    {
+        $tenantNames ??= array_column($this->tenantCatalog(), 'label', 'value');
+
+        return array_map(function (array $row) use ($tenantNames): array {
+            $status = FeedbackStatus::from((string) $row['status']);
+
+            $type = is_string($row['type'] ?? null) ? FeedbackType::tryFrom($row['type']) : null;
+
+            return [
+                ...$row,
+                'status_label' => $status->label(),
+                // Null on a report sent before the kind existed (M175) — no kind is shown, not a guess.
+                'type_label' => $type?->label(),
+                // The role in words (M175); null on a report sent before the role was recorded.
+                'reporter_role_label' => is_string($row['reporter_role'] ?? null)
+                    ? AssignableRoles::label($row['reporter_role'])
+                    : null,
+                'tenant_name' => $tenantNames[(string) $row['tenant_id']] ?? 'Unknown workspace',
+                'transitions' => array_map(
+                    static fn (FeedbackStatus $to): array => ['value' => $to->value, 'label' => $to->label()],
+                    $status->allowedTransitions(),
+                ),
+            ];
+        }, $rows);
     }
 
     /**

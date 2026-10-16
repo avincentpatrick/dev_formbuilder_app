@@ -34,6 +34,9 @@ final class AuditRedactor
     private const array SECRETS = [
         'users' => ['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'],
         'webhook_endpoint' => ['secret', 'secret_previous'],
+        // M175 — a platform support token's hash. Registered in the SAME increment that creates the table, by the
+        // rule above. The service never puts it in a payload; this is the backstop if one ever does.
+        'platform_api_tokens' => ['token_hash'],
         // A native-connector OAuth grant (H15a / ADR-0009 §D10). Registered in the SAME increment that
         // creates the table: an unregistered credential-bearing alias is silently un-redacted and nothing
         // detects the omission. Highest blast radius of anything on this list — these tokens act inside the

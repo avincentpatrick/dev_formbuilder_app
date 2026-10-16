@@ -389,6 +389,15 @@ class AppServiceProvider extends ServiceProvider
                 : 'ip:'.$request->ip(),
         ));
 
+        // The platform support API (M175, ADR-0023) — one caller, the dev session's feedback pull, which makes a
+        // handful of requests per session. 60 a minute per token is ample for a pull with screenshots; the
+        // per-address limit bounds guessing, since this throttle runs BEFORE the token is looked up. Keyed on a
+        // hash, never the token itself, so the cache never holds a usable credential.
+        RateLimiter::for('platform-api', fn (Request $request): array => [
+            Limit::perMinute(60)->by('platform-tok:'.hash('sha256', (string) $request->bearerToken())),
+            Limit::perMinute(120)->by('platform-ip:'.$request->ip()),
+        ]);
+
         // Guest runtime limits (Increment F5). The submit/schema surface is limited per token AND per IP
         // (technical-architecture.md §7.2), so a single leaked link and a single enumerating IP are both
         // bounded; the mint surface is limited per IP. Keyed on the raw token string (no verification

@@ -95,6 +95,9 @@ return Application::configure(basePath: dirname(__DIR__))
             // conflicting, which is why the completion hop there uses a path these two do not.
             // The group declares its own stack — Fortify's, not the connector one; see the file.
             Route::group([], base_path('routes/google-auth.php'));
+            // The platform support API (M175, ADR-0023) — the dev session's feedback pull. On any platform host
+            // (`D141`), behind a platform support token and nothing else; the group declares its own stack.
+            Route::group([], base_path('routes/platform-api.php'));
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -255,7 +258,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // getPrevious()), and ModelNotFoundException → NotFoundHttpException. So we match the POST-conversion
         // types here. ValidationException / AuthenticationException / ThrottleRequestsException / the domain
         // Form* exceptions are NOT rewritten and are matched directly.
-        $isApi = fn (Request $request): bool => $request->is('api/v1/*');
+        //
+        // M175 — the platform support API (`api/platform/v1/*`, ADR-0023) answers in the SAME envelope: its only
+        // client is `scripts/feedback-pull.php`, which reads `error.code` the way any /api/v1 client does.
+        $isApi = fn (Request $request): bool => $request->is('api/v1/*', 'api/platform/v1/*');
 
         // ── The WEB surface's JSON refusal (M90, docs/feature-backlog.md:8919) ────────────────────────
         // `$isApi` keys on the PATH, so a `fetch` at a tenant WEB route — which is what the builder, scopes

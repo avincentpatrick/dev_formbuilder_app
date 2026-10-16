@@ -301,6 +301,26 @@ components:
 
 ---
 
+## 3a. The platform support API (M175, ADR-0023)
+
+A separate surface from `/api/v1`, with one client: `scripts/feedback-pull.php`, which the development session runs at every start to read the testers' feedback and push status changes back (`D139`). It is **not** in `openapi.json` (Scramble documents `api/v1` only); this section and ADR-0023 are its contract.
+
+- **Base:** `https://<any platform host>/api/platform/v1` — the central host or any workspace subdomain (`D141`: on the testing server the central host is the agency's website); a custom domain answers 404.
+- **Authentication:** `Authorization: Bearer msp_…` — a **platform support token** issued on the console's Settings page (data-dictionary §39). No session, cookie or tenant API key is accepted. Every call re-checks that the token is unrevoked and unexpired and that its owner is still a platform super-admin with two-factor confirmed; any failure is `401 unauthenticated`.
+- **Errors:** the §2.3 envelope, `{ "error": { "code", "message", "details" } }`. Platform maintenance answers `503 maintenance_mode`.
+- **Rate limit:** 60 requests a minute per token, 120 per address (`throttle:platform-api`).
+- **Audit:** every call leaves a platform audit row naming the token (`exported` for a read, `updated` for a status change).
+
+| Method and path | What it does | Answers |
+|---|---|---|
+| `GET /feedback` | Reports across every workspace, newest first. Query: `status` (comma list of stored values — `new`, `reviewed`, `resolved`, `wont_fix`), `type` (`bug`, `suggestion`, `question`), `since` (ISO-8601, earliest `submitted_at`), `page`, `per_page` (≤100, default 50). | `200 { data: [row…], meta: { current_page, last_page, total, per_page } }`; `422 validation_failed` on an unknown status or kind. |
+| `GET /feedback/{id}/screenshot` | The report's screenshot, once its virus scan has cleared it. | `200` the image (`X-Content-Type-Options: nosniff`); `404 not_found` when there is none; `409 not_yet_available` while scanning. |
+| `PATCH /feedback/{id}` | Move a report. Body: `{ "status": "<stored value>", "note": "<reply, ≤1000>"? }`. Resolved and Declined tell the reporter (bell and email, the note quoted in the email). | `200 { data: row }`; `422 invalid_transition` for a step the lifecycle does not offer; `404 not_found`. |
+
+**A row** carries `id`, `tenant_id`, `tenant_name`, `type`, `type_label`, `status` (stored), `status_label` (New · Ongoing · Resolved · Declined), `route`, `page_url`, `page_title`, `remarks`, `browser_info`, `reporter` (`{name, email}` or null), `reporter_role`, `reporter_role_label`, `submitted_at`, `resolved_at`, `resolution_note`, `resolver`, `has_screenshot` and `transitions` (the legal next steps, `[{value, label}]`).
+
+---
+
 ## 4. Out of Scope / Deferred
 
 - ~~The full, generated `openapi.yaml`~~ — **delivered in Phase 0 Increment E** as `openapi.json` at the repo root (Scramble-generated, Redocly-validated, drift-checked in CI). See §0.

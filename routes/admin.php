@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\FeedbackConsoleController;
 use App\Http\Controllers\Admin\ImpersonationController;
 use App\Http\Controllers\Admin\PlatformAuditController;
 use App\Http\Controllers\Admin\PlatformSettingsController;
+use App\Http\Controllers\Admin\SupportTokenController;
 use App\Http\Controllers\Admin\TenantAdminController;
 use App\Http\Controllers\Admin\TwoFactorResetController;
 use Illuminate\Support\Facades\Route;
@@ -124,5 +125,13 @@ Route::domain((string) config('tenancy.central_domain'))
             // of the only page that can switch it off.
             Route::get('/settings', [PlatformSettingsController::class, 'index'])->name('admin.settings.index');
             Route::patch('/settings', [PlatformSettingsController::class, 'update'])->name('admin.settings.update');
+
+            // Platform support tokens (M175, `R-78f43f26`, ADR-0023) — the credential the dev session's feedback
+            // pull presents to `/api/platform/v1`. Issued and revoked from a card on the Settings page, inside
+            // this group's `superadmin.mfa` + `step-up`, because the token itself will never be asked again.
+            // `{token}` is a raw uuid, not a bound model, on the `{feedback}` precedent above.
+            Route::post('/support-tokens', [SupportTokenController::class, 'store'])->name('admin.support-tokens.store');
+            Route::delete('/support-tokens/{token}', [SupportTokenController::class, 'destroy'])
+                ->whereUuid('token')->name('admin.support-tokens.destroy');
         });
     });

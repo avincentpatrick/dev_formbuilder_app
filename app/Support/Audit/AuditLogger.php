@@ -42,7 +42,9 @@ final class AuditLogger
      * authenticated user; pass it explicitly (or null for a guest/system-less action) when auth() is not
      * the actor.
      *
-     * `$connection` exists for exactly one caller and is not a general escape hatch: I5's PLATFORM settings
+     * `$connection` exists for PLATFORM rows only and is not a general escape hatch — two callers, both in
+     * {@see SuperAdminService}: I5's settings writes and M175's `recordPlatformAudit()` (the platform support
+     * tokens and every call made with one). I5's PLATFORM settings
      * writes ({@see SuperAdminService::updatePlatformSettings()}) describe a row that
      * belongs to no tenant, so their audit carries `tenant_id = NULL` — which the strict append-only INSERT
      * policy (`tenant_id = ctx`) cannot pass on the app connection. They run on the elevated

@@ -183,10 +183,13 @@ function formatDate(iso: string | null): string {
     color: var(--mds-color-text-secondary);
 }
 
+/* The console Settings cards' own title (`.platform__title`), so this card reads as one of them. */
 .tokens__title {
     margin: 0;
     font-family: var(--mds-font-family-display);
-    font-size: var(--mds-type-heading-sm-font-size);
+    font-size: var(--mds-type-heading-3-font-size);
+    line-height: var(--mds-type-heading-3-line-height);
+    font-weight: var(--mds-type-heading-3-font-weight);
     color: var(--mds-color-text-heading);
 }
 

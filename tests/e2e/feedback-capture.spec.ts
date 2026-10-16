@@ -69,7 +69,9 @@ test('the feedback panel is off the screen when the screenshot is taken, and com
     const dialog = page.getByRole('dialog', { name: 'Send feedback' });
     await expect(dialog).toBeVisible();
 
-    await dialog.getByRole('radio', { name: 'Bug' }).check();
+    // The label, as a person does: the radio's drawn circle sits over its visually hidden native input.
+    await dialog.getByText('Bug', { exact: true }).click();
+    await expect(dialog.getByRole('radio', { name: 'Bug' })).toBeChecked();
     await dialog.getByRole('textbox', { name: "What's on your mind?" }).fill('The export button does nothing');
 
     // The precondition the two stand-ins exist for: without a secure context there is no Capture button.

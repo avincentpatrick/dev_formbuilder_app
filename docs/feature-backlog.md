@@ -2238,7 +2238,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   authentication authority at that door. **User decision of record, 2026-08-20**, taken on the evidence
   rather than as a new position — §D22 already gives an SSO session's *re-authentication* to the IdP via
   `ForceAuthn` rather than to a local credential, so login is that principle one step earlier in the same
-  flow; `docs/security-threat-model.md:193` already called the SAML side *"a deliberate divergence"*; and
+  flow; `docs/security-threat-model.md:194` already called the SAML side *"a deliberate divergence"*; and
   the 2026-08-14 Google decision was itself framed as a divergence **from** this.
   ⚠️ **THE ROW'S OWN EVIDENCE HAD GONE STALE, IN EXACTLY THE WAY THE ROW IS ABOUT.** It cited `0016:168`;
   M2's §D31 had since pushed that sentence down by seventy lines (`git show 0028ea1~1:docs/adr/0016-saml-sso.md`
@@ -2262,7 +2262,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `PROGRESS_ARCHIVE.md` keeps what was believed at the time.
   ⚠️⚠️ **AND THIS INCREMENT REPRODUCED THE VERY DEFECT CLASS IT CLOSES — FOUR TIMES, IN ITS OWN PROSE.**
   A +59-line §D32 and a +10-line middleware docblock invalidated M7's own `0016:238`, its `0019:37` /
-  `ACCESS-MATRIX.md:408` evidence list, **and two LIVE rows in this file that M7 never read** — one of
+  `ACCESS-MATRIX.md:411` evidence list, **and two LIVE rows in this file that M7 never read** — one of
   them `EnforceTenantTwoFactor.php:33-52`, the sole evidence for the *enrolment-nudge* argument §D32
   leans on twice. M7 had explicitly checked which citations its insertion would move and answered
   *"nothing else moves"* — true of the citations that already existed, and silent about the ones the same
@@ -2966,7 +2966,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   an Inertia arrival.~~** ⛔ **THE ROW'S FIX WOULD HAVE SHIPPED A REGRESSION, AND THAT IS THE FINDING.**
   Read from `usePage().url` unconditionally, as the row describes, the field displays **any** page's `q` —
   and `q` is the shared filter key on six other list pages (`forms/Index.vue:60`, `audit/Index.vue:59`,
-  `feedback/Index.vue:47`, `submissions/Inbox.vue:144`, `members/Index.vue:63`, `webhooks/Index.vue:73`),
+  `feedback/Index.vue:49`, `submissions/Inbox.vue:144`, `members/Index.vue:63`, `webhooks/Index.vue:73`),
   every one committing client-side with `preserveState`. The workspace-search box would have shown the
   audit ledger's filter term, where pressing Enter posts it to `/search` and silently turns "filter this
   list" into "search everything". Shipped gated on `page.component === 'search/Index'`, which also fixes
@@ -3420,12 +3420,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   pins the gate. The cross-tenant case is kept because it pins RLS at binding, and it carries a comment
   saying in as many words that it is not a substitute.
   ⛔⛔ **AND THE CENSUS FOUND THE GATE IS WALKED AROUND BY A SIBLING ROUTE — LIVE, NOT LATENT.**
-  `GET /attachments/{attachment}` (`routes/tenant.php:751-752`) is authorized by `AttachmentPolicy::view()`,
+  `GET /attachments/{attachment}` (`routes/tenant.php:755-756`) is authorized by `AttachmentPolicy::view()`,
   whose entire body was `$user->can('submissions.view')` — **it never read its `$attachment` argument**.
   ADR-0015 §D6 filed the screenshot into that same shared table, and `RolePermissionSeeder` grants
   `submissions.view` to `viewer`, `reviewer` and `form_editor` while granting `feedback.view` to none of
   them. So the id-addressed route served the PII image to exactly the three roles the dedicated route
-  refuses — and `FeedbackController.php:78-84` says in its own words that it declines to route through
+  refuses — and `FeedbackController.php:97-103` says in its own words that it declines to route through
   `AttachmentController` **precisely to avoid that coupling**, which was open in the other direction the
   whole time. Fixed: the policy now reads the kind through a `match`, so a feedback screenshot is read under
   `feedback.view` on every route that serves it or on none. **No permission key minted**, so no paired file
@@ -3504,7 +3504,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ✅ **DONE — M34 (2026-08-27).** Three tests, both routes: `AttachmentPolicyTest` gets a `pending` and an
   `infected` case on `GET /attachments/{attachment}`, and `FeedbackTest` gets an `infected` case on
   `GET /feedback/{report}/screenshot`. Both controllers carry their own copy of the guard —
-  `FeedbackController.php:78-84` says in its own words why it declines to route through
+  `FeedbackController.php:97-103` says in its own words why it declines to route through
   `AttachmentController` — so asserting one proves nothing about the other and both are pinned.
   ⚠️ **THE ROW'S FIXTURE-COST CLAIM WAS EXACTLY RIGHT, WHICH IS WORTH RECORDING BECAUSE IT USUALLY IS NOT.**
   `AttachmentFactory` really does carry `pending()` (`:158`), `clean()` (`:163`) and `infected()` (`:173`),
@@ -3532,7 +3532,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/` or `routes/`, re-verified this increment rather than carried over from the row. Filed by `M29`.
 - ~~**`major` · `GET /admin/feedback/{feedback}/screenshot` streams cross-tenant PII from the central host and no test asserts a refusal on it.**~~
   ✅ **DONE — M35 (2026-08-27).** Every citation exact, the third row running: `routes/admin.php:83-84`,
-  the index's three denials at `FeedbackConsoleTest.php:223`/`:229`/`:234`, and the screenshot's only case at
+  the index's three denials at `FeedbackConsoleTest.php:93`/`:229`/`:234`, and the screenshot's only case at
   `:338-348` whose own comment says the 404 proves the lookup resolved rather than that anyone was refused.
   ⛔ **THE ROW'S STATED WEAKNESS WAS THE PART WORTH BUILDING FOR, AND IT WAS MEASURED RATHER THAN ARGUED.**
   The realistic silent mutation it names is a route declared outside the group, so that mutation was run
@@ -3554,7 +3554,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and the controller answers **404** for a report it cannot resolve: the same status from two different
   decisions. A non-super-admin case written against a random id — or against a report with no screenshot, the
   only fixture the console suite could build — **passes with the middleware deleted**.
-  `tests/Feature/Tenant/FeedbackTest.php:317-319` states the identical trap on the tenant-side twin. So the
+  `tests/Feature/Tenant/FeedbackTest.php:328-330` states the identical trap on the tenant-side twin. So the
   404 arm runs against a report a super-admin really does get 200 image bytes from, which meant building the
   first committed-screenshot fixture the console suite has ever had (`consoleScreenshot()`); that positive
   control is itself the first test in this repository to drive this route to a success. **Proven, not
@@ -3562,7 +3562,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   controller and streams the bytes. The other three arms answer with a redirect, which no 404 can be confused
   with, and say so rather than paying for a fixture they do not need.
   ⛔ **AND ASKING THE KILLER QUESTION OF EVERY GATE ON THE ROUTE — NOT ONLY THE ONES THE ROW NAMES — FOUND A
-  THIRD NAKED ONE.** `FeedbackConsoleController.php:82`'s `abort_unless(...->servable(), 409)` was asserted
+  THIRD NAKED ONE.** `FeedbackConsoleController.php:95`'s `abort_unless(...->servable(), 409)` was asserted
   by **nothing**: M34 pinned that guard on the two routes it was looking at (`FeedbackController.php:94`,
   `AttachmentController::show()`'s scan-status guard) and this console copy is the third, so quarantined bytes could be served to
   the one principal who reads across every tenant with the whole repository green. Covered here, with the
@@ -4569,7 +4569,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `previous_keys` key by name, because a line number in a config file is a pointer with a shelf life.
   Original filing follows.
   **`major` · The threat model's `Open` row asserts `APP_PREVIOUS_KEYS` "appears in no `.env.example` and
-  in no document".** `docs/security-threat-model.md:100` (repeated `:218` — **was `:217` until M9's own §8 row shifted it, which is exactly the hazard the citation-cluster row below records**; duplicated into
+  in no document".** `docs/security-threat-model.md:101` (repeated `:218` — **was `:217` until M9's own §8 row shifted it, which is exactly the hazard the citation-cluster row below records**; duplicated into
   `docs/adr/0009:31,:83,:168,:290`). It is present on this branch at `.env.example:207-209` with an
   ADR-0009 §D9 warning attached, and discussed in two more documents — so the register is wrong at the
   moment it is ratified, and an operator planning an `APP_KEY` rotation is told not to look for the seam
@@ -5243,11 +5243,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   unrelated code, and they are the *only* evidence offered for §D3's load-bearing non-expressibility
   claim); `docs/adr/0007:124,:29,:86,:190` (ADR-0002 §D6 moved to `:248` when this branch inserted +119
   lines above it); `docs/adr/0009:21,:286` (a defect the code already fixed, and the code now points back
-  at the ADR as the remaining carrier); `docs/adr/0009:168` + `security-threat-model.md:100`
+  at the ADR as the remaining carrier); `docs/adr/0009:168` + `security-threat-model.md:101`
   (`config/app.php:120-124`, not `:99-106`); `docs/adr/0009:168` again (the "stock `slack` block" pointer
   now lands on the **Google sign-in** block this branch added — the exact conflation the sentence forbids);
   `docs/adr/0016:133,:135,:147` (ADR-0019 §D6b, not §D7); `docs/adr/0020:43`; `docs/adr/0011:8,:111`
-  (`MdsTabs` exists as of J4c1); `docs/audit-compliance-logging-spec.md:54`;
+  (`MdsTabs` exists as of J4c1); `docs/audit-compliance-logging-spec.md:55`;
   `docs/piping-output-encoding-design.md:181` (was `:180`; **M57 moved it by one line and the citation
   linter caught it in the same run** — the ledger tier went 18 → 19 and named this pointer, which is the
   clearest evidence yet for the rule this very row is about); `docs/offline-first-sync-design.md:128`;
@@ -7434,7 +7434,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   SEEDERS.** Declared at `app/Models/Form.php:41`, `:88` and `:120`, read at
   `app/Services/Submissions/EncodeFormPresenter.php:210` and
   `app/Services/Submissions/PublicFormPresenter.php` (its `single_page_mode` key) — and every assignment in the tree is a seeder or a
-  test (`database/seeders/DemoSeeder.php:535`, `database/seeders/E2eSeeder.php` (three fixtures),
+  test (`database/seeders/DemoSeeder.php:536`, `database/seeders/E2eSeeder.php` (three fixtures),
   `tests/Feature/Submissions/EncodeStepPayloadTest.php:76`). The sole creation path,
   `app/Services/Forms/FormService.php`, opens a `Form::create([` whose six explicit keys on the lines
   below it omit the column, so every real form takes the database default. No `FormRequest` names it, and
@@ -7444,10 +7444,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/Http/Controllers/Tenant/FormSaveResumeController.php`. ⛔ **THE DEFAULT HALF IS NARROWER THAN THE
   SWEEP OFFERED AND WORSE THAN IT LOOKS.** It is not doc-vs-code; it is four documents holding two
   incompatible values. `database/migrations/2026_07_06_000201_create_forms_table.php:46` and
-  `docs/data-dictionary.md:221` say `false`. `docs/ux/form-filling-ux-flow.md` calls `true` "the literal
+  `docs/data-dictionary.md:222` say `false`. `docs/ux/form-filling-ux-flow.md` calls `true` "the literal
   default for a new form" and `docs/PRD.md:103` agrees. So repairing one pair does not settle it. ⚠️ The
   cost is already on the record: `PROGRESS_ARCHIVE.md:297` logs an E2E timeout caused by the seeded form
-  defaulting to multi-step. **Live.** Filed by `M80`. **Tier: early-testing.** ⚠️ **`D35` ANSWERED 2026-09-20 (`M105`) — add the setting, default step by step.** ⚠️ **The answer settles the setting, not the documents.** Four of them hold two incompatible defaults — the migration and `docs/data-dictionary.md:221` say `false`; `docs/ux/form-filling-ux-flow.md` and `docs/PRD.md:103` say `true` — and whoever takes this row reconciles all four. Measured by `M105`.
+  defaulting to multi-step. **Live.** Filed by `M80`. **Tier: early-testing.** ⚠️ **`D35` ANSWERED 2026-09-20 (`M105`) — add the setting, default step by step.** ⚠️ **The answer settles the setting, not the documents.** Four of them hold two incompatible defaults — the migration and `docs/data-dictionary.md:222` say `false`; `docs/ux/form-filling-ux-flow.md` and `docs/PRD.md:103` say `true` — and whoever takes this row reconciles all four. Measured by `M105`.
   ✅ **CLOSED BY `M120`.** The column has a writer: `UpdatePageModeRequest` + `FormPageModeController` +
   `PATCH /forms/{form}/page-mode` + `FormService::setSinglePageMode`, and a **Pages** section in
   `FormSettingsModal` using `MdsSegmentedControl` so both modes are named and the default is visible.
@@ -7490,19 +7490,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   consults it: `app/Models/Form.php:83` (`$fillable`), `app/Models/Form.php:115` (cast),
   `database/migrations/2026_07_06_000201_create_forms_table.php:41` (default `true`),
   `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php:53` (a column-name census) and the documenting
-  row at `docs/data-dictionary.md:216`. The two places that would consult it gate on something else —
+  row at `docs/data-dictionary.md:217`. The two places that would consult it gate on something else —
   `app/Policies/SubmissionPolicy.php:42` returns `submissions.create` with the published-version and
   Editor-grant conjuncts on the lines below, summarised at `app/Policies/SubmissionPolicy.php:33`, and no
-  conjunct is this flag; the encode routes at `routes/tenant.php:656` reason explicitly about two *other*
+  conjunct is this flag; the encode routes at `routes/tenant.php:660` reason explicitly about two *other*
   omitted gates without mentioning it. ⚠️ **TWO CORRECTIONS THE JOIN MADE TO THE FINDING, AND BOTH CHANGE
   THE ROW.** (a) It is one of **five** unread flags — `allow_api_import`, `allow_offline_sync`,
   `allow_ocr_single` and `allow_ocr_linelist` are equally reader-less. The other four sit ahead of unbuilt
-  or held features and `docs/data-dictionary.md:217` carries that rationale explicitly; this one's feature
+  or held features and `docs/data-dictionary.md:218` carries that rationale explicitly; this one's feature
   is built, which is what makes it filable rather than a ratified absence. (b) The `$fillable` entry is
   **not** a mass-assignment risk: `app/Services/Forms/FormService.php` opens an explicit six-key array,
   so nothing can set it either. ⚠️ **The remedy is genuinely two-directional** — `docs/PRD.md:252` opens
   Feature #7 and its acceptance criteria never ask for a per-form off switch, so narrowing
-  `docs/data-dictionary.md:216` is as defensible as wiring the gate, and the row should be taken with both
+  `docs/data-dictionary.md:217` is as defensible as wiring the gate, and the row should be taken with both
   priced. Precedent for the shape: `users.last_active_tenant_id`, already in this file. **Live.**
   Filed by `M80`. **Tier: during-testing.**
 
@@ -7511,7 +7511,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Measured by `M79`'s sweeps (2026-09-06), joined and refuted by `M80`. Seven hits, all declaration:
   `database/migrations/2026_07_06_000201_create_forms_table.php:45`, `app/Models/Form.php:87` and `:119`,
   `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php:53`, and the three documenting lines
-  `docs/data-dictionary.md:220`, `docs/erd.md` (inside the `forms` entity block) and
+  `docs/data-dictionary.md:221`, `docs/erd.md` (inside the `forms` entity block) and
   `docs/ux/form-filling-ux-flow.md:49`. ⛔ **THE SWEEP NAMED THE MANIFEST AND MISSED THE LOAD-BEARING
   HALF.** Both surfaces gate on the **plan** entitlement instead: `routes/api.php:293` carries
   `feature:offline_sync` and `app/Http/Controllers/Api/V1/SyncManifestController.php:69` never touches the
@@ -7537,7 +7537,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/Enums/QueueName.php:40` (`Exports`), `app/Jobs/Submissions/GeneratePdfJob.php:59` which carries that
   queue and whose docblock at `:30` records the queue "has existed with none since H2", the dispatcher at
   `routes/tenant.php`, `AttachmentKind::export_artifact` at `docs/data-dictionary.md:41` and
-  `NotificationType::export_ready` at `docs/data-dictionary.md:55`, the `exports_count` meter, and a 12/min
+  `NotificationType::export_ready` at `docs/data-dictionary.md:56`, the `exports_count` meter, and a 12/min
   fairness ceiling at `config/queue-fairness.php:68`. ⚠️ **One named piece does NOT ship, and the row would
   overstate itself by claiming otherwise:** §7.3 also says completion is signalled by a realtime Reverb
   push, and there is no broadcasting config in the tree at all —
@@ -7561,7 +7561,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the comment opening at `config/permission.php:20`. ⚠️ **The one near-miss is a circular pointer, not a
   deferral**: `docs/multi-tenancy-rbac-design.md:742` defers the request/response *shapes* to Doc #14, and
   `docs/api-specification.md:13` points straight back at §7.1 as the authoritative inventory. Neither
-  defers the build. This repository builds `/api/v1` twins deliberately — `routes/tenant.php:767` says
+  defers the build. This repository builds `/api/v1` twins deliberately — `routes/tenant.php:771` says
   so — so the web surface does not discharge it. **Live.** Filed by `M80`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.** ⛔ **THIS IS THE ROW THAT MADE THE ANSWER `C` RATHER THAN `A`.** `D38`'s premise sentence *"nothing shipped depends on them"* is false here: the documented `GET /api/v1/roles` is the stated reason roles use UUIDv7 primary keys rather than Spatie's bigints, cited at `docs/multi-tenancy-rbac-design.md:56`, `app/Models/Role.php:13` and `config/permission.php:20-21`. **That schema shipped**, so a plain trim orphans the rationale for a decision already paid for.
 
 - **`minor` · §7.1's `Form draft` row pins four `/api/v1` builder endpoints registered nowhere, and the
@@ -7613,7 +7613,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`minor` · §7.1's flat webhook-delivery paths and §7.4's per-tenant delivery-log UI both contradict the
   same document's per-endpoint spec, and only the per-endpoint form was built.** Measured by `M79`'s sweeps
   (2026-09-06), joined and refuted by `M80`. Every delivery listing in the tree is parent-scoped —
-  `routes/api.php:323`, `routes/api.php:328`, `routes/tenant.php:770`, and the query chains opening at
+  `routes/api.php:323`, `routes/api.php:328`, `routes/tenant.php:774`, and the query chains opening at
   `app/Http/Controllers/Api/V1/WebhookDeliveryController.php:31` and
   `app/Services/Webhooks/WebhookEndpointPresenter.php:105`, whose `webhook_endpoint_id` predicates sit on
   the following line in each — and `openapi.json` carries the nested pair only. ⛔ **DO NOT TAKE THIS AS
@@ -7673,7 +7673,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/Services/Connectors/ConnectionSubscriptionService.php:114` each soft-delete and say so in a trailing
   comment — so a taker should settle whether §8 is scoped to its three named entities before sizing the
   job. ⚠️ **Two more places in one further document promise the same unbuilt jobs** —
-  `docs/data-dictionary.md:131` and `docs/data-dictionary.md` §10, the latter an S3 object-deletion job
+  `docs/data-dictionary.md:132` and `docs/data-dictionary.md` §10, the latter an S3 object-deletion job
   that does not exist, which is the half carrying real future cost since orphaned objects outlive their
   rows. ⚠️ **Take it with `D14`, not independently**: `D14` recommends leaving the submission
   delete/restore surface unbuilt, decides the surface rather than the grace period, and says nothing about
@@ -7701,7 +7701,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   THE JOIN SURFACED RATHER THAN BURIED.** `PROGRESS_ARCHIVE.md:322` records "Idempotency-Key (§2.4)
   deferred" inside Increment E's documented-not-fixed list. It names no reason, it targets **Phase 1** —
   long closed — and it was never converted into a queue row, nor were its three siblings from the same
-  sentence. `docs/api-specification.md:304` is §4 Out of Scope and does not carry it. That archive note is
+  sentence. `docs/api-specification.md:324` is §4 Out of Scope and does not carry it. That archive note is
   the record of a deferral nobody filed, which is exactly what this row corrects. **Live.**
   Filed by `M80`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.** ⚠️ **`M105` re-measured one clause:** *"exactly two hits repository-wide"* now returns six, because the ledger rows quoting the sentence are themselves hits. The two substantive hits are unchanged. Note also that `PROGRESS_ARCHIVE.md:322` records `Idempotency-Key (§2.4) deferred` — this is a **lapsed deferral**, not an unbacked promise.
 
@@ -7826,7 +7826,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `docs/api-specification.md:65`, a table introduced as "Concrete numbers" at
   `docs/api-specification.md:67` pins "Guest respondent (per IP, across all tokens) | 100 requests/minute"
   at `docs/api-specification.md:72`. The guest submit surface's per-IP arm resolves through
-  `app/Providers/AppServiceProvider.php:408` to `config/guest.php:40`, which is 60. ⚠️ **Say "the surface
+  `app/Providers/AppServiceProvider.php:417` to `config/guest.php:40`, which is 60. ⚠️ **Say "the surface
   that row describes", not "the only per-IP ceiling"** — `config/guest.php` defines three:
   `submit_per_ip` 60 (`:40`), `mint_per_ip` 30 (`:41`) and `challenge_per_ip` 90 (`:49`). None is 100.
   ⚠️ **And they are env-overridable defaults, not fixed definitions** — each is written
@@ -8810,7 +8810,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the one the row prescribed.** Every citation held: the FK is `cascadeOnDelete()` and IMMEDIATE, there is
   no `DEFERRABLE` anywhere in `database/migrations/`, `respond()` has exactly two catch arms, and
   `bootstrap/app.php` registers no `QueryException` renderable across its 24 `render()` calls.
-  ⚠️ **One citation needed a caveat**: `bootstrap/app.php:549` *does* register a `Throwable` catch-all, but
+  ⚠️ **One citation needed a caveat**: `bootstrap/app.php:555` *does* register a `Throwable` catch-all, but
   it returns early for anything outside `api/v1/*`, and the builder sits on a tenant subdomain.
   ⛔ **"THE 422 EVERY OTHER REFUSAL ON THAT SURFACE RETURNS" IS FALSE — THE SURFACE RETURNS SIX STATUSES.**
   403 on a `can:` denial and on an unverified email, 404 on a binding miss, 409 on drift, 419 on CSRF, 422
@@ -8975,7 +8975,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   enum-catalog gate was built for"* is not what it looks like: the catalog has 28 rows, the mirror census
   ~28 constructs, and the **intersection is 8**. They are different sets that overlap.
   ⚠️ **`bot_challenge` has FOUR copies, not two** — `resources/js/components/forms/types.ts:26`,
-  `resources/public-runtime/lib/types.ts:141`, `docs/data-dictionary.md:231` and the enum — and
+  `resources/public-runtime/lib/types.ts:141`, `docs/data-dictionary.md:232` and the enum — and
   `FormBotChallenge` is not one of the 28 catalog rows, so `M88`'s gate is blind to it too. Two of the four
   are now gated here; the document copy is filed below.
   ⛔ **TWO GRAMMARS, AND AN UNMATCHED ROW IS A FAILURE RATHER THAN A SKIP.** Four live mirrors — including
@@ -8991,9 +8991,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   actually about and the one nothing could see before. Closed by `M89`. Filed by `M88`.
 - ~~**`minor` · An entitlement denial on three builder routes answers a JSON `fetch` with a 302 to HTML, and
   a shipped test pins it that way.**~~ Found by `M89`'s fan-out (2026-09-10) while closing the 23503 row.
-  `bootstrap/app.php:337-343` renders a `feature:` denial as `back()` on its non-API arm, and the
+  `bootstrap/app.php:343-349` renders a `feature:` denial as `back()` on its non-API arm, and the
   `feature:field_library` routes — `forms.fields.from-library`, `forms.fields.save-to-library`,
-  `forms.library-items` (`routes/tenant.php:576-585`) — are driven by `builderClient.ts`, which sends
+  `forms.library-items` (`routes/tenant.php:580-589`) — are driven by `builderClient.ts`, which sends
   `Accept: application/json`. ⛔ **So the client follows the redirect, receives HTML, falls into its own
   `catch` at `builderClient.ts:68` and shows a generic "Request failed"** — the user is never told the
   feature is not on their plan. ⚠️ **This is strictly worse than the 23503 row it was found beside**: that
@@ -9135,7 +9135,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   each carry a `none` that `RequiredMode` does not**, so they are near-mirrors rather than mirrors and a
   set-equality gate would redden on arrival; whether the extra member is a rendering concern or a
   vocabulary divergence is the question nobody has answered. ⚠️ **A fourth copy of `bot_challenge` sits in
-  `docs/data-dictionary.md:231`** as prose, and `FormBotChallenge` is not one of the 28 catalog rows, so
+  `docs/data-dictionary.md:232`** as prose, and `FormBotChallenge` is not one of the 28 catalog rows, so
   `M88`'s catalog gate is blind to it as well. ⚠️ **And `resources/js/Pages/submissions/show.test.ts:43-52`
   pins `SubmissionStatus` as an `as const` array in a TEST file**, which its own comment at `:56-58`
   correctly calls a literal a person maintains. Filed rather than added to the gate because each needs a
@@ -10520,7 +10520,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   understates the room that is left at the moment it finally appears. The earlier byte-ceiling row is closed, so
   nothing open tracks the next surgery. ⚠️ Plan the next `## Current Status` move into `PROGRESS_ARCHIVE.md` before
   the ceiling forces it, and raise `next.php`'s threshold to about 8,000 bytes so the warning arrives with room to
-  make the move deliberately rather than under a red gate. **Live.** Filed by `M98`. **Tier: early-testing.** ⛔ **AMENDED BY `M104` (2026-09-20) — THE PREMISE EXPIRED TWO DAYS AFTER THIS ROW WAS FILED, AND NO GATE IN THIS REPOSITORY CAN SEE THAT.** The row says *"The earlier byte-ceiling row is closed, so nothing open tracks the next surgery"* — and `M100` then PERFORMED that surgery. Commit `f181efb` carries `[tracker-surgery]` at line start: 9 lines and 29,883 bytes moved, `PROGRESS.md` 129,102 -> 99,219, headroom 898 -> 30,781, proved A1-A4, slice sha256 `44fabf4f`, with `PROGRESS_ARCHIVE.md` growing to match. The row was never amended, so a discharged obligation read as an imminent one for four close-outs. ⚠️ **EVERY FIGURE IN THIS ROW IS THEREFORE STALE IN THE FAVOURABLE DIRECTION:** it states 124,804 bytes with 5,196 left; the tree at `c0e1638` reads **112,009 bytes with 17,991 of headroom**, and growth since that surgery measures **+3,198 bytes per close-out**, so the next move is roughly five or six close-outs out rather than imminent. ✅ **THE SECOND REMEDY IS DONE:** `scripts/next.php` now warns at `HEADROOM_WARNING_BYTES = 8000` instead of 4,000, and its message no longer RESTATES the growth rate — the old text said "two to three KB", already below the measured mean when anyone read it, so the sentence understated the pressure at the exact moment it appeared. It now points at the gate that measures the rate. Proved by deliberate defect: raising the constant makes the warning fire, and the file was restored by sha256 comparison. ⚠️ **LEFT OPEN AGAINST THE NEXT SURGERY, NOT CLOSED** — performing one now would move bytes that do not need moving, which is the opposite of the discipline this row exists to protect. **Still Live.** ⛔ **AMENDED AND RETIERED BY `M110` (2026-09-25) — THE PREMISE HAS NOW EXPIRED IN THE OTHER DIRECTION, AND THE SURGERY IS OWED BY THE NEXT CLOSE-OUT.** `M104` measured 17,991 bytes of headroom and concluded *"the next move is roughly five or six close-outs out rather than imminent"* — correct when written. `M110`'s own close-out measured `PROGRESS.md` at **128,421 bytes, 1,579 of headroom**, having added **+3,550 bytes** in one bullet. ⚠️ **That is LESS THAN ONE close-out of room at this row's own measured growth rate of +3,198**, so the next session's status bullet breaches R1 and takes CI with it. **Retiered `during-testing` → `early-testing` for that reason**, which is the first retier this row has taken. ✅ **The warning mechanism built by `M104` works and is why this was caught rather than hit:** `HEADROOM_WARNING_BYTES = 8000` fires in the hand-off, and `preflight` prints the headroom on every run — both spoke during this close-out. ⛔ **DO THE SURGERY BEFORE WRITING THE NEXT STATUS BULLET, NOT AFTER**, and prove it with `scripts/tracker-surgery.php` while both files are still uncommitted — the paths arm reads the working tree and sees nothing once the change is committed. ⚠️ **AND THE BYTE HALF IS THE ONE THAT CATCHES THIS FILE:** `M110` added one line and 3,550 bytes, so a line-count intuition would have read this close-out as trivial. **Still Live.** ⛔ **AND `M110` FOUND THE SECOND REMEDY IS ONLY HALF DONE — THE CLAIM DIRECTLY ABOVE IS WRONG IN ITS OWN TERMS.** `M104` recorded *"its message no longer RESTATES the growth rate"*, and that is true of the **rate**. But `scripts/next.php:273-274` still hard-codes a derived **count** as a literal string — `'roughly two close-outs at the growth rate scripts/tracker-lint.php measures'` — emitted unchanged at every headroom below `HEADROOM_WARNING_BYTES`. ⚠️ **It is accurate only at the trigger and decays from there:** 8,000 ÷ the measured 3,198 is about 2.5, so "roughly two" is right the moment the warning first fires and wrong by every byte after it. `M110`'s own close-out generated the line at **1,513 bytes** — under half a close-out — and the hand-off told the next session *"roughly two"*. ⛔ **THAT IS THE SAME DEFECT `M104` SET OUT TO FIX, ONE LEVEL UP:** a number in prose that is correct when written and decays silently, understating the pressure at exactly the moment the warning exists to create it. The fix is the one `M104` already chose — **derive the count from the headroom and the rate, or print neither and point at `tracker-lint`** — and it is a one-line change in the same function. **Filed here rather than as a new row because this row already owns that warning's text and already makes the claim being corrected.** ⚠️ Fixing it is CODE and wants its own increment; the surgery above does not wait on it. ✅ **CLOSED BY `M111` (2026-09-25) — THE SURGERY IS DONE AND THE `next.php` HALF WENT WITH IT, SO THIS ROW CLOSES RATHER THAN TAKING A FOURTH AMENDMENT.** The sixth tracker surgery moved `PROGRESS.md` lines 214-220 — the `M108` down to `M102` status bullets, one per line, contiguous, split by pre-measured line index and never by search — into `PROGRESS_ARCHIVE.md` at line 5294: **7 lines, 29,947 bytes, `PROGRESS.md` 128,487 -> 98,540, headroom 1,513 -> 31,460**, with a 1,845-byte dated batch note and one blank line as the 1,846 bytes declared added. ✅ **`scripts/tracker-surgery.php` passed A1-A4 on the FIRST run against an uncommitted tree** — multiset 7 distinct hashes with exact multiplicity, byte conservation exact at 2,836,101 with no tolerance, exactly the two declared paths, contiguous slice sha256 `aced1748e042c312`. The commit carries the surgery marker at line start; the full record is the `M111` release in `docs/claims/lane-a.md`. ⚠️ **THIS ROW'S OWN GROWTH RATE WAS UNDERSTATED BY A QUARTER, AND IT WAS RE-MEASURED RATHER THAN INHERITED:** `git cat-file -s 0a9ae04:PROGRESS.md` is 111,860 against 128,487 at `ebacb1b`, which is **+4,157 bytes per close-out** across `M107`-`M110`, not the +3,198 `M104` measured from `M100`'s surgery. The row's conclusion was therefore right by a wider margin than it claimed. ⚠️ **Seven bullets rather than nine, chosen from `M107`'s OUTCOME rather than its scale:** `M107` moved nine and left 18,140 bytes, about five close-outs, and the ceiling bound again four close-outs later — which is why this row has been amended three times. Seven leaves about seven close-outs and keeps `M110` and `M109` in `## Current Status` beside `M111`'s own; nine would have left a single bullet there. ✅ **The `next.php` half is done, taking the SECOND of the two options this row offered.** `tracker_headroom_warning()` now states no close-out count at all and says why, rather than deriving one: deriving it needs the rate, the rate lives in `tracker-lint`, and a second copy of it here is the same defect `M104` set out to remove. ⚠️ **This departs from this row's own instruction that the fix "wants its own increment", and the departure is deliberate:** it is one line in a function every close-out runs anyway, and deferring it would have made this the fourth amendment cycle on one row. ✅ **Proved by deliberate defect, not by a green run** — the line renders only below `HEADROOM_WARNING_BYTES`, so the constant was raised to 40,000 (sha256 `cf29f5da` -> `f4b1d708`), the sentence was captured rendering at 31,460 bytes with no count in it, and the file was restored by byte comparison back to `cf29f5da`. `mutate.php` was deliberately NOT the instrument: it drives Pest in a container and there is no test behind a generated string — the artefact IS the string, which is a limit of that harness worth knowing rather than a reason to skip the proof. ⚠️ The dated rationale for choosing 8,000 is left in place as a dated rationale, with the re-measured rate recorded beside it.
+  make the move deliberately rather than under a red gate. **Live.** Filed by `M98`. **Tier: early-testing.** ⛔ **AMENDED BY `M104` (2026-09-20) — THE PREMISE EXPIRED TWO DAYS AFTER THIS ROW WAS FILED, AND NO GATE IN THIS REPOSITORY CAN SEE THAT.** The row says *"The earlier byte-ceiling row is closed, so nothing open tracks the next surgery"* — and `M100` then PERFORMED that surgery. Commit `f181efb` carries `[tracker-surgery]` at line start: 9 lines and 29,883 bytes moved, `PROGRESS.md` 129,102 -> 99,219, headroom 898 -> 30,781, proved A1-A4, slice sha256 `44fabf4f`, with `PROGRESS_ARCHIVE.md` growing to match. The row was never amended, so a discharged obligation read as an imminent one for four close-outs. ⚠️ **EVERY FIGURE IN THIS ROW IS THEREFORE STALE IN THE FAVOURABLE DIRECTION:** it states 124,804 bytes with 5,196 left; the tree at `c0e1638` reads **112,009 bytes with 17,991 of headroom**, and growth since that surgery measures **+3,198 bytes per close-out**, so the next move is roughly five or six close-outs out rather than imminent. ✅ **THE SECOND REMEDY IS DONE:** `scripts/next.php` now warns at `HEADROOM_WARNING_BYTES = 8000` instead of 4,000, and its message no longer RESTATES the growth rate — the old text said "two to three KB", already below the measured mean when anyone read it, so the sentence understated the pressure at the exact moment it appeared. It now points at the gate that measures the rate. Proved by deliberate defect: raising the constant makes the warning fire, and the file was restored by sha256 comparison. ⚠️ **LEFT OPEN AGAINST THE NEXT SURGERY, NOT CLOSED** — performing one now would move bytes that do not need moving, which is the opposite of the discipline this row exists to protect. **Still Live.** ⛔ **AMENDED AND RETIERED BY `M110` (2026-09-25) — THE PREMISE HAS NOW EXPIRED IN THE OTHER DIRECTION, AND THE SURGERY IS OWED BY THE NEXT CLOSE-OUT.** `M104` measured 17,991 bytes of headroom and concluded *"the next move is roughly five or six close-outs out rather than imminent"* — correct when written. `M110`'s own close-out measured `PROGRESS.md` at **128,421 bytes, 1,579 of headroom**, having added **+3,550 bytes** in one bullet. ⚠️ **That is LESS THAN ONE close-out of room at this row's own measured growth rate of +3,198**, so the next session's status bullet breaches R1 and takes CI with it. **Retiered `during-testing` → `early-testing` for that reason**, which is the first retier this row has taken. ✅ **The warning mechanism built by `M104` works and is why this was caught rather than hit:** `HEADROOM_WARNING_BYTES = 8000` fires in the hand-off, and `preflight` prints the headroom on every run — both spoke during this close-out. ⛔ **DO THE SURGERY BEFORE WRITING THE NEXT STATUS BULLET, NOT AFTER**, and prove it with `scripts/tracker-surgery.php` while both files are still uncommitted — the paths arm reads the working tree and sees nothing once the change is committed. ⚠️ **AND THE BYTE HALF IS THE ONE THAT CATCHES THIS FILE:** `M110` added one line and 3,550 bytes, so a line-count intuition would have read this close-out as trivial. **Still Live.** ⛔ **AND `M110` FOUND THE SECOND REMEDY IS ONLY HALF DONE — THE CLAIM DIRECTLY ABOVE IS WRONG IN ITS OWN TERMS.** `M104` recorded *"its message no longer RESTATES the growth rate"*, and that is true of the **rate**. But `scripts/next.php:278-279` still hard-codes a derived **count** as a literal string — `'roughly two close-outs at the growth rate scripts/tracker-lint.php measures'` — emitted unchanged at every headroom below `HEADROOM_WARNING_BYTES`. ⚠️ **It is accurate only at the trigger and decays from there:** 8,000 ÷ the measured 3,198 is about 2.5, so "roughly two" is right the moment the warning first fires and wrong by every byte after it. `M110`'s own close-out generated the line at **1,513 bytes** — under half a close-out — and the hand-off told the next session *"roughly two"*. ⛔ **THAT IS THE SAME DEFECT `M104` SET OUT TO FIX, ONE LEVEL UP:** a number in prose that is correct when written and decays silently, understating the pressure at exactly the moment the warning exists to create it. The fix is the one `M104` already chose — **derive the count from the headroom and the rate, or print neither and point at `tracker-lint`** — and it is a one-line change in the same function. **Filed here rather than as a new row because this row already owns that warning's text and already makes the claim being corrected.** ⚠️ Fixing it is CODE and wants its own increment; the surgery above does not wait on it. ✅ **CLOSED BY `M111` (2026-09-25) — THE SURGERY IS DONE AND THE `next.php` HALF WENT WITH IT, SO THIS ROW CLOSES RATHER THAN TAKING A FOURTH AMENDMENT.** The sixth tracker surgery moved `PROGRESS.md` lines 214-220 — the `M108` down to `M102` status bullets, one per line, contiguous, split by pre-measured line index and never by search — into `PROGRESS_ARCHIVE.md` at line 5294: **7 lines, 29,947 bytes, `PROGRESS.md` 128,487 -> 98,540, headroom 1,513 -> 31,460**, with a 1,845-byte dated batch note and one blank line as the 1,846 bytes declared added. ✅ **`scripts/tracker-surgery.php` passed A1-A4 on the FIRST run against an uncommitted tree** — multiset 7 distinct hashes with exact multiplicity, byte conservation exact at 2,836,101 with no tolerance, exactly the two declared paths, contiguous slice sha256 `aced1748e042c312`. The commit carries the surgery marker at line start; the full record is the `M111` release in `docs/claims/lane-a.md`. ⚠️ **THIS ROW'S OWN GROWTH RATE WAS UNDERSTATED BY A QUARTER, AND IT WAS RE-MEASURED RATHER THAN INHERITED:** `git cat-file -s 0a9ae04:PROGRESS.md` is 111,860 against 128,487 at `ebacb1b`, which is **+4,157 bytes per close-out** across `M107`-`M110`, not the +3,198 `M104` measured from `M100`'s surgery. The row's conclusion was therefore right by a wider margin than it claimed. ⚠️ **Seven bullets rather than nine, chosen from `M107`'s OUTCOME rather than its scale:** `M107` moved nine and left 18,140 bytes, about five close-outs, and the ceiling bound again four close-outs later — which is why this row has been amended three times. Seven leaves about seven close-outs and keeps `M110` and `M109` in `## Current Status` beside `M111`'s own; nine would have left a single bullet there. ✅ **The `next.php` half is done, taking the SECOND of the two options this row offered.** `tracker_headroom_warning()` now states no close-out count at all and says why, rather than deriving one: deriving it needs the rate, the rate lives in `tracker-lint`, and a second copy of it here is the same defect `M104` set out to remove. ⚠️ **This departs from this row's own instruction that the fix "wants its own increment", and the departure is deliberate:** it is one line in a function every close-out runs anyway, and deferring it would have made this the fourth amendment cycle on one row. ✅ **Proved by deliberate defect, not by a green run** — the line renders only below `HEADROOM_WARNING_BYTES`, so the constant was raised to 40,000 (sha256 `cf29f5da` -> `f4b1d708`), the sentence was captured rendering at 31,460 bytes with no count in it, and the file was restored by byte comparison back to `cf29f5da`. `mutate.php` was deliberately NOT the instrument: it drives Pest in a container and there is no test behind a generated string — the artefact IS the string, which is a limit of that harness worth knowing rather than a reason to skip the proof. ⚠️ The dated rationale for choosing 8,000 is left in place as a dated rationale, with the re-measured rate recorded beside it.
 - ~~**`minor` · The one sentence a struck row left behind — never approve an unknown contributor's run — is assigned to
   two rows disjunctively and carried by neither.**~~ Found by `M99` (2026-09-18) while auditing what the `early-testing`
   rows hold that no gate can see. The closed fork-pull-request row in this ledger ends by saying the sentence
@@ -10707,7 +10707,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`minor` · The `AppSecurityHeaders` mount census says four and the tree has ten, and the wrong number is written
   in the code as well as in the threat model.** Found by `M101` (2026-09-19) while measuring which surfaces a
   response header can reach. `app/Http/Middleware/AppSecurityHeaders.php:27` says it is *"named on four groups
-  explicitly"* and names four; `docs/security-threat-model.md:72` repeats the same four. Counting
+  explicitly"* and names four; `docs/security-threat-model.md:73` repeats the same four. Counting
   `AppSecurityHeaders::class` across `routes/` and `config/` returns **10** — `routes/web.php`, seven groups in
   `routes/tenant.php`, `routes/google-auth.php` and `config/fortify.php`. ⛔ **The docblock's next sentence is what
   makes this worth filing rather than tidying:** it prices *"adding a fifth surface"* as an edit there plus an edit
@@ -10894,7 +10894,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M109` (2026-09-25) — `minor` · ~~`docs/ACCESS-MATRIX.md:105` tells its reader the central host answers a workspace route with a 404,
   and it does not — it redirects.~~** Filed 2026-09-20 by `M105`, which found the same false symptom in two places
   while verifying `D51`. The sentence reads *"a direct sign-in there lands on `/dashboard`, a workspace-only route
-  the central host answers with a 404"*. `bootstrap/app.php:617-625` renders `NotASubdomainException` for a **web**
+  the central host answers with a 404"*. `bootstrap/app.php:623-631` renders `NotASubdomainException` for a **web**
   request as `redirect(config('app.url'))`; only the `/api/v1` arm returns 404, and
   `tests/Feature/Tenancy/CentralHostFallbackTest.php:25` and `:32` both pin `assertRedirect`. ⚠️ **`M98` named this
   exact sentence on 2026-09-18 and it is untouched four increments later**, which is the reason it is a row rather
@@ -11301,7 +11301,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   never sees that their last edit did not save. ⚠️ **A second surface is built and unused:** `builderClient.ts:61-72`
   parses the 422 body into an `errors` map, and `useBuilderStore.ts:207-209` keeps only `.message` — a grep finds
   no consumer of `errors` anywhere outside the file that builds it. Per-field save errors are already on the wire
-  and are being discarded. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AND THE ROW'S PREMISE WAS FALSE IN ITS MOST LOAD-BEARING HALF, WHICH IS THE FINDING OF THIS INCREMENT.** ✅ Every citation held; one is off by one (`:127` is blank, the `.catch(() => undefined)` is at **`:128`**). ⛔ **THE STRUCTURED VIOLATION LIST WAS NEVER ON THE INERTIA WIRE.** The row, and `M112`'s own close-out, both read as though `B1a` had already put it there and only the rendering was left. `M112` rendered it for **`/api/v1/*` only**: `bootstrap/app.php:324` returns `null` for the web arm deliberately — **and it never even gets the chance**, because `FormPublishController.php:33-37` catches `PublishValidationException` *before* the render handler could fire and flashes `getMessage()` alone, with the violations in scope and discarded. **No builder page could render a per-field refusal at any cost.** The controller now flashes it under its own key, and `HandleInertiaRequests` + `inertia.d.ts` carry it. ⚠️ **A NEW KEY, NOT `publishWarnings`:** that payload is `list<string>` prose whose banner is titled *"Published, with …"* — untrue over a refusal — and two existing assertions pin it absent on this path. Modelling the refusal on it would have reproduced the defect being filed, which `M112` warned about in the abstract and is concrete here. ⛔ **THE GUARD CANNOT LIVE IN THE STORE, MEASURED RATHER THAN CHOSEN.** `whenIdle()` resolves on failure by construction — `enqueue()` ends with `queue = run.catch(() => undefined)` — and **two existing Vitest cases await it after a deliberately failed burst** (`save-state.test.ts`, `builderClient.test.ts-263`), so making it reject turns both into unhandled rejections. The verdict is therefore **read** after the await, in `Builder.vue`. ✅ **And the row's teardown claim is structural, not incidental:** `router.post` passes `preserveScroll` but **no `preserveState`**, so Inertia's non-GET default remounts the page, re-runs `useBuilderStore(props)` and resets the save error. ✅ **`ConfigPanel.vue` was NOT edited** — its alert at `:260` is already correct and already hoisted out of the selection branch; the defect is the remount, so the repair belongs at the call site. That kept this row at **one** hub file. ✅ **The banner copies `builder__warnings` for markup and geometry ONLY**, including the doubled-class specificity fix at `:756-761`, which it now shares. `MdsAlert` renders `role="status"`, so the one-tablist invariant, the thirteen `[role="tab"]` locators and `list-layout`'s three-pane count cannot see it, and **no spec clicks Publish** — `templates-axe.spec.ts:36` only asserts it visible, so the Publish button keeps its plain slot text. ⚠️ **The 422 `errors` map is still unconsumed and is filed as its own row** — it is built at `builderClient.ts:61-72`, typed on `BuilderRequestError:32`, and its only reader anywhere is its own test at `builderClient.test.ts:74`. ✅ **Mutation `m113-violations-not-flashed` CAUGHT** (the controller flashes an empty list — only the two flash cases redden, the success case stays green). ⚠️ **The client guard's control has NO HARNESS LANE and was run by hand, said plainly rather than implied:** `mutate.php` drives Pest only, so the guard was removed from `Builder.vue` with the sha256 recorded before and after and confirmed moved, Vitest run (1 failed / 11 passed — the guard case alone), then restored from a pre-write byte copy with the sha256 confirmed back and `git status` clean.
+  and are being discarded. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AND THE ROW'S PREMISE WAS FALSE IN ITS MOST LOAD-BEARING HALF, WHICH IS THE FINDING OF THIS INCREMENT.** ✅ Every citation held; one is off by one (`:127` is blank, the `.catch(() => undefined)` is at **`:128`**). ⛔ **THE STRUCTURED VIOLATION LIST WAS NEVER ON THE INERTIA WIRE.** The row, and `M112`'s own close-out, both read as though `B1a` had already put it there and only the rendering was left. `M112` rendered it for **`/api/v1/*` only**: `bootstrap/app.php:330` returns `null` for the web arm deliberately — **and it never even gets the chance**, because `FormPublishController.php:33-37` catches `PublishValidationException` *before* the render handler could fire and flashes `getMessage()` alone, with the violations in scope and discarded. **No builder page could render a per-field refusal at any cost.** The controller now flashes it under its own key, and `HandleInertiaRequests` + `inertia.d.ts` carry it. ⚠️ **A NEW KEY, NOT `publishWarnings`:** that payload is `list<string>` prose whose banner is titled *"Published, with …"* — untrue over a refusal — and two existing assertions pin it absent on this path. Modelling the refusal on it would have reproduced the defect being filed, which `M112` warned about in the abstract and is concrete here. ⛔ **THE GUARD CANNOT LIVE IN THE STORE, MEASURED RATHER THAN CHOSEN.** `whenIdle()` resolves on failure by construction — `enqueue()` ends with `queue = run.catch(() => undefined)` — and **two existing Vitest cases await it after a deliberately failed burst** (`save-state.test.ts`, `builderClient.test.ts-263`), so making it reject turns both into unhandled rejections. The verdict is therefore **read** after the await, in `Builder.vue`. ✅ **And the row's teardown claim is structural, not incidental:** `router.post` passes `preserveScroll` but **no `preserveState`**, so Inertia's non-GET default remounts the page, re-runs `useBuilderStore(props)` and resets the save error. ✅ **`ConfigPanel.vue` was NOT edited** — its alert at `:260` is already correct and already hoisted out of the selection branch; the defect is the remount, so the repair belongs at the call site. That kept this row at **one** hub file. ✅ **The banner copies `builder__warnings` for markup and geometry ONLY**, including the doubled-class specificity fix at `:756-761`, which it now shares. `MdsAlert` renders `role="status"`, so the one-tablist invariant, the thirteen `[role="tab"]` locators and `list-layout`'s three-pane count cannot see it, and **no spec clicks Publish** — `templates-axe.spec.ts:36` only asserts it visible, so the Publish button keeps its plain slot text. ⚠️ **The 422 `errors` map is still unconsumed and is filed as its own row** — it is built at `builderClient.ts:61-72`, typed on `BuilderRequestError:32`, and its only reader anywhere is its own test at `builderClient.test.ts:74`. ✅ **Mutation `m113-violations-not-flashed` CAUGHT** (the controller flashes an empty list — only the two flash cases redden, the success case stays green). ⚠️ **The client guard's control has NO HARNESS LANE and was run by hand, said plainly rather than implied:** `mutate.php` drives Pest only, so the guard was removed from `Builder.vue` with the sha256 recorded before and after and confirmed moved, Vitest run (1 failed / 11 passed — the guard case alone), then restored from a pre-write byte copy with the sha256 confirmed back and `git status` clean.
 
 - ✅ **CLOSED BY `M112` (2026-09-26) — `minor` · Per-type knowledge — which validation rules apply to which field type, and what a new field of each
   type should already validate — exists nowhere in the system.** Filed 2026-09-25 by `M110`, from the report
@@ -12002,7 +12002,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (`app/Services/Expressions/StructuredRuleLowering.php:73`) and `conditionForOperator()`'s default arm throws
   for a null operator on `required_if`/`skip_if` — and `StructuredRuleEvaluator::conditionHolds()` (`:113-116`)
   does **not** catch, so it propagates out of `SemanticValidator::requiredState()` (`:1403-1420`) and out of the
-  submission pipeline to `bootstrap/app.php:599`'s renderable, which answers a generic failure. ⚠️ **The end of
+  submission pipeline to `bootstrap/app.php:605`'s renderable, which answers a generic failure. ⚠️ **The end of
   that chain is INFERRED from the throw path and the renderable, not yet driven end to end** — a submission
   through a published form carrying such a row is the first thing to write, and it decides whether the answer is
   a 422-shaped refusal or a dead form. ✅ **`M115` removed the easiest way to CREATE one** (the editor now offers
@@ -12093,7 +12093,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   prospective, and a version already published with such a row keeps throwing forever. ⚠️ **A fifth catch arm
   is the cheap half; the question the row must answer is what the per-item `error.code` should be**, since
   `expression_error` is currently a server-fault slug that `error-normalizer.ts:77-80` deliberately does not
-  classify as a validation refusal. **Live.** Filed by `M116`. **Tier: early-testing.** ✅ **CLOSED BY `M117` — AND THE ROW'S HEADLINE CHAIN WAS WRONG IN ITS PREMISE, IN BOTH DIRECTIONS.** `replayOne()` now catches the abstract `ExpressionException`, reporting `expression_error` per item as `SyncResultStatus::Error` inside a 200, so one bad row no longer replaces the per-item result list. ⛔ **(a) `replay.ts` IS NOT A CLIENT OF THE BATCH ENDPOINT AT ALL** — it posts one row at a time to the *guest* endpoint (`api-client.ts:174`), which this controller's own docblock states at `:33-34`. So "re-sends all twenty, five times, and parks the lot" described neither channel: the batch endpoint has **no in-repo client**, and on the guest channel each row parks independently. Both halves were still real defects and both are fixed — the guest half by classifying `expression_error` as `terminal` in `error-normalizer.ts`, which `REPLAY_OUTCOME` already parks, so it no longer burns five attempts on a failure no retry can change. ⛔ **(b) A SECOND UNCAUGHT TYPE HAD THE IDENTICAL ESCAPE:** `ExpressionSyntaxException` shares `bootstrap/app.php:599`'s union arm and is reachable from the same path because `ExpressionEvaluator::evaluate()` PARSES its argument — hence the arm names the BASE class. ⚠️ **One claim corrected:** the 422 branch was a two-code allowlist with no comment, so `expression_error` fell to `unknown` **by omission, not by a recorded decision** — there was no decision to overturn. ⛔ **AND THE GATE IS STRUCTURAL, WHICH IS A MEASURED VERDICT RATHER THAN A SHORTCUT: THE TRIGGERING STATE IS NO LONGER CONSTRUCTIBLE BY ANYONE.** `M116`'s publish gate refuses the authoring shapes; the three content child tables are `draft_child` under **FORCE ROW LEVEL SECURITY**, so a published version is immutable to *every* role — an Eloquent insert raised the RLS violation, the same write on `pgsql_privileged` matched **zero rows**, and an `update()` matched zero rows and **reported success**; the parser rejects both under-arity and unknown functions (`selected(consent)` and `nosuchfn(consent)` both measured as parse failures), so no authored expression reaches the remaining `unevaluable` sites; and `SubmissionPipeline`, `SemanticValidator`, `ExpressionEvaluator`, `ExpressionParser` and `StructuralValidationGate` are all `final`, so there is no mocking seam either. The arm is therefore defence for versions published BEFORE that gate, which a test database cannot hold — so `SyncApiTest` pins that the arm and the renderable cover the same set, with a completeness arm over the exception directory. Four mutations CAUGHT (two Pest via `mutate.php`, two Vitest hand-run).
+  classify as a validation refusal. **Live.** Filed by `M116`. **Tier: early-testing.** ✅ **CLOSED BY `M117` — AND THE ROW'S HEADLINE CHAIN WAS WRONG IN ITS PREMISE, IN BOTH DIRECTIONS.** `replayOne()` now catches the abstract `ExpressionException`, reporting `expression_error` per item as `SyncResultStatus::Error` inside a 200, so one bad row no longer replaces the per-item result list. ⛔ **(a) `replay.ts` IS NOT A CLIENT OF THE BATCH ENDPOINT AT ALL** — it posts one row at a time to the *guest* endpoint (`api-client.ts:174`), which this controller's own docblock states at `:33-34`. So "re-sends all twenty, five times, and parks the lot" described neither channel: the batch endpoint has **no in-repo client**, and on the guest channel each row parks independently. Both halves were still real defects and both are fixed — the guest half by classifying `expression_error` as `terminal` in `error-normalizer.ts`, which `REPLAY_OUTCOME` already parks, so it no longer burns five attempts on a failure no retry can change. ⛔ **(b) A SECOND UNCAUGHT TYPE HAD THE IDENTICAL ESCAPE:** `ExpressionSyntaxException` shares `bootstrap/app.php:605`'s union arm and is reachable from the same path because `ExpressionEvaluator::evaluate()` PARSES its argument — hence the arm names the BASE class. ⚠️ **One claim corrected:** the 422 branch was a two-code allowlist with no comment, so `expression_error` fell to `unknown` **by omission, not by a recorded decision** — there was no decision to overturn. ⛔ **AND THE GATE IS STRUCTURAL, WHICH IS A MEASURED VERDICT RATHER THAN A SHORTCUT: THE TRIGGERING STATE IS NO LONGER CONSTRUCTIBLE BY ANYONE.** `M116`'s publish gate refuses the authoring shapes; the three content child tables are `draft_child` under **FORCE ROW LEVEL SECURITY**, so a published version is immutable to *every* role — an Eloquent insert raised the RLS violation, the same write on `pgsql_privileged` matched **zero rows**, and an `update()` matched zero rows and **reported success**; the parser rejects both under-arity and unknown functions (`selected(consent)` and `nosuchfn(consent)` both measured as parse failures), so no authored expression reaches the remaining `unevaluable` sites; and `SubmissionPipeline`, `SemanticValidator`, `ExpressionEvaluator`, `ExpressionParser` and `StructuralValidationGate` are all `final`, so there is no mocking seam either. The arm is therefore defence for versions published BEFORE that gate, which a test database cannot hold — so `SyncApiTest` pins that the arm and the renderable cover the same set, with a completeness arm over the exception directory. Four mutations CAUGHT (two Pest via `mutate.php`, two Vitest hand-run).
 
 - ✅ **CLOSED BY `M121` (2026-10-01) — `minor` · A respondent is never told the rule engine failed — every conditional question is shown with no
   conditions applied, and the submit guard lets them submit anyway.** Found by `M116` (2026-09-28), beside
@@ -12189,7 +12189,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   a fifth `FormTabSet` entry, and the two tests that pin the tab set exactly** —
   `FormTabSetReachabilityTest.php:53-60` asserts `toBe(['overview','submissions','builder','analytics'])` and
   `FormHubGateTest.php:230-241` pins `tabs.0..3` plus `has('tabs', 4)`. ⚠️ **Two things to carry in:** the hub
-  scan `tests/e2e/responsive-axe.spec.ts:265-291` waits on `getByRole('navigation', { name: <form title> })`, so
+  scan `tests/e2e/responsive-axe.spec.ts:268-294` waits on `getByRole('navigation', { name: <form title> })`, so
   a new nav landmark must not share that accessible name (`landmark-unique`); and **Scope belongs here rather
   than on the builder** — it confers capacity instead of describing the form, which is why
   `routes/tenant.php`'s `forms.scope` route gives it its own route, so the hub tab is where the second form-list dialog
@@ -12215,7 +12215,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   only the draft race at `:143-145`; `SubmissionDraftController.php:108-129` catches three of the same four
   submission exceptions and misses the expression types identically; and
   `SubmissionEditController.php:135` catches only `SubmissionEditException`, with `:104` recording that
-  `SubmissionValidationException` is *deliberately* uncaught. Each escapes to `bootstrap/app.php:599-612`'s
+  `SubmissionValidationException` is *deliberately* uncaught. Each escapes to `bootstrap/app.php:605-618`'s
   renderable, so a respondent reads *"A form expression could not be evaluated."* ⚠️ **Blast radius is one
   response rather than a destroyed per-item contract, which is why `M117` did not widen its claim to cover
   them** — but `M117` also measured that the guest channel is the one with real users on it. ⚠️ The
@@ -14145,7 +14145,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M173` (2026-10-16) — ****`minor` · The settings pages stack 640px cards in one column, so a wide screen shows one narrow column and the rest of the page empty.**
   `resources/js/Pages/Settings/Index.vue` (`.settings-card { max-width: 640px }`) with `:475` a column; `resources/js/Pages/Settings/Sso.vue:158`
-  and `:151`; `resources/js/Pages/admin/Settings.vue:188`; and the same 640px cap re-declared in every card component —
+  and `:151`; `resources/js/Pages/admin/Settings.vue:201`; and the same 640px cap re-declared in every card component —
   `resources/js/components/settings/AboutCard.vue:110`, `resources/js/components/settings/MaintenanceCard.vue:104`,
   `resources/js/components/settings/ModulesCard.vue:121`, `resources/js/components/settings/AccessCard.vue:159`,
   `resources/js/components/settings/NotificationPreferencesCard.vue:177`, `resources/js/components/settings/BrandingCard.vue:312`,
@@ -14266,7 +14266,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · Fifteen files set small error text in `--mds-color-danger-text`, which resolves to `danger-300` in dark and measures 4.22:1 on the surface.**
   The repository's own notes say so (`resources/js/Pages/admin/AuditLog.vue:287`, `resources/js/Pages/admin/TenantDetail.vue:547`,
-  `resources/js/components/builder/LogicRail.vue:228`, `resources/js/components/shell/FeedbackButton.vue:295`) and the uses remain:
+  `resources/js/components/builder/LogicRail.vue:228`, `resources/js/components/shell/FeedbackButton.vue:444`) and the uses remain:
   `resources/js/Pages/forms/Builder.vue:857`, `resources/js/components/webhooks/WebhookFormModal.vue:197`,
   `resources/js/components/scopes/GrantModal.vue:256`, `resources/js/components/scopes/DeleteNodeModal.vue:120`,
   `resources/js/components/builder/ConfigPanel.vue:787`, `resources/js/components/submissions/MediaInput.vue:420`, `:557`, `:583`,
@@ -14366,7 +14366,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The testers' request (2026-10-15): *"there must also a way to check the older version for history"*. `app/Services/Forms/FormHubPresenter.php:87-92`
   sends each version's id, number, status and published date; `resources/js/Pages/forms/Show.vue:444-487` draws the panel with
   Print blank and Restore as the only actions; `form_versions.change_summary` (`app/Services/Forms/SchemaChangeClassifier.php`,
-  by key) reaches no page; an old version is reachable only as the Print blank PDF (`routes/tenant.php:576`), the XLSForm download
+  by key) reaches no page; an old version is reachable only as the Print blank PDF (`routes/tenant.php:580`), the XLSForm download
   (`:554`) or `GET /api/v1/forms/{form}/versions/{version}`. The remedy: the panel lists each version's summary (added, removed and
   changed questions by label) and a View that opens the old version read-only through the preview runtime from `schema_snapshot`
   (a tenant route beside the Print blank one). The interactive field-by-field diff stays `version-diff-ui`
@@ -14376,7 +14376,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The testers' comment (2026-10-15): *"it can only have a single set of options and also there is also 1 type of question unlike in
   kobo, every cell can be configured separately, it can pick different type of questions and different set of options for each"*.
   Measured: `resources/js/components/builder/MatrixEditor.vue:46` says "Each cell is a single choice from this shared list";
-  `config.cells` is that list (`docs/data-dictionary.md:377`), the request validates rows, columns and cells as value/label lists
+  `config.cells` is that list (`docs/data-dictionary.md:378`), the request validates rows, columns and cells as value/label lists
   only (`app/Http/Requests/Forms/UpdateFieldRequest.php:274-306`), the normalizer rejects unknown rows or columns and nothing else
   (`app/Services/Submissions/StructuralAnswerNormalizer.php:548-593`), publish checks the three lists non-empty and distinct
   (`app/Services/Forms/StructuralValidationGate.php:532-562`), and `app/Enums/FieldType.php:12` claims each cell is
@@ -14446,7 +14446,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Left by `M133`'s v1 and `M141` and recorded on `R-5fdbc47c`: the preview runtime (`resources/js/components/builder/PreviewRuntime.vue`)
   is built from the draft's props, which carry `linkable_sources` (`app/Services/Forms/BuilderPresenter.php:105-107`) but never a
   list's rows or a link's answers, so an author checks a PSGC cascade or a linked list only on the published form. The remedy: a
-  tenant route beside the choice-list routes (`routes/tenant.php:1098-1107`) returns the draft's linked lists and the first 200 rows
+  tenant route beside the choice-list routes (`routes/tenant.php:1102-1111`) returns the draft's linked lists and the first 200 rows
   of each list-bound question with "showing 200 of N", and the preview merges them the way the guest runtime does
   (`resources/public-runtime/lib/linked-choices.ts:89-112`). **Live.** Filed by `M172`. **Tier: early-testing.** **Amended 2026-10-15 by `M172`:** an old version opened read-only from the hub (`resources/js/Pages/forms/VersionView.vue`) draws `schemaWithoutListOptions()` through the same preview, so a list-backed cascade shows no choices there either; the same route closes both.
 
@@ -14473,7 +14473,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The testers' question (2026-10-15): *"Does the platform support cascading options linked to the Philippine Standard Geographic
   code (PSGC)?"*. `M141` made a PSGC-sized cascade work from uploaded CSV files (measured at 43,739 options), but no PSGC data
   exists in the repository, each form re-uploads its own lists (`app/Services/Forms/ChoiceListMaterializer.php:148` reads them by
-  version), `docs/PRD.md:442` declined a national geography, and `docs/data-dictionary.md:370` says a reference-dataset table is
+  version), `docs/PRD.md:442` declined a national geography, and `docs/data-dictionary.md:371` says a reference-dataset table is
   "deliberately not introduced here". The Philippine Statistics Authority publishes the PSGC Publication Datafile each quarter
   (3Q 2026 released 2026-10-12; ten-digit codes kept as text; region, province or independent city, city or municipality,
   barangay). `D131` (the user, 2026-10-15): built in, free. The remedy: a platform-wide read-only `psgc_places` table (code, name,
@@ -14520,14 +14520,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **Tier: early-testing.**
 
 - **`minor` · A condition, a calculation or answer piping cannot read a grid cell.**
-  `docs/data-dictionary.md:378` records that no expression may reference a grid (`app/Services/Forms/ExpressionValidationGate.php`),
+  `docs/data-dictionary.md:379` records that no expression may reference a grid (`app/Services/Forms/ExpressionValidationGate.php`),
   `app/Enums/PipingEligibility.php:110` excludes it from piping, and `resources/js/components/help/manual.ts:1122` tells authors so.
   With typed cells (the grid rows above) a cell becomes a scalar an expression could read as `${grid.row.column}`; both engines
   and their golden vectors would learn it together. Filed so the gap the typed grid opens is queued rather than left in prose.
   **Live.** Filed by `M172`. **Tier: during-testing.**
 
 - **`minor` · A grid cannot sit inside a repeatable section.**
-  `app/Services/Forms/StructuralValidationGate.php:147-154` refuses it at publish, and `docs/data-dictionary.md:378` records the
+  `app/Services/Forms/StructuralValidationGate.php:147-154` refuses it at publish, and `docs/data-dictionary.md:379` records the
   rule. A table of tables is rare; a grid per household member is not. Needs the repeat-group answer shape to carry an object per
   instance in both engines and in every export. **Live.** Filed by `M172`. **Tier: during-testing.**
 
@@ -14567,7 +14567,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · A keyer on the manual-entry page cannot open the reference files the form's version carries.**
   Found by `M174` while verifying `R-66952d33`: a version's reference files (`M132`; hidden from respondents since `M138`, `D92` A)
-  are listed only to whoever may edit the form (`routes/tenant.php:1093`, `can:update,form`, on the draft), and
+  are listed only to whoever may edit the form (`routes/tenant.php:1097`, `can:update,form`, on the draft), and
   `app/Services/Submissions/EncodeFormPresenter.php:203-233` sends none, so a staff member keying a paper response cannot open the
   instructions or the blank the author attached. `D136` A (the user, 2026-10-16) put the manual-entry side panel's facts and steps in
   `M174` and filed this as its own row. The remedy: the presenter sends the entered version's reference files (name, size, a download
@@ -14578,8 +14578,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The testers' second round, relayed by the user (2026-10-16): *"there must be a tagging … if its resolved declined new and ongoing,
   get user, also update user if its fixed/resolved"*. `app/Enums/FeedbackStatus.php:64` lets a new report become reviewed or won't
   fix only, and `:12` records that `feedback_reports.status` carries no CHECK; only `app/Services/Admin/SuperAdminService.php:813`
-  (`transitionFeedback()`) moves it, writing an audit row and nothing else; `app/Enums/NotificationType.php:47` starts a list with no
-  feedback value; the reporter gets the toast at `app/Http/Controllers/Tenant/FeedbackController.php:54` and, below Owner and Admin,
+  (`transitionFeedback()`) moves it, writing an audit row and nothing else; `app/Enums/NotificationType.php:48` starts a list with no
+  feedback value; the reporter gets the toast at `app/Http/Controllers/Tenant/FeedbackController.php:73` and, below Owner and Admin,
   cannot open `/feedback` at all (`routes/tenant.php:451-452`, `can:feedback.view`). The remedy (`D139`): the statuses read
   **New · Ongoing · Resolved · Declined** — `reviewed` and `wont_fix` keep their stored values and change their labels only, so no
   row is touched — with a CHECK generated from the enum; new → ongoing, resolved or declined; ongoing → resolved or declined;
@@ -14596,7 +14596,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   artisan command reads feedback. The remedy (`D139`): a platform support API on the central host — list (by status and since),
   one report's screenshot, and a status change with a note — authorised by a super-admin's token carrying one ability, created,
   expired and revoked in the console and shown once, rate-limited, every call audited; it reads through
-  `SuperAdminService::listFeedback()` (`app/Services/Admin/SuperAdminService.php:507`) and writes through `transitionFeedback()`,
+  `SuperAdminService::listFeedback()` (`app/Services/Admin/SuperAdminService.php:518`) and writes through `transitionFeedback()`,
   never widening the SELECT-only bypass of
   `database/migrations/2026_08_07_000002_apply_superadmin_bypass_to_feedback_reports.php`; a new ADR records the cross-workspace
   surface (`docs/adr/0018-per-tenant-extraction.md` kept extraction off HTTP). `scripts/feedback-pull.php` (host PHP, no `vendor/`)
@@ -14750,7 +14750,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`minor` · Questions move one at a time; an author cannot select several and send them to another section.**
   The testers' comment (2026-10-11, comment 4): *"Form builder does not all[ow] bulk movement of questions to a section"*. The
   builder's selection holds one item (`resources/js/components/builder/types.ts:330`), though the server's reorder already takes
-  whole lists (`routes/tenant.php:620`). The remedy: a checkbox per question in Structure (shift-click for a range) and a "Move to
+  whole lists (`routes/tenant.php:624`). The remedy: a checkbox per question in Structure (shift-click for a range) and a "Move to
   section…" action — one order write, one undo entry — built after the save-token row so a bulk move does not set off the conflict
   dialog. **Live.** Filed by `M174`. **Tier: early-testing.**
 

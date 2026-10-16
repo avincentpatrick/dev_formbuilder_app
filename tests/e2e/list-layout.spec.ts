@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { settlePaint } from './support/axe';
 import { openConsole } from './support/console';
 import { formEntry, openBuilder } from './support/navigate';
@@ -435,4 +435,69 @@ test('Scanned forms — the upload card keeps a measure beside a grid of scans',
     // A grid of rows rather than one row per line: at 1920 the list is about 970px and a 28rem track about 480px, so 60%
     // stays well clear of both a full-width row and two tracks.
     expect(m.row.width / m.list.width, JSON.stringify(m)).toBeLessThanOrEqual(0.6);
+});
+
+// ── M174 — THE DETAIL PAGES, THE STACKS AND THE MANUAL-ENTRY PAGE ───────────────────────────────────────────────────────
+// The same comment, its third increment (`D120`, `D121`). A detail page's facts sit in a 26rem column beside its tables,
+// answers or log from a 75rem container — at 1920 on a tenant page, since 1440 leaves 1136px (71rem) beside the expanded
+// sidebar — and stacks of rows become grids that gain columns. Every locator below exists on the trunk too, so each case
+// is red there by its geometry rather than by a missing class.
+
+type Box = { left: number; right: number; top: number; bottom: number; width: number };
+
+async function box(locator: Locator): Promise<Box> {
+    return locator.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+
+        return {
+            left: Math.round(r.left),
+            right: Math.round(r.right),
+            top: Math.round(r.top),
+            bottom: Math.round(r.bottom),
+            width: Math.round(r.width),
+        };
+    });
+}
+
+/** `aside` sits wholly to the right of `main`, in a bounded column (26rem = 416px, plus rounding). */
+function expectBeside(main: Box, aside: Box, what: string): void {
+    expect(aside.left, `${what}: ${JSON.stringify({ main, aside })}`).toBeGreaterThanOrEqual(main.right);
+    expect(aside.width, `${what}: ${JSON.stringify({ main, aside })}`).toBeLessThanOrEqual(418);
+}
+
+test('Form hub — the versions sit beside the latest responses at 1920', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto('/forms', { waitUntil: 'networkidle' });
+    await formEntry(page, 'Community Health Survey').getByRole('link', { name: 'Community Health Survey', exact: true }).click();
+    await page.waitForURL(/\/forms\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+    await settlePaint(page);
+
+    const latest = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Latest responses', level: 2 }) });
+    const versions = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Versions', level: 2 }) });
+
+    expectBeside(await box(latest), await box(versions), 'the hub at 1920');
+});
+
+test('A response — the facts sit beside the answers, and the sections two across, at 1920', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+    // Branching Router: two seeded responses, neither from a scan, on a version of three sections — the only seeded
+    // response shape with more than one block and no scanned paper (a scanned response keeps its paper beside the answers).
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto('/forms', { waitUntil: 'networkidle' });
+    await formEntry(page, 'Branching Router').getByRole('link', { name: 'Branching Router', exact: true }).click();
+    await page.waitForURL(/\/forms\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+    await page.locator('.hub__row-link').first().click();
+    await page.waitForURL(/\/submissions\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+    await settlePaint(page);
+
+    const facts = await box(page.locator('.detail__grid'));
+    const answers = await box(page.locator('.detail__blocks'));
+    expectBeside(answers, facts, 'the response at 1920');
+
+    const tops = await page.locator('.detail__block').evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
+    expect(tops.length, 'the response rendered fewer than two sections').toBeGreaterThanOrEqual(2);
+    expect(tops[1], `two sections side by side: ${JSON.stringify(tops)}`).toBe(tops[0]);
 });

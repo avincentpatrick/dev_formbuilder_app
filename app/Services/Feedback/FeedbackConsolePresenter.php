@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Feedback;
 
 use App\Enums\FeedbackStatus;
+use App\Enums\FeedbackType;
 use App\Models\Tenant;
 use App\Services\Admin\SuperAdminService;
 use Illuminate\Database\Eloquent\Collection;
@@ -34,7 +35,7 @@ final class FeedbackConsolePresenter
     public function __construct(private readonly SuperAdminService $superAdmin) {}
 
     /**
-     * @param  array{status?: ?string, tenant_id?: ?string}  $filters
+     * @param  array{status?: ?string, tenant_id?: ?string, type?: ?string}  $filters
      * @return array<string, mixed>
      */
     public function index(array $filters, int $page): array
@@ -47,9 +48,13 @@ final class FeedbackConsolePresenter
         $rows = array_map(function (array $row) use ($names): array {
             $status = FeedbackStatus::from((string) $row['status']);
 
+            $type = is_string($row['type'] ?? null) ? FeedbackType::tryFrom($row['type']) : null;
+
             return [
                 ...$row,
                 'status_label' => $status->label(),
+                // Null on a report sent before the kind existed (M175) — the console shows no kind, not a guess.
+                'type_label' => $type?->label(),
                 'tenant_name' => $names[$row['tenant_id']] ?? 'Unknown workspace',
                 'transitions' => array_map(
                     static fn (FeedbackStatus $to): array => ['value' => $to->value, 'label' => $to->label()],
@@ -64,14 +69,18 @@ final class FeedbackConsolePresenter
             'filters' => [
                 'statuses' => FeedbackStatus::options(),
                 'tenants' => $tenants,
+                'types' => FeedbackType::options(),
                 'applied' => [
                     'status' => $filters['status'] ?? null,
                     'tenant_id' => $filters['tenant_id'] ?? null,
+                    'type' => $filters['type'] ?? null,
                 ],
             ],
             'empty_reason' => match (true) {
                 $rows !== [] => null,
-                ($filters['status'] ?? null) !== null || ($filters['tenant_id'] ?? null) !== null => 'no_matches',
+                ($filters['status'] ?? null) !== null
+                    || ($filters['tenant_id'] ?? null) !== null
+                    || ($filters['type'] ?? null) !== null => 'no_matches',
                 default => 'no_rows',
             },
         ];

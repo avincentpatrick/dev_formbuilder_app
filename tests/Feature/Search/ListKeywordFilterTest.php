@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\DomainEventType;
 use App\Enums\FeedbackStatus;
+use App\Enums\FeedbackType;
 use App\Enums\SubmissionStatus;
 use App\Enums\WebhookEndpointStatus;
 use App\Models\FeedbackReport;
@@ -220,7 +221,7 @@ it('narrows the feedback list on remarks and on the page route', function (): vo
 it('narrows the feedback list on the page title, and by kind (M175, R-2ce2f274)', function (): void {
     FeedbackReport::create([
         'user_id' => $this->owner->id,
-        'type' => \App\Enums\FeedbackType::Bug,
+        'type' => FeedbackType::Bug,
         'route' => '/forms/1/builder',
         'page_url' => 'https://acme.meridian.test/forms/1/builder',
         'page_title' => 'Builder — Household survey',
@@ -231,7 +232,7 @@ it('narrows the feedback list on the page title, and by kind (M175, R-2ce2f274)'
     ]);
     FeedbackReport::create([
         'user_id' => $this->owner->id,
-        'type' => \App\Enums\FeedbackType::Question,
+        'type' => FeedbackType::Question,
         'route' => '/analytics',
         'remarks' => 'Where do the exports go?',
         'status' => FeedbackStatus::New,

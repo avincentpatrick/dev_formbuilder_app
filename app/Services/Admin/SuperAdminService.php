@@ -501,7 +501,10 @@ final class SuperAdminService
      * only because `users` has no tenant column and does not use the trait; every future cross-tenant read
      * of a tenant-scoped table does.
      *
-     * @param  array{status?: ?string, tenant_id?: ?string}  $filters
+     * M175 (`R-2ce2f274`): each row carries its kind and the page's full address and title, and `type` narrows
+     * by kind.
+     *
+     * @param  array{status?: ?string, tenant_id?: ?string, type?: ?string}  $filters
      * @return array{rows: list<array<string, mixed>>, meta: array{current_page: int, last_page: int, total: int, per_page: int}}
      */
     public function listFeedback(array $filters, int $perPage, int $page): array
@@ -512,6 +515,7 @@ final class SuperAdminService
                 ->withoutGlobalScope(FeedbackReport::$tenantScope)
                 ->when($filters['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
                 ->when($filters['tenant_id'] ?? null, fn ($q, $v) => $q->where('tenant_id', $v))
+                ->when($filters['type'] ?? null, fn ($q, $v) => $q->where('type', $v))
                 ->orderByDesc('submitted_at');
 
             $total = (clone $query)->count();
@@ -527,7 +531,10 @@ final class SuperAdminService
                 'rows' => array_values($reports->map(fn (FeedbackReport $r): array => [
                     'id' => (string) $r->getKey(),
                     'tenant_id' => $r->tenant_id,
+                    'type' => $r->type?->value,
                     'route' => $r->route,
+                    'page_url' => $r->page_url,
+                    'page_title' => $r->page_title,
                     'remarks' => $r->remarks,
                     'browser_info' => $r->browser_info,
                     'status' => $r->status->value,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Feedback;
 
 use App\Enums\FeedbackStatus;
+use App\Enums\FeedbackType;
 use App\Models\FeedbackReport;
 use App\Services\Audit\AuditLogPresenter;
 use App\Support\Search\KeywordFilter;
@@ -47,7 +48,10 @@ final class FeedbackPresenter
      * prose a tenant reads in dozens rather than thousands, and J1b measured that an index on `~~*` would
      * be unreachable under RLS regardless.
      *
-     * @param  array{status?: ?string, q?: ?SearchTerms}  $filters
+     * M175 (`R-2ce2f274`): `q` also matches the page's TITLE and full ADDRESS — the title is now what the page
+     * column shows — and `type` narrows by kind.
+     *
+     * @param  array{status?: ?string, type?: ?string, q?: ?SearchTerms}  $filters
      * @return array<string, mixed>
      */
     public function index(array $filters): array
@@ -59,8 +63,11 @@ final class FeedbackPresenter
             ->tap(fn (Builder $q) => KeywordFilter::applyLike($q, $terms, [
                 'feedback_reports.remarks',
                 'feedback_reports.route',
+                'feedback_reports.page_title',
+                'feedback_reports.page_url',
             ]))
             ->when($filters['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
+            ->when($filters['type'] ?? null, fn ($q, $v) => $q->where('type', $v))
             ->orderByDesc('submitted_at')
             ->paginate(self::PER_PAGE)
             ->withQueryString();
@@ -72,6 +79,11 @@ final class FeedbackPresenter
             'data' => $items->map(fn (FeedbackReport $r): array => [
                 'id' => (string) $r->getKey(),
                 'route' => $r->route,
+                'page_url' => $r->page_url,
+                'page_title' => $r->page_title,
+                // Null on a report sent before the kind existed — the list shows no kind rather than a guess.
+                'type' => $r->type?->value,
+                'type_label' => $r->type?->label(),
                 'remarks' => $r->remarks,
                 'status' => $r->status->value,
                 'status_label' => $r->status->label(),
@@ -92,8 +104,10 @@ final class FeedbackPresenter
             ],
             'filters' => [
                 'statuses' => FeedbackStatus::options(),
+                'types' => FeedbackType::options(),
                 'applied' => [
                     'status' => $filters['status'] ?? null,
+                    'type' => $filters['type'] ?? null,
                     // The CLAMPED string, so the box re-renders what actually ran (J1e).
                     'q' => $terms->raw(),
                 ],
@@ -103,7 +117,7 @@ final class FeedbackPresenter
             // lists since J1e so the two strings cannot be misspelled apart.
             'empty_reason' => ListEmptyReason::for(
                 $items->isNotEmpty(),
-                ($filters['status'] ?? null) !== null || ! $terms->isEmpty(),
+                ($filters['status'] ?? null) !== null || ($filters['type'] ?? null) !== null || ! $terms->isEmpty(),
             ),
         ];
     }

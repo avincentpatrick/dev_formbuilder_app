@@ -11,6 +11,7 @@ use App\Enums\ConnectionStatus;
 use App\Enums\DomainEventType;
 use App\Enums\DomainVerificationFailure;
 use App\Enums\FeedbackStatus;
+use App\Enums\FeedbackType;
 use App\Enums\FieldType;
 use App\Enums\FormScheduleState;
 use App\Enums\NotificationType;
@@ -1558,13 +1559,19 @@ class E2eSeeder extends Seeder
      */
     private function seedFeedback(User $owner, User $reviewer): void
     {
+        // M175 (`R-2ce2f274`): every kind once, plus one report with NO kind and no page — the shape of a report
+        // sent before either existed — so the Kind column's three badge colours and its "—" all reach the scan,
+        // and the first row's page title is a link.
+        $origin = 'http://acme.'.(string) config('tenancy.central_domain');
         $rows = [
-            ['user' => $owner, 'route' => '/dashboard', 'status' => FeedbackStatus::New, 'remarks' => 'The date range picker resets when I switch tabs.'],
-            ['user' => $reviewer, 'route' => '/submissions', 'status' => FeedbackStatus::Reviewed, 'remarks' => 'Could the inbox remember my last filter?'],
-            ['user' => $owner, 'route' => '/forms', 'status' => FeedbackStatus::Resolved, 'remarks' => 'Duplicating a field lost its options — fixed now, thanks.'],
+            ['user' => $owner, 'type' => FeedbackType::Bug, 'route' => '/dashboard', 'page_title' => 'Dashboard', 'status' => FeedbackStatus::New, 'remarks' => 'The date range picker resets when I switch tabs.'],
+            ['user' => $reviewer, 'type' => FeedbackType::Suggestion, 'route' => '/submissions', 'page_title' => 'Responses', 'status' => FeedbackStatus::Reviewed, 'remarks' => 'Could the inbox remember my last filter?'],
+            ['user' => $owner, 'type' => FeedbackType::Question, 'route' => '/forms', 'page_title' => null, 'status' => FeedbackStatus::Resolved, 'remarks' => 'Duplicating a field lost its options — fixed now, thanks.'],
             [
                 'user' => $reviewer,
+                'type' => null,
                 'route' => '/analytics',
+                'page_title' => null,
                 'status' => FeedbackStatus::WontFix,
                 'remarks' => 'Please add a pie chart to the analytics page https://example.test/reference/dashboards/comparison-of-chart-types-for-categorical-data',
             ],
@@ -1576,7 +1583,10 @@ class E2eSeeder extends Seeder
 
             $attributes = [
                 'user_id' => $row['user']->getKey(),
+                'type' => $row['type']?->value,
                 'route' => $row['route'],
+                'page_url' => $row['type'] === null ? null : $origin.$row['route'],
+                'page_title' => $row['page_title'],
                 'remarks' => $row['remarks'],
                 'browser_info' => ['viewport' => '1440x900', 'platform' => 'e2e-seed'],
                 'status' => $row['status']->value,

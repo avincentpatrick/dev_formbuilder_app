@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Tenant;
 
+use App\Enums\FeedbackType;
 use App\Http\Controllers\Concerns\ReadsKeywordFilter;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\StoreFeedbackRequest;
@@ -37,9 +38,12 @@ final class FeedbackController extends Controller
     public function index(Request $request): Response
     {
         $status = $request->query('status');
+        $type = $request->query('type');
 
         return Inertia::render('feedback/Index', $this->presenter->index([
             'status' => is_string($status) && $status !== '' ? $status : null,
+            // Only a kind the enum knows — anything else reads as no filter rather than as an empty list.
+            'type' => is_string($type) ? FeedbackType::tryFrom($type)?->value : null,
             'q' => $this->keyword($request),
         ]));
     }

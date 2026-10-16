@@ -3532,7 +3532,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/` or `routes/`, re-verified this increment rather than carried over from the row. Filed by `M29`.
 - ~~**`major` · `GET /admin/feedback/{feedback}/screenshot` streams cross-tenant PII from the central host and no test asserts a refusal on it.**~~
   ✅ **DONE — M35 (2026-08-27).** Every citation exact, the third row running: `routes/admin.php:83-84`,
-  the index's three denials at `FeedbackConsoleTest.php:153`/`:158`/`:162`, and the screenshot's only case at
+  the index's three denials at `FeedbackConsoleTest.php:223`/`:229`/`:234`, and the screenshot's only case at
   `:338-348` whose own comment says the 404 proves the lookup resolved rather than that anyone was refused.
   ⛔ **THE ROW'S STATED WEAKNESS WAS THE PART WORTH BUILDING FOR, AND IT WAS MEASURED RATHER THAN ARGUED.**
   The realistic silent mutation it names is a route declared outside the group, so that mutation was run
@@ -3554,7 +3554,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and the controller answers **404** for a report it cannot resolve: the same status from two different
   decisions. A non-super-admin case written against a random id — or against a report with no screenshot, the
   only fixture the console suite could build — **passes with the middleware deleted**.
-  `tests/Feature/Tenant/FeedbackTest.php:307-309` states the identical trap on the tenant-side twin. So the
+  `tests/Feature/Tenant/FeedbackTest.php:317-319` states the identical trap on the tenant-side twin. So the
   404 arm runs against a report a super-admin really does get 200 image bytes from, which meant building the
   first committed-screenshot fixture the console suite has ever had (`consoleScreenshot()`); that positive
   control is itself the first test in this repository to drive this route to a success. **Proven, not
@@ -3562,7 +3562,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   controller and streams the bytes. The other three arms answer with a redirect, which no 404 can be confused
   with, and say so rather than paying for a fixture they do not need.
   ⛔ **AND ASKING THE KILLER QUESTION OF EVERY GATE ON THE ROUTE — NOT ONLY THE ONES THE ROW NAMES — FOUND A
-  THIRD NAKED ONE.** `FeedbackConsoleController.php:78`'s `abort_unless(...->servable(), 409)` was asserted
+  THIRD NAKED ONE.** `FeedbackConsoleController.php:82`'s `abort_unless(...->servable(), 409)` was asserted
   by **nothing**: M34 pinned that guard on the two routes it was looking at (`FeedbackController.php:75`,
   `AttachmentController::show()`'s scan-status guard) and this console copy is the third, so quarantined bytes could be served to
   the one principal who reads across every tenant with the whole repository green. Covered here, with the
@@ -5251,7 +5251,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `docs/piping-output-encoding-design.md:181` (was `:180`; **M57 moved it by one line and the citation
   linter caught it in the same run** — the ledger tier went 18 → 19 and named this pointer, which is the
   clearest evidence yet for the rule this very row is about); `docs/offline-first-sync-design.md:128`;
-  `docs/data-dictionary.md:62` (§28, not §31 — the pointer currently lands on a note arguing the opposite
+  `docs/data-dictionary.md:63` (§28, not §31 — the pointer currently lands on a note arguing the opposite
   case); `docs/api-specification.md:179` (`read:audit_log` is orphaned four blockquotes below its table
   and renders outside it); `docs/ux/design-system-reference.md:812,:843`;
   `docs/pricing-feature-gating-matrix.md:56` (Business is seeded `unlimited`, not 25 endpoints);

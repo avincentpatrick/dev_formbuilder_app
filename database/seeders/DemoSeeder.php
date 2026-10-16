@@ -7,6 +7,7 @@ namespace Database\Seeders;
 use App\Enums\AuditEvent;
 use App\Enums\BillingInterval;
 use App\Enums\FeedbackStatus;
+use App\Enums\FeedbackType;
 use App\Enums\FieldType;
 use App\Enums\NotificationType;
 use App\Enums\PlanTier;
@@ -1212,10 +1213,11 @@ class DemoSeeder extends Seeder
     private function seedFeedback(array $people): void
     {
         $rows = [
-            ['slot' => 'owner@demo.test', 'route' => '/dashboard', 'status' => FeedbackStatus::New, 'ago' => 2, 'remarks' => 'The date range picker resets when I switch tabs.'],
-            ['slot' => 'reviewer@demo.test', 'route' => '/submissions', 'status' => FeedbackStatus::Reviewed, 'ago' => 9, 'remarks' => 'Could the inbox remember my last filter?'],
-            ['slot' => 'editor@demo.test', 'route' => '/forms', 'status' => FeedbackStatus::Resolved, 'ago' => 21, 'remarks' => 'Duplicating a field lost its options — fixed now, thanks.'],
-            ['slot' => 'viewer@demo.test', 'route' => '/analytics', 'status' => FeedbackStatus::WontFix, 'ago' => 40, 'remarks' => 'Please add a pie chart.'],
+            // M175: a kind on each but the oldest, which stands for a report sent before the kind existed.
+            ['slot' => 'owner@demo.test', 'type' => FeedbackType::Bug, 'route' => '/dashboard', 'status' => FeedbackStatus::New, 'ago' => 2, 'remarks' => 'The date range picker resets when I switch tabs.'],
+            ['slot' => 'reviewer@demo.test', 'type' => FeedbackType::Suggestion, 'route' => '/submissions', 'status' => FeedbackStatus::Reviewed, 'ago' => 9, 'remarks' => 'Could the inbox remember my last filter?'],
+            ['slot' => 'editor@demo.test', 'type' => FeedbackType::Question, 'route' => '/forms', 'status' => FeedbackStatus::Resolved, 'ago' => 21, 'remarks' => 'Duplicating a field lost its options — fixed now, thanks.'],
+            ['slot' => 'viewer@demo.test', 'type' => null, 'route' => '/analytics', 'status' => FeedbackStatus::WontFix, 'ago' => 40, 'remarks' => 'Please add a pie chart.'],
         ];
 
         foreach ($rows as $row) {
@@ -1231,6 +1233,7 @@ class DemoSeeder extends Seeder
 
             $attributes = [
                 'user_id' => $user->getKey(),
+                'type' => $row['type']?->value,
                 'route' => $row['route'],
                 'remarks' => $row['remarks'],
                 'browser_info' => ['viewport' => '1440x900', 'platform' => 'demo-seed'],

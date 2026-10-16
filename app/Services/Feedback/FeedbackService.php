@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Services\Feedback;
 
 use App\Enums\FeedbackStatus;
+use App\Enums\FeedbackType;
 use App\Models\FeedbackReport;
 use App\Models\User;
 use App\Services\Admin\SuperAdminService;
 use App\Services\Attachments\AttachmentStorageService;
+use App\Support\Platform\BuildInfo;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -36,7 +38,10 @@ use Ramsey\Uuid\Uuid;
  */
 final class FeedbackService
 {
-    public function __construct(private readonly AttachmentStorageService $attachments) {}
+    public function __construct(
+        private readonly AttachmentStorageService $attachments,
+        private readonly BuildInfo $build,
+    ) {}
 
     /**
      * Persist one feedback report and, if the reporter attached one, its screenshot.
@@ -56,7 +61,12 @@ final class FeedbackService
      * row is gone, so nothing serves it). That is the pre-existing behaviour of every upload path here and
      * is a storage-sweep concern, not a correctness one.
      *
-     * @param  array{route: string, remarks: string, browser_info?: array<string, mixed>|null}  $validated
+     * M175 (`R-2ce2f274`): the report carries its kind and the page's full address and title, and the SERVER
+     * stamps the deployment's version and commit into `browser_info` — over anything the client sent, since a
+     * client cannot know what served it. The client's own `bundle` sha stays beside them: on the testing
+     * server `APP_VERSION` is unset, and the bundle sha is then the one fact that names the build.
+     *
+     * @param  array{type: string, route: string, remarks: string, page_url?: string|null, page_title?: string|null, browser_info?: array<string, mixed>|null}  $validated
      */
     public function submit(array $validated, ?UploadedFile $screenshot, User $user): FeedbackReport
     {
@@ -72,9 +82,16 @@ final class FeedbackService
             $report->forceFill([
                 'id' => $reportId,
                 'user_id' => $user->getKey(),
+                'type' => FeedbackType::from($validated['type']),
                 'route' => $validated['route'],
+                'page_url' => $validated['page_url'] ?? null,
+                'page_title' => $validated['page_title'] ?? null,
                 'remarks' => $validated['remarks'],
-                'browser_info' => $validated['browser_info'] ?? [],
+                'browser_info' => [
+                    ...($validated['browser_info'] ?? []),
+                    'app_version' => $this->build->version(),
+                    'app_commit' => $this->build->commit(),
+                ],
                 'screenshot_attachment_id' => $attachment?->getKey(),
                 // Written explicitly rather than left to the column default: `status` carries no CHECK
                 // constraint, so the enum is the only guard there is (see FeedbackStatus's docblock).

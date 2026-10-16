@@ -46,6 +46,7 @@ const columns: DataTableColumn[] = [
     { key: 'submitted_at', header: 'Sent' },
     { key: 'tenant_name', header: 'Workspace' },
     { key: 'reporter', header: 'From' },
+    { key: 'type', header: 'Kind' },
     { key: 'remarks', header: 'Remarks' },
     { key: 'status', header: 'Status' },
 ];
@@ -53,10 +54,12 @@ const columns: DataTableColumn[] = [
 const selected = reactive({
     status: props.filters.applied.status ?? '',
     tenant_id: props.filters.applied.tenant_id ?? '',
+    type: props.filters.applied.type ?? '',
 });
 
 const statusOptions = [{ value: '', label: 'All statuses' }, ...props.filters.statuses];
 const tenantOptions = [{ value: '', label: 'All workspaces' }, ...props.filters.tenants];
+const typeOptions = [{ value: '', label: 'All kinds' }, ...props.filters.types];
 
 const detailRow = ref<ConsoleFeedbackRow | null>(null);
 const busy = ref(false);
@@ -65,6 +68,7 @@ function queryParams(extra: Record<string, string | number> = {}): Record<string
     const params: Record<string, string | number> = {};
     if (selected.status) params.status = selected.status;
     if (selected.tenant_id) params.tenant_id = selected.tenant_id;
+    if (selected.type) params.type = selected.type;
     return { ...params, ...extra };
 }
 
@@ -89,6 +93,7 @@ function goToPage(target: number): void {
 function clearFilters(): void {
     selected.status = '';
     selected.tenant_id = '';
+    selected.type = '';
     visit({}, true);
 }
 
@@ -166,6 +171,15 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
                         @update:model-value="applyFilters"
                     />
                 </MdsFormField>
+                <MdsFormField label="Kind" input-id="admin-feedback-type">
+                    <MdsSelect
+                        id="admin-feedback-type"
+                        v-model="selected.type"
+                        :options="typeOptions"
+                        :disabled="busy"
+                        @update:model-value="applyFilters"
+                    />
+                </MdsFormField>
         </MdsFilterBar>
 
         <p class="admin-fb__hint">
@@ -180,6 +194,14 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
 
             <template #cell-reporter="{ row }">
                 {{ reporterLabel(row as ConsoleFeedbackRow) }}
+            </template>
+
+            <template #cell-type="{ row }">
+                <MdsBadge
+                    v-if="(row as ConsoleFeedbackRow).type"
+                    v-bind="statusVariant((row as ConsoleFeedbackRow).type as string)"
+                />
+                <span v-else class="admin-fb__none">—</span>
             </template>
 
             <template #cell-remarks="{ row }">
@@ -246,8 +268,21 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
                         <dd>{{ formatDate(detailRow.submitted_at) }}</dd>
                     </div>
                     <div>
+                        <dt>Kind</dt>
+                        <dd>
+                            <MdsBadge v-if="detailRow.type" v-bind="statusVariant(detailRow.type)" />
+                            <span v-else>—</span>
+                        </dd>
+                    </div>
+                    <div>
                         <dt>Page</dt>
-                        <dd class="admin-fb__mono">{{ detailRow.route }}</dd>
+                        <dd>
+                            <!-- The title, linked to the full address (M175); an older report shows its path. -->
+                            <a v-if="detailRow.page_url" :href="detailRow.page_url" class="admin-fb__page">{{
+                                detailRow.page_title || detailRow.route
+                            }}</a>
+                            <span v-else class="admin-fb__mono">{{ detailRow.route }}</span>
+                        </dd>
                     </div>
                     <div>
                         <dt>Reporter</dt>
@@ -303,6 +338,24 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
 .admin-fb__hint {
     margin: 0 0 var(--mds-space-3);
     font-size: var(--mds-type-body-sm-font-size);
+    color: var(--mds-color-text-secondary);
+}
+
+/* Always underlined, as admin/Tenants.vue's name link is: /admin/* is never axe-scanned, so a colour-only
+   link would be invisible to every gate. The theme-aware primary text token keeps it legible in dark. */
+.admin-fb__page {
+    color: var(--mds-color-action-primary-fg);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    overflow-wrap: anywhere;
+}
+
+.admin-fb__page:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 2px;
+}
+
+.admin-fb__none {
     color: var(--mds-color-text-secondary);
 }
 

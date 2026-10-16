@@ -21,6 +21,12 @@ export type EmptyReason = 'no_rows' | 'no_matches' | null;
 export type FeedbackRow = {
     id: string;
     route: string;
+    /** The full address (M175) — rendered as a link, so the server accepts an http(s) address only. */
+    page_url: string | null;
+    page_title: string | null;
+    /** `bug` / `suggestion` / `question` (M175); null on a report sent before the kind existed. */
+    type: string | null;
+    type_label: string | null;
     remarks: string;
     status: string;
     /** From `FeedbackStatus::label()` — the SERVER owns the wording, so badge and filter agree. */
@@ -37,8 +43,9 @@ export type FeedbackPageProps = {
     meta: PageMeta;
     filters: {
         statuses: FilterOption[];
+        types: FilterOption[];
         /** `q` is the CLAMPED string the server ran, not the raw input — see `SearchTerms::raw()` (J1e). */
-        applied: { status: string | null; q: string | null };
+        applied: { status: string | null; type: string | null; q: string | null };
     };
     empty_reason: EmptyReason;
 };
@@ -51,6 +58,10 @@ export type ConsoleFeedbackRow = {
     tenant_id: string;
     tenant_name: string;
     route: string;
+    page_url: string | null;
+    page_title: string | null;
+    type: string | null;
+    type_label: string | null;
     remarks: string;
     browser_info: Record<string, unknown>;
     status: string;
@@ -70,7 +81,8 @@ export type ConsoleFeedbackPageProps = {
     filters: {
         statuses: FilterOption[];
         tenants: FilterOption[];
-        applied: { status: string | null; tenant_id: string | null };
+        types: FilterOption[];
+        applied: { status: string | null; tenant_id: string | null; type: string | null };
     };
     empty_reason: EmptyReason;
 };

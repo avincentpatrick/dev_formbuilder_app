@@ -95,3 +95,11 @@ describe('statusVariant — submission screen-out (I9a)', () => {
         expect(statusVariant('under_review')).toEqual({ variant: 'warning', label: 'Under review' });
     });
 });
+
+describe('statusVariant — what kind a feedback report is (M175, `R-2ce2f274`)', () => {
+    it('names each kind in words, and tells them apart by colour only as a second cue', () => {
+        expect(statusVariant('bug')).toEqual({ variant: 'danger', label: 'Bug' });
+        expect(statusVariant('suggestion')).toEqual({ variant: 'info', label: 'Suggestion' });
+        expect(statusVariant('question')).toEqual({ variant: 'neutral', label: 'Question' });
+    });
+});

@@ -37,6 +37,7 @@ const props = defineProps<FeedbackPageProps>();
 const columns: DataTableColumn[] = [
     { key: 'submitted_at', header: 'Sent' },
     { key: 'reporter', header: 'From' },
+    { key: 'type', header: 'Kind' },
     { key: 'route', header: 'Page' },
     { key: 'remarks', header: 'Remarks' },
     { key: 'status', header: 'Status' },
@@ -44,9 +45,11 @@ const columns: DataTableColumn[] = [
 
 const selected = reactive({
     status: props.filters.applied.status ?? '',
+    type: props.filters.applied.type ?? '',
     q: props.filters.applied.q ?? '',
 });
 const statusOptions = [{ value: '', label: 'All statuses' }, ...props.filters.statuses];
+const typeOptions = [{ value: '', label: 'All kinds' }, ...props.filters.types];
 
 const detailRow = ref<FeedbackRow | null>(null);
 const busy = ref(false);
@@ -54,6 +57,7 @@ const busy = ref(false);
 function queryParams(extra: Record<string, string | number> = {}): Record<string, string | number> {
     const params: Record<string, string | number> = {};
     if (selected.status) params.status = selected.status;
+    if (selected.type) params.type = selected.type;
     if (selected.q) params.q = selected.q;
     return { ...params, ...extra };
 }
@@ -79,6 +83,7 @@ function goToPage(page: number): void {
 
 function clearFilters(): void {
     selected.status = '';
+    selected.type = '';
     selected.q = '';
     visit({}, true);
 }
@@ -119,7 +124,7 @@ function excerpt(text: string): string {
                 v-model="selected.q"
                 :applied="filters.applied.q ?? ''"
                 label="Search feedback"
-                placeholder="Remarks or page"
+                placeholder="Remarks, page or address"
                 @submit="applyFilters"
             />
             <MdsFormField label="Status" input-id="feedback-status">
@@ -127,6 +132,15 @@ function excerpt(text: string): string {
                     id="feedback-status"
                     v-model="selected.status"
                     :options="statusOptions"
+                    :disabled="busy"
+                    @update:model-value="applyFilters"
+                />
+            </MdsFormField>
+            <MdsFormField label="Kind" input-id="feedback-type">
+                <MdsSelect
+                    id="feedback-type"
+                    v-model="selected.type"
+                    :options="typeOptions"
                     :disabled="busy"
                     @update:model-value="applyFilters"
                 />
@@ -147,8 +161,17 @@ function excerpt(text: string): string {
                 {{ reporterLabel(row as FeedbackRow) }}
             </template>
 
+            <template #cell-type="{ row }">
+                <MdsBadge v-if="(row as FeedbackRow).type" v-bind="statusVariant((row as FeedbackRow).type as string)" />
+                <span v-else class="fbl__none">—</span>
+            </template>
+
             <template #cell-route="{ row }">
-                <span class="fbl__mono">{{ (row as FeedbackRow).route }}</span>
+                <!-- The title, linked to the full address (M175); a report sent before either existed shows its path. -->
+                <a v-if="(row as FeedbackRow).page_url" :href="(row as FeedbackRow).page_url as string" class="fbl__page">{{
+                    (row as FeedbackRow).page_title || (row as FeedbackRow).route
+                }}</a>
+                <span v-else class="fbl__mono">{{ (row as FeedbackRow).route }}</span>
             </template>
 
             <template #cell-remarks="{ row }">
@@ -206,8 +229,20 @@ function excerpt(text: string): string {
                         <dd>{{ formatDate(detailRow.submitted_at) }}</dd>
                     </div>
                     <div>
+                        <dt>Kind</dt>
+                        <dd>
+                            <MdsBadge v-if="detailRow.type" v-bind="statusVariant(detailRow.type)" />
+                            <span v-else>—</span>
+                        </dd>
+                    </div>
+                    <div>
                         <dt>Page</dt>
-                        <dd class="fbl__mono">{{ detailRow.route }}</dd>
+                        <dd>
+                            <a v-if="detailRow.page_url" :href="detailRow.page_url" class="fbl__page">{{
+                                detailRow.page_title || detailRow.route
+                            }}</a>
+                            <span v-else class="fbl__mono">{{ detailRow.route }}</span>
+                        </dd>
                     </div>
                     <div>
                         <dt>Status</dt>
@@ -240,6 +275,23 @@ function excerpt(text: string): string {
 .fbl__mono {
     font-family: var(--mds-font-family-mono);
     font-size: var(--mds-type-body-sm-font-size);
+}
+
+/* Always underlined: the theme-aware primary text token keeps it legible in dark (audit/Index.vue's note). */
+.fbl__page {
+    color: var(--mds-color-action-primary-fg);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    overflow-wrap: anywhere;
+}
+
+.fbl__page:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 2px;
+}
+
+.fbl__none {
+    color: var(--mds-color-text-secondary);
 }
 
 .fbl__remarks {

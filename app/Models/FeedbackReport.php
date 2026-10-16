@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\FeedbackStatus;
+use App\Enums\FeedbackType;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\HasUuidv7;
 use App\Models\Concerns\TenantScoped;
@@ -20,7 +21,10 @@ use Illuminate\Support\Carbon;
  * @property string $id
  * @property string $tenant_id
  * @property string $user_id
+ * @property FeedbackType|null $type
  * @property string $route
+ * @property string|null $page_url
+ * @property string|null $page_title
  * @property string $remarks
  * @property array<string, mixed> $browser_info
  * @property string|null $screenshot_attachment_id
@@ -45,7 +49,10 @@ class FeedbackReport extends Model implements TenantScoped
     protected $fillable = [
         'tenant_id',
         'user_id',
+        'type',
         'route',
+        'page_url',
+        'page_title',
         'remarks',
         'browser_info',
         'screenshot_attachment_id',
@@ -59,6 +66,7 @@ class FeedbackReport extends Model implements TenantScoped
     {
         return [
             'status' => FeedbackStatus::class,
+            'type' => FeedbackType::class,
             'browser_info' => 'array',
             'submitted_at' => 'datetime',
             'resolved_at' => 'datetime',

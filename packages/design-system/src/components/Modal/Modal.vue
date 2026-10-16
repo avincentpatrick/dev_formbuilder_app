@@ -103,7 +103,10 @@ const props = withDefaults(
     { closeLabel: 'Close', teleport: true, size: 'md' },
 );
 
-const emit = defineEmits<{ close: []; 'update:open': [value: boolean] }>();
+// `after-leave` (M175, `R-2ce2f274`): the leave transition has FINISHED and the panel is off the page — not
+// merely that `open` went false, when it is still painted, fading out. The feedback panel steps aside for a
+// screen capture on it (ADR-0015 §D11); a frame taken before it would still hold the panel.
+const emit = defineEmits<{ close: []; 'update:open': [value: boolean]; 'after-leave': [] }>();
 
 const titleId = useId();
 const panel = ref<HTMLElement | null>(null);
@@ -336,7 +339,7 @@ onBeforeUnmount(closePage);
 
 <template>
     <Teleport to="body" :disabled="!teleport">
-        <Transition name="mds-modal">
+        <Transition name="mds-modal" @after-leave="emit('after-leave')">
             <div v-if="open" ref="backdrop" class="mds-modal__backdrop" @mousedown="onBackdrop">
                 <div
                     ref="panel"

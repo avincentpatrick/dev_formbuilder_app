@@ -73,6 +73,13 @@ const STATUS: Record<string, StatusDescriptor> = {
     reviewed: { variant: 'warning', label: 'Reviewed' },
     resolved: { variant: 'success', label: 'Resolved' },
     wont_fix: { variant: 'neutral', label: "Won't fix" },
+    // What kind a feedback report is (M175, `R-2ce2f274`): FeedbackType (bug/suggestion/question), shown
+    // beside the status on both feedback lists. A bug is danger because something is broken; a suggestion
+    // info, an idea to weigh; a question neutral, asking for an answer and nothing else. The word carries the
+    // meaning (WCAG 1.4.1) — the colour only separates them at a glance. None of the three collides.
+    bug: { variant: 'danger', label: 'Bug' },
+    suggestion: { variant: 'info', label: 'Suggestion' },
+    question: { variant: 'neutral', label: 'Question' },
 };
 
 /** Resolve a status string to its badge {variant,label}. Unknown values fall back to a neutral pill

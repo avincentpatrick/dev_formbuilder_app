@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 use App\Enums\AttachmentKind;
 use App\Enums\FeedbackStatus;
+use App\Enums\FeedbackType;
 use App\Enums\ScanStatus;
 use App\Models\Attachment;
 use App\Models\FeedbackReport;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\Platform\BuildInfo;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -429,13 +431,13 @@ it('records the full page address, its title, the screen it was on and the build
     enterTenant($tenant->id, $user->id);
     $report = FeedbackReport::query()->firstOrFail();
 
-    expect($report->type)->toBe(\App\Enums\FeedbackType::Suggestion)
+    expect($report->type)->toBe(FeedbackType::Suggestion)
         ->and($report->page_url)->toBe('https://acme.meridian.test/forms/1/builder?tab=logic')
         ->and($report->page_title)->toBe('Builder — Household survey')
         ->and($report->browser_info)->toMatchArray([
             'component' => 'forms/Builder',
             'bundle' => 'abc1234',
-            'app_version' => app(\App\Support\Platform\BuildInfo::class)->version(),
+            'app_version' => app(BuildInfo::class)->version(),
         ]);
 });
 

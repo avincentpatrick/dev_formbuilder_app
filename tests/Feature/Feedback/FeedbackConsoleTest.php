@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Enums\AttachmentKind;
 use App\Enums\AuditEvent;
 use App\Enums\FeedbackStatus;
 use App\Enums\NotificationType;
@@ -18,7 +17,6 @@ use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -58,145 +56,6 @@ uses(RefreshDatabase::class);
 | from a committed fixture already in the state it needs. This is a harness artifact and not a product
 | behaviour; in production both writes are committed.
 */
-
-/**
- * A committed tenant the privileged connection can actually see.
- *
- * ⚠️ **`Tenant::on('pgsql_privileged')` DOES NOT WORK, and it fails silently.** Stancl's base model uses
- * the `CentralConnection` trait, whose `getConnectionName()` returns
- * `config('tenancy.database.central_connection')` UNCONDITIONALLY — so the connection override is
- * discarded and the row lands on the default connection inside RefreshDatabase's uncommitted
- * transaction. The write appears to succeed; the failure surfaces later and somewhere else, as an FK
- * violation when the committed `feedback_reports` insert cannot find its tenant. Hence the query builder,
- * which has no model to override it. (`tenants` is RLS-exempt, so the row is readable afterwards from any
- * connection.)
- */
-function consoleTenant(string $name, string $slug): Tenant
-{
-    $id = Uuid::uuid7()->toString();
-
-    DB::connection('pgsql_privileged')->table('tenants')->insert([
-        'id' => $id,
-        'name' => $name,
-        'slug' => $slug,
-        'status' => 'active',
-        'data' => '{}',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-
-    /** @var Tenant $tenant */
-    $tenant = Tenant::query()->findOrFail($id);
-
-    return $tenant;
-}
-
-/** A committed user, likewise. */
-function consoleUser(string $email): User
-{
-    /** @var User $user */
-    $user = User::on('pgsql_privileged')->forceCreate([
-        'name' => 'Console Reporter',
-        'email' => $email,
-        'password' => Hash::make(Str::random(40)),
-        'email_verified_at' => now(),
-    ]);
-
-    return $user;
-}
-
-/**
- * A committed feedback report. `status` is written from the enum. `$extra` sets any further column — the
- * kind and the page (M175) — on the same committed insert, since a later UPDATE would be the uncommitted kind.
- *
- * @param  array<string, mixed>  $extra
- */
-function consoleReport(Tenant $tenant, User $user, FeedbackStatus $status, string $remarks, array $extra = []): FeedbackReport
-{
-    /** @var FeedbackReport $report */
-    $report = FeedbackReport::on('pgsql_privileged')->forceCreate([
-        'id' => Uuid::uuid7()->toString(),
-        'tenant_id' => $tenant->id,
-        'user_id' => $user->id,
-        'route' => '/dashboard',
-        'remarks' => $remarks,
-        'browser_info' => ['userAgent' => 'PestUA', 'viewport' => '1440x900'],
-        'status' => $status->value,
-        'submitted_at' => now(),
-        ...$extra,
-    ]);
-
-    return $report;
-}
-
-/** The bytes {@see consoleScreenshot()} stores, so a case can assert the body it got is the body it wrote. */
-const CONSOLE_SCREENSHOT_BYTES = 'CONSOLE-SCREENSHOT-BYTES';
-
-/**
- * A committed screenshot for a committed report, plus the pointer that links them and the object on disk.
- *
- * ⚠️ **THE ATTACHMENT HAS TO BE COMMITTED TOO, AND THE REASON IS AN FK RATHER THAN A CONNECTION.**
- * `feedback_reports.screenshot_attachment_id` is a real foreign key onto `attachments`, so pointing a
- * COMMITTED report at a row that only exists inside RefreshDatabase's open transaction makes the privileged
- * UPDATE wait on a lock the test itself is holding — a hang, not an error. Both rows therefore go in on
- * `pgsql_privileged`, which is a superuser and bypasses RLS.
- *
- * The query builder rather than the model, for the reason {@see consoleTenant()} gives at length: a model's
- * traits and global scopes get a vote on the connection and on `tenant_id`, and here they would be voting
- * with no tenant context set at all.
- *
- * **Nothing is added to {@see purgeCommittedFeedbackFixtures()} and that is checked, not assumed:**
- * `attachments.tenant_id` is `cascadeOnDelete`, and the purge deletes the reports before the tenants — so
- * the tenant delete takes the attachment with it. Caller must have called `Storage::fake('local')` first,
- * or this writes a real object into the local disk.
- */
-function consoleScreenshot(FeedbackReport $report, ScanStatus $scan = ScanStatus::Clean): string
-{
-    $id = Uuid::uuid7()->toString();
-    $path = "tenants/{$report->tenant_id}/feedback_screenshot/".date('Ym')."/{$id}.png";
-    $connection = DB::connection('pgsql_privileged');
-
-    $connection->table('attachments')->insert([
-        'id' => $id,
-        'tenant_id' => $report->tenant_id,
-        // No morph-map entry and none needed: there is no DB FK on the morph columns and the console never
-        // resolves the owner back to a class. This is the alias production writes.
-        'attachable_type' => 'feedback_report',
-        'attachable_id' => $report->id,
-        'kind' => AttachmentKind::FeedbackScreenshot->value,
-        'disk' => 'local',
-        'path' => $path,
-        'original_filename' => 'capture.png',
-        'mime_type' => 'image/png',
-        'size_bytes' => strlen(CONSOLE_SCREENSHOT_BYTES),
-        'checksum_sha256' => hash('sha256', CONSOLE_SCREENSHOT_BYTES),
-        'width' => 1_600,
-        'height' => 900,
-        'is_encrypted_at_rest' => false,
-        'is_pii' => true,
-        // Defaults to Clean rather than to the column default: `ScanStatus::servable()` gates the stream,
-        // and a `pending` row 409s before any of this reaches the disk. The parameter exists so the
-        // quarantine case can ask for exactly that.
-        'virus_scan_status' => $scan->value,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-
-    // No `updated_at` in the SET list: `feedback_reports` carries `submitted_at` and `resolved_at` and no
-    // Eloquent timestamps at all, so naming one is an undefined-column error rather than a no-op.
-    $connection->table('feedback_reports')->where('id', $report->id)->update([
-        'screenshot_attachment_id' => $id,
-    ]);
-
-    Storage::disk('local')->put($path, CONSOLE_SCREENSHOT_BYTES);
-
-    return $path;
-}
-
-function adminUrl(string $path): string
-{
-    return 'http://'.config('tenancy.central_domain').'/admin'.$path;
-}
 
 beforeEach(function (): void {
     TenantContext::flush();
@@ -586,20 +445,6 @@ it('shows each report kind and page, and filters the console by kind (M175, R-2c
 | The reporter must be a COMMITTED, active member: the mailer finds their address through the `users`
 | visibility policy, which admits a user only through an active membership of the adopted workspace.
 */
-
-/** A committed, active membership, so the `users` policy admits the reporter under the adopted context. */
-function consoleMember(Tenant $tenant, User $user): void
-{
-    DB::connection('pgsql_privileged')->table('tenant_users')->insert([
-        'id' => Uuid::uuid7()->toString(),
-        'tenant_id' => $tenant->id,
-        'user_id' => $user->id,
-        'status' => 'active',
-        'joined_at' => now(),
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-}
 
 it('names the statuses New, Ongoing, Resolved and Declined in the filter and on every row', function (): void {
     $this->withoutVite();

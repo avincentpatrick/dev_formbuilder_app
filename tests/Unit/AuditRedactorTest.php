@@ -116,3 +116,15 @@ it('redacts the reply an operator writes to a feedback reporter, and keeps the s
         ->and($result['new']['resolution_note'])->toBe(AuditRedactor::PLACEHOLDER)
         ->and($result['redacted_fields'])->toContain('resolution_note');
 });
+
+it('never stores a platform support token\'s hash, on either side (M175)', function (): void {
+    $result = $this->redactor->redact(
+        'platform_api_tokens',
+        old: null,
+        new: ['name' => 'Dev laptop', 'token_hash' => str_repeat('a', 64), 'expires_at' => '2027-01-14T00:00:00Z'],
+    );
+
+    expect($result['new']['name'])->toBe('Dev laptop')
+        ->and($result['new']['token_hash'])->toBe(AuditRedactor::PLACEHOLDER)
+        ->and($result['redacted_fields'])->toContain('token_hash');
+});

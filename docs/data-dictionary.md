@@ -1481,6 +1481,33 @@ The choice lists a form version takes from uploaded CSV files (M141, `R-f69aab42
 
 ---
 
+## 39. `platform_api_tokens`
+
+The platform support tokens (M175, `R-78f43f26`, `D139`, `D141`): the credential the dev session's feedback pull (`scripts/feedback-pull.php`) presents to the platform support API (`/api/platform/v1/feedback…`, ADR-0023). Issued, listed and revoked on the console's Settings page by a platform super-admin; the plaintext is shown once and never stored.
+
+**Writers:** `App\Services\Admin\PlatformSupportTokenService` (issue, revoke) behind `/admin/support-tokens` (console gates), and `App\Http\Middleware\AuthenticatePlatformToken` (stamps `last_used_at`). **Readers:** that middleware, and the console's token list.
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `uuid` | No | application-generated (`HasUuidv7`) | No | Primary key — a uuid so a platform audit row can name it (`audits.auditable_id` is a uuid). |
+| `user_id` | `uuid` | No | — | No | FK to `users.id`, `ON DELETE CASCADE` — the super-admin who issued it, and whose standing (`is_super_admin`, confirmed 2FA) is re-checked on every call. |
+| `name` | `varchar(100)` | No | — | No | What it is for, in the issuer's words ("Dev laptop — feedback pull"). |
+| `token_hash` | `char(64)` | No | — | No | `sha256` of the plaintext, unique. The plaintext (`msp_` + 48 random characters) is shown once and exists nowhere else. An unconditional audit secret (`AuditRedactor::SECRETS`). |
+| `ability` | `varchar(50)` | No | — | No | The one thing it may do — `feedback:support` (read every workspace's feedback and its screenshots, move a report with a reply). No default, so a row never gets an ability by omission. |
+| `expires_at` | `timestamptz` | No | — | No | Required, at most 90 days out: the token carries no session, so its lifetime is the only clock on it. |
+| `last_used_at` | `timestamptz` | Yes | `NULL` | No | Stamped on each authenticated call. |
+| `revoked_at` | `timestamptz` | Yes | `NULL` | No | Set when revoked; a revoked token is refused at once. |
+| `created_at` / `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
+
+**Indexes**: `UNIQUE (token_hash)`.
+
+> **Design Notes**
+> - **No `tenant_id`, no RLS, and the elevated role is never granted it.** A support token belongs to the platform, not to a workspace, so it cannot live in Sanctum's `personal_access_tokens` — strictly tenant-isolated, read only under a tenant context. The app role reads this table directly; the cross-workspace READS it authorises still go through `SuperAdminService`'s SELECT-only carve-out, unwidened.
+> - **Every call is audited as a platform row** (`tenant_id` NULL, `auditable_type = platform_api_tokens`, the token's id): `exported` for a read, `updated` for a status change — which also leaves the reporting workspace's own `feedback_reports` row, as the console does. Issuing is `created`, revoking `updated`.
+> - **It answers on any platform host** (`D141`): on the testing server the central host is the agency's website, reachable only from the box. The console that issues it stays central-only.
+
+---
+
 ## Foreign Key Relationship Summary
 
 ```
@@ -1648,6 +1675,7 @@ ocr_scans.(tenant_id, form_id)         -> forms.(tenant_id, id)             (com
 ocr_scans.uploaded_by                  -> users.id           (external, nullable, SET NULL)
 form_folders.tenant_id                 -> tenants.id                        (CASCADE)
 form_folders.created_by                -> users.id           (external, nullable, SET NULL)
+platform_api_tokens.user_id            -> users.id           (external, CASCADE)
                                           (form_version_id carries NO db-level FK — see §33)
 ```
 

@@ -209,10 +209,14 @@ function openAdd(): void {
 }
 
 
+/* M174 (`R-fb647b5e`, `D120`): a grid that gains columns, so a wide screen shows more domains side by side rather than
+   one card stretched from edge to edge with its status at one end and its actions at the other. 26rem keeps a card's
+   DNS record readable; `min(100%, …)` keeps a phone at one column. */
 .domains__list {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 26rem), 1fr));
     gap: var(--mds-space-4);
+    align-items: start;
 }
 
 .domains__form {

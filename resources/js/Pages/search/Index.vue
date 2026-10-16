@@ -87,7 +87,7 @@ function clearFilters(): void {
 </script>
 
 <template>
-    <div>
+    <div class="search">
         <Head :title="filters.applied.q ? `Search: ${clamped}` : 'Search'" />
 
         <PageHeader title="Search" icon="search" />
@@ -207,10 +207,35 @@ function clearFilters(): void {
     color: var(--mds-color-text-secondary);
 }
 
+/* M174: the container the groups read (an element cannot query its own size). */
+.search {
+    container-type: inline-size;
+}
+
 .search__groups {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--mds-space-5);
+    align-items: start;
+}
+
+/* M174 (`R-fb647b5e`, `D120`): the groups side by side once the page is wide, each keeping its own rows, so a result's
+   title is no longer 2,000px from the edge its row card ends at. Steps rather than `auto-fill`: there are at most
+   four groups, and a filling grid lands three and one at 1920. A lone group — one entity chosen — takes the row. */
+@container (min-width: 64rem) {
+    .search__groups {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .search__group:only-child {
+        grid-column: 1 / -1;
+    }
+}
+
+@container (min-width: 120rem) {
+    .search__groups {
+        grid-template-columns: repeat(auto-fit, minmax(26rem, 1fr));
+    }
 }
 
 .search__group-heading {

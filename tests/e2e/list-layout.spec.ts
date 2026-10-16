@@ -535,3 +535,41 @@ test.describe('the console workspace page', () => {
         expectBeside(await box(usage), await box(page.locator('.admin-td__grid')), 'the console workspace at 1440');
     });
 });
+
+test('Domains — the domain cards sit side by side at 1440', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+    // Domains at 1440: the two seeded domains side by side (two 26rem tracks fit 1136px), not one under the other.
+    await page.goto('/domains', { waitUntil: 'networkidle' });
+    await settlePaint(page);
+    const domains = await page.locator('.domain-card').evaluateAll((els) => els.map((el) => {
+        const r = el.getBoundingClientRect();
+
+        return { left: Math.round(r.left), top: Math.round(r.top) };
+    }));
+    expect(domains.length, 'the seed holds two domains').toBeGreaterThanOrEqual(2);
+    expect(domains[1].top, `domains at 1440: ${JSON.stringify(domains)}`).toBe(domains[0].top);
+    expect(domains[1].left, `domains at 1440: ${JSON.stringify(domains)}`).toBeGreaterThan(domains[0].left);
+});
+
+test('Search — the result groups sit two across at 1440', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+    // Search at 1440: the four groups for "clinic" two across (the page is 71rem, past 64rem).
+    await page.goto('/search?q=clinic', { waitUntil: 'networkidle' });
+    await settlePaint(page);
+    expect(await columns(page, '.search__group'), '/search?q=clinic at 1440').toBe(2);
+});
+
+test('Achievements — the leaderboard sits beside the team tiles at 1920', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+    // Achievements at 1920: the leaderboard beside the team's tiles rather than a full-width ladder under them.
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto('/achievements', { waitUntil: 'networkidle' });
+    await settlePaint(page);
+    const team = page.locator('section').filter({ has: page.getByRole('heading', { name: 'This workspace', level: 2 }) });
+    const tiles = await box(team.locator('.ach__stats'));
+    const ladder = await box(page.locator('.ach__ladder'));
+    expect(ladder.left, `achievements at 1920: ${JSON.stringify({ tiles, ladder })}`).toBeGreaterThanOrEqual(tiles.right);
+});

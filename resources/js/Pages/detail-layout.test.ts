@@ -1,6 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { containerBlock, nested, read, rule, styleOf } from '../__tests__/css-source';
 
 /**
  * The detail pages gain a side column on a wide screen (M174, `D120`): from a 75rem container a page's facts sit in a
@@ -12,57 +11,6 @@ import { describe, expect, it } from 'vitest';
  * ⚠️ An element cannot query its own size, so each page declares the container on its root and splits an inner
  * wrapper — the `M129` trap `FormSettingsSections.vue` records, and the scans page's shape since `M173`.
  */
-
-const read = (path: string): string => readFileSync(join(process.cwd(), path), 'utf8');
-const styleOf = (path: string): string => {
-    const source = read(path);
-
-    return source.slice(source.indexOf('<style'));
-};
-
-/** The body of a top-level rule written at column 0, or null. */
-function rule(css: string, selector: string): string | null {
-    const start = css.indexOf(`\n${selector} {`);
-
-    return start === -1 ? null : css.slice(start, css.indexOf('}', start));
-}
-
-/**
- * The whole of a column-0 `@container (min-width: <width>)` block, braces counted, or null. Anchored at column 0 so a
- * comment quoting the rule cannot satisfy it; the blocks it reads hold no comments, so a brace inside one cannot
- * miscount.
- */
-function containerBlock(css: string, width: string): string | null {
-    const head = `\n@container (min-width: ${width}) {`;
-    const start = css.indexOf(head);
-
-    if (start === -1) {
-        return null;
-    }
-
-    let depth = 0;
-
-    for (let i = start + head.length - 1; i < css.length; i++) {
-        if (css[i] === '{') {
-            depth++;
-        } else if (css[i] === '}' && --depth === 0) {
-            return css.slice(start, i + 1);
-        }
-    }
-
-    return null;
-}
-
-/** The body of a rule nested one level inside a block (four spaces in), or null. */
-function nested(block: string | null, selector: string): string | null {
-    if (block === null) {
-        return null;
-    }
-
-    const start = block.indexOf(`\n    ${selector} {`);
-
-    return start === -1 ? null : block.slice(start, block.indexOf('}', start));
-}
 
 /** Main content first and widest; the facts in a bounded column beside it. */
 const ASIDE_SPLIT = /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+minmax\(18rem,\s*26rem\)/;

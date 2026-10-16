@@ -14830,3 +14830,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   converted or moved — who, when, which setting, before and after; a History tab in the right panel lists them, and **Put back**
   shows the earlier value before applying it as an ordinary edit with one undo entry. **Live.** Filed by `M174`.
   **Tier: during-testing.**
+
+- **`nit` · No seeded form open for manual entry shows two sections at once, so the manual-entry page's sections list is never drawn in a browser test.**
+  Found by `M174`: the side panel lists a form's sections only while it sits beside the form and only when two or more are
+  visible (`resources/js/Pages/submissions/Encode.vue`, `stepList`), and the two seeded forms with more than one section —
+  Branching Router and Referral Router in `database/seeders/E2eSeeder.php` — show one branch at a time, so
+  `tests/e2e/list-layout.spec.ts` can measure the panel but not the list; three mount cases in
+  `resources/js/Pages/submissions/encode.test.ts` pin it instead. The remedy: a seeded published form with two ungated sections
+  (stepped) and an e2e case at 1920 that reads the list and its current step, then presses Next. **Latent.** Filed by `M174`.
+  **Tier: during-testing.**

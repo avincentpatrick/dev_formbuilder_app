@@ -456,7 +456,7 @@ quote it*, now on its fourth gate.
   respondent can be on step 5 having never seen step 3). Put that rule in §3.9 before generalising.
   Migrating it puts **17 assertions** at risk across `resources/public-runtime/__tests__/components.test.ts`
   and `public-runtime-axe.spec.ts`, inside a separate Vue SPA that imports eight design-system components.
-  The second consumer is `Pages/submissions/Encode.vue:897-899` — a bare `p aria-live="polite"` reading
+  The second consumer is `Pages/submissions/Encode.vue:933-935` — a bare `p aria-live="polite"` reading
   "Step 3 of 5" with no landmark and no navigable steps, pinned by nine assertions in `encode.test.ts`.
 
 - **A `--mds-person-identity-*` scale** — `MdsAvatar` is monochrome, and DSR §3.12 records why reusing the
@@ -503,7 +503,7 @@ are still in place.
   STRUCTURALLY INERT ON EVERY `AppLayout` PAGE.~~** The row is **correct in its diagnosis and wrong in
   its evidence**, and both halves matter.
   ⛔ **THE PROOF THE ROW OFFERS IS A NO-OP AND PROVES NOTHING.** It says *"delete `min-width: 0` from
-  the leaderboard name cell (`achievements/Index.vue:452-459`) and every scan still passes."* That rule
+  the leaderboard name cell (`achievements/Index.vue:523-530`) and every scan still passes."* That rule
   **also** carries `overflow: hidden`, and per CSS Sizing 3 a flex item whose main-axis overflow is not
   `visible` already resolves `min-width: auto` to **0** — so the declaration is redundant and deleting
   it changes nothing: **343/343 with it and without it**, measured in Chromium. The scan passing was the
@@ -559,7 +559,7 @@ are still in place.
   sets `.app-shell { overflow-x: clip }` and `.app-shell__content` is `overflow-y: auto`, so its
   `overflow-x` computes to `auto`. **Any overrun clips or scrolls inside the content region and the
   document width never moves.** Delete `min-width: 0` from the leaderboard name cell
-  (`resources/js/Pages/achievements/Index.vue:452-459` — the exact idiom `responsive-axe.spec.ts:24-28`
+  (`resources/js/Pages/achievements/Index.vue:523-530` — the exact idiom `responsive-axe.spec.ts:24-28`
   says the scan protects) and every scan still passes.
   ⚠️ **Three files in the suite present it as working** — `support/axe.ts`, `builder-axe.spec.ts`, and
   `responsive-axe.spec.ts`, whose ~40 comment lines name this assertion as the reason those pages are
@@ -7630,7 +7630,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `Index.vue` and `Show.vue`, and `resources/js/Pages/webhooks/Index.vue:125` surfaces a delivery **count**
   as a stat tile, not a log. ⚠️ **The gap is narrower than "the DLQ is unsurfaced"**, and saying so keeps
   the row honest: `app/Enums/WebhookDeliveryStatus.php:33` is a real `dead_lettered` case and
-  `resources/js/Pages/webhooks/Show.vue:267` renders delivery status generically, so the state is visible
+  `resources/js/Pages/webhooks/Show.vue:271` renders delivery status generically, so the state is visible
   per endpoint — what is missing is the cross-endpoint view and any explicit dead-letter labelling.
   **Live.** Filed by `M80`. **Tier: during-testing.**
 
@@ -8281,7 +8281,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   it falsifies a dated record. **The prescribed sequence is not available.** The ceiling therefore moves
   17 → 18 — a raise, which the constant permits with the reason stated, and the reason is that the ledger
   did not change at all. The resolver got better and the rot was always there.
-  ⚠️ **THE ROW'S FLAGSHIP TIER-1 INSTANCE IS ALIVE.** `Pages/submissions/Encode.vue:897` resolves and
+  ⚠️ **THE ROW'S FLAGSHIP TIER-1 INSTANCE IS ALIVE.** `Pages/submissions/Encode.vue:933` resolves and
   line 897 is not blank, so widening leaves tier 1 at **0 rotten** and buys zero new tier-1 detections.
   That citation is substantively wrong — it describes a control ~350 lines away — but that is the class
   this gate cannot see by design, and an open row already owns it.
@@ -11325,7 +11325,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   come from `BuilderPresenter::enums()`, which is `ucfirst` over an underscore replacement. ⚠️ **The app already
   knows how to do both, two tabs away:** `ConditionRow.vue:180-210` ships `has at least`, `is blank`,
   `does not include`, and filters by context. The validation editor simply never got it. ⛔ **One paired change
-  must ship in the same increment or this is a net weakening:** `Encode.vue:1191` has no `novalidate` while
+  must ship in the same increment or this is a net weakening:** `Encode.vue:1263` has no `novalidate` while
   `PageView.vue:144` and `StepView.vue:203` do, so a bad email is rejected for a staff keyer and accepted from a
   respondent on the same form. Adding `novalidate` aligns them and removes the only enforcement that exists —
   which is safe only once the per-type `pattern` defaults land beside it. **Live.** Filed by `M110`.
@@ -12047,7 +12047,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M134` (2026-10-05) — **`minor` · The encode page still enforces four families of native browser validation the guest runtime does
   not, and nothing in the repository can turn that difference red.** Filed 2026-09-27 by `M115`, split out of
-  `R-e878d49a` on the user's decision when the blast radius measured wider than that row's framing. `Encode.vue:1191`
+  `R-e878d49a` on the user's decision when the blast radius measured wider than that row's framing. `Encode.vue:1263`
   has no `novalidate` while `PageView.vue:144` and `StepView.vue:203` do, so one form rejects an answer from a
   staff keyer and accepts it from a respondent. ⛔ **Adding `novalidate` removes FOUR families, not one**, and
   `DefaultFieldRules` replaces exactly one of them: `type="email"`/`type="url"` mismatch (replaced by a seeded
@@ -12104,7 +12104,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   stop on `field-errors`; the respondent fills a form whose skip logic and conditional requiredness are
   silently inert, submits, and meets the server's generic 422. ⛔ **AND THE BANNER EXISTS, ON THE WRONG
   PAGE.** `engineFailed` has exactly one consumer — the staff encode page's *"Conditions could not be
-  applied"* notice (`resources/js/Pages/submissions/Encode.vue:1178-1183`) — and grep finds no consumer under
+  applied"* notice (`resources/js/Pages/submissions/Encode.vue:1250-1255`) — and grep finds no consumer under
   `resources/public-runtime/components` or `App.vue` at all. So a keyer is warned and a respondent is not.
   ⚠️ **Whether the guest surface should warn or REFUSE is a product question this row must settle**, because
   a form whose conditions are inert may be collecting answers to questions that should have been skipped.
@@ -14097,9 +14097,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The user's comment (2026-10-14): *"there are some large words in the form overview specially the accepting responses and last
   response date is being wraped making the word cut in half"*. Measured on `origin/main` at `0dc971b6`:
   `packages/design-system/src/components/StatTile/StatTile.vue:187` sets the value in the heading-1 role (38px) and `:225` gives it
-  `overflow-wrap: anywhere` (added by `M19` for a 123px column at 834px); `resources/js/Pages/forms/Show.vue:530` lays four tiles in
+  `overflow-wrap: anywhere` (added by `M19` for a 123px column at 834px); `resources/js/Pages/forms/Show.vue:531` lays four tiles in
   `repeat(auto-fit, minmax(200px, 1fr))`, so at 1200px each text column is about 180px — "Accepting" (`:374`) breaks mid-word and the
-  date-time value (`:386`) wraps to three lines. `resources/js/Pages/admin/TenantDetail.vue:342-349` passes `row.display` into the same
+  date-time value (`:386`) wraps to three lines. `resources/js/Pages/admin/TenantDetail.vue:347-354` passes `row.display` into the same
   role. The remedy is a `valueSize` prop on `MdsStatTile` — `compact` sets the heading-3 role with the same gradient, `anywhere` kept
   as the escape — used by the hub's two prose tiles and the console's usage tiles, with the hub grid's floor raised to
   `min(100%, 240px)`; a story and a `StatTile.test.ts` case, red first. **Live.** Filed by `M171`. **Tier: during-testing.** ✅ **CLOSED BY `M171` (2026-10-15):** `MdsStatTile` takes `valueSize="compact"` — the value in the heading-3 role whole (size, leading, weight) with the base tracking, the gradient and the `anywhere` escape kept — and ALL FOUR hub tiles use it (the user chose one even row over two sizes); the last response shows its date with the time on the caption line, because a compact date-and-time still wrapped at 1440px; the hub grid's floor is `min(100%, 240px)`; the console's usage tiles are compact too. `list-layout.spec.ts` measures every word of every hub tile value in one line box (red on the trunk at 834 and 1440 — "Accepting" — green at 375), and one line per value at 1440 — for every month with a two-digit day, because heading-2 was tried first and CI's browser wrapped the seeded "Oct 11, 2026" (9 of 12 months wrap at heading-2, measured).
@@ -14140,7 +14140,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the `--wide` class deleted, the builder's `--fluid` kept; the Vitest set rewritten; the e2e case made a 1920px case asserting a
   list page AND `/settings` fill the region (red today); the two stories; DSR §3.0 and the §6 bullet amended — and the same edit
   records the page-level `dl` collapse at 480px that ten pages author (`resources/js/Pages/scopes/Index.vue:387`,
-  `resources/js/Pages/forms/Show.vue:594`) against §6's "pages never add breakpoint logic" sentence, which today contradicts them.
+  `resources/js/Pages/forms/Show.vue:601`) against §6's "pages never add breakpoint logic" sentence, which today contradicts them.
   **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** ✅ **CLOSED BY `M173` (2026-10-16):** `AppLayout.vue` and `AdminLayout.vue` cap no width; one more step of side padding (`--mds-space-12`) from a 1920px viewport; `WIDE_PAGES` and the `--wide` class deleted, the builder's `--fluid` kept. `AppLayout.test.ts` gives every former wide page and every former exclusion the plain column and pins the stylesheet as text; `list-layout.spec.ts` measures `/submissions`, `/settings` and `/dashboard` filling the region at 1920 (1600 and 1200px in a 1680px region on the trunk) and at 2560, with 48px padding at 1920 and 32px at 1440. The stories carry no cap. DSR §3.0 and §6 amended — the row's "ten pages" with a 480px `dl` collapse were five pages and one component, and the `TwoColumnLayout` primitive §6 named was never built, so the amendment records the `auto-fill` pattern instead. Three comments that explained themselves by the cap corrected; `FormCard.vue`'s dated measurement left as history.
 
 - ✅ **CLOSED BY `M173` (2026-10-16) — ****`minor` · The settings pages stack 640px cards in one column, so a wide screen shows one narrow column and the rest of the page empty.**
@@ -14173,54 +14173,54 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   modal stays one column because its container never reaches 60em; a new Vitest case on the source pins the query, the way
   `resources/js/Pages/forms/builder-layout.test.ts` pins the builder's. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Remedy amended 2026-10-15 by `M173` (`D135` A, the user):** the two-up layout above cannot work — `FormSettingsSections.vue` shows one section at a time behind its rail, so two sections are never on screen together. The rail stays; one rule holds every `MdsFormField` (`.mds-field`) inside a section at 48rem, so the boxes keep a reading width while a section's lists and tables fill; the pop-up and the 420px query are unchanged; the pin is a source-text Vitest case plus a browser measurement in `tests/e2e/list-layout.spec.ts`. ✅ **CLOSED BY `M173` (2026-10-16) (`D135` A):** one rule holds every `.mds-field` in a section, and the four rows that carry a panel's Save button, at 48rem; lists and tables fill. `FormSettingsSections.layout.test.ts` pins it; `list-layout.spec.ts` measures the Details boxes at 768px with the body wider than 1200px at 1920 (934px boxes on the trunk; 1382px with the rule dropped) and the Save button ending where the boxes end — the real-browser look found it 614px to their right before the save rows took the measure.
 
-- **`minor` · The form hub and the submission page stack their facts above their tables, so on a wide screen every row runs from one edge of the glass to the other.**
-  `resources/js/Pages/forms/Show.vue:343-366` (identity and facts), `:368-407` (tiles), `:415-487` (two full-width tables);
-  `resources/js/Pages/submissions/Show.vue:415-420` three fact cards in `auto-fit minmax(18rem, 1fr)` and `:350-361` the answer blocks
-  one under the other, each row `10rem 1fr` (`:495-501`), so a value sits 2,000px from its label on a 2560px screen. `D120` A. The
+- ✅ **CLOSED BY `M174` (2026-10-16) — ****`minor` · The form hub and the submission page stack their facts above their tables, so on a wide screen every row runs from one edge of the glass to the other.**
+  `resources/js/Pages/forms/Show.vue:376-399` (identity and facts), `:401-440` (tiles), `:442-539` (two full-width tables);
+  `resources/js/Pages/submissions/Show.vue:428-432` three fact cards in `auto-fit minmax(18rem, 1fr)` and `:353-368` the answer blocks
+  one under the other, each row `10rem 1fr` (`:544-549`), so a value sits 2,000px from its label on a 2560px screen. `D120` A. The
   remedy is a page grid from a 75rem container — main content (tables, answers) in `minmax(0, 1fr)`, the facts, versions, review and
   PDF cards in a `minmax(18rem, 26rem)` aside — with the submission's answer blocks two-up (`auto-fill minmax(min(100%, 36rem), 1fr)`)
-  and the scan split (`:435-450`) unchanged; `resources/js/Pages/forms/show.test.ts` keeps its every-prop-has-a-reader rule. **Live.**
-  Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
+  and the scan split (`:445-469`) unchanged; `resources/js/Pages/forms/show.test.ts` keeps its every-prop-has-a-reader rule. **Live.**
+  Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** ✅ **CLOSED BY `M174` (2026-10-16):** from a 75rem container (the page root) the hub's Versions panel sits in a 26rem column beside Latest responses — DataTable draws it as its stacked cards, a version history — and a response's fact, PDF and review cards sit in that column beside its answers, their label rows stacked; the DOM never reorders, so a phone and a screen reader meet the facts first as before. The hub's own facts stay a header strip, which never ran edge to edge. The answer blocks lay two across at a 32rem floor, not the 36rem above, which gives one column beside the facts at 1920 (about 1144px of room, 1168 needed). A response with scanned pages keeps `M168`'s paper and answers halves with its facts above: a third column would leave the paper about 370px wide. `resources/js/Pages/detail-layout.test.ts` pins it; `tests/e2e/list-layout.spec.ts` measures the Versions beside Latest responses at 1920 and a Branching Router response's facts beside two sections side by side (both stacked at 1584px on the trunk); the mutants: the hub split dropped, the 36rem floor.
 
-- **`minor` · The webhook, integration-rule and console workspace pages stack two fact cards over a full-width log, and the console's dialogs rely on browser-default paragraph margins.**
-  `resources/js/Pages/webhooks/Show.vue:358-363` and `resources/js/Pages/integrations/RuleShow.vue:326-331` put two cards in
-  `auto-fit minmax(18rem, 1fr)` above the log (`:259` in each); `resources/js/Pages/admin/TenantDetail.vue:542-546` the same with
-  `:546-548` stacking every section under it. On that page `:491-498` and `:513-519` are paragraphs with no class in two dialogs
-  (every tenant dialog styles a `__prose` rule), and `:562` hard-codes `letter-spacing: 0.04em` where `--mds-tracking-wide` exists.
+- ✅ **CLOSED BY `M174` (2026-10-16) — ****`minor` · The webhook, integration-rule and console workspace pages stack two fact cards over a full-width log, and the console's dialogs rely on browser-default paragraph margins.**
+  `resources/js/Pages/webhooks/Show.vue:369-373` and `resources/js/Pages/integrations/RuleShow.vue:337-341` put two cards in
+  `auto-fit minmax(18rem, 1fr)` above the log (`:263` in each); `resources/js/Pages/admin/TenantDetail.vue:555-559` the same with
+  `:588-590` stacking every section under it. On that page three paragraphs had no class in two dialogs
+  (every tenant dialog styles a `__prose` rule), and a micro-label hard-coded `letter-spacing: 0.04em` where `--mds-tracking-wide` exists.
   `D120` A. The remedy is the hub's page grid (cards aside, log main, from 75rem), a `__prose` rule, and the token. **Live.**
-  Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
+  Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** ✅ **CLOSED BY `M174` (2026-10-16):** from a 75rem container the webhook's and the rule's two cards sit in a 26rem column beside the notice and the delivery log, their label rows stacked (a URL or a secret beside a 12rem label had about 170px); the console workspace page gets its own container wrapper — its root is the console layout — and its Workspace and Plan cards sit beside the usage, capability, domain and support sections from 1440, where the console already has 1392px. The three dialog paragraphs take an `admin-td__prose` rule (the second keeps a gap, since the modal body spaces nothing) and the micro-label the token. `resources/js/Pages/detail-layout.test.ts` pins it; `tests/e2e/list-layout.spec.ts` measures the Zapier webhook's and the "New submissions" rule's cards beside their logs at 1920 and the console's cards beside Usage at 1440 (all above, full width, on the trunk); the mutants: each split dropped, the prose rule dropped.
 
-- **`minor` · Domains, search results and the achievements leaderboard are single columns of full-width rows.**
-  `resources/js/Pages/domains/Index.vue:212-216` (`.domains__list`, a column of `DomainCard`s), `resources/js/Pages/search/Index.vue:210-214`
-  (the groups) and `:235-247` (one full-width card per result), `resources/js/Pages/achievements/Index.vue:458-465` (`.ach__ladder`, a
-  column) with `:485-492` giving the name `flex: 1`, so the rank sits at the left edge and the points at the far right of a 2560px
+- ✅ **CLOSED BY `M174` (2026-10-16) — ****`minor` · Domains, search results and the achievements leaderboard are single columns of full-width rows.**
+  `resources/js/Pages/domains/Index.vue:215-220` (`.domains__list`, a column of `DomainCard`s), `resources/js/Pages/search/Index.vue:215-220`
+  (the groups) and `:260-272` (one full-width card per result), `resources/js/Pages/achievements/Index.vue:496-503` (`.ach__ladder`, a
+  column) with `:523-530` giving the name `flex: 1`, so the rank sits at the left edge and the points at the far right of a 2560px
   row. `D120` A. The remedy: domain cards in `auto-fill minmax(min(100%, 26rem), 1fr)`; search groups side by side from 64rem with
   their rows inside each group; the leaderboard beside the team tiles and the note in a two-column section grid from 75rem.
-  **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
+  **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** ✅ **CLOSED BY `M174` (2026-10-16):** the domain cards sit in a 26rem `auto-fill` grid (two across at 1440), and the setup guide above them keeps its text at an 80ch measure (`resources/js/components/domains/DomainSetupGuide.vue` — its lines ran about 1,100px at 1920, found in the browser and named in the claim as a conditional extension); the search groups sit two across from a 64rem page and in one row from 120rem — steps, because `auto-fill` lands three and one at 1920 — and a lone group (one entity chosen) takes the row; from a 75rem page the leaderboard sits beside the team's tiles and note, and a workspace with nobody on the board keeps its tiles across. Beside the cited ladder, the badges grid was `auto-fit` with no `min()` guard and is now `auto-fill` with one. `resources/js/Pages/grid-layout.test.ts` pins it; `tests/e2e/list-layout.spec.ts` measures the two domains side by side and two search columns at 1440 and the ladder beside the tiles at 1920 (stacked, one column and below on the trunk); the mutants: each layout dropped.
 
-- **`nit` · Template cards' "Use this template" buttons sit at different heights across a row.**
+- ✅ **CLOSED BY `M174` (2026-10-16) — ****`nit` · Template cards' "Use this template" buttons sit at different heights across a row.**
   `resources/js/Pages/forms/Templates.vue:128-132` makes each card a flex column but never pushes the footer to the bottom;
   `resources/js/components/forms/FormCard.vue:225` does it with `margin-top: auto` on the card footer. The remedy is the same rule,
-  `:deep(.mds-card__footer) { margin-top: auto }`. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
+  `:deep(.mds-card__footer) { margin-top: auto }`. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** ✅ **CLOSED BY `M174` (2026-10-16):** the rule, with `padding-top: var(--mds-space-4)` beside it — `margin-top: auto` alone takes the 16px the footer's own margin gave to zero in a row's tallest card. Pinned in `resources/js/Pages/grid-layout.test.ts`; `tests/e2e/list-layout.spec.ts` checks every card's footer ends at its card's padding at 1440 (two cards 21px short on the trunk); the mutant: the auto margin dropped.
 
-- **`minor` · The sign-in and register pages centre a 400px card and a pitch panel in the middle of a wide screen, and the landing page caps itself at 64rem.**
-  `resources/js/Layouts/AuthLayout.vue:83-91` centres `.auth__frame`, `:122-134` is the 400px card, and `:220-247` makes the split
-  variant's panel a 26rem flex track beside it; `resources/js/Pages/Welcome.vue:117-126` caps the page at 64rem and the hero at 44rem,
-  `:147-153` the lede at 36rem, `:169-173` lays the capability grid with `auto-fit`, and `:134` hard-codes an eyebrow's tracking.
+- ✅ **CLOSED BY `M174` (2026-10-16) — ****`minor` · The sign-in and register pages centre a 400px card and a pitch panel in the middle of a wide screen, and the landing page caps itself at 64rem.**
+  `resources/js/Layouts/AuthLayout.vue:88-96` centres `.auth__frame`, `:137-149` is the 400px card, and a 54em container query made the split
+  variant's panel a 26rem flex track beside it; `resources/js/Pages/Welcome.vue` capped the page at 64rem and the hero at 44rem,
+  the lede at 36rem, laid the capability grid with `auto-fit` in that cap, and hard-coded an eyebrow's tracking.
   `D122` A (the user, 2026-10-14): a two-pane sign-in. The remedy: the split variant becomes a two-pane page — the pitch panel fills
   the left half on a sunken surface, the card centred in the right half, stacked below the 54em container threshold; the seven
   utility pages keep the card; the landing hero stays centred but its grid fills with `auto-fill` and bounded cards, and the tracking
   takes `--mds-tracking-wide`. The layout docblock's two CI constraints hold: no second control whose name contains "Sign in", and
   the panel's headline stays a paragraph. `tests/e2e/auth-axe.spec.ts` gains the two-pane case. **Live.** Filed by `M171`.
-  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
+  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** ✅ **CLOSED BY `M174` (2026-10-16) (`D122` A):** past the threshold the pitch panel fills the left half on `--mds-color-bg-sunken` with a 1px divider — in dark the sunken surface is the canvas colour — and the card sits centred in the right half; the split gives up its own padding so the halves reach the window, which makes the threshold 57em of a container that is now the window: the same 912px viewport, measured (911 the card, 912 the halves). "Stacked below the threshold" is read as today's narrow page — the card alone, the panel hidden — since a pitch above the form would push the fields below a phone's fold. The landing page drops its 64rem cap and its four cards fill with `auto-fit`, not the `auto-fill` above: with exactly four, `auto-fill` leaves empty tracks and a left-aligned group under a centred hero. The docblock and `docs/ux/exceptions-log.md` #14 named `responsive-axe.spec.ts` as the h1 locator these pages answer to; it is `google-signin.spec.ts` and `auth-axe.spec.ts`, corrected, and #14 amended. `resources/js/Layouts/auth-layout.test.ts` pins it; `tests/e2e/auth-axe.spec.ts` measures login and register at 1440 (the panel a centred 416px track at x=296 on the trunk) and the landing grid at 1920 (1024px); the light and dark scans axe the halves; the mutants: the halves dropped, the cap back.
 
-- **`minor` · The staff encode page caps itself at 720px and leaves the rest of a wide screen empty.**
-  `resources/js/Pages/submissions/Encode.vue:1575-1577` (`.encode { max-width: 720px }`) and `:1962` (`max-width: 90rem` in scan mode).
+- ✅ **CLOSED BY `M174` (2026-10-16) — ****`minor` · The staff encode page caps itself at 720px and leaves the rest of a wide screen empty.**
+  `resources/js/Pages/submissions/Encode.vue` (`.encode { max-width: 720px }`) and `:2117` (90rem in scan mode).
   `D121` A (the user, 2026-10-14): the inputs keep a reading-width column and the rest of the width carries the page's own side
   panel. The remedy: from 75rem a two-column grid — the form at a 45rem measure and an aside holding the facts that today sit above
   it (the form's status and version, the schedule notice, the reference files, the autosave state); scan mode's equal halves
-  (`M168`) unchanged. The page's two `--mds-color-danger-text` uses (`:1921`, `:2029`) take `--mds-color-status-danger-fg` with this
-  row, so the consistency row never edits this hub. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Remedy amended 2026-10-16 by `M174` (`D136` A, the user):** the page is sent no form status and no reference files (`app/Services/Submissions/EncodeFormPresenter.php:203-233` — the version number only), and the autosave label stays in the header beside Cancel. The side panel holds the form's name and version, the open or closed notice, and the form's sections with the current one marked — the list shown from the split only, the "Step N of M" line kept at every width; scan mode keeps its halves; the version's reference files are filed as their own row.
+  (`M168`) unchanged. The page's two `--mds-color-danger-text` uses take `--mds-color-status-danger-fg` with this
+  row, so the consistency row never edits this hub. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Remedy amended 2026-10-16 by `M174` (`D136` A, the user):** the page is sent no form status and no reference files (`app/Services/Submissions/EncodeFormPresenter.php:203-233` — the version number only), and the autosave label stays in the header beside Cancel. The side panel holds the form's name and version, the open or closed notice, and the form's sections with the current one marked — the list shown from the split only, the "Step N of M" line kept at every width; scan mode keeps its halves; the version's reference files are filed as their own row. ✅ **CLOSED BY `M174` (2026-10-16) (`D136` A):** from a 75rem page the form keeps its 45rem column and a 26rem panel beside it holds the form's name and version and its open or closed notice, moved there, and the form's sections with the current one marked (links in single-page mode); the panel is first in the DOM, so a phone still meets them above the form. The sections list renders only while the panel sits beside the form, by a ResizeObserver on the page root against the same 75rem, and is never merely hidden — it repeats every section's name, and a hidden copy would make every reader that finds a section by name find two (`responsive-axe.spec.ts`'s `getByText`, this page's own unit tests; the mutant that rendered it always turned an existing stepped-flow test red). Not sticky: a long list would leave its tail unreachable. A scanned paper keeps `M168`'s halves, moved from the page root onto the form's wrapper (`ocr-review-axe.spec.ts`'s `expectPaperBeside` green); the two danger uses take the on-surface pair. Pinned in `resources/js/Pages/submissions/encode-layout.test.ts` and three mount cases in `encode.test.ts`; `tests/e2e/list-layout.spec.ts` measures the intro beside a 720px form at 1920 (above it on the trunk). **Not seen in a browser:** the sections list itself — no seeded form open for manual entry shows two sections at once (both routers show one branch at a time), so it is pinned by the mount cases only.
 
 - **`minor` · The feedback panel is in every captured screenshot, a report carries no type, and only the page's path is recorded.**
   The user's comment (2026-10-14): *"when i click capture screen, the modal for the feedback is always included. i think there is a
@@ -14265,7 +14265,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   not built is queued rather than left in prose. **Live.** Filed by `M171`. **Tier: after-launch.**
 
 - **`minor` · Fifteen files set small error text in `--mds-color-danger-text`, which resolves to `danger-300` in dark and measures 4.22:1 on the surface.**
-  The repository's own notes say so (`resources/js/Pages/admin/AuditLog.vue:287`, `resources/js/Pages/admin/TenantDetail.vue:539`,
+  The repository's own notes say so (`resources/js/Pages/admin/AuditLog.vue:287`, `resources/js/Pages/admin/TenantDetail.vue:547`,
   `resources/js/components/builder/LogicRail.vue:228`, `resources/js/components/shell/FeedbackButton.vue:295`) and the uses remain:
   `resources/js/Pages/forms/Builder.vue:857`, `resources/js/components/webhooks/WebhookFormModal.vue:197`,
   `resources/js/components/scopes/GrantModal.vue:256`, `resources/js/components/scopes/DeleteNodeModal.vue:120`,
@@ -14288,7 +14288,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`nit` · Three truncated values offer no way to read the whole text where they are shown.**
   `resources/js/Pages/webhooks/Index.vue:224-236` (`.webhooks__url`), `resources/js/Pages/integrations/Index.vue:456-468`
-  (`.connection__channel`) and `resources/js/Pages/integrations/RuleShow.vue:421-431` (`.detail__result`) clip with an ellipsis and
+  (`.connection__channel`) and `resources/js/Pages/integrations/RuleShow.vue:432-442` (`.detail__result`) clip with an ellipsis and
   carry no `title`. The remedy is a `title` with the full value — allowed because the same text is on the row's detail page, so no
   tooltip component is owed. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 

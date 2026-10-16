@@ -44,7 +44,7 @@ vi.mock('@inertiajs/vue3', () => ({
         return form;
     },
     usePage: () => ({ component: 'forms/Builder', url: '/forms/1/builder', props: {} }),
-    Link: { template: '<a><slot /></a>' },
+    Link: { props: ['href'], template: '<a :href="href"><slot /></a>' },
 }));
 
 vi.mock('./screenshot', () => ({
@@ -271,6 +271,17 @@ describe('feedback panel — what the report says (M175, `R-2ce2f274`)', () => {
         expect(form.page_title).toBe('Builder — Household survey');
         expect(form.route).toBe(window.location.pathname);
         expect(form.browser_info).toMatchObject({ component: 'forms/Builder', bundle: 'dev' });
+
+        wrapper.unmount();
+    });
+
+    it('offers the reporter their own reports, where a status and a reply are read (M175, `R-9bfd832e`)', async () => {
+        const wrapper = render();
+        await openPanel(wrapper);
+
+        const link = wrapper.find('a[href="/feedback/mine"]');
+        expect(link.exists()).toBe(true);
+        expect(link.text()).toContain('See your reports');
 
         wrapper.unmount();
     });

@@ -27,12 +27,14 @@ describe('statusVariant — webhook tokens (H14)', () => {
 describe('statusVariant — feedback triage tokens (I7a)', () => {
     it('mirrors the submission review lifecycle, because it is the same shape', () => {
         expect(statusVariant('new')).toEqual({ variant: 'info', label: 'New' });
-        expect(statusVariant('reviewed')).toEqual({ variant: 'warning', label: 'Reviewed' });
+        // M175 (`D139`): the stored `reviewed` READS Ongoing — the label changed, the value did not.
+        expect(statusVariant('reviewed')).toEqual({ variant: 'warning', label: 'Ongoing' });
         expect(statusVariant('resolved')).toEqual({ variant: 'success', label: 'Resolved' });
     });
 
     it("colours wont_fix neutral, not danger — a settled decision is not a failure", () => {
-        expect(statusVariant('wont_fix')).toEqual({ variant: 'neutral', label: "Won't fix" });
+        // M175 (`D139`): the stored `wont_fix` READS Declined.
+        expect(statusVariant('wont_fix')).toEqual({ variant: 'neutral', label: 'Declined' });
     });
 
     it('does not disturb any status the four feedback words could have collided with', () => {

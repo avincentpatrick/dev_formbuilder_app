@@ -47,6 +47,8 @@ function row(overrides: Partial<ConsoleFeedbackRow> = {}): ConsoleFeedbackRow {
         submitted_at: '2026-08-05T09:30:00+00:00',
         resolved_at: null,
         reporter: { name: 'Demo Owner', email: 'owner@demo.test' },
+        reporter_role_label: 'Form Editor',
+        resolution_note: null,
         resolver: null,
         has_screenshot: false,
         type: 'bug',
@@ -137,7 +139,8 @@ describe('feedback console — transitions come from the server', () => {
 
         expect(mocks.patch).toHaveBeenCalledTimes(1);
         expect(mocks.patch.mock.calls[0][0]).toBe('/admin/feedback/0192e2e0-0000-7000-8000-000000000001');
-        expect(mocks.patch.mock.calls[0][1]).toEqual({ status: 'reviewed' });
+        // M175: the reply travels with the status; left empty, it is sent as no reply at all.
+        expect(mocks.patch.mock.calls[0][1]).toEqual({ status: 'reviewed', note: null });
         expect(mocks.patch.mock.calls[0][2]).toMatchObject({ preserveScroll: true });
 
         wrapper.unmount();
@@ -255,6 +258,43 @@ describe('feedback console — what kind, and which page (M175, `R-2ce2f274`)', 
         const link = wrapper.find(`a[href="${address}"]`);
         expect(link.exists()).toBe(true);
         expect(link.text()).toBe('Builder — Household survey');
+
+        wrapper.unmount();
+    });
+});
+
+describe('feedback console — the reply and the reporter (M175, `R-9bfd832e`)', () => {
+    it('sends the reply typed in the note box with the new status', async () => {
+        const wrapper = render({
+            data: [row({ transitions: [{ value: 'resolved', label: 'Resolved' }, { value: 'wont_fix', label: 'Declined' }] })],
+        });
+        await openDetail(wrapper);
+
+        await wrapper.find('textarea#admin-feedback-note').setValue('Fixed in version abc1234, live on staging.');
+        const button = wrapper.findAll('button').find((candidate) => candidate.text() === 'Mark Resolved');
+        await button!.trigger('click');
+
+        expect(mocks.patch.mock.calls[0][1]).toEqual({ status: 'resolved', note: 'Fixed in version abc1234, live on staging.' });
+
+        wrapper.unmount();
+    });
+
+    it("says the reporter is told, and shows a reply already sent", async () => {
+        const wrapper = render({ data: [row({ status: 'resolved', status_label: 'Resolved', resolution_note: 'Fixed last week.' })] });
+        await openDetail(wrapper);
+
+        expect(wrapper.text()).toContain('Fixed last week.');
+        expect(wrapper.text()).toMatch(/the reporter is told/i);
+
+        wrapper.unmount();
+    });
+
+    it("names the reporter's role and email beside their name", async () => {
+        const wrapper = render();
+        await openDetail(wrapper);
+
+        expect(wrapper.text()).toContain('Form Editor');
+        expect(wrapper.text()).toContain('owner@demo.test');
 
         wrapper.unmount();
     });

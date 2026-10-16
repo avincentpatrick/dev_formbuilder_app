@@ -137,3 +137,25 @@ it('names the paused endpoint without repeating its failure count', function ():
     // The count is on /webhooks/{id}, which is where the row links — a bell row is not a dashboard.
     expect($copy['description'])->toContain('CRM sync')->and($copy['description'])->not->toContain('20');
 });
+
+it('tells a reporter their feedback was resolved or declined, and quotes the note in the email only (M175)', function (): void {
+    // The note is the operator's free text. `notifications.data` is readable by every member of the
+    // workspace at the database level (its migration allows ids and labels only), so the note travels as
+    // MAIL CONTEXT — into the email, which goes to the reporter alone — and never through `data`, which is
+    // all the bell ever sees.
+    $data = ['feedback_report_id' => 'fb-1', 'status' => 'resolved', 'page_title' => 'Builder — Household survey'];
+    $note = 'Fixed in version abc1234, live on staging.';
+
+    $email = NotificationCopy::for(NotificationType::FeedbackClosed, 'Acme Research', $data, ['note' => $note]);
+    expect($email['headline'])->toContain('resolved')
+        ->and($email['body'])->toContain($note)
+        ->and($email['body'])->toContain('Builder — Household survey');
+
+    $bell = NotificationCopy::inApp(NotificationType::FeedbackClosed, $data);
+    expect($bell['description'])->toContain('resolved')
+        ->and($bell['description'])->not->toContain($note);
+
+    $declined = NotificationCopy::for(NotificationType::FeedbackClosed, 'Acme Research', [...$data, 'status' => 'wont_fix'], ['note' => 'Out of scope for now.']);
+    expect($declined['headline'])->toContain('declined')
+        ->and($declined['body'])->toContain('Out of scope for now.');
+});

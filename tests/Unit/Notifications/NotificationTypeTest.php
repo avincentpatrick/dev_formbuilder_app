@@ -31,6 +31,8 @@ it('pins the case order, because the DB CHECKs are generated from it', function 
         // K1b — the third append in a row. This one had no thematic sibling to be tempted by, which makes
         // it the easy case; the rule is the same either way.
         'badge_earned',
+        // M175 (`R-9bfd832e`) — appended: a reporter is told their feedback was resolved or declined.
+        'feedback_closed',
     ]);
 });
 
@@ -113,6 +115,8 @@ it('names only real roles, and only for the types that address a role', function
         NotificationType::ExportReady,
         NotificationType::WebhookFailed,
         NotificationType::BadgeEarned,
+        // M175 — the person who sent the report, and nobody else: a decline is not news to a colleague.
+        NotificationType::FeedbackClosed,
     ] as $addressed) {
         expect($addressed->recipientRoles())->toBe([]);
     }
@@ -145,7 +149,10 @@ it('points each type at one destination, shared by the bell and the email', func
         ->and(NotificationType::ImpersonationStarted->pathFor([]))->toBe('audit-log')
         // J3a — the same destination `member_invited` points at, and likewise unconditional: the members
         // page is where a new arrival is acted on. Asserted with an EMPTY payload for the reason above.
-        ->and(NotificationType::MemberJoined->pathFor([]))->toBe('members');
+        ->and(NotificationType::MemberJoined->pathFor([]))->toBe('members')
+        // M175 — the reporter's own list, where the status and the note are read; unconditional, because
+        // every member may open it.
+        ->and(NotificationType::FeedbackClosed->pathFor(['feedback_report_id' => 'fb-1']))->toBe('feedback/mine');
 });
 
 it('returns no path rather than a broken one when the payload lacks its identifier', function (): void {

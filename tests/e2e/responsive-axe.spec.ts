@@ -122,6 +122,9 @@ const pages = [
     // The PLATFORM console (/admin/feedback) is on the same footing as /admin/settings: central host,
     // super-admin session, so it is scanned by `admin-console-axe.spec.ts` (I10e) rather than here.
     { name: 'Feedback', path: '/feedback' },
+    // M175 (`R-9bfd832e`) — every member's own reports: the status, the kind and the support team's reply.
+    // The E2E owner has sent two of the four fixture reports, one of them closed with a reply.
+    { name: 'My feedback', path: '/feedback/mine' },
     // The step-up re-authentication page (I8c, scanning what I8a made load-bearing). It sits behind
     // `auth`, which is why it is HERE and not in auth-axe.spec.ts with the genuinely unauthenticated
     // pages — a no-storageState visit would be redirected to /login and would scan that instead, passing

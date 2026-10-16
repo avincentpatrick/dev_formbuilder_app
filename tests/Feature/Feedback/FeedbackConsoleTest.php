@@ -5,16 +5,21 @@ declare(strict_types=1);
 use App\Enums\AttachmentKind;
 use App\Enums\AuditEvent;
 use App\Enums\FeedbackStatus;
+use App\Enums\NotificationType;
 use App\Enums\ScanStatus;
 use App\Models\Audit;
 use App\Models\FeedbackReport;
+use App\Models\Notification as NotificationRecord;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Notifications\EventNotification;
 use App\Services\Admin\SuperAdminService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Ramsey\Uuid\Uuid;
@@ -266,7 +271,8 @@ it('reads feedback across every tenant through the elevated carve-out', function
 
     // Each row carries the verbs the server will actually accept — never a client-side re-derivation.
     expect(array_column($byRemarks['Alpha says the exports are slow.']['transitions'], 'value'))
-        ->toBe(['reviewed', 'wont_fix'])
+        // M175: new may go straight to resolved — a fix that landed before anyone marked it Ongoing.
+        ->toBe(['reviewed', 'resolved', 'wont_fix'])
         ->and(array_column($byRemarks['Beta says the map is fixed now.']['transitions'], 'value'))
         ->toBe(['reviewed']);
 });
@@ -379,17 +385,18 @@ it('clears the resolution when a closed report is re-opened', function (): void 
 it('refuses a transition the lifecycle does not offer', function (): void {
     $tenant = consoleTenant('Console Illegal', 'console-illegal-'.Str::random(6));
     $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
-    // `new` → `resolved` skips triage; the console never offers it, so reaching it means a hand-made request.
-    $report = consoleReport($tenant, $reporter, FeedbackStatus::New, 'Illegal '.Str::random(8));
+    // M175: `new` → `resolved` is legal now, so the illegal step is resolved → declined: a closed report is
+    // re-opened (Ongoing) before it is closed the other way, and reaching it means a hand-made request.
+    $report = consoleReport($tenant, $reporter, FeedbackStatus::Resolved, 'Illegal '.Str::random(8));
 
     $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
 
     $this->actingAs($admin)
-        ->patch(adminUrl("/feedback/{$report->id}"), ['status' => FeedbackStatus::Resolved->value])
+        ->patch(adminUrl("/feedback/{$report->id}"), ['status' => FeedbackStatus::Declined->value])
         ->assertSessionHasErrors('admin');
 
     enterTenant($tenant->id, $reporter->id);
-    expect(FeedbackReport::query()->findOrFail($report->id)->status)->toBe(FeedbackStatus::New);
+    expect(FeedbackReport::query()->findOrFail($report->id)->status)->toBe(FeedbackStatus::Resolved);
 });
 
 it('404s an unknown report id rather than 500ing', function (): void {
@@ -569,3 +576,133 @@ it('shows each report kind and page, and filters the console by kind (M175, R-2c
         ->and(array_column($props['filters']['types'], 'value'))->toBe(['bug', 'suggestion', 'question'])
         ->and($props['filters']['applied']['type'])->toBe('question');
 });
+
+/*
+| M175 (`R-9bfd832e`, `D139`) — the status reads New · Ongoing · Resolved · Declined, the operator may write a
+| reply, and the reporter is TOLD: Resolved and Declined send the reporter a bell row and an email. The reply
+| is the operator's free text, and `notifications.data` is readable by every member at the database level, so
+| the reply reaches the reporter by email and on My reports — never through `data`.
+|
+| The reporter must be a COMMITTED, active member: the mailer finds their address through the `users`
+| visibility policy, which admits a user only through an active membership of the adopted workspace.
+*/
+
+/** A committed, active membership, so the `users` policy admits the reporter under the adopted context. */
+function consoleMember(Tenant $tenant, User $user): void
+{
+    DB::connection('pgsql_privileged')->table('tenant_users')->insert([
+        'id' => Uuid::uuid7()->toString(),
+        'tenant_id' => $tenant->id,
+        'user_id' => $user->id,
+        'status' => 'active',
+        'joined_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+}
+
+it('names the statuses New, Ongoing, Resolved and Declined in the filter and on every row', function (): void {
+    $this->withoutVite();
+
+    $tenant = consoleTenant('Console Labels', 'console-labels-'.Str::random(6));
+    $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
+    $marker = 'Labels marker '.Str::random(10);
+    consoleReport($tenant, $reporter, FeedbackStatus::Ongoing, $marker, ['reporter_role' => 'form_editor']);
+
+    $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
+    $props = $this->actingAs($admin)->get(adminUrl('/feedback'))->assertOk()->viewData('page')['props'];
+    $row = collect($props['data'])->firstWhere('remarks', $marker);
+
+    expect(array_column($props['filters']['statuses'], 'label'))->toBe(['New', 'Ongoing', 'Resolved', 'Declined'])
+        ->and($row['status'])->toBe('reviewed')
+        ->and($row['status_label'])->toBe('Ongoing')
+        ->and(array_column($row['transitions'], 'label'))->toBe(['Resolved', 'Declined'])
+        ->and($row['reporter_role_label'])->toBe('Form Editor')
+        ->and($row['reporter']['email'])->toBe($reporter->email);
+});
+
+it('lets a new report be resolved straight away, and keeps the reply on the report and out of the audit', function (): void {
+    Notification::fake();
+
+    $tenant = consoleTenant('Console Reply', 'console-reply-'.Str::random(6));
+    $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
+    consoleMember($tenant, $reporter);
+    $report = consoleReport($tenant, $reporter, FeedbackStatus::New, 'Reply to me '.Str::random(8));
+
+    $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
+
+    $this->actingAs($admin)
+        ->patch(adminUrl("/feedback/{$report->id}"), [
+            'status' => FeedbackStatus::Resolved->value,
+            'note' => 'Fixed in version abc1234, live on staging.',
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
+
+    enterTenant($tenant->id, $reporter->id);
+    $fresh = FeedbackReport::query()->findOrFail($report->id);
+    expect($fresh->status)->toBe(FeedbackStatus::Resolved)
+        ->and($fresh->resolution_note)->toBe('Fixed in version abc1234, live on staging.');
+
+    // The reply is the operator's free text written TO a person: the tenant's audit log records that one was
+    // written, never its words (AuditRedactor::PII).
+    /** @var Audit $audit */
+    $audit = Audit::query()->where('auditable_type', 'feedback_reports')->latest('id')->firstOrFail();
+    expect(json_encode($audit->new_values))->not->toContain('Fixed in version abc1234');
+});
+
+it('tells the reporter by bell and by email when their report is resolved, with the reply in the email only', function (): void {
+    Notification::fake();
+
+    $tenant = consoleTenant('Console Told', 'console-told-'.Str::random(6));
+    $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
+    consoleMember($tenant, $reporter);
+    $report = consoleReport($tenant, $reporter, FeedbackStatus::Ongoing, 'Tell me '.Str::random(8), ['page_title' => 'Dashboard']);
+
+    $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
+
+    $this->actingAs($admin)
+        ->patch(adminUrl("/feedback/{$report->id}"), [
+            'status' => FeedbackStatus::Resolved->value,
+            'note' => 'Fixed in version abc1234, live on staging.',
+        ])
+        ->assertSessionHasNoErrors();
+
+    enterTenant($tenant->id, $reporter->id);
+
+    /** @var NotificationRecord $bell */
+    $bell = NotificationRecord::query()->where('user_id', $reporter->id)->sole();
+    expect($bell->type)->toBe(NotificationType::FeedbackClosed)
+        ->and($bell->data)->toMatchArray(['feedback_report_id' => $report->id, 'status' => 'resolved'])
+        ->and(json_encode($bell->data))->not->toContain('Fixed in version abc1234');
+
+    Notification::assertSentOnDemand(
+        EventNotification::class,
+        fn (EventNotification $mail, array $channels, AnonymousNotifiable $to): bool => $to->routes['mail'] === $reporter->email
+            && $mail->type === NotificationType::FeedbackClosed
+            && str_contains($mail->body, 'Fixed in version abc1234, live on staging.'),
+    );
+});
+
+it('tells the reporter when their report is declined, and nobody when it is only marked Ongoing', function (string $from, string $to, int $told): void {
+    Notification::fake();
+
+    $tenant = consoleTenant('Console Quiet', 'console-quiet-'.Str::random(6));
+    $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
+    consoleMember($tenant, $reporter);
+    $report = consoleReport($tenant, $reporter, FeedbackStatus::from($from), 'Quiet or told '.Str::random(8));
+
+    $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
+
+    $this->actingAs($admin)
+        ->patch(adminUrl("/feedback/{$report->id}"), ['status' => $to, 'note' => 'Out of scope for the pilot.'])
+        ->assertSessionHasNoErrors();
+
+    enterTenant($tenant->id, $reporter->id);
+    expect(NotificationRecord::query()->where('user_id', $reporter->id)->count())->toBe($told);
+    Notification::assertSentOnDemandTimes(EventNotification::class, $told);
+})->with([
+    // Stored values, not cases: the dataset is built when the file loads.
+    'declined' => ['new', 'wont_fix', 1],
+    'ongoing' => ['new', 'reviewed', 0],
+]);

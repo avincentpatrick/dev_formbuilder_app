@@ -10,24 +10,30 @@ import { expect, test } from '@playwright/test';
  * asserts the thing the user saw: at the moment a frame is drawn off the stream, no dialog is on the page.
  *
  * ── TWO STAND-INS, BOTH NAMED ───────────────────────────────────────────────────────────────────────────
- * · The e2e host is plain http on a non-localhost name, which is not a secure context, so the browser hides
- *   `getDisplayMedia` and the panel hides its Capture button. Chromium is told to treat this one origin as
- *   secure — the `public-runtime-offline.spec.ts` precedent.
+ * · CI's e2e host is plain http on a non-localhost name — not a secure context — so the browser exposes no
+ *   `navigator.mediaDevices` and the panel hides its Capture button. ⚠️ The `--unsafely-treat-insecure-origin-
+ *   as-secure` launch flag does NOT take there (measured, M175: this spec timed out on CI waiting for the
+ *   button; `public-runtime-offline.spec.ts` skips its service-worker cases on CI for the same reason), and
+ *   locally the host is `acme.localhost`, which is ALWAYS secure — so a flag-based spec passes locally and
+ *   proves nothing about CI. The init script therefore makes the page report a secure context and provides
+ *   `mediaDevices` itself. This spec is about the ORDER of the step-aside; the secure-context gate itself is
+ *   pinned in `FeedbackButton.test.ts`.
  * · A headless browser has no screen picker, so `getDisplayMedia` is replaced by a canvas's own stream, and
  *   `drawImage` is wrapped to record whether a dialog was present each time a VIDEO frame is drawn — the
  *   instant the screenshot is actually taken.
  * The project runs with `reducedMotion: 'reduce'`, so the modal's leave takes about 1ms.
  */
 
-const baseURL = process.env.E2E_BASE_URL ?? 'http://acme.meridian.test:8000';
-const secureOrigin = new URL(baseURL).origin;
-
-test.use({
-    launchOptions: { args: [`--unsafely-treat-insecure-origin-as-secure=${secureOrigin}`] },
-});
-
 test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
+        // Stand in for a secure context on CI's plain-http host (see the header); a no-op where it already is.
+        if (window.isSecureContext !== true) {
+            Object.defineProperty(window, 'isSecureContext', { configurable: true, get: () => true });
+        }
+        if (!navigator.mediaDevices) {
+            Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: {} });
+        }
+
         const probe = { dialogAtDraw: [] as boolean[] };
         (window as unknown as { __feedbackProbe: typeof probe }).__feedbackProbe = probe;
 
@@ -42,8 +48,8 @@ test.beforeEach(async ({ page }) => {
             return (drawImage as (...a: unknown[]) => void).apply(this, args);
         } as CanvasRenderingContext2D['drawImage'];
 
-        if (navigator.mediaDevices) {
-            navigator.mediaDevices.getDisplayMedia = async () => {
+        {
+            (navigator.mediaDevices as MediaDevices).getDisplayMedia = async () => {
                 const canvas = document.createElement('canvas');
                 canvas.width = 640;
                 canvas.height = 360;

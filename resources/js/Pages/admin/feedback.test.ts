@@ -49,6 +49,10 @@ function row(overrides: Partial<ConsoleFeedbackRow> = {}): ConsoleFeedbackRow {
         reporter: { name: 'Demo Owner', email: 'owner@demo.test' },
         resolver: null,
         has_screenshot: false,
+        type: 'bug',
+        type_label: 'Bug',
+        page_url: null,
+        page_title: null,
         transitions: [
             { value: 'reviewed', label: 'Reviewed' },
             { value: 'wont_fix', label: "Won't fix" },
@@ -69,7 +73,12 @@ function props(overrides: Partial<ConsoleFeedbackPageProps> = {}): ConsoleFeedba
                 { value: 'wont_fix', label: "Won't fix" },
             ],
             tenants: [{ value: '0192e2e0-0000-7000-8000-0000000000aa', label: 'Demo Workspace' }],
-            applied: { status: null, tenant_id: null },
+            types: [
+                { value: 'bug', label: 'Bug' },
+                { value: 'suggestion', label: 'Suggestion' },
+                { value: 'question', label: 'Question' },
+            ],
+            applied: { status: null, tenant_id: null, type: null },
         },
         empty_reason: null,
         ...overrides,
@@ -219,5 +228,34 @@ describe('feedback console — navigation', () => {
         const empty = render({ data: [], empty_reason: 'no_rows' });
         expect(empty.find('.mds-filterbar h2').text()).toBe('Filters');
         empty.unmount();
+    });
+});
+
+describe('feedback console — what kind, and which page (M175, `R-2ce2f274`)', () => {
+    it('shows what kind each report is, and filters the queue by it', async () => {
+        const wrapper = render({ data: [row({ type: 'suggestion', type_label: 'Suggestion' })] });
+
+        // The table body, not the page: the kind filter lists every kind's name as an option.
+        expect(wrapper.find('tbody').text()).toContain('Suggestion');
+
+        await wrapper.find('select#admin-feedback-type').setValue('question');
+
+        expect(mocks.get.mock.calls[0][0]).toBe('/admin/feedback');
+        expect(mocks.get.mock.calls[0][1]).toEqual({ type: 'question' });
+        expect(mocks.get.mock.calls[0][2]).toMatchObject({ replace: true });
+
+        wrapper.unmount();
+    });
+
+    it('names the page by its title, linked to the address the report was sent from', async () => {
+        const address = 'https://acme.meridian.test/forms/1/builder?tab=logic';
+        const wrapper = render({ data: [row({ page_title: 'Builder — Household survey', page_url: address })] });
+        await openDetail(wrapper);
+
+        const link = wrapper.find(`a[href="${address}"]`);
+        expect(link.exists()).toBe(true);
+        expect(link.text()).toBe('Builder — Household survey');
+
+        wrapper.unmount();
     });
 });

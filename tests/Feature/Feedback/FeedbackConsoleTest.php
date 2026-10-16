@@ -100,8 +100,13 @@ function consoleUser(string $email): User
     return $user;
 }
 
-/** A committed feedback report. `status` is written from the enum — the column has no CHECK constraint. */
-function consoleReport(Tenant $tenant, User $user, FeedbackStatus $status, string $remarks): FeedbackReport
+/**
+ * A committed feedback report. `status` is written from the enum. `$extra` sets any further column — the
+ * kind and the page (M175) — on the same committed insert, since a later UPDATE would be the uncommitted kind.
+ *
+ * @param  array<string, mixed>  $extra
+ */
+function consoleReport(Tenant $tenant, User $user, FeedbackStatus $status, string $remarks, array $extra = []): FeedbackReport
 {
     /** @var FeedbackReport $report */
     $report = FeedbackReport::on('pgsql_privileged')->forceCreate([
@@ -113,6 +118,7 @@ function consoleReport(Tenant $tenant, User $user, FeedbackStatus $status, strin
         'browser_info' => ['userAgent' => 'PestUA', 'viewport' => '1440x900'],
         'status' => $status->value,
         'submitted_at' => now(),
+        ...$extra,
     ]);
 
     return $report;
@@ -526,4 +532,40 @@ it('bounces a super-admin whose password confirmation has gone stale', function 
 
 it('redirects a guest away from a screenshot', function (): void {
     $this->get(adminUrl('/feedback/'.Uuid::uuid7()->toString().'/screenshot'))->assertRedirect();
+});
+
+it('shows each report kind and page, and filters the console by kind (M175, R-2ce2f274)', function (): void {
+    $this->withoutVite();
+
+    $tenant = consoleTenant('Console Kinds', 'console-kinds-'.Str::random(6));
+    $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
+    $marker = 'Kind marker '.Str::random(10);
+
+    consoleReport($tenant, $reporter, FeedbackStatus::New, "{$marker} question", [
+        'type' => 'question',
+        'page_title' => 'Analytics — Household survey',
+        'page_url' => 'https://console-kinds.meridian.test/forms/1/analytics',
+    ]);
+    consoleReport($tenant, $reporter, FeedbackStatus::New, "{$marker} bug", ['type' => 'bug']);
+
+    $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
+
+    $response = $this->actingAs($admin)->get(adminUrl('/feedback').'?type=question')->assertOk();
+
+    /** @var array<string, mixed> $props */
+    $props = $response->viewData('page')['props'];
+    /** @var list<array<string, mixed>> $rows */
+    $rows = $props['data'];
+    $byRemarks = array_column($rows, null, 'remarks');
+
+    expect($byRemarks)->toHaveKey("{$marker} question")
+        ->and($byRemarks)->not->toHaveKey("{$marker} bug")
+        ->and(array_values(array_unique(array_column($rows, 'type'))))->toBe(['question'])
+        ->and($byRemarks["{$marker} question"])->toMatchArray([
+            'type_label' => 'Question',
+            'page_title' => 'Analytics — Household survey',
+            'page_url' => 'https://console-kinds.meridian.test/forms/1/analytics',
+        ])
+        ->and(array_column($props['filters']['types'], 'value'))->toBe(['bug', 'suggestion', 'question'])
+        ->and($props['filters']['applied']['type'])->toBe('question');
 });

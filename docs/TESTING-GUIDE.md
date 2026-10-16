@@ -420,11 +420,14 @@ rewriting its answers are different powers.
 
 ## 11. Feedback — Feature #11
 
-1. Any page · owner. Find the **Feedback** button in the top bar and open it.
-2. Submit feedback with a comment only. **Expect:** a confirmation toast, and the page you were on is
-   captured with it — you never left the screen you were reporting about.
-3. Open it again and press **Capture screen**. **Expect:** your browser asks which window or tab to share;
-   pick this one and a thumbnail appears in the panel. Press **Remove**, then capture again — it replaces.
+1. Any page · owner. Find the **Feedback** button in the top bar and open it. **Expect:** it asks first
+   **what kind of feedback this is** — Bug, Suggestion or Question — and will not send until you choose.
+2. Choose a kind and submit with a comment only. **Expect:** a confirmation toast, and the page you were on
+   is captured with it — its full address and its title — so you never left the screen you were reporting about.
+3. Open it again, type a comment, and press **Capture screen**. **Expect:** your browser asks which window or
+   tab to share; pick this one. The panel **gets out of the way for a moment** and comes back with your
+   comment and kind as you left them and a thumbnail of the page **without the panel in it**. Press **Remove**,
+   then capture again — it replaces.
 4. Now open it once more, press **Capture screen**, and **cancel** the browser's picker. **Expect:** nothing
    happens. No error, no red text, and the form is still ready to send. *Declining is a normal choice, not a
    failure — if you see an error here, that is a defect.*
@@ -435,11 +438,16 @@ rewriting its answers are different powers.
    > deliberate — that image is displayed back to the platform operator, and an SVG can carry a script.
 
 6. `/feedback` · owner. **Expect:** a read-only list of everything your workspace has sent, including what
-   you just submitted, with a **Screenshot** tag on the ones that have one. Open a row to read it in full and
-   see the image.
+   you just submitted, with its **Kind** (a Bug, Suggestion or Question badge; a dash on a report sent before
+   kinds existed), the page's title as a link back to that page, and a **Screenshot** tag on the ones that
+   have one. Filter by **Kind**. Open a row to read it in full and see the image.
 7. **Expect no way to change a status here.** That belongs to the platform support team — §15 is where you
    act on these. Sign in as `viewer@demo.test` and try `/feedback`. **Expect:** turned away; every role can
    *send* feedback, only Owner and Admin can *read* the workspace's list.
+8. Still as `viewer@demo.test`, open the **account menu** (your initials, top right) → **My feedback**
+   (`/feedback/mine`; the panel's **See your reports** link goes there too). **Expect:** only *your own*
+   reports, each with its kind, its status in words — **New, Ongoing, Resolved or Declined** — and, once the
+   support team has closed it, their **reply**. A screenshot is named ("Screenshot attached") but not shown.
 
 ---
 
@@ -542,16 +550,17 @@ The console lives on the **central host**, not on a workspace, and it requires t
 7. `/admin/users`. **Expect:** users across all workspaces — this is one of the places that reads across
    tenants.
 8. `/admin/feedback`. **Expect:** every workspace's feedback in one queue — the four seeded demo reports
-   (one in each state: New, Reviewed, Resolved, Won't fix) plus anything you sent in §11, from **both**
-   `demo` and `northwind`. Filter by workspace and by status.
-9. Open a **New** report. **Expect:** the full remarks, the page it came from, the reporter's email, the
-   browser details, and the screenshot if it has one. **Expect the only buttons to be `Mark Reviewed` and
-   `Mark Won't fix`** — not `Mark Resolved`. A report goes to Resolved *through* Reviewed; the console only
+   (one in each state: **New, Ongoing, Resolved, Declined** — the words since M175) plus anything you sent in
+   §11, from **both** `demo` and `northwind`. Filter by workspace, by status and by kind.
+9. Open a **New** report. **Expect:** the full remarks, its kind, the page it came from (a link), the
+   reporter's email and role, the browser details, and the screenshot if it has one. **Expect three buttons —
+   `Mark Ongoing`, `Mark Resolved` and `Mark Declined`** — and a **Reply to the reporter** box. The console only
    ever offers the steps the server will accept.
-10. Mark it **Reviewed**, then open it again and mark it **Resolved**. Now re-open it (`Mark Reviewed`).
-   **Expect:** it returns to Reviewed and the "Closed" line disappears — re-opening clears the resolution
-   rather than keeping a stale one. Note there is no way back to **New**: once someone has looked at a
-   report, the queue must not be able to claim nobody has.
+10. Type a reply and mark it **Resolved**. **Expect:** the reporter gets a bell notification and an email
+   (Mailpit, <http://localhost:8025>) quoting your reply. Open it again: the reply shows under **Reply sent**,
+   and the only button is `Mark Ongoing`. Re-open it. **Expect:** it returns to Ongoing and the "Closed" line
+   disappears — re-opening clears the resolution rather than keeping a stale one. Note there is no way back
+   to **New**: once someone has looked at a report, the queue must not be able to claim nobody has.
 11. **This is the transparency check, and it is the interesting one.** Sign in to the workspace that report
    came from (e.g. <http://demo.localhost:8080> as `owner@demo.test`) and open `/audit-log`. **Expect:** your
    status changes are listed there, under **Feedback report**, showing the before and after status —
@@ -670,7 +679,7 @@ something the page *displays* but does not search, which is the case worth knowi
 | `/submissions` | reviewer remarks, return reason, the **parent form's title**, a full reference | **answer text** (§18 — the PII rule), respondent name |
 | `/members` | name, email — **including pending invites** | nothing on the page; this box searches everything the roster shows |
 | `/webhooks` | endpoint name, URL | the **Scope** column (which form it listens to) — that wants its own dropdown, not a substring match |
-| `/feedback` | remarks, the page route | the reporter's name |
+| `/feedback` | remarks, the page route, the page's **title** and full **address** (M175) | the reporter's name |
 | `/audit-log` | the target **form's title**, the **actor's name or email** | ⚠️ **the before/after values** — see step 17.1.8 |
 
 1. `/forms` · owner. Search `health`. **Expect:** only *Community Health Survey 2026*. Search `surve`.

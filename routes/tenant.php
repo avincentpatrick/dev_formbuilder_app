@@ -450,6 +450,10 @@ Route::middleware([
     // status lifecycle is deliberately absent here: it belongs to the platform support console.
     Route::get('/feedback', [FeedbackController::class, 'index'])
         ->middleware('can:feedback.view')->name('feedback.index');
+    // M175 (`R-9bfd832e`, `D139`) — every member's OWN reports, with the status and the support team's reply.
+    // No `can:` gate, on the `/achievements` and `/notifications` precedent (above): the reporter reads their
+    // own record. The narrowing is the presenter's `user_id` predicate — RLS on this table is tenant-wide.
+    Route::get('/feedback/mine', [FeedbackController::class, 'mine'])->name('feedback.mine');
     Route::get('/feedback/{feedbackReport}/screenshot', [FeedbackController::class, 'screenshot'])
         ->middleware('can:feedback.view')->name('feedback.screenshot');
     Route::post('/feedback', [FeedbackController::class, 'store'])

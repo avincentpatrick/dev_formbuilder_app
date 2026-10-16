@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\DomainEventType;
 use App\Enums\FeedbackStatus;
+use App\Enums\FeedbackType;
 use App\Enums\SubmissionStatus;
 use App\Enums\WebhookEndpointStatus;
 use App\Models\FeedbackReport;
@@ -215,6 +216,45 @@ it('narrows the feedback list on remarks and on the page route', function (): vo
     // The route branch.
     $this->get(listUrl('/feedback', 'analytics'))->assertOk()
         ->assertInertia(fn (Assert $page) => $page->has('data', 1)->where('data.0.route', '/analytics'));
+});
+
+it('narrows the feedback list on the page title, and by kind (M175, R-2ce2f274)', function (): void {
+    FeedbackReport::create([
+        'user_id' => $this->owner->id,
+        'type' => FeedbackType::Bug,
+        'route' => '/forms/1/builder',
+        'page_url' => 'https://acme.meridian.test/forms/1/builder',
+        'page_title' => 'Builder — Household survey',
+        'remarks' => 'Dragging a question does nothing',
+        'status' => FeedbackStatus::New,
+        'browser_info' => [],
+        'submitted_at' => now(),
+    ]);
+    FeedbackReport::create([
+        'user_id' => $this->owner->id,
+        'type' => FeedbackType::Question,
+        'route' => '/analytics',
+        'remarks' => 'Where do the exports go?',
+        'status' => FeedbackStatus::New,
+        'browser_info' => [],
+        'submitted_at' => now(),
+    ]);
+
+    // The title branch: "household" is in neither the remarks nor the path.
+    $this->get(listUrl('/feedback', 'household'))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('data', 1)
+            ->where('data.0.page_title', 'Builder — Household survey')
+            ->where('data.0.page_url', 'https://acme.meridian.test/forms/1/builder')
+            ->where('data.0.type', 'bug')
+            ->where('data.0.type_label', 'Bug'));
+
+    $this->get('http://acme.meridian.test/feedback?type=question')->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('data', 1)
+            ->where('data.0.route', '/analytics')
+            ->where('filters.applied.type', 'question')
+            ->where('filters.types.0.value', 'bug'));
 });
 
 it('ANDs a feedback keyword with the status filter', function (): void {

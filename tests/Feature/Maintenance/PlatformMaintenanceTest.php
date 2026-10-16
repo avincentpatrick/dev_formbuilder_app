@@ -136,3 +136,14 @@ it('serves everything normally when maintenance is off', function (): void {
 
     $this->actingAs($owner)->get('http://acme.meridian.test/dashboard')->assertOk();
 });
+
+it('answers the platform support API inside the same envelope (M175, R-78f43f26)', function (): void {
+    // Not exempt, deliberately: a paused platform pauses the feedback pull too, and says so in the envelope
+    // the pull script reads rather than in an HTML page it cannot.
+    pausePlatform('Paused.');
+
+    $this->getJson('http://acme.meridian.test/api/platform/v1/feedback')
+        ->assertStatus(503)
+        ->assertJsonPath('error.code', 'maintenance_mode')
+        ->assertJsonPath('error.message', 'Paused.');
+});

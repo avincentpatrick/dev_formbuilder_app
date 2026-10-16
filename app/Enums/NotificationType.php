@@ -10,6 +10,7 @@ use App\Models\Submission;
 use App\Notifications\Submissions\SubmissionPdfReadyNotification;
 use App\Notifications\Webhooks\WebhookAutoDisabledNotification;
 use App\Policies\SubmissionPolicy;
+use App\Services\Admin\SuperAdminService;
 use App\Services\Gamification\BadgeAwarder;
 use App\Services\Notifications\NotificationRecipientResolver;
 
@@ -117,6 +118,18 @@ enum NotificationType: string
     case BadgeEarned = 'badge_earned';
 
     /**
+     * M175 (`R-9bfd832e`, `D139`) — a reporter's feedback was RESOLVED or DECLINED by the platform support team.
+     * APPENDED, never inserted: both CHECKs are generated from {@see self::values()}.
+     *
+     * Addressed to the reporter alone (`recipientRoles()` is empty): a decline is not news to a colleague.
+     * Emitted by {@see SuperAdminService::transitionFeedback()} inside its adopted-tenant
+     * transaction, so the row, the preference lookup and the address all pass the strict policies. The support
+     * team's reply is NOT in `data` — every member can read that column at the database level — it reaches the
+     * email as mail-only context and is read in full on My reports, where this points.
+     */
+    case FeedbackClosed = 'feedback_closed';
+
+    /**
      * Human label for the notification center, the preferences card, and any email subject built from the
      * type alone — one string, three surfaces. Mirrors {@see AuditEvent::label()}, and like it carries no
      * companion `badgeVariant()`: colour is presentation, owned by the TS side (I4).
@@ -139,6 +152,9 @@ enum NotificationType: string
             // preferences row and the email subject, both of which describe a KIND of notification rather
             // than one instance of it.
             self::BadgeEarned => 'Badge earned',
+            // M175 — the KIND of notification (the /settings row and the email subject); the status is in the
+            // description.
+            self::FeedbackClosed => 'Feedback update',
         };
     }
 
@@ -219,7 +235,7 @@ enum NotificationType: string
             // about the recipient rather than about a record they relate to, so there is no role that could
             // express "gets told about this" — see the case's own docblock.
             self::SubmissionReturned, self::SubmissionApproved, self::ExportReady, self::WebhookFailed,
-            self::BadgeEarned => [],
+            self::BadgeEarned, self::FeedbackClosed => [],
         };
     }
 
@@ -281,6 +297,9 @@ enum NotificationType: string
             // discharged, found by the final integration review. Unconditional like `members` above: the
             // destination is a surface, not a row, so there is no payload id that could be missing.
             self::BadgeEarned => 'achievements',
+            // M175 — the reporter's own list, where the status and the reply are read. Unconditional: every
+            // member may open it, and it is a surface rather than a row.
+            self::FeedbackClosed => 'feedback/mine',
         };
     }
 
@@ -302,6 +321,7 @@ enum NotificationType: string
             // null path) but required: this match is exhaustive, and an empty string would fail the
             // catalog's own "every case has an action label" assertion.
             self::BadgeEarned => 'View your progress',
+            self::FeedbackClosed => 'See your reports',
         };
     }
 

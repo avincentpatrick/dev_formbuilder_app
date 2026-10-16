@@ -1,0 +1,102 @@
+<?php
+
+declare(strict_types=1);
+
+/*
+ * A stand-in for the platform support API (M175, `R-78f43f26`), served by `php -S` for
+ * tests/Feature/Docs/FeedbackPullScriptTest.php — so the pull script is driven end to end over real HTTP, with
+ * no application, no database and no network beyond the loopback.
+ *
+ * It answers the three endpoints `scripts/feedback-pull.php` calls, refuses any bearer but the one the test
+ * generated (FEEDBACK_PULL_FIXTURE_TOKEN — generated at run time, never committed, so a secret scanner has
+ * nothing to find), and appends every PATCH body to FEEDBACK_PULL_FIXTURE_LOG so the test can read what was
+ * sent. A report id ending `refuse` answers 422, as the real API does for a step the lifecycle does not offer.
+ */
+
+$token = (string) getenv('FEEDBACK_PULL_FIXTURE_TOKEN');
+$log = (string) getenv('FEEDBACK_PULL_FIXTURE_LOG');
+
+$path = (string) parse_url((string) $_SERVER['REQUEST_URI'], PHP_URL_PATH);
+$method = (string) $_SERVER['REQUEST_METHOD'];
+
+$json = static function (int $status, array $body): void {
+    http_response_code($status);
+    header('Content-Type: application/json');
+    echo json_encode($body, JSON_THROW_ON_ERROR);
+};
+
+if (($_SERVER['HTTP_AUTHORIZATION'] ?? '') !== 'Bearer '.$token) {
+    $json(401, ['error' => ['code' => 'unauthenticated', 'message' => 'Authentication is required.', 'details' => null]]);
+
+    return true;
+}
+
+$row = static fn (string $id, string $type, string $status, bool $shot): array => [
+    'id' => $id,
+    'tenant_id' => '0192e2e0-0000-7000-8000-0000000000aa',
+    'tenant_name' => 'Staging',
+    'type' => $type,
+    'type_label' => ucfirst($type),
+    'status' => $status,
+    'status_label' => $status === 'reviewed' ? 'Ongoing' : 'New',
+    'route' => '/forms/1/builder',
+    'page_url' => 'https://staging.example.test/forms/1/builder',
+    'page_title' => 'Builder — Household survey',
+    'remarks' => $type === 'bug' ? 'Dragging a question does nothing.' : 'Could the inbox remember my filter?',
+    'browser_info' => ['component' => 'forms/Builder', 'bundle' => 'abc1234'],
+    'reporter' => ['name' => 'Tess Tester', 'email' => 'tess@staging.example.test'],
+    'reporter_role' => 'form_editor',
+    'reporter_role_label' => 'Form Editor',
+    'submitted_at' => '2026-10-16T09:30:00+00:00',
+    'resolved_at' => null,
+    'resolution_note' => null,
+    'has_screenshot' => $shot,
+];
+
+if ($method === 'GET' && $path === '/api/platform/v1/feedback') {
+    parse_str((string) parse_url((string) $_SERVER['REQUEST_URI'], PHP_URL_QUERY), $query);
+
+    if (($query['status'] ?? '') === 'new' && ($query['per_page'] ?? '') === '1') {
+        $json(200, ['data' => [$row('0192e2e0-0000-7000-8000-000000000001', 'bug', 'new', true)],
+            'meta' => ['current_page' => 1, 'last_page' => 3, 'total' => 3, 'per_page' => 1]]);
+
+        return true;
+    }
+
+    $json(200, [
+        'data' => [
+            $row('0192e2e0-0000-7000-8000-000000000001', 'bug', 'new', true),
+            $row('0192e2e0-0000-7000-8000-000000000002', 'suggestion', 'reviewed', false),
+        ],
+        'meta' => ['current_page' => 1, 'last_page' => 1, 'total' => 2, 'per_page' => 100],
+    ]);
+
+    return true;
+}
+
+if ($method === 'GET' && preg_match('#^/api/platform/v1/feedback/([0-9a-z-]+)/screenshot$#', $path) === 1) {
+    header('Content-Type: image/png');
+    echo 'FIXTURE-PNG-BYTES';
+
+    return true;
+}
+
+if ($method === 'PATCH' && preg_match('#^/api/platform/v1/feedback/([0-9a-z-]+)$#', $path, $m) === 1) {
+    $body = (string) file_get_contents('php://input');
+    file_put_contents($log, json_encode(['id' => $m[1], 'body' => json_decode($body, true)])."\n", FILE_APPEND);
+
+    if (str_ends_with($m[1], 'refuse')) {
+        $json(422, ['error' => ['code' => 'invalid_transition', 'message' => 'A feedback report cannot go from Resolved to Declined.', 'details' => null]]);
+
+        return true;
+    }
+
+    $decoded = json_decode($body, true);
+    $json(200, ['data' => ['id' => $m[1], 'status' => $decoded['status'] ?? null, 'resolution_note' => $decoded['note'] ?? null]]);
+
+    return true;
+}
+
+$json(404, ['error' => ['code' => 'not_found', 'message' => 'The requested resource was not found.', 'details' => null]]);
+
+return true;

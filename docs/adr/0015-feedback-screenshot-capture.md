@@ -69,6 +69,16 @@ The consequence was live rather than latent. `viewer`, `reviewer` and `form_edit
 
 **What this changes for a legitimate user: nothing.** The "your PDF is ready" notification (`GeneratePdfJob`) links to this route, and its recipient is whoever requested the export — who necessarily passed `SubmissionPolicy::export()`, the same scope plus `submissions.export`. The links that stop working are exactly the ones held by someone since removed from the form, which is the defect.
 
+**§D11 — the panel steps aside for its own screenshot (M175, `R-2ce2f274`, `D127`, 2026-10-16).** The user's comment (2026-10-14): *"when i click capture screen, the modal for the feedback is always included."* §D1's capture ran while the panel was open, so the frame always held the panel. The decision (`D127` A): **the panel steps aside.**
+
+The order is the decision. `acquireScreen()` calls `getDisplayMedia` **inside the click** — a browser grants its picker only to a user gesture, so this step cannot wait for anything. Only once the stream is playing does the panel close; the capture then waits for `MdsModal`'s new `after-leave` event (the leave transition has *finished*, not merely begun — 250ms, 1ms under reduced motion), or at most **400ms** for a modal that never says, takes **two fresh frames** off the stream (a captured surface reaches the `<video>` a frame or two late, and each wait is capped because a still page may send none), draws one, stops every track, and reopens the panel by setting `open` directly. **Never through the trigger's `openPanel()`**, which resets the form: the reporter finds what they typed, the kind they chose and the new picture exactly where they left them. A decline never moves the panel at all — it resolves before the panel closes.
+
+Acquiring before closing is what makes the order robust: nothing depends on how long the click's permission lasts, so the panel may take as long as it needs to leave. The alternative — close first, then ask — would race the gesture's lifetime and fail on a slow machine as a picker that silently never opens.
+
+The same increment makes the report say **what kind it is** (`FeedbackType`: bug, suggestion, question — required) and **where it came from** (`page_url`, the full address, and `page_title`), and stamps the deployment's version server-side beside the bundle's own sha. `page_url` is rendered as a link on both lists, so `StoreFeedbackRequest` accepts an `http`/`https` address only — the same reasoning §D7 applies to SVG: whatever a tenant stores here is rendered back into the operator's console.
+
+Proved by a real browser as well as by Vitest: `tests/e2e/feedback-capture.spec.ts` replaces `getDisplayMedia` with a canvas stream and wraps `drawImage`, asserting that no dialog is on the page at the instant a video frame is drawn.
+
 ---
 
 ## Consequences

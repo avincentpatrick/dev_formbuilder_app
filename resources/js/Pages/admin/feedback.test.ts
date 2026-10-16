@@ -47,8 +47,14 @@ function row(overrides: Partial<ConsoleFeedbackRow> = {}): ConsoleFeedbackRow {
         submitted_at: '2026-08-05T09:30:00+00:00',
         resolved_at: null,
         reporter: { name: 'Demo Owner', email: 'owner@demo.test' },
+        reporter_role_label: 'Form Editor',
+        resolution_note: null,
         resolver: null,
         has_screenshot: false,
+        type: 'bug',
+        type_label: 'Bug',
+        page_url: null,
+        page_title: null,
         transitions: [
             { value: 'reviewed', label: 'Reviewed' },
             { value: 'wont_fix', label: "Won't fix" },
@@ -69,7 +75,12 @@ function props(overrides: Partial<ConsoleFeedbackPageProps> = {}): ConsoleFeedba
                 { value: 'wont_fix', label: "Won't fix" },
             ],
             tenants: [{ value: '0192e2e0-0000-7000-8000-0000000000aa', label: 'Demo Workspace' }],
-            applied: { status: null, tenant_id: null },
+            types: [
+                { value: 'bug', label: 'Bug' },
+                { value: 'suggestion', label: 'Suggestion' },
+                { value: 'question', label: 'Question' },
+            ],
+            applied: { status: null, tenant_id: null, type: null },
         },
         empty_reason: null,
         ...overrides,
@@ -128,7 +139,8 @@ describe('feedback console — transitions come from the server', () => {
 
         expect(mocks.patch).toHaveBeenCalledTimes(1);
         expect(mocks.patch.mock.calls[0][0]).toBe('/admin/feedback/0192e2e0-0000-7000-8000-000000000001');
-        expect(mocks.patch.mock.calls[0][1]).toEqual({ status: 'reviewed' });
+        // M175: the reply travels with the status; left empty, it is sent as no reply at all.
+        expect(mocks.patch.mock.calls[0][1]).toEqual({ status: 'reviewed', note: null });
         expect(mocks.patch.mock.calls[0][2]).toMatchObject({ preserveScroll: true });
 
         wrapper.unmount();
@@ -219,5 +231,71 @@ describe('feedback console — navigation', () => {
         const empty = render({ data: [], empty_reason: 'no_rows' });
         expect(empty.find('.mds-filterbar h2').text()).toBe('Filters');
         empty.unmount();
+    });
+});
+
+describe('feedback console — what kind, and which page (M175, `R-2ce2f274`)', () => {
+    it('shows what kind each report is, and filters the queue by it', async () => {
+        const wrapper = render({ data: [row({ type: 'suggestion', type_label: 'Suggestion' })] });
+
+        // The table body, not the page: the kind filter lists every kind's name as an option.
+        expect(wrapper.find('tbody').text()).toContain('Suggestion');
+
+        await wrapper.find('select#admin-feedback-type').setValue('question');
+
+        expect(mocks.get.mock.calls[0][0]).toBe('/admin/feedback');
+        expect(mocks.get.mock.calls[0][1]).toEqual({ type: 'question' });
+        expect(mocks.get.mock.calls[0][2]).toMatchObject({ replace: true });
+
+        wrapper.unmount();
+    });
+
+    it('names the page by its title, linked to the address the report was sent from', async () => {
+        const address = 'https://acme.meridian.test/forms/1/builder?tab=logic';
+        const wrapper = render({ data: [row({ page_title: 'Builder — Household survey', page_url: address })] });
+        await openDetail(wrapper);
+
+        const link = wrapper.find(`a[href="${address}"]`);
+        expect(link.exists()).toBe(true);
+        expect(link.text()).toBe('Builder — Household survey');
+
+        wrapper.unmount();
+    });
+});
+
+describe('feedback console — the reply and the reporter (M175, `R-9bfd832e`)', () => {
+    it('sends the reply typed in the note box with the new status', async () => {
+        const wrapper = render({
+            data: [row({ transitions: [{ value: 'resolved', label: 'Resolved' }, { value: 'wont_fix', label: 'Declined' }] })],
+        });
+        await openDetail(wrapper);
+
+        await wrapper.find('textarea#admin-feedback-note').setValue('Fixed in version abc1234, live on staging.');
+        const button = wrapper.findAll('button').find((candidate) => candidate.text() === 'Mark Resolved');
+        await button!.trigger('click');
+
+        expect(mocks.patch.mock.calls[0][1]).toEqual({ status: 'resolved', note: 'Fixed in version abc1234, live on staging.' });
+
+        wrapper.unmount();
+    });
+
+    it("says the reporter is told, and shows a reply already sent", async () => {
+        const wrapper = render({ data: [row({ status: 'resolved', status_label: 'Resolved', resolution_note: 'Fixed last week.' })] });
+        await openDetail(wrapper);
+
+        expect(wrapper.text()).toContain('Fixed last week.');
+        expect(wrapper.text()).toMatch(/the reporter is told/i);
+
+        wrapper.unmount();
+    });
+
+    it("names the reporter's role and email beside their name", async () => {
+        const wrapper = render();
+        await openDetail(wrapper);
+
+        expect(wrapper.text()).toContain('Form Editor');
+        expect(wrapper.text()).toContain('owner@demo.test');
+
+        wrapper.unmount();
     });
 });

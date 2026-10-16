@@ -47,7 +47,8 @@ final class MaintenanceResponse
             return Inertia::location($request->fullUrl());
         }
 
-        if ($request->is('api/v1/*')) {
+        // M175: the platform support API shares the envelope — its pull script reads `error.code`.
+        if ($request->is('api/v1/*', 'api/platform/v1/*')) {
             return ApiErrorResponse::make(503, 'maintenance_mode', $message);
         }
 

@@ -2,19 +2,22 @@
 
 declare(strict_types=1);
 
-use App\Enums\AttachmentKind;
 use App\Enums\AuditEvent;
 use App\Enums\FeedbackStatus;
+use App\Enums\NotificationType;
 use App\Enums\ScanStatus;
 use App\Models\Audit;
 use App\Models\FeedbackReport;
+use App\Models\Notification as NotificationRecord;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Notifications\EventNotification;
 use App\Services\Admin\SuperAdminService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Ramsey\Uuid\Uuid;
@@ -53,139 +56,6 @@ uses(RefreshDatabase::class);
 | from a committed fixture already in the state it needs. This is a harness artifact and not a product
 | behaviour; in production both writes are committed.
 */
-
-/**
- * A committed tenant the privileged connection can actually see.
- *
- * ⚠️ **`Tenant::on('pgsql_privileged')` DOES NOT WORK, and it fails silently.** Stancl's base model uses
- * the `CentralConnection` trait, whose `getConnectionName()` returns
- * `config('tenancy.database.central_connection')` UNCONDITIONALLY — so the connection override is
- * discarded and the row lands on the default connection inside RefreshDatabase's uncommitted
- * transaction. The write appears to succeed; the failure surfaces later and somewhere else, as an FK
- * violation when the committed `feedback_reports` insert cannot find its tenant. Hence the query builder,
- * which has no model to override it. (`tenants` is RLS-exempt, so the row is readable afterwards from any
- * connection.)
- */
-function consoleTenant(string $name, string $slug): Tenant
-{
-    $id = Uuid::uuid7()->toString();
-
-    DB::connection('pgsql_privileged')->table('tenants')->insert([
-        'id' => $id,
-        'name' => $name,
-        'slug' => $slug,
-        'status' => 'active',
-        'data' => '{}',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-
-    /** @var Tenant $tenant */
-    $tenant = Tenant::query()->findOrFail($id);
-
-    return $tenant;
-}
-
-/** A committed user, likewise. */
-function consoleUser(string $email): User
-{
-    /** @var User $user */
-    $user = User::on('pgsql_privileged')->forceCreate([
-        'name' => 'Console Reporter',
-        'email' => $email,
-        'password' => Hash::make(Str::random(40)),
-        'email_verified_at' => now(),
-    ]);
-
-    return $user;
-}
-
-/** A committed feedback report. `status` is written from the enum — the column has no CHECK constraint. */
-function consoleReport(Tenant $tenant, User $user, FeedbackStatus $status, string $remarks): FeedbackReport
-{
-    /** @var FeedbackReport $report */
-    $report = FeedbackReport::on('pgsql_privileged')->forceCreate([
-        'id' => Uuid::uuid7()->toString(),
-        'tenant_id' => $tenant->id,
-        'user_id' => $user->id,
-        'route' => '/dashboard',
-        'remarks' => $remarks,
-        'browser_info' => ['userAgent' => 'PestUA', 'viewport' => '1440x900'],
-        'status' => $status->value,
-        'submitted_at' => now(),
-    ]);
-
-    return $report;
-}
-
-/** The bytes {@see consoleScreenshot()} stores, so a case can assert the body it got is the body it wrote. */
-const CONSOLE_SCREENSHOT_BYTES = 'CONSOLE-SCREENSHOT-BYTES';
-
-/**
- * A committed screenshot for a committed report, plus the pointer that links them and the object on disk.
- *
- * ⚠️ **THE ATTACHMENT HAS TO BE COMMITTED TOO, AND THE REASON IS AN FK RATHER THAN A CONNECTION.**
- * `feedback_reports.screenshot_attachment_id` is a real foreign key onto `attachments`, so pointing a
- * COMMITTED report at a row that only exists inside RefreshDatabase's open transaction makes the privileged
- * UPDATE wait on a lock the test itself is holding — a hang, not an error. Both rows therefore go in on
- * `pgsql_privileged`, which is a superuser and bypasses RLS.
- *
- * The query builder rather than the model, for the reason {@see consoleTenant()} gives at length: a model's
- * traits and global scopes get a vote on the connection and on `tenant_id`, and here they would be voting
- * with no tenant context set at all.
- *
- * **Nothing is added to {@see purgeCommittedFeedbackFixtures()} and that is checked, not assumed:**
- * `attachments.tenant_id` is `cascadeOnDelete`, and the purge deletes the reports before the tenants — so
- * the tenant delete takes the attachment with it. Caller must have called `Storage::fake('local')` first,
- * or this writes a real object into the local disk.
- */
-function consoleScreenshot(FeedbackReport $report, ScanStatus $scan = ScanStatus::Clean): string
-{
-    $id = Uuid::uuid7()->toString();
-    $path = "tenants/{$report->tenant_id}/feedback_screenshot/".date('Ym')."/{$id}.png";
-    $connection = DB::connection('pgsql_privileged');
-
-    $connection->table('attachments')->insert([
-        'id' => $id,
-        'tenant_id' => $report->tenant_id,
-        // No morph-map entry and none needed: there is no DB FK on the morph columns and the console never
-        // resolves the owner back to a class. This is the alias production writes.
-        'attachable_type' => 'feedback_report',
-        'attachable_id' => $report->id,
-        'kind' => AttachmentKind::FeedbackScreenshot->value,
-        'disk' => 'local',
-        'path' => $path,
-        'original_filename' => 'capture.png',
-        'mime_type' => 'image/png',
-        'size_bytes' => strlen(CONSOLE_SCREENSHOT_BYTES),
-        'checksum_sha256' => hash('sha256', CONSOLE_SCREENSHOT_BYTES),
-        'width' => 1_600,
-        'height' => 900,
-        'is_encrypted_at_rest' => false,
-        'is_pii' => true,
-        // Defaults to Clean rather than to the column default: `ScanStatus::servable()` gates the stream,
-        // and a `pending` row 409s before any of this reaches the disk. The parameter exists so the
-        // quarantine case can ask for exactly that.
-        'virus_scan_status' => $scan->value,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-
-    // No `updated_at` in the SET list: `feedback_reports` carries `submitted_at` and `resolved_at` and no
-    // Eloquent timestamps at all, so naming one is an undefined-column error rather than a no-op.
-    $connection->table('feedback_reports')->where('id', $report->id)->update([
-        'screenshot_attachment_id' => $id,
-    ]);
-
-    Storage::disk('local')->put($path, CONSOLE_SCREENSHOT_BYTES);
-
-    return $path;
-}
-
-function adminUrl(string $path): string
-{
-    return 'http://'.config('tenancy.central_domain').'/admin'.$path;
-}
 
 beforeEach(function (): void {
     TenantContext::flush();
@@ -260,7 +130,8 @@ it('reads feedback across every tenant through the elevated carve-out', function
 
     // Each row carries the verbs the server will actually accept — never a client-side re-derivation.
     expect(array_column($byRemarks['Alpha says the exports are slow.']['transitions'], 'value'))
-        ->toBe(['reviewed', 'wont_fix'])
+        // M175: new may go straight to resolved — a fix that landed before anyone marked it Ongoing.
+        ->toBe(['reviewed', 'resolved', 'wont_fix'])
         ->and(array_column($byRemarks['Beta says the map is fixed now.']['transitions'], 'value'))
         ->toBe(['reviewed']);
 });
@@ -272,7 +143,7 @@ it('filters the console by status', function (): void {
     $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
     $marker = 'Filter marker '.Str::random(10);
 
-    consoleReport($tenant, $reporter, FeedbackStatus::WontFix, $marker);
+    consoleReport($tenant, $reporter, FeedbackStatus::Declined, $marker);
 
     $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
 
@@ -294,7 +165,7 @@ it('transitions a report and audits it into the affected tenant own ledger', fun
     $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
 
     $this->actingAs($admin)
-        ->patch(adminUrl("/feedback/{$report->id}"), ['status' => FeedbackStatus::Reviewed->value])
+        ->patch(adminUrl("/feedback/{$report->id}"), ['status' => FeedbackStatus::Ongoing->value])
         // Without this a REFUSED transition would also pass `assertRedirect()` — the error path is a
         // redirect-back too, which is how a silently-rejected transition looks like a successful one.
         ->assertSessionHasNoErrors()
@@ -305,7 +176,7 @@ it('transitions a report and audits it into the affected tenant own ledger', fun
     enterTenant($tenant->id, $reporter->id);
 
     $fresh = FeedbackReport::query()->findOrFail($report->id);
-    expect($fresh->status)->toBe(FeedbackStatus::Reviewed)
+    expect($fresh->status)->toBe(FeedbackStatus::Ongoing)
         // `reviewed` is not terminal, so nothing is stamped yet.
         ->and($fresh->resolved_at)->toBeNull()
         ->and($fresh->resolved_by)->toBeNull();
@@ -324,7 +195,7 @@ it('transitions a report and audits it into the affected tenant own ledger', fun
 it('stamps the resolution when a report closes', function (): void {
     $tenant = consoleTenant('Console Close', 'console-close-'.Str::random(6));
     $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
-    $report = consoleReport($tenant, $reporter, FeedbackStatus::Reviewed, 'Close me '.Str::random(8));
+    $report = consoleReport($tenant, $reporter, FeedbackStatus::Ongoing, 'Close me '.Str::random(8));
 
     $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
 
@@ -347,7 +218,7 @@ it('clears the resolution when a closed report is re-opened', function (): void 
     $tenant = consoleTenant('Console Reopen', 'console-reopen-'.Str::random(6));
     $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
     $closer = consoleUser(Str::random(8).'@feedbackconsoletest.local');
-    $report = consoleReport($tenant, $reporter, FeedbackStatus::WontFix, 'Reopen me '.Str::random(8));
+    $report = consoleReport($tenant, $reporter, FeedbackStatus::Declined, 'Reopen me '.Str::random(8));
 
     // Give it a resolution to clear, committed alongside the row itself.
     DB::connection('pgsql_privileged')->table('feedback_reports')->where('id', $report->id)->update([
@@ -358,14 +229,14 @@ it('clears the resolution when a closed report is re-opened', function (): void 
     $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
 
     $this->actingAs($admin)
-        ->patch(adminUrl("/feedback/{$report->id}"), ['status' => FeedbackStatus::Reviewed->value])
+        ->patch(adminUrl("/feedback/{$report->id}"), ['status' => FeedbackStatus::Ongoing->value])
         ->assertSessionHasNoErrors()
         ->assertRedirect();
 
     // Re-opening CLEARS the stamp: those columns mean "when and by whom was this CLOSED", and it is not.
     enterTenant($tenant->id, $reporter->id);
     $reopened = FeedbackReport::query()->findOrFail($report->id);
-    expect($reopened->status)->toBe(FeedbackStatus::Reviewed)
+    expect($reopened->status)->toBe(FeedbackStatus::Ongoing)
         ->and($reopened->resolved_at)->toBeNull()
         ->and($reopened->resolved_by)->toBeNull();
 });
@@ -373,24 +244,25 @@ it('clears the resolution when a closed report is re-opened', function (): void 
 it('refuses a transition the lifecycle does not offer', function (): void {
     $tenant = consoleTenant('Console Illegal', 'console-illegal-'.Str::random(6));
     $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
-    // `new` → `resolved` skips triage; the console never offers it, so reaching it means a hand-made request.
-    $report = consoleReport($tenant, $reporter, FeedbackStatus::New, 'Illegal '.Str::random(8));
+    // M175: `new` → `resolved` is legal now, so the illegal step is resolved → declined: a closed report is
+    // re-opened (Ongoing) before it is closed the other way, and reaching it means a hand-made request.
+    $report = consoleReport($tenant, $reporter, FeedbackStatus::Resolved, 'Illegal '.Str::random(8));
 
     $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
 
     $this->actingAs($admin)
-        ->patch(adminUrl("/feedback/{$report->id}"), ['status' => FeedbackStatus::Resolved->value])
+        ->patch(adminUrl("/feedback/{$report->id}"), ['status' => FeedbackStatus::Declined->value])
         ->assertSessionHasErrors('admin');
 
     enterTenant($tenant->id, $reporter->id);
-    expect(FeedbackReport::query()->findOrFail($report->id)->status)->toBe(FeedbackStatus::New);
+    expect(FeedbackReport::query()->findOrFail($report->id)->status)->toBe(FeedbackStatus::Resolved);
 });
 
 it('404s an unknown report id rather than 500ing', function (): void {
     $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
 
     $this->actingAs($admin)
-        ->patch(adminUrl('/feedback/'.Uuid::uuid7()->toString()), ['status' => FeedbackStatus::Reviewed->value])
+        ->patch(adminUrl('/feedback/'.Uuid::uuid7()->toString()), ['status' => FeedbackStatus::Ongoing->value])
         ->assertNotFound();
 });
 
@@ -527,3 +399,155 @@ it('bounces a super-admin whose password confirmation has gone stale', function 
 it('redirects a guest away from a screenshot', function (): void {
     $this->get(adminUrl('/feedback/'.Uuid::uuid7()->toString().'/screenshot'))->assertRedirect();
 });
+
+it('shows each report kind and page, and filters the console by kind (M175, R-2ce2f274)', function (): void {
+    $this->withoutVite();
+
+    $tenant = consoleTenant('Console Kinds', 'console-kinds-'.Str::random(6));
+    $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
+    $marker = 'Kind marker '.Str::random(10);
+
+    consoleReport($tenant, $reporter, FeedbackStatus::New, "{$marker} question", [
+        'type' => 'question',
+        'page_title' => 'Analytics — Household survey',
+        'page_url' => 'https://console-kinds.meridian.test/forms/1/analytics',
+    ]);
+    consoleReport($tenant, $reporter, FeedbackStatus::New, "{$marker} bug", ['type' => 'bug']);
+
+    $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
+
+    $response = $this->actingAs($admin)->get(adminUrl('/feedback').'?type=question')->assertOk();
+
+    /** @var array<string, mixed> $props */
+    $props = $response->viewData('page')['props'];
+    /** @var list<array<string, mixed>> $rows */
+    $rows = $props['data'];
+    $byRemarks = array_column($rows, null, 'remarks');
+
+    expect($byRemarks)->toHaveKey("{$marker} question")
+        ->and($byRemarks)->not->toHaveKey("{$marker} bug")
+        ->and(array_values(array_unique(array_column($rows, 'type'))))->toBe(['question'])
+        ->and($byRemarks["{$marker} question"])->toMatchArray([
+            'type_label' => 'Question',
+            'page_title' => 'Analytics — Household survey',
+            'page_url' => 'https://console-kinds.meridian.test/forms/1/analytics',
+        ])
+        ->and(array_column($props['filters']['types'], 'value'))->toBe(['bug', 'suggestion', 'question'])
+        ->and($props['filters']['applied']['type'])->toBe('question');
+});
+
+/*
+| M175 (`R-9bfd832e`, `D139`) — the status reads New · Ongoing · Resolved · Declined, the operator may write a
+| reply, and the reporter is TOLD: Resolved and Declined send the reporter a bell row and an email. The reply
+| is the operator's free text, and `notifications.data` is readable by every member at the database level, so
+| the reply reaches the reporter by email and on My reports — never through `data`.
+|
+| The reporter must be a COMMITTED, active member: the mailer finds their address through the `users`
+| visibility policy, which admits a user only through an active membership of the adopted workspace.
+*/
+
+it('names the statuses New, Ongoing, Resolved and Declined in the filter and on every row', function (): void {
+    $this->withoutVite();
+
+    $tenant = consoleTenant('Console Labels', 'console-labels-'.Str::random(6));
+    $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
+    $marker = 'Labels marker '.Str::random(10);
+    consoleReport($tenant, $reporter, FeedbackStatus::Ongoing, $marker, ['reporter_role' => 'form_editor']);
+
+    $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
+    $props = $this->actingAs($admin)->get(adminUrl('/feedback'))->assertOk()->viewData('page')['props'];
+    $row = collect($props['data'])->firstWhere('remarks', $marker);
+
+    expect(array_column($props['filters']['statuses'], 'label'))->toBe(['New', 'Ongoing', 'Resolved', 'Declined'])
+        ->and($row['status'])->toBe('reviewed')
+        ->and($row['status_label'])->toBe('Ongoing')
+        ->and(array_column($row['transitions'], 'label'))->toBe(['Resolved', 'Declined'])
+        ->and($row['reporter_role_label'])->toBe('Form Editor')
+        ->and($row['reporter']['email'])->toBe($reporter->email);
+});
+
+it('lets a new report be resolved straight away, and keeps the reply on the report and out of the audit', function (): void {
+    Notification::fake();
+
+    $tenant = consoleTenant('Console Reply', 'console-reply-'.Str::random(6));
+    $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
+    consoleMember($tenant, $reporter);
+    $report = consoleReport($tenant, $reporter, FeedbackStatus::New, 'Reply to me '.Str::random(8));
+
+    $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
+
+    $this->actingAs($admin)
+        ->patch(adminUrl("/feedback/{$report->id}"), [
+            'status' => FeedbackStatus::Resolved->value,
+            'note' => 'Fixed in version abc1234, live on staging.',
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
+
+    enterTenant($tenant->id, $reporter->id);
+    $fresh = FeedbackReport::query()->findOrFail($report->id);
+    expect($fresh->status)->toBe(FeedbackStatus::Resolved)
+        ->and($fresh->resolution_note)->toBe('Fixed in version abc1234, live on staging.');
+
+    // The reply is the operator's free text written TO a person: the tenant's audit log records that one was
+    // written, never its words (AuditRedactor::PII).
+    /** @var Audit $audit */
+    $audit = Audit::query()->where('auditable_type', 'feedback_reports')->latest('id')->firstOrFail();
+    expect(json_encode($audit->new_values))->not->toContain('Fixed in version abc1234');
+});
+
+it('tells the reporter by bell and by email when their report is resolved, with the reply in the email only', function (): void {
+    Notification::fake();
+
+    $tenant = consoleTenant('Console Told', 'console-told-'.Str::random(6));
+    $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
+    consoleMember($tenant, $reporter);
+    $report = consoleReport($tenant, $reporter, FeedbackStatus::Ongoing, 'Tell me '.Str::random(8), ['page_title' => 'Dashboard']);
+
+    $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
+
+    $this->actingAs($admin)
+        ->patch(adminUrl("/feedback/{$report->id}"), [
+            'status' => FeedbackStatus::Resolved->value,
+            'note' => 'Fixed in version abc1234, live on staging.',
+        ])
+        ->assertSessionHasNoErrors();
+
+    enterTenant($tenant->id, $reporter->id);
+
+    /** @var NotificationRecord $bell */
+    $bell = NotificationRecord::query()->where('user_id', $reporter->id)->sole();
+    expect($bell->type)->toBe(NotificationType::FeedbackClosed)
+        ->and($bell->data)->toMatchArray(['feedback_report_id' => $report->id, 'status' => 'resolved'])
+        ->and(json_encode($bell->data))->not->toContain('Fixed in version abc1234');
+
+    Notification::assertSentOnDemand(
+        EventNotification::class,
+        fn (EventNotification $mail, array $channels, AnonymousNotifiable $to): bool => $to->routes['mail'] === $reporter->email
+            && $mail->type === NotificationType::FeedbackClosed
+            && str_contains($mail->body, 'Fixed in version abc1234, live on staging.'),
+    );
+});
+
+it('tells the reporter when their report is declined, and nobody when it is only marked Ongoing', function (string $from, string $to, int $told): void {
+    Notification::fake();
+
+    $tenant = consoleTenant('Console Quiet', 'console-quiet-'.Str::random(6));
+    $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
+    consoleMember($tenant, $reporter);
+    $report = consoleReport($tenant, $reporter, FeedbackStatus::from($from), 'Quiet or told '.Str::random(8));
+
+    $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
+
+    $this->actingAs($admin)
+        ->patch(adminUrl("/feedback/{$report->id}"), ['status' => $to, 'note' => 'Out of scope for the pilot.'])
+        ->assertSessionHasNoErrors();
+
+    enterTenant($tenant->id, $reporter->id);
+    expect(NotificationRecord::query()->where('user_id', $reporter->id)->count())->toBe($told);
+    Notification::assertSentOnDemandTimes(EventNotification::class, $told);
+})->with([
+    // Stored values, not cases: the dataset is built when the file loads.
+    'declined' => ['new', 'wont_fix', 1],
+    'ongoing' => ['new', 'reviewed', 0],
+]);

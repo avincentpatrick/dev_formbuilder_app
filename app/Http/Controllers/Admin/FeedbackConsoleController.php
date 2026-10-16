@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\FeedbackStatus;
+use App\Enums\FeedbackType;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\Admin\SuperAdminService;
@@ -40,11 +41,14 @@ final class FeedbackConsoleController extends Controller
     {
         $status = $request->query('status');
         $tenantId = $request->query('tenant_id');
+        $type = $request->query('type');
         $page = (int) $request->query('page', '1');
 
         return Inertia::render('admin/Feedback', $this->presenter->index([
             'status' => is_string($status) && $status !== '' ? $status : null,
             'tenant_id' => is_string($tenantId) && $tenantId !== '' ? $tenantId : null,
+            // Only a kind the enum knows — anything else reads as no filter rather than as an empty queue.
+            'type' => is_string($type) ? FeedbackType::tryFrom($type)?->value : null,
         ], max(1, $page)));
     }
 
@@ -53,6 +57,8 @@ final class FeedbackConsoleController extends Controller
     {
         $validated = $request->validate([
             'status' => ['required', Rule::enum(FeedbackStatus::class)],
+            // M175 (`R-9bfd832e`): the reply to the reporter, sent with a Resolved or Declined status.
+            'note' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $report = $this->superAdmin->findFeedback($feedback);
@@ -61,7 +67,14 @@ final class FeedbackConsoleController extends Controller
         /** @var User $actor */
         $actor = $request->user();
 
-        $this->superAdmin->transitionFeedback($report, FeedbackStatus::from((string) $validated['status']), $actor);
+        $note = $validated['note'] ?? null;
+
+        $this->superAdmin->transitionFeedback(
+            $report,
+            FeedbackStatus::from((string) $validated['status']),
+            $actor,
+            is_string($note) ? $note : null,
+        );
 
         return back()->with('toast', ['type' => 'success', 'message' => 'Feedback updated']);
     }

@@ -101,3 +101,30 @@ it('passes null arrays through untouched', function (): void {
     expect($result['new'])->toBeNull();
     expect($result['redacted_fields'])->toBeNull();
 });
+
+it('redacts the reply an operator writes to a feedback reporter, and keeps the status (M175)', function (): void {
+    // The reply is free text written TO a person — the same reason `remarks` on this table is registered.
+    // The workspace's audit log records that a report was resolved and that a reply was written; the words
+    // reach the reporter by email and on My reports, not through the ledger.
+    $result = $this->redactor->redact(
+        'feedback_reports',
+        old: ['status' => 'reviewed', 'resolution_note' => null],
+        new: ['status' => 'resolved', 'resolution_note' => 'Fixed in version abc1234, live on staging.'],
+    );
+
+    expect($result['new']['status'])->toBe('resolved')
+        ->and($result['new']['resolution_note'])->toBe(AuditRedactor::PLACEHOLDER)
+        ->and($result['redacted_fields'])->toContain('resolution_note');
+});
+
+it('never stores a platform support token\'s hash, on either side (M175)', function (): void {
+    $result = $this->redactor->redact(
+        'platform_api_tokens',
+        old: null,
+        new: ['name' => 'Dev laptop', 'token_hash' => str_repeat('a', 64), 'expires_at' => '2027-01-14T00:00:00Z'],
+    );
+
+    expect($result['new']['name'])->toBe('Dev laptop')
+        ->and($result['new']['token_hash'])->toBe(AuditRedactor::PLACEHOLDER)
+        ->and($result['redacted_fields'])->toContain('token_hash');
+});

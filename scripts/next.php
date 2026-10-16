@@ -166,9 +166,14 @@ function render_line(string $lane, array $state): string
         sprintf('Then: php scripts/preflight.php --lane=%s and php scripts/state.php.', $lane),
         'Every number in the block above was derived from the tree by state.php and none of it was typed;'
             .' docs/adr has no gap since ADR-0010 was written, and state.php refuses to measure if one appears.',
-        sprintf('main IS THE TRUNK: branch from origin/main, PR into main, self-merge on 6/6 green with each'
-            .' job\'s step count read individually. Your claim goes in %s and is PUSHED before you open the'
-            .' first file.', $config['claim']),
+        // ⛔ D137 (2026-10-16): every green run on main deploys under the testers, so a PR merges only at a
+        //    planned merge point, in its batch, after the user's staging backup — never on its own at green.
+        sprintf('main IS THE TRUNK: branch from origin/main, PR into main. MERGE ONLY AT A PLANNED MERGE POINT,'
+            .' never a lone small PR: between merge points a PR waits green; at a merge point, after the user has'
+            .' run the staging backup block, merge the batch in order, each on 6/6 green with each job\'s step count'
+            .' read individually and each only once the previous deploy has finished and /up answers. Migrations'
+            .' are additive only - never remove staging data. Your claim goes in %s and is PUSHED before you open'
+            .' the first file.', $config['claim']),
         // ⛔ M93 — THE D13 HARD-WIRE IS GONE, AND WHAT REPLACED IT IS READ OUT OF THE LINE ITSELF.
         //    `M67` derived "take the next BATCHED increment" from `D13` being answered, so that a regeneration
         //    could not silently drop it. `D12` then ENDED the batch series (2026-09-14): the queue is ordered

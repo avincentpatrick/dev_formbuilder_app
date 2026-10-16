@@ -149,3 +149,19 @@ export type TenantDetailPageProps = {
     domains: TenantDomains;
     impersonation: { targets: ImpersonationTarget[] };
 };
+
+/**
+ * One platform support token on the console's Settings page (M175, `R-78f43f26`), mirrored from
+ * `PlatformSupportTokenService::list()`. Names and dates only: the server keeps a hash, and the plaintext is the
+ * one-shot `flash.newSupportToken`.
+ */
+export type SupportTokenRow = {
+    id: string;
+    name: string;
+    owner: TenantOwner | null;
+    created_at: string;
+    expires_at: string;
+    last_used_at: string | null;
+    revoked_at: string | null;
+    state: 'active' | 'expired' | 'revoked';
+};

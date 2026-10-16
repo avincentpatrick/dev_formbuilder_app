@@ -9,6 +9,7 @@ use App\Exceptions\Settings\PlatformSettingsConflictException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UpdatePlatformSettingsRequest;
 use App\Models\User;
+use App\Services\Admin\PlatformSupportTokenService;
 use App\Services\Admin\SuperAdminService;
 use App\Services\Settings\PlatformSettings;
 use App\Support\Platform\BuildInfo;
@@ -35,6 +36,7 @@ final class PlatformSettingsController extends Controller
         private readonly SuperAdminService $superAdmin,
         private readonly PlatformSettings $settings,
         private readonly BuildInfo $build,
+        private readonly PlatformSupportTokenService $tokens,
     ) {}
 
     public function index(): Response
@@ -52,6 +54,8 @@ final class PlatformSettingsController extends Controller
             // page rather than with the settings object so the form posts it back untouched.
             'fingerprint' => $this->settings->fingerprint(),
             'about' => $this->build->toArray(),
+            // M175 — the platform support tokens, names and dates only; the secret is a one-shot flash.
+            'support_tokens' => $this->tokens->list(),
         ]);
     }
 

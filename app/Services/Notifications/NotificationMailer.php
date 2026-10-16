@@ -34,11 +34,14 @@ use Illuminate\Support\Facades\Notification;
 final class NotificationMailer
 {
     /**
+     * `$mailContext` (M175) reaches the email's words only — see {@see NotificationCopy::for()}.
+     *
      * @param  list<string>  $userIds
      * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $mailContext
      * @return list<string> the ids actually mailed — a member with no address is skipped, not failed
      */
-    public function send(NotificationType $type, array $userIds, array $data): array
+    public function send(NotificationType $type, array $userIds, array $data, array $mailContext = []): array
     {
         if ($userIds === []) {
             return [];
@@ -50,7 +53,7 @@ final class NotificationMailer
             return [];
         }
 
-        $copy = NotificationCopy::for($type, $tenant->name, $data);
+        $copy = NotificationCopy::for($type, $tenant->name, $data, $mailContext);
         $path = $type->pathFor($data);
         $url = $path === null ? null : TenantUrl::to($tenant, $path);
         $brand = BrandPalette::forTenant($tenant);

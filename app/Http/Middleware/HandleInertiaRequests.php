@@ -138,6 +138,9 @@ class HandleInertiaRequests extends Middleware
                 // 200-shaped array. Both live for a single request via the session flash.
                 'newSecret' => $request->session()->get('newSecret'),
                 'testResult' => $request->session()->get('testResult'),
+                // M175 — a platform support token's plaintext, once, after the console issues it; the same
+                // one-shot posture as `newSecret` above. The server keeps only its hash.
+                'newSupportToken' => $request->session()->get('newSupportToken'),
             ],
         ];
     }

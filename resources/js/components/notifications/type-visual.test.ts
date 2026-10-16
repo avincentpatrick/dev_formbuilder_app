@@ -65,7 +65,9 @@ describe('notificationVisual', () => {
         // K1b adds `badge_earned` here rather than to `info`: a badge is not news about the workspace, it is
         // a thing the reader wanted and now has — which is what this band means.
         expect(byVariant('success')).toEqual(['badge_earned', 'export_ready', 'submission_approved']);
-        expect(byVariant('info')).toEqual(['member_invited', 'member_joined', 'submission_received']);
+        // M175 adds `feedback_closed` to info: news about a report the reader sent — resolved or declined, the
+        // reader reads the note either way, so neither the success nor the warning band's question fits it.
+        expect(byVariant('info')).toEqual(['feedback_closed', 'member_invited', 'member_joined', 'submission_received']);
     });
 
     it('gives the invited/joined pair different glyphs, because they are a sequence and not a synonym', () => {

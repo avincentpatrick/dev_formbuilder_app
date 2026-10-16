@@ -260,6 +260,7 @@ All URLs are relative to a workspace host, e.g. `http://demo.localhost:8080/form
 | `/scopes` | `manageScopes` | `ScopeNodePolicy::viewAny` = `scopes.manage` | — | ✅ | ✅ | — | — | — |
 | `/audit-log` | `viewAuditLog` | `AuditPolicy::viewAny` = `audit_log.view` | — | ✅ | ✅ | — | — | — |
 | `/feedback` | `viewFeedback` | `feedback.view` | — | ✅ | ✅ | — | — | — |
+| `/feedback/mine` *(M175)* | — (Account menu → **My feedback**) | (authenticated) — the member's OWN reports only, by an application `user_id` predicate | — | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `/webhooks` | `manageWebhooks` | `WebhookEndpointPolicy::viewAny` = `webhooks.manage` | `webhooks` | ✅ | ✅ | — | — | — |
 | `/integrations` | `manageIntegrations` | `ConnectionPolicy::viewAny` = `integrations.manage` | `native_connectors` | ✅ | ✅ | — | — | — |
 | `/domains` | `manageDomains` | `tenant.settings.manage` | `custom_domain` (nav only) | ✅ | ✅ | — | — | — |
@@ -328,10 +329,12 @@ are **hidden rather than locked with an upgrade CTA** — an upsell would point 
 | `/admin/users` | Platform user list |
 | `/admin/audit-log` | Platform-wide audit ledger |
 | `/admin/feedback` | Feedback reports across tenants |
-| `/admin/settings` | Platform settings |
+| `/admin/settings` | Platform settings, and the **Support tokens** card (M175: `POST /admin/support-tokens`, `DELETE /admin/support-tokens/{token}`) |
 | `/admin/two-factor` | TOTP enrolment — the gate below |
 
 Three middleware stack up: `EnsureSuperAdmin` → `EnsureSuperAdminMfa` → `RequireRecentPassword`.
+
+**The platform support API** (`/api/platform/v1/feedback…`, M175, ADR-0023) is NOT behind these: it answers on any platform host — a workspace subdomain included — and only to a **platform support token** issued on the Support tokens card. Its owner must still be a super-admin with two-factor confirmed on every call. No session, role or tenant API key opens it.
 
 > ## ⚠️ THE SUPER-ADMIN NEEDS A REAL AUTHENTICATOR APP — DO NOT "FIX" THIS
 >

@@ -71,6 +71,10 @@ export const NOTIFICATION_VISUAL: Record<NotificationTypeKey, NotificationVisual
     review_requested: { icon: 'search', variant: 'warning' },
     submission_returned: { icon: 'undo', variant: 'warning' },
     webhook_failed: { icon: 'alert', variant: 'danger' },
+    // M175 — a reporter's feedback was resolved or declined. The `feedback` speech bubble, the same mark as
+    // the top bar's Feedback button, so the bell row reads as the answer to that button. `info`: news about
+    // something the reader sent, read in full on My reports either way.
+    feedback_closed: { icon: 'feedback', variant: 'info' },
 };
 
 /**

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import Modal from './Modal.vue';
 import { openModalCount, popModalRoot, pushModalRoot } from './inert-stack';
@@ -760,5 +760,26 @@ describe('MdsModal — size (M137, `R-581cb07b`)', () => {
         await flushPromises();
 
         expect(document.body.querySelector('.mds-modal__panel')!.classList.contains('mds-modal__panel--lg')).toBe(true);
+    });
+});
+describe('MdsModal — after-leave (M175, `R-2ce2f274`)', () => {
+    // A caller that must act once the panel is OFF the screen — the feedback panel steps aside for a screen
+    // capture (ADR-0015 §D11) — needs to know when the leave transition has finished, not merely that `open`
+    // went false: until then the panel is still painted, fading out, and a frame taken then still holds it.
+    // `transition: false` runs the REAL <Transition>; the test-utils default stub never calls its hooks.
+    it('says when its leave transition has finished, and not before', async () => {
+        const wrapper = mount(Modal, {
+            attachTo: document.body,
+            props: { open: true, title: 'Send feedback' },
+            global: { stubs: { transition: false } },
+        });
+        mounted.push(wrapper);
+        await flushPromises();
+
+        expect(wrapper.emitted('after-leave')).toBeUndefined();
+
+        await wrapper.setProps({ open: false });
+        await vi.waitFor(() => expect(wrapper.emitted('after-leave')).toHaveLength(1));
+        expect(document.body.querySelector('[role="dialog"]')).toBeNull();
     });
 });

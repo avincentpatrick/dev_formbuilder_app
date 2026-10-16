@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 use App\Enums\AttachmentKind;
 use App\Enums\FeedbackStatus;
+use App\Enums\FeedbackType;
 use App\Enums\ScanStatus;
 use App\Models\Attachment;
 use App\Models\FeedbackReport;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\Platform\BuildInfo;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -67,6 +69,7 @@ it('lets any role submit feedback, scoped to the tenant', function (): void {
 
     $this->actingAs($user)
         ->post('http://acme.meridian.test/feedback', [
+            'type' => 'bug',
             'route' => '/dashboard',
             'remarks' => 'The dashboard is great, but exports are slow.',
             'browser_info' => ['userAgent' => 'PestUA', 'viewport' => '1440x900'],
@@ -105,6 +108,7 @@ it('isolates feedback to its own tenant under RLS', function (): void {
     makeActiveMember($userA, 'viewer');
 
     $this->actingAs($userA)->post('http://acme.meridian.test/feedback', [
+        'type' => 'bug',
         'route' => '/dashboard',
         'remarks' => 'Tenant A confidential note.',
     ])->assertRedirect();
@@ -132,6 +136,7 @@ it('stores a screenshot through the shared attachments pipeline and links it bot
     makeActiveMember($user, 'viewer');
 
     $this->actingAs($user)->post('http://acme.meridian.test/feedback', [
+        'type' => 'bug',
         'route' => '/forms/42',
         'remarks' => 'The map picker renders behind the toolbar.',
         'screenshot' => feedbackScreenshotFile(),
@@ -168,6 +173,7 @@ it('rejects a screenshot that is not a raster image', function (): void {
     // An SVG is an XML document that can carry <script>, and this image is rendered back into the platform
     // operator's own console, same-origin on the central host — the highest-value stored-XSS target here.
     $this->actingAs($user)->post('http://acme.meridian.test/feedback', [
+        'type' => 'bug',
         'route' => '/dashboard',
         'remarks' => 'Trying to smuggle a script.',
         'screenshot' => UploadedFile::fake()->create('payload.svg', 4, 'image/svg+xml'),
@@ -186,6 +192,7 @@ it('submits without a screenshot, leaving the pointer null', function (): void {
     makeActiveMember($user, 'viewer');
 
     $this->actingAs($user)->post('http://acme.meridian.test/feedback', [
+        'type' => 'bug',
         'route' => '/dashboard',
         'remarks' => 'No picture needed for this one.',
     ])->assertRedirect();
@@ -204,6 +211,7 @@ it('shows the workspace its own feedback to a holder of feedback.view, and hides
     makeActiveMember($viewer, 'viewer');
 
     $this->actingAs($viewer)->post('http://acme.meridian.test/feedback', [
+        'type' => 'bug',
         'route' => '/dashboard',
         'remarks' => 'Exports are slow on big forms.',
     ])->assertRedirect();
@@ -239,12 +247,14 @@ it('serves a screenshot to the workspace and 404s a report that has none', funct
     makeActiveMember($owner, 'owner');
 
     $this->actingAs($owner)->post('http://acme.meridian.test/feedback', [
+        'type' => 'bug',
         'route' => '/dashboard',
         'remarks' => 'With a picture.',
         'screenshot' => feedbackScreenshotFile(),
     ])->assertRedirect();
 
     $this->actingAs($owner)->post('http://acme.meridian.test/feedback', [
+        'type' => 'bug',
         'route' => '/dashboard',
         'remarks' => 'Without a picture.',
     ])->assertRedirect();
@@ -276,6 +286,7 @@ it('refuses a screenshot to a member who lacks feedback.view', function (): void
     // create the very report it is then refused. A second actor would resolve its permissions from this
     // request's state.
     $this->actingAs($viewer)->post('http://acme.meridian.test/feedback', [
+        'type' => 'bug',
         'route' => '/dashboard',
         'remarks' => 'A capture of my own screen.',
         'screenshot' => feedbackScreenshotFile(),
@@ -348,6 +359,7 @@ it('409s a feedback screenshot whose scan has not cleared, on the route that ser
     makeActiveMember($owner, 'owner');
 
     $this->actingAs($owner)->post('http://acme.meridian.test/feedback', [
+        'type' => 'bug',
         'route' => '/dashboard',
         'remarks' => 'With a picture that has not been scanned.',
         'screenshot' => feedbackScreenshotFile(),
@@ -362,3 +374,93 @@ it('409s a feedback screenshot whose scan has not cleared, on the route that ser
         ->get("http://acme.meridian.test/feedback/{$report->id}/screenshot")
         ->assertStatus(409);
 });
+
+/*
+| M175 (`R-2ce2f274`, `D127`) — a report says what kind it is and which page it came from. The kind is
+| required on submit and limited to the enum (the column is nullable only so the reports sent before it
+| existed keep their place). The page address is shown as a LINK on both lists, so only a web address is
+| accepted — a `javascript:` URL stored here would run in the operator's console on a click. The build is
+| stamped by the SERVER: a client cannot claim to have been served by a version it was not.
+*/
+
+it('requires a kind, and only one of the three it knows', function (): void {
+    $tenant = Tenant::create(['name' => 'Acme', 'slug' => 'acme']);
+    $tenant->domains()->create(['domain' => 'acme']);
+    $user = User::factory()->create();
+    enterTenant($tenant->id, $user->id);
+    makeActiveMember($user, 'viewer');
+
+    $this->actingAs($user)
+        ->post('http://acme.meridian.test/feedback', ['route' => '/dashboard', 'remarks' => 'No kind given.'])
+        ->assertSessionHasErrors('type');
+
+    $this->actingAs($user)
+        ->post('http://acme.meridian.test/feedback', ['type' => 'complaint', 'route' => '/dashboard', 'remarks' => 'Unknown kind.'])
+        ->assertSessionHasErrors('type');
+
+    enterTenant($tenant->id, $user->id);
+    expect(FeedbackReport::query()->count())->toBe(0);
+});
+
+it('records the full page address, its title, the screen it was on and the build that served it', function (): void {
+    $tenant = Tenant::create(['name' => 'Acme', 'slug' => 'acme']);
+    $tenant->domains()->create(['domain' => 'acme']);
+    $user = User::factory()->create();
+    enterTenant($tenant->id, $user->id);
+    makeActiveMember($user, 'form_editor');
+
+    $this->actingAs($user)
+        ->post('http://acme.meridian.test/feedback', [
+            'type' => 'suggestion',
+            'route' => '/forms/1/builder',
+            'page_url' => 'https://acme.meridian.test/forms/1/builder?tab=logic',
+            'page_title' => 'Builder — Household survey',
+            'remarks' => 'Let me drag several questions at once.',
+            'browser_info' => [
+                'userAgent' => 'PestUA',
+                'viewport' => '1440x900',
+                'component' => 'forms/Builder',
+                'bundle' => 'abc1234',
+                // A client cannot stamp the server's version — the server writes its own over it.
+                'app_version' => 'forged',
+            ],
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    enterTenant($tenant->id, $user->id);
+    $report = FeedbackReport::query()->firstOrFail();
+
+    expect($report->type)->toBe(FeedbackType::Suggestion)
+        ->and($report->page_url)->toBe('https://acme.meridian.test/forms/1/builder?tab=logic')
+        ->and($report->page_title)->toBe('Builder — Household survey')
+        ->and($report->browser_info)->toMatchArray([
+            'component' => 'forms/Builder',
+            'bundle' => 'abc1234',
+            'app_version' => app(BuildInfo::class)->version(),
+        ]);
+});
+
+it('refuses a page address that is not a web address, because both lists render it as a link', function (string $address): void {
+    $tenant = Tenant::create(['name' => 'Acme', 'slug' => 'acme']);
+    $tenant->domains()->create(['domain' => 'acme']);
+    $user = User::factory()->create();
+    enterTenant($tenant->id, $user->id);
+    makeActiveMember($user, 'viewer');
+
+    $this->actingAs($user)
+        ->post('http://acme.meridian.test/feedback', [
+            'type' => 'bug',
+            'route' => '/dashboard',
+            'page_url' => $address,
+            'remarks' => 'A crafted address.',
+        ])
+        ->assertSessionHasErrors('page_url');
+
+    enterTenant($tenant->id, $user->id);
+    expect(FeedbackReport::query()->count())->toBe(0);
+})->with([
+    'a script' => ['javascript:alert(document.cookie)'],
+    'a data url' => ['data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=='],
+    'no scheme' => ['acme.meridian.test/dashboard'],
+]);

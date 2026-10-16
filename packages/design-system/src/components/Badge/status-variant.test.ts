@@ -27,12 +27,14 @@ describe('statusVariant — webhook tokens (H14)', () => {
 describe('statusVariant — feedback triage tokens (I7a)', () => {
     it('mirrors the submission review lifecycle, because it is the same shape', () => {
         expect(statusVariant('new')).toEqual({ variant: 'info', label: 'New' });
-        expect(statusVariant('reviewed')).toEqual({ variant: 'warning', label: 'Reviewed' });
+        // M175 (`D139`): the stored `reviewed` READS Ongoing — the label changed, the value did not.
+        expect(statusVariant('reviewed')).toEqual({ variant: 'warning', label: 'Ongoing' });
         expect(statusVariant('resolved')).toEqual({ variant: 'success', label: 'Resolved' });
     });
 
     it("colours wont_fix neutral, not danger — a settled decision is not a failure", () => {
-        expect(statusVariant('wont_fix')).toEqual({ variant: 'neutral', label: "Won't fix" });
+        // M175 (`D139`): the stored `wont_fix` READS Declined.
+        expect(statusVariant('wont_fix')).toEqual({ variant: 'neutral', label: 'Declined' });
     });
 
     it('does not disturb any status the four feedback words could have collided with', () => {
@@ -93,5 +95,13 @@ describe('statusVariant — submission screen-out (I9a)', () => {
     it('leaves the statuses screened_out sits between untouched', () => {
         expect(statusVariant('submitted')).toEqual({ variant: 'info', label: 'Submitted' });
         expect(statusVariant('under_review')).toEqual({ variant: 'warning', label: 'Under review' });
+    });
+});
+
+describe('statusVariant — what kind a feedback report is (M175, `R-2ce2f274`)', () => {
+    it('names each kind in words, and tells them apart by colour only as a second cue', () => {
+        expect(statusVariant('bug')).toEqual({ variant: 'danger', label: 'Bug' });
+        expect(statusVariant('suggestion')).toEqual({ variant: 'info', label: 'Suggestion' });
+        expect(statusVariant('question')).toEqual({ variant: 'neutral', label: 'Question' });
     });
 });

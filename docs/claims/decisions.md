@@ -24,10 +24,20 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D140`, the last one filed, was asked and answered on 2026-10-16 by the round-2 planning session (with `D137`–`D139`), its filing adopted into `M174`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D141`, the last one filed, was asked and answered on 2026-10-16 while `M175` (F) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D141 — `D139` put the platform support API on the central host, but on the testing server the central host (`pitahc.gov.ph`) is the agency's website: only the box itself reaches the console there, through its hosts file, so this machine could never pull the testers' reports from it. Where does the feedback API answer? **A — on the workspace host too: `https://staging.pitahc.gov.ph/api/platform/v1/…` (any platform host, a custom domain refused), opened only by the platform support token — a super-admin's, with confirmed 2FA, one ability, an expiry of at most 90 days, revocable, every call audited; the console itself stays on the central host.**
+
+**Asked and answered 2026-10-16 (user decision, in chat), while `M175` (F) was planned; recorded in its claim.** Measured: `pitahc.gov.ph` resolves to 121.58.210.229 (the agency's website), `staging.pitahc.gov.ph` to 121.58.210.237 (the testing server); `docs/deployment-infrastructure.md` step 7 reaches the console through a hosts entry on the server itself. The token is the whole authorization: it carries no session, so the console's step-up never applies to it — which is why it expires, is re-checked against the account on every call, and leaves an audit row per call.
+
+- **A — the workspace host, token only (recommended, chosen).** Reachable from this machine; the console's reach is unchanged.
+- **B — A, plus an IP lock**: the token also works only from one internet address; safer if it leaks, but the pull stops whenever the office address changes until it is updated in the console.
+- **C — off the internet**: an artisan export on the server, copied to this machine by hand each session (the shape ADR-0018 §D1 chose for extraction); nothing new exposed, but nothing automatic either, which `D139` asked for.
+
+**What the answer files, in the same push:** `R-78f43f26`'s remedy re-hosted (its tail says so); ADR-0023 records the surface.
+
 ### D140 — The testers' second round asks to remove the Yes/No and Duration question types: Yes/No is covered by a Single choice, and a duration should be worked out by a calculation. Staging holds forms and answers that use Yes/No, and nothing may be removed from it. How do the two types go? **A — both leave the palette and can no longer be created; every existing question keeps working and no data is touched. `D134` changes: Duration is not built; Signature still is.**
 
 **Instructed and answered 2026-10-16 (user decision, in chat), recorded by the round-2 planning session (plan `~/.claude/plans/here-are-added-comments-peppy-quill.md`); its filing is adopted into `M174`'s claim.** The user: *"remove the yes/no question. it is already covered by the options"*, *"also remove the duration question type, that can also be covered in the calculate"*, and *"always make sure that the staging has data, do not remove data"*. The palette lists every field type (`app/Services/Forms/BuilderPresenter.php`), the catalog seeds create Yes/No questions, and a Duration question cannot be answered on any surface.

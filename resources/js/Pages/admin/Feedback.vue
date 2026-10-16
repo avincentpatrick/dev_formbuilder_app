@@ -31,6 +31,7 @@ import {
     MdsModal,
     MdsPagination,
     MdsSelect,
+    MdsTextarea,
     statusVariant,
     type DataTableColumn,
 } from '@meridian/design-system';
@@ -46,6 +47,7 @@ const columns: DataTableColumn[] = [
     { key: 'submitted_at', header: 'Sent' },
     { key: 'tenant_name', header: 'Workspace' },
     { key: 'reporter', header: 'From' },
+    { key: 'type', header: 'Kind' },
     { key: 'remarks', header: 'Remarks' },
     { key: 'status', header: 'Status' },
 ];
@@ -53,10 +55,12 @@ const columns: DataTableColumn[] = [
 const selected = reactive({
     status: props.filters.applied.status ?? '',
     tenant_id: props.filters.applied.tenant_id ?? '',
+    type: props.filters.applied.type ?? '',
 });
 
 const statusOptions = [{ value: '', label: 'All statuses' }, ...props.filters.statuses];
 const tenantOptions = [{ value: '', label: 'All workspaces' }, ...props.filters.tenants];
+const typeOptions = [{ value: '', label: 'All kinds' }, ...props.filters.types];
 
 const detailRow = ref<ConsoleFeedbackRow | null>(null);
 const busy = ref(false);
@@ -65,6 +69,7 @@ function queryParams(extra: Record<string, string | number> = {}): Record<string
     const params: Record<string, string | number> = {};
     if (selected.status) params.status = selected.status;
     if (selected.tenant_id) params.tenant_id = selected.tenant_id;
+    if (selected.type) params.type = selected.type;
     return { ...params, ...extra };
 }
 
@@ -89,14 +94,24 @@ function goToPage(target: number): void {
 function clearFilters(): void {
     selected.status = '';
     selected.tenant_id = '';
+    selected.type = '';
     visit({}, true);
+}
+
+/** The reply typed for the open report (M175); sent with the next status change, then cleared. */
+const note = ref('');
+
+function openReport(row: ConsoleFeedbackRow): void {
+    note.value = '';
+    detailRow.value = row;
 }
 
 function transition(row: ConsoleFeedbackRow, status: string): void {
     busy.value = true;
     router.patch(
         `/admin/feedback/${row.id}`,
-        { status },
+        // An empty box is no reply at all, never an empty one — the server keeps the last reply then.
+        { status, note: note.value.trim() === '' ? null : note.value.trim() },
         {
             preserveScroll: true,
             onFinish: () => (busy.value = false),
@@ -166,6 +181,15 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
                         @update:model-value="applyFilters"
                     />
                 </MdsFormField>
+                <MdsFormField label="Kind" input-id="admin-feedback-type">
+                    <MdsSelect
+                        id="admin-feedback-type"
+                        v-model="selected.type"
+                        :options="typeOptions"
+                        :disabled="busy"
+                        @update:model-value="applyFilters"
+                    />
+                </MdsFormField>
         </MdsFilterBar>
 
         <p class="admin-fb__hint">
@@ -180,6 +204,14 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
 
             <template #cell-reporter="{ row }">
                 {{ reporterLabel(row as ConsoleFeedbackRow) }}
+            </template>
+
+            <template #cell-type="{ row }">
+                <MdsBadge
+                    v-if="(row as ConsoleFeedbackRow).type"
+                    v-bind="statusVariant((row as ConsoleFeedbackRow).type as string)"
+                />
+                <span v-else class="admin-fb__none">—</span>
             </template>
 
             <template #cell-remarks="{ row }">
@@ -202,7 +234,7 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
                     icon="search"
                     label="Open report"
                     size="sm"
-                    @click="detailRow = row as ConsoleFeedbackRow"
+                    @click="openReport(row as ConsoleFeedbackRow)"
                 />
             </template>
 
@@ -237,6 +269,7 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
         <MdsModal
             :open="detailRow !== null"
             :title="detailRow ? `${detailRow.tenant_name} · ${reporterLabel(detailRow)}` : 'Feedback'"
+            size="lg"
             @close="detailRow = null"
         >
             <div v-if="detailRow" class="admin-fb__detail">
@@ -246,12 +279,31 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
                         <dd>{{ formatDate(detailRow.submitted_at) }}</dd>
                     </div>
                     <div>
+                        <dt>Kind</dt>
+                        <dd>
+                            <MdsBadge v-if="detailRow.type" v-bind="statusVariant(detailRow.type)" />
+                            <span v-else>—</span>
+                        </dd>
+                    </div>
+                    <div>
                         <dt>Page</dt>
-                        <dd class="admin-fb__mono">{{ detailRow.route }}</dd>
+                        <dd>
+                            <!-- The title, linked to the full address (M175); an older report shows its path. -->
+                            <a v-if="detailRow.page_url" :href="detailRow.page_url" class="admin-fb__page">{{
+                                detailRow.page_title || detailRow.route
+                            }}</a>
+                            <span v-else class="admin-fb__mono">{{ detailRow.route }}</span>
+                        </dd>
                     </div>
                     <div>
                         <dt>Reporter</dt>
-                        <dd>{{ detailRow.reporter?.email ?? '—' }}</dd>
+                        <dd>
+                            {{ detailRow.reporter?.email ?? '—' }}
+                            <!-- The role they held when they sent it (M175); absent on older reports. -->
+                            <span v-if="detailRow.reporter_role_label" class="admin-fb__role">
+                                · {{ detailRow.reporter_role_label }}
+                            </span>
+                        </dd>
                     </div>
                     <div>
                         <dt>Status</dt>
@@ -278,6 +330,21 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
                         <dd>{{ value }}</dd>
                     </template>
                 </dl>
+
+                <!-- M175 (`R-9bfd832e`): the last reply the reporter was sent, then the box for the next one. -->
+                <div v-if="detailRow.resolution_note" class="admin-fb__reply">
+                    <p class="admin-fb__reply-label">Reply sent</p>
+                    <p class="admin-fb__body">{{ detailRow.resolution_note }}</p>
+                </div>
+
+                <MdsFormField
+                    v-if="detailRow.transitions.length"
+                    label="Reply to the reporter (optional)"
+                    input-id="admin-feedback-note"
+                    help="Sent with the status you choose. On Resolved or Declined the reporter is told by notification and email, and reads the reply on My feedback."
+                >
+                    <MdsTextarea id="admin-feedback-note" v-model="note" :rows="3" maxlength="1000" />
+                </MdsFormField>
             </div>
 
             <template #actions>
@@ -304,6 +371,43 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
     margin: 0 0 var(--mds-space-3);
     font-size: var(--mds-type-body-sm-font-size);
     color: var(--mds-color-text-secondary);
+}
+
+/* Always underlined, as admin/Tenants.vue's name link is: /admin/* is never axe-scanned, so a colour-only
+   link would be invisible to every gate. The theme-aware primary text token keeps it legible in dark. */
+.admin-fb__page {
+    color: var(--mds-color-action-primary-fg);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    overflow-wrap: anywhere;
+}
+
+.admin-fb__page:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 2px;
+}
+
+.admin-fb__none {
+    color: var(--mds-color-text-secondary);
+}
+
+.admin-fb__role {
+    color: var(--mds-color-text-secondary);
+}
+
+/* A sunken panel needs its own border to read as one in dark, where sunken resolves to the canvas (M174). */
+.admin-fb__reply {
+    padding: var(--mds-space-3);
+    border: 1px solid var(--mds-color-border-default);
+    border-radius: var(--mds-radius-md);
+    background-color: var(--mds-color-bg-sunken);
+}
+
+.admin-fb__reply-label {
+    margin: 0 0 var(--mds-space-1);
+    font-size: var(--mds-type-body-sm-font-size);
+    font-weight: var(--mds-font-weight-medium);
+    color: var(--mds-color-text-body);
 }
 
 .admin-fb__remarks {

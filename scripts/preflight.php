@@ -397,6 +397,33 @@ if (isset($opts['with-pint'])) {
     note('config/, routes/ and bootstrap/ entirely.');
 }
 
+// ── The testers' feedback (M175, `R-f3fb2522`, `D139`): how many reports are New, so the pull that CLAUDE.md's
+//    "Start every session" runs cannot be skipped silently. ⛔ It INFORMS AND WARNS AND NEVER BLOCKS — a testing
+//    server that is down, or a token that expired, must not stop a session from building. It sits after every
+//    blocking section on purpose, so nothing between it and the result can append to the failures.
+section("Testers' feedback");
+$feedbackHome = getenv('USERPROFILE') ?: getenv('HOME') ?: '';
+$feedbackTokenFile = rtrim((string) $feedbackHome, '/\\').DIRECTORY_SEPARATOR.'.meridian'.DIRECTORY_SEPARATOR.'feedback-pull.json';
+
+if (! is_file($feedbackTokenFile)) {
+    note("No token file at {$feedbackTokenFile} — the feedback pull is not set up on this machine.");
+} else {
+    $feedbackStatus = 0;
+    $feedbackOut = sh(sprintf(
+        '%s %s --count --timeout=5 2>&1',
+        escapeshellarg(PHP_BINARY),
+        escapeshellarg($root.'/scripts/feedback-pull.php'),
+    ), $feedbackStatus);
+
+    if ($feedbackStatus === 0 && preg_match('/new=(\d+)/', $feedbackOut, $feedbackMatch) === 1) {
+        (int) $feedbackMatch[1] > 0
+            ? warn("{$feedbackMatch[1]} New feedback report(s): pull and triage them before the first row — php scripts/feedback-pull.php --out=<scratchpad>\\feedback")
+            : pass('no New feedback reports');
+    } else {
+        warn('the New-feedback count could not be read: '.trim(last_line($feedbackOut)));
+    }
+}
+
 section('Result');
 
 if ($failures === []) {

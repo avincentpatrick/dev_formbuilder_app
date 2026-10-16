@@ -138,6 +138,8 @@ declare module '@inertiajs/core' {
             prunedAnswers?: string[] | null;
             newSecret?: FlashNewSecret | null;
             testResult?: FlashTestResult | null;
+            /** M175 — a platform support token's plaintext, flashed once after the console issues it. */
+            newSupportToken?: { token: string; name: string } | null;
         };
         entitlements: EntitlementSnapshot | null;
         errors: Record<string, string>;

@@ -33,10 +33,15 @@ final class NotificationDispatcher
     ) {}
 
     /**
+     * `$mailContext` (M175) reaches the EMAIL only and is never stored: `data` is written to a row every member
+     * of the workspace can read at the database level, so free text addressed to one person travels here
+     * instead (today: the support team's reply to a feedback report).
+     *
      * @param  list<string>  $userIds
      * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $mailContext
      */
-    public function dispatch(NotificationType $type, array $userIds, array $data): void
+    public function dispatch(NotificationType $type, array $userIds, array $data, array $mailContext = []): void
     {
         // The clean no-op every caller relies on: a guest submission has no respondent to tell, and an
         // empty recipient set must cost zero queries rather than a `whereIn ()`.
@@ -66,7 +71,7 @@ final class NotificationDispatcher
             }
         }
 
-        $mailed = $this->mailer->send($type, $toMail, $data);
+        $mailed = $this->mailer->send($type, $toMail, $data, $mailContext);
         $stamped = array_values(array_intersect($mailed, array_keys($rows)));
 
         if ($stamped !== []) {

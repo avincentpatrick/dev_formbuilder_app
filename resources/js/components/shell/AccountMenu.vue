@@ -26,6 +26,9 @@ const user = computed(() => page.props.auth.user);
 
 const items: MenuItem[] = [
     { id: 'settings', label: 'Settings', icon: 'settings', href: '/settings' },
+    // M175 (`R-9bfd832e`) — every member's own reports, with the support team's replies. Here rather than in
+    // the sidebar: it is about the person, like Settings, and every role may open it.
+    { id: 'my-feedback', label: 'My feedback', icon: 'feedback', href: '/feedback/mine' },
     { id: 'logout', label: 'Log out', icon: 'logout' },
 ];
 

@@ -16,7 +16,125 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M173`, full width: the shell and the settings pages (`R-fd7b8879`, `R-ba9d6349`, `R-14971e37`, `R-8ee7d2dc`) (m173-ui2-full-width-shell-settings)
+## Status: ACTIVE CLAIM — `M174`, full width: the detail pages, the stacks and the sign-in (`R-348f997c`, `R-7b8a74ae`, `R-fb647b5e`, `R-10b38d6d`, `R-3d51f0ae`, `R-66952d33`) (m174-ui3-full-width-detail-stacks-signin)
+
+Taken 2026-10-16 under the testing freeze of 2026-10-13: this claim builds, opens the PR and gets it green, then stops — nothing merges
+until the user says so, after a fresh staging backup (`D123`, `D128`). It is UI3, the third of the UI programme's six themed increments
+(`~/.claude/plans/hi-let-s-conduct-a-mutable-goose.md` §E row 3; the build plan
+`~/.claude/plans/pasted-content-id-43d7-read-claude-md-robust-kahn.md`). ⛔ **STACKED:** branch `m174-ui3-full-width-detail-stacks-signin`
+is cut from `m173-ui2-full-width-shell-settings` after `origin/main` is merged into it (the user, 2026-10-16: merge UI2 and UI3
+together), PR into main. Both PRs merge on the user's word after ONE fresh staging backup — `M173` (PR #366) first, then this branch
+rebased onto the trunk. No user check was owed at this session's start. One question was asked and answered, recorded on the branch as
+`D136`: the manual-entry page's side panel holds facts and steps — the form's name and version, the open or closed notice, and the
+form's sections with the current one marked; the version's reference files are filed as their own row.
+
+Rows taken, in build order, each its own commits: `R-348f997c` (the form hub and the submission page stack their facts above their
+tables), `R-7b8a74ae` (the webhook, rule and console workspace pages stack two cards over a full-width log; the console's dialogs rely
+on browser-default margins), `R-fb647b5e` (domains, search results and the leaderboard are single columns of full-width rows),
+`R-10b38d6d` (the template cards' buttons sit at different heights), `R-3d51f0ae` (the sign-in pages centre a card and a 26rem panel;
+the landing page caps itself at 64rem), `R-66952d33` (the manual-entry page caps itself at 720px).
+
+### Evidence verified
+Read on `m173-ui2-full-width-shell-settings` at `0344375a` (the code this branch builds on; the trunk differs from it only in this
+file) by three read-only passes plus my own reads, Docker not yet started — every citation is a static reading.
+- `R-348f997c`: **`forms/Show.vue` — every citation moved but one:** identity `:343-366` → `:376-399`, tiles `:368-407` → `:401-440`, the
+  two tables `:415-487` → `:442-537`, the 70ch description `:501` → `:570`, the tile grid `:528-533` → `:597-603`; `:644` (the 480px
+  block) held. `submissions/Show.vue`: fact cards `:415-420` → `:419-424`, answer blocks `:350-361` → `:350-365`, label rows `:495-501` →
+  `:499-505`, the scan split `:435-450` → `:430-454`; `:439` and `:535` held. `forms/show.test.ts` keeps its every-prop-has-a-reader
+  case (`:432-481`) — held.
+- `R-7b8a74ae`: `webhooks/Show.vue:358-363`, `:259`, `:441` — held. `integrations/RuleShow.vue:326-331`, `:259`, `:421-431`, `:433` —
+  held. `admin/TenantDetail.vue:542-546` held; `:546-548` → `:548-550`; the dialog paragraphs `:491-498`/`:513-519` → `:493-500`/`:515-521`;
+  the literal tracking `:562` → `:564`. Its comment at `:539-540` (use the status-danger pair, never `danger-text`) governs no rule — no
+  rule in that style block uses either token; left as guidance. The `__prose` precedent `members/Index.vue:497-502` — held.
+- `R-fb647b5e`: `domains/Index.vue:212-216`, `search/Index.vue:210-214`, `:235-247`, `achievements/Index.vue:458-465`, `:485-492` — held.
+- `R-10b38d6d`: `forms/Templates.vue:128-132`, `FormCard.vue:225` (`.form-card :deep(.mds-card__footer) { margin-top: auto }`) — held.
+- `R-3d51f0ae`: **`AuthLayout.vue:83-91` is `.auth`, not `.auth__frame`** (that is `:116-120`); `:122-134` (the 400px card) and `:220-247`
+  (the 54em container block, the panel a `0 1 26rem` flex track) — held. `Welcome.vue:117-126`, `:147-153`, `:169-173`, `:134` — held.
+- `R-66952d33`: `submissions/Encode.vue:1575-1577` (`max-width: 720px`, left-aligned — no auto margin), `:1962` (90rem in scan mode),
+  `:1921` and `:2029` (`danger-text`) — held.
+
+### Premise verified
+- One session only (the user, 2026-10-13). Lane B is retired. `M173` is held on its branch, not merged; this branch stacks on it.
+- **The UI plan says this increment touches no hub. False:** the hub set derived today (`php scripts/backlog-triage.php --json`, files
+  cited by three or more open rows) holds `resources/js/Pages/forms/Show.vue` (`R-348f997c`) and `resources/js/Pages/submissions/Encode.vue`
+  (`R-66952d33`). `D128` allows file overlap and asks every hub to be named here: these two. `FormCard.vue` is a hub and is cited by
+  `R-10b38d6d` as precedent only — not edited. No DSR edit is owed: `M173`'s §6 amendment already sanctions a page's own container
+  split and a measured input column.
+- **No UI3 page declares a container**; every split today is a viewport `@media`. A 75rem container is reached on tenant pages at a
+  1920 window (1440 leaves 1136px, as on the scans page) and in the console at 1440 (1392px). An element cannot query itself, so each
+  page root (or a new wrapper) is the container and an inner wrapper carries the split (the `M173` scans shape).
+- **A container is a containing block for fixed descendants — safe here:** no `position: fixed` inside any UI3 page; Modal, Tooltip
+  and Toast teleport to `body`; DataTable's frame is already a container.
+- **`TenantDetail`'s root is `<AdminLayout>`**, so it needs its own wrapper element to be a container; its test stub replaces
+  AdminLayout with `<main><slot/></main>` and requires exactly one `<form>`.
+- **`R-66952d33` believes the page has a form status and reference files to move aside. False:** `EncodeFormPresenter.php:203-233`
+  sends neither — only the version number exists, inside the intro. The autosave label must stay in the header beside Cancel (an
+  always-present live region, `Encode.vue:1131-1139`). Scan mode's 50/50 grid sits on the page root with direct-child selectors, and
+  `ocr-review-axe`'s `expectPaperBeside` measures it. Hence the question and `D136`.
+- **`AuthLayout`'s docblock says `responsive-axe` settles on an h1 on these pages. False:** that locator is the landing page's
+  (`responsive-axe.spec.ts:680`); the real readers are `google-signin.spec.ts:48` and `auth-axe`. The constraint stands; the citation is
+  corrected while the file is open. `docs/ux/exceptions-log.md` #14 records the split's shape and arithmetic and is amended with it.
+- In dark mode `--mds-color-bg-sunken` resolves to the canvas colour, so a sunken panel needs a 1px divider to read as a pane.
+- Load-bearing selectors kept: `.hub__tiles`, `[data-version-changes]`, `[data-version-view]`, `.hub__row-link`, `.detail__body` and its
+  `--scan`, `.encode` and `.encode--scan`, `.encode__scan-pages`, `.encode__form`, `.encode__schedule-banner`, `.ach__ladder` (a `UL`,
+  role list), `.ach__badge-meter`, `#tenant-plan`, `#tenant-interval`, webhooks' one "Newest first." paragraph before its one table.
+
+### Remedy verdict
+- **The aside sits RIGHT and the DOM never reorders:** `minmax(0, 1fr) minmax(18rem, 26rem)` from a 75rem container, the facts first in
+  the DOM as today (phones and screen readers unchanged), placed by `grid-column`/`grid-row: 1` on a two-child wrapper. Inside the aside,
+  label/value rows stack (each page's own 480px collapse shape): at 26rem a 10–12rem label leaves a URL or a secret about 170px.
+- **Hub — "facts and versions in the aside":** the facts are a short header strip that never runs edge to edge, so they stay; the
+  **Versions panel is the aside**, beside Latest responses (DataTable draws it as its stacked cards, as it does at 375px). The DOM is
+  already latest-then-versions: no reordering.
+- **Submission — the row's 36rem floor is wrong for its own outcome:** beside a 26rem aside at 1920 the answers have about 1144px and two
+  36rem blocks need 1168 — one column. 32rem gives two at 1920; the e2e case asserts the outcome and the browser fixes the number.
+  **With scanned pages the page split does not apply:** a third column would shrink the paper to about 370px, the width `M168` rejected;
+  the facts stay above the paper and the answers, as today.
+- **Search:** four entity groups — `auto-fill` lands 3+1 at 1920. Container steps instead: two columns from 64rem, `auto-fit` 26rem tracks
+  from 120rem, a lone group (a filter) spans the row.
+- **Achievements:** `.ach__badges` is an `auto-fit` card grid with no `min(100%, …)` guard, beside the cited ladder — taken here as
+  `auto-fill` with the guard (same file, same archetype).
+- **Templates:** `margin-top: auto` alone leaves no gap between the body and the footer in a row's tallest card; `padding-top:
+  var(--mds-space-4)` keeps the design system's gap.
+- **Sign-in:** "stacked below the 54em threshold" is read as today's narrow layout — the card alone, the panel hidden — because a pitch
+  above the form would push the fields below a phone's fold. 54em is kept unless a half cannot hold the 400px card and its padding.
+- **Landing:** with exactly four cards `auto-fill` leaves empty tracks and a left-aligned group under a centred hero; `auto-fit` is what
+  fills (`D122`: "the grid fills"). The 64rem cap goes; the hero and the lede keep their measures.
+- **Manual entry (`D136`):** the form at `minmax(0, 45rem)` (today's 720px), the aside at `minmax(18rem, 26rem)`, sticky and capped to the
+  window; beyond about 1160px the remainder stays empty — the cost of a reading measure. The steps list shows from the split only; the
+  "Step N of M" line stays at every width. Scan mode keeps its halves, moved from the root to the main wrapper.
+
+Files: `resources/js/Pages/forms/Show.vue` (hub), `resources/js/Pages/submissions/Show.vue`, `resources/js/Pages/webhooks/Show.vue`,
+`resources/js/Pages/integrations/RuleShow.vue`, `resources/js/Pages/admin/TenantDetail.vue`, new `resources/js/Pages/detail-layout.test.ts`;
+`resources/js/Pages/domains/Index.vue`, `resources/js/Pages/search/Index.vue`, `resources/js/Pages/achievements/Index.vue`,
+`resources/js/Pages/forms/Templates.vue`, new `resources/js/Pages/grid-layout.test.ts`; `resources/js/Layouts/AuthLayout.vue`,
+`resources/js/Pages/Welcome.vue`, new `resources/js/Layouts/auth-layout.test.ts`, `docs/ux/exceptions-log.md`; `resources/js/Pages/submissions/Encode.vue`
+(hub), new `resources/js/Pages/submissions/encode-layout.test.ts`; `tests/e2e/list-layout.spec.ts`, `tests/e2e/auth-axe.spec.ts`; on the
+branch: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`; close-out: `PROGRESS.md`, `docs/gate-baselines.md`;
+this file on main. `resources/js/components/domains/DomainSetupGuide.vue` only if its prose runs past about 80ch at 1920 (an extension).
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`, `docs/ux/exceptions-log.md`,
+`tests/e2e/list-layout.spec.ts`, `tests/e2e/auth-axe.spec.ts`, `PROGRESS.md` (own block).
+Paired files taken: none.
+Namespaces spent: `D136` (asked and answered in this session); nothing from the ADR or migration namespaces.
+E2E specs the diff reaches, run locally: `list-layout`, `auth-axe`, `responsive-axe`, `google-signin`, `ocr-review-axe`,
+`encode-validation`, `templates-axe`, `search-nav`, `impersonation`, `builder-draft-superseded`, `personalization-axe`,
+`sidebar-collapse`; CI runs every spec.
+Prediction: red on the trunk — every new Vitest pin; the e2e cases: the hub's Versions below Latest responses at 1920, the submission's
+facts above its answers and its blocks in one column, the webhook's and the rule's cards above their logs at 1920, the console tenant's
+cards above Usage at 1440, the two domain cards stacked at 1440, one search column at 1440, the leaderboard below the team tiles at 1920,
+a template card's footer off its card's bottom at 1440, the login and register panel a centred 416px track at 1440, the landing grid
+1024px at 1920, the manual-entry intro above the form at 1920. All green after. Mutants, each turning only its named case red: the hub
+split dropped, the blocks floor back to 36rem, the webhook aside placement dropped, the console `__prose` rule dropped, the domains list
+a column, the search container step dropped, the achievements split dropped, the templates footer rule dropped, the two-half sign-in rule
+dropped, the manual-entry aside placement dropped, one danger-text use restored. `responsive-axe`, `personalization-axe`, `google-signin`
+and `ocr-review-axe` (`expectPaperBeside`) stay green. **Most likely wrong:** the submission's 2-up blocks — the seed may hold no
+response without scanned pages whose form has two blocks, and the browser may show uneven block heights reading worse than one column.
+Runner-up: the scan-mode selectors after the manual-entry move.
+
+## HELD — `M173`, full width: the shell and the settings pages (`R-fd7b8879`, `R-ba9d6349`, `R-14971e37`, `R-8ee7d2dc`) (m173-ui2-full-width-shell-settings)
+
+⛔ **Held to merge with `M174`, which is stacked on this branch (2026-10-16):** `origin/main` is merged into this branch before `M174` is
+cut, so PR #366 runs again; both merge on the user's word after one fresh staging backup, this one first.
 
 **BUILT — PR #366, CI 6/6 green with real step counts (run 38779366161 at `0344375a`: Static analysis 32 · E2E 20 · Contract 16 ·
 Frontend 12 · Pest 11 · axe 11; the only skips are the two main-only staging-header steps and the failure-only report upload; the

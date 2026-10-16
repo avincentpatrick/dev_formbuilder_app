@@ -1215,9 +1215,9 @@ class DemoSeeder extends Seeder
         $rows = [
             // M175: a kind on each but the oldest, which stands for a report sent before the kind existed.
             ['slot' => 'owner@demo.test', 'type' => FeedbackType::Bug, 'route' => '/dashboard', 'status' => FeedbackStatus::New, 'ago' => 2, 'remarks' => 'The date range picker resets when I switch tabs.'],
-            ['slot' => 'reviewer@demo.test', 'type' => FeedbackType::Suggestion, 'route' => '/submissions', 'status' => FeedbackStatus::Reviewed, 'ago' => 9, 'remarks' => 'Could the inbox remember my last filter?'],
+            ['slot' => 'reviewer@demo.test', 'type' => FeedbackType::Suggestion, 'route' => '/submissions', 'status' => FeedbackStatus::Ongoing, 'ago' => 9, 'remarks' => 'Could the inbox remember my last filter?'],
             ['slot' => 'editor@demo.test', 'type' => FeedbackType::Question, 'route' => '/forms', 'status' => FeedbackStatus::Resolved, 'ago' => 21, 'remarks' => 'Duplicating a field lost its options — fixed now, thanks.'],
-            ['slot' => 'viewer@demo.test', 'type' => null, 'route' => '/analytics', 'status' => FeedbackStatus::WontFix, 'ago' => 40, 'remarks' => 'Please add a pie chart.'],
+            ['slot' => 'viewer@demo.test', 'type' => null, 'route' => '/analytics', 'status' => FeedbackStatus::Declined, 'ago' => 40, 'remarks' => 'Please add a pie chart.'],
         ];
 
         foreach ($rows as $row) {
@@ -1229,7 +1229,7 @@ class DemoSeeder extends Seeder
 
             $id = self::fixtureUuid(self::FIXTURE_PREFIX.'feedback:'.$row['slot'].':'.$row['route']);
             $submittedAt = CarbonImmutable::now()->utc()->subDays($row['ago']);
-            $resolved = in_array($row['status'], [FeedbackStatus::Resolved, FeedbackStatus::WontFix], true);
+            $resolved = in_array($row['status'], [FeedbackStatus::Resolved, FeedbackStatus::Declined], true);
 
             $attributes = [
                 'user_id' => $user->getKey(),

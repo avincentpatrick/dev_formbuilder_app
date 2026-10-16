@@ -16,8 +16,8 @@ use App\Notifications\EventNotification;
 use App\Services\Admin\SuperAdminService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Notifications\AnonymousNotifiable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -284,7 +284,7 @@ it('filters the console by status', function (): void {
     $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
     $marker = 'Filter marker '.Str::random(10);
 
-    consoleReport($tenant, $reporter, FeedbackStatus::WontFix, $marker);
+    consoleReport($tenant, $reporter, FeedbackStatus::Declined, $marker);
 
     $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
 
@@ -306,7 +306,7 @@ it('transitions a report and audits it into the affected tenant own ledger', fun
     $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
 
     $this->actingAs($admin)
-        ->patch(adminUrl("/feedback/{$report->id}"), ['status' => FeedbackStatus::Reviewed->value])
+        ->patch(adminUrl("/feedback/{$report->id}"), ['status' => FeedbackStatus::Ongoing->value])
         // Without this a REFUSED transition would also pass `assertRedirect()` — the error path is a
         // redirect-back too, which is how a silently-rejected transition looks like a successful one.
         ->assertSessionHasNoErrors()
@@ -317,7 +317,7 @@ it('transitions a report and audits it into the affected tenant own ledger', fun
     enterTenant($tenant->id, $reporter->id);
 
     $fresh = FeedbackReport::query()->findOrFail($report->id);
-    expect($fresh->status)->toBe(FeedbackStatus::Reviewed)
+    expect($fresh->status)->toBe(FeedbackStatus::Ongoing)
         // `reviewed` is not terminal, so nothing is stamped yet.
         ->and($fresh->resolved_at)->toBeNull()
         ->and($fresh->resolved_by)->toBeNull();
@@ -336,7 +336,7 @@ it('transitions a report and audits it into the affected tenant own ledger', fun
 it('stamps the resolution when a report closes', function (): void {
     $tenant = consoleTenant('Console Close', 'console-close-'.Str::random(6));
     $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
-    $report = consoleReport($tenant, $reporter, FeedbackStatus::Reviewed, 'Close me '.Str::random(8));
+    $report = consoleReport($tenant, $reporter, FeedbackStatus::Ongoing, 'Close me '.Str::random(8));
 
     $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
 
@@ -359,7 +359,7 @@ it('clears the resolution when a closed report is re-opened', function (): void 
     $tenant = consoleTenant('Console Reopen', 'console-reopen-'.Str::random(6));
     $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
     $closer = consoleUser(Str::random(8).'@feedbackconsoletest.local');
-    $report = consoleReport($tenant, $reporter, FeedbackStatus::WontFix, 'Reopen me '.Str::random(8));
+    $report = consoleReport($tenant, $reporter, FeedbackStatus::Declined, 'Reopen me '.Str::random(8));
 
     // Give it a resolution to clear, committed alongside the row itself.
     DB::connection('pgsql_privileged')->table('feedback_reports')->where('id', $report->id)->update([
@@ -370,14 +370,14 @@ it('clears the resolution when a closed report is re-opened', function (): void 
     $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
 
     $this->actingAs($admin)
-        ->patch(adminUrl("/feedback/{$report->id}"), ['status' => FeedbackStatus::Reviewed->value])
+        ->patch(adminUrl("/feedback/{$report->id}"), ['status' => FeedbackStatus::Ongoing->value])
         ->assertSessionHasNoErrors()
         ->assertRedirect();
 
     // Re-opening CLEARS the stamp: those columns mean "when and by whom was this CLOSED", and it is not.
     enterTenant($tenant->id, $reporter->id);
     $reopened = FeedbackReport::query()->findOrFail($report->id);
-    expect($reopened->status)->toBe(FeedbackStatus::Reviewed)
+    expect($reopened->status)->toBe(FeedbackStatus::Ongoing)
         ->and($reopened->resolved_at)->toBeNull()
         ->and($reopened->resolved_by)->toBeNull();
 });
@@ -403,7 +403,7 @@ it('404s an unknown report id rather than 500ing', function (): void {
     $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
 
     $this->actingAs($admin)
-        ->patch(adminUrl('/feedback/'.Uuid::uuid7()->toString()), ['status' => FeedbackStatus::Reviewed->value])
+        ->patch(adminUrl('/feedback/'.Uuid::uuid7()->toString()), ['status' => FeedbackStatus::Ongoing->value])
         ->assertNotFound();
 });
 

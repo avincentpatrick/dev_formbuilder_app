@@ -260,6 +260,7 @@ All URLs are relative to a workspace host, e.g. `http://demo.localhost:8080/form
 | `/scopes` | `manageScopes` | `ScopeNodePolicy::viewAny` = `scopes.manage` | — | ✅ | ✅ | — | — | — |
 | `/audit-log` | `viewAuditLog` | `AuditPolicy::viewAny` = `audit_log.view` | — | ✅ | ✅ | — | — | — |
 | `/feedback` | `viewFeedback` | `feedback.view` | — | ✅ | ✅ | — | — | — |
+| `/feedback/mine` *(M175)* | — (Account menu → **My feedback**) | (authenticated) — the member's OWN reports only, by an application `user_id` predicate | — | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `/webhooks` | `manageWebhooks` | `WebhookEndpointPolicy::viewAny` = `webhooks.manage` | `webhooks` | ✅ | ✅ | — | — | — |
 | `/integrations` | `manageIntegrations` | `ConnectionPolicy::viewAny` = `integrations.manage` | `native_connectors` | ✅ | ✅ | — | — | — |
 | `/domains` | `manageDomains` | `tenant.settings.manage` | `custom_domain` (nav only) | ✅ | ✅ | — | — | — |

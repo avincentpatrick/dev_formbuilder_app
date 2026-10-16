@@ -121,4 +121,52 @@ final class FeedbackPresenter
             ),
         ];
     }
+
+    /**
+     * One page of the SIGNED-IN MEMBER'S OWN reports — "My reports" (M175, `R-9bfd832e`, `D139`).
+     *
+     * ⚠️ THE `user_id` PREDICATE IS THE WHOLE BOUNDARY. `feedback_reports` is strict TENANT isolation, so under
+     * RLS a member's query sees every colleague's report in the workspace; "mine" is this one line, and
+     * `MyFeedbackTest`'s colleague case is what proves it is here.
+     *
+     * The screenshot is NAMED (`has_screenshot`), never linked: ADR-0015 §D9 reads a feedback screenshot under
+     * `feedback.view` on every route that serves it or on none, and most reporters do not hold it.
+     *
+     * @return array<string, mixed>
+     */
+    public function mine(string $userId, int $page): array
+    {
+        $paginator = FeedbackReport::query()
+            ->where('user_id', $userId)
+            ->orderByDesc('submitted_at')
+            ->paginate(self::PER_PAGE, page: max(1, $page));
+
+        /** @var Collection<int, FeedbackReport> $items */
+        $items = collect($paginator->items());
+
+        return [
+            'data' => $items->map(fn (FeedbackReport $r): array => [
+                'id' => (string) $r->getKey(),
+                'type' => $r->type?->value,
+                'type_label' => $r->type?->label(),
+                'route' => $r->route,
+                'page_url' => $r->page_url,
+                'page_title' => $r->page_title,
+                'remarks' => $r->remarks,
+                'status' => $r->status->value,
+                'status_label' => $r->status->label(),
+                'submitted_at' => $r->submitted_at->toIso8601String(),
+                'resolved_at' => $r->resolved_at?->toIso8601String(),
+                'resolution_note' => $r->resolution_note,
+                'has_screenshot' => $r->screenshot_attachment_id !== null,
+            ])->all(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'total' => $paginator->total(),
+                'per_page' => $paginator->perPage(),
+            ],
+            'empty_reason' => ListEmptyReason::for($items->isNotEmpty(), false),
+        ];
+    }
 }

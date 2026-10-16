@@ -31,6 +31,7 @@ import {
     MdsModal,
     MdsPagination,
     MdsSelect,
+    MdsTextarea,
     statusVariant,
     type DataTableColumn,
 } from '@meridian/design-system';
@@ -97,11 +98,20 @@ function clearFilters(): void {
     visit({}, true);
 }
 
+/** The reply typed for the open report (M175); sent with the next status change, then cleared. */
+const note = ref('');
+
+function openReport(row: ConsoleFeedbackRow): void {
+    note.value = '';
+    detailRow.value = row;
+}
+
 function transition(row: ConsoleFeedbackRow, status: string): void {
     busy.value = true;
     router.patch(
         `/admin/feedback/${row.id}`,
-        { status },
+        // An empty box is no reply at all, never an empty one — the server keeps the last reply then.
+        { status, note: note.value.trim() === '' ? null : note.value.trim() },
         {
             preserveScroll: true,
             onFinish: () => (busy.value = false),
@@ -224,7 +234,7 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
                     icon="search"
                     label="Open report"
                     size="sm"
-                    @click="detailRow = row as ConsoleFeedbackRow"
+                    @click="openReport(row as ConsoleFeedbackRow)"
                 />
             </template>
 
@@ -286,7 +296,13 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
                     </div>
                     <div>
                         <dt>Reporter</dt>
-                        <dd>{{ detailRow.reporter?.email ?? '—' }}</dd>
+                        <dd>
+                            {{ detailRow.reporter?.email ?? '—' }}
+                            <!-- The role they held when they sent it (M175); absent on older reports. -->
+                            <span v-if="detailRow.reporter_role_label" class="admin-fb__role">
+                                · {{ detailRow.reporter_role_label }}
+                            </span>
+                        </dd>
                     </div>
                     <div>
                         <dt>Status</dt>
@@ -313,6 +329,21 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
                         <dd>{{ value }}</dd>
                     </template>
                 </dl>
+
+                <!-- M175 (`R-9bfd832e`): the last reply the reporter was sent, then the box for the next one. -->
+                <div v-if="detailRow.resolution_note" class="admin-fb__reply">
+                    <p class="admin-fb__reply-label">Reply sent</p>
+                    <p class="admin-fb__body">{{ detailRow.resolution_note }}</p>
+                </div>
+
+                <MdsFormField
+                    v-if="detailRow.transitions.length"
+                    label="Reply to the reporter (optional)"
+                    input-id="admin-feedback-note"
+                    help="Sent with the status you choose. On Resolved or Declined the reporter is told by notification and email, and reads the reply on My feedback."
+                >
+                    <MdsTextarea id="admin-feedback-note" v-model="note" :rows="3" maxlength="1000" />
+                </MdsFormField>
             </div>
 
             <template #actions>
@@ -357,6 +388,25 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
 
 .admin-fb__none {
     color: var(--mds-color-text-secondary);
+}
+
+.admin-fb__role {
+    color: var(--mds-color-text-secondary);
+}
+
+/* A sunken panel needs its own border to read as one in dark, where sunken resolves to the canvas (M174). */
+.admin-fb__reply {
+    padding: var(--mds-space-3);
+    border: 1px solid var(--mds-color-border-default);
+    border-radius: var(--mds-radius-md);
+    background-color: var(--mds-color-bg-sunken);
+}
+
+.admin-fb__reply-label {
+    margin: 0 0 var(--mds-space-1);
+    font-size: var(--mds-type-body-sm-font-size);
+    font-weight: var(--mds-font-weight-medium);
+    color: var(--mds-color-text-body);
 }
 
 .admin-fb__remarks {

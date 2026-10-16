@@ -93,8 +93,11 @@ final class FeedbackService
                     'app_commit' => $this->build->commit(),
                 ],
                 'screenshot_attachment_id' => $attachment?->getKey(),
-                // Written explicitly rather than left to the column default: `status` carries no CHECK
-                // constraint, so the enum is the only guard there is (see FeedbackStatus's docblock).
+                // The role the reporter holds in this workspace now (M175) — a snapshot, so the console can say
+                // who saw the problem without reading roles across workspaces. The roles relation is scoped to
+                // the live team id, which the tenant request has already set.
+                'reporter_role' => $user->getRoleNames()->first(),
+                // Written explicitly rather than left to the column default, so the row says what it is.
                 'status' => FeedbackStatus::New,
             ])->save();
 

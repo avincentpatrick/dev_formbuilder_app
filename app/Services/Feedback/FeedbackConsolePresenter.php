@@ -8,6 +8,7 @@ use App\Enums\FeedbackStatus;
 use App\Enums\FeedbackType;
 use App\Models\Tenant;
 use App\Services\Admin\SuperAdminService;
+use App\Support\Authorization\AssignableRoles;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
@@ -55,6 +56,10 @@ final class FeedbackConsolePresenter
                 'status_label' => $status->label(),
                 // Null on a report sent before the kind existed (M175) — the console shows no kind, not a guess.
                 'type_label' => $type?->label(),
+                // The role in words (M175); null on a report sent before the role was recorded.
+                'reporter_role_label' => is_string($row['reporter_role'] ?? null)
+                    ? AssignableRoles::label($row['reporter_role'])
+                    : null,
                 'tenant_name' => $names[$row['tenant_id']] ?? 'Unknown workspace',
                 'transitions' => array_map(
                     static fn (FeedbackStatus $to): array => ['value' => $to->value, 'label' => $to->label()],

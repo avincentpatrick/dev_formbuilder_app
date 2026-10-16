@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Notifications;
 
 use App\Enums\BadgeKey;
+use App\Enums\FeedbackStatus;
 use App\Enums\NotificationType;
 use App\Enums\SubmissionPdfOutcome;
 use App\Jobs\Submissions\GeneratePdfJob;
@@ -41,10 +42,16 @@ use App\Support\Connectors\Providers\SlackMessageFormatter;
 final class NotificationCopy
 {
     /**
+     * `$mailContext` (M175) carries what the EMAIL may say and the stored row may not — today only the support
+     * team's reply to a feedback report. `notifications.data` is readable by every member of the workspace at
+     * the database level, so free text written to one person never goes there; the bell copy below cannot see
+     * this parameter at all.
+     *
      * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $mailContext
      * @return array{headline: string, body: string}
      */
-    public static function for(NotificationType $type, string $tenantName, array $data): array
+    public static function for(NotificationType $type, string $tenantName, array $data, array $mailContext = []): array
     {
         $form = self::string($data, 'form_title') ?? 'one of your forms';
 
@@ -129,6 +136,31 @@ final class NotificationCopy
                 'body' => (self::badge($data)?->description() ?? 'A new achievement was added to your record.')
                     .' It was added to your achievements in '.$tenantName.'.',
             ],
+            // M175 — written to the reporter. The reply, when the support team wrote one, is quoted from the
+            // mail context; the page is named by its title when the report recorded one.
+            NotificationType::FeedbackClosed => [
+                'headline' => 'Your feedback was '.self::feedbackOutcome($data).'.',
+                'body' => trim(
+                    'The platform support team marked your feedback'
+                    .(self::string($data, 'page_title') === null ? '' : ' about "'.self::string($data, 'page_title').'"')
+                    .' as '.self::feedbackOutcome($data).' in '.$tenantName.'.'
+                    .(self::string($mailContext, 'note') === null ? '' : ' Their reply: "'.self::string($mailContext, 'note').'"'),
+                ),
+            ],
+        };
+    }
+
+    /**
+     * "resolved" or "declined", from a `feedback_closed` payload's stored status; "updated" for anything else.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private static function feedbackOutcome(array $data): string
+    {
+        return match (self::string($data, 'status')) {
+            FeedbackStatus::Resolved->value => 'resolved',
+            FeedbackStatus::Declined->value => 'declined',
+            default => 'updated',
         };
     }
 
@@ -202,6 +234,8 @@ final class NotificationCopy
             NotificationType::BadgeEarned => self::badge($data) === null
                 ? 'You earned a badge.'
                 : 'You earned the '.self::badge($data)->label().' badge.',
+            // M175 — the outcome only. The reply is never in `data`, so it cannot reach the bell even by mistake.
+            NotificationType::FeedbackClosed => 'Your feedback was '.self::feedbackOutcome($data).'.',
         };
     }
 

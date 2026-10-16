@@ -22,7 +22,7 @@
  * report away. The report also says what KIND it is and the full address and title of the page.
  */
 import { onBeforeUnmount, ref } from 'vue';
-import { useForm, usePage } from '@inertiajs/vue3';
+import { Link, useForm, usePage } from '@inertiajs/vue3';
 import { MdsButton, MdsFormField, MdsIcon, MdsModal, MdsRadio } from '@meridian/design-system';
 import { APP_VERSION } from '../../../public-runtime/lib/app-version';
 import { acquireScreen, isCaptureSupported, type ScreenCapture } from './screenshot';
@@ -266,6 +266,12 @@ onBeforeUnmount(releasePreview);
 
                     <p v-if="form.errors.screenshot" class="fb__shot-error">{{ form.errors.screenshot }}</p>
                 </fieldset>
+
+                <!-- M175 (`R-9bfd832e`): where the reporter reads what became of what they sent. -->
+                <p class="fb__mine">
+                    <Link href="/feedback/mine" class="fb__mine-link" @click="open = false">See your reports</Link>
+                    and the support team's replies.
+                </p>
             </form>
             <template #actions>
                 <MdsButton variant="tertiary" @click="open = false">Cancel</MdsButton>
@@ -309,6 +315,24 @@ onBeforeUnmount(releasePreview);
     display: flex;
     flex-direction: column;
     gap: var(--mds-space-4);
+}
+
+.fb__mine {
+    margin: 0;
+    font-size: var(--mds-type-body-sm-font-size);
+    color: var(--mds-color-text-secondary);
+}
+
+/* Always underlined, with the theme-aware primary text token (audit/Index.vue's note on dark contrast). */
+.fb__mine-link {
+    color: var(--mds-color-action-primary-fg);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.fb__mine-link:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 2px;
 }
 
 .fb__kind {

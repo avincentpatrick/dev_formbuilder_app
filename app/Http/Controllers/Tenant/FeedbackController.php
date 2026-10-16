@@ -48,6 +48,21 @@ final class FeedbackController extends Controller
         ]));
     }
 
+    /**
+     * The signed-in member's OWN reports (M175, `R-9bfd832e`) — every role may open it; the narrowing is the
+     * presenter's `user_id` predicate, because RLS on this table is tenant-wide.
+     */
+    public function mine(Request $request): Response
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        return Inertia::render('feedback/Mine', $this->presenter->mine(
+            (string) $user->getKey(),
+            (int) $request->query('page', '1'),
+        ));
+    }
+
     public function store(StoreFeedbackRequest $request, FeedbackService $feedback): RedirectResponse
     {
         /** @var User $user */

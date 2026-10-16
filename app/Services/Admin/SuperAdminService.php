@@ -7,6 +7,7 @@ namespace App\Services\Admin;
 use App\Enums\AuditEvent;
 use App\Enums\BillingInterval;
 use App\Enums\FeedbackStatus;
+use App\Enums\NotificationType;
 use App\Enums\SettingKey;
 use App\Enums\SettingScope;
 use App\Enums\TenantStatus;
@@ -23,6 +24,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Audit\AuditLogPresenter;
 use App\Services\Entitlements\EntitlementService;
+use App\Services\Notifications\NotificationDispatcher;
 use App\Services\Settings\PlatformSettings;
 use App\Support\Audit\AuditLogger;
 use App\Support\Tenancy\SuperAdminContext;
@@ -70,7 +72,10 @@ use Illuminate\Support\Facades\DB;
  */
 final class SuperAdminService
 {
-    public function __construct(private readonly AuditLogger $audit) {}
+    public function __construct(
+        private readonly AuditLogger $audit,
+        private readonly NotificationDispatcher $notifications,
+    ) {}
 
     /**
      * Every tenant on the platform, display-ready (central, RLS-exempt table — default connection).
@@ -540,7 +545,10 @@ final class SuperAdminService
                     'status' => $r->status->value,
                     'submitted_at' => $r->submitted_at->toIso8601String(),
                     'resolved_at' => $r->resolved_at?->toIso8601String(),
+                    'resolution_note' => $r->resolution_note,
                     'reporter' => $names[$r->user_id] ?? null,
+                    // The role the reporter held when they sent it (M175), snapshotted at submit; null before.
+                    'reporter_role' => $r->reporter_role,
                     'resolver' => $r->resolved_by === null ? null : ($names[$r->resolved_by] ?? null),
                     'has_screenshot' => $r->screenshot_attachment_id !== null,
                 ])->all()),
@@ -815,9 +823,17 @@ final class SuperAdminService
      * and `'attachment'`. Emitting `'feedback_report'` would still write a perfectly valid-looking row,
      * and would silently switch OFF redaction of `remarks`/`browser_info` for it.
      *
+     * ── THE REPORTER IS TOLD (M175, `R-9bfd832e`, `D139`) ──────────────────────────────────────────────────
+     * `$note` is the support team's reply, stored on the report (`resolution_note`) whenever one is given and
+     * kept when none is. Reaching Resolved or Declined dispatches `feedback_closed` to the REPORTER alone — inside
+     * this transaction, so the bell row, the preference lookup and the reporter's address all pass the strict
+     * policies under the adopted context, and the queued email waits for the commit (`after_commit`). The reply
+     * reaches the email as mail-only context, never `data` ({@see NotificationDispatcher::dispatch()}), and the
+     * audit records that it changed without its words ({@see AuditRedactor::PII}).
+     *
      * @throws SuperAdminException on a transition the lifecycle does not offer
      */
-    public function transitionFeedback(FeedbackReport $report, FeedbackStatus $to, User $actor): void
+    public function transitionFeedback(FeedbackReport $report, FeedbackStatus $to, User $actor, ?string $note = null): void
     {
         $from = $report->status;
 
@@ -825,7 +841,9 @@ final class SuperAdminService
             throw SuperAdminException::invalidFeedbackTransition($from, $to);
         }
 
-        DB::transaction(function () use ($report, $from, $to, $actor): void {
+        $note = $note === null || trim($note) === '' ? null : trim($note);
+
+        DB::transaction(function () use ($report, $from, $to, $actor, $note): void {
             $savedTenant = TenantContext::currentTenantId();
             $savedUser = TenantContext::currentUserId();
             TenantContext::applyLocal($report->tenant_id);
@@ -838,18 +856,22 @@ final class SuperAdminService
                     'status' => $from->value,
                     'resolved_at' => $row->resolved_at?->toIso8601String(),
                     'resolved_by' => $row->resolved_by,
+                    'resolution_note' => $row->resolution_note,
                 ];
 
                 // Re-opening CLEARS the resolution stamp rather than preserving it: those two columns mean
                 // "when, and by whom, was this closed", and a re-opened report is not closed. The history
-                // is not lost — it is in the audit row this method writes.
+                // is not lost — it is in the audit row this method writes. The reply is kept unless a new one
+                // is written: it is what the reporter last read, and re-opening says nothing new to them.
                 $resolvedAt = $to->isTerminal() ? now() : null;
                 $resolvedBy = $to->isTerminal() ? (string) $actor->getKey() : null;
+                $resolutionNote = $note ?? $row->resolution_note;
 
                 $row->forceFill([
                     'status' => $to,
                     'resolved_at' => $resolvedAt,
                     'resolved_by' => $resolvedBy,
+                    'resolution_note' => $resolutionNote,
                 ])->save();
 
                 $this->audit->record(
@@ -861,9 +883,25 @@ final class SuperAdminService
                         'status' => $to->value,
                         'resolved_at' => $resolvedAt?->toIso8601String(),
                         'resolved_by' => $resolvedBy,
+                        'resolution_note' => $resolutionNote,
                     ],
                     actorId: (string) $actor->getKey(),
                 );
+
+                // Resolved or Declined: the reporter is told — by bell and, unless they switched it off, by
+                // email. Ids and labels only in `data`; the reply rides as mail-only context.
+                if ($to->isTerminal()) {
+                    $this->notifications->dispatch(
+                        NotificationType::FeedbackClosed,
+                        [(string) $row->user_id],
+                        array_filter([
+                            'feedback_report_id' => (string) $row->getKey(),
+                            'status' => $to->value,
+                            'page_title' => $row->page_title,
+                        ], static fn (?string $value): bool => $value !== null),
+                        $resolutionNote === null ? [] : ['note' => $resolutionNote],
+                    );
+                }
             } finally {
                 TenantContext::applyLocal($savedTenant, $savedUser);
             }

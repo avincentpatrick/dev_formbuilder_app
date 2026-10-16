@@ -9,6 +9,8 @@ use App\Enums\FeedbackType;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\HasUuidv7;
 use App\Models\Concerns\TenantScoped;
+use App\Services\Admin\SuperAdminService;
+use App\Services\Feedback\FeedbackService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
@@ -32,6 +34,8 @@ use Illuminate\Support\Carbon;
  * @property Carbon $submitted_at
  * @property Carbon|null $resolved_at
  * @property string|null $resolved_by
+ * @property string|null $resolution_note the support team's reply to the reporter (M175)
+ * @property string|null $reporter_role the reporter's role when they sent it (M175)
  */
 class FeedbackReport extends Model implements TenantScoped
 {
@@ -41,10 +45,11 @@ class FeedbackReport extends Model implements TenantScoped
     public $timestamps = false;
 
     /**
-     * `resolved_at`/`resolved_by` are deliberately ABSENT: they are written only by
-     * {@see App\Services\Feedback\FeedbackService::transition()} — the platform support console's
+     * `resolved_at`/`resolved_by`/`resolution_note` are deliberately ABSENT: they are written only by
+     * {@see SuperAdminService::transitionFeedback()} — the platform support team's
      * transition, never a tenant-side submit — so they are set with `forceFill()` and can never arrive
-     * through mass assignment from a request payload.
+     * through mass assignment from a request payload. `reporter_role` (M175) is likewise server-written, by
+     * {@see FeedbackService::submit()}, from the reporter's live role.
      */
     protected $fillable = [
         'tenant_id',

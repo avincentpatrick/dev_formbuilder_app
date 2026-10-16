@@ -69,10 +69,12 @@ const STATUS: Record<string, StatusDescriptor> = {
     // same idea two ways. `wont_fix` is neutral for the reason `disabled`/`revoked` are: it is a
     // deliberate, settled decision, not a failure, and red would read as one. Note none of these four
     // words collide with an existing key, so nothing above changes meaning.
+    // M175 (`D139`): the testers' words — `reviewed` READS Ongoing and `wont_fix` READS Declined; the stored
+    // values did not change, so these two keys keep their names and only their labels moved.
     new: { variant: 'info', label: 'New' },
-    reviewed: { variant: 'warning', label: 'Reviewed' },
+    reviewed: { variant: 'warning', label: 'Ongoing' },
     resolved: { variant: 'success', label: 'Resolved' },
-    wont_fix: { variant: 'neutral', label: "Won't fix" },
+    wont_fix: { variant: 'neutral', label: 'Declined' },
     // What kind a feedback report is (M175, `R-2ce2f274`): FeedbackType (bug/suggestion/question), shown
     // beside the status on both feedback lists. A bug is danger because something is broken; a suggestion
     // info, an idea to weigh; a question neutral, asking for an answer and nothing else. The word carries the

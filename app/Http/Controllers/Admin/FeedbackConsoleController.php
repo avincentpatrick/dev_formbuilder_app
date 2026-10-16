@@ -57,6 +57,8 @@ final class FeedbackConsoleController extends Controller
     {
         $validated = $request->validate([
             'status' => ['required', Rule::enum(FeedbackStatus::class)],
+            // M175 (`R-9bfd832e`): the reply to the reporter, sent with a Resolved or Declined status.
+            'note' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $report = $this->superAdmin->findFeedback($feedback);
@@ -65,7 +67,14 @@ final class FeedbackConsoleController extends Controller
         /** @var User $actor */
         $actor = $request->user();
 
-        $this->superAdmin->transitionFeedback($report, FeedbackStatus::from((string) $validated['status']), $actor);
+        $note = $validated['note'] ?? null;
+
+        $this->superAdmin->transitionFeedback(
+            $report,
+            FeedbackStatus::from((string) $validated['status']),
+            $actor,
+            is_string($note) ? $note : null,
+        );
 
         return back()->with('toast', ['type' => 'success', 'message' => 'Feedback updated']);
     }

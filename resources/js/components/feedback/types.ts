@@ -68,11 +68,41 @@ export type ConsoleFeedbackRow = {
     status_label: string;
     submitted_at: string;
     resolved_at: string | null;
+    /** The support team's reply to the reporter (M175); null until one is written. */
+    resolution_note?: string | null;
     reporter: FeedbackPerson | null;
+    /** The reporter's role in words when they sent it (M175); null on older reports. */
+    reporter_role_label?: string | null;
     resolver: FeedbackPerson | null;
     has_screenshot: boolean;
     /** Straight from FeedbackStatus::allowedTransitions() — the same source the server guards with. */
     transitions: FilterOption[];
+};
+
+/**
+ * One of the signed-in member's OWN reports — "My reports" (M175, `R-9bfd832e`). The screenshot is named by
+ * `has_screenshot` and never linked: ADR-0015 §D9 serves it under `feedback.view` or not at all.
+ */
+export type MyFeedbackRow = {
+    id: string;
+    type: string | null;
+    type_label: string | null;
+    route: string;
+    page_url: string | null;
+    page_title: string | null;
+    remarks: string;
+    status: string;
+    status_label: string;
+    submitted_at: string;
+    resolved_at: string | null;
+    resolution_note: string | null;
+    has_screenshot: boolean;
+};
+
+export type MyFeedbackPageProps = {
+    data: MyFeedbackRow[];
+    meta: PageMeta;
+    empty_reason: EmptyReason;
 };
 
 export type ConsoleFeedbackPageProps = {

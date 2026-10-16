@@ -1565,14 +1565,14 @@ class E2eSeeder extends Seeder
         $origin = 'http://acme.'.(string) config('tenancy.central_domain');
         $rows = [
             ['user' => $owner, 'type' => FeedbackType::Bug, 'route' => '/dashboard', 'page_title' => 'Dashboard', 'status' => FeedbackStatus::New, 'remarks' => 'The date range picker resets when I switch tabs.'],
-            ['user' => $reviewer, 'type' => FeedbackType::Suggestion, 'route' => '/submissions', 'page_title' => 'Responses', 'status' => FeedbackStatus::Reviewed, 'remarks' => 'Could the inbox remember my last filter?'],
+            ['user' => $reviewer, 'type' => FeedbackType::Suggestion, 'route' => '/submissions', 'page_title' => 'Responses', 'status' => FeedbackStatus::Ongoing, 'remarks' => 'Could the inbox remember my last filter?'],
             ['user' => $owner, 'type' => FeedbackType::Question, 'route' => '/forms', 'page_title' => null, 'status' => FeedbackStatus::Resolved, 'remarks' => 'Duplicating a field lost its options — fixed now, thanks.'],
             [
                 'user' => $reviewer,
                 'type' => null,
                 'route' => '/analytics',
                 'page_title' => null,
-                'status' => FeedbackStatus::WontFix,
+                'status' => FeedbackStatus::Declined,
                 'remarks' => 'Please add a pie chart to the analytics page https://example.test/reference/dashboards/comparison-of-chart-types-for-categorical-data',
             ],
         ];
@@ -1588,6 +1588,12 @@ class E2eSeeder extends Seeder
                 'page_url' => $row['type'] === null ? null : $origin.$row['route'],
                 'page_title' => $row['page_title'],
                 'remarks' => $row['remarks'],
+                // M175: the closed rows carry the support team's reply, so My feedback and the console both
+                // render one in the axe sweeps; the reporter's role is the one each fixture user holds.
+                'resolution_note' => $closed ? 'Thanks for telling us. '.($row['status'] === FeedbackStatus::Resolved
+                    ? 'This is fixed in the latest release.'
+                    : 'We are not changing this for now.') : null,
+                'reporter_role' => $row['user']->is($owner) ? 'owner' : 'reviewer',
                 'browser_info' => ['viewport' => '1440x900', 'platform' => 'e2e-seed'],
                 'status' => $row['status']->value,
                 'submitted_at' => now()->subDays(($index + 1) * 3),

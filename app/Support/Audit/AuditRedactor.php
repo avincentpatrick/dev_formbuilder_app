@@ -78,7 +78,12 @@ final class AuditRedactor
         // is precisely the accountability the ledger exists to preserve.
         'submission' => ['guest_ip', 'guest_user_agent', 'guest_contact_email', 'remarks'],
         'attachment' => ['original_filename'],
-        'feedback_reports' => ['remarks', 'browser_info'],
+        // M175 adds `resolution_note`, the support team's reply to the reporter — and it is redacted where
+        // `returned_reason` above is not, for a reason particular to this table: a reply routinely QUOTES the
+        // report it answers, and `remarks` is already redacted here as PII. Kept verbatim, the reply would carry
+        // the tester's words into the append-only ledger by quotation. The ledger records THAT a reply was
+        // written (`redacted_fields`); the words stay on the report, where the reporter reads them.
+        'feedback_reports' => ['remarks', 'browser_info', 'resolution_note'],
         // M132. The addresses an email automation sends to, typed by an author.
         'form_automation' => ['recipients'],
     ];

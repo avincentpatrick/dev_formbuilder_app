@@ -204,7 +204,7 @@ function formatDate(iso: string | null): string {
 </script>
 
 <template>
-    <div>
+    <div class="detail">
         <Head :title="`Submission · ${submission.form_title}`" />
 
         <PageHeader :title="submission.form_title" icon="submissions">
@@ -247,121 +247,125 @@ function formatDate(iso: string | null): string {
             </template>
         </PageHeader>
 
-        <div class="detail__grid">
-            <MdsCard>
-                <dl class="detail__meta">
-                    <!-- Increment J2e — FIRST, because it is what this page is ABOUT. Until now the detail
-                         view showed no identifier at all: a respondent quoting a code had nothing on screen
-                         to match it against. Not a link (this IS that page) and not truncated. -->
-                    <div class="detail__meta-row">
-                        <dt>Reference</dt>
-                        <dd class="detail__reference">{{ submission.reference }}</dd>
-                    </div>
-                    <div class="detail__meta-row">
-                        <dt>Status</dt>
-                        <dd><MdsBadge v-bind="statusVariant(submission.status)" dot /></dd>
-                    </div>
-                    <div class="detail__meta-row">
-                        <dt>Version</dt>
-                        <dd>{{ submission.version_number !== null ? `v${submission.version_number}` : '—' }}</dd>
-                    </div>
-                    <div class="detail__meta-row"><dt>Source</dt><dd>{{ submission.source_label }}</dd></div>
-                    <div class="detail__meta-row"><dt>Respondent</dt><dd>{{ submission.respondent }}</dd></div>
-                    <div class="detail__meta-row"><dt>Submitted</dt><dd>{{ formatDate(submission.submitted_at) }}</dd></div>
-                    <div v-if="submission.finalized_at" class="detail__meta-row">
-                        <dt>Finalized</dt><dd>{{ formatDate(submission.finalized_at) }}</dd>
-                    </div>
-                    <div v-if="submission.locale" class="detail__meta-row"><dt>Locale</dt><dd>{{ submission.locale }}</dd></div>
-                </dl>
-            </MdsCard>
-
-            <!--
-                PDF record (Increment H17). Deliberately its own card rather than a fifth button in
-                #actions: the header already carries up to four review-workflow buttons, and this is
-                not a review action — it has state (generated when, how big) that a button cannot
-                express, and its own explanation of why nothing appears immediately.
-            -->
-            <MdsCard>
-                <template #header><h2 class="detail__card-title">PDF record</h2></template>
-
-                <template v-if="pdf">
-                    <dl class="detail__meta">
-                        <div class="detail__meta-row">
-                            <dt>Generated</dt><dd>{{ formatDate(pdf.generated_at) }}</dd>
-                        </div>
-                        <div class="detail__meta-row"><dt>Size</dt><dd>{{ formatBytes(pdf.size_bytes) }}</dd></div>
-                    </dl>
-                    <div class="detail__pdf-actions">
-                        <MdsButton as="a" :href="`/attachments/${pdf.id}`" variant="primary" icon-left="download">
-                            Download
-                        </MdsButton>
-                        <MdsButton variant="tertiary" :loading="pdfQueuing" @click="generatePdf">Regenerate</MdsButton>
-                    </div>
-                    <p class="detail__pdf-hint">
-                        Regenerating replaces this file. Only the questions this respondent was shown are included.
-                    </p>
-                </template>
-
-                <template v-else>
-                    <p class="detail__pdf-hint">
-                        A printable record of this submission, showing only the questions the respondent was
-                        actually shown. We will email you a link when it is ready.
-                    </p>
-                    <div class="detail__pdf-actions">
-                        <MdsButton variant="secondary" icon-left="download" :loading="pdfQueuing" @click="generatePdf">
-                            Generate PDF
-                        </MdsButton>
-                    </div>
-                </template>
-            </MdsCard>
-
-            <MdsCard v-if="hasReviewInfo">
-                <template #header><h2 class="detail__card-title">Review</h2></template>
-                <dl class="detail__meta">
-                    <div v-if="submission.review.validator" class="detail__meta-row">
-                        <dt>Reviewer</dt><dd>{{ submission.review.validator }}</dd>
-                    </div>
-                    <div v-if="submission.review.validated_at" class="detail__meta-row">
-                        <dt>Reviewed</dt><dd>{{ formatDate(submission.review.validated_at) }}</dd>
-                    </div>
-                    <div v-if="submission.review.returned_reason" class="detail__meta-row">
-                        <dt>Return reason</dt><dd>{{ submission.review.returned_reason }}</dd>
-                    </div>
-                    <div v-if="submission.review.remarks" class="detail__meta-row">
-                        <dt>Remarks</dt><dd>{{ submission.review.remarks }}</dd>
-                    </div>
-                </dl>
-            </MdsCard>
-        </div>
-
-        <!--
-            M153 (`R-1e00f872`). A response saved from a scan shows the paper it was read from, so whoever checks
-            its answers can check them against the page — on a wide screen side by side, the paper held in view
-            while the answers scroll (the review screen's layout, `Encode.vue`'s `.encode--scan`); below that,
-            the paper first. A response that was not a scan renders exactly as before.
-        -->
-        <div class="detail__body" :class="{ 'detail__body--scan': scan_pages.length > 0 }">
-            <div v-if="scan_pages.length > 0" class="detail__scan">
+        <!-- M174 (`R-348f997c`): the facts first in the DOM, as before; from a 75rem container they sit in a column
+             beside the answers (the `<style>` block says how), except beside a scanned paper. -->
+        <div class="detail__layout" :class="{ 'detail__layout--scan': scan_pages.length > 0 }">
+            <div class="detail__grid">
                 <MdsCard>
-                    <ScanPages :pages="scan_pages" title="Scanned pages" />
+                    <dl class="detail__meta">
+                        <!-- Increment J2e — FIRST, because it is what this page is ABOUT. Until now the detail
+                             view showed no identifier at all: a respondent quoting a code had nothing on screen
+                             to match it against. Not a link (this IS that page) and not truncated. -->
+                        <div class="detail__meta-row">
+                            <dt>Reference</dt>
+                            <dd class="detail__reference">{{ submission.reference }}</dd>
+                        </div>
+                        <div class="detail__meta-row">
+                            <dt>Status</dt>
+                            <dd><MdsBadge v-bind="statusVariant(submission.status)" dot /></dd>
+                        </div>
+                        <div class="detail__meta-row">
+                            <dt>Version</dt>
+                            <dd>{{ submission.version_number !== null ? `v${submission.version_number}` : '—' }}</dd>
+                        </div>
+                        <div class="detail__meta-row"><dt>Source</dt><dd>{{ submission.source_label }}</dd></div>
+                        <div class="detail__meta-row"><dt>Respondent</dt><dd>{{ submission.respondent }}</dd></div>
+                        <div class="detail__meta-row"><dt>Submitted</dt><dd>{{ formatDate(submission.submitted_at) }}</dd></div>
+                        <div v-if="submission.finalized_at" class="detail__meta-row">
+                            <dt>Finalized</dt><dd>{{ formatDate(submission.finalized_at) }}</dd>
+                        </div>
+                        <div v-if="submission.locale" class="detail__meta-row"><dt>Locale</dt><dd>{{ submission.locale }}</dd></div>
+                    </dl>
+                </MdsCard>
+
+                <!--
+                    PDF record (Increment H17). Deliberately its own card rather than a fifth button in
+                    #actions: the header already carries up to four review-workflow buttons, and this is
+                    not a review action — it has state (generated when, how big) that a button cannot
+                    express, and its own explanation of why nothing appears immediately.
+                -->
+                <MdsCard>
+                    <template #header><h2 class="detail__card-title">PDF record</h2></template>
+
+                    <template v-if="pdf">
+                        <dl class="detail__meta">
+                            <div class="detail__meta-row">
+                                <dt>Generated</dt><dd>{{ formatDate(pdf.generated_at) }}</dd>
+                            </div>
+                            <div class="detail__meta-row"><dt>Size</dt><dd>{{ formatBytes(pdf.size_bytes) }}</dd></div>
+                        </dl>
+                        <div class="detail__pdf-actions">
+                            <MdsButton as="a" :href="`/attachments/${pdf.id}`" variant="primary" icon-left="download">
+                                Download
+                            </MdsButton>
+                            <MdsButton variant="tertiary" :loading="pdfQueuing" @click="generatePdf">Regenerate</MdsButton>
+                        </div>
+                        <p class="detail__pdf-hint">
+                            Regenerating replaces this file. Only the questions this respondent was shown are included.
+                        </p>
+                    </template>
+
+                    <template v-else>
+                        <p class="detail__pdf-hint">
+                            A printable record of this submission, showing only the questions the respondent was
+                            actually shown. We will email you a link when it is ready.
+                        </p>
+                        <div class="detail__pdf-actions">
+                            <MdsButton variant="secondary" icon-left="download" :loading="pdfQueuing" @click="generatePdf">
+                                Generate PDF
+                            </MdsButton>
+                        </div>
+                    </template>
+                </MdsCard>
+
+                <MdsCard v-if="hasReviewInfo">
+                    <template #header><h2 class="detail__card-title">Review</h2></template>
+                    <dl class="detail__meta">
+                        <div v-if="submission.review.validator" class="detail__meta-row">
+                            <dt>Reviewer</dt><dd>{{ submission.review.validator }}</dd>
+                        </div>
+                        <div v-if="submission.review.validated_at" class="detail__meta-row">
+                            <dt>Reviewed</dt><dd>{{ formatDate(submission.review.validated_at) }}</dd>
+                        </div>
+                        <div v-if="submission.review.returned_reason" class="detail__meta-row">
+                            <dt>Return reason</dt><dd>{{ submission.review.returned_reason }}</dd>
+                        </div>
+                        <div v-if="submission.review.remarks" class="detail__meta-row">
+                            <dt>Remarks</dt><dd>{{ submission.review.remarks }}</dd>
+                        </div>
+                    </dl>
                 </MdsCard>
             </div>
 
-            <div class="detail__blocks">
-                <MdsCard v-for="(block, i) in blocks" :key="block.id ?? `ungrouped-${i}`" class="detail__block">
-                    <template v-if="block.label" #header><h2 class="detail__card-title">{{ block.label }}</h2></template>
-                    <p v-if="block.fields.length === 0" class="detail__empty">No entries.</p>
-                    <dl v-else class="detail__answers">
-                        <div v-for="field in block.fields" :key="field.key" class="detail__answer">
-                            <dt>
-                                {{ field.label }}
-                                <!-- M172 (`R-a44638b6`, `D133`): an answer to a question the current version no longer asks, kept and marked. -->
-                                <MdsBadge v-if="field.removed_in" variant="neutral" :label="`Removed from the form in version ${field.removed_in}`" data-removed-in />
-                            </dt>
-                            <dd>{{ field.value || '—' }}</dd>
-                        </div>
-                    </dl>
-                </MdsCard>
+            <!--
+                M153 (`R-1e00f872`). A response saved from a scan shows the paper it was read from, so whoever checks
+                its answers can check them against the page — on a wide screen side by side, the paper held in view
+                while the answers scroll (the review screen's layout, `Encode.vue`'s `.encode--scan`); below that,
+                the paper first. A response that was not a scan renders exactly as before.
+            -->
+            <div class="detail__body" :class="{ 'detail__body--scan': scan_pages.length > 0 }">
+                <div v-if="scan_pages.length > 0" class="detail__scan">
+                    <MdsCard>
+                        <ScanPages :pages="scan_pages" title="Scanned pages" />
+                    </MdsCard>
+                </div>
+
+                <div class="detail__blocks">
+                    <MdsCard v-for="(block, i) in blocks" :key="block.id ?? `ungrouped-${i}`" class="detail__block">
+                        <template v-if="block.label" #header><h2 class="detail__card-title">{{ block.label }}</h2></template>
+                        <p v-if="block.fields.length === 0" class="detail__empty">No entries.</p>
+                        <dl v-else class="detail__answers">
+                            <div v-for="field in block.fields" :key="field.key" class="detail__answer">
+                                <dt>
+                                    {{ field.label }}
+                                    <!-- M172 (`R-a44638b6`, `D133`): an answer to a question the current version no longer asks, kept and marked. -->
+                                    <MdsBadge v-if="field.removed_in" variant="neutral" :label="`Removed from the form in version ${field.removed_in}`" data-removed-in />
+                                </dt>
+                                <dd>{{ field.value || '—' }}</dd>
+                            </div>
+                        </dl>
+                    </MdsCard>
+                </div>
             </div>
         </div>
 
@@ -416,6 +420,11 @@ function formatDate(iso: string | null): string {
    inside `PageHeader`'s slot, which brings its own styling. Left behind it would be dead rules that read as
    an element still on the page. */
 
+/* M174: the container the facts' split reads (an element cannot query its own size). */
+.detail {
+    container-type: inline-size;
+}
+
 .detail__grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
@@ -423,8 +432,14 @@ function formatDate(iso: string | null): string {
     margin-bottom: var(--mds-space-5);
 }
 
-.detail__block {
-    margin-bottom: var(--mds-space-4);
+/* M174 (`R-348f997c`): the answer blocks gain columns on a wide screen instead of running each label 2,000px from its
+   value. 32rem, not the row's 36rem: beside the facts' 26rem column a 1920 window leaves about 1144px, and two 36rem
+   blocks need 1168 — one column. */
+.detail__blocks {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 32rem), 1fr));
+    gap: var(--mds-space-4);
+    align-items: start;
 }
 
 /* M153 — the scanned pages beside the answers. Stacked (paper first) until there is room for both; then the
@@ -450,6 +465,36 @@ function formatDate(iso: string | null): string {
         max-height: calc(100vh - 2 * var(--mds-space-4));
         overflow-y: auto;
         margin-bottom: 0;
+    }
+}
+
+/* M174 (`R-348f997c`, `D120`): from a 75rem container the fact cards sit in a 26rem column beside the answers, one card
+   under another, their label/value rows stacked — the shape the 480px rule below gives a phone. Not beside a scanned
+   paper: a third column would leave the paper about 370px wide, the width M168 rejected, so a scan keeps the facts above
+   its halves. */
+@container (min-width: 75rem) {
+    .detail__layout:not(.detail__layout--scan) {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(18rem, 26rem);
+        column-gap: var(--mds-space-6);
+        align-items: start;
+    }
+
+    .detail__layout:not(.detail__layout--scan) > .detail__grid {
+        grid-column: 2;
+        grid-row: 1;
+        grid-template-columns: minmax(0, 1fr);
+        margin-bottom: 0;
+    }
+
+    .detail__layout:not(.detail__layout--scan) > .detail__body {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .detail__layout:not(.detail__layout--scan) > .detail__grid .detail__meta-row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--mds-space-1);
     }
 }
 

@@ -662,6 +662,16 @@ The number itself is derived from what must fit rather than from a device: a 400
 `--mds-space-8` gap + a 26rem panel is 848px, and 864 clears it with the slack a shrinking flex item
 needs.
 
+**⚠️ Amended by M174 (2026-10-16, `R-3d51f0ae`, `D122`): the split is TWO HALVES, and its threshold is 57em of a
+container that is now the whole window.** The user asked for no content in the middle only, and chose a two-pane
+sign-in: past the threshold the panel fills the left half on `--mds-color-bg-sunken` and the card sits centred in
+the right half. The split variant gives up `.auth`'s padding so the halves reach the window's edges (its frame takes
+the 24px while it is still the plain card), so the container is the window and the old 54em-plus-padding became
+57em: the same **912px viewport**, measured again — 911 is the card, 912 the halves — with each half then 456px, the
+400px card and 28px either side. In dark mode the sunken surface resolves to the canvas colour, so the panel carries
+a 1px `--mds-color-border-default` divider to read as a pane. Below the threshold nothing changed: the panel is
+still `display: none`, and the seven utility pages still use the plain card.
+
 **⚠️ The layout deliberately does NOT take `overflow-x: clip`, diverging from `AppLayout`.** That is the
 opposite of a tidy-up and it is the entry's most reversible-looking decision. `assertClean` measures
 `document.documentElement.scrollWidth`, and **#12** and **#13** both record that `.app-shell`'s clip pins
@@ -672,8 +682,9 @@ to genuinely not overflow instead, which the panel's `display: none` below the t
 
 **Three constraints that are not design choices.**
 
-- **Exactly one `<h1>`.** `responsive-axe.spec.ts` settles on `getByRole('heading', { level: 1 })` and the
-  card's title already is one, so the panel's headline is a `<p>` carrying the display role.
+- **Exactly one `<h1>`.** `google-signin.spec.ts` and `auth-axe.spec.ts` settle on `getByRole('heading', { level: 1 })`
+  on these pages and the card's title already is one, so the panel's headline is a `<p>` carrying the display role.
+  (Until M174 this line named `responsive-axe.spec.ts`, whose h1 locator is the landing page's.)
 - **No control in the panel whose accessible name contains "Sign in".** `global-setup.ts` locates the
   submit button with a NON-exact `getByRole('button', { name: 'Sign in' })`, twice, before any spec runs.
   A second match is a strict-mode violation in global setup — not a handful of failures but the whole

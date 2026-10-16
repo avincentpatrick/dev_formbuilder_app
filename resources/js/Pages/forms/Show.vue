@@ -445,96 +445,98 @@ function isPrintable(version: VersionRow): boolean {
             the panel is empty, which for a brand-new form is both of them at once. J1e's Style-B rule,
             applied to a page that is not a list.
         -->
-        <section class="hub__panel">
-            <h2 class="hub__panel-title">Latest responses</h2>
-            <MdsDataTable
-                :columns="recentColumns"
-                :rows="recent"
-                caption="Latest responses to this form"
-                row-key="id"
-            >
-                <template #cell-submitted_at="{ row }">
-                    <Link v-if="canOpenResponse" :href="`/submissions/${row.id}`" class="hub__row-link">
-                        {{ formatDateTime(row.submitted_at) }}
-                    </Link>
-                    <span v-else>{{ formatDateTime(row.submitted_at) }}</span>
-                </template>
-                <template #cell-status="{ value }">
-                    <MdsBadge v-bind="statusVariant(String(value))" dot />
-                </template>
-                <template #empty>
-                    <MdsEmptyState
-                        headline="No responses yet"
-                        description="Responses appear here as the form is filled out. Share the link or add one by hand to get started."
-                    />
-                </template>
-            </MdsDataTable>
-            <p v-if="recent.length > 0 && responsesHref" class="hub__more">
-                <Link :href="responsesHref">View all responses</Link>
-            </p>
-        </section>
+        <div class="hub__panels">
+            <section class="hub__panel hub__panel--latest">
+                <h2 class="hub__panel-title">Latest responses</h2>
+                <MdsDataTable
+                    :columns="recentColumns"
+                    :rows="recent"
+                    caption="Latest responses to this form"
+                    row-key="id"
+                >
+                    <template #cell-submitted_at="{ row }">
+                        <Link v-if="canOpenResponse" :href="`/submissions/${row.id}`" class="hub__row-link">
+                            {{ formatDateTime(row.submitted_at) }}
+                        </Link>
+                        <span v-else>{{ formatDateTime(row.submitted_at) }}</span>
+                    </template>
+                    <template #cell-status="{ value }">
+                        <MdsBadge v-bind="statusVariant(String(value))" dot />
+                    </template>
+                    <template #empty>
+                        <MdsEmptyState
+                            headline="No responses yet"
+                            description="Responses appear here as the form is filled out. Share the link or add one by hand to get started."
+                        />
+                    </template>
+                </MdsDataTable>
+                <p v-if="recent.length > 0 && responsesHref" class="hub__more">
+                    <Link :href="responsesHref">View all responses</Link>
+                </p>
+            </section>
 
-        <section class="hub__panel">
-            <h2 class="hub__panel-title">Versions</h2>
-            <MdsDataTable :columns="versionColumns" :rows="versions" caption="This form's versions" row-key="id">
-                <template #cell-version_number="{ value }">v{{ value }}</template>
-                <template #cell-status="{ value }">
-                    <MdsBadge v-bind="statusVariant(String(value))" dot />
-                </template>
-                <template #cell-published_at="{ row }">{{ formatDate(row.published_at) }}</template>
-                <template #cell-changes="{ row }">
-                    <div v-if="row.changes" class="hub__changes" data-version-changes>
-                        <p v-for="line in changeLines(row.changes)" :key="line" class="hub__changes-line">{{ line }}</p>
-                        <p v-if="row.changes.note" class="hub__changes-note">“{{ row.changes.note }}”</p>
-                    </div>
-                    <span v-else>—</span>
-                </template>
-                <template #row-actions="{ row }">
-                    <div class="hub__row-actions">
-                        <!--
-                            `can.template` is the presenter's `can:view,form` flag, which is this route's
-                            actual gate. The forms list gates the same button on `can.edit` and says in its
-                            own comment that it is a proxy standing in for a view flag it does not have;
-                            this page has the real one, so it uses it.
-                        -->
-                        <MdsButton
-                            v-if="can.template && isPrintable(row)"
-                            variant="tertiary"
-                            size="sm"
-                            icon-left="monitor"
-                            data-version-view
-                            @click="viewVersion(row)"
-                        >
-                            View
-                        </MdsButton>
-                        <MdsButton
-                            v-if="can.template && isPrintable(row)"
-                            variant="tertiary"
-                            size="sm"
-                            icon-left="download"
-                            @click="printBlank(row)"
-                        >
-                            Print blank
-                        </MdsButton>
-                        <MdsButton
-                            v-if="can.edit && isPrintable(row)"
-                            variant="tertiary"
-                            size="sm"
-                            icon-left="clock"
-                            @click="restoreTarget = row"
-                        >
-                            Restore
-                        </MdsButton>
-                    </div>
-                </template>
-                <template #empty>
-                    <MdsEmptyState
-                        headline="No versions yet"
-                        description="A version is created the first time this form is published."
-                    />
-                </template>
-            </MdsDataTable>
-        </section>
+            <section class="hub__panel hub__panel--versions">
+                <h2 class="hub__panel-title">Versions</h2>
+                <MdsDataTable :columns="versionColumns" :rows="versions" caption="This form's versions" row-key="id">
+                    <template #cell-version_number="{ value }">v{{ value }}</template>
+                    <template #cell-status="{ value }">
+                        <MdsBadge v-bind="statusVariant(String(value))" dot />
+                    </template>
+                    <template #cell-published_at="{ row }">{{ formatDate(row.published_at) }}</template>
+                    <template #cell-changes="{ row }">
+                        <div v-if="row.changes" class="hub__changes" data-version-changes>
+                            <p v-for="line in changeLines(row.changes)" :key="line" class="hub__changes-line">{{ line }}</p>
+                            <p v-if="row.changes.note" class="hub__changes-note">“{{ row.changes.note }}”</p>
+                        </div>
+                        <span v-else>—</span>
+                    </template>
+                    <template #row-actions="{ row }">
+                        <div class="hub__row-actions">
+                            <!--
+                                `can.template` is the presenter's `can:view,form` flag, which is this route's
+                                actual gate. The forms list gates the same button on `can.edit` and says in its
+                                own comment that it is a proxy standing in for a view flag it does not have;
+                                this page has the real one, so it uses it.
+                            -->
+                            <MdsButton
+                                v-if="can.template && isPrintable(row)"
+                                variant="tertiary"
+                                size="sm"
+                                icon-left="monitor"
+                                data-version-view
+                                @click="viewVersion(row)"
+                            >
+                                View
+                            </MdsButton>
+                            <MdsButton
+                                v-if="can.template && isPrintable(row)"
+                                variant="tertiary"
+                                size="sm"
+                                icon-left="download"
+                                @click="printBlank(row)"
+                            >
+                                Print blank
+                            </MdsButton>
+                            <MdsButton
+                                v-if="can.edit && isPrintable(row)"
+                                variant="tertiary"
+                                size="sm"
+                                icon-left="clock"
+                                @click="restoreTarget = row"
+                            >
+                                Restore
+                            </MdsButton>
+                        </div>
+                    </template>
+                    <template #empty>
+                        <MdsEmptyState
+                            headline="No versions yet"
+                            description="A version is created the first time this form is published."
+                        />
+                    </template>
+                </MdsDataTable>
+            </section>
+        </div>
 
         <MdsModal :open="restoreTarget !== null" title="Restore version" @close="restoreTarget = null">
             <p class="hub__prose">
@@ -561,6 +563,11 @@ function isPrintable(version: VersionRow): boolean {
 </template>
 
 <style scoped>
+/* M174: the container the panels' split reads (an element cannot query its own size). */
+.hub {
+    container-type: inline-size;
+}
+
 .hub__identity {
     margin-top: var(--mds-space-5);
 }
@@ -604,6 +611,19 @@ function isPrintable(version: VersionRow): boolean {
 
 .hub__panel {
     margin-top: var(--mds-space-8);
+}
+
+/* M174 (`R-348f997c`, `D120`): from a 75rem container the versions sit in a 26rem column beside the latest responses, so a
+   response row no longer runs from one edge of a wide screen to the other. The DOM is already latest-then-versions, so
+   nothing reorders. Below 75rem — a 1440 window beside the expanded sidebar leaves 71rem — the panels stack as before. In
+   the bounded column DataTable draws the versions as its stacked cards, as it does at 375px. */
+@container (min-width: 75rem) {
+    .hub__panels {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(18rem, 26rem);
+        column-gap: var(--mds-space-6);
+        align-items: start;
+    }
 }
 
 .hub__panel-title {

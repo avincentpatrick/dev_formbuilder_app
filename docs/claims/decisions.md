@@ -24,10 +24,60 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D135`, the last one filed, was asked and answered on 2026-10-15 in the build session that filed it and recorded in `M173`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D140`, the last one filed, was asked and answered on 2026-10-16 by the round-2 planning session (with `D137`–`D139`), its filing adopted into `M174`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D140 — The testers' second round asks to remove the Yes/No and Duration question types: Yes/No is covered by a Single choice, and a duration should be worked out by a calculation. Staging holds forms and answers that use Yes/No, and nothing may be removed from it. How do the two types go? **A — both leave the palette and can no longer be created; every existing question keeps working and no data is touched. `D134` changes: Duration is not built; Signature still is.**
+
+**Instructed and answered 2026-10-16 (user decision, in chat), recorded by the round-2 planning session (plan `~/.claude/plans/here-are-added-comments-peppy-quill.md`); its filing is adopted into `M174`'s claim.** The user: *"remove the yes/no question. it is already covered by the options"*, *"also remove the duration question type, that can also be covered in the calculate"*, and *"always make sure that the staging has data, do not remove data"*. The palette lists every field type (`app/Services/Forms/BuilderPresenter.php`), the catalog seeds create Yes/No questions, and a Duration question cannot be answered on any surface.
+
+- **A — retire from the palette (the shape the never-remove-data rule leaves, chosen).** A palette flag, a refusal to create, a "retired — change it to Single choice" note on existing questions, a Yes / No choices preset on Single choice; existing questions, answers and exports unchanged.
+- **B — convert every existing question** to a Single choice: rewrites drafts and leaves published versions mixed; refused by the data rule.
+- **C — delete the types**: every form holding one breaks; refused by the data rule.
+
+**What the answer files, in the same push:** `R-0b7db001` (Yes/No retired) and `R-22011569` (Duration retired). **Owed by the next increment's first commit (the filing touches only the end of the ledger):** `R-af2d278b`'s tail — Signature only, Duration withdrawn; `R-5033e87e` and `R-0a7275ce` — no yes/no column or table type.
+
+### D139 — The testers' feedback is the fastest way to find what to fix, but a report stays in the console until someone copies it into the dev session, and the tester is never told what became of it. How should feedback reach the dev session, and what is the tester told? **A — the dev session pulls every report automatically at the start of each session and triages it against the line; the statuses read New, Ongoing, Resolved and Declined; the tester is notified on Resolved and Declined, and the session sends only "fixed and live" by itself.**
+
+**Asked and answered 2026-10-16 (user decision, in chat), recorded by the round-2 planning session; its filing is adopted into `M174`'s claim.** The user: *"pull it automatically, every start of a session, we will include always to check the feedback record if there is any and automatically insert it in the pipeline. but review it if its already fixed or ongoing"*, and earlier *"there must be a tagging for if its a bug, a question or a suggestion/recommendation, get url, tagging if its resolved declined new and ongoing, get user, also update user if its fixed/resolved"*. Two follow-ups were answered the same way: the session sends a tester only "Fixed in version X, live on staging" on its own — an answer to a question and every Declined go to the user first; a pulled bug is filed `early-testing` and a suggestion `during-testing`.
+
+- **A — pull automatically (recommended, chosen).** A platform support API on the central host, a token kept on the dev machine only, `scripts/feedback-pull.php`, and a triage rule at session start: already fixed → Resolved; already queued → Ongoing, cited on its row; new → a row and Ongoing.
+- **B — export from the console**: a download the user drops into the chat each time; no token, one manual step per pull.
+- **C — both**: the pull, with the download kept as a fallback.
+
+**What the answer files, in the same push:** `R-9bfd832e` (statuses, the note, the tester told, own reports), `R-78f43f26` (the support API and the pull script), `R-f3fb2522` (the session-start routine). With `R-2ce2f274` (`D127`: the capture, the type, the page address) they are the increment F of `D138`.
+
+### D138 — The testers' second round (seven comments of 2026-10-11 and eleven items of 2026-10-16) lands while `M174` builds UI3, with UI4–UI6 and T2–T6 still ordered by `D128`. The user asks to put the feedback mechanism first. What is the order of record now? **A — `M174` → F (feedback) → merge 1 → R1 (builder fixes) → R2 (types, visibility, moving) → merge 2 → R3 (references) → R4 (calculations) → merge 3 → UI5 → UI6 → T2 with the Likert row → merge 4 → T3 → T4 → merge 5 → T5 → T6 → L (change history) → merge 6.**
+
+**Asked and answered 2026-10-16 (user decision, in chat), recorded by the round-2 planning session; its filing is adopted into `M174`'s claim.** The user: *"kindly prioritize the issue on the feedback mechanism so users can use that to directly pinpoint the problem and directly fix it here"*. The line orders by tier and cannot sequence one row after another (`R-6175d935`), so this order lives here, in the plan (`~/.claude/plans/here-are-added-comments-peppy-quill.md` §E) and in each hand-off; every round-2 row is `early-testing` except the change history (`during-testing`). The first merge carries UI2 (`M173`), UI3 (`M174`) and F, as the user chose.
+
+- **A — the testers' fixes next (recommended, chosen).** Feedback, then the round-2 builder fixes, types and visibility, references and calculations; then UI5–UI6; then the grid and Likert (T2–T6); the change history last. `D128`'s UI4 becomes F.
+- **B — finish the UI programme first**: F, UI5, UI6, then the round-2 items, then T2–T6.
+- **C — the grid and Likert early**: F, the round-2 fixes, T2, then references, UI5–UI6 and the rest.
+
+**What the answer files, in the same push:** the increments' rows — F: `R-2ce2f274`, `R-9bfd832e`, `R-78f43f26`, `R-f3fb2522`; R1: `R-c4802b60` (`major`), `R-164579e8`, `R-5354b4b9`, `R-5554c526`, `R-61d43278`, `R-923c5041`, `R-36e6f557`, `R-a11cc78a`; R2: `R-0b7db001`, `R-22011569`, `R-71509975`, `R-f44e9d00`, `R-9bbaa97b`, `R-4a6f004f`, `R-b05fbaae`; R3: `R-75719ac4`, `R-917496f9`; R4: `R-f77aa45d`, `R-da02fe03`, `R-f7a18b7a`; T2: `R-f03cf999` beside `R-1c1d7266`; L: `R-3894369d`. **Owed by F's first commit:** `R-2ce2f274`'s tail names F and this decision; the gap table's `or_other` line is tagged with `R-71509975`.
+
+### D137 — The testing freeze held every PR at green until the user's word (`D123`, `D128`), so finished work waited and each merge was a separate deploy under the testers. The user lifts the hold but wants no small merges, and staging must never lose data. How do merges work now? **A — PRs merge in consolidated batches at the plan's merge points, never a lone small PR; at a merge point the session merges on its own after the user runs the staging backup block; migrations are additive only; a defect that blocks testers may go out alone on the user's word.**
+
+**Asked and answered 2026-10-16 (user decision, in chat), recorded by the round-2 planning session; its filing is adopted into `M174`'s claim.** The user: *"remove the rule on holding the merge but do not merge on small merges, make a strategic consolidated merge so we wont merge small fixes or changes. always make sure that the staging has data, do not remove data"*. Every green CI run on `main` deploys (`.github/workflows/deploy.yml`), so a lone small merge is a deploy under the testers; the before-merge backup is a block the user runs on the testing server.
+
+- **A — the session merges at a merge point after the backup (recommended, chosen).** The plan names the merge points; between them a PR waits green; a merge point merges its batch in order, each with an explicit body, then checks the site and that the data survived; once `R-a11cc78a` (a deploy that backs itself up and counts its rows) is proven, the backup block is retired.
+- **B — the user's word at every merge point**: the session stops at green and asks, as under the freeze.
+- **C — merge each PR when green**: the pre-freeze rule; a deploy per increment.
+
+**What the answer files, in the same push:** `R-a11cc78a`. **Owed by F's first commit (the imperative layer, outside this docs-only filing):** `CLAUDE.md` "The trunk" and the generated hand-off (`scripts/next.php`) say merge only at a planned merge point, after the user's staging backup, additive migrations only; `PROGRESS.md` Standing Rule 5 records why.
+
+### D136 — The staff manual-entry page keeps its questions in a reading-width column (`D121`), with a side panel carrying form facts, progress and reference files; but the page is sent no form status and no reference files — showing those needs new server data and a staff download, not layout. What goes in the side panel in UI3? **A — facts and steps: the form's name and version, the open or closed notice, and the form's sections with the current one marked; the version's reference files filed as their own row.**
+
+**Asked and answered 2026-10-16 (user decision, in chat), recorded by Lane A in `M174`'s claim.** Found while verifying `R-66952d33`'s premise: `app/Services/Submissions/EncodeFormPresenter.php` sends the version number and nothing about the form's status or its reference files (those reach the builder only, through `forms.reference-files.index`), and the autosave label must stay in the header beside Cancel, where a keyer looks before leaving.
+
+- **A — facts and steps (recommended, chosen).** The panel shows what the page already has; `R-66952d33` stays a layout row; the reference files become their own row.
+- **B — also the reference files**, as download links for staff: new server data through the encode presenter (a hub) and a permission check; a bigger increment and a later merge.
+- **C — the column only for now**: the questions keep a 45rem column and the panel is filed as its own row; the right side of a wide screen stays empty on this page.
+
+**What the answer files, in the same push:** `R-66952d33`'s remedy amended to A; a new `during-testing` row for the version's reference files on the manual-entry page.
+
 ### D135 — The form's Settings tab shows one section at a time (a rail switches thirteen sections), so `R-14971e37`'s remedy — the sections laid two-up — has nothing to pair. Once the page fills the width, how should the tab use a wide screen? **A — keep the rail: one section at a time, as today; every labelled box in a section keeps a reading width (48rem) while the lists and tables inside a section fill the width.**
 
 **Asked and answered 2026-10-15 (user decision, in chat), recorded by Lane A in `M173`'s claim.** Found while verifying `R-14971e37`'s premise: `resources/js/components/forms/FormSettingsSections.vue` mounts each section once and shows only the active one (`v-show`), the same component the builder's Settings pop-up mounts, so two sections are never on screen together. Without a remedy, removing the shell's cap (`R-fd7b8879`) would stretch a section's boxes to about 2,000px on a 2560px screen.

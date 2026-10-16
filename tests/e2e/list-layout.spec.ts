@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { settlePaint } from './support/axe';
 import { openConsole } from './support/console';
 import { formEntry, openBuilder } from './support/navigate';
@@ -435,4 +435,180 @@ test('Scanned forms — the upload card keeps a measure beside a grid of scans',
     // A grid of rows rather than one row per line: at 1920 the list is about 970px and a 28rem track about 480px, so 60%
     // stays well clear of both a full-width row and two tracks.
     expect(m.row.width / m.list.width, JSON.stringify(m)).toBeLessThanOrEqual(0.6);
+});
+
+// ── M174 — THE DETAIL PAGES, THE STACKS AND THE MANUAL-ENTRY PAGE ───────────────────────────────────────────────────────
+// The same comment, its third increment (`D120`, `D121`). A detail page's facts sit in a 26rem column beside its tables,
+// answers or log from a 75rem container — at 1920 on a tenant page, since 1440 leaves 1136px (71rem) beside the expanded
+// sidebar — and stacks of rows become grids that gain columns. Every locator below exists on the trunk too, so each case
+// is red there by its geometry rather than by a missing class.
+
+type Box = { left: number; right: number; top: number; bottom: number; width: number };
+
+async function box(locator: Locator): Promise<Box> {
+    return locator.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+
+        return {
+            left: Math.round(r.left),
+            right: Math.round(r.right),
+            top: Math.round(r.top),
+            bottom: Math.round(r.bottom),
+            width: Math.round(r.width),
+        };
+    });
+}
+
+/** `aside` sits wholly to the right of `main`, in a bounded column (26rem = 416px, plus rounding). */
+function expectBeside(main: Box, aside: Box, what: string): void {
+    expect(aside.left, `${what}: ${JSON.stringify({ main, aside })}`).toBeGreaterThanOrEqual(main.right);
+    expect(aside.width, `${what}: ${JSON.stringify({ main, aside })}`).toBeLessThanOrEqual(418);
+}
+
+test('Form hub — the versions sit beside the latest responses at 1920', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto('/forms', { waitUntil: 'networkidle' });
+    await formEntry(page, 'Community Health Survey').getByRole('link', { name: 'Community Health Survey', exact: true }).click();
+    await page.waitForURL(/\/forms\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+    await settlePaint(page);
+
+    const latest = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Latest responses', level: 2 }) });
+    const versions = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Versions', level: 2 }) });
+
+    expectBeside(await box(latest), await box(versions), 'the hub at 1920');
+});
+
+test('A response — the facts sit beside the answers, and the sections two across, at 1920', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+    // Branching Router: two seeded responses, neither from a scan, on a version of three sections — the only seeded
+    // response shape with more than one block and no scanned paper (a scanned response keeps its paper beside the answers).
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto('/forms', { waitUntil: 'networkidle' });
+    await formEntry(page, 'Branching Router').getByRole('link', { name: 'Branching Router', exact: true }).click();
+    await page.waitForURL(/\/forms\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+    await page.locator('.hub__row-link').first().click();
+    await page.waitForURL(/\/submissions\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+    await settlePaint(page);
+
+    const facts = await box(page.locator('.detail__grid'));
+    const answers = await box(page.locator('.detail__blocks'));
+    expectBeside(answers, facts, 'the response at 1920');
+
+    const tops = await page.locator('.detail__block').evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
+    expect(tops.length, 'the response rendered fewer than two sections').toBeGreaterThanOrEqual(2);
+    expect(tops[1], `two sections side by side: ${JSON.stringify(tops)}`).toBe(tops[0]);
+});
+
+test('Webhook and integration rule — the cards sit beside the delivery log at 1920', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto('/webhooks', { waitUntil: 'networkidle' });
+    await page.locator('tr').filter({ hasText: 'Zapier' }).getByRole('button', { name: 'View endpoint' }).click();
+    await page.waitForURL(/\/webhooks\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+    await settlePaint(page);
+    expectBeside(await box(page.locator('section.detail__log')), await box(page.locator('.detail__grid')), 'the webhook at 1920');
+
+    await page.goto('/integrations', { waitUntil: 'networkidle' });
+    await page.locator('tr').filter({ hasText: 'New submissions' }).getByRole('button', { name: 'View rule' }).click();
+    await page.waitForURL(/\/integrations\/rules\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+    await settlePaint(page);
+    expectBeside(await box(page.locator('section.detail__log')), await box(page.locator('.detail__grid')), 'the rule at 1920');
+});
+
+test.describe('the console workspace page', () => {
+    test.use({ storageState: 'tests/e2e/.auth/admin.json' });
+
+    test('the workspace and plan cards sit beside the sections at 1440', async ({ page }, info) => {
+        test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+        // The console's padding is 24px a side, so a 1440 window already gives the page 1392px — past 75rem.
+        await openConsole(page, '/admin/tenants');
+        await page.getByRole('link', { name: /acme|Acme Research/i }).first().click();
+        await page.waitForURL(/\/admin\/tenants\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+        await settlePaint(page);
+
+        const usage = page.locator('.mds-card').filter({ has: page.getByRole('heading', { name: 'Usage', level: 2 }) });
+        expectBeside(await box(usage), await box(page.locator('.admin-td__grid')), 'the console workspace at 1440');
+    });
+});
+
+test('Domains — the domain cards sit side by side at 1440', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+    // Domains at 1440: the two seeded domains side by side (two 26rem tracks fit 1136px), not one under the other.
+    await page.goto('/domains', { waitUntil: 'networkidle' });
+    await settlePaint(page);
+    const domains = await page.locator('.domain-card').evaluateAll((els) => els.map((el) => {
+        const r = el.getBoundingClientRect();
+
+        return { left: Math.round(r.left), top: Math.round(r.top) };
+    }));
+    expect(domains.length, 'the seed holds two domains').toBeGreaterThanOrEqual(2);
+    expect(domains[1].top, `domains at 1440: ${JSON.stringify(domains)}`).toBe(domains[0].top);
+    expect(domains[1].left, `domains at 1440: ${JSON.stringify(domains)}`).toBeGreaterThan(domains[0].left);
+});
+
+test('Search — the result groups sit two across at 1440', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+    // Search at 1440: the four groups for "clinic" two across (the page is 71rem, past 64rem).
+    await page.goto('/search?q=clinic', { waitUntil: 'networkidle' });
+    await settlePaint(page);
+    expect(await columns(page, '.search__group'), '/search?q=clinic at 1440').toBe(2);
+});
+
+test('Achievements — the leaderboard sits beside the team tiles at 1920', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+    // Achievements at 1920: the leaderboard beside the team's tiles rather than a full-width ladder under them.
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto('/achievements', { waitUntil: 'networkidle' });
+    await settlePaint(page);
+    const team = page.locator('section').filter({ has: page.getByRole('heading', { name: 'This workspace', level: 2 }) });
+    const tiles = await box(team.locator('.ach__stats'));
+    const ladder = await box(page.locator('.ach__ladder'));
+    expect(ladder.left, `achievements at 1920: ${JSON.stringify({ tiles, ladder })}`).toBeGreaterThanOrEqual(tiles.right);
+});
+
+test('Templates — every card\'s button sits at the foot of its card at 1440', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+    // The cards in a row stretch to the tallest; a card with a shorter description must still end in its button, so a
+    // row's "Use this template" buttons share one line.
+    await page.goto('/forms/templates', { waitUntil: 'networkidle' });
+    await settlePaint(page);
+    const gaps = await page.locator('.templates__cell .mds-card').evaluateAll((cards) =>
+        cards.map((card) => {
+            const footer = card.querySelector('.mds-card__footer')!.getBoundingClientRect();
+
+            return Math.round(card.getBoundingClientRect().bottom - footer.bottom - parseFloat(getComputedStyle(card).paddingBottom));
+        }),
+    );
+
+    expect(gaps.length, 'no template cards').toBeGreaterThanOrEqual(3);
+    expect(Math.max(...gaps), `footer distance above each card's padding: ${JSON.stringify(gaps)}`).toBeLessThanOrEqual(1);
+});
+
+// `D121`, `D136` (the user, 2026-10-14 and 2026-10-16): the questions keep a reading column, and the rest of a wide page
+// carries the side panel — the form's name and version, the open or closed notice, the form's sections.
+test('Manual entry — the form keeps a reading column with its side panel beside it at 1920', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto('/forms', { waitUntil: 'networkidle' });
+    await formEntry(page, 'Clinic Intake').getByRole('button', { name: 'New submission' }).click();
+    await page.waitForURL('**/submissions/create', { timeout: 30_000 });
+    await page.getByRole('button', { name: 'Submit response' }).waitFor({ state: 'visible', timeout: 10_000 });
+    await settlePaint(page);
+
+    const form = await box(page.locator('.encode__form'));
+    const intro = await box(page.locator('.encode__intro'));
+
+    // 45rem = 720px, the measure the page always had, plus rounding.
+    expect(form.width, JSON.stringify({ form, intro })).toBeLessThanOrEqual(722);
+    expect(intro.left, `the intro beside the form: ${JSON.stringify({ form, intro })}`).toBeGreaterThanOrEqual(form.right);
 });

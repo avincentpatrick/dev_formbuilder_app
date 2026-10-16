@@ -16,9 +16,14 @@
  * name merely contains "Sign in" is a strict-mode violation in global setup, which is not a handful of
  * failures but all ~506 specs with none executed. The heading below is safe because it is a heading.
  *
- * ⚠️ AND THE PANEL'S HEADLINE IS A `<p>`, NOT AN `<h1>`. `responsive-axe.spec.ts` settles on
- * `getByRole('heading', { level: 1 })`, and `.auth__title` is already the page's one h1. A second would
- * make that locator ambiguous and change what axe's heading-order rules see.
+ * ⚠️ AND THE PANEL'S HEADLINE IS A `<p>`, NOT AN `<h1>`. `google-signin.spec.ts` and `auth-axe.spec.ts` settle
+ * on `getByRole('heading', { level: 1 })` on these pages, and `.auth__title` is already the page's one h1. A second
+ * would make that locator ambiguous and change what axe's heading-order rules see. (Until M174 this note named
+ * `responsive-axe.spec.ts`, whose h1 locator is the landing page's, not these.)
+ *
+ * ── M174 (`R-3d51f0ae`, `D122`): THE SPLIT IS TWO HALVES ───────────────────────────────────────────────────────
+ * On a wide screen the panel fills the left half on the sunken surface and the card sits centred in the right half,
+ * rather than a 400px card and a 26rem panel huddled in the middle of the glass. Below the threshold nothing changes.
  */
 import { Head } from '@inertiajs/vue3';
 import { MdsIcon } from '@meridian/design-system';
@@ -102,15 +107,25 @@ const pitch = [
    `container-type: inline-size` rather than a media query, following JR5 and exceptions-log #13.
    ⚠️ THE `font-size` PIN IS WHAT MAKES THE `em` THRESHOLD MEAN ANYTHING. A media query's `em` resolves
    against the ROOT font size, which `[data-font-size]` never moves — it re-points the `--mds-type-*`
-   tokens instead — so `@media (min-width: 54em)` would be correct at exactly one type scale and wrong at
+   tokens instead — so `@media (min-width: 57em)` would be correct at exactly one type scale and wrong at
    the other two. A container query's `em` resolves against the CONTAINER's own font size, so pinning it
-   here makes the threshold scale with the text it is protecting: 864px at standard, and proportionally
+   here makes the threshold scale with the text it is protecting: 912px at standard, and proportionally
    later at `large` and `extra_large`, where the same layout needs more room.
    The pin is a genuine no-op today — `resources/css/app.css` already sets exactly this on `body` — which
    is the point: it is a guarantee against a future change to that rule, not a restyle. */
 .auth--split {
     container-type: inline-size;
     font-size: var(--mds-type-body-lg-font-size);
+    /* M174: the halves reach the edges of the window, so the split carries no padding of its own; its frame takes
+       `.auth`'s 24px instead while it is still the plain card, and is stretched to the full height to hold the card
+       centred as before. */
+    padding: 0;
+    align-items: stretch;
+}
+
+.auth--split > .auth__frame {
+    align-items: center;
+    padding: var(--mds-space-6);
 }
 
 .auth__frame {
@@ -217,32 +232,35 @@ const pitch = [
     color: var(--mds-color-text-body);
 }
 
-@container (min-width: 54em) {
-    /* ⚠️ 54em IS A CONTAINER WIDTH, NOT A VIEWPORT WIDTH, AND THE TWO DIFFER BY EXACTLY THIS LAYOUT'S
-       PADDING. A container query measures the CONTENT box, so `.auth`'s 2 × `--mds-space-6` (48px) is not
-       in it: 54em = 864px of container is reached at a **912px viewport**. Measured, not computed —
-       viewport 911 is still the card and 912 is the split, with the container reading 863 and 864.
-
-       The threshold is derived from what has to fit rather than from a device: 400px card + a
-       `--mds-space-8` gap + a 26rem panel = 848px, so 864 clears it with the slack a shrinking flex item
-       needs. Keying it to the content is what makes it survive the type scale — at `large` and
-       `extra_large` the same 54em resolves to a larger pixel width, because the `font-size` pinned on the
-       container above is a `--mds-type-*` token.
-
-       ⚠️ THE FIRST DRAFT OF THIS COMMENT SAID "864px", MEANING THE VIEWPORT, AND WAS WRONG BY THOSE 48px.
-       JR3 paid for the identical mistake on `MdsDataTable` — a 260px threshold written in the belief it
-       would never fire, firing on every 300px card — and its note is explicit: reason about a container
-       threshold in content-box terms or it is off by exactly the padding. It is recorded twice now. */
-    .auth__frame {
-        gap: var(--mds-space-8);
-        align-items: center;
+@container (min-width: 57em) {
+    /* ⚠️ 57em IS A CONTAINER WIDTH — AND SINCE M174 THE CONTAINER IS THE WHOLE WINDOW, because the split carries no
+       padding of its own. It is the same 912px viewport the 54em threshold was reached at before (54em of container
+       plus `.auth`'s 2 × 24px of padding, measured then: 911 was the card, 912 the split). Each half is then 456px:
+       the 400px card with 28px either side. Keying it to the content is what makes it survive the type scale — at
+       `large` and `extra_large` the same 57em resolves to a larger pixel width, because the `font-size` pinned on the
+       container above is a `--mds-type-*` token. JR3 paid for reasoning about a container threshold in viewport terms
+       (`MdsDataTable`), and this comment's own first draft did it once: content-box terms, always. */
+    .auth--split > .auth__frame {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        align-items: stretch;
+        padding: 0;
     }
 
     .auth__pitch {
         display: flex;
-        flex: 0 1 26rem;
         flex-direction: column;
+        justify-content: center;
         gap: var(--mds-space-6);
+        padding: var(--mds-space-12) max(var(--mds-space-10), calc((100% - 30rem) / 2));
+        background-color: var(--mds-color-bg-sunken);
+        border-inline-end: 1px solid var(--mds-color-border-default);
+    }
+
+    .auth__card {
+        align-self: center;
+        justify-self: center;
+        margin-block: var(--mds-space-8);
     }
 }
 </style>

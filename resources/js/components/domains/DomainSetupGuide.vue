@@ -120,4 +120,12 @@ defineProps<{ appHost: string }>();
     line-height: var(--mds-type-body-sm-line-height);
     color: var(--mds-color-text-secondary);
 }
+
+/* M174 (`R-fb647b5e`, `D120`): the page fills a wide screen and the card with it, but reading text keeps a measure,
+   left-aligned — at 1920 these lines ran about 1,100px. */
+.domain-guide__lead,
+.domain-guide__steps,
+.domain-guide__foot {
+    max-inline-size: 80ch;
+}
 </style>

@@ -268,72 +268,78 @@ function earnedDate(iso: string): string {
         <section v-if="scoreboard" class="ach__section" aria-labelledby="ach-team-heading">
             <h2 id="ach-team-heading" class="ach__section-title">This workspace</h2>
 
-            <div class="ach__stats">
-                <MdsStatTile label="Team points" icon="award" :value="number(scoreboard.team.points)" />
-                <MdsStatTile label="Responses collected" icon="submissions" :value="number(scoreboard.team.responses)" />
-                <MdsStatTile label="Live forms" icon="forms" :value="number(scoreboard.team.published_forms)" />
-                <MdsStatTile label="Members" icon="users" :value="number(scoreboard.team.active_members)" />
-                <!-- NOT "Badges earned": that label is already spent by this member's own tile further up,
-                     and two tiles with one name on one page is an ambiguous accessible name (WCAG 2.4.6) as
-                     well as a puzzle for anybody comparing the two numbers. -->
-                <MdsStatTile label="Badges across the team" icon="check" :value="number(scoreboard.team.badges)" />
-                <MdsStatTile label="People scoring" icon="user-plus" :value="number(scoreboard.team.contributors)" />
+            <!-- M174 (`R-fb647b5e`): the team's tiles and their note, then the leaderboard — side by side from a 75rem
+                 page, one under the other below it, in this DOM order either way. -->
+            <div class="ach__workspace">
+                <div class="ach__team">
+                    <div class="ach__stats">
+                        <MdsStatTile label="Team points" icon="award" :value="number(scoreboard.team.points)" />
+                        <MdsStatTile label="Responses collected" icon="submissions" :value="number(scoreboard.team.responses)" />
+                        <MdsStatTile label="Live forms" icon="forms" :value="number(scoreboard.team.published_forms)" />
+                        <MdsStatTile label="Members" icon="users" :value="number(scoreboard.team.active_members)" />
+                        <!-- NOT "Badges earned": that label is already spent by this member's own tile further up,
+                             and two tiles with one name on one page is an ambiguous accessible name (WCAG 2.4.6) as
+                             well as a puzzle for anybody comparing the two numbers. -->
+                        <MdsStatTile label="Badges across the team" icon="check" :value="number(scoreboard.team.badges)" />
+                        <MdsStatTile label="People scoring" icon="user-plus" :value="number(scoreboard.team.contributors)" />
+                    </div>
+
+                    <!--
+                        ⚠️⚠️ THE ONE PARAGRAPH THIS PAGE CANNOT DO WITHOUT, AND IT IS RENDERED TEXT ON PURPOSE.
+                        ADR-0020 §D11(c): these totals are LARGER than the ladder below adds up to, in three
+                        separate ways, and all three are decisions rather than defects. A reader who spots the gap
+                        and finds no explanation concludes the feature is broken — so the explanation goes where
+                        they are already looking, not behind a hover nobody performs. Stated as what each number
+                        COUNTS rather than as an apology, because neither figure is wrong.
+                    -->
+                    <p class="ach__note">
+                        These count the whole workspace, so they are larger than the leaderboard adds up to.
+                        <strong>Responses</strong> includes answers collected through public links, which credit
+                        nobody — otherwise the leaderboard would be a contest between links rather than between
+                        people. <strong>Team points</strong> and <strong>people scoring</strong> also include
+                        teammates who have since left: what they earned stays on the record, while the leaderboard
+                        names people who are here now.
+                    </p>
+                </div>
+
+                <div v-if="scoreboard.entries.length > 0" class="ach__board">
+                    <h3 class="ach__subheading">Leaderboard</h3>
+                    <!--
+                        Not `MdsDataTable`: two figures per row, no sorting, no pagination, no row actions.
+
+                        ⚠️⚠️ AND DELIBERATELY A `<ul>` RATHER THAN AN `<ol>`, WHICH IS THE OPPOSITE OF THE
+                        OBVIOUS CHOICE FOR A LEADERBOARD. An ordered list's semantics are POSITIONAL — assistive
+                        technology announces "item 3 of 12" from DOM order — and this ladder is COMPETITION
+                        ranked, so a tie for 2nd is followed by 4th (ADR-0020 §D11(b)). On an `<ol>` the third
+                        row would be announced as third while reading "4th", and the two claims would contradict
+                        each other in exactly the case the ranking rule exists for. The `value` attribute does
+                        not rescue it: with `list-style: none` no marker is painted, and AT still counts
+                        position rather than reading `value`. So the rank travels as TEXT, once, where the
+                        rendered and announced answers cannot diverge.
+
+                        `role="list"` because `list-style: none` strips list semantics in Safari/VoiceOver —
+                        the note MdsBreadcrumb, MdsTabNav and NotificationBell all carry.
+                    -->
+                    <ul class="ach__ladder" role="list">
+                        <li v-for="entry in scoreboard.entries" :key="entry.user_id" class="ach__ladder-row">
+                            <span class="ach__ladder-rank">{{ ordinal(entry.rank) }}</span>
+                            <span class="ach__ladder-name">{{ entry.name }}</span>
+                            <!-- Both figures name their own unit. An award glyph beside a bare "3" is an
+                                 unlabelled number to anybody not looking at it, and there is no shared
+                                 `.sr-only` in this repository to caption it with — every component that needs
+                                 one rolls the clip-rect pattern AND the `position: relative` it requires, which
+                                 is a containment defect this repo has paid for four times. A word is cheaper
+                                 and cannot be got wrong. -->
+                            <span class="ach__ladder-points">{{ number(entry.points) }} pts</span>
+                            <span class="ach__ladder-badges">{{ number(entry.badges) }} badges</span>
+                        </li>
+                    </ul>
+                    <p class="ach__note ach__note--tight">
+                        Everyone on the team appears, including teammates who have not earned anything yet.
+                        Tied places share a number, so the next place skips one.
+                    </p>
+                </div>
             </div>
-
-            <!--
-                ⚠️⚠️ THE ONE PARAGRAPH THIS PAGE CANNOT DO WITHOUT, AND IT IS RENDERED TEXT ON PURPOSE.
-                ADR-0020 §D11(c): these totals are LARGER than the ladder below adds up to, in three
-                separate ways, and all three are decisions rather than defects. A reader who spots the gap
-                and finds no explanation concludes the feature is broken — so the explanation goes where
-                they are already looking, not behind a hover nobody performs. Stated as what each number
-                COUNTS rather than as an apology, because neither figure is wrong.
-            -->
-            <p class="ach__note">
-                These count the whole workspace, so they are larger than the leaderboard adds up to.
-                <strong>Responses</strong> includes answers collected through public links, which credit
-                nobody — otherwise the leaderboard would be a contest between links rather than between
-                people. <strong>Team points</strong> and <strong>people scoring</strong> also include
-                teammates who have since left: what they earned stays on the record, while the leaderboard
-                names people who are here now.
-            </p>
-
-            <template v-if="scoreboard.entries.length > 0">
-                <h3 class="ach__subheading">Leaderboard</h3>
-                <!--
-                    Not `MdsDataTable`: two figures per row, no sorting, no pagination, no row actions.
-
-                    ⚠️⚠️ AND DELIBERATELY A `<ul>` RATHER THAN AN `<ol>`, WHICH IS THE OPPOSITE OF THE
-                    OBVIOUS CHOICE FOR A LEADERBOARD. An ordered list's semantics are POSITIONAL — assistive
-                    technology announces "item 3 of 12" from DOM order — and this ladder is COMPETITION
-                    ranked, so a tie for 2nd is followed by 4th (ADR-0020 §D11(b)). On an `<ol>` the third
-                    row would be announced as third while reading "4th", and the two claims would contradict
-                    each other in exactly the case the ranking rule exists for. The `value` attribute does
-                    not rescue it: with `list-style: none` no marker is painted, and AT still counts
-                    position rather than reading `value`. So the rank travels as TEXT, once, where the
-                    rendered and announced answers cannot diverge.
-
-                    `role="list"` because `list-style: none` strips list semantics in Safari/VoiceOver —
-                    the note MdsBreadcrumb, MdsTabNav and NotificationBell all carry.
-                -->
-                <ul class="ach__ladder" role="list">
-                    <li v-for="entry in scoreboard.entries" :key="entry.user_id" class="ach__ladder-row">
-                        <span class="ach__ladder-rank">{{ ordinal(entry.rank) }}</span>
-                        <span class="ach__ladder-name">{{ entry.name }}</span>
-                        <!-- Both figures name their own unit. An award glyph beside a bare "3" is an
-                             unlabelled number to anybody not looking at it, and there is no shared
-                             `.sr-only` in this repository to caption it with — every component that needs
-                             one rolls the clip-rect pattern AND the `position: relative` it requires, which
-                             is a containment defect this repo has paid for four times. A word is cheaper
-                             and cannot be got wrong. -->
-                        <span class="ach__ladder-points">{{ number(entry.points) }} pts</span>
-                        <span class="ach__ladder-badges">{{ number(entry.badges) }} badges</span>
-                    </li>
-                </ul>
-                <p class="ach__note ach__note--tight">
-                    Everyone on the team appears, including teammates who have not earned anything yet.
-                    Tied places share a number, so the next place skips one.
-                </p>
-            </template>
         </section>
     </div>
 </template>
@@ -343,6 +349,8 @@ function earnedDate(iso: string): string {
     display: flex;
     flex-direction: column;
     gap: var(--mds-space-6);
+    /* M174: the container the workspace split reads (an element cannot query its own size). */
+    container-type: inline-size;
 }
 
 .ach__section {
@@ -387,9 +395,11 @@ function earnedDate(iso: string): string {
     margin-top: calc(var(--mds-space-1) * -1);
 }
 
+/* M174: `auto-fill`, so two earned badges stay badge-sized on a wide screen instead of stretching across it; `min()` so a
+   phone never overflows. */
 .ach__badges {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
     gap: var(--mds-space-3);
     padding: 0;
     margin: 0;
@@ -453,6 +463,34 @@ function earnedDate(iso: string): string {
 
 .ach__badge-meter {
     margin-top: var(--mds-space-1);
+}
+
+/* M174 (`R-fb647b5e`, `D120`): the team's tiles and note, then the leaderboard — one under the other, and from a 75rem
+   page side by side, so a ladder row's rank and its points are no longer a whole wide screen apart. A workspace with
+   nobody on the board yet keeps its tiles across the row. */
+.ach__workspace,
+.ach__team,
+.ach__board {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-3);
+}
+
+@container (min-width: 75rem) {
+    .ach__workspace {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        column-gap: var(--mds-space-6);
+        align-items: start;
+    }
+
+    .ach__team:only-child {
+        grid-column: 1 / -1;
+    }
+
+    .ach__board > .ach__subheading {
+        margin-top: 0;
+    }
 }
 
 .ach__ladder {

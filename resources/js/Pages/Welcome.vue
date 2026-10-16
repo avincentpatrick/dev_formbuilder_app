@@ -114,11 +114,6 @@ const capabilities = [
     font-family: var(--mds-font-family-body);
 }
 
-.landing__inner {
-    max-width: 64rem;
-    margin: 0 auto;
-}
-
 .landing__hero {
     max-width: 44rem;
     margin: 0 auto var(--mds-space-16);
@@ -131,7 +126,7 @@ const capabilities = [
     font-size: var(--mds-type-label-font-size);
     line-height: var(--mds-type-label-line-height);
     font-weight: var(--mds-type-label-font-weight);
-    letter-spacing: 0.08em;
+    letter-spacing: var(--mds-tracking-wide);
     text-transform: uppercase;
 }
 
@@ -166,9 +161,12 @@ const capabilities = [
     line-height: var(--mds-type-body-sm-line-height);
 }
 
+/* M174 (`R-3d51f0ae`, `D122`): no cap on the page — the hero and the lede keep their measures, centred as a landing
+   page's composition is, and the feature grid fills the window. `auto-fit`, not `auto-fill`: with exactly four cards,
+   `auto-fill` leaves empty tracks and a left-aligned group under a centred hero. `min()` keeps a phone at one column. */
 .landing__grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
     gap: var(--mds-space-4);
 }
 

@@ -2262,7 +2262,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `PROGRESS_ARCHIVE.md` keeps what was believed at the time.
   ⚠️⚠️ **AND THIS INCREMENT REPRODUCED THE VERY DEFECT CLASS IT CLOSES — FOUR TIMES, IN ITS OWN PROSE.**
   A +59-line §D32 and a +10-line middleware docblock invalidated M7's own `0016:238`, its `0019:37` /
-  `ACCESS-MATRIX.md:407` evidence list, **and two LIVE rows in this file that M7 never read** — one of
+  `ACCESS-MATRIX.md:408` evidence list, **and two LIVE rows in this file that M7 never read** — one of
   them `EnforceTenantTwoFactor.php:33-52`, the sole evidence for the *enrolment-nudge* argument §D32
   leans on twice. M7 had explicitly checked which citations its insertion would move and answered
   *"nothing else moves"* — true of the citations that already existed, and silent about the ones the same
@@ -3425,7 +3425,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ADR-0015 §D6 filed the screenshot into that same shared table, and `RolePermissionSeeder` grants
   `submissions.view` to `viewer`, `reviewer` and `form_editor` while granting `feedback.view` to none of
   them. So the id-addressed route served the PII image to exactly the three roles the dedicated route
-  refuses — and `FeedbackController.php:59-65` says in its own words that it declines to route through
+  refuses — and `FeedbackController.php:78-84` says in its own words that it declines to route through
   `AttachmentController` **precisely to avoid that coupling**, which was open in the other direction the
   whole time. Fixed: the policy now reads the kind through a `match`, so a feedback screenshot is read under
   `feedback.view` on every route that serves it or on none. **No permission key minted**, so no paired file
@@ -3504,7 +3504,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ✅ **DONE — M34 (2026-08-27).** Three tests, both routes: `AttachmentPolicyTest` gets a `pending` and an
   `infected` case on `GET /attachments/{attachment}`, and `FeedbackTest` gets an `infected` case on
   `GET /feedback/{report}/screenshot`. Both controllers carry their own copy of the guard —
-  `FeedbackController.php:59-65` says in its own words why it declines to route through
+  `FeedbackController.php:78-84` says in its own words why it declines to route through
   `AttachmentController` — so asserting one proves nothing about the other and both are pinned.
   ⚠️ **THE ROW'S FIXTURE-COST CLAIM WAS EXACTLY RIGHT, WHICH IS WORTH RECORDING BECAUSE IT USUALLY IS NOT.**
   `AttachmentFactory` really does carry `pending()` (`:158`), `clean()` (`:163`) and `infected()` (`:173`),
@@ -3520,7 +3520,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   test covering only `pending` stays green if `infected` is later added to the servable set.
   ⚠️ **CITATION DRIFT, THE FOURTH INCREMENT RUNNING, AND MINOR THIS TIME.** The row cites
   `app/Enums/ScanStatus.php:12` for the *"serving gate the threat model relies on"* docblock; it is at
-  `:26-27`. `FeedbackController.php:75` and `AttachmentController::show()`'s scan-status guard were both exact (`M129` dropped the second's line number, which its import moved). Filed by `M29`.
+  `:26-27`. `FeedbackController.php:94` and `AttachmentController::show()`'s scan-status guard were both exact (`M129` dropped the second's line number, which its import moved). Filed by `M29`.
 - ~~**`minor` · `AttachmentController`'s docblock calls `GET /attachments/{attachment}` a "signed read-back", and nothing about it is signed.**~~
   ✅ **DONE — M34 (2026-08-27).** Citation exact: the class docblock of `app/Http/Controllers/Tenant/AttachmentController.php` (`M129` dropped its line number, which its import moved).
   The word is struck, and the docblock now names the controls that **do** exist rather than leaving a hole
@@ -3563,7 +3563,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   with, and say so rather than paying for a fixture they do not need.
   ⛔ **AND ASKING THE KILLER QUESTION OF EVERY GATE ON THE ROUTE — NOT ONLY THE ONES THE ROW NAMES — FOUND A
   THIRD NAKED ONE.** `FeedbackConsoleController.php:82`'s `abort_unless(...->servable(), 409)` was asserted
-  by **nothing**: M34 pinned that guard on the two routes it was looking at (`FeedbackController.php:75`,
+  by **nothing**: M34 pinned that guard on the two routes it was looking at (`FeedbackController.php:94`,
   `AttachmentController::show()`'s scan-status guard) and this console copy is the third, so quarantined bytes could be served to
   the one principal who reads across every tenant with the whole repository green. Covered here, with the
   streaming case one column apart as its positive control.
@@ -12057,7 +12057,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `:454-456`, `:492-494`, `:503-505`), which nothing replaces at all. ⛔ **AND THE CHANGE IS UNFALSIFIABLE TODAY.**
   `novalidate` appears in **no test in the repository**; every Vitest submit is a dispatched `submit` event, which
   jsdom processes without constraint validation; and there is **no encode functional Playwright spec at all** —
-  the only real-browser encode coverage is axe-only (`tests/e2e/responsive-axe.spec.ts:375-434`) and never clicks
+  the only real-browser encode coverage is axe-only (`tests/e2e/responsive-axe.spec.ts:378-437`) and never clicks
   Submit. So this row owes three things before a line changes: an audit of what the SERVER re-checks for each of
   the four families, a decision on the legacy-field backfill, and the first encode functional spec that can prove
   the alignment either way. ⚠️ **The pairing direction from the original row still holds** — `novalidate` must not

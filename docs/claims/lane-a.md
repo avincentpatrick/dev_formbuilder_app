@@ -16,7 +16,131 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M174`, full width: the detail pages, the stacks and the sign-in (`R-348f997c`, `R-7b8a74ae`, `R-fb647b5e`, `R-10b38d6d`, `R-3d51f0ae`, `R-66952d33`) (m174-ui3-full-width-detail-stacks-signin)
+## Status: ACTIVE CLAIM — `M175`, feedback the testers can use, and the dev session reads (`R-2ce2f274`, `R-9bfd832e`, `R-78f43f26`, `R-f3fb2522`) (m175-f-feedback)
+
+Taken 2026-10-16. It is F of the testers' round 2 (`D138`; the plan of record `~/.claude/plans/here-are-added-comments-peppy-quill.md` §B, §E;
+the build plan `~/.claude/plans/pasted-content-id-afe2-read-claude-md-sunny-squirrel.md`). ⛔ **STACKED:** branch `m175-f-feedback` is
+cut from `origin/m174-ui3-full-width-detail-stacks-signin` at `f303ba5b` and merges `origin/main` (this claim) in; PR into main. **F completes
+merge point 1 (`D137`):** once this PR is green 6/6, the user runs the staging backup block, then `M173` (PR #366) merges, `M174` (PR #367)
+is rebased onto the trunk and merges once green, then this branch is rebased and merges once green — each with an explicit body, each only
+after the previous deploy has finished and `/up` answers 200, with a staging data census before and after. No user check was owed at this
+session's start (`M170`–`M172` confirmed; `M173`/`M174` not yet live). One question was asked and answered in planning, recorded on the
+branch as `D141`: the support API answers on the workspace host, because on staging the central host is the agency website.
+
+Rows taken, in build order, each its own commits: `R-2ce2f274` (the panel is in every captured screenshot, a report has no type, only the
+path is recorded), `R-9bfd832e` (statuses read New · Ongoing · Resolved · Declined, a note, the tester told, every member sees their own
+reports), `R-78f43f26` (a platform support API and `scripts/feedback-pull.php`), `R-f3fb2522` (every session starts with the pull). Also
+owed by the round-2 filing and taken in the first commit: the tails of `R-2ce2f274`, `R-af2d278b`, `R-5033e87e`, `R-0a7275ce`, the gap
+table's `or_other` line, and the merge rule (`D137`) in `CLAUDE.md` "The trunk", `scripts/next.php` and `PROGRESS.md` Standing Rule 5.
+
+### Evidence verified
+Read on `m174-ui3-full-width-detail-stacks-signin` at `f303ba5b` by three read-only passes plus my own reads, Docker not yet started.
+- `R-2ce2f274`: `FeedbackButton.vue:70-86` (`capture()` with the modal open), `:121` (`MdsModal`), `:39` (`window.location.pathname`) —
+  held. `screenshot.ts:39-67` — held. The create migration `:27` (`route` only; no type column anywhere) — held. `FeedbackStatus.php:12`
+  (no CHECK) — held. `DocumentedEnumCatalogDriftTest.php` gates the catalog — held.
+- `R-9bfd832e`: `FeedbackStatus.php:64` (`New => [Reviewed, WontFix]`) — held. `SuperAdminService.php:813` (`transitionFeedback()`, audit
+  only) — held. `NotificationType.php:47` (no feedback value) — held. `FeedbackController.php:54` (the toast) — held. `routes/tenant.php:451-452`
+  (`can:feedback.view`) — held. The CHECK-rebuild precedent `2026_08_17_000103_…_badge_earned.php` — held.
+- `R-78f43f26`: `routes/api.php` (no feedback route) and `ApiAbilities.php:24-32` (no feedback ability) — held. `routes/admin.php` (console
+  behind `superadmin`, `superadmin.mfa`, `step-up`) — held. `SuperAdminService.php:507` (`listFeedback()`) — held. The SELECT-only bypass
+  `2026_08_07_000002_…` — held. `docs/adr/0018-per-tenant-extraction.md` §D1 (extraction off HTTP) — held.
+- `R-f3fb2522`: `CLAUDE.md` "Start every session" runs `preflight.php` and `state.php` only — held.
+
+### Premise verified
+- One session only (the user, 2026-10-13). Lane B is retired. `M173` and `M174` are held for merge point 1; this branch stacks on `M174`.
+- **`R-78f43f26` believes the API lives on the central host. False for staging:** `pitahc.gov.ph` resolves to 121.58.210.229, the agency
+  website; only the box reaches the console, through its hosts file — so this machine could never pull. Asked in planning: **`D141` A** —
+  the API answers on any platform host (custom domains refused), opened only by a platform support token; the console stays central-only.
+- **The row expects a Sanctum token. Structurally impossible:** `personal_access_tokens` is strictly tenant-RLS'd and `AuthenticateApiToken`
+  needs a tenant context, so a platform token gets its own central table (no `tenant_id`, no RLS, never granted to the elevated role).
+- **`openapi.json` and `routes/api.php` are named as hubs. Not touched:** Scramble documents `api/v1` only; the platform API gets its own
+  routes file and is documented in ADR-0023 and `docs/api-specification.md`.
+- **ADR-0015 has no §D11 yet** — this increment writes it. **§D9 forbids an own-screenshot route** (the screenshot is read under
+  `feedback.view` on every route or on none), so My reports says "screenshot attached" without a link.
+- `browser_info` keys without a validation rule are stripped. `BuildInfo::version()` reads `dev` on staging (`APP_VERSION` unset), while
+  the bundle carries its git sha (`__APP_VERSION__`): the client sends the bundle sha, the server stamps its own.
+- `notifications.data` is readable by every member of the workspace under strict RLS and its docblock allows ids and labels only, so the
+  operator's note reaches the reporter by email and on My reports, never through `data`.
+- The badge keys `reviewed` and `wont_fix` in `status-variant.ts` are used by feedback alone, so the relabel is safe there.
+- A refused transition through the API would reach `bootstrap/app.php`'s catch-all before the `SuperAdminException` arm and answer 500;
+  the API controller answers it itself.
+
+### Remedy verdict
+- **Capture:** acquire the stream inside the click, then close, wait for the modal's new `after-leave` (or ≤400ms), grab a fresh frame,
+  reopen with the text intact — nothing depends on how long the click's permission lasts. Works as prescribed, reordered.
+- **Type and page:** `FeedbackType` with a nullable column and a CHECK (every live row NULL, so safe); `page_url`, `page_title`; required on
+  submit. Works as prescribed.
+- **Statuses:** labels change over unchanged stored values; the status CHECK is added `NOT VALID` and validated in a savepoint, so a value
+  nobody expected can never take the deploy's `migrate` down (the census reads the values first). A notification type appended last, its
+  two CHECKs rebuilt (no data touched). Works, with the note moved out of `data`.
+- **API:** `platform_api_tokens`, `AuthenticatePlatformToken` (super-admin and confirmed 2FA re-checked on every call), `routes/platform-api.php`,
+  a limiter, the error envelope widened, every call audited as a platform row; reads and writes only through `SuperAdminService`, the
+  bypass never widened. The pull script uses the curl extension (the host's `openssl.cafile` is empty). Works, re-hosted by `D141`.
+- **Session start:** `CLAUDE.md` gains the pull (no numbers), a Standing Rule carries `D139`'s triage, and `preflight` prints the New count
+  without ever failing. Works as prescribed.
+
+Files: first commit — `docs/feature-backlog.md`, `docs/claims/decisions.md`, `CLAUDE.md`, `scripts/next.php`, `PROGRESS.md`, `docs/pipeline.md`.
+`R-2ce2f274` — `packages/design-system/src/components/Modal/Modal.vue` and `Modal.test.ts`, `resources/js/components/shell/screenshot.ts`,
+`FeedbackButton.vue` and `FeedbackButton.test.ts`, new `app/Enums/FeedbackType.php`, new `database/migrations/2026_08_17_000131_add_type_and_page_to_feedback_reports_table.php`,
+`app/Models/FeedbackReport.php`, `app/Http/Requests/Tenant/StoreFeedbackRequest.php`, `app/Services/Feedback/FeedbackService.php`,
+`FeedbackPresenter.php`, `FeedbackConsolePresenter.php`, `app/Http/Controllers/Tenant/FeedbackController.php`,
+`app/Http/Controllers/Admin/FeedbackConsoleController.php`, `app/Services/Admin/SuperAdminService.php` (hub),
+`resources/js/components/feedback/types.ts`, `resources/js/Pages/feedback/Index.vue` and `index.test.ts`, `resources/js/Pages/admin/Feedback.vue`
+and `feedback.test.ts`, `database/seeders/E2eSeeder.php`, `database/seeders/DemoSeeder.php`, `docs/adr/0015-feedback-screenshot-capture.md`,
+`docs/data-dictionary.md` (hub), `docs/TESTING-GUIDE.md`, `tests/Feature/Tenant/FeedbackTest.php`, `tests/Feature/Search/ListKeywordFilterTest.php`,
+`tests/Feature/Feedback/FeedbackConsoleTest.php`, `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php`, new `tests/e2e/feedback-capture.spec.ts`.
+`R-9bfd832e` — `app/Enums/FeedbackStatus.php` and the PHP files naming its two renamed cases, new migrations `2026_08_17_000132_add_resolution_note_and_reporter_role_to_feedback_reports_table.php`
+and `2026_08_17_000133_recreate_notification_type_checks_for_feedback_closed.php`, `app/Enums/NotificationType.php` (hub),
+`app/Support/Notifications/NotificationCopy.php`, `app/Services/Notifications/NotificationDispatcher.php`, `NotificationMailer.php`,
+`NotificationPresenter.php`, `app/Support/Audit/AuditRedactor.php`, `routes/tenant.php` (hub), new `resources/js/Pages/feedback/Mine.vue` and
+`mine.test.ts`, `resources/js/components/shell/AccountMenu.vue`, `resources/js/components/notifications/types.ts`, `type-visual.ts` and
+`type-visual.test.ts`, `packages/design-system/src/components/Badge/status-variant.ts` and its test, `docs/audit-compliance-logging-spec.md`
+(hub), `docs/ACCESS-MATRIX.md` (hub), `tests/Unit/Notifications/NotificationTypeTest.php`, `NotificationCopyTest.php`, new
+`tests/Feature/Notifications/FeedbackClosedNotificationTest.php`, new `tests/Feature/Tenant/MyFeedbackTest.php`,
+`tests/Feature/Seeders/DemoSeederIdempotencyTest.php`, `tests/Unit/AuditRedactorTest.php`, `tests/e2e/responsive-axe.spec.ts` (hub); and the
+files of `R-2ce2f274` above that the statuses reach.
+`R-78f43f26` — new `database/migrations/2026_08_17_000134_create_platform_api_tokens_table.php`, new `app/Models/PlatformApiToken.php`, new
+`app/Services/Admin/PlatformSupportTokenService.php`, new `app/Http/Middleware/AuthenticatePlatformToken.php`, new
+`app/Http/Controllers/Platform/FeedbackApiController.php`, new `app/Http/Controllers/Admin/SupportTokenController.php`,
+`app/Http/Controllers/Admin/PlatformSettingsController.php`, new `routes/platform-api.php`, `routes/admin.php`, `bootstrap/app.php` (hub),
+`app/Support/Http/MaintenanceResponse.php`, `app/Providers/AppServiceProvider.php` (hub), `app/Support/Audit/AuditableTypes.php`,
+`resources/js/Pages/admin/Settings.vue`, new `resources/js/components/admin/SupportTokensCard.vue` and its test, `resources/js/components/admin/types.ts`,
+new `docs/adr/0023-platform-support-api.md`, `docs/api-specification.md` (hub), `docs/security-threat-model.md` (hub), new
+`tests/Feature/Platform/PlatformFeedbackApiTest.php`, `PlatformApiTokenTest.php`, new `tests/Feature/Admin/SupportTokenConsoleTest.php`,
+`tests/Pest.php`, new `scripts/feedback-pull.php`, new `tests/Feature/Docs/FeedbackPullScriptTest.php`, new `tests/fixtures/feedback-pull/`.
+`R-f3fb2522` — `CLAUDE.md`, `PROGRESS.md`, `scripts/preflight.php`, new `tests/Feature/Docs/SessionStartFeedbackTest.php`.
+Close-out: `PROGRESS.md`, `docs/gate-baselines.md`, `docs/pipeline.md`; this file on main. `playwright.config.ts` only if the capture spec
+cannot take the insecure-origin flag in the spec itself (an extension).
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`, `docs/data-dictionary.md`,
+`docs/api-specification.md`, `docs/security-threat-model.md`, `docs/audit-compliance-logging-spec.md`, `docs/ACCESS-MATRIX.md`,
+`docs/TESTING-GUIDE.md`, `docs/adr/0015-feedback-screenshot-capture.md`, new `docs/adr/0023-platform-support-api.md`,
+`tests/e2e/responsive-axe.spec.ts`, new `tests/e2e/feedback-capture.spec.ts`, `PROGRESS.md` (own block and the two Standing Rules named).
+Hubs (`D128`: overlap allowed, every hub named): `CLAUDE.md`, `PROGRESS.md`, `scripts/next.php`, `app/Enums/NotificationType.php`,
+`app/Services/Admin/SuperAdminService.php`, `bootstrap/app.php`, `app/Providers/AppServiceProvider.php`,
+`resources/js/components/shell/FeedbackButton.vue`, `routes/tenant.php`, `tests/e2e/responsive-axe.spec.ts`, `docs/data-dictionary.md`,
+`docs/api-specification.md`, `docs/security-threat-model.md`, `docs/audit-compliance-logging-spec.md`, `docs/ACCESS-MATRIX.md`,
+`docs/TESTING-GUIDE.md`, `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md` — re-derived against this list before the PR.
+Paired files taken: `app/Enums/NotificationType.php` ↔ `resources/js/components/notifications/types.ts` (`NotificationTypeParityTest`).
+Namespaces spent: migrations `2026_08_17_000131` to `2026_08_17_000134`; ADR `0023`; ADR-0015 §D11; `D141` (asked and answered in planning);
+one `NotificationType` value, appended last.
+E2E specs the diff reaches, run locally: `feedback-capture` (new), `responsive-axe`, `list-layout`, `admin-console-axe`,
+`personalization-axe`, `search-nav`; CI runs every spec.
+Prediction: red first on this head — the Modal and FeedbackButton Vitest cases (the panel open at the grab, the text lost on reopen), both
+feedback pages' type and title cases, `FeedbackTest` (type required, page fields, the version stamp), the three `Documented*DriftTest`s
+for every new column, CHECK and enum, `TenantExtractColumnDriftTest`, `NotificationTypeTest`, the new notification, My reports, API, token,
+console, script and session-start tests, `DemoSeederIdempotencyTest` (25 → 27 notifications), and the new capture e2e. All green after.
+Mutants, each turning only its named case red: the close before the grab dropped (Vitest and e2e), reopen through `openPanel()`, `type`
+not required, each CHECK statement deleted, the `after-leave` emit deleted, the version stamp dropped, new → resolved dropped, the dispatch
+removed, the note put into `data`, the `user_id` predicate dropped, the redaction removed, the notification type out of order, the expiry
+check dropped, the super-admin/2FA re-check dropped, `RequirePlatformHost` removed, the audit call removed, `$isApi` reverted,
+`token_hash` listed, the decline guard removed, the `CLAUDE.md` pull line deleted, preflight's section made blocking. **Most likely
+wrong:** the capture e2e — the workspace host is not a secure context, so it rests on the insecure-origin flag and a stubbed stream.
+Runner-up: the committed-fixture harness the elevated and auth connections need in the API and console tests.
+
+## HELD — `M174`, full width: the detail pages, the stacks and the sign-in (`R-348f997c`, `R-7b8a74ae`, `R-fb647b5e`, `R-10b38d6d`, `R-3d51f0ae`, `R-66952d33`) (m174-ui3-full-width-detail-stacks-signin)
+
+⛔ **Held for merge point 1 (2026-10-16, `D137`, `D138`):** `M175` (F, feedback) is stacked on this branch. Once its PR is green, after the
+user runs the staging backup block, `M173` (PR #366) merges, then this branch is rebased onto the trunk and merges once green, then F.
 
 **BUILT — PR #367, CI 6/6 green with real step counts (run 38875893654 at `f303ba5b`: Static analysis 32 · E2E 20 · Contract 16 ·
 Frontend 12 · Pest 11 · axe 11; the only skips are the two main-only staging-header steps and the failure-only report upload; the run at

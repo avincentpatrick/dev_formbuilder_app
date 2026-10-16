@@ -186,8 +186,7 @@ onBeforeUnmount(releasePreview);
             <form class="fb__form" @submit.prevent="submit">
                 <fieldset class="fb__kind" :aria-describedby="form.errors.type ? 'fb-kind-error' : undefined">
                     <legend class="fb__kind-legend">
-                        What kind of feedback is this?
-                        <span class="fb__required" aria-hidden="true">*</span>
+                        What kind of feedback is this?<span class="fb__required"> (required)</span>
                     </legend>
                     <div class="fb__kind-options">
                         <div v-for="kind in KINDS" :key="kind.value" class="fb__kind-option">
@@ -353,8 +352,10 @@ onBeforeUnmount(releasePreview);
     font-weight: var(--mds-font-weight-medium);
 }
 
+/* The shared field's own "(required)" (MdsFormField), so the panel's two questions say it the same way. */
 .fb__required {
-    color: var(--mds-color-status-danger-fg);
+    font-weight: var(--mds-font-weight-regular);
+    color: var(--mds-color-text-secondary);
 }
 
 .fb__kind-options {

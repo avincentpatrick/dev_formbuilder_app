@@ -269,6 +269,7 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
         <MdsModal
             :open="detailRow !== null"
             :title="detailRow ? `${detailRow.tenant_name} · ${reporterLabel(detailRow)}` : 'Feedback'"
+            size="lg"
             @close="detailRow = null"
         >
             <div v-if="detailRow" class="admin-fb__detail">

@@ -573,3 +573,22 @@ test('Achievements — the leaderboard sits beside the team tiles at 1920', asyn
     const ladder = await box(page.locator('.ach__ladder'));
     expect(ladder.left, `achievements at 1920: ${JSON.stringify({ tiles, ladder })}`).toBeGreaterThanOrEqual(tiles.right);
 });
+
+test('Templates — every card\'s button sits at the foot of its card at 1440', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+    // The cards in a row stretch to the tallest; a card with a shorter description must still end in its button, so a
+    // row's "Use this template" buttons share one line.
+    await page.goto('/forms/templates', { waitUntil: 'networkidle' });
+    await settlePaint(page);
+    const gaps = await page.locator('.templates__cell .mds-card').evaluateAll((cards) =>
+        cards.map((card) => {
+            const footer = card.querySelector('.mds-card__footer')!.getBoundingClientRect();
+
+            return Math.round(card.getBoundingClientRect().bottom - footer.bottom - parseFloat(getComputedStyle(card).paddingBottom));
+        }),
+    );
+
+    expect(gaps.length, 'no template cards').toBeGreaterThanOrEqual(3);
+    expect(Math.max(...gaps), `footer distance above each card's padding: ${JSON.stringify(gaps)}`).toBeLessThanOrEqual(1);
+});

@@ -131,6 +131,14 @@ function useTemplate(template: TemplateCard): void {
     width: 100%;
 }
 
+/* M174 (`R-10b38d6d`): the card stretches to its row, so its footer goes to the bottom and every "Use this template"
+   in a row shares one line — as `.form-card`'s does. `padding-top` keeps the 16px the footer's own margin gave, which
+   `margin-top: auto` alone takes to zero in the row's tallest card. */
+.templates__cell :deep(.mds-card__footer) {
+    margin-top: auto;
+    padding-top: var(--mds-space-4);
+}
+
 .templates__meta {
     display: inline-flex;
     gap: var(--mds-space-2);

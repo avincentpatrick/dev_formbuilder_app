@@ -87,3 +87,15 @@ describe('achievements — the leaderboard sits beside the team tiles', () => {
         );
     });
 });
+
+describe('templates — every card\'s button sits at the foot of its card', () => {
+    it('pushes the footer to the bottom of a stretched card, keeping the design system\'s gap above it', () => {
+        // `.form-card` does the same (`FormCard.vue`); `padding-top` keeps the 16px the footer's own margin gave, which
+        // `margin-top: auto` alone takes to zero in a row's tallest card.
+        const body = rule(styleOf('resources/js/Pages/forms/Templates.vue'), '.templates__cell :deep(.mds-card__footer)');
+
+        expect(body, '.templates__cell :deep(.mds-card__footer)').not.toBeNull();
+        expect(body).toMatch(/margin-top:\s*auto/);
+        expect(body).toMatch(/padding-top:\s*var\(--mds-space-4\)/);
+    });
+});

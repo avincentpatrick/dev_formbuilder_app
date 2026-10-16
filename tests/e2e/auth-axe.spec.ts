@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { assertClean, forceTheme } from './support/axe';
+import { assertClean, forceTheme, settlePaint } from './support/axe';
 // The SHARED derivation, not a fourth hand-rolled `baseURL.replace('acme.', '')`. `hosts.ts` was created
 // to collapse exactly these copies and `global-setup.ts` already imports it; this file and
 // `responsive-axe.spec.ts` were the two that still hand-rolled it. Three copies of a string transform is
@@ -172,3 +172,47 @@ for (const theme of themes) {
         await assertClean(page, 'Two-factor challenge (recovery)');
     });
 }
+
+// ── M174 (`R-3d51f0ae`, `D122`) — THE TWO FRONT DOORS AS TWO HALVES ───────────────────────────────────────────────────
+// *"…no content on the middle only. so no blank spaces on the left and right…"* (the user, 2026-10-14). On a wide screen
+// the pitch panel fills the left half and the sign-in card sits centred in the right half, instead of a 400px card and a
+// 26rem panel huddled in the middle. Measured here because the scans above can only say the page is clean, not where it
+// sits; desktop only, the one project past the threshold.
+test('Login and register — two halves at 1440: the pitch fills the left, the card centred in the right', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'The split is a desktop-width layout; the other projects show the card alone.');
+
+    for (const path of ['/login', `${centralOrigin}/register`]) {
+        await page.goto(path, { waitUntil: 'networkidle' });
+        await page.getByRole('heading', { level: 1 }).waitFor();
+        await settlePaint(page);
+
+        const m = await page.evaluate(() => {
+            const pitch = document.querySelector('.auth__pitch')!.getBoundingClientRect();
+            const card = document.querySelector('.auth__card')!.getBoundingClientRect();
+
+            return {
+                viewport: document.documentElement.clientWidth,
+                pitchLeft: Math.round(pitch.left),
+                pitchWidth: Math.round(pitch.width),
+                cardCentre: Math.round(card.left + card.width / 2),
+            };
+        });
+
+        expect(m.pitchLeft, `${path}: ${JSON.stringify(m)}`).toBeLessThanOrEqual(1);
+        expect(Math.abs(m.pitchWidth - m.viewport / 2), `${path}: ${JSON.stringify(m)}`).toBeLessThanOrEqual(2);
+        expect(Math.abs(m.cardCentre - (m.viewport * 3) / 4), `${path}: ${JSON.stringify(m)}`).toBeLessThanOrEqual(2);
+    }
+});
+
+test('Landing page — the feature grid fills a 1920px window', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto(`${centralOrigin}/`, { waitUntil: 'networkidle' });
+    await page.getByRole('heading', { level: 1 }).waitFor();
+    await settlePaint(page);
+
+    // 64rem = 1024px was the cap; the page's own padding is 24px a side from 48rem.
+    const grid = await page.locator('.landing__grid').evaluate((el) => Math.round(el.getBoundingClientRect().width));
+    expect(grid, 'the landing grid at 1920').toBeGreaterThan(1800);
+});

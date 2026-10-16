@@ -14572,3 +14572,261 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `M174` and filed this as its own row. The remedy: the presenter sends the entered version's reference files (name, size, a download
   link under the permission that lets a member enter responses), and the side panel lists them under the facts.
   **Live.** Filed by `M174`. **Tier: during-testing.**
+
+- **`minor` · A feedback report's status reads New, Reviewed, Resolved or Won't fix, only the console can change it, and the tester who sent it is never told what became of it.**
+  The testers' second round, relayed by the user (2026-10-16): *"there must be a tagging … if its resolved declined new and ongoing,
+  get user, also update user if its fixed/resolved"*. `app/Enums/FeedbackStatus.php:64` lets a new report become reviewed or won't
+  fix only, and `:12` records that `feedback_reports.status` carries no CHECK; only `app/Services/Admin/SuperAdminService.php:813`
+  (`transitionFeedback()`) moves it, writing an audit row and nothing else; `app/Enums/NotificationType.php:47` starts a list with no
+  feedback value; the reporter gets the toast at `app/Http/Controllers/Tenant/FeedbackController.php:54` and, below Owner and Admin,
+  cannot open `/feedback` at all (`routes/tenant.php:451-452`, `can:feedback.view`). The remedy (`D139`): the statuses read
+  **New · Ongoing · Resolved · Declined** — `reviewed` and `wont_fix` keep their stored values and change their labels only, so no
+  row is touched — with a CHECK generated from the enum; new → ongoing, resolved or declined; ongoing → resolved or declined;
+  resolved or declined → ongoing; a nullable `resolution_note`; Resolved and Declined dispatch a new notification type (the bell and
+  an email, through the existing dispatcher, the CHECK rebuilt as
+  `database/migrations/2026_08_17_000103_recreate_notification_type_checks_for_badge_earned.php` did) carrying the note and a link;
+  every member sees their own reports; the console shows the reporter's name, email and role and takes the note.
+  `docs/data-dictionary.md` §21 and the enum catalog move with it. **Live.** Filed by `M174`. **Tier: early-testing.**
+
+- **`minor` · Nothing outside the signed-in console can read feedback, so a report reaches the dev session only when someone copies it across by hand.**
+  The user (2026-10-16) wants testers to *"directly pinpoint the problem"* and the dev session to fix it *"here"*. `routes/api.php`
+  has no feedback route and `app/Support/Api/ApiAbilities.php:24-32` no feedback ability; every API route belongs to one workspace;
+  the only cross-workspace read is the console (`routes/admin.php`, behind `superadmin`, `superadmin.mfa` and `step-up`), and no
+  artisan command reads feedback. The remedy (`D139`): a platform support API on the central host — list (by status and since),
+  one report's screenshot, and a status change with a note — authorised by a super-admin's token carrying one ability, created,
+  expired and revoked in the console and shown once, rate-limited, every call audited; it reads through
+  `SuperAdminService::listFeedback()` (`app/Services/Admin/SuperAdminService.php:507`) and writes through `transitionFeedback()`,
+  never widening the SELECT-only bypass of
+  `database/migrations/2026_08_07_000002_apply_superadmin_bypass_to_feedback_reports.php`; a new ADR records the cross-workspace
+  surface (`docs/adr/0018-per-tenant-extraction.md` kept extraction off HTTP). `scripts/feedback-pull.php` (host PHP, no `vendor/`)
+  reads the address and the token from a file outside the repository, downloads New and Ongoing reports with their screenshots into
+  the session's scratchpad, prints a digest (id, type, reporter, page address, remarks, screenshot), and pushes back with
+  `--ongoing` and `--resolve` and a note. `routes/api.php` and `openapi.json` are hubs. **Live.** Filed by `M174`.
+  **Tier: early-testing.**
+
+- **`minor` · A session starts without looking at the testers' feedback, so a report waits unseen until the user relays it.**
+  `CLAUDE.md`'s "Start every session" runs `scripts/preflight.php` and `scripts/state.php`, and neither reads `feedback_reports`.
+  The user (2026-10-16): *"every start of a session, we will include always to check the feedback record if there is any and
+  automatically insert it in the pipeline. but review it if its already fixed or ongoing"*. The remedy (`D139`), once the pull
+  script exists: the pull joins "Start every session" (no number in `CLAUDE.md`), and the triage rule and its reason go in
+  `PROGRESS.md`'s Standing Rules — already fixed → Resolved with "Fixed in version X, live on staging"; already queued → Ongoing,
+  and the row cites the report; new → a row (a bug `early-testing`, a suggestion `during-testing`, a question answered in a draft the
+  user approves) and Ongoing; nothing but the stock fixed note reaches a tester without the user's OK; a close-out marks Resolved the
+  reports whose rows it closed, only once the deploy is live. `scripts/preflight.php` prints how many reports are New when the token
+  file exists, so the step cannot be skipped silently. **Live.** Filed by `M174`. **Tier: early-testing.**
+
+- **`major` · Moving a question or a section re-stamps every question's save token, so the author's next edit to any question opens "This item changed elsewhere".**
+  The testers' comment (2026-10-11, comment 5): after creating a question and changing only whether it is required, the dialog
+  *"This item changed elsewhere — Someone else edited this field since you opened it"* showed the same text on both sides. Measured
+  by reading: `app/Services/Forms/FormBuilderService.php:588` (`reorder()`) writes each position through Eloquent's query builder
+  (`:603`, `:612`), whose `update()` adds `updated_at`, so every question and section of the draft gets a new token; the token is that
+  timestamp, compared exactly by `assertNoDrift()` (`:740`); `persistOrder()` (`resources/js/components/builder/useBuilderStore.ts:422`)
+  ignores the reply, so the page keeps the old tokens. A drag or keyboard move, the Advanced tab's Section choice, an undo of a
+  delete or a section move therefore makes the next ordinary edit of any question 409 once a second has passed — a single author
+  meets "someone else". The comments at `FormBuilderService.php:42` and `:582` say the opposite. The remedy: `reorder()` writes
+  positions without touching `updated_at`, the comments corrected, and a Pest case that reorders, advances the clock a second and
+  saves with the old token (red on this head); the retry of an edit whose request did land is checked in the same pass.
+  **Live.** Filed by `M174`. **Tier: early-testing.**
+
+- **`minor` · The "This item changed elsewhere" dialog compares only the label and the key, so both sides can look the same, and closing it throws the author's edit away.**
+  `resources/js/components/builder/ConflictDialog.vue:30` and `:35` print the two labels (and the keys) though the store keeps both
+  whole rows; the testers' screenshot (2026-10-11, comment 5) shows identical columns because the difference was the Required
+  setting. `ConflictDialog.vue:20` maps closing the dialog to "Use theirs", and `resources/js/components/builder/useBuilderStore.ts:1005`
+  then forgets the journal entry, so the dialog's own *"your edit hasn't been lost"* is false once it is closed. The testers' wish
+  for a per-question record of changes is its own row. The remedy: the dialog lists each setting that differs, in plain words, side
+  by side (label, required, help, rules, choices …); closing it leaves the choice pending and the edit journaled until "Keep mine"
+  or "Use theirs". **Live.** Filed by `M174`. **Tier: early-testing.**
+
+- **`minor` · "Add a question here" never adds a question: it selects the section and moves focus to a palette that is easy to miss and refuses focus while a save runs.**
+  The testers' comment (2026-10-11, comment 3): *"“+ Add question here” button not working"*. `resources/js/Pages/forms/Builder.vue:200`
+  (`openPaletteFor()`) selects the section, switches a pane that matters only in the compact layout, and focuses the first palette
+  button — which is disabled while a save runs, so the focus silently fails; nothing is added. The buttons are
+  `resources/js/components/builder/BuilderCanvas.vue:260` and `resources/js/components/builder/PreviewRuntime.vue:451`, and
+  `resources/js/components/help/manual.ts:274` promises the click adds a question. The remedy: the button opens the palette's
+  types as a menu at the button and adds the chosen type into that section at that place (Structure and Preview, the untitled block
+  too); the manual's sentence becomes true; the tests assert a question is created, not only that focus moved.
+  **Live.** Filed by `M174`. **Tier: early-testing.**
+
+- **`minor` · A refused question save shows its first error twice — as the lead line and again as the first bullet — and numbers its rules by their place in the request, not on screen.**
+  The testers' comment (2026-10-11, comment 2): *"Instructions repeat"* — *"A validation rule must be either a structured rule or an
+  expression — not both, not neither."* above *"Rule 1: A validation rule must be …"*. `resources/js/components/builder/ConfigPanel.vue:486`
+  prints the reply's `message`, which Laravel fills with the first error, and `:489` lists every error including that one;
+  `resources/js/components/builder/field-save-errors.ts:79` names `validations.N` by its position in the request after unfinished
+  rows are withheld, so "Rule 1" can point at the wrong row. The message itself (`app/Http/Requests/Forms/UpdateFieldRequest.php:376`)
+  speaks of structured rules and expressions. The remedy: a neutral lead line ("This question was not saved. Fix the items below.")
+  whenever the reply carries an errors map; rule numbers from the editor's rows; the message in plain words ("Rule 1 is empty.
+  Choose what it checks, or remove it."). **Live.** Filed by `M174`. **Tier: early-testing.**
+
+- **`minor` · "Allow negative numbers" is a Basics checkbox that is really a hidden "Minimum value 0" rule, so removing that rule turns negatives back on.**
+  The user (2026-10-16): *"when they removed the allow negative, the other settings will be saved, but when they removed the
+  validation rules, the allow negative returned … include the allow negative in the rules since it is really a validation rule"*.
+  `resources/js/components/builder/field-conversion.ts:246` (`negativeFloor()`) derives the checkbox from whether a `min_value 0` row
+  exists and `:261` (`withNegativesAllowed()`) adds or removes that row; `resources/js/components/builder/FieldTypeControl.vue:316`
+  binds the checkbox to it. Unticking adds a visible "Minimum value 0" rule; deleting that rule on the Validation tab ticks the box
+  again; editing its value disables the box. The remedy: the Basics checkbox goes; the Validation tab's rule menu offers **No
+  negative numbers**, stored as today's `min_value 0` and shown under that name — one place, no derived state; existing rules are
+  unchanged; `manual.ts` follows. **Live.** Filed by `M174`. **Tier: early-testing.**
+
+- **`minor` · The question label box is one line, so a long question cannot be read or edited in full.**
+  The testers' comment (2026-10-11, comment 7): *"Label field is too small. It cannot accommodate long questions. Make the field
+  multi-line or expanding"*; the user (2026-10-16): *"make the label box larger"*. `resources/js/components/builder/ConfigPanel.vue:518`
+  is a single-line `MdsTextInput`; `resources/js/components/builder/InlineLabelEdit.vue:68` is single-line too; a label may hold 500
+  characters. `packages/design-system/src/components/Textarea/Textarea.vue:46` and `:55` give the design system's text area a fixed
+  minimum and a manual resize, and nothing anywhere grows with its text. The remedy: `MdsTextarea` gains an auto-grow option (with
+  its story), used for the Basics label and the in-place label edit; it wraps and grows with the text, Enter does not add a line
+  break, and a counter shows near the limit. **Live.** Filed by `M174`. **Tier: early-testing.**
+
+- **`minor` · The "Change question type" dialog speaks in developer words and repeats the type as the question's name.**
+  The testers' comment (2026-10-11, comment 1): *"Make the text/instructions more “smart highschooler” friendly"*, on a screenshot of
+  this dialog. `resources/js/components/builder/ConvertFieldDialog.vue:39` says *"It keeps its key, so conditions, calculations and
+  text that mention it still point to it"*; `resources/js/components/builder/field-conversion.ts:195` and
+  `app/Enums/ConversionWarning.php:50` carry the rest, with `app/Enums/ConversionDropReason.php` and `app/Enums/ConversionImpact.php`;
+  a new question's label is its type's label (`app/Services/Forms/FormBuilderService.php:137`), so the dialog reads *"Current type of
+  “Date & time”: Date & time"*. The remedy: `docs/ux/design-system-reference.md` gains a voice rule — write for a smart
+  high-schooler: short sentences, everyday words, say what happens to the answers — and the dialog, the conversion sentences and the
+  three server enums are rewritten to it; the dialog stops repeating the type when the label is the type's own; `manual.ts` and the
+  tests that pin the wording move in the same commit. The rest of the builder's wording is its own row.
+  **Live.** Filed by `M174`. **Tier: early-testing.**
+
+- **`minor` · A deploy takes no backup of its own, and nothing checks that the data survived it.**
+  The user (2026-10-16): *"always make sure that the staging has data, do not remove data"*. `deploy.ps1` runs `migrate --force`
+  (its header, `:38`) with no backup step; the before-merge backup is a block the user runs by hand on the testing server; a
+  migration that drops a column or deletes rows would pass every gate. The remedy (`D137`): `deploy.ps1` takes the backup before it
+  migrates and refuses to migrate if the backup fails; it counts the rows of every table before and after and fails loudly, keeping
+  the backup, if any count drops; a migration lint refuses a drop, a truncate or a row delete in a new migration unless a decision
+  records it. Proved on the testing server with the user before the per-merge backup block is retired (the runner's account and the
+  backup task's rights are unmeasured). **Live.** Filed by `M174`. **Tier: early-testing.**
+
+- **`minor` · The palette still offers Yes/No, which a Single choice with Yes and No already covers.**
+  The user (2026-10-16): *"remove the yes/no question. it is already covered by the options"*. The palette lists every field type
+  (`app/Services/Forms/BuilderPresenter.php:222`); `app/Http/Requests/Forms/StoreFieldRequest.php:28` accepts any; the catalog
+  creates Yes/No questions (`database/seeders/Data/PlatformTemplateBlueprints.php:49`, and the library's consent item). The remedy
+  (`D140`): a palette flag hides the type (`resources/js/components/builder/FieldPalette.vue:25` already filters), creating one is
+  refused, and every existing Yes/No question keeps working on every surface — no data is touched; a retired type says it is
+  retired and offers Change type to Single choice; Single choice gains a Yes / No choices preset; the catalog seeds switch to Single
+  choice for new copies only (re-seeding stays the user's step); the grid's column types (`R-5033e87e`, `R-0a7275ce`) drop yes/no.
+  **Live.** Filed by `M174`. **Tier: early-testing.**
+
+- **`minor` · The palette offers Duration, which no respondent can answer, while authors want a duration worked out from two dates.**
+  The user (2026-10-16): *"remove the duration question type, that can also be covered in the calculate"*. A Duration question has
+  no control on the web form or manual entry (`resources/js/components/submissions/FieldInput.vue:604`, "Not available for manual
+  entry yet"); `R-af2d278b` planned to build one (`D134`). The remedy (`D140`, which changes `D134`): Duration leaves the palette the
+  way Yes/No does; existing Duration questions keep their place; `R-af2d278b` keeps Signature only; a duration is worked out by the
+  calculation editor (a Start, an End and Units). **Live.** Filed by `M174`. **Tier: early-testing.**
+
+- **`minor` · A choice question has no "Other, please specify" switch; the write-in and its condition are built by hand, and an imported `or_other` is dropped.**
+  The user (2026-10-16): *"for any option questions like checkbox, radiobutton or select, there must be a setting … that enable a
+  others options so an automatic additional others, specify field will be automatically added and configured to be a child
+  question"*. Nothing supports it (the gap table's `or_other` line near the top of this file);
+  `app/Services/Xlsform/XlsformImportParser.php` keeps only a select's list name. XLSForm's `or_other` appends an `other` choice and
+  a text question shown when `selected(.., 'other')`, and ODK advises writing that pattern out because `or_other` breaks
+  translations. The remedy: an Options-tab switch on Single choice, Multiple choice and Dropdown adds an `other` choice ("Other",
+  editable) and a Short text "Please specify" placed right after it, shown only when `selected(${q},'other')`, required when shown,
+  linked by `config.other_specify_key` so switching off removes both (the `D133` delete dialog applies); XLSForm import maps
+  `or_other` to it and export writes the explicit pattern. **Live.** Filed by `M174`. **Tier: early-testing.**
+
+- **`minor` · A question cannot be set to always hidden, and a calculated question can never be shown to respondents.**
+  The user (2026-10-16): *"there must be a setting for a calculated question if the user wants is visible or not, actually for every
+  question, there must be an option to have always visible and always hidden, align it to existing settings"*. Visibility today is a
+  question's condition, a section's condition, a skip rule or the Hidden type; `resources/public-runtime/engine/field-roles.ts:33`
+  never renders Calculated, Hidden or Page break; `app/Services/Submissions/EncodeFormPresenter.php:99` leaves a calculation out of
+  manual entry, and the PDF and the printed form skip it. The remedy: "Show to respondents: **Always · Never · Only when…**" on
+  every question (Only when = the existing condition editor; Never = `config.visibility: hidden`, still computed and stored);
+  Calculated defaults to Never (today's behaviour) and Always shows its value read-only, formatted by its result type; the Hidden
+  type stays Never; both engines, manual entry, the PDF and print follow. **Live.** Filed by `M174`. **Tier: early-testing.**
+
+- **`minor` · The builder preview leaves out a section whose questions are all hidden or calculated, so the author cannot see the section they made.**
+  The user (2026-10-16): *"if a type of question is calculated, and it is the only question in a section, the section itself will
+  be hidden in the section tab, making the user confuse"*. `resources/public-runtime/composables/useFormRuntime.ts:482` (`pagesOf()`)
+  keeps a page only when one of its fields renders (`:503`), and the builder preview runs the same engine;
+  `resources/js/components/builder/PreviewPane.vue:234` counts as empty only a section with no fields at all; only the Logic view
+  says *"Nobody filling the form sees this section"* (`resources/js/components/builder/LogicRail.vue:150`). The remedy: the preview
+  shows such a section as a card — "Respondents won't see this section: every question in it is hidden" — with its questions dimmed
+  and editable, and the step strip marks it; respondents' forms are unchanged. **Live.** Filed by `M174`. **Tier: early-testing.**
+
+- **`minor` · Questions move one at a time; an author cannot select several and send them to another section.**
+  The testers' comment (2026-10-11, comment 4): *"Form builder does not all[ow] bulk movement of questions to a section"*. The
+  builder's selection holds one item (`resources/js/components/builder/types.ts:330`), though the server's reorder already takes
+  whole lists (`routes/tenant.php:620`). The remedy: a checkbox per question in Structure (shift-click for a range) and a "Move to
+  section…" action — one order write, one undo entry — built after the save-token row so a bulk move does not set off the conflict
+  dialog. **Live.** Filed by `M174`. **Tier: early-testing.**
+
+- **`minor` · The builder's help text and messages use words a first-time author does not know.**
+  The testers' comment (2026-10-11, comment 1) asks for wording a smart high-schooler understands, and its screenshot is one dialog
+  of many: `resources/js/components/builder/ConfigPanel.vue:523` (*"Evaluated on the server. Use ${field} references …"*) and `:683`
+  (*"Referenced in expressions and exports"*), the help texts of the builder's other editors, the store's messages and the preview's
+  list of limits all speak of keys, expressions and references. The remedy: the voice rule that the type-dialog row writes into
+  `docs/ux/design-system-reference.md`, applied to every builder help text and message; `manual.ts` follows.
+  **Live.** Filed by `M174`. **Tier: early-testing.**
+
+- **`minor` · An author can point at another question only by typing `${key}` in most places, and no list shows each question's code.**
+  The user (2026-10-16): *"all the type of question must include the referencing"*; the testers (2026-10-11, comment 6): *"direct
+  reference the field (not the entire field question but the field code should be enough)"*. A reference is `${key}`
+  (`app/Services/Expressions/ExpressionLexer.php`); conditions, Required-when and the two question-against-question rules have
+  pickers, but a calculation (`resources/js/components/builder/ConfigPanel.vue:523`), an Expression-mode rule, a default value and
+  piping into a label, help, placeholder, section text or the confirmation message are typed by hand. The remedy: one "Insert a
+  question" picker (an `@` or a button) — questions grouped by section with their label and code, calculations, and where a date fits
+  Today, Yesterday, Tomorrow, N days from now, N days ago and One month from now; filtered to what the spot accepts; it inserts
+  `${key}` at the caret, and typing `@code` or `${code}` stays allowed and completes. Every type that can be read is offered (grids
+  and maps stay out until they can be). **Live.** Filed by `M174`. **Tier: early-testing.**
+
+- **`minor` · A number's minimum or maximum cannot be another question's answer, the question-against-question rules are strictly greater or less, and an expression comparing with a blank answer refuses every answer.**
+  The testers' comment (2026-10-11, comment 6): *"Validation rules for number field should be able to reference answers/responses
+  from previous questions"*. A minimum or maximum takes a number only (`app/Services/Forms/ExpressionValidationGate.php:191`);
+  `greater_than_field` and `less_than_field` are strict (`app/Enums/ValidationRuleType.php:199`); the only way to say "at most
+  `field_2`" is the expression `. <= ${field_2}`, which fails while `field_2` is blank because a blank side is NaN and NaN compares
+  false (`app/Services/Expressions/ExpressionEvaluator.php:152`) — `M134` made only the structured rules pass on a blank
+  (`app/Services/Validation/StructuredRuleEvaluator.php:176`). The remedy: a minimum or maximum may be "a number or another
+  question's answer" (the picker); "at least" and "at most" join the two strict rules; an expression comparison with a blank side
+  passes, in both engines with golden vectors and the corpus line in `docs/architecture/technical-architecture.md`.
+  **Live.** Filed by `M174`. **Tier: early-testing.**
+
+- **`minor` · A calculation is a typed formula with no picker, no presets and no result type, and it cannot use another calculation.**
+  The user (2026-10-16): *"lets make the calculate referenced … create a calculated field using the form's own questions by clicking
+  or selecting, not by purely typing. not all users are technical. but make sure that formula can still be typed … put presets"*,
+  with Fillout's calculation screens (number, text and duration; a duration from a Start and an End in years, months, weeks, days,
+  hours or minutes). `resources/js/components/builder/ConfigPanel.vue:522` is a two-row text box whose help says *"Evaluated on the
+  server"* though both engines compute it; `config.calculated_formula` is the only setting; `tests/golden/validation/calculated.json`
+  pins that a calculation cannot read another. The remedy: a Type (**Number · Text · Date · Duration**, decimal places for Number)
+  and two modes — **Build it** (presets: Sum, Difference, Average, Count answered, Age from a birth date, Duration between two dates
+  or times with Start, End and Units, a date N days from a date, If … then …) and **Formula** (typed, with the reference picker); a
+  preset writes the formula shown beneath it, and editing that formula switches to Formula; a calculation may use an earlier one,
+  in dependency order, cycles refused. **Live.** Filed by `M174`. **Tier: early-testing.**
+
+- **`minor` · The expression engines have no date arithmetic, so an age or a duration cannot be calculated, though the Help page promises "an age from a birth date".**
+  `app/Services/Expressions/FunctionRegistry.php` offers `selected`, `if`, `count`, `int`, `today` and `now` only; arithmetic on a
+  date is NaN and publish refuses it (`app/Services/Forms/ExpressionOperandJudge.php`, "not supported yet");
+  `resources/js/components/help/manual.ts:894` describes a calculation as *"a total, an age from a birth date"*. Duration leaves the
+  palette for a calculation (`D140`), so the calculation has to do it. The remedy: `date_diff(start, end, unit)` (years, months,
+  weeks, days, hours, minutes), `date_add(date, n, unit)`, `age(date)`, `round(n, places)`, `sum(…)` and `coalesce(a, b)` in both
+  engines, with golden vectors, the operand judge and the function list in `docs/architecture/technical-architecture.md`.
+  **Live.** Filed by `M174`. **Tier: early-testing.**
+
+- **`nit` · The builder's draft check looks for a calculation's formula under the wrong key, so every calculated question would read "no formula yet".**
+  `resources/js/components/builder/draft-snapshot.ts:402` reads `config.formula`, but the formula lives in
+  `config.calculated_formula` (`resources/js/components/builder/ConfigPanel.vue:262`); `resources/js/components/builder/draft-snapshot.test.ts`
+  pins the wrong key. Nothing shows it today only because the preview never draws a calculated question; it will once a calculation
+  can be shown. The remedy: read `calculated_formula`, and the test with it. **Latent.** It surfaces once a calculated question can be
+  shown. Filed by `M174`. **Tier: early-testing.**
+
+- **`minor` · A Likert matrix is drawn as stacked cards that repeat the scale in every row, and a Likert scale as loose chips; neither looks like a Likert scale.**
+  The user (2026-10-16): *"the likert matrix doesnt look like likert matrix, make a deep research on how kobo make the likert
+  matrix"*. `resources/js/components/submissions/MatrixGrid.vue:94` draws each statement as its own card with the scale's words
+  repeated beside its radios (no `<table>`, by the docblock at `:9`); `resources/js/components/submissions/FieldInput.vue:258` sends
+  a Likert scale to the chip-row control. KoboToolbox's Rating question is one grid — a header row of scale words over equal-width
+  columns, a statement column about a third wide, one centred radio per cell (Enketo's `label` / `list-nolabel` table) — and its
+  `likert` appearance draws one scale as radios on a joined line with the words centred beneath. The remedy, with the grid's table
+  row (`R-1c1d7266`): the Likert matrix is that grid from 48em and, below it, each statement's scale is the joined line; a Likert
+  scale takes the joined line at every width; the web form, manual entry and the preview share it; the PDF and print draw the grid
+  with tick boxes; answers stay `{row: score}`. **Live.** Filed by `M174`. **Tier: early-testing.**
+
+- **`minor` · A question keeps no history of its changes, so an author cannot see which setting changed, from what, or put one change back.**
+  The testers' comment (2026-10-11, comment 5): *"it is best to have a ledger/list/log of the nitty-gritty changes per field … An
+  option to revert changes on each of the field modification … Revert changes should state what the previous state was before
+  applying reversal (this can be another module)"*. Undo lives in memory and is lost on reload; the edit journal holds unsent edits
+  only; a question records who last changed it (`app/Services/Forms/FormBuilderService.php:301`) and nothing more; draft edits are
+  deliberately kept out of the audit ledger (`docs/audit-compliance-logging-spec.md`, "Deliberately NOT audited"). The remedy: a
+  `form_field_revisions` table keyed by the question key (so it survives a publish), written wherever a question is saved,
+  converted or moved — who, when, which setting, before and after; a History tab in the right panel lists them, and **Put back**
+  shows the earlier value before applying it as an ordinary edit with one undo entry. **Live.** Filed by `M174`.
+  **Tier: during-testing.**

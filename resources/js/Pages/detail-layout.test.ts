@@ -138,6 +138,7 @@ describe('console workspace page — the identity and plan cards sit beside the 
         const layout = nested(block, '.admin-td__layout');
 
         expect(layout, '@container (min-width: 75rem) .admin-td__layout').not.toBeNull();
+        expect(layout).toMatch(/display:\s*grid/);
         expect(layout).toMatch(ASIDE_SPLIT);
         expect(nested(block, '.admin-td__layout > .admin-td__grid')).toMatch(/grid-column:\s*2/);
         expect(nested(block, '.admin-td__layout > .admin-td__main')).toMatch(/grid-column:\s*1/);

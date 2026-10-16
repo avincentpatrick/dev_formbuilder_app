@@ -45,6 +45,7 @@ describe('manual entry — a reading column with the side panel beside it', () =
         const layout = nested(block, '.encode:not(.encode--scan) .encode__layout');
 
         expect(layout, '@container (min-width: 75rem) .encode:not(.encode--scan) .encode__layout').not.toBeNull();
+        expect(layout).toMatch(/display:\s*grid/);
         expect(layout).toMatch(/grid-template-columns:\s*minmax\(0,\s*45rem\)\s+minmax\(18rem,\s*26rem\)/);
         expect(nested(block, '.encode:not(.encode--scan) .encode__aside')).toMatch(/grid-column:\s*2/);
         expect(nested(block, '.encode:not(.encode--scan) .encode__main')).toMatch(/grid-column:\s*1/);

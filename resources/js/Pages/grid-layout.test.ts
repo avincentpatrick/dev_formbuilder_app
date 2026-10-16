@@ -82,6 +82,7 @@ describe('achievements — the leaderboard sits beside the team tiles', () => {
     it('splits the workspace in two from a 75rem container, a lone team across the row', () => {
         const block = containerBlock(styleOf(ACHIEVEMENTS), '75rem');
 
+        expect(nested(block, '.ach__workspace')).toMatch(/display:\s*grid/);
         expect(nested(block, '.ach__workspace')).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s+minmax\(0,\s*1fr\)/);
         expect(nested(block, '.ach__team:only-child')).toMatch(/grid-column:\s*1 \/ -1/);
     });

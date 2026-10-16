@@ -24,10 +24,20 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D135`, the last one filed, was asked and answered on 2026-10-15 in the build session that filed it and recorded in `M173`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D136`, the last one filed, was asked and answered on 2026-10-16 in the build session that filed it and recorded in `M174`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D136 — The staff manual-entry page keeps its questions in a reading-width column (`D121`), with a side panel carrying form facts, progress and reference files; but the page is sent no form status and no reference files — showing those needs new server data and a staff download, not layout. What goes in the side panel in UI3? **A — facts and steps: the form's name and version, the open or closed notice, and the form's sections with the current one marked; the version's reference files filed as their own row.**
+
+**Asked and answered 2026-10-16 (user decision, in chat), recorded by Lane A in `M174`'s claim.** Found while verifying `R-66952d33`'s premise: `app/Services/Submissions/EncodeFormPresenter.php` sends the version number and nothing about the form's status or its reference files (those reach the builder only, through `forms.reference-files.index`), and the autosave label must stay in the header beside Cancel, where a keyer looks before leaving.
+
+- **A — facts and steps (recommended, chosen).** The panel shows what the page already has; `R-66952d33` stays a layout row; the reference files become their own row.
+- **B — also the reference files**, as download links for staff: new server data through the encode presenter (a hub) and a permission check; a bigger increment and a later merge.
+- **C — the column only for now**: the questions keep a 45rem column and the panel is filed as its own row; the right side of a wide screen stays empty on this page.
+
+**What the answer files, in the same push:** `R-66952d33`'s remedy amended to A; a new `during-testing` row for the version's reference files on the manual-entry page.
+
 ### D135 — The form's Settings tab shows one section at a time (a rail switches thirteen sections), so `R-14971e37`'s remedy — the sections laid two-up — has nothing to pair. Once the page fills the width, how should the tab use a wide screen? **A — keep the rail: one section at a time, as today; every labelled box in a section keeps a reading width (48rem) while the lists and tables inside a section fill the width.**
 
 **Asked and answered 2026-10-15 (user decision, in chat), recorded by Lane A in `M173`'s claim.** Found while verifying `R-14971e37`'s premise: `resources/js/components/forms/FormSettingsSections.vue` mounts each section once and shows only the active one (`v-show`), the same component the builder's Settings pop-up mounts, so two sections are never on screen together. Without a remedy, removing the shell's cap (`R-fd7b8879`) would stretch a section's boxes to about 2,000px on a 2560px screen.

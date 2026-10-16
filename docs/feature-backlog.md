@@ -14220,7 +14220,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   panel. The remedy: from 75rem a two-column grid — the form at a 45rem measure and an aside holding the facts that today sit above
   it (the form's status and version, the schedule notice, the reference files, the autosave state); scan mode's equal halves
   (`M168`) unchanged. The page's two `--mds-color-danger-text` uses (`:1921`, `:2029`) take `--mds-color-status-danger-fg` with this
-  row, so the consistency row never edits this hub. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
+  row, so the consistency row never edits this hub. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Remedy amended 2026-10-16 by `M174` (`D136` A, the user):** the page is sent no form status and no reference files (`app/Services/Submissions/EncodeFormPresenter.php:203-233` — the version number only), and the autosave label stays in the header beside Cancel. The side panel holds the form's name and version, the open or closed notice, and the form's sections with the current one marked — the list shown from the split only, the "Step N of M" line kept at every width; scan mode keeps its halves; the version's reference files are filed as their own row.
 
 - **`minor` · The feedback panel is in every captured screenshot, a report carries no type, and only the page's path is recorded.**
   The user's comment (2026-10-14): *"when i click capture screen, the modal for the feedback is always included. i think there is a
@@ -14563,3 +14563,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   including that undoing a delete also brings back the comparison rules it cleared. The remedy: the label as the buttons'
   accessible description and in a polite status after each undo or redo, keeping the name and the title the visible text.
   **Live.** Filed by `M172`. **Tier: during-testing.**
+
+- **`minor` · A keyer on the manual-entry page cannot open the reference files the form's version carries.**
+  Found by `M174` while verifying `R-66952d33`: a version's reference files (`M132`; hidden from respondents since `M138`, `D92` A)
+  are listed only to whoever may edit the form (`routes/tenant.php:1093`, `can:update,form`, on the draft), and
+  `app/Services/Submissions/EncodeFormPresenter.php:203-233` sends none, so a staff member keying a paper response cannot open the
+  instructions or the blank the author attached. `D136` A (the user, 2026-10-16) put the manual-entry side panel's facts and steps in
+  `M174` and filed this as its own row. The remedy: the presenter sends the entered version's reference files (name, size, a download
+  link under the permission that lets a member enter responses), and the side panel lists them under the facts.
+  **Live.** Filed by `M174`. **Tier: during-testing.**

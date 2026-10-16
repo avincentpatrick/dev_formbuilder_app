@@ -30,11 +30,10 @@ const rows = [
 const render = () => ({
     components: { DataTable, Badge, Button },
     setup: () => ({ columns, rows, statusVariant }),
-    // JR4: 1600, mirroring `.app-shell__inner--wide`. The story never reaches it — the Storybook iframe is
-    // ~1280px — so this is fidelity, not layout: a composed story that claims to be the shape a list page
-    // renders should not carry the cap the app stopped using.
+    // M173: no cap, mirroring `.app-shell__inner` — the app shell caps no page's width (`D120`), so a composed
+    // story that claims to be the shape a list page renders carries none either.
     template: `
-        <main style="max-width:1600px;margin:0 auto;padding:var(--mds-space-8)">
+        <main style="padding:var(--mds-space-8)">
             <header style="display:flex;align-items:center;justify-content:space-between;
                            gap:var(--mds-space-4);margin-bottom:var(--mds-space-6)">
                 <h1 style="margin:0;font-family:var(--mds-font-family-display);

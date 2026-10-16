@@ -555,7 +555,7 @@ are still in place.
 
   *The original row, preserved:* `tests/e2e/support/axe.ts:41-44`
   (twin at `tests/e2e/builder-axe.spec.ts:88-91`) measures
-  `document.documentElement.scrollWidth > clientWidth + 1`, while `resources/js/Layouts/AppLayout.vue:147`
+  `document.documentElement.scrollWidth > clientWidth + 1`, while `resources/js/Layouts/AppLayout.vue:114`
   sets `.app-shell { overflow-x: clip }` and `.app-shell__content` is `overflow-y: auto`, so its
   `overflow-x` computes to `auto`. **Any overrun clips or scrolls inside the content region and the
   document width never moves.** Delete `min-width: 0` from the leaderboard name cell
@@ -565,8 +565,8 @@ are still in place.
   `responsive-axe.spec.ts`, whose ~40 comment lines name this assertion as the reason those pages are
   scanned at all (`/domains`' 64-hex tokens, `/analytics`' legends, the audit-diff cells, `/feedback`'s
   long URLs). **The repo already knows better everywhere else**: `docs/ux/exceptions-log.md:646-651`,
-  `tests/e2e/list-layout.spec.ts:10-17` and `search-nav.spec.ts:6-10` all record that the clip pins it
-  flat. Only three element-level replacements exist (`list-layout.spec.ts:45-56`,
+  `tests/e2e/list-layout.spec.ts:11-18` and `search-nav.spec.ts:6-10` all record that the clip pins it
+  flat. Only three element-level replacements exist (`list-layout.spec.ts:46-57`,
   `search-nav.spec.ts:89-100`, `personalization-axe.spec.ts:95-101`), covering three surfaces.
   ⚠️ **`AuthLayout`, `AdminLayout`, the guest runtime and `Welcome.vue` carry no clip**, so
   `auth-axe`, `admin-console-axe` and `public-runtime-*` are unaffected — do not "fix" them. **Live**, and
@@ -2997,7 +2997,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   written this way. Fix is the same one-line `if (channelsLoading.value) return;`. Filed by `M23`. **Not live** — the repaired button guard already stops the duplicate click, exactly as the row itself says, judged by `M65`. ✅ **CLOSED BY `M94` (2026-09-14) — NOT LIVE.** The channel-refresh button's own loading state already ignores a second click, and the call is a read with no side effect, so no defect is reachable.
 - **`minor` · Thirteen Vitest stubs across four files are silently inert.**
   `resources/js/Pages/submissions/show.test.ts:109-113,266-270` · `resources/js/components/sso/cards.test.ts:37`
-  · `resources/js/components/sso/SsoPolicyCard.test.ts:84` · `resources/js/Layouts/AppLayout.test.ts:47` —
+  · `resources/js/components/sso/SsoPolicyCard.test.ts:84` · `resources/js/Layouts/AppLayout.test.ts:49` —
   all key `global.stubs` on the **barrel export alias** (`MdsCard`, `MdsBadge`, `MdsModal`, `MdsTextarea`,
   `MdsFormField`, `MdsToastHost`). Vue Test Utils matches a stub against the component's own inferred name,
   which for a `<script setup>` SFC is its **filename** — `Card.vue` gives `Card`. So none of them matches
@@ -11388,7 +11388,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   collapse specially when form building is the active page so we have plenty of room for form builder"*.
   `Sidebar.vue` has no collapse affordance: its width is purely media-query driven — 240px above 1024px, a 64px
   icon rail below it (`:403-405`), an off-canvas drawer below 480px (`:447-475`) — and the only state that exists
-  is the mobile drawer, owned at `AppLayout.vue:17` and reset on every navigation (`:84-86`). ⚠️ **There is no
+  is the mobile drawer, owned at `AppLayout.vue:17` and reset on every navigation (`:54-56`). ⚠️ **There is no
   localStorage anywhere in `resources/js/`**: the single hit is a *comment* at `Pages/forms/Index.vue:104`
   explaining why a stored flag was deliberately not used, so adding one would be this app's first client-side
   persisted preference and a new architectural precedent. ✅ **The precedent that already exists is server-side
@@ -14127,12 +14127,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `min(100%, 20rem)` floor; `resources/js/Pages/integrations/index.test.ts` pins the rules. **Live.** Filed by `M171`.
   **Tier: during-testing.** ✅ **CLOSED BY `M171` (2026-10-15):** H15b's paragraph rule is restored (the dangling list was left by J4a's `74a0e1f6`); the Connect button moved into `MdsCard`'s footer slot and the card became a column whose body grows (gap `--mds-space-3`), so every button sits on one line across a row of cards with the footer's 16px above it. Not the remedy's `margin-top: auto`: an auto margin is zero in the tallest card of a row, which is the Google card with the warning. The grid is `auto-fill`, floor `min(100%, 20rem)`. `list-layout.spec.ts` measures the warning-to-button gap (0px on the trunk at all three widths) and one line of buttons at 1440.
 
-- **`minor` · Every tenant page sits in a centred 1200px column (1600px for ten list pages) and the console in 1100px, leaving dead space either side of a wide screen.**
+- ✅ **CLOSED BY `M173` (2026-10-16) — ****`minor` · Every tenant page sits in a centred 1200px column (1600px for ten list pages) and the console in 1100px, leaving dead space either side of a wide screen.**
   The user's comment (2026-10-14): *"some pages only occupies the middle part of the page specially when screen is wide. can we make
-  every page occupy the whole width? no content on the middle only"*. `resources/js/Layouts/AppLayout.vue:169` caps
+  every page occupy the whole width? no content on the middle only"*. `resources/js/Layouts/AppLayout.vue` caps
   `.app-shell__inner` at 1200px, `:192` at 1600px for the `WIDE_PAGES` set (`:48-59`), `:197` none for the builder;
   `resources/js/Layouts/AdminLayout.vue:199` caps `.admin__inner` at 1100px. `resources/js/Layouts/AppLayout.test.ts:68-90` pins the
-  set, `tests/e2e/list-layout.spec.ts:100-119` asserts `/settings` is exactly 1200px at a 1600px window,
+  set, `tests/e2e/list-layout.spec.ts` asserts `/settings` is exactly 1200px at a 1600px window,
   `packages/design-system/src/stories/ListPage.stories.ts:37` and `packages/design-system/src/stories/CardGrid.stories.ts:98`
   hard-code 1600px, and `docs/ux/design-system-reference.md:588` ("a consistent max-width") and `:1541` ("a padded,
   max-width-constrained column") record the rule being changed. `D120` A (the user, 2026-10-14): fill with layout. The remedy:
@@ -14141,10 +14141,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   list page AND `/settings` fill the region (red today); the two stories; DSR §3.0 and the §6 bullet amended — and the same edit
   records the page-level `dl` collapse at 480px that ten pages author (`resources/js/Pages/scopes/Index.vue:387`,
   `resources/js/Pages/forms/Show.vue:594`) against §6's "pages never add breakpoint logic" sentence, which today contradicts them.
-  **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
+  **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** ✅ **CLOSED BY `M173` (2026-10-16):** `AppLayout.vue` and `AdminLayout.vue` cap no width; one more step of side padding (`--mds-space-12`) from a 1920px viewport; `WIDE_PAGES` and the `--wide` class deleted, the builder's `--fluid` kept. `AppLayout.test.ts` gives every former wide page and every former exclusion the plain column and pins the stylesheet as text; `list-layout.spec.ts` measures `/submissions`, `/settings` and `/dashboard` filling the region at 1920 (1600 and 1200px in a 1680px region on the trunk) and at 2560, with 48px padding at 1920 and 32px at 1440. The stories carry no cap. DSR §3.0 and §6 amended — the row's "ten pages" with a 480px `dl` collapse were five pages and one component, and the `TwoColumnLayout` primitive §6 named was never built, so the amendment records the `auto-fill` pattern instead. Three comments that explained themselves by the cap corrected; `FormCard.vue`'s dated measurement left as history.
 
-- **`minor` · The settings pages stack 640px cards in one column, so a wide screen shows one narrow column and the rest of the page empty.**
-  `resources/js/Pages/Settings/Index.vue:482` (`.settings-card { max-width: 640px }`) with `:475` a column; `resources/js/Pages/Settings/Sso.vue:158`
+- ✅ **CLOSED BY `M173` (2026-10-16) — ****`minor` · The settings pages stack 640px cards in one column, so a wide screen shows one narrow column and the rest of the page empty.**
+  `resources/js/Pages/Settings/Index.vue` (`.settings-card { max-width: 640px }`) with `:475` a column; `resources/js/Pages/Settings/Sso.vue:158`
   and `:151`; `resources/js/Pages/admin/Settings.vue:188`; and the same 640px cap re-declared in every card component —
   `resources/js/components/settings/AboutCard.vue:110`, `resources/js/components/settings/MaintenanceCard.vue:104`,
   `resources/js/components/settings/ModulesCard.vue:121`, `resources/js/components/settings/AccessCard.vue:159`,
@@ -14154,24 +14154,24 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `resources/js/components/sso/IdpMetadataCard.vue:223`. `D120` A. The remedy: the caps go; the cards sit in
   `repeat(auto-fill, minmax(min(100%, 36rem), 1fr))` with `align-items: start` (two columns at 1440, three from 1920); the console
   page's Save foot spans the row; the 380px input measure inside a card (`resources/js/Pages/Settings/Index.vue:505`) stays, since
-  `D120` keeps a measure for inputs. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
+  `D120` keeps a measure for inputs. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** ✅ **CLOSED BY `M173` (2026-10-16):** the three pages lay their cards in `repeat(auto-fill, minmax(min(100%, 30rem), 1fr))`, top-aligned — not the 36rem above, which gives one column at 1440 (1136px of room, 1172px needed); the 640px cap gone from the three pages and the eleven cards; the console's refusal alert and Save foot span the row; the forms' 380px measure kept. `settings-layout.test.ts` pins it; `list-layout.spec.ts` counts two columns at 1440 and three at 1920 on `/settings` (one on the trunk; one again with a 36rem mutant) and two at 1440 on `/admin/settings`. The SSO failures card holds a list, not a table, so it stays one card; no e2e seed is entitled to SSO, so that page's grid is pinned by source only.
 
-- **`minor` · The scanned-forms and scan-status pages cap themselves at 720px, and the recent-scans list runs each row from one edge to the other.**
+- ✅ **CLOSED BY `M173` (2026-10-16) — ****`minor` · The scanned-forms and scan-status pages cap themselves at 720px, and the recent-scans list runs each row from one edge to the other.**
   `resources/js/Pages/ocr/Scans.vue:300` and `resources/js/Pages/ocr/ScanStatus.vue:135` (`max-width: 720px`); `Scans.vue:395-414` lays
   the recent scans as full-width rows with the status at the left edge and the action link at the right
   (`justify-content: space-between` at `:408`). Three error texts here read `--mds-color-danger-text` (`Scans.vue:358`, `:433`,
   `ScanStatus.vue:150`), which resolves to `danger-300` in dark and fails 4.5:1 on the surface; they take `--mds-color-status-danger-fg`
   with this row so the consistency row never edits these files. `D120` A and `D121` A (the upload form keeps a measure as a form; the
   list fills). The remedy: the caps go; the list becomes a card grid (`auto-fill minmax(min(100%, 28rem), 1fr)`); from 75rem the
-  upload card keeps a 36rem measure beside the list. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
+  upload card keeps a 36rem measure beside the list. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** ✅ **CLOSED BY `M173` (2026-10-16):** the caps gone; `.scans` is the container and `.scans__layout` splits from `@container (min-width: 75rem)` — the upload card at 36rem beside the recent scans; the list an `auto-fill` 28rem grid of the same rows; three error texts in `--mds-color-status-danger-fg`. Pinned in `scans.test.ts` and `scan-status.test.ts`; `list-layout.spec.ts` measures the card at 576px beside a 984px list of two-across rows at 1920 (720px stacked, every row the full list, on the trunk).
 
-- **`minor` · The form's Settings tab stretches every section's inputs across the whole width.**
+- ✅ **CLOSED BY `M173` (2026-10-16) — ****`minor` · The form's Settings tab stretches every section's inputs across the whole width.**
   `resources/js/Pages/forms/Settings.vue:67` mounts `FormSettingsSections` in one `MdsCard` with no measure, and
   `resources/js/components/forms/FormSettingsSections.vue:354` is the component's only container query (420px, the narrow side).
   `D120` A and `D121` A: inputs keep a reading-width column. The remedy: from a 60em container the sections lay two-up
   (`auto-fill minmax(min(100%, 32rem), 1fr)`, `align-items: start`), each section's controls at a 36rem measure; the 880px settings
   modal stays one column because its container never reaches 60em; a new Vitest case on the source pins the query, the way
-  `resources/js/Pages/forms/builder-layout.test.ts` pins the builder's. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
+  `resources/js/Pages/forms/builder-layout.test.ts` pins the builder's. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Remedy amended 2026-10-15 by `M173` (`D135` A, the user):** the two-up layout above cannot work — `FormSettingsSections.vue` shows one section at a time behind its rail, so two sections are never on screen together. The rail stays; one rule holds every `MdsFormField` (`.mds-field`) inside a section at 48rem, so the boxes keep a reading width while a section's lists and tables fill; the pop-up and the 420px query are unchanged; the pin is a source-text Vitest case plus a browser measurement in `tests/e2e/list-layout.spec.ts`. ✅ **CLOSED BY `M173` (2026-10-16) (`D135` A):** one rule holds every `.mds-field` in a section, and the four rows that carry a panel's Save button, at 48rem; lists and tables fill. `FormSettingsSections.layout.test.ts` pins it; `list-layout.spec.ts` measures the Details boxes at 768px with the body wider than 1200px at 1920 (934px boxes on the trunk; 1382px with the rule dropped) and the Save button ending where the boxes end — the real-browser look found it 614px to their right before the save rows took the measure.
 
 - **`minor` · The form hub and the submission page stack their facts above their tables, so on a wide screen every row runs from one edge of the glass to the other.**
   `resources/js/Pages/forms/Show.vue:343-366` (identity and facts), `:368-407` (tiles), `:415-487` (two full-width tables);
@@ -14243,7 +14243,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The user's request (2026-10-14): *"lets also have a what's new prompt to users for new login so users are aware for every changes.
   versioning must also be included. lets put the current version in the app, footer and login so users are aware."* `config/app.php:32`
   reads `APP_VERSION` with the default `dev` and `app/Support/Platform/BuildInfo.php:28-33` passes it through; `.env.example:22` leaves it
-  blank and `deploy.ps1` never sets it. The shell has no footer (`resources/js/Layouts/AppLayout.vue:110-116`), the sidebar ends at Help
+  blank and `deploy.ps1` never sets it. The shell has no footer (`resources/js/Layouts/AppLayout.vue:80-83`), the sidebar ends at Help
   (`resources/js/components/shell/nav-model.ts:140`), the account menu lists Settings and Log out
   (`resources/js/components/shell/AccountMenu.vue:27-30`), and the gap-table row at `docs/feature-backlog.md:160` names a What's new
   feed that nothing queues. `D124` A (0.9.0 now, 1.0.0 at launch), `D125` C (changed by the user on 2026-10-15: the notes written
@@ -14284,7 +14284,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `resources/js/Pages/help/Index.vue:223` (0.04em), `resources/js/components/shell/Sidebar.vue:338` (0.06em) and
   `resources/js/Layouts/AdminLayout.vue:130` (0.04em); `packages/design-system/src/components/FilterBar/FilterBar.vue:58-61` records the
   token as the one letting for the product's micro-labels (the console workspace page's and the landing page's literals are taken by
-  their own rows). The remedy is the token. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
+  their own rows). The remedy is the token. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Narrowed 2026-10-15 by `M173`:** `M173` edits `resources/js/Layouts/AdminLayout.vue` for the shell row and takes its literal there, as the UI programme's plan intended; this row's remainder is `help/Index.vue` and `Sidebar.vue`.
 
 - **`nit` · Three truncated values offer no way to read the whole text where they are shown.**
   `resources/js/Pages/webhooks/Index.vue:224-236` (`.webhooks__url`), `resources/js/Pages/integrations/Index.vue:456-468`

@@ -21,46 +21,16 @@ const page = usePage();
 const { toasts, push, dismiss } = useToast();
 
 // Full-bleed pages (the form builder) manage their own internal layout + scroll and fill the whole
-// content region edge-to-edge — no centered max-width, no shell padding. Detected off the current page
-// component so the SINGLE persistent AppLayout instance is kept (no remount/flash on entering the
-// builder); the workspace itself owns overflow, so the shell's scroll region is disabled for it.
+// content region edge-to-edge — no shell padding. Detected off the current page component so the SINGLE
+// persistent AppLayout instance is kept (no remount/flash on entering the builder); the workspace itself
+// owns overflow, so the shell's scroll region is disabled for it.
+//
+// Every other page also fills the region (M173, `D120`): the shell caps no page's width. JR4 capped them at
+// 1200px (1600px for a list of ten) so a row's title and its date would not sit at opposite edges of a wide
+// screen; that job now belongs to each page's own layout — card grids that gain columns, a reading measure
+// for inputs and prose — never to a centred column with empty space either side.
 const FLUID_PAGES = new Set<string>(['forms/Builder']);
 const fluid = computed(() => FLUID_PAGES.has(page.component));
-
-// JR4 — wide pages cap at 1600 rather than 1200, detected the same way and for the same reason (one
-// persistent instance, no props, no page-side change). THE RULE, so the next page is easy to classify:
-// a page is wide when its main content is an unbounded collection of PEER ITEMS THAT GAIN A COLUMN —
-// a data table, a card grid. Everything else keeps 1200, where the cap is doing its real job of holding
-// a readable measure.
-//
-// ⚠️ OPT-IN RATHER THAN OPT-OUT, DELIBERATELY, BECAUSE OF WHAT FORGETTING COSTS. A list page missing
-// from this set renders exactly as it does today; a settings form missing from an exclusion list would
-// render 1600px of input fields. The failure mode of forgetting has to be "no change".
-//
-// The exclusions are measured, not left over: `domains/Index` (:217) and `search/Index` (:211) are
-// `flex-direction: column` stacks of FULL-WIDTH cards, so widening them produces the very defect this
-// increment exists to remove — a title at one edge of the glass and its date at the other. `scopes` is
-// a tree beside a detail pane, `Settings` and `submissions/Encode` are forms whose 640px cards would be
-// stranded at the left of a 1600px column, and every detail page is about one thing rather than many.
-//
-// `submissions/Inbox` is ONE component name for TWO routes (`/submissions` and the per-form Responses
-// tab, both rendered by SubmissionInboxController). Both get the wide column; both are a list.
-const WIDE_PAGES = new Set<string>([
-    'Dashboard',
-    'analytics/Index',
-    'audit/Index',
-    'feedback/Index',
-    'forms/Index',
-    'forms/Templates',
-    'integrations/Index',
-    'members/Index',
-    'submissions/Inbox',
-    'webhooks/Index',
-]);
-// `!fluid` first: a page in both sets must keep its full-bleed layout rather than acquire a cap. The CSS
-// is also ordered so `--fluid` wins on specificity ties — belt and braces, because these two modifiers
-// are the only place in the app where two layout classes can meet on one element.
-const wide = computed(() => !fluid.value && WIDE_PAGES.has(page.component));
 
 // Server flash → toast bridge: any controller that redirects with ->with('toast', {...}) surfaces it
 // here once. Fires on the visit that carries the flash (immediate covers a redirect-then-render).
@@ -107,10 +77,7 @@ watch(() => page.url, () => {
                 aria-label="Main content"
                 @scroll="onScroll"
             >
-                <div
-                    class="app-shell__inner"
-                    :class="{ 'app-shell__inner--wide': wide, 'app-shell__inner--fluid': fluid }"
-                >
+                <div class="app-shell__inner" :class="{ 'app-shell__inner--fluid': fluid }">
                     <slot />
                 </div>
             </main>
@@ -165,34 +132,15 @@ watch(() => page.url, () => {
     overflow: hidden;
 }
 
+/* M173 (`D120`) — no cap: the column is the whole region less its padding, at every width. A page lays its
+   own width out. ⚠️ No project in the Playwright matrix can see a width (its widest is 1440, where JR4's
+   1200px cap never bound either), so `tests/e2e/list-layout.spec.ts` measures this at 1920 and 2560 and
+   `AppLayout.test.ts` pins the rule as text. */
 .app-shell__inner {
-    max-width: 1200px;
-    margin: 0 auto;
     padding: var(--mds-space-8);
 }
 
-/* JR4 — ⚠️ 1600, AND THE INTERESTING NUMBER IS THE ONE THIS IS NOT. `max-width: none` is what the
-   complaint appears to ask for and it is wrong: unbounded, a row on a 32" panel puts a form's title at
-   one edge and its date at the other and the eye cannot carry the association across two feet of glass.
-   Same reasoning as the forms grid's `auto-fill` rather than `auto-fit` (`forms/Index.vue:688`).
-
-   THE GUTTER IS ARITHMETIC, NOT TASTE. The content region is `viewport − 240` (the sidebar) and the
-   column is capped, so the dead space EACH SIDE is:
-       cap 1200 → 0 @1440 ·  80 @1600 · 240 @1920 · 560 @2560
-       cap 1600 → 0 @1440 ·   0 @1600 ·  40 @1920 · 200 @2560
-   A wide monitor is filled; a very wide one still reads as a page rather than a spreadsheet.
-
-   ⚠️ AND NO GATE IN THIS REPO CAN SEE THIS CHANGE — Playwright's widest project is 1440×900, where the
-   gutter is exactly 0 both before and after. That is why it survived every increment, and why
-   `tests/e2e/list-layout.spec.ts` sets its own 1600px viewport rather than trusting the matrix.
-
-   Declared BEFORE `--fluid`: both are single-class specificity, so source order is the only thing that
-   makes `max-width: none` win if a page ever appears in both sets. */
-.app-shell__inner--wide {
-    max-width: 1600px;
-}
-
-/* Edge-to-edge, full-height, no centered column — the page fills the region. */
+/* Edge-to-edge, full-height — the builder owns its own layout and scroll. */
 .app-shell__inner--fluid {
     max-width: none;
     height: 100%;
@@ -203,6 +151,13 @@ watch(() => page.url, () => {
 @media (max-width: 480px) {
     .app-shell__inner:not(.app-shell__inner--fluid) {
         padding: var(--mds-space-4);
+    }
+}
+
+/* One more step of side padding on a wide screen, so a page's content never meets the edge of the glass. */
+@media (min-width: 1920px) {
+    .app-shell__inner:not(.app-shell__inner--fluid) {
+        padding-inline: var(--mds-space-12);
     }
 }
 </style>

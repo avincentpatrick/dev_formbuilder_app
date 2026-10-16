@@ -728,8 +728,8 @@ function submitRestore(): void {
     guard — it was the one grid in the app without one.)
 
     `auto-fill`, not `auto-fit`: with `auto-fit` the empty tracks collapse, so a tenant with ONE form
-    gets a single card stretched across the whole column — 1600px on this page since JR4 made it a wide
-    one. `auto-fill` keeps it card-sized, which is also what the approved direction draws.
+    gets a single card stretched across the whole column — the whole content region since M173 removed
+    the shell's cap. `auto-fill` keeps it card-sized, which is also what the approved direction draws.
 */
 .forms__grid {
     display: grid;

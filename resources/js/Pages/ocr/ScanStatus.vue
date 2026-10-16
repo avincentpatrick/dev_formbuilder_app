@@ -128,11 +128,11 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/* M173 (`R-8ee7d2dc`, `D120`) — the page fills the width; it was a 720px column. */
 .scan-status {
     display: flex;
     flex-direction: column;
     gap: var(--mds-space-4);
-    max-width: 720px;
 }
 
 .scan-status__reading {
@@ -147,7 +147,7 @@ onBeforeUnmount(() => {
 
 .scan-status__check {
     margin: var(--mds-space-3) 0 0;
-    color: var(--mds-color-danger-text);
+    color: var(--mds-color-status-danger-fg);
     font-size: var(--mds-type-body-sm-font-size);
 }
 

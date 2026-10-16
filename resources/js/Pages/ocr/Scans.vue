@@ -206,98 +206,124 @@ function uploadedAt(iso: string): string {
             read automatically, and you check every answer before it is saved as a response.
         </p>
 
-        <MdsAlert v-if="refusal !== null" tone="info" :message="refusal" />
+        <div class="scans__layout">
+            <MdsAlert v-if="refusal !== null" class="scans__upload-card" tone="info" :message="refusal" />
 
-        <MdsCard v-else>
-            <form class="scans__upload" @submit.prevent="send">
-                <label class="scans__label" for="scan-pages">Pages of one form</label>
-                <p id="scan-pages-hint" class="scans__hint">
-                    Up to {{ upload.max_pages }} photos, one per page, or one PDF. JPEG, PNG, WebP or PDF, up to
-                    {{ perFileMegabytes }} MB each.
-                </p>
-                <input
-                    id="scan-pages"
-                    class="scans__file"
-                    type="file"
-                    multiple
-                    :accept="accept"
-                    aria-describedby="scan-pages-hint"
-                    :aria-invalid="error !== null ? 'true' : undefined"
-                    :aria-errormessage="error !== null ? 'scan-pages-error' : undefined"
-                    @change="onChoose"
-                />
-                <p v-if="error !== null" id="scan-pages-error" class="scans__error" role="alert">{{ error }}</p>
-                <ChosenPages :pages="chosenView" :disabled="sending" @remove="remove" />
-                <p class="scans__announce" aria-live="polite">{{ announce }}</p>
-                <div class="scans__actions">
-                    <MdsButton type="submit" variant="primary" icon-left="upload" :loading="sending">
-                        Read this scan
+            <MdsCard v-else class="scans__upload-card">
+                <form class="scans__upload" @submit.prevent="send">
+                    <label class="scans__label" for="scan-pages">Pages of one form</label>
+                    <p id="scan-pages-hint" class="scans__hint">
+                        Up to {{ upload.max_pages }} photos, one per page, or one PDF. JPEG, PNG, WebP or PDF, up to
+                        {{ perFileMegabytes }} MB each.
+                    </p>
+                    <input
+                        id="scan-pages"
+                        class="scans__file"
+                        type="file"
+                        multiple
+                        :accept="accept"
+                        aria-describedby="scan-pages-hint"
+                        :aria-invalid="error !== null ? 'true' : undefined"
+                        :aria-errormessage="error !== null ? 'scan-pages-error' : undefined"
+                        @change="onChoose"
+                    />
+                    <p v-if="error !== null" id="scan-pages-error" class="scans__error" role="alert">{{ error }}</p>
+                    <ChosenPages :pages="chosenView" :disabled="sending" @remove="remove" />
+                    <p class="scans__announce" aria-live="polite">{{ announce }}</p>
+                    <div class="scans__actions">
+                        <MdsButton type="submit" variant="primary" icon-left="upload" :loading="sending">
+                            Read this scan
+                        </MdsButton>
+                    </div>
+                </form>
+            </MdsCard>
+
+            <section class="scans__recent" aria-labelledby="scans-recent-title">
+                <h2 id="scans-recent-title" class="scans__title">Recent scans</h2>
+
+                <div class="scans__search">
+                    <MdsSearchField
+                        v-model="referenceQuery"
+                        :applied="search.reference ?? ''"
+                        label="Find a scan by its reference"
+                        placeholder="For example 7K4M-2QXB"
+                        @submit="findByReference"
+                    />
+                    <MdsButton v-if="search.reference !== null" variant="tertiary" size="sm" @click="showAll">
+                        Show all scans
                     </MdsButton>
                 </div>
-            </form>
-        </MdsCard>
 
-        <section class="scans__recent" aria-labelledby="scans-recent-title">
-            <h2 id="scans-recent-title" class="scans__title">Recent scans</h2>
-
-            <div class="scans__search">
-                <MdsSearchField
-                    v-model="referenceQuery"
-                    :applied="search.reference ?? ''"
-                    label="Find a scan by its reference"
-                    placeholder="For example 7K4M-2QXB"
-                    @submit="findByReference"
+                <MdsEmptyState
+                    v-if="scans.length === 0 && search.reference !== null"
+                    headline="No scan has that reference"
+                    description="Check the reference against what the sender was given. A reference is eight letters and digits, like 7K4M-2QXB."
                 />
-                <MdsButton v-if="search.reference !== null" variant="tertiary" size="sm" @click="showAll">
-                    Show all scans
-                </MdsButton>
-            </div>
 
-            <MdsEmptyState
-                v-if="scans.length === 0 && search.reference !== null"
-                headline="No scan has that reference"
-                description="Check the reference against what the sender was given. A reference is eight letters and digits, like 7K4M-2QXB."
-            />
+                <MdsEmptyState
+                    v-else-if="scans.length === 0"
+                    headline="No scans yet"
+                    description="Scans of this form appear here, newest first, with where each one stands."
+                />
 
-            <MdsEmptyState
-                v-else-if="scans.length === 0"
-                headline="No scans yet"
-                description="Scans of this form appear here, newest first, with where each one stands."
-            />
-
-            <ol v-else class="scans__list">
-                <li v-for="scan in scans" :key="scan.id" class="scans__row">
-                    <div class="scans__row-main">
-                        <MdsBadge :variant="badgeVariant(scan.status)" :label="scan.status_label" dot />
-                        <MdsBadge v-if="scan.from_public_link" variant="neutral" label="From the public link" />
-                        <span v-if="scan.reference" class="scans__reference">Reference {{ scan.reference }}</span>
-                        <span class="scans__meta">
-                            {{ uploadedAt(scan.created_at) }} ·
-                            {{ scan.pages }} {{ scan.pages === 1 ? 'page' : 'pages' }}<template v-if="scan.uploaded_by">
-                                · {{ scan.uploaded_by }}</template>
-                        </span>
-                    </div>
-                    <p v-if="scan.error_message" class="scans__row-error">{{ scan.error_message }}</p>
-                    <div class="scans__row-action">
-                        <Link v-if="scan.submission_url" :href="scan.submission_url" class="scans__link">
-                            View the response
-                        </Link>
-                        <Link v-else-if="scan.review_url" :href="scan.review_url" class="scans__link">
-                            {{ scan.status === 'read' ? 'Review' : 'Open' }}
-                        </Link>
-                    </div>
-                </li>
-            </ol>
-        </section>
+                <ol v-else class="scans__list">
+                    <li v-for="scan in scans" :key="scan.id" class="scans__row">
+                        <div class="scans__row-main">
+                            <MdsBadge :variant="badgeVariant(scan.status)" :label="scan.status_label" dot />
+                            <MdsBadge v-if="scan.from_public_link" variant="neutral" label="From the public link" />
+                            <span v-if="scan.reference" class="scans__reference">Reference {{ scan.reference }}</span>
+                            <span class="scans__meta">
+                                {{ uploadedAt(scan.created_at) }} ·
+                                {{ scan.pages }} {{ scan.pages === 1 ? 'page' : 'pages' }}<template v-if="scan.uploaded_by">
+                                    · {{ scan.uploaded_by }}</template>
+                            </span>
+                        </div>
+                        <p v-if="scan.error_message" class="scans__row-error">{{ scan.error_message }}</p>
+                        <div class="scans__row-action">
+                            <Link v-if="scan.submission_url" :href="scan.submission_url" class="scans__link">
+                                View the response
+                            </Link>
+                            <Link v-else-if="scan.review_url" :href="scan.review_url" class="scans__link">
+                                {{ scan.status === 'read' ? 'Review' : 'Open' }}
+                            </Link>
+                        </div>
+                    </li>
+                </ol>
+            </section>
+        </div>
     </div>
 </template>
 
 <style scoped>
+/* M173 (`R-8ee7d2dc`, `D120`, `D121`) — the page fills the width; it was a 720px column. The upload form keeps a
+   measure because it is a form; the recent scans become a grid. The page is the container for its own split, and
+   the split is on an inner wrapper, because an element cannot match its own container query (the `M129` note in
+   `FormSettingsSections.vue`). */
 .scans {
+    container-type: inline-size;
     display: flex;
     flex-direction: column;
     gap: var(--mds-space-4);
-    max-width: 720px;
+}
+
+.scans__layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-4);
+}
+
+.scans__upload-card {
+    max-inline-size: 36rem;
+}
+
+/* From 75rem of page the upload card sits beside the recent scans instead of above them. */
+@container (min-width: 75rem) {
+    .scans__layout {
+        display: grid;
+        grid-template-columns: minmax(0, 36rem) minmax(0, 1fr);
+        align-items: start;
+        gap: var(--mds-space-6);
+    }
 }
 
 .scans__intro {
@@ -355,7 +381,7 @@ function uploadedAt(iso: string): string {
 
 .scans__error {
     margin: 0;
-    color: var(--mds-color-danger-text);
+    color: var(--mds-color-status-danger-fg);
     font-size: var(--mds-type-body-sm-font-size);
 }
 
@@ -392,9 +418,11 @@ function uploadedAt(iso: string): string {
     font-weight: var(--mds-type-heading-3-font-weight);
 }
 
+/* A grid of the same bordered rows, so a wide screen shows more scans across rather than one row's status at the
+   left edge and its link at the right. `auto-fill` keeps a lone scan row-sized. */
 .scans__list {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 28rem), 1fr));
     gap: var(--mds-space-2);
     margin: 0;
     padding: 0;
@@ -430,7 +458,7 @@ function uploadedAt(iso: string): string {
 .scans__row-error {
     flex-basis: 100%;
     margin: 0;
-    color: var(--mds-color-danger-text);
+    color: var(--mds-color-status-danger-fg);
     font-size: var(--mds-type-body-sm-font-size);
 }
 

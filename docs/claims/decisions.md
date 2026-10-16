@@ -24,10 +24,20 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D134`, the last one filed, was asked and answered on 2026-10-15 in the planning session that filed it and recorded in `M172`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D135`, the last one filed, was asked and answered on 2026-10-15 in the build session that filed it and recorded in `M173`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D135 — The form's Settings tab shows one section at a time (a rail switches thirteen sections), so `R-14971e37`'s remedy — the sections laid two-up — has nothing to pair. Once the page fills the width, how should the tab use a wide screen? **A — keep the rail: one section at a time, as today; every labelled box in a section keeps a reading width (48rem) while the lists and tables inside a section fill the width.**
+
+**Asked and answered 2026-10-15 (user decision, in chat), recorded by Lane A in `M173`'s claim.** Found while verifying `R-14971e37`'s premise: `resources/js/components/forms/FormSettingsSections.vue` mounts each section once and shows only the active one (`v-show`), the same component the builder's Settings pop-up mounts, so two sections are never on screen together. Without a remedy, removing the shell's cap (`R-fd7b8879`) would stretch a section's boxes to about 2,000px on a 2560px screen.
+
+- **A — keep the rail (recommended, chosen).** One rule holds every `MdsFormField` inside a section at 48rem; lists, tables and grids inside a section (choice lists, automations, data sharing, theme presets) fill; the pop-up looks the same.
+- **B — every section as a card** in a two- or three-across grid on the Settings tab page only, the rail a jump-to list; all thirteen sections mount at once and the page and the pop-up stop looking alike.
+- **C — leave the tab alone** in this increment, the row kept open.
+
+**What the answer files, in the same push:** `R-14971e37`'s remedy amended to A (no new row).
+
 ### D134 — Duration and Signature questions can be placed on a form and answered on neither the web form nor manual entry (`R-af2d278b`). Build the controls now, or hide the two types until after testing? **A — build both controls, in the testers' programme's last increment.**
 
 **Asked and answered 2026-10-15 (user decision, in chat), recorded by Lane A in `M172`'s claim.** The testers asked whether the "Adv" question types are ready (item 6 of their first round); the eleven badged types are, and the two that are not carry no badge.

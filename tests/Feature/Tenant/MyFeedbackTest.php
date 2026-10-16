@@ -30,6 +30,8 @@ uses(RefreshDatabase::class);
 */
 
 beforeEach(function (): void {
+    // CI's Pest job builds no front end; an Inertia page render would look for the Vite manifest.
+    $this->withoutVite();
     TenantContext::flush();
     app(PermissionRegistrar::class)->setPermissionsTeamId(null);
     (new RolePermissionSeeder)->run();

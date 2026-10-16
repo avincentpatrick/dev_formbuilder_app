@@ -53,7 +53,7 @@ it('issues a token shown once, stores only its hash, and lists tokens without an
 
     $this->actingAs($admin)->get(adminUrl('/settings'))->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->component('admin/Settings')
+            ->component('admin/Settings', false)
             ->has('support_tokens', 1)
             ->where('support_tokens.0.name', 'Dev laptop — feedback pull')
             ->where('support_tokens.0.owner.email', $admin->email)

@@ -17,6 +17,7 @@ copy that will be wrong within days. `scripts/tracker-lint.php` R8 enforces it a
 ```
 php scripts/preflight.php --lane=a
 php scripts/state.php
+php scripts/feedback-pull.php --out=<this session's scratchpad>\feedback
 ```
 
 `preflight` asserts the branch base, whether your claim is published, whether another suite is
@@ -25,6 +26,14 @@ again with `--with-gates --with-pint` before you push.
 
 `state.php` derives the numbers and prints what is stale. Neither is a CI step, and neither belongs
 in `composer run quality` — do not "fix" that by registering them.
+
+⛔ **The pull reads the testers' New and Ongoing feedback — triage every report before the first row**, by
+the feedback rule in `PROGRESS.md`'s Standing Rules: already fixed and live → `--resolve=<id> --version=<sha>`;
+already queued → `--ongoing=<id>` and cite the report on its row; new → file a row (a bug `early-testing`, a
+suggestion `during-testing`, a question answered in a draft the user approves) and `--ongoing=<id>`.
+**Nothing but the stock fixed note reaches a tester without the user's approval** (`--user-approved`). The
+token lives outside the repository, and screenshots land only in the scratchpad. No token file yet, or the
+server unreachable — say so in one line and carry on; `preflight` prints the New count and never blocks on it.
 
 ## The trunk
 
@@ -217,7 +226,10 @@ the parent commit and accidentally gives the right answer.
 3. Regenerate `docs/gate-baselines.md` from your own post-merge run.
 4. Update only your own status block, run `php scripts/pipeline.php` — the bullet you prepend moves the
    markers the line cites — then `php scripts/next.php --lane=a --write`, and push them together.
-5. End with a three-to-five bullet status and the bare next-prompt line.
+5. Mark Resolved the testers' reports whose rows you closed —
+   `php scripts/feedback-pull.php --resolve=<id> --version=<sha>` — **only once the deploy is live**; the
+   reporter is told at once.
+6. End with a three-to-five bullet status and the bare next-prompt line.
 
 ⛔ **A fix to a user's comment is announced by name.** The close-out quotes the comment, says it is fixed
 and where it is live, and gives the exact clicks to check it. Until the user confirms it, the next session

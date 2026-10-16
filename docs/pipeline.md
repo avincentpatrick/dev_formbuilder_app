@@ -102,15 +102,15 @@ grouping a batch.
 | 39 | `R-c7247dbf` | The product shows no user-facing version and has no "What's new": Settings → About reads "dev" on the testing server, and a user learns of a change o… | early-testing | `docs/feature-backlog.md:14242` | — | ready | — | — |
 | 40 | `R-ed7f3127` | A cascade level or a choice list cannot be filtered by what another form has recorded, so "only the barangays with a report in form X" cannot be buil… | early-testing | `docs/feature-backlog.md:14489` | — | ready | — | — |
 | 41 | `R-2ce2f274` | The feedback panel is in every captured screenshot, a report carries no type, and only the page's path is recorded. | early-testing | `docs/feature-backlog.md:14225` | — | ready | — | — |
-| 42 | `R-36e6f557` | The "Change question type" dialog speaks in developer words and repeats the type as the question's name. | early-testing | `docs/feature-backlog.md:14682` | — | ready | — | — |
-| 43 | `R-49813d21` | Fifteen files set small error text in `--mds-color-danger-text`, which resolves to `danger-300` in dark and measures 4.22:1 on the surface. | early-testing | `docs/feature-backlog.md:14267` | — | ready | — | — |
-| 44 | `R-f724595b` | Three uppercase micro-labels hard-code their tracking where `--mds-tracking-wide` exists. | early-testing | `docs/feature-backlog.md:14283` | — | ready | — | — |
-| 45 | `R-78f43f26` | Nothing outside the signed-in console can read feedback, so a report reaches the dev session only when someone copies it across by hand. | early-testing | `docs/feature-backlog.md:14592` | — | ready | — | — |
+| 42 | `R-78f43f26` | Nothing outside the signed-in console can read feedback, so a report reaches the dev session only when someone copies it across by hand. | early-testing | `docs/feature-backlog.md:14592` | — | ready | — | — |
+| 43 | `R-36e6f557` | The "Change question type" dialog speaks in developer words and repeats the type as the question's name. | early-testing | `docs/feature-backlog.md:14682` | — | ready | — | — |
+| 44 | `R-49813d21` | Fifteen files set small error text in `--mds-color-danger-text`, which resolves to `danger-300` in dark and measures 4.22:1 on the surface. | early-testing | `docs/feature-backlog.md:14267` | — | ready | — | — |
+| 45 | `R-f724595b` | Three uppercase micro-labels hard-code their tracking where `--mds-tracking-wide` exists. | early-testing | `docs/feature-backlog.md:14283` | — | ready | — | — |
 | 46 | `R-0a7275ce` | A form's sections cannot be laid out as a table, the third presentation the user's comment 16 asked for. | early-testing | `docs/feature-backlog.md:13133` | — | ready | — | — |
 | 47 | `R-a11cc78a` | A deploy takes no backup of its own, and nothing checks that the data survived it. | early-testing | `docs/feature-backlog.md:14694` | — | ready | — | — |
 | 48 | `R-f7a18b7a` | The builder's draft check looks for a calculation's formula under the wrong key, so every calculated question would read "no formula yet". | early-testing | `docs/feature-backlog.md:14808` | — | blocked | precondition: row is latent | — |
 | 49 | `version-diff-ui` | PRD Feature #8 — the interactive field-by-field version-diff view | during-testing | `docs/form-versioning-schema-migration.md:209` | 3 | ready | — | L |
-| 50 | `deferral-site-disposition` | Give every documented deferral section and deferral sentence a recorded disposition | during-testing | `PROGRESS.md:208` | — | ready | — | L |
+| 50 | `deferral-site-disposition` | Give every documented deferral section and deferral sentence a recorded disposition | during-testing | `PROGRESS.md:210` | — | ready | — | L |
 | 51 | `prd-feature-disposition` | Record what became of each documented product feature and acceptance criterion | during-testing | `docs/PRD.md:530` | — | ready | — | XL |
 | 52 | `R-9e3e417e` | §7.1's `Form draft` row pins four `/api/v1` builder endpoints registered nowhere, and the `validations` sub-resource exists on neither surface. | during-testing | `docs/feature-backlog.md:7567` | — | ready | — | — |
 | 53 | `R-5041cc72` | `FormService` has seven lock-free writers to `forms` and one locked, and six of them build their audit payload from a model nobody re-read. | during-testing | `docs/feature-backlog.md:8890` | — | ready | — | — |
@@ -377,7 +377,7 @@ grouping a batch.
 | 314 | `gdpr-legal-posture` | The GDPR, legal and pricing posture decisions | before-launch | `docs/data-privacy-gdpr-compliance.md:126` | 4 | held | user: the GDPR, legal and pricing calls are the user's own | S |
 | 315 | `payments-checkout` | Embedded payments and self-serve billing — Cashier, Stripe Checkout, Stripe Tax | before-launch | `docs/adr/0008-entitlement-and-metering.md:168` | 4 | held | user: needs a Stripe account; cut from Phase 3 by decision 2026-07-21 | XL |
 | 316 | `track-b-deployment` | Track B — stand up the ADR-0005 self-hosted production host | before-launch | `docs/deployment-infrastructure.md:682` | 4 | held | user: deferred until app development is done, and needs the host itself | XL |
-| 317 | `uploading-import` | All uploading and import features, including bulk Excel and CSV, and the ledger entries marked RE-HOMED TO uploading-import | before-launch | `PROGRESS.md:207` | — | held | user: held by the explicit-signal decision of 2026-08-09; re-enters only on their go-signal | XL |
+| 317 | `uploading-import` | All uploading and import features, including bulk Excel and CSV, and the ledger entries marked RE-HOMED TO uploading-import | before-launch | `PROGRESS.md:209` | — | held | user: held by the explicit-signal decision of 2026-08-09; re-enters only on their go-signal | XL |
 | 318 | `R-486c204b` | A claim file has no constrained form for a forward declaration, so the one stale declaration on the tree cannot be gated. | after-launch | `docs/feature-backlog.md:4240` | — | ready | — | — |
 | 319 | `R-eecdb678` | `scripts/mutate.php` cannot drive a positive control for anything that is not Pest in a container. | after-launch | `docs/feature-backlog.md:4367` | — | ready | — | — |
 | 320 | `R-fb9f9e3e` | A tracker surgery whose diff touches only `paths-ignore`d files produces no post-merge run at all, so `R7`'s trunk arm is unreachable for exactly the… | after-launch | `docs/feature-backlog.md:5498` | — | ready | — | — |
@@ -519,8 +519,8 @@ grouping a batch.
 10 row(s) recorded `done` and 0 dispositioned `n/a`. They are not work and are listed here
 rather than dropped, so that this file and its sources cannot disagree about what was decided.
 
-- `testing-server-notified` — done (`PROGRESS.md:210`)
-- `tier-verdicts` — done (`PROGRESS.md:209`)
+- `testing-server-notified` — done (`PROGRESS.md:212`)
+- `tier-verdicts` — done (`PROGRESS.md:211`)
 - `ocr-bakeoff-harness` — done (`docs/ocr-pipeline-design.md:368`)
 - `ocr-provider-bakeoff` — done (`docs/ocr-pipeline-design.md:362`)
 - `ocr-single-form` — done (`docs/ocr-pipeline-design.md:361`)

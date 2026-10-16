@@ -1,5 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { containerBlock, nested, read, rule, styleOf } from '../__tests__/css-source';
+import { containerBlock, nested, rule, styleSlice } from '../__tests__/css-source';
+
+const read = (path: string): string => readFileSync(join(process.cwd(), path), 'utf8');
+const styleOf = (path: string): string => styleSlice(read(path));
 
 /**
  * The two front doors become two halves (M174, `R-3d51f0ae`, `D122`): on a wide screen the pitch panel fills the left

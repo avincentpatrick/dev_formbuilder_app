@@ -592,3 +592,23 @@ test('Templates — every card\'s button sits at the foot of its card at 1440', 
     expect(gaps.length, 'no template cards').toBeGreaterThanOrEqual(3);
     expect(Math.max(...gaps), `footer distance above each card's padding: ${JSON.stringify(gaps)}`).toBeLessThanOrEqual(1);
 });
+
+// `D121`, `D136` (the user, 2026-10-14 and 2026-10-16): the questions keep a reading column, and the rest of a wide page
+// carries the side panel — the form's name and version, the open or closed notice, the form's sections.
+test('Manual entry — the form keeps a reading column with its side panel beside it at 1920', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'Sets its own viewport — running it three times proves nothing.');
+
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto('/forms', { waitUntil: 'networkidle' });
+    await formEntry(page, 'Clinic Intake').getByRole('button', { name: 'New submission' }).click();
+    await page.waitForURL('**/submissions/create', { timeout: 30_000 });
+    await page.getByRole('button', { name: 'Submit response' }).waitFor({ state: 'visible', timeout: 10_000 });
+    await settlePaint(page);
+
+    const form = await box(page.locator('.encode__form'));
+    const intro = await box(page.locator('.encode__intro'));
+
+    // 45rem = 720px, the measure the page always had, plus rounding.
+    expect(form.width, JSON.stringify({ form, intro })).toBeLessThanOrEqual(722);
+    expect(intro.left, `the intro beside the form: ${JSON.stringify({ form, intro })}`).toBeGreaterThanOrEqual(form.right);
+});

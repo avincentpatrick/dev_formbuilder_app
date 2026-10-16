@@ -1,5 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { containerBlock, nested, read, rule, styleOf } from '../__tests__/css-source';
+import { containerBlock, nested, rule, styleSlice } from '../__tests__/css-source';
+
+const read = (path: string): string => readFileSync(join(process.cwd(), path), 'utf8');
+const styleOf = (path: string): string => styleSlice(read(path));
 
 /**
  * The detail pages gain a side column on a wide screen (M174, `D120`): from a 75rem container a page's facts sit in a

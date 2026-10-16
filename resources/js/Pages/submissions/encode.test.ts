@@ -1320,3 +1320,64 @@ describe('encode page — a note with content blocks (M130, `R-c9f50df2`)', () =
         expect(wrapper.text()).not.toContain('Intro (for the team)');
     });
 });
+
+describe('encode page — the sections beside the form (M174, `D136`)', () => {
+    /**
+     * happy-dom lays nothing out, so the page's width arrives through a stubbed observer: past 75rem (1200px at the
+     * 16px root) the panel sits beside the form and the list renders; short of it the list is absent, not hidden.
+     */
+    function observeWidth(width: number): void {
+        vi.stubGlobal(
+            'ResizeObserver',
+            class {
+                constructor(private readonly callback: ResizeObserverCallback) {}
+
+                observe(): void {
+                    this.callback([{ contentRect: { width } } as ResizeObserverEntry], this as unknown as ResizeObserver);
+                }
+
+                unobserve(): void {}
+
+                disconnect(): void {}
+            },
+        );
+    }
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it('lists the sections with the current one marked once the panel sits beside the form', async () => {
+        observeWidth(1300);
+        const wrapper = mountEncode(routerPayload({ singlePage: false }));
+        await typeInto(wrapper, 'Role', 'staff');
+
+        expect(wrapper.findAll('.encode__step').map((item) => item.text())).toEqual(['Anything else', 'Staff details']);
+        expect(wrapper.get('[aria-current="step"]').text()).toBe('Anything else');
+
+        await wrapper.findAll('button').find((b) => b.text().includes('Next'))!.trigger('click');
+        expect(wrapper.get('[aria-current="step"]').text()).toBe('Staff details');
+    });
+
+    it('links each section to its card in single-page mode, marking none as current', async () => {
+        observeWidth(1300);
+        const wrapper = mountEncode(routerPayload({ singlePage: true }));
+        await typeInto(wrapper, 'Role', 'staff');
+
+        expect(wrapper.findAll('.encode__step-link').map((link) => link.attributes('href'))).toEqual([
+            '#encode-step-closing',
+            '#encode-step-staff',
+        ]);
+        expect(wrapper.find('#encode-step-staff').exists()).toBe(true);
+        // Scoped: the breadcrumb's last crumb carries its own `aria-current="page"`.
+        expect(wrapper.find('.encode__steps [aria-current]').exists()).toBe(false);
+    });
+
+    it('renders no list while the panel stacks above the form, so no section is named twice', async () => {
+        observeWidth(1100);
+        const wrapper = mountEncode(routerPayload({ singlePage: false }));
+        await typeInto(wrapper, 'Role', 'staff');
+
+        expect(wrapper.find('.encode__steps').exists()).toBe(false);
+    });
+});

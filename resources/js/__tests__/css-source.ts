@@ -1,21 +1,16 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
 /**
  * Reading a single-file component's CSS as source text, for the layout pins (M174). happy-dom lays out nothing, so a
  * page's columns are measured in a real browser (`tests/e2e/list-layout.spec.ts`); these pins hold the source shape that
  * produces them. Every selector is anchored at a known indent — column 0 for a top-level rule, four spaces inside an
  * at-rule — so a comment quoting a rule can never satisfy a pin.
+ *
+ * ⚠️ STRING FUNCTIONS ONLY, NO `node:fs`. `vue-tsc` checks this module (it is not a `*.test.ts`) and the app carries no
+ * Node types, so each test file reads its own source and passes the text here — the two lines every layout test in this
+ * repository already writes.
  */
 
-export const read = (path: string): string => readFileSync(join(process.cwd(), path), 'utf8');
-
 /** Everything from the first `<style` on: the component's CSS (and, for a component with two blocks, both). */
-export const styleOf = (path: string): string => {
-    const source = read(path);
-
-    return source.slice(source.indexOf('<style'));
-};
+export const styleSlice = (source: string): string => source.slice(source.indexOf('<style'));
 
 /** The body of a top-level rule written at column 0, or null. */
 export function rule(css: string, selector: string): string | null {

@@ -282,6 +282,42 @@ const shownSteps = computed<RuntimeStep[]>(() => {
 
 const stepPosition = computed(() => `Step ${runtime.currentStepIndex.value + 1} of ${visibleSteps.value.length}`);
 
+// ── M174 (`R-66952d33`, `D136`) — the sections beside the form ─────────────────────────────────────────────────────────
+// The side panel lists the form's sections only while it sits BESIDE the form, which is the stylesheet's 75rem container
+// query on this page's root. That is read here once more, by observing the root's own content box against the same
+// 75rem, because the list must be ABSENT below it rather than hidden: it repeats every section's name, and with a hidden
+// copy on the page every reader that finds a section by its name — `getByText` in the e2e scans, `text()` in this
+// page's unit tests — would find two. `rem` resolves against the root font size, which the in-app text size never
+// moves (it re-points the type tokens), so the two thresholds cannot disagree. A scanned paper takes the room instead.
+const pageRoot = ref<HTMLElement | null>(null);
+const besideForm = ref(false);
+let rootObserver: ResizeObserver | null = null;
+
+onMounted(() => {
+    if (pageRoot.value === null || typeof ResizeObserver === 'undefined') {
+        return;
+    }
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    rootObserver = new ResizeObserver(([entry]) => {
+        besideForm.value = entry !== undefined && entry.contentRect.width >= 75 * rem;
+    });
+    rootObserver.observe(pageRoot.value);
+});
+
+onBeforeUnmount(() => rootObserver?.disconnect());
+
+const stepList = computed<Array<{ key: string; label: string; current: boolean }>>(() => {
+    if (!besideForm.value || hasPaper.value || runtime.isTerminal.value || visibleSteps.value.length < 2) {
+        return [];
+    }
+
+    return visibleSteps.value.map((step, index) => ({
+        key: step.key,
+        label: blockFor(step)?.label || `Section ${index + 1}`,
+        current: !props.form.single_page_mode && index === runtime.currentStepIndex.value,
+    }));
+});
+
 const blockByStepKey = computed<Record<string, Block>>(() => {
     const map: Record<string, Block> = {};
     for (const block of props.blocks) {
@@ -1107,7 +1143,7 @@ function onConflictKeydown(event: KeyboardEvent): void {
 </script>
 
 <template>
-    <div class="encode" :class="{ 'encode--scan': hasPaper }">
+    <div ref="pageRoot" class="encode" :class="{ 'encode--scan': hasPaper }">
         <Head
             :title="isScanning ? `Review a scan — ${form.title}` : isEditing ? `Edit answers — ${form.title}` : `Encode — ${form.title}`"
         />
@@ -1145,435 +1181,475 @@ function onConflictKeydown(event: KeyboardEvent): void {
             </template>
         </PageHeader>
 
-        <p class="encode__intro">
-            <template v-if="isEditing">
-                Correcting a recorded response for <strong>{{ form.title }}</strong> (v{{ version.version_number }}).
-            </template>
-            <template v-else-if="isScanning">
-                Checking a scanned response for <strong>{{ form.title }}</strong> (v{{ version.version_number }}).
-                Compare each answer with the paper, correct what is wrong, then save it.
-            </template>
-            <template v-else>
-                Encoding a response for <strong>{{ form.title }}</strong> (v{{ version.version_number }}).
-            </template>
-        </p>
-
-        <!-- Edit banner (I9c). The demotion is announced BEFORE any typing, not discovered at Save: an
-             editor fixing one character in an approved response is entitled to know that saving withdraws
-             the approval.
-             ⚠️ `role="status"`, NOT `role="alert"`, EVEN FOR THE WARNING — and the reason is written twenty
-             lines above this in the autosave note: a live region that is inserted into the DOM with its
-             content already in it is not reliably announced, because assistive tech has to be observing the
-             node before the text changes. This banner is present at first paint and never changes (
-             `demotes_on_save` is a server prop), so `alert` buys nothing on the readers that ignore
-             load-time alerts and INTERRUPTS on the ones that do not. The warning is carried by the heading
-             text and the accent, which is where it belongs. -->
-        <div
-            v-if="isEditing"
-            class="encode__editing"
-            :class="{ 'encode__editing--warning': editing!.demotes_on_save }"
-            role="status"
-        >
-            <strong class="encode__editing-title">
-                {{ editing!.demotes_on_save ? 'This response has been approved' : 'Editing a recorded response' }}
-            </strong>
-            <span class="encode__editing-body">
-                <template v-if="editing!.demotes_on_save">
-                    <!-- ⚠️ "under review", not "the review queue". The service sets `under_review`, not
-                         `submitted` — a reviewer filtering the inbox on Submitted will NOT see it come back,
-                         and an earlier draft of this sentence promised exactly that. -->
-                    Saving a change withdraws the approval and moves this response back to
-                    <strong>under review</strong>, so a reviewer has to decide it again. Every change is
-                    recorded in the audit log.
-                </template>
-                <template v-else>
-                    You are changing answers that have already been submitted. Every change is recorded in the
-                    audit log, with your name against it.
-                </template>
-            </span>
-        </div>
-
-        <!-- Resume banner (I9b). Two jobs: confirm that what is on screen is the keyer's own saved work
-             rather than a blank form, and name the expiry, because the reaper HARD-deletes an expired draft
-             and a silent disappearance is the worst version of this feature. -->
-        <div v-if="draft !== null" class="encode__resume" role="status">
-            <strong class="encode__resume-title">Continuing a saved draft</strong>
-            <span class="encode__resume-body">
-                Your answers were restored{{ draftSavedLabel }}. This draft is saved as you type and is not
-                submitted until you press Submit.{{ draftExpiryLabel }}
-            </span>
-        </div>
-
-        <!-- M129 — what the reviewer must know before checking a single answer: an older printing, a stamp
-             that could not be read, pages past the limit, nothing read at all, and every answer on the paper
-             that could not be filled in, in the server's own words. `role="status"` for the edit banner's
-             reason: present at first paint and never changing. -->
-        <div v-if="isScanning && scan!.notices.length > 0" class="encode__scan-notices">
-            <div
-                v-for="notice in scan!.notices"
-                :key="notice.code"
-                class="encode__scan-notice"
-                :class="`encode__scan-notice--${notice.tone}`"
-                role="status"
-                :data-notice="notice.code"
-            >
-                <p class="encode__scan-notice-text">{{ notice.message }}</p>
-                <ul v-if="notice.items" class="encode__scan-notice-list">
-                    <li v-for="(item, i) in notice.items" :key="i">
-                        <strong>{{ item.label }}</strong><template v-if="item.text"> — the scan read “{{ item.text }}”</template>.
-                        {{ item.message }}
-                    </li>
-                </ul>
-            </div>
-        </div>
-
-        <!-- M129 — the live half: answers the scan filled in that the other answers now hide. Always present in
-             scan mode and filled in place, so a screen reader is already observing it when it changes. -->
-        <div v-if="isScanning" class="encode__scan-hidden" role="status" aria-live="polite">
-            <template v-if="scanHiddenAnswers.length > 0">
-                <p class="encode__scan-notice-text">
-                    {{ scanHiddenAnswers.length === 1 ? 'One answer the scan filled in does' : `${scanHiddenAnswers.length} answers the scan filled in do` }}
-                    not apply to the other answers, so {{ scanHiddenAnswers.length === 1 ? 'it' : 'they' }} will not be
-                    saved: {{ scanHiddenAnswers.join(', ') }}.
-                </p>
-            </template>
-        </div>
-
-        <!-- M129 — a save refused for a reason no single answer carries. Inserted after a POST returns, so
-             assertive — the conflict alert's argument below. -->
-        <MdsAlert v-if="scanError !== null" tone="danger" assertive title="This response was not saved" :message="scanError" />
-
-        <!-- The one autosave failure a keyer must act on rather than wait out (a submitted-elsewhere draft or
-             an expired session). `role="alert"` because unlike the indicator above, continuing to type after
-             this is wasted work. -->
-        <div v-if="autosave.state.value === 'stopped'" class="encode__degraded" role="alert">
-            <strong class="encode__degraded-title">Your changes are no longer being saved</strong>
-            <span class="encode__degraded-body">{{ autosave.message.value }}</span>
-        </div>
-
-        <!-- M74 — the refused correction, and the way out of it.
-             `MdsAlert` rather than a sixth hand-rolled notice, and NOT `MdsBanner`: Banner's whole API is
-             `message: string` with no slots, and this needs a button. `dismissible` stays at its default
-             FALSE, which the component's own boundary docblock decides — "hiding a live condition hides a
-             fact", and this condition is still true for as long as the page is refused.
-             ⚠️ `assertive` is correct here and is the MIRROR IMAGE of the `encode__editing` banner's
-             argument below: that one is `role="status"` because it is present at first paint, where a live
-             region inserted with its content already in it is not reliably announced. This node is inserted
-             AFTER a PATCH returns, which is exactly the case `role="alert"` exists for. Do not "fix" it.
-             The message is the SERVER's sentence, not a hard-coded one — which is also what makes the
-             control behavioural rather than structural. -->
-        <!-- The unsaved-corrections guard (M75). ⛔ THE ASYMMETRY THIS CLOSES: before it, the DESTRUCTIVE
-             action on this page was two-click confirmed while the ACCIDENTAL one — Cancel, a breadcrumb, a
-             sidebar item, a closed tab — discarded every character with no prompt and no trace. `assertive`
-             for the same reason the conflict alert below is: this node is inserted in response to something
-             the keyer just did, which is exactly what `role="alert"` is for.
-             ⚠️ The copy names the channel rather than the control, because "unsaved" is only true here —
-             on the draft channel the same click saves. -->
-        <div v-if="leaveArmed" ref="leaveRoot" @keydown="onLeaveKeydown">
-            <MdsAlert
-                tone="warning"
-                assertive
-                title="You have unsaved corrections"
-                :message="leaveMessage"
-            >
-                <template #actions>
-                    <MdsButton data-leave-stay size="sm" variant="secondary" @click="stayOnPage">
-                        Stay on this page
-                    </MdsButton>
-                    <MdsButton size="sm" variant="destructive" @click="leaveAnyway">
-                        Leave and discard
-                    </MdsButton>
-                </template>
-            </MdsAlert>
-        </div>
-
-        <div v-if="conflictMessage !== null" ref="conflictRoot" @keydown="onConflictKeydown">
-            <MdsAlert
-                tone="danger"
-                assertive
-                title="This response was changed somewhere else"
-                :message="conflictMessage"
-            >
-                <template #actions>
-                    <template v-if="discardArmed">
-                        <span class="encode__conflict-confirm">
-                            This deletes every change you have typed on this page.
-                        </span>
-                        <MdsButton data-conflict-keep size="sm" variant="secondary" @click="cancelDiscard">
-                            Keep my changes
-                        </MdsButton>
-                        <MdsButton size="sm" variant="destructive" @click="confirmDiscard">
-                            Discard and reload
-                        </MdsButton>
+        <!-- M174 (`R-66952d33`, `D121`, `D136`): the side panel first in the DOM — the form's name and version, the
+             open or closed notice, its sections — then everything the keyer works in. From a 75rem page the panel
+             sits beside a 45rem form; below that, and beside a scanned paper, it stacks above (the `<style>` block). -->
+        <div class="encode__layout">
+            <div class="encode__aside">
+                <p class="encode__intro">
+                    <template v-if="isEditing">
+                        Correcting a recorded response for <strong>{{ form.title }}</strong> (v{{ version.version_number }}).
                     </template>
-                    <MdsButton v-else size="sm" variant="secondary" @click="armDiscard">
-                        Discard my changes and reload
-                    </MdsButton>
-                </template>
-            </MdsAlert>
-        </div>
-
-        <!-- Pruned-answer report (H21c): the previous submission WAS recorded — the copy must say so while
-             naming what relevance removed from it. -->
-        <div
-            v-if="prunedAnswers.length > 0 && !prunedDismissed"
-            class="encode__pruned"
-            role="status"
-            aria-live="polite"
-        >
-            <div class="encode__pruned-body">
-                <strong class="encode__pruned-title">
-                    Recorded, but {{ prunedAnswers.length }}
-                    {{ prunedAnswers.length === 1 ? 'answer was' : 'answers were' }} not saved
-                </strong>
-                <p class="encode__pruned-lede">
-                    These questions did not apply to the answers given, so they were left out of the response:
-                </p>
-                <ul class="encode__pruned-list">
-                    <li v-for="(entry, i) in prunedAnswers" :key="i">{{ entry }}</li>
-                </ul>
-            </div>
-            <MdsButton variant="tertiary" icon-left="close" @click="prunedDismissed = true">Dismiss</MdsButton>
-        </div>
-
-        <!-- The engine degraded on a malformed published expression (H21c): every question is shown and the
-             server stays authoritative. Said out loud rather than swallowed — silently showing every branch
-             is exactly the pre-H21c behaviour this page exists to end. -->
-        <div v-if="runtime.engineFailed.value" class="encode__degraded" role="alert">
-            <strong class="encode__degraded-title">Conditions could not be applied</strong>
-            <span class="encode__degraded-body">
-                Every question is shown. Answers that do not apply will still be removed when you submit.
-            </span>
-        </div>
-
-        <!-- Scheduled-form pre-warning (H12b): the form is visible for reference, but submitting is blocked. -->
-        <div v-if="scheduleNotice" class="encode__schedule-banner" role="alert">
-            <strong class="encode__schedule-title">{{ scheduleNotice.title }}</strong>
-            <span class="encode__schedule-body">{{ scheduleNotice.body }}</span>
-        </div>
-
-        <!-- M129 — the paper, beside the form on a wide screen and above it on a narrow one (the grid lives on
-             `.encode--scan`). Rendered in scan mode, and since M154 when correcting a response saved from a scan
-             ("Scanned pages", as on the response page), so create, resume and a typed response's edit keep their
-             exact DOM. -->
-        <div v-if="hasPaper" class="encode__scan-pages">
-            <ScanPages :pages="paperPages" :title="isScanning ? undefined : 'Scanned pages'" />
-        </div>
-
-        <form class="encode__form" novalidate @submit.prevent="submit">
-            <!-- Form-WIDE error summary (H21c). Doc #27 §5.5: Submit reports across the whole form, because a
-                 step-scoped banner on a multi-step form announces "0 fields need your attention" while the
-                 submit is refused elsewhere. Each jump changes step before it focuses. -->
-            <div v-if="summaryItems.length > 0" class="encode__summary" role="alert" aria-live="assertive">
-                <strong class="encode__summary-title">
-                    {{ summaryItems.length }}
-                    {{ summaryItems.length === 1 ? 'answer needs' : 'answers need' }} attention
-                </strong>
-                <ul class="encode__summary-list">
-                    <li v-for="item in summaryItems" :key="item.address">
-                        <button type="button" class="encode__summary-link" @click="jumpTo(item)">
-                            {{ item.label }}
-                        </button>
-                    </li>
-                </ul>
-            </div>
-
-            <!-- Keyer-only reference rows (H21c) — never shown to a respondent, so never part of a step. -->
-            <MdsCard v-if="referenceRows.length > 0">
-                <div class="encode__block">
-                    <div class="encode__block-head">
-                        <h2 class="encode__block-title">Reference fields</h2>
-                        <p class="encode__block-desc">
-                            Not shown to the respondent. These values normally arrive from the form’s link —
-                            enter them here when you are keying from paper.
-                        </p>
-                    </div>
-                    <div class="encode__fields">
-                        <div v-for="field in referenceRows" :key="field.key" :id="anchorFor(field.key)">
-                            <FieldInput
-                                :field="field"
-                                :model-value="flatValue(field.key)"
-                                :error="fieldError(field.key)"
-                                :read-only="isEditing"
-                                @update:model-value="setFlatValue(field.key, $event)"
-                            />
-                        </div>
-                    </div>
-                </div>
-            </MdsCard>
-
-            <!-- Doc #27 §4.1's TERMINAL state, reached on this channel too: no counter (never "Step 1 of 0"),
-                 an explicit panel, and ONE labelled Submit. `isTerminal` carries this rather than
-                 `isLastStep`, which is correctly false at zero steps. -->
-            <MdsCard v-if="runtime.isTerminal.value">
-                <div class="encode__terminal">
-                    <h2 class="encode__block-title">No questions to answer</h2>
-                    <p class="encode__block-desc">
-                        Nothing in this form applies to the answers given so far. You can still record the
-                        response as it stands.
-                    </p>
-                </div>
-            </MdsCard>
-
-            <template v-else>
-                <p v-if="!form.single_page_mode" class="encode__progress" aria-live="polite">
-                    {{ stepPosition }}
+                    <template v-else-if="isScanning">
+                        Checking a scanned response for <strong>{{ form.title }}</strong> (v{{ version.version_number }}).
+                        Compare each answer with the paper, correct what is wrong, then save it.
+                    </template>
+                    <template v-else>
+                        Encoding a response for <strong>{{ form.title }}</strong> (v{{ version.version_number }}).
+                    </template>
                 </p>
 
-                <MdsCard v-for="step in shownSteps" :key="step.key">
-                    <div class="encode__block">
-                        <div
-                            v-if="blockFor(step)?.label || blockFor(step)?.description || boundsHint(blockFor(step)!)"
-                            class="encode__block-head"
+                <!-- Scheduled-form pre-warning (H12b): the form is visible for reference, but submitting is blocked. -->
+                <div v-if="scheduleNotice" class="encode__schedule-banner" role="alert">
+                    <strong class="encode__schedule-title">{{ scheduleNotice.title }}</strong>
+                    <span class="encode__schedule-body">{{ scheduleNotice.body }}</span>
+                </div>
+
+                <!-- M174 (`D136`): the form's sections, the current one marked — the progress a keyer otherwise
+                     reads only as "Step N of M". Rendered only while the panel sits beside the form (`besideForm`),
+                     never merely hidden: the list repeats every section's name, and a page that names a hidden step
+                     twice breaks every reader that finds a section by its name. In single-page mode each name jumps
+                     to its section. -->
+                <div v-if="stepList.length > 0" class="encode__steps">
+                    <h2 class="encode__steps-title">Sections</h2>
+                    <ol class="encode__steps-list" role="list">
+                        <li
+                            v-for="step in stepList"
+                            :key="step.key"
+                            class="encode__step"
+                            :class="{ 'encode__step--current': step.current }"
+                            :aria-current="step.current ? 'step' : undefined"
                         >
-                            <h2 v-if="blockFor(step)?.label" class="encode__block-title">
-                                {{ blockFor(step)?.label }}
-                            </h2>
-                            <p v-if="blockFor(step)?.description" class="encode__block-desc">
-                                {{ blockFor(step)?.description }}
-                            </p>
-                            <p v-if="boundsHint(blockFor(step)!)" class="encode__block-note">
-                                {{ boundsHint(blockFor(step)!) }}
-                            </p>
-                        </div>
-
-                        <!-- Repeatable section: an add/remove-instance loop over the member fields (G2), now
-                             driven by the store so per-instance relevance and the answer shape agree. -->
-                        <template v-if="step.isRepeat && step.sectionKey !== null">
-                            <p v-if="runtime.instanceCount(step.sectionKey) === 0" class="encode__empty">
-                                Nothing added yet.
-                            </p>
-
-                            <ol v-else class="encode__instances">
-                                <li v-for="(uid, index) in runtime.instanceUidsFor(step.sectionKey)" :key="uid">
-                                    <fieldset class="encode__instance">
-                                        <legend class="encode__instance-legend">
-                                            {{ instanceLegend(blockFor(step)!, index) }}
-                                        </legend>
-                                        <div class="encode__fields">
-                                            <template v-for="field in rowsOf(step)" :key="field.key">
-                                                <div
-                                                    v-if="runtime.instanceFieldRelevant(step.sectionKey, index, field.key)"
-                                                    :id="anchorFor(runtime.instanceAddress(step.sectionKey, index, field.key))"
-                                                >
-                                                    <FieldInput
-                                                        :field="field"
-                                                        :model-value="instanceValue(step.sectionKey, index, field.key)"
-                                                        :error="instanceError(step.sectionKey, index, field.key)"
-                                                        :read-only="isEditing"
-                                                        @update:model-value="setInstanceValue(step.sectionKey, index, field.key, $event)"
-                                                    />
-                                                </div>
-                                            </template>
-                                        </div>
-                                        <div class="encode__instance-actions">
-                                            <MdsButton
-                                                type="button"
-                                                variant="tertiary"
-                                                size="sm"
-                                                icon-left="trash"
-                                                :aria-label="`Remove ${instanceLegend(blockFor(step)!, index)}`"
-                                                @click="removeInstance(step.sectionKey, index)"
-                                            >
-                                                Remove
-                                            </MdsButton>
-                                        </div>
-                                    </fieldset>
-                                </li>
-                            </ol>
-
-                            <p v-if="countError(step.sectionKey)" class="encode__count-error" role="alert">
-                                {{ countError(step.sectionKey) }}
-                            </p>
-
-                            <div class="encode__add">
-                                <MdsButton
-                                    type="button"
-                                    variant="secondary"
-                                    icon-left="plus"
-                                    :disabled="!runtime.canAddInstance(step.sectionKey)"
-                                    @click="addInstance(step.sectionKey)"
-                                >
-                                    Add {{ blockFor(step)?.label ?? 'entry' }}
-                                </MdsButton>
-                                <span v-if="!runtime.canAddInstance(step.sectionKey)" class="encode__max-note">
-                                    Maximum of {{ blockFor(step)?.max_instances }} reached.
-                                </span>
-                            </div>
-                        </template>
-
-                        <!-- Flat step (or the synthetic lead block): relevant fields render directly. -->
-                        <div v-else class="encode__fields">
-                            <!-- M129 — in scan mode a row the scan has something to say about carries its note
-                                 under the control and a coloured edge; the note's words, not the colour, carry
-                                 the meaning. No class and no note in the other modes. -->
-                            <div
-                                v-for="field in rowsOf(step)"
-                                :key="field.key"
-                                :id="anchorFor(field.key)"
-                                :class="scanNotes[field.key] ? ['encode__scan-row', `encode__scan-row--${scanNotes[field.key].tone}`] : undefined"
-                            >
-                                <FieldInput
-                                    :field="field"
-                                    :model-value="flatValue(field.key)"
-                                    :error="fieldError(field.key)"
-                                    :read-only="isEditing"
-                                    @update:model-value="setFlatValue(field.key, $event)"
-                                />
-                                <p v-if="scanNotes[field.key]" class="encode__scan-note">{{ scanNotes[field.key].text }}</p>
-                            </div>
-                        </div>
-                    </div>
-                </MdsCard>
-            </template>
-
-            <div class="encode__actions">
-                <!-- The sticky footer's Cancel — the same `cancel_url` as the header's, which is the point. -->
-                <Link v-if="cancel_url" :href="cancel_url" class="encode__cancel">Cancel</Link>
-                <MdsButton
-                    v-if="!form.single_page_mode && !runtime.isTerminal.value && !runtime.isFirstStep.value"
-                    type="button"
-                    variant="secondary"
-                    icon-left="chevron-left"
-                    @click="goPrev"
-                >
-                    Back
-                </MdsButton>
-                <!-- ⚠️ IN EDIT MODE, NEXT IS SECONDARY AND SAVE IS ALWAYS PRESENT.
-                     Creating a response is a sequence — you fill step 1, then step 2, and Submit belongs at
-                     the end. CORRECTING one is not: the editor came here to fix a known field, they land on
-                     step 1 because edit mode restores no cursor, and with Save gated behind `isLastStep`
-                     they would have to click Next through every remaining step to commit a one-character fix
-                     on step 6 of 8 — with nothing on screen explaining why Save is missing. Save is
-                     therefore rendered on every step, and Next stays available beside it for reading
-                     through. -->
-                <MdsButton
-                    v-if="!form.single_page_mode && !runtime.isTerminal.value && !runtime.isLastStep.value"
-                    type="button"
-                    :variant="isEditing ? 'secondary' : 'primary'"
-                    icon-right="chevron-right"
-                    @click="goNext"
-                >
-                    Next
-                </MdsButton>
-                <MdsButton
-                    v-if="isEditing || form.single_page_mode || runtime.isTerminal.value || runtime.isLastStep.value"
-                    type="submit"
-                    variant="primary"
-                    icon-left="check"
-                    :loading="submitting"
-                    :disabled="!canSubmit"
-                >
-                    {{ isEditing ? 'Save changes' : isScanning ? 'Save response' : 'Submit response' }}
-                </MdsButton>
+                            <a v-if="form.single_page_mode" :href="`#encode-step-${step.key}`" class="encode__step-link">
+                                {{ step.label }}
+                            </a>
+                            <template v-else>{{ step.label }}</template>
+                        </li>
+                    </ol>
+                </div>
             </div>
-        </form>
+
+            <div class="encode__main">
+                <!-- Edit banner (I9c). The demotion is announced BEFORE any typing, not discovered at Save: an
+                     editor fixing one character in an approved response is entitled to know that saving withdraws
+                     the approval.
+                     ⚠️ `role="status"`, NOT `role="alert"`, EVEN FOR THE WARNING — and the reason is written twenty
+                     lines above this in the autosave note: a live region that is inserted into the DOM with its
+                     content already in it is not reliably announced, because assistive tech has to be observing the
+                     node before the text changes. This banner is present at first paint and never changes (
+                     `demotes_on_save` is a server prop), so `alert` buys nothing on the readers that ignore
+                     load-time alerts and INTERRUPTS on the ones that do not. The warning is carried by the heading
+                     text and the accent, which is where it belongs. -->
+                <div
+                    v-if="isEditing"
+                    class="encode__editing"
+                    :class="{ 'encode__editing--warning': editing!.demotes_on_save }"
+                    role="status"
+                >
+                    <strong class="encode__editing-title">
+                        {{ editing!.demotes_on_save ? 'This response has been approved' : 'Editing a recorded response' }}
+                    </strong>
+                    <span class="encode__editing-body">
+                        <template v-if="editing!.demotes_on_save">
+                            <!-- ⚠️ "under review", not "the review queue". The service sets `under_review`, not
+                                 `submitted` — a reviewer filtering the inbox on Submitted will NOT see it come back,
+                                 and an earlier draft of this sentence promised exactly that. -->
+                            Saving a change withdraws the approval and moves this response back to
+                            <strong>under review</strong>, so a reviewer has to decide it again. Every change is
+                            recorded in the audit log.
+                        </template>
+                        <template v-else>
+                            You are changing answers that have already been submitted. Every change is recorded in the
+                            audit log, with your name against it.
+                        </template>
+                    </span>
+                </div>
+
+                <!-- Resume banner (I9b). Two jobs: confirm that what is on screen is the keyer's own saved work
+                     rather than a blank form, and name the expiry, because the reaper HARD-deletes an expired draft
+                     and a silent disappearance is the worst version of this feature. -->
+                <div v-if="draft !== null" class="encode__resume" role="status">
+                    <strong class="encode__resume-title">Continuing a saved draft</strong>
+                    <span class="encode__resume-body">
+                        Your answers were restored{{ draftSavedLabel }}. This draft is saved as you type and is not
+                        submitted until you press Submit.{{ draftExpiryLabel }}
+                    </span>
+                </div>
+
+                <!-- M129 — what the reviewer must know before checking a single answer: an older printing, a stamp
+                     that could not be read, pages past the limit, nothing read at all, and every answer on the paper
+                     that could not be filled in, in the server's own words. `role="status"` for the edit banner's
+                     reason: present at first paint and never changing. -->
+                <div v-if="isScanning && scan!.notices.length > 0" class="encode__scan-notices">
+                    <div
+                        v-for="notice in scan!.notices"
+                        :key="notice.code"
+                        class="encode__scan-notice"
+                        :class="`encode__scan-notice--${notice.tone}`"
+                        role="status"
+                        :data-notice="notice.code"
+                    >
+                        <p class="encode__scan-notice-text">{{ notice.message }}</p>
+                        <ul v-if="notice.items" class="encode__scan-notice-list">
+                            <li v-for="(item, i) in notice.items" :key="i">
+                                <strong>{{ item.label }}</strong><template v-if="item.text"> — the scan read “{{ item.text }}”</template>.
+                                {{ item.message }}
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- M129 — the live half: answers the scan filled in that the other answers now hide. Always present in
+                     scan mode and filled in place, so a screen reader is already observing it when it changes. -->
+                <div v-if="isScanning" class="encode__scan-hidden" role="status" aria-live="polite">
+                    <template v-if="scanHiddenAnswers.length > 0">
+                        <p class="encode__scan-notice-text">
+                            {{ scanHiddenAnswers.length === 1 ? 'One answer the scan filled in does' : `${scanHiddenAnswers.length} answers the scan filled in do` }}
+                            not apply to the other answers, so {{ scanHiddenAnswers.length === 1 ? 'it' : 'they' }} will not be
+                            saved: {{ scanHiddenAnswers.join(', ') }}.
+                        </p>
+                    </template>
+                </div>
+
+                <!-- M129 — a save refused for a reason no single answer carries. Inserted after a POST returns, so
+                     assertive — the conflict alert's argument below. -->
+                <MdsAlert v-if="scanError !== null" tone="danger" assertive title="This response was not saved" :message="scanError" />
+
+                <!-- The one autosave failure a keyer must act on rather than wait out (a submitted-elsewhere draft or
+                     an expired session). `role="alert"` because unlike the indicator above, continuing to type after
+                     this is wasted work. -->
+                <div v-if="autosave.state.value === 'stopped'" class="encode__degraded" role="alert">
+                    <strong class="encode__degraded-title">Your changes are no longer being saved</strong>
+                    <span class="encode__degraded-body">{{ autosave.message.value }}</span>
+                </div>
+
+                <!-- M74 — the refused correction, and the way out of it.
+                     `MdsAlert` rather than a sixth hand-rolled notice, and NOT `MdsBanner`: Banner's whole API is
+                     `message: string` with no slots, and this needs a button. `dismissible` stays at its default
+                     FALSE, which the component's own boundary docblock decides — "hiding a live condition hides a
+                     fact", and this condition is still true for as long as the page is refused.
+                     ⚠️ `assertive` is correct here and is the MIRROR IMAGE of the `encode__editing` banner's
+                     argument below: that one is `role="status"` because it is present at first paint, where a live
+                     region inserted with its content already in it is not reliably announced. This node is inserted
+                     AFTER a PATCH returns, which is exactly the case `role="alert"` exists for. Do not "fix" it.
+                     The message is the SERVER's sentence, not a hard-coded one — which is also what makes the
+                     control behavioural rather than structural. -->
+                <!-- The unsaved-corrections guard (M75). ⛔ THE ASYMMETRY THIS CLOSES: before it, the DESTRUCTIVE
+                     action on this page was two-click confirmed while the ACCIDENTAL one — Cancel, a breadcrumb, a
+                     sidebar item, a closed tab — discarded every character with no prompt and no trace. `assertive`
+                     for the same reason the conflict alert below is: this node is inserted in response to something
+                     the keyer just did, which is exactly what `role="alert"` is for.
+                     ⚠️ The copy names the channel rather than the control, because "unsaved" is only true here —
+                     on the draft channel the same click saves. -->
+                <div v-if="leaveArmed" ref="leaveRoot" @keydown="onLeaveKeydown">
+                    <MdsAlert
+                        tone="warning"
+                        assertive
+                        title="You have unsaved corrections"
+                        :message="leaveMessage"
+                    >
+                        <template #actions>
+                            <MdsButton data-leave-stay size="sm" variant="secondary" @click="stayOnPage">
+                                Stay on this page
+                            </MdsButton>
+                            <MdsButton size="sm" variant="destructive" @click="leaveAnyway">
+                                Leave and discard
+                            </MdsButton>
+                        </template>
+                    </MdsAlert>
+                </div>
+
+                <div v-if="conflictMessage !== null" ref="conflictRoot" @keydown="onConflictKeydown">
+                    <MdsAlert
+                        tone="danger"
+                        assertive
+                        title="This response was changed somewhere else"
+                        :message="conflictMessage"
+                    >
+                        <template #actions>
+                            <template v-if="discardArmed">
+                                <span class="encode__conflict-confirm">
+                                    This deletes every change you have typed on this page.
+                                </span>
+                                <MdsButton data-conflict-keep size="sm" variant="secondary" @click="cancelDiscard">
+                                    Keep my changes
+                                </MdsButton>
+                                <MdsButton size="sm" variant="destructive" @click="confirmDiscard">
+                                    Discard and reload
+                                </MdsButton>
+                            </template>
+                            <MdsButton v-else size="sm" variant="secondary" @click="armDiscard">
+                                Discard my changes and reload
+                            </MdsButton>
+                        </template>
+                    </MdsAlert>
+                </div>
+
+                <!-- Pruned-answer report (H21c): the previous submission WAS recorded — the copy must say so while
+                     naming what relevance removed from it. -->
+                <div
+                    v-if="prunedAnswers.length > 0 && !prunedDismissed"
+                    class="encode__pruned"
+                    role="status"
+                    aria-live="polite"
+                >
+                    <div class="encode__pruned-body">
+                        <strong class="encode__pruned-title">
+                            Recorded, but {{ prunedAnswers.length }}
+                            {{ prunedAnswers.length === 1 ? 'answer was' : 'answers were' }} not saved
+                        </strong>
+                        <p class="encode__pruned-lede">
+                            These questions did not apply to the answers given, so they were left out of the response:
+                        </p>
+                        <ul class="encode__pruned-list">
+                            <li v-for="(entry, i) in prunedAnswers" :key="i">{{ entry }}</li>
+                        </ul>
+                    </div>
+                    <MdsButton variant="tertiary" icon-left="close" @click="prunedDismissed = true">Dismiss</MdsButton>
+                </div>
+
+                <!-- The engine degraded on a malformed published expression (H21c): every question is shown and the
+                     server stays authoritative. Said out loud rather than swallowed — silently showing every branch
+                     is exactly the pre-H21c behaviour this page exists to end. -->
+                <div v-if="runtime.engineFailed.value" class="encode__degraded" role="alert">
+                    <strong class="encode__degraded-title">Conditions could not be applied</strong>
+                    <span class="encode__degraded-body">
+                        Every question is shown. Answers that do not apply will still be removed when you submit.
+                    </span>
+                </div>
+
+                <!-- M129 — the paper, beside the form on a wide screen and above it on a narrow one (the grid lives on
+                     `.encode--scan .encode__main` since M174). Rendered in scan mode, and since M154 when correcting a response saved from a scan
+                     ("Scanned pages", as on the response page), so create, resume and a typed response's edit keep their
+                     exact DOM. -->
+                <div v-if="hasPaper" class="encode__scan-pages">
+                    <ScanPages :pages="paperPages" :title="isScanning ? undefined : 'Scanned pages'" />
+                </div>
+
+                <form class="encode__form" novalidate @submit.prevent="submit">
+                    <!-- Form-WIDE error summary (H21c). Doc #27 §5.5: Submit reports across the whole form, because a
+                         step-scoped banner on a multi-step form announces "0 fields need your attention" while the
+                         submit is refused elsewhere. Each jump changes step before it focuses. -->
+                    <div v-if="summaryItems.length > 0" class="encode__summary" role="alert" aria-live="assertive">
+                        <strong class="encode__summary-title">
+                            {{ summaryItems.length }}
+                            {{ summaryItems.length === 1 ? 'answer needs' : 'answers need' }} attention
+                        </strong>
+                        <ul class="encode__summary-list">
+                            <li v-for="item in summaryItems" :key="item.address">
+                                <button type="button" class="encode__summary-link" @click="jumpTo(item)">
+                                    {{ item.label }}
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Keyer-only reference rows (H21c) — never shown to a respondent, so never part of a step. -->
+                    <MdsCard v-if="referenceRows.length > 0">
+                        <div class="encode__block">
+                            <div class="encode__block-head">
+                                <h2 class="encode__block-title">Reference fields</h2>
+                                <p class="encode__block-desc">
+                                    Not shown to the respondent. These values normally arrive from the form’s link —
+                                    enter them here when you are keying from paper.
+                                </p>
+                            </div>
+                            <div class="encode__fields">
+                                <div v-for="field in referenceRows" :key="field.key" :id="anchorFor(field.key)">
+                                    <FieldInput
+                                        :field="field"
+                                        :model-value="flatValue(field.key)"
+                                        :error="fieldError(field.key)"
+                                        :read-only="isEditing"
+                                        @update:model-value="setFlatValue(field.key, $event)"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </MdsCard>
+
+                    <!-- Doc #27 §4.1's TERMINAL state, reached on this channel too: no counter (never "Step 1 of 0"),
+                         an explicit panel, and ONE labelled Submit. `isTerminal` carries this rather than
+                         `isLastStep`, which is correctly false at zero steps. -->
+                    <MdsCard v-if="runtime.isTerminal.value">
+                        <div class="encode__terminal">
+                            <h2 class="encode__block-title">No questions to answer</h2>
+                            <p class="encode__block-desc">
+                                Nothing in this form applies to the answers given so far. You can still record the
+                                response as it stands.
+                            </p>
+                        </div>
+                    </MdsCard>
+
+                    <template v-else>
+                        <p v-if="!form.single_page_mode" class="encode__progress" aria-live="polite">
+                            {{ stepPosition }}
+                        </p>
+
+                        <MdsCard v-for="step in shownSteps" :id="`encode-step-${step.key}`" :key="step.key">
+                            <div class="encode__block">
+                                <div
+                                    v-if="blockFor(step)?.label || blockFor(step)?.description || boundsHint(blockFor(step)!)"
+                                    class="encode__block-head"
+                                >
+                                    <h2 v-if="blockFor(step)?.label" class="encode__block-title">
+                                        {{ blockFor(step)?.label }}
+                                    </h2>
+                                    <p v-if="blockFor(step)?.description" class="encode__block-desc">
+                                        {{ blockFor(step)?.description }}
+                                    </p>
+                                    <p v-if="boundsHint(blockFor(step)!)" class="encode__block-note">
+                                        {{ boundsHint(blockFor(step)!) }}
+                                    </p>
+                                </div>
+
+                                <!-- Repeatable section: an add/remove-instance loop over the member fields (G2), now
+                                     driven by the store so per-instance relevance and the answer shape agree. -->
+                                <template v-if="step.isRepeat && step.sectionKey !== null">
+                                    <p v-if="runtime.instanceCount(step.sectionKey) === 0" class="encode__empty">
+                                        Nothing added yet.
+                                    </p>
+
+                                    <ol v-else class="encode__instances">
+                                        <li v-for="(uid, index) in runtime.instanceUidsFor(step.sectionKey)" :key="uid">
+                                            <fieldset class="encode__instance">
+                                                <legend class="encode__instance-legend">
+                                                    {{ instanceLegend(blockFor(step)!, index) }}
+                                                </legend>
+                                                <div class="encode__fields">
+                                                    <template v-for="field in rowsOf(step)" :key="field.key">
+                                                        <div
+                                                            v-if="runtime.instanceFieldRelevant(step.sectionKey, index, field.key)"
+                                                            :id="anchorFor(runtime.instanceAddress(step.sectionKey, index, field.key))"
+                                                        >
+                                                            <FieldInput
+                                                                :field="field"
+                                                                :model-value="instanceValue(step.sectionKey, index, field.key)"
+                                                                :error="instanceError(step.sectionKey, index, field.key)"
+                                                                :read-only="isEditing"
+                                                                @update:model-value="setInstanceValue(step.sectionKey, index, field.key, $event)"
+                                                            />
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                                <div class="encode__instance-actions">
+                                                    <MdsButton
+                                                        type="button"
+                                                        variant="tertiary"
+                                                        size="sm"
+                                                        icon-left="trash"
+                                                        :aria-label="`Remove ${instanceLegend(blockFor(step)!, index)}`"
+                                                        @click="removeInstance(step.sectionKey, index)"
+                                                    >
+                                                        Remove
+                                                    </MdsButton>
+                                                </div>
+                                            </fieldset>
+                                        </li>
+                                    </ol>
+
+                                    <p v-if="countError(step.sectionKey)" class="encode__count-error" role="alert">
+                                        {{ countError(step.sectionKey) }}
+                                    </p>
+
+                                    <div class="encode__add">
+                                        <MdsButton
+                                            type="button"
+                                            variant="secondary"
+                                            icon-left="plus"
+                                            :disabled="!runtime.canAddInstance(step.sectionKey)"
+                                            @click="addInstance(step.sectionKey)"
+                                        >
+                                            Add {{ blockFor(step)?.label ?? 'entry' }}
+                                        </MdsButton>
+                                        <span v-if="!runtime.canAddInstance(step.sectionKey)" class="encode__max-note">
+                                            Maximum of {{ blockFor(step)?.max_instances }} reached.
+                                        </span>
+                                    </div>
+                                </template>
+
+                                <!-- Flat step (or the synthetic lead block): relevant fields render directly. -->
+                                <div v-else class="encode__fields">
+                                    <!-- M129 — in scan mode a row the scan has something to say about carries its note
+                                         under the control and a coloured edge; the note's words, not the colour, carry
+                                         the meaning. No class and no note in the other modes. -->
+                                    <div
+                                        v-for="field in rowsOf(step)"
+                                        :key="field.key"
+                                        :id="anchorFor(field.key)"
+                                        :class="scanNotes[field.key] ? ['encode__scan-row', `encode__scan-row--${scanNotes[field.key].tone}`] : undefined"
+                                    >
+                                        <FieldInput
+                                            :field="field"
+                                            :model-value="flatValue(field.key)"
+                                            :error="fieldError(field.key)"
+                                            :read-only="isEditing"
+                                            @update:model-value="setFlatValue(field.key, $event)"
+                                        />
+                                        <p v-if="scanNotes[field.key]" class="encode__scan-note">{{ scanNotes[field.key].text }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </MdsCard>
+                    </template>
+
+                    <div class="encode__actions">
+                        <!-- The sticky footer's Cancel — the same `cancel_url` as the header's, which is the point. -->
+                        <Link v-if="cancel_url" :href="cancel_url" class="encode__cancel">Cancel</Link>
+                        <MdsButton
+                            v-if="!form.single_page_mode && !runtime.isTerminal.value && !runtime.isFirstStep.value"
+                            type="button"
+                            variant="secondary"
+                            icon-left="chevron-left"
+                            @click="goPrev"
+                        >
+                            Back
+                        </MdsButton>
+                        <!-- ⚠️ IN EDIT MODE, NEXT IS SECONDARY AND SAVE IS ALWAYS PRESENT.
+                             Creating a response is a sequence — you fill step 1, then step 2, and Submit belongs at
+                             the end. CORRECTING one is not: the editor came here to fix a known field, they land on
+                             step 1 because edit mode restores no cursor, and with Save gated behind `isLastStep`
+                             they would have to click Next through every remaining step to commit a one-character fix
+                             on step 6 of 8 — with nothing on screen explaining why Save is missing. Save is
+                             therefore rendered on every step, and Next stays available beside it for reading
+                             through. -->
+                        <MdsButton
+                            v-if="!form.single_page_mode && !runtime.isTerminal.value && !runtime.isLastStep.value"
+                            type="button"
+                            :variant="isEditing ? 'secondary' : 'primary'"
+                            icon-right="chevron-right"
+                            @click="goNext"
+                        >
+                            Next
+                        </MdsButton>
+                        <MdsButton
+                            v-if="isEditing || form.single_page_mode || runtime.isTerminal.value || runtime.isLastStep.value"
+                            type="submit"
+                            variant="primary"
+                            icon-left="check"
+                            :loading="submitting"
+                            :disabled="!canSubmit"
+                        >
+                            {{ isEditing ? 'Save changes' : isScanning ? 'Save response' : 'Submit response' }}
+                        </MdsButton>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 </template>
 
 <style scoped>
+/* M174: the container the side panel's split reads (an element cannot query its own size). The 720px cap went with
+   it: the reading column is `.encode__layout`'s, below. */
 .encode {
-    max-width: 720px;
+    container-type: inline-size;
+}
+
+/* M174 (`R-66952d33`, `D121`, `D136`): below the split — and beside a scanned paper below its own breakpoint — the page
+   is the 45rem column it always was (720px), the panel's facts above the form. */
+.encode__layout {
+    max-inline-size: 45rem;
 }
 
 /* `.encode__crumb` went with its markup in J2c — the hand-rolled crumb became `MdsBreadcrumb`, which brings
@@ -1599,6 +1675,87 @@ function onConflictKeydown(event: KeyboardEvent): void {
     font-size: var(--mds-type-body-md-font-size);
     line-height: var(--mds-type-body-md-line-height);
     color: var(--mds-color-text-secondary);
+}
+
+/* M174 (`D136`): the sections beside the form — a quiet list on a rule, the current one marked by weight and by an
+   accent on the rule as well as by colour (WCAG 1.4.1). `role="list"` on the `<ol>` because `list-style: none` strips
+   list semantics in Safari. */
+.encode__steps {
+    margin: 0 0 var(--mds-space-6);
+}
+
+.encode__steps-title {
+    margin: 0 0 var(--mds-space-2);
+    color: var(--mds-color-text-secondary);
+    font-size: var(--mds-type-label-font-size);
+    line-height: var(--mds-type-label-line-height);
+    font-weight: var(--mds-type-label-font-weight);
+    letter-spacing: var(--mds-tracking-wide);
+    text-transform: uppercase;
+}
+
+.encode__steps-list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-inline-start: 1px solid var(--mds-color-border-default);
+}
+
+.encode__step {
+    margin-inline-start: -1px;
+    padding: var(--mds-space-1) var(--mds-space-3);
+    border-inline-start: 2px solid transparent;
+    color: var(--mds-color-text-secondary);
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+}
+
+.encode__step--current {
+    border-inline-start-color: var(--mds-color-action-primary-fg);
+    color: var(--mds-color-text-heading);
+    font-weight: var(--mds-font-weight-semibold);
+}
+
+.encode__step-link {
+    color: var(--mds-color-action-primary-fg);
+    text-decoration: none;
+}
+
+.encode__step-link:hover {
+    text-decoration: underline;
+}
+
+.encode__step-link:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--mds-radius-sm);
+}
+
+/* M174 (`R-66952d33`, `D121`, `D136`): from a 75rem page the form keeps its 45rem column and the side panel sits in a
+   26rem column beside it; past about 1,160px the rest stays empty, the cost of a reading measure. The panel is first in
+   the DOM, so a phone and a screen reader meet the form's name, its open or closed notice and its sections first, as
+   they always met the intro. Not sticky: a long section list in a sticky column would leave its tail unreachable. A
+   scanned paper takes the room instead (the paper's halves, below). */
+@container (min-width: 75rem) {
+    .encode:not(.encode--scan) .encode__layout {
+        display: grid;
+        grid-template-columns: minmax(0, 45rem) minmax(18rem, 26rem);
+        column-gap: var(--mds-space-6);
+        align-items: start;
+        max-inline-size: none;
+    }
+
+    .encode:not(.encode--scan) .encode__aside {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .encode:not(.encode--scan) .encode__main {
+        grid-column: 1;
+        grid-row: 1;
+    }
 }
 
 /* Pruned-answer report (H21c) — border-accent rather than colour alone (WCAG 1.4.1), and a WARNING accent
@@ -1918,7 +2075,7 @@ function onConflictKeydown(event: KeyboardEvent): void {
     margin: 0;
     font-size: var(--mds-type-body-sm-font-size);
     line-height: var(--mds-type-body-sm-line-height);
-    color: var(--mds-color-danger-text);
+    color: var(--mds-color-status-danger-fg);
 }
 
 .encode__add {
@@ -1942,9 +2099,11 @@ function onConflictKeydown(event: KeyboardEvent): void {
 }
 
 /* ── M129 — scan mode ───────────────────────────────────────────────────────────────────────────────────
-   The paper and the form side by side on a wide screen. Every child of the page spans both columns except the
-   paper (left, sticky) and the form (right); auto-placement puts the two on one row because the paper comes
-   first in the DOM. Below the breakpoint nothing changes but the paper's gap: it stacks above the form.
+   The paper and the form side by side on a wide screen. Every child of the form's wrapper spans both columns except
+   the paper (left, sticky) and the form (right); auto-placement puts the two on one row because the paper comes
+   first in the DOM. Below the breakpoint nothing changes but the paper's gap: it stacks above the form. Since M174 the
+   grid is on `.encode__main` rather than the page root, which now holds the side panel above it; the halves, the
+   breakpoint and the 90rem cap are unchanged.
    M168 (`R-17caf80e`): EQUAL HALVES, as the saved response (`Show.vue`) and the guest's own check already are. The user
    asked for the scan bigger, "50/50 for both guest and logged in upload": `1fr 45rem` gave the form 720px and left the
    paper ~390px at 1440 beside the 240px sidebar. 75rem stays — with the sidebar it is about the room the guest page
@@ -1954,21 +2113,24 @@ function onConflictKeydown(event: KeyboardEvent): void {
 }
 
 @media (min-width: 75rem) {
-    .encode--scan {
+    .encode--scan .encode__layout {
+        max-inline-size: 90rem;
+    }
+
+    .encode--scan .encode__main {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         column-gap: var(--mds-space-6);
         align-items: start;
-        max-width: 90rem;
     }
 
-    .encode--scan > * {
+    .encode--scan .encode__main > * {
         grid-column: 1 / -1;
     }
 
     /* M154: capped to the window and scrolling on its own, as the response page's column is — uncapped, a
        two-page scan's second page sat below the fold for as long as the form scrolled past it. */
-    .encode--scan > .encode__scan-pages {
+    .encode--scan .encode__main > .encode__scan-pages {
         grid-column: 1;
         position: sticky;
         top: var(--mds-space-4);
@@ -1977,7 +2139,7 @@ function onConflictKeydown(event: KeyboardEvent): void {
         margin: 0;
     }
 
-    .encode--scan > .encode__form {
+    .encode--scan .encode__main > .encode__form {
         grid-column: 2;
     }
 }
@@ -2026,7 +2188,7 @@ function onConflictKeydown(event: KeyboardEvent): void {
 }
 
 .encode__scan-row--danger {
-    border-left-color: var(--mds-color-danger-text);
+    border-left-color: var(--mds-color-status-danger-fg);
 }
 
 .encode__scan-row--info {

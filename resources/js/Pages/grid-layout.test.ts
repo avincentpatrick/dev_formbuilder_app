@@ -1,5 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { FILLING_GRID, containerBlock, nested, read, rule, styleOf } from '../__tests__/css-source';
+import { FILLING_GRID, containerBlock, nested, rule, styleSlice } from '../__tests__/css-source';
+
+const read = (path: string): string => readFileSync(join(process.cwd(), path), 'utf8');
+const styleOf = (path: string): string => styleSlice(read(path));
 
 /**
  * The stacks become grids (M174, `R-fb647b5e`, `D120`): a page that listed its items one full-width row under another —

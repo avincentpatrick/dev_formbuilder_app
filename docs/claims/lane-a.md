@@ -18,6 +18,50 @@ Standing Rule 7(b-bis).
 
 ## Status: ACTIVE CLAIM — `M174`, full width: the detail pages, the stacks and the sign-in (`R-348f997c`, `R-7b8a74ae`, `R-fb647b5e`, `R-10b38d6d`, `R-3d51f0ae`, `R-66952d33`) (m174-ui3-full-width-detail-stacks-signin)
 
+**BUILT — PR #367, CI 6/6 green with real step counts (run 38875893654 at `f303ba5b`: Static analysis 32 · E2E 20 · Contract 16 ·
+Frontend 12 · Pest 11 · axe 11; the only skips are the two main-only staging-header steps and the failure-only report upload; the run at
+`5cabaaf8` was 6/6 too, 798 e2e passed) — AND NOT MERGED.** ⛔ **Asked at green (2026-10-16), the user chose to HOLD it for merge point 1**
+(`D137`, `D138`, recorded by the planning session's round-2 filing, below): `M173` (PR #366, 6/6 again at `41144e58` once the trunk was merged
+in), then this branch rebased onto the trunk, then F (feedback, stacked on this branch) — once F is green, after the user runs the staging
+backup block. The branch carries the six rows' closures, the status bullet and the regenerated line and hand-off.
+
+**Adopted mid-build: the testers' round-2 filing** by the planning session (plan `~/.claude/plans/here-are-added-comments-peppy-quill.md`),
+one docs-only commit `ab5e442e` on its local branch, merged into this branch at `5cabaaf8` on three conditions it kept (docs only, rows
+appended at the end, nothing mid-file): `D137`–`D140` answered, and 26 rows "Filed by `M174`" (the round-1 precedent, adopted by `M172`).
+`D136` is this claim's; the planning session took numbers from `D137`.
+
+Measured against the prediction:
+- **Red first, as predicted.** 36 Vitest pins and 2 mount cases red on the unchanged code; the 11 real-browser cases red by their geometry —
+  the hub's Versions and a response's facts stacked at 1584px at 1920, the webhook's cards at 1584px above its log, the console's at 1392px
+  above Usage at 1440, the two domains stacked and one search column at 1440, the ladder 1584px wide under the tiles, two template footers
+  21px off their cards, the login panel a 416px track at x=296, the landing grid 1024px, the manual-entry intro above a 720px form.
+- **Mutants: 14 Vitest and 11 e2e, all caught, each turning only its own case red.** **Partly wrong:** three Vitest mutants survived their
+  first run — `display: block` on the console's, the achievements workspace's and the manual-entry layouts passed pins that checked only the
+  column tracks; the pins now assert `display: grid` too (`99f0de95`) and catch them. The steps-list gate mutant (render the list always)
+  turned an existing stepped-flow unit test red as well as its own guard — the reason the gate exists. The 11 page mutants ran as one build:
+  each case visits one page and each mutant sat in a different page, so each red is its own.
+- **Most likely wrong — the 2-up answer blocks — held:** a Branching Router response's three sections sat two across at 1920 at 32rem; the
+  36rem mutant put them in one column (tops 190, 313, 436). The runner-up, the scan selectors after the move, held: `ocr-review-axe`'s
+  `expectPaperBeside` green on all three projects.
+- **Not predicted:**
+  - **The steps list repeats every section's name**, so a CSS-hidden copy breaks every reader that finds a section by name — Playwright's strict
+    `getByText(...).waitFor()` in `responsive-axe` (a hub) and this page's own `wrapper.text()` tests. It renders only while the panel sits
+    beside the form (a ResizeObserver on the page root against the same 75rem), never merely hidden. The panel is a `div`, not an `<aside>`
+    (an aside inside the app's main region is a misplaced landmark), and not sticky (a long list would leave its tail unreachable).
+  - **`vue-tsc` checks the shared pin helper** (`resources/js/__tests__/css-source.ts` is not a `*.test.ts`) and the app has no Node types;
+    the helper keeps string functions only and each pin file reads its own source.
+  - **The domain setup guide's text ran about 1,100px at 1920** — the claim's conditional extension, met; it takes an 80ch measure.
+  - **Thirteen citations in other rows pointed into lines this branch moved** without the gate seeing them (they landed on non-blank lines);
+    re-pointed by reading. The ledger stayed at 17 rotten under its ceiling of 17.
+  - **Local e2e (the specs the diff reaches, all projects): 407 passed, 14 failed, 47 skipped.** Six on the stale local Sheets connection
+    (`M173`'s finding); seven run while the full Vitest and the Docs Pest loaded the machine, all green on a quiet re-run; one,
+    `impersonation`, on the local `.env` (`APP_URL` on port 8080, unreachable from the e2e container). CI passed every one.
+  - **Not seen in a browser:** the sections list itself — no seeded form open for manual entry shows two sections at once — filed as a
+    `during-testing` nit; three mount cases pin it.
+- Filed: the version's reference files on the manual-entry page (`D136`) and the unseeded sections list, both `during-testing`. Pint passed;
+  PHPStan cannot move (no `app`, `database` or `routes` change); `vue-tsc` clean; full Vitest 226 files, 3,687 tests; `preflight --with-gates
+  --with-pint` OK; the Docs tests green but the recorded bind-mount artefact.
+
 Taken 2026-10-16 under the testing freeze of 2026-10-13: this claim builds, opens the PR and gets it green, then stops — nothing merges
 until the user says so, after a fresh staging backup (`D123`, `D128`). It is UI3, the third of the UI programme's six themed increments
 (`~/.claude/plans/hi-let-s-conduct-a-mutable-goose.md` §E row 3; the build plan
@@ -133,8 +177,9 @@ Runner-up: the scan-mode selectors after the manual-entry move.
 
 ## HELD — `M173`, full width: the shell and the settings pages (`R-fd7b8879`, `R-ba9d6349`, `R-14971e37`, `R-8ee7d2dc`) (m173-ui2-full-width-shell-settings)
 
-⛔ **Held to merge with `M174`, which is stacked on this branch (2026-10-16):** `origin/main` is merged into this branch before `M174` is
-cut, so PR #366 runs again; both merge on the user's word after one fresh staging backup, this one first.
+⛔ **Held for merge point 1 (2026-10-16, the user at `M174`'s green; `D137`, `D138`):** `origin/main` was merged into this branch at
+`41144e58` and PR #366 ran 6/6 again (run 38828057151: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11); it
+merges first at merge point 1, then `M174` rebased, then F, once F is green and after the user's staging backup.
 
 **BUILT — PR #366, CI 6/6 green with real step counts (run 38779366161 at `0344375a`: Static analysis 32 · E2E 20 · Contract 16 ·
 Frontend 12 · Pest 11 · axe 11; the only skips are the two main-only staging-header steps and the failure-only report upload; the

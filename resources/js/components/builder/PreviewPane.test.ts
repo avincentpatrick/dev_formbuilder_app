@@ -79,6 +79,7 @@ const relevance = ref<Record<string, boolean>>({ q1: true, q2: true, cap: true }
 const stepCount = ref(2);
 
 import PreviewPane from './PreviewPane.vue';
+import { PALETTE } from './builder-store-fixtures';
 import { PREVIEW_REBUILD_DEBOUNCE_MS } from './preview-model';
 import type { BuilderStore } from './useBuilderStore';
 import type { LocalField, LocalSection, Selection } from './types';
@@ -152,6 +153,9 @@ function makeStore(fields: LocalField[], sections: LocalSection[]): Double {
         }),
         select: (next: Selection) => (selection.value = next),
         addSection: vi.fn(() => Promise.resolve()),
+        // M176 (`R-5354b4b9`): "Add a question here" adds through the store, at the spot it names, from the palette's types.
+        addField: vi.fn(() => Promise.resolve()),
+        palette: PALETTE,
         // M151: the store's own rename — trim, refuse a blank or unchanged label — so the double moves like the real one.
         renameField: vi.fn((uid: string, label: string) => {
             const next = label.trim();
@@ -429,17 +433,19 @@ describe('what the author reads', () => {
 });
 
 describe('the author adds a section or a question from the preview (M139, R-598b9100)', () => {
-    it('offers each shown section its own add, named for it, and hands the builder that section', async () => {
+    it('offers each shown section its own add, named for it, and adds the chosen type at the end of that page (M176)', async () => {
         const double = twoSections();
         const wrapper = mountPane(double, true);
         await flushPromises();
 
-        const add = wrapper.find('[data-preview-add-question]');
-        expect(add.text()).toBe('Add a question to S1');
-        await add.trigger('click');
+        const add = wrapper.get('[data-preview-add-question]');
+        expect(add.get('[data-add-here-toggle]').text()).toBe('Add a question to S1');
+        await add.get('[data-add-here-toggle]').trigger('click');
+        await add.get('[data-add-type="short_text"]').trigger('click');
 
-        const s1 = double.sections.value!.find((s) => s.key === 's1')!;
-        expect(wrapper.emitted('add-question')).toEqual([[s1.uid]]);
+        // After q1, the page's last question: section s1's id, place 1 — a question, not a selection (the testers'
+        // "“+ Add question here” button not working").
+        expect(double.store.addField).toHaveBeenCalledWith('short_text', 'sec-s1', 1);
     });
 
     it('shows the author a section with no question yet — which the engine never makes a step — and its add', async () => {
@@ -451,10 +457,10 @@ describe('the author adds a section or a question from the preview (M139, R-598b
         const empty = wrapper.find('[data-preview-empty-section]');
         expect(empty.find('h3').text()).toBe('S3');
         expect(empty.text()).toContain('Respondents do not see this section until it has one.');
-        await empty.find('button').trigger('click');
+        await empty.get('[data-add-here-toggle]').trigger('click');
+        await empty.get('[data-add-type="integer"]').trigger('click');
 
-        const s3 = double.sections.value!.find((s) => s.key === 's3')!;
-        expect(wrapper.emitted('add-question')).toEqual([[s3.uid]]);
+        expect(double.store.addField).toHaveBeenCalledWith('integer', 'sec-s3', 0);
         // Only the empty one: the two sections with a question are steps, not placeholders.
         expect(wrapper.findAll('[data-preview-empty-section]')).toHaveLength(1);
     });

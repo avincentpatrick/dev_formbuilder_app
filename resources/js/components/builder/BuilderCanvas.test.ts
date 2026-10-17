@@ -59,13 +59,20 @@ describe('BuilderCanvas — an empty section (M139)', () => {
         expect(empties[0].element.closest('[data-drop-group]')?.getAttribute('data-drop-group')).toBe('s2');
     });
 
-    it('hands the builder the section to add a question to', async () => {
+    it('adds the chosen type into that empty section — a question, not only a selection (M176, R-5354b4b9)', async () => {
+        // The testers: "“+ Add question here” button not working". It selected the section and moved focus to the palette.
+        const fetch = fetchMock().mockResolvedValue(jsonResponse(200, serverField({ id: 'f2', key: 'age', label: 'Number', field_type: 'integer', form_section_id: 's2', sequence: 2 })));
         const { store, wrapper } = canvas();
 
-        await wrapper.find('[data-section-empty] button').trigger('click');
+        await wrapper.get('[data-section-empty] [data-add-here-toggle]').trigger('click');
+        await wrapper.get('[data-section-empty] [data-add-type="integer"]').trigger('click');
+        await store.whenIdle();
+        await flushPromises();
 
-        const visit = store.sections.value.find((s) => s.key === 'visit')!;
-        expect(wrapper.emitted('add-question')).toEqual([[visit.uid]]);
+        const created = requestLog(fetch).filter((r) => r.method === 'POST' && r.url.endsWith('/fields'));
+        expect(created.map((r) => r.body)).toEqual([{ field_type: 'integer', section_id: 's2' }]);
+        expect(store.fields.value.find((f) => f.id === 'f2')?.form_section_id).toBe('s2');
+        expect(store.selection.value).toMatchObject({ kind: 'field' });
     });
 });
 

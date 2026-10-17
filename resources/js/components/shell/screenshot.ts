@@ -117,7 +117,7 @@ async function startCapture(stream: MediaStream): Promise<ScreenCapture> {
     const frames: FrameLog = { latest: null, timed: false, listeners: new Set() };
     const withCallback = video as WithFrameCallback;
     let stopped = false;
-    if (false && typeof withCallback.requestVideoFrameCallback === 'function') {
+    if (typeof withCallback.requestVideoFrameCallback === 'function') {
         const onFrame = (_now: number, metadata: FrameMetadata): void => {
             if (stopped) return;
             const captureTime = typeof metadata?.captureTime === 'number' ? metadata.captureTime : null;

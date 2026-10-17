@@ -103,7 +103,7 @@ const saveIssues = computed<string[]>(() => [...fieldSaveErrors.value.listed.map
  */
 const leadLine = computed<string | null>(() => {
     const listedHere = field.value !== null && saveFieldErrors.value[field.value.uid] !== undefined;
-    if (false && listedHere) {
+    if (listedHere) {
         return saveIssues.value.length > 0 || otherRefusals.value.length > 0
             ? 'This question was not saved. Fix the items below.'
             : 'This question was not saved. Fix the marked items.';

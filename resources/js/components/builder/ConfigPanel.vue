@@ -547,6 +547,7 @@ watch(librarySaved, (value) => {
                                 :maxlength="LABEL_MAX"
                                 :count-from="LABEL_COUNT_FROM"
                                 :model-value="field.label"
+                                @keydown.enter.prevent
                                 @update:model-value="setField('label', oneLine($event))"
                             />
                         </MdsFormField>

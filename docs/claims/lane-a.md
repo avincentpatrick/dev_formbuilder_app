@@ -16,7 +16,53 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M175`, feedback the testers can use, and the dev session reads (`R-2ce2f274`, `R-9bfd832e`, `R-78f43f26`, `R-f3fb2522`) (m175-f-feedback)
+## Status: NO ACTIVE CLAIM — `M173`, `M174` and `M175` are merged and live on staging (merge point 1, released below). The next claim is written here. Merge only at a planned merge point, after the user's staging backup.
+
+## RELEASED — `M175`, feedback the testers can use, and the dev session reads (`R-2ce2f274`, `R-9bfd832e`, `R-78f43f26`, `R-f3fb2522`) (merged as PR #368, `ce5d5c7b`, last at merge point 1, 6/6 green with real step counts on its rebased run at `2914d5de` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+Built and merged 2026-10-16 by the build session (Opus) from the round-2 plan (`~/.claude/plans/here-are-added-comments-peppy-quill.md`
+§B, §E; build plan `~/.claude/plans/pasted-content-id-afe2-read-claude-md-sunny-squirrel.md`). It completed merge point 1 (`D137`,
+`D138`): after the user's census and backup (`Result: 0`, `staging-2026-10-16-150715.dump`, 439,588 B), `M173` merged first, `M174` was
+rebased onto the trunk and merged once green, then this branch. No user check was owed at the start. One question was asked and answered
+in planning, recorded as `D141` (A): the support API answers on the workspace host, because on staging the central host is the agency's
+website. Rows taken: the four claimed, plus the docs-only filing's owed tails (`R-af2d278b`, `R-5033e87e`, `R-0a7275ce`, the `or_other`
+gap line) and the merge rule in `CLAUDE.md`, `scripts/next.php` and Standing Rule 5 (`D137`). Filed: the support API's exposure
+(`before-launch`, `docs/security-threat-model.md` §9 item 35).
+
+**Measured against the prediction:**
+- **Red first, exactly as listed, row by row** — 12 Vitest + 10 Pest (`R-2ce2f274`), 19 Pest + 8 Vitest + the missing page
+  (`R-9bfd832e`), 24 Pest + the missing card, then 7 script cases over real HTTP (`R-78f43f26`), 4 (`R-f3fb2522`). All green after.
+- **Mutants: 28, all caught** — Pest through `scripts/mutate.php` (4 + 7 + 6 + 1 on the script + 2), Vitest by byte-restore (3 + 3 + 1),
+  and the e2e no-step-aside bundle (red at all three viewports).
+- **The one I named most likely wrong WAS wrong, and not where I guessed.** The capture e2e passed locally and timed out on CI on all three
+  viewports: `acme.localhost` is always a secure context, so the insecure-origin launch flag was never exercised locally — and it does
+  not take on CI (`public-runtime-offline.spec.ts` skips its service-worker cases there for the same reason). The spec now stubs the
+  secure context itself; verified locally with a copy that first removed both (3 + 3 passed).
+- **Not predicted:**
+  - **Two more CI-only failures, from the same root:** CI's Pest job builds no front end, so `MyFeedbackTest` needed `withoutVite()`
+    and the token-card test the page-file lookup skipped, as their neighbours do. Proved by re-running every changed test file with
+    the Vite manifest hidden (274 passed).
+  - **Sanctum could not hold a platform token** (strictly tenant-isolated), so `platform_api_tokens` is its own table; the API is
+    re-hosted by `D141`; a refused transition would have reached the handler's catch-all and answered 500.
+  - **A `preg_replace` that failed to compile returned null and emptied three test files** — restored from the commit before anything
+    ran. The tool layer also collapsed doubled backslashes twice; both caught by reading the bytes back.
+  - **The full Vitest run found a type token that does not exist** (`--mds-type-heading-sm-font-size`); the card takes heading-3.
+  - **The real-browser look:** the console's report dialog widened (its three status buttons wrapped), and the panel's kind question says
+    "(required)" as the shared field does.
+  - **Container PHPStan reports 44 undefined-property errors on files F never touched; host PHPStan, CI's view, is 0** — the recorded trap.
+- **Measured on the local stack:** the pull read four reports from two workspaces and resolved one; Mailpit held the reporter's email
+  quoting the reply and linking to My feedback.
+- **Merge point 1, measured on staging:** the user's census after the last deploy (2026-10-17 00:19 UTC) matched the one before the
+  backup exactly — tenants 1, users 6, forms 11, form_versions 27, submissions 22, attachments 62, feedback_reports 0, notifications 62;
+  `000131`–`000134` ran in batch 14; the backup is still on disk at 439,588 B. F's deploy (run 38936171146, after post-merge CI run
+  38931970141) answered `/up` and `/login` 200, and `/api/platform/v1/feedback` 401 without a token.
+- **The support token and the first pull (2026-10-17):** the user created "Dev laptop — feedback pull" (90 days) on the box's console
+  and saved it on the dev machine through a hidden prompt — it never passed through chat. Two snags on the way, neither a defect: the
+  first `/admin/settings` was a 404 because the browser was signed in as the workspace Owner (the console 404s any non-operator, by
+  design), and a sign-in on the central host lands on its landing page, because `/dashboard` is workspace-only. The first pull was
+  accepted and read 0 reports — the census's `feedback_reports 0` — so there was nothing to triage.
+
+**The claim as it was taken:**
 
 Taken 2026-10-16. It is F of the testers' round 2 (`D138`; the plan of record `~/.claude/plans/here-are-added-comments-peppy-quill.md` §B, §E;
 the build plan `~/.claude/plans/pasted-content-id-afe2-read-claude-md-sunny-squirrel.md`). ⛔ **STACKED:** branch `m175-f-feedback` is
@@ -137,7 +183,13 @@ check dropped, the super-admin/2FA re-check dropped, `RequirePlatformHost` remov
 wrong:** the capture e2e — the workspace host is not a secure context, so it rests on the insecure-origin flag and a stubbed stream.
 Runner-up: the committed-fixture harness the elevated and auth connections need in the API and console tests.
 
-## HELD — `M174`, full width: the detail pages, the stacks and the sign-in (`R-348f997c`, `R-7b8a74ae`, `R-fb647b5e`, `R-10b38d6d`, `R-3d51f0ae`, `R-66952d33`) (m174-ui3-full-width-detail-stacks-signin)
+## RELEASED — `M174`, full width: the detail pages, the stacks and the sign-in (`R-348f997c`, `R-7b8a74ae`, `R-fb647b5e`, `R-10b38d6d`, `R-3d51f0ae`, `R-66952d33`) (merged as PR #367, `4727b17e`, second at merge point 1, 6/6 green with real step counts on its rebased run at `aa6607a4` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+✅ **Merged at merge point 1 (2026-10-16, `D137`, `D138`), second of three:** rebased onto the trunk after `M173` (`e639bc41`), replaying only
+its own commits. Its first rebased run went red on pipeline-lint (P1 drift): the line had been regenerated in a scratch worktree with no
+`vendor/`, the trap `M172` recorded; regenerated in the main checkout, run 38923095905 at `aa6607a4` was 6/6. Merged once `M173`'s deploy
+answered `/up` 200; its own deploy (run 38931348555) finished and staging answered `/up` and `/login` 200 before F merged. The hold notes
+below are kept as they were written.
 
 ⛔ **Held for merge point 1 (2026-10-16, `D137`, `D138`):** `M175` (F, feedback) is stacked on this branch. Once its PR is green, after the
 user runs the staging backup block, `M173` (PR #366) merges, then this branch is rebased onto the trunk and merges once green, then F.
@@ -299,7 +351,11 @@ and `ocr-review-axe` (`expectPaperBeside`) stay green. **Most likely wrong:** th
 response without scanned pages whose form has two blocks, and the browser may show uneven block heights reading worse than one column.
 Runner-up: the scan-mode selectors after the manual-entry move.
 
-## HELD — `M173`, full width: the shell and the settings pages (`R-fd7b8879`, `R-ba9d6349`, `R-14971e37`, `R-8ee7d2dc`) (m173-ui2-full-width-shell-settings)
+## RELEASED — `M173`, full width: the shell and the settings pages (`R-fd7b8879`, `R-ba9d6349`, `R-14971e37`, `R-8ee7d2dc`) (merged as PR #366, `e639bc41`, first at merge point 1, 6/6 green with real step counts on its run at `41144e58` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+✅ **Merged at merge point 1 (2026-10-16, `D137`, `D138`), first of three**, after the user's data census and staging backup (`Result: 0`,
+`staging-2026-10-16-150715.dump`, 439,588 B), on run 38828057151 at `41144e58`; its deploy (run 38925326222) finished and staging answered
+`/up` 200 before `M174` merged. The hold notes below are kept as they were written.
 
 ⛔ **Held for merge point 1 (2026-10-16, the user at `M174`'s green; `D137`, `D138`):** `origin/main` was merged into this branch at
 `41144e58` and PR #366 ran 6/6 again (run 38828057151: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11); it

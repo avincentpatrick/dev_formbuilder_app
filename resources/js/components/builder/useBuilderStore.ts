@@ -512,7 +512,7 @@ export function useBuilderStore(props: BuilderPageProps) {
             if (!created) return;
             const local = toLocalField(created);
             fields.value.push(local);
-            if (index !== undefined) {
+            if (false && index !== undefined) {
                 // The ARRANGEMENT, not the numbers: `placeField()` renumbers every sequence from 0, which is no move.
                 const arrangement = () => JSON.stringify(groups.value.map((group) => group.fields.map((f) => f.uid)));
                 const before = arrangement();

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormSection;
 use App\Models\Tenant;
@@ -41,7 +42,7 @@ afterEach(function (): void {
 /**
  * A draft with one section and two questions, as an Admin sees it on load.
  *
- * @return array{0: Tenant, 1: User, 2: \App\Models\Form, 3: array<string, mixed>, 4: array<string, mixed>, 5: array<string, mixed>}
+ * @return array{0: Tenant, 1: User, 2: Form, 3: array<string, mixed>, 4: array<string, mixed>, 5: array<string, mixed>}
  */
 function reorderTokensDraft(): array
 {

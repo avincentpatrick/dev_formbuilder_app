@@ -2,12 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Models\Form;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\FormService;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
@@ -32,7 +34,7 @@ afterEach(function (): void {
     app(PermissionRegistrar::class)->setPermissionsTeamId(null);
 });
 
-/** @return array{0: User, 1: \App\Models\Form, 2: array<string, mixed>} */
+/** @return array{0: User, 1: Form, 2: array<string, mixed>} */
 function ruleWordsField(): array
 {
     $tenant = Tenant::create(['name' => 'Acme', 'slug' => 'acme', 'default_locale' => 'en']);
@@ -49,7 +51,7 @@ function ruleWordsField(): array
     return [$admin, $form, $field];
 }
 
-function ruleWordsSave(User $admin, \App\Models\Form $form, array $field, array $rule): \Illuminate\Testing\TestResponse
+function ruleWordsSave(User $admin, Form $form, array $field, array $rule): TestResponse
 {
     return test()->actingAs($admin)->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$field['id']}", [
         'key' => $field['key'], 'label' => $field['label'], 'is_required' => 'optional', 'config' => [],

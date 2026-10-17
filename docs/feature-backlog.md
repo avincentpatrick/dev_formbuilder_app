@@ -14641,7 +14641,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   or "Use theirs". **Live.** Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M176` (2026-10-18):** the dialog lists every setting that differs in the settings panel's words, side by side (`conflict-diff.ts`, compared as the server stores rows); closing it defers the choice — the edit stays on screen and in the journal, a builder notice carries **Review**, publish stays held and says why — and a reload raises the conflict again instead of dropping the edit (the journal marks the entry). "Use theirs" reads "Use the saved version". Red first: 8 cases against the stashed old code. Mutants caught: closing chooses theirs again, the reload re-raise disabled. Built and held for merge point 2 (`D137`), not yet live.
 
 - ✅ **CLOSED BY `M176` (2026-10-18) — ****`minor` · "Add a question here" never adds a question: it selects the section and moves focus to a palette that is easy to miss and refuses focus while a save runs.**
-  The testers' comment (2026-10-11, comment 3): *"“+ Add question here” button not working"*. `resources/js/Pages/forms/Builder.vue:200`
+  The testers' comment (2026-10-11, comment 3): *"“+ Add question here” button not working"*. `resources/js/Pages/forms/Builder.vue` (line 200 at `cef2a9b0`, before `M176`)
   (`openPaletteFor()`) selects the section, switches a pane that matters only in the compact layout, and focuses the first palette
   button — which is disabled while a save runs, so the focus silently fails; nothing is added. The buttons are
   `resources/js/components/builder/BuilderCanvas.vue:260` and `resources/js/components/builder/PreviewRuntime.vue:451`, and

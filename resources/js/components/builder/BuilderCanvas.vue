@@ -261,7 +261,7 @@ function confirmDelete(): void {
                         <AddQuestionHere
                             :palette="store.palette"
                             label="Add a question here"
-                            @add="(type) => void store.addField(type, group.section!.id, 0)"
+                            @add="(type) => void store.addField(type, null, 0)"
                         />
                     </li>
                 </ul>

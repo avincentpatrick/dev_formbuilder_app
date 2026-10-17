@@ -206,7 +206,7 @@ const offersNoNegatives = computed<boolean>(
 
 /** The value the rule <select> shows for a row. */
 function kindOf(row: BuilderValidation): string {
-    return false && isNoNegativesRule(row) ? NO_NEGATIVES : (row.rule_type ?? '');
+    return offersNoNegatives.value && isNoNegativesRule(row) ? NO_NEGATIVES : (row.rule_type ?? '');
 }
 
 /**

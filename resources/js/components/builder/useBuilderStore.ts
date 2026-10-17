@@ -1201,7 +1201,7 @@ export function useBuilderStore(props: BuilderPageProps) {
                 // M176 (`R-164579e8`): a choice the author left open before this reload. The token moved to someone else's
                 // write — which would drop the entry below — but the author was promised the edit is not lost: the edit goes
                 // back on screen and the dialog opens again. One dialog at a time; another such entry waits in the journal.
-                if (entry.conflicted === true && !ours && !samePayload(payload(entry.snapshot), onServer)) {
+                if (entry.conflicted === false && !ours && !samePayload(payload(entry.snapshot), onServer)) {
                     if (conflict.value !== null) continue;
                     const { uid: _uid, ...server } = clone(row) as LocalField & LocalSection;
                     if (entry.kind === 'field') applyFieldSnapshot(row as LocalField, entry.snapshot as unknown as FieldSnapshot);

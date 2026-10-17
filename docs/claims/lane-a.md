@@ -16,7 +16,156 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M173`, `M174` and `M175` are merged and live on staging (merge point 1, released below). The next claim is written here. Merge only at a planned merge point, after the user's staging backup.
+## Status: ACTIVE CLAIM — `M176`, R1 of the testers' round 2: the builder fixes, and a capture that waits for the page (`R-c4802b60`, `R-164579e8`, `R-5354b4b9`, `R-5554c526`, `R-61d43278`, `R-923c5041`, `R-36e6f557`, `R-a11cc78a`, `R-8496edfa`) (m176-r1-builder-fixes)
+
+Taken 2026-10-18. It is R1 of the testers' round 2 (`D138`; the plan of record `~/.claude/plans/here-are-added-comments-peppy-quill.md` §B,
+§E; the build plan `~/.claude/plans/pasted-content-id-e51d-read-claude-md-mutable-acorn.md`). Branch `m176-r1-builder-fixes`, cut from
+`origin/main` at `cef2a9b0` (this claim on top), PR into main — not stacked. ⛔ **NOT MERGED IN THIS SESSION:** the PR waits green for merge
+point 2, which merges it with R2 (`D137`, `D138`); R2's deploy, not this one, is the first to run the deploy guard (`D143`).
+
+**No user check was owed at this session's start: the user CONFIRMED `M173`, `M174` and F (`M175`) on staging on 2026-10-17 ("all good")** —
+recorded here, as `M173`'s claim recorded `M172`'s. The session-start feedback pull read 0 reports, so nothing was triaged. Three questions
+were asked and answered in planning (2026-10-17/18), recorded on the branch as `D142`–`D144`, each the recommended option: **`D142` A** —
+"Add a question here" opens the question types as an inline list in that section (`MdsMenu` may not sit in a scroll container, DSR §3.4b,
+and both centre panes scroll); **`D143` A** — the deploy guard is proven at merge point 2, the user's backup block running first until the
+guard's first run passes; **`D144` A** — a table whose count drops after a migration leaves the site down on purpose, with the backup's
+path in the log.
+
+Rows taken, in build order, each its own commits (`D75`): `R-c4802b60` (`major` — moving a question re-stamps every save token, so the next
+edit opens "This item changed elsewhere"), `R-164579e8` (the conflict dialog compares only label and key, and closing it throws the edit
+away), `R-5554c526` (a refused save says its first error twice and numbers rules by their place in the request), `R-61d43278` ("Allow
+negative numbers" is a hidden "Minimum value 0" rule), `R-923c5041` (the label box is one line), `R-5354b4b9` ("Add a question here" never
+adds one), `R-36e6f557` (the type dialog speaks in developer words and repeats the type as the name), `R-8496edfa` (with reduced motion a
+real capture sometimes still shows the feedback panel), `R-a11cc78a` (a deploy takes no backup of its own and nothing checks the data
+survived). The first commit records `D142`–`D144`.
+
+### Evidence verified
+Read on `cef2a9b0` (= `origin/main`) by three read-only passes plus my own reads, Docker not yet started. Every citation held; two point
+inside the element rather than at its first line, noted.
+- `R-c4802b60`: `FormBuilderService.php:588` (`reorder()`), `:603` and `:612` (query-builder `update()`s), `:740` (`assertNoDrift()`, exact
+  string equality), the comments at `:42` and `:582` (claiming the opposite) — held. Laravel's `Eloquent\Builder::update()` adds
+  `updated_at` (`vendor/…/Eloquent/Builder.php:1305`) — held. `useBuilderStore.ts:422` (`persistOrder()` discards the reply) — held.
+- `R-164579e8`: `ConflictDialog.vue:20` (close → `theirs`), `:30`, `:35` (labels; keys at `:31`/`:36`) — held. `useBuilderStore.ts:1005`
+  (`forget()` after either choice; the section arm at `:1019`) — held.
+- `R-5354b4b9`: `Builder.vue:200` (`openPaletteFor()`: select, pane switch, focus a palette button `:disabled="saving"`) — held.
+  `BuilderCanvas.vue:260` (button inside the `<li>` at `:257`) — held. `PreviewRuntime.vue:451` — held. `manual.ts:274` — held.
+- `R-5554c526`: `ConfigPanel.vue:486` (`saveError` = Laravel's first-error summary) and `:489` (every error listed) — held.
+  `field-save-errors.ts:79` (`Rule ${N + 1}` by request position) — held. `UpdateFieldRequest.php:376` (the XOR message) — held.
+- `R-61d43278`: `field-conversion.ts:246` (`negativeFloor()`), `:261` (`withNegativesAllowed()`) — held. `FieldTypeControl.vue:316` (the
+  binding inside the `MdsCheckbox` opening at `:315`) — held.
+- `R-923c5041`: `ConfigPanel.vue:518` (single-line `MdsTextInput`, no `maxlength`) — held. `InlineLabelEdit.vue:68` (`:maxlength`, inside
+  the `MdsTextInput` at `:63-71`) — held. `Textarea.vue:46` (`min-height: 88px`) and `:55` (`resize: vertical`) — held.
+- `R-36e6f557`: `ConvertFieldDialog.vue:39` (HELP) — held. `field-conversion.ts:195` — held. `ConversionWarning.php:50` — held, with
+  `ConversionDropReason.php` and `ConversionImpact.php` (`message()` only, no `label()`). `FormBuilderService.php:137` (a new question's
+  label is its type's) — held, so the dialog reads *"Current type of “Date & time”: Date & time"*.
+- `R-a11cc78a`: `deploy.ps1:38` (the header; the `migrate --force` call at `:496`, inside the window) — held; no backup step anywhere in it.
+- `R-8496edfa`: `screenshot.ts` (`FRAME_WAIT_MS = 150`, two `nextFrame` calls in `grab()`) — held. `tests/e2e/feedback-capture.spec.ts`
+  (`dialogAtDraw` recorded in a `drawImage` wrapper, the stream a `canvas.captureStream(30)`) — held.
+
+### Premise verified
+- One session only (the user, 2026-10-13); lane B retired; no other claim, held block or forward queue in either claim file.
+- **`R-c4802b60` understates itself.** `persistOrder()` sends EVERY row of the draft, so every question and section is re-stamped, not only
+  the moved ones; undo of a delete and redo of an add (`restoreFieldServer`, `restoreSectionServer`) reorder too; and `restoreJournal()`
+  silently drops, on reload, an unsaved edit whose base the reorder made stale. **The row's "retry of an edit that did land" is a second
+  instance:** a 409 whose `current` is this tab's own landed write is recognised only when the content is unchanged (`samePayload`), so
+  an author who typed more after a lost reply meets "someone else" against their own write. Taken in the same pass.
+- **`R-164579e8`:** `MdsModal` has no non-dismissible mode (the X, Escape and the backdrop all close), so closing must defer the choice and
+  a control must bring the dialog back. A deferred entry would be dropped on reload by the same `restoreJournal()` path — re-raised
+  instead. No `ConflictDialog.test.ts` exists; nothing exported diffs two rows (the panel's words live in `field-save-errors.ts` `NAMES`).
+- **`R-5354b4b9`:** the plan's "menu at the button" is barred — `MdsMenu` must not be mounted inside a scroll container (DSR §3.4b) and
+  `.canvas` and `.builder-preview` both scroll — so `D142` chose an inline list. `addField()` appends across the whole draft and the server
+  takes no position, so "at that place" is a client placement plus one `persistOrder()`. Structure shows the button only on an empty
+  section with a header; Preview has three add buttons, the untitled lead step's included. `builder-preview-authoring.spec.ts` pins today's
+  behaviour (focus moved to the palette).
+- **`R-5554c526`:** the testers' exact XOR message is probably unreachable since `M170` withheld unfinished rows (`isUnfinishedRule`,
+  `rule_type === null` only — a `rule_type` of `''` still reaches it); the lead-line duplication holds for every refusal. Three rule
+  numberings exist: the request index, the Validation tab's, and Basics' Required-when subset.
+- **`R-61d43278`:** a native `<select>` binds by value and a rule's label always comes from its `rule_type`, so "No negative numbers" is a
+  display kind derived in one place — the Validation tab — from `min_value` with `0`, never a new stored type (a new `ValidationRuleType`
+  case would need both engines and the mirror). `builder-settings-refresh.spec.ts` builds its later rules on the toggle's row.
+- **`R-923c5041`:** no `Textarea.test.ts` exists; the ConfigPanel label carries no `maxlength`; four Vitest files find the label as
+  `input[aria-label=…]`; no counter or auto-grow exists anywhere in the design system.
+- **`R-36e6f557`:** the DSR has no voice section; no test pins the dialog's lead line or HELP; `builder-convert-axe.spec.ts` pins the
+  hidden-question sentence verbatim; the enums' sentences are transmitted, never mirrored, so no drift test pins them.
+- **`R-a11cc78a`:** `deploy.ps1` runs the copy already in the live checkout, so a change to it takes effect one deploy late — R1's own
+  deploy runs the old script, and R2's is the guard's first run (`D143`). The runner is NETWORK SERVICE; the `pg_dump` path is inferred
+  (PostgreSQL 15). No gate refuses a drop today (`migration-lint.php` checks RLS only); the one table drop in any `up()` is
+  `2026_07_20_000005`, guarded by a row count. Maintenance mode pauses the worker and the scheduler, so counts taken after `down` are
+  stable.
+- **`R-8496edfa`:** the CI-skip precedent (`public-runtime-offline.spec.ts`) tests a capability, not a CI flag, and the existing capture
+  spec fakes `isSecureContext` — so the real-capture spec keys on `process.env.CI` and the desktop project. No `screenshot.test.ts`
+  exists. The full `chromium` channel with `--auto-accept-this-tab-capture` captures on `acme.localhost` in the e2e container (measured
+  after `M175`, the probe not kept).
+
+### Remedy verdict
+- **Tokens:** `->toBase()->update()` writes the positions without `updated_at` and keeps the global scopes — works (read in
+  `Eloquent\Builder`). The own-write 409 adopts `current.version` when `current` equals the last payload this tab sent (the journal's
+  `sent`), then re-sends the newer content — added.
+- **Dialog:** each differing setting in the panel's words, side by side; closing defers, a Review control reopens, a reload re-raises —
+  works as prescribed, extended to the reload.
+- **Add here:** an inline type list (`D142`) placing the question in that section at that spot, one undo entry — works, reshaped.
+- **One message:** a neutral lead line whenever the reply has an errors map; rule numbers from the editor's rows, recorded at send time;
+  the XOR message split into its two plain cases — works.
+- **No negatives:** the Basics checkbox goes; the Validation tab's kind select offers "No negative numbers", stored as `min_value 0` and
+  shown under that name — works as prescribed.
+- **Label:** `MdsTextarea` gains `autosize` and a counter (`inheritAttrs: false`, attributes bound to the `<textarea>`); Enter adds no
+  line break — works as prescribed.
+- **Wording:** a DSR voice rule, then the dialog, the conversion sentences and the three enums rewritten to it; no repeated type — works.
+- **Capture:** wait for a `requestVideoFrameCallback` frame captured after the panel left (`captureTime`), else a minimum wait and a quiet
+  period under a hard cap; a real-capture e2e, local only — works as prescribed; its red on the trunk is probabilistic (3 of 13 measured).
+- **Deploy:** inside the window, after `down`: a backup and a census, refusing (site brought back up on the old code) if either fails; after
+  `migrate`, the census compared, a drop leaving the site down (`D144`); a migration-lint rule refusing a drop, truncate or row delete in
+  any `up()` outside a decision-cited allow-list — works; proven on the box at merge point 2 (`D143`).
+
+Files: first commit — `docs/claims/decisions.md`, `docs/pipeline.md`.
+`R-c4802b60` — `app/Services/Forms/FormBuilderService.php` (hub), new `tests/Feature/Forms/ReorderKeepsTokensTest.php`,
+`resources/js/components/builder/useBuilderStore.ts` (hub), `save-state.test.ts`, `edit-journal.ts`.
+`R-164579e8` — `ConflictDialog.vue` and new `ConflictDialog.test.ts`, new `conflict-diff.ts` and its test, a new shared row-compare
+module beside the store, `field-save-errors.ts`, `field-conversion.ts`, `useBuilderStore.ts`, `edit-journal.ts`, `ConfigPanel.vue` (hub),
+`resources/js/Pages/forms/Builder.vue` (hub), `save-label.ts`, the store's conflict tests (`builderClient.test.ts`, `save-state.test.ts`).
+`R-5554c526` — `ConfigPanel.vue` and `ConfigPanel.test.ts`, `field-save-errors.ts` and its test, `useBuilderStore.ts`,
+`app/Http/Requests/Forms/UpdateFieldRequest.php` (hub), a Pest file under `tests/Feature/Forms/` for the two messages.
+`R-61d43278` — `FieldTypeControl.vue` and its test, `field-conversion.ts` and its test, `ValidationEditor.vue` and its test,
+`settings-save-matrix.test.ts`, `resources/js/components/help/manual.ts` (hub) and `manual.test.ts`, `tests/e2e/builder-settings-refresh.spec.ts`.
+`R-923c5041` — `packages/design-system/src/components/Textarea/Textarea.vue`, `Textarea.stories.ts`, new `Textarea.test.ts`,
+`docs/ux/design-system-reference.md` (hub), `ConfigPanel.vue`, `InlineLabelEdit.vue`, and the label selectors in `BuilderCanvas.test.ts`,
+`PreviewPane.test.ts`, `PreviewRuntime.test.ts`, `usePreviewReorder.test.ts`.
+`R-5354b4b9` — new `resources/js/components/builder/AddQuestionHere.vue` and its test, new `palette-groups.ts`, `FieldPalette.vue`,
+`useBuilderStore.ts`, `Builder.vue`, `BuilderCanvas.vue` (hub) and its test, `PreviewRuntime.vue` (hub), `PreviewPane.vue` and its test,
+`preview-model.ts`, `manual.ts`, `tests/e2e/builder-preview-authoring.spec.ts`.
+`R-36e6f557` — `docs/ux/design-system-reference.md`, `ConvertFieldDialog.vue` and its test, `field-conversion.ts` and its test,
+`app/Enums/ConversionWarning.php`, `ConversionDropReason.php`, `ConversionImpact.php`, `manual.ts` and `manual.test.ts`,
+`tests/e2e/builder-convert-axe.spec.ts`.
+`R-8496edfa` — `resources/js/components/shell/screenshot.ts` and new `screenshot.test.ts`, `FeedbackButton.vue` and its test, new
+`tests/e2e/feedback-capture-real.spec.ts`, `docs/adr/0015-feedback-screenshot-capture.md`, `docs/TESTING-GUIDE.md` (hub).
+`R-a11cc78a` — `deploy.ps1`, new `app/Console/Commands/DeployBackupCommand.php` and `DeployCensusCommand.php`, a new `config/deploy.php`,
+`scripts/migration-lint.php`, new `tests/Feature/Deploy/DeployDataGuardTest.php`, `DeployBackupCommandTest.php`, `DeployCensusCommandTest.php`,
+`docs/deployment-infrastructure.md` (hub).
+Close-out: `docs/feature-backlog.md` (hub), `PROGRESS.md` (hub, own block), `docs/pipeline.md` (hub); this file on main.
+Shared artefacts taken: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/ux/design-system-reference.md`,
+`docs/deployment-infrastructure.md`, `docs/TESTING-GUIDE.md`, `docs/adr/0015-feedback-screenshot-capture.md`,
+`tests/e2e/builder-settings-refresh.spec.ts`, `tests/e2e/builder-preview-authoring.spec.ts`, `tests/e2e/builder-convert-axe.spec.ts`, new
+`tests/e2e/feedback-capture-real.spec.ts`, `PROGRESS.md` (own block).
+Hubs (`D128`: overlap allowed, every hub named; derived by `backlog-triage.php --json` against this list, re-derived before the PR):
+`app/Services/Forms/FormBuilderService.php`, `app/Http/Requests/Forms/UpdateFieldRequest.php`, `resources/js/Pages/forms/Builder.vue`,
+`resources/js/components/builder/useBuilderStore.ts`, `ConfigPanel.vue`, `BuilderCanvas.vue`, `PreviewRuntime.vue`,
+`resources/js/components/help/manual.ts`, `docs/ux/design-system-reference.md`, `docs/deployment-infrastructure.md`, `docs/TESTING-GUIDE.md`,
+`docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`, `PROGRESS.md`.
+Paired files taken: none (no new `ValidationRuleType` case, so no mirror).
+Namespaces spent: `D142`–`D144` (asked and answered in planning); ADR-0015 §D11 amended; no migration, no new ADR.
+E2E specs the diff reaches, run locally: `builder-settings-refresh`, `builder-preview-authoring`, `builder-convert-axe`, `builder-axe`,
+`builder-structure`, `builder-draft-superseded`, `field-library-axe`, `feedback-capture`, and the new `feedback-capture-real` (local only,
+skipped on CI); CI runs every spec.
+Prediction: red first on this head — `ReorderKeepsTokensTest` (409 after a reorder and a second), the own-write retry, `ConflictDialog` and
+`conflict-diff` (no diff rows; close emits `theirs`), the lead line and "Rule 2" behind a withheld row, the two split Pest messages, the
+No-negatives `ValidationEditor` cases, `Textarea.test.ts`, `AddQuestionHere` and the created-in-place Canvas/Preview cases, the dialog's
+lead line, `screenshot.test.ts`, the real-capture e2e, the three deploy-guard Pest files and the lint rule's control. All green after.
+Mutants (about 20), each turning only its named case red: `toBase()` dropped, the `sent` match dropped, close back to `theirs`, `forget`
+on defer, the lead back to `saveError`, the row map dropped, the No-negatives derivation dropped, the autosize height update dropped,
+Enter's `preventDefault` dropped, placement dropped, the section dropped, the no-repeat condition dropped, `since` ignored (unit and
+e2e), the census drop check dropped, the refusal's `up` dropped, the lint rule dropped (a committed `dropColumn` migration). **Most
+likely wrong:** the real-capture e2e's red on the trunk — probabilistic, and the 3-in-13 rate came from a throwaway probe under other
+conditions. Runner-up: mapping a Required-when rule's error to that subset's own numbering.
 
 ## RELEASED — `M175`, feedback the testers can use, and the dev session reads (`R-2ce2f274`, `R-9bfd832e`, `R-78f43f26`, `R-f3fb2522`) (merged as PR #368, `ce5d5c7b`, last at merge point 1, 6/6 green with real step counts on its rebased run at `2914d5de` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

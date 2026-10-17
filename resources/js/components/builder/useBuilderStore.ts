@@ -70,6 +70,10 @@ export function useBuilderStore(props: BuilderPageProps) {
     const superseded = ref<{ draft: SupersedingDraft | null } | null>(null);
     // M172 (`R-733eff09`, `D132`): the key a save asked for and the one the server kept instead, per row, while they differ.
     const keyNotices = ref<Record<Uid, { wanted: string; kept: string }>>({});
+    // M176 (`R-c4802b60`): every payload this page sent for a row since the server last confirmed one — so a 409 whose
+    // `current` is one of them is read as THIS page's own landed write (its reply lost), never as someone else's.
+    // In memory, not the journal: the journal's storage can be refused, and this is about the page's own requests.
+    const sentSinceHeld = new Map<Uid, Record<string, unknown>[]>();
     const undoStack = ref<HistoryEntry[]>([]);
     const redoStack = ref<HistoryEntry[]>([]);
 
@@ -269,11 +273,26 @@ export function useBuilderStore(props: BuilderPageProps) {
         return result && !result.conflict ? result.data : null;
     }
 
+    /**
+     * M176 (`R-c4802b60`) — note a payload as sent, and answer what was sent BEFORE it since the last confirmed save. Bounded:
+     * a row whose saves have failed for an hour is not one whose oldest attempt is what the server holds.
+     */
+    function noteSent(uid: Uid, sent: Record<string, unknown>): Record<string, unknown>[] {
+        const earlier = sentSinceHeld.get(uid) ?? [];
+        sentSinceHeld.set(uid, [...earlier, sent].slice(-10));
+        return earlier;
+    }
+
+    function isEarlierSend(earlier: Record<string, unknown>[], current: Record<string, unknown>): boolean {
+        return earlier.some((other) => samePayload(current, other));
+    }
+
     /** True once the server holds the field as it is on screen — false on a refusal, a failure or a 409 (M155). */
-    async function persistField(uid: Uid): Promise<boolean> {
+    async function persistField(uid: Uid, resent = false): Promise<boolean> {
         const field = findField(uid);
         if (!field) return false;
         const sent = fieldPayload(field);
+        const earlier = noteSent(uid, sent);
         const result = await guard(() => client.patch<ServerField>(`${base}/fields/${field.id}`, sent), { uid });
         if (!result) return false;
         // M170 — a 409 whose question already holds exactly this edit is not a conflict. It is how the put-back after a
@@ -284,14 +303,22 @@ export function useBuilderStore(props: BuilderPageProps) {
         // matched, a conflict was raised over nothing, and the next save went at a token already spent.
         if (result.conflict && samePayload(fieldPayload(result.current as unknown as LocalField), sent)) {
             field.version = result.current.version;
+            sentSinceHeld.delete(uid);
             delete save.fieldErrors[uid];
             return true;
+        }
+        // M176 (`R-c4802b60`) — the server holds an EARLIER save of this page, whose reply never came back, and the author has
+        // typed on since. That is this page's own write, not someone else's: take its token and send the newer edit, once.
+        if (result.conflict && !resent && isEarlierSend(earlier, fieldPayload(result.current as unknown as LocalField))) {
+            field.version = result.current.version;
+            return persistField(uid, true);
         }
         if (result.conflict) {
             conflict.value = { kind: 'field', uid, mine: clone(field), theirs: result.current };
             return false;
         }
         field.version = result.data.version;
+        sentSinceHeld.delete(uid);
         delete save.fieldErrors[uid]; // the server holds this field now: its marks are answered
         adoptKeptKey(uid, field, String(sent.key), result.data.key);
         return true;
@@ -362,21 +389,28 @@ export function useBuilderStore(props: BuilderPageProps) {
     }
 
     /** True once the server holds the section as it is on screen — false on a refusal, a failure or a 409 (M155). */
-    async function persistSection(uid: Uid): Promise<boolean> {
+    async function persistSection(uid: Uid, resent = false): Promise<boolean> {
         const section = findSection(uid);
         if (!section) return false;
         const sent = sectionPayload(section);
+        const earlier = noteSent(uid, sent);
         const result = await guard(() => client.patch<ServerSection>(`${base}/sections/${section.id}`, sent));
         if (!result) return false;
         if (result.conflict && samePayload(sectionPayload(result.current as unknown as LocalSection), sent)) {
             section.version = result.current.version; // M170: as `persistField()` — the same edit, landed twice
+            sentSinceHeld.delete(uid);
             return true;
+        }
+        if (result.conflict && !resent && isEarlierSend(earlier, sectionPayload(result.current as unknown as LocalSection))) {
+            section.version = result.current.version; // M176: as `persistField()` — this page's own landed write
+            return persistSection(uid, true);
         }
         if (result.conflict) {
             conflict.value = { kind: 'section', uid, mine: clone(section), theirs: result.current };
             return false;
         }
         section.version = result.data.version;
+        sentSinceHeld.delete(uid);
         adoptKeptKey(uid, section, String(sent.key), result.data.key); // M172: as `persistField()`
         return true;
     }
@@ -1082,6 +1116,7 @@ export function useBuilderStore(props: BuilderPageProps) {
 
     function forget(uid: Uid, kind: 'field' | 'section', id: string): void {
         delete save.unsaved[uid];
+        sentSinceHeld.delete(uid);
         journal?.drop(kind, id);
     }
 

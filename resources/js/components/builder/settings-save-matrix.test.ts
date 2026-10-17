@@ -354,6 +354,10 @@ describe('a refresh straight after a change keeps it (R-bfa3eb93)', () => {
         mock.mockImplementationOnce(() =>
             Promise.resolve(jsonResponse(409, { current: { ...WHOLE_NUMBER, hint: 'Help one.', version: 'v8' }, message: 'Changed elsewhere.' })),
         );
+        // M176 (`R-c4802b60`): that 409's row is this page's own put-back, so the page sends the newer edit once more at
+        // `v8` — and, the page going, that request fails too. What the third page proves is unchanged: an edit no write
+        // landed is put back.
+        mock.mockImplementationOnce(() => Promise.reject(new TypeError('Failed to fetch')));
         second.flushForLeave();
         fail(new TypeError('Failed to fetch')); // the page is going
         await flushPromises();

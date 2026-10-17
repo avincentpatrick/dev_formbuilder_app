@@ -87,7 +87,7 @@ describe('consequenceView', () => {
         );
 
         expect(view.question).toEqual([
-            'Its requiredness changes from Conditional to Optional.',
+            'Whether it must be answered changes from Conditional to Optional.',
             'Its default value “hello” is removed.',
             'Its default is no longer a formula.',
             'It is no longer indexed for reporting.',
@@ -108,7 +108,7 @@ describe('consequenceView', () => {
 
         expect(view.removed).toEqual([{ label: 'Must match a pattern', value: 'abc', shows: 'Bad.', reason: 'It was the old type’s built-in check.' }]);
         expect(view.added).toEqual([{ label: 'Must match a pattern', value: 'xyz', shows: 'Enter a valid phone number.' }]);
-        expect(view.kept).toBe('1 existing validation rule stays unchanged.');
+        expect(view.kept).toBe('1 rule stays as it is.');
     });
 
     it('names a removed minimum of zero as the Validation tab does — "No negative numbers" (M176)', () => {
@@ -134,7 +134,7 @@ describe('consequenceView', () => {
 
     it('says nothing is lost only for a plan that needs no review (FC11)', () => {
         expect(consequenceView(conversionPlan(), ctx()).summary).toContain('Nothing is lost');
-        expect(consequenceView(conversionPlan({ to: 'phone', requires_confirmation: true }), ctx()).summary).toBe('Here is what changing it to Phone does.');
+        expect(consequenceView(conversionPlan({ to: 'phone', requires_confirmation: true }), ctx()).summary).toBe('Here is what happens if it becomes Phone.');
     });
 });
 

@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { computed, ref } from 'vue';
 
+import ConvertFieldDialog from './ConvertFieldDialog.vue';
 import FieldTypeControl from './FieldTypeControl.vue';
 import { conversionPlan, ENUMS, fetchMock, jsonResponse, PALETTE, pageProps, requestLog, serverField } from './builder-store-fixtures';
 import type { LocalField, LocalSection } from './types';
@@ -56,6 +57,27 @@ describe('FieldTypeControl', () => {
         expect(wrapper.text()).toContain('Short text');
         expect(wrapper.get('[data-convert-opener]').text()).toBe('Change type');
         expect(wrapper.find('[data-convert-target]').exists()).toBe(false);
+    });
+
+    it('hands the dialog no name for a question still called by its type, so it says the type once (FT15, M176)', () => {
+        // M176 (`R-36e6f557`): a new question's label is its type's own name — "Text", "Date & time" — and the dialog read
+        // "Current type of “Date & time”: Date & time".
+        const nameFor = (label: string): unknown => {
+            const field: LocalField = { ...serverField({ label }), uid: 'f1' };
+            const double = {
+                selectedField: computed(() => field),
+                palette: PALETTE,
+                enums: ENUMS,
+                fields: ref<LocalField[]>([field]),
+                sections: ref<LocalSection[]>([]),
+            } as unknown as BuilderStore;
+
+            return mountControl(double, false).findComponent(ConvertFieldDialog).props('questionLabel');
+        };
+
+        expect(nameFor('Text')).toBe(''); // the palette's name for the text group
+        expect(nameFor('Short text')).toBe(''); // the type's own label
+        expect(nameFor('Occupation')).toBe('Occupation');
     });
 
     it('flushes, reads the plans, applies the choice, closes, announces and returns focus (FT2)', async () => {

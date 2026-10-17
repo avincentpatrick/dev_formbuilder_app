@@ -63,6 +63,10 @@ const questionLabel = computed(() => {
     const current = field.value;
     if (!current) return '';
     const label = current.label.trim();
+    // M176 (`R-36e6f557`): a new question is named after its type ("Date & time", or the palette's "Text"), and the dialog
+    // said "Current type of “Date & time”: Date & time". No name, then: the dialog says the type once.
+    const type = paletteByValue.get(current.field_type);
+    if (label !== '' && (label === type?.label || label === type?.variant?.label)) return '';
 
     return label === '' ? current.key : label;
 });

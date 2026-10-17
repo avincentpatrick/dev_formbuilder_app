@@ -757,7 +757,7 @@ const reference: ChapterDraft[] = [
                         ['Select the question, and on ', ui('Basics', CONFIG), ' click ', ui('Change type', TYPE_CONTROL), '.'],
                         ['In the window “', ui('Change question type', CONVERT), '”, pick the new type in ', ui('Change to', CONVERT), '.'],
                         ['Read what will change, under ', ui('Things to check', CONVERT), ' and ', ui('Elsewhere in the form', CONVERT), ' — for example, choices that will be removed.'],
-                        ['Confirm. The question keeps its key, so conditions and formulas that mention it still find it. ', ui('Undo', BUILDER), ' changes it back.'],
+                        ['Confirm. Its ', ui('Field key', CONFIG), ' stays the same, so conditions and formulas that use the question keep working. ', ui('Undo', BUILDER), ' changes it back.'],
                     ),
                     p(
                         'A question changes only into a close relative: text types into each other; ', ui('Whole number', FIELD_TYPES), ' and ', ui('Decimal number', FIELD_TYPES),

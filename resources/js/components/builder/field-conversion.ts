@@ -82,6 +82,7 @@ export function needsReview(plan: ConversionPlan): boolean {
     return plan.requires_confirmation || plan.census.length > 0;
 }
 
+// M176 (`R-36e6f557`): in the DSR §1.5 voice — say what the author loses, in everyday words.
 const CONFIG_SENTENCES: Record<string, string> = {
     options: 'Its choices are removed.',
     levels: 'Its levels are removed.',
@@ -89,14 +90,14 @@ const CONFIG_SENTENCES: Record<string, string> = {
     columns: 'Its columns are removed.',
     cells: 'Its cell choices are removed.',
     accepted_types: 'Its accepted file types are reset.',
-    capture_source: 'Its capture source is removed.',
+    capture_source: 'Its choice of camera or upload is removed.',
     max_file_size_bytes: 'Its file size limit is removed.',
     max_count: 'Its maximum number of files is removed.',
     min_count: 'Its minimum number of files is removed.',
     prefill_source: 'Where its value comes from is removed.',
-    url_param: 'Its link parameter is removed.',
+    url_param: 'The web-address setting that fills it in is removed.',
     calculated_formula: 'Its formula is removed.',
-    capture_altitude: 'Altitude capture is turned off.',
+    capture_altitude: 'It no longer records height above sea level.',
     accuracy_threshold: 'Its accuracy target is removed.',
     default_center: 'Its default map centre is removed.',
     default_zoom: 'Its default map zoom is removed.',
@@ -111,7 +112,7 @@ function optionLabel(options: readonly { value: string; label: string }[], value
 function changeSentence(change: ConversionChange, enums: BuilderEnums): string {
     switch (change.column) {
         case 'is_required':
-            return `Its requiredness changes from ${optionLabel(enums.required_modes, change.from)} to ${optionLabel(enums.required_modes, change.to)}.`;
+            return `Whether it must be answered changes from ${optionLabel(enums.required_modes, change.from)} to ${optionLabel(enums.required_modes, change.to)}.`;
         case 'default_value':
             return change.to === null
                 ? `Its default value “${String(change.from)}” is removed.`
@@ -195,13 +196,13 @@ export function consequenceView(plan: ConversionPlan, ctx: ConsequenceContext): 
 
     return {
         summary: needsReview(plan)
-            ? `Here is what changing it to ${ctx.labelOf(plan.to)} does.`
-            : 'Nothing is lost: its rules and settings carry over, and nothing else in the form is affected.',
+            ? `Here is what happens if it becomes ${ctx.labelOf(plan.to)}.`
+            : 'Nothing is lost: its rules and settings carry over, and nothing else in the form changes.',
         question: [
             ...plan.config_dropped.map((key) => CONFIG_SENTENCES[key] ?? `Its “${key}” setting is removed.`),
             ...plan.changes.map((change) => changeSentence(change, ctx.enums)),
         ],
-        kept: kept > 0 && rulesMove ? `${kept} existing validation ${kept === 1 ? 'rule stays' : 'rules stay'} unchanged.` : null,
+        kept: kept > 0 && rulesMove ? `${kept} ${kept === 1 ? 'rule stays as it is' : 'rules stay as they are'}.` : null,
         removed: plan.dropped.map((rule) => ({ ...ruleLine(rule, ctx.enums), reason: rule.reason_message })),
         added: plan.added.map((rule) => ruleLine(rule, ctx.enums)),
         warnings: plan.warnings.map((warning) => warning.message),

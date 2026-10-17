@@ -59,6 +59,25 @@ Feature #6's acceptance criteria state this exactly: *"Any exception to using th
 
 Design/Frontend Engineering jointly owns this document and the component library it describes. Scope is explicitly the **shared, cross-screen system**: tokens, primitive and composite components, the app shell(s), accessibility baseline, and the governance process around all of the above. It does **not** own: page-specific business logic, the field-type catalog's domain semantics (owned by the Data Dictionary and the form-builder feature docs), or the Form-Filling UX Flow Spec's flow-level decisions (partial-save/resume, single-page vs. multi-step — plan doc #20), though that spec is expected to compose components defined here rather than invent its own.
 
+### 1.5 Voice — write for a smart high-schooler *(M176, `R-36e6f557`)*
+
+Every word the product shows — a label, a help line, a dialog, an error, a warning — is written for a **smart high-schooler**:
+someone quick, who knows nothing about how the product is built. The testers asked for exactly this (2026-10-11): *"Make the
+text/instructions more “smart highschooler” friendly"*, on a dialog that said *"It keeps its key, so conditions, calculations and
+text that mention it still point to it"*.
+
+- **Short sentences, everyday words.** One idea per sentence. No developer words — *structured rule*, *expression engine*,
+  *indexed data type*, *token*, *payload* — unless the screen itself shows that word as a control's name, and then use it exactly.
+- **Say what happens to the answers.** A change explains what the respondent, the answers already given, or the published form
+  will notice — not what the code does.
+- **Name a thing as the screen names it.** A question's key is its **field key** (the label on the Advanced tab); a rule's kind is
+  the name in the rule menu. A word the author cannot find on screen is a word they cannot act on.
+- **Say it once.** Never repeat a value as its own label (*"Current type of “Date & time”: Date & time"*), and never lead an error
+  with the first of the items listed under it.
+- **Tell the author what to do next** when something blocks them: *"Add one before you publish the form"*, not *"cannot be published"*.
+
+A message composed on the server (an enum's `message()`) follows the same rule; it is the same voice wherever it is rendered.
+
 ---
 
 ## 2. Design Tokens

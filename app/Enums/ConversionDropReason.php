@@ -19,12 +19,13 @@ enum ConversionDropReason: string
     /** The rule is the old type's built-in format check, which does not apply to the new type. */
     case TypeDefault = 'type_default';
 
+    /** M176 (`R-36e6f557`): in the DSR §1.5 voice — short sentences, everyday words, what to do next. */
     public function message(): string
     {
         return match ($this) {
-            self::TargetTakesNoRules => 'The new type takes no validation rules.',
-            self::NotAllowedForShape => 'The new type cannot be checked this way.',
-            self::TypeDefault => "This was the old type's built-in format check, and it does not apply to the new type.",
+            self::TargetTakesNoRules => 'The new type has no rules.',
+            self::NotAllowedForShape => 'This rule doesn’t work for the new type.',
+            self::TypeDefault => 'This was the old type’s built-in format check. The new type doesn’t use it.',
         };
     }
 }

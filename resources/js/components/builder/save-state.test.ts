@@ -599,3 +599,54 @@ group('a refused edit is not a saved one: no baseline, no undo entry (M155, R-0a
         expect(store.saveState.value).toBe('saved');
     });
 });
+
+group('a 409 over this tab\'s own earlier write is not someone else (M176, R-c4802b60)', () => {
+    // The testers met "This item changed elsewhere" with nobody else editing. One way there needed no move at all: a save
+    // whose reply never came back had in fact LANDED, so its token was spent; the author typed on, and the next save went at
+    // the old token. The server answered 409 with the author's own earlier write — and M170's check only recognises a
+    // 409 whose row equals what THIS request sent, so anything typed since turned the author's own write into "someone else".
+    function bodies(mock: ReturnType<typeof vi.fn>): Array<Record<string, unknown>> {
+        return mock.mock.calls
+            .filter(([, init]) => (init as RequestInit | undefined)?.method === 'PATCH')
+            .map(([, init]) => JSON.parse(String((init as RequestInit).body)) as Record<string, unknown>);
+    }
+
+    it('takes the token of its own landed write and sends the newer edit, with no dialog', async () => {
+        const mock = fetchMock().mockRejectedValueOnce(new TypeError('Failed to fetch'));
+        const store = useBuilderStore(pageProps());
+
+        await editField(store, 'Job title'); // landed on the server; the reply was lost
+        expect(store.saveState.value).toBe('failed');
+
+        mock.mockResolvedValueOnce(
+            jsonResponse(409, {
+                message: 'This item was changed elsewhere since you last loaded it.',
+                current: serverField({ label: 'Job title', version: 'v2' }),
+            }),
+        ).mockResolvedValueOnce(jsonResponse(200, serverField({ label: 'Job title (main)', version: 'v3' })));
+        await editField(store, 'Job title (main)');
+
+        expect(store.conflict.value).toBeNull();
+        expect(store.saveState.value).toBe('saved');
+        expect(bodies(mock).map((body) => [body.label, body.version])).toEqual([
+            ['Job title', 'v1'],
+            ['Job title (main)', 'v1'],
+            ['Job title (main)', 'v2'],
+        ]);
+        expect(store.fields.value[0].version).toBe('v3');
+    });
+
+    it('still asks when the server holds something this tab never sent', async () => {
+        const mock = fetchMock().mockRejectedValueOnce(new TypeError('Failed to fetch'));
+        const store = useBuilderStore(pageProps());
+        await editField(store, 'Job title');
+
+        mock.mockResolvedValue(
+            jsonResponse(409, { message: 'Changed elsewhere.', current: serverField({ label: 'Their title', version: 'v2' }) }),
+        );
+        await editField(store, 'Job title (main)');
+
+        expect(store.conflict.value).not.toBeNull();
+        expect(bodies(mock)).toHaveLength(2); // nothing re-sent over a row someone else wrote
+    });
+});

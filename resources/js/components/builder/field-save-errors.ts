@@ -80,7 +80,7 @@ export function describeSavePath(path: string, ruleRows?: readonly number[]): st
     if (NAMES[path] !== undefined) return NAMES[path];
 
     const rule = /^validations\.(\d+)/.exec(path);
-    if (rule) return `Rule ${(ruleRows?.[Number(rule[1])] ?? Number(rule[1])) + 1}`;
+    if (rule) return `Rule ${Number(rule[1]) + 1}`;
 
     const listed = /^config\.(options|levels|rows|columns|cells|accepted_types)\.(\d+)/.exec(path);
     if (listed) return `${LISTS[listed[1]]} ${Number(listed[2]) + 1}`;

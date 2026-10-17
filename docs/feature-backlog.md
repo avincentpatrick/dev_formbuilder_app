@@ -14849,3 +14849,18 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the testing server only. Before real data — beside `D48`'s private-repository step — the exposure is reconsidered: an IP lock
   on the token, the API on the central host once production has a reachable one, or a shorter ceiling than 90 days (ADR-0023
   §D2, §D5). **Latent.** Filed by `M175`. **Tier: before-launch.**
+
+- **`minor` · With reduced motion on, a real screen capture sometimes still shows the feedback panel, because the frame is drawn before the capture has caught up with the page.**
+  The user's check of `M175` on staging (2026-10-17): *"the feedback modal still blockes the screen capture"* — then, on a closer
+  look, *"the preview shows the modal blocking the screen but when i capture it, the preview removes the modal"*: what showed the
+  panel was Chrome's share-picker preview, taken before the panel steps aside, and the attached screenshot was clean. Measured by a
+  throwaway real-capture probe (Chromium `--auto-accept-this-tab-capture`, the panel painted magenta, 1440×900): with
+  `prefers-reduced-motion: reduce`, 3 of 13 captures held the whole panel (24.2% of the picture); without it, 0 of 13. `grab()` in
+  `resources/js/components/shell/screenshot.ts` waits for two presented frames, at most 150ms each, once the panel has left; under
+  reduced motion the leave takes about 1ms, a tab capture reaches the `<video>` a few frames late, and a frame taken before the
+  panel left can be drawn. `tests/e2e/feedback-capture.spec.ts` could not see it: it records whether a dialog is in the DOM when a
+  frame is drawn, off a canvas stream with no latency — never what the frame shows. The remedy: wait for a frame captured after the
+  panel left (the `requestVideoFrameCallback` metadata's `captureTime` where the browser gives it), else for the captured frames to
+  settle — a minimum wait and a quiet period under a hard cap; and a real-capture e2e asserting the drawn picture holds no panel
+  pixels, run where a secure context exists and skipped on CI's plain-http host (the `public-runtime-offline.spec.ts` precedent).
+  **Live.** Filed by `M175`. **Tier: early-testing.**

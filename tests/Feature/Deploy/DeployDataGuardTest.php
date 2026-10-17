@@ -12,26 +12,26 @@ declare(strict_types=1);
 | migrate; a drop → the site left down), the `BuildRetentionTest` precedent; the first real run is merge point 2's.
 */
 
-function deployScript(): string
+function dataGuardScript(): string
 {
     return (string) file_get_contents(base_path('deploy.ps1'));
 }
 
 /** Where `$needle` first appears in deploy.ps1, after `$from` — failing loudly when it is absent. */
-function deployStep(string $needle, int $from = 0): int
+function dataGuardStep(string $needle, int $from = 0): int
 {
-    $at = strpos(deployScript(), $needle, $from);
+    $at = strpos(dataGuardScript(), $needle, $from);
     expect($at)->not->toBeFalse("deploy.ps1 no longer contains: {$needle}");
 
     return (int) $at;
 }
 
 it('backs up and counts the rows once the site is down, and before anything is replaced', function (): void {
-    $window = deployStep('# 5. The maintenance window.');
-    $down = deployStep("@('artisan', 'down'", $window);
-    $backup = deployStep("@('artisan', 'deploy:backup'", $window);
-    $census = deployStep("@('artisan', 'deploy:census', \"--write=", $window);
-    $reset = deployStep("'reset', '--hard', \$sha", $window);
+    $window = dataGuardStep('# 5. The maintenance window.');
+    $down = dataGuardStep("@('artisan', 'down'", $window);
+    $backup = dataGuardStep("@('artisan', 'deploy:backup'", $window);
+    $census = dataGuardStep("@('artisan', 'deploy:census', \"--write=", $window);
+    $reset = dataGuardStep("'reset', '--hard', \$sha", $window);
 
     expect($down)->toBeLessThan($backup)
         ->and($backup)->toBeLessThan($census)
@@ -39,9 +39,9 @@ it('backs up and counts the rows once the site is down, and before anything is r
 });
 
 it('refuses to migrate when the backup or the count fails, bringing the site back up on the old code', function (): void {
-    $script = deployScript();
-    $backup = deployStep("@('artisan', 'deploy:backup'");
-    $reset = deployStep("'reset', '--hard', \$sha");
+    $script = dataGuardScript();
+    $backup = dataGuardStep("@('artisan', 'deploy:backup'");
+    $reset = dataGuardStep("'reset', '--hard', \$sha");
     $guard = substr($script, $backup, $reset - $backup);
 
     expect($guard)->toContain('catch')
@@ -50,16 +50,16 @@ it('refuses to migrate when the backup or the count fails, bringing the site bac
 });
 
 it('compares the rows after migrating, inside the window, so a drop leaves the site down', function (): void {
-    $migrate = deployStep("@('artisan', 'migrate', '--force')");
-    $compare = deployStep("@('artisan', 'deploy:census', \"--compare=", $migrate);
-    $completed = deployStep('$windowCompleted = $true', $migrate);
+    $migrate = dataGuardStep("@('artisan', 'migrate', '--force')");
+    $compare = dataGuardStep("@('artisan', 'deploy:census', \"--compare=", $migrate);
+    $completed = dataGuardStep('$windowCompleted = $true', $migrate);
 
     expect($compare)->toBeLessThan($completed);
 });
 
 it('leaves the docs-only path without a window, a backup or a count', function (): void {
-    $docsOnly = deployStep('# 2b.');
-    $window = deployStep('# 5. The maintenance window.');
+    $docsOnly = dataGuardStep('# 2b.');
+    $window = dataGuardStep('# 5. The maintenance window.');
 
-    expect(substr(deployScript(), $docsOnly, $window - $docsOnly))->not->toContain('deploy:backup');
+    expect(substr(dataGuardScript(), $docsOnly, $window - $docsOnly))->not->toContain('deploy:backup');
 });

@@ -182,7 +182,7 @@ describe('FieldTypeControl', () => {
     });
 });
 
-describe('FieldTypeControl — the format switch and “Allow negative numbers” (M125)', () => {
+describe('FieldTypeControl — the format switch (M125); “Allow negative numbers” moved to the Validation tab (M176)', () => {
     const MIN_VALUE = {
         value: 'min_value',
         label: 'Minimum value',
@@ -322,58 +322,15 @@ describe('FieldTypeControl — the format switch and “Allow negative numbers�
         wrapper.unmount();
     });
 
-    it('writes and removes only its own minimum, keeping every other rule where it is (FT13)', async () => {
-        const mock = fetchMock().mockResolvedValue(jsonResponse(200, serverField({ field_type: 'integer', version: 'v2' })));
-        const store = numberStore({
-            is_required: 'conditional',
-            validations: [
-                { rule_type: 'required_if', operator: 'eq', rule_value: 'yes', expression: null, error_message: null, related_field_key: 'consent', sequence: 0 },
-                { rule_type: 'max_value', operator: null, rule_value: '120', expression: null, error_message: null, related_field_key: null, sequence: 1 },
-            ],
-        });
-        const wrapper = mountControl(store);
-        const box = wrapper.get<HTMLInputElement>('[data-negative-toggle] input[type="checkbox"]');
-        expect(box.element.checked).toBe(true);
+    it('offers no "Allow negative numbers" box: it is a rule on the Validation tab now (FT13, M176)', () => {
+        // M176 (`R-61d43278`): the box was a hidden "Minimum value 0" row, so deleting that row on the Validation tab ticked
+        // it back on — the user's report. Every minimum, 0 included, now lives in one place; this control writes no rule.
+        const minimum = { rule_type: 'min_value', operator: null, rule_value: '0', expression: null, error_message: null, related_field_key: null, sequence: 0 };
+        const store = numberStore({ validations: [minimum] });
+        const wrapper = mountControl(store, false);
 
-        await box.setValue(false);
-        expect(rowSummary(store)).toEqual([
-            ['required_if', 'yes', 0],
-            ['max_value', '120', 1],
-            ['min_value', '0', 2],
-        ]);
-        await store.whenIdle();
-        await settle();
-        expect(requestLog(mock).map((r) => r.method)).toEqual(['PATCH']);
-        expect((requestLog(mock)[0].body as { validations: unknown[] }).validations).toHaveLength(3);
-
-        await box.setValue(true);
-        expect(rowSummary(store)).toEqual([
-            ['required_if', 'yes', 0],
-            ['max_value', '120', 1],
-        ]);
-        wrapper.unmount();
-    });
-
-    it('reads a minimum the Validation tab set, and leaves it to that tab (FT14)', () => {
-        const minimum = (value: string) => ({
-            rule_type: 'min_value',
-            operator: null,
-            rule_value: value,
-            expression: null,
-            error_message: null,
-            related_field_key: null,
-            sequence: 0,
-        });
-        const below = mountControl(numberStore({ validations: [minimum('-10')] }), false);
-        const box = below.get<HTMLInputElement>('[data-negative-toggle] input[type="checkbox"]');
-
-        expect(box.element.disabled).toBe(true);
-        expect(box.element.checked).toBe(true);
-        const hint = below.get('[data-negative-toggle] .field-type__hint');
-        expect(hint.text()).toContain('Validation tab');
-        expect(box.attributes('aria-describedby')).toBe(hint.attributes('id'));
-
-        const above = mountControl(numberStore({ validations: [minimum('5')] }), false);
-        expect(above.get<HTMLInputElement>('[data-negative-toggle] input[type="checkbox"]').element.checked).toBe(false);
+        expect(wrapper.find('[data-negative-toggle]').exists()).toBe(false);
+        expect(wrapper.text()).not.toContain('Allow negative numbers');
+        expect(rowSummary(store)).toEqual([['min_value', '0', 0]]);
     });
 });

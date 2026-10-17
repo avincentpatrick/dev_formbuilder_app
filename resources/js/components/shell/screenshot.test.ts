@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { acquireScreen, GRAB_CAP_MS, GRAB_MIN_WAIT_MS, GRAB_QUIET_MS } from './screenshot';
+import { acquireScreen, GRAB_CAP_MS, GRAB_MIN_WAIT_MS, GRAB_NUDGE_MS, GRAB_QUIET_MS } from './screenshot';
 
 /**
  * M176 (`R-8496edfa`) — the frame drawn is one the browser CAPTURED after the feedback panel left.
@@ -70,6 +70,37 @@ async function grabbing(since: number): Promise<{ done: () => boolean; file: Pro
 }
 
 describe('grab() — a frame captured after the panel left', () => {
+    it('takes a clean frame that came BEFORE it was asked for — the frame chain runs from the start', async () => {
+        // Measured (M176 probes): a detached <video> takes up a new frame only while a frame callback waits for one. The
+        // clean frame often lands while the panel is still stepping aside; with no callback pending it went untaken, the
+        // page sent nothing more, and the stale frame — panel and all — was drawn.
+        const since = performance.now();
+        const screen = await acquireScreen();
+        presentFrame({ captureTime: since + 3 }); // arrives before grab() is called
+
+        let finished = false;
+        void screen!.grab(since).then(() => (finished = true));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(finished).toBe(true);
+        expect(drawImage).toHaveBeenCalledTimes(1);
+    });
+
+    it('asks the page for a fresh frame when none captured after the panel left has come', async () => {
+        const since = performance.now();
+        const { done } = await grabbing(since);
+        presentFrame({ captureTime: since - 5 }); // the browser stamps its frames, and this one is too early
+
+        await vi.advanceTimersByTimeAsync(GRAB_NUDGE_MS + 5);
+        expect(document.querySelector('[data-capture-nudge]'), 'a one-pixel repaint asked for').not.toBeNull();
+
+        presentFrame({ captureTime: since + GRAB_NUDGE_MS }); // the frame that repaint caused
+        await vi.advanceTimersByTimeAsync(0);
+        expect(done()).toBe(true);
+        await vi.advanceTimersByTimeAsync(50);
+        expect(document.querySelector('[data-capture-nudge]'), 'and it is gone again').toBeNull();
+    });
+
     it('never draws a frame the browser captured before the panel left, however many arrive', async () => {
         const since = performance.now();
         const { done, file } = await grabbing(since);

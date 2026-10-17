@@ -130,7 +130,10 @@ async function capture(): Promise<void> {
         steppedAside = true;
         await stepAside();
 
-        const file = await screen.grab();
+        // M176 (`R-8496edfa`): the panel is out of the DOM; two animation frames later the page without it has been
+        // painted. A frame CAPTURED from then on cannot hold it — and `grab()` draws only such a frame (ADR-0015 §D11).
+        await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+        const file = await screen.grab(performance.now());
         if (file !== null) {
             setScreenshot(file);
         }

@@ -76,7 +76,12 @@ const section = props.store.selectedSection;
 const saveError = props.store.saveError;
 const saveFieldErrors = props.store.saveFieldErrors;
 // M128 (`R-d001de0c`): a refused save, marked ON the selected field's controls; every other key in words, and a line per OTHER refused field.
-const fieldSaveErrors = computed(() => sortFieldSaveErrors(field.value ? saveFieldErrors.value[field.value.uid] : undefined));
+// M176 (`R-5554c526`): the editor row of each rule a question's last save sent, so a refused rule is named as it is on screen.
+// Optional: a store double without it names rules by their place in the request, as before.
+const saveRuleRows = computed<Record<string, number[]>>(() => props.store.saveRuleRows?.value ?? {});
+const fieldSaveErrors = computed(() =>
+    sortFieldSaveErrors(field.value ? saveFieldErrors.value[field.value.uid] : undefined, field.value ? saveRuleRows.value[field.value.uid] : undefined),
+);
 // M172 (`R-733eff09`): every other refused question by name WITH its reasons, as a button that selects it on the tab holding
 // the error. The line it replaced — "has a change that was not saved. Select it to see why" — said neither, and selecting
 // the question opened Basics, where the testers' key refusal was not shown.
@@ -88,9 +93,25 @@ interface OtherRefusal {
 const otherRefusals = computed<OtherRefusal[]>(() =>
     props.store.fields.value
         .filter((f) => f.uid !== field.value?.uid && saveFieldErrors.value[f.uid] !== undefined)
-        .map((f) => ({ uid: f.uid, name: f.label || f.key, reasons: describeRefusal(saveFieldErrors.value[f.uid]) })),
+        .map((f) => ({ uid: f.uid, name: f.label || f.key, reasons: describeRefusal(saveFieldErrors.value[f.uid], saveRuleRows.value[f.uid]) })),
 );
 const saveIssues = computed<string[]>(() => [...fieldSaveErrors.value.listed.map((issue) => issue.text), ...inlineElsewhere.value]);
+/**
+ * M176 (`R-5554c526`) — the alert's lead line. A refusal that carries a list of items is said ONCE, by those items: the reply's
+ * own `message` is Laravel's copy of the first of them ("… (and 1 more error)"), so leading with it said that item twice —
+ * the testers' "Instructions repeat". A failure with no list (the network, a 500) keeps its own words.
+ */
+const leadLine = computed<string | null>(() => {
+    const listedHere = field.value !== null && saveFieldErrors.value[field.value.uid] !== undefined;
+    if (listedHere) {
+        return saveIssues.value.length > 0 || otherRefusals.value.length > 0
+            ? 'This question was not saved. Fix the items below.'
+            : 'This question was not saved. Fix the marked items.';
+    }
+    if (otherRefusals.value.length > 0) return 'Some questions were not saved. Fix the items below.';
+
+    return saveError.value;
+});
 const enums = props.store.enums;
 const saving = props.store.saving;
 // Transient "Saved to library" confirmation (Increment G9b), cleared after a beat.
@@ -199,14 +220,14 @@ const inlineElsewhere = computed<string[]>(() =>
         })
         .map(([path, message]) => {
             const tab = tabs.value.find((candidate) => candidate.key === tabForSavePath(path));
-            return `${describeSavePath(path)} (${tab?.label ?? ''} tab): ${message}`;
+            return `${describeSavePath(path, field.value ? saveRuleRows.value[field.value.uid] : undefined)} (${tab?.label ?? ''} tab): ${message}`;
         }),
 );
 
-function describeRefusal(errors: Record<string, string[]> | undefined): string {
+function describeRefusal(errors: Record<string, string[]> | undefined, ruleRows?: readonly number[]): string {
     const reasons = Object.entries(errors ?? {})
         .filter(([, messages]) => messages[0] !== undefined)
-        .map(([path, messages]) => `${describeSavePath(path)}: ${messages[0]}`);
+        .map(([path, messages]) => `${describeSavePath(path, ruleRows)}: ${messages[0]}`);
 
     return reasons.length > 0 ? reasons.join(' ') : 'A change was not saved.';
 }
@@ -482,8 +503,8 @@ watch(librarySaved, (value) => {
              Above the strip, not between the strip and its own panel. A save failure is about the pane
              rather than about the selected tab, and wedging it into the tab-to-panel gap was the one
              place it could not belong. -->
-        <div v-if="saveError || saveIssues.length > 0 || otherRefusals.length > 0" :key="failureKey" class="config__error" role="alert">
-            <p v-if="saveError">{{ saveError }}</p>
+        <div v-if="leadLine || saveIssues.length > 0 || otherRefusals.length > 0" :key="failureKey" class="config__error" role="alert">
+            <p v-if="leadLine">{{ leadLine }}</p>
             <MdsButton v-if="hasUnsaved" class="config__retry" size="sm" variant="secondary" @click="retry">Retry</MdsButton>
             <ul v-if="saveIssues.length > 0 || otherRefusals.length > 0">
                 <li v-for="issue in saveIssues" :key="issue">{{ issue }}</li>

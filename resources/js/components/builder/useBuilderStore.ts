@@ -109,7 +109,9 @@ export function useBuilderStore(props: BuilderPageProps) {
         unsaved: Record<Uid, 'field' | 'section'>;
         /** M172 (`R-d85d51d2`): one per failure, so the panel can re-announce a refusal identical to the last. */
         failures: number;
-    }>({ inFlight: 0, error: null, wrote: false, fieldErrors: {}, pending: false, unsaved: {}, failures: 0 });
+        /** M176 (`R-5554c526`): per question, the editor row of each rule its last save SENT — `validations.N` → row. */
+        ruleRows: Record<Uid, number[]>;
+    }>({ inFlight: 0, error: null, wrote: false, fieldErrors: {}, pending: false, unsaved: {}, failures: 0, ruleRows: {} });
 
     // M170 (`R-bfa3eb93`) — every edit the server has not confirmed, kept for this tab so a refresh puts it back. A
     // read-only builder (an archived form has no draft) edits nothing, so it keeps nothing. See `edit-journal.ts`.
@@ -195,6 +197,7 @@ export function useBuilderStore(props: BuilderPageProps) {
      * its refused value is still on screen and nothing has sent it again.
      */
     const saveFieldErrors = computed(() => save.fieldErrors);
+    const saveRuleRows = computed(() => save.ruleRows);
 
     // ⚠️ M170 — A REQUEST IN FLIGHT, NOT `saveState === 'saving'`. The buttons this disables (Save to library, the
     // toolbar's) must stay usable while an edit only waits out its debounce: each sends that edit first.
@@ -297,6 +300,8 @@ export function useBuilderStore(props: BuilderPageProps) {
         if (!field) return false;
         const sent = fieldPayload(field);
         const earlier = noteSent(uid, sent);
+        // M176 (`R-5554c526`): which editor row each sent rule is, so a refusal of `validations.N` names the row on screen.
+        save.ruleRows[uid] = field.validations.flatMap((rule, row) => (isUnfinishedRule(rule) ? [] : [row]));
         const result = await guard(() => client.patch<ServerField>(`${base}/fields/${field.id}`, sent), { uid });
         if (!result) return false;
         // M170 — a 409 whose question already holds exactly this edit is not a conflict. It is how the put-back after a
@@ -1495,6 +1500,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         saveState,
         saveError,
         saveFieldErrors,
+        saveRuleRows,
         hasUnsaved,
         conflict,
         conflictDeferred: computed(() => conflictDeferred.value),
@@ -1608,11 +1614,12 @@ function asStored(payload: Record<string, unknown>): Record<string, unknown> {
 
 /**
  * M170 (`R-7ebfb08e`) — a rule with neither a check nor an expression is a row still being written: switching a rule to
- * Expression makes one, and the server refuses it ("not both, not neither"). Sent, it refused the WHOLE question — every
- * Basics and Advanced edit with it — until the row was finished. It stays on screen and is sent once it is a rule.
+ * Expression makes one, and the server refuses it ("Empty. Choose what it checks, or remove it."). Sent, it refused the
+ * WHOLE question — every Basics and Advanced edit with it — until the row was finished. It stays on screen and is sent
+ * once it is a rule. M176 (`R-5554c526`): a check chosen and then set back to the empty choice (`''`) is no check either.
  */
 function isUnfinishedRule(rule: { rule_type: string | null; expression: string | null }): boolean {
-    return rule.rule_type === null && (rule.expression ?? '').trim() === '';
+    return (rule.rule_type ?? '') === '' && (rule.expression ?? '').trim() === '';
 }
 
 function fieldPayload(field: LocalField): Record<string, unknown> {

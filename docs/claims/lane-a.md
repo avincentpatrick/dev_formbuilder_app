@@ -18,6 +18,53 @@ Standing Rule 7(b-bis).
 
 ## Status: ACTIVE CLAIM — `M176`, R1 of the testers' round 2: the builder fixes, and a capture that waits for the page (`R-c4802b60`, `R-164579e8`, `R-5354b4b9`, `R-5554c526`, `R-61d43278`, `R-923c5041`, `R-36e6f557`, `R-a11cc78a`, `R-8496edfa`) (m176-r1-builder-fixes)
 
+**BUILT — PR #369, CI 6/6 green with real step counts (run 39070047421 at `8b144231`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the only skips are the two main-only staging-header steps and the failure-only report upload; the runs at `6b2d8a3c` and `1ae0efd9` were 6/6 too) — AND NOT MERGED.** ⛔ **Held for merge point 2 (`D137`, `D138`):** this PR
+merges with R2's, after the user's census and staging backup block; R2 (`M177`) is stacked on this branch. The branch carries the nine rows'
+closures, two new rows (`R-2d921bbe`, `R-75a92d29`), the status bullet, the regenerated line and hand-off. R1's own deploy at merge point 2 runs
+the OLD `deploy.ps1`; R2's deploy is the guard's first real run (`D143`, `R-2d921bbe`).
+
+**Measured against the prediction:**
+- **Red first, row by row, exactly where predicted** — Pest `ReorderKeepsTokensTest` 4, `RuleRefusalWordsTest` 2, the three deploy files 13;
+  Vitest: the own-write retry 1, the conflict dialog and store 8 (+ `conflict-diff` by absence), the lead line and numbering 5, No negatives 7,
+  `Textarea` 2 (+ its two default guards green both ways) and the label consumers 3, Add here 4 (+ `AddQuestionHere` by absence), the type
+  dialog 10, `screenshot.test.ts` 3; the real-capture e2e red **4 of 20** on `M175`'s code (24.2% of each picture — the probe's own figure).
+  Every negative control and guard was green on both sides. All green after.
+- **Mutants: 21, all caught, each turning its named case red** — Pest through `scripts/mutate.php` (`toBase()` on fields, on sections; the
+  XOR message; the census drop check) and committed for Vitest, e2e and the lint (the own-write branch; close→theirs; the reload re-raise; the
+  lead line; the row map; the No-negatives derivation; its pin; the autosize height; Enter's guard; placement; section; the no-repeat
+  condition; `since` ignored; the chain dropped, as a unit and BUILT into the app — 7 of 20 real captures held the panel; the refusal's `up`; a
+  migration that drops a column).
+- **The one I named most likely wrong WAS wrong, in a way I did not guess.** The real-capture e2e's red on the trunk held (4 of 20). What was
+  wrong was the row's REMEDY: `captureTime` gating alone still failed **6 of 20**. Five throwaway probes found a second cause no row named —
+  **a detached `<video>` takes up a new frame only while a `requestVideoFrameCallback` waits**, so the clean frame arrived, was not taken up,
+  and the static page sent nothing more. The fix runs a frame chain from `play()` to `stop()`, nudges one pixel after 120ms and caps at 750ms:
+  **60 of 60** clean over three runs. ADR-0015 §D11 records the measurements.
+- **The runner-up resolved by reading, not measuring:** the Validation tab lists every rule ("These also appear on the Validation tab"), so its
+  numbering is the one a refusal uses — Required-when rows included.
+- **Not predicted:**
+  - **My first `ReorderKeepsTokensTest` moved the clock AFTER the move, and passed on the defective code at random** (the re-stamp landed in the
+    token's own second). The clock moves before the move; 4/4 red deterministically.
+  - **`R-c4802b60` understated itself twice** (premise, above) — every row of the draft was re-stamped, and the "retry that landed" was a
+    second instance; **`R-61d43278`'s prescribed derivation would have flipped a row's kind mid-typing** ("0.5" passes through "0") — a
+    client-only `shown_as` hint keeps the author's choice; **`R-923c5041`'s two-root textarea would have broken `ContentBlocksEditor`'s toolbar**
+    (it reads `$el`) — the root stays the `<textarea>` unless a counter is asked for, pinned by a fifth case; **`placeField()` renumbers from 0**,
+    so "did it move" compares the arrangement.
+  - **Harness slips, each caught before a push:** git-bash rewrote `docker exec -w /var/www/html`, so my mutant helper measured nothing and
+    reported SURVIVED twice (history reset; the helper now refuses without a Tests line); a wrong `git revert` flag let an amend relabel a mutant
+    commit (repaired locally); a "65 passed" summary hid two test files that failed to PARSE; Python's `\a`/`\b` put BEL and BACKSPACE into the
+    runbook (a control-byte scan of every touched file caught them); `tests/Feature/Forms` collected 25 tests as a container directory run (run
+    by explicit path instead: 370 passed). Recorded in the gate-traps memory.
+  - **Gates that fired on my own edits:** the citation ratchet (8 ledger citations blanked → re-pointed, the ceiling lowered 17 → 16), the
+    tier-1 lint (ADR-0007 cited `migration-lint.php:34`), Pint (imports), a global Pest helper name clash.
+- **Local gates on the final tree:** Vitest 233 files, 3761 passed; host PHPStan 0 errors; Pint and the lint gates pass; Pest by explicit path
+  (370) and the Deploy, Docs and Unit/Forms directories, green but for the known container-only `SuiteCollectionFloorTest`; E2E the 9 specs the diff reaches on all three viewports, 113 passed, 10 skipped (viewport-specific), 0 failed; `builder-preview-authoring` 12 passed again after the look's fix; `feedback-capture-real` 60 of 60 clean over three runs.
+- **The real-browser look** (a throwaway desktop spec, screenshots in the git-ignored `storage/app/m176-look/`) found two things no test had: the inline type list inherited the empty section's italic and was squeezed to one narrow column (it now takes the whole row in plain type), and the conflict dialog and its notice quoted a 470-character label in full (`shortLabel()` now quotes its first words). It also measured that "Decide later" closes the dialog with no request after it, and a real two-tab conflict listing Help text and Placeholder side by side.
+- **CI caught one slip of mine:** I pushed the look's fix without preflight, its one import line in `Builder.vue` moved a closed row's citation onto a blank line, and the ratchet went red on `2f60d931` (17 against 16). Pinned to `cef2a9b0` like the other closed rows; green after.
+- **A PowerShell 5.1 harness** (scratchpad, the `BuildRetentionTest` precedent) ran the REAL window lifted out of `deploy.ps1` against a stub
+  `php`: backup refused → down, backup, up, no reset; rows lost → left down with the warning; all well → up; a `-Ref` rollback to a release
+  older than the census → the warning, no compare.
+- **Not mine, filed:** the trunk's `docs/claims/decisions.md` carries one ESC byte (`R-75a92d29`, after-launch).
+
 Taken 2026-10-18. It is R1 of the testers' round 2 (`D138`; the plan of record `~/.claude/plans/here-are-added-comments-peppy-quill.md` §B,
 §E; the build plan `~/.claude/plans/pasted-content-id-e51d-read-claude-md-mutable-acorn.md`). Branch `m176-r1-builder-fixes`, cut from
 `origin/main` at `cef2a9b0` (this claim on top), PR into main — not stacked. ⛔ **NOT MERGED IN THIS SESSION:** the PR waits green for merge

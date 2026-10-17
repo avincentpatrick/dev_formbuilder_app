@@ -39,8 +39,9 @@ use Ramsey\Uuid\Uuid;
  *  - CONTENT edits (updateField/updateSection) are optimistic: the client echoes the `updated_at` token it
  *    last read; a drift throws {@see BuilderConflictException} (→ 409) carrying the fresh row.
  *  - STRUCTURAL edits (add/delete/duplicate/reorder) are serialized by a `forms`-row FOR UPDATE lock and
- *    carry no token. Reorder writes via the query builder so it does NOT bump `updated_at` — a positional
- *    change must not spuriously 409 the next content PATCH on a moved row.
+ *    carry no token. Reorder writes through the BASE query builder (`toBase()`) so it does NOT bump
+ *    `updated_at` — a positional change must not spuriously 409 the next content PATCH. Until M176 this sentence
+ *    was false: Eloquent's own `update()` adds `updated_at`, and every row of the draft was re-stamped per move.
  *
  * Expressions (`relevant_expression`, validation `expression`) are persisted UNVALIDATED — the expression
  * engine is the deferred ADR-0004 work.
@@ -579,7 +580,7 @@ final class FormBuilderService
         $item->increment('usage_count');
     }
 
-    // ── Reorder (structural; serialized by the form-row lock, does NOT bump updated_at) ───────────
+    // ── Reorder (structural; serialized by the form-row lock; `toBase()` so it does NOT bump updated_at) ──
 
     /**
      * @param  list<array{id: string, sequence: int}>  $sections
@@ -598,8 +599,12 @@ final class FormBuilderService
 
             $validSections = FormSection::query()->where('form_version_id', $draft->id)->pluck('id')->flip();
 
+            // M176 (`R-c4802b60`): through `toBase()`, never Eloquent's `update()`, which adds `updated_at` — the row's save
+            // token. The client sends EVERY section and question on each move, so a re-stamp here made the author's next
+            // ordinary edit of any question answer 409 ("This item changed elsewhere") once a second had passed.
+            // `toBase()` applies the model's global scopes first, so the tenant scope still holds.
             foreach ($sections as $row) {
-                FormSection::query()->whereKey($row['id'])->where('form_version_id', $draft->id)
+                FormSection::query()->whereKey($row['id'])->where('form_version_id', $draft->id)->toBase()
                     ->update(['sequence' => $row['sequence']]);
             }
 
@@ -609,7 +614,7 @@ final class FormBuilderService
                     $targetSection = null; // never let a field point at a section from another version
                 }
 
-                FormField::query()->whereKey($row['id'])->where('form_version_id', $draft->id)->update([
+                FormField::query()->whereKey($row['id'])->where('form_version_id', $draft->id)->toBase()->update([
                     'form_section_id' => $targetSection,
                     'sequence' => $row['sequence'],
                     'section_sequence' => $row['section_sequence'],

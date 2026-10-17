@@ -12,6 +12,7 @@
 import { computed, reactive, ref, type Ref } from 'vue';
 import { builderFor, BuilderRequestError, DraftSupersededError, type BuilderResult, type SupersedingDraft } from './builderClient';
 import { editJournal } from './edit-journal';
+import { canonical } from './row-compare';
 import type {
     BuilderPageProps,
     CanvasGroup,
@@ -65,6 +66,9 @@ export function useBuilderStore(props: BuilderPageProps) {
     const sections = ref<LocalSection[]>(props.sections.map(toLocalSection));
     const selection = ref<Selection>(null);
     const conflict = ref<ConflictState | null>(null);
+    // M176 (`R-164579e8`): the author closed the dialog without choosing. The conflict stays pending — the edit on screen
+    // and in the journal, publish held — and the builder's notice brings the dialog back (`reviewConflict()`).
+    const conflictDeferred = ref(false);
     // M172 (`R-81756e95`): the form was published since this page loaded. Every id the page holds is the old draft's, so
     // nothing more is sent; the dialog offers the reload, and the journal puts each kept edit back into the new draft.
     const superseded = ref<{ draft: SupersedingDraft | null } | null>(null);
@@ -314,7 +318,7 @@ export function useBuilderStore(props: BuilderPageProps) {
             return persistField(uid, true);
         }
         if (result.conflict) {
-            conflict.value = { kind: 'field', uid, mine: clone(field), theirs: result.current };
+            raiseConflict({ kind: 'field', uid, mine: clone(field), theirs: result.current }, field.id);
             return false;
         }
         field.version = result.data.version;
@@ -406,7 +410,7 @@ export function useBuilderStore(props: BuilderPageProps) {
             return persistSection(uid, true);
         }
         if (result.conflict) {
-            conflict.value = { kind: 'section', uid, mine: clone(section), theirs: result.current };
+            raiseConflict({ kind: 'section', uid, mine: clone(section), theirs: result.current }, section.id);
             return false;
         }
         section.version = result.data.version;
@@ -1018,10 +1022,31 @@ export function useBuilderStore(props: BuilderPageProps) {
     }
 
     // ── Conflict resolution (409) — never silently discard either side ──────────
+    /**
+     * M176 (`R-164579e8`) — a conflict opens the dialog (again, if one was deferred), and its row's journal entry is marked,
+     * so a reload raises it again instead of dropping the author's edit for a token that moved to someone else's write.
+     */
+    function raiseConflict(state: ConflictState, id: string): void {
+        conflict.value = state;
+        conflictDeferred.value = false;
+        journal?.markConflicted(state.kind, id);
+    }
+
+    /** The dialog was closed without a choice: nothing is chosen, nothing is forgotten. */
+    function deferConflict(): void {
+        if (conflict.value !== null) conflictDeferred.value = true;
+    }
+
+    /** The builder's notice: open the deferred dialog again. */
+    function reviewConflict(): void {
+        conflictDeferred.value = false;
+    }
+
     function resolveConflict(choice: 'mine' | 'theirs'): Promise<void> {
         return enqueue(async () => {
             const state = conflict.value;
             conflict.value = null;
+            conflictDeferred.value = false;
             if (!state) return;
 
             if (state.kind === 'field') {
@@ -1173,6 +1198,17 @@ export function useBuilderStore(props: BuilderPageProps) {
                 if (samePayload(payload(entry.snapshot), onServer)) continue;
             } else {
                 const ours = row.version === entry.base || (entry.sent ?? []).some((sent) => samePayload(payload(sent), onServer));
+                // M176 (`R-164579e8`): a choice the author left open before this reload. The token moved to someone else's
+                // write — which would drop the entry below — but the author was promised the edit is not lost: the edit goes
+                // back on screen and the dialog opens again. One dialog at a time; another such entry waits in the journal.
+                if (entry.conflicted === true && !ours && !samePayload(payload(entry.snapshot), onServer)) {
+                    if (conflict.value !== null) continue;
+                    const { uid: _uid, ...server } = clone(row) as LocalField & LocalSection;
+                    if (entry.kind === 'field') applyFieldSnapshot(row as LocalField, entry.snapshot as unknown as FieldSnapshot);
+                    else applySectionSnapshot(row as LocalSection, entry.snapshot as unknown as SectionSnapshot);
+                    raiseConflict({ kind: entry.kind, uid: row.uid, mine: clone(row), theirs: server } as ConflictState, row.id);
+                    continue;
+                }
                 if (!ours || samePayload(payload(entry.snapshot), onServer)) {
                     journal.drop(entry.kind, entry.id);
                     continue;
@@ -1461,6 +1497,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         saveFieldErrors,
         hasUnsaved,
         conflict,
+        conflictDeferred: computed(() => conflictDeferred.value),
         // M172: the form was published since this page loaded (read-only; the page offers the reload)
         superseded: computed(() => superseded.value),
         // M172 (`R-733eff09`): a key the server kept instead of the one typed, per row; and one per failure (`R-d85d51d2`)
@@ -1506,6 +1543,8 @@ export function useBuilderStore(props: BuilderPageProps) {
         undo,
         redo,
         resolveConflict,
+        deferConflict,
+        reviewConflict,
         whenIdle,
         flushForLeave,
         retryUnsaved,
@@ -1537,18 +1576,6 @@ function applySectionSnapshot(section: LocalSection, snap: SectionSnapshot): voi
 
 function snapshotsEqual(a: unknown, b: unknown): boolean {
     return JSON.stringify(a) === JSON.stringify(b);
-}
-
-/** Keys sorted at every depth: Postgres `jsonb` hands a config back in its own key order, not the one it was sent in. */
-function canonical(value: unknown): unknown {
-    if (Array.isArray(value)) return value.map(canonical);
-    if (value !== null && typeof value === 'object') {
-        const object = value as Record<string, unknown>;
-
-        return Object.fromEntries(Object.keys(object).sort().map((key) => [key, canonical(object[key])]));
-    }
-
-    return value;
 }
 
 /**

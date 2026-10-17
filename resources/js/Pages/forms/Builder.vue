@@ -40,7 +40,16 @@ const props = defineProps<BuilderPageProps>();
 const restoredFromHistory = takeHistoryRestore();
 if (restoredFromHistory) router.visit(window.location.href, { preserveState: false, preserveScroll: true, replace: true });
 const store = useBuilderStore(restoredFromHistory ? { ...props, draft: null } : props);
-const { selection, saving, saveState, canUndo, canRedo, conflict, library, saveError, superseded } = store;
+const { selection, saving, saveState, canUndo, canRedo, conflict, conflictDeferred, library, saveError, superseded } = store;
+
+// M176 (`R-164579e8`): the conflict dialog names a condition's questions by label and a question type by its palette name.
+const rowLabels = computed<Record<string, string>>(() =>
+    Object.fromEntries([...store.sections.value, ...store.fields.value].map((row) => [row.key, row.label])),
+);
+const paletteLabels = new Map(props.palette.flatMap((group) => group.types.map((type) => [type.value, type.label] as const)));
+function typeLabel(value: string): string {
+    return paletteLabels.get(value) ?? value;
+}
 
 // The toolbar's polite live region. Reads the store's EXPLICIT verdict rather than inferring success
 // from an idle queue -- see `save-label.ts` for why the failed state renders a string at all.
@@ -232,9 +241,11 @@ function publish(): void {
 /** M172 (`R-81756e95`) — why the last Publish press did nothing; gone as soon as everything is saved again. */
 const publishHeld = ref<string | null>(null);
 function heldReason(): string {
-    return superseded.value !== null
-        ? 'This form was published since this page loaded. Reload, then publish again.'
-        : 'Some changes are not saved yet. The settings panel shows why; fix or undo them, then publish again.';
+    if (superseded.value !== null) return 'This form was published since this page loaded. Reload, then publish again.';
+    // M176 (`R-164579e8`): a deferred conflict holds publish too, and the settings panel says nothing about it.
+    if (conflict.value !== null) return 'Something you edited was also saved somewhere else. Choose which version to keep, then publish again.';
+
+    return 'Some changes are not saved yet. The settings panel shows why; fix or undo them, then publish again.';
 }
 watch(saveState, (state) => {
     if (state !== 'failed') publishHeld.value = null;
@@ -504,6 +515,22 @@ function submitImport(): void {
             {{ publishHeld }}
         </MdsAlert>
 
+        <!-- M176 (`R-164579e8`): the conflict dialog was closed without a choice. Nothing was chosen and nothing is lost;
+             this is how the author gets back to it. -->
+        <MdsAlert
+            v-if="conflict !== null && conflictDeferred"
+            class="builder__warnings"
+            tone="warning"
+            title="Choose which version to keep"
+            data-conflict-pending
+        >
+            “{{ conflict.mine.label || conflict.theirs.label }}” was also saved somewhere else. Your version stays on
+            screen until you choose.
+            <template #actions>
+                <MdsButton size="sm" variant="secondary" @click="store.reviewConflict()">Review</MdsButton>
+            </template>
+        </MdsAlert>
+
         <MdsAlert
             v-if="publishViolations.length > 0 && !publishViolationsDismissed"
             class="builder__violations"
@@ -674,7 +701,15 @@ function submitImport(): void {
             </div>
         </div>
 
-        <ConflictDialog :conflict="conflict" @resolve="store.resolveConflict" />
+        <ConflictDialog
+            :conflict="conflict"
+            :deferred="conflictDeferred"
+            :enums="props.enums"
+            :labels="rowLabels"
+            :type-label="typeLabel"
+            @resolve="store.resolveConflict"
+            @defer="store.deferConflict"
+        />
         <DraftSupersededDialog
             :open="superseded !== null"
             :version-number="superseded?.draft?.version_number ?? null"

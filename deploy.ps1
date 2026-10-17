@@ -480,7 +480,6 @@ try {
 }
 catch {
     $guardFailure = $_.Exception.Message
-    Invoke-Native php @('artisan', 'up')
     throw "Refused to migrate: the deploy's own backup or row count failed ($guardFailure). Nothing was changed; the site is back up on the old code."
 }
 

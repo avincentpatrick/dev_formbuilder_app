@@ -15,6 +15,7 @@ import { computed } from 'vue';
 import { MdsButton, MdsModal } from '@meridian/design-system';
 import type { LabelLookup } from './condition-describer';
 import { conflictDifferences } from './conflict-diff';
+import { shortLabel } from './label-text';
 import type { BuilderEnums } from './types';
 import type { ConflictState } from './useBuilderStore';
 
@@ -39,7 +40,7 @@ const differences = computed(() =>
 );
 
 const noun = computed(() => (props.conflict?.kind === 'section' ? 'section' : 'question'));
-const name = computed(() => props.conflict?.mine.label || props.conflict?.theirs.label || '');
+const name = computed(() => shortLabel(props.conflict?.mine.label || props.conflict?.theirs.label || ''));
 </script>
 
 <template>

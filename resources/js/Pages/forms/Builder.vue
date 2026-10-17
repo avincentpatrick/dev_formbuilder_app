@@ -31,6 +31,7 @@ import SaveAsTemplateModal from '@/components/forms/SaveAsTemplateModal.vue';
 import { useBuilderStore } from '@/components/builder/useBuilderStore';
 import { takeHistoryRestore } from '@/components/builder/history-restore';
 import { saveLabel } from '@/components/builder/save-label';
+import { shortLabel } from '@/components/builder/label-text';
 import type { BuilderPageProps } from '@/components/builder/types';
 import { useEntitlements } from '@/composables/useEntitlements';
 
@@ -515,7 +516,7 @@ function submitImport(): void {
             title="Choose which version to keep"
             data-conflict-pending
         >
-            “{{ conflict.mine.label || conflict.theirs.label }}” was also saved somewhere else. Your version stays on
+            “{{ shortLabel(conflict.mine.label || conflict.theirs.label) }}” was also saved somewhere else. Your version stays on
             screen until you choose.
             <template #actions>
                 <MdsButton size="sm" variant="secondary" @click="store.reviewConflict()">Review</MdsButton>

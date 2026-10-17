@@ -47,7 +47,7 @@ function choose(typeValue: string): void {
 </script>
 
 <template>
-    <div ref="root" class="add-here" @keydown.esc.stop.prevent="open && close()">
+    <div ref="root" class="add-here" :class="{ 'add-here--open': open }" @keydown.esc.stop.prevent="open && close()">
         <MdsButton
             type="button"
             variant="tertiary"
@@ -83,10 +83,19 @@ function choose(typeValue: string): void {
 .add-here {
     display: flex;
     flex-direction: column;
+    align-items: flex-start;
     gap: var(--mds-space-2);
 }
 
+/* Open, it takes the whole row its host lays out — both hosts are wrapping flex rows, which would squeeze the list to one
+   narrow column — and drops the host's italic note styling (measured in the real-browser look). */
+.add-here--open {
+    flex-basis: 100%;
+    font-style: normal;
+}
+
 .add-here__list {
+    align-self: stretch;
     display: flex;
     flex-direction: column;
     gap: var(--mds-space-3);
@@ -99,6 +108,7 @@ function choose(typeValue: string): void {
 .add-here__lead {
     margin: 0;
     color: var(--mds-color-text-body);
+    font-style: normal;
     font-size: var(--mds-type-body-sm-font-size);
     line-height: var(--mds-type-body-sm-line-height);
 }

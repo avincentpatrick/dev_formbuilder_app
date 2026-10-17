@@ -11,3 +11,16 @@ export const LABEL_COUNT_FROM = 450;
 export function oneLine(text: string): string {
     return text.replace(/[ \t]*[\r\n]+[ \t]*/g, ' ');
 }
+
+/**
+ * A question's label as a sentence quotes it: whole when short, else its first words and an ellipsis — the conflict dialog and
+ * its notice quoted a 470-character label in full (M176's real-browser look), which buried what they had to say.
+ */
+export function shortLabel(text: string, max = 60): string {
+    const label = oneLine(text).trim();
+    if (label.length <= max) return label;
+    const cut = label.slice(0, max);
+    const space = cut.lastIndexOf(' ');
+
+    return `${(space > max / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}

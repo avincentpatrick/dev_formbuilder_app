@@ -85,6 +85,14 @@ describe('ConflictDialog', () => {
         expect(wrapper.emitted('resolve')).toEqual([['theirs'], ['mine']]);
     });
 
+    it('quotes a long question by its first words, not in full', () => {
+        const long = 'How many people usually sleep in this house, including children, older relatives and seasonal guests?';
+        const lead = mountDialog(conflictOver({ label: long, is_required: 'required' })).get('.conflict__lead').text();
+
+        expect(lead).toContain('“How many people usually sleep in this house, including…”');
+        expect(lead).not.toContain('seasonal guests');
+    });
+
     it('stays closed while the choice is deferred', () => {
         const wrapper = mountDialog(conflictOver({ is_required: 'required' }), true);
 

@@ -159,13 +159,16 @@ function makeStore(
         fields?: LocalField[];
         errors?: Record<string, Record<string, string[]>>;
         touch?: (uid: string, kind: string) => void;
+        saveError?: string | null;
+        ruleRows?: Record<string, number[]>;
     } = {},
 ): BuilderStore {
     return {
         formId: 'form-1',
         selectedField: computed(() => selected.field ?? null),
         selectedSection: computed(() => selected.section ?? null),
-        saveError: ref<string | null>(null), saveFieldErrors: ref<Record<string, Record<string, string[]>>>(selected.errors ?? {}),
+        saveError: ref<string | null>(selected.saveError ?? null), saveFieldErrors: ref<Record<string, Record<string, string[]>>>(selected.errors ?? {}),
+        saveRuleRows: ref<Record<string, number[]>>(selected.ruleRows ?? {}),
         saving: ref(false),
         librarySaved: ref<string | null>(null),
         enums: ENUMS,
@@ -653,5 +656,48 @@ describe('ConfigPanel — a formula default (M134, R-6d7b9ff7)', () => {
         expect(visit.default_value).toBe('2026-01-01');
         expect((visit as LocalField & { default_value_is_expression: boolean }).default_value_is_expression).toBe(false);
         expect(touch).toHaveBeenLastCalledWith('f1', 'field');
+    });
+});
+
+describe('ConfigPanel — a refused save is said once (M176, R-5554c526)', () => {
+    // The testers' comment (2026-10-11, comment 2): "Instructions repeat". The lead line was the reply's `message`, which
+    // Laravel fills with the FIRST error (plus "(and N more errors)"), and the list below named every error — that one too.
+    it('leads with one plain line, then each item — never the first item twice', () => {
+        const target = field();
+        const wrapper = mountPanel(
+            makeStore({
+                field: target,
+                saveError: 'Empty. Choose what it checks, or remove it. (and 1 more error)',
+                errors: { [target.uid]: { 'validations.0': ['Empty. Choose what it checks, or remove it.'], 'config.options.1.label': ['The label is required.'] } },
+            }),
+        );
+
+        const alert = wrapper.get('[role="alert"]');
+        expect(alert.find('p').text()).toBe('This question was not saved. Fix the items below.');
+        expect(alert.text()).not.toContain('(and 1 more error)');
+        expect(alert.text().split('Empty. Choose what it checks').length - 1).toBe(1);
+    });
+
+    it('keeps the reply\'s own words when the failure carried no list of items', () => {
+        const target = field();
+        const wrapper = mountPanel(makeStore({ field: target, saveError: 'Something went wrong saving your change.' }));
+
+        expect(wrapper.get('[role="alert"]').find('p').text()).toBe('Something went wrong saving your change.');
+    });
+
+    it('numbers a refused rule as the Validation tab does, past a rule still being written', () => {
+        // The request leaves out a rule still being written, so `validations.0` was the SECOND rule on screen and the
+        // alert said "Rule 1". The store records, at send time, which editor row each sent rule was.
+        const target = field();
+        const wrapper = mountPanel(
+            makeStore({
+                field: target,
+                saveError: 'The rule value must be a number.',
+                errors: { [target.uid]: { 'validations.0.rule_value': ['The rule value must be a number.'] } },
+                ruleRows: { [target.uid]: [1] },
+            }),
+        );
+
+        expect(wrapper.get('[role="alert"]').text()).toContain('Rule 2: The rule value must be a number.');
     });
 });

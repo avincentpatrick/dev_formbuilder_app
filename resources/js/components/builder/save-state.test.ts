@@ -708,3 +708,34 @@ group('closing the conflict dialog never throws the edit away (M176, R-164579e8)
         expect(sessionStorage.getItem(KEPT)).toBeNull();
     });
 });
+group('a refused rule is numbered by its row on screen (M176, R-5554c526)', () => {
+    const writing = { rule_type: null, operator: null, rule_value: null, expression: '', error_message: null, related_field_key: null, sequence: 0 };
+    const minimum = { rule_type: 'min_value', operator: null, rule_value: 'x', expression: null, error_message: null, related_field_key: null, sequence: 1 };
+
+    function patchBodies(mock: ReturnType<typeof vi.fn>): Array<Record<string, unknown>> {
+        return mock.mock.calls
+            .filter(([, init]) => (init as RequestInit | undefined)?.method === 'PATCH')
+            .map(([, init]) => JSON.parse(String((init as RequestInit).body)) as Record<string, unknown>);
+    }
+
+    it('records which editor row each sent rule was, so the alert can say "Rule 2"', async () => {
+        fetchMock().mockResolvedValue(
+            jsonResponse(422, { message: 'The rule value must be a number.', errors: { 'validations.0.rule_value': ['The rule value must be a number.'] } }),
+        );
+        const store = useBuilderStore({ ...pageProps(), fields: [serverField({ validations: [writing, minimum] as never })] });
+
+        await editField(store, 'Job');
+
+        expect(store.saveRuleRows.value[store.fields.value[0].uid]).toEqual([1]);
+    });
+
+    it('withholds a rule whose check is an empty choice, exactly as one with no check at all', async () => {
+        const mock = fetchMock().mockResolvedValue(jsonResponse(200, serverField({ version: 'v2' })));
+        const blankChoice = { ...writing, rule_type: '', expression: null };
+        const store = useBuilderStore({ ...pageProps(), fields: [serverField({ validations: [blankChoice, minimum] as never })] });
+
+        await editField(store, 'Job');
+
+        expect((patchBodies(mock)[0].validations as unknown[]).length).toBe(1);
+    });
+});

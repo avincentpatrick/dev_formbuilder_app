@@ -650,3 +650,61 @@ group('a 409 over this tab\'s own earlier write is not someone else (M176, R-c48
         expect(bodies(mock)).toHaveLength(2); // nothing re-sent over a row someone else wrote
     });
 });
+group('closing the conflict dialog never throws the edit away (M176, R-164579e8)', () => {
+    // The dialog promised "your edit hasn't been lost", and closing it chose "Use theirs" and forgot the journal entry.
+    // Closing now DEFERS; and a reload, which drops an entry whose token moved to someone else's write, raises it again.
+    const KEPT = 'meridian:builder-edits:form-1';
+    const theirs = () => jsonResponse(409, { message: 'Changed elsewhere.', current: serverField({ label: 'Theirs', version: 'v9' }) });
+
+    afterEach(() => sessionStorage.clear());
+
+    it('keeps the conflict, the edit on screen and its journal entry when deferred; Review reopens it', async () => {
+        fetchMock().mockResolvedValue(theirs());
+        const store = useBuilderStore(pageProps());
+        await editField(store, 'Mine');
+        expect(store.conflict.value).not.toBeNull();
+
+        store.deferConflict();
+
+        expect(store.conflictDeferred.value).toBe(true);
+        expect(store.conflict.value).not.toBeNull();
+        expect(store.fields.value[0].label).toBe('Mine');
+        expect(store.saveState.value).toBe('failed');
+        const kept = JSON.parse(sessionStorage.getItem(KEPT) ?? '[]') as Array<{ snapshot: { label: string }; conflicted?: boolean }>;
+        expect(kept.map((entry) => [entry.snapshot.label, entry.conflicted])).toEqual([['Mine', true]]);
+
+        store.reviewConflict();
+        expect(store.conflictDeferred.value).toBe(false);
+    });
+
+    it('raises a deferred conflict again after a reload, with the edit back on screen and nothing sent', async () => {
+        const mock = fetchMock().mockResolvedValue(theirs());
+        const store = useBuilderStore(pageProps());
+        await editField(store, 'Mine');
+        store.deferConflict();
+        const sent = mock.mock.calls.length;
+
+        const reloaded = useBuilderStore({ ...pageProps(), fields: [serverField({ label: 'Theirs', version: 'v9' })] });
+        await flushPromises();
+
+        expect(reloaded.conflict.value).not.toBeNull();
+        expect(reloaded.conflict.value!.theirs.label).toBe('Theirs');
+        expect(reloaded.fields.value[0].label).toBe('Mine');
+        expect(mock.mock.calls.length).toBe(sent);
+    });
+
+    it('forgets the kept edit once a version is chosen', async () => {
+        fetchMock().mockResolvedValue(theirs());
+        const store = useBuilderStore(pageProps());
+        await editField(store, 'Mine');
+        store.deferConflict();
+
+        await store.resolveConflict('theirs');
+        await flushPromises();
+
+        expect(store.conflict.value).toBeNull();
+        expect(store.conflictDeferred.value).toBe(false);
+        expect(store.fields.value[0].label).toBe('Theirs');
+        expect(sessionStorage.getItem(KEPT)).toBeNull();
+    });
+});

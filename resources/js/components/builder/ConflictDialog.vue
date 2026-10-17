@@ -48,7 +48,7 @@ const name = computed(() => props.conflict?.mine.label || props.conflict?.theirs
         size="lg"
         title="This item changed elsewhere"
         close-label="Decide later"
-        @close="emit('defer')"
+        @close="emit('resolve', 'theirs')"
     >
         <div v-if="conflict" class="conflict">
             <p class="conflict__lead">

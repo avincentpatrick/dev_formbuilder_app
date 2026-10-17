@@ -128,6 +128,8 @@ const SHARE = 'resources/js/components/forms/SharePanel.vue';
 const PUBLISH = 'app/Http/Controllers/Tenant/FormPublishController.php';
 const INBOX = 'resources/js/Pages/submissions/Inbox.vue';
 const ANALYTICS = 'resources/js/Pages/forms/Analytics.vue';
+// M176 (`R-61d43278`): "No negative numbers" is a kind the builder names itself, stored as a minimum of 0.
+const RULE_WORDS = 'resources/js/components/builder/field-conversion.ts';
 
 /** Part one, "Step by step" (`M162`): creating a form, from a blank page to an exported response. */
 const guide: ChapterDraft[] = [
@@ -347,8 +349,8 @@ const guide: ChapterDraft[] = [
                     ),
                     p(
                         'Picked the wrong kind of question? The ', ui('Question type', TYPE_CONTROL), ' row at the top of ',
-                        ui('Basics', CONFIG), ' has a ', ui('Change type', TYPE_CONTROL), ' button. For a number you can also tick ',
-                        ui('Allow negative numbers', TYPE_CONTROL), '.',
+                        ui('Basics', CONFIG), ' has a ', ui('Change type', TYPE_CONTROL), ' button. To refuse answers below zero on a number, add the rule ',
+                        ui('No negative numbers', RULE_WORDS), ' on the ', ui('Validation', CONFIG), ' tab.',
                     ),
                 ],
             },
@@ -738,7 +740,6 @@ const reference: ChapterDraft[] = [
                     list(
                         [ui('Question type', TYPE_CONTROL), ' and ', ui('Change type', TYPE_CONTROL), ' — see ', link('Change a question’s type', '#change-type'), '.'],
                         ['A ', ui('format', TYPE_CONTROL), ' switch, on text and number questions only: ', ui('Short text', FIELD_TYPES), ' or ', ui('Long text', FIELD_TYPES), ', ', ui('Whole number', FIELD_TYPES), ' or ', ui('Decimal number', FIELD_TYPES), '.'],
-                        [ui('Allow negative numbers', TYPE_CONTROL), ' — numbers only. Untick it to refuse answers below zero.'],
                         [ui('Label', CONFIG), ', ', ui('Help text', CONFIG), ' and ', ui('Placeholder', CONFIG), ' — the wording respondents see.'],
                         [ui('Calculation formula', CONFIG), ' — ', ui('Calculated', FIELD_TYPES), ' questions only. See ', link('Calculated', '#type-calculated'), '.'],
                         [
@@ -774,6 +775,7 @@ const reference: ChapterDraft[] = [
                     p('The kinds of rule, and the questions they suit:'),
                     list(
                         [ui('Minimum value', RULE_TYPES), ' and ', ui('Maximum value', RULE_TYPES), ' — numbers and ', ui('Likert scale', FIELD_TYPES), '. For example, an age from 0 to 120.'],
+                        [ui('No negative numbers', RULE_WORDS), ' — numbers only. It refuses any answer below zero, and needs no value.'],
                         [ui('Minimum length', RULE_TYPES), ' and ', ui('Maximum length', RULE_TYPES), ' — text. For example, an ID of exactly 10 characters.'],
                         [ui('Must match a pattern', RULE_TYPES), ' — text in a fixed shape, such as a phone number. Email, phone and web-address questions start with one.'],
                         [ui('Greater than another question', RULE_TYPES), ' and ', ui('Less than another question', RULE_TYPES), ' — numbers compared with another answer, such as “children” less than “household size”.'],
@@ -882,7 +884,7 @@ const reference: ChapterDraft[] = [
                         ui('Decimal number', FIELD_TYPES), ' on ', ui('Basics', CONFIG), '.',
                     ),
                     list(
-                        [ui('Allow negative numbers', TYPE_CONTROL), ' — ticked by default. Untick it for counts and ages.'],
+                        ['Negative answers are allowed until you add the rule ', ui('No negative numbers', RULE_WORDS), ' on the ', ui('Validation', CONFIG), ' tab — add it for counts and ages.'],
                         ['Useful rules: ', ui('Minimum value', RULE_TYPES), ', ', ui('Maximum value', RULE_TYPES), ', ', ui('Greater than another question', RULE_TYPES), ', ', ui('Less than another question', RULE_TYPES), '.'],
                     ),
                 ],

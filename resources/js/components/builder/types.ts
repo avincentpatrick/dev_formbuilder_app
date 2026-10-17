@@ -25,6 +25,12 @@ export interface BuilderValidation {
     logic_group?: string | null;
     logic_operator?: 'and' | 'or' | null;
     sequence: number;
+    /**
+     * M176 (`R-61d43278`) — CLIENT-ONLY, never sent: how the Validation tab shows the row when the author chose its kind.
+     * A minimum of 0 is "No negative numbers" unless the author picked "Minimum value" for it — typing "0.5" passes
+     * through "0", and the row must not change kind under the author's fingers. Absent on a row as loaded: then derived.
+     */
+    shown_as?: 'no_negatives' | 'rule';
 }
 
 export interface ServerField {

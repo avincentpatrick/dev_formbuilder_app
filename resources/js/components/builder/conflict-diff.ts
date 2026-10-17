@@ -11,6 +11,7 @@
  */
 
 import { describe, type LabelLookup } from './condition-describer';
+import { isNoNegativesRule, NO_NEGATIVES_LABEL } from './field-conversion';
 import { describeSavePath } from './field-save-errors';
 import { canonical } from './row-compare';
 import type { BuilderEnums, BuilderValidation, LocalField, LocalSection, ServerField, ServerSection } from './types';
@@ -112,6 +113,7 @@ function conditionWords(expression: unknown, labels: LabelLookup, always: string
 
 function ruleWords(rule: BuilderValidation, words: DiffWords): string {
     if (rule.rule_type === null || rule.rule_type === '') return rule.expression ? `A custom check: ${rule.expression}` : 'An empty rule';
+    if (isNoNegativesRule(rule)) return NO_NEGATIVES_LABEL;
     const parts = [
         optionLabel(words.enums.validation_rule_types, rule.rule_type),
         rule.operator ? optionLabel(words.enums.comparison_operators, rule.operator) : '',

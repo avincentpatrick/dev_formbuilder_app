@@ -77,8 +77,8 @@ const group = (page: Page) => page.getByRole('group', { name: 'Requiredness' });
 const checks = (page: Page) => page.locator('.config__checks');
 
 /*
- * In order, because two of them meet: "Allow negative numbers" off writes a minimum of 0 as rule 1, so the Validation cases
- * add rules 2 and 3 — and a custom minimum would disable the toggle, which is why the toggle goes first.
+ * In order, because they meet: "No negative numbers" is rule 1 — a minimum of 0, chosen on the Validation tab by name
+ * since M176 (`R-61d43278`; it was the Basics "Allow negative numbers" box) — so the next Validation cases add rules 2 and 3.
  */
 const SETTINGS: Setting[] = [
     {
@@ -100,10 +100,17 @@ const SETTINGS: Setting[] = [
         check: (page) => expect(group(page).getByRole('radio', { name: 'Required', exact: true })).toBeChecked(),
     },
     {
-        name: 'Allow negative numbers',
-        tab: 'Basics',
-        change: (page) => page.getByText('Allow negative numbers', { exact: true }).click(),
-        check: (page) => expect(page.getByRole('checkbox', { name: 'Allow negative numbers' })).not.toBeChecked(),
+        name: 'No negative numbers',
+        tab: 'Validation',
+        change: async (page) => {
+            await page.getByRole('button', { name: 'Add rule' }).click();
+            await page.getByLabel('Rule 1 check', { exact: true }).selectOption('no_negative_numbers');
+        },
+        check: async (page) => {
+            // Stored as a minimum of 0, and shown under its own name after the refresh — with no value to type.
+            await expect(page.getByLabel('Rule 1 check', { exact: true })).toHaveValue('no_negative_numbers');
+            await expect(page.getByLabel('Rule 1 value', { exact: true })).toHaveCount(0);
+        },
     },
     {
         name: 'a maximum value rule',

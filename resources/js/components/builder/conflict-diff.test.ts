@@ -84,12 +84,14 @@ describe('conflictDifferences', () => {
     });
 
     it('says a rule in words, and an empty value as Empty', () => {
-        const rule = { rule_type: 'min_value', operator: null, rule_value: '0', expression: null, error_message: null, related_field_key: null, sequence: 0 };
-        const a = mine({ hint: 'Count everyone.', validations: [rule] as never });
+        const rule = { rule_type: 'min_value', operator: null, rule_value: '5', expression: null, error_message: null, related_field_key: null, sequence: 0 };
+        const zero = { ...rule, rule_value: '0', sequence: 1 };
+        const a = mine({ hint: 'Count everyone.', validations: [rule, zero] as never });
 
         expect(conflictDifferences('field', a, serverField(), WORDS)).toEqual([
             { setting: 'Help text', mine: 'Count everyone.', theirs: 'Empty' },
-            { setting: 'Rules', mine: '1. Minimum value 0', theirs: 'No rules' },
+            // M176 (`R-61d43278`): a minimum of 0 is named as the Validation tab names it.
+            { setting: 'Rules', mine: '1. Minimum value 5; 2. No negative numbers', theirs: 'No rules' },
         ]);
     });
 

@@ -7,7 +7,7 @@
  * `no_answer` value shape (a note) or the `prefill` editor (a hidden field) — never from a `{note, hidden}` literal,
  * which would be one more client-side type mirror nothing pins.
  */
-import type { BuilderEnums, BuilderValidation, LocalField, LocalSection, PaletteType } from './types';
+import type { BuilderEnums, LocalField, LocalSection, PaletteType } from './types';
 import type { ConversionAddedRule, ConversionCensusEntry, ConversionChange, ConversionPlan, ConversionRule } from './useBuilderStore';
 
 export type ConvertPhase = 'loading' | 'load-failed' | 'choosing' | 'applying' | 'stale' | 'apply-failed';
@@ -134,6 +134,9 @@ function ruleLine(rule: ConversionRule | ConversionAddedRule, enums: BuilderEnum
         return { label: 'A custom check', value: 'expression' in rule ? rule.expression : null, shows: rule.error_message };
     }
 
+    // M176: a minimum of 0 is named as the Validation tab names it, with no value to show.
+    if (isNoNegativesRule(rule)) return { label: NO_NEGATIVES_LABEL, value: null, shows: rule.error_message };
+
     const operator = 'operator' in rule && rule.operator !== null ? optionLabel(enums.comparison_operators, rule.operator) : '';
     const value = [operator, rule.rule_value ?? ''].filter((part) => part !== '').join(' ');
 
@@ -226,52 +229,22 @@ export function variantOptions(palette: Iterable<PaletteType>, group: string): T
     return [...palette].filter((type) => type.variant?.group === group).map((type) => ({ value: type.value, label: type.label }));
 }
 
-/** The one rule "Allow negative numbers" writes: a minimum of exactly 0, the existing `min_value` rule — no new config key. */
+/** "No negative numbers" is stored as what it always was: a minimum of exactly 0, the existing `min_value` rule. */
 export const NEGATIVE_FLOOR_RULE = 'min_value';
 
-/**
- * What a field's rules say about negative answers. `custom` is any OTHER minimum — one the author set on the Validation
- * tab — which the toggle reads but never rewrites; `allowed` then reports whether that minimum still admits a negative.
- */
-export interface NegativeFloor {
-    state: 'none' | 'zero' | 'custom';
-    allowed: boolean;
-}
+/** The kind's name, wherever a rule is named — the Validation tab, the type dialog, the conflict dialog. */
+export const NO_NEGATIVES_LABEL = 'No negative numbers';
 
-function isMinimum(row: BuilderValidation): boolean {
+/**
+ * M176 (`R-61d43278`) — whether a rule reads as "No negative numbers": a structured minimum of 0, unless the author chose
+ * it as a "Minimum value" (`shown_as`). It replaced the Basics checkbox's `negativeFloor()` / `withNegativesAllowed()`,
+ * which derived a toggle from this very row — so deleting the row on the Validation tab ticked the box back on (the
+ * user's report). One place now holds every minimum.
+ */
+export function isNoNegativesRule(row: { rule_type: string | null; rule_value: string | null; expression?: string | null; shown_as?: string }): boolean {
+    if (row.shown_as === 'rule') return false;
+    if (row.shown_as === 'no_negatives') return true;
+
     // `expression === null` first, mirroring the M116 partition: a raw-expression row is never a structured rule.
-    return row.expression === null && row.rule_type === NEGATIVE_FLOOR_RULE;
-}
-
-export function negativeFloor(rows: readonly BuilderValidation[]): NegativeFloor {
-    const minimums = rows.filter(isMinimum);
-    if (minimums.length === 0) return { state: 'none', allowed: true };
-    if (minimums.length === 1 && (minimums[0].rule_value ?? '').trim() === '0') return { state: 'zero', allowed: false };
-
-    // A blank threshold constrains nothing, so a row being typed does not read as a refusal.
-    return { state: 'custom', allowed: minimums.every((row) => (row.rule_value ?? '').trim() === '' || Number(row.rule_value) < 0) };
-}
-
-/**
- * The rows with the toggle's own row added or removed — and nothing else moved. The M116 discipline, re-stated because
- * `ConfigPanel`'s partition is private to a hub: every row this toggle does not own keeps its relative order, so the
- * "Required when…" reveal beside it and the Validation tab never reshuffle. Returns the SAME array when there is nothing
- * to do, including over a `custom` minimum, which belongs to the Validation tab.
- */
-export function withNegativesAllowed(rows: BuilderValidation[], allowed: boolean): BuilderValidation[] {
-    const { state } = negativeFloor(rows);
-    let next: BuilderValidation[];
-
-    if (allowed && state === 'zero') {
-        next = rows.filter((row) => !isMinimum(row));
-    } else if (!allowed && state === 'none') {
-        next = [
-            ...rows,
-            { rule_type: NEGATIVE_FLOOR_RULE, operator: null, rule_value: '0', expression: null, error_message: null, related_field_key: null, sequence: rows.length },
-        ];
-    } else {
-        return rows;
-    }
-
-    return next.map((row, i) => ({ ...row, sequence: i }));
+    return (row.expression ?? null) === null && row.rule_type === NEGATIVE_FLOOR_RULE && (row.rule_value ?? '').trim() === '0';
 }

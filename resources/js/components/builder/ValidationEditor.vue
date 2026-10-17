@@ -352,7 +352,7 @@ function setRuleType(index: number, chosen: string): void {
     const extra: Partial<BuilderValidation> = noNegatives
         ? { rule_value: '0', shown_as: 'no_negatives' }
         : value === NEGATIVE_FLOOR_RULE
-          ? { ...(isNoNegativesRule(props.validations[index]) ? { rule_value: null } : {}) }
+          ? { shown_as: 'rule', ...(isNoNegativesRule(props.validations[index]) ? { rule_value: null } : {}) }
           : {};
     const rule = props.ruleTypes.find((candidate) => candidate.value === value) ?? null;
 

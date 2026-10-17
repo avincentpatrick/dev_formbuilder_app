@@ -185,7 +185,7 @@ function capturedAfter(frames: FrameLog, since: number): Promise<void> {
             if (finished) return;
             const latest = frames.latest;
             if (frames.timed) {
-                if (latest?.captureTime !== null && latest?.captureTime !== undefined && latest.captureTime >= -Infinity) finish();
+                if (latest?.captureTime !== null && latest?.captureTime !== undefined && latest.captureTime >= since) finish();
                 return;
             }
             const now = performance.now();

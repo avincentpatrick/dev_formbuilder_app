@@ -38,3 +38,12 @@ export const Dark: Story = {
     decorators: [dark],
 };
 export const InvalidDark: Story = { args: { invalid: true, modelValue: '' }, decorators: [dark] };
+
+// M176 (`R-923c5041`): the builder's question label — one line to start, growing with the text.
+export const Autosize: Story = {
+    args: { autosize: true, modelValue: 'How many people usually sleep in this house, including children and anyone staying for the season?' },
+};
+// …and saying how near its limit it is once it gets there.
+export const AutosizeWithCounter: Story = {
+    args: { autosize: true, maxlength: 500, countFrom: 450, modelValue: 'A long question. '.repeat(27).trim() },
+};

@@ -53,6 +53,7 @@ import PrefillEditor from './PrefillEditor.vue';
 import ValidationEditor from './ValidationEditor.vue';
 import type { ContentBlock } from './content-blocks';
 import { describeSavePath, freeKeyFor, sortFieldSaveErrors, tabForSavePath } from './field-save-errors';
+import { LABEL_COUNT_FROM, LABEL_MAX, oneLine } from './label-text';
 import type { BuilderStore } from './useBuilderStore';
 import type { BuilderValidation, ComparableField, ConditionCatalogue, EnumOption, LocalField, LocalSection } from './types';
 interface Choice {
@@ -536,7 +537,19 @@ watch(librarySaved, (value) => {
                     <template v-if="activeTab === 'basics'">
                         <FieldTypeControl :store="store" />
                         <MdsFormField label="Label" :help="field.field_type === 'note' ? NOTE_LABEL_HELP : undefined" :error="fieldSaveErrors.inline.label" v-slot="{ id, describedby, invalid }">
-                            <MdsTextInput :id="id" :describedby="describedby" :invalid="invalid" :model-value="field.label" @update:model-value="setField('label', $event)" />
+                            <!-- M176 (`R-923c5041`): a long question is read whole — the box grows with it; one line of text, so
+                                 Enter adds no break and a pasted one becomes a space; the label's 500 counted near the end. -->
+                            <MdsTextarea
+                                :id="id"
+                                :describedby="describedby"
+                                :invalid="invalid"
+                                autosize
+                                :maxlength="LABEL_MAX"
+                                :count-from="LABEL_COUNT_FROM"
+                                :model-value="field.label"
+                                @keydown.enter.prevent
+                                @update:model-value="setField('label', oneLine($event))"
+                            />
                         </MdsFormField>
                         <MdsFormField
                             v-if="isCalculated"

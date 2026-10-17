@@ -561,9 +561,10 @@ describe('ConfigPanel — a refused save marks the field (M128, R-d001de0c)', ()
         const target = field();
         const wrapper = mountPanel(makeStore({ field: target, errors: { [target.uid]: { label: ['The label field is required.'] } } }));
 
-        const input = wrapper.find('input[aria-invalid="true"]');
+        // M176 (`R-923c5041`): the Label is a growing <textarea> now, so the control is found by its value, whatever its tag.
+        const input = wrapper.find('[aria-invalid="true"]');
         expect(input.exists()).toBe(true);
-        expect(input.element).toBe(wrapper.findAll('input').find((i) => (i.element as HTMLInputElement).value === target.label)!.element);
+        expect(input.element).toBe(wrapper.findAll('input, textarea').find((i) => (i.element as HTMLTextAreaElement).value === target.label)!.element);
 
         const described = (input.attributes('aria-describedby') ?? '').split(' ');
         const message = described.map((id) => wrapper.find(`[id="${id}"]`)).find((el) => el.exists() && el.text().includes('The label field is required.'));
@@ -722,9 +723,8 @@ describe('ConfigPanel — the Label box grows with a long question (M176, R-923c
         expect(box.attributes('maxlength')).toBe('500');
         expect(wrapper.text()).not.toContain('of 500 characters');
 
-        target.label = 'x'.repeat(460);
-        await wrapper.setProps({ store: makeStore({ field: target }) });
-        expect(wrapper.text()).toContain('460 of 500 characters');
+        const long = mountPanel(makeStore({ field: field({ label: 'x'.repeat(460) }) }));
+        expect(long.text()).toContain('460 of 500 characters');
     });
 
     it('takes no line break: Enter adds none, and a pasted one becomes a space', async () => {

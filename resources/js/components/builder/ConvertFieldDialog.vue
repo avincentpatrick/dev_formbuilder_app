@@ -22,7 +22,7 @@ import type { ConsequenceView, ConvertPhase, TargetGroup } from './field-convers
 const props = defineProps<{
     open: boolean;
     phase: ConvertPhase;
-    /** The question's label, or its key when it has none. */
+    /** The question's label, or its key when it has none — or `''` while its label is still its type's own name (M176). */
     questionLabel: string;
     /** The current type's palette label. */
     currentLabel: string;
@@ -36,7 +36,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{ 'update:selected': [to: string]; confirm: []; retry: []; close: [] }>();
 
-const HELP = 'It keeps its key, so conditions, calculations and text that mention it still point to it. What changes is listed below.';
+// M176 (`R-36e6f557`): in the DSR §1.5 voice — it read "It keeps its key, so conditions, calculations and text that mention it
+// still point to it". The key is named as the Advanced tab names it.
+const HELP = 'Its field key stays the same, so conditions, formulas and text that use this question keep working. The list below shows what changes.';
 
 const bodyEl = ref<HTMLElement | null>(null);
 const staleEl = ref<HTMLElement | null>(null);
@@ -51,7 +53,7 @@ const primaryLabel = computed(() => {
     return props.targetLabel !== '' ? `Change to ${props.targetLabel}` : 'Change type';
 });
 const status = computed(() => {
-    if (props.phase === 'loading') return 'Checking which types it can change to…';
+    if (props.phase === 'loading') return 'Checking which types this question can become…';
     if (props.phase === 'applying') return `Changing it to ${props.targetLabel}…`;
     return '';
 });
@@ -123,8 +125,11 @@ function onClose(): void {
 <template>
     <MdsModal :open="open" title="Change question type" :return-focus="['[data-convert-opener]']" @close="onClose">
         <div ref="bodyEl" class="convert">
+            <!-- M176 (`R-36e6f557`): a question still named by its type ("Date & time") says the type once; it read
+                 "Current type of “Date & time”: Date & time". -->
             <p class="convert__lead">
-                Current type of “{{ questionLabel }}”: <strong>{{ currentLabel }}</strong>
+                <template v-if="questionLabel === ''">This is a <strong>{{ currentLabel }}</strong> question.</template>
+                <template v-else>“{{ questionLabel }}” is a <strong>{{ currentLabel }}</strong> question.</template>
             </p>
             <p class="convert__status" role="status">{{ status }}</p>
 
@@ -132,7 +137,7 @@ function onClose(): void {
                 v-if="phase === 'load-failed'"
                 tone="danger"
                 assertive
-                title="Couldn’t check which types it can change to"
+                title="Couldn’t check which types this question can become"
                 :message="message ?? undefined"
             />
             <MdsAlert
@@ -143,7 +148,7 @@ function onClose(): void {
                 :message="message ?? undefined"
             />
             <div v-if="phase === 'stale'" ref="staleEl" tabindex="-1" class="convert__stale" data-convert-stale>
-                <MdsAlert tone="warning" title="This question changed while this was open" :message="message ?? undefined" />
+                <MdsAlert tone="warning" title="This question changed while this window was open" :message="message ?? undefined" />
             </div>
 
             <template v-if="showChoice">
@@ -198,7 +203,7 @@ function onClose(): void {
 
                     <template v-if="view.elsewhere.length > 0">
                         <h3 class="convert__heading">Elsewhere in the form</h3>
-                        <p class="convert__intro">These still point to this question, but what they check changes:</p>
+                        <p class="convert__intro">These still use this question, but they will work differently:</p>
                         <ul class="convert__list">
                             <li v-for="(item, i) in view.elsewhere" :key="`elsewhere-${i}`">
                                 <strong>{{ item.owner }}</strong> — {{ item.message }}

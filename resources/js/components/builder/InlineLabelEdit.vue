@@ -11,15 +11,20 @@
  * `label` is the input's accessible name — the row shows no visible label beside it. Enter and blur commit; Escape
  * cancels. Each edit ends ONCE: Enter unmounts the input, and whether a browser then sends a blur for it is not something
  * to depend on. Enter while an input method is composing belongs to the IME, not to us.
+ *
+ * M176 (`R-923c5041`): a box that grows with a long question ("Label field is too small. It cannot accommodate long
+ * questions"), wrapping instead of scrolling sideways. Still one line of text: Enter commits as before, and a pasted line
+ * break becomes a space.
  */
 import { onMounted, ref } from 'vue';
-import { MdsTextInput } from '@meridian/design-system';
+import { MdsTextarea } from '@meridian/design-system';
+import { LABEL_MAX, oneLine } from './label-text';
 
-const props = withDefaults(defineProps<{ value: string; label: string; maxlength?: number }>(), { maxlength: 500 });
+const props = withDefaults(defineProps<{ value: string; label: string; maxlength?: number }>(), { maxlength: LABEL_MAX });
 const emit = defineEmits<{ commit: [value: string, via: 'key' | 'blur']; cancel: [] }>();
 
 const draft = ref(props.value);
-const input = ref<{ $el: HTMLInputElement } | null>(null);
+const input = ref<{ $el: HTMLTextAreaElement } | null>(null);
 let finished = false;
 
 function commit(via: 'key' | 'blur'): void {
@@ -60,12 +65,14 @@ defineExpose({ commit });
 </script>
 
 <template>
-    <MdsTextInput
+    <MdsTextarea
         ref="input"
-        v-model="draft"
+        :model-value="draft"
         class="inline-label-edit"
+        autosize
         :aria-label="label"
         :maxlength="maxlength"
+        @update:model-value="draft = oneLine($event)"
         @keydown="onKeydown"
         @blur="commit('blur')"
     />

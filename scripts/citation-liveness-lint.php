@@ -158,7 +158,10 @@ const TIER2_FILES = ['docs/feature-backlog.md'];
 // in the ledger, which shifted every self-citation below them and manufactured four fresh dead ones at once.
 // A line-count-neutral edit is the only safe way to touch prose above a self-citation, and dropping a number
 // is the only repair that stays repaired.
-const LEDGER_ROT_CEILING = 17;
+// ⚙️ RATCHETED 17 → 16 BY `M176`, in the same commit as the repair that earned it. Its builder edits turned eight
+// ledger citations blank; re-pointing them (line-count-neutral, inside each line) also landed one that was already dead
+// (`ValidationEditor.vue:93`) on its prop declaration. Three in rows `M176` closes now name the file at `cef2a9b0`.
+const LEDGER_ROT_CEILING = 16;
 
 /** R3 floors. Three, because there are three independent ways for this gate to pass while blind. */
 const MIN_EXPECTED_DOCUMENTS = 40;

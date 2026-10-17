@@ -12,6 +12,7 @@
 import { computed, reactive, ref, type Ref } from 'vue';
 import { builderFor, BuilderRequestError, DraftSupersededError, type BuilderResult, type SupersedingDraft } from './builderClient';
 import { editJournal } from './edit-journal';
+import { canonical } from './row-compare';
 import type {
     BuilderPageProps,
     CanvasGroup,
@@ -65,11 +66,18 @@ export function useBuilderStore(props: BuilderPageProps) {
     const sections = ref<LocalSection[]>(props.sections.map(toLocalSection));
     const selection = ref<Selection>(null);
     const conflict = ref<ConflictState | null>(null);
+    // M176 (`R-164579e8`): the author closed the dialog without choosing. The conflict stays pending — the edit on screen
+    // and in the journal, publish held — and the builder's notice brings the dialog back (`reviewConflict()`).
+    const conflictDeferred = ref(false);
     // M172 (`R-81756e95`): the form was published since this page loaded. Every id the page holds is the old draft's, so
     // nothing more is sent; the dialog offers the reload, and the journal puts each kept edit back into the new draft.
     const superseded = ref<{ draft: SupersedingDraft | null } | null>(null);
     // M172 (`R-733eff09`, `D132`): the key a save asked for and the one the server kept instead, per row, while they differ.
     const keyNotices = ref<Record<Uid, { wanted: string; kept: string }>>({});
+    // M176 (`R-c4802b60`): every payload this page sent for a row since the server last confirmed one — so a 409 whose
+    // `current` is one of them is read as THIS page's own landed write (its reply lost), never as someone else's.
+    // In memory, not the journal: the journal's storage can be refused, and this is about the page's own requests.
+    const sentSinceHeld = new Map<Uid, Record<string, unknown>[]>();
     const undoStack = ref<HistoryEntry[]>([]);
     const redoStack = ref<HistoryEntry[]>([]);
 
@@ -101,7 +109,9 @@ export function useBuilderStore(props: BuilderPageProps) {
         unsaved: Record<Uid, 'field' | 'section'>;
         /** M172 (`R-d85d51d2`): one per failure, so the panel can re-announce a refusal identical to the last. */
         failures: number;
-    }>({ inFlight: 0, error: null, wrote: false, fieldErrors: {}, pending: false, unsaved: {}, failures: 0 });
+        /** M176 (`R-5554c526`): per question, the editor row of each rule its last save SENT — `validations.N` → row. */
+        ruleRows: Record<Uid, number[]>;
+    }>({ inFlight: 0, error: null, wrote: false, fieldErrors: {}, pending: false, unsaved: {}, failures: 0, ruleRows: {} });
 
     // M170 (`R-bfa3eb93`) — every edit the server has not confirmed, kept for this tab so a refresh puts it back. A
     // read-only builder (an archived form has no draft) edits nothing, so it keeps nothing. See `edit-journal.ts`.
@@ -187,6 +197,7 @@ export function useBuilderStore(props: BuilderPageProps) {
      * its refused value is still on screen and nothing has sent it again.
      */
     const saveFieldErrors = computed(() => save.fieldErrors);
+    const saveRuleRows = computed(() => save.ruleRows);
 
     // ⚠️ M170 — A REQUEST IN FLIGHT, NOT `saveState === 'saving'`. The buttons this disables (Save to library, the
     // toolbar's) must stay usable while an edit only waits out its debounce: each sends that edit first.
@@ -269,11 +280,28 @@ export function useBuilderStore(props: BuilderPageProps) {
         return result && !result.conflict ? result.data : null;
     }
 
+    /**
+     * M176 (`R-c4802b60`) — note a payload as sent, and answer what was sent BEFORE it since the last confirmed save. Bounded:
+     * a row whose saves have failed for an hour is not one whose oldest attempt is what the server holds.
+     */
+    function noteSent(uid: Uid, sent: Record<string, unknown>): Record<string, unknown>[] {
+        const earlier = sentSinceHeld.get(uid) ?? [];
+        sentSinceHeld.set(uid, [...earlier, sent].slice(-10));
+        return earlier;
+    }
+
+    function isEarlierSend(earlier: Record<string, unknown>[], current: Record<string, unknown>): boolean {
+        return earlier.some((other) => samePayload(current, other));
+    }
+
     /** True once the server holds the field as it is on screen — false on a refusal, a failure or a 409 (M155). */
-    async function persistField(uid: Uid): Promise<boolean> {
+    async function persistField(uid: Uid, resent = false): Promise<boolean> {
         const field = findField(uid);
         if (!field) return false;
         const sent = fieldPayload(field);
+        const earlier = noteSent(uid, sent);
+        // M176 (`R-5554c526`): which editor row each sent rule is, so a refusal of `validations.N` names the row on screen.
+        save.ruleRows[uid] = field.validations.flatMap((rule, row) => (isUnfinishedRule(rule) ? [] : [row]));
         const result = await guard(() => client.patch<ServerField>(`${base}/fields/${field.id}`, sent), { uid });
         if (!result) return false;
         // M170 — a 409 whose question already holds exactly this edit is not a conflict. It is how the put-back after a
@@ -284,14 +312,22 @@ export function useBuilderStore(props: BuilderPageProps) {
         // matched, a conflict was raised over nothing, and the next save went at a token already spent.
         if (result.conflict && samePayload(fieldPayload(result.current as unknown as LocalField), sent)) {
             field.version = result.current.version;
+            sentSinceHeld.delete(uid);
             delete save.fieldErrors[uid];
             return true;
         }
+        // M176 (`R-c4802b60`) — the server holds an EARLIER save of this page, whose reply never came back, and the author has
+        // typed on since. That is this page's own write, not someone else's: take its token and send the newer edit, once.
+        if (result.conflict && !resent && isEarlierSend(earlier, fieldPayload(result.current as unknown as LocalField))) {
+            field.version = result.current.version;
+            return persistField(uid, true);
+        }
         if (result.conflict) {
-            conflict.value = { kind: 'field', uid, mine: clone(field), theirs: result.current };
+            raiseConflict({ kind: 'field', uid, mine: clone(field), theirs: result.current }, field.id);
             return false;
         }
         field.version = result.data.version;
+        sentSinceHeld.delete(uid);
         delete save.fieldErrors[uid]; // the server holds this field now: its marks are answered
         adoptKeptKey(uid, field, String(sent.key), result.data.key);
         return true;
@@ -362,21 +398,28 @@ export function useBuilderStore(props: BuilderPageProps) {
     }
 
     /** True once the server holds the section as it is on screen — false on a refusal, a failure or a 409 (M155). */
-    async function persistSection(uid: Uid): Promise<boolean> {
+    async function persistSection(uid: Uid, resent = false): Promise<boolean> {
         const section = findSection(uid);
         if (!section) return false;
         const sent = sectionPayload(section);
+        const earlier = noteSent(uid, sent);
         const result = await guard(() => client.patch<ServerSection>(`${base}/sections/${section.id}`, sent));
         if (!result) return false;
         if (result.conflict && samePayload(sectionPayload(result.current as unknown as LocalSection), sent)) {
             section.version = result.current.version; // M170: as `persistField()` — the same edit, landed twice
+            sentSinceHeld.delete(uid);
             return true;
         }
+        if (result.conflict && !resent && isEarlierSend(earlier, sectionPayload(result.current as unknown as LocalSection))) {
+            section.version = result.current.version; // M176: as `persistField()` — this page's own landed write
+            return persistSection(uid, true);
+        }
         if (result.conflict) {
-            conflict.value = { kind: 'section', uid, mine: clone(section), theirs: result.current };
+            raiseConflict({ kind: 'section', uid, mine: clone(section), theirs: result.current }, section.id);
             return false;
         }
         section.version = result.data.version;
+        sentSinceHeld.delete(uid);
         adoptKeptKey(uid, section, String(sent.key), result.data.key); // M172: as `persistField()`
         return true;
     }
@@ -458,12 +501,24 @@ export function useBuilderStore(props: BuilderPageProps) {
     }
 
     // ── Public actions (each enqueued) ──────────────────────────────────────────
-    function addField(typeValue: string, sectionId: string | null = null): Promise<void> {
+    /**
+     * `index` — M176 (`R-5354b4b9`): the place in the section the author asked for ("Add a question here" at a page's end in
+     * Preview). The server appends a new question after every other one in the draft, so the store places it and saves the
+     * order once, only when that moved anything. Part of the add: one undo entry, and redo restores the order it held.
+     */
+    function addField(typeValue: string, sectionId: string | null = null, index?: number): Promise<void> {
         return enqueue(async () => {
             const created = await createFieldServer(typeValue, sectionId);
             if (!created) return;
             const local = toLocalField(created);
             fields.value.push(local);
+            if (index !== undefined) {
+                // The ARRANGEMENT, not the numbers: `placeField()` renumbers every sequence from 0, which is no move.
+                const arrangement = () => JSON.stringify(groups.value.map((group) => group.fields.map((f) => f.uid)));
+                const before = arrangement();
+                placeField(local.uid, sectionId, index);
+                if (arrangement() !== before) await persistOrder();
+            }
             // M125 — the palette added "Text"/"Number", so the question says that rather than "Short text". Saved
             // before the baseline and the snapshot are taken, so the add stays ONE undo entry and redo replays it.
             const seeded = variantLabelOf(props.palette, typeValue);
@@ -984,10 +1039,31 @@ export function useBuilderStore(props: BuilderPageProps) {
     }
 
     // ── Conflict resolution (409) — never silently discard either side ──────────
+    /**
+     * M176 (`R-164579e8`) — a conflict opens the dialog (again, if one was deferred), and its row's journal entry is marked,
+     * so a reload raises it again instead of dropping the author's edit for a token that moved to someone else's write.
+     */
+    function raiseConflict(state: ConflictState, id: string): void {
+        conflict.value = state;
+        conflictDeferred.value = false;
+        journal?.markConflicted(state.kind, id);
+    }
+
+    /** The dialog was closed without a choice: nothing is chosen, nothing is forgotten. */
+    function deferConflict(): void {
+        if (conflict.value !== null) conflictDeferred.value = true;
+    }
+
+    /** The builder's notice: open the deferred dialog again. */
+    function reviewConflict(): void {
+        conflictDeferred.value = false;
+    }
+
     function resolveConflict(choice: 'mine' | 'theirs'): Promise<void> {
         return enqueue(async () => {
             const state = conflict.value;
             conflict.value = null;
+            conflictDeferred.value = false;
             if (!state) return;
 
             if (state.kind === 'field') {
@@ -1082,6 +1158,7 @@ export function useBuilderStore(props: BuilderPageProps) {
 
     function forget(uid: Uid, kind: 'field' | 'section', id: string): void {
         delete save.unsaved[uid];
+        sentSinceHeld.delete(uid);
         journal?.drop(kind, id);
     }
 
@@ -1138,6 +1215,17 @@ export function useBuilderStore(props: BuilderPageProps) {
                 if (samePayload(payload(entry.snapshot), onServer)) continue;
             } else {
                 const ours = row.version === entry.base || (entry.sent ?? []).some((sent) => samePayload(payload(sent), onServer));
+                // M176 (`R-164579e8`): a choice the author left open before this reload. The token moved to someone else's
+                // write — which would drop the entry below — but the author was promised the edit is not lost: the edit goes
+                // back on screen and the dialog opens again. One dialog at a time; another such entry waits in the journal.
+                if (entry.conflicted === true && !ours && !samePayload(payload(entry.snapshot), onServer)) {
+                    if (conflict.value !== null) continue;
+                    const { uid: _uid, ...server } = clone(row) as LocalField & LocalSection;
+                    if (entry.kind === 'field') applyFieldSnapshot(row as LocalField, entry.snapshot as unknown as FieldSnapshot);
+                    else applySectionSnapshot(row as LocalSection, entry.snapshot as unknown as SectionSnapshot);
+                    raiseConflict({ kind: entry.kind, uid: row.uid, mine: clone(row), theirs: server } as ConflictState, row.id);
+                    continue;
+                }
                 if (!ours || samePayload(payload(entry.snapshot), onServer)) {
                     journal.drop(entry.kind, entry.id);
                     continue;
@@ -1424,8 +1512,10 @@ export function useBuilderStore(props: BuilderPageProps) {
         saveState,
         saveError,
         saveFieldErrors,
+        saveRuleRows,
         hasUnsaved,
         conflict,
+        conflictDeferred: computed(() => conflictDeferred.value),
         // M172: the form was published since this page loaded (read-only; the page offers the reload)
         superseded: computed(() => superseded.value),
         // M172 (`R-733eff09`): a key the server kept instead of the one typed, per row; and one per failure (`R-d85d51d2`)
@@ -1471,6 +1561,8 @@ export function useBuilderStore(props: BuilderPageProps) {
         undo,
         redo,
         resolveConflict,
+        deferConflict,
+        reviewConflict,
         whenIdle,
         flushForLeave,
         retryUnsaved,
@@ -1504,18 +1596,6 @@ function snapshotsEqual(a: unknown, b: unknown): boolean {
     return JSON.stringify(a) === JSON.stringify(b);
 }
 
-/** Keys sorted at every depth: Postgres `jsonb` hands a config back in its own key order, not the one it was sent in. */
-function canonical(value: unknown): unknown {
-    if (Array.isArray(value)) return value.map(canonical);
-    if (value !== null && typeof value === 'object') {
-        const object = value as Record<string, unknown>;
-
-        return Object.fromEntries(Object.keys(object).sort().map((key) => [key, canonical(object[key])]));
-    }
-
-    return value;
-}
-
 /**
  * M170 — whether two saves would write the same row: their payloads, the version token aside. Compared as the PAYLOAD
  * rather than the snapshot because that is all the server ever stores of a save, so a key the page sends and the store
@@ -1546,11 +1626,12 @@ function asStored(payload: Record<string, unknown>): Record<string, unknown> {
 
 /**
  * M170 (`R-7ebfb08e`) — a rule with neither a check nor an expression is a row still being written: switching a rule to
- * Expression makes one, and the server refuses it ("not both, not neither"). Sent, it refused the WHOLE question — every
- * Basics and Advanced edit with it — until the row was finished. It stays on screen and is sent once it is a rule.
+ * Expression makes one, and the server refuses it ("Empty. Choose what it checks, or remove it."). Sent, it refused the
+ * WHOLE question — every Basics and Advanced edit with it — until the row was finished. It stays on screen and is sent
+ * once it is a rule. M176 (`R-5554c526`): a check chosen and then set back to the empty choice (`''`) is no check either.
  */
 function isUnfinishedRule(rule: { rule_type: string | null; expression: string | null }): boolean {
-    return rule.rule_type === null && (rule.expression ?? '').trim() === '';
+    return (rule.rule_type ?? '') === '' && (rule.expression ?? '').trim() === '';
 }
 
 function fieldPayload(field: LocalField): Record<string, unknown> {

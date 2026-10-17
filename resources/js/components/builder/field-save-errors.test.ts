@@ -88,3 +88,14 @@ describe('describeSavePath', () => {
         ]);
     });
 });
+
+describe('a rule is named by its row on screen (M176, R-5554c526)', () => {
+    it('maps the request\'s rule index to the editor\'s row when the store recorded one', () => {
+        expect(describeSavePath('validations.0', [1, 3])).toBe('Rule 2');
+        expect(describeSavePath('validations.1.rule_value', [1, 3])).toBe('Rule 4');
+        expect(describeSavePath('validations.2', [1, 3])).toBe('Rule 3'); // no record for it: its own place, as before
+        expect(sortFieldSaveErrors({ 'validations.0': ['Empty. Choose what it checks, or remove it.'] }, [1]).listed).toEqual([
+            { key: 'validations.0', text: 'Rule 2: Empty. Choose what it checks, or remove it.' },
+        ]);
+    });
+});

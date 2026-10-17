@@ -369,11 +369,15 @@ final class UpdateFieldRequest extends FormRequest
                 $hasExpression = ($row['expression'] ?? '') !== '';
                 $hasRule = ($row['rule_type'] ?? '') !== '';
 
-                // Mirrors the form_field_validations XOR CHECK: exactly one of expression / rule_type.
+                // Mirrors the form_field_validations XOR CHECK: exactly one of expression / rule_type. M176 (`R-5554c526`): in
+                // plain words, one sentence per real case, naming no rule — the builder puts the rule's number on screen in
+                // front ("Rule 2: …"). It read "must be either a structured rule or an expression — not both, not neither".
                 if ($hasExpression === $hasRule) {
                     $validator->errors()->add(
                         "validations.{$i}",
-                        'A validation rule must be either a structured rule or an expression — not both, not neither.',
+                        $hasRule
+                            ? 'Has both a check and an expression. Keep one of them.'
+                            : 'Empty. Choose what it checks, or remove it.',
                     );
                 }
             }

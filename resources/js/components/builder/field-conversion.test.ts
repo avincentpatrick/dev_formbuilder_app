@@ -6,12 +6,11 @@ import {
     consequenceView,
     GROUP_NOT_ASKED,
     GROUP_QUESTION_TYPES,
+    isNoNegativesRule,
     needsReview,
-    negativeFloor,
     staleMessage,
     targetGroups,
     variantOptions,
-    withNegativesAllowed,
     type ConsequenceContext,
 } from './field-conversion';
 import type { BuilderValidation, LocalField, LocalSection, PaletteType } from './types';
@@ -88,7 +87,7 @@ describe('consequenceView', () => {
         );
 
         expect(view.question).toEqual([
-            'Its requiredness changes from Conditional to Optional.',
+            'Whether it must be answered changes from Conditional to Optional.',
             'Its default value “hello” is removed.',
             'Its default is no longer a formula.',
             'It is no longer indexed for reporting.',
@@ -109,7 +108,19 @@ describe('consequenceView', () => {
 
         expect(view.removed).toEqual([{ label: 'Must match a pattern', value: 'abc', shows: 'Bad.', reason: 'It was the old type’s built-in check.' }]);
         expect(view.added).toEqual([{ label: 'Must match a pattern', value: 'xyz', shows: 'Enter a valid phone number.' }]);
-        expect(view.kept).toBe('1 existing validation rule stays unchanged.');
+        expect(view.kept).toBe('1 rule stays as it is.');
+    });
+
+    it('names a removed minimum of zero as the Validation tab does — "No negative numbers" (M176)', () => {
+        const view = consequenceView(
+            conversionPlan({
+                requires_confirmation: true,
+                dropped: [{ sequence: 0, rule_type: 'min_value', operator: null, rule_value: '0', expression: null, error_message: null, reason: 'target_takes_no_rules', reason_message: 'The new type takes no rules.' }],
+            }),
+            ctx(),
+        );
+
+        expect(view.removed).toEqual([{ label: 'No negative numbers', value: null, shows: null, reason: 'The new type takes no rules.' }]);
     });
 
     it('passes the server’s warnings through verbatim and in order (FC8)', () => {
@@ -123,7 +134,7 @@ describe('consequenceView', () => {
 
     it('says nothing is lost only for a plan that needs no review (FC11)', () => {
         expect(consequenceView(conversionPlan(), ctx()).summary).toContain('Nothing is lost');
-        expect(consequenceView(conversionPlan({ to: 'phone', requires_confirmation: true }), ctx()).summary).toBe('Here is what changing it to Phone does.');
+        expect(consequenceView(conversionPlan({ to: 'phone', requires_confirmation: true }), ctx()).summary).toBe('Here is what happens if it becomes Phone.');
     });
 });
 
@@ -175,41 +186,15 @@ describe('the variant groups (M125)', () => {
         expect(variantOptions(paletteByValue.values(), 'nothing')).toEqual([]);
     });
 
-    it('reads no minimum, a minimum of zero and any other minimum apart', () => {
-        expect(negativeFloor([])).toEqual({ state: 'none', allowed: true });
-        expect(negativeFloor([rule('min_value', ' 0 ')])).toEqual({ state: 'zero', allowed: false });
-        expect(negativeFloor([rule('min_value', '5')])).toEqual({ state: 'custom', allowed: false });
-        expect(negativeFloor([rule('min_value', '-3')])).toEqual({ state: 'custom', allowed: true });
-        expect(negativeFloor([rule('min_value', '0'), rule('min_value', '0')])).toEqual({ state: 'custom', allowed: false });
-        // A raw-expression row is classified by its expression, never by the rule column.
-        expect(negativeFloor([rule(null, null, { expression: '. >= 0' })])).toEqual({ state: 'none', allowed: true });
-    });
-
-    it('adds and removes only its own row, and renumbers without reordering the rest', () => {
-        const rows = [rule('required_if', 'yes', { operator: 'eq', related_field_key: 'consent' }), rule('max_value', '120', { sequence: 1 })];
-
-        const refused = withNegativesAllowed(rows, false);
-        expect(refused.map((row) => [row.rule_type, row.rule_value, row.sequence])).toEqual([
-            ['required_if', 'yes', 0],
-            ['max_value', '120', 1],
-            ['min_value', '0', 2],
-        ]);
-
-        // Interleaved: a rule added on the Validation tab AFTER the floor keeps its place when the floor goes.
-        const interleaved = [...refused, rule('pattern', '^\\d+$', { sequence: 3 })];
-        expect(withNegativesAllowed(interleaved, true).map((row) => [row.rule_type, row.sequence])).toEqual([
-            ['required_if', 0],
-            ['max_value', 1],
-            ['pattern', 2],
-        ]);
-    });
-
-    it('returns the very same array when there is nothing to do, including over another minimum', () => {
-        const none = [rule('max_value', '120')];
-        const custom = [rule('min_value', '5')];
-
-        expect(withNegativesAllowed(none, true)).toBe(none);
-        expect(withNegativesAllowed(custom, true)).toBe(custom);
-        expect(withNegativesAllowed(custom, false)).toBe(custom);
+    it('reads a minimum of zero as "No negative numbers", unless the author chose it as a Minimum value (M176)', () => {
+        // M176 (`R-61d43278`): the one place that names the kind, for the Validation tab and the type dialog alike. It replaced
+        // the Basics checkbox's `negativeFloor()` / `withNegativesAllowed()`, which derived a toggle from this very row.
+        expect(isNoNegativesRule(rule('min_value', '0'))).toBe(true);
+        expect(isNoNegativesRule(rule('min_value', ' 0 '))).toBe(true);
+        expect(isNoNegativesRule(rule('min_value', '5'))).toBe(false);
+        expect(isNoNegativesRule(rule('max_value', '0'))).toBe(false);
+        expect(isNoNegativesRule(rule(null, null, { expression: '. >= 0' }))).toBe(false);
+        expect(isNoNegativesRule(rule('min_value', '0', { shown_as: 'rule' }))).toBe(false);
+        expect(isNoNegativesRule(rule('min_value', '0', { shown_as: 'no_negatives' }))).toBe(true);
     });
 });

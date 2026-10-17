@@ -42,17 +42,18 @@ enum ConversionWarning: string
     /** The field sits in a repeatable section, where the new type cannot be published. */
     case RepeatableSectionRefusesType = 'repeatable_section_refuses_type';
 
+    /** M176 (`R-36e6f557`): in the DSR §1.5 voice — short sentences, everyday words, what to do next. */
     public function message(): string
     {
         return match ($this) {
-            self::NeedsSetup => 'This question needs its choices, levels, rows or columns set up before the form can be published.',
-            self::CalculatedNeedsFormula => 'A calculated question computes nothing until it has a formula, and the form cannot be published without one.',
-            self::HiddenNeedsPrefillSource => 'A hidden question holds nothing until you choose where its value comes from.',
-            self::DefaultValueFormat => 'The default value was written for the old type and may not suit the new one.',
-            self::IndexingUnavailable => 'This question is marked for reporting, but answers of the new type cannot be indexed.',
-            self::IndexedTypeMayNotSuit => 'This question is marked for reporting, and the data type it is indexed as was chosen for the old type.',
-            self::ScaleValuesNotNumeric => 'A Likert scale scores its choices as numbers, and at least one choice value is not a number.',
-            self::RepeatableSectionRefusesType => 'This question sits in a repeatable section, where the new type cannot be published.',
+            self::NeedsSetup => 'Add its choices (or its levels, rows or columns) before you publish the form.',
+            self::CalculatedNeedsFormula => 'A calculated question needs a formula. Add one before you publish the form.',
+            self::HiddenNeedsPrefillSource => 'A hidden question stays empty until you choose where its value comes from.',
+            self::DefaultValueFormat => 'Its default value was made for the old type. Check that it still fits.',
+            self::IndexingUnavailable => 'It is indexed for reporting, but answers of the new type can’t be indexed.',
+            self::IndexedTypeMayNotSuit => 'It is indexed for reporting with a data type chosen for the old type. Check that it still fits.',
+            self::ScaleValuesNotNumeric => 'A Likert scale scores each choice as a number, and at least one choice’s value isn’t a number.',
+            self::RepeatableSectionRefusesType => 'This question is in a repeating section, where the new type can’t be used. Move it, or choose another type, before you publish.',
         };
     }
 }

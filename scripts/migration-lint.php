@@ -10,6 +10,13 @@ declare(strict_types=1);
  * mistake possible in this schema, and the one no code-review convention should be trusted to catch.
  * Tenant-scoped tables on the explicit exemption list (ADR-0002 §D1) are allowed to skip isolation.
  *
+ * M176 (`R-a11cc78a`, `D137`) — a second rule: MIGRATIONS ARE ADDITIVE. A migration's `up()` may not drop a table or a
+ * column, truncate, or delete rows, unless `DESTRUCTIVE_ALLOWED` names it with an answered decision. The user
+ * (2026-10-16): *"always make sure that the staging has data, do not remove data"* — and such a migration passed every
+ * gate there was. `deploy.ps1` counts the rows before and after it migrates (the other half of the row); this is the
+ * half that refuses the change before it is merged. Only `up()` is read: `down()` undoes what `up()` added, so it drops
+ * by design (the trap `constraint-boundary-lint.php` records — scanning `down()` made "the dropped set" the whole schema).
+ *
  * Standalone (nikic/php-parser), same pattern as scripts/controller-gate.php.
  *
  * Usage: php scripts/migration-lint.php
@@ -63,6 +70,28 @@ const EXEMPT_TABLES = [
  */
 const SPATIE_TENANT_SCOPED_TABLES = ['roles', 'model_has_roles', 'model_has_permissions'];
 
+/**
+ * M176 (`R-a11cc78a`) — the migrations whose `up()` may remove something, each with its reason. ⛔ A NEW ENTRY MUST CITE
+ * AN ANSWERED DECISION (`Dn`, checked against `docs/claims/decisions.md`): removing data from the testing server is the
+ * user's call, never a migration's (`D137`). The one entry below predates the rule and is guarded by its own row count.
+ */
+const DESTRUCTIVE_ALLOWED = [
+    '2026_07_20_000005_drop_form_collaborators_table.php' => 'history, before D137: drops an empty, never-used table, and refuses to when it holds a row',
+];
+
+/** Blueprint and query-builder calls that remove a column, its data, or rows. `drop` of an index or a key is not one. */
+const DESTRUCTIVE_METHODS = [
+    'dropColumn', 'dropColumns', 'removeColumn', 'dropConstrainedForeignId', 'dropConstrainedForeignIdFor',
+    'dropMorphs', 'dropNullableMorphs', 'dropTimestamps', 'dropTimestampsTz', 'dropSoftDeletes', 'dropSoftDeletesTz',
+    'dropRememberToken', 'truncate', 'delete', 'forceDelete',
+];
+
+/** `Schema::` calls that remove a table. */
+const DESTRUCTIVE_SCHEMA_CALLS = ['drop', 'dropIfExists', 'dropColumns', 'dropAllTables', 'dropAllViews'];
+
+/** Raw SQL that removes data. `DROP CONSTRAINT`, `DROP NOT NULL`, `DROP INDEX` and `ON DELETE` are not matched. */
+const DESTRUCTIVE_SQL = '/\b(DROP\s+(?:TABLE|COLUMN)|TRUNCATE|DELETE\s+FROM)\b/i';
+
 $root = dirname(__DIR__);
 $dir = $root.'/database/migrations';
 
@@ -101,6 +130,28 @@ foreach ($iterator as $file) {
     $ast = $parser->parse($code);
     if ($ast === null) {
         continue;
+    }
+
+    // M176 (`R-a11cc78a`): the additive rule — every migration, before any early return below.
+    $removes = destructive_operations($ast, $finder);
+    if ($removes !== []) {
+        $allowed = DESTRUCTIVE_ALLOWED[basename($relative)] ?? null;
+        if ($allowed === null) {
+            $violations[] = sprintf(
+                '%s: its up() removes data (%s). Migrations are additive (D137): never drop a table or a column, truncate or '
+                    .'delete rows on the testing server. If it truly must, the user decides: record the answer in '
+                    .'docs/claims/decisions.md and name it in DESTRUCTIVE_ALLOWED.',
+                $relative,
+                implode('; ', $removes)
+            );
+        } elseif (! str_starts_with($allowed, 'history, before D137') && ! cites_answered_decision($allowed, $root)) {
+            $violations[] = sprintf(
+                '%s: DESTRUCTIVE_ALLOWED lets it remove data, but its reason cites no answered decision (a `Dn` under '
+                    .'## ANSWERED in docs/claims/decisions.md): "%s".',
+                $relative,
+                $allowed
+            );
+        }
     }
 
     // Spatie-pivot rule — runs BEFORE the literal-table early-return below, because Spatie's stock
@@ -284,4 +335,70 @@ function first_arg_is(Node $call, string $literal): bool
     $first = $call->args[0] ?? null;
 
     return $first instanceof Node\Arg && $first->value instanceof String_ && $first->value->value === $literal;
+}
+
+/**
+ * M176 (`R-a11cc78a`) — what a migration's `up()` would remove, in words. Empty when it only adds or changes.
+ *
+ * @param  list<Node\Stmt>  $ast
+ * @return list<string>
+ */
+function destructive_operations(array $ast, NodeFinder $finder): array
+{
+    $up = null;
+    foreach ($finder->findInstanceOf($ast, Node\Stmt\ClassMethod::class) as $method) {
+        if ($method->name->toString() === 'up') {
+            $up = $method->stmts ?? [];
+        }
+    }
+    if ($up === null) {
+        return [];
+    }
+
+    $found = [];
+    foreach ($finder->findInstanceOf($up, StaticCall::class) as $call) {
+        if ($call->class instanceof Node\Name && $call->class->getLast() === 'Schema' && $call->name instanceof Node\Identifier
+            && in_array($call->name->toString(), DESTRUCTIVE_SCHEMA_CALLS, true)) {
+            $found[] = 'Schema::'.$call->name->toString().'()';
+        }
+    }
+    foreach ($finder->findInstanceOf($up, MethodCall::class) as $call) {
+        if ($call->name instanceof Node\Identifier && in_array($call->name->toString(), DESTRUCTIVE_METHODS, true)) {
+            $found[] = '->'.$call->name->toString().'()';
+        }
+    }
+    $strings = array_merge(
+        array_map(static fn (String_ $s): string => $s->value, $finder->findInstanceOf($up, String_::class)),
+        array_map(
+            static fn (Node\InterpolatedStringPart $p): string => $p->value,
+            $finder->findInstanceOf($up, Node\InterpolatedStringPart::class)
+        ),
+    );
+    foreach ($strings as $sql) {
+        if (preg_match(DESTRUCTIVE_SQL, $sql, $match) === 1) {
+            $found[] = 'SQL '.strtoupper((string) preg_replace('/\s+/', ' ', $match[1]));
+        }
+    }
+
+    return array_values(array_unique($found));
+}
+
+/** Whether `$reason` names a decision answered in `docs/claims/decisions.md` (a `### Dn — ` heading under ANSWERED). */
+function cites_answered_decision(string $reason, string $root): bool
+{
+    if (preg_match_all('/\bD(\d+)\b/', $reason, $ids) < 1) {
+        return false;
+    }
+    $decisions = (string) @file_get_contents($root.'/docs/claims/decisions.md');
+    $answered = strstr($decisions, "\n## ANSWERED");
+    if ($answered === false) {
+        return false;
+    }
+    foreach ($ids[1] as $id) {
+        if (preg_match('/^### D'.$id.' — /mu', $answered) === 1) {
+            return true;
+        }
+    }
+
+    return false;
 }

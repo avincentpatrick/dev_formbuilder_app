@@ -427,7 +427,7 @@ rewriting its answers are different powers.
 3. Open it again, type a comment, and press **Capture screen**. **Expect:** your browser asks which window or
    tab to share; pick this one. The panel **gets out of the way for a moment** and comes back with your
    comment and kind as you left them and a thumbnail of the page **without the panel in it**. Press **Remove**,
-   then capture again — it replaces.
+   then capture again — it replaces. Then turn on your system's **reduce motion** setting and capture a few times more. **Expect:** still never the panel in the thumbnail — before `M176` it sometimes was (the panel leaves too fast for a capture that runs a few frames behind). *(Developers: `tests/e2e/feedback-capture-real.spec.ts` captures for real twenty times in the e2e container; it is skipped on CI, which has no secure context.)*
 4. Now open it once more, press **Capture screen**, and **cancel** the browser's picker. **Expect:** nothing
    happens. No error, no red text, and the form is still ready to send. *Declining is a normal choice, not a
    failure — if you see an error here, that is a defect.*

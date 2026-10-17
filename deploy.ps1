@@ -275,6 +275,8 @@ $StageEnv = Join-Path $StagePath '.env'
 $DownFile = Join-Path $AppPath 'storage\framework\down'
 $DeployedShaFile = Join-Path $AppPath 'storage\framework\deployed-sha'
 $BootstrapCache = Join-Path $AppPath 'bootstrap\cache'
+# M176 (R-a11cc78a): the row census taken before the migration, compared after it (step 5a and the window).
+$CensusFile = Join-Path $AppPath 'storage\app\deploy-backups\census-before-migrate.json'
 
 # 0. Refuse before changing anything when this site has no worker service. Without one, queued
 #    mail (verification, invitations, password resets) never sends, and nothing would say so.
@@ -466,6 +468,22 @@ if ([IO.Directory]::Exists($LiveBuild)) {
 #    app\ PHP, and migrate --force runs inside it too, so a clean boot could read a half-migrated
 #    schema. Neither is a browser's problem and neither was written down before.
 Invoke-Native php @('artisan', 'down', '--retry=15', '--render=deploy-window')
+
+# 5a. THE DATA GUARD (M176, R-a11cc78a, D137, D143). A backup of the database and a count of every table's rows, taken
+#     once the site is down — so nothing writes between them and the migration — and BEFORE anything is replaced, from
+#     the live checkout as it stands. If either fails, nothing has changed yet: the site comes back up on the old code
+#     and the deploy refuses to migrate. ⚠️ Unproven on the box until merge point 2 (D143): the runner's account had
+#     never run pg_dump there. The backup's path is printed in this log; docs/deployment-infrastructure.md restores it.
+try {
+    Invoke-Native php @('artisan', 'deploy:backup')
+    Invoke-Native php @('artisan', 'deploy:census', "--write=$CensusFile")
+}
+catch {
+    $guardFailure = $_.Exception.Message
+    Invoke-Native php @('artisan', 'up')
+    throw "Refused to migrate: the deploy's own backup or row count failed ($guardFailure). Nothing was changed; the site is back up on the old code."
+}
+
 $windowCompleted = $false
 try {
     Invoke-Native git @('-C', $AppPath, 'reset', '--hard', $sha)
@@ -494,6 +512,16 @@ try {
     Invoke-Native php @('artisan', 'package:discover')
 
     Invoke-Native php @('artisan', 'migrate', '--force')
+
+    # M176 (R-a11cc78a, D144): every table holds at least as many rows as before the migration — or this throws, the
+    # window stays incomplete, and the site is LEFT DOWN on purpose: no tester writes on top of lost data before a restore
+    # is decided. A release older than the census (a -Ref rollback to it) cannot count, and says so rather than failing.
+    if (Test-Path -LiteralPath (Join-Path $AppPath 'app\Console\Commands\DeployCensusCommand.php')) {
+        Invoke-Native php @('artisan', 'deploy:census', "--compare=$CensusFile")
+    }
+    else {
+        Write-Warning 'This release predates the row census (a -Ref rollback to it?), so the rows after its migration were not compared.'
+    }
     Invoke-Native php @('artisan', 'config:cache')
     Invoke-Native php @('artisan', 'route:cache')
     Invoke-Native php @('artisan', 'view:cache')

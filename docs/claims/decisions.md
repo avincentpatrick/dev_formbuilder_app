@@ -24,10 +24,38 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D141`, the last one filed, was asked and answered on 2026-10-16 while `M175` (F) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D144`, the last one filed, was asked and answered on 2026-10-18 while `M176` (R1) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D144 — The deploy will count every table's rows before and after it migrates (`R-a11cc78a`). If a table holds fewer rows after the migration than before it, what should the deploy do? **A — stop with the site left down on purpose, the backup's path in the log, so no tester writes on top of lost data before a restore is decided.**
+
+**Asked and answered 2026-10-18 (user decision, in chat), while `M176` (R1) was planned; recorded in its claim.** The window in `deploy.ps1` already leaves the site down on purpose when a step inside it fails; a count that drops after `migrate` is data already gone, and bringing the site back up would let new answers land on top of it before anyone has decided whether to restore the backup.
+
+- **A — stop, the site stays down (recommended, chosen).** Maintenance mode holds; the run goes red naming each table that shrank and the backup to restore from.
+- **B — bring the site back up and warn.** The run goes red with the same list, and the testers keep working while it is looked at.
+
+**What the answer files, in the same push:** nothing new — it is `R-a11cc78a`'s remedy, taken by `M176`.
+
+### D143 — `deploy.ps1` runs the copy already in the server's live checkout, so a change to it takes effect one deploy late: R1's own deploy runs the old script, and R2's deploy at merge point 2 is the first to take the deploy's own backup and count the rows (`R-a11cc78a`). Whether the runner's account can run `pg_dump` and write the backup folder has never been measured. When is the guard proven on the testing server? **A — at merge point 2: the user's backup block still runs first; if the guard cannot back up, it brings the site back up on R1's code and stops, and the server's rights are fixed together then; the block is retired only after a guarded deploy has passed.**
+
+**Asked and answered 2026-10-18 (user decision, in chat), while `M176` (R1) was planned; recorded in its claim.** The runner is the GitHub Actions service running as NETWORK SERVICE; the nightly backup task runs as SYSTEM; the `pg_dump` path on the box is inferred, not read. `D137` retires the per-merge backup block once the guard is proven.
+
+- **A — at merge point 2 (recommended, chosen).** No extra time on the server now; a failure is safe (nothing migrated, the site back up) and is fixed step by step in that session.
+- **B — now, on the server.** One guided block (RDP as Administrator, about ten minutes) runs `pg_dump` and a test write as the runner's account before the step is written.
+
+**What the answer files, in the same push:** nothing new — R2's hand-off carries the merge-point-2 steps (read the run log for the backup path and both counts; fix the runner's rights if the guard refused).
+
+### D142 — "Add a question here" must add a question (`R-5354b4b9`). The plan said a menu at the button, but `MdsMenu` may not be mounted inside a scroll container (DSR §3.4b) and both the Structure canvas and the Preview pane scroll. How does the list of question types appear? **A — an inline list: the button opens the types right there in the section as a grid of buttons; the chosen type lands in that spot; Cancel folds it away — the same in Structure and Preview.**
+
+**Asked and answered 2026-10-18 (user decision, in chat, with mock-ups), while `M176` (R1) was planned; recorded in its claim.** The testers' comment (2026-10-11, comment 3): *"“+ Add question here” button not working"*. Today the button only selects the section and moves focus to the palette, which refuses focus while a save runs.
+
+- **A — an inline list (recommended, chosen).** Nothing floats over a scrolling pane, so nothing is cut off; it reuses the palette's own grouping.
+- **B — a small window** titled "Add a question to <section>" listing the types.
+- **C — a pop-up menu at the button**, after teaching the design system's menu to float above a scrolling pane — a larger design-system change.
+
+**What the answer files, in the same push:** nothing new — it reshapes `R-5354b4b9`'s remedy, taken by `M176`.
+
 ### D141 — `D139` put the platform support API on the central host, but on the testing server the central host (`pitahc.gov.ph`) is the agency's website: only the box itself reaches the console there, through its hosts file, so this machine could never pull the testers' reports from it. Where does the feedback API answer? **A — on the workspace host too: `https://staging.pitahc.gov.ph/api/platform/v1/…` (any platform host, a custom domain refused), opened only by the platform support token — a super-admin's, with confirmed 2FA, one ability, an expiry of at most 90 days, revocable, every call audited; the console itself stays on the central host.**
 
 **Asked and answered 2026-10-16 (user decision, in chat), while `M175` (F) was planned; recorded in its claim.** Measured: `pitahc.gov.ph` resolves to 121.58.210.229 (the agency's website), `staging.pitahc.gov.ph` to 121.58.210.237 (the testing server); `docs/deployment-infrastructure.md` step 7 reaches the console through a hosts entry on the server itself. The token is the whole authorization: it carries no session, so the console's step-up never applies to it — which is why it expires, is re-checked against the account on every call, and leaves an audit row per call.

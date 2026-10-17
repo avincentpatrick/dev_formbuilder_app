@@ -599,3 +599,143 @@ group('a refused edit is not a saved one: no baseline, no undo entry (M155, R-0a
         expect(store.saveState.value).toBe('saved');
     });
 });
+
+group('a 409 over this tab\'s own earlier write is not someone else (M176, R-c4802b60)', () => {
+    // The testers met "This item changed elsewhere" with nobody else editing. One way there needed no move at all: a save
+    // whose reply never came back had in fact LANDED, so its token was spent; the author typed on, and the next save went at
+    // the old token. The server answered 409 with the author's own earlier write — and M170's check only recognises a
+    // 409 whose row equals what THIS request sent, so anything typed since turned the author's own write into "someone else".
+    function bodies(mock: ReturnType<typeof vi.fn>): Array<Record<string, unknown>> {
+        return mock.mock.calls
+            .filter(([, init]) => (init as RequestInit | undefined)?.method === 'PATCH')
+            .map(([, init]) => JSON.parse(String((init as RequestInit).body)) as Record<string, unknown>);
+    }
+
+    it('takes the token of its own landed write and sends the newer edit, with no dialog', async () => {
+        const mock = fetchMock().mockRejectedValueOnce(new TypeError('Failed to fetch'));
+        const store = useBuilderStore(pageProps());
+
+        await editField(store, 'Job title'); // landed on the server; the reply was lost
+        expect(store.saveState.value).toBe('failed');
+
+        mock.mockResolvedValueOnce(
+            jsonResponse(409, {
+                message: 'This item was changed elsewhere since you last loaded it.',
+                current: serverField({ label: 'Job title', version: 'v2' }),
+            }),
+        ).mockResolvedValueOnce(jsonResponse(200, serverField({ label: 'Job title (main)', version: 'v3' })));
+        await editField(store, 'Job title (main)');
+
+        expect(store.conflict.value).toBeNull();
+        expect(store.saveState.value).toBe('saved');
+        expect(bodies(mock).map((body) => [body.label, body.version])).toEqual([
+            ['Job title', 'v1'],
+            ['Job title (main)', 'v1'],
+            ['Job title (main)', 'v2'],
+        ]);
+        expect(store.fields.value[0].version).toBe('v3');
+    });
+
+    it('still asks when the server holds something this tab never sent', async () => {
+        const mock = fetchMock().mockRejectedValueOnce(new TypeError('Failed to fetch'));
+        const store = useBuilderStore(pageProps());
+        await editField(store, 'Job title');
+
+        mock.mockResolvedValue(
+            jsonResponse(409, { message: 'Changed elsewhere.', current: serverField({ label: 'Their title', version: 'v2' }) }),
+        );
+        await editField(store, 'Job title (main)');
+
+        expect(store.conflict.value).not.toBeNull();
+        expect(bodies(mock)).toHaveLength(2); // nothing re-sent over a row someone else wrote
+    });
+});
+group('closing the conflict dialog never throws the edit away (M176, R-164579e8)', () => {
+    // The dialog promised "your edit hasn't been lost", and closing it chose "Use theirs" and forgot the journal entry.
+    // Closing now DEFERS; and a reload, which drops an entry whose token moved to someone else's write, raises it again.
+    const KEPT = 'meridian:builder-edits:form-1';
+    const theirs = () => jsonResponse(409, { message: 'Changed elsewhere.', current: serverField({ label: 'Theirs', version: 'v9' }) });
+
+    afterEach(() => sessionStorage.clear());
+
+    it('keeps the conflict, the edit on screen and its journal entry when deferred; Review reopens it', async () => {
+        fetchMock().mockResolvedValue(theirs());
+        const store = useBuilderStore(pageProps());
+        await editField(store, 'Mine');
+        expect(store.conflict.value).not.toBeNull();
+
+        store.deferConflict();
+
+        expect(store.conflictDeferred.value).toBe(true);
+        expect(store.conflict.value).not.toBeNull();
+        expect(store.fields.value[0].label).toBe('Mine');
+        expect(store.saveState.value).toBe('failed');
+        const kept = JSON.parse(sessionStorage.getItem(KEPT) ?? '[]') as Array<{ snapshot: { label: string }; conflicted?: boolean }>;
+        expect(kept.map((entry) => [entry.snapshot.label, entry.conflicted])).toEqual([['Mine', true]]);
+
+        store.reviewConflict();
+        expect(store.conflictDeferred.value).toBe(false);
+    });
+
+    it('raises a deferred conflict again after a reload, with the edit back on screen and nothing sent', async () => {
+        const mock = fetchMock().mockResolvedValue(theirs());
+        const store = useBuilderStore(pageProps());
+        await editField(store, 'Mine');
+        store.deferConflict();
+        const sent = mock.mock.calls.length;
+
+        const reloaded = useBuilderStore({ ...pageProps(), fields: [serverField({ label: 'Theirs', version: 'v9' })] });
+        await flushPromises();
+
+        expect(reloaded.conflict.value).not.toBeNull();
+        expect(reloaded.conflict.value!.theirs.label).toBe('Theirs');
+        expect(reloaded.fields.value[0].label).toBe('Mine');
+        expect(mock.mock.calls.length).toBe(sent);
+    });
+
+    it('forgets the kept edit once a version is chosen', async () => {
+        fetchMock().mockResolvedValue(theirs());
+        const store = useBuilderStore(pageProps());
+        await editField(store, 'Mine');
+        store.deferConflict();
+
+        await store.resolveConflict('theirs');
+        await flushPromises();
+
+        expect(store.conflict.value).toBeNull();
+        expect(store.conflictDeferred.value).toBe(false);
+        expect(store.fields.value[0].label).toBe('Theirs');
+        expect(sessionStorage.getItem(KEPT)).toBeNull();
+    });
+});
+group('a refused rule is numbered by its row on screen (M176, R-5554c526)', () => {
+    const writing = { rule_type: null, operator: null, rule_value: null, expression: '', error_message: null, related_field_key: null, sequence: 0 };
+    const minimum = { rule_type: 'min_value', operator: null, rule_value: 'x', expression: null, error_message: null, related_field_key: null, sequence: 1 };
+
+    function patchBodies(mock: ReturnType<typeof vi.fn>): Array<Record<string, unknown>> {
+        return mock.mock.calls
+            .filter(([, init]) => (init as RequestInit | undefined)?.method === 'PATCH')
+            .map(([, init]) => JSON.parse(String((init as RequestInit).body)) as Record<string, unknown>);
+    }
+
+    it('records which editor row each sent rule was, so the alert can say "Rule 2"', async () => {
+        fetchMock().mockResolvedValue(
+            jsonResponse(422, { message: 'The rule value must be a number.', errors: { 'validations.0.rule_value': ['The rule value must be a number.'] } }),
+        );
+        const store = useBuilderStore({ ...pageProps(), fields: [serverField({ validations: [writing, minimum] as never })] });
+
+        await editField(store, 'Job');
+
+        expect(store.saveRuleRows.value[store.fields.value[0].uid]).toEqual([1]);
+    });
+
+    it('withholds a rule whose check is an empty choice, exactly as one with no check at all', async () => {
+        const mock = fetchMock().mockResolvedValue(jsonResponse(200, serverField({ version: 'v2' })));
+        const blankChoice = { ...writing, rule_type: '', expression: null };
+        const store = useBuilderStore({ ...pageProps(), fields: [serverField({ validations: [blankChoice, minimum] as never })] });
+
+        await editField(store, 'Job');
+
+        expect((patchBodies(mock)[0].validations as unknown[]).length).toBe(1);
+    });
+});

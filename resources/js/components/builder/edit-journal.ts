@@ -46,6 +46,12 @@ export interface JournalEntry {
      * last one sent.
      */
     sent?: Record<string, unknown>[];
+    /**
+     * M176 (`R-164579e8`) — a save of this edit met someone else's write (409) and the author has not chosen yet. On load
+     * the store raises the conflict again rather than dropping the edit for a token that moved to a write this tab never
+     * sent: closing the dialog must not throw the edit away, and neither must a reload.
+     */
+    conflicted?: boolean;
     /** When it was last written, so an abandoned entry expires rather than replaying forever. */
     at: number;
 }
@@ -78,6 +84,7 @@ function isEntry(value: unknown): value is JournalEntry {
         && typeof entry.snapshot === 'object'
         && entry.snapshot !== null
         && (entry.sent === undefined || Array.isArray(entry.sent))
+        && (entry.conflicted === undefined || typeof entry.conflicted === 'boolean')
         && typeof entry.at === 'number'
     );
 }
@@ -85,10 +92,15 @@ function isEntry(value: unknown): value is JournalEntry {
 export interface EditJournal {
     /** Every live entry; expired and malformed ones are dropped as they are read. */
     read(): JournalEntry[];
-    /** Keep the row's edit. An entry's `sent` survives a newer edit unless the caller says what it now is. */
-    put(entry: Omit<JournalEntry, 'at' | 'sent'> & { sent?: Record<string, unknown>[] }): void;
+    /**
+     * Keep the row's edit. An entry's `sent` survives a newer edit unless the caller says what it now is; its `conflicted`
+     * mark survives too, unless the caller says what was sent (a save landed — so the choice was made).
+     */
+    put(entry: Omit<JournalEntry, 'at' | 'sent' | 'conflicted'> & { sent?: Record<string, unknown>[] }): void;
     /** Add what is being sent for the row to its `sent`, if an edit of it is kept. */
     markSent(kind: JournalKind, id: string, sent: Record<string, unknown>): void;
+    /** M176 — the row's save met someone else's write and the author has not chosen yet. */
+    markConflicted(kind: JournalKind, id: string): void;
     drop(kind: JournalKind, id: string): void;
 }
 
@@ -164,7 +176,8 @@ export function editJournal(
             const all = load();
             const previous = all.find((other) => other.kind === entry.kind && other.id === entry.id);
             const rest = all.filter((other) => other !== previous);
-            save([...rest, { ...entry, sent: entry.sent ?? previous?.sent ?? [], at: now() }]);
+            const conflicted = entry.sent === undefined && previous?.conflicted === true;
+            save([...rest, { ...entry, sent: entry.sent ?? previous?.sent ?? [], ...(conflicted ? { conflicted } : {}), at: now() }]);
         },
         markSent(kind, id, sent) {
             const all = load();
@@ -174,6 +187,13 @@ export function editJournal(
             // The newest last, each content once, and a bounded list: a row edited for an hour without a save landing is
             // not one whose fifteenth-oldest attempt is going to be what the server holds.
             entry.sent = [...(entry.sent ?? []).filter((other) => JSON.stringify(other) !== written), sent].slice(-SENT_KEPT);
+            save(all);
+        },
+        markConflicted(kind, id) {
+            const all = load();
+            const entry = all.find((other) => other.kind === kind && other.id === id);
+            if (!entry) return;
+            entry.conflicted = true;
             save(all);
         },
         drop(kind, id) {

@@ -236,7 +236,7 @@ describe('PreviewRuntime — the label edit on a question’s row (M151)', () =>
         expect(wrapper.emitted('edit')).toEqual([['name']]);
 
         await wrapper.setProps({ editingKey: 'name', editingValue: 'Your name' });
-        const input = wrapper.find('[data-preview-field="name"] input[aria-label="Question label"]');
+        const input = wrapper.find('[data-preview-field="name"] [aria-label="Question label"]');
         expect((input.element as HTMLInputElement).value).toBe('Your name');
         expect(editButton(wrapper, 'name').exists()).toBe(false);
 

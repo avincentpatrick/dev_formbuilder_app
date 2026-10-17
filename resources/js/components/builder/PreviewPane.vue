@@ -29,7 +29,15 @@ import { computed, h, nextTick, onBeforeUnmount, provide, ref, watch, type Funct
 import { ContentImageRetryKey } from '../submissions/note-content';
 import PreviewRuntime from './PreviewRuntime.vue';
 import { PRESET_PREVIEW_ATTR, presetScopeCss } from './preset-scope';
-import { PREVIEW_REBUILD_DEBOUNCE_MS, buildPreviewModel, carryAnswers, previewLimitations, previewPlacement } from './preview-model';
+import {
+    PREVIEW_REBUILD_DEBOUNCE_MS,
+    buildPreviewModel,
+    carryAnswers,
+    previewInsertPlacement,
+    previewLimitations,
+    previewPlacement,
+    type PreviewDropTarget,
+} from './preview-model';
 import type { BuilderStore } from './useBuilderStore';
 import type { BuilderPageProps } from './types';
 import { useFlipReorder } from './useFlipReorder';
@@ -223,9 +231,9 @@ const presetCss = computed(() =>
 /** A `<style>` element from a render function: a template may not contain one. */
 const PresetStyle: FunctionalComponent<{ css: string }> = (p) => h('style', p.css);
 
-// M139 (`R-598b9100`): the author adds a section or a question from here. A question goes to the section through the
-// builder's own path — select the section, open the palette — so there is no second way to add one.
-const emit = defineEmits<{ 'add-question': [sectionUid: string | null] }>();
+// M139 (`R-598b9100`): the author adds a section or a question from here. M176 (`R-5354b4b9`, `D142`): a question is ADDED,
+// of the type chosen in place, at the spot the button stands for — it used to select the section and open the palette,
+// which added nothing (the testers: "“+ Add question here” button not working").
 
 /**
  * Sections with no question yet, in order — read off the LIVE store, because the engine never makes them a step. Keyed by
@@ -242,10 +250,14 @@ const emptySections = computed(() =>
         })),
 );
 
-function onAddQuestion(sectionKey: string | null): void {
-    const id = sectionKey === null ? undefined : model.value.projection.sectionIdByKey[sectionKey];
-    const section = id === undefined ? undefined : props.store.sections.value.find((s) => s.id === id);
-    emit('add-question', section?.uid ?? null);
+function onAddQuestion(target: PreviewDropTarget, typeValue: string): void {
+    const place = previewInsertPlacement(target, {
+        fields: props.store.fields.value,
+        uidByKey: model.value.projection.uidByKey,
+        sectionIdByKey: model.value.projection.sectionIdByKey,
+    });
+    if (place === null) return;
+    void props.store.addField(typeValue, place.group, place.index);
 }
 
 function onAddSection(): void {
@@ -319,6 +331,7 @@ function onRename(key: string, value: string, via: 'key' | 'blur'): void {
             :drop-id="reorder.dropId.value"
             @select="onSelect"
             @step="stepKey = $event"
+            :palette="store.palette"
             @add-question="onAddQuestion"
             @add-section="onAddSection"
             @edit="onEdit"

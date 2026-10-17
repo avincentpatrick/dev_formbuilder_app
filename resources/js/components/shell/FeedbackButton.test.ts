@@ -159,6 +159,8 @@ describe('feedback panel — the panel steps aside for the capture (M175, ADR-00
 
         // The frame was taken with no panel on the page — the whole point of the row.
         expect(dialogAtGrab).toBe(false);
+        // M176 (`R-8496edfa`): and the grab is told WHEN the panel left, so it draws only a frame captured after that.
+        expect(typeof screen.grab.mock.calls[0]?.[0]).toBe('number');
         // …and the reporter finds what they typed and chose, plus the picture, exactly where they left it.
         expect((wrapper.find('textarea').element as HTMLTextAreaElement).value).toBe('The save button does nothing');
         expect((wrapper.find('input[type="radio"][value="bug"]').element as HTMLInputElement).checked).toBe(true);
@@ -172,7 +174,9 @@ describe('feedback panel — the panel steps aside for the capture (M175, ADR-00
     });
 
     it('takes the frame within 400ms even when the panel never reports that it has left', async () => {
-        vi.useFakeTimers();
+        // M176 (`R-8496edfa`): then two animation frames for the page without the panel to be painted, before the grab —
+        // faked too, so the case still measures the 400ms cap and not this browser's frame rate.
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date', 'performance', 'requestAnimationFrame'] });
         const screen = screenWith(png());
         mocks.acquire.mockResolvedValue(screen);
 
@@ -185,6 +189,7 @@ describe('feedback panel — the panel steps aside for the capture (M175, ADR-00
 
         expect(screen.grab).not.toHaveBeenCalled();
         await vi.advanceTimersByTimeAsync(400);
+        await vi.advanceTimersByTimeAsync(40); // the two painted frames
         expect(screen.grab).toHaveBeenCalledTimes(1);
 
         await vi.advanceTimersByTimeAsync(50);

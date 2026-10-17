@@ -309,7 +309,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         }
         // M176 (`R-c4802b60`) — the server holds an EARLIER save of this page, whose reply never came back, and the author has
         // typed on since. That is this page's own write, not someone else's: take its token and send the newer edit, once.
-        if (false && result.conflict && !resent && isEarlierSend(earlier, fieldPayload(result.current as unknown as LocalField))) {
+        if (result.conflict && !resent && isEarlierSend(earlier, fieldPayload(result.current as unknown as LocalField))) {
             field.version = result.current.version;
             return persistField(uid, true);
         }

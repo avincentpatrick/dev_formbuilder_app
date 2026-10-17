@@ -701,3 +701,42 @@ describe('ConfigPanel — a refused save is said once (M176, R-5554c526)', () =>
         expect(wrapper.get('[role="alert"]').text()).toContain('Rule 2: The rule value must be a number.');
     });
 });
+
+describe('ConfigPanel — the Label box grows with a long question (M176, R-923c5041)', () => {
+    // The testers (2026-10-11, comment 7): "Label field is too small. It cannot accommodate long questions. Make the field
+    // multi-line or expanding"; the user (2026-10-16): "make the label box larger".
+    function labelBox(wrapper: ReturnType<typeof mountPanel>) {
+        const label = wrapper.findAll('label').find((candidate) => candidate.text().trim() === 'Label');
+        expect(label, 'a label reading "Label"').toBeDefined();
+
+        return wrapper.get(`[id="${label!.attributes('for')}"]`);
+    }
+
+    it('is a growing box held to the label\'s 500 characters, with a count once it is near them', async () => {
+        const target = field();
+        const wrapper = mountPanel(makeStore({ field: target }));
+        const box = labelBox(wrapper);
+
+        expect(box.element.tagName).toBe('TEXTAREA');
+        expect(box.classes()).toContain('mds-textarea--autosize');
+        expect(box.attributes('maxlength')).toBe('500');
+        expect(wrapper.text()).not.toContain('of 500 characters');
+
+        target.label = 'x'.repeat(460);
+        await wrapper.setProps({ store: makeStore({ field: target }) });
+        expect(wrapper.text()).toContain('460 of 500 characters');
+    });
+
+    it('takes no line break: Enter adds none, and a pasted one becomes a space', async () => {
+        const target = field();
+        const wrapper = mountPanel(makeStore({ field: target }));
+        const box = labelBox(wrapper);
+
+        const enter = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true });
+        box.element.dispatchEvent(enter);
+        expect(enter.defaultPrevented).toBe(true);
+
+        await box.setValue('How many people\r\nsleep here?');
+        expect(target.label).toBe('How many people sleep here?');
+    });
+});

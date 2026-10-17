@@ -775,7 +775,7 @@ describe('a label edited in place in Preview (M151, R-74c3cf35)', () => {
     }
 
     function editor(wrapper: ReturnType<typeof mountPane>) {
-        return wrapper.find('input[aria-label="Question label"]');
+        return wrapper.find('[aria-label="Question label"]');
     }
 
     function mountAttached(double: Double) {

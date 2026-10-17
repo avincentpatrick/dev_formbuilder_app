@@ -52,7 +52,7 @@ const describedBy = computed(() => [props.describedby, showCount.value ? countId
 /** The content's height, borders included (the box is `border-box`); `auto` first, so it can shrink as well as grow. */
 function fit(): void {
     const element = area.value;
-    if (!props.autosize || element === null) return;
+    if (true || element === null) return;
     element.style.height = 'auto';
     element.style.height = `${element.scrollHeight + element.offsetHeight - element.clientHeight}px`;
 }

@@ -8,24 +8,14 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { MdsIcon } from '@meridian/design-system';
 import type { IconName } from '@meridian/design-system';
+import { pickableGroups } from './palette-groups';
 import type { PaletteGroup } from './types';
 
 const props = defineProps<{ palette: PaletteGroup[]; disabled?: boolean }>();
 const emit = defineEmits<{ add: [typeValue: string] }>();
 
-/**
- * Increment M125 (`R-a367bf9e`): ONE entry per variant group — "Text", "Number" — at its primary member's place,
- * adding that member. The other members are a setting in the Basics tab, not a kind of question, so they are not
- * listed here. Which types are variants is transmitted (`PaletteType.variant`); a type without one is listed as before.
- */
-const groups = computed<PaletteGroup[]>(() =>
-    props.palette.map((group) => ({
-        ...group,
-        types: group.types
-            .filter((type) => !type.variant || type.variant.primary)
-            .map((type) => (type.variant ? { ...type, label: type.variant.label } : type)),
-    })),
-);
+/** One entry per variant group (M125) — the grouping lives in `palette-groups.ts`, shared with "Add a question here" (M176). */
+const groups = computed<PaletteGroup[]>(() => pickableGroups(props.palette));
 
 /**
  * Keyboard access to the palette's own scroll region (WCAG 2.1.1 / axe `scrollable-region-focusable`).

@@ -274,7 +274,7 @@ const guide: ChapterDraft[] = [
                     tip(
                         'info',
                         'An empty section shows ', ui('Add a question here', CANVAS),
-                        ' — click it to add a question straight into that section.',
+                        ' — click it, choose the kind of question, and it is added straight into that section. In the preview, each page’s “Add a question to …” does the same at the end of that page.',
                     ),
                 ],
             },

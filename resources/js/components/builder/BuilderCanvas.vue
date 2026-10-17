@@ -13,6 +13,7 @@
  */
 import { computed, nextTick, ref } from 'vue';
 import { MdsBadge, MdsButton, MdsEmptyState, MdsIcon, MdsIconButton, statusVariant } from '@meridian/design-system';
+import AddQuestionHere from './AddQuestionHere.vue';
 import DeleteFieldDialog from './DeleteFieldDialog.vue';
 import InlineLabelEdit from './InlineLabelEdit.vue';
 import type { LocalField, Selection } from './types';
@@ -21,8 +22,9 @@ import { useCanvasReorder } from './useCanvasReorder';
 import { useFlipReorder } from './useFlipReorder';
 
 const props = defineProps<{ store: BuilderStore; fieldTypeLabels: Record<string, string> }>();
-// M139 (`R-598b9100`): "Add a question here" on an empty section — the builder selects it and opens the palette.
-const emit = defineEmits<{ 'add-question': [sectionUid: string | null]; picked: [] }>();
+// M139 (`R-598b9100`) offered "Add a question here" on an empty section; M176 (`R-5354b4b9`, `D142`) makes it add one —
+// the types open in place, and the chosen one lands in that section — instead of handing the builder a selection.
+const emit = defineEmits<{ picked: [] }>();
 
 const store = props.store;
 const groups = store.groups;
@@ -256,9 +258,11 @@ function confirmDelete(): void {
                     <!-- M139 (R-598b9100): the drag into an empty section always worked; the words never said so. -->
                     <li v-if="group.section && group.fields.length === 0" class="canvas__section-empty" data-section-empty>
                         <span>No questions in this section yet. Drag one in by its handle, or add one.</span>
-                        <MdsButton variant="tertiary" size="sm" icon-left="plus" @click="emit('add-question', group.section.uid)">
-                            Add a question here
-                        </MdsButton>
+                        <AddQuestionHere
+                            :palette="store.palette"
+                            label="Add a question here"
+                            @add="(type) => void store.addField(type, group.section!.id, 0)"
+                        />
                     </li>
                 </ul>
             </div>

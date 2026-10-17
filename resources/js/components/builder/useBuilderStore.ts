@@ -501,12 +501,24 @@ export function useBuilderStore(props: BuilderPageProps) {
     }
 
     // ── Public actions (each enqueued) ──────────────────────────────────────────
-    function addField(typeValue: string, sectionId: string | null = null): Promise<void> {
+    /**
+     * `index` — M176 (`R-5354b4b9`): the place in the section the author asked for ("Add a question here" at a page's end in
+     * Preview). The server appends a new question after every other one in the draft, so the store places it and saves the
+     * order once, only when that moved anything. Part of the add: one undo entry, and redo restores the order it held.
+     */
+    function addField(typeValue: string, sectionId: string | null = null, index?: number): Promise<void> {
         return enqueue(async () => {
             const created = await createFieldServer(typeValue, sectionId);
             if (!created) return;
             const local = toLocalField(created);
             fields.value.push(local);
+            if (index !== undefined) {
+                // The ARRANGEMENT, not the numbers: `placeField()` renumbers every sequence from 0, which is no move.
+                const arrangement = () => JSON.stringify(groups.value.map((group) => group.fields.map((f) => f.uid)));
+                const before = arrangement();
+                placeField(local.uid, sectionId, index);
+                if (arrangement() !== before) await persistOrder();
+            }
             // M125 — the palette added "Text"/"Number", so the question says that rather than "Short text". Saved
             // before the baseline and the snapshot are taken, so the add stays ONE undo entry and redo replays it.
             const seeded = variantLabelOf(props.palette, typeValue);

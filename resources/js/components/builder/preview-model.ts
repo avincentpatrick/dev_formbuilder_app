@@ -342,6 +342,35 @@ export function previewPlacement(
 }
 
 /**
+ * M176 (`R-5354b4b9`) — where a NEW question goes for a target named in the preview ("Add a question here" at a page's end):
+ * `placeField`'s section id and index, counted as `previewPlacement` counts them, with no question being moved. `null`
+ * when the target names a question or a section the store no longer has.
+ */
+export function previewInsertPlacement(target: PreviewDropTarget, ctx: PreviewPlacementContext): { group: string | null; index: number } | null {
+    let group: string | null;
+    let anchor: LocalField | undefined;
+    if (target.kind === 'end') {
+        if (target.sectionKey === null) {
+            group = null;
+        } else {
+            const id = ctx.sectionIdByKey[target.sectionKey];
+            if (id === undefined) return null;
+            group = id;
+        }
+    } else {
+        const uid = ctx.uidByKey[target.key];
+        anchor = uid === undefined ? undefined : ctx.fields.find((f) => f.uid === uid);
+        if (anchor === undefined) return null;
+        group = anchor.form_section_id;
+    }
+
+    const inGroup = ctx.fields.filter((f) => f.form_section_id === group).sort((a, b) => a.sequence - b.sequence);
+    const index = anchor === undefined ? inGroup.length : inGroup.indexOf(anchor) + (target.kind === 'after' ? 1 : 0);
+
+    return { group, index };
+}
+
+/**
  * What a drop on a page in the section strip means (`D105`): the end of that page — below its last question — or, for a
  * page with none to stand below (a repeatable section's), the end of its section. Not the end of the SECTION in general:
  * a section split by page breaks has one entry per page, and "Household" should not land a question on its third page.

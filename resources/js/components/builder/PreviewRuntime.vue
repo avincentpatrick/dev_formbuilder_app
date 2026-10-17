@@ -42,6 +42,7 @@ import type { RuntimeStep } from '../../../public-runtime/composables/useFormRun
 import type { AnswerMap, RenderField, RenderModel, RenderSection, SchemaResponse } from '../../../public-runtime/lib/types';
 import { ContentHeadingBaseKey } from '../submissions/note-content';
 import type { ProjectionIssue } from './draft-snapshot';
+import AddQuestionHere from './AddQuestionHere.vue';
 import InlineLabelEdit from './InlineLabelEdit.vue';
 import {
     engineKnows,
@@ -53,8 +54,10 @@ import {
     previewShowsLabel,
     previewStepEndTarget,
     previewStepLabels,
+    type PreviewDropTarget,
 } from './preview-model';
 import PreviewStepStrip from './PreviewStepStrip.vue';
+import type { PaletteGroup } from './types';
 import { dropIdOf } from './usePreviewReorder';
 
 const props = defineProps<{
@@ -98,14 +101,17 @@ const props = defineProps<{
      * "Add a question", no "Add section". Those edit the draft, and this is not the draft.
      */
     readOnly?: boolean;
+    /** M176 (`R-5354b4b9`): the types "Add a question here" offers — the palette's own. Absent where nothing is added. */
+    palette?: PaletteGroup[];
 }>();
 
-// M139: the author's own controls in the preview. The pane turns them into a selection and an opened palette.
+// M139: the author's own controls in the preview. M176 (`R-5354b4b9`, `D142`): "Add a question here" opens the types in
+// place and says which was chosen and WHERE — a page's end, a section's end — and the pane adds it there.
 // M151: and a label edited on its row, which the pane writes through the store.
 const emit = defineEmits<{
     select: [key: string];
     step: [key: string];
-    'add-question': [sectionKey: string | null];
+    'add-question': [target: PreviewDropTarget, typeValue: string];
     'add-section': [];
     edit: [key: string];
     rename: [key: string, value: string, via: 'key' | 'blur'];
@@ -440,16 +446,12 @@ function go(delta: number): void {
                     :data-drop-id="pageEndId(block.step)"
                     :data-drop-label="`at the end of ${block.title ?? 'the first questions'}`"
                 >
-                    <MdsButton
-                        type="button"
-                        variant="tertiary"
-                        size="sm"
-                        icon-left="plus"
+                    <AddQuestionHere
                         data-preview-add-question
-                        @click="emit('add-question', block.step.sectionKey)"
-                    >
-                        {{ block.title ? `Add a question to ${block.title}` : 'Add a question here' }}
-                    </MdsButton>
+                        :palette="palette ?? []"
+                        :label="block.title ? `Add a question to ${block.title}` : 'Add a question here'"
+                        @add="(type) => emit('add-question', previewStepEndTarget(block.step), type)"
+                    />
                 </div>
             </section>
         </template>
@@ -482,16 +484,21 @@ function go(delta: number): void {
             </header>
             <p class="preview__empty">No questions yet. Respondents do not see this section until it has one.</p>
             <div class="preview__author">
-                <MdsButton type="button" variant="tertiary" size="sm" icon-left="plus" @click="emit('add-question', empty.key)">
-                    Add a question to {{ empty.label }}
-                </MdsButton>
+                <AddQuestionHere
+                    :palette="palette ?? []"
+                    :label="`Add a question to ${empty.label}`"
+                    @add="(type) => emit('add-question', { kind: 'end', sectionKey: empty.key }, type)"
+                />
             </div>
         </section>
 
         <div v-if="!readOnly" class="preview__author preview__author--end" data-preview-author-end>
-            <MdsButton v-if="steps.length === 0" type="button" variant="tertiary" size="sm" icon-left="plus" @click="emit('add-question', null)">
-                Add a question
-            </MdsButton>
+            <AddQuestionHere
+                v-if="steps.length === 0"
+                :palette="palette ?? []"
+                label="Add a question"
+                @add="(type) => emit('add-question', { kind: 'end', sectionKey: null }, type)"
+            />
             <MdsButton type="button" variant="secondary" size="sm" icon-left="layout" data-preview-add-section @click="emit('add-section')">
                 Add section
             </MdsButton>

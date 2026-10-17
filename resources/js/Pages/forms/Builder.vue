@@ -8,7 +8,7 @@
  * selector (a fully keyboard-operable path). Rendered full-bleed by AppLayout (forms/Builder is a fluid
  * page). Publishing/versioning stays on the existing Inertia endpoints.
  */
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     MdsAlert,
@@ -201,17 +201,8 @@ function onInsertFromLibrary(itemId: string): void {
     void store.insertFromLibrary(itemId, targetSection());
 }
 
-/**
- * M139 (`R-598b9100`): "Add a question here", from an empty section in Structure or from any section in the preview.
- * It selects that section, so `targetSection()` sends the next palette add there, and brings the palette to the
- * author — on a narrow screen through the pane switch — with focus on its first type. Null is the top of the form.
- */
-function openPaletteFor(sectionUid: string | null): void {
-    store.select(sectionUid === null ? null : { kind: 'section', uid: sectionUid });
-    leftTab.value = 'fields';
-    pane.value = 'fields';
-    void nextTick(() => document.querySelector<HTMLElement>('.builder__pane--left .palette button')?.focus());
-}
+// M139's `openPaletteFor()` — "Add a question here" selected the section and focused the palette, adding nothing — is gone:
+// M176 (`R-5354b4b9`, `D142`) adds the chosen type in place, from the canvas and the preview themselves.
 
 function publish(): void {
     void store.whenIdle().then(() => {
@@ -678,7 +669,7 @@ function submitImport(): void {
                         v-show="centreView === 'structure'"
                         :store="store"
                         :field-type-labels="fieldTypeLabels"
-                        @add-question="openPaletteFor" @picked="pane = 'settings'"
+                        @picked="pane = 'settings'"
                     />
                     <PreviewPane
                         v-show="centreView === 'preview'"
@@ -686,7 +677,6 @@ function submitImport(): void {
                         :form="form"
                         :draft="draft"
                         :active="centreView === 'preview'"
-                        @add-question="openPaletteFor"
                     />
                     <LogicRail
                         v-show="centreView === 'logic'"

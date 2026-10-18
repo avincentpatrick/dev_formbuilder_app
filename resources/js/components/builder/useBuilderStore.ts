@@ -1031,7 +1031,6 @@ export function useBuilderStore(props: BuilderPageProps) {
             for (const uid of ordered) {
                 const target = groups.value.find((group) => (group.section?.id ?? null) === sectionId);
                 placeField(uid, sectionId, target ? target.fields.filter((field) => field.uid !== uid).length : 0);
-                await persistOrder();
             }
             const after = snapshotOrder();
             if (JSON.stringify(before) === JSON.stringify(after)) return;

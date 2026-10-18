@@ -22,7 +22,7 @@
  * {@link RailNode.neverAStep}.
  */
 
-import { rendersNothing } from '../../../public-runtime/engine';
+import { fieldRendersNothing } from '../../../public-runtime/engine';
 import { describe, type ConditionReading, type LabelLookup } from './condition-describer';
 import type { CanvasGroup, LocalField, LocalSection, Uid } from './types';
 
@@ -112,7 +112,8 @@ function toNode(group: CanvasGroup, labels: LabelLookup, byNode: Map<string, Gra
         maxInstances: section?.max_instances ?? null,
         fieldCount: group.fields.length,
         conditioned: group.fields.filter(hasCondition).map((field) => toRailField(field, labels, byNode)),
-        neverAStep: group.fields.length > 0 && group.fields.every((field) => rendersNothing(field.field_type)),
+        // M177 (`R-f44e9d00`): per question — Never renders nothing, a calculation set to Always does.
+        neverAStep: group.fields.length > 0 && group.fields.every((field) => fieldRendersNothing({ field_type: field.field_type, visibility: field.config.visibility as string | null | undefined })),
         notices: section === null ? [] : (byNode.get(section.key) ?? []),
     };
 }

@@ -28,17 +28,7 @@
  */
 import { computed, ref, watch } from 'vue';
 import { useEntitlements } from '@/composables/useEntitlements';
-import {
-    MdsButton,
-    MdsCheckbox,
-    MdsFormField,
-    MdsNumberInput,
-    MdsSegmentedControl,
-    MdsSelect,
-    MdsTabs,
-    MdsTextInput,
-    MdsTextarea,
-} from '@meridian/design-system';
+import { MdsButton, MdsCheckbox, MdsFormField, MdsNumberInput, MdsRadio, MdsSegmentedControl, MdsSelect, MdsTabs, MdsTextarea, MdsTextInput } from '@meridian/design-system';
 import CascadingEditor from './CascadingEditor.vue';
 import ChoicesEditor from './ChoicesEditor.vue';
 import ConditionEditor from './ConditionEditor.vue';
@@ -48,6 +38,7 @@ import GeoEditor from './GeoEditor.vue';
 import LikertMatrixEditor from './LikertMatrixEditor.vue';
 import LinkedChoicesEditor from './LinkedChoicesEditor.vue';
 import OtherSpecifyControl from './OtherSpecifyControl.vue';
+import { applyShowMode, showModeFixed, showModeOf, type ShowMode } from './field-visibility';
 import MatrixEditor from './MatrixEditor.vue';
 import MediaEditor from './MediaEditor.vue';
 import PrefillEditor from './PrefillEditor.vue';
@@ -155,6 +146,27 @@ const REQUIRED_MODE_CONDITIONAL = 'conditional';
 const NOTE_LABEL_HELP = 'Respondents see this label only while the note has no content. Once it has content, the label names the note here and in the PDF.';
 
 const requiredOptions = enums.required_modes;
+
+// M177 (`R-f44e9d00`): Show to respondents — derived from what is stored, applied in ONE change (one touch, one undo entry).
+const SHOW_OPTIONS: { value: ShowMode; label: string }[] = [
+    { value: 'always', label: 'Always' },
+    { value: 'never', label: 'Never' },
+    { value: 'when', label: 'Only when…' },
+];
+const showMode = computed<ShowMode>(() => (field.value ? showModeOf(field.value) : 'always'));
+const neverShown = computed(() => field.value?.config.visibility === 'hidden');
+// The condition editor is re-mounted when Always clears its expression, so no row of a cleared condition lingers on screen.
+const conditionMount = ref(0);
+function setShowMode(mode: string): void {
+    const current = field.value;
+    if (!current) return;
+    const next = applyShowMode(current, mode as ShowMode);
+    const cleared = current.relevant_expression !== next.relevant_expression;
+    current.config = next.config;
+    current.relevant_expression = next.relevant_expression;
+    if (cleared) conditionMount.value++;
+    props.store.touch(current.uid, 'field');
+}
 const sectionOptions = computed<EnumOption[]>(() => [
     { value: '', label: 'No section (top level)' },
     ...props.store.sections.value.map((s) => ({ value: s.id, label: s.label })),
@@ -582,7 +594,11 @@ watch(librarySaved, (value) => {
                                 @update:model-value="setField('placeholder', $event || null)"
                             />
                         </MdsFormField>
-                        <div v-if="!isCalculated" class="config__group">
+                        <p v-if="neverShown && !isCalculated" class="config__note" data-never-required>
+                            Respondents never see this question, so it is never required. Change that under Show to respondents on the
+                            Advanced tab.
+                        </p>
+                        <div v-if="!isCalculated && !neverShown" class="config__group">
                             <span class="config__group-label">Requiredness</span>
                             <MdsSegmentedControl
                                 :model-value="field.is_required"
@@ -740,8 +756,25 @@ watch(librarySaved, (value) => {
                                 @update:model-value="reparent($event)"
                             />
                         </MdsFormField>
+                        <fieldset v-if="!showModeFixed(field.field_type)" class="config__show" data-show-to-respondents>
+                            <legend class="config__group-label">Show to respondents</legend>
+                            <div class="config__show-options">
+                                <MdsRadio
+                                    v-for="option in SHOW_OPTIONS"
+                                    :key="option.value"
+                                    :model-value="showMode"
+                                    :value="option.value"
+                                    :label="option.label"
+                                    :name="`show-${field.uid}`"
+                                    @update:model-value="setShowMode"
+                                />
+                            </div>
+                            <p v-if="showMode === 'never' && field.relevant_expression" class="config__when-note">
+                                Its condition below is kept. Choose Only when… to use it again.
+                            </p>
+                        </fieldset>
                         <ConditionEditor
-                            :key="`field-${field.uid}`"
+                            :key="`field-${field.uid}-${conditionMount}`"
                             :expression="field.relevant_expression"
                             :catalogue="catalogue"
                             legend="Show this question only when…"
@@ -914,6 +947,21 @@ watch(librarySaved, (value) => {
     background-color: var(--mds-color-bg-sunken);
     color: var(--mds-color-danger-text);
     font-size: var(--mds-type-body-sm-font-size);
+}
+
+.config__show {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.config__show-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mds-space-2) var(--mds-space-4);
 }
 
 .config__note {

@@ -407,6 +407,10 @@ const guide: ChapterDraft[] = [
                         ['Click ', ui('Add condition', CONDITIONS), ', then choose the earlier question, the comparison and the answer — “Are you pregnant?” is Yes.'],
                         ['For more than one condition, choose ', ui('All of', CONDITIONS), ' (every condition must hold) or ', ui('Any of', CONDITIONS), ' (one is enough).'],
                     ),
+                    p(
+                        'Above the condition, ', ui('Show to respondents', CONFIG), ' reads ', ui('Only when…', CONFIG), ' once a condition is set. Choose ', ui('Never', CONFIG),
+                        ' to keep a question on the form without asking anyone — its condition is kept for later, and it is never required — or ', ui('Always', CONFIG), ' to remove the condition.',
+                    ),
                     p('A whole section can be shown or skipped the same way: select the section and use “', ui('Show this section only when…', CONFIG), '”.'),
                     tip('info', 'Check your conditions on the ', ui('Logic', BUILDER), ' view, which writes out every condition in plain words, and try them in', link('Preview', '#preview'), '.'),
                 ],
@@ -895,7 +899,10 @@ const reference: ChapterDraft[] = [
                 id: 'type-calculated',
                 title: 'Calculated',
                 blocks: [
-                    p('An answer worked out from other answers — a total, an age from a birth date. Respondents never see it; it is worked out when the response is saved.'),
+                    p(
+                        'An answer worked out from other answers — a total, an age from a birth date. Respondents do not see it unless you choose ', ui('Always', CONFIG),
+                        ' under ', ui('Show to respondents', CONFIG), ' on its ', ui('Advanced', CONFIG), ' tab: then they see its value, read-only, as they answer. Either way it is worked out again when the response is saved.',
+                    ),
                     list(
                         ['Write the formula in ', ui('Calculation formula', CONFIG), '. Refer to another question by its ', ui('Field key', CONFIG), ' inside ${ } — for example ', ui('e.g. ${quantity} * ${unit_price}', CONFIG), '.'],
                         ['Use + − * / for arithmetic, and if(), count(), int() or today() for more.'],

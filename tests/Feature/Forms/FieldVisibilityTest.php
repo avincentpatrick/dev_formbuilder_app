@@ -10,6 +10,7 @@ use App\Services\Forms\FormService;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
@@ -42,7 +43,7 @@ afterEach(function (): void {
     app(PermissionRegistrar::class)->setPermissionsTeamId(null);
 });
 
-function fieldVisibilitySave(object $test, mixed $visibility): Illuminate\Testing\TestResponse
+function fieldVisibilitySave(object $test, mixed $visibility): TestResponse
 {
     $field = app(FormBuilderService::class)->addField($test->form, $test->admin, FieldType::ShortText, null);
 

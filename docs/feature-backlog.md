@@ -11485,7 +11485,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   in this repository could see it** — `.builder__pane { overflow: hidden }` CLIPS the spill instead of
   scrolling it, so `assertNoHorizontalOverflow`'s `.app-shell__content` read is flat over it, axe has no rule,
   and `personalization-axe` had element-level reads for the pane switcher (`M19`) and the config pane (`M109`)
-  but never for this control. Fixed with the host-level `flex-wrap` `ConfigPanel.vue:732` already applies to
+  but never for this control. Fixed with the host-level `flex-wrap` `ConfigPanel.vue:748` already applies to
   the Requiredness control — `D28`'s measured affordance. ⛔ **THE ROW'S OWN EVIDENCE: ONE CITATION FALSE, FOUR
   ROTTED, AND ONE CLAIM FALSE.** `ConfirmationModal.vue:11` names a file `M117` renamed and a sentence it
   deleted (the in-tree statement moved to `draft-snapshot.ts:7`); `Builder.vue:531-537` and `:462-471` are both
@@ -11746,14 +11746,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   which must not become a seventh. The PHP `FieldType` enum is authoritative and the builder palette is fully
   server-driven — but the **renderers** carry six hand-written mirrors: `schema-mapping.ts:48-59` (`SUPPORTED`,
   whose own comment admits it mirrors `EncodeFormPresenter::SUPPORTED`), `:72` (`HAS_OPTIONS`), `:75`
-  (`TEXT_TYPES`), `FieldInput.vue` (`MEDIA_TYPES`) and `ConfigPanel.vue:178` (`NUMERIC_TYPES`). ✅ **Only
+  (`TEXT_TYPES`), `FieldInput.vue` (`MEDIA_TYPES`) and `ConfigPanel.vue:190` (`NUMERIC_TYPES`). ✅ **Only
   `field-roles.ts`'s `RENDERS_NOTHING` is pinned**, by `tests/Unit/Forms/PdfFieldRoleTest.php`, which regex-parses
   the TypeScript from PHP and asserts set equality — so the instrument already exists in this repository and needs
   copying, not inventing. ⚠️ **`EncodeFormPresenter`'s own docblock (`:64-72`) admits the duplication and records
   that collapsing it was deliberately declined** — which makes a parity test the right answer rather than a
   refactor: it converts five unguarded mirrors into guarded ones **without deleting any of them**. ⚠️ A gate
   written here is green on arrival and therefore proves nothing until a committed mutation — removing one type
-  from one mirror — turns it red. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AS A PROVEN STRICT SUBSET OF `R-09f73330`, NOT WORKED SEPARATELY.** ✅ Its citations hold, with two off-by-N: `HAS_OPTIONS` is declared at `schema-mapping.ts:73`, not `:72` (`:72` is the comment), and the `EncodeFormPresenter` docblock admission runs `:64-69`, not `:64-72`. ⛔ **ALL FIVE GAPS IT NAMES APPEAR IN `R-09f73330` VERBATIM, AT THE SAME FILE AND LINE** — `schema-mapping.ts:48`/`:73`/`:75`, `FieldInput.vue`'s `MEDIA_TYPES` and `ConfigPanel.vue:178` — and it names **no** declaration that row does not. (It also cites `field-roles.ts`'s `RENDERS_NOTHING`, but as already-gated *evidence*, not as a gap.) So the single gate written for `R-09f73330` necessarily closes this one too, and **working both would have collided on three production files** under `D13` clause 1. ⚠️ **Its *"six copies, five ungated"* is a FLOOR:** there are **ten** ungated declarations by declaration count, and an eleventh that was already gated. ⚠️ **And its supporting citation is mis-aimed, though its conclusion survives:** `EncodeFormPresenter`'s docblock at `:64-69` declines collapsing the *builder functions*, not the `SUPPORTED` constant — the admission that actually supports the row is on the TypeScript side, at `schema-mapping.ts:46`. ⚠️ **Its *"the instrument exists and needs copying"* is now UNDERSTATED:** the technique has been copied three further times since it was filed — `DraftProjectionMirrorDriftTest`, `DocumentedEnumMirrorDriftTest` (a table-driven generalisation over three grammars) and the `NotificationType`/`ShellAbility` parity tests.
+  from one mirror — turns it red. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AS A PROVEN STRICT SUBSET OF `R-09f73330`, NOT WORKED SEPARATELY.** ✅ Its citations hold, with two off-by-N: `HAS_OPTIONS` is declared at `schema-mapping.ts:73`, not `:72` (`:72` is the comment), and the `EncodeFormPresenter` docblock admission runs `:64-69`, not `:64-72`. ⛔ **ALL FIVE GAPS IT NAMES APPEAR IN `R-09f73330` VERBATIM, AT THE SAME FILE AND LINE** — `schema-mapping.ts:48`/`:73`/`:75`, `FieldInput.vue`'s `MEDIA_TYPES` and `ConfigPanel.vue:190` — and it names **no** declaration that row does not. (It also cites `field-roles.ts`'s `RENDERS_NOTHING`, but as already-gated *evidence*, not as a gap.) So the single gate written for `R-09f73330` necessarily closes this one too, and **working both would have collided on three production files** under `D13` clause 1. ⚠️ **Its *"six copies, five ungated"* is a FLOOR:** there are **ten** ungated declarations by declaration count, and an eleventh that was already gated. ⚠️ **And its supporting citation is mis-aimed, though its conclusion survives:** `EncodeFormPresenter`'s docblock at `:64-69` declines collapsing the *builder functions*, not the `SUPPORTED` constant — the admission that actually supports the row is on the TypeScript side, at `schema-mapping.ts:46`. ⚠️ **Its *"the instrument exists and needs copying"* is now UNDERSTATED:** the technique has been copied three further times since it was filed — `DraftProjectionMirrorDriftTest`, `DocumentedEnumMirrorDriftTest` (a table-driven generalisation over three grammars) and the `NotificationType`/`ShellAbility` parity tests.
 
 - **`minor` · Three more request paths prune an array key by the same mechanism `B0` just fixed, and one of
   them may be doing it on purpose.** Found by `M111` (2026-09-25) while sweeping for the CLASS behind
@@ -11814,7 +11814,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `HAS_OPTIONS`, `:75` `TEXT_TYPES`; `display-value.ts:44` `HAS_OPTIONS` (a second copy), `:47` `GEO_TYPES`,
   `:55` `MEDIA_TYPES`; `semantic-validator.ts:32` `MEDIA_FIELD_TYPES` (a third copy of the media set);
   `FieldInput.vue`'s `MEDIA_TYPES` (a fourth) and its inline text-type literal (a second `TEXT_TYPES`);
-  and `ConfigPanel.vue:178` `NUMERIC_TYPES`. ⛔ **`TEXT_TYPES` and `NUMERIC_TYPES` MIRROR NOTHING** — there is no
+  and `ConfigPanel.vue:190` `NUMERIC_TYPES`. ⛔ **`TEXT_TYPES` and `NUMERIC_TYPES` MIRROR NOTHING** — there is no
   PHP predicate or registry either one corresponds to, so they cannot drift from a source; they ARE a source, and
   an undeclared one. ✅ **The technique is proven and is now used twice:** `tests/Unit/Forms/PdfFieldRoleTest.php`
   parses `field-roles.ts` by regex with two anti-vacuity arms, and `M112` built
@@ -11909,7 +11909,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · The builder and PHP disagree about whether a duration field takes an ordered comparison, and the
   disagreement is now pinned rather than resolved.** Found by `M113` (2026-09-26) while building the client
-  field-type mirror census. `ConfigPanel.vue:178`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
+  field-type mirror census. `ConfigPanel.vue:190`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
   'likert_scale']` — four members. `ValueShape::allowsOperator()` (`ValueShape.php:218-242`) permits
   `gt`/`lt`/`gte`/`lte` for `Number`, `Duration` and `Scale`, which is **five** types: the same four plus
   `duration`. ⛔ **`R-09f73330` SAYS THIS SET "MIRRORS NOTHING", AND THAT STOPPED BEING TRUE IN THE INCREMENT
@@ -14377,7 +14377,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   kobo, every cell can be configured separately, it can pick different type of questions and different set of options for each"*.
   Measured: `resources/js/components/builder/MatrixEditor.vue:46` says "Each cell is a single choice from this shared list";
   `config.cells` is that list (`docs/data-dictionary.md:378`), the request validates rows, columns and cells as value/label lists
-  only (`app/Http/Requests/Forms/UpdateFieldRequest.php:274-306`), the normalizer rejects unknown rows or columns and nothing else
+  only (`app/Http/Requests/Forms/UpdateFieldRequest.php:277-309`), the normalizer rejects unknown rows or columns and nothing else
   (`app/Services/Submissions/StructuralAnswerNormalizer.php:548-593`), publish checks the three lists non-empty and distinct
   (`app/Services/Forms/StructuralValidationGate.php:532-562`), and `app/Enums/FieldType.php:12` claims each cell is
   "independently typed", which is false. KoboToolbox's Question Matrix gives every column its own response type (Select One,
@@ -14414,7 +14414,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · Only a Single choice or Dropdown can take its choices from another form's answers; a Multiple choice cannot.**
   `app/Services/Forms/LinkedChoiceService.php:39` limits a link to single choice and dropdown, and
-  `app/Http/Requests/Forms/UpdateFieldRequest.php:319-331` accepts `config.options_source` for those two only; the Options tab
+  `app/Http/Requests/Forms/UpdateFieldRequest.php:322-334` accepts `config.options_source` for those two only; the Options tab
   offers the link through `resources/js/components/builder/LinkedChoicesEditor.vue` (`ConfigPanel.vue:499-515`). The testers'
   comment (2026-10-15): *"All input forms that has options like radio button, checkboxes, select options … must have an option to
   populate options thru the connection to responses from other forms"*. Split out of `R-5fdbc47c`, which named multi-select as
@@ -14436,7 +14436,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`minor` · A text box cannot offer suggestions from a list file or another form's answers.**
   The testers' comment (2026-10-15): *"sometimes even the textbox must have an option to populate options thru the connection to
   responses from other forms"*. `resources/js/components/submissions/FieldInput.vue:217-265` renders a text question as a plain
-  input, and `app/Http/Requests/Forms/UpdateFieldRequest.php:319-331` accepts no source on it. The remedy: `config.suggestions_source
+  input, and `app/Http/Requests/Forms/UpdateFieldRequest.php:322-334` accepts no source on it. The remedy: `config.suggestions_source
   = {kind: list | form, …}` on Short text gives a type-ahead (a `<datalist>`-backed combobox) on the web form, the encode page
   (`app/Services/Submissions/EncodeFormPresenter.php:606-632` already serves linked lists there) and the preview, while free text
   stays accepted and the server never checks it; the chooser reads "Suggestions come from" on a text question. **Live.** Filed by `M172`.
@@ -14491,7 +14491,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   recorded value in a source form?"*. `app/Support/Forms/ShareableQuestions.php:31-39` never offers a `cascading_select` for
   sharing; a link feeds a flat list of answers for one key (`app/Services/Forms/LinkedChoiceService.php:258-275`, served by
   `app/Http/Controllers/Public/PublicFormSchemaController.php:60-77`) and nothing filters an existing option list by it; the
-  cascade control shows every child of the chosen parent (`resources/js/components/submissions/FieldInput.vue:331-368`). The
+  cascade control shows every child of the chosen parent (`resources/js/components/submissions/FieldInput.vue:344-381`). The
   remedy: `config.levels[i].filter` and, on a list- or form-sourced choice question, `config.options_filter = {form_id, field_key,
   mode: present | absent}`; `ShareableQuestions` admits the cascade (its shared value set is per level); the linked-choices
   endpoint gains `sets` beside the schema with their own stamp (`D60` A), cached by the worker per version
@@ -14807,7 +14807,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`nit` · The builder's draft check looks for a calculation's formula under the wrong key, so every calculated question would read "no formula yet".**
   `resources/js/components/builder/draft-snapshot.ts:402` reads `config.formula`, but the formula lives in
-  `config.calculated_formula` (`resources/js/components/builder/ConfigPanel.vue:262`); `resources/js/components/builder/draft-snapshot.test.ts`
+  `config.calculated_formula` (`resources/js/components/builder/ConfigPanel.vue:274`); `resources/js/components/builder/draft-snapshot.test.ts`
   pins the wrong key. Nothing shows it today only because the preview never draws a calculated question; it will once a calculation
   can be shown. The remedy: read `calculated_formula`, and the test with it. **Latent.** It surfaces once a calculated question can be
   shown. Filed by `M174`. **Tier: early-testing.**

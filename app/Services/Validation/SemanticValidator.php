@@ -16,6 +16,7 @@ use App\Services\Expressions\Coercion;
 use App\Services\Expressions\EvaluationContext;
 use App\Services\Expressions\ExpressionEvaluator;
 use App\Services\Expressions\Marker;
+use App\Support\Forms\FieldVisibility;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -533,7 +534,10 @@ final class SemanticValidator
         //
         // Both are NARROWINGS — they can only remove errors, never invent one — so neither can introduce a
         // new PHP/TS divergence. Pinned in both engines by tests/golden/validation/hidden.json.
-        if ($field->field_type === FieldType::Calculated || $field->field_type === FieldType::Hidden) {
+        // M177 (`R-f44e9d00`): a question set to Never is the hidden field's case exactly — nobody sees it, so nobody can
+        // repair an error on it. Pinned by tests/golden/validation/visibility.json.
+        if ($field->field_type === FieldType::Calculated || $field->field_type === FieldType::Hidden
+            || FieldVisibility::of($field->config) === FieldVisibility::HIDDEN) {
             return;
         }
 
@@ -1242,7 +1246,8 @@ final class SemanticValidator
     {
         $rendering = array_values(array_filter(
             $members,
-            static fn (FormField $member): bool => PdfFieldRole::for($member->field_type) !== PdfFieldRole::Omitted,
+            // M177 (`R-f44e9d00`): per field — a member set to Never renders nothing, a calculation set to Always does.
+            static fn (FormField $member): bool => ! FieldVisibility::rendersNothing($member->field_type, $member->config),
         ));
 
         if ($rendering === []) {

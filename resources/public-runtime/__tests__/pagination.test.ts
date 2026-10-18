@@ -260,7 +260,7 @@ describe('paginateAtPageBreaks — what the step-change record says when pages m
 });
 
 type FixtureSection = { key: string; sequence: number; repeatable?: boolean; min?: number; max?: number; relevant?: string };
-type FixtureField = { key: string; section?: string; field_type?: string; sequence: number; relevant?: string };
+type FixtureField = { key: string; section?: string; field_type?: string; sequence: number; relevant?: string; visibility?: string };
 type FixtureCase = { name: string; sections?: FixtureSection[]; fields?: FixtureField[]; answers?: AnswerMap; expected_steps: string[] };
 
 /**
@@ -296,6 +296,8 @@ describe('paginating never changes which sections show', () => {
                         field_type: f.field_type ?? 'short_text',
                         sequence: f.sequence,
                         relevant_expression: f.relevant ?? null,
+                        // M177 (`R-f44e9d00`): Show to respondents, as the builder stores it.
+                        ...(f.visibility !== undefined ? { config: { visibility: f.visibility } } : {}),
                     }),
                 ),
             }),

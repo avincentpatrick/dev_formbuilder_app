@@ -201,7 +201,8 @@ final class StepProjection
     private static function rendering(Collection $fields): array
     {
         return array_values($fields->filter(
-            static fn (FormField $field): bool => PdfFieldRole::for($field->field_type) !== PdfFieldRole::Omitted,
+            // M177 (`R-f44e9d00`): per field — a question set to Never renders nothing, a calculation set to Always does.
+            static fn (FormField $field): bool => ! FieldVisibility::rendersNothing($field->field_type, $field->config),
         )->all());
     }
 

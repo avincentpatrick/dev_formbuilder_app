@@ -52,6 +52,10 @@ const encodeField = computed<EncodeField>(() => ({
 }));
 
 const value = computed<AnswerValue>(() => {
+    // M177 (`R-f44e9d00`): a calculation set to Always shows what the engine worked out; it is never an answer typed.
+    if (props.field.fieldType === 'calculated') {
+        return (runtime.result.value.computed[props.field.key] ?? null) as AnswerValue;
+    }
     const current = runtime.answers[props.field.key];
     if (current === undefined || current === null) {
         return null;

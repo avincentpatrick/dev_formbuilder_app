@@ -20,7 +20,7 @@
 import { ABSENT, isEmpty, isNumericLike, toNumber, toStr, yesNoAnswer, type EngineValue, type MaybeAbsent } from './coercion';
 import { EvaluationContext, type Answers } from './context';
 import { ExpressionEvaluator, makeExpressionEvaluator } from './evaluator';
-import { rendersNothing } from './field-roles';
+import { fieldRendersNothing } from './field-roles';
 import { StructuredRuleLowering, type FieldKeysById } from './lowering';
 import { StructuredRuleEvaluator } from './structured-rule-evaluator';
 import type { CompositeAnswer, GeoAnswer, InstanceAnswers, MediaAnswer, SchemaField, SemanticInput, ValidationRow } from './schema';
@@ -466,7 +466,10 @@ export class SemanticValidator {
         //
         // Both are NARROWINGS, so neither can invent a divergence with PHP. Twin of
         // `SemanticValidator::collectFieldErrors()`; pinned in both engines by golden/validation/hidden.json.
-        if (field.field_type === 'calculated' || field.field_type === 'hidden') {
+        //
+        // M177 (`R-f44e9d00`): a question set to Never is the hidden field's case exactly — nobody sees it, so nobody can
+        // repair an error on it. Pinned by golden/validation/visibility.json.
+        if (field.field_type === 'calculated' || field.field_type === 'hidden' || field.visibility === 'hidden') {
             return;
         }
 
@@ -1065,7 +1068,7 @@ export class SemanticValidator {
         // `field_type` is optional on the engine's minimal `SchemaField` (a golden vector may omit it), and an
         // unspecified type renders something — which is what PHP sees too, where the column is a non-nullable
         // `FieldType` and the runner defaults an omitted one to `short_text`.
-        const rendering = members.filter((member) => !rendersNothing(member.field_type ?? ''));
+        const rendering = members.filter((member) => !fieldRendersNothing(member));
 
         if (rendering.length === 0) {
             return false; // predicate 2 — nothing in the group renders a question at all

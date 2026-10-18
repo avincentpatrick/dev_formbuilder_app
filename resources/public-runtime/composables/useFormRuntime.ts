@@ -37,7 +37,7 @@ import {
     buildEngineSchema,
     buildRenderModel,
     buildTemplateSources,
-    rendersNothing,
+    fieldRendersNothing,
     resolveOptional,
     resolveText,
     toSemanticInput,
@@ -500,7 +500,8 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
             }
             // Increment H7 — hidden and calculated fields render nothing, so a block (or page) holding only those
             // has no question in it and vanishes, rather than render a heading over a blank panel.
-            if (!rendersNothing(field.fieldType)) {
+            // M177 (`R-f44e9d00`): per field — a question set to Never renders nothing, a calculation set to Always does.
+            if (!fieldRendersNothing({ field_type: field.fieldType, visibility: field.visibility })) {
                 fields.push(field);
             }
         }
@@ -555,7 +556,7 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
             }
             // A repeatable section is ONE step and never paginates: it renders an add/remove loop, and its
             // instances are what the respondent pages through.
-            const members = (membersBySection[section.key] ?? []).filter((f) => !rendersNothing(f.fieldType));
+            const members = (membersBySection[section.key] ?? []).filter((f) => !fieldRendersNothing({ field_type: f.fieldType, visibility: f.visibility }));
             if (members.length === 0 || !anyFieldCurrentlyRelevant(members, section.key, true)) {
                 continue;
             }

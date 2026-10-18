@@ -397,11 +397,12 @@ export function projectDraft(input: DraftProjectionInput): DraftProjection {
         }
 
         // State 7: `calculated` with no formula — the key is ABSENT from config, not null, because the
-        // engine branches on presence.
+        // engine branches on presence. M177 (`R-f7a18b7a`): `calculated_formula`, the key the builder writes and the
+        // engine reads; this read `formula`, so every calculation would have said "no formula yet" once one can show.
         if (f.field_type === 'calculated') {
-            const formula = config.formula;
+            const formula = config.calculated_formula;
             if (typeof formula !== 'string' || formula.trim() === '') {
-                delete config.formula;
+                delete config.calculated_formula;
                 add(f.uid, key, 'missing_formula', 'This calculation has no formula yet, so it has no value in the preview.');
             }
         }
@@ -514,6 +515,10 @@ export function shapeOf(snapshot: RawSchemaSnapshot): string {
         f.relevant_expression,
         f.default_value,
         optionValuesOf(f.config),
+        // M177 (`R-f44e9d00`): Show to respondents decides what renders, and an Always calculation shows its formula's
+        // value — so both rebuild the runtime, as an option value does.
+        f.config?.visibility ?? null,
+        f.field_type === 'calculated' ? (f.config?.calculated_formula ?? null) : null,
         // M131: the grouping too — a regroup changes what the engine folds, so it must rebuild the runtime.
         f.validations.map((v) => [v.rule_type, v.operator, v.rule_value, v.expression, v.related_field_key, v.sequence, v.logic_group_ordinal, v.logic_operator]),
     ]);

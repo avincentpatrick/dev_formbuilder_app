@@ -95,7 +95,7 @@
     ],
     "fields": [
       { "key": "a", "section": "s1", "sequence": 1 },
-      { "key": "total", "section": "s2", "field_type": "calculated", "visibility": "shown", "sequence": 2 }
+      { "key": "total", "section": "s2", "field_type": "calculated", "visibility": "shown", "calculate": "1 + 1", "sequence": 2 }
     ],
     "answers": {},
     "expected_steps": ["s1", "s2"]

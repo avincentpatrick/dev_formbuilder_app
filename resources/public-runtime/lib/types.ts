@@ -316,6 +316,8 @@ export interface RenderField {
     appearance: string | null;
     /** A note's content blocks (M130), carried raw from `config.content`; null for every other type. */
     content: unknown[] | null;
+    /** M177 (`R-f44e9d00`): Show to respondents — `hidden` (Never) or `shown` (Always); null keeps the type's own rule. */
+    visibility: 'hidden' | 'shown' | null;
     sequence: number;
     sectionSequence: number | null;
 }

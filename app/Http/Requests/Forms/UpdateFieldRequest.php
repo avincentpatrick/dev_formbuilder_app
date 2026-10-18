@@ -60,6 +60,8 @@ final class UpdateFieldRequest extends FormRequest
             'relevant_expression' => ['nullable', 'string', 'max:2000'],
             'appearance' => ['nullable', 'string', 'max:60', Rule::in($this->allowedAppearances($field))],
             'config' => ['present', 'array'],
+            // M177 (`R-f44e9d00`): Show to respondents — Never (`hidden`) or Always (`shown`); absent keeps the type's own rule.
+            'config.visibility' => ['sometimes', 'nullable', 'in:hidden,shown'],
             'default_value' => ['nullable', 'string', 'max:2000'],
             // M134 (`R-6d7b9ff7`) — optional: absent keeps the stored flag, so an older client cannot clear it by omission.
             'default_value_is_expression' => ['sometimes', 'boolean'],
@@ -178,6 +180,7 @@ final class UpdateFieldRequest extends FormRequest
             'config.default_center.lon' => 'default longitude',
             'config.default_zoom' => 'default zoom',
             // Choices, cascading select (its levels, and the level and parent on each choice), and a linked list.
+            'config.visibility' => 'Show to respondents',
             'config.options' => 'choices',
             'config.other_specify_key' => 'Please specify question',
             'config.options.*.value' => 'choice value',

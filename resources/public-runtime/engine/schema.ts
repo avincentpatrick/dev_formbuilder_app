@@ -70,6 +70,8 @@ export interface SchemaField {
     grid?: GridConfig | null;
     /** Media count bounds (Increment G6): min/max attachment count for `processMedia`. Absent ⇒ no bounds. */
     media?: { maxCount: number | null; minCount: number | null } | null;
+    /** M177 (`R-f44e9d00`): Show to respondents (`config.visibility`). Absent / null ⇒ the type's own rule. */
+    visibility?: 'hidden' | 'shown' | null;
 }
 
 export interface SchemaSection {

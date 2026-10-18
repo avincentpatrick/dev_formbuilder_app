@@ -33,7 +33,7 @@
  */
 import { projectDraft, type DraftProjection, type DraftProjectionInput, type ProjectionIssue } from './draft-snapshot';
 import { renderableBlocks } from '../submissions/note-content';
-import { buildRenderModel, rendersNothing } from '../../../public-runtime/lib/schema-mapping';
+import { buildRenderModel, fieldRendersNothing } from '../../../public-runtime/lib/schema-mapping';
 import type { AnswerMap, RenderField, RenderModel, RenderSection, SchemaResponse } from '../../../public-runtime/lib/types';
 import type { FormRuntime, RuntimeStep } from '../../../public-runtime/composables/useFormRuntime';
 import type { LocalField, Uid } from './types';
@@ -200,7 +200,7 @@ export function previewPendingFields(steps: readonly RuntimeStep[], model: Rende
         }
     }
 
-    return model.fields.filter((f) => !placed.has(f.key) && !rendersNothing(f.fieldType));
+    return model.fields.filter((f) => !placed.has(f.key) && !fieldRendersNothing({ field_type: f.fieldType, visibility: f.visibility }));
 }
 
 /**

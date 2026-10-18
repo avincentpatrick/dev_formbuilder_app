@@ -16,6 +16,7 @@ use App\Services\Templates\TemplateRenderer;
 use App\Services\Templates\TemplateSources;
 use App\Services\Validation\SemanticResult;
 use App\Services\Validation\SemanticValidator;
+use App\Support\Forms\FieldVisibility;
 use App\Support\Forms\LocaleVariant;
 use App\Support\Submissions\SubmissionReference;
 use Illuminate\Support\Collection;
@@ -160,8 +161,9 @@ final class SubmissionPdfPresenter
         // — inside the label the respondent read it in.
         $sources = TemplateSources::fromFields($allFields);
 
+        // M177 (`R-f44e9d00`): what the respondent saw, per field — an Always calculation yes, a Never question no.
         $visible = $allFields->filter(
-            fn (FormField $f): bool => PdfFieldRole::for($f->field_type) !== PdfFieldRole::Omitted,
+            fn (FormField $f): bool => FieldVisibility::pdfRole($f->field_type, $f->config) !== PdfFieldRole::Omitted,
         );
 
         /** @var Collection<string, Collection<int, FormField>> $bySection */
@@ -270,7 +272,7 @@ final class SubmissionPdfPresenter
                 continue;
             }
 
-            $role = PdfFieldRole::for($field->field_type);
+            $role = FieldVisibility::pdfRole($field->field_type, $field->config);
             $label = LocaleVariant::resolve($field->label_translations, $field->label, $locale, $field->key);
 
             $rows[] = [

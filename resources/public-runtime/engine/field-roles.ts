@@ -53,7 +53,7 @@ export function fieldRendersNothing(field: { field_type?: string; visibility?: s
         return true;
     }
     if (type === 'calculated') {
-        return field.visibility !== 'shown';
+        return true;
     }
 
     return rendersNothing(type);

@@ -957,6 +957,10 @@ watch(librarySaved, (value) => {
     border: 0;
 }
 
+.config__show > legend {
+    padding: 0;
+}
+
 .config__show-options {
     display: flex;
     flex-wrap: wrap;

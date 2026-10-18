@@ -67,6 +67,7 @@ const SECTION_SETTINGS: Record<string, string> = {
 
 const CONFIG_NAMES: Record<string, string> = {
     options: 'Choices',
+    other_specify_key: 'Other, please specify',
     levels: 'Levels',
     rows: 'Rows',
     columns: 'Columns',

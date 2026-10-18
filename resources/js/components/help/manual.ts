@@ -606,6 +606,7 @@ const CONDITION_EDITOR = 'resources/js/components/builder/ConditionEditor.vue';
 const APPEARANCE = 'app/Enums/FieldAppearance.php';
 const INDEXED = 'app/Enums/IndexedDataType.php';
 const LINKED = 'resources/js/components/builder/LinkedChoicesEditor.vue';
+const OTHER_SPECIFY = 'resources/js/components/builder/OtherSpecifyControl.vue';
 const CASCADING = 'resources/js/components/builder/CascadingEditor.vue';
 const LIKERT_MATRIX = 'resources/js/components/builder/LikertMatrixEditor.vue';
 const MATRIX = 'resources/js/components/builder/MatrixEditor.vue';
@@ -940,6 +941,11 @@ const reference: ChapterDraft[] = [
                         ['On the ', ui('Options', CONFIG), ' tab, click ', ui('Add option', CHOICES), ' once for each choice.'],
                         ['Fill in each choice’s ', ui('Label', CHOICES), ' (what respondents read) and ', ui('Value', CHOICES), ' (the short code saved in the results and exports).'],
                         ['Pick a ', ui('Choice layout', CONFIG), ': ', ui('One per line (default)', CONFIG), ', ', ui('Side by side', APPEARANCE), ' or ', ui('In columns', APPEARANCE), '.'],
+                    ),
+                    p(
+                        'To let respondents write in an answer of their own, turn on ', ui('Add “Other, please specify”', OTHER_SPECIFY), ' on the ', ui('Options', CONFIG),
+                        ' tab. It adds the choice “Other” and a question “Please specify” right after this one; respondents see it only when they pick Other, and must answer it then. Turning it off removes both. ',
+                        ui('Multiple choice', FIELD_TYPES), ' and ', ui('Dropdown', FIELD_TYPES), ' have it too.',
                     ),
                     p(
                         'Its choices can also come from another form: under ', ui('Choices come from', LINKED), ', pick ', ui("Another form's answers", LINKED),

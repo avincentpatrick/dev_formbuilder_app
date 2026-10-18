@@ -23,6 +23,7 @@ use App\Http\Controllers\Tenant\FormBuilderController;
 use App\Http\Controllers\Tenant\FormConfirmationMessageController;
 use App\Http\Controllers\Tenant\FormController;
 use App\Http\Controllers\Tenant\FormFieldConversionController;
+use App\Http\Controllers\Tenant\FormFieldOtherSpecifyController;
 use App\Http\Controllers\Tenant\FormFolderAssignmentController;
 use App\Http\Controllers\Tenant\FormFolderController;
 use App\Http\Controllers\Tenant\FormHubController;
@@ -621,6 +622,11 @@ Route::middleware([
         ->middleware('can:update,form')->name('forms.fields.conversions');
     Route::post('/forms/{form}/fields/{field}/convert', [FormFieldConversionController::class, 'store'])
         ->middleware(['can:update,form', 'builder.draft'])->name('forms.fields.convert');
+    // M177 (`R-71509975`): "Other, please specify" on (the choice and the Please specify question, one transaction) and off.
+    Route::post('/forms/{form}/fields/{field}/other-specify', [FormFieldOtherSpecifyController::class, 'store'])
+        ->middleware(['can:update,form', 'builder.draft'])->name('forms.fields.other-specify.store');
+    Route::delete('/forms/{form}/fields/{field}/other-specify', [FormFieldOtherSpecifyController::class, 'destroy'])
+        ->middleware(['can:update,form', 'builder.draft'])->name('forms.fields.other-specify.destroy');
     Route::post('/forms/{form}/reorder', [FormBuilderController::class, 'reorder'])
         ->middleware(['can:update,form', 'builder.draft'])->name('forms.reorder');
 

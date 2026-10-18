@@ -278,6 +278,11 @@ final class FieldTypeConversion
             unset($config['options_source']);
         }
 
+        // M177 (`R-71509975`): a Likert scale has no "Other, please specify" — the link is dropped, and the plan says so.
+        if (! OtherSpecify::offers($to)) {
+            unset($config[OtherSpecify::CONFIG_KEY]);
+        }
+
         return $config;
     }
 

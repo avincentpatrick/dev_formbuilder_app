@@ -7,6 +7,7 @@ use App\Enums\RequiredMode;
 use App\Models\FormField;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Forms\BuilderPresenter;
 use App\Services\Forms\FormBuilderService;
 use App\Services\Forms\FormService;
 use App\Support\Tenancy\TenantContext;
@@ -177,7 +178,7 @@ it('drops the link when the question becomes a type without the setting', functi
 });
 
 it('tells the builder which types offer the switch, written out (M177)', function (): void {
-    $payload = app(\App\Services\Forms\BuilderPresenter::class)->present($this->form->refresh());
+    $payload = app(BuilderPresenter::class)->present($this->form->refresh());
 
     expect($payload['enums']['other_specify_types'])->toBe(['single_select', 'multi_select', 'dropdown']);
 });

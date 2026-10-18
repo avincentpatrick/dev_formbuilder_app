@@ -130,6 +130,22 @@ final class FormException extends RuntimeException
         return new self("This question cannot be changed from {$from->label()} to {$to->label()}.");
     }
 
+    /** M177 (`R-71509975`): "Other, please specify" belongs to a question that takes one or several typed choices. */
+    public static function otherSpecifyNotOffered(): self
+    {
+        return new self('Only a single choice, multiple choice or dropdown question with its own choices can add “Other, please specify”.');
+    }
+
+    public static function otherSpecifyAlreadyOn(): self
+    {
+        return new self('This question already has “Other, please specify”.');
+    }
+
+    public static function otherSpecifyNotOn(): self
+    {
+        return new self('This question has no “Please specify” question to remove. Reload the builder to see it as it is.');
+    }
+
     public static function formHasNoDraft(): self
     {
         return new self('This form has no editable draft. Publish or restore a version first.');

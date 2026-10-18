@@ -52,8 +52,10 @@ function categoryLabel(key: string | null): string {
 const bars = computed<BarDatum[]>(() => {
     const rows = props.question?.rows ?? [];
 
+    // M177 (`R-71509975`): a key says WHICH kind of bar it is — an answer, no answer, or the overflow — because a choice
+    // may be valued `other` (the "Other, please specify" switch adds one) and the overflow bar was keyed `other` too.
     const list: BarDatum[] = rows.map((row, index) => ({
-        key: row.key ?? `null-${index}`,
+        key: row.key === null ? `none:${index}` : `answer:${row.key}`,
         label: categoryLabel(row.key),
         value: row.count,
     }));
@@ -61,7 +63,7 @@ const bars = computed<BarDatum[]>(() => {
     const other = props.question?.other ?? null;
     if (other !== null) {
         list.push({
-            key: 'other',
+            key: 'overflow',
             label: `Other (${other.categories} ${other.categories === 1 ? 'value' : 'values'})`,
             value: other.count,
             neutral: true,

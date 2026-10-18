@@ -134,7 +134,7 @@ const TAB_BY_PATH: Record<string, string> = {
 export function tabForSavePath(path: string): string | null {
     if (TAB_BY_PATH[path] !== undefined) return TAB_BY_PATH[path];
     if (path.startsWith('validations')) return 'validation';
-    if (path.startsWith('config.options')) return 'options';
+    if (path.startsWith('config.options') || path === 'config.other_specify_key') return 'options';
     if (path.startsWith('config.levels')) return 'cascading';
     if (/^config\.(rows|columns|cells)/.test(path)) return 'grid';
     if (path.startsWith('config.content')) return 'content';

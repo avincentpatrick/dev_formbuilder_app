@@ -18,6 +18,7 @@ import DeleteFieldDialog from './DeleteFieldDialog.vue';
 import InlineLabelEdit from './InlineLabelEdit.vue';
 import type { LocalField, Selection } from './types';
 import type { BuilderStore } from './useBuilderStore';
+import { useAnsweredDelete } from './useAnsweredDelete';
 import { useCanvasReorder } from './useCanvasReorder';
 import { useFlipReorder } from './useFlipReorder';
 
@@ -109,23 +110,14 @@ const hasContent = (): boolean => groups.value.some((g) => g.fields.length > 0) 
 
 /**
  * M172 (`R-a44638b6`, `D133`) — a delete asks first only when responses hold answers to the question, and says how many
- * and that they keep them. With none it deletes at once, as it always has (undo still brings it back).
+ * and that they keep them. With none it deletes at once, as it always has (undo still brings it back). M177: the
+ * asking lives in `useAnsweredDelete`, shared with the "Other, please specify" switch.
  */
-const pendingDelete = ref<{ uid: string; label: string; count: number | null } | null>(null);
+const deletion = useAnsweredDelete(props.store);
+const pendingDelete = deletion.pending;
 
 async function requestDelete(field: LocalField): Promise<void> {
-    const count = await props.store.answersFor(field.uid);
-    if (count === 0) {
-        void props.store.deleteField(field.uid);
-        return;
-    }
-    pendingDelete.value = { uid: field.uid, label: field.label || field.key, count };
-}
-
-function confirmDelete(): void {
-    const target = pendingDelete.value;
-    pendingDelete.value = null;
-    if (target) void props.store.deleteField(target.uid);
+    await deletion.request(field.uid, field.label || field.key, () => void props.store.deleteField(field.uid));
 }
 </script>
 
@@ -275,8 +267,8 @@ function confirmDelete(): void {
             :open="pendingDelete !== null"
             :label="pendingDelete?.label ?? ''"
             :count="pendingDelete?.count ?? null"
-            @confirm="confirmDelete"
-            @cancel="pendingDelete = null"
+            @confirm="deletion.confirm"
+            @cancel="deletion.cancel"
         />
     </div>
 </template>

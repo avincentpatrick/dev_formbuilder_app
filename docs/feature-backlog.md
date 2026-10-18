@@ -32,7 +32,7 @@ Several of these are **real XLSForm round-trip import failures today** — a Kob
 
 | Item | Priority | Phase | Note |
 |---|---|---|---|
-| `or_other` "please specify" write-in on select fields | should | 2 (or 1 — additive to `config` jsonb, low cost) | XLSForm `or_other` modifier silently dropped on import today — queued as `R-71509975` (the testers' round 2, `D138`'s R2) |
+| `or_other` "please specify" write-in on select fields | should | 2 (or 1 — additive to `config` jsonb, low cost) | XLSForm `or_other` imports as the "Other, please specify" pair since `M177` (`R-71509975`), and the pair exports as the explicit pattern (`docs/xlsform-interop-spec.md`) |
 | Slider / range (bounded numeric) field type | should | 2 | XLSForm `range` type; a Kobo form using it fails import |
 | Ranking / ordering (drag-to-rank) field type | should | 2 | XLSForm `rank` type; standard survey question with no workaround |
 | Rating / star scale field type | should | 2 | Distinct from `likert_scale`'s radio rows; expected on CSAT/feedback forms |
@@ -3420,7 +3420,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   pins the gate. The cross-tenant case is kept because it pins RLS at binding, and it carries a comment
   saying in as many words that it is not a substitute.
   ⛔⛔ **AND THE CENSUS FOUND THE GATE IS WALKED AROUND BY A SIBLING ROUTE — LIVE, NOT LATENT.**
-  `GET /attachments/{attachment}` (`routes/tenant.php:755-756`) is authorized by `AttachmentPolicy::view()`,
+  `GET /attachments/{attachment}` (`routes/tenant.php:761-756`) is authorized by `AttachmentPolicy::view()`,
   whose entire body was `$user->can('submissions.view')` — **it never read its `$attachment` argument**.
   ADR-0015 §D6 filed the screenshot into that same shared table, and `RolePermissionSeeder` grants
   `submissions.view` to `viewer`, `reviewer` and `form_editor` while granting `feedback.view` to none of
@@ -7552,7 +7552,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (2026-09-06), joined and refuted by `M80`. Not one of the 68 route registrations in `routes/api.php`
   contains `users` or `roles`; `app/Http/Controllers/Api/V1/` holds 22 controllers and none is a user, role
   or member controller; no `read:users` / `write:roles` Sanctum ability exists. The capability ships on the
-  web surface only — `routes/tenant.php:410`, `:411`, `:417`, `:419`, `:421`. ⛔ **THE CODE ALREADY NAMES
+  web surface only — `routes/tenant.php:411`, `:411`, `:417`, `:419`, `:421`. ⛔ **THE CODE ALREADY NAMES
   THE CONSEQUENCE:** `app/Http/Resources/Api/V1/AuditResource.php:28` says in as many words that there is
   no `/api/v1/users` endpoint, so an API-only consumer of `GET /api/v1/audits` receives `user_id` and
   `acting_as_user_id` UUIDs it cannot resolve. ⛔ **AND THE ENDPOINT WAS NEVER RETRACTED — IT SHAPED THE
@@ -7573,7 +7573,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   AND THE ROW MUST NOT REPEAT IT.** The builder ships on the tenant-web surface — `routes/tenant.php`
   through `:587`, all `can:update,form`, all on `FormBuilderController`. What is absent is the `/api/v1`
   **twin**, which this repository treats as a separate obligation:
-  `docs/xlsform-interop-spec.md:138` records both surfaces for the adjacent export, and
+  `docs/xlsform-interop-spec.md:139` records both surfaces for the adjacent export, and
   `routes/tenant.php` calls its own route "the browser-facing twin of the doc-pinned /api/v1 endpoint".
   ⚠️ **Two of the four pinned groups are twinned outright, one only partly, one not at all** — sections and
   fields have full web twins, the draft READ exists as `GET /forms/{form}/builder` at
@@ -14621,7 +14621,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M176` (2026-10-18) — ****`major` · Moving a question or a section re-stamps every question's save token, so the author's next edit to any question opens "This item changed elsewhere".**
   The testers' comment (2026-10-11, comment 5): after creating a question and changing only whether it is required, the dialog
   *"This item changed elsewhere — Someone else edited this field since you opened it"* showed the same text on both sides. Measured
-  by reading: `app/Services/Forms/FormBuilderService.php:588` (`reorder()`) writes each position through Eloquent's query builder
+  by reading: `app/Services/Forms/FormBuilderService.php:713` (`reorder()`) writes each position through Eloquent's query builder
   (`:603`, `:612`), whose `update()` adds `updated_at`, so every question and section of the draft gets a new token; the token is that
   timestamp, compared exactly by `assertNoDrift()` (`:740`); `persistOrder()` (`resources/js/components/builder/useBuilderStore.ts:422`)
   ignores the reply, so the page keeps the old tokens. A drag or keyboard move, the Advanced tab's Section choice, an undo of a
@@ -14652,7 +14652,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M176` (2026-10-18) — ****`minor` · A refused question save shows its first error twice — as the lead line and again as the first bullet — and numbers its rules by their place in the request, not on screen.**
   The testers' comment (2026-10-11, comment 2): *"Instructions repeat"* — *"A validation rule must be either a structured rule or an
-  expression — not both, not neither."* above *"Rule 1: A validation rule must be …"*. `resources/js/components/builder/ConfigPanel.vue:486`
+  expression — not both, not neither."* above *"Rule 1: A validation rule must be …"*. `resources/js/components/builder/ConfigPanel.vue:487`
   prints the reply's `message`, which Laravel fills with the first error, and `:489` lists every error including that one;
   `resources/js/components/builder/field-save-errors.ts:79` names `validations.N` by its position in the request after unfinished
   rows are withheld, so "Rule 1" can point at the wrong row. The message itself (`app/Http/Requests/Forms/UpdateFieldRequest.php:376`)
@@ -14756,7 +14756,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · The builder's help text and messages use words a first-time author does not know.**
   The testers' comment (2026-10-11, comment 1) asks for wording a smart high-schooler understands, and its screenshot is one dialog
-  of many: `resources/js/components/builder/ConfigPanel.vue:523` (*"Evaluated on the server. Use ${field} references …"*) and `:683`
+  of many: `resources/js/components/builder/ConfigPanel.vue:524` (*"Evaluated on the server. Use ${field} references …"*) and `:683`
   (*"Referenced in expressions and exports"*), the help texts of the builder's other editors, the store's messages and the preview's
   list of limits all speak of keys, expressions and references. The remedy: the voice rule that the type-dialog row writes into
   `docs/ux/design-system-reference.md`, applied to every builder help text and message; `manual.ts` follows.
@@ -14766,7 +14766,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The user (2026-10-16): *"all the type of question must include the referencing"*; the testers (2026-10-11, comment 6): *"direct
   reference the field (not the entire field question but the field code should be enough)"*. A reference is `${key}`
   (`app/Services/Expressions/ExpressionLexer.php`); conditions, Required-when and the two question-against-question rules have
-  pickers, but a calculation (`resources/js/components/builder/ConfigPanel.vue:523`), an Expression-mode rule, a default value and
+  pickers, but a calculation (`resources/js/components/builder/ConfigPanel.vue:524`), an Expression-mode rule, a default value and
   piping into a label, help, placeholder, section text or the confirmation message are typed by hand. The remedy: one "Insert a
   question" picker (an `@` or a button) — questions grouped by section with their label and code, calculations, and where a date fits
   Today, Yesterday, Tomorrow, N days from now, N days ago and One month from now; filtered to what the spot accepts; it inserts

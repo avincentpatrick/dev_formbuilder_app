@@ -26,7 +26,7 @@ import type { AnswerMap } from '../lib/types';
 import { field, schemaResponse, section } from './fixtures';
 
 type FixtureSection = { key: string; sequence: number; repeatable?: boolean; min?: number; max?: number; relevant?: string };
-type FixtureField = { key: string; section?: string; field_type?: string; sequence: number; relevant?: string };
+type FixtureField = { key: string; section?: string; field_type?: string; sequence: number; relevant?: string; visibility?: string };
 type FixtureCase = {
     name: string;
     note?: string;
@@ -59,6 +59,8 @@ function runtimeFor(testCase: FixtureCase) {
                 field_type: f.field_type ?? 'short_text',
                 sequence: f.sequence,
                 relevant_expression: f.relevant ?? null,
+                // M177 (`R-f44e9d00`): Show to respondents, as the builder stores it.
+                ...(f.visibility !== undefined ? { config: { visibility: f.visibility } } : {}),
             }),
         ),
         // The store builds `visibleSteps` either way, but multi-step is the mode the projection describes.

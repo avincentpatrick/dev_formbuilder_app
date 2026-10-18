@@ -52,6 +52,8 @@ type FieldFragment = {
     grid?: { rows: string[]; columns: string[]; cells?: string[] };
     // Media count bounds (G6): min/max attachment count.
     media?: { min?: number; max?: number };
+    // M177 (`R-f44e9d00`): Show to respondents — Never (`hidden`) or Always (`shown`); absent keeps the type's own rule.
+    visibility?: 'hidden' | 'shown';
 };
 
 type SectionFragment = { key: string; relevant?: string; repeatable?: boolean; min?: number; max?: number };
@@ -131,6 +133,7 @@ function buildSemanticInput(vector: SemanticVector): SemanticInput {
             cascade: field.cascade ?? null,
             grid: field.grid ?? null,
             media: field.media ? { minCount: field.media.min ?? null, maxCount: field.media.max ?? null } : null,
+            visibility: field.visibility ?? null,
         });
 
         (field.rules ?? []).forEach((rule, ruleIndex) => {

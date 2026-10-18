@@ -740,3 +740,44 @@ describe('ConfigPanel — the Label box grows with a long question (M176, R-923c
         expect(target.label).toBe('How many people sleep here?');
     });
 });
+
+describe('ConfigPanel — Show to respondents (M177, R-f44e9d00)', () => {
+    async function openAdvanced(wrapper: ReturnType<typeof mountPanel>): Promise<void> {
+        await wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Advanced')!.trigger('click');
+    }
+
+    const checked = (wrapper: ReturnType<typeof mountPanel>): string | undefined =>
+        wrapper.findAll<HTMLInputElement>('[data-show-to-respondents] input[type="radio"]').find((r) => r.element.checked)?.element.value;
+
+    it('offers Always, Never and Only when on the Advanced tab, read from what is stored', async () => {
+        const plain = mountPanel(makeStore({ field: field() }));
+        await openAdvanced(plain);
+        expect(plain.findAll('[data-show-to-respondents] input[type="radio"]').map((r) => r.attributes('value'))).toEqual(['always', 'never', 'when']);
+        expect(checked(plain)).toBe('always');
+
+        const conditioned = mountPanel(makeStore({ field: field({ relevant_expression: "${age} = '1'" }) }));
+        await openAdvanced(conditioned);
+        expect(checked(conditioned)).toBe('when');
+    });
+
+    it('stores Never as config.visibility in one change, keeping the condition', async () => {
+        const touch = vi.fn();
+        const question = reactive(field({ relevant_expression: "${age} = '1'" })) as LocalField;
+        const wrapper = mountPanel(makeStore({ field: question, touch }));
+        await openAdvanced(wrapper);
+
+        await wrapper.get('[data-show-to-respondents] input[value="never"]').setValue(true);
+
+        expect(question.config).toEqual({ visibility: 'hidden' });
+        expect(question.relevant_expression).toBe("${age} = '1'");
+        expect(touch).toHaveBeenCalledTimes(1);
+    });
+
+    it('asks no Required of a question set to Never', async () => {
+        const wrapper = mountPanel(makeStore({ field: field({ config: { visibility: 'hidden' } }) }));
+
+        expect(wrapper.find('[aria-label="Requiredness"]').exists()).toBe(false);
+        expect(wrapper.text()).toContain('Respondents never see this question');
+    });
+});
+

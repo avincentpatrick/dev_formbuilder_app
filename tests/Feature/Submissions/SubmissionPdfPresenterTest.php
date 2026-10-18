@@ -126,6 +126,23 @@ it('drops the fields a respondent never saw, which the inbox still renders', fun
         ->and($inbox)->toHaveKey('doubled');
 });
 
+it('shows a calculation set to Always with its stored value, and drops a question set to Never (M177, R-f44e9d00)', function (): void {
+    // The PDF claims to show what the respondent saw: an Always calculation they saw, a Never question they did not.
+    $form = app(FormService::class)->create($this->tenant, $this->owner, 'Visibility');
+    $version = $form->draftVersion;
+    addFormField($version, $this->owner, 'age', FieldType::Integer, 1);
+    addFormField($version, $this->owner, 'doubled', FieldType::Calculated, 2, ['config' => ['calculated_formula' => '${age} * 2', 'visibility' => 'shown']]);
+    addFormField($version, $this->owner, 'ref', FieldType::ShortText, 3, ['config' => ['visibility' => 'hidden']]);
+    app(PublishService::class)->publish($form->refresh(), $this->owner);
+    $submission = seedPdfSubmission($form->refresh(), $this->owner, ['age' => '21', 'doubled' => '42', 'ref' => 'B-12']);
+
+    $pdf = pdfRows(app(SubmissionPdfPresenter::class)->present($submission));
+
+    expect($pdf)->toHaveKeys(['age', 'doubled'])
+        ->and($pdf['doubled'])->toBe('42')
+        ->and($pdf)->not->toHaveKey('ref');
+});
+
 it('renders a note as prose with no answer slot', function (): void {
     // The one type the PDF shows that the inbox drops — a consent paragraph the respondent read.
     $form = pdfBranchForm($this->tenant, $this->owner);

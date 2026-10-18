@@ -105,6 +105,11 @@ function buildSemanticInput(array $schema, array $answers, string $locale, ?stri
                 'max_count' => $field['media']['max'] ?? null,
             ];
         }
+        // M177 (`R-f44e9d00`): Show to respondents — MERGED into whatever config the branches above assigned, never
+        // assigned over it, so a vector may pair a visibility with a formula, options or a grid.
+        if (isset($field['visibility'])) {
+            $attributes['config'] = [...($attributes['config'] ?? []), 'visibility' => $field['visibility']];
+        }
         $fields[] = makeSchemaField($attributes);
 
         foreach (($field['rules'] ?? []) as $ruleIndex => $rule) {

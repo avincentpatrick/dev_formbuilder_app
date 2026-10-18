@@ -163,6 +163,40 @@ it('never infers yes_no from a two-option select_one (conservative, §3)', funct
     expect(xlsformField($plan, 'ok')->fieldType)->toBe(FieldType::SingleSelect);
 });
 
+it('turns or_other into an Other choice and a Please specify question right after it (M177, R-71509975)', function (): void {
+    $plan = xlsformParser()->parse(xlsformWb(
+        survey: [
+            ['type' => 'select_one jobs or_other', 'name' => 'job', 'label' => 'Job'],
+            ['type' => 'text', 'name' => 'notes', 'label' => 'Notes'],
+        ],
+        choices: [
+            ['list_name' => 'jobs', 'name' => 'farmer', 'label' => 'Farmer'],
+        ],
+    ));
+
+    expect(array_map(static fn (FieldSpec $f): string => $f->key, $plan->fields))->toBe(['job', 'job_other', 'notes']);
+    $job = xlsformField($plan, 'job');
+    expect($job->config['options'])->toBe([['value' => 'farmer', 'label' => 'Farmer'], ['value' => 'other', 'label' => 'Other']])
+        ->and($job->config['other_specify_key'])->toBe('job_other');
+    $other = xlsformField($plan, 'job_other');
+    expect($other->fieldType)->toBe(FieldType::ShortText)
+        ->and($other->label)->toBe('Please specify')
+        ->and($other->isRequired)->toBe(RequiredMode::Required)
+        ->and($other->relevantExpression)->toBe("selected(\${job}, 'other')");
+});
+
+it('keeps the or_other pair linked when the choice question’s name is sanitised (M177)', function (): void {
+    $plan = xlsformParser()->parse(xlsformWb(
+        survey: [['type' => 'select_multiple jobs or_other', 'name' => 'Job!', 'label' => 'Job']],
+        choices: [['list_name' => 'jobs', 'name' => 'farmer', 'label' => 'Farmer']],
+    ));
+
+    [$job, $other] = $plan->fields;
+    expect($job->key)->toBe('job_')
+        ->and($job->config['other_specify_key'])->toBe($other->key)
+        ->and($other->relevantExpression)->toBe("selected(\${job_}, 'other')");
+});
+
 it('builds select options from the choices sheet and drops a synthetic appearance', function (): void {
     $plan = xlsformParser()->parse(xlsformWb(
         survey: [

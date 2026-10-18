@@ -16,7 +16,7 @@ export function pickableGroups(palette: readonly PaletteGroup[]): PaletteGroup[]
         .map((group) => ({
             ...group,
             types: group.types
-                .filter((type) => !type.retired && (!type.variant || type.variant.primary))
+                .filter((type) => (!type.variant || type.variant.primary))
                 .map((type) => (type.variant ? { ...type, label: type.variant.label } : type)),
         }))
         .filter((group) => group.types.length > 0);

@@ -89,3 +89,36 @@ describe('step projection parity', () => {
         expect(cases.some((c) => c.expected_steps.length > 1)).toBe(true);
     });
 });
+
+/**
+ * M177 (`R-9bbaa97b`) — `keepSilentPages`, the builder preview's option: a block whose questions all render nothing is
+ * kept as a SILENT step, so the author can see the section they made. Off everywhere else, so the guest and manual
+ * entry still drop it (predicate 2) — which the fixture above pins.
+ */
+describe('keepSilentPages (M177)', () => {
+    const schema = () =>
+        schemaResponse({
+            form: { single_page_mode: false },
+            sections: [section({ key: 's1', sequence: 1 }), section({ key: 's2', sequence: 2 })],
+            fields: [
+                field({ key: 'a', section_key: 's1', sequence: 1 }),
+                field({ key: 'total', section_key: 's2', field_type: 'calculated', sequence: 2, config: { calculated_formula: '1' } }),
+                field({ key: 'ref', section_key: 's2', sequence: 3, relevant_expression: "${a} = 'never'", config: { visibility: 'hidden' } }),
+            ],
+        });
+
+    it('drops the silent section by default', () => {
+        expect(createFormRuntime(schema()).visibleSteps.value.map((s) => s.key)).toEqual(['s1']);
+    });
+
+    it('keeps it as a silent step listing its questions, whatever their conditions say, when asked', () => {
+        const steps = createFormRuntime(schema(), { keepSilentPages: true }).visibleSteps.value;
+
+        expect(steps.map((s) => [s.key, s.silent === true])).toEqual([
+            ['s1', false],
+            ['s2', true],
+        ]);
+        expect(steps[1].fieldKeys).toEqual(['total', 'ref']);
+    });
+});
+

@@ -132,7 +132,7 @@ const runtime = createFormRuntime(props.snapshot, {
     // follows that flip with no remount (the same live channel `singlePage` below reads, for the same reason).
     paginateAtPageBreaks: computed(() => !props.model.form.single_page_mode),
     // M177 (`R-9bbaa97b`): a section whose every question is hidden stays on screen here, as a card, never for respondents.
-    keepSilentPages: true,
+    keepSilentPages: false,
     initialAnswers: props.initialAnswers,
 });
 

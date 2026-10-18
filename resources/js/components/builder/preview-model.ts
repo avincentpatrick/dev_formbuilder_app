@@ -134,8 +134,10 @@ export function previewStepLabels(
         const title = section === null ? LEAD_STEP_LABEL : titleFor(section).trim() || UNTITLED_SECTION_LABEL;
         // Increment M124 — a page after a section's first: two entries must never read the same.
         const page = step.continuation === true ? ' (continued)' : '';
+        // M177 (`R-9bbaa97b`): a section the preview keeps although respondents never see it says so in the strip too.
+        const silent = step.silent === true ? ' (hidden from respondents)' : '';
 
-        return { value: step.key, label: `${index + 1}. ${title}${page}` };
+        return { value: step.key, label: `${index + 1}. ${title}${page}${silent}` };
     });
 }
 

@@ -431,6 +431,7 @@ const guide: ChapterDraft[] = [
                         ' in the middle column. Answer the questions as a respondent would: required questions, rules and show-or-skip conditions all work here, and nothing you type is saved as a response.',
                     ),
                     p('You can still edit while you preview: double-click a question’s wording to change it, or drag a question by its handle to move it.'),
+                    p('A section whose every question is hidden — a calculation, a hidden field, or a question set to Never — still shows here as a card that says respondents won’t see it. Click a question on the card to open its settings.'),
                     tip(
                         'info',
                         'The box “', ui('What this preview does not do', PREVIEW),

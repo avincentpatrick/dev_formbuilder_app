@@ -63,7 +63,7 @@ function setMaxFileSize(mb: number | null): void {
             <h3 class="media-editor__heading">What can be uploaded</h3>
             <MdsFormField
                 label="Accepted file types"
-                help="Comma-separated MIME types or globs (e.g. image/*, application/pdf). Leave blank to accept any type."
+                help="The kinds of file to take, separated by commas — for example image/* for any picture, or application/pdf. Leave it empty to take any file."
                 v-slot="{ id, describedby }"
             >
                 <MdsTextInput
@@ -76,7 +76,7 @@ function setMaxFileSize(mb: number | null): void {
             </MdsFormField>
             <MdsFormField
                 label="Maximum file size (MB)"
-                help="The largest a single uploaded file may be. Leave blank for the platform default."
+                help="The largest one file may be. Leave it empty for the standard limit."
                 v-slot="{ id, describedby }"
             >
                 <MdsNumberInput

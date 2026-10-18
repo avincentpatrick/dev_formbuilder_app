@@ -1951,7 +1951,7 @@ export function roundTripIsExact(forward: ConversionPlan, reverse: ConversionPla
 }
 
 const QUESTION_GONE = 'This question no longer exists.';
-const CONVERT_BLOCKED_BY_CONFLICT = 'Resolve the editing conflict first, then change the type.';
+const CONVERT_BLOCKED_BY_CONFLICT = 'First choose which version of the question to keep, then change its type.';
 const CONVERT_BLOCKED_BY_FAILED_SAVE =
     'Your last change hasn’t saved, so the type can’t be changed yet. Close this and fix the problem shown at the top of the settings panel.';
 const TYPE_MOVED_ELSEWHERE = 'This question’s type was changed somewhere else. Reload the page to see it.';

@@ -209,7 +209,7 @@ function submit(clear: boolean): void {
         <MdsFormField
             v-slot="{ id, describedby, invalid }"
             :label="`Message (${form.confirmation_message === '' ? 'default' : props.form.default_locale})`"
-            help="Blank uses the built-in default."
+            help="Leave it empty to use the standard thank-you message."
             :error="form.errors.confirmation_message"
         >
             <MdsTextarea
@@ -227,7 +227,7 @@ function submit(clear: boolean): void {
             :key="locale"
             v-slot="{ id, describedby, invalid }"
             :label="`Message (${locale})`"
-            help="Blank falls back to the message above."
+            help="Leave it empty to show the message above."
             :error="form.errors[`confirmation_message_translations.${locale}`]"
         >
             <MdsTextarea

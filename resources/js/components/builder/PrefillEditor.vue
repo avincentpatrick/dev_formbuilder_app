@@ -62,7 +62,7 @@ const effectiveParam = computed(() => (props.urlParam?.trim() || props.fieldKey)
             <MdsFormField
                 v-if="isFixed"
                 label="Fixed value"
-                help="Recorded on every response. Set by the server, so it cannot be changed by whoever opens the form."
+                help="Saved with every response. It is filled in when the response is saved, so whoever fills in the form cannot change it."
                 v-slot="{ id, describedby }"
             >
                 <MdsTextInput

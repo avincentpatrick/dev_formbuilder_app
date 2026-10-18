@@ -247,8 +247,8 @@ const note = computed<string | null>(() => {
                 @update:model-value="onTextChange"
             />
             <p class="cond__help">
-                Supports ${question} references, and/or/not, = != &gt; &lt; &gt;= &lt;=, arithmetic, and
-                selected()/count(). {{ copy.checked }}
+                Point at another question with its field key inside ${ }. You can use and, or, not, = != &gt; &lt; &gt;=
+                &lt;=, + - * /, selected() and count(). {{ copy.checked }}
             </p>
 
             <div v-if="representable" class="cond__actions">

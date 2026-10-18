@@ -543,8 +543,7 @@ watch(librarySaved, (value) => {
                 <!-- ── Field editor ─────────────────────────────────────────── -->
                 <template v-if="field">
                     <p v-if="advanced && configEditor === null" class="config__note">
-                        Baseline settings for this advanced field type. Its full editor and runtime arrive with the
-                        form engine.
+                        This type has only its basic settings here for now. Its own settings come in a later update.
                     </p>
 
                     <template v-if="activeTab === 'basics'">
@@ -567,7 +566,7 @@ watch(librarySaved, (value) => {
                         <MdsFormField
                             v-if="isCalculated"
                             label="Calculation formula" :error="fieldSaveErrors.inline['config.calculated_formula']"
-                            help="Evaluated on the server. Use ${field} references, arithmetic (+ - * /), comparisons, and if()/count()/int()/today()/now()."
+                            help="Worked out from other answers. Put another question's field key inside ${ }, and use + - * /, comparisons, or if(), count(), int(), today() and now()."
                             v-slot="{ id, describedby, invalid }"
                         >
                             <MdsTextarea
@@ -731,7 +730,7 @@ watch(librarySaved, (value) => {
                     </template>
 
                     <template v-else-if="activeTab === 'advanced'">
-                        <MdsFormField label="Field key" help="Referenced in expressions and exports. Lowercase, unique." :error="fieldSaveErrors.inline.key" v-slot="{ id, describedby, invalid }">
+                        <MdsFormField label="Field key" help="This question's short name in exports, formulas and conditions. Lowercase letters, numbers and _ only." :error="fieldSaveErrors.inline.key" v-slot="{ id, describedby, invalid }">
                             <MdsTextInput
                                 :id="id"
                                 :describedby="describedby" :invalid="invalid"
@@ -847,7 +846,7 @@ watch(librarySaved, (value) => {
                         <MdsFormField label="Section title" v-slot="{ id }">
                             <MdsTextInput :id="id" :model-value="section.label" @update:model-value="setSection('label', $event)" />
                         </MdsFormField>
-                        <MdsFormField label="Section key" help="Lowercase, unique within the form." v-slot="{ id, describedby }">
+                        <MdsFormField label="Section key" help="This section's short name in exports and conditions. Lowercase letters, numbers and _ only." v-slot="{ id, describedby }">
                             <MdsTextInput
                                 :id="id"
                                 :describedby="describedby"

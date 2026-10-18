@@ -400,7 +400,7 @@ export function projectDraft(input: DraftProjectionInput): DraftProjection {
         // engine branches on presence. M177 (`R-f7a18b7a`): `calculated_formula`, the key the builder writes and the
         // engine reads; this read `formula`, so every calculation would have said "no formula yet" once one can show.
         if (f.field_type === 'calculated') {
-            const formula = config.formula;
+            const formula = config.calculated_formula;
             if (typeof formula !== 'string' || formula.trim() === '') {
                 delete config.calculated_formula;
                 add(f.uid, key, 'missing_formula', 'This calculation has no formula yet, so it has no value in the preview.');

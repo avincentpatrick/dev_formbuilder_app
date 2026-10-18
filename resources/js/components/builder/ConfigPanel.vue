@@ -566,7 +566,7 @@ watch(librarySaved, (value) => {
                         <MdsFormField
                             v-if="isCalculated"
                             label="Calculation formula" :error="fieldSaveErrors.inline['config.calculated_formula']"
-                            help="Evaluated on the server. Worked out from other answers. Put another question's field key inside ${ }, and use + - * /, comparisons, or if(), count(), int(), today() and now()."
+                            help="Worked out from other answers. Put another question's field key inside ${ }, and use + - * /, comparisons, or if(), count(), int(), today() and now()."
                             v-slot="{ id, describedby, invalid }"
                         >
                             <MdsTextarea

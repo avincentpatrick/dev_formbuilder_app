@@ -275,6 +275,20 @@ it('marks the four palette variants, one primary per group, and nothing else', f
     expect(array_keys($grouped))->toEqualCanonicalizing(['short_text', 'long_text', 'integer', 'decimal']);
 });
 
+it('marks exactly Yes/No and Duration retired, and keeps all 31 entries (M177)', function (): void {
+    // M177 (`R-0b7db001`, `R-22011569`, `D140`). Written out rather than derived from `FieldType::isRetired()`, for the reason
+    // the file header gives. Additive: labels and lookups key off every entry, so a retired type is flagged, never missing.
+    $retiredByType = [];
+    foreach ($this->payload['palette'] as $group) {
+        foreach ($group['types'] as $type) {
+            $retiredByType[$type['value']] = $type['retired'];
+        }
+    }
+
+    expect($retiredByType)->toHaveCount(count(FieldType::cases()))
+        ->and(array_keys(array_filter($retiredByType)))->toEqualCanonicalizing(['yes_no', 'duration']);
+});
+
 it('gives every palette entry the layouts an author may choose, and only the two list types any', function (): void {
     // M130 (R-6c76bed2). Written out, for the same reason as above: the list is what the Options tab offers, and a
     // census computed by FieldAppearance::for() itself could not fail.

@@ -70,7 +70,8 @@ function ruleRetentionForm(): array
 function ruleRetentionAddField(User $admin, Form $form, string $type): FormField
 {
     $id = test()->actingAs($admin)
-        ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => $type])
+        // M177 (`D140`): a Yes/No here is an existing question; an author can no longer add one, the undo's `restore` can.
+        ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => $type, 'restore' => in_array($type, ['yes_no', 'duration'], true)])
         ->assertOk()
         ->json('id');
 

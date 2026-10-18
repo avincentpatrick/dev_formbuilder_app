@@ -79,7 +79,9 @@ function settingsRoundTripPayload(array $row, string $label): array
 function settingsRoundTripCreate(User $admin, Form $form, string $type): array
 {
     return test()->actingAs($admin)
-        ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => $type])
+        // M177 (`D140`): an author can no longer ADD a retired type; the undo's `restore` still can, which is how a question
+        // of every type — an existing one included — is made here.
+        ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => $type, 'restore' => in_array($type, ['yes_no', 'duration'], true)])
         ->assertOk()
         ->json();
 }

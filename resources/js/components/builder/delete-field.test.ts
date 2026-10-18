@@ -142,3 +142,28 @@ describe('a rule of another question comparing with the deleted one (R-9ea69e29)
         expect(consentSave).toHaveLength(1); // the rule is saved back, naming the restored question's key
     });
 });
+
+describe('the undo of a delete puts a question back as it was (M177)', () => {
+    // M177 (`R-0b7db001`, `D140`): the server refuses an author ADDING a retired type, and the undo of a delete re-creates
+    // the question through the same route — so the store says it is restoring, and an author's own add never does.
+    it('re-creates the deleted question with `restore`, and adds a new one without it', async () => {
+        mock.mockImplementation((url: string, init?: RequestInit) => {
+            const body = typeof init?.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : {};
+            if (init?.method === 'POST' && url.endsWith('/fields')) return Promise.resolve(jsonResponse(200, { ...AGE, id: 'f-new', key: 'text_9', field_type: String(body.field_type) }));
+
+            return Promise.resolve(jsonResponse(200, { ...serverField(), ...body, id: url.split('/').pop(), version: 'v9' }));
+        });
+        const store = useBuilderStore(pageProps({ fields: [{ ...AGE, field_type: 'yes_no' }], sections: [] }));
+
+        await store.deleteField(store.fields.value[0].uid);
+        await store.undo();
+        await store.addField('short_text', null);
+        await flushPromises();
+
+        const creates = requestLog(mock).filter((request) => request.method === 'POST' && request.url.endsWith('/fields'));
+        expect(creates.map((request) => request.body)).toEqual([
+            { field_type: 'yes_no', section_id: null, restore: true },
+            { field_type: 'short_text', section_id: null },
+        ]);
+    });
+});

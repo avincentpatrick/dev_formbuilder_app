@@ -77,6 +77,10 @@ function fieldConversionExpected(FieldType $from, FieldType $to): bool
     if ($t === 'parking' || $f === 'parking') {
         return true;
     }
+    // D145 (2026-10-18): a Yes/No becomes a Single choice, and back for the builder's undo only.
+    if ([$from, $to] === [FieldType::YesNo, FieldType::SingleSelect] || [$from, $to] === [FieldType::SingleSelect, FieldType::YesNo]) {
+        return true;
+    }
     if ($f === 'isolated') {
         return false;
     }
@@ -171,10 +175,10 @@ it('partitions all thirty-one types exactly once and leaves no family empty', fu
     }
 });
 
-it('allows exactly 182 ordered pairs', function (): void {
+it('allows exactly 184 ordered pairs', function (): void {
     // ⛔ THE ANTI-VACUITY NUMBER. 68 within families (text 20, number 2, temporal 6, choice 12, geo 6,
-    // attachment 20, grid 2) + 58 into note/hidden (29 each) + 56 out of them (2 × 28). A matrix that
-    // allowed nothing, or everything, cannot land on it.
+    // attachment 20, grid 2) + 58 into note/hidden (29 each) + 56 out of them (2 × 28) + 2 by `D145` (yes/no to
+    // single choice, and back for undo). A matrix that allowed nothing, or everything, cannot land on it.
     $allowed = 0;
     foreach (FieldType::cases() as $from) {
         foreach (FieldType::cases() as $to) {
@@ -182,7 +186,7 @@ it('allows exactly 182 ordered pairs', function (): void {
         }
     }
 
-    expect($allowed)->toBe(182);
+    expect($allowed)->toBe(184);
 });
 
 it('agrees with an independently written oracle on every one of the 961 pairs', function (): void {
@@ -205,8 +209,8 @@ it('refuses the D64 cross-shape pairs by name', function (FieldType $from, Field
     'whole number to calculated' => [FieldType::Integer, FieldType::Calculated],
     'calculated to whole number' => [FieldType::Calculated, FieldType::Integer],
     'duration to decimal' => [FieldType::Duration, FieldType::Decimal],
-    'yes/no to single choice' => [FieldType::YesNo, FieldType::SingleSelect],
-    'single choice to yes/no' => [FieldType::SingleSelect, FieldType::YesNo],
+    'yes/no to multiple choice' => [FieldType::YesNo, FieldType::MultiSelect],
+    'dropdown to yes/no' => [FieldType::Dropdown, FieldType::YesNo],
     'cascading to single choice' => [FieldType::CascadingSelect, FieldType::SingleSelect],
     'single choice to cascading' => [FieldType::SingleSelect, FieldType::CascadingSelect],
     'a type to itself' => [FieldType::ShortText, FieldType::ShortText],
@@ -225,6 +229,8 @@ it('allows the in-family pairs by name', function (FieldType $from, FieldType $t
     'photo to file upload' => [FieldType::ImageCapture, FieldType::FileUpload],
     'matrix to likert matrix' => [FieldType::Matrix, FieldType::LikertMatrix],
     'date to date and time' => [FieldType::Date, FieldType::Datetime],
+    'yes/no to single choice (D145)' => [FieldType::YesNo, FieldType::SingleSelect],
+    'single choice to yes/no, for the undo (D145)' => [FieldType::SingleSelect, FieldType::YesNo],
 ]);
 
 it('makes note and hidden two-way for every type but page_break', function (): void {
@@ -247,9 +253,49 @@ it('never converts to or from page_break', function (): void {
     }
 });
 
-it('offers calculated, duration, yes/no and cascading only note and hidden', function (FieldType $type): void {
+it('offers calculated, duration and cascading only note and hidden', function (FieldType $type): void {
     expect(FieldTypeConversion::targetsFor($type))->toBe([FieldType::Note, FieldType::Hidden]);
-})->with([FieldType::Calculated, FieldType::Duration, FieldType::YesNo, FieldType::CascadingSelect]);
+})->with([FieldType::Calculated, FieldType::Duration, FieldType::CascadingSelect]);
+
+it('offers a yes/no a single choice, then note and hidden (D145)', function (): void {
+    expect(FieldTypeConversion::targetsFor(FieldType::YesNo))->toBe([FieldType::SingleSelect, FieldType::Note, FieldType::Hidden]);
+});
+
+it('turns a yes/no into a single choice with the choices Yes and No, and its default with it (D145)', function (string $default, string $choice): void {
+    $field = makeSchemaField(['field_type' => FieldType::YesNo, 'config' => [], 'default_value' => $default]);
+    $plan = fieldConversionPlan($field, [], FieldType::SingleSelect);
+
+    expect($plan->config)->toBe(['options' => [['value' => 'yes', 'label' => 'Yes'], ['value' => 'no', 'label' => 'No']]])
+        ->and($plan->changes)->toBe([['column' => 'default_value', 'from' => $default, 'to' => $choice]])
+        ->and(fieldConversionWarningCodes($plan))->toBe(['answers_become_choices']);
+})->with([
+    'true' => ['true', 'yes'],
+    'one' => ['1', 'yes'],
+    'false' => ['false', 'no'],
+    'no' => ['no', 'no'],
+]);
+
+it('tells the author that earlier answers stay and new ones are choices, with no default to rewrite (D145)', function (): void {
+    $plan = fieldConversionPlan(makeSchemaField(['field_type' => FieldType::YesNo, 'config' => []]), [], FieldType::SingleSelect);
+
+    expect($plan->changes)->toBe([])
+        ->and(fieldConversionWarningCodes($plan))->toBe(['answers_become_choices'])
+        ->and(ConversionWarning::AnswersBecomeChoices->message())->toContain('Earlier answers stay');
+});
+
+it('turns a single choice back into a yes/no for the undo, dropping its choices and keeping a yes or no default (D145)', function (): void {
+    $field = makeSchemaField([
+        'field_type' => FieldType::SingleSelect,
+        'config' => ['options' => [['value' => 'yes', 'label' => 'Yes'], ['value' => 'no', 'label' => 'No']]],
+        'default_value' => 'no',
+    ]);
+    $plan = fieldConversionPlan($field, [], FieldType::YesNo);
+
+    expect($plan->config)->toBe([])
+        ->and($plan->configDropped)->toBe(['options'])
+        ->and($plan->changes)->toBe([])
+        ->and(fieldConversionWarningCodes($plan))->toBe([]);
+});
 
 it('orders targets family first in catalog order, then note, then hidden', function (): void {
     expect(FieldTypeConversion::targetsFor(FieldType::Email))

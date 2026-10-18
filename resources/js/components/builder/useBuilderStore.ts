@@ -991,6 +991,58 @@ export function useBuilderStore(props: BuilderPageProps) {
         });
     }
 
+    // ── Several questions at once (M177, `R-4a6f004f`, `D146`) ─────────────────────────────────────
+    // The ticks are their own set beside `selection`: the settings pane, the add target, Logic and Preview all read the
+    // ONE selected row, and a tick must change none of them.
+    const checked = ref<Set<Uid>>(new Set());
+    let checkAnchor: Uid | null = null;
+
+    /** Tick or untick a question — and with `extend` (shift held), every question between it and the last one ticked. */
+    function setChecked(uid: Uid, value: boolean, extend = false): void {
+        const order = flattenedFields().map((field) => field.uid);
+        let targets = [uid];
+        if (extend && checkAnchor !== null && order.includes(checkAnchor) && order.includes(uid)) {
+            const [from, to] = [order.indexOf(checkAnchor), order.indexOf(uid)].sort((a, b) => a - b);
+            targets = order.slice(from, to + 1);
+        }
+        const next = new Set(checked.value);
+        targets.forEach((target) => (value ? next.add(target) : next.delete(target)));
+        checked.value = next;
+        checkAnchor = uid;
+    }
+
+    function clearChecked(): void {
+        checked.value = new Set();
+        checkAnchor = null;
+    }
+
+    /**
+     * Move every given question to the end of a section (or the top level), in the order they stood — ONE order write
+     * and ONE undo entry, the shape of a drag (`placeField()` for each, then the whole order saved once). The ticks clear.
+     */
+    function moveFieldsToSection(uids: Uid[], sectionId: string | null): Promise<void> {
+        flushCommit();
+        return enqueue(async () => {
+            const wanted = new Set(uids);
+            const ordered = flattenedFields().filter((field) => wanted.has(field.uid)).map((field) => field.uid);
+            clearChecked();
+            if (ordered.length === 0) return;
+            const before = snapshotOrder();
+            for (const uid of ordered) {
+                const target = groups.value.find((group) => (group.section?.id ?? null) === sectionId);
+                placeField(uid, sectionId, target ? target.fields.filter((field) => field.uid !== uid).length : 0);
+            }
+            const after = snapshotOrder();
+            if (JSON.stringify(before) === JSON.stringify(after)) return;
+            await persistOrder();
+            pushHistory(
+                ordered.length === 1 ? 'Move a question' : `Move ${ordered.length} questions`,
+                () => applyOrderAndPersist(before),
+                () => applyOrderAndPersist(after),
+            );
+        });
+    }
+
     /** Reparent a field to another section (or ungrouped) — a structural move, so it goes via reorder. */
     function moveFieldToSection(uid: Uid, sectionId: string | null): Promise<void> {
         return enqueue(async () => {
@@ -1654,6 +1706,11 @@ export function useBuilderStore(props: BuilderPageProps) {
         addSection,
         deleteSection,
         moveFieldToSection,
+        // several questions at once (M177)
+        checkedFields: checked,
+        setChecked,
+        clearChecked,
+        moveFieldsToSection,
         // changing a question's type (M123)
         loadConversionPlans,
         convertField,

@@ -16,8 +16,14 @@ withDefaults(
         invalid?: boolean;
         disabled?: boolean;
         required?: boolean;
+        /**
+         * M177 (`R-4a6f004f`): keep `label` as the accessible name but draw no text beside the box — for a tick box
+         * whose row already names what it selects (the builder's Structure list). Off by default: a visible label is
+         * the rule (§3.2), and this is the one exception a list row's own text pays for.
+         */
+        hideLabel?: boolean;
     }>(),
-    { modelValue: false, invalid: false, disabled: false, required: false },
+    { modelValue: false, invalid: false, disabled: false, required: false, hideLabel: false },
 );
 
 defineEmits<{ 'update:modelValue': [value: boolean] }>();
@@ -48,7 +54,7 @@ defineEmits<{ 'update:modelValue': [value: boolean] }>();
                 />
             </svg>
         </span>
-        <span class="mds-checkbox__label">{{ label }}</span>
+        <span class="mds-checkbox__label" :class="{ 'mds-checkbox__label--hidden': hideLabel }">{{ label }}</span>
     </label>
 </template>
 
@@ -76,6 +82,19 @@ defineEmits<{ 'update:modelValue': [value: boolean] }>();
 
 /* Native control: hidden visually, still focusable + operable. */
 .mds-checkbox__input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* M177: the label stays the accessible name, drawn nowhere — the input's own visually-hidden rule. */
+.mds-checkbox__label--hidden {
     position: absolute;
     width: 1px;
     height: 1px;

@@ -319,6 +319,7 @@ const guide: ChapterDraft[] = [
                 blocks: [
                     list(
                         ['Reorder: drag a question or a section by its handle (the six dots on its left). Without a mouse, focus the handle, press Enter or Space, move with the arrow keys, then press Enter again.'],
+                        ['Move several at once: tick the box beside each question in ', ui('Structure', BUILDER), ' (hold Shift to tick every question between two), choose a section under ', ui('Move to', CANVAS), ', and press ', ui('Move', CANVAS), '. They keep their order, and one ', ui('Undo', BUILDER), ' puts them all back.'],
                         ['Rename: double-click a question’s label in ', ui('Structure', BUILDER), ' and type. Press Enter to keep it.'],
                         ['Copy: ', ui('Duplicate field', CANVAS), ' adds a copy right below the question.'],
                         ['Delete: ', ui('Delete field', CANVAS), ' for a question, ', ui('Delete section', CANVAS), ' for a section. ', ui('Undo', BUILDER), ' brings it back. If responses already hold answers to the question, you are told how many first: they keep them, marked as removed from the form.'],

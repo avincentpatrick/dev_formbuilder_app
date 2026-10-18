@@ -469,7 +469,7 @@ export class SemanticValidator {
         //
         // M177 (`R-f44e9d00`): a question set to Never is the hidden field's case exactly — nobody sees it, so nobody can
         // repair an error on it. Pinned by golden/validation/visibility.json.
-        if (field.field_type === 'calculated' || field.field_type === 'hidden' || field.visibility === 'hidden') {
+        if (field.field_type === 'calculated' || field.field_type === 'hidden') {
             return;
         }
 

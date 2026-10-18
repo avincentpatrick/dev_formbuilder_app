@@ -145,6 +145,9 @@ export interface PaletteType {
     // The layouts an author may choose for this type (M130) — `FieldAppearance::for()` via BuilderPresenter. Empty
     // for a type with no layout setting; optional for the same reason as `variant`, and absent reads as empty.
     appearances?: EnumOption[];
+    // M177 (`D140`) — `FieldType::isRetired()`: never offered to pick (palette, "Add a question here", Change type), while an
+    // existing question of the type keeps its label and lookups. Optional like `variant`; absent reads as not retired.
+    retired?: boolean;
 }
 
 export interface PaletteVariant {

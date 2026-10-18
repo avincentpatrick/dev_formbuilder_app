@@ -31,7 +31,11 @@ final class PlatformFieldLibraryItems
             ]),
             self::item('Phone number', 'A contact phone number.', 'Contact', FieldType::Phone, 'Phone number'),
             self::item('Email address', 'A contact email address.', 'Contact', FieldType::Email, 'Email address'),
-            self::item('Consent', 'Consent to take part.', 'Consent', FieldType::YesNo, 'Do you consent to take part?'),
+            // M177 (`R-0b7db001`, `D140`): a Single choice with the choices Yes and No — Yes/No left the palette. New copies only;
+            // an item already in a workspace is updated by re-seeding, which stays the operator's step.
+            self::item('Consent', 'Consent to take part.', 'Consent', FieldType::SingleSelect, 'Do you consent to take part?', [
+                'options' => ['Yes', 'No'],
+            ]),
         ];
     }
 

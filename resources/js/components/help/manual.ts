@@ -291,7 +291,7 @@ const guide: ChapterDraft[] = [
                         [ui('Single choice', FIELD_TYPES), ' — pick exactly one answer from a short list.'],
                         [ui('Multiple choice', FIELD_TYPES), ' — tick every answer that applies.'],
                         [ui('Dropdown', FIELD_TYPES), ' — pick one answer from a long list.'],
-                        [ui('Yes / No', FIELD_TYPES), ' — a simple yes-or-no question.'],
+                        ['A yes-or-no question is a ', ui('Single choice', FIELD_TYPES), ': on its ', ui('Options', CONFIG), ' tab, press ', ui('Add Yes and No', CHOICES), '.'],
                         [ui('Date', FIELD_TYPES), ', ', ui('Time', FIELD_TYPES), ' and ', ui('Date & time', FIELD_TYPES), ' — a calendar or clock picker.'],
                         [ui('Email', FIELD_TYPES), ' and ', ui('Phone', FIELD_TYPES), ' — checked to look like an email address or a phone number.'],
                         [ui('Photo', FIELD_TYPES), ', ', ui('File upload', FIELD_TYPES), ' and ', ui('Signature', FIELD_TYPES), ' — the respondent attaches or draws something.'],
@@ -762,7 +762,8 @@ const reference: ChapterDraft[] = [
                     p(
                         'A question changes only into a close relative: text types into each other; ', ui('Whole number', FIELD_TYPES), ' and ', ui('Decimal number', FIELD_TYPES),
                         '; the date and time types; ', ui('Single choice', FIELD_TYPES), ', ', ui('Multiple choice', FIELD_TYPES), ', ', ui('Dropdown', FIELD_TYPES), ' and ', ui('Likert scale', FIELD_TYPES),
-                        '; the GPS types; the media types; and the two grids. ', ui('Calculated', FIELD_TYPES), ', ', ui('Duration', FIELD_TYPES), ', ', ui('Yes / No', FIELD_TYPES), ' and ',
+                        '; the GPS types; the media types; and the two grids. A ', ui('Yes / No', FIELD_TYPES), ' question becomes a ', ui('Single choice', FIELD_TYPES), ' with the choices Yes and No. ',
+                        ui('Calculated', FIELD_TYPES), ', ', ui('Duration', FIELD_TYPES), ' and ',
                         ui('Cascading select', FIELD_TYPES), ' can only become a ', ui('Note / label', FIELD_TYPES), ' or a ', ui('Hidden field', FIELD_TYPES), '. A ', ui('Page break', FIELD_TYPES), ' cannot change.',
                     ),
                 ],
@@ -920,7 +921,7 @@ const reference: ChapterDraft[] = [
                 id: 'type-duration',
                 title: 'Duration',
                 blocks: [
-                    tip('warning', 'Respondents cannot answer a Duration question yet: the form shows “', NOT_YET, '” Use a ', ui('Whole number', FIELD_TYPES), ' question, such as “minutes”, for now.'),
+                    tip('warning', 'This type is retired: you can no longer add one. Respondents cannot answer a Duration question — the form shows “', NOT_YET, '” Use a ', ui('Whole number', FIELD_TYPES), ' question, such as “minutes”, for now; a duration will be worked out by a calculation.'),
                 ],
             },
         ],
@@ -970,7 +971,8 @@ const reference: ChapterDraft[] = [
                 id: 'type-yes-no',
                 title: 'Yes / No',
                 blocks: [
-                    p('Two buttons, ', ui('Yes', FIELD_INPUT), ' and ', ui('No', FIELD_INPUT), '. It has no settings of its own: write the question in ', ui('Label', CONFIG), ' and you are done.'),
+                    p('This type is retired: you can no longer add one, and a question already on a form keeps working. To ask yes or no, add a ', ui('Single choice', FIELD_TYPES), ' and press ', ui('Add Yes and No', CHOICES), ' on its ', ui('Options', CONFIG), ' tab. An existing one shows ', ui('Change to Single choice', TYPE_CONTROL), ', which keeps its answers.'),
+                    p('On the form it shows two buttons, ', ui('Yes', FIELD_INPUT), ' and ', ui('No', FIELD_INPUT), '.'),
                 ],
             },
             {

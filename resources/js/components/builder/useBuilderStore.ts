@@ -273,9 +273,11 @@ export function useBuilderStore(props: BuilderPageProps) {
     }
 
     // ── Server helpers (low-level; NOT enqueued — always called inside an enqueued action) ──────
-    async function createFieldServer(typeValue: string, sectionId: string | null): Promise<ServerField | null> {
+    // M177 (`D140`): `restore` says a history step is putting an existing question back — the server refuses an author ADDING a
+    // retired type (Yes/No, Duration), and the undo of a delete re-creates one through this same route.
+    async function createFieldServer(typeValue: string, sectionId: string | null, restore = false): Promise<ServerField | null> {
         const result = await guard(() =>
-            client.post<ServerField>(`${base}/fields`, { field_type: typeValue, section_id: sectionId }),
+            client.post<ServerField>(`${base}/fields`, { field_type: typeValue, section_id: sectionId, ...(restore ? { restore: true } : {}) }),
         );
         return result && !result.conflict ? result.data : null;
     }
@@ -384,7 +386,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         snap: FieldSnapshot,
         sequence: number,
     ): Promise<void> {
-        const created = await createFieldServer(typeValue, sectionId);
+        const created = await createFieldServer(typeValue, sectionId, true);
         if (!created) return;
         const local: LocalField = { ...created, uid };
         applyFieldSnapshot(local, snap);
@@ -1402,6 +1404,9 @@ export function useBuilderStore(props: BuilderPageProps) {
                 to: target,
                 version: live.version,
                 fingerprint: plan.fingerprint,
+                // M177 (`D145`): reversing a conversion may reach a retired type (Single choice back to Yes/No), which an
+                // author may not pick — so the step says it is restoring.
+                restore: true,
             }),
         );
         if (result === null) throw new HistoryStepFailed(`${failure} ${save.error ?? ''}`.trim());

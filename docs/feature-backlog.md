@@ -14332,7 +14332,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `copyKey()`); the client never creates one. The refusal is shown under Field key on the Advanced tab only
   (`resources/js/components/builder/ConfigPanel.vue:605-612`), while selecting a question always opens Basics (`:165-170`); the
   alert names every other refused question as "has a change that was not saved. Select it to see why" (`:80`) with no reason and
-  no badge on the tab; a validation refusal is not counted as unsaved, so there is no Retry (`useBuilderStore.ts:946-954`).
+  no badge on the tab; a validation refusal is not counted as unsaved, so there is no Retry (`useBuilderStore.ts:948-956`).
   `docs/form-versioning-schema-migration.md:129` says a key is never renamed, and nothing enforces it. `D132` (the user,
   2026-10-15): *"if we can already help the user avoid the errors, notify them or the app auto adjust the key naming to avoid
   conflicts"*. The remedy: the store knows every key in the draft — as the author types a key in use the panel says so inline
@@ -14504,7 +14504,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `resources/js/components/builder/FieldPalette.vue:102` titles every advanced type "baseline settings (advanced editor coming
   with the form engine)" beside the badge at `:106`; `resources/js/components/builder/ConfigPanel.vue:432-435` shows "Baseline
   settings for this advanced field type" only when an advanced type has no editor, and every one has had its editor since the
-  form engine landed; `app/Enums/FieldType.php:120-122` says the same. The testers asked whether the Adv types are ready
+  form engine landed; `app/Enums/FieldType.php:122-124` says the same. The testers asked whether the Adv types are ready
   (2026-10-15); they are, and the tooltip says otherwise. The remedy: the tooltip says what the Help page says
   (`resources/js/components/help/manual.ts:649`), the note and the docblock go. **Live.** Filed by `M172`. **Tier: early-testing.**
 
@@ -14682,7 +14682,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M176` (2026-10-18) — ****`minor` · The "Change question type" dialog speaks in developer words and repeats the type as the question's name.**
   The testers' comment (2026-10-11, comment 1): *"Make the text/instructions more “smart highschooler” friendly"*, on a screenshot of
   this dialog. `resources/js/components/builder/ConvertFieldDialog.vue:39` says *"It keeps its key, so conditions, calculations and
-  text that mention it still point to it"*; `resources/js/components/builder/field-conversion.ts:195` and
+  text that mention it still point to it"*; `resources/js/components/builder/field-conversion.ts:199` and
   `app/Enums/ConversionWarning.php:50` carry the rest, with `app/Enums/ConversionDropReason.php` and `app/Enums/ConversionImpact.php`;
   a new question's label is its type's label (`app/Services/Forms/FormBuilderService.php:137`), so the dialog reads *"Current type of
   “Date & time”: Date & time"*. The remedy: `docs/ux/design-system-reference.md` gains a voice rule — write for a smart

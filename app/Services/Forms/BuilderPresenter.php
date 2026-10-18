@@ -243,6 +243,9 @@ final class BuilderPresenter
                 'operand_kind' => OperandKind::for($type)->value,
                 // Increment M125 — additive: the palette shows ONE entry per group, and all 31 entries stay.
                 'variant' => $type->variantGroup()?->paletteVariant($type),
+                // M177 (`R-0b7db001`, `R-22011569`, `D140`) — additive too: a retired type is left out of what an author
+                // picks from (the palette, "Add a question here", Change type), and stays here for every label and lookup.
+                'retired' => $type->isRetired(),
                 // Increment M130 — the layouts an author may choose for this type (`FieldAppearance::for()`),
                 // transmitted rather than listed in the client; empty for every type with no layout setting.
                 'appearances' => array_map(

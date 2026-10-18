@@ -673,6 +673,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         fields.value.push(child);
         baselines.set(child.uid, fieldSnapshot(child));
         const group = groups.value.find((g) => (g.section?.id ?? null) === field.form_section_id);
+        placeField(child.uid, field.form_section_id, (group?.fields.findIndex((f) => f.uid === uid) ?? -1) + 1);
         await persistOrder();
 
         return child.uid;

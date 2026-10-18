@@ -16,7 +16,138 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M176`, R1 of the testers' round 2: the builder fixes, and a capture that waits for the page (`R-c4802b60`, `R-164579e8`, `R-5354b4b9`, `R-5554c526`, `R-61d43278`, `R-923c5041`, `R-36e6f557`, `R-a11cc78a`, `R-8496edfa`) (m176-r1-builder-fixes)
+## Status: ACTIVE CLAIM — `M177`, R2 of the testers' round 2: question types, visibility and moving (`R-0b7db001`, `R-22011569`, `R-71509975`, `R-f44e9d00`, `R-9bbaa97b`, `R-4a6f004f`, `R-b05fbaae`, `R-f7a18b7a`) (m177-r2-types-visibility-moving)
+
+Taken 2026-10-18. It is R2 of the testers' round 2 (`D138`; the plan of record `~/.claude/plans/here-are-added-comments-peppy-quill.md` §B, §E;
+the build plan `~/.claude/plans/pasted-content-id-9a0a-read-claude-md-pure-kay.md`). ⛔ **STACKED:** branch `m177-r2-types-visibility-moving`
+is cut from `origin/m176-r1-builder-fixes` at `8b144231` and merges `origin/main` (this claim) in; PR into main. **R2 completes merge point 2
+(`D137`, `D143`, `D144`):** once this PR is green 6/6, the user runs the staging census and backup block; `M176` (PR #369) merges with an
+explicit body; once its deploy has finished and `/up` answers 200, this branch is rebased onto the trunk and merges once green. Its deploy is
+the first real run of the deploy's own backup and row count (`R-2d921bbe`): the run log is read for the backup's path and both counts, and
+the user's census follows. No user check was owed at this session's start (R1 = `M176` built and held, not live). The feedback pull read 0
+reports. Two questions were asked and answered in planning (2026-10-18, the user, in chat), recorded on the branch's first commit:
+**`D145` A** — an existing Yes/No may be changed to a Single choice (choices Yes and No; earlier answers stay; `D64` gains this one exception);
+**`D146` A** — a tick box on every Structure row, a bar above the list when one is ticked, shift-click for a range.
+
+Rows taken, in build order, each its own commits: `R-0b7db001` + `R-22011569` (Yes/No and Duration leave the palette), `R-71509975` (an
+"Other, please specify" switch), `R-f44e9d00` (Show to respondents: Always · Never · Only when), `R-9bbaa97b` (the preview keeps a section
+whose questions are all hidden), `R-4a6f004f` (bulk move), `R-b05fbaae` (the builder's words in the DSR §1.5 voice). **Also taken:**
+`R-f7a18b7a` (R4's latent nit) — `R-f44e9d00` makes it live the moment a calculation can be shown, so it closes here, not in R4.
+
+### Evidence verified
+Read on `m176-r1-builder-fixes` at `8b144231` by three read-only passes plus my own reads, Docker not yet started.
+- `R-0b7db001`: `BuilderPresenter.php:222` (`palette()`, every enum case) — held. `StoreFieldRequest.php:28` (`Rule::enum(FieldType::class)`)
+  — held. `PlatformTemplateBlueprints.php:49` (a `yes_no` question) — held; also `:84`, `:96`, `:99`, `:163`, `:192`, `:193`, and the
+  library's Consent item `PlatformFieldLibraryItems.php:34`. `FieldPalette.vue:25` — **moved** by `M176`: the filter is now
+  `palette-groups.ts:11-18` (`pickableGroups()`), which `FieldPalette.vue:18` and `AddQuestionHere.vue` both call; `:25` is a comment.
+- `R-22011569`: `FieldInput.vue:604` ("Not available for manual entry yet") — held, inside the `encode-unsupported` branch at `:600-604`;
+  Duration reaches it because `schema-mapping.ts` `SUPPORTED` and `EncodeFormPresenter.php` leave it out.
+- `R-71509975`: the gap table's `or_other` line (`docs/feature-backlog.md:35`, tagged with this row) — held. `XlsformImportParser.php`
+  `listNameFromType()` keeps `$tokens[1]` only, so `or_other` is dropped — held.
+- `R-f44e9d00`: `field-roles.ts:33` (`RENDERS_NOTHING`, by type only) — held. `EncodeFormPresenter.php:99` (`OMITTED` = page break,
+  calculated) — held. The PDF (`PdfFieldRole.php`, `SubmissionPdfPresenter.php`) and print (`PrintAnswerArea.php`) skip by type — held.
+- `R-9bbaa97b`: `useFormRuntime.ts:482` (`pagesOf()`) and `:503` (a page keeps only rendering fields) — held. `PreviewPane.vue:234` —
+  **moved** to `:242` (`emptySections`, a section with no fields at all). `LogicRail.vue:150` ("Nobody filling the form sees this section")
+  — held.
+- `R-4a6f004f`: `types.ts:330` — **moved** to `:336` (`Selection`, one item). `routes/tenant.php:624` (`POST /forms/{form}/reorder`, whole
+  arrays) — held.
+- `R-b05fbaae`: `ConfigPanel.vue:523` — **moved** to `:557` ("Evaluated on the server. Use ${field} references …"); `:683` — **moved** to
+  `:717` ("Referenced in expressions and exports. Lowercase, unique.").
+- `R-f7a18b7a`: `draft-snapshot.ts:402` (`config.formula`) — held; the builder writes `config.calculated_formula`; `draft-snapshot.test.ts`
+  pins the wrong key — held.
+
+### Premise verified
+- One session only (the user, 2026-10-13); lane B retired; no other claim, held block or forward queue in either claim file beyond `M176`,
+  moved under HELD by this claim.
+- **Retiring a type cannot be a flat refusal.** The builder's undo puts a deleted question back through the same `POST /fields`
+  (`useBuilderStore.ts` `restoreFieldServer()`: undo of a delete, redo of an add, a duplicate, a library insert), and a conversion's undo
+  re-reads the plans and needs its reverse target offered. The refusal therefore applies to an author picking a type, with a `restore` flag
+  the store's undo and redo send; the plans still list retired targets, flagged, and the dialog never offers one.
+- **`D64` refused Yes/No → Single choice** (`FieldTypeConversion.php`: `yes_no` and `duration` are Isolated, converting only to note or
+  hidden; `FieldTypeConversionTest.php` pins it), so `D140`'s "change it to Single choice" needed a user decision — `D145` A. **Duration has
+  no answerable successor**, so its note says to change it to a Note or delete it, not "Single choice".
+- **The palette payload keeps all 31 types:** labels and lookups key off it (`ConfigPanel.vue`, `FieldTypeControl.vue`, `Builder.vue`, the
+  store) and `BuilderEnumsPayloadTest` pins 31. Retiring is an additive `retired` key, filtered in `pickableGroups()`.
+- **`other` already collides twice:** the library "Sex" item slugs a choice to `other`, and the analytics overflow bar keys itself `other`
+  beside rows keyed by choice value (`QuestionResultCard.vue`, `breakdown-bars.ts`) — duplicate Vue keys. The switch adopts an existing
+  `other` choice, and the overflow key becomes one no choice can take.
+- **The `D133` delete dialog lives only inside `BuilderCanvas.requestDelete()`** and shows a count; no dialog lists references. Switching
+  "Other" off reuses it, lifted into a shared composable.
+- **No server call creates two fields or places one:** `addField()` appends; M176's placement is client-side (`placeField()` +
+  `persistOrder()`). The pair is created in one transaction by a new endpoint and placed by the client, one undo entry.
+- **"Never" on an ordinary question needs both engines:** each skips required and constraint errors by type only (TS
+  `semantic-validator.ts`, PHP `SemanticValidator.php`), so a required short text set to Never would raise an error nobody can fix. The
+  PHP golden runner assigns `config` per branch, so a `visibility` key must be merged, not assigned.
+- **No calculated result type exists yet** (R4's `R-f77aa45d` adds it): "Always" formats with the shared display rule until then.
+- **The preview rebuilds only on the draft's shape** (`draft-snapshot.ts` `shapeOf()` leaves config out), and the engine has no author
+  mode; `paginateAtPageBreaks` is the precedent for a channel option. The guest's "drops a section of non-rendering fields" stays.
+- **A failed reorder write still pushes an undo entry** (`commitReorder`, `moveFieldToSection`: `persistOrder()` returns nothing). Bulk move
+  rides the same path; measured in the build and fixed there if real.
+- **"Move to section…" cannot be an `MdsMenu`** (DSR §3.4b: the canvas scrolls), and `MdsCheckbox` always shows its label and emits a bare
+  boolean, so a hidden label and the click's shift key are a design-system change.
+
+### Remedy verdict
+- `R-0b7db001`, `R-22011569`: **works, reshaped** — a palette flag, a refusal with a `restore` escape for undo, a retired note, a Yes / No
+  preset, the catalog seeds switched for new copies; and by `D145` a `yes_no → single_select` conversion (its reverse kept for undo only).
+- `R-71509975`: **works, reshaped** — one endpoint for on and off, adopting an existing `other`; the link kept across key renames, duplicate,
+  library save and conversion; XLSForm import maps `or_other`, export already writes the explicit pattern.
+- `R-f44e9d00`: **works, understated** — both engines' error skip, the golden vectors, the step projection, manual entry, the PDF and the
+  printed form; result-type formatting waits for R4.
+- `R-9bbaa97b`: **works** — a preview-only runtime option keeps a silent page; guest and manual entry unchanged.
+- `R-4a6f004f`: **works** — the server already takes whole lists; one `placeField()` per question inside one reorder session.
+- `R-b05fbaae`: **works** — about forty builder help, hint and note strings, the store's messages and the preview's limits list; no label
+  the manual quotes is renamed without the manual.
+- `R-f7a18b7a`: **works** — read `calculated_formula`.
+
+Files: `R-0b7db001`/`R-22011569` — `app/Enums/FieldType.php`, `app/Services/Forms/BuilderPresenter.php`,
+`app/Http/Requests/Forms/StoreFieldRequest.php`, `ConvertFieldRequest.php`, `app/Support/Forms/FieldTypeConversion.php`,
+`app/Services/Forms/FormBuilderService.php`, `database/seeders/Data/PlatformTemplateBlueprints.php`, `PlatformFieldLibraryItems.php`;
+`resources/js/components/builder/types.ts`, `palette-groups.ts`, `field-conversion.ts`, `FieldTypeControl.vue`, `ConfigPanel.vue`,
+`ChoicesEditor.vue`, `useBuilderStore.ts`; their Pest and Vitest files (`BuilderEnumsPayloadTest`, `BuilderSettingsRoundTripTest`,
+`FieldTypeConversionTest`, `field-palette.test.ts`, …). `R-71509975` — a new controller action and route in `routes/tenant.php`,
+`FormBuilderService.php`, `UpdateFieldRequest.php`, `app/Services/Xlsform/XlsformImportParser.php`, `DeleteFieldDialog.vue` and a new
+composable lifted from `BuilderCanvas.vue`, `ChoicesEditor.vue`/`ConfigPanel.vue`, the store, the analytics `QuestionResultCard.vue` and
+`breakdown-bars.ts`, `docs/xlsform-interop-spec.md`. `R-f44e9d00`/`R-f7a18b7a` — `resources/public-runtime/engine/field-roles.ts`,
+`semantic-validator.ts`, `schema.ts`, `lib/schema-mapping.ts`, `composables/useFormRuntime.ts`, `resources/js/components/submissions/FieldInput.vue`,
+`app/Services/Validation/SemanticValidator.php`, `app/Support/Forms/StepProjection.php`, `app/Enums/PdfFieldRole.php`,
+`app/Services/Submissions/EncodeFormPresenter.php`, `SubmissionPdfPresenter.php`, the print presenter, `resources/js/Pages/submissions/Encode.vue`,
+`ConfigPanel.vue`, `logic-rail.ts`, `draft-snapshot.ts`, `tests/golden/validation/` (a new file and `manifest.json`),
+`tests/fixtures/step-projection.json`, `docs/data-dictionary.md`, `docs/architecture/technical-architecture.md` §4.3. `R-9bbaa97b` —
+`useFormRuntime.ts`, `PreviewRuntime.vue`, `PreviewPane.vue`, `PreviewStepStrip.vue`, `preview-model.ts`. `R-4a6f004f` — the store,
+`BuilderCanvas.vue`, a new bulk bar component, `packages/design-system/src/components/Checkbox/` (component, story),
+`docs/ux/design-system-reference.md`. `R-b05fbaae` — the builder components' help strings, the store's constants, `builderClient.ts`,
+`preview-model.ts`, and the tests that pin them. Every row: `resources/js/components/help/manual.ts` where it describes the change.
+Close-out: `docs/feature-backlog.md`, `PROGRESS.md` (own block), `docs/pipeline.md`, `docs/gate-baselines.md`, `CLAUDE.md` and
+`scripts/next.php` (only if the guard passes and `R-2d921bbe` retires the backup block), `docs/deployment-infrastructure.md`; this file on main.
+Shared artefacts taken: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/ux/design-system-reference.md`,
+`docs/data-dictionary.md`, `docs/architecture/technical-architecture.md`, `docs/xlsform-interop-spec.md`, `docs/deployment-infrastructure.md`,
+`openapi.json` (only if the `FieldType` docblock changes), `tests/e2e/builder-structure.spec.ts`, `tests/e2e/builder-preview-authoring.spec.ts`,
+`PROGRESS.md` (own block).
+Hubs (`D128`: overlap allowed, every hub named; re-derived by `backlog-triage.php --json` before the PR):
+`app/Services/Forms/FormBuilderService.php`, `BuilderPresenter.php`, `app/Http/Requests/Forms/UpdateFieldRequest.php`, `StoreFieldRequest.php`,
+`app/Support/Forms/FieldTypeConversion.php`, `app/Services/Validation/SemanticValidator.php` + `resources/public-runtime/engine/semantic-validator.ts`,
+`field-roles.ts` + `app/Enums/PdfFieldRole.php`, `useFormRuntime.ts`, `schema-mapping.ts`, `resources/js/components/builder/useBuilderStore.ts`,
+`ConfigPanel.vue`, `BuilderCanvas.vue`, `PreviewPane.vue`, `PreviewRuntime.vue`, `draft-snapshot.ts`, `FieldInput.vue`,
+`EncodeFormPresenter.php`, `Encode.vue`, `XlsformImportParser.php`, `MdsCheckbox`, `manual.ts`, `docs/ux/design-system-reference.md`,
+`docs/data-dictionary.md`, `docs/architecture/technical-architecture.md`, `docs/feature-backlog.md`, `docs/claims/decisions.md`,
+`docs/pipeline.md`, `PROGRESS.md`.
+Paired files taken: the two engines (`SemanticValidator.php` ↔ `semantic-validator.ts`, through the golden vectors), `PdfFieldRole::Omitted`
+↔ `RENDERS_NOTHING`, the step projection (`StepProjection.php` ↔ `useFormRuntime.ts`, through `tests/fixtures/step-projection.json`).
+Namespaces spent: `D145`, `D146` (asked and answered in planning); no migration, no ADR.
+E2E specs the diff reaches, run locally: `builder-structure`, `builder-preview-authoring`, `builder-axe`, `builder-convert-axe`,
+`builder-settings-refresh`, `field-library-axe`, and whichever public-runtime, encode and XLSForm specs the diff reaches, named at the
+release; CI runs every spec.
+Prediction: red first on this head — the retired-type refusal and the restore escape, the palette's `retired` key, `pickableGroups()`, the
+`yes_no → single_select` plan; the Other endpoint (on, off, adopt, rename, duplicate) and the `or_other` import; the four visibility golden
+vectors on BOTH engines, the step-projection case, the encode and PDF cases, the Always row; the preview's silent page and the strip's mark;
+one `/reorder` and one undo for a bulk move, the shift range; the moved pinned sentences; `R-f7a18b7a`'s key. All green after. Mutants
+(about 15), each turning only its named case red: the filter dropped, the refusal dropped, the restore escape always on, the condition text,
+the adopt branch, the TS skip, the PHP skip, the projection, the encode omission, the silent-page flag ignored, a per-item persist, the
+range off, one rewritten sentence put back. **Most likely wrong:** the PHP engine's Never vector — the golden runner assigns `config` per
+branch, so a first vector can lose the key and pass on the defective code; its red must be seen on PHP, not only TS. Runner-up: the
+retired filter leaving an Add-here group heading with no types.
+
+## HELD — `M176`, R1 of the testers' round 2: the builder fixes, and a capture that waits for the page (`R-c4802b60`, `R-164579e8`, `R-5354b4b9`, `R-5554c526`, `R-61d43278`, `R-923c5041`, `R-36e6f557`, `R-a11cc78a`, `R-8496edfa`) (m176-r1-builder-fixes)
 
 **BUILT — PR #369, CI 6/6 green with real step counts (run 39070047421 at `8b144231`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the only skips are the two main-only staging-header steps and the failure-only report upload; the runs at `6b2d8a3c` and `1ae0efd9` were 6/6 too) — AND NOT MERGED.** ⛔ **Held for merge point 2 (`D137`, `D138`):** this PR
 merges with R2's, after the user's census and staging backup block; R2 (`M177`) is stacked on this branch. The branch carries the nine rows'

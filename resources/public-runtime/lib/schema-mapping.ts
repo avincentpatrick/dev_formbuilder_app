@@ -519,7 +519,6 @@ export function buildEngineSchema(schema: SchemaResponse): EngineSchema {
         // Media count bounds (Increment G6) — min/max attachment count for the engine's processMedia pass.
         media: isMediaFieldType(f.field_type) ? engineMediaConfig(f) : null,
         // M177 (`R-f44e9d00`): Show to respondents — a Never question raises no error nobody could repair.
-        visibility: visibilityOf(f),
     }));
 
     const sections: SchemaSection[] = schema.version.schema.sections.map((s) => ({

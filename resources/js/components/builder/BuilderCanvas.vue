@@ -50,7 +50,7 @@ const sectionTargets = computed(() => [
 ]);
 
 function onTick(uid: string, value: boolean): void {
-    store.setChecked(uid, value, shiftHeld);
+    store.setChecked(uid, value, false);
     shiftHeld = false;
 }
 

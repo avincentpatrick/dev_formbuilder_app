@@ -63,7 +63,7 @@ const bars = computed<BarDatum[]>(() => {
     const other = props.question?.other ?? null;
     if (other !== null) {
         list.push({
-            key: 'other',
+            key: 'overflow',
             label: `Other (${other.categories} ${other.categories === 1 ? 'value' : 'values'})`,
             value: other.count,
             neutral: true,

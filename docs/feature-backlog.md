@@ -9763,7 +9763,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   scroll container in between can add stray scroll: `scopes/Index.vue`, `BuilderCanvas.vue`, `FeedbackButton.vue`,
   `GeoInput.vue` and the guest runtime's `RuntimeShell.vue`. `clipped-node-containment.test.ts` pins exactly these
   five. ⚠️ The fix is one line each and the verification is not, since a positioned container also changes stacking,
-  so each wants a look at the running page. **Latent.** Filed by `M94`. **Tier: during-testing.**
+  so each wants a look at the running page. **Latent.** Filed by `M94`. **Tier: during-testing.** **`BuilderCanvas.vue` fixed by `M177` (2026-10-19):** `.canvas` positions itself, the containing block of its one absolutely positioned node (its sticky bulk-move bar is the only other positioned child, and nothing gains a stacking context); four remain, pinned exactly.
 - **`minor` · The password-strength requirement list loses its list semantics in Safari, and 21 more files carry the
   same shape.** Carried out of this ledger's design-system section by `M94` (2026-09-14). `MdsPasswordStrength`
   renders its list with `list-style: none` and no `role="list"`, so VoiceOver reads the requirements with no count,

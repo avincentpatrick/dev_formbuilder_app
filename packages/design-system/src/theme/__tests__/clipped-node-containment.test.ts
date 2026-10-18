@@ -70,7 +70,7 @@ const RULE = /([^{}]+)\{([^{}]*)\}/g;
  */
 const KNOWN_UNGUARDED = [
     'resources/js/Pages/scopes/Index.vue',
-    'resources/js/components/builder/BuilderCanvas.vue',
+    // ✅ `BuilderCanvas.vue` LEFT in M177: `.canvas` now positions itself, the containing block of its announcement region.
     'resources/js/components/shell/FeedbackButton.vue',
     'resources/js/components/submissions/GeoInput.vue',
     // Still here on purpose: M15 changed `SyncStatus.vue` and did not touch this one, and a containing

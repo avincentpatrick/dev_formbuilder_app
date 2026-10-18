@@ -319,6 +319,10 @@ async function requestDelete(field: LocalField): Promise<void> {
 
 <style scoped>
 .canvas {
+    /* M177: the containing block for `.canvas__sr`, its one absolutely positioned node — so the 1px announcement region
+       resolves inside this scroller rather than adding scroll to the page (clipped-node-containment.test.ts). No
+       z-index, so no stacking context; the sticky bulk bar is its only other positioned child. */
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--mds-space-4);

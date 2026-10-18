@@ -351,6 +351,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         const previous = (baselines.get(uid) as { key?: string } | undefined)?.key;
         if ('validations' in row && previous !== undefined && previous !== keptKey) {
             repointRules(uid, previous, keptKey);
+            repointOtherPair(row, previous, keptKey);
         }
     }
 

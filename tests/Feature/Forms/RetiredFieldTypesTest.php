@@ -126,7 +126,8 @@ it('turns an existing Yes/No into a Single choice with the choices Yes and No, k
         ->assertJsonPath('key', $field->key);
 
     enterTenant($this->tenant->id, $this->admin->id);
-    expect($field->refresh()->config['options'])->toBe([['value' => 'yes', 'label' => 'Yes'], ['value' => 'no', 'label' => 'No']]);
+    // toEqual: jsonb does not keep an object's key order.
+    expect($field->refresh()->config['options'])->toEqual([['value' => 'yes', 'label' => 'Yes'], ['value' => 'no', 'label' => 'No']]);
 });
 
 it('plans a single choice back into a Yes/No only so the undo can reverse it', function (): void {

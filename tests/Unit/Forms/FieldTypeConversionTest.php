@@ -272,8 +272,14 @@ it('turns a yes/no into a single choice with the choices Yes and No, and its def
     'true' => ['true', 'yes'],
     'one' => ['1', 'yes'],
     'false' => ['false', 'no'],
-    'no' => ['no', 'no'],
+    'capital No' => ['No', 'no'],
 ]);
+
+it('leaves a yes/no default that is already a choice value as it is (D145)', function (): void {
+    $plan = fieldConversionPlan(makeSchemaField(['field_type' => FieldType::YesNo, 'config' => [], 'default_value' => 'no']), [], FieldType::SingleSelect);
+
+    expect($plan->changes)->toBe([]);
+});
 
 it('tells the author that earlier answers stay and new ones are choices, with no default to rewrite (D145)', function (): void {
     $plan = fieldConversionPlan(makeSchemaField(['field_type' => FieldType::YesNo, 'config' => []]), [], FieldType::SingleSelect);
@@ -794,7 +800,7 @@ it('moves the fingerprint when a config key it will drop is added', function ():
 });
 
 it('gives every warning and every drop reason a sentence', function (): void {
-    expect(ConversionWarning::cases())->toHaveCount(8)
+    expect(ConversionWarning::cases())->toHaveCount(9) // M177: answers_become_choices (D145)
         ->and(ConversionDropReason::cases())->toHaveCount(3);
 
     foreach ([...ConversionWarning::cases(), ...ConversionDropReason::cases()] as $case) {

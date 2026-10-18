@@ -68,7 +68,6 @@ export function targetGroups(plans: readonly ConversionPlan[], palette: Readonly
 
     for (const plan of plans) {
         const type = palette.get(plan.to);
-        if (type?.retired) continue;
         (isAskedOfRespondent(type) ? asked : notAsked).push({ value: plan.to, label: type?.label ?? plan.to });
     }
 

@@ -386,7 +386,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         snap: FieldSnapshot,
         sequence: number,
     ): Promise<void> {
-        const created = await createFieldServer(typeValue, sectionId, false);
+        const created = await createFieldServer(typeValue, sectionId, true);
         if (!created) return;
         const local: LocalField = { ...created, uid };
         applyFieldSnapshot(local, snap);

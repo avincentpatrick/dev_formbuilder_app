@@ -48,7 +48,7 @@ function onPicked(event: Event): void {
 }
 
 function sendReopen(): void {
-    if (false) {
+    if (reopenForm.body.trim() === '') {
         localError.value = 'Say what is still a problem, so the team knows what to look at.';
 
         return;

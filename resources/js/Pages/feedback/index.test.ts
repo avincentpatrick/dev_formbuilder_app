@@ -6,9 +6,10 @@ import type { FeedbackPageProps, FeedbackRow } from '@/components/feedback/types
  * The tenant's own feedback list (Increment I7a, PRD Feature #11).
  *
  * Two assertions carry the weight:
- *  · IT OFFERS NO TRANSITION. Feature #11 gives the status lifecycle to the platform support team's
- *    internal view. A "Mark resolved" button here would be a tenant resolving a report in the OPERATOR's
- *    queue — a permissions defect that would look like a helpful affordance in review.
+ *  · IT OFFERS NO SUPPORT TRANSITION. Feature #11 gives triage, Resolved and Declined to the platform support
+ *    team's internal view. A "Mark resolved" button here would be a tenant resolving a report in the OPERATOR's
+ *    queue. Since M179 (`D151`) the only moves here are a tester's — It works / Still a problem — and only
+ *    where the server's `actions` offer them.
  *  · A NULL REPORTER IS A REMOVED MEMBER, NOT THE SYSTEM. The `users` join-shape RLS hides a removed
  *    member's row from a colleague, so a live non-null user_id can still resolve to null. Rendering that
  *    as "System" would attribute a person's words to the software.
@@ -16,11 +17,16 @@ import type { FeedbackPageProps, FeedbackRow } from '@/components/feedback/types
 
 const mocks = vi.hoisted(() => ({ get: vi.fn() }));
 
-vi.mock('@inertiajs/vue3', () => ({
-    Head: { name: 'Head', render: () => null },
-    Link: { name: 'Link', props: ['href'], template: '<a :href="href"><slot /></a>' },
-    router: { get: mocks.get },
-}));
+vi.mock('@inertiajs/vue3', async () => {
+    const { reactive } = await import('vue');
+
+    return {
+        Head: { name: 'Head', render: () => null },
+        Link: { name: 'Link', props: ['href'], template: '<a :href="href"><slot /></a>' },
+        router: { get: mocks.get },
+        useForm: (initial: Record<string, unknown>) => reactive({ ...initial, errors: {}, processing: false, post: vi.fn(), reset: vi.fn(), setError: vi.fn() }),
+    };
+});
 
 vi.mock('@/components/shell/PageHeader.vue', () => ({
     default: { name: 'PageHeader', template: '<header><slot name="actions" /></header>' },
@@ -43,6 +49,16 @@ function row(overrides: Partial<FeedbackRow> = {}): FeedbackRow {
         type_label: 'Bug',
         page_url: null,
         page_title: null,
+        source: 'button',
+        source_label: null,
+        reference: null,
+        title: null,
+        resolution_note: null,
+        confirmed_at: null,
+        confirmer: null,
+        comments: [],
+        actions: [],
+        can_comment: true,
         ...overrides,
     };
 }
@@ -63,7 +79,11 @@ function props(overrides: Partial<FeedbackPageProps> = {}): FeedbackPageProps {
                 { value: 'suggestion', label: 'Suggestion' },
                 { value: 'question', label: 'Question' },
             ],
-            applied: { status: null, type: null, q: null },
+            sources: [
+                { value: 'button', label: 'Feedback button' },
+                { value: 'relayed', label: 'Testing-round comment' },
+            ],
+            applied: { status: null, type: null, source: null, q: null },
         },
         empty_reason: null,
         ...overrides,
@@ -87,7 +107,7 @@ describe('tenant feedback list — read-only by design', () => {
         const labels = wrapper.findAll('button').map((button) => button.text());
 
         expect(labels.join(' ')).not.toMatch(/mark|resolve|review|won't fix/i);
-        expect(wrapper.text()).toContain('the status here is theirs to change, not yours');
+        expect(wrapper.text()).toContain('The platform support team triages each report');
 
         wrapper.unmount();
     });
@@ -171,6 +191,54 @@ describe('tenant feedback list — what kind, and which page (M175, `R-2ce2f274`
 
         expect(wrapper.find('tbody').text()).toContain('/dashboard');
         expect(wrapper.find('tbody').text()).not.toMatch(/\bBug\b|Suggestion|Question/);
+
+        wrapper.unmount();
+    });
+});
+
+describe('tenant feedback list — our note, the thread, and where a report came from (M179)', () => {
+    it('shows the support team\'s note, the thread and the tester\'s moves in the report', async () => {
+        const wrapper = render({
+            data: [
+                row({
+                    source: 'relayed',
+                    reference: 'U7',
+                    title: 'Remove the Duration question type',
+                    source_label: 'Your items, Oct 16',
+                    route: '',
+                    status: 'resolved',
+                    status_label: 'Resolved',
+                    resolution_note: 'Fixed in version a5b718b, live on staging.',
+                    comments: [
+                        { id: 'c1', author: 'Tess Tester', author_kind: 'member', action: null, body: 'Gone from the palette.', created_at: '2026-10-20T01:00:00+00:00', has_screenshot: false },
+                    ],
+                    actions: [
+                        { verb: 'confirm', label: 'It works' },
+                        { verb: 'reopen', label: 'Still a problem' },
+                    ],
+                }),
+            ],
+        });
+
+        expect(wrapper.text()).toContain('U7');
+        expect(wrapper.text()).toContain('Remove the Duration question type');
+
+        await wrapper.find('button[aria-label="View report"]').trigger('click');
+
+        expect(wrapper.find('[data-feedback-reply]').text()).toContain('Fixed in version a5b718b, live on staging.');
+        expect(wrapper.find('[data-feedback-thread]').text()).toContain('Gone from the palette.');
+        expect(wrapper.find('[data-verdict="confirm"]').exists()).toBe(true);
+
+        wrapper.unmount();
+    });
+
+    it('filters by where a report came from', async () => {
+        const wrapper = render();
+
+        await wrapper.find('#feedback-source').setValue('relayed');
+
+        expect(mocks.get).toHaveBeenCalled();
+        expect(mocks.get.mock.calls.at(-1)?.[1]).toMatchObject({ source: 'relayed' });
 
         wrapper.unmount();
     });

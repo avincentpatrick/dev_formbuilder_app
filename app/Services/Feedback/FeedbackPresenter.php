@@ -16,6 +16,7 @@ use App\Services\Audit\AuditLogPresenter;
 use App\Support\Search\KeywordFilter;
 use App\Support\Search\ListEmptyReason;
 use App\Support\Search\SearchTerms;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use LogicException;
@@ -199,6 +200,24 @@ final class FeedbackPresenter
             ],
             'view' => $open > 0 && ($view === 'testing' || $paginator->total() === 0) ? 'testing' : 'mine',
         ];
+    }
+
+    /**
+     * How many of this workspace's relayed reports are still open — not Confirmed, not Declined (M179, `D150`) —
+     * for the `feedback.testing_round_open` shared prop, so the Feedback panel can point at the testing round
+     * while there is something to check. Null without a workspace, where no query runs (the `entitlements`
+     * prop's fail-closed rule).
+     */
+    public function testingRoundOpen(): ?int
+    {
+        if (TenantContext::currentTenantId() === null) {
+            return null;
+        }
+
+        return FeedbackReport::query()
+            ->where('source', FeedbackSource::Relayed->value)
+            ->whereNotIn('status', [FeedbackStatus::Confirmed->value, FeedbackStatus::Declined->value])
+            ->count();
     }
 
     /**

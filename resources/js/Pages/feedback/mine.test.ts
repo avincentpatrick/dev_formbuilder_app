@@ -10,7 +10,8 @@ import type { MyFeedbackPageProps, MyFeedbackRow } from '@/components/feedback/t
  * the words New · Ongoing · Resolved · Declined, and the support team's reply.
  *
  * Three things carry the weight:
- *  · IT IS READ-ONLY. A reporter cannot move their own report through the operator's queue.
+ *  · THE SUPPORT LIFECYCLE IS NOT HERE. A reporter cannot triage, resolve or decline their own report; since
+ *    M179 (`D151`) they can only say It works / Still a problem on a fix, and only where the SERVER offers it.
  *  · THE SCREENSHOT IS NAMED, NEVER SHOWN. ADR-0015 §D9 reads a feedback screenshot under `feedback.view`
  *    on every route that serves it or on none — and most reporters do not hold it.
  *  · THE REPLY APPEARS ONLY WHERE THERE IS ONE, so an empty box never reads as "they said nothing".
@@ -18,11 +19,16 @@ import type { MyFeedbackPageProps, MyFeedbackRow } from '@/components/feedback/t
 
 const mocks = vi.hoisted(() => ({ get: vi.fn() }));
 
-vi.mock('@inertiajs/vue3', () => ({
-    Head: { name: 'Head', render: () => null },
-    Link: { name: 'Link', props: ['href'], template: '<a :href="href"><slot /></a>' },
-    router: { get: mocks.get },
-}));
+vi.mock('@inertiajs/vue3', async () => {
+    const { reactive } = await import('vue');
+
+    return {
+        Head: { name: 'Head', render: () => null },
+        Link: { name: 'Link', props: ['href'], template: '<a :href="href"><slot /></a>' },
+        router: { get: mocks.get },
+        useForm: (initial: Record<string, unknown>) => reactive({ ...initial, errors: {}, processing: false, post: vi.fn(), reset: vi.fn(), setError: vi.fn() }),
+    };
+});
 
 vi.mock('@/components/shell/PageHeader.vue', () => ({
     default: { name: 'PageHeader', props: ['title'], template: '<header><h1>{{ title }}</h1><slot name="actions" /></header>' },
@@ -45,8 +51,39 @@ function row(overrides: Partial<MyFeedbackRow> = {}): MyFeedbackRow {
         resolved_at: null,
         resolution_note: null,
         has_screenshot: false,
+        source: 'button',
+        source_label: null,
+        reference: null,
+        title: null,
+        confirmed_at: null,
+        confirmer: null,
+        comments: [],
+        actions: [],
+        can_comment: true,
         ...overrides,
     };
+}
+
+/** A relayed report — a comment the team loaded; every member sees it under Testing-round comments (M179). */
+function relayed(reference: string, overrides: Partial<MyFeedbackRow> = {}): MyFeedbackRow {
+    return row({
+        id: `relayed-${reference}`,
+        route: '',
+        page_url: null,
+        page_title: null,
+        source: 'relayed',
+        source_label: 'Your items, Oct 16',
+        reference,
+        title: `Relayed ${reference}`,
+        status: 'resolved',
+        status_label: 'Resolved',
+        resolution_note: 'Fixed in version a5b718b, live on staging.',
+        actions: [
+            { verb: 'confirm', label: 'It works' },
+            { verb: 'reopen', label: 'Still a problem' },
+        ],
+        ...overrides,
+    });
 }
 
 function render(overrides: Partial<MyFeedbackPageProps> = {}): VueWrapper {
@@ -55,6 +92,8 @@ function render(overrides: Partial<MyFeedbackPageProps> = {}): VueWrapper {
             data: [row()],
             meta: { current_page: 1, last_page: 1, total: 1, per_page: 25 },
             empty_reason: null,
+            testing_round: { open: 0, data: [] },
+            view: 'mine',
             ...overrides,
         },
     });
@@ -103,11 +142,70 @@ describe('my reports — what became of what I sent', () => {
         wrapper.unmount();
     });
 
-    it('offers no way to change a status', () => {
+    it('offers no support-side verb — only what the server offers a tester, and here it offers none', () => {
         const wrapper = render();
 
         const labels = wrapper.findAll('button').map((button) => button.text()).join(' ');
         expect(labels).not.toMatch(/mark|resolve|decline|ongoing/i);
+        expect(labels).not.toMatch(/it works|still a problem/i);
+
+        wrapper.unmount();
+    });
+});
+
+describe('feedback & testing — the testing-round tab (M179, D150)', () => {
+    it('shows no tab strip at all while nothing relayed is open', () => {
+        const wrapper = render({ testing_round: { open: 0, data: [relayed('U1', { status: 'confirmed', status_label: 'Confirmed working', actions: [] })] } });
+
+        expect(wrapper.find('[role="tablist"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testing-round]').exists()).toBe(false);
+        expect(wrapper.find('[data-my-reports]').exists()).toBe(true);
+
+        wrapper.unmount();
+    });
+
+    it('names how many are open on the tab, and opens on it when the server says so', async () => {
+        const wrapper = render({
+            view: 'testing',
+            testing_round: { open: 2, data: [relayed('U3'), relayed('U8', { status: 'reviewed', status_label: 'Ongoing', actions: [] })] },
+        });
+
+        const tabs = wrapper.findAll('[role="tab"]').map((tab) => tab.text());
+        expect(tabs).toEqual(['My reports', 'Testing-round comments (2 open)']);
+        expect(wrapper.find('[data-testing-round]').exists()).toBe(true);
+        expect(wrapper.text()).toContain('Relayed U3');
+        expect(wrapper.text()).toContain('From: Your items, Oct 16');
+        expect(wrapper.text()).toContain('Fixed in version a5b718b, live on staging.');
+
+        await wrapper.findAll('[role="tab"]')[0].trigger('click');
+        expect(wrapper.find('[data-my-reports]').exists()).toBe(true);
+        expect(wrapper.find('[data-testing-round]').exists()).toBe(false);
+
+        wrapper.unmount();
+    });
+
+    it('offers It works and Still a problem only on the rows the server offers them on', () => {
+        const wrapper = render({
+            view: 'testing',
+            testing_round: { open: 2, data: [relayed('U3'), relayed('U8', { status: 'reviewed', status_label: 'Ongoing', actions: [] })] },
+        });
+
+        const fixed = wrapper.find('[data-feedback-report="U3"]');
+        const inHand = wrapper.find('[data-feedback-report="U8"]');
+        expect(fixed.find('[data-verdict="confirm"]').exists()).toBe(true);
+        expect(fixed.find('[data-verdict="reopen"]').exists()).toBe(true);
+        expect(inHand.find('[data-feedback-verdict]').exists()).toBe(false);
+
+        wrapper.unmount();
+    });
+
+    it('says who confirmed a fix', () => {
+        const wrapper = render({
+            view: 'testing',
+            testing_round: { open: 1, data: [relayed('U1'), relayed('R1-4', { status: 'confirmed', status_label: 'Confirmed working', confirmer: 'Tess Tester', actions: [] })] },
+        });
+
+        expect(wrapper.find('[data-feedback-report="R1-4"] [data-feedback-confirmed]').text()).toContain('Confirmed working by Tess Tester');
 
         wrapper.unmount();
     });

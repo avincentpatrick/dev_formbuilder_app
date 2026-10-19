@@ -113,6 +113,11 @@ declare module '@inertiajs/core' {
              */
             impersonating: { exit_url: string } | null;
         };
+        /**
+         * M179 (`D150`) — how many testing-round comments are still open in this workspace (not Confirmed, not
+         * Declined); null off-tenant. The Feedback panel points at them while it is above zero.
+         */
+        feedback?: { testing_round_open: number } | null;
         ui: {
             theme: UiTheme;
             /** The tenant's active brand ramp (H23a3), or null. Theme => role => #RRGGBB. */

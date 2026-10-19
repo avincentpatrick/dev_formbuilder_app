@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
     acquire: vi.fn(),
     supported: vi.fn(() => true),
     lastForm: null as null | Record<string, unknown>,
+    pageProps: {} as Record<string, unknown>,
 }));
 
 vi.mock('@inertiajs/vue3', () => ({
@@ -43,7 +44,7 @@ vi.mock('@inertiajs/vue3', () => ({
 
         return form;
     },
-    usePage: () => ({ component: 'forms/Builder', url: '/forms/1/builder', props: {} }),
+    usePage: () => ({ component: 'forms/Builder', url: '/forms/1/builder', props: mocks.pageProps }),
     Link: { props: ['href'], template: '<a :href="href"><slot /></a>' },
 }));
 
@@ -88,6 +89,7 @@ function screenWith(file: File | null, onGrab: () => void = () => {}) {
 const png = (): File => new File(['x'], 'screenshot.png', { type: 'image/png' });
 
 beforeEach(() => {
+    mocks.pageProps = {};
     mocks.post.mockClear();
     mocks.reset.mockClear();
     mocks.acquire.mockReset();
@@ -287,6 +289,20 @@ describe('feedback panel — what the report says (M175, `R-2ce2f274`)', () => {
         const link = wrapper.find('a[href="/feedback/mine"]');
         expect(link.exists()).toBe(true);
         expect(link.text()).toContain('See your reports');
+        // Nothing relayed is open here, so no testing-round link (M179).
+        expect(wrapper.find('a[href="/feedback/mine?view=testing"]').exists()).toBe(false);
+
+        wrapper.unmount();
+    });
+
+    it('points at the testing-round comments while some are open, by name and count (M179, `D150`)', async () => {
+        mocks.pageProps = { feedback: { testing_round_open: 3 } };
+        const wrapper = render();
+        await openPanel(wrapper);
+
+        const link = wrapper.find('a[href="/feedback/mine?view=testing"]');
+        expect(link.exists()).toBe(true);
+        expect(link.text()).toBe('testing-round comments (3 open)');
 
         wrapper.unmount();
     });

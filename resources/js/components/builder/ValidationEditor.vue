@@ -239,7 +239,7 @@ function ruleOptionsFor(row: BuilderValidation): SelectOption[] {
 function relatedOptionsFor(row: BuilderValidation): SelectOption[] {
     const rule = ruleTypeOf(row);
     // M178: a calculation is left out — no rule reads one before R4 (`D149`); a row already naming one keeps it below.
-    const readable = props.comparableFields.filter((field) => !field.computed);
+    const readable = props.comparableFields;
     const offered = rule === null ? readable : readable.filter((field) => mayCompare(rule, props.operators, field));
     const options: SelectOption[] = offered.map((field) => ({ value: field.key, label: field.label }));
 

@@ -419,6 +419,14 @@ if (! is_file($feedbackTokenFile)) {
         (int) $feedbackMatch[1] > 0
             ? warn("{$feedbackMatch[1]} New feedback report(s): pull and triage them before the first row — php scripts/feedback-pull.php --out=<scratchpad>\\feedback")
             : pass('no New feedback reports');
+
+        // M179 (`D151`): what the testers said since the last pull — a reopened fix, a comment — is triaged
+        // like a new report. Counted, never blocking, like the line above.
+        if (preg_match('/reopened=(\d+) comments=(\d+)/', $feedbackOut, $threadMatch) === 1) {
+            ((int) $threadMatch[1] + (int) $threadMatch[2]) > 0
+                ? warn("{$threadMatch[1]} reopened report(s) and {$threadMatch[2]} new comment(s) since the last pull — the pull lists them; triage each like a new report")
+                : pass('no reopened reports or new comments since the last pull');
+        }
     } else {
         warn('the New-feedback count could not be read: '.trim(last_line($feedbackOut)));
     }

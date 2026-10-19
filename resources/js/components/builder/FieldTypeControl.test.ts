@@ -356,3 +356,59 @@ describe('FieldTypeControl — the format switch (M125); “Allow negative numbe
         expect(rowSummary(store)).toEqual([['min_value', '0', 0]]);
     });
 });
+
+describe('FieldTypeControl — a retired type (M177)', () => {
+    // M177 (`R-0b7db001`, `R-22011569`, `D140`, `D145`): Yes/No and Duration left the palette; an existing question keeps
+    // working and says so, and a Yes/No points at the one change that replaces it.
+    const RETIRED_PALETTE = [
+        ...PALETTE,
+        {
+            category: 'choice',
+            label: 'Choice',
+            icon: 'list',
+            types: [
+                { value: 'single_select', label: 'Single choice', advanced: false, has_options: true, config_editor: 'choices', value_shape: 'choice', operand_kind: 'value' },
+                { value: 'yes_no', label: 'Yes / No', advanced: false, has_options: false, config_editor: null, value_shape: 'boolean', operand_kind: 'value', retired: true },
+            ],
+        },
+        {
+            category: 'datetime',
+            label: 'Date & time',
+            icon: 'calendar',
+            types: [{ value: 'duration', label: 'Duration', advanced: false, has_options: false, config_editor: null, value_shape: 'duration', operand_kind: 'duration', retired: true }],
+        },
+    ];
+
+    function retiredStore(fieldType: string): BuilderStore {
+        const store = useBuilderStore(pageProps({ palette: RETIRED_PALETTE, fields: [serverField({ field_type: fieldType })] }));
+        store.select({ kind: 'field', uid: store.fields.value[0].uid });
+
+        return store;
+    }
+
+    it('says a Yes/No is retired, still works, and opens the dialog with Single choice chosen (FT-R1)', async () => {
+        const plan = conversionPlan({ from: 'yes_no', to: 'single_select', requires_confirmation: true });
+        const mock = fetchMock().mockResolvedValueOnce(jsonResponse(200, { plans: [plan, conversionPlan({ from: 'yes_no', to: 'note' })] }));
+        const wrapper = mountControl(retiredStore('yes_no'));
+
+        const note = wrapper.get('[data-retired-note]');
+        expect(note.text()).toContain('This type is retired. It still works.');
+        await note.get('[data-retired-change]').trigger('click');
+        await settle();
+
+        expect(requestLog(mock).map((r) => `${r.method} ${r.url}`)).toEqual(['GET /forms/form-1/fields/f1/conversions']);
+        expect(wrapper.get<HTMLSelectElement>('[data-convert-target]').element.value).toBe('single_select');
+    });
+
+    it('says a Duration is retired and cannot be answered, and offers no Single choice (FT-R2)', () => {
+        const wrapper = mountControl(retiredStore('duration'), false);
+
+        const note = wrapper.get('[data-retired-note]');
+        expect(note.text()).toContain('Respondents can’t answer it.');
+        expect(note.find('[data-retired-change]').exists()).toBe(false);
+    });
+
+    it('says nothing about a type that is not retired (FT-R3)', () => {
+        expect(mountControl(retiredStore('single_select'), false).find('[data-retired-note]').exists()).toBe(false);
+    });
+});

@@ -136,6 +136,12 @@ function publishFixtureCaseForm(Tenant $tenant, User $owner, array $case): Form
             [
                 'form_section_id' => isset($f['section']) ? $sectionIdByKey[$f['section']] : null,
                 'relevant_expression' => $f['relevant'] ?? null,
+                // M177 (`R-f44e9d00`): Show to respondents, as the builder stores it — and a calculation's formula, which
+                // publish requires of every calculation and no other consumer of this fixture reads.
+                'config' => array_filter([
+                    'visibility' => $f['visibility'] ?? null,
+                    'calculated_formula' => $f['calculate'] ?? null,
+                ], static fn (mixed $value): bool => $value !== null),
             ],
         );
     }
@@ -204,6 +210,8 @@ function modelsFromSnapshot(array $snapshot): array
         'field_type' => FieldType::from($f['field_type']),
         'sequence' => $f['sequence'],
         'relevant_expression' => $f['relevant_expression'],
+        // M177 (`R-f44e9d00`): the shipped snapshot's config, where Show to respondents lives.
+        'config' => $f['config'] ?? [],
     ]), $rawFields));
 
     return [$sections, $fields];

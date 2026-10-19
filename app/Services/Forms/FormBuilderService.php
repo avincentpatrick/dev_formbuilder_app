@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Support\Forms\ConversionPlan;
 use App\Support\Forms\DefaultFieldRules;
 use App\Support\Forms\FieldTypeConversion;
+use App\Support\Forms\OtherSpecify;
 use App\Support\Tenancy\PlatformRowCounter;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
@@ -370,6 +371,11 @@ final class FormBuilderService
             $this->assertStillDraftChild($form, $field);
 
             $copy = $field->replicate(['created_by', 'updated_by']);
+            // M177 (`R-71509975`): the copy keeps its choices, the Other one too, but not the link — two questions would
+            // otherwise claim one Please specify, and turning either off would delete the other's.
+            $copyConfig = (array) $copy->config;
+            unset($copyConfig[OtherSpecify::CONFIG_KEY]);
+            $copy->config = $copyConfig;
             $copy->key = $this->copyKey($draft, $field->key);
             $copy->label = $field->label.' (copy)';
             $copy->sequence = $this->nextFieldSequence($draft);
@@ -387,6 +393,125 @@ final class FormBuilderService
 
             return $copy->refresh();
         });
+    }
+
+    // ── "Other, please specify" (M177, `R-71509975`) ────────────────────────────
+
+    /**
+     * Turn "Other, please specify" on: an `other` choice (an existing one adopted — {@see OtherSpecify::withOther()}), and
+     * a Short text "Please specify", shown only when `other` is picked and required when shown, linked by the choice
+     * question's `config.other_specify_key`. ONE transaction under the draft lock, so the pair never half-exists.
+     *
+     * The new question is appended, as every add is; the builder places it right after the choice question and saves the
+     * order (`placeField()` + `persistOrder()`, M176's add-here shape). The choice question is returned too: its config
+     * changed, so its token did, and the builder's next edit of it must carry the new one.
+     *
+     * @return array{parent: FormField, child: FormField}
+     */
+    public function addOtherSpecify(Form $form, User $user, FormField $field): array
+    {
+        return DB::transaction(function () use ($form, $user, $field): array {
+            $draft = $this->lockDraft($form);
+            $this->assertStillDraftChild($form, $field);
+            $field->refresh();
+
+            /** @var array<string, mixed> $config */
+            $config = (array) $field->config;
+            if (! OtherSpecify::offers($field->field_type) || LinkedChoiceService::declaresLink($config)) {
+                throw FormException::otherSpecifyNotOffered();
+            }
+            if ($this->otherSpecifyChild($draft, $config) !== null) {
+                throw FormException::otherSpecifyAlreadyOn();
+            }
+
+            $child = FormField::create([
+                'form_version_id' => $draft->id,
+                'form_section_id' => $field->form_section_id,
+                'key' => $this->freeDerivedKey($draft, "{$field->key}_other"),
+                'field_type' => FieldType::ShortText,
+                'label' => OtherSpecify::CHILD_LABEL,
+                'is_required' => RequiredMode::Required,
+                'relevant_expression' => OtherSpecify::condition($field->key),
+                'config' => $this->defaultConfig(FieldType::ShortText),
+                'sequence' => $this->nextFieldSequence($draft),
+                'created_by' => $user->id,
+            ]);
+
+            /** @var list<array<string, mixed>> $options */
+            $options = array_values((array) ($config['options'] ?? []));
+            $config['options'] = OtherSpecify::withOther($options);
+            $config[OtherSpecify::CONFIG_KEY] = $child->key;
+            $field->forceFill(['config' => $config, 'updated_by' => $user->id])->save();
+
+            return ['parent' => $field->refresh(), 'child' => $child->refresh()];
+        });
+    }
+
+    /**
+     * Turn it off: the Please specify question and the `other` choice both go. The builder asks first when responses
+     * hold answers to the Please specify question (`D133`, the delete dialog); its answers stay, as any deleted
+     * question's do.
+     */
+    public function removeOtherSpecify(Form $form, User $user, FormField $field): FormField
+    {
+        return DB::transaction(function () use ($form, $user, $field): FormField {
+            $draft = $this->lockDraft($form);
+            $this->assertStillDraftChild($form, $field);
+            $field->refresh();
+
+            /** @var array<string, mixed> $config */
+            $config = (array) $field->config;
+            $child = $this->otherSpecifyChild($draft, $config);
+            if ($child === null) {
+                throw FormException::otherSpecifyNotOn();
+            }
+
+            $child->delete(); // cascades its validations, and every rule of another question comparing with it
+
+            /** @var list<array<string, mixed>> $options */
+            $options = array_values((array) ($config['options'] ?? []));
+            $config['options'] = OtherSpecify::withoutOther($options);
+            unset($config[OtherSpecify::CONFIG_KEY]);
+            $field->forceFill(['config' => $config, 'updated_by' => $user->id])->save();
+
+            return $field->refresh();
+        });
+    }
+
+    /**
+     * The Please specify question a choice question's link names, in this draft — or null when it names none, or one
+     * that is gone (renamed or deleted elsewhere): the switch then reads off and can be turned on again.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    private function otherSpecifyChild(FormVersion $draft, array $config): ?FormField
+    {
+        $key = $config[OtherSpecify::CONFIG_KEY] ?? null;
+
+        return is_string($key) && $key !== ''
+            ? FormField::query()->where('form_version_id', $draft->id)->where('key', $key)->first()
+            : null;
+    }
+
+    /**
+     * `$base` when no row of the draft holds it, else `{base}_2`, `{base}_3`… — fields and sections share one key space.
+     * Kept inside the column's 150 characters by shortening the base, never the suffix.
+     */
+    private function freeDerivedKey(FormVersion $draft, string $base): string
+    {
+        $taken = FormField::query()->where('form_version_id', $draft->id)->pluck('key')
+            ->merge(FormSection::query()->where('form_version_id', $draft->id)->pluck('key'))
+            ->flip();
+
+        $base = substr($base, 0, 140);
+        $candidate = $base;
+        $n = 2;
+        while ($taken->has($candidate)) {
+            $candidate = "{$base}_{$n}";
+            $n++;
+        }
+
+        return $candidate;
     }
 
     // ── Type conversion (Increment M121) ────────────────────────────────────────

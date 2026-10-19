@@ -442,6 +442,10 @@ const prunedDismissed = ref(false);
 
 // ── Rows ─────────────────────────────────────────────────────────────────────────────────────────────────
 function flatValue(fieldKey: string): AnswerValue {
+    // M177 (`R-f44e9d00`): a calculation set to Always is on this page read-only, showing what the engine worked out.
+    const worked = runtime.result.value.computed[fieldKey];
+    if (worked !== undefined) return worked as AnswerValue;
+
     return (runtime.answers[fieldKey] ?? null) as AnswerValue;
 }
 

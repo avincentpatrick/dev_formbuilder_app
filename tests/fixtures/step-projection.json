@@ -73,6 +73,34 @@
     "expected_steps": ["s1"]
   },
   {
+    "name": "visibility_never_only_section_is_dropped",
+    "note": "M177 (`R-f44e9d00`): a question set to Never shows to nobody, so a section holding only such questions renders no step, as a hidden-type one does.",
+    "sections": [
+      { "key": "s1", "sequence": 1 },
+      { "key": "s2", "sequence": 2 }
+    ],
+    "fields": [
+      { "key": "a", "section": "s1", "sequence": 1 },
+      { "key": "ref", "section": "s2", "visibility": "hidden", "sequence": 2 }
+    ],
+    "answers": {},
+    "expected_steps": ["s1"]
+  },
+  {
+    "name": "visibility_always_calculated_section_is_kept",
+    "note": "M177 (`R-f44e9d00`): a calculation set to Always shows its value, so its section is a step.",
+    "sections": [
+      { "key": "s1", "sequence": 1 },
+      { "key": "s2", "sequence": 2 }
+    ],
+    "fields": [
+      { "key": "a", "section": "s1", "sequence": 1 },
+      { "key": "total", "section": "s2", "field_type": "calculated", "visibility": "shown", "calculate": "1 + 1", "sequence": 2 }
+    ],
+    "answers": {},
+    "expected_steps": ["s1", "s2"]
+  },
+  {
     "name": "predicate_3_section_whose_every_field_is_gated_off_is_dropped",
     "note": "The one correctness change H21a asks for. Predicate 2 is a STATIC type test, so without predicate 3 this section renders a heading, a Next button and zero questions — the grayed-out step form-filling-ux-flow.md 3.2 rejects, reached through another door.",
     "sections": [

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Rules\PickableFieldType;
+
 /**
  * The 31-value field-type catalog across 8 categories (data-dictionary FieldType catalog, carried
  * forward from legacy's 8-category `input_types` lookup, expressed as code with no lookup table).
@@ -202,6 +204,31 @@ enum FieldType: string
         return match ($this) {
             self::FileUpload, self::ImageCapture, self::AudioCapture, self::VideoCapture, self::Signature => true,
             default => false,
+        };
+    }
+
+    /**
+     * Whether an author may no longer PICK this type — from the palette, the "Add a question here" list, or as a
+     * conversion target (M177, `R-0b7db001`, `R-22011569`, `D140`). Yes/No is a Single choice with the choices Yes and
+     * No; a Duration has no control anyone can answer, and a duration is worked out by a calculation. Every existing
+     * question of a retired type keeps working everywhere — no data is touched — and the builder's undo may still put
+     * one back ({@see PickableFieldType}).
+     *
+     * ⛔ TOTAL, WITH NO `default` ARM, for the {@see self::variantGroup()} reason: retiring a type is a decision
+     * (`D140`), so a thirty-second type must be placed here on purpose.
+     */
+    public function isRetired(): bool
+    {
+        return match ($this) {
+            self::YesNo, self::Duration => true,
+            self::ShortText, self::LongText, self::Email, self::Phone, self::Url,
+            self::Integer, self::Decimal, self::Calculated,
+            self::Date, self::Time, self::Datetime,
+            self::SingleSelect, self::MultiSelect, self::Dropdown, self::CascadingSelect,
+            self::LikertScale, self::LikertMatrix,
+            self::Geopoint, self::Geotrace, self::Geoshape,
+            self::FileUpload, self::ImageCapture, self::AudioCapture, self::VideoCapture, self::Signature,
+            self::Note, self::PageBreak, self::Hidden, self::Matrix => false,
         };
     }
 

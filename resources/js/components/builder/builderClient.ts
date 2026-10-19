@@ -107,7 +107,8 @@ async function request<T>(method: Method, url: string, body?: unknown, extra: Re
     }
 
     if (!response.ok) {
-        let message = `Request failed (${response.status}).`;
+        // M177 (`R-b05fbaae`): in the DSR §1.5 voice; the status stays, for whoever reports it.
+        let message = `Something went wrong (error ${response.status}). Try again.`;
         let errors: Record<string, string[]> = {};
         try {
             const payload = (await response.json()) as { message?: string; errors?: Record<string, string[]> };

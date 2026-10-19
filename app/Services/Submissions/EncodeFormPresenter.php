@@ -18,6 +18,7 @@ use App\Services\Forms\StepGraphInspector;
 use App\Services\Templates\TemplateRenderer;
 use App\Services\Templates\TemplateSources;
 use App\Services\Validation\SemanticValidator;
+use App\Support\Forms\FieldVisibility;
 use App\Support\Forms\FormScheduleView;
 use App\Support\Forms\StepDescriptor;
 use App\Support\Forms\StepProjection;
@@ -134,8 +135,13 @@ final class EncodeFormPresenter
         $editing = $isDraft ? null : $subject;
         $sections = $version->sections()->orderBy('sequence')->get();
         $allFields = $version->fields()->orderBy('sequence')->get();
+        // M177 (`R-f44e9d00`): a keyer types what is on the paper. A question set to Never is on none (the printed form
+        // leaves it off), so it is not here either — the Hidden type keeps its keyer row whatever it says (H7). A
+        // calculation set to Always IS here, read-only, worked out as the keyer types.
         $fields = $allFields
-            ->reject(fn (FormField $f): bool => in_array($f->field_type, self::OMITTED, true));
+            ->reject(fn (FormField $f): bool => (in_array($f->field_type, self::OMITTED, true)
+                    && ! ($f->field_type === FieldType::Calculated && FieldVisibility::of($f->config) === FieldVisibility::SHOWN))
+                || ($f->field_type !== FieldType::Hidden && FieldVisibility::of($f->config) === FieldVisibility::HIDDEN));
 
         // Increment H6a — piping (Doc #26 §3.4). ~~This page serves a BLANK keying form: there is no
         // submission and therefore no answer document, so every hole renders as the empty string.~~

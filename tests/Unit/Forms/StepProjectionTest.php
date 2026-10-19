@@ -81,6 +81,8 @@ function stepProjectionModels(array $case): array
         'field_type' => FieldType::from($f['field_type'] ?? 'short_text'),
         'sequence' => $f['sequence'],
         'relevant_expression' => $f['relevant'] ?? null,
+        // M177 (`R-f44e9d00`): Show to respondents, as the builder stores it.
+        'config' => isset($f['visibility']) ? ['visibility' => $f['visibility']] : [],
     ]), $rawFields));
 
     return [$sections, $fields];

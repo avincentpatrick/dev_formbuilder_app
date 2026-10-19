@@ -52,8 +52,10 @@ function categoryLabel(key: string | null): string {
 const bars = computed<BarDatum[]>(() => {
     const rows = props.question?.rows ?? [];
 
+    // M177 (`R-71509975`): an answer's key says it is an answer, because a choice may be valued `other` (the "Other, please
+    // specify" switch adds one) and the overflow bar is keyed `other` — two bars with one Vue key, side by side.
     const list: BarDatum[] = rows.map((row, index) => ({
-        key: row.key ?? `null-${index}`,
+        key: row.key === null ? `none:${index}` : `answer:${row.key}`,
         label: categoryLabel(row.key),
         value: row.count,
     }));

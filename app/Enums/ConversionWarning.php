@@ -42,6 +42,9 @@ enum ConversionWarning: string
     /** The field sits in a repeatable section, where the new type cannot be published. */
     case RepeatableSectionRefusesType = 'repeatable_section_refuses_type';
 
+    /** M177 (`D145`): a Yes/No becomes a Single choice — answers already given keep their yes-or-no form. */
+    case AnswersBecomeChoices = 'answers_become_choices';
+
     /** M176 (`R-36e6f557`): in the DSR §1.5 voice — short sentences, everyday words, what to do next. */
     public function message(): string
     {
@@ -54,6 +57,7 @@ enum ConversionWarning: string
             self::IndexedTypeMayNotSuit => 'It is indexed for reporting with a data type chosen for the old type. Check that it still fits.',
             self::ScaleValuesNotNumeric => 'A Likert scale scores each choice as a number, and at least one choice’s value isn’t a number.',
             self::RepeatableSectionRefusesType => 'This question is in a repeating section, where the new type can’t be used. Move it, or choose another type, before you publish.',
+            self::AnswersBecomeChoices => 'Earlier answers stay as they were. New answers are saved as the choice Yes or No.',
         };
     }
 }

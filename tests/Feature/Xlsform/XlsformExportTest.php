@@ -136,6 +136,30 @@ it('assembles the survey sheet across every field family', function (): void {
         ->and(surveyRow($sheets, 'intro')['type'])->toBe('note');
 });
 
+it('writes an Other, please specify pair out in full, never as or_other (M177, R-71509975)', function (): void {
+    // ODK advises the explicit pattern over `or_other`, which breaks translations; the pair is two real questions, so it
+    // exports as one: a choice `other` and a text question whose relevant names it.
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    $form = makeForm($owner, 'Jobs');
+    $version = makeDraftVersion($form);
+    addFormField($version, $owner, 'job', FieldType::SingleSelect, 0, ['config' => [
+        'options' => [['value' => 'farmer', 'label' => 'Farmer'], ['value' => 'other', 'label' => 'Other']],
+        'other_specify_key' => 'job_other',
+    ]]);
+    addFormField($version, $owner, 'job_other', FieldType::ShortText, 1, [
+        'label' => 'Please specify', 'is_required' => RequiredMode::Required, 'relevant_expression' => "selected(\${job}, 'other')",
+    ]);
+
+    $sheets = app(XlsformExporter::class)->build($form, $version->refresh());
+
+    expect(surveyRow($sheets, 'job')['type'])->toBe('select_one job')
+        ->and(surveyRow($sheets, 'job_other'))->toMatchArray(['type' => 'text', 'required' => 'yes', 'relevant' => "selected(\${job}, 'other')"])
+        ->and(array_column(array_filter($sheets['choices']['rows'], static fn (array $r): bool => $r['list_name'] === 'job'), 'name'))->toBe(['farmer', 'other']);
+});
+
 it('expands the lossy grid + structural types (§3)', function (): void {
     $tenant = inboxTenant();
     $owner = User::factory()->create();

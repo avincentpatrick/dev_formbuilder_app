@@ -36,3 +36,25 @@ const RENDERS_NOTHING = new Set<string>(['hidden', 'calculated', 'page_break']);
 export function rendersNothing(fieldType: string): boolean {
     return RENDERS_NOTHING.has(fieldType);
 }
+
+/** M177 (`R-f44e9d00`) — "Show to respondents": `hidden` is Never, `shown` is Always; absent keeps the type's own rule. */
+export type FieldVisibility = 'hidden' | 'shown';
+
+/**
+ * Whether THIS field renders to a respondent — the per-field rule beside the per-type set above, which stays the
+ * default (and the literal `PdfFieldRoleTest` parses). Never hides any question; Always shows a calculation's value,
+ * which is Never by default; the Hidden type and a page break render nothing whatever is stored. Twin of
+ * `App\Support\Forms\FieldVisibility::rendersNothing()`, pinned by `tests/golden/validation/visibility.json` and the
+ * shared step fixture.
+ */
+export function fieldRendersNothing(field: { field_type?: string; visibility?: string | null }): boolean {
+    const type = field.field_type ?? '';
+    if (type === 'hidden' || type === 'page_break' || field.visibility === 'hidden') {
+        return true;
+    }
+    if (type === 'calculated') {
+        return field.visibility !== 'shown';
+    }
+
+    return rendersNothing(type);
+}

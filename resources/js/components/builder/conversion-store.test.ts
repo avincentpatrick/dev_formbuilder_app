@@ -192,7 +192,8 @@ describe('undo and redo of a conversion', () => {
 
         const log = requestLog(mock).slice(1);
         expect(log.map((r) => `${r.method} ${r.url}`)).toEqual(['GET /forms/form-1/fields/f1/conversions', 'POST /forms/form-1/fields/f1/convert']);
-        expect(log[1].body).toEqual({ to: 'short_text', version: 'v2', fingerprint: 'b'.repeat(64) });
+        // M177 (`R-0b7db001`): a history step says it is restoring — the server lets it reach a retired type an author may not pick.
+        expect(log[1].body).toEqual({ to: 'short_text', version: 'v2', fingerprint: 'b'.repeat(64), restore: true });
         expect(store.fields.value[0].field_type).toBe('short_text');
         expect(store.canRedo.value).toBe(true);
     });
@@ -248,7 +249,7 @@ describe('undo and redo of a conversion', () => {
 
         const log = requestLog(mock).slice(3);
         expect(log.map((r) => r.method)).toEqual(['GET', 'POST']);
-        expect(log[1].body).toEqual({ to: 'long_text', version: 'v3', fingerprint: 'd'.repeat(64) });
+        expect(log[1].body).toEqual({ to: 'long_text', version: 'v3', fingerprint: 'd'.repeat(64), restore: true });
         expect(store.fields.value[0].field_type).toBe('long_text');
         expect(store.canUndo.value).toBe(true);
     });

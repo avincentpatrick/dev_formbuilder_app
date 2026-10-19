@@ -67,6 +67,12 @@ final class FieldTypeConversion
     private const SINGLE_OPTION = [FieldType::SingleSelect, FieldType::Dropdown, FieldType::LikertScale];
 
     /**
+     * M177 (`D145`): the choices a Yes/No arrives at Single choice with — the values the XLSForm export has always
+     * written for a Yes/No (`XlsformExporter::pushYesNoList()`), so a condition reading `= 'yes'` keeps its meaning.
+     */
+    private const YES_NO_OPTIONS = [['value' => 'yes', 'label' => 'Yes'], ['value' => 'no', 'label' => 'No']];
+
+    /**
      * ⛔ A `match` ON THE ENUM WITH NO `default` ARM: a thirty-second field type is a PHPStan level-8 error
      * here, never a silent member of some family.
      */
@@ -105,6 +111,10 @@ final class FieldTypeConversion
             return false;
         }
 
+        if (self::isYesNoEdge($from, $to)) {
+            return true;
+        }
+
         $toFamily = self::family($to);
 
         return match (self::family($from)) {
@@ -114,6 +124,17 @@ final class FieldTypeConversion
             ConversionFamily::Text, ConversionFamily::Number, ConversionFamily::Temporal, ConversionFamily::Choice,
             ConversionFamily::Geo, ConversionFamily::Attachment, ConversionFamily::Grid => $toFamily === self::family($from) || $toFamily === ConversionFamily::Parking,
         };
+    }
+
+    /**
+     * M177 (`D145`, amending `D64`): Yes/No left the palette (`D140`), and an existing one becomes a Single choice with
+     * the choices Yes and No — the one exception to its Isolated family. The way back exists so the builder's undo can
+     * reverse it through the same endpoint (`D64`'s amendment made note and hidden two-way for the same reason); an
+     * author never picks it, because a retired type is never offered ({@see FieldType::isRetired()}).
+     */
+    private static function isYesNoEdge(FieldType $from, FieldType $to): bool
+    {
+        return [$from, $to] === [FieldType::YesNo, FieldType::SingleSelect] || [$from, $to] === [FieldType::SingleSelect, FieldType::YesNo];
     }
 
     /**
@@ -170,7 +191,13 @@ final class FieldTypeConversion
         // Read raw: an unsaved row (the Unit tests', and a field created without one) may carry no config.
         /** @var array<string, mixed> $source */
         $source = (array) $field->getAttribute('config');
-        $config = $throughParking ? $targetDefaultConfig : self::inFamilyConfig($from, $to, $source, $targetDefaultConfig);
+        $config = match (true) {
+            $throughParking => $targetDefaultConfig,
+            // `D145`: a Yes/No's answers were never typed choices, so the Single choice gets exactly two; back, it holds none.
+            $to === FieldType::SingleSelect && $from === FieldType::YesNo => array_replace($targetDefaultConfig, ['options' => self::YES_NO_OPTIONS]),
+            $to === FieldType::YesNo => $targetDefaultConfig,
+            default => self::inFamilyConfig($from, $to, $source, $targetDefaultConfig),
+        };
 
         [$kept, $dropped] = self::partitionRows($from, $to, $validations);
         $changes = self::changes($field, $to, $toParking);
@@ -249,6 +276,11 @@ final class FieldTypeConversion
 
         if (! in_array($to, LinkedChoiceService::LINKABLE_TYPES, true)) {
             unset($config['options_source']);
+        }
+
+        // M177 (`R-71509975`): a Likert scale has no "Other, please specify" — the link is dropped, and the plan says so.
+        if (! OtherSpecify::offers($to)) {
+            unset($config[OtherSpecify::CONFIG_KEY]);
         }
 
         return $config;
@@ -381,6 +413,16 @@ final class FieldTypeConversion
             $changes[] = ['column' => 'is_required', 'from' => $required, 'to' => RequiredMode::Optional];
         }
 
+        // `D145`: a Yes/No's default is any yes-or-no spelling (`Coercion::yesNoAnswer()`); a Single choice's must be one
+        // of its two values. The way back needs nothing — a Yes/No reads `yes` and `no` already.
+        $defaultValue = self::defaultValue($field);
+        if ($field->field_type === FieldType::YesNo && $to === FieldType::SingleSelect && self::filled($defaultValue) && ! self::defaultIsExpression($field)) {
+            $choice = Coercion::yesNoAnswer($defaultValue) ? 'yes' : 'no';
+            if ($choice !== $defaultValue) {
+                $changes[] = ['column' => 'default_value', 'from' => $defaultValue, 'to' => $choice];
+            }
+        }
+
         // A note has no answer: nothing to default, nothing to index. Hidden keeps both — its default is its
         // fixed prefill, and it is indexable.
         if ($to === FieldType::Note) {
@@ -455,6 +497,7 @@ final class FieldTypeConversion
                 // Only a refusal the conversion CREATES: a geo field already in a repeat was already refused.
                 ConversionWarning::RepeatableSectionRefusesType => $inRepeatableSection
                     && self::refusedInRepeat($to) && ! self::refusedInRepeat($from),
+                ConversionWarning::AnswersBecomeChoices => $from === FieldType::YesNo && $to === FieldType::SingleSelect,
             };
 
             if ($fires) {
@@ -492,6 +535,8 @@ final class FieldTypeConversion
             in_array($from, self::PLAIN_TEXT, true) && in_array($to, self::PLAIN_TEXT, true) => true,
             $from === FieldType::Integer && $to === FieldType::Decimal => true,
             in_array($from, self::SINGLE_OPTION, true) && in_array($to, self::SINGLE_OPTION, true) => true,
+            // `D145`: rewritten to `yes`/`no` on the way to a Single choice ({@see self::changes()}), read as-is on the way back.
+            self::isYesNoEdge($from, $to) => true,
             default => false,
         };
     }

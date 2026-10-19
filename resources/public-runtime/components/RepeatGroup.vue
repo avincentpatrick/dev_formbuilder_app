@@ -11,7 +11,7 @@ import { computed, nextTick, ref } from 'vue';
 import { MdsButton } from '@meridian/design-system';
 import InstanceField from './InstanceField.vue';
 import { useAnnouncer, useRuntime } from '../composables/context';
-import { rendersNothing } from '../lib/schema-mapping';
+import { fieldRendersNothing } from '../lib/schema-mapping';
 import type { RenderSection } from '../lib/types';
 
 const props = defineProps<{ section: RenderSection }>();
@@ -33,7 +33,7 @@ const label = computed(() => runtime.sectionTitleFor(props.section));
 // yet" under its label, in the guest form and the builder preview alike, and announced as a new question when
 // its condition flipped. Render-only on purpose: `membersOf()` stays total for the store's own walks, and nothing
 // computes or validates a member of either type through it.
-const members = computed(() => runtime.membersOf(sectionKey.value).filter((f) => !rendersNothing(f.fieldType)));
+const members = computed(() => runtime.membersOf(sectionKey.value).filter((f) => !fieldRendersNothing({ field_type: f.fieldType, visibility: f.visibility })));
 const uids = computed(() => runtime.instanceUidsFor(sectionKey.value));
 const count = computed(() => runtime.instanceCount(sectionKey.value));
 const canAdd = computed(() => runtime.canAddInstance(sectionKey.value));

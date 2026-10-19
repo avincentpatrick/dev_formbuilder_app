@@ -28,17 +28,7 @@
  */
 import { computed, ref, watch } from 'vue';
 import { useEntitlements } from '@/composables/useEntitlements';
-import {
-    MdsButton,
-    MdsCheckbox,
-    MdsFormField,
-    MdsNumberInput,
-    MdsSegmentedControl,
-    MdsSelect,
-    MdsTabs,
-    MdsTextInput,
-    MdsTextarea,
-} from '@meridian/design-system';
+import { MdsButton, MdsCheckbox, MdsFormField, MdsNumberInput, MdsRadio, MdsSegmentedControl, MdsSelect, MdsTabs, MdsTextarea, MdsTextInput } from '@meridian/design-system';
 import CascadingEditor from './CascadingEditor.vue';
 import ChoicesEditor from './ChoicesEditor.vue';
 import ConditionEditor from './ConditionEditor.vue';
@@ -47,6 +37,8 @@ import FieldTypeControl from './FieldTypeControl.vue';
 import GeoEditor from './GeoEditor.vue';
 import LikertMatrixEditor from './LikertMatrixEditor.vue';
 import LinkedChoicesEditor from './LinkedChoicesEditor.vue';
+import OtherSpecifyControl from './OtherSpecifyControl.vue';
+import { applyShowMode, showModeFixed, showModeOf, type ShowMode } from './field-visibility';
 import MatrixEditor from './MatrixEditor.vue';
 import MediaEditor from './MediaEditor.vue';
 import PrefillEditor from './PrefillEditor.vue';
@@ -154,6 +146,27 @@ const REQUIRED_MODE_CONDITIONAL = 'conditional';
 const NOTE_LABEL_HELP = 'Respondents see this label only while the note has no content. Once it has content, the label names the note here and in the PDF.';
 
 const requiredOptions = enums.required_modes;
+
+// M177 (`R-f44e9d00`): Show to respondents — derived from what is stored, applied in ONE change (one touch, one undo entry).
+const SHOW_OPTIONS: { value: ShowMode; label: string }[] = [
+    { value: 'always', label: 'Always' },
+    { value: 'never', label: 'Never' },
+    { value: 'when', label: 'Only when…' },
+];
+const showMode = computed<ShowMode>(() => (field.value ? showModeOf(field.value) : 'always'));
+const neverShown = computed(() => field.value?.config.visibility === 'hidden');
+// The condition editor is re-mounted when Always clears its expression, so no row of a cleared condition lingers on screen.
+const conditionMount = ref(0);
+function setShowMode(mode: string): void {
+    const current = field.value;
+    if (!current) return;
+    const next = applyShowMode(current, mode as ShowMode);
+    const cleared = current.relevant_expression !== next.relevant_expression;
+    current.config = next.config;
+    current.relevant_expression = next.relevant_expression;
+    if (cleared) conditionMount.value++;
+    props.store.touch(current.uid, 'field');
+}
 const sectionOptions = computed<EnumOption[]>(() => [
     { value: '', label: 'No section (top level)' },
     ...props.store.sections.value.map((s) => ({ value: s.id, label: s.label })),
@@ -530,8 +543,7 @@ watch(librarySaved, (value) => {
                 <!-- ── Field editor ─────────────────────────────────────────── -->
                 <template v-if="field">
                     <p v-if="advanced && configEditor === null" class="config__note">
-                        Baseline settings for this advanced field type. Its full editor and runtime arrive with the
-                        form engine.
+                        This type has only its basic settings here for now. Its own settings come in a later update.
                     </p>
 
                     <template v-if="activeTab === 'basics'">
@@ -554,7 +566,7 @@ watch(librarySaved, (value) => {
                         <MdsFormField
                             v-if="isCalculated"
                             label="Calculation formula" :error="fieldSaveErrors.inline['config.calculated_formula']"
-                            help="Evaluated on the server. Use ${field} references, arithmetic (+ - * /), comparisons, and if()/count()/int()/today()/now()."
+                            help="Worked out from other answers. Put another question's field key inside ${ }, and use + - * /, comparisons, or if(), count(), int(), today() and now()."
                             v-slot="{ id, describedby, invalid }"
                         >
                             <MdsTextarea
@@ -581,7 +593,11 @@ watch(librarySaved, (value) => {
                                 @update:model-value="setField('placeholder', $event || null)"
                             />
                         </MdsFormField>
-                        <div v-if="!isCalculated" class="config__group">
+                        <p v-if="neverShown && !isCalculated" class="config__note" data-never-required>
+                            Respondents never see this question, so it is never required. Change that under Show to respondents on the
+                            Advanced tab.
+                        </p>
+                        <div v-if="!isCalculated && !neverShown" class="config__group">
                             <span class="config__group-label">Requiredness</span>
                             <MdsSegmentedControl
                                 :model-value="field.is_required"
@@ -609,7 +625,7 @@ watch(librarySaved, (value) => {
                     </template>
 
                     <template v-else-if="activeTab === 'options'">
-                        <LinkedChoicesEditor v-if="enums.linked_choice_types?.includes(field.field_type)" :config="field.config" :sources="props.store.linkableSources" @update:config="field.config = $event; props.store.touch(field.uid, 'field')" /><ChoicesEditor v-if="field.config.options_source == null" :options="choices" @update:options="setConfig('options', $event)" />
+                        <LinkedChoicesEditor v-if="enums.linked_choice_types?.includes(field.field_type)" :config="field.config" :sources="props.store.linkableSources" @update:config="field.config = $event; props.store.touch(field.uid, 'field')" /><ChoicesEditor v-if="field.config.options_source == null" :options="choices" @update:options="setConfig('options', $event)" /><OtherSpecifyControl :store="props.store" />
                         <MdsFormField
                             v-if="layoutOptions.length > 0"
                             label="Choice layout"
@@ -714,7 +730,7 @@ watch(librarySaved, (value) => {
                     </template>
 
                     <template v-else-if="activeTab === 'advanced'">
-                        <MdsFormField label="Field key" help="Referenced in expressions and exports. Lowercase, unique." :error="fieldSaveErrors.inline.key" v-slot="{ id, describedby, invalid }">
+                        <MdsFormField label="Field key" help="This question's short name in exports, formulas and conditions. Lowercase letters, numbers and _ only." :error="fieldSaveErrors.inline.key" v-slot="{ id, describedby, invalid }">
                             <MdsTextInput
                                 :id="id"
                                 :describedby="describedby" :invalid="invalid"
@@ -739,8 +755,25 @@ watch(librarySaved, (value) => {
                                 @update:model-value="reparent($event)"
                             />
                         </MdsFormField>
+                        <fieldset v-if="!showModeFixed(field.field_type)" class="config__show" data-show-to-respondents>
+                            <legend class="config__group-label">Show to respondents</legend>
+                            <div class="config__show-options">
+                                <MdsRadio
+                                    v-for="option in SHOW_OPTIONS"
+                                    :key="option.value"
+                                    :model-value="showMode"
+                                    :value="option.value"
+                                    :label="option.label"
+                                    :name="`show-${field.uid}`"
+                                    @update:model-value="setShowMode"
+                                />
+                            </div>
+                            <p v-if="showMode === 'never' && field.relevant_expression" class="config__when-note">
+                                Its condition below is kept. Choose Only when… to use it again.
+                            </p>
+                        </fieldset>
                         <ConditionEditor
-                            :key="`field-${field.uid}`"
+                            :key="`field-${field.uid}-${conditionMount}`"
                             :expression="field.relevant_expression"
                             :catalogue="catalogue"
                             legend="Show this question only when…"
@@ -813,7 +846,7 @@ watch(librarySaved, (value) => {
                         <MdsFormField label="Section title" v-slot="{ id }">
                             <MdsTextInput :id="id" :model-value="section.label" @update:model-value="setSection('label', $event)" />
                         </MdsFormField>
-                        <MdsFormField label="Section key" help="Lowercase, unique within the form." v-slot="{ id, describedby }">
+                        <MdsFormField label="Section key" help="This section's short name in exports and conditions. Lowercase letters, numbers and _ only." v-slot="{ id, describedby }">
                             <MdsTextInput
                                 :id="id"
                                 :describedby="describedby"
@@ -913,6 +946,25 @@ watch(librarySaved, (value) => {
     background-color: var(--mds-color-bg-sunken);
     color: var(--mds-color-danger-text);
     font-size: var(--mds-type-body-sm-font-size);
+}
+
+.config__show {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.config__show > legend {
+    padding: 0;
+}
+
+.config__show-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mds-space-2) var(--mds-space-4);
 }
 
 .config__note {

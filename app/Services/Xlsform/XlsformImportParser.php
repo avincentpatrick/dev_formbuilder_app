@@ -13,6 +13,7 @@ use App\Services\Xlsform\Dto\RawWorkbook;
 use App\Services\Xlsform\Dto\SectionSpec;
 use App\Services\Xlsform\Dto\SettingsSpec;
 use App\Services\Xlsform\Dto\ValidationSpec;
+use App\Support\Forms\OtherSpecify;
 
 /**
  * Turns a {@see RawWorkbook} into a DB-free {@see ImportPlan} (Increment G7b / docs/xlsform-interop-spec.md
@@ -28,6 +29,14 @@ use App\Services\Xlsform\Dto\ValidationSpec;
  */
 final class XlsformImportParser
 {
+    /**
+     * M177 (`R-71509975`): each `or_other` question and the Please specify question made for it, kept as objects so the
+     * link survives {@see self::sanitizeKeys()} renaming either key. Reset at every parse.
+     *
+     * @var list<array{0: FieldSpec, 1: FieldSpec}>
+     */
+    private array $otherPairs = [];
+
     public function __construct(
         private readonly XlsformTypeMap $types,
         private readonly GeoWireConverter $geo,
@@ -41,6 +50,7 @@ final class XlsformImportParser
         }
 
         $warnings = [];
+        $this->otherPairs = [];
         $choicesByList = $this->normalizeChoices($workbook);
 
         [$sections, $fields] = $this->walkSurvey($workbook, $choicesByList, $warnings);
@@ -48,6 +58,7 @@ final class XlsformImportParser
         $fields = $this->cascades->resolve($fields, $choicesByList, $warnings);
 
         $this->sanitizeKeys($sections, $fields, $warnings);
+        $this->relinkOtherPairs();
         $this->assignSequences($sections, $fields);
 
         return new ImportPlan(
@@ -112,7 +123,14 @@ final class XlsformImportParser
                 continue;
             }
 
-            $fields[] = $this->buildField($typeRaw, $row, $this->currentSectionKey($stack), $rowNumber, $choicesByList, $warnings);
+            $field = $this->buildField($typeRaw, $row, $this->currentSectionKey($stack), $rowNumber, $choicesByList, $warnings);
+            $fields[] = $field;
+
+            // M177 (`R-71509975`): `select_one list or_other` was dropped to a plain select; it is the Other, please
+            // specify pair — the choice `other`, and a text question right after it shown only when it is picked.
+            if ($this->hasOrOther($typeRaw) && OtherSpecify::offers($field->fieldType)) {
+                $fields[] = $this->otherSpecifyFor($field);
+            }
         }
 
         return [$sections, $fields];
@@ -454,6 +472,42 @@ final class XlsformImportParser
         }
 
         return null;
+    }
+
+    /** Whether a `select_one <list> or_other` / `select_multiple <list> or_other` type carries the `or_other` modifier. */
+    private function hasOrOther(string $typeRaw): bool
+    {
+        $tokens = preg_split('/\s+/', strtolower(trim($typeRaw))) ?: [];
+
+        return ($tokens[2] ?? null) === 'or_other';
+    }
+
+    /** The Please specify question for an `or_other` question, which gains the `other` choice and the link. */
+    private function otherSpecifyFor(FieldSpec $choice): FieldSpec
+    {
+        /** @var list<array<string, mixed>> $options */
+        $options = array_values((array) ($choice->config['options'] ?? []));
+        $choice->config['options'] = OtherSpecify::withOther($options);
+
+        $child = new FieldSpec(
+            key: "{$choice->key}_other",
+            fieldType: FieldType::ShortText,
+            sectionKey: $choice->sectionKey,
+            label: OtherSpecify::CHILD_LABEL,
+            isRequired: RequiredMode::Required,
+        );
+        $this->otherPairs[] = [$choice, $child];
+
+        return $child;
+    }
+
+    /** After the keys are final: the link names the Please specify question's key, and its condition the choice's. */
+    private function relinkOtherPairs(): void
+    {
+        foreach ($this->otherPairs as [$choice, $child]) {
+            $choice->config[OtherSpecify::CONFIG_KEY] = $child->key;
+            $child->relevantExpression = OtherSpecify::condition($choice->key);
+        }
     }
 
     /** The `list_name` inline in a `select_one <list>` / `select_multiple <list>` type token, or null. */

@@ -131,6 +131,8 @@ const runtime = createFormRuntime(props.snapshot, {
     // re-run the step list on every keystroke, while this invalidates only when the mode itself flips — and it
     // follows that flip with no remount (the same live channel `singlePage` below reads, for the same reason).
     paginateAtPageBreaks: computed(() => !props.model.form.single_page_mode),
+    // M177 (`R-9bbaa97b`): a section whose every question is hidden stays on screen here, as a card, never for respondents.
+    keepSilentPages: true,
     initialAnswers: props.initialAnswers,
 });
 
@@ -370,7 +372,28 @@ function go(delta: number): void {
                     <p v-if="block.description" class="preview__desc">{{ block.description }}</p>
                 </header>
 
-                <RepeatGroup v-if="block.step.isRepeat && block.section" :section="block.section" />
+                <!-- M177 (`R-9bbaa97b`): respondents never see this section; the author still does, and can pick its questions. -->
+                <div v-if="block.step.silent" class="preview__silent" data-silent-step>
+                    <p class="preview__silent-lead">
+                        {{ block.section ? 'Respondents won’t see this section: every question in it is hidden.' : 'Respondents won’t see these questions: every one of them is hidden.' }}
+                    </p>
+                    <ul class="preview__silent-list">
+                        <li v-for="field in block.fields" :key="field.key">
+                            <button
+                                type="button"
+                                class="preview__silent-field"
+                                :class="{ 'preview__silent-field--selected': field.key === selectedKey }"
+                                :aria-pressed="field.key === selectedKey"
+                                :data-preview-field="field.key"
+                                @click="emit('select', field.key)"
+                            >
+                                {{ field.label || field.key }}
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
+                <RepeatGroup v-else-if="block.step.isRepeat && block.section" :section="block.section" />
 
                 <div v-else class="preview__fields">
                     <div
@@ -656,6 +679,51 @@ function go(delta: number): void {
 
 .preview__row--selected {
     border-left-color: var(--mds-color-action-primary-bg);
+}
+
+/* M177 (`R-9bbaa97b`): a section respondents never see — the inert card's dashed look, its questions dimmed and pickable. */
+.preview__silent {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-2);
+    padding: var(--mds-space-3);
+    border: 1px dashed var(--mds-color-border-default);
+    border-radius: var(--mds-radius-md);
+    background-color: var(--mds-color-bg-sunken);
+}
+
+.preview__silent-lead {
+    margin: 0;
+    color: var(--mds-color-text-secondary);
+    font-size: var(--mds-type-body-sm-font-size);
+}
+
+.preview__silent-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.preview__silent-field {
+    width: 100%;
+    min-height: 44px;
+    padding: var(--mds-space-2) var(--mds-space-3);
+    border: 1px solid var(--mds-color-border-default);
+    border-radius: var(--mds-radius-sm);
+    background: transparent;
+    color: var(--mds-color-text-secondary);
+    font: inherit;
+    text-align: start;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+}
+
+.preview__silent-field--selected {
+    border-color: var(--mds-color-border-strong);
+    color: var(--mds-color-text-body);
 }
 
 .preview__inert {

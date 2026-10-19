@@ -204,6 +204,20 @@ group('the never-a-step marker', () => {
         expect(rail[0].neverAStep).toBe(true);
     });
 
+    it('marks a section whose only question is set to Never, and not one holding a calculation set to Always (M177)', () => {
+        const never = buildRail({
+            groups: groups([], { section: section('quiet'), fields: [field('ref', { config: { visibility: 'hidden' } })] }),
+            notices: [],
+        });
+        const always = buildRail({
+            groups: groups([], { section: section('totals'), fields: [field('total', { field_type: 'calculated', config: { visibility: 'shown' } })] }),
+            notices: [],
+        });
+
+        expect(never[0].neverAStep).toBe(true);
+        expect(always[0].neverAStep).toBe(false);
+    });
+
     it('does NOT mark a section with one visible field among hidden ones', () => {
         const rail = buildRail({
             groups: groups([], {

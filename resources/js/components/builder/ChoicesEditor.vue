@@ -29,6 +29,14 @@ function add(): void {
 function remove(index: number): void {
     emit('update:options', props.options.filter((_, i) => i !== index));
 }
+// M177 (`R-0b7db001`, `D140`): Yes/No left the palette because a Single choice with these two covers it. The values are the
+// ones the XLSForm export has always written for a Yes/No, so `= 'yes'` reads the same either way.
+function addYesNo(): void {
+    emit('update:options', [
+        { value: 'yes', label: 'Yes' },
+        { value: 'no', label: 'No' },
+    ]);
+}
 </script>
 
 <template>
@@ -61,9 +69,12 @@ function remove(index: number): void {
             />
         </div>
         <p v-if="options.length === 0" class="choices__empty">No options yet.</p>
-        <div>
+        <div class="choices__actions">
             <MdsButton variant="tertiary" size="sm" icon-left="plus" :disabled="disabled" @click="add">
                 Add option
+            </MdsButton>
+            <MdsButton v-if="options.length === 0" variant="tertiary" size="sm" :disabled="disabled" data-choices-yes-no @click="addYesNo">
+                Add Yes and No
             </MdsButton>
         </div>
     </div>
@@ -90,6 +101,12 @@ function remove(index: number): void {
     color: var(--mds-color-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.03em;
+}
+
+.choices__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mds-space-2);
 }
 
 .choices__empty {

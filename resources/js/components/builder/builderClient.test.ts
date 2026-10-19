@@ -83,7 +83,8 @@ group('builderClient surfaces a 409 as a value, never as a throw', () => {
 
         const error = await builderClient.patch('/forms/x/fields/f1', {}).catch((e: unknown) => e);
 
-        expect((error as BuilderRequestError).message).toBe('Request failed (502).');
+        // M177 (`R-b05fbaae`): in the DSR §1.5 voice — what happened and what to do; the status stays for whoever reports it.
+        expect((error as BuilderRequestError).message).toBe('Something went wrong (error 502). Try again.');
     });
 
     it('says the author was signed out on a 419 CSRF page or a 401, never "Request failed (419)." (M170)', async () => {

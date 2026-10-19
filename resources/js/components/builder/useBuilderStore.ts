@@ -13,6 +13,7 @@ import { computed, reactive, ref, type Ref } from 'vue';
 import { builderFor, BuilderRequestError, DraftSupersededError, type BuilderResult, type SupersedingDraft } from './builderClient';
 import { editJournal } from './edit-journal';
 import { canonical } from './row-compare';
+import { otherSpecifyCondition } from './other-specify';
 import type {
     BuilderPageProps,
     CanvasGroup,
@@ -273,9 +274,11 @@ export function useBuilderStore(props: BuilderPageProps) {
     }
 
     // ── Server helpers (low-level; NOT enqueued — always called inside an enqueued action) ──────
-    async function createFieldServer(typeValue: string, sectionId: string | null): Promise<ServerField | null> {
+    // M177 (`D140`): `restore` says a history step is putting an existing question back — the server refuses an author ADDING a
+    // retired type (Yes/No, Duration), and the undo of a delete re-creates one through this same route.
+    async function createFieldServer(typeValue: string, sectionId: string | null, restore = false): Promise<ServerField | null> {
         const result = await guard(() =>
-            client.post<ServerField>(`${base}/fields`, { field_type: typeValue, section_id: sectionId }),
+            client.post<ServerField>(`${base}/fields`, { field_type: typeValue, section_id: sectionId, ...(restore ? { restore: true } : {}) }),
         );
         return result && !result.conflict ? result.data : null;
     }
@@ -346,7 +349,38 @@ export function useBuilderStore(props: BuilderPageProps) {
             delete keyNotices.value[uid];
         }
         const previous = (baselines.get(uid) as { key?: string } | undefined)?.key;
-        if ('validations' in row && previous !== undefined && previous !== keptKey) repointRules(uid, previous, keptKey);
+        if ('validations' in row && previous !== undefined && previous !== keptKey) {
+            repointRules(uid, previous, keptKey);
+            repointOtherPair(row, previous, keptKey);
+        }
+    }
+
+    /**
+     * M177 (`R-71509975`) — a key renamed on either side of an "Other, please specify" pair keeps the pair linked. Unlike a
+     * rule's comparison (stored by id), both halves are TEXT the server holds as sent, so the other row is changed AND
+     * saved: the Please specify condition names the choice question's new key (only while it is still the condition the
+     * switch wrote), and the choice question's link names the Please specify question's new key.
+     */
+    function repointOtherPair(row: LocalField, oldKey: string, newKey: string): void {
+        const childKey = row.config.other_specify_key;
+        const child = typeof childKey === 'string' ? fields.value.find((field) => field.key === childKey) : undefined;
+        if (child && child.relevant_expression === otherSpecifyCondition(oldKey)) {
+            child.relevant_expression = otherSpecifyCondition(newKey);
+            resave(child.uid);
+        }
+        const parent = fields.value.find((field) => field.uid !== row.uid && field.config.other_specify_key === oldKey);
+        if (parent) {
+            parent.config = { ...parent.config, other_specify_key: newKey };
+            resave(parent.uid);
+        }
+    }
+
+    /** Save a row the store changed on the author's behalf — after the save in flight, never as an undo step of its own. */
+    function resave(uid: Uid): void {
+        void enqueue(async () => {
+            const row = findField(uid);
+            if (row && (await persistField(uid))) baselines.set(uid, fieldSnapshot(row));
+        });
     }
 
     /**
@@ -384,7 +418,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         snap: FieldSnapshot,
         sequence: number,
     ): Promise<void> {
-        const created = await createFieldServer(typeValue, sectionId);
+        const created = await createFieldServer(typeValue, sectionId, true);
         if (!created) return;
         const local: LocalField = { ...created, uid };
         applyFieldSnapshot(local, snap);
@@ -620,6 +654,78 @@ export function useBuilderStore(props: BuilderPageProps) {
         } catch {
             return null;
         }
+    }
+
+    // ── "Other, please specify" (M177, `R-71509975`) ────────────────────────────────
+    /**
+     * One call makes the `other` choice and the Please specify question; the store places the question right after the
+     * choice question and saves the order — the add-here shape (M176), so the pair is ONE undo entry. The choice question
+     * is adopted from the reply: its config moved, so its token did. `childUid` keeps the question's identity on screen
+     * across an undo and a redo, as every restored row's does.
+     */
+    async function addOtherSpecifyServer(uid: Uid, childUid?: Uid): Promise<Uid | null> {
+        const field = findField(uid);
+        if (!field) return null;
+        const result = await guard(() => client.post<{ parent: ServerField; child: ServerField }>(`${base}/fields/${field.id}/other-specify`));
+        if (!result || result.conflict) return null;
+        adoptField(field, result.data.parent);
+        const child: LocalField = { ...clone(result.data.child), uid: childUid ?? nextUid() };
+        fields.value.push(child);
+        baselines.set(child.uid, fieldSnapshot(child));
+        const group = groups.value.find((g) => (g.section?.id ?? null) === field.form_section_id);
+        placeField(child.uid, field.form_section_id, (group?.fields.findIndex((f) => f.uid === uid) ?? -1) + 1);
+        await persistOrder();
+
+        return child.uid;
+    }
+
+    async function removeOtherSpecifyServer(uid: Uid): Promise<boolean> {
+        const field = findField(uid);
+        if (!field) return false;
+        const childKey = field.config.other_specify_key;
+        const result = await guard(() => client.delete<{ parent: ServerField }>(`${base}/fields/${field.id}/other-specify`));
+        if (!result || result.conflict) return false;
+        adoptField(field, result.data.parent);
+        const child = fields.value.find((f) => f.key === childKey);
+        if (child) removeFieldLocal(child.uid);
+
+        return true;
+    }
+
+    function addOtherSpecify(uid: Uid): Promise<void> {
+        flushCommit(); // the reply replaces the choice question: an edit a keystroke ago must land first
+        return enqueue(async () => {
+            const childUid = await addOtherSpecifyServer(uid);
+            if (childUid === null) return;
+            pushHistory(
+                'Add Other, please specify',
+                async () => {
+                    await removeOtherSpecifyServer(uid);
+                },
+                async () => {
+                    await addOtherSpecifyServer(uid, childUid);
+                },
+            );
+        });
+    }
+
+    function removeOtherSpecify(uid: Uid): Promise<void> {
+        flushCommit();
+        return enqueue(async () => {
+            const field = findField(uid);
+            if (!field) return;
+            const childUid = fields.value.find((f) => f.key === field.config.other_specify_key)?.uid;
+            if (!(await removeOtherSpecifyServer(uid))) return;
+            pushHistory(
+                'Remove Other, please specify',
+                async () => {
+                    await addOtherSpecifyServer(uid, childUid);
+                },
+                async () => {
+                    await removeOtherSpecifyServer(uid);
+                },
+            );
+        });
     }
 
     function duplicateField(uid: Uid): Promise<void> {
@@ -882,6 +988,58 @@ export function useBuilderStore(props: BuilderPageProps) {
             if (JSON.stringify(before) === JSON.stringify(after)) return; // no net change → no history/persist
             await persistOrder();
             pushHistory(label, () => applyOrderAndPersist(before), () => applyOrderAndPersist(after));
+        });
+    }
+
+    // ── Several questions at once (M177, `R-4a6f004f`, `D146`) ─────────────────────────────────────
+    // The ticks are their own set beside `selection`: the settings pane, the add target, Logic and Preview all read the
+    // ONE selected row, and a tick must change none of them.
+    const checked = ref<Set<Uid>>(new Set());
+    let checkAnchor: Uid | null = null;
+
+    /** Tick or untick a question — and with `extend` (shift held), every question between it and the last one ticked. */
+    function setChecked(uid: Uid, value: boolean, extend = false): void {
+        const order = flattenedFields().map((field) => field.uid);
+        let targets = [uid];
+        if (extend && checkAnchor !== null && order.includes(checkAnchor) && order.includes(uid)) {
+            const [from, to] = [order.indexOf(checkAnchor), order.indexOf(uid)].sort((a, b) => a - b);
+            targets = order.slice(from, to + 1);
+        }
+        const next = new Set(checked.value);
+        targets.forEach((target) => (value ? next.add(target) : next.delete(target)));
+        checked.value = next;
+        checkAnchor = uid;
+    }
+
+    function clearChecked(): void {
+        checked.value = new Set();
+        checkAnchor = null;
+    }
+
+    /**
+     * Move every given question to the end of a section (or the top level), in the order they stood — ONE order write
+     * and ONE undo entry, the shape of a drag (`placeField()` for each, then the whole order saved once). The ticks clear.
+     */
+    function moveFieldsToSection(uids: Uid[], sectionId: string | null): Promise<void> {
+        flushCommit();
+        return enqueue(async () => {
+            const wanted = new Set(uids);
+            const ordered = flattenedFields().filter((field) => wanted.has(field.uid)).map((field) => field.uid);
+            clearChecked();
+            if (ordered.length === 0) return;
+            const before = snapshotOrder();
+            for (const uid of ordered) {
+                const target = groups.value.find((group) => (group.section?.id ?? null) === sectionId);
+                placeField(uid, sectionId, target ? target.fields.filter((field) => field.uid !== uid).length : 0);
+            }
+            const after = snapshotOrder();
+            if (JSON.stringify(before) === JSON.stringify(after)) return;
+            await persistOrder();
+            pushHistory(
+                ordered.length === 1 ? 'Move a question' : `Move ${ordered.length} questions`,
+                () => applyOrderAndPersist(before),
+                () => applyOrderAndPersist(after),
+            );
         });
     }
 
@@ -1402,6 +1560,9 @@ export function useBuilderStore(props: BuilderPageProps) {
                 to: target,
                 version: live.version,
                 fingerprint: plan.fingerprint,
+                // M177 (`D145`): reversing a conversion may reach a retired type (Single choice back to Yes/No), which an
+                // author may not pick — so the step says it is restoring.
+                restore: true,
             }),
         );
         if (result === null) throw new HistoryStepFailed(`${failure} ${save.error ?? ''}`.trim());
@@ -1535,6 +1696,9 @@ export function useBuilderStore(props: BuilderPageProps) {
         addField,
         deleteField,
         answersFor,
+        // "Other, please specify" (M177)
+        addOtherSpecify,
+        removeOtherSpecify,
         duplicateField,
         insertFromLibrary,
         saveFieldToLibrary,
@@ -1542,6 +1706,11 @@ export function useBuilderStore(props: BuilderPageProps) {
         addSection,
         deleteSection,
         moveFieldToSection,
+        // several questions at once (M177)
+        checkedFields: checked,
+        setChecked,
+        clearChecked,
+        moveFieldsToSection,
         // changing a question's type (M123)
         loadConversionPlans,
         convertField,
@@ -1782,7 +1951,7 @@ export function roundTripIsExact(forward: ConversionPlan, reverse: ConversionPla
 }
 
 const QUESTION_GONE = 'This question no longer exists.';
-const CONVERT_BLOCKED_BY_CONFLICT = 'Resolve the editing conflict first, then change the type.';
+const CONVERT_BLOCKED_BY_CONFLICT = 'First choose which version of the question to keep, then change its type.';
 const CONVERT_BLOCKED_BY_FAILED_SAVE =
     'Your last change hasn’t saved, so the type can’t be changed yet. Close this and fix the problem shown at the top of the settings panel.';
 const TYPE_MOVED_ELSEWHERE = 'This question’s type was changed somewhere else. Reload the page to see it.';

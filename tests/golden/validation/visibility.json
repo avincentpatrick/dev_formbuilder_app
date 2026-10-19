@@ -1,0 +1,63 @@
+[
+  {
+    "name": "visibility_never_required_produces_no_error",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "ref", "visibility": "hidden", "is_required": "required"}, {"key": "name", "is_required": "required"}]},
+    "answers": {},
+    "expected": {
+      "relevance": {"fields": {"ref": true, "name": true}, "sections": {}},
+      "errors": [{"field": "name", "rule": "field_required"}],
+      "effective_answers": {},
+      "computed": {}
+    }
+  },
+  {
+    "name": "visibility_never_rule_produces_no_error",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "ref", "visibility": "hidden", "rules": [{"rule_type": "max_length", "rule_value": "3"}]}]},
+    "answers": {"ref": "far-too-long"},
+    "expected": {
+      "relevance": {"fields": {"ref": true}, "sections": {}},
+      "errors": [],
+      "effective_answers": {"ref": "far-too-long"},
+      "computed": {}
+    }
+  },
+  {
+    "name": "visibility_never_is_still_relevance_pruned",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "gate"}, {"key": "ref", "visibility": "hidden", "relevant": "${gate} = 'on'"}]},
+    "answers": {"gate": "off", "ref": "B-12"},
+    "expected": {
+      "relevance": {"fields": {"gate": true, "ref": false}, "sections": {}},
+      "errors": [],
+      "effective_answers": {"gate": "off"},
+      "computed": {}
+    }
+  },
+  {
+    "name": "visibility_always_calculated_still_computes",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "a"}, {"key": "b"}, {"key": "total", "field_type": "calculated", "calculate": "${a} + ${b}", "visibility": "shown"}]},
+    "answers": {"a": 2, "b": 3},
+    "expected": {
+      "relevance": {"fields": {"a": true, "b": true, "total": true}, "sections": {}},
+      "errors": [],
+      "effective_answers": {"a": 2, "b": 3},
+      "computed": {"total": 5}
+    }
+  },
+  {
+    "name": "visibility_never_members_do_not_enforce_min_instances",
+    "grammar_version": "2.0",
+    "schema": {"sections": [{"key": "hh", "repeatable": true, "min": 2}], "fields": [{"key": "member_name", "section": "hh", "visibility": "hidden"}]},
+    "answers": {"hh": [{"member_name": "Bob"}]},
+    "expected": {
+      "relevance": {"fields": {}, "sections": {"hh": true}},
+      "errors": [],
+      "effective_answers": {"hh": [{"member_name": "Bob"}]},
+      "computed": {},
+      "repeat_relevance": {"hh": [{"member_name": true}]}
+    }
+  }
+]

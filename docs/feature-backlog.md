@@ -32,7 +32,7 @@ Several of these are **real XLSForm round-trip import failures today** — a Kob
 
 | Item | Priority | Phase | Note |
 |---|---|---|---|
-| `or_other` "please specify" write-in on select fields | should | 2 (or 1 — additive to `config` jsonb, low cost) | XLSForm `or_other` modifier silently dropped on import today — queued as `R-71509975` (the testers' round 2, `D138`'s R2) |
+| `or_other` "please specify" write-in on select fields | should | 2 (or 1 — additive to `config` jsonb, low cost) | XLSForm `or_other` imports as the "Other, please specify" pair since `M177` (`R-71509975`), and the pair exports as the explicit pattern (`docs/xlsform-interop-spec.md`) |
 | Slider / range (bounded numeric) field type | should | 2 | XLSForm `range` type; a Kobo form using it fails import |
 | Ranking / ordering (drag-to-rank) field type | should | 2 | XLSForm `rank` type; standard survey question with no workaround |
 | Rating / star scale field type | should | 2 | Distinct from `likert_scale`'s radio rows; expected on CSAT/feedback forms |
@@ -3420,7 +3420,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   pins the gate. The cross-tenant case is kept because it pins RLS at binding, and it carries a comment
   saying in as many words that it is not a substitute.
   ⛔⛔ **AND THE CENSUS FOUND THE GATE IS WALKED AROUND BY A SIBLING ROUTE — LIVE, NOT LATENT.**
-  `GET /attachments/{attachment}` (`routes/tenant.php:755-756`) is authorized by `AttachmentPolicy::view()`,
+  `GET /attachments/{attachment}` (`routes/tenant.php:761-756`) is authorized by `AttachmentPolicy::view()`,
   whose entire body was `$user->can('submissions.view')` — **it never read its `$attachment` argument**.
   ADR-0015 §D6 filed the screenshot into that same shared table, and `RolePermissionSeeder` grants
   `submissions.view` to `viewer`, `reviewer` and `form_editor` while granting `feedback.view` to none of
@@ -7552,7 +7552,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (2026-09-06), joined and refuted by `M80`. Not one of the 68 route registrations in `routes/api.php`
   contains `users` or `roles`; `app/Http/Controllers/Api/V1/` holds 22 controllers and none is a user, role
   or member controller; no `read:users` / `write:roles` Sanctum ability exists. The capability ships on the
-  web surface only — `routes/tenant.php:410`, `:411`, `:417`, `:419`, `:421`. ⛔ **THE CODE ALREADY NAMES
+  web surface only — `routes/tenant.php:411`, `:411`, `:417`, `:419`, `:421`. ⛔ **THE CODE ALREADY NAMES
   THE CONSEQUENCE:** `app/Http/Resources/Api/V1/AuditResource.php:28` says in as many words that there is
   no `/api/v1/users` endpoint, so an API-only consumer of `GET /api/v1/audits` receives `user_id` and
   `acting_as_user_id` UUIDs it cannot resolve. ⛔ **AND THE ENDPOINT WAS NEVER RETRACTED — IT SHAPED THE
@@ -7573,7 +7573,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   AND THE ROW MUST NOT REPEAT IT.** The builder ships on the tenant-web surface — `routes/tenant.php`
   through `:587`, all `can:update,form`, all on `FormBuilderController`. What is absent is the `/api/v1`
   **twin**, which this repository treats as a separate obligation:
-  `docs/xlsform-interop-spec.md:138` records both surfaces for the adjacent export, and
+  `docs/xlsform-interop-spec.md:139` records both surfaces for the adjacent export, and
   `routes/tenant.php` calls its own route "the browser-facing twin of the doc-pinned /api/v1 endpoint".
   ⚠️ **Two of the four pinned groups are twinned outright, one only partly, one not at all** — sections and
   fields have full web twins, the draft READ exists as `GET /forms/{form}/builder` at
@@ -9763,7 +9763,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   scroll container in between can add stray scroll: `scopes/Index.vue`, `BuilderCanvas.vue`, `FeedbackButton.vue`,
   `GeoInput.vue` and the guest runtime's `RuntimeShell.vue`. `clipped-node-containment.test.ts` pins exactly these
   five. ⚠️ The fix is one line each and the verification is not, since a positioned container also changes stacking,
-  so each wants a look at the running page. **Latent.** Filed by `M94`. **Tier: during-testing.**
+  so each wants a look at the running page. **Latent.** Filed by `M94`. **Tier: during-testing.** **`BuilderCanvas.vue` fixed by `M177` (2026-10-19):** `.canvas` positions itself, the containing block of its one absolutely positioned node (its sticky bulk-move bar is the only other positioned child, and nothing gains a stacking context); four remain, pinned exactly.
 - **`minor` · The password-strength requirement list loses its list semantics in Safari, and 21 more files carry the
   same shape.** Carried out of this ledger's design-system section by `M94` (2026-09-14). `MdsPasswordStrength`
   renders its list with `list-style: none` and no `role="list"`, so VoiceOver reads the requirements with no count,
@@ -11485,7 +11485,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   in this repository could see it** — `.builder__pane { overflow: hidden }` CLIPS the spill instead of
   scrolling it, so `assertNoHorizontalOverflow`'s `.app-shell__content` read is flat over it, axe has no rule,
   and `personalization-axe` had element-level reads for the pane switcher (`M19`) and the config pane (`M109`)
-  but never for this control. Fixed with the host-level `flex-wrap` `ConfigPanel.vue:732` already applies to
+  but never for this control. Fixed with the host-level `flex-wrap` `ConfigPanel.vue:748` already applies to
   the Requiredness control — `D28`'s measured affordance. ⛔ **THE ROW'S OWN EVIDENCE: ONE CITATION FALSE, FOUR
   ROTTED, AND ONE CLAIM FALSE.** `ConfirmationModal.vue:11` names a file `M117` renamed and a sentence it
   deleted (the in-tree statement moved to `draft-snapshot.ts:7`); `Builder.vue:531-537` and `:462-471` are both
@@ -11746,14 +11746,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   which must not become a seventh. The PHP `FieldType` enum is authoritative and the builder palette is fully
   server-driven — but the **renderers** carry six hand-written mirrors: `schema-mapping.ts:48-59` (`SUPPORTED`,
   whose own comment admits it mirrors `EncodeFormPresenter::SUPPORTED`), `:72` (`HAS_OPTIONS`), `:75`
-  (`TEXT_TYPES`), `FieldInput.vue` (`MEDIA_TYPES`) and `ConfigPanel.vue:178` (`NUMERIC_TYPES`). ✅ **Only
+  (`TEXT_TYPES`), `FieldInput.vue` (`MEDIA_TYPES`) and `ConfigPanel.vue:190` (`NUMERIC_TYPES`). ✅ **Only
   `field-roles.ts`'s `RENDERS_NOTHING` is pinned**, by `tests/Unit/Forms/PdfFieldRoleTest.php`, which regex-parses
   the TypeScript from PHP and asserts set equality — so the instrument already exists in this repository and needs
   copying, not inventing. ⚠️ **`EncodeFormPresenter`'s own docblock (`:64-72`) admits the duplication and records
   that collapsing it was deliberately declined** — which makes a parity test the right answer rather than a
   refactor: it converts five unguarded mirrors into guarded ones **without deleting any of them**. ⚠️ A gate
   written here is green on arrival and therefore proves nothing until a committed mutation — removing one type
-  from one mirror — turns it red. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AS A PROVEN STRICT SUBSET OF `R-09f73330`, NOT WORKED SEPARATELY.** ✅ Its citations hold, with two off-by-N: `HAS_OPTIONS` is declared at `schema-mapping.ts:73`, not `:72` (`:72` is the comment), and the `EncodeFormPresenter` docblock admission runs `:64-69`, not `:64-72`. ⛔ **ALL FIVE GAPS IT NAMES APPEAR IN `R-09f73330` VERBATIM, AT THE SAME FILE AND LINE** — `schema-mapping.ts:48`/`:73`/`:75`, `FieldInput.vue`'s `MEDIA_TYPES` and `ConfigPanel.vue:178` — and it names **no** declaration that row does not. (It also cites `field-roles.ts`'s `RENDERS_NOTHING`, but as already-gated *evidence*, not as a gap.) So the single gate written for `R-09f73330` necessarily closes this one too, and **working both would have collided on three production files** under `D13` clause 1. ⚠️ **Its *"six copies, five ungated"* is a FLOOR:** there are **ten** ungated declarations by declaration count, and an eleventh that was already gated. ⚠️ **And its supporting citation is mis-aimed, though its conclusion survives:** `EncodeFormPresenter`'s docblock at `:64-69` declines collapsing the *builder functions*, not the `SUPPORTED` constant — the admission that actually supports the row is on the TypeScript side, at `schema-mapping.ts:46`. ⚠️ **Its *"the instrument exists and needs copying"* is now UNDERSTATED:** the technique has been copied three further times since it was filed — `DraftProjectionMirrorDriftTest`, `DocumentedEnumMirrorDriftTest` (a table-driven generalisation over three grammars) and the `NotificationType`/`ShellAbility` parity tests.
+  from one mirror — turns it red. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AS A PROVEN STRICT SUBSET OF `R-09f73330`, NOT WORKED SEPARATELY.** ✅ Its citations hold, with two off-by-N: `HAS_OPTIONS` is declared at `schema-mapping.ts:73`, not `:72` (`:72` is the comment), and the `EncodeFormPresenter` docblock admission runs `:64-69`, not `:64-72`. ⛔ **ALL FIVE GAPS IT NAMES APPEAR IN `R-09f73330` VERBATIM, AT THE SAME FILE AND LINE** — `schema-mapping.ts:48`/`:73`/`:75`, `FieldInput.vue`'s `MEDIA_TYPES` and `ConfigPanel.vue:190` — and it names **no** declaration that row does not. (It also cites `field-roles.ts`'s `RENDERS_NOTHING`, but as already-gated *evidence*, not as a gap.) So the single gate written for `R-09f73330` necessarily closes this one too, and **working both would have collided on three production files** under `D13` clause 1. ⚠️ **Its *"six copies, five ungated"* is a FLOOR:** there are **ten** ungated declarations by declaration count, and an eleventh that was already gated. ⚠️ **And its supporting citation is mis-aimed, though its conclusion survives:** `EncodeFormPresenter`'s docblock at `:64-69` declines collapsing the *builder functions*, not the `SUPPORTED` constant — the admission that actually supports the row is on the TypeScript side, at `schema-mapping.ts:46`. ⚠️ **Its *"the instrument exists and needs copying"* is now UNDERSTATED:** the technique has been copied three further times since it was filed — `DraftProjectionMirrorDriftTest`, `DocumentedEnumMirrorDriftTest` (a table-driven generalisation over three grammars) and the `NotificationType`/`ShellAbility` parity tests.
 
 - **`minor` · Three more request paths prune an array key by the same mechanism `B0` just fixed, and one of
   them may be doing it on purpose.** Found by `M111` (2026-09-25) while sweeping for the CLASS behind
@@ -11814,7 +11814,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `HAS_OPTIONS`, `:75` `TEXT_TYPES`; `display-value.ts:44` `HAS_OPTIONS` (a second copy), `:47` `GEO_TYPES`,
   `:55` `MEDIA_TYPES`; `semantic-validator.ts:32` `MEDIA_FIELD_TYPES` (a third copy of the media set);
   `FieldInput.vue`'s `MEDIA_TYPES` (a fourth) and its inline text-type literal (a second `TEXT_TYPES`);
-  and `ConfigPanel.vue:178` `NUMERIC_TYPES`. ⛔ **`TEXT_TYPES` and `NUMERIC_TYPES` MIRROR NOTHING** — there is no
+  and `ConfigPanel.vue:190` `NUMERIC_TYPES`. ⛔ **`TEXT_TYPES` and `NUMERIC_TYPES` MIRROR NOTHING** — there is no
   PHP predicate or registry either one corresponds to, so they cannot drift from a source; they ARE a source, and
   an undeclared one. ✅ **The technique is proven and is now used twice:** `tests/Unit/Forms/PdfFieldRoleTest.php`
   parses `field-roles.ts` by regex with two anti-vacuity arms, and `M112` built
@@ -11909,7 +11909,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · The builder and PHP disagree about whether a duration field takes an ordered comparison, and the
   disagreement is now pinned rather than resolved.** Found by `M113` (2026-09-26) while building the client
-  field-type mirror census. `ConfigPanel.vue:178`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
+  field-type mirror census. `ConfigPanel.vue:190`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
   'likert_scale']` — four members. `ValueShape::allowsOperator()` (`ValueShape.php:218-242`) permits
   `gt`/`lt`/`gte`/`lte` for `Number`, `Duration` and `Scale`, which is **five** types: the same four plus
   `duration`. ⛔ **`R-09f73330` SAYS THIS SET "MIRRORS NOTHING", AND THAT STOPPED BEING TRUE IN THE INCREMENT
@@ -14332,7 +14332,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `copyKey()`); the client never creates one. The refusal is shown under Field key on the Advanced tab only
   (`resources/js/components/builder/ConfigPanel.vue:605-612`), while selecting a question always opens Basics (`:165-170`); the
   alert names every other refused question as "has a change that was not saved. Select it to see why" (`:80`) with no reason and
-  no badge on the tab; a validation refusal is not counted as unsaved, so there is no Retry (`useBuilderStore.ts:946-954`).
+  no badge on the tab; a validation refusal is not counted as unsaved, so there is no Retry (`useBuilderStore.ts:948-956`).
   `docs/form-versioning-schema-migration.md:129` says a key is never renamed, and nothing enforces it. `D132` (the user,
   2026-10-15): *"if we can already help the user avoid the errors, notify them or the app auto adjust the key naming to avoid
   conflicts"*. The remedy: the store knows every key in the draft — as the author types a key in use the panel says so inline
@@ -14377,7 +14377,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   kobo, every cell can be configured separately, it can pick different type of questions and different set of options for each"*.
   Measured: `resources/js/components/builder/MatrixEditor.vue:46` says "Each cell is a single choice from this shared list";
   `config.cells` is that list (`docs/data-dictionary.md:378`), the request validates rows, columns and cells as value/label lists
-  only (`app/Http/Requests/Forms/UpdateFieldRequest.php:274-306`), the normalizer rejects unknown rows or columns and nothing else
+  only (`app/Http/Requests/Forms/UpdateFieldRequest.php:277-309`), the normalizer rejects unknown rows or columns and nothing else
   (`app/Services/Submissions/StructuralAnswerNormalizer.php:548-593`), publish checks the three lists non-empty and distinct
   (`app/Services/Forms/StructuralValidationGate.php:532-562`), and `app/Enums/FieldType.php:12` claims each cell is
   "independently typed", which is false. KoboToolbox's Question Matrix gives every column its own response type (Select One,
@@ -14414,7 +14414,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · Only a Single choice or Dropdown can take its choices from another form's answers; a Multiple choice cannot.**
   `app/Services/Forms/LinkedChoiceService.php:39` limits a link to single choice and dropdown, and
-  `app/Http/Requests/Forms/UpdateFieldRequest.php:319-331` accepts `config.options_source` for those two only; the Options tab
+  `app/Http/Requests/Forms/UpdateFieldRequest.php:322-334` accepts `config.options_source` for those two only; the Options tab
   offers the link through `resources/js/components/builder/LinkedChoicesEditor.vue` (`ConfigPanel.vue:499-515`). The testers'
   comment (2026-10-15): *"All input forms that has options like radio button, checkboxes, select options … must have an option to
   populate options thru the connection to responses from other forms"*. Split out of `R-5fdbc47c`, which named multi-select as
@@ -14436,7 +14436,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`minor` · A text box cannot offer suggestions from a list file or another form's answers.**
   The testers' comment (2026-10-15): *"sometimes even the textbox must have an option to populate options thru the connection to
   responses from other forms"*. `resources/js/components/submissions/FieldInput.vue:217-265` renders a text question as a plain
-  input, and `app/Http/Requests/Forms/UpdateFieldRequest.php:319-331` accepts no source on it. The remedy: `config.suggestions_source
+  input, and `app/Http/Requests/Forms/UpdateFieldRequest.php:322-334` accepts no source on it. The remedy: `config.suggestions_source
   = {kind: list | form, …}` on Short text gives a type-ahead (a `<datalist>`-backed combobox) on the web form, the encode page
   (`app/Services/Submissions/EncodeFormPresenter.php:606-632` already serves linked lists there) and the preview, while free text
   stays accepted and the server never checks it; the chooser reads "Suggestions come from" on a text question. **Live.** Filed by `M172`.
@@ -14491,7 +14491,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   recorded value in a source form?"*. `app/Support/Forms/ShareableQuestions.php:31-39` never offers a `cascading_select` for
   sharing; a link feeds a flat list of answers for one key (`app/Services/Forms/LinkedChoiceService.php:258-275`, served by
   `app/Http/Controllers/Public/PublicFormSchemaController.php:60-77`) and nothing filters an existing option list by it; the
-  cascade control shows every child of the chosen parent (`resources/js/components/submissions/FieldInput.vue:331-368`). The
+  cascade control shows every child of the chosen parent (`resources/js/components/submissions/FieldInput.vue:344-381`). The
   remedy: `config.levels[i].filter` and, on a list- or form-sourced choice question, `config.options_filter = {form_id, field_key,
   mode: present | absent}`; `ShareableQuestions` admits the cascade (its shared value set is per level); the linked-choices
   endpoint gains `sets` beside the schema with their own stamp (`D60` A), cached by the worker per version
@@ -14504,7 +14504,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `resources/js/components/builder/FieldPalette.vue:102` titles every advanced type "baseline settings (advanced editor coming
   with the form engine)" beside the badge at `:106`; `resources/js/components/builder/ConfigPanel.vue:432-435` shows "Baseline
   settings for this advanced field type" only when an advanced type has no editor, and every one has had its editor since the
-  form engine landed; `app/Enums/FieldType.php:120-122` says the same. The testers asked whether the Adv types are ready
+  form engine landed; `app/Enums/FieldType.php:122-124` says the same. The testers asked whether the Adv types are ready
   (2026-10-15); they are, and the tooltip says otherwise. The remedy: the tooltip says what the Help page says
   (`resources/js/components/help/manual.ts:649`), the note and the docblock go. **Live.** Filed by `M172`. **Tier: early-testing.**
 
@@ -14621,7 +14621,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M176` (2026-10-18) — ****`major` · Moving a question or a section re-stamps every question's save token, so the author's next edit to any question opens "This item changed elsewhere".**
   The testers' comment (2026-10-11, comment 5): after creating a question and changing only whether it is required, the dialog
   *"This item changed elsewhere — Someone else edited this field since you opened it"* showed the same text on both sides. Measured
-  by reading: `app/Services/Forms/FormBuilderService.php:588` (`reorder()`) writes each position through Eloquent's query builder
+  by reading: `app/Services/Forms/FormBuilderService.php:713` (`reorder()`) writes each position through Eloquent's query builder
   (`:603`, `:612`), whose `update()` adds `updated_at`, so every question and section of the draft gets a new token; the token is that
   timestamp, compared exactly by `assertNoDrift()` (`:740`); `persistOrder()` (`resources/js/components/builder/useBuilderStore.ts:422`)
   ignores the reply, so the page keeps the old tokens. A drag or keyboard move, the Advanced tab's Section choice, an undo of a
@@ -14652,7 +14652,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M176` (2026-10-18) — ****`minor` · A refused question save shows its first error twice — as the lead line and again as the first bullet — and numbers its rules by their place in the request, not on screen.**
   The testers' comment (2026-10-11, comment 2): *"Instructions repeat"* — *"A validation rule must be either a structured rule or an
-  expression — not both, not neither."* above *"Rule 1: A validation rule must be …"*. `resources/js/components/builder/ConfigPanel.vue:486`
+  expression — not both, not neither."* above *"Rule 1: A validation rule must be …"*. `resources/js/components/builder/ConfigPanel.vue:487`
   prints the reply's `message`, which Laravel fills with the first error, and `:489` lists every error including that one;
   `resources/js/components/builder/field-save-errors.ts:79` names `validations.N` by its position in the request after unfinished
   rows are withheld, so "Rule 1" can point at the wrong row. The message itself (`app/Http/Requests/Forms/UpdateFieldRequest.php:376`)
@@ -14682,7 +14682,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M176` (2026-10-18) — ****`minor` · The "Change question type" dialog speaks in developer words and repeats the type as the question's name.**
   The testers' comment (2026-10-11, comment 1): *"Make the text/instructions more “smart highschooler” friendly"*, on a screenshot of
   this dialog. `resources/js/components/builder/ConvertFieldDialog.vue:39` says *"It keeps its key, so conditions, calculations and
-  text that mention it still point to it"*; `resources/js/components/builder/field-conversion.ts:195` and
+  text that mention it still point to it"*; `resources/js/components/builder/field-conversion.ts:199` and
   `app/Enums/ConversionWarning.php:50` carry the rest, with `app/Enums/ConversionDropReason.php` and `app/Enums/ConversionImpact.php`;
   a new question's label is its type's label (`app/Services/Forms/FormBuilderService.php:137`), so the dialog reads *"Current type of
   “Date & time”: Date & time"*. The remedy: `docs/ux/design-system-reference.md` gains a voice rule — write for a smart
@@ -14756,7 +14756,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · The builder's help text and messages use words a first-time author does not know.**
   The testers' comment (2026-10-11, comment 1) asks for wording a smart high-schooler understands, and its screenshot is one dialog
-  of many: `resources/js/components/builder/ConfigPanel.vue:523` (*"Evaluated on the server. Use ${field} references …"*) and `:683`
+  of many: `resources/js/components/builder/ConfigPanel.vue:524` (*"Evaluated on the server. Use ${field} references …"*) and `:683`
   (*"Referenced in expressions and exports"*), the help texts of the builder's other editors, the store's messages and the preview's
   list of limits all speak of keys, expressions and references. The remedy: the voice rule that the type-dialog row writes into
   `docs/ux/design-system-reference.md`, applied to every builder help text and message; `manual.ts` follows.
@@ -14766,7 +14766,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The user (2026-10-16): *"all the type of question must include the referencing"*; the testers (2026-10-11, comment 6): *"direct
   reference the field (not the entire field question but the field code should be enough)"*. A reference is `${key}`
   (`app/Services/Expressions/ExpressionLexer.php`); conditions, Required-when and the two question-against-question rules have
-  pickers, but a calculation (`resources/js/components/builder/ConfigPanel.vue:523`), an Expression-mode rule, a default value and
+  pickers, but a calculation (`resources/js/components/builder/ConfigPanel.vue:524`), an Expression-mode rule, a default value and
   piping into a label, help, placeholder, section text or the confirmation message are typed by hand. The remedy: one "Insert a
   question" picker (an `@` or a button) — questions grouped by section with their label and code, calculations, and where a date fits
   Today, Yesterday, Tomorrow, N days from now, N days ago and One month from now; filtered to what the spot accepts; it inserts
@@ -14807,7 +14807,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`nit` · The builder's draft check looks for a calculation's formula under the wrong key, so every calculated question would read "no formula yet".**
   `resources/js/components/builder/draft-snapshot.ts:402` reads `config.formula`, but the formula lives in
-  `config.calculated_formula` (`resources/js/components/builder/ConfigPanel.vue:262`); `resources/js/components/builder/draft-snapshot.test.ts`
+  `config.calculated_formula` (`resources/js/components/builder/ConfigPanel.vue:274`); `resources/js/components/builder/draft-snapshot.test.ts`
   pins the wrong key. Nothing shows it today only because the preview never draws a calculated question; it will once a calculation
   can be shown. The remedy: read `calculated_formula`, and the test with it. **Latent.** It surfaces once a calculated question can be
   shown. Filed by `M174`. **Tier: early-testing.**

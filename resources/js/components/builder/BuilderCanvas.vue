@@ -12,12 +12,13 @@
  * main button for an InlineLabelEdit, since an input cannot live inside a button.
  */
 import { computed, nextTick, ref } from 'vue';
-import { MdsBadge, MdsButton, MdsEmptyState, MdsIcon, MdsIconButton, statusVariant } from '@meridian/design-system';
+import { MdsBadge, MdsButton, MdsCheckbox, MdsEmptyState, MdsFormField, MdsIcon, MdsIconButton, MdsSelect, statusVariant } from '@meridian/design-system';
 import AddQuestionHere from './AddQuestionHere.vue';
 import DeleteFieldDialog from './DeleteFieldDialog.vue';
 import InlineLabelEdit from './InlineLabelEdit.vue';
 import type { LocalField, Selection } from './types';
 import type { BuilderStore } from './useBuilderStore';
+import { useAnsweredDelete } from './useAnsweredDelete';
 import { useCanvasReorder } from './useCanvasReorder';
 import { useFlipReorder } from './useFlipReorder';
 
@@ -31,6 +32,31 @@ const groups = store.groups;
 const selection = store.selection;
 
 const canvasRoot = ref<HTMLElement | null>(null);
+
+// ── Several questions at once (M177, `R-4a6f004f`, `D146` A) ─────────────────────────────────────────────────────────
+// A tick box on every row and, once one is ticked, a bar that moves them all to a section. Shift held as a tick box is
+// pressed (pointer or keyboard) ticks the range from the last one ticked — read from the press, because the change event
+// the box emits carries no modifier keys. The bar holds a native select, never `MdsMenu`, which may not live inside this
+// scrolling pane (DSR §3.4b).
+const checked = store.checkedFields;
+let shiftHeld = false;
+const bulkTarget = ref('');
+const sectionTargets = computed(() => [
+    { value: '', label: 'No section (top level)' },
+    ...store.sections.value
+        .slice()
+        .sort((a, b) => a.sequence - b.sequence)
+        .map((section) => ({ value: section.id, label: section.label || section.key })),
+]);
+
+function onTick(uid: string, value: boolean): void {
+    store.setChecked(uid, value, shiftHeld);
+    shiftHeld = false;
+}
+
+async function moveChecked(): Promise<void> {
+    await store.moveFieldsToSection([...checked.value], bulkTarget.value === '' ? null : bulkTarget.value);
+}
 
 // ── A label edited in place (M150, `R-34edf1f5`) ────────────────────────────────────────────────────────────────────
 const editingUid = ref<string | null>(null);
@@ -109,23 +135,14 @@ const hasContent = (): boolean => groups.value.some((g) => g.fields.length > 0) 
 
 /**
  * M172 (`R-a44638b6`, `D133`) — a delete asks first only when responses hold answers to the question, and says how many
- * and that they keep them. With none it deletes at once, as it always has (undo still brings it back).
+ * and that they keep them. With none it deletes at once, as it always has (undo still brings it back). M177: the
+ * asking lives in `useAnsweredDelete`, shared with the "Other, please specify" switch.
  */
-const pendingDelete = ref<{ uid: string; label: string; count: number | null } | null>(null);
+const deletion = useAnsweredDelete(props.store);
+const pendingDelete = deletion.pending;
 
 async function requestDelete(field: LocalField): Promise<void> {
-    const count = await props.store.answersFor(field.uid);
-    if (count === 0) {
-        void props.store.deleteField(field.uid);
-        return;
-    }
-    pendingDelete.value = { uid: field.uid, label: field.label || field.key, count };
-}
-
-function confirmDelete(): void {
-    const target = pendingDelete.value;
-    pendingDelete.value = null;
-    if (target) void props.store.deleteField(target.uid);
+    await deletion.request(field.uid, field.label || field.key, () => void props.store.deleteField(field.uid));
 }
 </script>
 
@@ -133,6 +150,15 @@ function confirmDelete(): void {
     <div ref="canvasRoot" class="canvas" :class="{ 'canvas--dragging': draggingUid !== null }">
         <!-- Assertive status region for drag/keyboard-reorder announcements (visually hidden). -->
         <div class="canvas__sr" role="status" aria-live="assertive">{{ announcement }}</div>
+
+        <div v-if="checked.size > 0" class="canvas__bulk" role="region" aria-label="Selected questions" data-bulk-bar>
+            <span class="canvas__bulk-count">{{ checked.size }} selected</span>
+            <MdsFormField label="Move to" v-slot="{ id, describedby }">
+                <MdsSelect :id="id" :describedby="describedby" :model-value="bulkTarget" :options="sectionTargets" @update:model-value="bulkTarget = $event" />
+            </MdsFormField>
+            <MdsButton size="sm" :disabled="isReordering" @click="moveChecked">Move</MdsButton>
+            <MdsButton size="sm" variant="tertiary" @click="store.clearChecked()">Clear</MdsButton>
+        </div>
 
         <div v-if="!hasContent()" class="canvas__empty">
             <MdsEmptyState
@@ -209,6 +235,16 @@ function confirmDelete(): void {
                             >
                                 <MdsIcon name="grip" size="md" />
                             </button>
+                            <MdsCheckbox
+                                class="canvas__tick"
+                                data-field-tick
+                                hide-label
+                                :label="`Select ${field.label || 'this question'}`"
+                                :model-value="checked.has(field.uid)"
+                                @pointerdown="shiftHeld = $event.shiftKey"
+                                @keydown="shiftHeld = $event.shiftKey"
+                                @update:model-value="onTick(field.uid, $event)"
+                            />
                             <!-- No type caption while editing: at 375px its 84px floor left the input about 50px wide. -->
                             <div v-if="editingUid === field.uid" class="canvas__field-editing">
                                 <InlineLabelEdit
@@ -275,20 +311,49 @@ function confirmDelete(): void {
             :open="pendingDelete !== null"
             :label="pendingDelete?.label ?? ''"
             :count="pendingDelete?.count ?? null"
-            @confirm="confirmDelete"
-            @cancel="pendingDelete = null"
+            @confirm="deletion.confirm"
+            @cancel="deletion.cancel"
         />
     </div>
 </template>
 
 <style scoped>
 .canvas {
+    /* M177: the containing block for `.canvas__sr`, its one absolutely positioned node — so the 1px announcement region
+       resolves inside this scroller rather than adding scroll to the page (clipped-node-containment.test.ts). No
+       z-index, so no stacking context; the sticky bulk bar is its only other positioned child. */
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--mds-space-4);
     padding: var(--mds-space-6);
     height: 100%;
     overflow-y: auto;
+}
+
+/* M177: the bar stays in view at the top of this scrolling pane while ticked rows scroll beneath it. */
+.canvas__bulk {
+    position: sticky;
+    top: calc(-1 * var(--mds-space-6));
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--mds-space-2) var(--mds-space-3);
+    padding: var(--mds-space-3);
+    border: 1px solid var(--mds-color-border-default);
+    border-radius: var(--mds-radius-md);
+    background-color: var(--mds-color-bg-surface);
+}
+
+.canvas__bulk-count {
+    align-self: center;
+    font-weight: var(--mds-font-weight-semibold);
+    color: var(--mds-color-text-body);
+}
+
+.canvas__tick {
+    flex-shrink: 0;
 }
 
 .canvas__sr {

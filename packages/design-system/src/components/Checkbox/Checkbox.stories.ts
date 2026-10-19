@@ -27,6 +27,8 @@ export const Unchecked: Story = { args: { modelValue: false } };
 export const Checked: Story = { args: { modelValue: true } };
 export const Invalid: Story = { args: { modelValue: false, invalid: true, label: 'Accept the terms' } };
 export const Disabled: Story = { args: { modelValue: true, disabled: true } };
+// M177: a list row's tick box — the label is the accessible name, the row's own text the visible one.
+export const HiddenLabel: Story = { args: { modelValue: true, label: 'Select Full name', hideLabel: true } };
 
 export const UncheckedDark: Story = { args: { modelValue: false }, decorators: [dark] };
 export const CheckedDark: Story = { args: { modelValue: true }, decorators: [dark] };

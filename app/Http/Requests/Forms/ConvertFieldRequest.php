@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Forms;
 
 use App\Enums\FieldType;
+use App\Rules\PickableFieldType;
 use App\Services\Forms\FormBuilderService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -35,9 +36,11 @@ final class ConvertFieldRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'to' => ['required', 'string', Rule::enum(FieldType::class)],
+            // M177 (`D140`, `D145`): never INTO a retired type — unless the builder's undo is reversing a conversion.
+            'to' => ['required', 'string', Rule::enum(FieldType::class), new PickableFieldType($this->boolean('restore'))],
             'version' => ['required', 'string'],
             'fingerprint' => ['nullable', 'string', 'regex:/^[0-9a-f]{64}$/'],
+            'restore' => ['sometimes', 'boolean'],
         ];
     }
 

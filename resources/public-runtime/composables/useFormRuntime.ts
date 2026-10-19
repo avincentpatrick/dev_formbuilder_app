@@ -37,7 +37,7 @@ import {
     buildEngineSchema,
     buildRenderModel,
     buildTemplateSources,
-    rendersNothing,
+    fieldRendersNothing,
     resolveOptional,
     resolveText,
     toSemanticInput,
@@ -79,6 +79,12 @@ export interface RuntimeStep {
      * by page breaks shows its heading on every page, because focus lands on it, but its description once.
      */
     continuation: boolean;
+    /**
+     * M177 (`R-9bbaa97b`) — the builder preview only (`RuntimeOptions.keepSilentPages`): a block whose every question
+     * renders nothing, kept so the author sees the section they made. Its `fieldKeys` are those questions; nobody
+     * answers them here. Absent on every step of the guest form and manual entry.
+     */
+    silent?: boolean;
 }
 
 /**
@@ -292,6 +298,12 @@ export interface RuntimeOptions {
      * never paginates. Read reactively, so the preview follows a live switch to single-page without a remount.
      */
     paginateAtPageBreaks?: MaybeRefOrGetter<boolean>;
+    /**
+     * M177 (`R-9bbaa97b`) — keep a block (or page) whose every question renders nothing — hidden, calculated, set to
+     * Never — as a SILENT step rather than drop it (predicate 2). ON in the builder preview only, so an author whose only
+     * question in a section is a calculation still sees the section; the guest form and manual entry never set it.
+     */
+    keepSilentPages?: boolean;
 }
 
 function isInstanceObject(value: unknown): value is InstanceAnswers {
@@ -479,15 +491,20 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
      * first page, and a first page emptied by conditions never hands its bare key on — which would read as the
      * respondent's page vanishing. `#` cannot occur in a section key or a field key.
      */
-    function pagesOf(base: string, ordered: RenderField[]): { key: string; fields: RenderField[] }[] {
-        const pages: { key: string; fields: RenderField[] }[] = [];
+    function pagesOf(base: string, ordered: RenderField[]): { key: string; fields: RenderField[]; silent: boolean }[] {
+        const pages: { key: string; fields: RenderField[]; silent: boolean }[] = [];
         let opener: string | null = null;
         let fields: RenderField[] = [];
+        let silent: RenderField[] = [];
         const close = (): void => {
             if (fields.length > 0) {
-                pages.push({ key: pages.length === 0 ? base : `${base}#${opener}`, fields });
+                pages.push({ key: pages.length === 0 ? base : `${base}#${opener}`, fields, silent: false });
+            } else if (opts.keepSilentPages === true && silent.length > 0) {
+                // M177 (`R-9bbaa97b`): the preview keeps it, so the author sees the section they made.
+                pages.push({ key: pages.length === 0 ? base : `${base}#${opener}`, fields: silent, silent: true });
             }
             fields = [];
+            silent = [];
         };
 
         for (const field of ordered) {
@@ -500,8 +517,11 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
             }
             // Increment H7 — hidden and calculated fields render nothing, so a block (or page) holding only those
             // has no question in it and vanishes, rather than render a heading over a blank panel.
-            if (!rendersNothing(field.fieldType)) {
+            // M177 (`R-f44e9d00`): per field — a question set to Never renders nothing, a calculation set to Always does.
+            if (!fieldRendersNothing({ field_type: field.fieldType, visibility: field.visibility })) {
                 fields.push(field);
+            } else {
+                silent.push(field);
             }
         }
         close();
@@ -520,7 +540,8 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
         const pushPages = (base: string, sectionKey: string | null, title: string | null, ordered: RenderField[]): void => {
             let shown = false;
             for (const page of pagesOf(base, ordered)) {
-                if (!anyFieldCurrentlyRelevant(page.fields, sectionKey, false)) {
+                // A silent page (the preview only) is an authoring aid, kept whatever its questions' conditions say.
+                if (!page.silent && !anyFieldCurrentlyRelevant(page.fields, sectionKey, false)) {
                     continue;
                 }
                 steps.push({
@@ -530,6 +551,7 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
                     fieldKeys: page.fields.map((f) => f.key),
                     isRepeat: false,
                     continuation: shown,
+                    ...(page.silent ? { silent: true } : {}),
                 });
                 shown = true;
             }
@@ -555,7 +577,16 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
             }
             // A repeatable section is ONE step and never paginates: it renders an add/remove loop, and its
             // instances are what the respondent pages through.
-            const members = (membersBySection[section.key] ?? []).filter((f) => !rendersNothing(f.fieldType));
+            const all = membersBySection[section.key] ?? [];
+            const members = all.filter((f) => !fieldRendersNothing({ field_type: f.fieldType, visibility: f.visibility }));
+            if (members.length === 0 && opts.keepSilentPages === true) {
+                // M177 (`R-9bbaa97b`): the preview keeps a repeat whose every member is hidden, as it does a flat section.
+                const quiet = all.filter((f) => f.fieldType !== PAGE_BREAK);
+                if (quiet.length > 0) {
+                    steps.push({ key: section.key, sectionKey: section.key, title, fieldKeys: quiet.map((f) => f.key), isRepeat: true, continuation: false, silent: true });
+                }
+                continue;
+            }
             if (members.length === 0 || !anyFieldCurrentlyRelevant(members, section.key, true)) {
                 continue;
             }

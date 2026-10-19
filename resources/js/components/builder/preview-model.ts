@@ -33,7 +33,7 @@
  */
 import { projectDraft, type DraftProjection, type DraftProjectionInput, type ProjectionIssue } from './draft-snapshot';
 import { renderableBlocks } from '../submissions/note-content';
-import { buildRenderModel, rendersNothing } from '../../../public-runtime/lib/schema-mapping';
+import { buildRenderModel, fieldRendersNothing } from '../../../public-runtime/lib/schema-mapping';
 import type { AnswerMap, RenderField, RenderModel, RenderSection, SchemaResponse } from '../../../public-runtime/lib/types';
 import type { FormRuntime, RuntimeStep } from '../../../public-runtime/composables/useFormRuntime';
 import type { LocalField, Uid } from './types';
@@ -134,8 +134,10 @@ export function previewStepLabels(
         const title = section === null ? LEAD_STEP_LABEL : titleFor(section).trim() || UNTITLED_SECTION_LABEL;
         // Increment M124 — a page after a section's first: two entries must never read the same.
         const page = step.continuation === true ? ' (continued)' : '';
+        // M177 (`R-9bbaa97b`): a section the preview keeps although respondents never see it says so in the strip too.
+        const silent = step.silent === true ? ' (hidden from respondents)' : '';
 
-        return { value: step.key, label: `${index + 1}. ${title}${page}` };
+        return { value: step.key, label: `${index + 1}. ${title}${page}${silent}` };
     });
 }
 
@@ -200,7 +202,7 @@ export function previewPendingFields(steps: readonly RuntimeStep[], model: Rende
         }
     }
 
-    return model.fields.filter((f) => !placed.has(f.key) && !rendersNothing(f.fieldType));
+    return model.fields.filter((f) => !placed.has(f.key) && !fieldRendersNothing({ field_type: f.fieldType, visibility: f.visibility }));
 }
 
 /**
@@ -263,7 +265,7 @@ export function previewLimitations(): string[] {
         // sections, because the respondent's form does not paginate those either — a "limitation" this list
         // shares with the real form is not one. `M120` had already taken its other clause, once
         // `single_page_mode` gained a writer.
-        'Inside a repeatable section, wording updates on the next structural change.',
+        'In a repeatable section, changed wording shows after you next add, move or delete something.',
         // M133 (`R-5da4a30f`): the list is read live from the other form's answers and served to the live form only;
         // the preview has no respondent link to fetch it with. The remainder row owns showing it here.
         'Choices taken from another form appear on the live form, not here.',

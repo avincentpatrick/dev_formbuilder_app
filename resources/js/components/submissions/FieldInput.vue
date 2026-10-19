@@ -214,6 +214,15 @@ const readOnlyFiles = computed<MediaAttachmentRef[]>(() =>
     Array.isArray(props.modelValue) ? (props.modelValue as MediaAttachmentRef[]).filter((ref) => typeof ref === 'object' && ref !== null) : [],
 );
 
+/** M177 (`R-f44e9d00`): a calculation's value as text — a dash until the answers it reads are given. */
+const computedText = computed<string>(() => {
+    const value = props.modelValue;
+    if (value === null || value === undefined || value === '') return '—';
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+
+    return typeof value === 'object' ? '—' : String(value);
+});
+
 const control = computed<
     | 'text'
     | 'textarea'
@@ -231,6 +240,7 @@ const control = computed<
     | 'media-readonly'
     | 'note'
     | 'prefilled'
+    | 'computed'
     | 'unsupported'
 >(() => {
     const t = props.field.field_type;
@@ -246,6 +256,9 @@ const control = computed<
     // `supported` check because a non-`url` hidden field is deliberately `supported: false` and must not
     // fall through to the "not available for manual entry (Phase 2)" notice, which would be wrong copy.
     if (t === 'hidden') return props.field.prefill === 'url' ? 'text' : 'prefilled';
+    // M177 (`R-f44e9d00`): a calculation reaches a page only when its author set it to Always — its value, worked out from
+    // the other answers, read-only. Before the `supported` check: nobody types a calculation on any channel.
+    if (t === 'calculated') return 'computed';
     if (!props.field.supported) return 'unsupported';
     if (['short_text', 'email', 'phone', 'url', 'date', 'time', 'datetime'].includes(t)) return 'text';
     if (t === 'long_text') return 'textarea';
@@ -596,6 +609,13 @@ function setCascadeLevel(index: number, value: string): void {
         <p class="encode-prefilled__note">
             {{ field.prefill_value ? 'Set automatically — not editable here.' : 'Set outside this form — nothing to enter here.' }}
         </p>
+    </div>
+
+    <!-- M177 (`R-f44e9d00`): a calculation set to Always — its current value, never an input. -->
+    <div v-else-if="control === 'computed'" class="encode-prefilled" data-computed>
+        <span class="encode-prefilled__label">{{ field.label }}</span>
+        <output class="encode-prefilled__value">{{ computedText }}</output>
+        <p class="encode-prefilled__note">Worked out from the other answers.</p>
     </div>
 
     <!-- Unsupported (advanced / repeat) — surfaced, not silently dropped -->

@@ -58,13 +58,17 @@ export function isAskedOfRespondent(type: PaletteType | undefined): boolean {
     return type !== undefined && type.value_shape !== 'no_answer' && type.config_editor !== 'prefill';
 }
 
-/** The targets in the server's order, split into the kinds a respondent answers and the kinds they do not. */
+/**
+ * The targets in the server's order, split into the kinds a respondent answers and the kinds they do not. M177 (`D140`,
+ * `D145`): a retired type is never offered — the server still plans one, for the undo of a conversion to read.
+ */
 export function targetGroups(plans: readonly ConversionPlan[], palette: ReadonlyMap<string, PaletteType>): TargetGroup[] {
     const asked: TargetOption[] = [];
     const notAsked: TargetOption[] = [];
 
     for (const plan of plans) {
         const type = palette.get(plan.to);
+        if (type?.retired) continue;
         (isAskedOfRespondent(type) ? asked : notAsked).push({ value: plan.to, label: type?.label ?? plan.to });
     }
 

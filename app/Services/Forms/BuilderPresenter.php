@@ -19,6 +19,7 @@ use App\Models\FormFieldValidation;
 use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Models\User;
+use App\Support\Forms\OtherSpecify;
 use DateTimeZone;
 use Illuminate\Support\Collection;
 
@@ -243,6 +244,9 @@ final class BuilderPresenter
                 'operand_kind' => OperandKind::for($type)->value,
                 // Increment M125 — additive: the palette shows ONE entry per group, and all 31 entries stay.
                 'variant' => $type->variantGroup()?->paletteVariant($type),
+                // M177 (`R-0b7db001`, `R-22011569`, `D140`) — additive too: a retired type is left out of what an author
+                // picks from (the palette, "Add a question here", Change type), and stays here for every label and lookup.
+                'retired' => $type->isRetired(),
                 // Increment M130 — the layouts an author may choose for this type (`FieldAppearance::for()`),
                 // transmitted rather than listed in the client; empty for every type with no layout setting.
                 'appearances' => array_map(
@@ -331,6 +335,8 @@ final class BuilderPresenter
             // M133 (`R-5da4a30f`) — the types a link to another form's answers may feed, transmitted so the Options
             // tab never keeps its own list.
             'linked_choice_types' => array_map(static fn (FieldType $type): string => $type->value, LinkedChoiceService::LINKABLE_TYPES),
+            // M177 (`R-71509975`): the types whose Options tab offers "Other, please specify" — transmitted, never listed in the client.
+            'other_specify_types' => array_map(static fn (FieldType $type): string => $type->value, OtherSpecify::types()),
             // M134 (`R-910d2286`) — what a condition may compare a question of each kind with, from `OperandKind`'s own
             // methods: the condition editor offers a subset of what the publish gate accepts, and never restates it.
             'operand_kinds' => array_map(static fn (OperandKind $kind): array => [

@@ -155,6 +155,21 @@ it('drops a section that holds nothing printable, heading included', function ()
         ->and(printedKeys($model))->toBe(['name']);
 });
 
+it('leaves a question set to Never off the paper, and still prints no calculation (M177, R-f44e9d00)', function (): void {
+    // Never asks nobody, so the paper has no place for it; a calculation set to Always is worked out from the other
+    // answers, so a paper respondent writes nothing there either.
+    [$form, $version] = printFixture([
+        'sections' => [],
+        'fields' => [
+            printField('name', 'short_text', ['sequence' => 0]),
+            printField('ref', 'short_text', ['sequence' => 1, 'config' => ['visibility' => 'hidden']]),
+            printField('total', 'calculated', ['sequence' => 2, 'config' => ['calculated_formula' => '1 + 1', 'visibility' => 'shown']]),
+        ],
+    ]);
+
+    expect(printedKeys($this->present->present($form, $version)))->toBe(['name']);
+});
+
 it('combs a date into captioned DD / MM / YYYY groups with a printed slash in each gap (layout 4, M148)', function (): void {
     // The layout decision the whole increment turns on: a free run of eight boxes cannot distinguish
     // the 3rd of April from the 4th of March, and no recognizer can recover that from the ink.

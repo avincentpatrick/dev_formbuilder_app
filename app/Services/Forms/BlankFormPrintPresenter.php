@@ -12,6 +12,7 @@ use App\Models\Form;
 use App\Models\FormVersion;
 use App\Services\Submissions\SchemaValueFormatter;
 use App\Services\Submissions\SubmissionPdfPresenter;
+use App\Support\Forms\FieldVisibility;
 use App\Support\Forms\LocaleVariant;
 use App\Support\Forms\StepProjection;
 use LogicException;
@@ -368,7 +369,9 @@ final class BlankFormPrintPresenter
             }
 
             $area = PrintAnswerArea::for($type);
-            if (! $area->isPrinted()) {
+            // M177 (`R-f44e9d00`): a question set to Never asks nobody, so the paper has no place for it. (A calculation set
+            // to Always stays off too — it is worked out from the other answers, so a paper respondent writes nothing.)
+            if (! $area->isPrinted() || FieldVisibility::of($field['config'] ?? null) === FieldVisibility::HIDDEN) {
                 continue;
             }
 

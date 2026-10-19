@@ -24,10 +24,28 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D144`, the last one filed, was asked and answered on 2026-10-18 while `M176` (R1) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D146`, the last one filed, was asked and answered on 2026-10-18 while `M177` (R2) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D146 — Bulk move (`R-4a6f004f`): how does an author pick several questions in the Structure view? **A — a tick box on every question row; when one is ticked, a bar appears above the list ("N selected · Move to [section] · Move · Clear"); shift-click ticks a range.**
+
+**Asked and answered 2026-10-18 (user decision, in chat, with mock-ups), while `M177` (R2) was planned; recorded in its claim.** The testers' comment (2026-10-11, comment 4): *"Form builder does not all[ow] bulk movement of questions to a section"*. `MdsMenu` may not be mounted inside the scrolling canvas (DSR §3.4b), so the target is chosen in the bar.
+
+- **A — a tick box on every row (recommended, chosen).** One click to start; the bar sits outside the scrolling list.
+- **B — a "Select questions" button first.** Rows look as they do today until it is pressed; Done hides the tick boxes again.
+
+**What the answer files, in the same push:** nothing new — it shapes `R-4a6f004f`'s remedy, taken by `M177`.
+
+### D145 — Retiring Yes/No (`R-0b7db001`, `D140`): its note was to offer "Change type → Single choice", but `D64` refuses converting a Yes/No into a Single choice. Allow that one change? **A — allow it: Change type turns a Yes/No into a Single choice with the choices Yes and No; earlier answers stay as they were, and the dialog warns that new answers are stored as a choice. `D64` gains this one exception.**
+
+**Asked and answered 2026-10-18 (user decision, in chat), while `M177` (R2) was planned; recorded in its claim.** `D64` puts `yes_no` in the Isolated family (`app/Support/Forms/FieldTypeConversion.php`), converting only to `note` or `hidden`. The builder's undo reverses a conversion through the same endpoint, so the reverse edge (`single_select → yes_no`) exists for undo only and the dialog never offers it (a retired type is never a target an author picks).
+
+- **A — allow that one change (recommended, chosen).** The retired note can point at a working button; the conversion plan, census and warnings already exist.
+- **B — keep `D64` as it is.** The note only says the type is retired and still works; new questions use Single choice's Yes / No preset.
+
+**What the answer files, in the same push:** nothing new — it shapes `R-0b7db001`'s remedy, taken by `M177`; `D64` carries a pointer here.
+
 ### D144 — The deploy will count every table's rows before and after it migrates (`R-a11cc78a`). If a table holds fewer rows after the migration than before it, what should the deploy do? **A — stop with the site left down on purpose, the backup's path in the log, so no tester writes on top of lost data before a restore is decided.**
 
 **Asked and answered 2026-10-18 (user decision, in chat), while `M176` (R1) was planned; recorded in its claim.** The window in `deploy.ps1` already leaves the site down on purpose when a step inside it fails; a count that drops after `migrate` is data already gone, and bringing the site back up would let new answers land on top of it before anyone has decided whether to restore the backup.
@@ -1713,6 +1731,7 @@ end state and needs a disclosure-safe refusal designed first, which is a decisio
 - **`note` and `hidden` are TWO-WAY.** "Always allowed" holds as a target and now as a source too, so a parked field can be turned back — which is what lets the builder's undo reverse a conversion through the same endpoint. That includes `note`/`hidden` → `calculated`, with a warning that a formula must be added, because publish does not catch an empty one.
 - **`calculated` converts only to `note`/`hidden`, and `page_break` converts to and from nothing.** `integer`↔`decimal` is lossless. ⚠️ **`duration` is its own `ValueShape`, so under `A`'s own words it too converts only to `note`/`hidden`** — recorded here as the literal reading, not as a fifth question.
 - **The row is split:** `M121` ships the engine (`app/Support/Forms/FieldTypeConversion.php`), `M122` the request, controller and routes.
+- **Amended 2026-10-18 by `D145`:** `yes_no` converts to `single_select` (choices Yes and No) — the one exception to its Isolated family — and back, for undo only.
 
 ---
 

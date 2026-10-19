@@ -89,3 +89,47 @@ test('Builder — a label renamed on its row, and a question dragged by its grip
         await archive(page, formId);
     }
 });
+
+/*
+ * M177 (`R-4a6f004f`, `D146` A) — the testers' comment 4 (2026-10-11): "Form builder does not all[ow] bulk movement of
+ * questions to a section". Two questions ticked in Structure go to a section together, in one order write, and stay
+ * there after a reload; one Undo puts both back.
+ */
+test('Builder — several questions ticked and moved to a section together, saved', async ({ page }, info) => {
+    test.setTimeout(180_000);
+    const formId = await createForm(page, `Bulk move ${info.project.name} ${Date.now()}`);
+
+    try {
+        for (let i = 0; i < 3; i++) {
+            await showBuilderPane(page, 'fields');
+            await page.locator('.palette').getByRole('button', { name: 'Text', exact: true }).click();
+            await saved(page);
+        }
+        await structure(page);
+        for (const [i, label] of ['Alpha', 'Beta', 'Gamma'].entries()) {
+            await rename(page, formId, rows(page).nth(i), label);
+        }
+        await page.getByRole('button', { name: 'Add section' }).click();
+        await saved(page);
+
+        await rows(page).nth(0).locator('[data-field-tick]').click();
+        await rows(page).nth(2).locator('[data-field-tick]').click();
+        const bar = page.locator('[data-bulk-bar]');
+        await expect(bar).toContainText('2 selected');
+        await assertClean(page, 'structure with two questions ticked');
+
+        await bar.getByRole('combobox', { name: 'Move to' }).selectOption({ index: 1 });
+        const sent = reorderSent(page, formId);
+        await bar.getByRole('button', { name: 'Move', exact: true }).click();
+        await sent;
+        await saved(page);
+        await expect(rows(page).locator('.canvas__field-label')).toHaveText(['Beta']);
+
+        await page.reload({ waitUntil: 'networkidle' });
+        await structure(page);
+        await expect(rows(page).locator('.canvas__field-label')).toHaveText(['Beta']);
+        await expect(page.locator('[data-drop-group]:not([data-drop-group="ungrouped"]) .canvas__field-label')).toHaveText(['Alpha', 'Gamma']);
+    } finally {
+        await archive(page, formId);
+    }
+});

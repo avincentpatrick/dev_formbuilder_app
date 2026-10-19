@@ -189,13 +189,23 @@ group('the eight draft-only states', () => {
     });
 
     it('7. omits a calculated field’s formula KEY when there is no formula', () => {
-        // Absent, not null: the engine branches on presence.
+        // Absent, not null: the engine branches on presence. M177 (`R-f7a18b7a`): the key is `calculated_formula`, the one
+        // the builder writes and the engine reads — the check read `formula`, so every calculation read "no formula yet".
         const { schema, issues } = projectDraft(
-            input([field({ uid: 'u1', field_type: 'calculated', config: { formula: '  ' } })]),
+            input([field({ uid: 'u1', field_type: 'calculated', config: { calculated_formula: '  ' } })]),
         );
 
-        expect('formula' in (schema.version.schema.fields[0].config ?? {})).toBe(false);
+        expect('calculated_formula' in (schema.version.schema.fields[0].config ?? {})).toBe(false);
         expect(issues.map((i) => i.code)).toContain('missing_formula');
+    });
+
+    it('7b. says nothing about a calculation that has its formula (M177, R-f7a18b7a)', () => {
+        const { schema, issues } = projectDraft(
+            input([field({ uid: 'u1', field_type: 'calculated', config: { calculated_formula: '${a} + 1' } })]),
+        );
+
+        expect(schema.version.schema.fields[0].config).toEqual({ calculated_formula: '${a} + 1' });
+        expect(issues.map((i) => i.code)).not.toContain('missing_formula');
     });
 
     it('8. orders fields by sequence and sections by their own sequence', () => {
@@ -317,6 +327,14 @@ group('shape — what makes a live preview affordable', () => {
         ).shape;
 
         expect(revalued).not.toBe(relabelled);
+    });
+
+    it('moves when a question is set to Always or Never, or a formula changes, so the preview rebuilds (M177)', () => {
+        const shape = (config: Record<string, unknown>) => projectDraft(input([field({ uid: 'u1', field_type: 'calculated', config })])).shape;
+
+        expect(shape({ calculated_formula: '1', visibility: 'shown' })).not.toBe(shape({ calculated_formula: '1' }));
+        expect(shape({ calculated_formula: '1', visibility: 'hidden' })).not.toBe(shape({ calculated_formula: '1' }));
+        expect(shape({ calculated_formula: '1 + 1' })).not.toBe(shape({ calculated_formula: '1' }));
     });
 
     it('is derivable from a snapshot alone', () => {

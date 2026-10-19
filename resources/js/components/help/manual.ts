@@ -291,7 +291,7 @@ const guide: ChapterDraft[] = [
                         [ui('Single choice', FIELD_TYPES), ' — pick exactly one answer from a short list.'],
                         [ui('Multiple choice', FIELD_TYPES), ' — tick every answer that applies.'],
                         [ui('Dropdown', FIELD_TYPES), ' — pick one answer from a long list.'],
-                        [ui('Yes / No', FIELD_TYPES), ' — a simple yes-or-no question.'],
+                        ['A yes-or-no question is a ', ui('Single choice', FIELD_TYPES), ': on its ', ui('Options', CONFIG), ' tab, press ', ui('Add Yes and No', CHOICES), '.'],
                         [ui('Date', FIELD_TYPES), ', ', ui('Time', FIELD_TYPES), ' and ', ui('Date & time', FIELD_TYPES), ' — a calendar or clock picker.'],
                         [ui('Email', FIELD_TYPES), ' and ', ui('Phone', FIELD_TYPES), ' — checked to look like an email address or a phone number.'],
                         [ui('Photo', FIELD_TYPES), ', ', ui('File upload', FIELD_TYPES), ' and ', ui('Signature', FIELD_TYPES), ' — the respondent attaches or draws something.'],
@@ -319,6 +319,7 @@ const guide: ChapterDraft[] = [
                 blocks: [
                     list(
                         ['Reorder: drag a question or a section by its handle (the six dots on its left). Without a mouse, focus the handle, press Enter or Space, move with the arrow keys, then press Enter again.'],
+                        ['Move several at once: tick the box beside each question in ', ui('Structure', BUILDER), ' (hold Shift to tick every question between two), choose a section under ', ui('Move to', CANVAS), ', and press ', ui('Move', CANVAS), '. They keep their order, and one ', ui('Undo', BUILDER), ' puts them all back.'],
                         ['Rename: double-click a question’s label in ', ui('Structure', BUILDER), ' and type. Press Enter to keep it.'],
                         ['Copy: ', ui('Duplicate field', CANVAS), ' adds a copy right below the question.'],
                         ['Delete: ', ui('Delete field', CANVAS), ' for a question, ', ui('Delete section', CANVAS), ' for a section. ', ui('Undo', BUILDER), ' brings it back. If responses already hold answers to the question, you are told how many first: they keep them, marked as removed from the form.'],
@@ -407,6 +408,10 @@ const guide: ChapterDraft[] = [
                         ['Click ', ui('Add condition', CONDITIONS), ', then choose the earlier question, the comparison and the answer — “Are you pregnant?” is Yes.'],
                         ['For more than one condition, choose ', ui('All of', CONDITIONS), ' (every condition must hold) or ', ui('Any of', CONDITIONS), ' (one is enough).'],
                     ),
+                    p(
+                        'Above the condition, ', ui('Show to respondents', CONFIG), ' reads ', ui('Only when…', CONFIG), ' once a condition is set. Choose ', ui('Never', CONFIG),
+                        ' to keep a question on the form without asking anyone — its condition is kept for later, and it is never required — or ', ui('Always', CONFIG), ' to remove the condition.',
+                    ),
                     p('A whole section can be shown or skipped the same way: select the section and use “', ui('Show this section only when…', CONFIG), '”.'),
                     tip('info', 'Check your conditions on the ', ui('Logic', BUILDER), ' view, which writes out every condition in plain words, and try them in', link('Preview', '#preview'), '.'),
                 ],
@@ -427,6 +432,7 @@ const guide: ChapterDraft[] = [
                         ' in the middle column. Answer the questions as a respondent would: required questions, rules and show-or-skip conditions all work here, and nothing you type is saved as a response.',
                     ),
                     p('You can still edit while you preview: double-click a question’s wording to change it, or drag a question by its handle to move it.'),
+                    p('A section whose every question is hidden — a calculation, a hidden field, or a question set to Never — still shows here as a card that says respondents won’t see it. Click a question on the card to open its settings.'),
                     tip(
                         'info',
                         'The box “', ui('What this preview does not do', PREVIEW),
@@ -606,6 +612,7 @@ const CONDITION_EDITOR = 'resources/js/components/builder/ConditionEditor.vue';
 const APPEARANCE = 'app/Enums/FieldAppearance.php';
 const INDEXED = 'app/Enums/IndexedDataType.php';
 const LINKED = 'resources/js/components/builder/LinkedChoicesEditor.vue';
+const OTHER_SPECIFY = 'resources/js/components/builder/OtherSpecifyControl.vue';
 const CASCADING = 'resources/js/components/builder/CascadingEditor.vue';
 const LIKERT_MATRIX = 'resources/js/components/builder/LikertMatrixEditor.vue';
 const MATRIX = 'resources/js/components/builder/MatrixEditor.vue';
@@ -762,7 +769,8 @@ const reference: ChapterDraft[] = [
                     p(
                         'A question changes only into a close relative: text types into each other; ', ui('Whole number', FIELD_TYPES), ' and ', ui('Decimal number', FIELD_TYPES),
                         '; the date and time types; ', ui('Single choice', FIELD_TYPES), ', ', ui('Multiple choice', FIELD_TYPES), ', ', ui('Dropdown', FIELD_TYPES), ' and ', ui('Likert scale', FIELD_TYPES),
-                        '; the GPS types; the media types; and the two grids. ', ui('Calculated', FIELD_TYPES), ', ', ui('Duration', FIELD_TYPES), ', ', ui('Yes / No', FIELD_TYPES), ' and ',
+                        '; the GPS types; the media types; and the two grids. A ', ui('Yes / No', FIELD_TYPES), ' question becomes a ', ui('Single choice', FIELD_TYPES), ' with the choices Yes and No. ',
+                        ui('Calculated', FIELD_TYPES), ', ', ui('Duration', FIELD_TYPES), ' and ',
                         ui('Cascading select', FIELD_TYPES), ' can only become a ', ui('Note / label', FIELD_TYPES), ' or a ', ui('Hidden field', FIELD_TYPES), '. A ', ui('Page break', FIELD_TYPES), ' cannot change.',
                     ),
                 ],
@@ -893,7 +901,10 @@ const reference: ChapterDraft[] = [
                 id: 'type-calculated',
                 title: 'Calculated',
                 blocks: [
-                    p('An answer worked out from other answers — a total, an age from a birth date. Respondents never see it; it is worked out when the response is saved.'),
+                    p(
+                        'An answer worked out from other answers — a total, an age from a birth date. Respondents do not see it unless you choose ', ui('Always', CONFIG),
+                        ' under ', ui('Show to respondents', CONFIG), ' on its ', ui('Advanced', CONFIG), ' tab: then they see its value, read-only, as they answer. Either way it is worked out again when the response is saved.',
+                    ),
                     list(
                         ['Write the formula in ', ui('Calculation formula', CONFIG), '. Refer to another question by its ', ui('Field key', CONFIG), ' inside ${ } — for example ', ui('e.g. ${quantity} * ${unit_price}', CONFIG), '.'],
                         ['Use + − * / for arithmetic, and if(), count(), int() or today() for more.'],
@@ -920,7 +931,7 @@ const reference: ChapterDraft[] = [
                 id: 'type-duration',
                 title: 'Duration',
                 blocks: [
-                    tip('warning', 'Respondents cannot answer a Duration question yet: the form shows “', NOT_YET, '” Use a ', ui('Whole number', FIELD_TYPES), ' question, such as “minutes”, for now.'),
+                    tip('warning', 'This type is retired: you can no longer add one. Respondents cannot answer a Duration question — the form shows “', NOT_YET, '” Use a ', ui('Whole number', FIELD_TYPES), ' question, such as “minutes”, for now; a duration will be worked out by a calculation.'),
                 ],
             },
         ],
@@ -939,6 +950,11 @@ const reference: ChapterDraft[] = [
                         ['On the ', ui('Options', CONFIG), ' tab, click ', ui('Add option', CHOICES), ' once for each choice.'],
                         ['Fill in each choice’s ', ui('Label', CHOICES), ' (what respondents read) and ', ui('Value', CHOICES), ' (the short code saved in the results and exports).'],
                         ['Pick a ', ui('Choice layout', CONFIG), ': ', ui('One per line (default)', CONFIG), ', ', ui('Side by side', APPEARANCE), ' or ', ui('In columns', APPEARANCE), '.'],
+                    ),
+                    p(
+                        'To let respondents write in an answer of their own, turn on ', ui('Add “Other, please specify”', OTHER_SPECIFY), ' on the ', ui('Options', CONFIG),
+                        ' tab. It adds the choice “Other” and a question “Please specify” right after this one; respondents see it only when they pick Other, and must answer it then. Turning it off removes both. ',
+                        ui('Multiple choice', FIELD_TYPES), ' and ', ui('Dropdown', FIELD_TYPES), ' have it too.',
                     ),
                     p(
                         'Its choices can also come from another form: under ', ui('Choices come from', LINKED), ', pick ', ui("Another form's answers", LINKED),
@@ -970,7 +986,8 @@ const reference: ChapterDraft[] = [
                 id: 'type-yes-no',
                 title: 'Yes / No',
                 blocks: [
-                    p('Two buttons, ', ui('Yes', FIELD_INPUT), ' and ', ui('No', FIELD_INPUT), '. It has no settings of its own: write the question in ', ui('Label', CONFIG), ' and you are done.'),
+                    p('This type is retired: you can no longer add one, and a question already on a form keeps working. To ask yes or no, add a ', ui('Single choice', FIELD_TYPES), ' and press ', ui('Add Yes and No', CHOICES), ' on its ', ui('Options', CONFIG), ' tab. An existing one shows ', ui('Change to Single choice', TYPE_CONTROL), ', which keeps its answers.'),
+                    p('On the form it shows two buttons, ', ui('Yes', FIELD_INPUT), ' and ', ui('No', FIELD_INPUT), '.'),
                 ],
             },
             {

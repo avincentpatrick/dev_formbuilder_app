@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Forms;
 
 use App\Enums\FieldType;
+use App\Rules\PickableFieldType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -25,8 +26,10 @@ final class StoreFieldRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'field_type' => ['required', Rule::enum(FieldType::class)],
+            // M177 (`D140`): never a retired type — unless the builder's undo is putting an existing question back.
+            'field_type' => ['required', Rule::enum(FieldType::class), new PickableFieldType($this->boolean('restore'))],
             'section_id' => ['nullable', 'uuid'],
+            'restore' => ['sometimes', 'boolean'],
         ];
     }
 }

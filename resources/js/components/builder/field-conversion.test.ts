@@ -54,6 +54,19 @@ describe('targetGroups', () => {
 
         expect(groups).toEqual([{ label: GROUP_NOT_ASKED, options: [{ value: 'banner', label: 'Banner' }] }]);
     });
+
+    it('never offers a retired type, though the server plans it for the undo of a conversion (FC-R1, M177)', () => {
+        // M177 (`R-0b7db001`, `D145`): Yes/No converts to Single choice, and back ONLY so the builder's undo can reverse it.
+        // The plan is listed — the undo reads it — and the dialog an author picks from leaves it out.
+        const choice: PaletteType = { value: 'single_select', label: 'Single choice', advanced: false, has_options: true, config_editor: 'choices', value_shape: 'choice', operand_kind: 'value' };
+        const yesNo: PaletteType = { value: 'yes_no', label: 'Yes / No', advanced: false, has_options: false, config_editor: null, value_shape: 'boolean', operand_kind: 'value', retired: true };
+        const groups = targetGroups(
+            [conversionPlan({ from: 'dropdown', to: 'single_select' }), conversionPlan({ from: 'dropdown', to: 'yes_no' })],
+            new Map([['single_select', choice], ['yes_no', yesNo]]),
+        );
+
+        expect(groups).toEqual([{ label: GROUP_QUESTION_TYPES, options: [{ value: 'single_select', label: 'Single choice' }] }]);
+    });
 });
 
 describe('needsReview', () => {

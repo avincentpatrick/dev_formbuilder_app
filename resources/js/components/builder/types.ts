@@ -145,6 +145,9 @@ export interface PaletteType {
     // The layouts an author may choose for this type (M130) — `FieldAppearance::for()` via BuilderPresenter. Empty
     // for a type with no layout setting; optional for the same reason as `variant`, and absent reads as empty.
     appearances?: EnumOption[];
+    // M177 (`D140`) — `FieldType::isRetired()`: never offered to pick (palette, "Add a question here", Change type), while an
+    // existing question of the type keeps its label and lookups. Optional like `variant`; absent reads as not retired.
+    retired?: boolean;
 }
 
 export interface PaletteVariant {
@@ -216,6 +219,9 @@ export interface BuilderEnums {
     // M133 (`R-5da4a30f`) — the question types that may take their choices from another form,
     // `LinkedChoiceService::LINKABLE_TYPES` transmitted. Optional: a hand-built enum block in a test offers none.
     linked_choice_types?: string[];
+    // M177 (`R-71509975`) — the types whose Options tab offers "Other, please specify" (`OtherSpecify::types()`). Optional so
+    // a hand-built enums payload in a test may carry none; absent reads as no type offering it.
+    other_specify_types?: string[];
     // M134 (`R-910d2286`) — one row per `OperandKind`, what the condition editor may offer. Optional: a hand-built
     // enum block in a test offers none, and the editor then filters nothing.
     operand_kinds?: OperandKindOption[];

@@ -59,6 +59,10 @@ let session = 0;
 let preparing = false;
 
 const currentLabel = computed(() => (field.value ? labelOf(field.value.field_type) : ''));
+// M177 (`R-0b7db001`, `R-22011569`, `D140`, `D145`): an existing question of a retired type keeps working and says so; a
+// Yes/No points at the one change that replaces it — a Single choice with the choices Yes and No.
+const retired = computed(() => (field.value ? paletteByValue.get(field.value.field_type)?.retired === true : false));
+const retiredToChoice = computed(() => field.value?.field_type === 'yes_no');
 const questionLabel = computed(() => {
     const current = field.value;
     if (!current) return '';
@@ -289,6 +293,18 @@ defineExpose({ openDialog });
                 @update:model-value="switchFormat"
             />
         </div>
+        <div v-if="retired" class="field-type__retired" data-retired-note>
+            <p v-if="retiredToChoice" class="field-type__retired-text">
+                This type is retired. It still works. Change it to Single choice, which asks the same with the choices Yes and No.
+            </p>
+            <p v-else class="field-type__retired-text">
+                This type is retired. Respondents can’t answer it. Change it to a Note, or delete it. A duration will be worked
+                out by a calculation.
+            </p>
+            <MdsButton v-if="retiredToChoice" variant="secondary" size="sm" data-retired-change @click="openDialog('single_select')">
+                Change to Single choice
+            </MdsButton>
+        </div>
         <p class="field-type__status" role="status">{{ announcement }}</p>
 
         <ConvertFieldDialog
@@ -325,6 +341,22 @@ defineExpose({ openDialog });
     align-items: center;
     gap: var(--mds-space-2);
     min-width: 0;
+}
+
+.field-type__retired {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--mds-space-2);
+    padding: var(--mds-space-2) var(--mds-space-3);
+    border-radius: var(--mds-radius-md);
+    background-color: var(--mds-color-status-warning-bg);
+    color: var(--mds-color-status-warning-fg);
+}
+
+.field-type__retired-text {
+    margin: 0;
+    font-size: var(--mds-type-body-sm-font-size);
 }
 
 .field-type__label {

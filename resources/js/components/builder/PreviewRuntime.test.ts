@@ -337,3 +337,52 @@ describe('PreviewRuntime — a published version, read-only (M172)', () => {
         wrapper.unmount();
     });
 });
+
+/**
+ * M177 (`R-9bbaa97b`) — the user (2026-10-16): a calculated question alone in a section made the section vanish from the
+ * preview, "making the user confuse". The preview keeps such a section as a card saying respondents won't see it, its
+ * questions listed and selectable, and the step strip marks it. The respondent's form is unchanged.
+ */
+describe('PreviewRuntime — a section whose every question is hidden (M177)', () => {
+    const snapshot = (singlePage: boolean) =>
+        schemaResponse({
+            form: { single_page_mode: singlePage },
+            sections: [section({ key: 'about', label: 'About you', sequence: 0 }), section({ key: 'totals', label: 'Totals', sequence: 1 })],
+            fields: [
+                field({ key: 'age', label: 'Age', field_type: 'integer', section_key: 'about', sequence: 0, section_sequence: 0 }),
+                field({ key: 'total', label: 'Running total', field_type: 'calculated', section_key: 'totals', sequence: 1, section_sequence: 0, config: { calculated_formula: '${age} + 1' } }),
+                field({ key: 'ref', label: 'Reference', section_key: 'totals', sequence: 2, section_sequence: 1, config: { visibility: 'hidden' } }),
+            ],
+        });
+
+    it.each([true, false])('shows the section as a card naming its questions (single page = %s)', async (singlePage) => {
+        const snap = snapshot(singlePage);
+        const wrapper = mount(PreviewRuntime, {
+            props: { snapshot: snap, model: buildRenderModel(snap), issuesByKey: {}, selectedKey: null, initialStepKey: singlePage ? null : 'totals' },
+        });
+        await flushPromises();
+
+        const card = wrapper.get('[data-silent-step]');
+        expect(card.text()).toContain('Respondents won’t see this section: every question in it is hidden.');
+        expect(card.text()).toContain('Running total');
+        expect(card.text()).toContain('Reference');
+        expect(card.find('input').exists()).toBe(false);
+
+        await card.findAll('button').find((b) => b.text().includes('Running total'))!.trigger('click');
+        expect(wrapper.emitted('select')?.at(-1)).toEqual(['total']);
+        wrapper.unmount();
+    });
+
+    it('marks the section in the step strip', async () => {
+        const snap = snapshot(false);
+        const wrapper = mount(PreviewRuntime, {
+            props: { snapshot: snap, model: buildRenderModel(snap), issuesByKey: {}, selectedKey: null, initialStepKey: null },
+        });
+        await flushPromises();
+
+        const labels = wrapper.findComponent({ name: 'PreviewStepStrip' }).props('options') as { label: string }[];
+        expect(labels.map((o) => o.label)).toEqual(['1. About you', '2. Totals (hidden from respondents)']);
+        wrapper.unmount();
+    });
+});
+

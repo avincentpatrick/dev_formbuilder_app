@@ -55,7 +55,7 @@ function setCenter(next: { lat: number | null; lon: number | null }): void {
             />
             <MdsFormField
                 label="Accuracy target (m)"
-                help="A soft reminder shown when a captured point's GPS accuracy is worse than this. Not enforced."
+                help="When a location reading is less exact than this, the respondent sees a reminder. The answer is still taken."
                 v-slot="{ id, describedby }"
             >
                 <MdsNumberInput

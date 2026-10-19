@@ -67,7 +67,7 @@ const SUPPORTED = new Set<string>([
  * must not import from `lib/`. It is re-exported here so every existing import path still resolves, and the
  * PHP parity test (`tests/Unit/Forms/PdfFieldRoleTest.php`) now parses the new home.
  */
-export { rendersNothing } from '../engine';
+export { fieldRendersNothing, rendersNothing } from '../engine';
 
 // Field types that carry an author-defined option list (mirror of FieldType::hasOptions()).
 const HAS_OPTIONS = new Set<string>(['single_select', 'multi_select', 'dropdown', 'likert_scale']);
@@ -429,9 +429,17 @@ function toRenderField(field: RawField): RenderField {
         media: buildMedia(field),
         appearance: field.appearance ?? null,
         content: field.field_type === 'note' && Array.isArray(field.config?.content) ? (field.config.content as unknown[]) : null,
+        visibility: visibilityOf(field),
         sequence: field.sequence,
         sectionSequence: field.section_sequence,
     };
+}
+
+/** M177 (`R-f44e9d00`): Show to respondents, as stored — anything but the two values reads as the type's own rule. */
+function visibilityOf(field: RawField): 'hidden' | 'shown' | null {
+    const value = field.config?.visibility;
+
+    return value === 'hidden' || value === 'shown' ? value : null;
 }
 
 function toRenderSection(section: RawSection): RenderSection {
@@ -510,6 +518,8 @@ export function buildEngineSchema(schema: SchemaResponse): EngineSchema {
         grid: f.field_type === 'matrix' || f.field_type === 'likert_matrix' ? engineGridConfig(f) : null,
         // Media count bounds (Increment G6) — min/max attachment count for the engine's processMedia pass.
         media: isMediaFieldType(f.field_type) ? engineMediaConfig(f) : null,
+        // M177 (`R-f44e9d00`): Show to respondents — a Never question raises no error nobody could repair.
+        visibility: visibilityOf(f),
     }));
 
     const sections: SchemaSection[] = schema.version.schema.sections.map((s) => ({

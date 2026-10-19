@@ -11458,7 +11458,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   pathology is hand-mirrors. ⛔ **THE BINDING CONSTRAINT IS ARIA, NOT ARCHITECTURE:** this page may hold exactly
   one `role="tablist"` (`ConfigPanel.vue:23-27`, `Builder.vue:462-471`) because thirteen Playwright locators walk
   `[role="tab"]` on it, four in click-every-match loops. The preview is a **third option on the existing centre
-  `MdsSegmentedControl`** (`Builder.vue:531-537`) — a radiogroup, one array entry, no new ARIA node. ⚠️ **That
+  `MdsSegmentedControl`** (`Builder.vue:537-543`) — a radiogroup, one array entry, no new ARIA node. ⚠️ **That
   invariant lives only in prose today** and should become an assertion in this increment, before every later
   builder change depends on it. **Live.** Filed by `M110`. **Tier: early-testing.**
 
@@ -11488,7 +11488,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   but never for this control. Fixed with the host-level `flex-wrap` `ConfigPanel.vue:748` already applies to
   the Requiredness control — `D28`'s measured affordance. ⛔ **THE ROW'S OWN EVIDENCE: ONE CITATION FALSE, FOUR
   ROTTED, AND ONE CLAIM FALSE.** `ConfirmationModal.vue:11` names a file `M117` renamed and a sentence it
-  deleted (the in-tree statement moved to `draft-snapshot.ts:7`); `Builder.vue:531-537` and `:462-471` are both
+  deleted (the in-tree statement moved to `draft-snapshot.ts:7`); `Builder.vue:537-543` and `:462-471` are both
   **+7** (`:538-544`, `:469-477`); `Encode.vue:38-42` is the IMPORT and was at filing time too, the mount being
   `:185-195`. ⛔ **And *"that invariant lives only in prose today"* is FALSE** — `ConfigPanel.test.ts`'s *exactly one tablist* case
   and its *adds no second tablist* case (`M129` dropped both line numbers, which its edits moved) and `FormSettingsModal.test.ts-110` already assert it at component level. What was genuinely
@@ -11909,7 +11909,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · The builder and PHP disagree about whether a duration field takes an ordered comparison, and the
   disagreement is now pinned rather than resolved.** Found by `M113` (2026-09-26) while building the client
-  field-type mirror census. `ConfigPanel.vue:190`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
+  field-type mirror census. `ConfigPanel.vue:192`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
   'likert_scale']` — four members. `ValueShape::allowsOperator()` (`ValueShape.php:218-242`) permits
   `gt`/`lt`/`gte`/`lte` for `Number`, `Duration` and `Scale`, which is **five** types: the same four plus
   `duration`. ⛔ **`R-09f73330` SAYS THIS SET "MIRRORS NOTHING", AND THAT STOPPED BEING TRUE IN THE INCREMENT
@@ -12253,11 +12253,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the builder, and it holds none.** Found 2026-09-28 by `M118` while verifying the one-tablist invariant before
   extending the centre control. The sentence *"thirteen locators across builder-axe, responsive-axe and
   personalization-axe"* appears in `resources/js/components/builder/ConfigPanel.vue:23-27`,
-  `resources/js/Pages/forms/Builder.vue:469-477`, `resources/js/components/builder/ConfigPanel.test.ts:212`,
+  `resources/js/Pages/forms/Builder.vue:475-483`, `resources/js/components/builder/ConfigPanel.test.ts:214`,
   `resources/js/components/builder/FormSettingsModal.test.ts:7` and `docs/claims/lane-a.md`. ✅ **Thirteen and
   four click-loops are both EXACT** — enumerated one by one. ⛔ **But `personalization-axe.spec.ts` contains
   zero `[role="tab"]` or `getByRole('tab')` locators**; the third file is `tests/e2e/field-library-axe.spec.ts:84`.
-  ⚠️ **Two stale counts ride along:** `resources/js/Pages/forms/builder-layout.test.ts:86` and `Builder.vue:921`
+  ⚠️ **Two stale counts ride along:** `resources/js/Pages/forms/builder-layout.test.ts:86` and `Builder.vue:927`
   both say **nine**, which is neither the total nor any partition of it that anyone has been able to name.
   ⚠️ **Why this is a `nit` and not a `minor`:** every locator is correctly enumerated, so nothing is unguarded
   — what is wrong is the map a future session reads before touching this page, and `M118` had to re-derive the
@@ -14267,9 +14267,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`minor` · Fifteen files set small error text in `--mds-color-danger-text`, which resolves to `danger-300` in dark and measures 4.22:1 on the surface.**
   The repository's own notes say so (`resources/js/Pages/admin/AuditLog.vue:287`, `resources/js/Pages/admin/TenantDetail.vue:547`,
   `resources/js/components/builder/LogicRail.vue:228`, `resources/js/components/shell/FeedbackButton.vue:445`) and the uses remain:
-  `resources/js/Pages/forms/Builder.vue:857`, `resources/js/components/webhooks/WebhookFormModal.vue:197`,
+  `resources/js/Pages/forms/Builder.vue:863`, `resources/js/components/webhooks/WebhookFormModal.vue:197`,
   `resources/js/components/scopes/GrantModal.vue:256`, `resources/js/components/scopes/DeleteNodeModal.vue:120`,
-  `resources/js/components/builder/ConfigPanel.vue:787`, `resources/js/components/submissions/MediaInput.vue:420`, `:557`, `:583`,
+  `resources/js/components/builder/ConfigPanel.vue:798`, `resources/js/components/submissions/MediaInput.vue:420`, `:557`, `:583`,
   `:589`, `resources/js/components/submissions/MatrixGrid.vue:290`, `resources/js/components/submissions/GeoInput.vue:637`, `:742`,
   `resources/js/components/submissions/FieldInput.vue:706`, `resources/js/components/integrations/RuleFormModal.vue:448`,
   `resources/js/components/builder/PreviewRuntime.vue:665` (the OCR pages' and the encode page's uses are taken by their own rows).
@@ -14415,7 +14415,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`minor` · Only a Single choice or Dropdown can take its choices from another form's answers; a Multiple choice cannot.**
   `app/Services/Forms/LinkedChoiceService.php:39` limits a link to single choice and dropdown, and
   `app/Http/Requests/Forms/UpdateFieldRequest.php:322-334` accepts `config.options_source` for those two only; the Options tab
-  offers the link through `resources/js/components/builder/LinkedChoicesEditor.vue` (`ConfigPanel.vue:499-515`). The testers'
+  offers the link through `resources/js/components/builder/LinkedChoicesEditor.vue` (`ConfigPanel.vue:510-526`). The testers'
   comment (2026-10-15): *"All input forms that has options like radio button, checkboxes, select options … must have an option to
   populate options thru the connection to responses from other forms"*. Split out of `R-5fdbc47c`, which named multi-select as
   the remainder's. The remedy: `multi_select` joins `LINKABLE_TYPES`, the request accepts the source for it, and the link is
@@ -14502,7 +14502,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`nit` · The palette's "Adv" tooltip promises an advanced editor "coming with the form engine", and the settings panel carries a baseline note no type can reach any more.**
   `resources/js/components/builder/FieldPalette.vue:102` titles every advanced type "baseline settings (advanced editor coming
-  with the form engine)" beside the badge at `:106`; `resources/js/components/builder/ConfigPanel.vue:432-435` shows "Baseline
+  with the form engine)" beside the badge at `:106`; `resources/js/components/builder/ConfigPanel.vue:443-446` shows "Baseline
   settings for this advanced field type" only when an advanced type has no editor, and every one has had its editor since the
   form engine landed; `app/Enums/FieldType.php:122-124` says the same. The testers asked whether the Adv types are ready
   (2026-10-15); they are, and the tooltip says otherwise. The remedy: the tooltip says what the Help page says
@@ -14762,33 +14762,33 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `docs/ux/design-system-reference.md`, applied to every builder help text and message; `manual.ts` follows.
   **Live.** Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M177` (2026-10-19):** the Calculated formula, field key, section key, advanced-type note, thank-you, location accuracy, file types and size, URL value and condition help, the preview's limits list, a failed request's fallback and the type change blocked by a conflict, all in the DSR §1.5 voice; `builder-voice.test.ts` refuses the developer words in every builder help, hint and note. Red first: 3. Mutant caught: "Evaluated on the server" put back. Live on staging since merge point 2 (PR #370, `a5b718bb`).
 
-- **`minor` · An author can point at another question only by typing `${key}` in most places, and no list shows each question's code.**
+- ✅ **CLOSED BY `M178` (2026-10-19) — ****`minor` · An author can point at another question only by typing `${key}` in most places, and no list shows each question's code.**
   The user (2026-10-16): *"all the type of question must include the referencing"*; the testers (2026-10-11, comment 6): *"direct
   reference the field (not the entire field question but the field code should be enough)"*. A reference is `${key}`
   (`app/Services/Expressions/ExpressionLexer.php`); conditions, Required-when and the two question-against-question rules have
-  pickers, but a calculation (`resources/js/components/builder/ConfigPanel.vue:524`), an Expression-mode rule, a default value and
+  pickers, but a calculation (`resources/js/components/builder/ConfigPanel.vue`, line 524 at `617f12d0`, before `M178`), an Expression-mode rule, a default value and
   piping into a label, help, placeholder, section text or the confirmation message are typed by hand. The remedy: one "Insert a
   question" picker (an `@` or a button) — questions grouped by section with their label and code, calculations, and where a date fits
   Today, Yesterday, Tomorrow, N days from now, N days ago and One month from now; filtered to what the spot accepts; it inserts
   `${key}` at the caret, and typing `@code` or `${code}` stays allowed and completes. Every type that can be read is offered (grids
-  and maps stay out until they can be). **Live.** Filed by `M174`. **Tier: early-testing.**
+  and maps stay out until they can be). **Live.** Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M178` (2026-10-19):** one "Insert a question" picker (`ReferenceInput.vue`) — a button opening a search over the spot's questions, grouped by section, each "Label · code", and `@` (at a word start) or `${` typed in the box opening the same list under it — writing at the caret through `execCommand('insertText')`, so one undo takes it back (`insert-at-caret.ts`; an insert past the box's limit is refused whole). It sits under the calculation formula, an Expression rule, a condition's "Edit as text", the label, help text, placeholder, a section's title and description, and the thank-you message (from the builder; the hub's settings page has no questions to offer). A formula spot offers any question a formula may name and **Today**; a text spot only what the publish gate lets it show, pinned against `TemplateScopeResolver` by `tests/fixtures/template-scope.json` on both sides; the palette carries `pipeable`. Narrowed, each reason recorded: the other date presets ride R4's `date_add` (`R-da02fe03`); a calculation is not offered in a formula until R4 (`D149`); the default value is left out, since nothing fills it in (`D148`); so are the inline label (it saves on blur) and a rule's message (not piped). The condition and compared-question lists show each question's code, in canvas order; the blank paper form prints a reference as a blank line (`D147`). Red first: the expose, the wiring, the pipeable census and the new modules' 27 cases; mutants caught: an insert at the end, later questions offered, a calculation offered in a formula, `@` off, the code hidden, the length guard off. Built and held for merge point 3 (`D137`), not yet live.
 
-- **`minor` · A number's minimum or maximum cannot be another question's answer, the question-against-question rules are strictly greater or less, and an expression comparing with a blank answer refuses every answer.**
+- ✅ **CLOSED BY `M178` (2026-10-19) — ****`minor` · A number's minimum or maximum cannot be another question's answer, the question-against-question rules are strictly greater or less, and an expression comparing with a blank answer refuses every answer.**
   The testers' comment (2026-10-11, comment 6): *"Validation rules for number field should be able to reference answers/responses
   from previous questions"*. A minimum or maximum takes a number only (`app/Services/Forms/ExpressionValidationGate.php:191`);
-  `greater_than_field` and `less_than_field` are strict (`app/Enums/ValidationRuleType.php:199`); the only way to say "at most
+  `greater_than_field` and `less_than_field` are strict (`app/Enums/ValidationRuleType.php`, line 199 at `617f12d0`, before `M178`); the only way to say "at most
   `field_2`" is the expression `. <= ${field_2}`, which fails while `field_2` is blank because a blank side is NaN and NaN compares
   false (`app/Services/Expressions/ExpressionEvaluator.php:152`) — `M134` made only the structured rules pass on a blank
   (`app/Services/Validation/StructuredRuleEvaluator.php:176`). The remedy: a minimum or maximum may be "a number or another
   question's answer" (the picker); "at least" and "at most" join the two strict rules; an expression comparison with a blank side
   passes, in both engines with golden vectors and the corpus line in `docs/architecture/technical-architecture.md`.
-  **Live.** Filed by `M174`. **Tier: early-testing.**
+  **Live.** Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M178` (2026-10-19):** two rule types, `at_least_field` and `at_most_field` ("At least / At most another question"), mirroring the strict pair in both engines — M134's "a blank compared answer passes" included — and the Validation tab's Minimum and Maximum offer "A number · Another question's answer", which switches the stored rule to the counterpart the server names (`bound_counterpart`) and clears the value; the compared-question lists leave calculations out until R4 (`D149`). An Expression rule comparing with a blank answer now passes: `ExpressionEvaluator::evaluateConstraint()` and its twin walk the boolean spine three-valued (Kleene `not`/`and`/`or`; a blank side, empty or NaN, is unknown) and are called only from a rule's own expression row, so the verdict is today's or unknown and can only remove a refusal — `. >= 0 and . <= ${q}` still refuses −1. Golden vectors: 6 + 7 validation and 2 leak guards (relevance and `required_if` still read a blank as false), and an 11-vector `constraint` mode in the expression corpus. The planned `if()`-branch case proved impossible: the grammar refuses a comparison as an `if()` branch. Red first on both engines; 15 mutants caught (at least made strict in the PHP enum, the TS map and the export; unknown read as a refusal on both engines; `or` dropping unknown; the walk wired into relevance; NaN not blank; the Minimum switch; the calculation filter; the preview's screen). Built and held for merge point 3 (`D137`), not yet live.
 
 - **`minor` · A calculation is a typed formula with no picker, no presets and no result type, and it cannot use another calculation.**
   The user (2026-10-16): *"lets make the calculate referenced … create a calculated field using the form's own questions by clicking
   or selecting, not by purely typing. not all users are technical. but make sure that formula can still be typed … put presets"*,
   with Fillout's calculation screens (number, text and duration; a duration from a Start and an End in years, months, weeks, days,
-  hours or minutes). `resources/js/components/builder/ConfigPanel.vue:556` is a two-row text box whose help says *"Evaluated on the
+  hours or minutes). `resources/js/components/builder/ConfigPanel.vue:579` is a two-row text box whose help says *"Evaluated on the
   server"* though both engines compute it; `config.calculated_formula` is the only setting; `tests/golden/validation/calculated.json`
   pins that a calculation cannot read another. The remedy: a Type (**Number · Text · Date · Duration**, decimal places for Number)
   and two modes — **Build it** (presets: Sum, Difference, Average, Count answered, Age from a birth date, Duration between two dates
@@ -14890,7 +14890,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `________` for the person filling it to write in; an escaped `$${` stays literal. **Live.** Filed by `M178`. **Tier: early-testing.** ✅ **CLOSED BY `M178` (2026-10-19):** `BlankFormPrintPresenter::paperText()` prints each reference in a field's label and hint and a section's title and description as `________`, through the render path's own lenient template parser (so `$${` stays literal and a malformed hole prints nothing, as on screen), before the view escapes the text. Red first: 1 Pest case. Built and held for merge point 3 (`D137`), not yet live.
 
 - **`minor` · A question's Default value is saved but never filled in for a respondent, though the Help page says it is.**
-  The Advanced tab's **Default value** (`resources/js/components/builder/ConfigPanel.vue:789`) saves `default_value`, but nothing reads it
+  The Advanced tab's **Default value** (`resources/js/components/builder/ConfigPanel.vue:800`) saves `default_value`, but nothing reads it
   when a form opens — `resources/public-runtime/lib/prefill.ts` seeds only a hidden question's fixed value — and it reaches only the
   XLSForm export (`app/Services/Xlsform/XlsformExporter.php:283`). `resources/js/components/help/manual.ts:814` says *"an answer filled
   in before the respondent starts, which they can change"*. The remedy (`D148` A, taken by R4): the default fills the answer when the
@@ -14900,7 +14900,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`minor` · A condition or a rule can name a calculated question, but always reads it as blank.**
   Both engines work out calculations last and never feed them back into relevance or constraints
   (`app/Services/Validation/SemanticValidator.php:153`, `resources/public-runtime/engine/semantic-validator.ts:180`), yet the condition
-  editor offers every calculated question (`resources/js/components/builder/ConfigPanel.vue:352`) and the compared-question lists do too,
+  editor offers every calculated question (`resources/js/components/builder/ConfigPanel.vue:354`) and the compared-question lists do too,
   because a calculation's value shape is a number (`app/Enums/ValueShape.php:109`) — so "show when the total is over 10" never shows,
   and a rule against a total never checks. The remedy (`D149` A, taken by R4 with its dependency order): conditions and rules read a
   calculation's value, the calculations worked out before what reads them, cycles refused at publish. Until then R3's lists leave

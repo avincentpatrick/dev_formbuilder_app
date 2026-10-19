@@ -16,7 +16,122 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M176` and `M177` are merged and live on staging (merge point 2, released below). The next claim is written here. Merge only at a planned merge point; R3's first commit retires the per-merge backup block, now that the deploy's own backup and row count have run (`R-2d921bbe`, `D143`).
+## Status: ACTIVE CLAIM — `M178`, R3 of the testers' round 2: references everywhere (`R-75719ac4`, `R-917496f9`, plus `R-2d921bbe`'s last step) (m178-r3-references)
+
+Taken 2026-10-19. It is R3 of the testers' round 2 (`D138`; the plan of record `~/.claude/plans/here-are-added-comments-peppy-quill.md` §B,
+§E; the build plan `~/.claude/plans/pasted-content-id-fff1-read-claude-md-quirky-orbit.md`). Branch `m178-r3-references`, cut from
+`origin/main` at `617f12d0` (this claim on top), PR into main — not stacked. ⛔ **NOT MERGED IN THIS SESSION:** the PR waits green for merge
+point 3, which merges it with R4 (`D137`, `D138`).
+
+**The owed check is done: the user checked R1 (`M176`) and R2 (`M177`) on staging on 2026-10-19 and answered "All good" for both** — never
+re-ask. The session-start feedback pull read 0 reports (preflight: 0 New), so nothing was triaged. Three questions were asked and answered in
+planning (2026-10-19, the user, in chat), recorded on the branch's first commit as `D147`–`D149`, each the recommended option: **`D147` A** —
+the blank paper form prints a reference inside a label, hint, description or section text as a blank line (built here); **`D148` A** — a
+question's Default value is made to work, filled in when the form opens and changeable (filed for R4); **`D149` A** — conditions and rules
+read a calculation's value (filed for R4, with its dependency order). ⛔ **`D147`–`D149` are spent by this claim** although they reach
+`docs/claims/decisions.md` on `main` only at merge point 3: `state.php` on `main` cannot see them, so the next decision anyone files is `D150`.
+**The order after R3 (the user, 2026-10-19, in chat): V next** (`~/.claude/plans/hi-please-give-me-parallel-chipmunk.md`, released alone at its
+green, branched from `origin/main` beside this held branch; it is `M179`, since `state.php`'s next free counts RELEASED headings only), **then
+R4**, stacked on this branch.
+
+Rows taken, in build order, each its own commits (`D75`): **`R-2d921bbe`'s last step first** (the per-merge backup block retired from
+`CLAUDE.md` "The trunk", `scripts/next.php`'s hand-off and Standing Rule 5's reason, the runbook saying the deploy's own backup and row count
+replaced it — the user's census before and after each merge point stays; `D137`, `D143`), with `D147`–`D149` and the filings; then
+`R-917496f9` (a number's limit cannot be another answer, the field comparisons are strict only, and an Expression rule comparing with a
+blank answer refuses every answer); the paper form's blank line (`D147`, a new row filed and closed here); `R-75719ac4` (one "Insert a
+question" picker, and every question list showing its code).
+
+### Evidence verified
+Read on `617f12d0` (= `origin/main`) by three read-only passes plus my own reads, Docker not yet started.
+- `R-917496f9`: `ExpressionValidationGate.php:191` (`non_numeric_threshold`, the check at `:189-190`) — held. `ValidationRuleType.php:199`
+  (`GreaterThanField => Gt`, `:200` `Lt`) — held. `ExpressionEvaluator.php:152` (`is_nan` → `Temporal::orders()`, false for a blank) —
+  held. `StructuredRuleEvaluator.php:176` (`passesFieldComparison()`'s docblock, M134's blank pass; the method at `:191-198`) — held.
+- `R-75719ac4`: `ExpressionLexer.php` (`lexReference()`, `${key}` only, `:161-190`) — held. `ConfigPanel.vue:524` — **moved** to `:566-580`
+  (the Calculation formula, an `MdsTextarea`; its help already rewritten by `M177`). The pickers the row names exist: `ConditionRow.vue`
+  (subject and compared-with `MdsSelect`s), `ValidationEditor.vue:468-476` (the compared question) — held; none shows a question's code.
+- `R-2d921bbe`: `CLAUDE.md` "The trunk" (`:41-44`, "after the user has run the staging backup block"), `scripts/next.php:169-176` (the
+  comment and the emitted sentence), `PROGRESS.md` Standing Rule 5's `D137` paragraph (`:45`), `docs/deployment-infrastructure.md:107` ("until
+  a guarded deploy has passed there, the user's pre-merge backup block still runs first") — held. No test pins any of the four sentences.
+
+### Premise verified
+- One session only; lane B retired; no other claim, held block or forward queue in either claim file. A planning-only session (V's) has
+  ended; it filed nothing in the repository.
+- **A Default value is never filled in for a respondent** (`prefill.ts:72-90` seeds only a hidden field's fixed value; nothing evaluates a
+  default) though `manual.ts:814` says it is — so the picker leaves that box out, and `D148` files the work for R4.
+- **The blank paper form prints a reference as typed** (`BlankFormPrintPresenter.php:385-386`, `blank-form.blade.php`) while every other
+  channel pipes it — the picker makes such labels one click away, hence `D147` here.
+- **No constraint, condition or rule reads a calculation** (`SemanticValidator.php:152-155`, TS `semantic-validator.ts:180-182`); the
+  compared-question lists offer calculations today (`ValueShape` maps Calculated to Number) and such a rule never checks. The new lists
+  leave calculations out until R4 (`D149`); a rule already naming one keeps it. Piping does read them, so text spots offer them.
+- **Only `today()` exists** (`FunctionRegistry.php:20-27`), `today() - 1` is NaN, and templates take no functions — so the picker offers
+  **Today** in a formula spot only; Yesterday, Tomorrow, N days from now or ago and One month from now ride R4's `date_add` (`R-da02fe03`).
+- **Arithmetic NaN stays raw inside the tree** (`ExpressionEvaluator.php:169-184`, `evaluator.ts:132-150`) and becomes blank only at the
+  boundary, so "a blank side" must mean empty OR NaN, or `. <= ${a} + ${b}` with `b` blank keeps refusing.
+- **No context flag tells a constraint from a condition** (`EvaluationContext` carries answers, self and now); relevance, skip, Required
+  when, calculations and automations must keep "a blank compares false". The pass is therefore a separate constraint walk, called only from
+  the Expression-row branch (`StructuredRuleEvaluator.php:58`, TS `:67`), and pinned by leak guards.
+- **`not()` and `if()` invert a naive pass** (`not(. > ${q})` would refuse every answer again; `if()` would take the wrong branch), so the
+  walk is three-valued (Kleene) on `not`/`and`/`or` and on `if()`'s branches — its result is always today's value or "unknown", so it can
+  only remove refusals.
+- **The settings panel scrolls** (`ConfigPanel.vue:912-919`), so no menu may float there (DSR §3.4b): the picker's list sits in the flow.
+  `MdsTextarea`/`MdsTextInput` expose no element; with a counter the Label's `$el` is a wrapper.
+- **Piping follows stricter rules than formulas** (`TemplateScopeResolver.php:66-106`: earlier questions only, the repeat scope, no section
+  keys, section titles top-level only) and `PipingEligibility` is not sent to the builder — a per-type flag is, and the scope is pinned
+  against the resolver by a fixture both languages run.
+- `InlineLabelEdit` saves on blur, so a button beside it cannot work; the panel's Label covers it. The rule's own error message is not piped.
+- ODK refuses `. >= ${k}` on a blank `k`; ours will pass — written into `docs/xlsform-interop-spec.md`.
+
+### Remedy verdict
+- `R-917496f9`: **works, reshaped** — two rule types, `at_least_field` and `at_most_field`, mirroring the strict pair (M134's blank pass
+  included); the Minimum and Maximum rows offer "A number · Another question's answer", which switches to the counterpart named by the server;
+  the Expression rule's blank side through a three-valued constraint walk, both engines, golden vectors and an `eval: "constraint"` corpus mode.
+- `R-75719ac4`: **works, narrowed** — one picker (a button, or `@`/`${` typed) in nine spots, grouped by section with label and code;
+  Today only; calculations in text spots only; the default value, the inline label and the rule's message left out (premise, above); the
+  existing question lists show the code.
+- `R-2d921bbe`: **works** — four sentences and a stale comment in `deploy.ps1`; a docs test pins the census.
+
+Files: `R-2d921bbe` — `CLAUDE.md`, `scripts/next.php`, `PROGRESS.md` (Standing Rule 5 and the generated hand-off), `docs/deployment-infrastructure.md`,
+`deploy.ps1` (a comment), a new `tests/Feature/Docs/MergePointRoutineTest.php`. `R-917496f9` — `app/Enums/ValidationRuleType.php`, `ValueShape.php`,
+`app/Services/Expressions/ExpressionEvaluator.php`, `app/Services/Validation/StructuredRuleEvaluator.php`, `StructuredRuleLowering.php`,
+`app/Services/Forms/BuilderPresenter.php`, `app/Services/Xlsform/XlsformExporter.php`, `app/Support/Forms/DefaultFieldRules.php` (a citation);
+`resources/public-runtime/engine/enums.ts`, `evaluator.ts`, `structured-rule-evaluator.ts`, `lowering.ts`; `resources/js/components/builder/
+ValidationEditor.vue`, `validation-options.ts`, `types.ts`, `draft-snapshot.ts`, `conflict-diff.ts`, `field-conversion.ts`; `tests/golden/validation/`
+and `tests/golden/expressions/` (vectors, manifests) and both runners; the pinned Pest and Vitest files. The paper line — `app/Services/Print/
+BlankFormPrintPresenter.php` (or its view). `R-75719ac4` — `packages/design-system/src/components/Textarea/`, `TextInput/` (component, story),
+new `resources/js/components/builder/insert-at-caret.ts`, `reference-candidates.ts`, `ReferencePicker.vue`, `ConfigPanel.vue`, `ConditionEditor.vue`,
+`ConditionRow.vue`, `ConfirmationPanel.vue`, `BuilderPresenter.php` (`pipeable`), a shared scope fixture under `tests/fixtures/`. Every row:
+`resources/js/components/help/manual.ts` where it describes the change.
+Close-out: `docs/feature-backlog.md`, `PROGRESS.md` (own block), `docs/pipeline.md`; this file on main. No gate baselines (no merge here).
+Shared artefacts taken: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/deployment-infrastructure.md`,
+`docs/data-dictionary.md`, `docs/architecture/technical-architecture.md`, `docs/xlsform-interop-spec.md`, `docs/ux/design-system-reference.md`,
+`tests/e2e/builder-insert-question.spec.ts` (new) and the builder specs the diff reaches, `PROGRESS.md` (own block).
+Hubs (`D128`: overlap allowed, every hub named; re-derived by `backlog-triage.php --json` before the PR): `CLAUDE.md`, `scripts/next.php`,
+`deploy.ps1`, `ValidationRuleType.php`, `ValueShape.php`, `ExpressionEvaluator.php` + `evaluator.ts`, `StructuredRuleEvaluator.php` +
+`structured-rule-evaluator.ts`, `StructuredRuleLowering.php` + `lowering.ts`, `SemanticValidator.php` + `semantic-validator.ts` (only if
+`family()` must learn the cases), `BuilderPresenter.php`, `XlsformExporter.php`, `BlankFormPrintPresenter.php`, `ConfigPanel.vue`,
+`ValidationEditor.vue`, `ConditionEditor.vue`, `ConditionRow.vue`, `ConfirmationPanel.vue`, `draft-snapshot.ts`, `manual.ts`, `MdsTextarea`,
+`MdsTextInput`, `docs/ux/design-system-reference.md`, `docs/data-dictionary.md`, `docs/architecture/technical-architecture.md`,
+`docs/xlsform-interop-spec.md`, `docs/deployment-infrastructure.md`, `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`,
+`PROGRESS.md`.
+Paired files taken: the two engines (`ExpressionEvaluator.php` ↔ `evaluator.ts`, `StructuredRuleEvaluator.php` ↔ `structured-rule-evaluator.ts`,
+`StructuredRuleLowering.php` ↔ `lowering.ts`, through the golden vectors), `ValidationRuleType.php` ↔ `enums.ts` (the mirror drift test), the
+piping scope (`TemplateScopeResolver.php` ↔ `reference-candidates.ts`, through the new fixture).
+Namespaces spent: `D147`, `D148`, `D149` (asked and answered in planning); no migration (`rule_type` is `varchar(30)` with no CHECK), no ADR.
+E2E specs the diff reaches, run locally: a new `builder-insert-question` (button and `@`, one undo per insert), `builder-axe`,
+`builder-settings-refresh`, `builder-preview-authoring`, and the public-runtime and print specs the diff reaches, named at the release; CI runs
+every spec.
+Prediction: red first on this head — the two new rule types on BOTH engines (equal passes, below fails, blank passes), the lowered operator
+pin, the payload's `gte`/`lte`, the export's `. >= ${k}`, the Minimum row's switch; the constraint walk's `. <= ${q}`, `. > 0 or . <= ${q}`
+with −1, the arithmetic-NaN case and the `if()`-branch case on both engines and in the corpus's constraint mode; the paper form's blank line;
+the picker's insert at the caret, its grouping and codes, its filters (kind, earlier-only, top-level, calculations, Today) and the scope
+fixture on both sides; the docs test on the retired block. Green on both sides, said so: the leak guards (relevance and Required when still
+compare a blank as false), `. >= 0 and . <= ${q}` with −1, `not(. > ${q})`. All green after. Mutants (about 15), each turning only its named
+case red: at least lowered to `>`; the blank pass dropped for at least; unknown read as false; `or` dropping unknown; the walk called from
+relevance; NaN not blank; the export case removed; the paper substitution removed; insert at the end; earlier-only off; a calculation offered
+in a formula spot; the `@` trigger off; the code not shown; the length guard off; the retired sentence put back. **Most likely wrong:** the
+picker's `execCommand('insertText')` path — happy-dom has no `execCommand`, so Vitest exercises only the fallback and the native-undo claim
+rests on the one e2e. Runner-up: a PHP vector that passes on the defective code because a blank-side comparison already falls through
+`Temporal::orders()` — each red must be seen on PHP, not only TS.
 
 ## RELEASED — `M177`, R2 of the testers' round 2: question types, visibility and moving (`R-0b7db001`, `R-22011569`, `R-71509975`, `R-f44e9d00`, `R-9bbaa97b`, `R-4a6f004f`, `R-b05fbaae`, `R-f7a18b7a`) (merged as PR #370, `a5b718bb`, last at merge point 2, 6/6 green with real step counts on its rebased run at `8846394b` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

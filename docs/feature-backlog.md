@@ -14880,3 +14880,35 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   trunk's `docs/claims/decisions.md` holds one ESC byte (0x1B) that `M176` did not write. Harmless to every renderer measured, but a
   byte nobody can see is a byte nobody can review. The remedy: find it by byte offset and remove it in a docs-only change, then check
   the file for others. **Live.** Filed by `M176`. **Tier: after-launch.**
+
+- **`minor` · A comment that reached us outside the Feedback button cannot be seen, followed or checked by the testers in the app.**
+  The user relayed 31 comments by hand — their UI comments of 2026-10-14, the testers' round 1 of 2026-10-15, round 2 and the testers' PDF
+  of 2026-10-16 — and asked on 2026-10-19 for their progress to be visible on staging, with a way for testers to mark a fix as working. None
+  of them is a report: `FeedbackService::submit()` (`app/Services/Feedback/FeedbackService.php:71`) is the only writer of `feedback_reports`,
+  and it writes one report per press of the Feedback button. A member's list is their own rows only
+  (`app/Services/Feedback/FeedbackPresenter.php:140`), so a report nobody sent through the button is seen by no one. The remedy (`D150` A):
+  a report gains a source (`button` | `relayed`), a reference (`R1-7a`, `U4`, …), a title and a source line; a relayed report is visible to
+  every member of its workspace under a **Testing-round comments** tab on Feedback, shown while one is still open; the 31 are loaded from a
+  committed file through the support API (`R-e727ca94`). **Live.** Filed by `M179`. **Tier: early-testing.**
+
+- **`minor` · A tester cannot confirm a fix, say it is still a problem, or comment on a report; our reply is the only message, and the Owner/Admin list never shows it.**
+  A member's Feedback page is read-only (`resources/js/Pages/feedback/Mine.vue:57-86`): the status and our one reply. No comment, confirm or
+  reopen exists anywhere. The Owner/Admin list never carries our reply (`app/Services/Feedback/FeedbackPresenter.php:57` builds its rows
+  without `resolution_note`). The only transition writer, `SuperAdminService::transitionFeedback()`
+  (`app/Services/Admin/SuperAdminService.php:929`), checks the status on the model it was handed, before its transaction, then re-reads the
+  row with no lock (`:947`) — so two moves at once can both pass a guard against a status that no longer holds, and the audit records that
+  stale status as the old one. The remedy (`D151` A): a new status **Confirmed** ("Confirmed working"), reachable only by a tester from
+  Resolved through **It works**; **Still a problem** returns a Resolved or Confirmed report to Ongoing and needs a comment (a screenshot
+  optional); a comment thread on every report, which anyone who can see it may add to; support alone marks Resolved and never Confirmed; one
+  lifecycle service for both doors, which re-reads the row under `lockForUpdate()` inside the transaction; and the Owner/Admin list shows our
+  note and the thread. **Live.** Filed by `M179`. **Tier: early-testing.**
+
+- **`minor` · The support API and the pull script cannot create a relayed report, post a reply, or see a reopen or a tester's comment.**
+  The platform support API has one write, a status change (`routes/platform-api.php:40`; ADR-0023 §D3), and `scripts/feedback-pull.php`
+  pulls only New and Ongoing reports (`:146`) and accepts only an id of 8 to 64 characters (`:93`), so `U1` cannot be named. Once testers can
+  reopen and comment (`R-129c44c3`), nothing would bring that back to a session, and nothing can load the 31 relayed comments
+  (`R-db9dec62`). The remedy (`D150`, `D151`; ADR-0023 §D7): the list carries the source, reference, title, who confirmed and the thread, and
+  filters by source, reference and comments since; `POST /feedback/relayed` creates or updates relayed reports by reference, never
+  rewriting a status after creation and telling no one; `POST /feedback/{id}/comments` posts a support reply; the pull script gains
+  `--relay`, `--comment` and references wherever it takes an id, its digest shows REOPENED reports and new comments, and preflight counts the
+  reopened. Every new write needs `--user-approved`. **Live.** Filed by `M179`. **Tier: early-testing.**

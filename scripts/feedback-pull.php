@@ -124,7 +124,7 @@ foreach (['ongoing' => 'reviewed', 'resolve' => 'resolved', 'decline' => 'wont_f
     }
 
     $answer = feedback_pull_json($config, 'PATCH', '/feedback/'.rawurlencode($id), $body, $timeout);
-    $label = ['reviewed' => 'Ongoing', 'resolved' => 'Resolved', 'wont_fix' => 'Declined'][$status];
+    $label = ['reviewed' => 'Ongoing', 'resolved' => 'Resolved', 'confirmed' => 'Confirmed working', 'wont_fix' => 'Declined'][$status];
     fwrite(STDOUT, 'feedback '.substr($id, 0, 8)." marked {$label}".(isset($body['note']) ? ', with the note sent to the reporter' : '').".\n");
     unset($answer);
 

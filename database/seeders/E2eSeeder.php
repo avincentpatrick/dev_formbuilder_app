@@ -1579,7 +1579,7 @@ class E2eSeeder extends Seeder
 
         foreach ($rows as $index => $row) {
             $id = self::FEEDBACK_FIXTURE_IDS[$index];
-            $closed = $row['status']->isTerminal();
+            $closed = $row['status']->stampsResolution();
 
             $attributes = [
                 'user_id' => $row['user']->getKey(),

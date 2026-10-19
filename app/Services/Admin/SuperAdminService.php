@@ -6,6 +6,7 @@ namespace App\Services\Admin;
 
 use App\Enums\AuditEvent;
 use App\Enums\BillingInterval;
+use App\Enums\FeedbackParty;
 use App\Enums\FeedbackStatus;
 use App\Enums\NotificationType;
 use App\Enums\SettingKey;
@@ -930,7 +931,7 @@ final class SuperAdminService
     {
         $from = $report->status;
 
-        if (! $from->canTransitionTo($to)) {
+        if (! $from->canTransitionTo($to, FeedbackParty::Support)) {
             throw SuperAdminException::invalidFeedbackTransition($from, $to);
         }
 
@@ -957,8 +958,8 @@ final class SuperAdminService
                 // "when, and by whom, was this closed", and a re-opened report is not closed. The history
                 // is not lost — it is in the audit row this method writes. The reply is kept unless a new one
                 // is written: it is what the reporter last read, and re-opening says nothing new to them.
-                $resolvedAt = $to->isTerminal() ? now() : null;
-                $resolvedBy = $to->isTerminal() ? (string) $actor->getKey() : null;
+                $resolvedAt = $to->stampsResolution() ? now() : null;
+                $resolvedBy = $to->stampsResolution() ? (string) $actor->getKey() : null;
                 $resolutionNote = $note ?? $row->resolution_note;
 
                 $row->forceFill([
@@ -984,7 +985,7 @@ final class SuperAdminService
 
                 // Resolved or Declined: the reporter is told — by bell and, unless they switched it off, by
                 // email. Ids and labels only in `data`; the reply rides as mail-only context.
-                if ($to->isTerminal()) {
+                if ($to->stampsResolution()) {
                     $this->notifications->dispatch(
                         NotificationType::FeedbackClosed,
                         [(string) $row->user_id],

@@ -80,7 +80,7 @@ it('renders the console for an enrolled super-admin', function (): void {
             ->component('admin/Feedback', false)
             ->has('data')
             ->where('meta.per_page', 25)
-            ->has('filters.statuses', 4)
+            ->has('filters.statuses', 5)
             ->has('filters.tenants'));
 });
 
@@ -214,7 +214,7 @@ it('stamps the resolution when a report closes', function (): void {
 it('clears the resolution when a closed report is re-opened', function (): void {
     // Starts from a COMMITTED `resolved` fixture rather than chaining onto the test above — see the
     // one-transition-per-test note in this file's header. Also the `wont_fix` arm, so the decline path
-    // is proved to stamp and clear exactly as `resolved` does (FeedbackStatus::isTerminal()).
+    // is proved to stamp and clear exactly as `resolved` does (FeedbackStatus::stampsResolution(), `isTerminal()` before M179).
     $tenant = consoleTenant('Console Reopen', 'console-reopen-'.Str::random(6));
     $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
     $closer = consoleUser(Str::random(8).'@feedbackconsoletest.local');
@@ -446,7 +446,7 @@ it('shows each report kind and page, and filters the console by kind (M175, R-2c
 | visibility policy, which admits a user only through an active membership of the adopted workspace.
 */
 
-it('names the statuses New, Ongoing, Resolved and Declined in the filter and on every row', function (): void {
+it('names the statuses New, Ongoing, Resolved, Confirmed working and Declined in the filter and on every row', function (): void {
     $this->withoutVite();
 
     $tenant = consoleTenant('Console Labels', 'console-labels-'.Str::random(6));
@@ -458,7 +458,7 @@ it('names the statuses New, Ongoing, Resolved and Declined in the filter and on 
     $props = $this->actingAs($admin)->get(adminUrl('/feedback'))->assertOk()->viewData('page')['props'];
     $row = collect($props['data'])->firstWhere('remarks', $marker);
 
-    expect(array_column($props['filters']['statuses'], 'label'))->toBe(['New', 'Ongoing', 'Resolved', 'Declined'])
+    expect(array_column($props['filters']['statuses'], 'label'))->toBe(['New', 'Ongoing', 'Resolved', 'Confirmed working', 'Declined'])
         ->and($row['status'])->toBe('reviewed')
         ->and($row['status_label'])->toBe('Ongoing')
         ->and(array_column($row['transitions'], 'label'))->toBe(['Resolved', 'Declined'])

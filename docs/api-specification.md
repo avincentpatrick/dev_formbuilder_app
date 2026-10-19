@@ -313,11 +313,11 @@ A separate surface from `/api/v1`, with one client: `scripts/feedback-pull.php`,
 
 | Method and path | What it does | Answers |
 |---|---|---|
-| `GET /feedback` | Reports across every workspace, newest first. Query: `status` (comma list of stored values — `new`, `reviewed`, `resolved`, `wont_fix`), `type` (`bug`, `suggestion`, `question`), `since` (ISO-8601, earliest `submitted_at`), `page`, `per_page` (≤100, default 50). | `200 { data: [row…], meta: { current_page, last_page, total, per_page } }`; `422 validation_failed` on an unknown status or kind. |
+| `GET /feedback` | Reports across every workspace, newest first. Query: `status` (comma list of stored values — `new`, `reviewed`, `resolved`, `confirmed`, `wont_fix`), `type` (`bug`, `suggestion`, `question`), `since` (ISO-8601, earliest `submitted_at`), `page`, `per_page` (≤100, default 50). | `200 { data: [row…], meta: { current_page, last_page, total, per_page } }`; `422 validation_failed` on an unknown status or kind. |
 | `GET /feedback/{id}/screenshot` | The report's screenshot, once its virus scan has cleared it. | `200` the image (`X-Content-Type-Options: nosniff`); `404 not_found` when there is none; `409 not_yet_available` while scanning. |
 | `PATCH /feedback/{id}` | Move a report. Body: `{ "status": "<stored value>", "note": "<reply, ≤1000>"? }`. Resolved and Declined tell the reporter (bell and email, the note quoted in the email). | `200 { data: row }`; `422 invalid_transition` for a step the lifecycle does not offer; `404 not_found`. |
 
-**A row** carries `id`, `tenant_id`, `tenant_name`, `type`, `type_label`, `status` (stored), `status_label` (New · Ongoing · Resolved · Declined), `route`, `page_url`, `page_title`, `remarks`, `browser_info`, `reporter` (`{name, email}` or null), `reporter_role`, `reporter_role_label`, `submitted_at`, `resolved_at`, `resolution_note`, `resolver`, `has_screenshot` and `transitions` (the legal next steps, `[{value, label}]`).
+**A row** carries `id`, `tenant_id`, `tenant_name`, `type`, `type_label`, `status` (stored), `status_label` (New · Ongoing · Resolved · Confirmed working · Declined — `confirmed` is reached only by a tester, never through this API, M179), `route`, `page_url`, `page_title`, `remarks`, `browser_info`, `reporter` (`{name, email}` or null), `reporter_role`, `reporter_role_label`, `submitted_at`, `resolved_at`, `resolution_note`, `resolver`, `has_screenshot` and `transitions` (the legal next steps, `[{value, label}]`).
 
 ---
 

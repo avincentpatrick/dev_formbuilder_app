@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use App\Enums\AuditEvent;
+use App\Enums\FeedbackParty;
 use App\Enums\FeedbackStatus;
 use App\Enums\NotificationType;
 use App\Enums\ScanStatus;
 use App\Models\Audit;
+use App\Models\FeedbackComment;
 use App\Models\FeedbackReport;
 use App\Models\Notification as NotificationRecord;
 use App\Models\Tenant;
@@ -551,3 +553,31 @@ it('tells the reporter when their report is declined, and nobody when it is only
     'declined' => ['new', 'wont_fix', 1],
     'ongoing' => ['new', 'reviewed', 0],
 ]);
+
+it('lets the console reply in a report\'s thread as the support team, and tells the reporter', function (): void {
+    Notification::fake();
+
+    $tenant = consoleTenant('Console Thread', 'console-thread-'.Str::random(6));
+    $reporter = consoleUser(Str::random(8).'@feedbackconsoletest.local');
+    consoleMember($tenant, $reporter);
+    $report = consoleReport($tenant, $reporter, FeedbackStatus::Ongoing, 'Reply in the thread '.Str::random(8));
+
+    $admin = User::factory()->superAdmin()->confirmedTwoFactor()->create();
+
+    // M179 (`D151`): an empty reply is refused before anything is written.
+    $this->actingAs($admin)->post(adminUrl("/feedback/{$report->id}/comments"), ['body' => ''])
+        ->assertSessionHasErrors('body');
+
+    $this->actingAs($admin)->post(adminUrl("/feedback/{$report->id}/comments"), ['body' => 'Which browser are you on?'])
+        ->assertSessionHasNoErrors();
+
+    enterTenant($tenant->id, $reporter->id);
+
+    /** @var FeedbackComment $reply */
+    $reply = FeedbackComment::query()->where('feedback_report_id', $report->id)->sole();
+    expect($reply->author_kind)->toBe(FeedbackParty::Support)
+        ->and($reply->user_id)->toBeNull()
+        ->and($reply->body)->toBe('Which browser are you on?')
+        ->and($report->fresh()->status)->toBe(FeedbackStatus::Ongoing)
+        ->and(NotificationRecord::query()->where('user_id', $reporter->id)->sole()->type)->toBe(NotificationType::FeedbackReply);
+});

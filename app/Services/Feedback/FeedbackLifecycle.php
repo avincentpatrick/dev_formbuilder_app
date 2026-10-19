@@ -9,9 +9,11 @@ use App\Enums\FeedbackCommentAction;
 use App\Enums\FeedbackParty;
 use App\Enums\FeedbackStatus;
 use App\Enums\NotificationType;
+use App\Enums\TenantUserStatus;
 use App\Exceptions\Feedback\FeedbackLifecycleException;
 use App\Models\FeedbackComment;
 use App\Models\FeedbackReport;
+use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Admin\SuperAdminService;
 use App\Services\Attachments\AttachmentStorageService;
@@ -108,22 +110,49 @@ final class FeedbackLifecycle
             actorId: (string) $actor->getKey(),
         );
 
-        // Resolved or Declined: the reporter is told — by bell and, unless they switched it off, by email. Ids and
-        // labels only in `data`; the reply rides as mail-only context.
+        // Resolved or Declined: the reporter and everyone who wrote in the thread are told — by bell and, unless
+        // they switched it off, by email. Ids and labels only in `data`; the reply rides as mail-only context.
         if ($to->stampsResolution()) {
-            $this->notifications->dispatch(
-                NotificationType::FeedbackClosed,
-                [(string) $row->user_id],
-                array_filter([
-                    'feedback_report_id' => (string) $row->getKey(),
-                    'status' => $to->value,
-                    'page_title' => $row->page_title,
-                ], static fn (?string $value): bool => $value !== null),
-                $resolutionNote === null ? [] : ['note' => $resolutionNote],
-            );
+            $this->tell(NotificationType::FeedbackClosed, $row, ['status' => $to->value], $resolutionNote);
         }
 
         return $row;
+    }
+
+    /**
+     * The support team's reply in a report's thread (M179, `D151`). ⚠️ Call it INSIDE the transaction that adopted
+     * the report's tenant context — {@see SuperAdminService::replyToFeedback()} is that caller — so the message,
+     * its audit row (in that workspace's own ledger) and the notifications all pass the strict policies. Moves
+     * nothing; tells the reporter and the thread (`feedback_reply`), the words in the email only.
+     *
+     * @throws ValidationException when the reply is empty
+     */
+    public function supportReply(string $reportId, User $actor, ?string $body): FeedbackComment
+    {
+        $body = $this->requiredBody($body, 'Write the reply first.');
+
+        $row = $this->lockedRow($reportId);
+        $row->forceFill(['last_comment_at' => now()])->save();
+
+        $comment = $this->writeComment($row, null, FeedbackParty::Support, null, $body, null);
+
+        // The ledger records THAT a reply was written; `body` is redacted (`AuditRedactor`), as a report's
+        // `resolution_note` is — a reply quotes the tester as readily.
+        $this->audit->record(
+            AuditEvent::Created,
+            'feedback_comments',
+            (string) $comment->getKey(),
+            new: [
+                'feedback_report_id' => (string) $row->getKey(),
+                'author_kind' => FeedbackParty::Support->value,
+                'body' => $body,
+            ],
+            actorId: (string) $actor->getKey(),
+        );
+
+        $this->tell(NotificationType::FeedbackReply, $row, [], $body);
+
+        return $comment;
     }
 
     /**
@@ -152,7 +181,7 @@ final class FeedbackLifecycle
                 'last_comment_at' => $now,
             ])->save();
 
-            $this->writeComment($row, $member, FeedbackCommentAction::Confirmed, $body, null);
+            $this->writeComment($row, $member, FeedbackParty::Member, FeedbackCommentAction::Confirmed, $body, null);
             $this->audit->record(AuditEvent::Updated, 'feedback_reports', (string) $row->getKey(), old: $old, new: $this->stamps($row), actorId: (string) $member->getKey());
 
             return $row;
@@ -189,7 +218,7 @@ final class FeedbackLifecycle
                 'last_comment_at' => now(),
             ])->save();
 
-            $this->writeComment($row, $member, FeedbackCommentAction::Reopened, $body, $screenshot);
+            $this->writeComment($row, $member, FeedbackParty::Member, FeedbackCommentAction::Reopened, $body, $screenshot);
             $this->audit->record(AuditEvent::Updated, 'feedback_reports', (string) $row->getKey(), old: $old, new: $this->stamps($row), actorId: (string) $member->getKey());
 
             return $row;
@@ -213,7 +242,7 @@ final class FeedbackLifecycle
             $row = $this->lockedRow((string) $report->getKey());
             $row->forceFill(['last_comment_at' => now()])->save();
 
-            return $this->writeComment($row, $member, null, $body, $screenshot);
+            return $this->writeComment($row, $member, FeedbackParty::Member, null, $body, $screenshot);
         });
 
         return $comment;
@@ -253,9 +282,10 @@ final class FeedbackLifecycle
         ];
     }
 
-    private function writeComment(FeedbackReport $row, User $member, ?FeedbackCommentAction $action, ?string $body, ?UploadedFile $screenshot): FeedbackComment
+    /** `$member` is null on a support reply: the support team is not a member, and `user_id` stays NULL. */
+    private function writeComment(FeedbackReport $row, ?User $member, FeedbackParty $side, ?FeedbackCommentAction $action, ?string $body, ?UploadedFile $screenshot): FeedbackComment
     {
-        $attachment = $screenshot === null
+        $attachment = $screenshot === null || $member === null
             ? null
             : $this->attachments->storeFeedbackScreenshot($screenshot, (string) $row->tenant_id, (string) $row->getKey(), (string) $member->getKey());
 
@@ -263,14 +293,68 @@ final class FeedbackLifecycle
         $comment->forceFill([
             'id' => Uuid::uuid7()->toString(),
             'feedback_report_id' => (string) $row->getKey(),
-            'user_id' => (string) $member->getKey(),
-            'author_kind' => FeedbackParty::Member,
+            'user_id' => $member === null ? null : (string) $member->getKey(),
+            'author_kind' => $side,
             'action' => $action,
             'body' => $body,
             'screenshot_attachment_id' => $attachment?->getKey(),
         ])->save();
 
         return $comment;
+    }
+
+    /**
+     * Tell the reporter and the thread about `$row` (M179): the reporter with the reporter's copy, and every
+     * member who wrote in the thread — each once, current members only, never the reporter twice — with the
+     * thread's (`data.audience`). `data` carries ids, labels and where the report came from, never free text;
+     * `$note` (the support team's words) rides as mail-only context.
+     *
+     * @param  array<string, string>  $extra
+     */
+    private function tell(NotificationType $type, FeedbackReport $row, array $extra, ?string $note): void
+    {
+        $data = array_filter([
+            'feedback_report_id' => (string) $row->getKey(),
+            ...$extra,
+            'page_title' => $row->page_title,
+            'title' => $row->title,
+            'source' => $row->source->value,
+        ], static fn (?string $value): bool => $value !== null);
+
+        $mailContext = $note === null ? [] : ['note' => $note];
+
+        $this->notifications->dispatch($type, [(string) $row->user_id], [...$data, 'audience' => 'reporter'], $mailContext);
+        $this->notifications->dispatch($type, $this->threadReaders($row), [...$data, 'audience' => 'thread'], $mailContext);
+    }
+
+    /**
+     * The members who wrote in `$row`'s thread, other than its reporter, who are still active in the workspace.
+     *
+     * @return list<string>
+     */
+    private function threadReaders(FeedbackReport $row): array
+    {
+        /** @var list<string> $writers */
+        $writers = FeedbackComment::query()
+            ->where('feedback_report_id', $row->getKey())
+            ->where('author_kind', FeedbackParty::Member->value)
+            ->whereNotNull('user_id')
+            ->where('user_id', '!=', $row->user_id)
+            ->distinct()
+            ->pluck('user_id')
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->all();
+
+        if ($writers === []) {
+            return [];
+        }
+
+        return array_values(array_unique(TenantUser::query()
+            ->whereIn('user_id', $writers)
+            ->where('status', TenantUserStatus::Active->value)
+            ->pluck('user_id')
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->all()));
     }
 
     private function optionalBody(?string $body): ?string

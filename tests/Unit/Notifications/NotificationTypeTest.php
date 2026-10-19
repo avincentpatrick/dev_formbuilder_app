@@ -33,6 +33,8 @@ it('pins the case order, because the DB CHECKs are generated from it', function 
         'badge_earned',
         // M175 (`R-9bfd832e`) — appended: a reporter is told their feedback was resolved or declined.
         'feedback_closed',
+        // M179 (`R-129c44c3`, `D151`) — appended: the support team replied in a report's thread.
+        'feedback_reply',
     ]);
 });
 
@@ -115,8 +117,11 @@ it('names only real roles, and only for the types that address a role', function
         NotificationType::ExportReady,
         NotificationType::WebhookFailed,
         NotificationType::BadgeEarned,
-        // M175 — the person who sent the report, and nobody else: a decline is not news to a colleague.
+        // M175 — the person who sent the report; since M179 also everyone who wrote in its thread. Never a
+        // role: a decline is not news to a colleague who never took part.
         NotificationType::FeedbackClosed,
+        // M179 — a support reply, addressed to the same people.
+        NotificationType::FeedbackReply,
     ] as $addressed) {
         expect($addressed->recipientRoles())->toBe([]);
     }
@@ -152,7 +157,11 @@ it('points each type at one destination, shared by the bell and the email', func
         ->and(NotificationType::MemberJoined->pathFor([]))->toBe('members')
         // M175 — the reporter's own list, where the status and the note are read; unconditional, because
         // every member may open it.
-        ->and(NotificationType::FeedbackClosed->pathFor(['feedback_report_id' => 'fb-1']))->toBe('feedback/mine');
+        ->and(NotificationType::FeedbackClosed->pathFor(['feedback_report_id' => 'fb-1']))->toBe('feedback/mine')
+        // M179 — a relayed report lives on the Testing-round comments tab, so its notifications open there.
+        ->and(NotificationType::FeedbackClosed->pathFor(['feedback_report_id' => 'fb-1', 'source' => 'relayed']))->toBe('feedback/mine?view=testing')
+        ->and(NotificationType::FeedbackReply->pathFor(['feedback_report_id' => 'fb-1']))->toBe('feedback/mine')
+        ->and(NotificationType::FeedbackReply->pathFor(['feedback_report_id' => 'fb-1', 'source' => 'relayed']))->toBe('feedback/mine?view=testing');
 });
 
 it('returns no path rather than a broken one when the payload lacks its identifier', function (): void {

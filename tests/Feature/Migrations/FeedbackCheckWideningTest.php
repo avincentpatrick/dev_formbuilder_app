@@ -57,3 +57,27 @@ it('widens feedback_reports_status_check for Confirmed on a database migrated be
     expect($narrowed?->definition)->not->toContain("'confirmed'")
         ->toContain("'new'")->toContain("'reviewed'")->toContain("'resolved'")->toContain("'wont_fix'");
 });
+
+it('widens both notification type CHECKs for feedback_reply, and narrows them back', function (): void {
+    $pre = "'submission_received', 'submission_returned', 'submission_approved', 'review_requested', 'export_ready', "
+        ."'member_invited', 'webhook_failed', 'impersonation_started', 'member_joined', 'badge_earned', 'feedback_closed'";
+
+    foreach (['notifications' => 'type', 'notification_preferences' => 'notification_type'] as $table => $column) {
+        DB::statement("ALTER TABLE {$table} DROP CONSTRAINT {$table}_type_check");
+        DB::statement("ALTER TABLE {$table} ADD CONSTRAINT {$table}_type_check CHECK ({$column} IN ({$pre}))");
+    }
+
+    $migration = require base_path('database/migrations/2026_08_17_000140_recreate_notification_type_checks_for_feedback_reply.php');
+
+    $migration->up();
+    foreach (['notifications', 'notification_preferences'] as $table) {
+        expect(feedbackCheckWideningDefinition($table, "{$table}_type_check")?->definition)
+            ->toContain("'feedback_reply'")->toContain("'feedback_closed'")->toContain("'submission_received'");
+    }
+
+    $migration->down();
+    foreach (['notifications', 'notification_preferences'] as $table) {
+        expect(feedbackCheckWideningDefinition($table, "{$table}_type_check")?->definition)
+            ->not->toContain("'feedback_reply'")->toContain("'feedback_closed'");
+    }
+});

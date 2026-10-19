@@ -16,6 +16,7 @@ use App\Exceptions\Settings\PlatformSettingsConflictException;
 use App\Models\Attachment;
 use App\Models\Audit;
 use App\Models\Concerns\BelongsToTenant;
+use App\Models\FeedbackComment;
 use App\Models\FeedbackReport;
 use App\Models\Plan;
 use App\Models\Setting;
@@ -916,7 +917,8 @@ final class SuperAdminService
      *
      * ── THE REPORTER IS TOLD (M175, `R-9bfd832e`, `D139`) ──────────────────────────────────────────────────
      * `$note` is the support team's reply, stored on the report (`resolution_note`) whenever one is given and
-     * kept when none is. Reaching Resolved or Declined dispatches `feedback_closed` to the REPORTER alone — inside
+     * kept when none is. Reaching Resolved or Declined dispatches `feedback_closed` to the REPORTER (since M179 also to
+     * every member who wrote in the thread — `FeedbackLifecycle::tell()`) — inside
      * this transaction, so the bell row, the preference lookup and the reporter's address all pass the strict
      * policies under the adopted context, and the queued email waits for the commit (`after_commit`). The reply
      * reaches the email as mail-only context, never `data` ({@see NotificationDispatcher::dispatch()}), and the
@@ -957,6 +959,31 @@ final class SuperAdminService
         }
 
         return $written;
+    }
+
+    /**
+     * The support team's reply in a report's thread (M179, `R-129c44c3`, `D151`) — the console's reply box and
+     * the support API's `POST /feedback/{id}/comments`. The same door as {@see self::transitionFeedback()}: adopt
+     * the report's tenant context on the ordinary connection, so the message and its audit pass the strict
+     * policies and the audit lands in that workspace's own ledger; {@see FeedbackLifecycle::supportReply()} does
+     * the rest, and tells the reporter and the thread.
+     */
+    public function replyToFeedback(FeedbackReport $report, User $actor, ?string $body): FeedbackComment
+    {
+        /** @var FeedbackComment $comment */
+        $comment = DB::transaction(function () use ($report, $actor, $body): FeedbackComment {
+            $savedTenant = TenantContext::currentTenantId();
+            $savedUser = TenantContext::currentUserId();
+            TenantContext::applyLocal($report->tenant_id);
+
+            try {
+                return $this->feedback->supportReply((string) $report->getKey(), $actor, $body);
+            } finally {
+                TenantContext::applyLocal($savedTenant, $savedUser);
+            }
+        });
+
+        return $comment;
     }
 
     /**

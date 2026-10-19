@@ -10,6 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\Admin\SuperAdminService;
 use App\Services\Feedback\FeedbackConsolePresenter;
+use App\Services\Feedback\FeedbackLifecycle;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -77,6 +78,27 @@ final class FeedbackConsoleController extends Controller
         );
 
         return back()->with('toast', ['type' => 'success', 'message' => 'Feedback updated']);
+    }
+
+    /**
+     * Reply in a report's thread, as the support team (M179, `R-129c44c3`, `D151`) — moves nothing; tells the
+     * reporter and everyone who wrote in the thread. See {@see SuperAdminService::replyToFeedback()}.
+     */
+    public function reply(Request $request, string $feedback): RedirectResponse
+    {
+        $validated = $request->validate([
+            'body' => ['required', 'string', 'max:'.FeedbackLifecycle::BODY_MAX],
+        ]);
+
+        $report = $this->superAdmin->findFeedback($feedback);
+        abort_if($report === null, 404);
+
+        /** @var User $actor */
+        $actor = $request->user();
+
+        $this->superAdmin->replyToFeedback($report, $actor, (string) $validated['body']);
+
+        return back()->with('toast', ['type' => 'success', 'message' => 'Reply sent']);
     }
 
     /** Stream a report's screenshot — see {@see SuperAdminService::feedbackScreenshot()} for why no bypass. */

@@ -121,13 +121,24 @@ enum NotificationType: string
      * M175 (`R-9bfd832e`, `D139`) — a reporter's feedback was RESOLVED or DECLINED by the platform support team.
      * APPENDED, never inserted: both CHECKs are generated from {@see self::values()}.
      *
-     * Addressed to the reporter alone (`recipientRoles()` is empty): a decline is not news to a colleague.
-     * Emitted by {@see SuperAdminService::transitionFeedback()} inside its adopted-tenant
+     * Addressed explicitly (`recipientRoles()` is empty): to the reporter, and since M179 (`D151`) to every
+     * member who wrote in the report's thread — each once, current members only (`data.audience` says which
+     * copy each gets). A decline is not news to a colleague who never took part. Emitted by
+     * {@see FeedbackLifecycle::support()} inside {@see SuperAdminService::transitionFeedback()}'s adopted-tenant
      * transaction, so the row, the preference lookup and the address all pass the strict policies. The support
      * team's reply is NOT in `data` — every member can read that column at the database level — it reaches the
-     * email as mail-only context and is read in full on My reports, where this points.
+     * email as mail-only context and is read in full on the Feedback page, where this points.
      */
     case FeedbackClosed = 'feedback_closed';
+
+    /**
+     * M179 (`R-129c44c3`, `D151`) — the platform support team REPLIED in a feedback report's thread. APPENDED,
+     * never inserted: both CHECKs are generated from {@see self::values()}.
+     *
+     * Addressed exactly as {@see self::FeedbackClosed} is — the reporter and every member who wrote in the
+     * thread — and for the same reason. The reply's words travel in the email only, never in `data`.
+     */
+    case FeedbackReply = 'feedback_reply';
 
     /**
      * Human label for the notification center, the preferences card, and any email subject built from the
@@ -155,6 +166,7 @@ enum NotificationType: string
             // M175 — the KIND of notification (the /settings row and the email subject); the status is in the
             // description.
             self::FeedbackClosed => 'Feedback update',
+            self::FeedbackReply => 'Feedback reply',
         };
     }
 
@@ -235,7 +247,7 @@ enum NotificationType: string
             // about the recipient rather than about a record they relate to, so there is no role that could
             // express "gets told about this" — see the case's own docblock.
             self::SubmissionReturned, self::SubmissionApproved, self::ExportReady, self::WebhookFailed,
-            self::BadgeEarned, self::FeedbackClosed => [],
+            self::BadgeEarned, self::FeedbackClosed, self::FeedbackReply => [],
         };
     }
 
@@ -298,8 +310,11 @@ enum NotificationType: string
             // destination is a surface, not a row, so there is no payload id that could be missing.
             self::BadgeEarned => 'achievements',
             // M175 — the reporter's own list, where the status and the reply are read. Unconditional: every
-            // member may open it, and it is a surface rather than a row.
-            self::FeedbackClosed => 'feedback/mine',
+            // member may open it, and it is a surface rather than a row. M179 — a RELAYED report lives on the
+            // Testing-round comments tab, so its notifications open there.
+            self::FeedbackClosed, self::FeedbackReply => ($data['source'] ?? null) === 'relayed'
+                ? 'feedback/mine?view=testing'
+                : 'feedback/mine',
         };
     }
 
@@ -322,6 +337,7 @@ enum NotificationType: string
             // catalog's own "every case has an action label" assertion.
             self::BadgeEarned => 'View your progress',
             self::FeedbackClosed => 'See your reports',
+            self::FeedbackReply => 'Read the reply',
         };
     }
 

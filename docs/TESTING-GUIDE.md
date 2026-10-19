@@ -549,8 +549,8 @@ The console lives on the **central host**, not on a workspace, and it requires t
    **Then expect the change to appear in Northwind's OWN `/audit-log`, not the platform one** — step 14.
 7. `/admin/users`. **Expect:** users across all workspaces — this is one of the places that reads across
    tenants.
-8. `/admin/feedback`. **Expect:** every workspace's feedback in one queue — the four seeded demo reports
-   (one in each state: **New, Ongoing, Resolved, Declined** — the words since M175) plus anything you sent in
+8. `/admin/feedback`. **Expect:** every workspace's feedback in one queue — the five seeded demo reports
+   (one in each state: **New, Ongoing, Resolved, Confirmed working, Declined** — the words since M175; Confirmed since M179) plus anything you sent in
    §11, from **both** `demo` and `northwind`. Filter by workspace, by status and by kind.
 9. Open a **New** report. **Expect:** the full remarks, its kind, the page it came from (a link), the
    reporter's email and role, the browser details, and the screenshot if it has one. **Expect three buttons —

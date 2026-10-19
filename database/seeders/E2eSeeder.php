@@ -1555,7 +1555,7 @@ class E2eSeeder extends Seeder
      *
      * Written with `forceCreate`, not through {@see App\Services\Feedback\FeedbackService}: the service
      * requires an `UploadedFile` and an open tenant context to attach a screenshot, and this fixture wants
-     * neither. `status` is written from the enum, never a literal — the column has no CHECK constraint.
+     * neither. `status` is written from the enum, never a literal — `feedback_reports_status_check` (M175, widened by M179) refuses anything else.
      */
     private function seedFeedback(User $owner, User $reviewer): void
     {

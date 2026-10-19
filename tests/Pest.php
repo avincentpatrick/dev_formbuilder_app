@@ -819,6 +819,7 @@ function purgeCommittedFeedbackFixtures(): void
         // belt and braces, since `users.id` is an FK target and the delete below would otherwise fail).
         $connection->table('feedback_reports')->whereIn('user_id', $userIds)->delete();
         $connection->table('feedback_reports')->whereIn('resolved_by', $userIds)->update(['resolved_by' => null]);
+        $connection->table('feedback_reports')->whereIn('confirmed_by', $userIds)->update(['confirmed_by' => null]);
     }
 
     if ($tenantIds !== []) {

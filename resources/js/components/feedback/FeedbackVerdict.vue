@@ -39,7 +39,7 @@ function has(verb: FeedbackAction['verb']): FeedbackAction | undefined {
 }
 
 function confirm(): void {
-    confirmForm.post(`/feedback/${props.reportId}/reopen`, { preserveScroll: true });
+    confirmForm.post(`/feedback/${props.reportId}/confirm`, { preserveScroll: true });
 }
 
 function onPicked(event: Event): void {

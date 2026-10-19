@@ -280,6 +280,52 @@ export class ExpressionEvaluator {
 
         return toStr(value) === needle;
     }
+
+    /**
+     * A VALIDATION RULE's verdict (M178) — the mirror of `ExpressionEvaluator::evaluateConstraint()`, whose docblock
+     * carries the reasoning: passes unless definitely false; an ordering comparison with a blank side (empty or NaN)
+     * is unknown; Kleene `not` / `and` / `or`; every other node (an `if()` included — the grammar keeps its branches
+     * to values) is today's `toBool`. Only a rule's own expression row calls it. Appended, because this file is cited by line.
+     */
+    evaluateConstraint(expression: string, context: EvaluationContext): boolean {
+        return this.constraintTruth(this.parser.parse(expression), context) !== false;
+    }
+
+    private constraintTruth(node: Node, context: EvaluationContext): boolean | null {
+        switch (node.type) {
+            case 'not': {
+                const operand = this.constraintTruth(node.operand, context);
+
+                return operand === null ? null : !operand;
+            }
+            case 'logical': {
+                const decides = node.op === 'or';
+                const left = this.constraintTruth(node.left, context);
+
+                if (left === decides) return decides; // the short-circuit evaluate() takes
+
+                const right = this.constraintTruth(node.right, context);
+
+                if (right === decides) return decides;
+
+                return left === null || right === null ? null : !decides;
+            }
+            case 'comparison': {
+                if (node.op !== 'gt' && node.op !== 'lt' && node.op !== 'gte' && node.op !== 'lte') break;
+
+                const left = this.evalNode(node.left, context);
+                const right = this.evalNode(node.right, context);
+
+                return this.isBlankSide(left) || this.isBlankSide(right) ? null : this.numericCompare(left, right, node.op);
+            }
+        }
+
+        return toBool(this.evalNode(node, context));
+    }
+
+    private isBlankSide(value: MaybeAbsent): boolean {
+        return isEmpty(value) || (typeof value === 'number' && Number.isNaN(value));
+    }
 }
 
 /** Assemble a ready-to-use evaluator — mirrors the Pest `makeExpressionEvaluator()` helper. */

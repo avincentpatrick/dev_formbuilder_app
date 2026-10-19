@@ -55,7 +55,7 @@ final class StructuredRuleEvaluator
         // A free-text expression supersedes the structured columns (the DB XOR CHECK); a blank one is a no-op.
         if ($row->expression !== null) {
             return trim($row->expression) === ''
-                || Coercion::toBool($this->evaluator->evaluate($row->expression, $context));
+                || $this->evaluator->evaluateConstraint($row->expression, $context); // M178: a blank side passes
         }
 
         return match ($row->rule_type) {

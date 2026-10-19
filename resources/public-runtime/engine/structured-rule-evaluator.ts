@@ -64,7 +64,7 @@ export class StructuredRuleEvaluator {
     passesConstraint(row: ValidationRow, fieldKey: string, answer: MaybeAbsent, context: EvaluationContext, fieldKeysById: FieldKeysById): boolean {
         // A free-text expression supersedes the structured columns (the DB XOR CHECK); a blank one is a no-op.
         if (row.expression !== null) {
-            return row.expression.trim() === '' || toBool(this.evaluator.evaluate(row.expression, context));
+            return row.expression.trim() === '' || this.evaluator.evaluateConstraint(row.expression, context); // M178: a blank side passes
         }
 
         switch (row.rule_type) {

@@ -47,5 +47,12 @@
     "schema": {"fields": [{"key": "src"}, {"key": "target", "rules": [{"rule_type": "skip_if", "operator": "eq", "related": "src", "rule_value": "skip"}]}]},
     "answers": {"src": "keep", "target": "val"},
     "expected": {"relevance": {"fields": {"src": true, "target": true}, "sections": {}}, "errors": [], "effective_answers": {"src": "keep", "target": "val"}, "computed": {}}
+  },
+  {
+    "name": "relevance_compared_blank_stays_hidden",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "q", "field_type": "integer"}, {"key": "dep", "relevant": "${q} > 5"}]},
+    "answers": {},
+    "expected": {"relevance": {"fields": {"q": true, "dep": false}, "sections": {}}, "errors": [], "effective_answers": {}, "computed": {}}
   }
 ]

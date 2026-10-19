@@ -1,6 +1,6 @@
 {
   "grammar_version": "2.0",
-  "total": 250,
+  "total": 261,
   "files": {
     "comparison": 14,
     "emptiness": 14,
@@ -11,6 +11,7 @@
     "functions": 31,
     "parse-errors": 43,
     "yes-no": 33,
-    "temporal": 37
+    "temporal": 37,
+    "constraint": 11
   }
 }

@@ -56,6 +56,8 @@ erDiagram
     users ||--o| user_ui_preferences : "personalizes (unique)"
     users ||--o{ feedback_reports : "submits"
     users |o--o{ feedback_reports : "confirms the fix (nullable, M179)"
+    feedback_reports ||--o{ feedback_comments : "thread (M179)"
+    users |o--o{ feedback_comments : "writes (nullable = support reply)"
     users ||--o{ model_has_roles : "assigned via"
     users |o--o{ tenants : "last_active_tenant (UX convenience, not ownership)"
 

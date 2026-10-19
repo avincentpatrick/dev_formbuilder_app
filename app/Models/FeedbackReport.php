@@ -14,6 +14,7 @@ use App\Services\Admin\SuperAdminService;
 use App\Services\Feedback\FeedbackService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
@@ -109,6 +110,16 @@ class FeedbackReport extends Model implements TenantScoped
     public function resolver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'resolved_by');
+    }
+
+    /**
+     * The report's thread, oldest first (M179, `D151`).
+     *
+     * @return HasMany<FeedbackComment, $this>
+     */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(FeedbackComment::class, 'feedback_report_id')->orderBy('created_at')->orderBy('id');
     }
 
     /**

@@ -43,6 +43,7 @@ const EXTRACTED_COLUMN_CENSUS = [
     'connection_subscriptions' => 'config connection_id consecutive_failure_count created_at created_by deleted_at event_types form_id id last_failure_at last_success_at name status tenant_id updated_at',
     'connections' => 'access_token connected_by created_at deleted_at external_account_id external_account_label id last_error last_error_at last_refreshed_at provider refresh_token scopes status tenant_id token_expires_at updated_at',
     'domains' => 'activated_at created_at domain id is_primary tenant_id token_issued_at updated_at verification_checked_at verification_failure_reason verification_token verified_at',
+    'feedback_comments' => 'action author_kind body created_at feedback_report_id id screenshot_attachment_id tenant_id user_id',
     'feedback_reports' => 'browser_info confirmed_at confirmed_by id last_comment_at page_title page_url reference remarks reporter_role resolution_note resolved_at resolved_by route screenshot_attachment_id source source_label status submitted_at tenant_id title type user_id',
     'field_library' => 'category created_at created_by default_config default_hint default_label default_label_translations default_validations deleted_at description field_type id is_active name tenant_id updated_at usage_count',
     'form_automation_runs' => 'attempt_count created_at error_code event_id form_automation_id id last_attempted_at response_status status submission_id tenant_id updated_at',

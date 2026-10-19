@@ -2,7 +2,7 @@
 
 **Project:** Form-Builder SaaS (`dev_formbuilder_app`)
 **Status:** Draft v1.0 — written against the approved architecture plan, before any migration is written (per the plan's "Next Steps," this doc precedes code).
-**Scope:** Every entity in the plan's §2.2 "Core Form/Submission Data Model": `tenants`, `forms`, `form_versions`, `form_sections`, `form_fields`, `form_field_validations`, `submissions`, `submission_answers`, `submission_answer_index`, `attachments`, `field_library`, `form_templates`, `audits`, `webhook_endpoints`, `webhook_deliveries`, `plans`, `subscriptions`, `usage_counters` — plus three tables added later at the user's explicit request to back PRD Features #9–#11: `user_ui_preferences`, `settings`, `feedback_reports` — and two added in the Phase-0-readiness review to back PRD Feature #13 (Notifications): `notifications`, `notification_preferences`.
+**Scope:** Every entity in the plan's §2.2 "Core Form/Submission Data Model": `tenants`, `forms`, `form_versions`, `form_sections`, `form_fields`, `form_field_validations`, `submissions`, `submission_answers`, `submission_answer_index`, `attachments`, `field_library`, `form_templates`, `audits`, `webhook_endpoints`, `webhook_deliveries`, `plans`, `subscriptions`, `usage_counters` — plus three tables added later at the user's explicit request to back PRD Features #9–#11: `user_ui_preferences`, `settings`, `feedback_reports` (with its thread, `feedback_comments`, since M179) — and two added in the Phase-0-readiness review to back PRD Feature #13 (Notifications): `notifications`, `notification_preferences`.
 **Out of scope:** `users`, `roles`, `permissions`, `model_has_roles`/`model_has_permissions`, `password_reset_tokens`, `sessions`, and other Laravel/Fortify/Spatie-Permission auth tables are **not** part of the plan's §2.2 model and are therefore not detailed here — they belong to the Multi-Tenancy & RBAC Design Doc (plan doc #9, `docs/multi-tenancy-rbac-design.md`). Where a column below is a foreign key into `users`, it is noted as "external — see RBAC doc" rather than fully specified. The one exception worth flagging now because it is load-bearing for this document's PII methodology and for `audits`/`submissions`/`webhook_endpoints`: `users.is_super_admin` is the explicit boolean called out in plan §2.1, replacing legacy's `id === 1` convention — it lives on `users`, not on `tenants`. Also out of scope by the same reasoning: `tenant_users` (tenant membership/invite lifecycle) and, since Increment G10a, `resource_grants` + `scope_nodes` (per-resource access scoping and the tenant-defined hierarchy it can target — these replaced the original `form_collaborators`, and are keyed off the RBAC doc's role catalog) — all introduced by that document, not this one.
 
 This document is the source of truth for column-level shape; it will be kept in sync with migrations in the same PR that changes them (plan §5, "docs-as-code discipline").
@@ -54,6 +54,8 @@ This document is the source of truth for column-level shape; it will be kept in 
 | `FeedbackStatus` | `feedback_reports.status` | `feedback_reports_status_check` | `new`, `reviewed`, `resolved`, `confirmed` *(added M179)*, `wont_fix` — read **New, Ongoing, Resolved, Confirmed working, Declined** (M175, `D139`; M179, `D151`): `reviewed` and `wont_fix` kept their stored values and changed their labels only, so no row was touched. `confirmed` is reached only by a tester's **It works** on a Resolved report. The CHECK (M175) is generated from the enum, added `NOT VALID` and then validated, so a value nobody expected could never fail the deploy; M179's `000135` rebuilds it wider the same way (added for PRD Feature #11). |
 | `FeedbackType` | `feedback_reports.type` | `feedback_reports_type_check` | `bug`, `suggestion`, `question` — what kind of report it is, chosen by the reporter (M175, `R-2ce2f274`, `D127`). The column is nullable only so the reports sent before it existed keep their place; a new report must name one. |
 | `FeedbackSource` | `feedback_reports.source` | `feedback_reports_source_check` | `button`, `relayed` — where a report came from (M179, `R-db9dec62`, `D150`): `button` is the Feedback button, and every report written before the column existed (the column defaults to it, so no row was rewritten); `relayed` is a comment that reached the team another way, loaded through the support API, and seen by every member of its workspace. |
+| `FeedbackParty` | `feedback_comments.author_kind` | `feedback_comments_author_kind_check` | `member`, `support` — who wrote a thread message (M179, `D151`): a member of the workspace, or the platform support team. The same enum is the side `FeedbackStatus::allowedTransitions()` takes. |
+| `FeedbackCommentAction` | `feedback_comments.action` | `feedback_comments_action_check` | `reopened`, `confirmed` — what a tester's move did (M179, `D151`): **Still a problem** writes `reopened` (body required), **It works** writes `confirmed`. NULL on an ordinary comment or reply. |
 | `NotificationType` | `notifications.type`, `notification_preferences.notification_type` | `notifications_type_check`, `notification_preferences_type_check` | `submission_received`, `submission_returned`, `submission_approved`, `review_requested`, `export_ready`, `member_invited`, `webhook_failed` (PRD Feature #13), then `impersonation_started` (I11b), `member_joined` (J3a), `badge_earned` (K1b) and `feedback_closed` (M175: a reporter is told their feedback was resolved or declined) — **eleven cases, each APPENDED, never inserted.** ⚠️ This row said "all seven cases wired" until K1b and had been **stale for two increments**, which is the failure mode a catalog exists to prevent: every widening added a case to the enum and a migration, and none of them came back here. **BUILT IN I3** as `app/Enums/NotificationType.php`, with both tables wired; the H17-era note that this was "entirely unbuilt" no longer applies, and `export_ready` is now wired — see §22. Three things the enum records that the catalog alone does not: **`review_requested` has no `DomainEventType` case** (there is no request-review verb in the product, and that catalog is the webhook *subscription* vocabulary, so an unemitted case would be subscribable and dead — it is a second fan-out of `submission.created` instead); **`export_ready` and `webhook_failed` keep the purpose-built branded emails they already had** at `GeneratePdfJob`/`DeliverWebhookJob` and gain only an in-app row, so `honorsEmailPreference()` is false for exactly those two; and the **case order is load-bearing**, because both tables' CHECKs are generated from `values()`. Grows as new notifiable events are wired in — same code-controlled posture as `WebhookEventType`. |
 | `NotificationChannel` | delivery channels a `NotificationType` supports | — none (no backing column) | `in_app`, `email` (added for PRD Feature #13) |
 | `PointRule` | `point_awards.rule` | `point_awards_rule_check` | `form.created`, `form.published`, `submission.collected`, `submission.reviewed`, `submission.edited`, `member.invited`, `member.joined` (K1a; ADR-0020, §31). The weights on each case are **a product statement, not a constant table** — collection out-earns everything because it is high-frequency and it *is* the product — and they are **copied into the row at award time**, so re-weighting moves future awards only. Added here in K1b: K1a shipped the enum and did not list it, and a catalog with a hole in it looks like a decision. |
@@ -91,6 +93,7 @@ This document is the source of truth for column-level shape; it will be kept in 
 19. [user_ui_preferences](#19-user_ui_preferences) *(added for PRD Feature #9)*
 20. [settings](#20-settings) *(added for PRD Feature #10)*
 21. [feedback_reports](#21-feedback_reports) *(added for PRD Feature #11)*
+21a. [feedback_comments](#21a-feedback_comments) *(added M179)*
 22. [notifications](#22-notifications) *(added for PRD Feature #13)*
 23. [notification_preferences](#23-notification_preferences) *(added for PRD Feature #13)*
 24. [connections](#24-connections) *(added for H15a / ADR-0009)*
@@ -920,6 +923,28 @@ Backs PRD Feature #11 (in-app feedback mechanism). Added after the original 18-t
 
 ---
 
+## 21a. `feedback_comments`
+
+A thread on every feedback report (M179, `R-129c44c3`, `D151`). Anyone who may see a report may comment on it; a tester's **It works** and **Still a problem** each write a message carrying its `action`; the platform support team's replies land here too. One row per message, never edited.
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `uuid` | No | application-generated (`HasUuidv7`) | No | Primary key. |
+| `tenant_id` | `uuid` | No | — | No | FK to `tenants.id` (cascade). Leads the composite keys below. |
+| `feedback_report_id` | `uuid` | No | — | No | The report the message belongs to — a COMPOSITE key, `(tenant_id, feedback_report_id)` → `feedback_reports (tenant_id, id)` (`feedback_comments_report_fk`, cascade), so a message can never name another workspace's report. |
+| `user_id` | `uuid` | Yes | `NULL` | No | FK to `users.id` (external, nullable, `ON DELETE SET NULL`) — the member who wrote it. NULL on a support reply, and once an erased account is gone (the thread then reads "Former member"). |
+| `author_kind` | `varchar(10)` — PHP enum: `FeedbackParty` | No | — | No | `member` / `support`. |
+| `action` | `varchar(15)` — PHP enum: `FeedbackCommentAction` | Yes | `NULL` | No | `reopened` / `confirmed` — set on the message a tester's move wrote; NULL on an ordinary comment or reply. |
+| `body` | `text` | Yes | `NULL` | **Yes (conditional)** | The message, up to 2,000 characters (enforced by the request and the lifecycle). Required except on a confirm, which may say nothing. Redacted in the audit ledger, like the report's `remarks`. |
+| `screenshot_attachment_id` | `uuid` | Yes | `NULL` | No | An optional screenshot — a `feedback_screenshot` attachment owned by the REPORT, so ADR-0015 §D9 (read under `feedback.view` on every route, or none) covers it unchanged. Composite key `(tenant_id, screenshot_attachment_id)` → `attachments (tenant_id, id)` (`feedback_comments_screenshot_fk`, `ON DELETE SET NULL (screenshot_attachment_id)`). |
+| `created_at` | `timestamptz` | No | set by Eloquent | No | When it was written. There is no `updated_at`: a message is never edited. |
+
+> **Design Notes**
+> - **AS BUILT (M179) — strict tenant isolation, plus the reports' SELECT-only carve-out.** `withTenantIsolation('feedback_comments')`, and `000139` adds `applySuperAdminBypass('feedback_comments', ['SELECT'])` with the matching `GRANT SELECT`, so the console and the support API show every workspace's threads. A support reply is WRITTEN by adopting the report's tenant context — never through the carve-out — so its audit row lands in that workspace's own ledger. `FeedbackCommentRlsTest` pins all of it, including a cross-workspace insert refused by the composite key on a connection RLS does not confine.
+> - **No relational CHECK.** "A member message has a user" and "a reopen has a body" live in the feedback lifecycle, not in the database: `DocumentedCheckConstraintDriftTest` reads any `column = 'literal'` CHECK as a value domain.
+
+---
+
 ## 22. `notifications`
 
 Backs PRD Feature #13 (Notifications). One row per in-app notification delivered to a user's notification center; email delivery of the same event is tracked by `emailed_at` rather than a second row. Added in the Phase-0-readiness review.
@@ -1634,6 +1659,10 @@ feedback_reports.user_id               -> users.id           (external)
 feedback_reports.screenshot_attachment_id -> attachments.id  (nullable)
 feedback_reports.resolved_by           -> users.id           (external, nullable)
 feedback_reports.confirmed_by          -> users.id           (external, nullable, M179)
+feedback_comments.tenant_id            -> tenants.id
+feedback_comments.(tenant_id, feedback_report_id) -> feedback_reports.(tenant_id, id)   (composite, cascade, M179)
+feedback_comments.user_id              -> users.id           (external, nullable)
+feedback_comments.(tenant_id, screenshot_attachment_id) -> attachments.(tenant_id, id) (composite, set null, M179)
 
 notifications.tenant_id                -> tenants.id
 notifications.user_id                  -> users.id           (external)

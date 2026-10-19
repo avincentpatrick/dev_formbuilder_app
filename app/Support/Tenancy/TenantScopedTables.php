@@ -58,6 +58,9 @@ final class TenantScopedTables
         'badge_awards',
         'connection_subscriptions',
         'connections',
+        // M179. A report's thread: a member's or the support team's words (`body`, conditional PII, redacted in
+        // the audit ledger, extracted like the report's own `remarks`). Nothing withheld.
+        'feedback_comments',
         'feedback_reports',
         // M132. A form's automations and their runs. `form_automations.secret` is withheld from the extract
         // (`TenantExtractColumns::WITHHELD`); a run holds no payload and no response body.

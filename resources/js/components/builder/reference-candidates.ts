@@ -159,7 +159,7 @@ export function matchCandidates(candidates: ReferenceCandidate[], query: string)
  * is left alone), or `${` (never the escaped `$${`), followed by what has been typed of the code so far.
  */
 export function findTrigger(before: string): { from: number; query: string } | null {
-    const at = /(?!)@([A-Za-z0-9_]*)$/.exec(before);
+    const at = /(?:^|[^A-Za-z0-9_.@])@([A-Za-z0-9_]*)$/.exec(before);
     if (at !== null) return { from: before.length - at[1].length - 1, query: at[1] };
 
     const brace = /(?:^|[^$])\$\{([A-Za-z0-9_]*)$/.exec(before);

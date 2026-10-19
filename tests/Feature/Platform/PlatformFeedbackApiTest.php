@@ -338,3 +338,25 @@ it('posts the support team\'s reply to a report\'s thread, and audits it in both
     $this->withToken($plain)->postJson(platformApi(workspaceHost(), '/feedback/'.Uuid::uuid7()->toString().'/comments'), ['body' => 'Hello'])
         ->assertNotFound();
 });
+
+it('accepts the committed relay file whole — 31 created, then 31 unchanged (M179, D150)', function (): void {
+    Notification::fake();
+    [, $plain] = issueSupportToken();
+
+    $slug = 'console-relay-file-'.Str::random(6);
+    $tenant = consoleTenant('Console Relay File', $slug);
+    $owner = consoleUser(Str::random(8).'@feedbackconsoletest.local');
+    consoleMember($tenant, $owner);
+
+    $items = json_decode((string) file_get_contents(base_path('database/data/feedback/relayed-2026-10.json')), true, flags: JSON_THROW_ON_ERROR)['items'];
+
+    $first = $this->withToken($plain)->postJson(platformApi(workspaceHost(), '/feedback/relayed'), [
+        'tenant' => $slug, 'reporter_email' => $owner->email, 'items' => $items,
+    ])->assertOk()->json('data');
+    $second = $this->withToken($plain)->postJson(platformApi(workspaceHost(), '/feedback/relayed'), [
+        'tenant' => $slug, 'reporter_email' => $owner->email, 'items' => $items,
+    ])->assertOk()->json('data');
+
+    expect(array_count_values(array_column($first, 'outcome')))->toBe(['created' => 31])
+        ->and(array_count_values(array_column($second, 'outcome')))->toBe(['unchanged' => 31]);
+});

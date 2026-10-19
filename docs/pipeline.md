@@ -516,7 +516,7 @@ rather than dropped, so that this file and its sources cannot disagree about wha
 
 ## What this file cannot see
 
-Scanned **1016 file(s)**, and `scripts/pipeline-lint.php` gates this file on every push. It
+Scanned **1027 file(s)**, and `scripts/pipeline-lint.php` gates this file on every push. It
 refuses a hand edit, a roadmap phase claiming work in flight without naming a live row, a
 second queue, a held row missing from either this line or the stop-list that guards unattended
 work, a documented column that exists, is used by nothing and is scheduled nowhere, a row or

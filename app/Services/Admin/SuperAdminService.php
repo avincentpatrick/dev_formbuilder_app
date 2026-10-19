@@ -710,7 +710,7 @@ final class SuperAdminService
 
         $ids = $reports
             ->flatMap(fn (FeedbackReport $r): array => array_filter([$r->user_id, $r->resolved_by, $r->confirmed_by]))
-            ->merge($commenters)
+            ->merge(array_filter($commenters))
             ->unique()
             ->values()
             ->all();
@@ -1091,18 +1091,14 @@ final class SuperAdminService
             throw FeedbackRelayException::unknownTenant($tenantKey);
         }
 
+        // `runFor()`, not the save/apply/`finally`-restore shape `transitionFeedback()` above still carries: a
+        // database error inside the batch must reach the caller as itself, not as the 25P02 a restore issued on
+        // an aborted transaction would replace it with (the open row the M3 adversarial pass filed on that shape).
         /** @var list<array{reference: string, id: string, outcome: string}> $results */
-        $results = DB::transaction(function () use ($tenant, $reporterEmail, $items, $actor): array {
-            $savedTenant = TenantContext::currentTenantId();
-            $savedUser = TenantContext::currentUserId();
-            TenantContext::applyLocal((string) $tenant->getKey());
-
-            try {
-                return $this->relay->relay($this->relayReporter($tenant, $reporterEmail), $items, $actor);
-            } finally {
-                TenantContext::applyLocal($savedTenant, $savedUser);
-            }
-        });
+        $results = TenantContext::runFor(
+            (string) $tenant->getKey(),
+            fn (): array => $this->relay->relay($this->relayReporter($tenant, $reporterEmail), $items, $actor),
+        );
 
         return $results;
     }
@@ -1138,18 +1134,12 @@ final class SuperAdminService
      */
     public function replyToFeedback(FeedbackReport $report, User $actor, ?string $body): FeedbackComment
     {
+        // `runFor()`, for the reason {@see self::relayFeedback()} gives.
         /** @var FeedbackComment $comment */
-        $comment = DB::transaction(function () use ($report, $actor, $body): FeedbackComment {
-            $savedTenant = TenantContext::currentTenantId();
-            $savedUser = TenantContext::currentUserId();
-            TenantContext::applyLocal($report->tenant_id);
-
-            try {
-                return $this->feedback->supportReply((string) $report->getKey(), $actor, $body);
-            } finally {
-                TenantContext::applyLocal($savedTenant, $savedUser);
-            }
-        });
+        $comment = TenantContext::runFor(
+            (string) $report->tenant_id,
+            fn (): FeedbackComment => $this->feedback->supportReply((string) $report->getKey(), $actor, $body),
+        );
 
         return $comment;
     }

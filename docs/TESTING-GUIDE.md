@@ -444,7 +444,7 @@ rewriting its answers are different powers.
 7. **Expect no way to change a status here.** That belongs to the platform support team — §15 is where you
    act on these. Sign in as `viewer@demo.test` and try `/feedback`. **Expect:** turned away; every role can
    *send* feedback, only Owner and Admin can *read* the workspace's list.
-8. Still as `viewer@demo.test`, open the **account menu** (your initials, top right) → **My feedback**
+8. Still as `viewer@demo.test`, open the **account menu** (your initials, top right) → **Feedback & testing** (M179; it read **My feedback** before)
    (`/feedback/mine`; the panel's **See your reports** link goes there too). **Expect:** only *your own*
    reports, each with its kind, its status in words — **New, Ongoing, Resolved or Declined** — and, once the
    support team has closed it, their **reply**. A screenshot is named ("Screenshot attached") but not shown.

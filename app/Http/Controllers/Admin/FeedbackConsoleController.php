@@ -21,8 +21,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * The platform support console for in-app feedback (Increment I7a) — PRD Feature #11's "dedicated internal
- * view … with a simple status lifecycle (New → Reviewed → Resolved)", and RBAC §9's `feedback_reports`
- * review queue. Central host only, behind `superadmin` + `superadmin.mfa`.
+ * view … with a simple status lifecycle (New → Reviewed → Resolved)" — as built New · Ongoing · Resolved · Declined (M175),
+ * with a tester's Confirmed and a thread since M179 — and RBAC §9's `feedback_reports` review queue. Central host only, behind `superadmin` + `superadmin.mfa`.
  *
  * ⚠️ **THE ROUTE PARAMETER IS A RAW UUID, NOT A BOUND MODEL, AND THAT IS LOAD-BEARING.** Route-model
  * binding would resolve `FeedbackReport` on the app connection, which on the central host carries NO

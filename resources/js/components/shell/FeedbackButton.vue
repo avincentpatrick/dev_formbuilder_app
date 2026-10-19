@@ -276,7 +276,7 @@ onBeforeUnmount(releasePreview);
                      and, while some are open, the testing-round comments every member can check. -->
                 <p class="fb__mine">
                     <Link href="/feedback/mine" class="fb__mine-link" @click="open = false">See your reports</Link>
-                    and the support team's replies<template v-if="false">, and the
+                    and the support team's replies<template v-if="testingRoundOpen > 0">, and the
                         <Link href="/feedback/mine?view=testing" class="fb__mine-link" @click="open = false"
                             >testing-round comments ({{ testingRoundOpen }} open)</Link
                         ></template

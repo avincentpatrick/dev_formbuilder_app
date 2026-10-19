@@ -14881,13 +14881,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   byte nobody can see is a byte nobody can review. The remedy: find it by byte offset and remove it in a docs-only change, then check
   the file for others. **Live.** Filed by `M176`. **Tier: after-launch.**
 
-- **`minor` · The blank paper form prints a reference inside a label, hint or section text as typed, so a respondent reads `${name}` on paper.**
+- ✅ **CLOSED BY `M178` (2026-10-19) — ****`minor` · The blank paper form prints a reference inside a label, hint or section text as typed, so a respondent reads `${name}` on paper.**
   Found by `M178`'s planning pass (2026-10-19). Every other channel pipes a `${key}` into the answer — the public form and the builder
   preview (`resources/public-runtime/composables/useFormRuntime.ts`), the submission PDF (`app/Services/Submissions/SubmissionPdfPresenter.php`)
-  — but the blank paper form only picks the language (`app/Services/Forms/BlankFormPrintPresenter.php:385`) and
+  — but the blank paper form only picked the language (`app/Services/Forms/BlankFormPrintPresenter.php`, line 385 at `617f12d0`, before `M178`) and
   `resources/views/pdf/blank-form.blade.php` prints the label, hint and description raw. The "Insert a question" picker (`R-75719ac4`)
   puts such a reference one click away. The remedy (`D147` A): on the blank paper form each reference prints as a blank line
-  `________` for the person filling it to write in; an escaped `$${` stays literal. **Live.** Filed by `M178`. **Tier: early-testing.**
+  `________` for the person filling it to write in; an escaped `$${` stays literal. **Live.** Filed by `M178`. **Tier: early-testing.** ✅ **CLOSED BY `M178` (2026-10-19):** `BlankFormPrintPresenter::paperText()` prints each reference in a field's label and hint and a section's title and description as `________`, through the render path's own lenient template parser (so `$${` stays literal and a malformed hole prints nothing, as on screen), before the view escapes the text. Red first: 1 Pest case. Built and held for merge point 3 (`D137`), not yet live.
 
 - **`minor` · A question's Default value is saved but never filled in for a respondent, though the Help page says it is.**
   The Advanced tab's **Default value** (`resources/js/components/builder/ConfigPanel.vue:789`) saves `default_value`, but nothing reads it

@@ -50,7 +50,7 @@ _None open._ `D149`, the last one filed, was asked and answered on 2026-10-19 wh
 
 ### D147 — On the printed blank paper form, a question whose label shows another answer (`${name}`) prints the code as typed. What should the paper show? **A — a blank line: "How old is ________?", for the person filling the paper to write in.**
 
-**Asked and answered 2026-10-19 (user decision, in chat), while `M178` (R3) was planned; recorded in its claim.** Every other channel pipes the answer in; the blank paper form prints the label, hint and description raw (`app/Services/Forms/BlankFormPrintPresenter.php:385`), and R3's picker makes such a label one click away.
+**Asked and answered 2026-10-19 (user decision, in chat), while `M178` (R3) was planned; recorded in its claim.** Every other channel pipes the answer in; the blank paper form printed the label, hint and description raw (`app/Services/Forms/BlankFormPrintPresenter.php`, line 385 at `617f12d0`), and R3's picker makes such a label one click away.
 
 - **A — a blank line (recommended, chosen).** Built in R3.
 - **B — the other question's label in brackets.** "How old is [Name]?"

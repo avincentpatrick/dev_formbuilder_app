@@ -12,6 +12,7 @@ use App\Models\Form;
 use App\Models\FormVersion;
 use App\Services\Submissions\SchemaValueFormatter;
 use App\Services\Submissions\SubmissionPdfPresenter;
+use App\Services\Templates\TemplateParser;
 use App\Support\Forms\FieldVisibility;
 use App\Support\Forms\LocaleVariant;
 use App\Support\Forms\StepProjection;
@@ -123,7 +124,10 @@ final class BlankFormPrintPresenter
 
     private const RULED_LINES_MAX = 10;
 
-    public function __construct(private readonly SchemaValueFormatter $formatter) {}
+    public function __construct(
+        private readonly SchemaValueFormatter $formatter,
+        private readonly TemplateParser $templates,
+    ) {}
 
     /**
      * The whole document model.
@@ -210,8 +214,8 @@ final class BlankFormPrintPresenter
                 continue;
             }
 
-            $label = LocaleVariant::resolve($section['label_translations'] ?? null, $this->stringOrNull($section['label'] ?? null), $locale, $key);
-            $description = LocaleVariant::resolve($section['description_translations'] ?? null, $this->stringOrNull($section['description'] ?? null), $locale);
+            $label = $this->paperText(LocaleVariant::resolve($section['label_translations'] ?? null, $this->stringOrNull($section['label'] ?? null), $locale, $key));
+            $description = $this->paperText(LocaleVariant::resolve($section['description_translations'] ?? null, $this->stringOrNull($section['description'] ?? null), $locale));
 
             $repeatable = $this->isRepeatable($section);
             $instances = $this->repeatInstances($section);
@@ -382,8 +386,8 @@ final class BlankFormPrintPresenter
             $rows[] = [
                 'key' => $key,
                 'area' => $area->value,
-                'label' => LocaleVariant::resolve($field['label_translations'] ?? null, $this->stringOrNull($field['label'] ?? null), $locale, $key),
-                'hint' => $this->blankToNull(LocaleVariant::resolve($field['hint_translations'] ?? null, $this->stringOrNull($field['hint'] ?? null), $locale)),
+                'label' => $this->paperText(LocaleVariant::resolve($field['label_translations'] ?? null, $this->stringOrNull($field['label'] ?? null), $locale, $key)),
+                'hint' => $this->blankToNull($this->paperText(LocaleVariant::resolve($field['hint_translations'] ?? null, $this->stringOrNull($field['hint'] ?? null), $locale))),
                 'required' => ($field['is_required'] ?? null) === RequiredMode::Required->value,
                 // Printed as a marker rather than resolved: a conditional field's expression has no
                 // answers to evaluate against on a blank sheet, and the enumerator needs to see that
@@ -759,4 +763,28 @@ final class BlankFormPrintPresenter
 
         return $blocks;
     }
+
+    /**
+     * Text another answer is piped into, as the PAPER must print it (M178, `D147` A). Every other channel replaces a
+     * `${key}` with the answer; a blank form has no answer yet, and printed the code as typed — so each reference is a
+     * blank line for the person filling the sheet to write in. Parsed with the render path's own lenient parser, so
+     * an escaped `$${` stays a literal `${` and a malformed hole prints nothing, exactly as on screen; substituted
+     * before the view escapes the text.
+     */
+    private function paperText(string $text): string
+    {
+        if (! str_contains($text, '${')) {
+            return $text;
+        }
+
+        $printed = '';
+        foreach ($this->templates->parseLenient($text) as $segment) {
+            $printed .= $segment['type'] === 'hole' ? self::WRITE_IN : $segment['value'];
+        }
+
+        return $printed;
+    }
+
+    /** The blank line a reference prints as on the paper form (`D147`). */
+    private const WRITE_IN = '________';
 }

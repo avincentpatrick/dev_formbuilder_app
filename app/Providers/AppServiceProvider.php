@@ -7,6 +7,7 @@ use App\Models\Attachment;
 use App\Models\Audit;
 use App\Models\Connection;
 use App\Models\ConnectionSubscription;
+use App\Models\FeedbackReport;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormFolder;
@@ -23,6 +24,7 @@ use App\Policies\AttachmentPolicy;
 use App\Policies\AuditPolicy;
 use App\Policies\ConnectionPolicy;
 use App\Policies\ConnectionSubscriptionPolicy;
+use App\Policies\FeedbackReportPolicy;
 use App\Policies\FormFolderPolicy;
 use App\Policies\FormPolicy;
 use App\Policies\NotificationPolicy;
@@ -303,6 +305,10 @@ class AppServiceProvider extends ServiceProvider
         // stored file behind the same per-form visibility the inbox uses. RLS already scopes to the tenant.
         Gate::policy(Attachment::class, AttachmentPolicy::class);
 
+        // Who may take part in a feedback report's thread (M179, `D151`): the reporter, any member on a relayed
+        // report, Owner/Admin. The routes add `feedback.submit`; the binding adds the workspace.
+        Gate::policy(FeedbackReport::class, FeedbackReportPolicy::class);
+
         // The tenant's scoping hierarchy (Increment G10a). Authoring a node IS authoring authorization
         // structure — a grant can be made against one — so it is Owner/Admin only, via `scopes.manage`.
         Gate::policy(ScopeNode::class, ScopeNodePolicy::class);
@@ -393,6 +399,13 @@ class AppServiceProvider extends ServiceProvider
         // handful of requests per session. 60 a minute per token is ample for a pull with screenshots; the
         // per-address limit bounds guessing, since this throttle runs BEFORE the token is looked up. Keyed on a
         // hash, never the token itself, so the cache never holds a usable credential.
+        // The testers' door into a feedback thread (M179) — It works, Still a problem, a comment. A tester checks
+        // a handful of fixes at a sitting; 30 a minute per member is ample and stops a stuck button from filling a
+        // thread everyone in the workspace reads.
+        RateLimiter::for('feedback-thread', fn (Request $request): Limit => Limit::perMinute(30)->by(
+            'feedback-thread:'.($request->user()?->getAuthIdentifier() ?? $request->ip()),
+        ));
+
         RateLimiter::for('platform-api', fn (Request $request): array => [
             Limit::perMinute(60)->by('platform-tok:'.hash('sha256', (string) $request->bearerToken())),
             Limit::perMinute(120)->by('platform-ip:'.$request->ip()),

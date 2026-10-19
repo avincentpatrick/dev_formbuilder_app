@@ -14700,7 +14700,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   records it. Proved on the testing server with the user before the per-merge backup block is retired (the runner's account and the
   backup task's rights are unmeasured). **Live.** Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M176` (2026-10-18):** `deploy.ps1`'s window runs `php artisan deploy:backup` (pg_dump -Fc, the password in the child's environment only) and `deploy:census --write` (every base table's row count) once the site is down and before anything is replaced — a failure brings the site back up on the old code and refuses to migrate — and `deploy:census --compare` after `migrate`, a table with fewer rows leaving the site down (`D144`); tables that empty themselves by design are listed with reasons in `config/deploy.php`. `migration-lint.php` refuses a migration whose `up()` drops a table or a column, truncates or deletes rows, unless an answered decision is cited (one historical entry). Proved by Pest (31 deploy cases), a PowerShell 5.1 harness over the real window, and committed mutants (the drop check, the refusal's `up`, a migration that drops a column). Built and held for merge point 2; its first real run there is owed by a row of its own (`D143`), and the user's backup block stays until it passes.
 
-- **`minor` · The palette still offers Yes/No, which a Single choice with Yes and No already covers.**
+- ✅ **CLOSED BY `M177` (2026-10-19) — ****`minor` · The palette still offers Yes/No, which a Single choice with Yes and No already covers.**
   The user (2026-10-16): *"remove the yes/no question. it is already covered by the options"*. The palette lists every field type
   (`app/Services/Forms/BuilderPresenter.php:222`); `app/Http/Requests/Forms/StoreFieldRequest.php:28` accepts any; the catalog
   creates Yes/No questions (`database/seeders/Data/PlatformTemplateBlueprints.php:49`, and the library's consent item). The remedy
@@ -14708,16 +14708,16 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   refused, and every existing Yes/No question keeps working on every surface — no data is touched; a retired type says it is
   retired and offers Change type to Single choice; Single choice gains a Yes / No choices preset; the catalog seeds switch to Single
   choice for new copies only (re-seeding stays the user's step); the grid's column types (`R-5033e87e`, `R-0a7275ce`) drop yes/no.
-  **Live.** Filed by `M174`. **Tier: early-testing.**
+  **Live.** Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M177` (2026-10-19):** `FieldType::isRetired()` (Yes/No, Duration) rides the palette as an additive `retired` flag, so labels and lookups keep every type; the palette, Add a question here and Change type never offer one; `PickableFieldType` refuses adding or converting into one unless the builder's undo is restoring (`restore: true`, sent only by its history steps). An existing Yes/No says it is retired and offers Change to Single choice — `D145`'s edge, choices Yes and No, its default rewritten, a warning that earlier answers stay; an empty choice list offers Add Yes and No; the catalog's seven yes-or-no template questions and the library's Consent copy as single choices (new copies only; re-seeding stays the operator's step). Left as they were, on purpose: copies of existing content (a duplicate, a workspace's own library item or template) and the public API's library create, a published contract. Red first: Vitest 10, Pest 18. Mutants caught: the palette filter, the dialog's filter, the refusal, the restore escape, the undo's flag, the `D145` edge. Live on staging since merge point 2 (PR #370, `a5b718bb`).
 
-- **`minor` · The palette offers Duration, which no respondent can answer, while authors want a duration worked out from two dates.**
+- ✅ **CLOSED BY `M177` (2026-10-19) — ****`minor` · The palette offers Duration, which no respondent can answer, while authors want a duration worked out from two dates.**
   The user (2026-10-16): *"remove the duration question type, that can also be covered in the calculate"*. A Duration question has
   no control on the web form or manual entry (`resources/js/components/submissions/FieldInput.vue:604`, "Not available for manual
   entry yet"); `R-af2d278b` planned to build one (`D134`). The remedy (`D140`, which changes `D134`): Duration leaves the palette the
   way Yes/No does; existing Duration questions keep their place; `R-af2d278b` keeps Signature only; a duration is worked out by the
-  calculation editor (a Start, an End and Units). **Live.** Filed by `M174`. **Tier: early-testing.**
+  calculation editor (a Start, an End and Units). **Live.** Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M177` (2026-10-19):** with `R-0b7db001` — Duration leaves the palette and cannot be added or converted into; an existing one says it is retired, that respondents can't answer it, and that a duration will be worked out by a calculation (R4's `R-f77aa45d`). Live on staging since merge point 2 (PR #370, `a5b718bb`).
 
-- **`minor` · A choice question has no "Other, please specify" switch; the write-in and its condition are built by hand, and an imported `or_other` is dropped.**
+- ✅ **CLOSED BY `M177` (2026-10-19) — ****`minor` · A choice question has no "Other, please specify" switch; the write-in and its condition are built by hand, and an imported `or_other` is dropped.**
   The user (2026-10-16): *"for any option questions like checkbox, radiobutton or select, there must be a setting … that enable a
   others options so an automatic additional others, specify field will be automatically added and configured to be a child
   question"*. Nothing supports it (the gap table's `or_other` line near the top of this file);
@@ -14726,9 +14726,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   translations. The remedy: an Options-tab switch on Single choice, Multiple choice and Dropdown adds an `other` choice ("Other",
   editable) and a Short text "Please specify" placed right after it, shown only when `selected(${q},'other')`, required when shown,
   linked by `config.other_specify_key` so switching off removes both (the `D133` delete dialog applies); XLSForm import maps
-  `or_other` to it and export writes the explicit pattern. **Live.** Filed by `M174`. **Tier: early-testing.**
+  `or_other` to it and export writes the explicit pattern. **Live.** Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M177` (2026-10-19):** an Options-tab switch on single choice, multiple choice and dropdown (transmitted as `enums.other_specify_types`; never for choices taken from another form). On: `POST …/fields/{field}/other-specify`, one transaction — an `other` choice added (an existing one adopted, the library "Sex" item's case) and a required Short text "Please specify" shown only when `selected(${key}, 'other')`, linked by `config.other_specify_key`; the store places it right after the choice question, one undo entry. Off: the `D133` question (`useAnsweredDelete`, lifted out of the canvas), then `DELETE …/other-specify` removes both. A renamed key on either side keeps the pair linked; a duplicate and a conversion to a type without the setting drop the link. XLSForm `or_other` imports as the pair; export already wrote the explicit pattern (pinned). The analytics card keys an answer apart from its overflow bar. Red first: Pest 16, Vitest 6 and the component. Mutants: 7 caught; one survived and proved a clause redundant, removed. Live on staging since merge point 2 (PR #370, `a5b718bb`).
 
-- **`minor` · A question cannot be set to always hidden, and a calculated question can never be shown to respondents.**
+- ✅ **CLOSED BY `M177` (2026-10-19) — ****`minor` · A question cannot be set to always hidden, and a calculated question can never be shown to respondents.**
   The user (2026-10-16): *"there must be a setting for a calculated question if the user wants is visible or not, actually for every
   question, there must be an option to have always visible and always hidden, align it to existing settings"*. Visibility today is a
   question's condition, a section's condition, a skip rule or the Hidden type; `resources/public-runtime/engine/field-roles.ts:33`
@@ -14736,31 +14736,31 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   manual entry, and the PDF and the printed form skip it. The remedy: "Show to respondents: **Always · Never · Only when…**" on
   every question (Only when = the existing condition editor; Never = `config.visibility: hidden`, still computed and stored);
   Calculated defaults to Never (today's behaviour) and Always shows its value read-only, formatted by its result type; the Hidden
-  type stays Never; both engines, manual entry, the PDF and print follow. **Live.** Filed by `M174`. **Tier: early-testing.**
+  type stays Never; both engines, manual entry, the PDF and print follow. **Live.** Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M177` (2026-10-19):** Show to respondents — Always · Never · Only when… — on the Advanced tab beside the condition editor ("align it to existing settings"), stored as `config.visibility` (`hidden` Never, `shown` Always for a calculation, absent the type's own rule, so every published version reads as before). `fieldRendersNothing()` and `App\Support\Forms\FieldVisibility` are twins pinned by five golden vectors (`tests/golden/validation/visibility.json`) and two shared step-fixture cases. A Never question raises no error it cannot repair and is never asked as required; an Always calculation shows its value read-only on the guest form, the preview and manual entry, and in the PDF; the printed form leaves a Never question off. Formatting by result type waits for R4 (`R-f77aa45d`). Red first: Vitest 19, Pest 11. Mutants caught: both engines' skip, the step projection, the mapping, Always, manual entry, print. Live on staging since merge point 2 (PR #370, `a5b718bb`).
 
-- **`minor` · The builder preview leaves out a section whose questions are all hidden or calculated, so the author cannot see the section they made.**
+- ✅ **CLOSED BY `M177` (2026-10-19) — ****`minor` · The builder preview leaves out a section whose questions are all hidden or calculated, so the author cannot see the section they made.**
   The user (2026-10-16): *"if a type of question is calculated, and it is the only question in a section, the section itself will
   be hidden in the section tab, making the user confuse"*. `resources/public-runtime/composables/useFormRuntime.ts:482` (`pagesOf()`)
   keeps a page only when one of its fields renders (`:503`), and the builder preview runs the same engine;
   `resources/js/components/builder/PreviewPane.vue:234` counts as empty only a section with no fields at all; only the Logic view
   says *"Nobody filling the form sees this section"* (`resources/js/components/builder/LogicRail.vue:150`). The remedy: the preview
   shows such a section as a card — "Respondents won't see this section: every question in it is hidden" — with its questions dimmed
-  and editable, and the step strip marks it; respondents' forms are unchanged. **Live.** Filed by `M174`. **Tier: early-testing.**
+  and editable, and the step strip marks it; respondents' forms are unchanged. **Live.** Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M177` (2026-10-19):** the runtime's `keepSilentPages` (the builder preview only) keeps such a block as a silent step: a card saying respondents won't see it, its questions listed and selectable, the step strip marking it "(hidden from respondents)"; the guest form and manual entry are unchanged. Red first: 4. Mutant caught: the option ignored. Live on staging since merge point 2 (PR #370, `a5b718bb`).
 
-- **`minor` · Questions move one at a time; an author cannot select several and send them to another section.**
+- ✅ **CLOSED BY `M177` (2026-10-19) — ****`minor` · Questions move one at a time; an author cannot select several and send them to another section.**
   The testers' comment (2026-10-11, comment 4): *"Form builder does not all[ow] bulk movement of questions to a section"*. The
   builder's selection holds one item (`resources/js/components/builder/types.ts:330`), though the server's reorder already takes
   whole lists (`routes/tenant.php:624`). The remedy: a checkbox per question in Structure (shift-click for a range) and a "Move to
   section…" action — one order write, one undo entry — built after the save-token row so a bulk move does not set off the conflict
-  dialog. **Live.** Filed by `M174`. **Tier: early-testing.**
+  dialog. **Live.** Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M177` (2026-10-19):** `D146` A — a tick box on every Structure row (`MdsCheckbox` gains `hideLabel`, the label the accessible name; story and DSR note), Shift for a range, a sticky bar with a native select (DSR §3.4b) that moves the ticked questions to the end of a section in the order they stood: one order write, one undo entry. Measured and left: a failed order write keeps its undo entry under "Not saved", as a failed edit does. CI's clipped-node guard then found the canvas newly passing by accident; `.canvas` positions itself now (`R-7d7ee3ae`, four remain). Red first: 6 and the e2e. Mutants caught: a write per question, Shift ignored. Live on staging since merge point 2 (PR #370, `a5b718bb`).
 
-- **`minor` · The builder's help text and messages use words a first-time author does not know.**
+- ✅ **CLOSED BY `M177` (2026-10-19) — ****`minor` · The builder's help text and messages use words a first-time author does not know.**
   The testers' comment (2026-10-11, comment 1) asks for wording a smart high-schooler understands, and its screenshot is one dialog
   of many: `resources/js/components/builder/ConfigPanel.vue:524` (*"Evaluated on the server. Use ${field} references …"*) and `:683`
   (*"Referenced in expressions and exports"*), the help texts of the builder's other editors, the store's messages and the preview's
   list of limits all speak of keys, expressions and references. The remedy: the voice rule that the type-dialog row writes into
   `docs/ux/design-system-reference.md`, applied to every builder help text and message; `manual.ts` follows.
-  **Live.** Filed by `M174`. **Tier: early-testing.**
+  **Live.** Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M177` (2026-10-19):** the Calculated formula, field key, section key, advanced-type note, thank-you, location accuracy, file types and size, URL value and condition help, the preview's limits list, a failed request's fallback and the type change blocked by a conflict, all in the DSR §1.5 voice; `builder-voice.test.ts` refuses the developer words in every builder help, hint and note. Red first: 3. Mutant caught: "Evaluated on the server" put back. Live on staging since merge point 2 (PR #370, `a5b718bb`).
 
 - **`minor` · An author can point at another question only by typing `${key}` in most places, and no list shows each question's code.**
   The user (2026-10-16): *"all the type of question must include the referencing"*; the testers (2026-10-11, comment 6): *"direct
@@ -14805,12 +14805,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   engines, with golden vectors, the operand judge and the function list in `docs/architecture/technical-architecture.md`.
   **Live.** Filed by `M174`. **Tier: early-testing.**
 
-- **`nit` · The builder's draft check looks for a calculation's formula under the wrong key, so every calculated question would read "no formula yet".**
+- ✅ **CLOSED BY `M177` (2026-10-19) — ****`nit` · The builder's draft check looks for a calculation's formula under the wrong key, so every calculated question would read "no formula yet".**
   `resources/js/components/builder/draft-snapshot.ts:402` reads `config.formula`, but the formula lives in
   `config.calculated_formula` (`resources/js/components/builder/ConfigPanel.vue:274`); `resources/js/components/builder/draft-snapshot.test.ts`
   pins the wrong key. Nothing shows it today only because the preview never draws a calculated question; it will once a calculation
   can be shown. The remedy: read `calculated_formula`, and the test with it. **Latent.** It surfaces once a calculated question can be
-  shown. Filed by `M174`. **Tier: early-testing.**
+  shown. Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M177` (2026-10-19):** taken by `M177` because `R-f44e9d00` made it live — `draft-snapshot.ts` reads `calculated_formula`, and the preview rebuilds on visibility and the formula. Red first: 2. Mutant caught. Live on staging since merge point 2 (PR #370, `a5b718bb`).
 
 - **`minor` · A Likert matrix is drawn as stacked cards that repeat the scale in every row, and a Likert scale as loose chips; neither looks like a Likert scale.**
   The user (2026-10-16): *"the likert matrix doesnt look like likert matrix, make a deep research on how kobo make the likert
@@ -14873,7 +14873,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   folder were never measured. The remedy, at merge point 2: after the user's backup block and census, read R2's deploy log for the
   backup's path and both counts; if the guard refused, fix the runner's rights with the user step by step (set `MERIDIAN_PG_DUMP` when
   `pg_dump` is not on its `PATH`) and run the deploy again; once a guarded deploy has passed, retire the backup block from the
-  merge-point routine (`D137`) and say so in the runbook. **Live.** Filed by `M176`. **Tier: early-testing.**
+  merge-point routine (`D137`) and say so in the runbook. **Live.** Filed by `M176`. **Tier: early-testing.** **PROVED AT MERGE POINT 2 (2026-10-19), by `M177`'s deploy (run 39190622862, `a5b718bb`):** inside the window, `deploy:backup` wrote `storage/app/deploy-backups/deploy-20261019-023810.dump` (439,736 bytes), `deploy:census` counted 66 tables and 9,792 rows before `migrate` ("Nothing to migrate") and found every table at least as full after; the site came back up and `/up` answered 200. NETWORK SERVICE could run `pg_dump` and write the folder, so no rights were changed. The user's census matched before and after, table by table. **What remains is the retirement, and R3's first commit takes it:** drop the per-merge backup block from `CLAUDE.md` "The trunk", `scripts/next.php`'s hand-off and Standing Rule 5's reason (`D137`, `D143`), and say in `docs/deployment-infrastructure.md` that the deploy's own backup replaced it (the nightly task stays).
 
 - **`nit` · `docs/claims/decisions.md` carries one stray ESC control byte that no editor shows.**
   Found by `M176`'s scan of every file it touched for control characters (after its own tool slips put two into the runbook): the

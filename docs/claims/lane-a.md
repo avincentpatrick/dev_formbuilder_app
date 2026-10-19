@@ -16,7 +16,50 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M177`, R2 of the testers' round 2: question types, visibility and moving (`R-0b7db001`, `R-22011569`, `R-71509975`, `R-f44e9d00`, `R-9bbaa97b`, `R-4a6f004f`, `R-b05fbaae`, `R-f7a18b7a`) (m177-r2-types-visibility-moving)
+## Status: NO ACTIVE CLAIM — `M176` and `M177` are merged and live on staging (merge point 2, released below). The next claim is written here. Merge only at a planned merge point; R3's first commit retires the per-merge backup block, now that the deploy's own backup and row count have run (`R-2d921bbe`, `D143`).
+
+## RELEASED — `M177`, R2 of the testers' round 2: question types, visibility and moving (`R-0b7db001`, `R-22011569`, `R-71509975`, `R-f44e9d00`, `R-9bbaa97b`, `R-4a6f004f`, `R-b05fbaae`, `R-f7a18b7a`) (merged as PR #370, `a5b718bb`, last at merge point 2, 6/6 green with real step counts on its rebased run at `8846394b` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+Built and merged 2026-10-18/19 by the build session (Opus) from the round-2 plan (`~/.claude/plans/here-are-added-comments-peppy-quill.md`
+§B, §E; build plan `~/.claude/plans/pasted-content-id-9a0a-read-claude-md-pure-kay.md`). It completed merge point 2 (`D137`): after the
+user's census and backup (`Result: 0`, `staging-2026-10-19-011830.dump`, 436,857 B), `M176` merged first (`ec308f9e`); once its deploy had
+finished (the OLD `deploy.ps1`, nothing to migrate) and `/up` answered 200, this branch was rebased onto the trunk — only its own 49 commits,
+the tree byte-identical to the one CI had passed — and merged once green. **Its deploy was the guard's first real run (`R-2d921bbe`):**
+`deploy:backup` wrote a 439,736-byte dump inside the window, `deploy:census` counted 66 tables and 9,792 rows before `migrate` and found every
+table at least as full after; the site came back up. The user's census after matched the one before exactly. No user check was owed at the
+start; the feedback pull read 0 reports at the start and at the close. Rows taken: the seven claimed and `R-f7a18b7a`, all closed. Not
+closed, re-scoped: `R-2d921bbe` — proved; the retirement of the backup block is R3's first commit (it touches `CLAUDE.md` and
+`scripts/next.php`, which no close-out may). Found and fixed in passing: `R-7d7ee3ae`'s `BuilderCanvas.vue` (four remain).
+
+**Measured against the prediction:**
+- **Red first, row by row, as predicted** — row a: Vitest 10, Pest 18; row b: Pest 16, Vitest 6 and the new component; row c: Vitest 19, Pest
+  11; row d: 4; row e: 6 and the e2e; row f: 3 and the moved fallback. The XLSForm export case passed on the trunk, as the claim said it would:
+  export already wrote the explicit pattern, so it is a pin, not a fix.
+- **Mutants: 26 run, 25 caught, each turning only its named case red** — Pest through `scripts/mutate.php` (the refusal, the restore escape,
+  the `D145` edge, the adopt branch, the condition's text, the duplicate's link, both engines' Never skip, the step projection, manual entry,
+  the printed form), Vitest committed and reverted (the palette filter, the dialog's filter, the undo's flag, the placement, the rename link,
+  the answer key's prefix, the TS skip, Always, the mapping, the formula key, the preview's silent pages, a write per question, Shift, the
+  voice guard). **One survived, and it was the finding:** keying the analytics overflow bar `overflow` was redundant — prefixing an answer's
+  key alone ends the clash — so that clause came out and the prefix took the mutant.
+- **The one named most likely wrong was not wrong:** the PHP golden runner went red on all three Never vectors, so merging `visibility` into
+  the config each branch assigns held. Runner-up, also held: the palette filter drops a group left empty, pinned.
+- **Not predicted:**
+  - **A fourth consumer of the step fixture** — `pagination.test.ts`, which the claim did not name — and the parity test publishes every case,
+    so the Always case needed a formula (`calculate`, read only there).
+  - **CI's clipped-node guard (`clipped-node-containment.test.ts`), which I had not run locally:** the sticky bulk-move bar made
+    `BuilderCanvas.vue` pass by accident (it positions something, but is no ancestor of the announcement region). `.canvas` positions itself
+    now, the real containing block, and the guard's known list shrank by one.
+  - **Finding 10 of the premise was measured and left:** a failed order write keeps its undo entry under "Not saved", exactly as a failed edit
+    does — consistent, not a defect.
+  - **Carve-outs chosen while building:** a duplicate, a workspace's own library item or template, and the public API's library create still
+    copy a Yes/No — copies of existing content, and the API a published contract.
+  - **My own slips, each caught before a commit landed:** jsonb keeps no key order; a default already `no` needs no rewrite; the warning
+    count; the shell's quoting of long heredocs (scripts moved to files); the tool layer collapsing a doubled backslash into a control byte in
+    the ledger (found by a scan, fixed); a probe's hidden-input click; the first full local Pest run killed by my 50-minute timeout at 464 of
+    551 files (the rest run separately: green but the known bind-mount artefact).
+  - **One local e2e flake** (tablet, the first add's save hung under load), green on rerun; mobile and desktop green first time; 174 more green.
+  - **The real-browser look's one finding:** the Show to respondents legend sat two pixels in (a legend's default padding), fixed.
+
 
 Taken 2026-10-18. It is R2 of the testers' round 2 (`D138`; the plan of record `~/.claude/plans/here-are-added-comments-peppy-quill.md` §B, §E;
 the build plan `~/.claude/plans/pasted-content-id-9a0a-read-claude-md-pure-kay.md`). ⛔ **STACKED:** branch `m177-r2-types-visibility-moving`
@@ -147,7 +190,9 @@ range off, one rewritten sentence put back. **Most likely wrong:** the PHP engin
 branch, so a first vector can lose the key and pass on the defective code; its red must be seen on PHP, not only TS. Runner-up: the
 retired filter leaving an Add-here group heading with no types.
 
-## HELD — `M176`, R1 of the testers' round 2: the builder fixes, and a capture that waits for the page (`R-c4802b60`, `R-164579e8`, `R-5354b4b9`, `R-5554c526`, `R-61d43278`, `R-923c5041`, `R-36e6f557`, `R-a11cc78a`, `R-8496edfa`) (m176-r1-builder-fixes)
+## RELEASED — `M176`, R1 of the testers' round 2: the builder fixes, and a capture that waits for the page (`R-c4802b60`, `R-164579e8`, `R-5354b4b9`, `R-5554c526`, `R-61d43278`, `R-923c5041`, `R-36e6f557`, `R-a11cc78a`, `R-8496edfa`) (merged as PR #369, `ec308f9e`, first at merge point 2, 6/6 green with real step counts at `8b144231` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+✅ **MERGED 2026-10-19 at merge point 2, first of two, after the user's census and backup (`Result: 0`); its deploy ran the OLD `deploy.ps1` as `D143` said it would (nothing to migrate) and `/up` answered 200 before `M177` was rebased and merged. Its comments were announced by name with `M177`'s, once both were live.** The record below is the build's, kept as written.
 
 **BUILT — PR #369, CI 6/6 green with real step counts (run 39070047421 at `8b144231`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the only skips are the two main-only staging-header steps and the failure-only report upload; the runs at `6b2d8a3c` and `1ae0efd9` were 6/6 too) — AND NOT MERGED.** ⛔ **Held for merge point 2 (`D137`, `D138`):** this PR
 merges with R2's, after the user's census and staging backup block; R2 (`M177`) is stacked on this branch. The branch carries the nine rows'

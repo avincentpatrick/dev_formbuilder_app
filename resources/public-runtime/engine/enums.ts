@@ -48,6 +48,6 @@ export type FieldComparisonRuleType = 'greater_than_field' | 'less_than_field' |
 export const FIELD_COMPARISON_OPERATOR: Readonly<Record<FieldComparisonRuleType, ComparisonOperator>> = {
     greater_than_field: 'gt',
     less_than_field: 'lt',
-    at_least_field: 'gt',
+    at_least_field: 'gte',
     at_most_field: 'lte',
 };

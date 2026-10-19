@@ -14915,3 +14915,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   rewriting a status after creation and telling no one; `POST /feedback/{id}/comments` posts a support reply; the pull script gains
   `--relay`, `--comment` and references wherever it takes an id, its digest shows REOPENED reports and new comments, and preflight counts the
   reopened. Every new write needs `--user-approved`. **Live.** Filed by `M179`. **Tier: early-testing.**
+
+- **`minor` · A relayed report is listed by its quoted original, not its reference and title, on both Feedback lists.**
+  Found by `M179`'s real-browser look (2026-10-20). The console's list and the Owner/Admin `/feedback` list show every report by an
+  excerpt of its remarks (`resources/js/Pages/admin/Feedback.vue:259`, `resources/js/Pages/feedback/Index.vue:204`), and a relayed
+  report's remarks are the tester's original, quoted — so the 31 relayed comments read as a column of long quotes with no `U8` or title
+  to find one by, while the testers' own page and both detail views lead with the reference and title. The console has no source filter
+  either (`/feedback` has one). The remedy: for a relayed row, the remarks cell shows the reference badge and the title (the detail
+  views' shape), and the console gains the From filter. The testers never see either list, so V shipped without it. **Live.** Filed by
+  `M179`. **Tier: during-testing.**

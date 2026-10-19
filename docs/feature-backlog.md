@@ -11110,8 +11110,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   two migrations changed nothing. ⛔ **Cleaning it is not a matter of adding `@property` lines one at a
   time** — `M107` added two and cleared three errors, which is a symptom, not a remedy. The remedy is to
   establish why the container's schema resolution differs from CI's, and then either fix it or record in the
-  gate table that PHPStan is CI-only on this host, the way Storybook axe and Vitest already are. **Live** —
-  it is the state of the gate today. Filed by `M107`. **Tier: after-launch.**
+  gate table that PHPStan is CI-only on this host, the way Storybook axe and Vitest already are. ➕ **`M179`
+  measured the third option:** on one tree, the container's full `phpstan analyse` gave 44 errors of this
+  shape, and the HOST's (`php vendor/bin/phpstan analyse --memory-limit=4G`) gave **0**, which is CI's number.
+  So the remedy is to run it on the host and correct `CLAUDE.md`'s gate table, which still says "container
+  only". **Live** — it is the state of the gate today. Filed by `M107`. **Tier: after-launch.**
 
 - **`nit` · `PROGRESS.md`'s `M101` bullet records a state of the tree that does not exist.** Found by `M106`
   (2026-09-20) while verifying `R-06228b4f`'s premise. That bullet ends *"`R-06228b4f` now says `Awaits D54` instead of

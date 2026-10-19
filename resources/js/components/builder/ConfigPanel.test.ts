@@ -175,6 +175,8 @@ function makeStore(
         palette: PALETTE,
         sections: ref<LocalSection[]>([]),
         fields: ref<LocalField[]>(selected.fields ?? []),
+        // M178: the panel lists questions in canvas order, as the real store gives them (ungrouped first, by sequence).
+        flattenedFields: () => [...(selected.fields ?? [])].sort((a, b) => a.sequence - b.sequence),
         touch: selected.touch ?? (() => undefined),
         moveFieldToSection: () => undefined,
         saveFieldToLibrary: () => Promise.resolve(),
@@ -781,3 +783,45 @@ describe('ConfigPanel — Show to respondents (M177, R-f44e9d00)', () => {
     });
 });
 
+
+describe('ConfigPanel — the "Insert a question" picker (M178, R-75719ac4)', () => {
+    // A palette that says what each type may be shown in a label (`pipeable`) and named in a formula (`operand_kind`).
+    const PICKER_PALETTE: PaletteGroup[] = [{
+        category: 'text', label: 'Text', icon: 'type',
+        types: [
+            { value: 'short_text', label: 'Short text', advanced: false, has_options: false, config_editor: null, value_shape: 'text', operand_kind: 'value', pipeable: true },
+            { value: 'integer', label: 'Whole number', advanced: false, has_options: false, config_editor: null, value_shape: 'number', operand_kind: 'number', pipeable: true },
+        ],
+    }];
+
+    function mountPicker() {
+        const earlier = field({ id: 'fld-0', uid: 'f0', key: 'name', label: 'Your name', sequence: 0 });
+        const selected = field({ id: 'fld-1', uid: 'f1', key: 'age', label: 'Age', field_type: 'integer', sequence: 1 });
+        const later = field({ id: 'fld-2', uid: 'f2', key: 'later_one', label: 'Later one', sequence: 2 });
+        const store = makeStore({ field: selected, fields: [later, selected, earlier] });
+        (store as unknown as { palette: PaletteGroup[] }).palette = PICKER_PALETTE;
+
+        return mountPanel(store);
+    }
+
+    const pickers = (wrapper: ReturnType<typeof mountPanel>) => wrapper.findAll('button').filter((button) => button.text() === 'Insert a question');
+
+    it('puts the picker under the label, the help text and the placeholder, offering only the questions before this one', async () => {
+        const wrapper = mountPicker();
+
+        expect(pickers(wrapper)).toHaveLength(3);
+
+        await pickers(wrapper)[0].trigger('click');
+
+        expect(wrapper.findAll('[role="option"]').map((option) => option.text())).toEqual(['Your name · name']);
+    });
+
+    it('leaves the Default value box without one, since nothing fills a default in yet (D148)', async () => {
+        const wrapper = mountPicker();
+        await wrapper.findAll('[role="tab"]').at(-1)?.trigger('click');
+
+        expect(wrapper.text()).toContain('Default value');
+        // None: the condition editor opens on its rows (its "Edit as text" box carries the picker), and the default has none.
+        expect(pickers(wrapper)).toHaveLength(0);
+    });
+});

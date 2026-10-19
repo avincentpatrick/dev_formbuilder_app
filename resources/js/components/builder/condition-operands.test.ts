@@ -49,7 +49,7 @@ describe('condition-operands', () => {
 
     it('offers a note as a subject only when it is the saved one, and then disabled', () => {
         expect(subjectFieldOptions(catalogue, null).map((o) => o.value)).toEqual(['field:hobbies', 'field:dob', 'field:mystery']);
-        expect(subjectFieldOptions(catalogue, 'remark')[0]).toEqual({ value: 'field:remark', label: `A note${UNAVAILABLE}`, disabled: true });
+        expect(subjectFieldOptions(catalogue, 'remark')[0]).toEqual({ value: 'field:remark', label: `A note · remark${UNAVAILABLE}`, disabled: true });
     });
 
     it('lets a date be ordered only against its own kinds, keeping an unclassified question', () => {

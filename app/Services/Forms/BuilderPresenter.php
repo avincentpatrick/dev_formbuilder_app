@@ -9,6 +9,7 @@ use App\Enums\FieldAppearance;
 use App\Enums\FieldType;
 use App\Enums\IndexedDataType;
 use App\Enums\OperandKind;
+use App\Enums\PipingEligibility;
 use App\Enums\RequiredMode;
 use App\Enums\ValidationRuleType;
 use App\Enums\ValueShape;
@@ -242,6 +243,9 @@ final class BuilderPresenter
                 // Increment M134 (`R-910d2286`) — what an EXPRESSION may compare this type's answer with, the kind the
                 // publish gate judges it by; the condition editor reads its capabilities from `enums()['operand_kinds']`.
                 'operand_kind' => OperandKind::for($type)->value,
+                // M178 (`R-75719ac4`) — whether a label, help text or message may show this type's answer (`PipingEligibility`),
+                // so the "Insert a question" picker offers in a text spot exactly what the publish gate accepts there.
+                'pipeable' => PipingEligibility::for($type) === PipingEligibility::Pipeable,
                 // Increment M125 — additive: the palette shows ONE entry per group, and all 31 entries stay.
                 'variant' => $type->variantGroup()?->paletteVariant($type),
                 // M177 (`R-0b7db001`, `R-22011569`, `D140`) — additive too: a retired type is left out of what an author

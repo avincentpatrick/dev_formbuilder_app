@@ -386,3 +386,21 @@ it('transmits what a condition may compare each kind with, written out row by ro
         $row('none', false, false, false, false, [], null),
     ]);
 });
+
+it('says of every palette entry whether a label may show its answer, written out type by type (M178)', function (): void {
+    // The "Insert a question" picker offers a text spot exactly these; publish refuses the rest (`PipingEligibility`).
+    // Transcribed independently of PipingEligibility::for(), so this census can fail.
+    $pipeable = [];
+    foreach ($this->payload['palette'] as $group) {
+        foreach ($group['types'] as $type) {
+            if ($type['pipeable']) {
+                $pipeable[] = $type['value'];
+            }
+        }
+    }
+
+    expect($pipeable)->toEqualCanonicalizing([
+        'short_text', 'long_text', 'email', 'phone', 'url', 'integer', 'decimal', 'date', 'time', 'datetime', 'duration',
+        'single_select', 'multi_select', 'dropdown', 'yes_no', 'cascading_select', 'likert_scale', 'calculated', 'hidden',
+    ]);
+});

@@ -84,3 +84,17 @@ describe('MdsTextarea — its root', () => {
         expect(mount(Textarea).vm.$el).toBeInstanceOf(HTMLTextAreaElement);
     });
 });
+
+describe('MdsTextarea — the box itself, for a caller that writes at the caret (M178)', () => {
+    it('exposes the <textarea> as `field`, with the counter and without it', () => {
+        const bare = mount(Textarea, { props: { modelValue: 'x' } });
+        const counted = mount(Textarea, { props: { modelValue: 'x', maxlength: 500, countFrom: 0 } });
+
+        expect((bare.vm as unknown as { field: unknown }).field).toBe(bare.get('textarea').element);
+        expect((counted.vm as unknown as { field: unknown }).field).toBe(counted.get('textarea').element);
+        // With the counter the root is the wrapper, which is why `field` exists at all.
+        expect(counted.element.tagName).toBe('DIV');
+        bare.unmount();
+        counted.unmount();
+    });
+});

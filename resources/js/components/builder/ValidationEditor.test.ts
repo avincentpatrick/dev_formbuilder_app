@@ -204,7 +204,8 @@ describe('ValidationEditor — a rule the field can no longer take', () => {
 
         expect(offered).toContain('gone_away (deleted)');
         expect(control(wrapper, 'Rule 1 compared field').findAll('option')[1].attributes('disabled')).toBeDefined();
-        expect(offered).toContain('Your age');
+        // M178: each question with its code.
+        expect(offered).toContain('Your age · age');
     });
 });
 
@@ -352,8 +353,8 @@ describe('ValidationEditor — the compared question publish will accept', () =>
         const wrapper = mountWith([row({ rule_type: 'greater_than_field' })], [...FIELDS, PAIN]);
         const offered = optionLabels(wrapper, 'Rule 1 compared field');
 
-        expect(offered).toContain('Your age');
-        expect(offered).toContain('Pain (1-5)');
+        expect(offered).toContain('Your age · age');
+        expect(offered).toContain('Pain (1-5) · pain');
         expect(offered).not.toContain('Notes');
         expect(offered).not.toContain('Date of visit');
     });

@@ -30,11 +30,13 @@
  * would be editing a rule they cannot see. Same posture as `ConditionRow.vue`'s disabled `selected()`
  * options, and the same reason.
  */
-import { MdsButton, MdsCallout, MdsFormField, MdsIconButton, MdsSelect, MdsTextInput, MdsTextarea } from '@meridian/design-system';
+import { MdsButton, MdsCallout, MdsFormField, MdsIconButton, MdsSelect, MdsTextInput } from '@meridian/design-system';
 import { computed } from 'vue';
 import type { BuilderValidation, ComparableField, EnumOption, OperatorOption, RuleTypeOption } from './types';
 import { isNoNegativesRule, NEGATIVE_FLOOR_RULE, NO_NEGATIVES_LABEL } from './field-conversion';
 import { mayCompare, operatorReads, repointPatch, ruleChangePatch } from './validation-options';
+import ReferenceInput from './ReferenceInput.vue';
+import type { ReferenceCandidate } from './reference-candidates';
 import {
     FAMILY_DEFAULT,
     applyCombinator,
@@ -55,6 +57,8 @@ const props = withDefaults(
         valueShape: string;
         /** Every other field in the draft, for the rules that name one. */
         comparableFields: ComparableField[];
+        /** M178 (`R-75719ac4`) — what an Expression rule's "Insert a question" picker offers; none, no picker. */
+        references?: ReferenceCandidate[];
         disabled?: boolean;
         /**
          * Narrow this instance to a subset of rule kinds (M116). Undefined — the Validation tab — means
@@ -241,7 +245,7 @@ function relatedOptionsFor(row: BuilderValidation): SelectOption[] {
     // M178: a calculation is left out — no rule reads one before R4 (`D149`); a row already naming one keeps it below.
     const readable = props.comparableFields.filter((field) => !field.computed);
     const offered = rule === null ? readable : readable.filter((field) => mayCompare(rule, props.operators, field));
-    const options: SelectOption[] = offered.map((field) => ({ value: field.key, label: field.label }));
+    const options: SelectOption[] = offered.map((field) => ({ value: field.key, label: codedLabel(field) }));
 
     const key = row.related_field_key;
 
@@ -259,6 +263,11 @@ function relatedOptionsFor(row: BuilderValidation): SelectOption[] {
     }
 
     return options;
+}
+
+/** M178 (`R-75719ac4`) — a question as a list names it: its label and its code, or the code alone when it has no label. */
+function codedLabel(field: ComparableField): string {
+    return field.label === field.key ? field.key : `${field.label} · ${field.key}`;
 }
 
 /**
@@ -537,8 +546,8 @@ const modeOptions: EnumOption[] = [
                 />
             </template>
 
-            <MdsTextarea
-                v-else
+            <ReferenceInput
+                v-else :candidates="references ?? []"
                 :model-value="row.expression ?? ''"
                 :rows="2"
                 placeholder="e.g. ${age} >= 18"

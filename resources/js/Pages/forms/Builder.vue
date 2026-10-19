@@ -33,6 +33,7 @@ import { takeHistoryRestore } from '@/components/builder/history-restore';
 import { saveLabel } from '@/components/builder/save-label';
 import { shortLabel } from '@/components/builder/label-text';
 import type { BuilderPageProps } from '@/components/builder/types';
+import { referenceCandidates } from '@/components/builder/reference-candidates';
 import { useEntitlements } from '@/composables/useEntitlements';
 
 const props = defineProps<BuilderPageProps>();
@@ -41,6 +42,11 @@ const props = defineProps<BuilderPageProps>();
 const restoredFromHistory = takeHistoryRestore();
 if (restoredFromHistory) router.visit(window.location.href, { preserveState: false, preserveScroll: true, replace: true });
 const store = useBuilderStore(restoredFromHistory ? { ...props, draft: null } : props);
+// M178 (`R-75719ac4`) — the thank-you message's "Insert a question" list: every question it may show (after the whole form).
+const confirmationReferences = computed(() => referenceCandidates(
+    { fields: store.fields.value, sections: store.sections.value, types: store.palette.flatMap((g) => g.types), kinds: store.enums.operand_kinds },
+    { grammar: 'template', host: { kind: 'confirmation' } },
+));
 const { selection, saving, saveState, canUndo, canRedo, conflict, conflictDeferred, library, saveError, superseded } = store;
 
 // M176 (`R-164579e8`): the conflict dialog names a condition's questions by label and a question type by its palette name.
@@ -717,7 +723,7 @@ function submitImport(): void {
             :form="form"
             :timezones="timezones"
             :share="share"
-            :save-resume-available="feature('save_and_resume')" :ocr-scanning="ocr_scanning" :reference-files="reference_files" :automations="automations" :data-sharing="data_sharing"
+            :save-resume-available="feature('save_and_resume')" :ocr-scanning="ocr_scanning" :reference-files="reference_files" :automations="automations" :data-sharing="data_sharing" :confirmation-references="confirmationReferences"
         />
 
         <MdsModal :open="importOpen" title="Import XLSForm" @close="importOpen = false">

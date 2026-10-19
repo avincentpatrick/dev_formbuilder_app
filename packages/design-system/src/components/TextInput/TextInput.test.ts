@@ -69,3 +69,12 @@ describe('MdsTextInput — attribute fall-through', () => {
         wrapper.unmount();
     });
 });
+
+describe('MdsTextInput — the box itself, for a caller that writes at the caret (M178)', () => {
+    it('exposes the <input> as `field`', () => {
+        const wrapper = mount(TextInput, { props: { modelValue: 'x' } });
+
+        expect((wrapper.vm as unknown as { field: unknown }).field).toBe(wrapper.get('input').element);
+        wrapper.unmount();
+    });
+});

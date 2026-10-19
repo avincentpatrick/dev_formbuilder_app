@@ -138,6 +138,9 @@ export interface PaletteType {
     value_shape: string;
     // M134 (`R-910d2286`) — what an EXPRESSION may compare this type's answer with, `OperandKind::for()` transmitted.
     operand_kind: string;
+    // M178 (`R-75719ac4`) — whether a label, help text or message may show this type's answer (`PipingEligibility`), so
+    // the "Insert a question" picker offers in a text spot what the publish gate accepts there. Optional: a fixture omits it.
+    pipeable?: boolean;
     // The palette group this type is one variant of (M125) — `FieldVariantGroup` via BuilderPresenter, or null.
     // The palette shows ONE entry per group (its primary) and the Basics tab switches between the members.
     // Optional: a hand-built palette in a test may carry none, and absent reads as ungrouped.

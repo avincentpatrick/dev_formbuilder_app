@@ -1,0 +1,33 @@
+{
+  "about": "M178 (R-75719ac4): which questions a piece of text may show, as the publish gate's TemplateScopeResolver decides it and as the builder's \"Insert a question\" picker offers them (reference-candidates.ts). Run by tests/Unit/Templates/TemplateScopeParityTest.php and resources/js/components/builder/reference-candidates.test.ts. `offered` is a set; `pipeable` is checked against PipingEligibility on the PHP side, so the fixture cannot claim a type the server does not.",
+  "form": {
+    "sections": [
+      {"id": "s-house", "key": "household", "label": "Household", "sequence": 0, "is_repeatable": false},
+      {"id": "s-members", "key": "members", "label": "Members", "sequence": 1, "is_repeatable": true},
+      {"id": "s-after", "key": "closing", "label": "", "sequence": 2, "is_repeatable": false}
+    ],
+    "fields": [
+      {"key": "name", "label": "Your name", "field_type": "short_text", "pipeable": true, "section": null, "sequence": 0},
+      {"key": "intro", "label": "About this form", "field_type": "note", "pipeable": false, "section": null, "sequence": 1},
+      {"key": "total", "label": "Total", "field_type": "calculated", "pipeable": true, "section": null, "sequence": 2},
+      {"key": "grid", "label": "Ratings", "field_type": "matrix", "pipeable": false, "section": null, "sequence": 3},
+      {"key": "city", "label": "City", "field_type": "short_text", "pipeable": true, "section": null, "sequence": 4},
+      {"key": "size", "label": "Household size", "field_type": "integer", "pipeable": true, "section": "household", "sequence": 0},
+      {"key": "head", "label": "Head of household", "field_type": "short_text", "pipeable": true, "section": "household", "sequence": 1},
+      {"key": "member_name", "label": "Member name", "field_type": "short_text", "pipeable": true, "section": "members", "sequence": 0},
+      {"key": "member_age", "label": "Member age", "field_type": "integer", "pipeable": true, "section": "members", "sequence": 1},
+      {"key": "token", "label": "", "field_type": "hidden", "pipeable": true, "section": "closing", "sequence": 0},
+      {"key": "remarks", "label": "Remarks", "field_type": "long_text", "pipeable": true, "section": "closing", "sequence": 1}
+    ]
+  },
+  "cases": [
+    {"name": "a question outside every section names only earlier ones", "host": {"kind": "field", "key": "total"}, "offered": ["name"]},
+    {"name": "a question takes a calculation and leaves out a grid and a note", "host": {"kind": "field", "key": "city"}, "offered": ["name", "total"]},
+    {"name": "a question in a section names everything outside earlier, and earlier members of its own section", "host": {"kind": "field", "key": "head"}, "offered": ["name", "total", "city", "size"]},
+    {"name": "a question in a repeating section names flat questions and earlier members of its own repeat", "host": {"kind": "field", "key": "member_age"}, "offered": ["name", "total", "city", "size", "head", "member_name"]},
+    {"name": "a question after a repeating section never names a member of it", "host": {"kind": "field", "key": "remarks"}, "offered": ["name", "total", "city", "size", "head", "token"]},
+    {"name": "a section heading sits before its own members", "host": {"kind": "section", "key": "household"}, "offered": ["name", "total", "city"]},
+    {"name": "a repeating section's heading names only earlier flat questions", "host": {"kind": "section", "key": "members"}, "offered": ["name", "total", "city", "size", "head"]},
+    {"name": "the thank-you message comes after the whole form, outside every repeat", "host": {"kind": "confirmation"}, "offered": ["name", "total", "city", "size", "head", "token", "remarks"]}
+  ]
+}

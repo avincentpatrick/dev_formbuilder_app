@@ -747,7 +747,7 @@ const reference: ChapterDraft[] = [
                     list(
                         [ui('Question type', TYPE_CONTROL), ' and ', ui('Change type', TYPE_CONTROL), ' — see ', link('Change a question’s type', '#change-type'), '.'],
                         ['A ', ui('format', TYPE_CONTROL), ' switch, on text and number questions only: ', ui('Short text', FIELD_TYPES), ' or ', ui('Long text', FIELD_TYPES), ', ', ui('Whole number', FIELD_TYPES), ' or ', ui('Decimal number', FIELD_TYPES), '.'],
-                        [ui('Label', CONFIG), ', ', ui('Help text', CONFIG), ' and ', ui('Placeholder', CONFIG), ' — the wording respondents see.'],
+                        [ui('Label', CONFIG), ', ', ui('Help text', CONFIG), ' and ', ui('Placeholder', CONFIG), ' — the wording respondents see. Each can show an earlier answer: click ', ui('Insert a question', 'resources/js/components/builder/ReferenceInput.vue'), ' under the box, or type @, and pick it from the list, which shows each question’s code.'],
                         [ui('Calculation formula', CONFIG), ' — ', ui('Calculated', FIELD_TYPES), ' questions only. See ', link('Calculated', '#type-calculated'), '.'],
                         [
                             ui('Requiredness', CONFIG), ': ', ui('Optional', PRESENTER), ', ', ui('Required', PRESENTER), ' or ', ui('Conditional', PRESENTER),
@@ -809,7 +809,7 @@ const reference: ChapterDraft[] = [
                             '“', ui('Show this question only when…', CONFIG), '” — ask the question only when earlier answers make it relevant. Click ', ui('Add condition', CONDITIONS),
                             ', choose a question, a check such as ', ui('is', CONDITION_ROW), ', ', ui('is not', CONDITION_ROW), ', ', ui('is blank', CONDITION_ROW), ' or ', ui('includes', CONDITION_ROW),
                             ', and a value. Combine several with ', ui('All of', CONDITIONS), ' or ', ui('Any of', CONDITIONS), ', or nest them with ', ui('Add group', CONDITIONS),
-                            '. ', ui('Edit as text', CONDITION_EDITOR), ' shows the same condition as a formula. See ', link('Show or skip questions', '#logic'), '.',
+                            '. ', ui('Edit as text', CONDITION_EDITOR), ' shows the same condition as a formula, with ', ui('Insert a question', 'resources/js/components/builder/ReferenceInput.vue'), ' to add a question by its code. See ', link('Show or skip questions', '#logic'), '.',
                         ],
                         [ui('Default value', CONFIG), ' — an answer filled in before the respondent starts, which they can change.'],
                         [ui('Contains personal data (PII)', CONFIG), ' and ', ui('Sensitive', CONFIG), ' — mark answers that identify or could harm a person, so they are handled with care.'],
@@ -906,7 +906,7 @@ const reference: ChapterDraft[] = [
                         ' under ', ui('Show to respondents', CONFIG), ' on its ', ui('Advanced', CONFIG), ' tab: then they see its value, read-only, as they answer. Either way it is worked out again when the response is saved.',
                     ),
                     list(
-                        ['Write the formula in ', ui('Calculation formula', CONFIG), '. Refer to another question by its ', ui('Field key', CONFIG), ' inside ${ } — for example ', ui('e.g. ${quantity} * ${unit_price}', CONFIG), '.'],
+                        ['Write the formula in ', ui('Calculation formula', CONFIG), '. Click ', ui('Insert a question', 'resources/js/components/builder/ReferenceInput.vue'), ' or type @ to add another question by its ', ui('Field key', CONFIG), ', which is written inside ${ } — for example ', ui('e.g. ${quantity} * ${unit_price}', CONFIG), '.'],
                         ['Use + − * / for arithmetic, and if(), count(), int() or today() for more.'],
                         ['It has no ', ui('Placeholder', CONFIG), ' or ', ui('Requiredness', CONFIG), ', and publishing refuses it without a formula.'],
                     ),

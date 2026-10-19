@@ -14444,7 +14444,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · The builder preview shows neither a list-backed cascade's choices nor a list taken from another form; it says the choices show on the live form.**
   Left by `M133`'s v1 and `M141` and recorded on `R-5fdbc47c`: the preview runtime (`resources/js/components/builder/PreviewRuntime.vue`)
-  is built from the draft's props, which carry `linkable_sources` (`app/Services/Forms/BuilderPresenter.php:105-107`) but never a
+  is built from the draft's props, which carry `linkable_sources` (`app/Services/Forms/BuilderPresenter.php:106-108`) but never a
   list's rows or a link's answers, so an author checks a PSGC cascade or a linked list only on the published form. The remedy: a
   tenant route beside the choice-list routes (`routes/tenant.php:1102-1111`) returns the draft's linked lists and the first 200 rows
   of each list-bound question with "showing 200 of N", and the preview merges them the way the guest runtime does

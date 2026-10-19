@@ -32,6 +32,7 @@ import { MdsButton, MdsCheckbox, MdsFormField, MdsNumberInput, MdsRadio, MdsSegm
 import CascadingEditor from './CascadingEditor.vue';
 import ChoicesEditor from './ChoicesEditor.vue';
 import ConditionEditor from './ConditionEditor.vue';
+import ReferenceInput from './ReferenceInput.vue';
 import ContentBlocksEditor from './ContentBlocksEditor.vue';
 import FieldTypeControl from './FieldTypeControl.vue';
 import GeoEditor from './GeoEditor.vue';
@@ -43,6 +44,7 @@ import MatrixEditor from './MatrixEditor.vue';
 import MediaEditor from './MediaEditor.vue';
 import PrefillEditor from './PrefillEditor.vue';
 import ValidationEditor from './ValidationEditor.vue';
+import { referenceCandidates, type ReferenceSource } from './reference-candidates';
 import type { ContentBlock } from './content-blocks';
 import { describeSavePath, freeKeyFor, sortFieldSaveErrors, tabForSavePath } from './field-save-errors';
 import { LABEL_COUNT_FROM, LABEL_MAX, oneLine } from './label-text';
@@ -349,7 +351,7 @@ const catalogue = computed<ConditionCatalogue>(() => {
     const ownKey = field.value?.key ?? section.value?.key ?? null;
 
     return {
-        fields: props.store.fields.value
+        fields: props.store.flattenedFields()
             .filter((f) => f.key !== '' && f.key !== ownKey)
             .map((f) => ({
                 key: f.key,
@@ -372,7 +374,7 @@ const catalogue = computed<ConditionCatalogue>(() => {
 // `numeric` is four field types and `ValueShape::allowsOperator()` admits five, a divergence
 // `FieldTypeMirrorDriftTest` pins deliberately and `R-c1f90d7a` owns.
 const comparableFields = computed<ComparableField[]>(() =>
-    props.store.fields.value
+    props.store.flattenedFields()
         .filter((f) => f.key !== '' && f.key !== (field.value?.key ?? null))
         .map((f) => ({
             key: f.key,
@@ -380,6 +382,15 @@ const comparableFields = computed<ComparableField[]>(() =>
             value_shape: shapeByType.get(f.field_type) ?? '', computed: props.store.palette.flatMap((g) => g.types).find((t) => t.value === f.field_type)?.operand_kind === 'computed',
         })),
 );
+
+// M178 (`R-75719ac4`) — what the "Insert a question" picker offers at each spot (`reference-candidates.ts`): a formula spot
+// any question a formula may name, a text spot only earlier questions a label may show, as the publish gate decides it.
+const referenceSource = computed<ReferenceSource>(() => ({
+    fields: props.store.fields.value, sections: props.store.sections.value, types: props.store.palette.flatMap((g) => g.types), kinds: enums.operand_kinds,
+}));
+const formulaReferences = computed(() => referenceCandidates(referenceSource.value, { grammar: 'expression', ownKey: field.value?.key ?? section.value?.key ?? null }));
+const fieldTextReferences = computed(() => (field.value === null ? [] : referenceCandidates(referenceSource.value, { grammar: 'template', host: { kind: 'field', key: field.value.key } })));
+const sectionTextReferences = computed(() => (section.value === null ? [] : referenceCandidates(referenceSource.value, { grammar: 'template', host: { kind: 'section', key: section.value.key } })));
 
 function setField<K extends keyof LocalField>(key: K, value: LocalField[K]): void {
     const target = field.value;
@@ -551,8 +562,8 @@ watch(librarySaved, (value) => {
                         <MdsFormField label="Label" :help="field.field_type === 'note' ? NOTE_LABEL_HELP : undefined" :error="fieldSaveErrors.inline.label" v-slot="{ id, describedby, invalid }">
                             <!-- M176 (`R-923c5041`): a long question is read whole — the box grows with it; one line of text, so
                                  Enter adds no break and a pasted one becomes a space; the label's 500 counted near the end. -->
-                            <MdsTextarea
-                                :id="id"
+                            <ReferenceInput
+                                :id="id" :candidates="fieldTextReferences"
                                 :describedby="describedby"
                                 :invalid="invalid"
                                 autosize
@@ -566,11 +577,11 @@ watch(librarySaved, (value) => {
                         <MdsFormField
                             v-if="isCalculated"
                             label="Calculation formula" :error="fieldSaveErrors.inline['config.calculated_formula']"
-                            help="Worked out from other answers. Put another question's field key inside ${ }, and use + - * /, comparisons, or if(), count(), int(), today() and now()."
+                            help="Worked out from other answers. Click Insert a question, or type @, to use another question's answer, and use + - * /, comparisons, or if(), count(), int(), today() and now()."
                             v-slot="{ id, describedby, invalid }"
                         >
-                            <MdsTextarea
-                                :id="id"
+                            <ReferenceInput
+                                :id="id" :candidates="formulaReferences"
                                 :describedby="describedby" :invalid="invalid"
                                 :model-value="calculatedFormula"
                                 :rows="2"
@@ -579,16 +590,16 @@ watch(librarySaved, (value) => {
                             />
                         </MdsFormField>
                         <MdsFormField label="Help text" :error="fieldSaveErrors.inline.hint" v-slot="{ id, describedby, invalid }">
-                            <MdsTextarea
-                                :id="id" :describedby="describedby" :invalid="invalid"
+                            <ReferenceInput
+                                :id="id" :describedby="describedby" :invalid="invalid" :candidates="fieldTextReferences"
                                 :model-value="field.hint ?? ''"
                                 :rows="2"
                                 @update:model-value="setField('hint', $event || null)"
                             />
                         </MdsFormField>
                         <MdsFormField v-if="!isCalculated" label="Placeholder" :error="fieldSaveErrors.inline.placeholder" v-slot="{ id, describedby, invalid }">
-                            <MdsTextInput
-                                :id="id" :describedby="describedby" :invalid="invalid"
+                            <ReferenceInput
+                                single-line :id="id" :describedby="describedby" :invalid="invalid" :candidates="fieldTextReferences"
                                 :model-value="field.placeholder ?? ''"
                                 @update:model-value="setField('placeholder', $event || null)"
                             />
@@ -724,7 +735,7 @@ watch(librarySaved, (value) => {
                             :rule-types="enums.validation_rule_types"
                             :operators="enums.comparison_operators"
                             :value-shape="valueShape"
-                            :comparable-fields="comparableFields"
+                            :comparable-fields="comparableFields" :references="formulaReferences"
                             @update:validations="setValidations"
                         />
                     </template>
@@ -775,7 +786,7 @@ watch(librarySaved, (value) => {
                         <ConditionEditor
                             :key="`field-${field.uid}-${conditionMount}`"
                             :expression="field.relevant_expression"
-                            :catalogue="catalogue"
+                            :catalogue="catalogue" :references="formulaReferences"
                             legend="Show this question only when…"
                             @update:expression="setField('relevant_expression', $event)"
                         />
@@ -844,7 +855,7 @@ watch(librarySaved, (value) => {
                 <template v-else-if="section">
                     <template v-if="activeTab === 'basics'">
                         <MdsFormField label="Section title" v-slot="{ id }">
-                            <MdsTextInput :id="id" :model-value="section.label" @update:model-value="setSection('label', $event)" />
+                            <ReferenceInput single-line :id="id" :candidates="sectionTextReferences" :model-value="section.label" @update:model-value="setSection('label', $event)" />
                         </MdsFormField>
                         <MdsFormField label="Section key" help="This section's short name in exports and conditions. Lowercase letters, numbers and _ only." v-slot="{ id, describedby }">
                             <MdsTextInput
@@ -861,8 +872,8 @@ watch(librarySaved, (value) => {
                             <MdsButton size="sm" variant="secondary" @click="setSection('key', sectionKeyClash.free)">Use {{ sectionKeyClash.free }}</MdsButton>
                         </div>
                         <MdsFormField label="Description" v-slot="{ id }">
-                            <MdsTextarea
-                                :id="id"
+                            <ReferenceInput
+                                :id="id" :candidates="sectionTextReferences"
                                 :model-value="section.description ?? ''"
                                 :rows="2"
                                 @update:model-value="setSection('description', $event || null)"
@@ -897,7 +908,7 @@ watch(librarySaved, (value) => {
                         <ConditionEditor
                             :key="`section-${section.uid}`"
                             :expression="section.relevant_expression"
-                            :catalogue="catalogue"
+                            :catalogue="catalogue" :references="formulaReferences"
                             legend="Show this section only when…"
                             @update:expression="setSection('relevant_expression', $event)"
                         />

@@ -75,6 +75,7 @@ import ScanningPanel from '@/components/forms/ScanningPanel.vue';
 import ScopePanel from '@/components/forms/ScopePanel.vue';
 import SharePanel from '@/components/forms/SharePanel.vue';
 import type { AutomationsProps, DataSharingProps, FormSettingsForm, OcrScanningProps, ReferenceFileRow, ScopeSectionProps, ShareProps } from '@/components/forms/types';
+import type { ReferenceCandidate } from '@/components/builder/reference-candidates';
 
 type SectionKey = 'general' | 'pages' | 'theme' | 'files' | 'choice-lists' | 'share' | 'scanning' | 'schedule' | 'confirmation' | 'save-resume' | 'automations' | 'sharing' | 'scope';
 
@@ -97,6 +98,8 @@ const props = defineProps<{
     dataSharing?: DataSharingProps | null;
     /** The hub-only Scope section (M129), sent only to a holder of `scopes.manage`. */
     scope?: ScopeSectionProps | null;
+    /** M178 (`R-75719ac4`) — the thank-you message's "Insert a question" list, from the builder; the hub sends none. */
+    confirmationReferences?: ReferenceCandidate[];
 }>();
 
 /**
@@ -244,7 +247,7 @@ watch(
                 </template>
                 <template v-if="mounted.has('confirmation')">
                     <div v-show="active === 'confirmation'" class="form-settings__section" :data-section="'confirmation'">
-                        <ConfirmationPanel :open="props.open" :form-id="props.formId" :form="props.form" />
+                        <ConfirmationPanel :open="props.open" :form-id="props.formId" :form="props.form" :references="props.confirmationReferences" />
                     </div>
                 </template>
                 <template v-if="props.saveResumeAvailable && mounted.has('save-resume')">

@@ -43,6 +43,13 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>();
 const area = ref<HTMLTextAreaElement | null>(null);
 const countId = useId();
 
+/**
+ * M178 (`R-75719ac4`) — the `<textarea>` itself, as `field`, whichever root renders: with the counter `$el` is the wrapper,
+ * so a caller that must reach the box (the builder's "Insert a question" picker, which writes at the caret) reads this.
+ * `$el` still works through the expose proxy, which is what `ContentBlocksEditor` uses.
+ */
+defineExpose({ field: area });
+
 const limit = computed(() => (props.maxlength === undefined || props.maxlength === '' ? undefined : Number(props.maxlength)));
 const showCount = computed(
     () => limit.value !== undefined && props.countFrom !== undefined && props.modelValue.length >= props.countFrom,

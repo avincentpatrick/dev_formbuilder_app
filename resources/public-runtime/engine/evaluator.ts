@@ -288,7 +288,7 @@ export class ExpressionEvaluator {
      * to values) is today's `toBool`. Only a rule's own expression row calls it. Appended, because this file is cited by line.
      */
     evaluateConstraint(expression: string, context: EvaluationContext): boolean {
-        return this.constraintTruth(this.parser.parse(expression), context) === true;
+        return this.constraintTruth(this.parser.parse(expression), context) !== false;
     }
 
     private constraintTruth(node: Node, context: EvaluationContext): boolean | null {

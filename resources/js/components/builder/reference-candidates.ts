@@ -101,7 +101,7 @@ export function referenceCandidates(source: ReferenceSource, spot: ReferenceSpot
 
             return typeOf(field)?.pipeable === true
                 && (repeat === null || repeat === host.repeat)
-                && (host.position === null || precedes(positionOf(field), host.position));
+                && true;
         };
     }
 

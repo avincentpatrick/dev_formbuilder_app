@@ -251,6 +251,9 @@ export interface ComparableField {
     key: string;
     label: string;
     value_shape: string;
+    // M178 — a calculated question (operand kind `computed`). No rule reads one yet (`D149`, R4), so a rule's compared-
+    // question list leaves it out; a row that already names one keeps it, marked unavailable.
+    computed: boolean;
 }
 
 // A question-library item as the picker shows it (Increment G9b). Mirrors BuilderPresenter::libraryItem —

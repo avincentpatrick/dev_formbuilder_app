@@ -554,3 +554,71 @@ describe('ValidationEditor — "No negative numbers" is a rule like any other (M
         expect(wrapper.find('[aria-label="Rule 1 value"]').exists()).toBe(true);
     });
 });
+
+describe('ValidationEditor — a number limit that may be another question’s answer (M178, R-917496f9)', () => {
+    // The pairing is the server's `bound_counterpart` (ValidationRuleType::boundCounterpart()), never a client list.
+    const BOUNDS: RuleTypeOption[] = [
+        { value: 'min_value', label: 'Minimum value', shapes: ['number', 'duration', 'scale'], takes_operator: false, takes_related_field: false, operator_may_be_empty: false, governs_relevance: false, governs_requiredness: false, related_comparison: null, bound_counterpart: 'at_least_field' },
+        { value: 'max_value', label: 'Maximum value', shapes: ['number', 'duration', 'scale'], takes_operator: false, takes_related_field: false, operator_may_be_empty: false, governs_relevance: false, governs_requiredness: false, related_comparison: null, bound_counterpart: 'at_most_field' },
+        { value: 'at_least_field', label: 'At least another question', shapes: ['number', 'duration'], takes_operator: false, takes_related_field: true, operator_may_be_empty: false, governs_relevance: false, governs_requiredness: false, related_comparison: 'gte', bound_counterpart: 'min_value' },
+        { value: 'at_most_field', label: 'At most another question', shapes: ['number', 'duration'], takes_operator: false, takes_related_field: true, operator_may_be_empty: false, governs_relevance: false, governs_requiredness: false, related_comparison: 'lte', bound_counterpart: 'max_value' },
+    ];
+    const COMPARABLE: ComparableField[] = [
+        { key: 'age', label: 'Your age', value_shape: 'number', computed: false },
+        { key: 'total', label: 'Total', value_shape: 'number', computed: true },
+    ];
+    const mountBounds = (valueShape: string, validations: BuilderValidation[]) =>
+        mount(ValidationEditor, {
+            props: { validations, ruleTypes: BOUNDS, operators: OPERATORS, valueShape, comparableFields: COMPARABLE },
+        });
+    const lastEmitted = (wrapper: ReturnType<typeof mountBounds>): BuilderValidation[] => {
+        const events = wrapper.emitted('update:validations') ?? [];
+
+        return events[events.length - 1]?.[0] as BuilderValidation[];
+    };
+
+    it('offers a Minimum row "A number · Another question’s answer", and the answer stores the counterpart with no value', async () => {
+        const wrapper = mountBounds('number', [row({ rule_type: 'min_value', rule_value: '5', shown_as: 'rule' })]);
+
+        expect(optionLabels(wrapper, 'Rule 1 compares with')).toEqual(['A number', 'Another question’s answer']);
+        expect((control(wrapper, 'Rule 1 compares with').element as HTMLSelectElement).value).toBe('number');
+
+        await control(wrapper, 'Rule 1 compares with').setValue('answer');
+
+        const [saved] = lastEmitted(wrapper);
+        expect(saved.rule_type).toBe('at_least_field');
+        // A "5" left behind would come back if the author switched back — a value nobody typed for this rule.
+        expect(saved.rule_value).toBeNull();
+        expect(saved.related_field_key).toBeNull();
+    });
+
+    it('shows an At most row as "Another question’s answer", and switching back stores the maximum without the question', async () => {
+        const wrapper = mountBounds('number', [row({ rule_type: 'at_most_field', related_field_key: 'age' })]);
+
+        expect((control(wrapper, 'Rule 1 compares with').element as HTMLSelectElement).value).toBe('answer');
+
+        await control(wrapper, 'Rule 1 compares with').setValue('number');
+
+        const [saved] = lastEmitted(wrapper);
+        expect(saved.rule_type).toBe('max_value');
+        expect(saved.related_field_key).toBeNull();
+    });
+
+    it('offers no such choice for No negative numbers, nor where the counterpart cannot take the question (a Likert scale)', () => {
+        const noNegatives = mountBounds('number', [row({ rule_type: 'min_value', rule_value: '0', shown_as: 'no_negatives' })]);
+        expect(noNegatives.find('[aria-label="Rule 1 compares with"]').exists()).toBe(false);
+
+        const scale = mountBounds('scale', [row({ rule_type: 'min_value', rule_value: '2' })]);
+        expect(scale.find('[aria-label="Rule 1 compares with"]').exists()).toBe(false);
+    });
+
+    it('leaves a calculation out of the compared questions, since no rule reads one yet (D149), and keeps one a row already names', () => {
+        const fresh = mountBounds('number', [row({ rule_type: 'at_least_field' })]);
+        const offered = optionLabels(fresh, 'Rule 1 compared field');
+        expect(offered.some((label) => label.startsWith('Your age'))).toBe(true);
+        expect(offered.some((label) => label.startsWith('Total'))).toBe(false);
+
+        const named = mountBounds('number', [row({ rule_type: 'at_least_field', related_field_key: 'total' })]);
+        expect(optionLabels(named, 'Rule 1 compared field').some((label) => label.startsWith('Total'))).toBe(true);
+    });
+});

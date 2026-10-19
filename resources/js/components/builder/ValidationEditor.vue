@@ -238,7 +238,9 @@ function ruleOptionsFor(row: BuilderValidation): SelectOption[] {
  */
 function relatedOptionsFor(row: BuilderValidation): SelectOption[] {
     const rule = ruleTypeOf(row);
-    const offered = rule === null ? props.comparableFields : props.comparableFields.filter((field) => mayCompare(rule, props.operators, field));
+    // M178: a calculation is left out — no rule reads one before R4 (`D149`); a row already naming one keeps it below.
+    const readable = props.comparableFields.filter((field) => !field.computed);
+    const offered = rule === null ? readable : readable.filter((field) => mayCompare(rule, props.operators, field));
     const options: SelectOption[] = offered.map((field) => ({ value: field.key, label: field.label }));
 
     const key = row.related_field_key;
@@ -355,14 +357,48 @@ function setRuleType(index: number, chosen: string): void {
           ? { shown_as: 'rule', ...(isNoNegativesRule(props.validations[index]) ? { rule_value: null } : {}) }
           : {};
     const rule = props.ruleTypes.find((candidate) => candidate.value === value) ?? null;
+    // M178: a rule comparing two answers reads no value, so one left from a Minimum would return on switching back.
+    const comparesAnswers = rule !== null && rule.takes_related_field && !rule.takes_operator ? { rule_value: null } : {};
 
     // M131: the compared question survives only if the NEW kind can be judged by it, and the operator only if
     // the new kind reads one that can read that question — `required_if` on text → `greater_than_field` used to
     // keep the text question, which publish refuses.
     const current = props.validations[index];
-    const patch = { ...ruleChangePatch(current, rule, props.comparableFields, props.operators), rule_type: value, ...extra };
+    const patch = { ...ruleChangePatch(current, rule, props.comparableFields, props.operators), rule_type: value, ...comparesAnswers, ...extra };
 
     update(index, { ...patch, ...regroupFor(current, { ...current, ...patch }) });
+}
+
+/**
+ * M178 (`R-917496f9`) — a Minimum or Maximum compares with "A number" or "Another question's answer". The second is the
+ * row's counterpart rule (`bound_counterpart`: `min_value` ↔ `at_least_field`, `max_value` ↔ `at_most_field`), so the
+ * choice switches the stored rule. Offered only where the counterpart can take this question (not a Likert scale, whose
+ * minimum has no field comparison) and never for "No negative numbers", whose value is fixed.
+ */
+const COMPARE_NUMBER = 'number';
+const COMPARE_ANSWER = 'answer';
+const compareOptions: EnumOption[] = [
+    { value: COMPARE_NUMBER, label: 'A number' },
+    { value: COMPARE_ANSWER, label: 'Another question’s answer' },
+];
+
+function counterpartOf(row: BuilderValidation): RuleTypeOption | null {
+    const counterpart = ruleTypeOf(row)?.bound_counterpart ?? null;
+
+    if (counterpart === null || kindOf(row) === NO_NEGATIVES) return null;
+
+    return allowedRuleTypes.value.find((rule) => rule.value === counterpart) ?? null;
+}
+
+function compareSourceOf(row: BuilderValidation): string {
+    return ruleTypeOf(row)?.takes_related_field === true ? COMPARE_ANSWER : COMPARE_NUMBER;
+}
+
+function setCompareSource(index: number, source: string): void {
+    const row = props.validations[index];
+    const counterpart = counterpartOf(row);
+
+    if (counterpart !== null && source !== compareSourceOf(row)) setRuleType(index, counterpart.value);
 }
 
 /** Re-pointing clears an operator the new question cannot take, and the value it compared against (M131). */
@@ -464,6 +500,14 @@ const modeOptions: EnumOption[] = [
                     :disabled="disabled"
                     :aria-label="`Rule ${i + 1} check`"
                     @update:model-value="setRuleType(i, $event)"
+                />
+                <MdsSelect
+                    v-if="counterpartOf(row) !== null"
+                    :model-value="compareSourceOf(row)"
+                    :options="compareOptions"
+                    :disabled="disabled"
+                    :aria-label="`Rule ${i + 1} compares with`"
+                    @update:model-value="setCompareSource(i, $event)"
                 />
                 <MdsSelect
                     v-if="ruleTypeOf(row)?.takes_related_field"

@@ -377,7 +377,7 @@ const comparableFields = computed<ComparableField[]>(() =>
         .map((f) => ({
             key: f.key,
             label: f.label.trim() === '' ? f.key : f.label,
-            value_shape: shapeByType.get(f.field_type) ?? '',
+            value_shape: shapeByType.get(f.field_type) ?? '', computed: props.store.palette.flatMap((g) => g.types).find((t) => t.value === f.field_type)?.operand_kind === 'computed',
         })),
 );
 

@@ -782,7 +782,7 @@ const reference: ChapterDraft[] = [
                     p('Rules stop a wrong answer before the form is sent. Click ', ui('Add rule', VALIDATION), ', choose the kind of rule, fill in its value, and write the message respondents see when it fails in “', ui('Error message shown to the respondent', VALIDATION), '”.'),
                     p('The kinds of rule, and the questions they suit:'),
                     list(
-                        [ui('Minimum value', RULE_TYPES), ' and ', ui('Maximum value', RULE_TYPES), ' — numbers and ', ui('Likert scale', FIELD_TYPES), '. For example, an age from 0 to 120.'],
+                        [ui('Minimum value', RULE_TYPES), ' and ', ui('Maximum value', RULE_TYPES), ' — numbers and ', ui('Likert scale', FIELD_TYPES), '. For example, an age from 0 to 120. For a number, set the rule to “', ui('Another question’s answer', VALIDATION), '” to use an answer instead of a fixed number — for example, “days off” at most “days worked”.'],
                         [ui('No negative numbers', RULE_WORDS), ' — numbers only. It refuses any answer below zero, and needs no value.'],
                         [ui('Minimum length', RULE_TYPES), ' and ', ui('Maximum length', RULE_TYPES), ' — text. For example, an ID of exactly 10 characters.'],
                         [ui('Must match a pattern', RULE_TYPES), ' — text in a fixed shape, such as a phone number. Email, phone and web-address questions start with one.'],

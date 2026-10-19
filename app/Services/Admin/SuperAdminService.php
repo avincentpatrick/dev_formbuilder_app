@@ -6,13 +6,12 @@ namespace App\Services\Admin;
 
 use App\Enums\AuditEvent;
 use App\Enums\BillingInterval;
-use App\Enums\FeedbackParty;
 use App\Enums\FeedbackStatus;
-use App\Enums\NotificationType;
 use App\Enums\SettingKey;
 use App\Enums\SettingScope;
 use App\Enums\TenantStatus;
 use App\Exceptions\Admin\SuperAdminException;
+use App\Exceptions\Feedback\FeedbackLifecycleException;
 use App\Exceptions\Settings\PlatformSettingsConflictException;
 use App\Models\Attachment;
 use App\Models\Audit;
@@ -25,6 +24,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Audit\AuditLogPresenter;
 use App\Services\Entitlements\EntitlementService;
+use App\Services\Feedback\FeedbackLifecycle;
 use App\Services\Notifications\NotificationDispatcher;
 use App\Services\Settings\PlatformSettings;
 use App\Support\Audit\AuditLogger;
@@ -75,7 +75,7 @@ final class SuperAdminService
 {
     public function __construct(
         private readonly AuditLogger $audit,
-        private readonly NotificationDispatcher $notifications,
+        private readonly FeedbackLifecycle $feedback,
     ) {}
 
     /**
@@ -925,84 +925,36 @@ final class SuperAdminService
      * Returns the row as written, so the platform support API can answer with it without re-reading it on
      * another connection before the write is committed (M175).
      *
-     * @throws SuperAdminException on a transition the lifecycle does not offer
+     * ── THE MOVE ITSELF LIVES IN THE FEEDBACK LIFECYCLE (M179, `R-129c44c3`) ──────────────────────────────────
+     * This method is the support DOOR: it adopts the tenant context and hands the move to
+     * {@see FeedbackLifecycle::support()}, which the testers' door shares. Until M179 the guard ran here, before
+     * the transaction, against the model the caller held — and the row was then re-read with no lock, so two
+     * moves at once could both pass a guard against a status that no longer held, and the audit recorded the
+     * stale status as the old one. The lifecycle reads the row `FOR UPDATE` under this adopted context and judges
+     * the move by it. `$report` now only says WHICH report and in WHICH workspace.
+     *
+     * @throws SuperAdminException on a transition the lifecycle does not offer from the row's real status
      */
     public function transitionFeedback(FeedbackReport $report, FeedbackStatus $to, User $actor, ?string $note = null): FeedbackReport
     {
-        $from = $report->status;
-
-        if (! $from->canTransitionTo($to, FeedbackParty::Support)) {
-            throw SuperAdminException::invalidFeedbackTransition($from, $to);
-        }
-
         $note = $note === null || trim($note) === '' ? null : trim($note);
 
-        /** @var FeedbackReport $written */
-        $written = DB::transaction(function () use ($report, $from, $to, $actor, $note): FeedbackReport {
-            $savedTenant = TenantContext::currentTenantId();
-            $savedUser = TenantContext::currentUserId();
-            TenantContext::applyLocal($report->tenant_id);
+        try {
+            /** @var FeedbackReport $written */
+            $written = DB::transaction(function () use ($report, $to, $actor, $note): FeedbackReport {
+                $savedTenant = TenantContext::currentTenantId();
+                $savedUser = TenantContext::currentUserId();
+                TenantContext::applyLocal($report->tenant_id);
 
-            try {
-                /** @var FeedbackReport $row */
-                $row = FeedbackReport::query()->findOrFail($report->getKey());
-
-                $old = [
-                    'status' => $from->value,
-                    'resolved_at' => $row->resolved_at?->toIso8601String(),
-                    'resolved_by' => $row->resolved_by,
-                    'resolution_note' => $row->resolution_note,
-                ];
-
-                // Re-opening CLEARS the resolution stamp rather than preserving it: those two columns mean
-                // "when, and by whom, was this closed", and a re-opened report is not closed. The history
-                // is not lost — it is in the audit row this method writes. The reply is kept unless a new one
-                // is written: it is what the reporter last read, and re-opening says nothing new to them.
-                $resolvedAt = $to->stampsResolution() ? now() : null;
-                $resolvedBy = $to->stampsResolution() ? (string) $actor->getKey() : null;
-                $resolutionNote = $note ?? $row->resolution_note;
-
-                $row->forceFill([
-                    'status' => $to,
-                    'resolved_at' => $resolvedAt,
-                    'resolved_by' => $resolvedBy,
-                    'resolution_note' => $resolutionNote,
-                ])->save();
-
-                $this->audit->record(
-                    AuditEvent::Updated,
-                    'feedback_reports',
-                    (string) $row->getKey(),
-                    old: $old,
-                    new: [
-                        'status' => $to->value,
-                        'resolved_at' => $resolvedAt?->toIso8601String(),
-                        'resolved_by' => $resolvedBy,
-                        'resolution_note' => $resolutionNote,
-                    ],
-                    actorId: (string) $actor->getKey(),
-                );
-
-                // Resolved or Declined: the reporter is told — by bell and, unless they switched it off, by
-                // email. Ids and labels only in `data`; the reply rides as mail-only context.
-                if ($to->stampsResolution()) {
-                    $this->notifications->dispatch(
-                        NotificationType::FeedbackClosed,
-                        [(string) $row->user_id],
-                        array_filter([
-                            'feedback_report_id' => (string) $row->getKey(),
-                            'status' => $to->value,
-                            'page_title' => $row->page_title,
-                        ], static fn (?string $value): bool => $value !== null),
-                        $resolutionNote === null ? [] : ['note' => $resolutionNote],
-                    );
+                try {
+                    return $this->feedback->support((string) $report->getKey(), $to, $actor, $note);
+                } finally {
+                    TenantContext::applyLocal($savedTenant, $savedUser);
                 }
-
-                return $row;
-            } finally {
-                TenantContext::applyLocal($savedTenant, $savedUser);
-            }
-        });
+            });
+        } catch (FeedbackLifecycleException $refused) {
+            throw new SuperAdminException($refused->getMessage(), previous: $refused);
+        }
 
         return $written;
     }

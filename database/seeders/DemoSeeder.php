@@ -34,6 +34,7 @@ use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Authorization\ResourceGrantService;
 use App\Services\Entitlements\EntitlementService;
+use App\Services\Feedback\FeedbackService;
 use App\Services\Forms\FormBuilderService;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
@@ -1206,7 +1207,7 @@ class DemoSeeder extends Seeder
      *
      * `FeedbackReport` has `public $timestamps = false` and its timeline is `submitted_at`/`resolved_at`, so
      * the spread needs no `forceFill` back-dating at all. Written with `forceCreate()` rather than through
-     * {@see \App\Services\Feedback\FeedbackService::submit()}, which needs an open tenant context and a request's
+     * {@see FeedbackService::submit()}, which needs an open tenant context and a request's
      * worth of input; the rows here only need to exist in every state.
      *
      * @param  array<string, User>  $people

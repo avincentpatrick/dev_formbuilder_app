@@ -53,7 +53,8 @@ final class FeedbackRelay
 
         foreach ($items as $item) {
             /** @var FeedbackReport|null $existing */
-            $existing = FeedbackReport::query()->where('reference', $item['reference'])->lockForUpdate()->first();
+            // Table-qualified, for the reason SuperAdminService::listFeedback() gives.
+            $existing = FeedbackReport::query()->where('feedback_reports.reference', $item['reference'])->lockForUpdate()->first();
 
             $results[] = $existing === null
                 ? $this->create($reporter, $item, $actor)

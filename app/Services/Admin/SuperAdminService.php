@@ -541,7 +541,9 @@ final class SuperAdminService
                 ->when($filters['type'] ?? null, fn ($q, $v) => $q->where('type', $v))
                 ->when($filters['since'] ?? null, fn ($q, $v) => $q->where('submitted_at', '>=', $v))
                 ->when($filters['source'] ?? null, fn ($q, $v) => $q->where('source', $v))
-                ->when($filters['reference'] ?? null, fn ($q, $v) => $q->where('reference', $v))
+                // Table-qualified: a support handle (`U8`), never `submissions.reference`, which J2e's disclosure
+                // test keeps to one lookup site.
+                ->when($filters['reference'] ?? null, fn ($q, $v) => $q->where('feedback_reports.reference', $v))
                 ->when($filters['commented_since'] ?? null, fn ($q, $v) => $q->whereExists(
                     fn ($sub) => $sub->selectRaw('1')
                         ->from('feedback_comments')

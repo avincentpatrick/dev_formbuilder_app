@@ -111,8 +111,8 @@ beforeEach(function (): void {
 });
 
 it('lets the elevated role read every workspace\'s threads while the context is open', function (): void {
-    [, $a] = commentRlsThread(commentRlsTenant('crls-a-'.Str::random(6)), commentRlsUser(), 'A '.Str::random(8));
-    [, $b] = commentRlsThread(commentRlsTenant('crls-b-'.Str::random(6)), commentRlsUser(), 'B '.Str::random(8));
+    [, $a] = commentRlsThread(commentRlsTenant('rls-comment-a-'.Str::random(6)), commentRlsUser(), 'A '.Str::random(8));
+    [, $b] = commentRlsThread(commentRlsTenant('rls-comment-b-'.Str::random(6)), commentRlsUser(), 'B '.Str::random(8));
 
     DB::connection(SuperAdminContext::CONNECTION)->transaction(function () use ($a, $b): void {
         SuperAdminContext::applyLocal();
@@ -127,7 +127,7 @@ it('lets the elevated role read every workspace\'s threads while the context is 
 });
 
 it('fails closed for the elevated role when the context is not open', function (): void {
-    [, $id] = commentRlsThread(commentRlsTenant('crls-closed-'.Str::random(6)), commentRlsUser(), 'Closed '.Str::random(8));
+    [, $id] = commentRlsThread(commentRlsTenant('rls-comment-closed-'.Str::random(6)), commentRlsUser(), 'Closed '.Str::random(8));
 
     DB::connection(SuperAdminContext::CONNECTION)->transaction(function () use ($id): void {
         expect(
@@ -140,8 +140,8 @@ it('fails closed for the elevated role when the context is not open', function (
 });
 
 it('keeps one workspace\'s thread from another, and the GUC grants the app connection nothing', function (): void {
-    $tenantA = commentRlsTenant('crls-role-a-'.Str::random(6));
-    $tenantB = commentRlsTenant('crls-role-b-'.Str::random(6));
+    $tenantA = commentRlsTenant('rls-comment-role-a-'.Str::random(6));
+    $tenantB = commentRlsTenant('rls-comment-role-b-'.Str::random(6));
     $userA = commentRlsUser();
     [, $foreign] = commentRlsThread($tenantB, commentRlsUser(), 'Other workspace '.Str::random(8));
 
@@ -170,8 +170,8 @@ it('installs a SELECT bypass and nothing more on feedback_comments', function ()
 });
 
 it('refuses a comment that names another workspace\'s report, even on a connection RLS does not confine', function (): void {
-    $tenantA = commentRlsTenant('crls-fk-a-'.Str::random(6));
-    $tenantB = commentRlsTenant('crls-fk-b-'.Str::random(6));
+    $tenantA = commentRlsTenant('rls-comment-fk-a-'.Str::random(6));
+    $tenantB = commentRlsTenant('rls-comment-fk-b-'.Str::random(6));
     $user = commentRlsUser();
     [$reportInB] = commentRlsThread($tenantB, $user, 'B '.Str::random(8));
 

@@ -398,7 +398,7 @@ function setCompareSource(index: number, source: string): void {
     const row = props.validations[index];
     const counterpart = counterpartOf(row);
 
-    if (counterpart !== null && source !== compareSourceOf(row)) setRuleType(index, row.rule_type ?? '');
+    if (counterpart !== null && source !== compareSourceOf(row)) setRuleType(index, counterpart.value);
 }
 
 /** Re-pointing clears an operator the new question cannot take, and the value it compared against (M131). */

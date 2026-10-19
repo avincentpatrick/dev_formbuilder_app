@@ -30,7 +30,7 @@ const props = defineProps<MyFeedbackPageProps>();
 
 const tabs = computed<TabItem[]>(() => [
     { key: 'mine', label: 'My reports' },
-    ...(props.testing_round.open > 0
+    ...(true
         ? [{ key: 'testing', label: `Testing-round comments (${props.testing_round.open} open)` }]
         : []),
 ]);

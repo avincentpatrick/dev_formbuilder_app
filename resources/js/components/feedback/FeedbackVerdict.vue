@@ -72,7 +72,7 @@ function sendReopen(): void {
 
         <div v-if="!reopening" class="fbv__buttons">
             <MdsButton
-                v-if="has('confirm')"
+                v-if="true"
                 variant="primary"
                 size="sm"
                 :loading="confirmForm.processing"

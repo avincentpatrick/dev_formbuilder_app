@@ -14803,7 +14803,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   palette for a calculation (`D140`), so the calculation has to do it. The remedy: `date_diff(start, end, unit)` (years, months,
   weeks, days, hours, minutes), `date_add(date, n, unit)`, `age(date)`, `round(n, places)`, `sum(…)` and `coalesce(a, b)` in both
   engines, with golden vectors, the operand judge and the function list in `docs/architecture/technical-architecture.md`.
-  **Live.** Filed by `M174`. **Tier: early-testing.**
+  **Live.** Filed by `M174`. **Tier: early-testing.** **AMENDED BY `M178` (2026-10-19):** the "Insert a question" picker (`R-75719ac4`) offers only **Today**, the one date the engines can produce (`today() - 1` is NaN, and a label takes no functions); this row's `date_add` brings the picker's other date presets — Yesterday, Tomorrow, N days from now, N days ago, One month from now — which R4 adds to the picker in the same change.
 
 - ✅ **CLOSED BY `M177` (2026-10-19) — ****`nit` · The builder's draft check looks for a calculation's formula under the wrong key, so every calculated question would read "no formula yet".**
   `resources/js/components/builder/draft-snapshot.ts:402` reads `config.formula`, but the formula lives in
@@ -14865,7 +14865,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   pixels, run where a secure context exists and skipped on CI's plain-http host (the `public-runtime-offline.spec.ts` precedent).
   **Live.** Filed by `M175`. **Tier: early-testing.** ✅ **CLOSED BY `M176` (2026-10-18):** `grab(since)` draws only a frame the browser captured after the panel left (`captureTime`), from a frame-callback chain that runs from `play()` to `stop()` — measured by five probes, a detached `<video>` takes up a new frame only while a callback is waiting, so the clean frame was dropped and a stale one drawn — with a one-pixel nudge after 120ms, a settle-and-quiet fallback where no capture time is given, and a 750ms cap (ADR-0015 §D11, amended). The new `tests/e2e/feedback-capture-real.spec.ts` (a real tab capture, local only) was red 4 of 20 on `M175`'s code and green 60 of 60 over three runs after. Mutants caught: `since` ignored, the chain dropped (unit, and built into the app: 7 of 20 held the panel). Built and held for merge point 2 (`D137`), not yet live.
 
-- **`minor` · The deploy's own backup and row count have never run on the testing server, so the user's per-merge backup block cannot yet be retired.**
+- ✅ **CLOSED BY `M178` (2026-10-19) — ****`minor` · The deploy's own backup and row count have never run on the testing server, so the user's per-merge backup block cannot yet be retired.**
   `M176` built the guard (`R-a11cc78a`): `deploy.ps1` runs `php artisan deploy:backup` and `deploy:census` around its migration
   (`app/Console/Commands/DeployBackupCommand.php`, `app/Console/Commands/DeployCensusCommand.php`, `config/deploy.php`). A changed
   `deploy.ps1` takes effect one deploy late, so R1's own deploy at merge point 2 runs the old script and R2's is the guard's first run
@@ -14873,10 +14873,35 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   folder were never measured. The remedy, at merge point 2: after the user's backup block and census, read R2's deploy log for the
   backup's path and both counts; if the guard refused, fix the runner's rights with the user step by step (set `MERIDIAN_PG_DUMP` when
   `pg_dump` is not on its `PATH`) and run the deploy again; once a guarded deploy has passed, retire the backup block from the
-  merge-point routine (`D137`) and say so in the runbook. **Live.** Filed by `M176`. **Tier: early-testing.** **PROVED AT MERGE POINT 2 (2026-10-19), by `M177`'s deploy (run 39190622862, `a5b718bb`):** inside the window, `deploy:backup` wrote `storage/app/deploy-backups/deploy-20261019-023810.dump` (439,736 bytes), `deploy:census` counted 66 tables and 9,792 rows before `migrate` ("Nothing to migrate") and found every table at least as full after; the site came back up and `/up` answered 200. NETWORK SERVICE could run `pg_dump` and write the folder, so no rights were changed. The user's census matched before and after, table by table. **What remains is the retirement, and R3's first commit takes it:** drop the per-merge backup block from `CLAUDE.md` "The trunk", `scripts/next.php`'s hand-off and Standing Rule 5's reason (`D137`, `D143`), and say in `docs/deployment-infrastructure.md` that the deploy's own backup replaced it (the nightly task stays).
+  merge-point routine (`D137`) and say so in the runbook. **Live.** Filed by `M176`. **Tier: early-testing.** **PROVED AT MERGE POINT 2 (2026-10-19), by `M177`'s deploy (run 39190622862, `a5b718bb`):** inside the window, `deploy:backup` wrote `storage/app/deploy-backups/deploy-20261019-023810.dump` (439,736 bytes), `deploy:census` counted 66 tables and 9,792 rows before `migrate` ("Nothing to migrate") and found every table at least as full after; the site came back up and `/up` answered 200. NETWORK SERVICE could run `pg_dump` and write the folder, so no rights were changed. The user's census matched before and after, table by table. **What remains is the retirement, and R3's first commit takes it:** drop the per-merge backup block from `CLAUDE.md` "The trunk", `scripts/next.php`'s hand-off and Standing Rule 5's reason (`D137`, `D143`), and say in `docs/deployment-infrastructure.md` that the deploy's own backup replaced it (the nightly task stays). ✅ **CLOSED BY `M178` (2026-10-19):** `CLAUDE.md` "The trunk", the hand-off `scripts/next.php` generates and Standing Rule 5's reason (`D137`, amended) now run a merge point between the user's data census before and after, with no backup by hand — every deploy's own backup and row count are read from its log; `docs/deployment-infrastructure.md` §5 says the guard replaced the block and the nightly task stays; `deploy.ps1`'s "unproven" comment corrected. `tests/Feature/Docs/MergePointRoutineTest.php` pins all four places (red first, 4 of 4). ⚠️ Built and held for merge point 3 (`D137`): the trunk keeps the block until this branch merges, so a release before then (V, alone) still runs it.
 
 - **`nit` · `docs/claims/decisions.md` carries one stray ESC control byte that no editor shows.**
   Found by `M176`'s scan of every file it touched for control characters (after its own tool slips put two into the runbook): the
   trunk's `docs/claims/decisions.md` holds one ESC byte (0x1B) that `M176` did not write. Harmless to every renderer measured, but a
   byte nobody can see is a byte nobody can review. The remedy: find it by byte offset and remove it in a docs-only change, then check
   the file for others. **Live.** Filed by `M176`. **Tier: after-launch.**
+
+- **`minor` · The blank paper form prints a reference inside a label, hint or section text as typed, so a respondent reads `${name}` on paper.**
+  Found by `M178`'s planning pass (2026-10-19). Every other channel pipes a `${key}` into the answer — the public form and the builder
+  preview (`resources/public-runtime/composables/useFormRuntime.ts`), the submission PDF (`app/Services/Submissions/SubmissionPdfPresenter.php`)
+  — but the blank paper form only picks the language (`app/Services/Forms/BlankFormPrintPresenter.php:385`) and
+  `resources/views/pdf/blank-form.blade.php` prints the label, hint and description raw. The "Insert a question" picker (`R-75719ac4`)
+  puts such a reference one click away. The remedy (`D147` A): on the blank paper form each reference prints as a blank line
+  `________` for the person filling it to write in; an escaped `$${` stays literal. **Live.** Filed by `M178`. **Tier: early-testing.**
+
+- **`minor` · A question's Default value is saved but never filled in for a respondent, though the Help page says it is.**
+  The Advanced tab's **Default value** (`resources/js/components/builder/ConfigPanel.vue:789`) saves `default_value`, but nothing reads it
+  when a form opens — `resources/public-runtime/lib/prefill.ts` seeds only a hidden question's fixed value — and it reaches only the
+  XLSForm export (`app/Services/Xlsform/XlsformExporter.php:283`). `resources/js/components/help/manual.ts:814` says *"an answer filled
+  in before the respondent starts, which they can change"*. The remedy (`D148` A, taken by R4): the default fills the answer when the
+  form opens — the public form, the preview and manual entry — and the respondent can change it; a default written as a formula is
+  worked out like a calculation, with the picker. **Live.** Filed by `M178`. **Tier: early-testing.**
+
+- **`minor` · A condition or a rule can name a calculated question, but always reads it as blank.**
+  Both engines work out calculations last and never feed them back into relevance or constraints
+  (`app/Services/Validation/SemanticValidator.php:153`, `resources/public-runtime/engine/semantic-validator.ts:180`), yet the condition
+  editor offers every calculated question (`resources/js/components/builder/ConfigPanel.vue:352`) and the compared-question lists do too,
+  because a calculation's value shape is a number (`app/Enums/ValueShape.php:109`) — so "show when the total is over 10" never shows,
+  and a rule against a total never checks. The remedy (`D149` A, taken by R4 with its dependency order): conditions and rules read a
+  calculation's value, the calculations worked out before what reads them, cycles refused at publish. Until then R3's lists leave
+  calculations out. **Live.** Filed by `M178`. **Tier: early-testing.**

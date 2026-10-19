@@ -24,10 +24,40 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D146`, the last one filed, was asked and answered on 2026-10-18 while `M177` (R2) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D149`, the last one filed, was asked and answered on 2026-10-19 while `M178` (R3) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D149 — A condition or a rule can name a calculated question, but both engines work out calculations last and read it as blank. What should happen? **A — let conditions and rules read the calculated value, in R4, which already orders calculations so one can use another.**
+
+**Asked and answered 2026-10-19 (user decision, in chat), while `M178` (R3) was planned; recorded in its claim.** Found by R3's planning pass: computed values never feed back into relevance or constraints (`app/Services/Validation/SemanticValidator.php:153`), yet the condition editor and the compared-question lists offer every calculated question, so such a condition never shows and such a rule never checks.
+
+- **A — let them read it, in R4 (recommended, chosen).** Calculations worked out in dependency order before the conditions and rules that read them; cycles refused at publish.
+- **B — stop offering them.** Calculated questions leave the condition and rule lists; only labels and messages show them.
+- **C — file it for later.** Leave the lists as they are.
+
+**What the answer files, in the same push:** the row *"A condition or a rule can name a calculated question, but always reads it as blank"* (`early-testing`, taken by R4). Until R4, R3's new lists leave calculations out.
+
+### D148 — A question's "Default value" is saved but never filled in for a respondent, though the Help page says it is. What should happen? **A — make it work, in R4: the default is filled in when the form opens, and the respondent can change it.**
+
+**Asked and answered 2026-10-19 (user decision, in chat), while `M178` (R3) was planned; recorded in its claim.** Found by R3's planning pass: nothing reads `default_value` when a form opens (`resources/public-runtime/lib/prefill.ts` seeds only a hidden field's fixed value), and `resources/js/components/help/manual.ts:814` promises it.
+
+- **A — make it work, in R4 (recommended, chosen).** R4 already reworks that panel and both formula engines, and goes live with R3 at merge point 3.
+- **B — make it work, later.** Its own row in the testing tier, after R4.
+- **C — hide the box for now.** Remove the box and the Help sentence until it is built.
+
+**What the answer files, in the same push:** the row *"A question's Default value is saved but never filled in for a respondent, though the Help page says it is"* (`early-testing`, taken by R4). R3's picker leaves the box out until then.
+
+### D147 — On the printed blank paper form, a question whose label shows another answer (`${name}`) prints the code as typed. What should the paper show? **A — a blank line: "How old is ________?", for the person filling the paper to write in.**
+
+**Asked and answered 2026-10-19 (user decision, in chat), while `M178` (R3) was planned; recorded in its claim.** Every other channel pipes the answer in; the blank paper form prints the label, hint and description raw (`app/Services/Forms/BlankFormPrintPresenter.php:385`), and R3's picker makes such a label one click away.
+
+- **A — a blank line (recommended, chosen).** Built in R3.
+- **B — the other question's label in brackets.** "How old is [Name]?"
+- **C — leave it for later.** Its own row; paper keeps the code until then.
+
+**What the answer files, in the same push:** the row *"The blank paper form prints a reference inside a label, hint or section text as typed"* (`early-testing`), filed and closed by `M178`.
+
 ### D146 — Bulk move (`R-4a6f004f`): how does an author pick several questions in the Structure view? **A — a tick box on every question row; when one is ticked, a bar appears above the list ("N selected · Move to [section] · Move · Clear"); shift-click ticks a range.**
 
 **Asked and answered 2026-10-18 (user decision, in chat, with mock-ups), while `M177` (R2) was planned; recorded in its claim.** The testers' comment (2026-10-11, comment 4): *"Form builder does not all[ow] bulk movement of questions to a section"*. `MdsMenu` may not be mounted inside the scrolling canvas (DSR §3.4b), so the target is chosen in the bar.

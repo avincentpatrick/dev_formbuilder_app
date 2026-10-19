@@ -3562,7 +3562,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   controller and streams the bytes. The other three arms answer with a redirect, which no 404 can be confused
   with, and say so rather than paying for a fixture they do not need.
   ⛔ **AND ASKING THE KILLER QUESTION OF EVERY GATE ON THE ROUTE — NOT ONLY THE ONES THE ROW NAMES — FOUND A
-  THIRD NAKED ONE.** `FeedbackConsoleController.php:95`'s `abort_unless(...->servable(), 409)` was asserted
+  THIRD NAKED ONE.** `FeedbackConsoleController.php:117`'s `abort_unless(...->servable(), 409)` was asserted
   by **nothing**: M34 pinned that guard on the two routes it was looking at (`FeedbackController.php:94`,
   `AttachmentController::show()`'s scan-status guard) and this console copy is the third, so quarantined bytes could be served to
   the one principal who reads across every tenant with the whole repository green. Covered here, with the
@@ -5251,7 +5251,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `docs/piping-output-encoding-design.md:181` (was `:180`; **M57 moved it by one line and the citation
   linter caught it in the same run** — the ledger tier went 18 → 19 and named this pointer, which is the
   clearest evidence yet for the rule this very row is about); `docs/offline-first-sync-design.md:128`;
-  `docs/data-dictionary.md:63` (§28, not §31 — the pointer currently lands on a note arguing the opposite
+  `docs/data-dictionary.md:66` (§28, not §31 — the pointer currently lands on a note arguing the opposite
   case); `docs/api-specification.md:179` (`read:audit_log` is orphaned four blockquotes below its table
   and renders outside it); `docs/ux/design-system-reference.md:812,:843`;
   `docs/pricing-feature-gating-matrix.md:56` (Business is seeded `unlimited`, not 25 endpoints);
@@ -7552,7 +7552,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (2026-09-06), joined and refuted by `M80`. Not one of the 68 route registrations in `routes/api.php`
   contains `users` or `roles`; `app/Http/Controllers/Api/V1/` holds 22 controllers and none is a user, role
   or member controller; no `read:users` / `write:roles` Sanctum ability exists. The capability ships on the
-  web surface only — `routes/tenant.php:411`, `:411`, `:417`, `:419`, `:421`. ⛔ **THE CODE ALREADY NAMES
+  web surface only — `routes/tenant.php:412`, `:411`, `:417`, `:419`, `:421`. ⛔ **THE CODE ALREADY NAMES
   THE CONSEQUENCE:** `app/Http/Resources/Api/V1/AuditResource.php:28` says in as many words that there is
   no `/api/v1/users` endpoint, so an API-only consumer of `GET /api/v1/audits` receives `user_id` and
   `acting_as_user_id` UUIDs it cannot resolve. ⛔ **AND THE ENDPOINT WAS NEVER RETRACTED — IT SHAPED THE
@@ -7561,7 +7561,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the comment opening at `config/permission.php:20`. ⚠️ **The one near-miss is a circular pointer, not a
   deferral**: `docs/multi-tenancy-rbac-design.md:742` defers the request/response *shapes* to Doc #14, and
   `docs/api-specification.md:13` points straight back at §7.1 as the authoritative inventory. Neither
-  defers the build. This repository builds `/api/v1` twins deliberately — `routes/tenant.php:771` says
+  defers the build. This repository builds `/api/v1` twins deliberately — `routes/tenant.php:787` says
   so — so the web surface does not discharge it. **Live.** Filed by `M80`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.** ⛔ **THIS IS THE ROW THAT MADE THE ANSWER `C` RATHER THAN `A`.** `D38`'s premise sentence *"nothing shipped depends on them"* is false here: the documented `GET /api/v1/roles` is the stated reason roles use UUIDv7 primary keys rather than Spatie's bigints, cited at `docs/multi-tenancy-rbac-design.md:56`, `app/Models/Role.php:13` and `config/permission.php:20-21`. **That schema shipped**, so a plain trim orphans the rationale for a decision already paid for.
 
 - **`minor` · §7.1's `Form draft` row pins four `/api/v1` builder endpoints registered nowhere, and the
@@ -7701,7 +7701,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   THE JOIN SURFACED RATHER THAN BURIED.** `PROGRESS_ARCHIVE.md:322` records "Idempotency-Key (§2.4)
   deferred" inside Increment E's documented-not-fixed list. It names no reason, it targets **Phase 1** —
   long closed — and it was never converted into a queue row, nor were its three siblings from the same
-  sentence. `docs/api-specification.md:324` is §4 Out of Scope and does not carry it. That archive note is
+  sentence. `docs/api-specification.md:326` is §4 Out of Scope and does not carry it. That archive note is
   the record of a deferral nobody filed, which is exactly what this row corrects. **Live.**
   Filed by `M80`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.** ⚠️ **`M105` re-measured one clause:** *"exactly two hits repository-wide"* now returns six, because the ledger rows quoting the sentence are themselves hits. The two substantive hits are unchanged. Note also that `PROGRESS_ARCHIVE.md:322` records `Idempotency-Key (§2.4) deferred` — this is a **lapsed deferral**, not an unbacked promise.
 
@@ -14473,7 +14473,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The testers' question (2026-10-15): *"Does the platform support cascading options linked to the Philippine Standard Geographic
   code (PSGC)?"*. `M141` made a PSGC-sized cascade work from uploaded CSV files (measured at 43,739 options), but no PSGC data
   exists in the repository, each form re-uploads its own lists (`app/Services/Forms/ChoiceListMaterializer.php:148` reads them by
-  version), `docs/PRD.md:442` declined a national geography, and `docs/data-dictionary.md:371` says a reference-dataset table is
+  version), `docs/PRD.md:442` declined a national geography, and `docs/data-dictionary.md:375` says a reference-dataset table is
   "deliberately not introduced here". The Philippine Statistics Authority publishes the PSGC Publication Datafile each quarter
   (3Q 2026 released 2026-10-12; ten-digit codes kept as text; region, province or independent city, city or municipality,
   barangay). `D131` (the user, 2026-10-15): built in, free. The remedy: a platform-wide read-only `psgc_places` table (code, name,
@@ -14886,7 +14886,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   of 2026-10-16 — and asked on 2026-10-19 for their progress to be visible on staging, with a way for testers to mark a fix as working. None
   of them is a report: `FeedbackService::submit()` (`app/Services/Feedback/FeedbackService.php:71`) is the only writer of `feedback_reports`,
   and it writes one report per press of the Feedback button. A member's list is their own rows only
-  (`app/Services/Feedback/FeedbackPresenter.php:140`), so a report nobody sent through the button is seen by no one. The remedy (`D150` A):
+  (`app/Services/Feedback/FeedbackPresenter.php:169`), so a report nobody sent through the button is seen by no one. The remedy (`D150` A):
   a report gains a source (`button` | `relayed`), a reference (`R1-7a`, `U4`, …), a title and a source line; a relayed report is visible to
   every member of its workspace under a **Testing-round comments** tab on Feedback, shown while one is still open; the 31 are loaded from a
   committed file through the support API (`R-e727ca94`). **Live.** Filed by `M179`. **Tier: early-testing.**

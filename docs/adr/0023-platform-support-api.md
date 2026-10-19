@@ -56,6 +56,9 @@ The answer to ADR-0018's "weakest credential" objection is that the token is the
 
 ### §D3 — Nothing new is reachable
 
+*(Amended by §D7, M179: the relay is the one endpoint the console does not also have, and a reply is a second
+write. Everything below still holds for the three endpoints it names.)*
+
 Three endpoints, `routes/platform-api.php`: list (filters: a status set, kind, since), one report's screenshot,
 and a status change with a reply. Every read goes through `SuperAdminService` exactly as the console's does — the
 list and the single report through the elevated SELECT-only carve-out, the screenshot by borrowing the report's
@@ -91,9 +94,40 @@ downloads New and Ongoing reports and screenshots into the session's scratchpad 
 `D139` lets a session send on its own: Ongoing with no note, and Resolved with the stock "Fixed in version X,
 live on staging." Any other reply and every Declined need `--user-approved`.
 
+### §D7 — Two more writes, the same single ability: the relay and the reply (M179, `R-e727ca94`, `D150`, `D151`)
+
+The user relayed 31 comments by hand — in chat and in a PDF — and asked for the testers to follow them and check
+the fixes inside Feedback (`D150`), and for a tester's "still a problem" to reach us (`D151`). Two endpoints join the
+three, under the same `feedback:support` ability, the same per-call checks (§D2), the same per-call platform audit
+(§D4, `created`) and the same throttle:
+
+- **`POST /feedback/relayed`** — loads a batch (at most 100 items) of RELAYED reports into one workspace, named by
+  slug or id; the reporter is an active member of it named by email, else its owner. **Create or update by
+  reference** (`R1-7a`, `U4` — unique within a workspace): a new reference becomes a report in the status the item
+  gives (Confirmed only at creation, for a fix the user already checked); an existing one has its WORDS updated —
+  title, remarks, source line — and **never its status**, which after the load belongs to the lifecycle, so
+  running the same file twice changes nothing. One transaction under the workspace's adopted context; every item
+  audited in that workspace's own ledger; **no notification** (a bulk load of history, not news).
+- **`POST /feedback/{id}/comments`** — the support team's reply in a report's thread, through
+  `SuperAdminService::replyToFeedback()` (adopt-context, as the status change): it moves nothing, is audited in
+  the workspace's ledger with its words redacted, and tells the reporter and everyone who wrote in the thread
+  (`feedback_reply`).
+
+**This makes §D3's "nothing new is reachable" false for the relay**, and the ADR says so rather than leaving §D3
+to contradict it: the console has no "load relayed comments" page — a one-off load did not need one, and the
+user's approval of the words travels with the file (`--user-approved`), not with a click. The list also gains
+`source`, `reference` and `commented_since` (reports with a MEMBER's message newer than that — our own replies are
+never news), and every row its thread.
+
 ## Consequences
 
 **Accepted:**
+
+- **A leaked token can now WRITE, not only read (M179, §D7).** Besides moving a report, it could plant relayed
+  reports that every member of a workspace sees, and post a support reply that is emailed to a report's reporter
+  and thread — a phishing vector in the platform's own name. Bounded by the same checks: §D2 on every call, the
+  90-day ceiling, revocation from the console, the per-call audit in both ledgers, the rate limit. The client
+  sends both only with `--user-approved`, which the server cannot enforce.
 
 - **A cross-workspace read reachable from the internet** on the testing server's workspace host. A leaked token
   reads every workspace's feedback — remarks, page addresses, reporter names and emails, screenshots — until it

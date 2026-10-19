@@ -6,12 +6,15 @@ namespace App\Services\Admin;
 
 use App\Enums\AuditEvent;
 use App\Enums\BillingInterval;
+use App\Enums\FeedbackParty;
 use App\Enums\FeedbackStatus;
 use App\Enums\SettingKey;
 use App\Enums\SettingScope;
 use App\Enums\TenantStatus;
+use App\Enums\TenantUserStatus;
 use App\Exceptions\Admin\SuperAdminException;
 use App\Exceptions\Feedback\FeedbackLifecycleException;
+use App\Exceptions\Feedback\FeedbackRelayException;
 use App\Exceptions\Settings\PlatformSettingsConflictException;
 use App\Models\Attachment;
 use App\Models\Audit;
@@ -22,10 +25,12 @@ use App\Models\Plan;
 use App\Models\Setting;
 use App\Models\Subscription;
 use App\Models\Tenant;
+use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Audit\AuditLogPresenter;
 use App\Services\Entitlements\EntitlementService;
 use App\Services\Feedback\FeedbackLifecycle;
+use App\Services\Feedback\FeedbackRelay;
 use App\Services\Notifications\NotificationDispatcher;
 use App\Services\Settings\PlatformSettings;
 use App\Support\Audit\AuditLogger;
@@ -36,6 +41,7 @@ use Carbon\CarbonInterface;
 use Closure;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * The one narrow, named super-admin service (RBAC §9 / ADR-0002 §D3): every cross-tenant platform
@@ -77,6 +83,7 @@ final class SuperAdminService
     public function __construct(
         private readonly AuditLogger $audit,
         private readonly FeedbackLifecycle $feedback,
+        private readonly FeedbackRelay $relay,
     ) {}
 
     /**
@@ -514,7 +521,12 @@ final class SuperAdminService
      * M175 (`R-78f43f26`) adds the platform support API's two filters: `statuses`, a SET of stored values (the
      * pull asks for New and Ongoing at once), and `since`, the earliest `submitted_at`.
      *
-     * @param  array{status?: ?string, statuses?: list<string>, tenant_id?: ?string, type?: ?string, since?: ?CarbonInterface}  $filters
+     * M179 (`R-e727ca94`) adds three more — `source`, `reference`, and `commented_since`: reports with a MEMBER's
+     * message newer than that, so the pull sees a reopen or a tester's comment and never our own replies as news —
+     * and every row carries its thread, read through `feedback_comments`' own SELECT carve-out with the ORM tenant
+     * scope dropped for the reason above.
+     *
+     * @param  array{status?: ?string, statuses?: list<string>, tenant_id?: ?string, type?: ?string, since?: ?CarbonInterface, source?: ?string, reference?: ?string, commented_since?: ?CarbonInterface}  $filters
      * @return array{rows: list<array<string, mixed>>, meta: array{current_page: int, last_page: int, total: int, per_page: int}}
      */
     public function listFeedback(array $filters, int $perPage, int $page): array
@@ -528,6 +540,15 @@ final class SuperAdminService
                 ->when($filters['tenant_id'] ?? null, fn ($q, $v) => $q->where('tenant_id', $v))
                 ->when($filters['type'] ?? null, fn ($q, $v) => $q->where('type', $v))
                 ->when($filters['since'] ?? null, fn ($q, $v) => $q->where('submitted_at', '>=', $v))
+                ->when($filters['source'] ?? null, fn ($q, $v) => $q->where('source', $v))
+                ->when($filters['reference'] ?? null, fn ($q, $v) => $q->where('reference', $v))
+                ->when($filters['commented_since'] ?? null, fn ($q, $v) => $q->whereExists(
+                    fn ($sub) => $sub->selectRaw('1')
+                        ->from('feedback_comments')
+                        ->whereColumn('feedback_comments.feedback_report_id', 'feedback_reports.id')
+                        ->where('feedback_comments.author_kind', FeedbackParty::Member->value)
+                        ->where('feedback_comments.created_at', '>', $v)
+                ))
                 ->orderByDesc('submitted_at');
 
             $total = (clone $query)->count();
@@ -537,10 +558,11 @@ final class SuperAdminService
             /** @var Collection<int, FeedbackReport> $reports */
             $reports = $query->forPage($current, $perPage)->get();
 
-            $names = $this->reporterNames($reports);
+            $threads = $this->threadsFor($reports);
+            $names = $this->reporterNames($reports, $threads);
 
             return [
-                'rows' => array_values($reports->map(fn (FeedbackReport $r): array => $this->feedbackRow($r, $names))->all()),
+                'rows' => array_values($reports->map(fn (FeedbackReport $r): array => $this->feedbackRow($r, $names, $threads[(string) $r->getKey()] ?? []))->all()),
                 'meta' => [
                     'current_page' => $current,
                     'last_page' => $lastPage,
@@ -563,17 +585,58 @@ final class SuperAdminService
      */
     public function describeFeedback(FeedbackReport $report): array
     {
+        /** @var list<FeedbackComment> $thread */
+        $thread = $report->relationLoaded('comments') ? array_values($report->comments->all()) : [];
+
         return $this->feedbackRow(
             $report,
-            $this->userNames(array_values(array_filter([$report->user_id, $report->resolved_by]))),
+            $this->userNames(array_values(array_unique(array_filter([
+                $report->user_id,
+                $report->resolved_by,
+                $report->confirmed_by,
+                ...array_map(static fn (FeedbackComment $c): ?string => $c->user_id, $thread),
+            ])))),
+            $thread,
         );
     }
 
     /**
+     * Every listed report's thread, oldest first, keyed by report id — one query through `feedback_comments`'
+     * SELECT carve-out, inside the caller's elevated transaction (M179).
+     *
+     * @param  Collection<int, FeedbackReport>  $reports
+     * @return array<string, list<FeedbackComment>>
+     */
+    private function threadsFor(Collection $reports): array
+    {
+        $ids = $reports->map(fn (FeedbackReport $r): string => (string) $r->getKey())->all();
+
+        if ($ids === []) {
+            return [];
+        }
+
+        /** @var Collection<int, FeedbackComment> $comments */
+        $comments = FeedbackComment::on(SuperAdminContext::CONNECTION)
+            ->withoutGlobalScope(FeedbackComment::$tenantScope)
+            ->whereIn('feedback_report_id', $ids)
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get();
+
+        $threads = [];
+        foreach ($comments as $comment) {
+            $threads[(string) $comment->feedback_report_id][] = $comment;
+        }
+
+        return $threads;
+    }
+
+    /**
      * @param  array<string, array{name: string, email: string}>  $names
+     * @param  list<FeedbackComment>  $thread
      * @return array<string, mixed>
      */
-    private function feedbackRow(FeedbackReport $r, array $names): array
+    private function feedbackRow(FeedbackReport $r, array $names, array $thread = []): array
     {
         return [
             'id' => (string) $r->getKey(),
@@ -593,6 +656,36 @@ final class SuperAdminService
             'reporter_role' => $r->reporter_role,
             'resolver' => $r->resolved_by === null ? null : ($names[$r->resolved_by] ?? null),
             'has_screenshot' => $r->screenshot_attachment_id !== null,
+            // M179 (`R-e727ca94`) — where it came from, the code the testers know it by, who confirmed the fix,
+            // and the thread. A support reply has no author (`user_id` NULL); a member's names their account.
+            'source' => $r->source->value,
+            'source_label' => $r->source_label,
+            'reference' => $r->reference,
+            'title' => $r->title,
+            'confirmed_at' => $r->confirmed_at?->toIso8601String(),
+            'confirmer' => $r->confirmed_by === null ? null : ($names[$r->confirmed_by] ?? null),
+            'last_comment_at' => $r->last_comment_at?->toIso8601String(),
+            'comments' => array_map(fn (FeedbackComment $c): array => $this->commentRow($c, $names), $thread),
+        ];
+    }
+
+    /**
+     * One thread message in the support API's shape (M179) — also the answer to a support reply.
+     *
+     * @param  array<string, array{name: string, email: string}>  $names
+     * @return array<string, mixed>
+     */
+    public function commentRow(FeedbackComment $c, array $names = []): array
+    {
+        return [
+            'id' => (string) $c->getKey(),
+            'feedback_report_id' => (string) $c->feedback_report_id,
+            'author_kind' => $c->author_kind->value,
+            'author' => $c->user_id === null ? null : ($names[$c->user_id] ?? null),
+            'action' => $c->action?->value,
+            'body' => $c->body,
+            'created_at' => $c->created_at->toIso8601String(),
+            'has_screenshot' => $c->screenshot_attachment_id !== null,
         ];
     }
 
@@ -601,12 +694,23 @@ final class SuperAdminService
      * SELECT bypass (2026_07_05_040100), inside the caller's already-open elevated transaction.
      *
      * @param  Collection<int, FeedbackReport>  $reports
+     * @param  array<string, list<FeedbackComment>>  $threads
      * @return array<string, array{name: string, email: string}>
      */
-    private function reporterNames(Collection $reports): array
+    private function reporterNames(Collection $reports, array $threads = []): array
     {
+        $commenters = [];
+        foreach ($threads as $thread) {
+            foreach ($thread as $comment) {
+                if ($comment->user_id !== null) {
+                    $commenters[] = (string) $comment->user_id;
+                }
+            }
+        }
+
         $ids = $reports
-            ->flatMap(fn (FeedbackReport $r): array => array_filter([$r->user_id, $r->resolved_by]))
+            ->flatMap(fn (FeedbackReport $r): array => array_filter([$r->user_id, $r->resolved_by, $r->confirmed_by]))
+            ->merge($commenters)
             ->unique()
             ->values()
             ->all();
@@ -949,7 +1053,9 @@ final class SuperAdminService
                 TenantContext::applyLocal($report->tenant_id);
 
                 try {
-                    return $this->feedback->support((string) $report->getKey(), $to, $actor, $note);
+                    // The thread is loaded HERE, under the adopted context: after the commit the API holds no
+                    // tenant context, and the elevated connection cannot see an uncommitted write.
+                    return $this->feedback->support((string) $report->getKey(), $to, $actor, $note)->load('comments');
                 } finally {
                     TenantContext::applyLocal($savedTenant, $savedUser);
                 }
@@ -959,6 +1065,68 @@ final class SuperAdminService
         }
 
         return $written;
+    }
+
+    /**
+     * Load comments relayed outside the Feedback button into one workspace (M179, `R-e727ca94`, `D150`; ADR-0023
+     * §D7) — the support API's `POST /feedback/relayed`, and its only caller. Resolves the workspace (by slug or
+     * id) and the reporter (an ACTIVE member of it, by email; the workspace's owner when none is named), then
+     * adopts that workspace's tenant context and hands the batch to {@see FeedbackRelay}: create or update by
+     * reference, never rewriting a status, telling no one, every item audited in the workspace's own ledger.
+     * All or nothing: one transaction.
+     *
+     * @param  list<array{reference: string, title: string, remarks: string, source_label?: ?string, status?: ?string, note?: ?string, type?: ?string, received_at?: ?string, confirmed_at?: ?string}>  $items
+     * @return list<array{reference: string, id: string, outcome: string}>
+     *
+     * @throws FeedbackRelayException for an unknown workspace or a reporter who is not an active member of it
+     */
+    public function relayFeedback(string $tenantKey, ?string $reporterEmail, array $items, User $actor): array
+    {
+        /** @var Tenant|null $tenant */
+        $tenant = Str::isUuid($tenantKey)
+            ? Tenant::query()->find($tenantKey)
+            : Tenant::query()->where('slug', $tenantKey)->first();
+
+        if ($tenant === null) {
+            throw FeedbackRelayException::unknownTenant($tenantKey);
+        }
+
+        /** @var list<array{reference: string, id: string, outcome: string}> $results */
+        $results = DB::transaction(function () use ($tenant, $reporterEmail, $items, $actor): array {
+            $savedTenant = TenantContext::currentTenantId();
+            $savedUser = TenantContext::currentUserId();
+            TenantContext::applyLocal((string) $tenant->getKey());
+
+            try {
+                return $this->relay->relay($this->relayReporter($tenant, $reporterEmail), $items, $actor);
+            } finally {
+                TenantContext::applyLocal($savedTenant, $savedUser);
+            }
+        });
+
+        return $results;
+    }
+
+    /** The relayed reports' reporter: an active member named by email, or the workspace's owner. */
+    private function relayReporter(Tenant $tenant, ?string $email): User
+    {
+        $userId = $email === null || trim($email) === ''
+            ? $tenant->owner_user_id
+            : User::query()->whereRaw('lower(email) = lower(?)', [trim($email)])->value('id');
+
+        $active = $userId !== null && TenantUser::query()
+            ->where('user_id', $userId)
+            ->where('status', TenantUserStatus::Active->value)
+            ->exists();
+
+        /** @var User|null $user */
+        $user = $active ? User::query()->find($userId) : null;
+
+        if ($user === null) {
+            throw FeedbackRelayException::unknownReporter();
+        }
+
+        return $user;
     }
 
     /**

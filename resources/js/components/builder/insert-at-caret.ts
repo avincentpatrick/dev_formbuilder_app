@@ -23,7 +23,7 @@ export function insertAtCaret(box: HTMLTextAreaElement | HTMLInputElement, text:
     box.focus();
     box.setSelectionRange(start, end);
 
-    const inserted = false;
+    const inserted = typeof document.execCommand === 'function' && document.execCommand('insertText', false, text);
 
     if (!inserted) {
         box.setRangeText(text, start, end);

@@ -18,6 +18,50 @@ Standing Rule 7(b-bis).
 
 ## Status: ACTIVE CLAIM — `M178`, R3 of the testers' round 2: references everywhere (`R-75719ac4`, `R-917496f9`, plus `R-2d921bbe`'s last step) (m178-r3-references)
 
+**BUILT — PR #371, CI 6/6 green with real step counts (run 39261448121 at `44951a80`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the only skips are the two main-only staging-header steps and the failure-only report upload) — AND NOT MERGED.** ⛔ **Held for merge point 3 (`D137`, `D138`):**
+this PR merges with R4's, between the user's census before and after. **V comes first** (`M179`, the user, 2026-10-19): released alone at its green,
+branched from `origin/main` beside this held branch; R4 then stacks on this branch with `origin/main` merged in. The branch carries the two rows'
+closures, `R-2d921bbe`'s, `D147`–`D149`, three filed rows (the paper form's, closed here; the Default value's and the calculations', for R4),
+`R-da02fe03` amended, the status bullet, the regenerated line and hand-off. ⚠️ The backup block's retirement takes effect only when this merges —
+until then the trunk's `CLAUDE.md` still asks for it, so V's lone release runs it.
+
+**Measured against the prediction:**
+- **Red first, row by row, where predicted** — the retired block's docs test 4 of 4; the two rule types 14 Pest (six golden vectors on PHP, the
+  payload's count, shapes, related field, comparison and pairing, the lowering pin, the export) and Vitest 9e2; the Minimum switch 3 Vitest (the
+  Likert / No-negatives guard green both sides); the blank-side walk on BOTH engines — five validation vectors and the 11-vector `constraint`
+  corpus (by absence), with the four guards green both sides; the paper line 1 Pest; the picker's expose 2, wiring 1, `pipeable` census 1, and
+  the new modules by absence (`insert-at-caret` 4, `reference-candidates` 14, `ReferenceInput` 7, the scope parity 2). The TS half of the two
+  rule types was proven by its mutants, not by a trunk red.
+- **Mutants: 20 run, 20 caught, each red set the one written down first** — through `scripts/mutate.php`: the retired sentence put back; at least
+  made strict (enum); the export's `>=`; unknown read as a refusal; `or` dropping unknown; the walk wired into relevance (8 red: the leak guard and
+  seven bool-mode corpus vectors); NaN not blank; the paper substitution. Committed and reverted: at least strict (TS map); the preview's screen;
+  the Minimum switch; the calculation filter; the TS walk; an insert at the end (3); later questions offered (8); a calculation in a formula; `@`
+  off (5); the code hidden (3); the length guard; and **the write forced through the fallback, red in a real browser at the Ctrl+Z assertion**.
+- **The one named most likely wrong held:** `execCommand('insertText')` gives ONE native undo step in Chromium (the new spec passed), and the
+  fallback loses it (the mutant). **Runner-up held:** the PHP blank-side vectors went red on PHP itself — `Temporal::orders()` rescued none.
+- **Not predicted:**
+  - **The planned `if()`-branch case was impossible** — the grammar refuses a comparison as an `if()` branch (`ExpressionParser.php:491`), so the
+    walk has no `if()` arm and the vector became a guard on an `if()` inside a comparison. The plan review's `if()` point was moot.
+  - **Three planning findings became decisions** (`D147`–`D149`): the paper form printed `${key}`; a Default value is never applied; no rule or
+    condition reads a calculation. The last two narrowed the picker (no Default value box, no calculation in a formula), as did `today()` being
+    the only date (the other presets ride `R-da02fe03`).
+  - **Line-cited files shaped the code:** match arms and `case` labels share lines so no cited line moves; where lines had to move (the two
+    imports and the candidate lists in `ConfigPanel.vue`, the import in `BuilderPresenter.php`, the thank-you plumbing in `Builder.vue`), eleven
+    open-row citations were re-pointed and checked line by line against the trunk. **My re-point script moved only the start of four RANGE
+    citations** (`531-537` read `537-537`); the ratchet caught two that landed on blank lines, a content diff the rest.
+  - **Harness slips, each caught before a push:** `git revert -q` is not a flag, so two Vitest mutants stacked before I saw it (both still red as
+    predicted; tree restored and checked); a long heredoc would not parse (edits moved to script files); `base_path()` in a Unit test; Vue
+    re-patching a textarea's value under a test with no v-model loop; happy-dom's `setRangeText` caret. Recorded in the gate-traps memory.
+  - **The local e2e run of the eight specs the diff reaches (204 tests) averaged over two minutes a test** — stopped after 12, all passing; the
+    new spec ran alone (desktop, 1 of 1, and red under its mutant). CI runs every spec.
+- **The real-browser look** (a throwaway desktop spec, screenshots in the git-ignored `storage/app/m178-look/`): the search and the `@` list,
+  grouped with codes; a Maximum set to "Another question's answer"; the preview piping "Hello Ana" into a label; 3 children passing while the
+  household size is blank. One observation, by design: the first question shows no picker (nothing comes before it).
+- **Local gates on the final tree:** Vitest (builder, forms, help, pages, design system) 143 files / 2,096 passed; type-check; Pint bare; PHPStan
+  scoped 0; the host lints; Pest — the expression and validation units 645, the enumerating and builder files, the Docs files 162 + the known
+  bind-mount `SuiteCollectionFloorTest`.
+
+
 Taken 2026-10-19. It is R3 of the testers' round 2 (`D138`; the plan of record `~/.claude/plans/here-are-added-comments-peppy-quill.md` §B,
 §E; the build plan `~/.claude/plans/pasted-content-id-fff1-read-claude-md-quirky-orbit.md`). Branch `m178-r3-references`, cut from
 `origin/main` at `617f12d0` (this claim on top), PR into main — not stacked. ⛔ **NOT MERGED IN THIS SESSION:** the PR waits green for merge

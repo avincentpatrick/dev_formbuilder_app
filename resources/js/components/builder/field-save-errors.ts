@@ -71,12 +71,16 @@ const LISTS: Record<string, string> = {
  * A request path in the panel's words: `validations.0.rule_value` is "Rule 1", `config.options.2.label`
  * is "Choice 3". Unknown paths fall back to the path itself rather than to nothing, so a reader can
  * always tell two refusals apart.
+ *
+ * M176 (`R-5554c526`) — `ruleRows` is the editor row each SENT rule was (the store records it at send time): a rule still
+ * being written is left out of the request, so `validations.0` can be the second rule on screen, and "Rule 1" pointed at
+ * the wrong one. The Validation tab's numbering is the one used — it lists every rule, Required-when ones included.
  */
-export function describeSavePath(path: string): string {
+export function describeSavePath(path: string, ruleRows?: readonly number[]): string {
     if (NAMES[path] !== undefined) return NAMES[path];
 
     const rule = /^validations\.(\d+)/.exec(path);
-    if (rule) return `Rule ${Number(rule[1]) + 1}`;
+    if (rule) return `Rule ${(ruleRows?.[Number(rule[1])] ?? Number(rule[1])) + 1}`;
 
     const listed = /^config\.(options|levels|rows|columns|cells|accepted_types)\.(\d+)/.exec(path);
     if (listed) return `${LISTS[listed[1]]} ${Number(listed[2]) + 1}`;
@@ -86,7 +90,7 @@ export function describeSavePath(path: string): string {
     return path;
 }
 
-export function sortFieldSaveErrors(errors: Record<string, string[]> | undefined): FieldSaveErrors {
+export function sortFieldSaveErrors(errors: Record<string, string[]> | undefined, ruleRows?: readonly number[]): FieldSaveErrors {
     const inline: Partial<Record<InlineFieldKey, string>> = {};
     const listed: ListedSaveError[] = [];
 
@@ -99,7 +103,7 @@ export function sortFieldSaveErrors(errors: Record<string, string[]> | undefined
             continue;
         }
 
-        listed.push({ key, text: `${describeSavePath(key)}: ${message}` });
+        listed.push({ key, text: `${describeSavePath(key, ruleRows)}: ${message}` });
     }
 
     return { inline, listed };

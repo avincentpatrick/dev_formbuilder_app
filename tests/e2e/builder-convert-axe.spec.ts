@@ -59,7 +59,7 @@ for (const theme of themes) {
         await assertClean(page, `change type — choosing (${theme})`);
 
         await target.selectOption('hidden');
-        await expect(dialog).toContainText('A hidden question holds nothing until you choose where its value comes from.');
+        await expect(dialog).toContainText('A hidden question stays empty until you choose where its value comes from.');
         await expect(dialog).toContainText('the section “Adults only”');
         await assertClean(page, `change type — consequences (${theme})`);
 

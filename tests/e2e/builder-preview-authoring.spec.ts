@@ -33,10 +33,14 @@ test('Builder — a section and its question added from the preview, and moved o
         const sectionTitle = (await placeholder.locator('h3').innerText()).trim();
         await assertClean(page, 'builder preview with an empty section');
 
-        // Its add selects the section and brings the palette, with focus on it.
+        // M176 (`R-5354b4b9`, `D142`): its add opens the types right there — focus on the first — and the chosen one is added
+        // to that section. It used to select the section and move focus to the palette, adding nothing (the testers'
+        // "“+ Add question here” button not working").
         await placeholder.getByRole('button', { name: `Add a question to ${sectionTitle}` }).click();
-        await expect.poll(() => page.evaluate(() => document.activeElement?.closest('.palette') !== null)).toBe(true);
-        await page.locator('.palette').getByRole('button', { name: 'Text', exact: true }).click();
+        const types = placeholder.getByRole('group', { name: 'Choose a question type' });
+        await expect(types).toBeVisible();
+        await expect(types.getByRole('button').first()).toBeFocused();
+        await types.getByRole('button', { name: 'Text', exact: true }).click();
         await saved(page);
 
         // The question is in that section: Structure shows it inside the section's drop zone, and the placeholder is gone.

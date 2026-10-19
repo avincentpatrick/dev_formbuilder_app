@@ -210,14 +210,14 @@ describe('a question dragged in the preview (M151)', () => {
         await flushPromises();
         await w.find('[data-preview-field="q2"] [data-preview-edit-label]').trigger('click');
         await flushPromises();
-        await w.find('input[aria-label="Question label"]').setValue('Renamed');
+        await w.find('[aria-label="Question label"]').setValue('Renamed');
         pointAt(section(w, 'visit'));
 
         pointer(grip(w, 'q1'), 'pointerdown', 20);
         pointer(window, 'pointermove', 115);
         await flushPromises();
 
-        expect(w.find('input[aria-label="Question label"]').exists()).toBe(false);
+        expect(w.find('[aria-label="Question label"]').exists()).toBe(false);
         expect(requestLog(fetch).some((r) => r.method === 'PATCH' && (r.body as { label?: string }).label === 'Renamed')).toBe(true);
         pointer(window, 'pointerup', 115);
     });

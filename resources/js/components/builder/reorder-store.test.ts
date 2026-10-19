@@ -151,3 +151,34 @@ describe('a move reaches the order the engine reads, on an imported form (M151)'
         expect(sent.fields.map((f) => f.section_sequence)).toEqual([null, null, null, null, null]);
     });
 });
+
+describe('a question added at a named spot lands there (M176, R-5354b4b9)', () => {
+    // "Add a question here" names the spot — a page's end in Preview, a section's start in Structure. The server appends a
+    // new question after every other one in the draft, so the store places it and saves the order once.
+    it('places it where it was asked for, with one reorder and one undo entry', async () => {
+        const mock = fetchMock().mockResolvedValueOnce(
+            jsonResponse(200, serverField({ id: 'f9', key: 'q9', label: 'Text', form_section_id: 's1', sequence: 9 })),
+        ).mockResolvedValue(jsonResponse(200, { ok: true }));
+        const s = store([{ form_section_id: 's1' }, { form_section_id: 's1' }, { form_section_id: 's2' }]);
+
+        await s.addField('short_text', 's1', 1);
+
+        expect(where(s)).toEqual(['top:', 's1:q1,q9,q2', 's2:q3']);
+        expect(requestLog(mock).map((r) => `${r.method} ${r.url.split('/').pop()}`)).toEqual(['POST fields', 'POST reorder']);
+        expect(s.canUndo.value).toBe(true);
+        mock.mockResolvedValue(jsonResponse(200, { ok: true }));
+        await s.undo();
+        expect(s.canUndo.value).toBe(false); // the add and its place were ONE step
+        expect(where(s)).toEqual(['top:', 's1:q1,q2', 's2:q3']);
+    });
+
+    it('saves no order when the spot is where the server put it anyway', async () => {
+        const mock = fetchMock().mockResolvedValue(jsonResponse(200, serverField({ id: 'f9', key: 'q9', label: 'Text', form_section_id: 's2', sequence: 9 })));
+        const s = store([{ form_section_id: 's1' }]);
+
+        await s.addField('short_text', 's2', 0);
+
+        expect(where(s)).toEqual(['top:', 's1:q1', 's2:q9']);
+        expect(requestLog(mock).map((r) => r.method)).toEqual(['POST']);
+    });
+});

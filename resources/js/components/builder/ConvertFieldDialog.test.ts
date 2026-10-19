@@ -54,7 +54,7 @@ describe('ConvertFieldDialog', () => {
         const wrapper = mountDialog({ phase: 'loading' });
 
         expect(wrapper.text()).toContain('Change question type');
-        expect(wrapper.text()).toContain('Checking which types it can change to');
+        expect(wrapper.text()).toContain('Checking which types this question can become');
         expect(wrapper.find('[data-convert-target]').exists()).toBe(false);
         const primary = wrapper.get('[data-convert-primary]');
         expect(primary.attributes('disabled')).toBeUndefined();
@@ -127,7 +127,7 @@ describe('ConvertFieldDialog', () => {
         await nextTick();
 
         expect(document.activeElement).toBe(wrapper.get('[data-convert-stale]').element);
-        expect(wrapper.text()).toContain('This question changed while this was open');
+        expect(wrapper.text()).toContain('This question changed while this window was open');
         wrapper.unmount();
     });
 
@@ -144,7 +144,7 @@ describe('ConvertFieldDialog', () => {
     it('offers a retry when the plans could not be read (CD10)', async () => {
         const wrapper = mountDialog({ phase: 'load-failed', message: 'Server Error' });
 
-        expect(wrapper.get('[role="alert"]').text()).toContain('Couldn’t check which types it can change to');
+        expect(wrapper.get('[role="alert"]').text()).toContain('Couldn’t check which types this question can become');
         expect(wrapper.get('[data-convert-primary]').text()).toBe('Try again');
         await wrapper.get('[data-convert-primary]').trigger('click');
 
@@ -162,5 +162,31 @@ describe('ConvertFieldDialog', () => {
 
         expect(wrapper.text()).toContain('This question can’t be changed to another type.');
         expect(wrapper.find('[data-convert-primary]').exists()).toBe(false);
+    });
+});
+
+describe('ConvertFieldDialog — plain words (M176, R-36e6f557)', () => {
+    // The testers (2026-10-11, comment 1): "Make the text/instructions more “smart highschooler” friendly", on this dialog —
+    // which read "Current type of “Date & time”: Date & time" for a new question, whose label is its type's name.
+    it('names the type once when the question still has the type as its name', () => {
+        const wrapper = mountDialog();
+        wrapper.setProps({ questionLabel: '', currentLabel: 'Date & time' });
+
+        return wrapper.vm.$nextTick().then(() => {
+            const lead = wrapper.get('.convert__lead').text();
+            expect(lead).toBe('This is a Date & time question.');
+            expect(lead.split('Date & time').length - 1).toBe(1);
+        });
+    });
+
+    it('names the question and its type in one short sentence', () => {
+        expect(mountDialog().get('.convert__lead').text()).toBe('“Your age” is a Whole number question.');
+    });
+
+    it('says what the question keeps in everyday words, naming the field key as the panel does', () => {
+        const help = mountDialog().text();
+
+        expect(help).toContain('Its field key stays the same');
+        expect(help).not.toContain('point to it');
     });
 });

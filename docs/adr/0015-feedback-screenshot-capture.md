@@ -79,6 +79,13 @@ The same increment makes the report say **what kind it is** (`FeedbackType`: bug
 
 Proved by a real browser as well as by Vitest: `tests/e2e/feedback-capture.spec.ts` replaces `getDisplayMedia` with a canvas stream and wraps `drawImage`, asserting that no dialog is on the page at the instant a video frame is drawn.
 
+**§D11, amended by M176 (`R-8496edfa`, 2026-10-18) — which frame is drawn.** The user's check of `M175` on staging found a real capture that still held the panel, with reduced motion on: 3 of 13 in a throwaway real-capture probe, 4 of 20 in `tests/e2e/feedback-capture-real.spec.ts` against `M175`'s code — each holding the whole panel, 24.2% of the picture. The canvas-stream spec above could not see it: it records whether a dialog is in the DOM when a frame is drawn, never what the frame shows. Five probes in a real Chromium tab capture measured two causes:
+
+1. **A tab capture reaches the page a few frames late.** The frame showing when the panel has left was often captured before it left (captured 7–23ms after the close, while the panel was still on screen). So the frame drawn is now one the browser says it *captured* after the panel left: `requestVideoFrameCallback`'s `captureTime`, in the `performance.now()` timeline, which Chrome sets on every tab-capture frame. `since` is taken two animation frames after `after-leave`, because a frame captured within one frame of the DOM change can still hold the panel (measured: one, 22ms after it).
+2. **A detached `<video>` takes up a new frame only while a frame callback is waiting for one.** The clean frame arrives 30–170ms after the panel leaves; when no callback was pending at that moment it was never taken up, the page sent nothing more (nothing on it changed), and the stale frame was drawn — the four failures of the twenty. With a callback chain running from `play()` to `stop()`, the same flow drew 12 of 12 clean. So `startCapture()` runs that chain and always knows the newest frame and when it was captured.
+
+A clean frame captured just before `since` is passed over, so after 120ms without a qualifying frame the page is nudged into sending one (one near-transparent pixel for one frame). Where a browser gives no capture time, the frames are waited out — at least 250ms after the panel left, then 150ms with no new frame. Never longer than 750ms. Proved by `screenshot.test.ts` (the module's first spec) and by `tests/e2e/feedback-capture-real.spec.ts`, a real tab capture (`channel: 'chromium'`, `--auto-accept-this-tab-capture`) that paints the panel magenta and reads each of twenty attached pictures: red 4 of 20 on `M175`'s code, green 60 of 60 over three runs after. It runs locally only — CI's host is not a secure context.
+
 ---
 
 ## Consequences

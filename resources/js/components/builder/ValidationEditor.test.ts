@@ -512,3 +512,45 @@ describe('ValidationEditor — the all/any switch', () => {
         expect(wrapper.find('.validations__combine').exists()).toBe(false);
     });
 });
+
+describe('ValidationEditor — "No negative numbers" is a rule like any other (M176, R-61d43278)', () => {
+    // The user (2026-10-16): "include the allow negative in the rules since it is really a validation rule". It was a Basics
+    // checkbox derived from a hidden "Minimum value 0" row, so deleting that row here ticked the box back on.
+    const zero = () => row({ rule_type: 'min_value', rule_value: '0' });
+
+    it('offers it to a number, beside Minimum value, and to nothing else', () => {
+        expect(optionLabels(mountEditor('number', [row({ rule_type: 'min_value' })]), 'Rule 1 check')).toContain('No negative numbers');
+        expect(optionLabels(mountEditor('duration', [row({ rule_type: 'min_value' })]), 'Rule 1 check')).not.toContain('No negative numbers');
+        expect(optionLabels(mountEditor('text', [row()]), 'Rule 1 check')).not.toContain('No negative numbers');
+    });
+
+    it('stores what it always stored — a minimum of 0 — when chosen', async () => {
+        const wrapper = mountEditor('number', [row({ rule_type: 'greater_than_field' })]);
+
+        await control(wrapper, 'Rule 1 check').setValue('no_negative_numbers');
+
+        const [emitted] = wrapper.emitted('update:validations')!.at(-1) as [BuilderValidation[]];
+        expect(emitted).toHaveLength(1);
+        expect(emitted[0]).toMatchObject({ rule_type: 'min_value', rule_value: '0', expression: null, related_field_key: null });
+    });
+
+    it('shows an existing minimum of 0 under that name, with no value to type', () => {
+        const wrapper = mountEditor('number', [zero()]);
+
+        expect((control(wrapper, 'Rule 1 check').element as HTMLSelectElement).value).toBe('no_negative_numbers');
+        expect(wrapper.find('[aria-label="Rule 1 value"]').exists()).toBe(false);
+    });
+
+    it('keeps a Minimum value chosen by the author as one, even while its value reads 0', async () => {
+        // Typing "0.5" passes through "0": the row must not turn into "No negative numbers" under the author's fingers.
+        const wrapper = mountEditor('number', [zero()]);
+
+        await control(wrapper, 'Rule 1 check').setValue('min_value');
+        const [chosen] = wrapper.emitted('update:validations')!.at(-1) as [BuilderValidation[]];
+        expect(chosen[0]).toMatchObject({ rule_type: 'min_value', rule_value: null });
+
+        await wrapper.setProps({ validations: [{ ...chosen[0], rule_value: '0' }] });
+        expect((control(wrapper, 'Rule 1 check').element as HTMLSelectElement).value).toBe('min_value');
+        expect(wrapper.find('[aria-label="Rule 1 value"]').exists()).toBe(true);
+    });
+});

@@ -140,9 +140,13 @@ describe('a Whole Number — every control on Basics, Validation and Advanced st
             expected: 'required',
         },
         {
-            tab: 'Basics',
-            name: 'Allow negative numbers',
-            change: (w) => w.find('[data-negative-toggle] input[type="checkbox"]').setValue(false),
+            // M176 (`R-61d43278`): "Allow negative numbers" left Basics; the rule it wrote is chosen on this tab by name.
+            tab: 'Validation',
+            name: 'No negative numbers',
+            change: async (w) => {
+                await w.findAll('button').find((button) => button.text() === 'Add rule')!.trigger('click');
+                await w.find('[aria-label="Rule 1 check"]').setValue('no_negative_numbers');
+            },
             sent: (b) => (b.validations as { rule_type: string; rule_value: string }[]).map((row) => `${row.rule_type} ${row.rule_value}`),
             expected: ['min_value 0'],
         },
@@ -354,6 +358,10 @@ describe('a refresh straight after a change keeps it (R-bfa3eb93)', () => {
         mock.mockImplementationOnce(() =>
             Promise.resolve(jsonResponse(409, { current: { ...WHOLE_NUMBER, hint: 'Help one.', version: 'v8' }, message: 'Changed elsewhere.' })),
         );
+        // M176 (`R-c4802b60`): that 409's row is this page's own put-back, so the page sends the newer edit once more at
+        // `v8` — and, the page going, that request fails too. What the third page proves is unchanged: an edit no write
+        // landed is put back.
+        mock.mockImplementationOnce(() => Promise.reject(new TypeError('Failed to fetch')));
         second.flushForLeave();
         fail(new TypeError('Failed to fetch')); // the page is going
         await flushPromises();
@@ -417,10 +425,11 @@ describe('a 409 over an edit the server already holds is judged on what was SENT
         expect(store.saveState.value).toBe('saved');
     });
 
-    it('takes the minimum "Allow negative numbers" writes as the same rule the server sends back with an empty group', async () => {
+    it('takes a minimum written with no group key as the same rule the server sends back with an empty group', async () => {
         const store = makeStore();
         const [field] = store.fields.value;
-        // Exactly the row `withNegativesAllowed()` writes: no `logic_group`, so `fieldPayload()` leaves the key out.
+        // The row the Basics "Allow negative numbers" box wrote until M176 (and code that knows nothing of groups still
+        // writes): no `logic_group`, so `fieldPayload()` leaves the key out.
         field.validations = [{ rule_type: 'min_value', operator: null, rule_value: '0', expression: null, error_message: null, related_field_key: null, sequence: 0 }];
         store.touch(field.uid, 'field');
         mock.mockImplementationOnce(() =>

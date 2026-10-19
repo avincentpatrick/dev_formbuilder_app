@@ -33,6 +33,7 @@
 import { MdsButton, MdsCallout, MdsFormField, MdsIconButton, MdsSelect, MdsTextInput, MdsTextarea } from '@meridian/design-system';
 import { computed } from 'vue';
 import type { BuilderValidation, ComparableField, EnumOption, OperatorOption, RuleTypeOption } from './types';
+import { isNoNegativesRule, NEGATIVE_FLOOR_RULE, NO_NEGATIVES_LABEL } from './field-conversion';
 import { mayCompare, operatorReads, repointPatch, ruleChangePatch } from './validation-options';
 import {
     FAMILY_DEFAULT,
@@ -194,11 +195,30 @@ function shapeOfRelated(row: BuilderValidation): string | null {
 }
 
 /**
+ * M176 (`R-61d43278`) — "No negative numbers" as a kind of its own in the rule <select>, stored as a minimum of 0. A
+ * client-only value: the server knows only `min_value`, so nothing in either engine or the mirror changes. Offered to a
+ * NUMBER only, where the minimum is offered — a duration or a scale is never negative, and a text has no minimum.
+ */
+const NO_NEGATIVES = 'no_negative_numbers';
+const offersNoNegatives = computed<boolean>(
+    () => props.valueShape === 'number' && allowedRuleTypes.value.some((rule) => rule.value === NEGATIVE_FLOOR_RULE),
+);
+
+/** The value the rule <select> shows for a row. */
+function kindOf(row: BuilderValidation): string {
+    return offersNoNegatives.value && isNoNegativesRule(row) ? NO_NEGATIVES : (row.rule_type ?? '');
+}
+
+/**
  * The rule <select>'s options: what this field type can take, plus whatever the row already holds. The
  * second half is what keeps a rule saved before a type change (or before this increment) visible.
  */
 function ruleOptionsFor(row: BuilderValidation): SelectOption[] {
-    const options: SelectOption[] = allowedRuleTypes.value.map((rule) => ({ value: rule.value, label: rule.label }));
+    const options: SelectOption[] = allowedRuleTypes.value.flatMap((rule) =>
+        rule.value === NEGATIVE_FLOOR_RULE && offersNoNegatives.value
+            ? [{ value: rule.value, label: rule.label }, { value: NO_NEGATIVES, label: NO_NEGATIVES_LABEL }]
+            : [{ value: rule.value, label: rule.label }],
+    );
 
     if (row.rule_type !== null && !options.some((option) => option.value === row.rule_type)) {
         const current = ruleTypeOf(row);
@@ -324,14 +344,23 @@ function update(index: number, patch: Partial<BuilderValidation>): void {
  * operator on a `pattern` row and a related field on a `min_length` one — columns no lowering reads, which
  * makes them dead data that reads as intent to the next person opening the row.
  */
-function setRuleType(index: number, value: string): void {
+function setRuleType(index: number, chosen: string): void {
+    // M176: "No negative numbers" is the minimum with its value fixed at 0; "Minimum value" chosen for such a row clears the
+    // value, so the author types one — and both say how the author chose, so the row keeps that kind while it is edited.
+    const noNegatives = chosen === NO_NEGATIVES;
+    const value = noNegatives ? NEGATIVE_FLOOR_RULE : chosen;
+    const extra: Partial<BuilderValidation> = noNegatives
+        ? { rule_value: '0', shown_as: 'no_negatives' }
+        : value === NEGATIVE_FLOOR_RULE
+          ? { shown_as: 'rule', ...(isNoNegativesRule(props.validations[index]) ? { rule_value: null } : {}) }
+          : {};
     const rule = props.ruleTypes.find((candidate) => candidate.value === value) ?? null;
 
     // M131: the compared question survives only if the NEW kind can be judged by it, and the operator only if
     // the new kind reads one that can read that question — `required_if` on text → `greater_than_field` used to
     // keep the text question, which publish refuses.
     const current = props.validations[index];
-    const patch = { ...ruleChangePatch(current, rule, props.comparableFields, props.operators), rule_type: value };
+    const patch = { ...ruleChangePatch(current, rule, props.comparableFields, props.operators), rule_type: value, ...extra };
 
     update(index, { ...patch, ...regroupFor(current, { ...current, ...patch }) });
 }
@@ -430,7 +459,7 @@ const modeOptions: EnumOption[] = [
 
             <template v-if="mode(row) === 'rule'">
                 <MdsSelect
-                    :model-value="row.rule_type ?? ''"
+                    :model-value="kindOf(row)"
                     :options="ruleOptionsFor(row)"
                     :disabled="disabled"
                     :aria-label="`Rule ${i + 1} check`"
@@ -455,12 +484,12 @@ const modeOptions: EnumOption[] = [
                     @update:model-value="update(i, { operator: $event === '' ? null : $event })"
                 />
                 <MdsTextInput
-                    v-if="takesRuleValue(row)"
+                    v-if="takesRuleValue(row) && kindOf(row) !== NO_NEGATIVES"
                     :model-value="row.rule_value ?? ''"
                     placeholder="Value"
                     :disabled="disabled"
                     :aria-label="`Rule ${i + 1} value`"
-                    @update:model-value="update(i, { rule_value: $event || null })"
+                    @update:model-value="update(i, { rule_value: $event || null, shown_as: 'rule' })"
                 />
             </template>
 

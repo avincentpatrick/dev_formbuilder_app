@@ -22,13 +22,37 @@
 /** The longest edge we encode. A raw 4K frame is ~8 MB of PNG; 1600px keeps text legible at a fraction. */
 const MAX_WIDTH = 1600;
 
-/** How long {@see ScreenCapture.grab} waits for each fresh frame before drawing whatever it has. */
-const FRAME_WAIT_MS = 150;
+/*
+ * ── WHICH FRAME IS DRAWN (M176, `R-8496edfa`, ADR-0015 §D11) ───────────────────────────────────────────────────────────
+ * `grab()` used to wait for two presented frames, at most 150ms each, once the panel had left. The user's check of `M175`
+ * found a real capture that still held the panel, with reduced motion on — 3 of 13 in a throwaway probe, then 4 of 20
+ * in `feedback-capture-real.spec.ts` on this code. Measured with five more probes (M176), two causes, both fixed here:
+ *  1. A tab capture reaches the <video> a few frames late, so the frame showing may have been captured BEFORE the panel
+ *     left. Now the frame drawn is one the browser says it CAPTURED after the panel left (`requestVideoFrameCallback`'s
+ *     `captureTime`, in the `performance.now()` timeline — Chrome stamps every tab-capture frame with it).
+ *  2. ⛔ A detached <video> TAKES UP a new frame only while a frame callback is waiting for one. The clean frame arrives
+ *     30–170ms after the panel leaves; if no callback was pending just then, it was never taken up, the page sent
+ *     nothing more (nothing on it changed), and the stale frame — panel and all — was drawn. So a callback chain runs
+ *     from the moment the stream plays until it stops, and always knows the newest frame and when it was captured.
+ * A clean frame captured within a frame of the panel leaving can still be passed over (the compositor may lag the DOM by a
+ * frame, so `since` is taken after it), so when no frame captured after `since` has come within {@see GRAB_NUDGE_MS} the
+ * page is nudged into sending one: a single near-transparent pixel, shown for one frame. Where a browser gives no capture
+ * time, the frames are waited out: at least {@see GRAB_MIN_WAIT_MS} after the panel left, then a quiet spell of
+ * {@see GRAB_QUIET_MS}. Never longer than {@see GRAB_CAP_MS}: the reporter is waiting.
+ */
+export const GRAB_MIN_WAIT_MS = 250;
+export const GRAB_QUIET_MS = 150;
+export const GRAB_NUDGE_MS = 120;
+export const GRAB_CAP_MS = 750;
+const GRAB_POLL_MS = 25;
 
 /** A live capture: take one frame when the page looks right, then stop. */
 export interface ScreenCapture {
-    /** Draw the newest frame and encode it as a PNG File; `null` if the stream never produced a picture. */
-    grab(): Promise<File | null>;
+    /**
+     * Draw a frame captured after `since` (a `performance.now()` time — when the panel left the page; now, if not given)
+     * and encode it as a PNG File; `null` if the stream never produced a picture.
+     */
+    grab(since?: number): Promise<File | null>;
     /** Stop every track. Idempotent. */
     stop(): void;
 }
@@ -89,9 +113,24 @@ async function startCapture(stream: MediaStream): Promise<ScreenCapture> {
     video.srcObject = stream;
     video.muted = true;
 
+    // The frame chain (cause 2 above): registered before playback starts, so no frame of this stream goes untaken.
+    const frames: FrameLog = { latest: null, timed: false, listeners: new Set() };
+    const withCallback = video as WithFrameCallback;
+    let stopped = false;
+    if (typeof withCallback.requestVideoFrameCallback === 'function') {
+        const onFrame = (_now: number, metadata: FrameMetadata): void => {
+            if (stopped) return;
+            const captureTime = typeof metadata?.captureTime === 'number' ? metadata.captureTime : null;
+            frames.latest = { at: performance.now(), captureTime };
+            if (captureTime !== null) frames.timed = true;
+            frames.listeners.forEach((listener) => listener());
+            withCallback.requestVideoFrameCallback?.(onFrame);
+        };
+        withCallback.requestVideoFrameCallback(onFrame);
+    }
+
     await video.play();
 
-    let stopped = false;
     const stop = (): void => {
         if (stopped) return;
         stopped = true;
@@ -102,37 +141,74 @@ async function startCapture(stream: MediaStream): Promise<ScreenCapture> {
 
     return {
         stop,
-        async grab(): Promise<File | null> {
-            // Two fresh frames before drawing. The page changed a moment ago (the panel left), and a
-            // captured surface reaches the <video> a frame or two late — the frame already showing may
-            // still hold the panel. Each wait is capped, because a static page may deliver no new frame.
-            await nextFrame(video);
-            await nextFrame(video);
+        async grab(since: number = performance.now()): Promise<File | null> {
+            await capturedAfter(frames, since);
 
             return frameToPngFile(video);
         },
     };
 }
 
-/** Resolve on the next frame the video presents, or after {@see FRAME_WAIT_MS}, whichever comes first. */
-function nextFrame(video: HTMLVideoElement): Promise<void> {
-    return new Promise<void>((resolve) => {
-        const timer = window.setTimeout(resolve, FRAME_WAIT_MS);
-        const withCallback = video as HTMLVideoElement & {
-            requestVideoFrameCallback?: (callback: () => void) => number;
-        };
+type FrameMetadata = { captureTime?: number };
+type WithFrameCallback = HTMLVideoElement & {
+    requestVideoFrameCallback?: (callback: (now: number, metadata: FrameMetadata) => void) => number;
+};
 
-        if (typeof withCallback.requestVideoFrameCallback === 'function') {
-            withCallback.requestVideoFrameCallback(() => {
-                window.clearTimeout(timer);
-                resolve();
-            });
-        } else {
-            requestAnimationFrame(() => requestAnimationFrame(() => {
-                window.clearTimeout(timer);
-                resolve();
-            }));
+/** What the frame chain knows: the newest frame taken up, and whether this browser stamps frames with a capture time. */
+interface FrameLog {
+    latest: { at: number; captureTime: number | null } | null;
+    timed: boolean;
+    listeners: Set<() => void>;
+}
+
+/** One near-transparent pixel for one frame: enough for the page to send a fresh frame, invisible in the picture. */
+function nudgeRepaint(): void {
+    if (typeof document === 'undefined') return;
+    const pixel = document.createElement('div');
+    pixel.setAttribute('aria-hidden', 'true');
+    pixel.dataset.captureNudge = '';
+    pixel.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;background:rgba(0,0,0,0.004);pointer-events:none;z-index:2147483647';
+    document.body.appendChild(pixel);
+    requestAnimationFrame(() => requestAnimationFrame(() => pixel.remove()));
+}
+
+/**
+ * Resolve once the newest frame was captured after `since` — or, where the browser gives no capture time, once the frames
+ * have settled — and never later than {@see GRAB_CAP_MS}. See the timing note at the top of this file.
+ */
+function capturedAfter(frames: FrameLog, since: number): Promise<void> {
+    return new Promise<void>((resolve) => {
+        const startedAt = performance.now();
+        let finished = false;
+
+        function check(): void {
+            if (finished) return;
+            const latest = frames.latest;
+            if (frames.timed) {
+                if (latest?.captureTime !== null && latest?.captureTime !== undefined && latest.captureTime >= since) finish();
+                return;
+            }
+            const now = performance.now();
+            if (now - since >= GRAB_MIN_WAIT_MS && now - (latest?.at ?? startedAt) >= GRAB_QUIET_MS) finish();
         }
+
+        function finish(): void {
+            if (finished) return;
+            finished = true;
+            window.clearTimeout(cap);
+            window.clearTimeout(nudge);
+            window.clearInterval(poll);
+            frames.listeners.delete(check);
+            resolve();
+        }
+
+        const cap = window.setTimeout(finish, GRAB_CAP_MS);
+        const nudge = window.setTimeout(() => {
+            if (!finished && frames.timed) nudgeRepaint();
+        }, GRAB_NUDGE_MS);
+        const poll = window.setInterval(check, GRAB_POLL_MS);
+        frames.listeners.add(check);
+        check(); // the frame wanted may already be the newest one
     });
 }
 

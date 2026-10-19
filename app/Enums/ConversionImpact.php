@@ -31,13 +31,14 @@ enum ConversionImpact: string
     /** A `${key}` in text shows this question's answer, and the new type has none it can show. */
     case TemplateHoleUnanswerable = 'template_hole_unanswerable';
 
+    /** M176 (`R-36e6f557`): in the DSR §1.5 voice — short sentences, everyday words, what to do next. */
     public function message(): string
     {
         return match ($this) {
-            self::ReferenceHasNoAnswer => 'This uses the question, which will no longer have an answer: "is empty" will always hold and every other comparison will fail.',
-            self::NumericUseOnNonNumber => 'This compares or calculates with the question as a number. The new type is not a number, so the comparison is no longer offered and holds only while an answer happens to be numeric.',
-            self::ListMeaningChanges => 'This checks whether the question contains or equals a choice. The new type changes whether the answer is one choice or a list, so the check will mean something different.',
-            self::TemplateHoleUnanswerable => 'This text shows the question\'s answer, and the new type has no answer to show. Publishing will refuse until the reference is removed.',
+            self::ReferenceHasNoAnswer => 'The new type has no answer, so “is empty” will always be true here, and every other check will fail.',
+            self::NumericUseOnNonNumber => 'This treats the answer as a number. The new type isn’t a number, so this only works while an answer happens to be one.',
+            self::ListMeaningChanges => 'This checks for a choice. The new type changes whether the answer is one choice or several, so the check will mean something different.',
+            self::TemplateHoleUnanswerable => 'This text shows the question’s answer, but the new type has no answer to show. Remove it before you publish.',
         };
     }
 }

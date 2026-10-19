@@ -16,21 +16,19 @@
  *
  * ✅ AND IT IS WHERE `R-a367bf9e`'s VARIANT SWITCH LIVES (M125). The palette shows one "Text" and one "Number"; a field
  * of a variant group gets a segmented "format" control over the group's members, labelled with their own TRANSMITTED
- * type labels, and a number gets "Allow negative numbers". A switch reads the plans, applies a plan that needs no
+ * type labels. (M176, `R-61d43278`: a number's "Allow negative numbers" box went to the Validation tab as the rule
+ * "No negative numbers" — it was a hidden minimum of 0 there already.) A switch reads the plans, applies a plan that needs no
  * review directly (one request, one undo entry — the store records it), and opens the dialog preselected when it does.
  */
 import { computed, nextTick, reactive, ref, useId, watch } from 'vue';
-import { MdsButton, MdsCheckbox, MdsSegmentedControl } from '@meridian/design-system';
+import { MdsButton, MdsSegmentedControl } from '@meridian/design-system';
 import ConvertFieldDialog from './ConvertFieldDialog.vue';
 import {
     consequenceView,
-    NEGATIVE_FLOOR_RULE,
     needsReview,
-    negativeFloor,
     staleMessage,
     targetGroups,
     variantOptions,
-    withNegativesAllowed,
     type ConvertPhase,
 } from './field-conversion';
 import type { Uid } from './types';
@@ -44,7 +42,6 @@ const labelOf = (value: string): string => paletteByValue.get(value)?.label ?? v
 
 const labelId = useId();
 const valueId = useId();
-const negativeHintId = useId();
 
 const dialog = reactive({
     open: false,
@@ -66,6 +63,10 @@ const questionLabel = computed(() => {
     const current = field.value;
     if (!current) return '';
     const label = current.label.trim();
+    // M176 (`R-36e6f557`): a new question is named after its type ("Date & time", or the palette's "Text"), and the dialog
+    // said "Current type of “Date & time”: Date & time". No name, then: the dialog says the type once.
+    const type = paletteByValue.get(current.field_type);
+    if (label !== '' && (label === type?.label || label === type?.variant?.label)) return '';
 
     return label === '' ? current.key : label;
 });
@@ -196,7 +197,7 @@ function shut(): void {
 
 /*
 |--------------------------------------------------------------------------
-| Increment M125 — the variant switch and "Allow negative numbers".
+| Increment M125 — the variant switch (and, until M176, "Allow negative numbers").
 |--------------------------------------------------------------------------
 | ⛔ A NATIVE CONTROL CHECKS ITSELF ON THE CLICK, BEFORE ANYTHING IS DECIDED. When the switch is then refused, cancelled
 | in the dialog or ignored while another is in flight, the bound value never changes, so Vue has no reason to re-patch
@@ -205,27 +206,16 @@ function shut(): void {
 | hand the dialog a dead opener to return focus to.
 */
 const formatRoot = ref<HTMLElement | null>(null);
-const negativeRoot = ref<HTMLElement | null>(null);
 let switching = false;
 
 const variant = computed(() => (field.value ? (paletteByValue.get(field.value.field_type)?.variant ?? null) : null));
 const formatOptions = computed(() => (variant.value ? variantOptions(paletteByValue.values(), variant.value.group) : []));
-/** Offered only where the server offers a minimum for this type's shape — a toggle must not build a rule publish refuses. */
-const offersNegativeToggle = computed(() => {
-    const type = field.value ? paletteByValue.get(field.value.field_type) : undefined;
-    if (!type || !variant.value) return false;
-
-    return props.store.enums.validation_rule_types.some((rule) => rule.value === NEGATIVE_FLOOR_RULE && rule.shapes.includes(type.value_shape));
-});
-const floor = computed(() => negativeFloor(field.value?.validations ?? []));
 
 function resyncControls(): void {
     const type = field.value?.field_type;
     formatRoot.value?.querySelectorAll<HTMLInputElement>('input[type="radio"]').forEach((input) => {
         input.checked = input.value === type;
     });
-    const box = negativeRoot.value?.querySelector<HTMLInputElement>('input[type="checkbox"]');
-    if (box) box.checked = floor.value.allowed;
 }
 
 async function switchFormat(to: string): Promise<void> {
@@ -272,18 +262,6 @@ async function switchFormat(to: string): Promise<void> {
     }
 }
 
-function setNegativesAllowed(allowed: boolean): void {
-    const target = field.value;
-    if (!target) return;
-    const next = withNegativesAllowed(target.validations, allowed);
-    if (next === target.validations) {
-        resyncControls();
-        return;
-    }
-    target.validations = next;
-    props.store.touch(target.uid, 'field');
-}
-
 defineExpose({ openDialog });
 </script>
 
@@ -310,18 +288,6 @@ defineExpose({ openDialog });
                 :ariaLabel="`${variant.label} format`"
                 @update:model-value="switchFormat"
             />
-        </div>
-        <div v-if="offersNegativeToggle" ref="negativeRoot" class="field-type__group" data-negative-toggle>
-            <MdsCheckbox
-                :model-value="floor.allowed"
-                label="Allow negative numbers"
-                :disabled="floor.state === 'custom'"
-                :describedby="floor.state === 'custom' ? negativeHintId : undefined"
-                @update:model-value="setNegativesAllowed"
-            />
-            <p v-if="floor.state === 'custom'" :id="negativeHintId" class="field-type__hint">
-                A minimum is set on the Validation tab — change it there.
-            </p>
         </div>
         <p class="field-type__status" role="status">{{ announcement }}</p>
 
@@ -385,13 +351,6 @@ defineExpose({ openDialog });
    "Whole number · Decimal number" refuse to shrink at 375px and the largest text size. */
 .field-type__group .mds-segmented {
     flex-wrap: wrap;
-}
-
-.field-type__hint {
-    margin: 0;
-    font-size: var(--mds-type-body-sm-font-size);
-    line-height: var(--mds-type-body-sm-line-height);
-    color: var(--mds-color-text-secondary);
 }
 
 /* Empty at rest and so zero-height; never `display: none`, which a screen reader would not announce from. */

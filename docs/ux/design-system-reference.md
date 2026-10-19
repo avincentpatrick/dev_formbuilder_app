@@ -59,6 +59,25 @@ Feature #6's acceptance criteria state this exactly: *"Any exception to using th
 
 Design/Frontend Engineering jointly owns this document and the component library it describes. Scope is explicitly the **shared, cross-screen system**: tokens, primitive and composite components, the app shell(s), accessibility baseline, and the governance process around all of the above. It does **not** own: page-specific business logic, the field-type catalog's domain semantics (owned by the Data Dictionary and the form-builder feature docs), or the Form-Filling UX Flow Spec's flow-level decisions (partial-save/resume, single-page vs. multi-step — plan doc #20), though that spec is expected to compose components defined here rather than invent its own.
 
+### 1.5 Voice — write for a smart high-schooler *(M176, `R-36e6f557`)*
+
+Every word the product shows — a label, a help line, a dialog, an error, a warning — is written for a **smart high-schooler**:
+someone quick, who knows nothing about how the product is built. The testers asked for exactly this (2026-10-11): *"Make the
+text/instructions more “smart highschooler” friendly"*, on a dialog that said *"It keeps its key, so conditions, calculations and
+text that mention it still point to it"*.
+
+- **Short sentences, everyday words.** One idea per sentence. No developer words — *structured rule*, *expression engine*,
+  *indexed data type*, *token*, *payload* — unless the screen itself shows that word as a control's name, and then use it exactly.
+- **Say what happens to the answers.** A change explains what the respondent, the answers already given, or the published form
+  will notice — not what the code does.
+- **Name a thing as the screen names it.** A question's key is its **field key** (the label on the Advanced tab); a rule's kind is
+  the name in the rule menu. A word the author cannot find on screen is a word they cannot act on.
+- **Say it once.** Never repeat a value as its own label (*"Current type of “Date & time”: Date & time"*), and never lead an error
+  with the first of the items listed under it.
+- **Tell the author what to do next** when something blocks them: *"Add one before you publish the form"*, not *"cannot be published"*.
+
+A message composed on the server (an enum's `message()`) follows the same rule; it is the same voice wherever it is rendered.
+
 ---
 
 ## 2. Design Tokens
@@ -653,7 +672,7 @@ Governing rule: **help text occupies its layout slot even when absent from a hid
 
 | Input | Default | Hover | Focus | Error | Disabled | Notes |
 |---|---|---|---|---|---|---|
-| **Text / Textarea** | `--mds-neutral-300` border, `--mds-neutral-0` fill | `--mds-neutral-400` border | Focus ring (§4.2) + `--mds-primary-600` border | `--mds-danger-600` border + error icon suffix | `--mds-neutral-100` fill, `--mds-neutral-400` text, border removed | Textarea has a resize handle only on the vertical axis; min-height = 3 lines |
+| **Text / Textarea** | `--mds-neutral-300` border, `--mds-neutral-0` fill | `--mds-neutral-400` border | Focus ring (§4.2) + `--mds-primary-600` border | `--mds-danger-600` border + error icon suffix | `--mds-neutral-100` fill, `--mds-neutral-400` text, border removed | Textarea has a resize handle only on the vertical axis; min-height = 3 lines. *(M176)* `autosize` opts a textarea out of both: one line to start, no handle, the box as tall as its text (re-measured on typing, on a new value and on a width change) — for a value that is one line in spirit but may run long, such as a question's label. `maxlength` with `countFrom` shows "N of MAX characters" under the box once the text reaches `countFrom`, tied to it by `aria-describedby` and deliberately not a live region (it would talk over the author's typing) |
 | **Search** *(added J1a)* | Author-styled box identical to Text — same border, fill, radius and `min-height: 40px` — **plus** the user-agent clear glyph inside the box once the field is non-empty (note 2) | Same as text | Same as text | Supported but unused: the component applies `mds-input--invalid` and `aria-invalid` for this type exactly as for text, and nothing prevents a consumer from doing so. A keyword query has no invalid state — a query matching nothing is an *empty state* (§3.3), not an error — so a search field rendering an error border is a smell, not a feature | Same as text | `MdsTextInput type="search"`. See the four binding notes below. |
 | **Select / Dropdown** | Same as text input, trailing chevron icon | Same | Same, plus open-state elevation `--mds-shadow-3` on the option panel | Same as text | Same as text | Combobox variants (searchable, cascading) follow the ARIA pattern in §4.5 |
 | **Checkbox** | `--mds-radius-sm` box, `--mds-neutral-300` border | Border darkens to `--mds-neutral-400` | Focus ring around the box | Border + adjacent error text | Reduced-opacity box, no interaction | Checked state fills `--mds-primary-600` with a white check glyph — never relies on fill color alone (the glyph itself is the non-color signifier) |

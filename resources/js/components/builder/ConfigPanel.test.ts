@@ -159,13 +159,16 @@ function makeStore(
         fields?: LocalField[];
         errors?: Record<string, Record<string, string[]>>;
         touch?: (uid: string, kind: string) => void;
+        saveError?: string | null;
+        ruleRows?: Record<string, number[]>;
     } = {},
 ): BuilderStore {
     return {
         formId: 'form-1',
         selectedField: computed(() => selected.field ?? null),
         selectedSection: computed(() => selected.section ?? null),
-        saveError: ref<string | null>(null), saveFieldErrors: ref<Record<string, Record<string, string[]>>>(selected.errors ?? {}),
+        saveError: ref<string | null>(selected.saveError ?? null), saveFieldErrors: ref<Record<string, Record<string, string[]>>>(selected.errors ?? {}),
+        saveRuleRows: ref<Record<string, number[]>>(selected.ruleRows ?? {}),
         saving: ref(false),
         librarySaved: ref<string | null>(null),
         enums: ENUMS,
@@ -558,9 +561,10 @@ describe('ConfigPanel — a refused save marks the field (M128, R-d001de0c)', ()
         const target = field();
         const wrapper = mountPanel(makeStore({ field: target, errors: { [target.uid]: { label: ['The label field is required.'] } } }));
 
-        const input = wrapper.find('input[aria-invalid="true"]');
+        // M176 (`R-923c5041`): the Label is a growing <textarea> now, so the control is found by its value, whatever its tag.
+        const input = wrapper.find('[aria-invalid="true"]');
         expect(input.exists()).toBe(true);
-        expect(input.element).toBe(wrapper.findAll('input').find((i) => (i.element as HTMLInputElement).value === target.label)!.element);
+        expect(input.element).toBe(wrapper.findAll('input, textarea').find((i) => (i.element as HTMLTextAreaElement).value === target.label)!.element);
 
         const described = (input.attributes('aria-describedby') ?? '').split(' ');
         const message = described.map((id) => wrapper.find(`[id="${id}"]`)).find((el) => el.exists() && el.text().includes('The label field is required.'));
@@ -653,5 +657,86 @@ describe('ConfigPanel — a formula default (M134, R-6d7b9ff7)', () => {
         expect(visit.default_value).toBe('2026-01-01');
         expect((visit as LocalField & { default_value_is_expression: boolean }).default_value_is_expression).toBe(false);
         expect(touch).toHaveBeenLastCalledWith('f1', 'field');
+    });
+});
+
+describe('ConfigPanel — a refused save is said once (M176, R-5554c526)', () => {
+    // The testers' comment (2026-10-11, comment 2): "Instructions repeat". The lead line was the reply's `message`, which
+    // Laravel fills with the FIRST error (plus "(and N more errors)"), and the list below named every error — that one too.
+    it('leads with one plain line, then each item — never the first item twice', () => {
+        const target = field();
+        const wrapper = mountPanel(
+            makeStore({
+                field: target,
+                saveError: 'Empty. Choose what it checks, or remove it. (and 1 more error)',
+                errors: { [target.uid]: { 'validations.0': ['Empty. Choose what it checks, or remove it.'], 'config.options.1.label': ['The label is required.'] } },
+            }),
+        );
+
+        const alert = wrapper.get('[role="alert"]');
+        expect(alert.find('p').text()).toBe('This question was not saved. Fix the items below.');
+        expect(alert.text()).not.toContain('(and 1 more error)');
+        expect(alert.text().split('Empty. Choose what it checks').length - 1).toBe(1);
+    });
+
+    it('keeps the reply\'s own words when the failure carried no list of items', () => {
+        const target = field();
+        const wrapper = mountPanel(makeStore({ field: target, saveError: 'Something went wrong saving your change.' }));
+
+        expect(wrapper.get('[role="alert"]').find('p').text()).toBe('Something went wrong saving your change.');
+    });
+
+    it('numbers a refused rule as the Validation tab does, past a rule still being written', () => {
+        // The request leaves out a rule still being written, so `validations.0` was the SECOND rule on screen and the
+        // alert said "Rule 1". The store records, at send time, which editor row each sent rule was.
+        const target = field();
+        const wrapper = mountPanel(
+            makeStore({
+                field: target,
+                saveError: 'The rule value must be a number.',
+                errors: { [target.uid]: { 'validations.0.rule_value': ['The rule value must be a number.'] } },
+                ruleRows: { [target.uid]: [1] },
+            }),
+        );
+
+        expect(wrapper.get('[role="alert"]').text()).toContain('Rule 2: The rule value must be a number.');
+    });
+});
+
+describe('ConfigPanel — the Label box grows with a long question (M176, R-923c5041)', () => {
+    // The testers (2026-10-11, comment 7): "Label field is too small. It cannot accommodate long questions. Make the field
+    // multi-line or expanding"; the user (2026-10-16): "make the label box larger".
+    function labelBox(wrapper: ReturnType<typeof mountPanel>) {
+        const label = wrapper.findAll('label').find((candidate) => candidate.text().trim() === 'Label');
+        expect(label, 'a label reading "Label"').toBeDefined();
+
+        return wrapper.get(`[id="${label!.attributes('for')}"]`);
+    }
+
+    it('is a growing box held to the label\'s 500 characters, with a count once it is near them', async () => {
+        const target = field();
+        const wrapper = mountPanel(makeStore({ field: target }));
+        const box = labelBox(wrapper);
+
+        expect(box.element.tagName).toBe('TEXTAREA');
+        expect(box.classes()).toContain('mds-textarea--autosize');
+        expect(box.attributes('maxlength')).toBe('500');
+        expect(wrapper.text()).not.toContain('of 500 characters');
+
+        const long = mountPanel(makeStore({ field: field({ label: 'x'.repeat(460) }) }));
+        expect(long.text()).toContain('460 of 500 characters');
+    });
+
+    it('takes no line break: Enter adds none, and a pasted one becomes a space', async () => {
+        const target = field();
+        const wrapper = mountPanel(makeStore({ field: target }));
+        const box = labelBox(wrapper);
+
+        const enter = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true });
+        box.element.dispatchEvent(enter);
+        expect(enter.defaultPrevented).toBe(true);
+
+        await box.setValue('How many people\r\nsleep here?');
+        expect(target.label).toBe('How many people sleep here?');
     });
 });

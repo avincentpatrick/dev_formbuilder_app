@@ -59,13 +59,20 @@ describe('BuilderCanvas — an empty section (M139)', () => {
         expect(empties[0].element.closest('[data-drop-group]')?.getAttribute('data-drop-group')).toBe('s2');
     });
 
-    it('hands the builder the section to add a question to', async () => {
+    it('adds the chosen type into that empty section — a question, not only a selection (M176, R-5354b4b9)', async () => {
+        // The testers: "“+ Add question here” button not working". It selected the section and moved focus to the palette.
+        const fetch = fetchMock().mockResolvedValue(jsonResponse(200, serverField({ id: 'f2', key: 'age', label: 'Number', field_type: 'integer', form_section_id: 's2', sequence: 2 })));
         const { store, wrapper } = canvas();
 
-        await wrapper.find('[data-section-empty] button').trigger('click');
+        await wrapper.get('[data-section-empty] [data-add-here-toggle]').trigger('click');
+        await wrapper.get('[data-section-empty] [data-add-type="integer"]').trigger('click');
+        await store.whenIdle();
+        await flushPromises();
 
-        const visit = store.sections.value.find((s) => s.key === 'visit')!;
-        expect(wrapper.emitted('add-question')).toEqual([[visit.uid]]);
+        const created = requestLog(fetch).filter((r) => r.method === 'POST' && r.url.endsWith('/fields'));
+        expect(created.map((r) => r.body)).toEqual([{ field_type: 'integer', section_id: 's2' }]);
+        expect(store.fields.value.find((f) => f.id === 'f2')?.form_section_id).toBe('s2');
+        expect(store.selection.value).toMatchObject({ kind: 'field' });
     });
 });
 
@@ -91,7 +98,7 @@ describe('BuilderCanvas — a label edited in place (M150)', () => {
 
     async function open(wrapper: ReturnType<typeof editable>['wrapper']): Promise<HTMLInputElement> {
         await wrapper.find('button[aria-label="Edit label of Name"]').trigger('click');
-        return wrapper.find('input[aria-label="Question label"]').element as HTMLInputElement;
+        return wrapper.find('[aria-label="Question label"]').element as HTMLInputElement;
     }
 
     it('swaps the row for a focused input holding the label', async () => {
@@ -104,14 +111,30 @@ describe('BuilderCanvas — a label edited in place (M150)', () => {
         expect(wrapper.find('.canvas__field-main').exists()).toBe(false);
     });
 
+    it('edits the label in a box that grows with a long question, and takes no line break (M176, R-923c5041)', async () => {
+        // The testers (2026-10-11, comment 7): "Label field is too small. It cannot accommodate long questions."
+        const { wrapper, patches } = editable();
+        await open(wrapper);
+        const box = wrapper.get('[aria-label="Question label"]');
+
+        expect(box.element.tagName).toBe('TEXTAREA');
+        expect(box.classes()).toContain('mds-textarea--autosize');
+
+        // A pasted line break becomes a space: a label is one line of text, however long it runs.
+        await box.setValue('How many people\nsleep here?');
+        await box.trigger('keydown', { key: 'Enter' });
+        await flushPromises();
+        expect((patches()[0].body as { label: string }).label).toBe('How many people sleep here?');
+    });
+
     it('saves the trimmed label once on Enter, and gives focus back to the row', async () => {
         const { store, wrapper, patches } = editable();
         const input = await open(wrapper);
 
-        await wrapper.find('input[aria-label="Question label"]').setValue('  Full name  ');
+        await wrapper.find('[aria-label="Question label"]').setValue('  Full name  ');
         // Nothing is written while typing.
         expect(patches()).toHaveLength(0);
-        await wrapper.find('input[aria-label="Question label"]').trigger('keydown', { key: 'Enter' });
+        await wrapper.find('[aria-label="Question label"]').trigger('keydown', { key: 'Enter' });
         // Written at once — not after the settings pane's 600ms debounce.
         await flushPromises();
 
@@ -126,8 +149,8 @@ describe('BuilderCanvas — a label edited in place (M150)', () => {
     it('is one undo entry', async () => {
         const { store, wrapper, patches } = editable();
         await open(wrapper);
-        await wrapper.find('input[aria-label="Question label"]').setValue('Full name');
-        await wrapper.find('input[aria-label="Question label"]').trigger('keydown', { key: 'Enter' });
+        await wrapper.find('[aria-label="Question label"]').setValue('Full name');
+        await wrapper.find('[aria-label="Question label"]').trigger('keydown', { key: 'Enter' });
         await flushPromises();
 
         await store.undo();
@@ -140,8 +163,8 @@ describe('BuilderCanvas — a label edited in place (M150)', () => {
     it('keeps the label on Escape, and writes nothing', async () => {
         const { store, wrapper, patches } = editable();
         await open(wrapper);
-        await wrapper.find('input[aria-label="Question label"]').setValue('Something else');
-        await wrapper.find('input[aria-label="Question label"]').trigger('keydown', { key: 'Escape' });
+        await wrapper.find('[aria-label="Question label"]').setValue('Something else');
+        await wrapper.find('[aria-label="Question label"]').trigger('keydown', { key: 'Escape' });
         await flushPromises();
 
         expect(patches()).toHaveLength(0);
@@ -153,7 +176,7 @@ describe('BuilderCanvas — a label edited in place (M150)', () => {
         // Escape unmounts the input, and a browser may still send it a blur: that blur must not save the discarded text.
         const { store, wrapper, patches } = editable();
         await open(wrapper);
-        const input = wrapper.find('input[aria-label="Question label"]');
+        const input = wrapper.find('[aria-label="Question label"]');
         await input.setValue('Something else');
         input.element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
         input.element.dispatchEvent(new FocusEvent('blur'));
@@ -166,8 +189,8 @@ describe('BuilderCanvas — a label edited in place (M150)', () => {
     it('keeps the label when it is left blank, and writes nothing', async () => {
         const { store, wrapper, patches } = editable();
         await open(wrapper);
-        await wrapper.find('input[aria-label="Question label"]').setValue('   ');
-        await wrapper.find('input[aria-label="Question label"]').trigger('keydown', { key: 'Enter' });
+        await wrapper.find('[aria-label="Question label"]').setValue('   ');
+        await wrapper.find('[aria-label="Question label"]').trigger('keydown', { key: 'Enter' });
         await flushPromises();
 
         expect(patches()).toHaveLength(0);
@@ -177,7 +200,7 @@ describe('BuilderCanvas — a label edited in place (M150)', () => {
     it('saves on blur too, and an Enter followed by a blur saves once', async () => {
         const { wrapper, patches } = editable();
         await open(wrapper);
-        const input = wrapper.find('input[aria-label="Question label"]');
+        const input = wrapper.find('[aria-label="Question label"]');
         await input.setValue('Full name');
         input.element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
         input.element.dispatchEvent(new FocusEvent('blur'));
@@ -189,19 +212,19 @@ describe('BuilderCanvas — a label edited in place (M150)', () => {
     it('leaves Enter to an input method that is composing', async () => {
         const { wrapper, patches } = editable();
         await open(wrapper);
-        const input = wrapper.find('input[aria-label="Question label"]');
+        const input = wrapper.find('[aria-label="Question label"]');
         await input.setValue('Full name');
         input.element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }));
         await flushPromises();
 
         expect(patches()).toHaveLength(0);
-        expect(wrapper.find('input[aria-label="Question label"]').exists()).toBe(true);
+        expect(wrapper.find('[aria-label="Question label"]').exists()).toBe(true);
     });
 
     it('opens on a double-click of the row', async () => {
         const { wrapper } = editable();
         await wrapper.find('.canvas__field-main').trigger('dblclick');
 
-        expect(wrapper.find('input[aria-label="Question label"]').exists()).toBe(true);
+        expect(wrapper.find('[aria-label="Question label"]').exists()).toBe(true);
     });
 });

@@ -126,7 +126,7 @@ function sendReply(row: ConsoleFeedbackRow): void {
 
     replyError.value = null;
     busy.value = true;
-    router.post(
+    router.patch(
         `/admin/feedback/${row.id}/comments`,
         { body: reply.value.trim() },
         {

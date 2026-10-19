@@ -200,6 +200,7 @@ it('derives both rule-kind lists from the enum, and they are neither empty nor i
 
     expect(array_values($needsRelated))->toEqualCanonicalizing([
         'required_if', 'required_with', 'skip_if', 'skip_with', 'greater_than_field', 'less_than_field',
+        'at_least_field', 'at_most_field',
     ]);
     expect(array_values($needsOperator))->toEqualCanonicalizing(['required_if', 'skip_if']);
 

@@ -786,7 +786,7 @@ const reference: ChapterDraft[] = [
                         [ui('No negative numbers', RULE_WORDS), ' — numbers only. It refuses any answer below zero, and needs no value.'],
                         [ui('Minimum length', RULE_TYPES), ' and ', ui('Maximum length', RULE_TYPES), ' — text. For example, an ID of exactly 10 characters.'],
                         [ui('Must match a pattern', RULE_TYPES), ' — text in a fixed shape, such as a phone number. Email, phone and web-address questions start with one.'],
-                        [ui('Greater than another question', RULE_TYPES), ' and ', ui('Less than another question', RULE_TYPES), ' — numbers compared with another answer, such as “children” less than “household size”.'],
+                        [ui('Greater than another question', RULE_TYPES), ' and ', ui('Less than another question', RULE_TYPES), ' — numbers compared with another answer, such as “children” less than “household size”; ', ui('At least another question', RULE_TYPES), ' and ', ui('At most another question', RULE_TYPES), ' also let an equal answer through. While the other question is still blank, all four let the answer through.'],
                         [
                             ui('Required when a condition holds', RULE_TYPES), ', ', ui('Required with another question', RULE_TYPES), ', ', ui('Skipped when a condition holds', RULE_TYPES), ' and ',
                             ui('Skipped with another question', RULE_TYPES), ' — any question that takes an answer.',

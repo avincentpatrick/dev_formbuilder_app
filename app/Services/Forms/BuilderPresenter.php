@@ -310,6 +310,10 @@ final class BuilderPresenter
                     // M131 (`R-799d60f5`) — the skip pair, so the all/any switch can tell the three families a
                     // group is folded within apart without a client list of rule names.
                     'governs_relevance' => $t->governsRelevance(),
+                    // M178 (`R-917496f9`) — the rule that states the same limit against another question's answer
+                    // (min_value ↔ at_least_field, max_value ↔ at_most_field), so the Minimum row's "A number · Another
+                    // question's answer" choice switches to it without a client list of rule names.
+                    'bound_counterpart' => $t->boundCounterpart()?->value,
                 ],
                 ValidationRuleType::cases(),
             ),

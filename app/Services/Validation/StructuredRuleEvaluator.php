@@ -59,7 +59,7 @@ final class StructuredRuleEvaluator
         }
 
         return match ($row->rule_type) {
-            ValidationRuleType::GreaterThanField, ValidationRuleType::LessThanField => $this->passesFieldComparison(
+            ValidationRuleType::GreaterThanField, ValidationRuleType::LessThanField, ValidationRuleType::AtLeastField, ValidationRuleType::AtMostField => $this->passesFieldComparison(
                 $row, $context, $fieldKeysById,
             ),
             ValidationRuleType::MinValue => Coercion::isEmpty($answer)

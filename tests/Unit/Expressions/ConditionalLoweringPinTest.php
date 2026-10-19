@@ -6,6 +6,8 @@ use App\Enums\ComparisonOperator;
 use App\Enums\ValidationRuleType;
 use App\Exceptions\Expressions\ExpressionEvaluationException;
 use App\Models\FormFieldValidation;
+use App\Services\Expressions\Ast\ComparisonNode;
+use App\Services\Expressions\Ast\FieldReferenceNode;
 use App\Services\Expressions\StructuredRuleLowering;
 
 /*
@@ -139,7 +141,32 @@ it('pins the memberships as counts, so a match arm deleted on both sides cannot 
     $count = fn (callable $p): int => count(array_filter(ValidationRuleType::cases(), $p));
 
     expect($count(fn (ValidationRuleType $t): bool => $t->takesOperator()))->toBe(4)
-        ->and($count(fn (ValidationRuleType $t): bool => $t->takesRelatedField()))->toBe(6)
+        ->and($count(fn (ValidationRuleType $t): bool => $t->takesRelatedField()))->toBe(8)
         ->and($count(fn (ValidationRuleType $t): bool => $t->operatorMayBeEmpty()))->toBe(2)
-        ->and(ValidationRuleType::cases())->toHaveCount(11);
+        ->and(ValidationRuleType::cases())->toHaveCount(13);
+});
+
+it('lowers each field comparison to exactly the comparison relatedComparison() names, owner on the left', function (): void {
+    // M178 (`R-917496f9`). "At least another question" lowered to a strict `>` would pass every vector that never
+    // sets the two answers EQUAL, and nothing above would notice — so the operator itself is pinned, against the
+    // enum fact the publish gate and the builder both read.
+    $lowering = new StructuredRuleLowering;
+    $lowered = 0;
+
+    foreach (ValidationRuleType::cases() as $type) {
+        if (! $type->takesRelatedField() || $type->takesOperator()) {
+            continue;
+        }
+
+        $node = $lowering->lower(pinRow($type, null, 'frelated'), pinKeyMap());
+
+        expect($node)->toBeInstanceOf(ComparisonNode::class);
+        assert($node instanceof ComparisonNode);
+        expect($node->op)->toBe($type->relatedComparison(null), $type->value)
+            ->and($node->left)->toEqual(new FieldReferenceNode('owner'))
+            ->and($node->right)->toEqual(new FieldReferenceNode('related'));
+        $lowered++;
+    }
+
+    expect($lowered)->toBe(4);
 });

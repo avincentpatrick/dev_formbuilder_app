@@ -197,6 +197,9 @@ export interface RuleTypeOption extends EnumOption {
     // M131 (`R-799d60f5`) — the skip pair. With `governs_requiredness` it splits the rules into the three families
     // both engines fold a group within; `rule-grouping.ts` reads the two, never a list of names.
     governs_relevance: boolean;
+    // M178 (`R-917496f9`) — the rule stating the same limit against another question's answer (`min_value` ↔
+    // `at_least_field`, `max_value` ↔ `at_most_field`; `ValidationRuleType::boundCounterpart()`), null otherwise.
+    bound_counterpart: string | null;
 }
 
 // One comparison operator as a rule row shows it (M115). `label` carries its symbol inside the string

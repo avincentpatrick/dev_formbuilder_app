@@ -374,3 +374,38 @@ it('refuses the WEB export to a viewer, the arm the existing collaborator case c
         ->get("http://acme.meridian.test/forms/{$form->id}/versions/{$version->id}/xlsform")
         ->assertForbidden();
 });
+
+it('writes each field comparison as its constraint, at least and at most included (M178, R-917496f9)', function (): void {
+    // `renderStructured()` ends in `default => null`, so a rule type it was never told about is dropped from the
+    // export without a word — this pins all four comparisons, the strict pair included, which no case did before.
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+
+    $form = makeForm($owner, 'Comparisons');
+    $version = makeDraftVersion($form);
+    $start = addFormField($version, $owner, 'start', FieldType::Integer, 0);
+
+    $cases = [
+        'after' => ['greater_than_field', '. > ${start}'],
+        'before' => ['less_than_field', '. < ${start}'],
+        'from' => ['at_least_field', '. >= ${start}'],
+        'upto' => ['at_most_field', '. <= ${start}'],
+    ];
+
+    $sequence = 1;
+    foreach ($cases as $key => [$rule]) {
+        $field = addFormField($version, $owner, $key, FieldType::Integer, $sequence++);
+        FormFieldValidation::create([
+            'form_version_id' => $version->id, 'form_field_id' => $field->id, 'rule_type' => $rule,
+            'related_form_field_id' => $start->id, 'error_message' => 'Out of range', 'sequence' => 0,
+        ]);
+    }
+
+    $sheets = app(XlsformExporter::class)->build($form, $version->refresh());
+
+    foreach ($cases as $key => [$rule, $constraint]) {
+        expect(surveyRow($sheets, $key)['constraint'] ?? null)->toBe($constraint, $rule);
+    }
+});

@@ -258,8 +258,8 @@ function engineRefuses(row: ValidationRow, keys: FieldKeysById): boolean {
                 lowering.lowerCondition(row, keys);
 
                 return false;
-            case 'greater_than_field':
-            case 'less_than_field':
+            case 'greater_than_field': case 'less_than_field':
+            case 'at_least_field': case 'at_most_field':
                 lowering.lower(row, keys);
 
                 return false;

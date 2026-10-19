@@ -185,7 +185,7 @@ enum ValueShape: string
                 || $this === self::Duration
                 || $this === self::Scale,
 
-            ValidationRuleType::GreaterThanField, ValidationRuleType::LessThanField => $this === self::Number
+            ValidationRuleType::GreaterThanField, ValidationRuleType::LessThanField, ValidationRuleType::AtLeastField, ValidationRuleType::AtMostField => $this === self::Number
                 || $this === self::Duration,
         };
     }

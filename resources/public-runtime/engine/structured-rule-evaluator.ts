@@ -68,8 +68,8 @@ export class StructuredRuleEvaluator {
         }
 
         switch (row.rule_type) {
-            case 'greater_than_field':
-            case 'less_than_field':
+            case 'greater_than_field': case 'less_than_field':
+            case 'at_least_field': case 'at_most_field':
                 return this.passesFieldComparison(row, context, fieldKeysById);
             case 'min_value':
                 return isEmpty(answer) || (isNumericLike(answer) && toNumber(answer) >= toNumber(this.ruleValue(row)));

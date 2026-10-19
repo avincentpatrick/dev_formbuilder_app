@@ -186,9 +186,9 @@ it('offers a note or page break nothing at all', function (): void {
 });
 
 it('leaves no rule type unanswered by any shape', function (): void {
-    // Anti-vacuity over the OTHER axis: every one of the eleven rule types must be allowed by at least
+    // Anti-vacuity over the OTHER axis: every one of the thirteen rule types must be allowed by at least
     // one shape and refused by at least one, or the table has a column that decides nothing.
-    expect(ValidationRuleType::cases())->toHaveCount(11);
+    expect(ValidationRuleType::cases())->toHaveCount(13);
 
     foreach (ValidationRuleType::cases() as $rule) {
         $allowed = array_filter(ValueShape::cases(), static fn (ValueShape $s): bool => $s->allows($rule));

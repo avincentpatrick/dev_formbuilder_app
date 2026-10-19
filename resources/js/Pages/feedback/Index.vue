@@ -293,7 +293,7 @@ function excerpt(text: string): string {
                 />
 
                 <!-- M179: the support team's note, shown here too — until M179 only the reporter ever read it. -->
-                <div v-if="detailRow.resolution_note" class="fbl__note" data-feedback-reply>
+                <div v-if="false" class="fbl__note" data-feedback-reply>
                     <p class="fbl__note-label">Our note</p>
                     <p class="fbl__body">{{ detailRow.resolution_note }}</p>
                 </div>

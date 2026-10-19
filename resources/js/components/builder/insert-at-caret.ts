@@ -13,7 +13,7 @@
  * half-written `${na`, and the caller says so.
  */
 export function insertAtCaret(box: HTMLTextAreaElement | HTMLInputElement, text: string, replaceFrom?: number): boolean {
-    const end = box.selectionEnd ?? box.value.length;
+    const end = box.value.length;
     const start = Math.min(replaceFrom ?? box.selectionStart ?? end, end);
 
     if (box.maxLength > 0 && box.value.length - (end - start) + text.length > box.maxLength) {

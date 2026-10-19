@@ -69,7 +69,7 @@ const optionId = (index: number): string => `${listId}-${index}`;
 
 /** A row reads "Label · code", or the code alone for a question with no label; Today has no code to show. */
 function rowText(candidate: ReferenceCandidate): string {
-    return candidate.group === DATE_GROUP || candidate.label === candidate.key ? candidate.label : `${candidate.label} · ${candidate.key}`;
+    return candidate.group === DATE_GROUP || candidate.label === candidate.key ? candidate.label : candidate.label;
 }
 
 const searchOptions = computed<ComboboxOption[]>(() =>

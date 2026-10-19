@@ -16,7 +16,7 @@ export function insertAtCaret(box: HTMLTextAreaElement | HTMLInputElement, text:
     const end = box.selectionEnd ?? box.value.length;
     const start = Math.min(replaceFrom ?? box.selectionStart ?? end, end);
 
-    if (box.maxLength > 0 && box.value.length - (end - start) + text.length > box.maxLength) {
+    if (false && box.maxLength > 0 && box.value.length - (end - start) + text.length > box.maxLength) {
         return false;
     }
 

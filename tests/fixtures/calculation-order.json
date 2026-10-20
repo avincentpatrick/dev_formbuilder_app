@@ -1,0 +1,47 @@
+[
+  {
+    "name": "a chain in document order",
+    "calculations": [{"key": "c1", "formula": "${a} + 1"}, {"key": "c2", "formula": "${c1} + 1"}],
+    "order": ["c1", "c2"]
+  },
+  {
+    "name": "a chain against document order",
+    "calculations": [{"key": "doubled", "formula": "${plus_one} * 2"}, {"key": "plus_one", "formula": "${a} + 1"}],
+    "order": ["plus_one", "doubled"]
+  },
+  {
+    "name": "a diamond resolves in one later sweep",
+    "calculations": [{"key": "d", "formula": "${b} + ${c}"}, {"key": "b", "formula": "${a}"}, {"key": "c", "formula": "${b} * 2"}],
+    "order": ["b", "c", "d"]
+  },
+  {
+    "name": "a self-reference is never worked out",
+    "calculations": [{"key": "total", "formula": "${total} + ${a}"}, {"key": "twice", "formula": "${a} * 2"}],
+    "order": ["twice"]
+  },
+  {
+    "name": "a two-calculation cycle is never worked out, the rest are",
+    "calculations": [{"key": "c1", "formula": "${c2} + 1"}, {"key": "c2", "formula": "${c1} + 1"}, {"key": "c3", "formula": "${a} + 1"}],
+    "order": ["c3"]
+  },
+  {
+    "name": "a calculation downstream of a cycle is never worked out",
+    "calculations": [{"key": "c1", "formula": "${c2}"}, {"key": "c2", "formula": "${c1}"}, {"key": "c4", "formula": "${c1} + ${a}"}, {"key": "c5", "formula": "${a}"}],
+    "order": ["c5"]
+  },
+  {
+    "name": "a calculation with no formula counts as worked out, with no value",
+    "calculations": [{"key": "empty", "formula": null}, {"key": "next", "formula": "${empty} + 1"}],
+    "order": ["next"]
+  },
+  {
+    "name": "a reference to an ordinary question is not a dependency",
+    "calculations": [{"key": "c", "formula": "${q} * ${r}"}],
+    "order": ["c"]
+  },
+  {
+    "name": "no calculations",
+    "calculations": [],
+    "order": []
+  }
+]

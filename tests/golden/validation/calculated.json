@@ -107,7 +107,7 @@
     }
   },
   {
-    "name": "calc_no_chaining_between_calcs",
+    "name": "calc_reads_earlier_calc",
     "grammar_version": "2.0",
     "schema": {"fields": [
       {"key": "a"},
@@ -118,7 +118,254 @@
     "expected": {
       "relevance": {"fields": {"a": true, "c1": true, "c2": true}},
       "effective_answers": {"a": 5},
-      "computed": {"c1": 6}
+      "computed": {"c1": 6, "c2": 7}
+    }
+  },
+  {
+    "name": "calc_chain_out_of_document_order",
+    "grammar_version": "2.0",
+    "schema": {"fields": [
+      {"key": "a"},
+      {"key": "doubled", "field_type": "calculated", "calculate": "${plus_one} * 2"},
+      {"key": "plus_one", "field_type": "calculated", "calculate": "${a} + 1"}
+    ]},
+    "answers": {"a": 5},
+    "expected": {
+      "relevance": {"fields": {"a": true, "doubled": true, "plus_one": true}},
+      "effective_answers": {"a": 5},
+      "computed": {"doubled": 12, "plus_one": 6}
+    }
+  },
+  {
+    "name": "calc_self_reference_blank",
+    "grammar_version": "2.0",
+    "schema": {"fields": [
+      {"key": "a"},
+      {"key": "total", "field_type": "calculated", "calculate": "${total} + ${a}"},
+      {"key": "twice", "field_type": "calculated", "calculate": "${a} * 2"}
+    ]},
+    "answers": {"a": 5},
+    "expected": {
+      "relevance": {"fields": {"a": true, "total": true, "twice": true}},
+      "effective_answers": {"a": 5},
+      "computed": {"twice": 10}
+    }
+  },
+  {
+    "name": "calc_cycle_blank_others_computed",
+    "grammar_version": "2.0",
+    "schema": {"fields": [
+      {"key": "a"},
+      {"key": "c1", "field_type": "calculated", "calculate": "${c2} + 1"},
+      {"key": "c2", "field_type": "calculated", "calculate": "${c1} + 1"},
+      {"key": "c3", "field_type": "calculated", "calculate": "${a} + 1"}
+    ]},
+    "answers": {"a": 5},
+    "expected": {
+      "relevance": {"fields": {"a": true, "c1": true, "c2": true, "c3": true}},
+      "effective_answers": {"a": 5},
+      "computed": {"c3": 6}
+    }
+  },
+  {
+    "name": "calc_downstream_of_cycle_blank",
+    "grammar_version": "2.0",
+    "schema": {"fields": [
+      {"key": "a"},
+      {"key": "c1", "field_type": "calculated", "calculate": "${c2} + 1"},
+      {"key": "c2", "field_type": "calculated", "calculate": "${c1} + 1"},
+      {"key": "c4", "field_type": "calculated", "calculate": "if(${a} > 0, 'positive', ${c1})"}
+    ]},
+    "answers": {"a": 5},
+    "expected": {
+      "relevance": {"fields": {"a": true, "c1": true, "c2": true, "c4": true}},
+      "effective_answers": {"a": 5},
+      "computed": {}
+    }
+  },
+  {
+    "name": "calc_hidden_calc_reads_blank_downstream",
+    "grammar_version": "2.0",
+    "schema": {"fields": [
+      {"key": "show"},
+      {"key": "a"},
+      {"key": "c1", "field_type": "calculated", "relevant": "${show} = 'yes'", "calculate": "${a} + 1"},
+      {"key": "c2", "field_type": "calculated", "calculate": "if(${c1} = '', 'none', ${c1})"}
+    ]},
+    "answers": {"show": "no", "a": 5},
+    "expected": {
+      "relevance": {"fields": {"show": true, "a": true, "c1": false, "c2": true}},
+      "effective_answers": {"show": "no", "a": 5},
+      "computed": {"c2": "none"}
+    }
+  },
+  {
+    "name": "calc_relevance_reads_calc_shown",
+    "grammar_version": "2.0",
+    "schema": {"fields": [
+      {"key": "a"},
+      {"key": "total", "field_type": "calculated", "calculate": "${a} * 2"},
+      {"key": "q", "relevant": "${total} > 30"}
+    ]},
+    "answers": {"a": 20, "q": "hi"},
+    "expected": {
+      "relevance": {"fields": {"a": true, "total": true, "q": true}},
+      "effective_answers": {"a": 20, "q": "hi"},
+      "computed": {"total": 40}
+    }
+  },
+  {
+    "name": "calc_relevance_reads_calc_pruned",
+    "grammar_version": "2.0",
+    "schema": {"fields": [
+      {"key": "a"},
+      {"key": "total", "field_type": "calculated", "calculate": "${a} * 2"},
+      {"key": "q", "relevant": "${total} > 30"}
+    ]},
+    "answers": {"a": 10, "q": "hi"},
+    "expected": {
+      "relevance": {"fields": {"a": true, "total": true, "q": false}},
+      "effective_answers": {"a": 10},
+      "computed": {"total": 20}
+    }
+  },
+  {
+    "name": "calc_section_relevance_reads_calc",
+    "grammar_version": "2.0",
+    "schema": {
+      "sections": [{"key": "extra", "relevant": "${total} > 30"}],
+      "fields": [
+        {"key": "a"},
+        {"key": "total", "field_type": "calculated", "calculate": "${a} * 2"},
+        {"key": "q", "section": "extra"}
+      ]
+    },
+    "answers": {"a": 10, "q": "hi"},
+    "expected": {
+      "relevance": {"fields": {"a": true, "total": true, "q": false}, "sections": {"extra": false}},
+      "effective_answers": {"a": 10},
+      "computed": {"total": 20}
+    }
+  },
+  {
+    "name": "calc_skip_rule_reads_calc",
+    "grammar_version": "2.0",
+    "schema": {"fields": [
+      {"key": "a"},
+      {"key": "total", "field_type": "calculated", "calculate": "${a} * 2"},
+      {"key": "q", "rules": [{"rule_type": "skip_if", "operator": "gt", "related": "total", "rule_value": "30"}]}
+    ]},
+    "answers": {"a": 20, "q": "hi"},
+    "expected": {
+      "relevance": {"fields": {"a": true, "total": true, "q": false}},
+      "effective_answers": {"a": 20},
+      "computed": {"total": 40}
+    }
+  },
+  {
+    "name": "calc_required_if_reads_calc",
+    "grammar_version": "2.0",
+    "schema": {"fields": [
+      {"key": "a"},
+      {"key": "total", "field_type": "calculated", "calculate": "${a} * 2"},
+      {"key": "q", "is_required": "conditional", "rules": [{"rule_type": "required_if", "operator": "gt", "related": "total", "rule_value": "30"}]}
+    ]},
+    "answers": {"a": 20},
+    "expected": {
+      "relevance": {"fields": {"a": true, "total": true, "q": true}},
+      "effective_answers": {"a": 20},
+      "computed": {"total": 40},
+      "errors": [{"field": "q", "rule": "field_required"}]
+    }
+  },
+  {
+    "name": "calc_constraint_reads_calc",
+    "grammar_version": "2.0",
+    "schema": {"fields": [
+      {"key": "a"},
+      {"key": "total", "field_type": "calculated", "calculate": "${a} * 2"},
+      {"key": "q", "rules": [{"expression": ". <= ${total}"}]}
+    ]},
+    "answers": {"a": 10, "q": 25},
+    "expected": {
+      "relevance": {"fields": {"a": true, "total": true, "q": true}},
+      "effective_answers": {"a": 10, "q": 25},
+      "computed": {"total": 20},
+      "errors": [{"field": "q", "rule": "constraint"}]
+    }
+  },
+  {
+    "name": "calc_member_constraint_reads_top_level_calc",
+    "grammar_version": "2.0",
+    "schema": {
+      "sections": [{"key": "roster", "repeatable": true}],
+      "fields": [
+        {"key": "a"},
+        {"key": "cap", "field_type": "calculated", "calculate": "${a} * 2"},
+        {"key": "n", "section": "roster", "rules": [{"expression": ". <= ${cap}"}]}
+      ]
+    },
+    "answers": {"a": 3, "roster": [{"n": 5}, {"n": 7}]},
+    "expected": {
+      "relevance": {"fields": {"a": true, "cap": true}, "sections": {"roster": true}},
+      "effective_answers": {"a": 3, "roster": [{"n": 5}, {"n": 7}]},
+      "repeat_relevance": {"roster": [{"n": true}, {"n": true}]},
+      "computed": {"cap": 6},
+      "errors": [{"field": "roster[1].n", "rule": "constraint"}]
+    }
+  },
+  {
+    "name": "calc_count_hidden_roster_condition_reads_raw",
+    "grammar_version": "2.0",
+    "schema": {
+      "sections": [{"key": "roster", "repeatable": true, "relevant": "${gate} = 'yes'"}],
+      "fields": [
+        {"key": "gate"},
+        {"key": "name", "section": "roster"},
+        {"key": "n", "field_type": "calculated", "calculate": "count(${roster})"},
+        {"key": "q", "relevant": "${n} > 1"}
+      ]
+    },
+    "answers": {"gate": "no", "roster": [{"name": "Ada"}, {"name": "Bob"}], "q": "hi"},
+    "expected": {
+      "relevance": {"fields": {"gate": true, "n": true, "q": true}, "sections": {"roster": false}},
+      "effective_answers": {"gate": "no", "q": "hi"},
+      "computed": {"n": 0}
+    }
+  },
+  {
+    "name": "calc_count_roster_rule_reads_final_value",
+    "grammar_version": "2.0",
+    "schema": {
+      "sections": [{"key": "roster", "repeatable": true}],
+      "fields": [
+        {"key": "name", "section": "roster"},
+        {"key": "n", "field_type": "calculated", "calculate": "count(${roster})"},
+        {"key": "q", "rules": [{"expression": ". >= ${n}"}]}
+      ]
+    },
+    "answers": {"roster": [{"name": "Ada"}, {"name": "Bob"}], "q": 1},
+    "expected": {
+      "relevance": {"fields": {"n": true, "q": true}, "sections": {"roster": true}},
+      "effective_answers": {"roster": [{"name": "Ada"}, {"name": "Bob"}], "q": 1},
+      "repeat_relevance": {"roster": [{"name": true}, {"name": true}]},
+      "computed": {"n": 2},
+      "errors": [{"field": "q", "rule": "constraint"}]
+    }
+  },
+  {
+    "name": "calc_raw_answer_under_calc_key_ignored",
+    "grammar_version": "2.0",
+    "schema": {"fields": [
+      {"key": "a"},
+      {"key": "total", "field_type": "calculated", "calculate": "${a} + 1"},
+      {"key": "q", "relevant": "${total} = 6"}
+    ]},
+    "answers": {"a": 5, "total": 99, "q": "hi"},
+    "expected": {
+      "relevance": {"fields": {"a": true, "total": true, "q": true}},
+      "effective_answers": {"a": 5, "total": 99, "q": "hi"},
+      "computed": {"total": 6}
     }
   }
 ]

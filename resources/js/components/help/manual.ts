@@ -460,7 +460,8 @@ const guide: ChapterDraft[] = [
                         [ui('Share', SETTINGS), ' — the public link. See ', link('Share your form', '#share'), '.'],
                         [
                             ui('Schedule', SETTINGS), ' — when the form opens and closes (', ui('Opens at', SCHEDULE), ', ', ui('Closes at', SCHEDULE),
-                            ') and an optional ', ui('Max responses', SCHEDULE), '. Click ', ui('Save schedule', SCHEDULE), '.',
+                            ') and an optional ', ui('Max responses', SCHEDULE), '. Click ', ui('Save schedule', SCHEDULE), '. Its ', ui('Timezone', SCHEDULE),
+                            ' is also the day the form’s formulas call today: a new form starts on Asia/Manila.',
                         ],
                         [ui('Thank-you message', SETTINGS), ' — what respondents see after they submit, and where they go next. Click ', ui('Save thank-you screen', THANKS), '.'],
                         [ui('Save and finish later', SETTINGS), ' — tick ', ui('Allow respondents to save and finish later', SAVE_RESUME), ' to let respondents come back to a half-finished form.'],
@@ -812,7 +813,7 @@ const reference: ChapterDraft[] = [
                             ', and a value. Combine several with ', ui('All of', CONDITIONS), ' or ', ui('Any of', CONDITIONS), ', or nest them with ', ui('Add group', CONDITIONS),
                             '. ', ui('Edit as text', CONDITION_EDITOR), ' shows the same condition as a formula, with ', ui('Insert a question', 'resources/js/components/builder/ReferenceInput.vue'), ' to add a question by its code. See ', link('Show or skip questions', '#logic'), '.',
                         ],
-                        [ui('Default value', CONFIG), ' — an answer filled in before the respondent starts, which they can change.'],
+                        [ui('Default value', CONFIG), ' — an answer filled in before the respondent starts, which they can change. ', ui('Fixed', CONFIG), ' is the answer as you write it (a choice question offers its own choices); ', ui('Formula', CONFIG), ' works it out once, when the form opens — ', ui('Insert a question', 'resources/js/components/builder/ReferenceInput.vue'), ' offers the questions before this one and dates such as Today and Tomorrow. Staff keying a new response get it too; a saved draft keeps what was saved.'],
                         [ui('Contains personal data (PII)', CONFIG), ' and ', ui('Sensitive', CONFIG), ' — mark answers that identify or could harm a person, so they are handled with care.'],
                         [ui('Indexed for reporting', CONFIG), ' — make the answer available to reports; then choose its ', ui('Indexed data type', CONFIG), ': ', ui('Text', INDEXED), ', ', ui('Number', INDEXED), ', ', ui('Boolean', INDEXED), ', ', ui('Date', INDEXED), ' or ', ui('Datetime', INDEXED), '.'],
                         [ui('Save to library', CONFIG), ' — keep a copy to reuse in other forms. See ', link('The question library', '#library'), '.'],

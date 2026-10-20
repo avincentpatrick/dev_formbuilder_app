@@ -16,7 +16,40 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M179`, V: the testers follow every relayed comment and check our fixes inside Feedback (`R-db9dec62`, `R-129c44c3`, `R-e727ca94`) (m179-v-relayed-feedback)
+## Status: NO ACTIVE CLAIM — `M179` (V) is merged and live on staging, released alone at its green (`D152`; below). `M178` (R3) stays HELD for merge point 3 with R4, the next claim. Merge only at a planned merge point.
+
+## RELEASED — `M179`, V: the testers follow every relayed comment and check our fixes inside Feedback (`R-db9dec62`, `R-129c44c3`, `R-e727ca94`) (merged as PR #372, `aec68222`, released alone (`D152`), 6/6 green with real step counts on its final run at `3337c4dd` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `aec68222` the same)
+
+Built and released 2026-10-19/20 by the build session (Opus) from the V plan (`~/.claude/plans/hi-please-give-me-parallel-chipmunk.md`;
+build plan `~/.claude/plans/pasted-content-id-5c4e-read-claude-md-jaunty-bonbon.md`). **Released alone (`D152`):** the user's census at
+00:33 UTC (tenants 1 · users 6 · forms 11 · form_versions 27 · submissions 22 · attachments 62 · feedback_reports 0 · notifications 62 — the
+same as merge points 1 and 2) and backup (`Result: 0`, `staging-2026-10-20-003306.dump`, 440,280 B); squash-merged with the
+`[tracker-surgery]` marker as the body's first line; the trunk's CI 6/6; the deploy (run 39351338125) backed up to
+`deploy-20261020-010857.dump` (443,521 B), counted 66 tables and 9,849 rows, ran `000135`–`000140`, and found every table at least as full
+after (67 tables — `feedback_comments` is the one new); `/up` 200. **The relay:** 31 created, then 31 unchanged on a second run; the API
+reads 31 relayed reports, 13 Resolved · 12 Ongoing · 6 Confirmed working, references `P1`…`UI5`. ⚠️ **Order deviation:** the relay ran
+before the user's census-after, which the build plan put first — harmless (the rule is "every count ≥ before", and the deploy's own count
+had already held every table), but the census-after reads `feedback_reports 31`. The feedback pull read 0 reports at the start and at
+the close. Rows taken: the three, all closed. Filed, not fixed: `R-08513868` (both Feedback lists show a relayed report by its quoted
+original — found by the browser look). Fixed in passing: `relayFeedback()` and `replyToFeedback()` had copied the save/apply/`finally`
+shape the M3 adversarial pass filed — both now `TenantContext::runFor()`; that row's `SuperAdminService` citations re-pointed to the five
+real call sites. The `M107` PHPStan row gained its measured remedy (host 0 errors where the container reports 44).
+
+**Measured against the prediction:**
+- **Red first, row by row — held.** 38 mutations, all caught: 30 Pest through `scripts/mutate.php`, 7 Vitest and 1 E2E committed and
+  reverted. **Two predicted red sets were wrong:** m15 (the policy's relayed arm) reddened half of what I wrote — the screenshot case's
+  reporter is the tester, so it never exercised that arm; and v2 (It works offered whatever the actions say) was predicted too wide — a
+  row with no actions draws no verdict at all.
+- **"Most likely wrong: the new end-to-end transition spec" — half right.** Locally the reopen walk timed out at the default five
+  seconds while the server had already committed it; waiting on the POST's own response fixed it before CI ever saw it, and on CI it was
+  green on every run. The E2E mutant (It works posting to `/reopen`) reddened exactly the predicted case.
+- **Runner-up, the CHECK rebuilds — not wrong.** `FeedbackCheckWideningTest` and the dev-stack up/down/up held, and staging ran all six.
+- **What no prediction named (the real misses):** (1) ⛔ a test's committed tenants outlived it — `FeedbackCommentRlsTest` used a
+  `crls-` slug that the shared purge (`console-%`, `rls-%`) never matches, so CI went 22 red in tenant-counting files I never ran beside
+  it (proved in one process: 15 failed with the old prefix, 27 passed with `rls-comment-`); (2) `SubmissionReferenceDisclosureTest`
+  matches `where('reference', …)` on any table — the two feedback lookups are now table-qualified; (3) `BacklogProvenanceTest` refused my
+  new row's wrapped Filed-by clause; (4) the relay returned outcomes in sorted, not file, order — caught by my own test; (5) the
+  container's full PHPStan reports 44 false errors where the host and CI report 0.
 
 Taken 2026-10-19. Branch `m179-v-relayed-feedback`, cut from `origin/main` at `d13f418f`, PR into main — not stacked on R3. The plan of
 record is `~/.claude/plans/hi-please-give-me-parallel-chipmunk.md` (V: §A the user's three answers, §B the design, §E the 31 items' text the

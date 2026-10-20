@@ -73,7 +73,6 @@ export const TODAY: ReferenceCandidate = { key: 'today()', label: 'Today', group
 export const DATES: ReferenceCandidate[] = [
     TODAY,
     ...([
-        ['Yesterday', "date_add(today(), -1, 'days')"],
         ['Tomorrow', "date_add(today(), 1, 'days')"],
         ['N days from now', "date_add(today(), 7, 'days')"],
         ['N days ago', "date_add(today(), -7, 'days')"],

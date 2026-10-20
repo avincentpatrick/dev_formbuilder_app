@@ -64,6 +64,18 @@ final class ExpressionEvaluator
         return Coercion::toBool($this->eval($this->parser->parse($expression), $context));
     }
 
+    /**
+     * Every distinct `${key}` an expression names, in first-seen order — what a calculation depends on (M180).
+     *
+     * @return list<string>
+     *
+     * @throws ExpressionSyntaxException
+     */
+    public function referencedKeys(string $expression): array
+    {
+        return $this->parser->referencedKeys($this->parser->parse($expression));
+    }
+
     /** Version-scoped convenience (memo namespaced by form_version_id). */
     public function evaluateForVersion(string $formVersionId, string $expression, EvaluationContext $context): mixed
     {

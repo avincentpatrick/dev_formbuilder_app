@@ -64,7 +64,7 @@ final class PrunedAnswerReport
      * IT RE-RUNS STAGE 1, AND THAT IS NOT AN OPTIMISATION IT SKIPPED — IT IS THE ONLY WAY THE MASKS LINE UP.
      * The first cut of this class walked the RAW request map, on the reasoning that the normalizer renames no
      * keys. True for flat keys, and WRONG for repeat instances: `normalizeRepeatSection()` DROPS an empty
-     * instance and re-indexes with `$instances[] =`, while `processRepeats()` appends one mask per SURVIVING
+     * instance and re-indexes with `$instances[] =`, while `settleRepeats()` appends one mask per SURVIVING
      * instance. So every dropped instance shifts every later mask by one, and the report then reads a
      * neighbour's mask — naming an answer that was persisted while missing the one that was actually pruned.
      * That is reachable on the ordinary encode flow, not in theory: `addInstance()` pushes a literal `{}`,
@@ -169,7 +169,7 @@ final class PrunedAnswerReport
     /**
      * A repeatable section drops in two distinct shapes, and conflating them would misreport one of them.
      *
-     * WHOLE-GROUP: an irrelevant section is skipped by `processRepeats()` before any instance is settled, so
+     * WHOLE-GROUP: an irrelevant section is skipped by `settleRepeats()` before any instance is settled, so
      * `repeatFieldRelevance` carries no mask for it at all and every instance went with it. Report the group
      * ONCE by its own label — listing each member of each instance would name a dozen rows for one condition.
      *

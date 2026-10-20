@@ -11,7 +11,7 @@
  */
 
 import { ABSENT, isEmpty, isNumericLike, toBool, toNumber, toStr, yesNoLiteral, type EngineValue, type MaybeAbsent } from './coercion';
-import { isEmptyStringLiteral, isStringLiteral, type Node } from './ast';
+import { isEmptyStringLiteral, isStringLiteral, referencedKeys, type Node } from './ast';
 import { EvaluationContext } from './context';
 import { ExpressionEvaluationError } from './errors';
 import { ExpressionLexer } from './lexer';
@@ -40,6 +40,11 @@ export class ExpressionEvaluator {
     /** The authoritative relevant/constraint form: toBool(evaluate-internal(...)). */
     evaluateBoolean(expression: string, context: EvaluationContext): boolean {
         return toBool(this.evalNode(this.parser.parse(expression), context));
+    }
+
+    /** Every distinct `${key}` an expression names, in first-seen order — what a calculation depends on (M180). */
+    referencedKeys(expression: string): string[] {
+        return referencedKeys(this.parser.parse(expression));
     }
 
     private normalize(value: MaybeAbsent): EngineValue {

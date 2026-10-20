@@ -67,3 +67,39 @@ export function kind(node: Node): NodeKind {
             return 'boolean';
     }
 }
+
+/**
+ * Every distinct `${key}` field reference in an AST, in first-seen order — the mirror of PHP
+ * `ExpressionParser::referencedKeys()`. M180 reads it for what a calculation depends on (`calculation-order.ts`).
+ */
+export function referencedKeys(node: Node): string[] {
+    const seen = new Set<string>();
+    const walk = (n: Node): void => {
+        switch (n.type) {
+            case 'field':
+                seen.add(n.key);
+
+                return;
+            case 'comparison':
+            case 'arithmetic':
+            case 'logical':
+                walk(n.left);
+                walk(n.right);
+
+                return;
+            case 'not':
+                walk(n.operand);
+
+                return;
+            case 'call':
+                n.args.forEach(walk);
+
+                return;
+            default:
+                return;
+        }
+    };
+    walk(node);
+
+    return [...seen];
+}

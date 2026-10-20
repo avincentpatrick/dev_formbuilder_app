@@ -8,8 +8,10 @@ use App\Enums\FieldType;
 use App\Enums\PdfFieldRole;
 use App\Enums\RequiredMode;
 use App\Enums\ValidationRuleType;
+use App\Exceptions\Expressions\ExpressionSyntaxException;
 use App\Models\FormField;
 use App\Models\FormFieldValidation;
+use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Services\Attachments\AttachmentReferenceValidator;
 use App\Services\Expressions\Coercion;
@@ -110,49 +112,72 @@ final class SemanticValidator
 
         // Repeat-group members are pulled out of the flat pass so the top-level relevance/answers/errors
         // stay exactly as they were pre-G1 (a form with no repeatable sections partitions nothing) — each
-        // instance is then evaluated in its own scope by processRepeats().
+        // instance is then evaluated in its own scope by settleRepeats() and checkRepeats().
         [$topLevelFields, $repeatMembersBySectionId] = $this->partitionFields($input);
 
-        [$fieldRelevance, $sectionRelevance] = $this->settleRelevance($input, $topLevelFields, $ruleSets, $fieldKeyById, $fieldKeys, $now);
-        $effectiveAnswers = $this->effectiveAnswers($input->answers, $fieldRelevance);
-        $errors = $this->collectErrors($topLevelFields, $ruleSets, $fieldRelevance, $effectiveAnswers, $fieldKeyById, $input->locale, $now);
+        // M180 (`R-39dbce5b`, `D149`): conditions and rules read a calculation. The calculations are worked out in
+        // dependency order ({@see CalculationOrder}) wherever an expression is evaluated, a calculation's own key never
+        // reads a raw answer, and each pass returns its own error list, so working them out earlier moves no error.
+        $plan = $this->calculationPlan($topLevelFields);
 
-        [$repeatEffective, $repeatErrors, $repeatRelevance] = $this->processRepeats(
+        // Relevance (fields, sections, skip rules — and each repeat member's) reads the calculations as an inline
+        // formula would: over the raw repeat instances, inside the fixed point ({@see settleRelevance()}).
+        [$fieldRelevance, $sectionRelevance, $settledValues] = $this->settleRelevance($input, $topLevelFields, $ruleSets, $fieldKeyById, $fieldKeys, $plan, $now);
+        $flatEffective = $this->effectiveAnswers($input->answers, $fieldRelevance);
+        $effectiveAnswers = $flatEffective;
+
+        $settledRepeats = $this->settleRepeats(
             $input,
             $repeatMembersBySectionId,
             $ruleSets,
             $sectionRelevance,
-            $effectiveAnswers,
+            $this->layered($flatEffective, ['keys' => $plan['keys'], 'values' => $settledValues]),
             $fieldKeyById,
             $fieldKeys,
             $now,
         );
 
+        /** @var array<string, list<array<string, mixed>>> $repeatEffective */
+        $repeatEffective = [];
+        /** @var array<string, list<array<string, bool>>> $repeatRelevance */
+        $repeatRelevance = [];
+        foreach ($settledRepeats as $settled) {
+            foreach ($settled['instances'] as [$instanceRelevance, $instanceEffective]) {
+                $repeatEffective[$settled['section']->key][] = $instanceEffective;
+                $repeatRelevance[$settled['section']->key][] = $instanceRelevance;
+            }
+        }
+
         foreach ($repeatEffective as $sectionKey => $instances) {
             $effectiveAnswers[$sectionKey] = $instances;
         }
 
+        // Calculated fields (grammar v2.0) are worked out over the full effective answers (flat + repeat instance
+        // arrays merged above, so a calc can `count(${section})`); a relevant calc's formula result is written to
+        // `computed`. Since M180 a calculation reads an earlier one, and every RULE below reads these values — the
+        // flat ones, a repeat member's, a grid's, a map's and a media question's required-when alike.
+        $computed = $this->computeCalculated($plan, $effectiveAnswers, $fieldRelevance, $now);
+        $calculated = ['keys' => $plan['keys'], 'values' => $computed];
+
+        $errors = $this->collectErrors($topLevelFields, $ruleSets, $fieldRelevance, $flatEffective, $this->layered($flatEffective, $calculated), $fieldKeyById, $input->locale, $now);
+        $repeatErrors = $this->checkRepeats($input, $settledRepeats, $ruleSets, $this->layered($flatEffective, $calculated), $fieldKeyById);
+
         // Composite (grid) fields (Increment G4b) are validated + pruned in their own pass, never routed
         // through the scalar collectFieldErrors path (Coercion::isEmpty diverges on an empty object between
         // the PHP and TS engines). Their relevance-pruned object replaces the raw effective answer.
-        $compositeErrors = $this->processComposites($topLevelFields, $fieldRelevance, $effectiveAnswers, $ruleSets, $fieldKeyById, $input->locale, $now);
+        $compositeErrors = $this->processComposites($topLevelFields, $fieldRelevance, $effectiveAnswers, $ruleSets, $fieldKeyById, $input->locale, $now, $calculated);
 
         // Geospatial fields (Increment G5b1) are validated in their own pass for the same reason as
         // composites (an object answer must not hit scalar isEmpty). Structural geometry checks (type,
         // coordinate range, ring closure, min-points) — no grammar change. An empty envelope is unset so
         // effective answers stay byte-identical across the PHP/TS engines ({} vs []).
-        $geoErrors = $this->processGeo($topLevelFields, $fieldRelevance, $effectiveAnswers, $ruleSets, $fieldKeyById, $input->locale, $now);
+        $geoErrors = $this->processGeo($topLevelFields, $fieldRelevance, $effectiveAnswers, $ruleSets, $fieldKeyById, $input->locale, $now, $calculated);
 
         // Media fields (Increment G6) are validated in their own pass for the same reason as geo/composites
         // (a list-of-objects answer must not hit scalar isEmpty). DB-free rules only — required + min/max
         // count; an empty list is unset so effective answers stay byte-identical across engines. Existence/
         // ownership/scan are the PHP-only AttachmentReferenceValidator, run by the pipeline after this.
-        $mediaErrors = $this->processMedia($topLevelFields, $fieldRelevance, $effectiveAnswers, $ruleSets, $fieldKeyById, $input->locale, $now);
-
-        // Calculated fields (grammar v2.0) are computed last, over the full effective answers (flat + repeat
-        // instance arrays merged above, so a calc can `count(${section})`); a relevant calc's formula result
-        // is written to `computed`. Computed values do not feed back into relevance/constraints (documented).
-        $computed = $this->computeCalculated($topLevelFields, $effectiveAnswers, $fieldRelevance, $now);
+        $mediaErrors = $this->processMedia($topLevelFields, $fieldRelevance, $effectiveAnswers, $ruleSets, $fieldKeyById, $input->locale, $now, $calculated);
 
         return new SemanticResult(
             $fieldRelevance,
@@ -267,15 +292,17 @@ final class SemanticValidator
      * (bounded, so a cyclic dependency terminates rather than spins). A field is relevant iff its section
      * is relevant AND its own `relevant_expression` holds AND no `skip_if`/`skip_with` fires. Only the
      * top-level `$fields` are masked, but ALL sections are evaluated (a repeatable section's relevance is
-     * produced here and consumed by processRepeats()).
+     * produced here and consumed by settleRepeats()).
      *
      * @param  Collection<int, FormField>  $fields  the top-level (non-repeat-member) fields
      * @param  array<string, array{constraint: list<list<FormFieldValidation>>, required: list<list<FormFieldValidation>>, skip: list<list<FormFieldValidation>>}>  $ruleSets
      * @param  array<string, string>  $fieldKeyById
      * @param  array<string, true>  $fieldKeys  every field key in the version (the section-collision guard)
-     * @return array{0: array<string, bool>, 1: array<string, bool>}
+     * @param  array{order: array<string, string>, keys: array<string, true>, fields: list<string>}  $plan
+     * @return array{0: array<string, bool>, 1: array<string, bool>, 2: array<string, mixed>} the field mask, the section mask, and
+     *                                                                                        the calculations' values at the fixed point (M180)
      */
-    private function settleRelevance(SemanticInput $input, Collection $fields, array $ruleSets, array $fieldKeyById, array $fieldKeys, ?string $now): array
+    private function settleRelevance(SemanticInput $input, Collection $fields, array $ruleSets, array $fieldKeyById, array $fieldKeys, array $plan, ?string $now): array
     {
         /** @var array<string, bool> $relevant */
         $relevant = [];
@@ -290,7 +317,10 @@ final class SemanticValidator
         $sectionRelevantById = [];
 
         for ($iteration = 0; $iteration < $maxIterations; $iteration++) {
-            $context = new EvaluationContext($this->relevanceContext($input, $relevant, $fieldKeys), now: $now);
+            // M180: the calculations relevant under this mask, worked out over this context. The context stays a pure
+            // function of the answers and the mask, so the fixed-point compare below still tests the mask alone.
+            [$answers] = $this->withCalculations($this->relevanceContext($input, $relevant, $fieldKeys), $plan, $relevant, $now);
+            $context = new EvaluationContext($answers, now: $now);
 
             [$sectionRelevance, $sectionRelevantById] = $this->sectionMasks($input, $context);
 
@@ -326,7 +356,8 @@ final class SemanticValidator
         // Both halves are provably no-ops on the fixed-point path, which is why no golden vector moves:
         // the break fires BEFORE `$relevant = $next`, so `$relevant` is exactly the map this context and
         // this section mask were already built from, and every key in it already passed the section gate.
-        $context = new EvaluationContext($this->relevanceContext($input, $relevant, $fieldKeys), now: $now);
+        [$answers] = $this->withCalculations($this->relevanceContext($input, $relevant, $fieldKeys), $plan, $relevant, $now);
+        $context = new EvaluationContext($answers, now: $now);
         [$sectionRelevance, $sectionRelevantById] = $this->sectionMasks($input, $context);
 
         foreach ($fields as $field) {
@@ -338,7 +369,10 @@ final class SemanticValidator
             }
         }
 
-        return [$this->fullMask($fields, $relevant), $sectionRelevance];
+        // M180: what a repeat member's condition reads — the calculations under the FINAL mask, over the raw instances.
+        [, $settledValues] = $this->withCalculations($this->relevanceContext($input, $relevant, $fieldKeys), $plan, $relevant, $now);
+
+        return [$this->fullMask($fields, $relevant), $sectionRelevance, $settledValues];
     }
 
     /**
@@ -471,6 +505,7 @@ final class SemanticValidator
      * @param  array<string, array{constraint: list<list<FormFieldValidation>>, required: list<list<FormFieldValidation>>, skip: list<list<FormFieldValidation>>}>  $ruleSets
      * @param  array<string, bool>  $fieldRelevance
      * @param  array<string, mixed>  $effectiveAnswers
+     * @param  array<string, mixed>  $contextAnswers  the flat effective answers with the calculations' values (M180)
      * @param  array<string, string>  $fieldKeyById
      * @return list<SemanticError>
      */
@@ -479,6 +514,7 @@ final class SemanticValidator
         array $ruleSets,
         array $fieldRelevance,
         array $effectiveAnswers,
+        array $contextAnswers,
         array $fieldKeyById,
         string $locale,
         ?string $now,
@@ -490,7 +526,7 @@ final class SemanticValidator
                 continue;
             }
 
-            $this->collectFieldErrors($field, $effectiveAnswers, $effectiveAnswers, $ruleSets, $fieldKeyById, $locale, $now, $errors, null, null);
+            $this->collectFieldErrors($field, $effectiveAnswers, $contextAnswers, $ruleSets, $fieldKeyById, $locale, $now, $errors, null, null);
         }
 
         return $errors;
@@ -748,6 +784,7 @@ final class SemanticValidator
      * @param  array<string, mixed>  $effectiveAnswers  MUTATED: each composite key set to its pruned object / unset
      * @param  array<string, array{constraint: list<list<FormFieldValidation>>, required: list<list<FormFieldValidation>>, skip: list<list<FormFieldValidation>>}>  $ruleSets
      * @param  array<string, string>  $fieldKeyById
+     * @param  array{keys: array<string, true>, values: array<string, mixed>}  $calculated  the calculations' values (M180)
      * @return list<SemanticError>
      */
     private function processComposites(
@@ -758,10 +795,11 @@ final class SemanticValidator
         array $fieldKeyById,
         string $locale,
         ?string $now,
+        array $calculated,
     ): array {
         /** @var list<SemanticError> $errors */
         $errors = [];
-        $context = new EvaluationContext($effectiveAnswers, now: $now);
+        $context = new EvaluationContext($this->layered($effectiveAnswers, $calculated), now: $now);
 
         foreach ($fields as $field) {
             if ($field->field_type !== FieldType::Matrix && $field->field_type !== FieldType::LikertMatrix) {
@@ -907,6 +945,7 @@ final class SemanticValidator
      * @param  array<string, mixed>  $effectiveAnswers
      * @param  array<string, array{constraint: list<list<FormFieldValidation>>, required: list<list<FormFieldValidation>>, skip: list<list<FormFieldValidation>>}>  $ruleSets
      * @param  array<string, string>  $fieldKeyById
+     * @param  array{keys: array<string, true>, values: array<string, mixed>}  $calculated  the calculations' values (M180)
      * @return list<SemanticError>
      */
     private function processGeo(
@@ -917,10 +956,11 @@ final class SemanticValidator
         array $fieldKeyById,
         string $locale,
         ?string $now,
+        array $calculated,
     ): array {
         /** @var list<SemanticError> $errors */
         $errors = [];
-        $context = new EvaluationContext($effectiveAnswers, now: $now);
+        $context = new EvaluationContext($this->layered($effectiveAnswers, $calculated), now: $now);
 
         foreach ($fields as $field) {
             if (! $field->field_type->isGeo()) {
@@ -1053,6 +1093,7 @@ final class SemanticValidator
      * @param  array<string, mixed>  $effectiveAnswers
      * @param  array<string, array{constraint: list<list<FormFieldValidation>>, required: list<list<FormFieldValidation>>, skip: list<list<FormFieldValidation>>}>  $ruleSets
      * @param  array<string, string>  $fieldKeyById
+     * @param  array{keys: array<string, true>, values: array<string, mixed>}  $calculated  the calculations' values (M180)
      * @return list<SemanticError>
      */
     private function processMedia(
@@ -1063,10 +1104,11 @@ final class SemanticValidator
         array $fieldKeyById,
         string $locale,
         ?string $now,
+        array $calculated,
     ): array {
         /** @var list<SemanticError> $errors */
         $errors = [];
-        $context = new EvaluationContext($effectiveAnswers, now: $now);
+        $context = new EvaluationContext($this->layered($effectiveAnswers, $calculated), now: $now);
 
         foreach ($fields as $field) {
             if (! $field->field_type->isMedia()) {
@@ -1124,22 +1166,24 @@ final class SemanticValidator
     }
 
     /**
-     * Validate every relevant repeatable section's instances (technical-architecture.md §4.1). A hidden
-     * repeatable section drops its whole array and enforces nothing (section-cascade). Otherwise the
-     * instance count is enforced against min/max (max first, as an abuse guard — a huge array is rejected
-     * before any per-instance settling), then each instance is settled + error-checked in its own scope.
-     * Instances are kept index-aligned with the submitted (normalised) array so an error address `sec[i]`
-     * always matches the stored `effective[sec][i]`.
+     * Settle every relevant repeatable section's instances (technical-architecture.md §4.1). A hidden repeatable
+     * section drops its whole array and enforces nothing (section-cascade). Instances are kept index-aligned with
+     * the submitted (normalised) array so an error address `sec[i]` always matches the stored `effective[sec][i]`.
+     *
+     * M180 split the old single pass in two: the calculations a member RULE reads need every group's pruned
+     * instances first ({@see computeCalculated()}), so the errors are collected afterwards by {@see checkRepeats()},
+     * in the same order as before — per section, `max`, each instance's members, then `min`.
      *
      * @param  array<string, list<FormField>>  $repeatMembersBySectionId
      * @param  array<string, array{constraint: list<list<FormFieldValidation>>, required: list<list<FormFieldValidation>>, skip: list<list<FormFieldValidation>>}>  $ruleSets
      * @param  array<string, bool>  $sectionRelevance  section key => relevant
-     * @param  array<string, mixed>  $baseEffective  the top-level effective answers (the outside scope)
+     * @param  array<string, mixed>  $baseEffective  the outside scope: the top-level effective answers with the
+     *                                               calculations' values at the relevance fixed point
      * @param  array<string, string>  $fieldKeyById
      * @param  array<string, true>  $fieldKeys  every field key in the version (the section-collision guard)
-     * @return array{0: array<string, list<array<string, mixed>>>, 1: list<SemanticError>, 2: array<string, list<array<string, bool>>>}
+     * @return list<array{section: FormSection, members: list<FormField>, count: int, instances: list<array{0: array<string, bool>, 1: array<string, mixed>}>}>
      */
-    private function processRepeats(
+    private function settleRepeats(
         SemanticInput $input,
         array $repeatMembersBySectionId,
         array $ruleSets,
@@ -1149,12 +1193,7 @@ final class SemanticValidator
         array $fieldKeys,
         ?string $now,
     ): array {
-        /** @var array<string, list<array<string, mixed>>> $effective */
-        $effective = [];
-        /** @var list<SemanticError> $errors */
-        $errors = [];
-        /** @var array<string, list<array<string, bool>>> $relevance */
-        $relevance = [];
+        $settled = [];
 
         foreach ($input->sections as $section) {
             if ($section->is_repeatable !== true) {
@@ -1171,23 +1210,11 @@ final class SemanticValidator
             $instances = is_array($rawInstances)
                 ? array_values(array_filter($rawInstances, static fn (mixed $instance): bool => is_array($instance)))
                 : [];
-            $count = count($instances);
 
-            // `max` stays AHEAD of the per-instance settling — it is the abuse guard this method's docblock
-            // names, and moving it below would settle the huge array it exists to reject. It also needs no
-            // step-visibility narrowing: a max violation means instances were submitted, so the respondent
-            // was shown the group.
-            $max = $section->max_instances;
-            if ($max !== null && $count > $max) {
-                $errors[] = new SemanticError($sectionKey, 'max_instances', $this->maxInstancesMessage($max), $sectionKey, null);
-            }
-
-            /** @var list<array<string, bool>> $instanceMasks */
-            $instanceMasks = [];
-
-            foreach ($instances as $index => $instanceAnswers) {
+            $results = [];
+            foreach ($instances as $instanceAnswers) {
                 /** @var array<string, mixed> $instanceAnswers */
-                [$instanceRelevance, $instanceEffective] = $this->settleInstanceRelevance(
+                $results[] = $this->settleInstanceRelevance(
                     $members,
                     $ruleSets,
                     $baseEffective,
@@ -1198,17 +1225,56 @@ final class SemanticValidator
                     $instances,
                     $now,
                 );
+            }
 
+            $settled[] = ['section' => $section, 'members' => $members, 'count' => count($instances), 'instances' => $results];
+        }
+
+        return $settled;
+    }
+
+    /**
+     * The errors of every settled repeatable section ({@see settleRepeats()}): the instance count against min/max
+     * and each instance's members, each checked in its own scope — the outside scope (now with the calculations'
+     * final values, M180) merged over that instance, so a member constraint may reference an outside field, a
+     * calculation and a same-instance sibling.
+     *
+     * @param  list<array{section: FormSection, members: list<FormField>, count: int, instances: list<array{0: array<string, bool>, 1: array<string, mixed>}>}>  $settledRepeats
+     * @param  array<string, array{constraint: list<list<FormFieldValidation>>, required: list<list<FormFieldValidation>>, skip: list<list<FormFieldValidation>>}>  $ruleSets
+     * @param  array<string, mixed>  $baseEffective  the top-level effective answers with the calculations' values
+     * @param  array<string, string>  $fieldKeyById
+     * @return list<SemanticError>
+     */
+    private function checkRepeats(SemanticInput $input, array $settledRepeats, array $ruleSets, array $baseEffective, array $fieldKeyById): array
+    {
+        /** @var list<SemanticError> $errors */
+        $errors = [];
+
+        foreach ($settledRepeats as $settled) {
+            $section = $settled['section'];
+            $sectionKey = $section->key;
+            $count = $settled['count'];
+
+            // `max` stays AHEAD of the per-instance errors — the abuse guard the settle pass's docblock names. It
+            // needs no step-visibility narrowing: a max violation means instances were submitted, so the respondent
+            // was shown the group.
+            $max = $section->max_instances;
+            if ($max !== null && $count > $max) {
+                $errors[] = new SemanticError($sectionKey, 'max_instances', $this->maxInstancesMessage($max), $sectionKey, null);
+            }
+
+            /** @var list<array<string, bool>> $instanceMasks */
+            $instanceMasks = [];
+
+            foreach ($settled['instances'] as $index => [$instanceRelevance, $instanceEffective]) {
                 $contextAnswers = array_merge($baseEffective, $instanceEffective);
-                foreach ($members as $field) {
+                foreach ($settled['members'] as $field) {
                     if (($instanceRelevance[$field->key] ?? false) !== true) {
                         continue;
                     }
-                    $this->collectFieldErrors($field, $instanceEffective, $contextAnswers, $ruleSets, $fieldKeyById, $input->locale, $now, $errors, $sectionKey, $index);
+                    $this->collectFieldErrors($field, $instanceEffective, $contextAnswers, $ruleSets, $fieldKeyById, $input->locale, $input->now, $errors, $sectionKey, $index);
                 }
 
-                $effective[$sectionKey][] = $instanceEffective;
-                $relevance[$sectionKey][] = $instanceRelevance;
                 $instanceMasks[] = $instanceRelevance;
             }
 
@@ -1218,12 +1284,12 @@ final class SemanticValidator
             // demands instances — a permanent blocker that is INVISIBLE, because the error-summary banner
             // iterates the visible step list and the step is not in it.
             $min = $section->min_instances;
-            if ($min !== null && $min > 0 && $count < $min && $this->repeatStepIsVisible($members, $instanceMasks)) {
+            if ($min !== null && $min > 0 && $count < $min && $this->repeatStepIsVisible($settled['members'], $instanceMasks)) {
                 $errors[] = new SemanticError($sectionKey, 'min_instances', $this->minInstancesMessage($min), $sectionKey, null);
             }
         }
 
-        return [$effective, $errors, $relevance];
+        return $errors;
     }
 
     /**
@@ -1348,36 +1414,117 @@ final class SemanticValidator
      * blank/NaN result (missing operands, division by zero) is omitted rather than stored as null. Calculated
      * fields inside a repeatable section are NOT computed in G3 (they are repeat members, not top-level).
      *
-     * @param  Collection<int, FormField>  $fields  the top-level fields
+     * Since M180 (`D149`) a calculation reads an earlier one: they are worked out in the plan's dependency order,
+     * and a calculation never worked out (a cycle, or downstream of one) reads as blank. The map is returned in
+     * field order, as before, so a stored document's key order does not move.
+     *
+     * @param  array{order: array<string, string>, keys: array<string, true>, fields: list<string>}  $plan
      * @param  array<string, mixed>  $effectiveAnswers  flat effective answers + repeat instance arrays (for count())
      * @param  array<string, bool>  $fieldRelevance
      * @return array<string, mixed> calculated field key => computed value
      */
-    private function computeCalculated(Collection $fields, array $effectiveAnswers, array $fieldRelevance, ?string $now): array
+    private function computeCalculated(array $plan, array $effectiveAnswers, array $fieldRelevance, ?string $now): array
     {
+        [, $values] = $this->withCalculations($effectiveAnswers, $plan, $fieldRelevance, $now);
+
         $computed = [];
-        $context = new EvaluationContext($effectiveAnswers, now: $now);
-
-        foreach ($fields as $field) {
-            if ($field->field_type !== FieldType::Calculated) {
-                continue;
-            }
-            if (($fieldRelevance[$field->key] ?? false) !== true) {
-                continue;
-            }
-
-            $formula = $this->calculateFormula($field);
-            if ($formula === null) {
-                continue;
-            }
-
-            $value = $this->evaluator->evaluate($formula, $context);
-            if ($value !== null) {
-                $computed[$field->key] = $value;
+        foreach ($plan['fields'] as $key) {
+            if (array_key_exists($key, $values)) {
+                $computed[$key] = $values[$key];
             }
         }
 
         return $computed;
+    }
+
+    /**
+     * The top-level calculations: the keys to work out in dependency order with their formulas ({@see CalculationOrder}),
+     * every calculation's key (none of them may read a raw answer), and those keys in field order (M180).
+     *
+     * A formula the parser refuses names nothing here, so it is evaluated — and throws — exactly when it was before:
+     * only when its calculation is relevant.
+     *
+     * @param  Collection<int, FormField>  $fields  the top-level fields
+     * @return array{order: array<string, string>, keys: array<string, true>, fields: list<string>}
+     */
+    private function calculationPlan(Collection $fields): array
+    {
+        $calculations = [];
+        $formulas = [];
+        foreach ($fields as $field) {
+            if ($field->field_type !== FieldType::Calculated) {
+                continue;
+            }
+
+            $formula = $this->calculateFormula($field);
+            $calculations[] = ['key' => $field->key, 'formula' => $formula];
+            if ($formula !== null) {
+                $formulas[$field->key] = $formula;
+            }
+        }
+
+        $references = function (string $formula): array {
+            try {
+                return $this->evaluator->referencedKeys($formula);
+            } catch (ExpressionSyntaxException) {
+                return [];
+            }
+        };
+
+        $order = [];
+        foreach (CalculationOrder::order($calculations, $references) as $key) {
+            $order[$key] = $formulas[$key];
+        }
+
+        $keys = [];
+        foreach ($calculations as $calculation) {
+            $keys[$calculation['key']] = true;
+        }
+
+        return ['order' => $order, 'keys' => $keys, 'fields' => array_keys($keys)];
+    }
+
+    /**
+     * The answers with every calculation's key taken out and the relevant calculations worked out back in, in the
+     * plan's order — each over the answers and the calculations before it. A calculation that is not relevant, or
+     * comes out blank, stays absent and reads as blank downstream, like any hidden question (M180).
+     *
+     * @param  array<string, mixed>  $answers
+     * @param  array{order: array<string, string>, keys: array<string, true>, fields: list<string>}  $plan
+     * @param  array<string, bool>  $relevant  a mask (or a set of relevant keys)
+     * @return array{0: array<string, mixed>, 1: array<string, mixed>} the layered answers, and the values alone
+     */
+    private function withCalculations(array $answers, array $plan, array $relevant, ?string $now): array
+    {
+        $answers = array_diff_key($answers, $plan['keys']);
+        $values = [];
+
+        foreach ($plan['order'] as $key => $formula) {
+            if (($relevant[$key] ?? false) !== true) {
+                continue;
+            }
+
+            $value = $this->evaluator->evaluate($formula, new EvaluationContext($answers, now: $now));
+            if ($value !== null) {
+                $answers[$key] = $value;
+                $values[$key] = $value;
+            }
+        }
+
+        return [$answers, $values];
+    }
+
+    /**
+     * An expression context's answers with the calculations' values laid over them: every calculation's key taken
+     * out of the answers, its value (when it has one) put back (M180).
+     *
+     * @param  array<string, mixed>  $answers
+     * @param  array{keys: array<string, true>, values: array<string, mixed>}  $calculated
+     * @return array<string, mixed>
+     */
+    private function layered(array $answers, array $calculated): array
+    {
+        return array_merge(array_diff_key($answers, $calculated['keys']), $calculated['values']);
     }
 
     /** The calc formula stored on a calculated field (`config.calculated_formula`); null when blank/absent. */

@@ -16,7 +16,100 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M181`, UI5 of the UI programme: versioning and What's new (`R-c7247dbf`) (m181-ui5-versioning-whats-new)
+## Status: ACTIVE CLAIM — `M182`, UI6 of the UI programme: consistency (`R-49813d21`, `R-3ca62317`, `R-f724595b`, `R-9d3c2439`) (m182-ui6-consistency)
+
+Taken 2026-10-21. Branch `m182-ui6-consistency`, **stacked**: cut from `origin/m181-ui5-versioning-whats-new` at `9dc6fdaf` (UI5, built
+and held), with `origin/main` merged on top to bring this claim — that merge is the claim-merge commit, and UI6's own commits start
+after it. It stacks because it bumps a `VERSION` that exists only on UI5's branch (Standing Rule 11). PR into main. ⛔ **NOT MERGED
+THIS SESSION:** held green for merge point 4 (`D137`, `D138`: UI5 → UI6 → T2 + Likert) — the user's census, #374 merged and live, this
+branch rebased onto the trunk by its own commits only and merged, then T2 + Likert, then the census after. The plan of record is
+`~/.claude/plans/hi-let-s-conduct-a-mutable-goose.md` (§D F1, F2, F3, F7; §E row 6); the build plan is
+`~/.claude/plans/read-claude-md-then-claude-plans-hi-let-enumerated-cherny.md`. `state.php` prints next free `M181` because it counts
+RELEASED headings and `M181` is HELD — this is `M182`.
+
+**No check is owed:** R3 and R4 were confirmed on 2026-10-20 and UI5 is not live. The session-start pull read 0 reports, 0 reopened and
+0 new comments (relayed 31: 15 Resolved · 10 Ongoing · 6 Confirmed working), so nothing was triaged. **Asked and answered in planning
+(the user, 2026-10-21, in chat), each the recommended option, recorded on this branch's first commit:** **`D158` A** — one red at the
+source: the dark `--mds-color-danger-text` is re-pointed to the `status-danger-fg` step, light unchanged; **`D159` A** — every case
+the rows' floors turned up is fixed here (two scope dialogs, three builder labels, eight more cut-off values). **The 0.9.1 notes'
+wording was approved by the user** (three items, verbatim in the build plan).
+
+Rows taken, in build order, each its own commits (`D75`): **`R-49813d21`** (the dark error red — `D158`), **`R-3ca62317`** (the
+console's reset dialog on browser margins, with the Move scope and Delete scope dialogs — `D159`), **`R-f724595b`** (micro-label
+tracking, with the builder's three — `D159`), **`R-9d3c2439`** (cut-off values with no title, with the eight — `D159`); then the release
+(0.9.1).
+
+### Evidence verified
+Read on `9dc6fdaf` (UI5's tree) by two read-only passes plus my own reads.
+- `R-49813d21`: the uses — held in kind; **moved:** `Builder.vue:863` → `:935`, `ConfigPanel.vue:837` → `:1024`, `FieldInput.vue:715` →
+  `:735`, `PreviewRuntime.vue:669` → `:752`, `FeedbackButton.vue:453` → `:456` (the note); the rest held. "Fifteen" counts uses — the row
+  names eleven files. The four notes (`AuditLog.vue:287`, `TenantDetail.vue:547`, `LogicRail.vue:228`, `FeedbackButton.vue`) — held.
+- `R-3ca62317`: `admin/Users.vue:91-97` (three bare paragraphs) — held; the file has no `<style>` block at all, and the error paragraph
+  carries no red. `members/Index.vue:497` (`__prose`) — held.
+- `R-f724595b`: `help/Index.vue:223` (0.04em) — held. `Sidebar.vue:366` (0.06em) — held (`M181` moved it there from `:338` and
+  re-pointed the row). `FilterBar.vue:58-61` — held.
+- `R-9d3c2439`: `webhooks/Index.vue:224-236`, `integrations/Index.vue:456-468`, `RuleShow.vue:432-442` — held; none of the three
+  elements (`:146`, `:265`, `:276`) carries a `title`.
+
+### Premise verified
+- ⛔ **`R-49813d21`'s defect is dead.** 4.22:1 is `#D07D6A` (danger-300) on `#123350`, the dark surface before JR1; JR1 moved it to
+  `#1a2130`, where the same red is **5.23:1** (6.04:1 on sunken `#0f131c`) — recomputed by hand from the hexes; it passes 4.5:1. Every
+  "4.22:1" sentence is stale (`PROGRESS.md`'s dark-palette note; the notes in `AuditLog.vue`, `TenantDetail.vue`, `LogicRail.vue`,
+  `ConditionEditor.vue`, `FeedbackButton.vue`, `Tenants.vue`, `StatTile.vue`). "Only the dark axe sweep can see it" is false as well: no
+  axe spec ever renders an error state. What IS live: **two error reds in dark** — 25 uses of `danger-text` in 20 files (the row's
+  eleven plus the guest runtime's six files, `FeedbackVerdict.vue`, the design system's `FormField` error and `Tabs` alert dot) at
+  danger-300, beside 32 uses of `status-danger-fg` at danger-200. In light both are danger-700 — identical. Hence `D158`.
+- `R-3ca62317`: "every tenant dialog styles a `__prose` rule" — **false for two**: Move scope (`scopes/Index.vue`) and Delete scope
+  (`DeleteNodeModal.vue`) open on a bare paragraph. In the console, Users is the only one. `members/Index.vue`'s rule is margin 0 with
+  no sibling rule, so copied as-is it would butt Users' paragraphs together; `TenantDetail.vue`'s (with `+ __prose { margin-top }`) is
+  the precedent to copy. No Vitest file mounts `admin/Users.vue`, and no e2e visits `/admin/users`.
+- `R-f724595b`: `--mds-tracking-wide` is 0.06em, so the Sidebar swap is invisible and Help's labels widen from 0.04em; no `-wider`
+  exists. The floor: `FieldPalette.vue` (0.04em), `ChoicesEditor.vue` and `BuilderCanvas.vue` (0.03em) are uppercase micro-labels too.
+  Not micro-labels, so kept literal by name: the three wordmarks (`AdminLayout`, `TopNav`, `AuthLayout`), the sign-in title and the
+  two-step key (mono).
+- `R-9d3c2439`: "the same text is on the row's detail page" — true for the url and the destination; **false for the excerpt**:
+  `RuleShow` is the detail page and nothing else shows it whole. The title exposes nothing new — the text is in the page already. The
+  floor: eight more clipped values with no title (the leaderboard name, the builder's form title, the canvas's section and question
+  labels, a scope's name, a media file's name, the Airtable link, a library item's name); two clipped strings are static (the TopNav
+  wordmark, the form card's stat labels) and stay out.
+- One session only; lane B retired; no other claim, held block or forward queue in either claim file beyond `M181`'s, below.
+
+### Remedy verdict
+- `R-49813d21`: **the prescribed swap works but is reshaped by `D158`:** two lines in
+  `packages/design-system/src/theme/theme-overrides.css` (both dark blocks) give every error text one red in dark, at 7.91:1 on the
+  surface; light is unchanged; pinned by a contrast case in the theme test; the stale notes rewritten in place.
+- `R-3ca62317`: **works**, with `TenantDetail.vue`'s rule (and its sibling margin), the error line in `status-danger-fg`; the two
+  scope dialogs class their lead paragraph.
+- `R-f724595b`: **works**; a sweep test keeps any new literal out, the kept literals named.
+- `R-9d3c2439`: **works**; a sweep test holds every clipped value to a `title`, the two static strings named.
+
+Files: `packages/design-system/src/theme/theme-overrides.css`, `packages/design-system/src/theme/__tests__/theme-overrides.test.ts`,
+`packages/design-system/src/components/StatTile/StatTile.vue` (a note); `resources/js/Pages/admin/Users.vue`, `AuditLog.vue`,
+`TenantDetail.vue`, `Tenants.vue` (notes); `resources/js/Pages/scopes/Index.vue`, `resources/js/components/scopes/DeleteNodeModal.vue`,
+`ScopeTree.vue`; `resources/js/Pages/help/Index.vue`; `resources/js/components/shell/Sidebar.vue`, `FeedbackButton.vue` (a note);
+`resources/js/components/builder/FieldPalette.vue`, `ChoicesEditor.vue`, `BuilderCanvas.vue`, `LibraryPicker.vue`, `LogicRail.vue` and
+`ConditionEditor.vue` (notes); `resources/js/Pages/forms/Builder.vue`; `resources/js/Pages/webhooks/Index.vue`;
+`resources/js/Pages/integrations/Index.vue`, `RuleShow.vue`; `resources/js/components/integrations/AirtableRuleFields.vue`;
+`resources/js/Pages/achievements/Index.vue`; `resources/js/components/submissions/MediaInput.vue`; `VERSION`,
+`database/data/releases.json`; the tests — new `resources/js/__tests__/letter-spacing-tokens.test.ts`,
+`resources/js/__tests__/truncation-title.test.ts`, `resources/js/__tests__/dialog-prose.test.ts`,
+`resources/js/Pages/webhooks/index.test.ts`, and `resources/js/Pages/integrations/index.test.ts`.
+Shared artefacts taken: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md` (own block, the
+hand-off and the dark-palette note's reason), the e2e specs the diff reaches (run, not edited).
+Paired files taken: none (no route, migration or deploy script).
+Hubs (`D128`: overlap allowed, every hub named): `resources/js/Pages/forms/Builder.vue`, `resources/js/components/builder/BuilderCanvas.vue`,
+`docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`, `PROGRESS.md`.
+Namespaces spent: `D158`, `D159` (asked and answered in planning); no migration prefix; no ADR.
+E2E specs the diff reaches, run locally: `whats-new` (two releases now), `responsive-axe`, `scopes-axe`, `builder-axe`,
+`admin-console-axe`, `public-runtime-axe`; CI runs every spec, and CI's Storybook axe scans `FormField`'s dark error story.
+Prediction: red first commit by commit — the theme test's same-step cases (both dark blocks) red, its 4.5:1 cases GREEN on the old step
+too (danger-300 passes since JR1 — they pin what must survive, not the defect); the dialog test red on Users' three paragraphs and the two
+scope leads; the tracking sweep red on exactly five sites; the title sweep red on exactly eleven; the two mount cases red. All green after.
+About eight mutants, each turning only its named cases. **Most likely wrong:** the title sweep's template matching — a class carried
+through a `:class` binding, or by two elements, makes it miss a site or count one twice, so the first red set will not be exactly eleven.
+Runner-up: with two releases in the table, `whats-new.spec.ts`'s unseen member sees both, and a check written for one entry fails.
+
+## HELD — `M181`, UI5 of the UI programme: versioning and What's new (`R-c7247dbf`) (m181-ui5-versioning-whats-new)
 
 Taken 2026-10-20. Branch `m181-ui5-versioning-whats-new`, cut from origin/main at `43e96656`, PR into main. ⛔ **NOT MERGED THIS
 SESSION:** it is held green for merge point 4 with UI6 and T2 + Likert (`D137`, `D138`: UI5 → UI6 → T2 + Likert → merge point 4).

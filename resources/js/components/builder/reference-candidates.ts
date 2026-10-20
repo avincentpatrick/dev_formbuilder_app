@@ -92,7 +92,7 @@ export function referenceCandidates(source: ReferenceSource, spot: ReferenceSpot
             const kind = typeOf(field)?.operand_kind;
             const row = source.kinds?.find((candidate) => candidate.value === kind);
 
-            return field.key !== spot.ownKey && kind !== undefined && kind !== 'computed' && (row === undefined || row.offered);
+            return field.key !== spot.ownKey && kind !== undefined && (row === undefined || row.offered);
         };
     } else {
         const host = hostScope(spot.host, source, sectionById);

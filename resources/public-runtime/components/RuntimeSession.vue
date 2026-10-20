@@ -210,7 +210,7 @@ onMounted(async () => {
     if (props.initialAnswers === undefined) {
         const draft = await autosave.restore();
         if (draft !== null) {
-            runtime.restoreAnswers(draft.answers); // M180: a default the draft does not hold was cleared — keep it cleared
+            runtime.restoreDraft(draft.answers); // M180: a default the draft does not hold was cleared — keep it cleared
             runtime.locale.value = draft.locale;
             runtime.goToStep(draft.currentStepKey);
         }

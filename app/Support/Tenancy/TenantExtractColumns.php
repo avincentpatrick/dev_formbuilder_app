@@ -162,6 +162,10 @@ final class TenantExtractColumns
                 .'informative half, the same shape `password_set_at` argues above: NULL means an account that '
                 .'has never completed a verification, so a column of them is a shortlist of invite '
                 .'placeholders and dormant self-registrations.',
+            'whats_new_seen_version' => 'Which release of the PLATFORM\'s What\'s new notes this person last closed '
+                .'(M181) — `welcomed_at`\'s class: a fact about the person\'s relationship with the product, not about '
+                .'their membership of this workspace. The identity is CENTRAL, so the value was set in whichever '
+                .'workspace they happened to be in, and it says nothing a tenant\'s own data needs.',
             'privacy_policy_accepted_at' => 'As `tos_accepted_at`: the timestamp records acceptance of THIS '
                 .'INSTALLATION\'S privacy policy, which is an agreement between the person and the platform '
                 .'operator. A tenant is not a party to it and cannot rely on it for their own consent record.',

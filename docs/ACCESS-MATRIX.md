@@ -267,6 +267,7 @@ All URLs are relative to a workspace host, e.g. `http://demo.localhost:8080/form
 | `/domains` | `manageDomains` | `tenant.settings.manage` | `custom_domain` (nav only) | ✅ | ✅ | — | — | — |
 | `/settings` | — | (authenticated; panels gate on `tenant.settings.manage`) | — | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `/help` | — | (authenticated; the user manual, M162 `D114` — no gate, so a Reviewer or Viewer reads why Forms is absent) | — | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `/whats-new` *(M181)* | — (the footer under every page and the sidebar foot) | (authenticated; every release's notes, newest first — no gate, like `/help`). `POST /whats-new/seen` is the prompt's any-close; it moves only the member's OWN `whats_new_seen_version`, forward only | — | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `/search`, `/notifications` | — | (authenticated) | — | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 Three ability keys have no nav item of their own and gate in-page controls instead:

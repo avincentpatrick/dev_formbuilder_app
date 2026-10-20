@@ -118,6 +118,8 @@ function encodeFieldAdapters(): array
             'geo' => $bannedInRepeats,
             'media' => $bannedInRepeats,
             'upload' => 'media is kept out of a repeatable section, so an instance has no upload endpoint',
+            // M180 (`R-f77aa45d`): a calculation inside a repeatable section is worked out by neither engine (`R-1c31e7cf`).
+            'calculation' => 'a calculation inside a repeatable section is never worked out, so an instance has no value to show by its Type',
         ]],
     ];
 }

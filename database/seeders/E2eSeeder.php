@@ -68,6 +68,7 @@ use App\Support\Audit\AuditLogger;
 use App\Support\Audit\AuditRedactor;
 use App\Support\Forms\RedirectTarget;
 use App\Support\Mapping\ColumnFingerprint;
+use App\Support\Platform\WhatsNew;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Database\Seeders\Concerns\DeterministicIds;
@@ -75,6 +76,7 @@ use Database\Seeders\Concerns\SeedsGamificationLedger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Seeder;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -200,6 +202,15 @@ class E2eSeeder extends Seeder
 
     private const REVIEWER_PASSWORD = 'meridian-e2e-2026';
 
+    /**
+     * M181 (`R-c7247dbf`) — the one member the What's new prompt is left for. Every other seeded identity is stamped as
+     * having seen the newest release (`seedWhatsNew()`), because the prompt makes the page behind it inert and demo@'s
+     * stored session opens every spec; this one is reset to unseen on every seed, for `tests/e2e/whats-new.spec.ts`.
+     */
+    private const WHATS_NEW_EMAIL = 'whatsnew@meridian.test';
+
+    private const WHATS_NEW_PASSWORD = 'meridian-e2e-2026';
+
     public function run(): void
     {
         if (app()->environment('production')) {
@@ -249,11 +260,12 @@ class E2eSeeder extends Seeder
         // **Give it any of them and the page changes shape just as surely as verifying it would.**
         $pending = $this->resolveOrCreateUser(self::PENDING_EMAIL, 'Pending Teammate', self::PENDING_PASSWORD, verified: false);
         $reviewer = $this->resolveOrCreateUser(self::REVIEWER_EMAIL, 'Rita Reviewer', self::REVIEWER_PASSWORD);
+        $newcomer = $this->resolveOrCreateUser(self::WHATS_NEW_EMAIL, 'Wren Okafor', self::WHATS_NEW_PASSWORD);
 
         // Active Owner membership + a pending invite. Wrapped in a transaction so applyLocal's
         // transaction-local RLS GUC (app.current_tenant_id) is actually in force for the INSERTs —
         // outside a transaction it wouldn't stick and the strict RLS WITH CHECK would reject the rows.
-        DB::transaction(function () use ($tenant, $owner, $pending, $reviewer): void {
+        DB::transaction(function () use ($tenant, $owner, $pending, $reviewer, $newcomer): void {
             TenantContext::applyLocal((string) $tenant->id, $owner->id);
             app(PermissionRegistrar::class)->setPermissionsTeamId((string) $tenant->id);
 
@@ -318,6 +330,18 @@ class E2eSeeder extends Seeder
                     'invited_role_id' => $this->roleId('reviewer'),
                 ]);
                 $reviewer->syncRoles(['reviewer']);
+            }
+
+            // M181 — an active Viewer who has never seen a What's new (see WHATS_NEW_EMAIL). Created like the reviewer,
+            // and sorted after them by name, so the grant modal's first recipient stays who it was.
+            if (! TenantUser::query()->where('user_id', $newcomer->id)->exists()) {
+                TenantUser::create([
+                    'user_id' => $newcomer->id,
+                    'status' => TenantUserStatus::Active,
+                    'joined_at' => now(),
+                    'invited_role_id' => $this->roleId('viewer'),
+                ]);
+                $newcomer->syncRoles(['viewer']);
             }
 
             // A demo form for the Forms page (D3) + the builder (D4a): a section + a few fields on the
@@ -981,6 +1005,46 @@ class E2eSeeder extends Seeder
 
         TenantContext::flush();
         app(PermissionRegistrar::class)->setPermissionsTeamId(null);
+
+        $this->seedWhatsNew();
+    }
+
+    /**
+     * M181 (`R-c7247dbf`, `D125` C) — the release notes, and who has seen them.
+     *
+     * CI never deploys, so nothing else fills `releases`: the same `releases:sync` the deploy runs copies the committed
+     * notes in. Then every identity but one is stamped as having seen the newest release — the prompt opens on the first
+     * page while anything is unseen and makes the page behind it inert, and `global-setup.ts` hands demo@'s session to
+     * every spec, so an unseen demo@ would stand a modal between every spec and its first click. The one left unseen
+     * (WHATS_NEW_EMAIL) is reset on every seed, so the prompt's spec finds it unseen however often this runs.
+     *
+     * Over `pgsql_privileged`, because `users` is FORCE RLS and this runs with no user GUC; and refusing zero rows where
+     * the rows are visible, for the reason `promoteToSuperAdmin()` gives.
+     */
+    private function seedWhatsNew(): void
+    {
+        if (Artisan::call('releases:sync') !== 0) {
+            throw new RuntimeException('releases:sync failed while seeding: '.trim(Artisan::output()));
+        }
+
+        $newest = app(WhatsNew::class)->all()[0]['version'] ?? null;
+        if ($newest === null) {
+            throw new RuntimeException('releases:sync left the releases table empty.');
+        }
+
+        $privileged = DB::connection('pgsql_privileged');
+        $others = fn () => $privileged->table('users')->where('email', '!=', self::WHATS_NEW_EMAIL);
+        $newcomer = fn () => $privileged->table('users')->where('email', self::WHATS_NEW_EMAIL);
+
+        $stamped = $others()->update(['whats_new_seen_version' => $newest]);
+        $reset = $newcomer()->update(['whats_new_seen_version' => null]);
+
+        if (($stamped === 0 && $others()->exists()) || ($reset === 0 && $newcomer()->exists())) {
+            throw new RuntimeException(
+                'Stamping the release each seeded user has seen affected zero rows where rows exist. '
+                .'The pgsql_privileged role is not bypassing FORCE row-level security on `users`.'
+            );
+        }
     }
 
     /**

@@ -109,6 +109,10 @@ const pages = [
     // headings, numbered steps, bold labels and underlined links, with a contents grid that must reflow to
     // one column at 375px rather than scroll sideways.
     { name: 'Help', path: '/help' },
+    // What's new (M181, `R-c7247dbf`): every release's notes, with a New / Improved / Fixed badge per change — the
+    // badges' contrast in both themes, and the 375px wrap of a long note beside its badge. demo@ has seen the newest
+    // release (`E2eSeeder::seedWhatsNew()`), so the prompt never covers what is scanned.
+    { name: "What's new", path: '/whats-new' },
     // The workspace's own feedback (I7a, PRD Feature #11). `E2eSeeder::seedFeedback()` puts one row in
     // each of the four FeedbackStatus states, which is what makes this scan worth running: the four map
     // to four DIFFERENT badge variants, and a table where every pill is the same colour proves nothing

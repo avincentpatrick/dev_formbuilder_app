@@ -16,7 +16,168 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M178`, R3 of the testers' round 2: references everywhere (`R-75719ac4`, `R-917496f9`, plus `R-2d921bbe`'s last step) (m178-r3-references)
+## Status: NO ACTIVE CLAIM — `M179` (V) is merged and live on staging, released alone at its green (`D152`; below). `M178` (R3) stays HELD for merge point 3 with R4, the next claim. Merge only at a planned merge point.
+
+## RELEASED — `M179`, V: the testers follow every relayed comment and check our fixes inside Feedback (`R-db9dec62`, `R-129c44c3`, `R-e727ca94`) (merged as PR #372, `aec68222`, released alone (`D152`), 6/6 green with real step counts on its final run at `3337c4dd` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `aec68222` the same)
+
+Built and released 2026-10-19/20 by the build session (Opus) from the V plan (`~/.claude/plans/hi-please-give-me-parallel-chipmunk.md`;
+build plan `~/.claude/plans/pasted-content-id-5c4e-read-claude-md-jaunty-bonbon.md`). **Released alone (`D152`):** the user's census at
+00:33 UTC (tenants 1 · users 6 · forms 11 · form_versions 27 · submissions 22 · attachments 62 · feedback_reports 0 · notifications 62 — the
+same as merge points 1 and 2) and backup (`Result: 0`, `staging-2026-10-20-003306.dump`, 440,280 B); squash-merged with the
+`[tracker-surgery]` marker as the body's first line; the trunk's CI 6/6; the deploy (run 39351338125) backed up to
+`deploy-20261020-010857.dump` (443,521 B), counted 66 tables and 9,849 rows, ran `000135`–`000140`, and found every table at least as full
+after (67 tables — `feedback_comments` is the one new); `/up` 200. **The relay:** 31 created, then 31 unchanged on a second run; the API
+reads 31 relayed reports, 13 Resolved · 12 Ongoing · 6 Confirmed working, references `P1`…`UI5`. ⚠️ **Order deviation:** the relay ran
+before the user's census-after, which the build plan put first — harmless (the rule is "every count ≥ before", and the deploy's own count
+had already held every table), but the census-after reads `feedback_reports 31`. The feedback pull read 0 reports at the start and at
+the close. Rows taken: the three, all closed. Filed, not fixed: `R-08513868` (both Feedback lists show a relayed report by its quoted
+original — found by the browser look). Fixed in passing: `relayFeedback()` and `replyToFeedback()` had copied the save/apply/`finally`
+shape the M3 adversarial pass filed — both now `TenantContext::runFor()`; that row's `SuperAdminService` citations re-pointed to the five
+real call sites. The `M107` PHPStan row gained its measured remedy (host 0 errors where the container reports 44).
+
+**Measured against the prediction:**
+- **Red first, row by row — held.** 38 mutations, all caught: 30 Pest through `scripts/mutate.php`, 7 Vitest and 1 E2E committed and
+  reverted. **Two predicted red sets were wrong:** m15 (the policy's relayed arm) reddened half of what I wrote — the screenshot case's
+  reporter is the tester, so it never exercised that arm; and v2 (It works offered whatever the actions say) was predicted too wide — a
+  row with no actions draws no verdict at all.
+- **"Most likely wrong: the new end-to-end transition spec" — half right.** Locally the reopen walk timed out at the default five
+  seconds while the server had already committed it; waiting on the POST's own response fixed it before CI ever saw it, and on CI it was
+  green on every run. The E2E mutant (It works posting to `/reopen`) reddened exactly the predicted case.
+- **Runner-up, the CHECK rebuilds — not wrong.** `FeedbackCheckWideningTest` and the dev-stack up/down/up held, and staging ran all six.
+- **What no prediction named (the real misses):** (1) ⛔ a test's committed tenants outlived it — `FeedbackCommentRlsTest` used a
+  `crls-` slug that the shared purge (`console-%`, `rls-%`) never matches, so CI went 22 red in tenant-counting files I never ran beside
+  it (proved in one process: 15 failed with the old prefix, 27 passed with `rls-comment-`); (2) `SubmissionReferenceDisclosureTest`
+  matches `where('reference', …)` on any table — the two feedback lookups are now table-qualified; (3) `BacklogProvenanceTest` refused my
+  new row's wrapped Filed-by clause; (4) the relay returned outcomes in sorted, not file, order — caught by my own test; (5) the
+  container's full PHPStan reports 44 false errors where the host and CI report 0.
+
+Taken 2026-10-19. Branch `m179-v-relayed-feedback`, cut from `origin/main` at `d13f418f`, PR into main — not stacked on R3. The plan of
+record is `~/.claude/plans/hi-please-give-me-parallel-chipmunk.md` (V: §A the user's three answers, §B the design, §E the 31 items' text the
+user approved); the build plan is `~/.claude/plans/pasted-content-id-5c4e-read-claude-md-jaunty-bonbon.md`. ⛔ **RELEASED ALONE at its green**
+(the user, 2026-10-19 — a one-time exception to `D137`, recorded as `D152`), while `M178` (R3) stays HELD below for merge point 3 with R4.
+The trunk's `CLAUDE.md` still asks for the user's staging backup block before a merge (R3 retires it only when it lands), so this release runs
+it: census → backup block → merge → the deploy's own backup and counts from its log → `/up` → census.
+
+**No user check was owed** (R1 and R2 confirmed "All good" on 2026-10-19 — never re-ask; R3 is not live). The session-start pull read 0
+reports, so nothing was triaged. **Numbers:** `state.php` prints next `M178` because it counts RELEASED headings only — `M178` is spent by
+the held claim, so this is `M179`. `D147`–`D149` are R3's on its held branch, so V's decisions are **`D150`–`D152`** (the plan's provisional
+D147–D149 renumbered). One question was asked and answered in this session's planning (the user, 2026-10-19): **the 11 items the user
+already checked ("All good") load as Resolved, as §E says**, so the testers who raised them press It works themselves — recorded in `D150`.
+
+Rows filed and taken here (V's first commit files them, so their ids were derived from their titles before this claim, by `finish_row()`'s
+rule): `R-db9dec62` (a comment that reached us outside the Feedback button cannot be seen, followed or checked by the testers),
+`R-129c44c3` (a tester cannot confirm a fix, say it is still a problem, or comment; our reply is the only message, and the Owner/Admin list
+never shows it — with the transition race), `R-e727ca94` (the support API and the pull script cannot relay, reply, or see a reopen or a
+tester's comment).
+
+### Evidence verified
+Read on `d13f418f` (= `origin/main`; the code is byte-identical to `617f12d0`, the plan's base — only claim commits lie between) by three
+read-only passes plus my own reads.
+- `R-db9dec62`: `FeedbackPresenter.php:137-142` (`mine()` = `where('user_id', …)`, "the whole boundary") — held. No bulk writer of
+  `feedback_reports` exists (`FeedbackService::submit()` is the only creator) — held. Census on staging: `feedback_reports` 0 (merge point 2).
+- `R-129c44c3`: `Mine.vue:57-86` (read-only cards; the reply at `:82-85`) — held. `FeedbackStatus.php:26-29` (four cases), `:70-77` (the
+  graph) — held. `SuperAdminService.php:929-1007` — held, and **the race is measured**: `$from = $report->status` and the guard at `:931-935`
+  run on the passed-in model before the transaction; inside, `findOrFail()` (`:947`) takes no lock, and the audit's `old.status` (`:950`) is
+  that stale `$from`. `FeedbackPresenter::index()` (`:79-98`) emits no `resolution_note` — held.
+- `R-e727ca94`: `routes/platform-api.php:33-42` (GET list, GET screenshot, PATCH) — held. `FeedbackApiController.php` — held. ADR-0023
+  §D3 ("the one write") — held. `scripts/feedback-pull.php:93` (an id must be 8–64 characters, so `U1` is refused) and `:146` (the pull
+  reads `status=new,reviewed` only) — held.
+
+### Premise verified
+- One session only; lane B retired; `M178` held (moved under `## HELD` below by this claim, the `9498091c` precedent); no other forward queue.
+- `D147`–`D149` exist only on `m178-r3-references`; `decisions.md` on main ends at `D146`. No lint checks decision numbers for gaps.
+- R3 touches no migration and no ADR, so V's prefixes start at `2026_08_17_000135` and ADR-0023 is amended (§D7), not a new ADR. R3 and V
+  overlap only in different hunks of `CLAUDE.md`, `PROGRESS.md`, `data-dictionary.md`, and the prepended/appended ends of `decisions.md`,
+  `feature-backlog.md` and the line — mechanical conflicts left for merge point 3, named in R4's prompt.
+- **The console's offered actions ARE `allowedTransitions()`** (`FeedbackConsolePresenter.php:100-103`, `admin/Feedback.vue:12`), so
+  Confirmed can never be a target in that graph — the tester's moves get their own.
+- **`isTerminal()` drives side effects** (the `resolved_*` stamp at `SuperAdminService.php:960-961`, `feedback_closed` at `:987-998`), so a
+  tester's confirm must not pass through it.
+- **ADR-0015 §D9:** a feedback screenshot is served under `feedback.view` on every route or on none, so a comment's screenshot is named to a
+  member and never shown.
+- **The repository is public (`D48`):** the committed relay file carries no email address and no person's name.
+- **The originals survive** in local transcripts (the UI audit of 2026-10-14, round 1 of 2026-10-15, round 2 and the testers' PDF of
+  2026-10-16), so each relayed item quotes its comment exactly, as §E promises.
+- The dev database stands at `000134`, like staging, so the CHECK rebuilds can be rehearsed on the real upgrade path.
+
+### Remedy verdict
+**Works, as designed in the plan's §B, with three corrections measured before any test:** (1) two transition graphs, not one — the
+support graph stays the console's offered-actions source; (2) `isTerminal()` keeps its side effects for Resolved and Declined only, and a
+new predicate carries "closed" for display; (3) a member's My reports reads `user_id = me AND source = button`, and the testing round reads
+`source = relayed` — an `OR` on one list would show the Owner all 31 twice. The lock is proven by the statement shape (`for update` after
+the tenant context), the `PublishLockingTest` precedent — a stale-model test alone cannot catch a dropped lock.
+
+Files: `app/Enums/{FeedbackStatus,FeedbackSource,FeedbackParty,FeedbackCommentAction,NotificationType}.php`, `app/Models/{FeedbackReport,
+FeedbackComment}.php`, `app/Services/Feedback/{FeedbackLifecycle,FeedbackPresenter,FeedbackConsolePresenter}.php`,
+`app/Services/Admin/SuperAdminService.php`, `app/Policies/FeedbackReportPolicy.php`, `app/Http/Controllers/Tenant/{FeedbackController,
+FeedbackThreadController}.php`, `app/Http/Controllers/Admin/FeedbackConsoleController.php`, `app/Http/Controllers/Platform/*Feedback*.php`,
+requests, `app/Support/{Tenancy/TenantScopedTables,Audit/AuditRedactor,Audit/AuditableTypes,Notifications/NotificationCopy}.php`,
+`app/Services/Notifications/NotificationPresenter.php`, `HandleInertiaRequests.php`, `bootstrap/app.php`, `routes/{tenant,admin,
+platform-api}.php`, migrations `000135`–`000140`, `database/seeders/{E2eSeeder,DemoSeeder}.php`, `database/data/feedback/relayed-2026-10.json`,
+`resources/js/Pages/feedback/{Mine,Index}.vue`, `resources/js/Pages/admin/Feedback.vue`, `resources/js/components/feedback/*`,
+`resources/js/components/shell/{AccountMenu,FeedbackButton}.vue`, `resources/js/components/notifications/{types,type-visual}.ts`,
+`resources/js/types/inertia.d.ts`, `packages/design-system/src/components/Badge/status-variant.ts`, `scripts/{feedback-pull,preflight}.php`,
+`tests/fixtures/feedback-pull/router.php`, the tests beside each, `tests/e2e/{feedback-testing-round,responsive-axe}.spec.ts`.
+Shared artefacts taken: `CLAUDE.md` ("Start every session" and "Closing out" only), `PROGRESS.md` (Standing Rule 10, my own status block,
+and the tracker surgery — the `M168` down to `M149` bullets to the archive), `PROGRESS_ARCHIVE.md`, `docs/claims/decisions.md`,
+`docs/feature-backlog.md`, `docs/pipeline.md`, `docs/data-dictionary.md`, `docs/adr/0023-platform-support-api.md`,
+`docs/{api-specification,security-threat-model,audit-compliance-logging-spec,PRD,multi-tenancy-rbac-design,erd,ACCESS-MATRIX,TESTING-GUIDE,
+data-privacy-gdpr-compliance}.md`, `tests/Pest.php`.
+Paired files taken: `tests/Feature/Notifications/NotificationTypeParityTest.php` ↔ `resources/js/components/notifications/types.ts` (a new
+`NotificationType` case, the same order on both sides).
+Namespaces spent: migration prefixes `2026_08_17_000135` to `2026_08_17_000140`; `D150`, `D151`, `D152`; ADR-0023 §D7 (no new ADR number).
+Prediction: red first, row by row — the drift tests, the column census and the RLS test red before the schema; the lifecycle's stale-status
+case red on the trunk (the guard reads the passed-in model) and its statement-shape case red until the lock exists; the member's view red
+for relayed reports; the pull script's new cases red by absence. Every gate's mutation caught. **The one I most expect to be wrong: the new
+end-to-end transition spec** — the first in the repository that walks a status change, on seeded rows shared by three viewport projects, on
+CI's plain-HTTP host. Runner-up: the two CHECK rebuilds, which no fresh database can see — hence `FeedbackCheckWideningTest` and the dev-stack
+rehearsal.
+
+## HELD — `M178`, R3 of the testers' round 2: references everywhere (`R-75719ac4`, `R-917496f9`, plus `R-2d921bbe`'s last step) (m178-r3-references)
+
+**BUILT — PR #371, CI 6/6 green with real step counts (run 39261448121 at `44951a80`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the only skips are the two main-only staging-header steps and the failure-only report upload) — AND NOT MERGED.** ⛔ **Held for merge point 3 (`D137`, `D138`):**
+this PR merges with R4's, between the user's census before and after. **V comes first** (`M179`, the user, 2026-10-19): released alone at its green,
+branched from `origin/main` beside this held branch; R4 then stacks on this branch with `origin/main` merged in. The branch carries the two rows'
+closures, `R-2d921bbe`'s, `D147`–`D149`, three filed rows (the paper form's, closed here; the Default value's and the calculations', for R4),
+`R-da02fe03` amended, the status bullet, the regenerated line and hand-off. ⚠️ The backup block's retirement takes effect only when this merges —
+until then the trunk's `CLAUDE.md` still asks for it, so V's lone release runs it.
+
+**Measured against the prediction:**
+- **Red first, row by row, where predicted** — the retired block's docs test 4 of 4; the two rule types 14 Pest (six golden vectors on PHP, the
+  payload's count, shapes, related field, comparison and pairing, the lowering pin, the export) and Vitest 9e2; the Minimum switch 3 Vitest (the
+  Likert / No-negatives guard green both sides); the blank-side walk on BOTH engines — five validation vectors and the 11-vector `constraint`
+  corpus (by absence), with the four guards green both sides; the paper line 1 Pest; the picker's expose 2, wiring 1, `pipeable` census 1, and
+  the new modules by absence (`insert-at-caret` 4, `reference-candidates` 14, `ReferenceInput` 7, the scope parity 2). The TS half of the two
+  rule types was proven by its mutants, not by a trunk red.
+- **Mutants: 20 run, 20 caught, each red set the one written down first** — through `scripts/mutate.php`: the retired sentence put back; at least
+  made strict (enum); the export's `>=`; unknown read as a refusal; `or` dropping unknown; the walk wired into relevance (8 red: the leak guard and
+  seven bool-mode corpus vectors); NaN not blank; the paper substitution. Committed and reverted: at least strict (TS map); the preview's screen;
+  the Minimum switch; the calculation filter; the TS walk; an insert at the end (3); later questions offered (8); a calculation in a formula; `@`
+  off (5); the code hidden (3); the length guard; and **the write forced through the fallback, red in a real browser at the Ctrl+Z assertion**.
+- **The one named most likely wrong held:** `execCommand('insertText')` gives ONE native undo step in Chromium (the new spec passed), and the
+  fallback loses it (the mutant). **Runner-up held:** the PHP blank-side vectors went red on PHP itself — `Temporal::orders()` rescued none.
+- **Not predicted:**
+  - **The planned `if()`-branch case was impossible** — the grammar refuses a comparison as an `if()` branch (`ExpressionParser.php:491`), so the
+    walk has no `if()` arm and the vector became a guard on an `if()` inside a comparison. The plan review's `if()` point was moot.
+  - **Three planning findings became decisions** (`D147`–`D149`): the paper form printed `${key}`; a Default value is never applied; no rule or
+    condition reads a calculation. The last two narrowed the picker (no Default value box, no calculation in a formula), as did `today()` being
+    the only date (the other presets ride `R-da02fe03`).
+  - **Line-cited files shaped the code:** match arms and `case` labels share lines so no cited line moves; where lines had to move (the two
+    imports and the candidate lists in `ConfigPanel.vue`, the import in `BuilderPresenter.php`, the thank-you plumbing in `Builder.vue`), eleven
+    open-row citations were re-pointed and checked line by line against the trunk. **My re-point script moved only the start of four RANGE
+    citations** (`531-537` read `537-537`); the ratchet caught two that landed on blank lines, a content diff the rest.
+  - **Harness slips, each caught before a push:** `git revert -q` is not a flag, so two Vitest mutants stacked before I saw it (both still red as
+    predicted; tree restored and checked); a long heredoc would not parse (edits moved to script files); `base_path()` in a Unit test; Vue
+    re-patching a textarea's value under a test with no v-model loop; happy-dom's `setRangeText` caret. Recorded in the gate-traps memory.
+  - **The local e2e run of the eight specs the diff reaches (204 tests) averaged over two minutes a test** — stopped after 12, all passing; the
+    new spec ran alone (desktop, 1 of 1, and red under its mutant). CI runs every spec.
+- **The real-browser look** (a throwaway desktop spec, screenshots in the git-ignored `storage/app/m178-look/`): the search and the `@` list,
+  grouped with codes; a Maximum set to "Another question's answer"; the preview piping "Hello Ana" into a label; 3 children passing while the
+  household size is blank. One observation, by design: the first question shows no picker (nothing comes before it).
+- **Local gates on the final tree:** Vitest (builder, forms, help, pages, design system) 143 files / 2,096 passed; type-check; Pint bare; PHPStan
+  scoped 0; the host lints; Pest — the expression and validation units 645, the enumerating and builder files, the Docs files 162 + the known
+  bind-mount `SuiteCollectionFloorTest`.
+
 
 Taken 2026-10-19. It is R3 of the testers' round 2 (`D138`; the plan of record `~/.claude/plans/here-are-added-comments-peppy-quill.md` §B,
 §E; the build plan `~/.claude/plans/pasted-content-id-fff1-read-claude-md-quirky-orbit.md`). Branch `m178-r3-references`, cut from

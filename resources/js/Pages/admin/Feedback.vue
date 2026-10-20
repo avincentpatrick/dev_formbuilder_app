@@ -36,7 +36,7 @@ import {
     type DataTableColumn,
 } from '@meridian/design-system';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
-import type { ConsoleFeedbackPageProps, ConsoleFeedbackRow } from '@/components/feedback/types';
+import type { ConsoleFeedbackComment, ConsoleFeedbackPageProps, ConsoleFeedbackRow } from '@/components/feedback/types';
 
 const props = defineProps<ConsoleFeedbackPageProps>();
 
@@ -62,7 +62,12 @@ const statusOptions = [{ value: '', label: 'All statuses' }, ...props.filters.st
 const tenantOptions = [{ value: '', label: 'All workspaces' }, ...props.filters.tenants];
 const typeOptions = [{ value: '', label: 'All kinds' }, ...props.filters.types];
 
-const detailRow = ref<ConsoleFeedbackRow | null>(null);
+/**
+ * The open report is looked up from the page's rows by id, never held as a copy (M179): a reply reloads the props,
+ * and the modal must show the thread as it now is.
+ */
+const detailId = ref<string | null>(null);
+const detailRow = computed<ConsoleFeedbackRow | null>(() => props.data.find((row) => row.id === detailId.value) ?? null);
 const busy = ref(false);
 
 function queryParams(extra: Record<string, string | number> = {}): Record<string, string | number> {
@@ -101,9 +106,44 @@ function clearFilters(): void {
 /** The reply typed for the open report (M175); sent with the next status change, then cleared. */
 const note = ref('');
 
+/** The support team's reply in the report's thread (M179, `D151`) — moves nothing; tells the reporter and the thread. */
+const reply = ref('');
+const replyError = ref<string | null>(null);
+
 function openReport(row: ConsoleFeedbackRow): void {
     note.value = '';
-    detailRow.value = row;
+    reply.value = '';
+    replyError.value = null;
+    detailId.value = row.id;
+}
+
+function sendReply(row: ConsoleFeedbackRow): void {
+    if (reply.value.trim() === '') {
+        replyError.value = 'Write the reply first.';
+
+        return;
+    }
+
+    replyError.value = null;
+    busy.value = true;
+    router.post(
+        `/admin/feedback/${row.id}/comments`,
+        { body: reply.value.trim() },
+        {
+            preserveScroll: true,
+            onFinish: () => (busy.value = false),
+            onSuccess: () => (reply.value = ''),
+        },
+    );
+}
+
+/** Who wrote a thread message: the Support team, a member by name, or a Former member — never "nobody". */
+function commentAuthor(comment: ConsoleFeedbackComment): string {
+    if (comment.author_kind === 'support') {
+        return 'Support team';
+    }
+
+    return comment.author?.name ?? 'Former member';
 }
 
 function transition(row: ConsoleFeedbackRow, status: string): void {
@@ -115,7 +155,7 @@ function transition(row: ConsoleFeedbackRow, status: string): void {
         {
             preserveScroll: true,
             onFinish: () => (busy.value = false),
-            onSuccess: () => (detailRow.value = null),
+            onSuccess: () => (detailId.value = null),
         },
     );
 }
@@ -270,7 +310,7 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
             :open="detailRow !== null"
             :title="detailRow ? `${detailRow.tenant_name} · ${reporterLabel(detailRow)}` : 'Feedback'"
             size="lg"
-            @close="detailRow = null"
+            @close="detailId = null"
         >
             <div v-if="detailRow" class="admin-fb__detail">
                 <dl class="admin-fb__meta">
@@ -285,7 +325,16 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
                             <span v-else>—</span>
                         </dd>
                     </div>
-                    <div>
+                    <div v-if="detailRow.source === 'relayed'">
+                        <dt>Comment</dt>
+                        <dd>
+                            <!-- A relayed report (M179): its reference, title and where it came from. -->
+                            <MdsBadge variant="neutral" :label="detailRow.reference ?? 'Relayed'" />
+                            {{ detailRow.title }}
+                            <span v-if="detailRow.source_label" class="admin-fb__role"> · {{ detailRow.source_label }}</span>
+                        </dd>
+                    </div>
+                    <div v-else>
                         <dt>Page</dt>
                         <dd>
                             <!-- The title, linked to the full address (M175); an older report shows its path. -->
@@ -312,6 +361,10 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
                     <div v-if="detailRow.resolved_at">
                         <dt>Closed</dt>
                         <dd>{{ formatDate(detailRow.resolved_at) }} · {{ detailRow.resolver?.name ?? '—' }}</dd>
+                    </div>
+                    <div v-if="detailRow.status === 'confirmed'">
+                        <dt>Confirmed working</dt>
+                        <dd>{{ detailRow.confirmer?.name ?? 'Former member' }}</dd>
                     </div>
                 </dl>
 
@@ -341,10 +394,37 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
                     v-if="detailRow.transitions.length"
                     label="Reply to the reporter (optional)"
                     input-id="admin-feedback-note"
-                    help="Sent with the status you choose. On Resolved or Declined the reporter is told by notification and email, and reads the reply on My feedback."
+                    help="Sent with the status you choose. On Resolved or Declined the reporter and everyone in the thread are told by notification and email, and read the reply on their Feedback page."
                 >
                     <MdsTextarea id="admin-feedback-note" v-model="note" :rows="3" maxlength="1000" />
                 </MdsFormField>
+
+                <!-- M179 (`D151`): the report's thread, and a reply in it that moves nothing. -->
+                <section class="admin-fb__thread" aria-label="Thread" data-console-thread>
+                    <h3 class="admin-fb__thread-title">Thread</h3>
+                    <ol v-if="detailRow.comments?.length" class="admin-fb__comments">
+                        <li v-for="comment in detailRow.comments" :key="comment.id" class="admin-fb__comment">
+                            <p class="admin-fb__comment-meta">
+                                <strong>{{ commentAuthor(comment) }}</strong>
+                                <span v-if="comment.action === 'reopened'"> · said it is still a problem</span>
+                                <span v-else-if="comment.action === 'confirmed'"> · said it works</span>
+                                · {{ formatDate(comment.created_at) }}
+                            </p>
+                            <p v-if="comment.body" class="admin-fb__body">{{ comment.body }}</p>
+                        </li>
+                    </ol>
+                    <p v-else class="admin-fb__role">No messages yet.</p>
+
+                    <MdsFormField
+                        label="Reply in the thread"
+                        input-id="admin-feedback-reply"
+                        help="Changes no status. The reporter and everyone in the thread are told."
+                        :error="replyError ?? undefined"
+                    >
+                        <MdsTextarea id="admin-feedback-reply" v-model="reply" :rows="2" maxlength="2000" />
+                    </MdsFormField>
+                    <MdsButton variant="secondary" size="sm" :loading="busy" data-console-reply @click="sendReply(detailRow)">Send reply</MdsButton>
+                </section>
             </div>
 
             <template #actions>
@@ -479,5 +559,41 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
     margin: 0;
     overflow-wrap: anywhere;
     color: var(--mds-color-text-body);
+}
+
+.admin-fb__thread {
+    display: grid;
+    gap: var(--mds-space-2);
+    margin-top: var(--mds-space-4);
+    padding-top: var(--mds-space-3);
+    border-top: 1px solid var(--mds-color-border-default);
+}
+
+.admin-fb__thread-title {
+    margin: 0;
+    font-size: var(--mds-type-body-md-font-size);
+    font-weight: var(--mds-font-weight-semibold);
+    color: var(--mds-color-text-heading);
+}
+
+.admin-fb__comments {
+    display: grid;
+    gap: var(--mds-space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.admin-fb__comment {
+    padding: var(--mds-space-2) var(--mds-space-3);
+    border: 1px solid var(--mds-color-border-default);
+    border-radius: var(--mds-radius-md);
+    background-color: var(--mds-color-bg-sunken);
+}
+
+.admin-fb__comment-meta {
+    margin: 0;
+    font-size: var(--mds-type-body-sm-font-size);
+    color: var(--mds-color-text-secondary);
 }
 </style>

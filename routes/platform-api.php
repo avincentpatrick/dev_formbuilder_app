@@ -37,6 +37,11 @@ Route::prefix('api/platform/v1')
         Route::get('/feedback', [FeedbackApiController::class, 'index'])->name('feedback.index');
         Route::get('/feedback/{feedback}/screenshot', [FeedbackApiController::class, 'screenshot'])
             ->whereUuid('feedback')->name('feedback.screenshot');
+        // M179 (`R-e727ca94`, ADR-0023 §D7) — the relay and a support reply, under the same single ability.
+        // `relayed` is a literal segment, declared before the uuid-constrained `{feedback}` routes cannot match it.
+        Route::post('/feedback/relayed', [FeedbackApiController::class, 'relay'])->name('feedback.relay');
+        Route::post('/feedback/{feedback}/comments', [FeedbackApiController::class, 'reply'])
+            ->whereUuid('feedback')->name('feedback.comments.store');
         Route::patch('/feedback/{feedback}', [FeedbackApiController::class, 'update'])
             ->whereUuid('feedback')->name('feedback.update');
     });

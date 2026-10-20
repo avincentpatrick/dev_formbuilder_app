@@ -24,10 +24,40 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D149`, the last one filed, was asked and answered on 2026-10-19 while `M178` (R3) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D152`, the last one filed, was asked and answered on 2026-10-19 while V (`M179`) was planned, and recorded in its claim. `D147`–`D149` are `M178`'s (R3), recorded on its held branch; they reach this file at merge point 3. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D152 — When should V (the testers following and checking every relayed comment inside Feedback) go live? **A — next, released alone as soon as it is green, after the user's backup step: a one-time exception to `D137`'s "no small merges".**
+
+**Asked and answered 2026-10-19 (user decision, in chat), while V was planned; recorded in `M179`'s claim.** The user had relayed 31 comments by hand (their UI comments of 2026-10-14, the testers' round 1 of 2026-10-15, round 2 and the testers' PDF of 2026-10-16) and asked for their progress to be visible on staging, with a way for testers to mark a fix as working. The user then added: plan only, without disturbing the session already running — so V is built after that session's increment (R3, `M178`, held green for merge point 3), branched from `origin/main` beside it.
+
+- **A — next, released alone (recommended, chosen).** Built before R4 and released on its own at its green, after the user's backup step; the testers can check the waiting fixes at once. A one-time exception to `D137`, needing the user's word — given.
+- **B — next, released with batch 3.** Built before R4 but released with R3 and R4 at merge point 3; keeps the no-small-merges rule, and the testers wait.
+- **C — after batch 3.** Built after R3 and R4, released with batch 4.
+
+**What the answer files, in the same push:** nothing new — it amends `D138`'s order (V between R3 and R4) and is the reason `M179` merges alone while `M178` waits. Its release follows the trunk's merge rule as it stands then (the user's backup block, until R3 retires it).
+
+### D151 — What can a tester do on a report we marked as fixed? **A — confirm it, reopen it, or comment: "It works" marks it Confirmed with the tester's name; "Still a problem" reopens it to Ongoing and needs a comment (a screenshot optional), and we see it in the next session's pull; anyone who can see a report may comment at any time; only we mark a report fixed.**
+
+**Asked and answered 2026-10-19 (user decision, in chat), while V was planned; recorded in `M179`'s claim.** The user (2026-10-19): *"the feedback feture of our app must be like that so users can check if it is really applied of fixed. we can only tag those as resolved on our end but users can comment or feedback again about the output of our fix"*. Today a tester can only read their own reports and our one reply (`resources/js/Pages/feedback/Mine.vue:57-86`); no comment, confirm or reopen exists, and the only transition writer checks the status before its transaction and takes no lock (`app/Services/Admin/SuperAdminService.php:929-1007`).
+
+- **A — confirm, reopen, comment (recommended, chosen).** A new status, Confirmed ("Confirmed working"), reachable only by a tester from Resolved; "Still a problem" goes back to Ongoing with a required comment; a comment thread on every report; support alone marks Resolved and can never mark Confirmed.
+- **B — comment only.** Testers add comments; we read them and decide whether to reopen. No confirm button.
+
+**What the answer files, in the same push:** the row *"A tester cannot confirm a fix, say it is still a problem, or comment on a report; our reply is the only message, and the Owner/Admin list never shows it"* (`early-testing`, taken by `M179`), and with `D150` the row *"The support API and the pull script cannot create a relayed report, post a reply, or see a reopen or a tester's comment"* (`early-testing`, taken by `M179`).
+
+### D150 — Where should the testers see the progress of the comments relayed outside the Feedback button, and mark them as working? **A — inside Feedback: each comment is loaded as a relayed report every member of the workspace can see, under a "Testing-round comments" view that hides itself once every relayed report is Confirmed or Declined; no separate page.**
+
+**Asked and answered 2026-10-19 (user decision, in chat), while V was planned; recorded in `M179`'s claim.** The user had asked for *"a temporary page for the monitoring of this comments in the staging site … so the users are aware of the progress and they can also click the resolve if they tested it"*, to be removed once the batch is done. Staging data is never deleted (`D137`), so a temporary page's records would stay in the database either way, and the confirm and reopen buttons would have to be built twice.
+
+- **A — inside Feedback (recommended, chosen).** The comments become reports with a source (`relayed`), a reference (e.g. `R1-7a`), a title and a source line; the confirm and reopen buttons are built once, in Feedback, which is the end state wanted anyway.
+- **B — a separate temporary page.** A "Comment tracker" page with a "Tested — it works" button, hidden once every line is done; Feedback's own buttons built a second time.
+
+**A follow-up, asked and answered 2026-10-19 while `M179` was planned (the user, in chat):** eleven of the 31 items are fixes the user already checked on staging ("All good", 2026-10-19). **They load as Resolved, as the approved list says** — the testers who raised them press "It works" themselves (recommended, chosen); the alternative was to load them as Confirmed by the user on Oct 19.
+
+**What the answer files, in the same push:** the row *"A comment that reached us outside the Feedback button cannot be seen, followed or checked by the testers in the app"* (`early-testing`, taken by `M179`).
+
 ### D149 — A condition or a rule can name a calculated question, but both engines work out calculations last and read it as blank. What should happen? **A — let conditions and rules read the calculated value, in R4, which already orders calculations so one can use another.**
 
 **Asked and answered 2026-10-19 (user decision, in chat), while `M178` (R3) was planned; recorded in its claim.** Found by R3's planning pass: computed values never feed back into relevance or constraints (`app/Services/Validation/SemanticValidator.php:153`), yet the condition editor and the compared-question lists offer every calculated question, so such a condition never shows and such a rule never checks.

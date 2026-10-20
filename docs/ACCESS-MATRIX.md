@@ -260,7 +260,8 @@ All URLs are relative to a workspace host, e.g. `http://demo.localhost:8080/form
 | `/scopes` | `manageScopes` | `ScopeNodePolicy::viewAny` = `scopes.manage` | — | ✅ | ✅ | — | — | — |
 | `/audit-log` | `viewAuditLog` | `AuditPolicy::viewAny` = `audit_log.view` | — | ✅ | ✅ | — | — | — |
 | `/feedback` | `viewFeedback` | `feedback.view` | — | ✅ | ✅ | — | — | — |
-| `/feedback/mine` *(M175)* | — (Account menu → **My feedback**) | (authenticated) — the member's OWN reports only, by an application `user_id` predicate | — | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `/feedback/mine` *(M175)* | — (Account menu → **Feedback**, M179) | (authenticated) — the member's OWN reports (an application `user_id` predicate), and since M179 every RELAYED report of the workspace under **Testing-round comments** | — | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `POST /feedback/{id}/confirm`, `/reopen`, `/comments` *(M179)* | — (It works · Still a problem · Add a comment) | `feedback.submit` + `FeedbackReportPolicy::participate` — the reporter, any member on a relayed report, Owner/Admin | — | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `/webhooks` | `manageWebhooks` | `WebhookEndpointPolicy::viewAny` = `webhooks.manage` | `webhooks` | ✅ | ✅ | — | — | — |
 | `/integrations` | `manageIntegrations` | `ConnectionPolicy::viewAny` = `integrations.manage` | `native_connectors` | ✅ | ✅ | — | — | — |
 | `/domains` | `manageDomains` | `tenant.settings.manage` | `custom_domain` (nav only) | ✅ | ✅ | — | — | — |

@@ -35,6 +35,12 @@ suggestion `during-testing`, a question answered in a draft the user approves) a
 token lives outside the repository, and screenshots land only in the scratchpad. No token file yet, or the
 server unreachable — say so in one line and carry on; `preflight` prints the New count and never blocks on it.
 
+⛔ **What the testers said since the last pull is triaged exactly like a new report** — a **REOPENED** report
+(a tester pressed Still a problem on a fix) and a tester's **comment**. A reply to a tester goes to the user
+first (`--comment=<id|reference> --note="…" --user-approved`). Relayed comments are summarised in one line and
+listed only when reopened or commented on: each is cited by its **reference** on its row, and wherever the pull
+takes an id, the reference may stand in for it.
+
 ## The trunk
 
 - `main` is the trunk. `git fetch && git checkout -b <branch> origin/main` — **never** from local `HEAD`.
@@ -229,8 +235,9 @@ the parent commit and accidentally gives the right answer.
 4. Update only your own status block, run `php scripts/pipeline.php` — the bullet you prepend moves the
    markers the line cites — then `php scripts/next.php --lane=a --write`, and push them together.
 5. Mark Resolved the testers' reports whose rows you closed —
-   `php scripts/feedback-pull.php --resolve=<id> --version=<sha>` — **only once the deploy is live**; the
-   reporter is told at once.
+   `php scripts/feedback-pull.php --resolve=<id|reference> --version=<sha>` — **only once the deploy is live**;
+   the reporter and everyone in the thread are told at once. A relayed report is resolved by the reference its
+   row cites.
 6. End with a three-to-five bullet status and the bare next-prompt line.
 
 ⛔ **A fix to a user's comment is announced by name.** The close-out quotes the comment, says it is fixed

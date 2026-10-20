@@ -169,8 +169,8 @@ it('converges every table on a re-seed rather than doubling it', function (): vo
         //
         // K1b still seeds no badge rows and edits no seeder — which is the point. A fixture asserting a
         // badge the engine would not produce is the failure mode `E2eSeeder` already records for itself.
-        ->and($first['notifications'])->toBe(27)   // M175: feedback_closed joins the cases()-x2 loop
-        ->and($first['feedback'])->toBe(4)           // one per FeedbackStatus case
+        ->and($first['notifications'])->toBe(29)   // M175: feedback_closed joins the cases()-x2 loop; M179: feedback_reply
+        ->and($first['feedback'])->toBe(5)           // one per FeedbackStatus case (Confirmed since M179)
         ->and($first['index'])->toBeGreaterThan(0)   // the question explorer has real values to summarise
         ->and($first['answers'])->toBe($first['submissions']); // exactly one answer row per submission
 });

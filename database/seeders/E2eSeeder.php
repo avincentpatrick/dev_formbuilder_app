@@ -10,6 +10,8 @@ use App\Enums\BillingInterval;
 use App\Enums\ConnectionStatus;
 use App\Enums\DomainEventType;
 use App\Enums\DomainVerificationFailure;
+use App\Enums\FeedbackParty;
+use App\Enums\FeedbackSource;
 use App\Enums\FeedbackStatus;
 use App\Enums\FeedbackType;
 use App\Enums\FieldType;
@@ -29,6 +31,7 @@ use App\Models\Audit;
 use App\Models\Connection;
 use App\Models\ConnectionSubscription;
 use App\Models\Domain;
+use App\Models\FeedbackComment;
 use App\Models\FeedbackReport;
 use App\Models\Form;
 use App\Models\FormField;
@@ -1536,6 +1539,23 @@ class E2eSeeder extends Seeder
     ];
 
     /**
+     * M179 (`D150`, `D151`) — relayed reports for the Testing-round comments tab, by reference. `E2E-U3` (Resolved,
+     * with a support reply in its thread) and the Confirmed and Ongoing ones are for the axe scan and are never
+     * moved; `E2E-WALK-1` and `E2E-WALK-2` are the two the transition spec presses It works and Still a problem
+     * on — dedicated rows, so the walk never changes what the scan reads. A re-seed puts every one back.
+     */
+    private const RELAYED_FIXTURES = [
+        ['id' => '0192e2e0-0000-7000-8000-00000000fb05', 'reference' => 'E2E-U3', 'title' => 'Larger label box', 'status' => FeedbackStatus::Resolved],
+        ['id' => '0192e2e0-0000-7000-8000-00000000fb06', 'reference' => 'E2E-R1-4', 'title' => 'The key has already been taken', 'status' => FeedbackStatus::Confirmed],
+        ['id' => '0192e2e0-0000-7000-8000-00000000fb07', 'reference' => 'E2E-U8', 'title' => 'Calculations by clicking', 'status' => FeedbackStatus::Ongoing],
+        ['id' => '0192e2e0-0000-7000-8000-00000000fb08', 'reference' => 'E2E-WALK-1', 'title' => 'Show to respondents: Always / Never / Only when', 'status' => FeedbackStatus::Resolved],
+        ['id' => '0192e2e0-0000-7000-8000-00000000fb09', 'reference' => 'E2E-WALK-2', 'title' => 'Remove the Yes/No question type', 'status' => FeedbackStatus::Resolved],
+    ];
+
+    /** The support reply in `E2E-U3`'s thread. */
+    private const RELAYED_REPLY_ID = '0192e2e0-0000-7000-8000-00000000fc01';
+
+    /**
      * Feedback fixtures (I7a, PRD Feature #11) — so `/feedback` renders a POPULATED table for the
      * responsive-axe scan rather than its empty state.
      *
@@ -1555,7 +1575,7 @@ class E2eSeeder extends Seeder
      *
      * Written with `forceCreate`, not through {@see App\Services\Feedback\FeedbackService}: the service
      * requires an `UploadedFile` and an open tenant context to attach a screenshot, and this fixture wants
-     * neither. `status` is written from the enum, never a literal — the column has no CHECK constraint.
+     * neither. `status` is written from the enum, never a literal — `feedback_reports_status_check` (M175, widened by M179) refuses anything else.
      */
     private function seedFeedback(User $owner, User $reviewer): void
     {
@@ -1579,7 +1599,7 @@ class E2eSeeder extends Seeder
 
         foreach ($rows as $index => $row) {
             $id = self::FEEDBACK_FIXTURE_IDS[$index];
-            $closed = $row['status']->isTerminal();
+            $closed = $row['status']->stampsResolution();
 
             $attributes = [
                 'user_id' => $row['user']->getKey(),
@@ -1610,6 +1630,69 @@ class E2eSeeder extends Seeder
             }
 
             FeedbackReport::query()->forceCreate([...$attributes, 'id' => $id]);
+        }
+
+        $this->seedRelayedFeedback($owner, $reviewer);
+    }
+
+    /**
+     * The relayed reports (M179) — see {@see self::RELAYED_FIXTURES}. Reported by the Owner, who relayed them;
+     * the Confirmed one confirmed by the reviewer, whom the transition spec signs in as.
+     */
+    private function seedRelayedFeedback(User $owner, User $reviewer): void
+    {
+        foreach (self::RELAYED_FIXTURES as $index => $fixture) {
+            $closed = $fixture['status'] === FeedbackStatus::Resolved || $fixture['status'] === FeedbackStatus::Confirmed;
+            $confirmed = $fixture['status'] === FeedbackStatus::Confirmed;
+
+            $attributes = [
+                'user_id' => $owner->getKey(),
+                'type' => FeedbackType::Suggestion->value,
+                'route' => '',
+                'page_url' => null,
+                'page_title' => null,
+                'remarks' => 'A comment the team relayed from the testers, quoted as they wrote it.',
+                'resolution_note' => $closed ? 'Fixed in version abc1234, live on staging.' : 'Planned for the next release.',
+                'reporter_role' => null,
+                'browser_info' => [],
+                'status' => $fixture['status']->value,
+                'submitted_at' => now()->subDays(10 + $index),
+                'resolved_at' => $closed ? now()->subDays(2) : null,
+                'resolved_by' => $closed ? $owner->getKey() : null,
+                'confirmed_at' => $confirmed ? now()->subDay() : null,
+                'confirmed_by' => $confirmed ? $reviewer->getKey() : null,
+                'source' => FeedbackSource::Relayed->value,
+                'source_label' => 'Your items, Oct 16',
+                'reference' => $fixture['reference'],
+                'title' => $fixture['title'],
+                'last_comment_at' => null,
+            ];
+
+            $existing = FeedbackReport::query()->whereKey($fixture['id'])->first();
+
+            if ($existing instanceof FeedbackReport) {
+                $existing->forceFill($attributes)->save();
+            } else {
+                FeedbackReport::query()->forceCreate([...$attributes, 'id' => $fixture['id']]);
+            }
+        }
+
+        // The walk's rows lose any thread a previous run left, so a re-seed starts them clean.
+        FeedbackComment::query()->whereIn('feedback_report_id', [
+            '0192e2e0-0000-7000-8000-00000000fb08',
+            '0192e2e0-0000-7000-8000-00000000fb09',
+        ])->delete();
+
+        if (! FeedbackComment::query()->whereKey(self::RELAYED_REPLY_ID)->exists()) {
+            FeedbackComment::query()->forceCreate([
+                'id' => self::RELAYED_REPLY_ID,
+                'feedback_report_id' => '0192e2e0-0000-7000-8000-00000000fb05',
+                'user_id' => null,
+                'author_kind' => FeedbackParty::Support->value,
+                'action' => null,
+                'body' => 'Please check it on a long question.',
+                'created_at' => now()->subDays(2),
+            ]);
         }
     }
 

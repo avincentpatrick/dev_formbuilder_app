@@ -246,8 +246,9 @@ final class NotificationPresenter
             // the reader is the earner looking at their own record. There is no gate to apply — which is
             // the same answer K1e will need, so the arm is correct then as well as inert now.
             NotificationType::BadgeEarned => true,
-            // M175 — My reports needs no permission beyond membership, and the reader is the reporter.
-            NotificationType::FeedbackClosed => true,
+            // M175 — My reports needs no permission beyond membership, and the reader is the reporter. M179 — the
+            // same page holds the thread a reader wrote in (a relayed report on its testing-round tab).
+            NotificationType::FeedbackClosed, NotificationType::FeedbackReply => true,
         };
     }
 

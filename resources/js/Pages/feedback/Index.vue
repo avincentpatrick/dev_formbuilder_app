@@ -12,7 +12,7 @@
  * No column is `sortable` — `MdsDataTable` sorts the page it was handed, client-side, and over a
  * server-paginated list that is a lie. Same rule the audit viewer states.
  */
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import {
     MdsBadge,
@@ -29,6 +29,8 @@ import {
     statusVariant,
     type DataTableColumn,
 } from '@meridian/design-system';
+import FeedbackThread from '@/components/feedback/FeedbackThread.vue';
+import FeedbackVerdict from '@/components/feedback/FeedbackVerdict.vue';
 import PageHeader from '@/components/shell/PageHeader.vue';
 import type { FeedbackPageProps, FeedbackRow } from '@/components/feedback/types';
 
@@ -46,18 +48,26 @@ const columns: DataTableColumn[] = [
 const selected = reactive({
     status: props.filters.applied.status ?? '',
     type: props.filters.applied.type ?? '',
+    source: props.filters.applied.source ?? '',
     q: props.filters.applied.q ?? '',
 });
 const statusOptions = [{ value: '', label: 'All statuses' }, ...props.filters.statuses];
 const typeOptions = [{ value: '', label: 'All kinds' }, ...props.filters.types];
+const sourceOptions = [{ value: '', label: 'From anywhere' }, ...props.filters.sources];
 
-const detailRow = ref<FeedbackRow | null>(null);
+/**
+ * The open report is looked up from the page's rows by id, never held as a copy (M179): It works, Still a problem
+ * and a comment reload the props, and the modal must show the thread as it now is.
+ */
+const detailId = ref<string | null>(null);
+const detailRow = computed<FeedbackRow | null>(() => props.data.find((row) => row.id === detailId.value) ?? null);
 const busy = ref(false);
 
 function queryParams(extra: Record<string, string | number> = {}): Record<string, string | number> {
     const params: Record<string, string | number> = {};
     if (selected.status) params.status = selected.status;
     if (selected.type) params.type = selected.type;
+    if (selected.source) params.source = selected.source;
     if (selected.q) params.q = selected.q;
     return { ...params, ...extra };
 }
@@ -84,6 +94,7 @@ function goToPage(page: number): void {
 function clearFilters(): void {
     selected.status = '';
     selected.type = '';
+    selected.source = '';
     selected.q = '';
     visit({}, true);
 }
@@ -145,11 +156,20 @@ function excerpt(text: string): string {
                     @update:model-value="applyFilters"
                 />
             </MdsFormField>
+            <MdsFormField label="From" input-id="feedback-source">
+                <MdsSelect
+                    id="feedback-source"
+                    v-model="selected.source"
+                    :options="sourceOptions"
+                    :disabled="busy"
+                    @update:model-value="applyFilters"
+                />
+            </MdsFormField>
         </MdsFilterBar>
 
         <p class="fbl__hint">
-            Newest first. Reports are handled by the platform support team — the status here is theirs to
-            change, not yours.
+            Newest first. The platform support team triages each report and marks it Resolved or Declined. When one
+            is Resolved, you — or a tester — can say whether the fix works, and anyone can add a comment.
         </p>
 
         <MdsDataTable :columns="columns" :rows="data" :loading="busy" caption="Feedback reports" row-key="id">
@@ -167,8 +187,13 @@ function excerpt(text: string): string {
             </template>
 
             <template #cell-route="{ row }">
+                <!-- A relayed report has no page (M179): its reference and title stand in. -->
+                <span v-if="(row as FeedbackRow).source === 'relayed'" class="fbl__relayed">
+                    <MdsBadge variant="neutral" :label="(row as FeedbackRow).reference ?? 'Relayed'" />
+                    {{ (row as FeedbackRow).title }}
+                </span>
                 <!-- The title, linked to the full address (M175); a report sent before either existed shows its path. -->
-                <a v-if="(row as FeedbackRow).page_url" :href="(row as FeedbackRow).page_url as string" class="fbl__page">{{
+                <a v-else-if="(row as FeedbackRow).page_url" :href="(row as FeedbackRow).page_url as string" class="fbl__page">{{
                     (row as FeedbackRow).page_title || (row as FeedbackRow).route
                 }}</a>
                 <span v-else class="fbl__mono">{{ (row as FeedbackRow).route }}</span>
@@ -186,7 +211,7 @@ function excerpt(text: string): string {
             </template>
 
             <template #row-actions="{ row }">
-                <MdsIconButton icon="search" label="View report" size="sm" @click="detailRow = row as FeedbackRow" />
+                <MdsIconButton icon="search" label="View report" size="sm" @click="detailId = (row as FeedbackRow).id" />
             </template>
 
             <template #empty>
@@ -220,7 +245,7 @@ function excerpt(text: string): string {
         <MdsModal
             :open="detailRow !== null"
             :title="detailRow ? `Feedback from ${reporterLabel(detailRow)}` : 'Feedback'"
-            @close="detailRow = null"
+            @close="detailId = null"
         >
             <div v-if="detailRow" class="fbl__detail">
                 <dl class="fbl__meta">
@@ -235,7 +260,15 @@ function excerpt(text: string): string {
                             <span v-else>—</span>
                         </dd>
                     </div>
-                    <div>
+                    <div v-if="detailRow.source === 'relayed'">
+                        <dt>Comment</dt>
+                        <dd>
+                            <MdsBadge variant="neutral" :label="detailRow.reference ?? 'Relayed'" />
+                            {{ detailRow.title }}
+                            <span v-if="detailRow.source_label" class="fbl__from">— {{ detailRow.source_label }}</span>
+                        </dd>
+                    </div>
+                    <div v-else>
                         <dt>Page</dt>
                         <dd>
                             <a v-if="detailRow.page_url" :href="detailRow.page_url" class="fbl__page">{{
@@ -258,6 +291,19 @@ function excerpt(text: string): string {
                     :src="`/feedback/${detailRow.id}/screenshot`"
                     alt="Screenshot attached to this report"
                 />
+
+                <!-- M179: the support team's note, shown here too — until M179 only the reporter ever read it. -->
+                <div v-if="detailRow.resolution_note" class="fbl__note" data-feedback-reply>
+                    <p class="fbl__note-label">Our note</p>
+                    <p class="fbl__body">{{ detailRow.resolution_note }}</p>
+                </div>
+
+                <p v-if="detailRow.status === 'confirmed'" class="fbl__confirmed">
+                    Confirmed working{{ detailRow.confirmer ? ` by ${detailRow.confirmer}` : '' }}
+                </p>
+
+                <FeedbackVerdict :report-id="detailRow.id" :actions="detailRow.actions" />
+                <FeedbackThread :report-id="detailRow.id" :comments="detailRow.comments" :can-comment="detailRow.can_comment" />
             </div>
         </MdsModal>
     </div>
@@ -338,5 +384,39 @@ function excerpt(text: string): string {
     border: 1px solid var(--mds-color-border-default);
     border-radius: var(--mds-radius-md);
     background-color: var(--mds-color-bg-sunken);
+}
+
+.fbl__relayed {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mds-space-2);
+}
+
+.fbl__from {
+    color: var(--mds-color-text-secondary);
+}
+
+/* A sunken panel needs its own border to read as one in dark, where sunken resolves to the canvas (M174). */
+.fbl__note {
+    margin-top: var(--mds-space-3);
+    padding: var(--mds-space-3);
+    border: 1px solid var(--mds-color-border-default);
+    border-radius: var(--mds-radius-md);
+    background-color: var(--mds-color-bg-sunken);
+}
+
+.fbl__note-label {
+    margin: 0 0 var(--mds-space-1);
+    font-size: var(--mds-type-body-sm-font-size);
+    font-weight: var(--mds-font-weight-medium);
+    color: var(--mds-color-text-body);
+}
+
+.fbl__confirmed {
+    margin: var(--mds-space-2) 0 0;
+    font-size: var(--mds-type-body-sm-font-size);
+    font-weight: var(--mds-font-weight-medium);
+    color: var(--mds-color-text-body);
 }
 </style>

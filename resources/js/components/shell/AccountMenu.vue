@@ -28,7 +28,9 @@ const items: MenuItem[] = [
     { id: 'settings', label: 'Settings', icon: 'settings', href: '/settings' },
     // M175 (`R-9bfd832e`) — every member's own reports, with the support team's replies. Here rather than in
     // the sidebar: it is about the person, like Settings, and every role may open it.
-    { id: 'my-feedback', label: 'My feedback', icon: 'feedback', href: '/feedback/mine' },
+    // M179: the page now holds the testing-round comments too, and an Owner's sidebar already has "Feedback"
+    // (the workspace's list) — so the account menu names this one apart.
+    { id: 'my-feedback', label: 'Feedback & testing', icon: 'feedback', href: '/feedback/mine' },
     { id: 'logout', label: 'Log out', icon: 'logout' },
 ];
 

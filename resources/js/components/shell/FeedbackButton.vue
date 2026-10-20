@@ -21,7 +21,7 @@
  * setting `open` directly — never through {@see openPanel}, which resets the form and would throw the
  * report away. The report also says what KIND it is and the full address and title of the page.
  */
-import { onBeforeUnmount, ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
 import { MdsButton, MdsFormField, MdsIcon, MdsModal, MdsRadio } from '@meridian/design-system';
 import { APP_VERSION } from '../../../public-runtime/lib/app-version';
@@ -38,6 +38,9 @@ const KINDS = [
 ] as const;
 
 const page = usePage();
+
+/** How many testing-round comments are still open (M179, `D150`) — the shared prop; 0 off-tenant. */
+const testingRoundOpen = computed(() => page.props.feedback?.testing_round_open ?? 0);
 
 const open = ref(false);
 const capturing = ref(false);
@@ -269,10 +272,15 @@ onBeforeUnmount(releasePreview);
                     <p v-if="form.errors.screenshot" class="fb__shot-error">{{ form.errors.screenshot }}</p>
                 </fieldset>
 
-                <!-- M175 (`R-9bfd832e`): where the reporter reads what became of what they sent. -->
+                <!-- M175 (`R-9bfd832e`): where the reporter reads what became of what they sent. M179 (`D150`):
+                     and, while some are open, the testing-round comments every member can check. -->
                 <p class="fb__mine">
                     <Link href="/feedback/mine" class="fb__mine-link" @click="open = false">See your reports</Link>
-                    and the support team's replies.
+                    and the support team's replies<template v-if="testingRoundOpen > 0">, and the
+                        <Link href="/feedback/mine?view=testing" class="fb__mine-link" @click="open = false"
+                            >testing-round comments ({{ testingRoundOpen }} open)</Link
+                        ></template
+                    >.
                 </p>
             </form>
             <template #actions>

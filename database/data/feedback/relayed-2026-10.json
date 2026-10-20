@@ -1,0 +1,321 @@
+{
+    "description": "M179 (D150, R-db9dec62): the 31 comments relayed to the team by hand between 2026-10-14 and 2026-10-16, loaded into Feedback as relayed reports by `php scripts/feedback-pull.php --relay=database/data/feedback/relayed-2026-10.json --tenant=<slug> --user-approved` (ADR-0023 section D7). Title, status and note are the text the user approved on 2026-10-19 (plan V, section E); each remark quotes the original comment (… marks a part addressed to the development session rather than about the app). The repository is public (D48): no email address and no person's name belongs in this file — the workspace and the reporter are named on the command line. Re-running the file changes words only, never a status.",
+    "items": [
+        {
+            "reference": "R1-1a",
+            "title": "Use another form's answers as options (Single choice, Dropdown)",
+            "status": "resolved",
+            "note": "Already available: source form → Settings → Data sharing; target question → Options → Another form's answers.",
+            "type": "question",
+            "source_label": "Testers' round 1 (Oct 12 testing), item 1",
+            "received_at": "2026-10-15T09:52:14+08:00",
+            "remarks": "“Dynamic Options / Cross-Form Population: Can the app import responses from another form and display then as select options in the form i am currently building?”"
+        },
+        {
+            "reference": "R1-1b",
+            "title": "…the same for Multiple choice, in the builder preview, and for grid rows",
+            "status": "reviewed",
+            "note": "Planned for batch 5.",
+            "type": "suggestion",
+            "source_label": "Testers' round 1 (Oct 12 testing), item 1",
+            "received_at": "2026-10-15T09:52:14+08:00",
+            "remarks": "“Dynamic Options / Cross-Form Population: Can the app import responses from another form and display then as select options in the form i am currently building?”"
+        },
+        {
+            "reference": "R1-2",
+            "title": "Philippine places (PSGC) cascade, filtered by another form",
+            "status": "reviewed",
+            "note": "Planned for batch 6. Today: upload one CSV per level (Cascading select → Levels).",
+            "type": "question",
+            "source_label": "Testers' round 1 (Oct 12 testing), item 2",
+            "received_at": "2026-10-15T09:52:14+08:00",
+            "remarks": "“PSGC Integration & Conditional Cascading: Does the platform support cascading options linked to the Philippine Standard Geographic code (PSGC)? Specifically, can options in a target form dynamically filter based on whether a specific barangay has recorded value in a source form?”"
+        },
+        {
+            "reference": "R1-3a",
+            "title": "Options from an uploaded list — cascading levels",
+            "status": "resolved",
+            "note": "Already available: Cascading select → Levels → from a file (CSV).",
+            "type": "suggestion",
+            "source_label": "Testers' round 1 (Oct 12 testing), item 3",
+            "received_at": "2026-10-15T09:52:14+08:00",
+            "remarks": "“All input forms that has options like radio button, checkboxes, select options, sometimes even the textbox must have an option to populate options thru the connection to responses from other forms that is being shared. or utilize the uploaded references and use that to create options”"
+        },
+        {
+            "reference": "R1-3b",
+            "title": "…for plain choice questions, Excel files, text-box suggestions, and the preview",
+            "status": "reviewed",
+            "note": "Planned for batch 5.",
+            "type": "suggestion",
+            "source_label": "Testers' round 1 (Oct 12 testing), item 3",
+            "received_at": "2026-10-15T09:52:14+08:00",
+            "remarks": "“All input forms that has options like radio button, checkboxes, select options, sometimes even the textbox must have an option to populate options thru the connection to responses from other forms that is being shared. or utilize the uploaded references and use that to create options”"
+        },
+        {
+            "reference": "R1-4",
+            "title": "“The key has already been taken”",
+            "status": "confirmed",
+            "confirmed_at": "2026-10-15T18:00:00+08:00",
+            "note": "Fixed Oct 15.",
+            "type": "bug",
+            "source_label": "Testers' round 1 (Oct 12 testing), item 4",
+            "received_at": "2026-10-15T09:52:14+08:00",
+            "remarks": "“They encounter an error ‘The key has already been taken. ************ has a change that was not saved. Select it to see why’. This kind of error prevents the user to move forward. if we can have a solution on this problem or it this part of the failure to autosave. please investigate”"
+        },
+        {
+            "reference": "R1-5",
+            "title": "“Belongs to a published version” when deleting",
+            "status": "confirmed",
+            "confirmed_at": "2026-10-15T18:00:00+08:00",
+            "note": "Fixed Oct 15.",
+            "type": "bug",
+            "source_label": "Testers' round 1 (Oct 12 testing), item 5",
+            "received_at": "2026-10-15T09:52:14+08:00",
+            "remarks": "“There is also an erroe when i tried to delete an item. it says: ‘That item belongs to a published version and can no longer be edited’. there must be a way to delete that if the published form doesnt have a submission or if there is already submitted record, ask and notify the user that it will be removed from the form builder but not totally delete it, its like tagging the item to obsolete(soft delete to retain the submitted responses still available with a colatilla this item/questionis already removed something like that) but there must also a way to check the older version for history.”"
+        },
+        {
+            "reference": "R1-6",
+            "title": "Are the “Adv” question types ready?",
+            "status": "reviewed",
+            "note": "Duration was removed on Oct 19; Signature, an explanation of “Adv” and a table of what each type can do — batch 6.",
+            "type": "question",
+            "source_label": "Testers' round 1 (Oct 12 testing), item 6",
+            "received_at": "2026-10-15T09:52:14+08:00",
+            "remarks": "“are the adv questions ready to use?”"
+        },
+        {
+            "reference": "R1-7a",
+            "title": "Grid: own type and choices per column, a real table, one spreadsheet column per cell",
+            "status": "reviewed",
+            "note": "Planned for batch 4.",
+            "type": "suggestion",
+            "source_label": "Testers' round 1 (Oct 12 testing), item 7",
+            "received_at": "2026-10-15T09:52:14+08:00",
+            "remarks": "“The grid has limitations. it can only have a single set of options and also there is also 1 type of question unlike in kobo, every sell can be configured separately, it can pick different type of questions and different set of options for each. and again, there must be a way to utilize the shared form responses and uploaded references in each question type because now, it is not existing. and also if the grid can be manipulated in the preview like in kobo, it can add rows and columns in the preview for easier visualization to the users. and also the user stated that rows can be determined thru the list from the shared responses from other form or uploaded reference. …”"
+        },
+        {
+            "reference": "R1-7b",
+            "title": "Grid: rows and choices from a list or form, add rows/columns in the preview, a section as a table",
+            "status": "reviewed",
+            "note": "Planned for batch 5.",
+            "type": "suggestion",
+            "source_label": "Testers' round 1 (Oct 12 testing), item 7",
+            "received_at": "2026-10-15T09:52:14+08:00",
+            "remarks": "“The grid has limitations. it can only have a single set of options and also there is also 1 type of question unlike in kobo, every sell can be configured separately, it can pick different type of questions and different set of options for each. and again, there must be a way to utilize the shared form responses and uploaded references in each question type because now, it is not existing. and also if the grid can be manipulated in the preview like in kobo, it can add rows and columns in the preview for easier visualization to the users. and also the user stated that rows can be determined thru the list from the shared responses from other form or uploaded reference. …”"
+        },
+        {
+            "reference": "U1",
+            "title": "“Allow negative” is now a validation rule",
+            "status": "resolved",
+            "note": "Fixed in version a5b718b, live on staging.",
+            "type": "bug",
+            "source_label": "Round 2 — the team's items, Oct 16, item 1",
+            "received_at": "2026-10-16T08:46:01+08:00",
+            "remarks": "“The user pin pointed that when they removed the allow negative, the other settings will be saved, but when they removed the validation rules, the allow negative returned, i think there is a conflict between those 2. If we can include the allow negative in the rules since it is really a valiation rule and make sure to align with other validation rules to avoid confilict.”"
+        },
+        {
+            "reference": "U2",
+            "title": "Show to respondents: Always / Never / Only when",
+            "status": "resolved",
+            "note": "Fixed in version a5b718b, live on staging.",
+            "type": "suggestion",
+            "source_label": "Round 2 — the team's items, Oct 16, item 2",
+            "received_at": "2026-10-16T08:46:01+08:00",
+            "remarks": "“if an type of question is calculated, and it is the only question in a section, the section itself will be hidden in the section tab, making the user confuse if they really added those section and question. there must be a setting for a calculated question if the user wants is visible or not, actually for every question, there must be an option to have always visible and always hidden, align it to existing settings of each question wihtout conflict.”"
+        },
+        {
+            "reference": "U3",
+            "title": "Larger label box (also PDF comment 7)",
+            "status": "resolved",
+            "note": "Fixed in version a5b718b, live on staging.",
+            "type": "suggestion",
+            "source_label": "Round 2 — the team's items, Oct 16, item 3; and the testers' PDF of Oct 11, comment 7",
+            "received_at": "2026-10-16T08:46:01+08:00",
+            "remarks": "“make the label box larger” — and the testers' PDF, comment 7: “Label field is too small. It cannot accommodate long questions. Make the field multi-line or expanding (auto-adjusts to content).”"
+        },
+        {
+            "reference": "U4",
+            "title": "Point at another question from a list, everywhere (also PDF comment 6)",
+            "status": "reviewed",
+            "note": "Planned for batch 3 — the next release.",
+            "type": "suggestion",
+            "source_label": "Round 2 — the team's items, Oct 16, item 4; and the testers' PDF of Oct 11, comment 6",
+            "received_at": "2026-10-16T08:46:01+08:00",
+            "remarks": "“and the user are still pushing for the referencing for each questions including the calculate. actually all the tye of question must include the referencing. …” — and the testers' PDF, comment 6: “Validation rules for number field should be able to reference answers/responses from previous questions. Add feature: direct reference the field (not the entire field question but the field code should be enough) in the validation rules.”"
+        },
+        {
+            "reference": "U5",
+            "title": "Feedback: clean screenshot, type, page link, statuses, tester told",
+            "status": "confirmed",
+            "confirmed_at": "2026-10-17T18:00:00+08:00",
+            "note": "Fixed Oct 17.",
+            "type": "suggestion",
+            "source_label": "Round 2 — the team's items, Oct 16, item 5",
+            "received_at": "2026-10-16T08:46:01+08:00",
+            "remarks": "“the feedback feature again is being brought up, the modal of the feedback is blocking the screenshot, and there must be a tagging for if its a bug, a question or a suggestion/recommendation, get url, tagging if its resolved declined new and ongoing, get user, also update user if its fixed/resolved”"
+        },
+        {
+            "reference": "U6",
+            "title": "Remove the Yes/No question type",
+            "status": "resolved",
+            "note": "Fixed in version a5b718b, live on staging.",
+            "type": "suggestion",
+            "source_label": "Round 2 — the team's items, Oct 16, item 6",
+            "received_at": "2026-10-16T08:46:01+08:00",
+            "remarks": "“remove the yes/no question. it is already covered by the options”"
+        },
+        {
+            "reference": "U7",
+            "title": "Remove the Duration question type",
+            "status": "resolved",
+            "note": "Fixed in version a5b718b, live on staging.",
+            "type": "suggestion",
+            "source_label": "Round 2 — the team's items, Oct 16, item 7",
+            "received_at": "2026-10-16T08:46:01+08:00",
+            "remarks": "“also remove the duration question type, that can also be covered in the calculate”"
+        },
+        {
+            "reference": "U8",
+            "title": "Build a calculation by clicking, with presets",
+            "status": "reviewed",
+            "note": "Planned for batch 3.",
+            "type": "suggestion",
+            "source_label": "Round 2 — the team's items, Oct 16, item 8",
+            "received_at": "2026-10-16T08:46:01+08:00",
+            "remarks": "“lets make the calculate referenced, meaning, there is an option for a user to create a calculated field using the form's own questions by clicking or selecting, not by purely typing. not all users are technical. but make sure that formula can still be typed, just let the user select the referenced questions to calculate. put presets. …”"
+        },
+        {
+            "reference": "U9",
+            "title": "A Likert matrix that looks like KoboToolbox's",
+            "status": "reviewed",
+            "note": "Planned for batch 4.",
+            "type": "suggestion",
+            "source_label": "Round 2 — the team's items, Oct 16, item 9",
+            "received_at": "2026-10-16T08:46:01+08:00",
+            "remarks": "“the user also noticed that the likert matrix doesnt look like likert matrix, …”"
+        },
+        {
+            "reference": "U10",
+            "title": "“Other, please specify” added automatically",
+            "status": "resolved",
+            "note": "Fixed in version a5b718b, live on staging.",
+            "type": "suggestion",
+            "source_label": "Round 2 — the team's items, Oct 16, item 10",
+            "received_at": "2026-10-16T08:46:01+08:00",
+            "remarks": "“for any option questions like checkbox, radiobutton or select, there must be a setting where user can select that enable a others options so an automatic additional others, specify field will be automatically added and configured to be aa child question of the option question”"
+        },
+        {
+            "reference": "P1",
+            "title": "Confusing words in the change-type dialog",
+            "status": "resolved",
+            "note": "Fixed in version a5b718b, live on staging.",
+            "type": "suggestion",
+            "source_label": "The testers' PDF of Oct 11, comment 1",
+            "received_at": "2026-10-16T08:46:01+08:00",
+            "remarks": "“Make the text/instructions more ‘smart highschooler’ friendly”"
+        },
+        {
+            "reference": "P2",
+            "title": "The same error shown twice",
+            "status": "resolved",
+            "note": "Fixed in version a5b718b, live on staging.",
+            "type": "bug",
+            "source_label": "The testers' PDF of Oct 11, comment 2",
+            "received_at": "2026-10-16T08:46:01+08:00",
+            "remarks": "“Instructions repeat”"
+        },
+        {
+            "reference": "P3",
+            "title": "“+ Add question here” did not add a question",
+            "status": "resolved",
+            "note": "Fixed in version a5b718b, live on staging.",
+            "type": "bug",
+            "source_label": "The testers' PDF of Oct 11, comment 3",
+            "received_at": "2026-10-16T08:46:01+08:00",
+            "remarks": "“‘+ Add question here’ button not working”"
+        },
+        {
+            "reference": "P4",
+            "title": "Move several questions to a section at once",
+            "status": "resolved",
+            "note": "Fixed in version a5b718b, live on staging.",
+            "type": "suggestion",
+            "source_label": "The testers' PDF of Oct 11, comment 4",
+            "received_at": "2026-10-16T08:46:01+08:00",
+            "remarks": "“Form builder does not all bulk movement of questions to a section”"
+        },
+        {
+            "reference": "P5a",
+            "title": "“This item changed elsewhere” when nothing did",
+            "status": "resolved",
+            "note": "Fixed in version a5b718b, live on staging.",
+            "type": "bug",
+            "source_label": "The testers' PDF of Oct 11, comment 5",
+            "received_at": "2026-10-16T08:46:01+08:00",
+            "remarks": "“Good that a prompt shows when changes are implemented but notation on changes are not specific. Example, after creating a field, I only changed the ‘requiredness’ of the field but it was not shown in the prompt (see image below). I think, it will also be bothersome if this occurs for every field modification. I think it is best to have a ledger/list/log of the nitty-gritty changes per field (backend) instead of a prompt for each change for monitoring purposes. An option to revert changes on each of the field modification would also be beneficial. Revert changes should state what the previous state was before applying reversal (this can be another module).”"
+        },
+        {
+            "reference": "P5b",
+            "title": "A history of each question's changes, with undo",
+            "status": "reviewed",
+            "note": "Planned for batch 6.",
+            "type": "suggestion",
+            "source_label": "The testers' PDF of Oct 11, comment 5",
+            "received_at": "2026-10-16T08:46:01+08:00",
+            "remarks": "“Good that a prompt shows when changes are implemented but notation on changes are not specific. Example, after creating a field, I only changed the ‘requiredness’ of the field but it was not shown in the prompt (see image below). I think, it will also be bothersome if this occurs for every field modification. I think it is best to have a ledger/list/log of the nitty-gritty changes per field (backend) instead of a prompt for each change for monitoring purposes. An option to revert changes on each of the field modification would also be beneficial. Revert changes should state what the previous state was before applying reversal (this can be another module).”"
+        },
+        {
+            "reference": "UI1",
+            "title": "Stat tiles, audit-log avatar, Connect button spacing",
+            "status": "confirmed",
+            "confirmed_at": "2026-10-15T18:00:00+08:00",
+            "note": "Fixed Oct 15.",
+            "type": "bug",
+            "source_label": "UI comments, Oct 14",
+            "received_at": "2026-10-14T10:42:53+08:00",
+            "remarks": "“also check the other parts like the spacing of contents, i noticed in the integration sites page, the button connect google sheets is too close from the object above it. also the initial avatar size in the audit log is so large under the actor column. there are some large words in the form overview specially the accepting responses and last response date is being wraped making the word cut in half.”"
+        },
+        {
+            "reference": "UI2",
+            "title": "Pages fill the full screen width",
+            "status": "confirmed",
+            "confirmed_at": "2026-10-17T18:00:00+08:00",
+            "note": "Fixed Oct 17.",
+            "type": "suggestion",
+            "source_label": "UI comments, Oct 14",
+            "received_at": "2026-10-14T10:42:53+08:00",
+            "remarks": "“I noticed that some pages only occupies the middle part of the page specially when screen is wide. can we make every page occupy the whole width? no content on the middle only. so no blank spaces on the left and right but still make it mobile responsive.”"
+        },
+        {
+            "reference": "UI3",
+            "title": "Feedback screenshot, type and page link",
+            "status": "confirmed",
+            "confirmed_at": "2026-10-17T18:00:00+08:00",
+            "note": "Fixed Oct 17.",
+            "type": "bug",
+            "source_label": "UI comments, Oct 14",
+            "received_at": "2026-10-14T10:42:53+08:00",
+            "remarks": "“I also noticed the feedback mechanism's bug. when i click capture screen, the modal for the feedback is always included. i think there is a better way of doing that. and lets tag it if its a bug, recommendation/suggestion or question. and lets capture the url for better logging”"
+        },
+        {
+            "reference": "UI4",
+            "title": "Version number and “What's new” after login",
+            "status": "reviewed",
+            "note": "Planned for batch 4.",
+            "type": "suggestion",
+            "source_label": "UI comments, Oct 14",
+            "received_at": "2026-10-14T10:42:53+08:00",
+            "remarks": "“lets also have a what's new prompt to users for new login so users are aware for every changes. versioning must also be included. lets put the current version in the app, footer and login so users are aware.”"
+        },
+        {
+            "reference": "UI5",
+            "title": "Small visual consistency fixes",
+            "status": "reviewed",
+            "note": "Planned for batch 4.",
+            "type": "suggestion",
+            "source_label": "UI comments, Oct 14",
+            "received_at": "2026-10-14T10:42:53+08:00",
+            "remarks": "“that;s only a few notices but please check everything and make our ui better. …”"
+        }
+    ]
+}

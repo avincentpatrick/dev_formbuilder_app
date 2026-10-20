@@ -54,6 +54,7 @@ final class AuditableTypes
         'users' => 'User',
         'tenant' => 'Organization',
         'feedback_reports' => 'Feedback report',
+        'feedback_comments' => 'Feedback comment',
     ];
 
     /**

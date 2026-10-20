@@ -234,7 +234,7 @@ it('shows the workspace its own feedback to a holder of feedback.view, and hides
             ->where('data.0.has_screenshot', false)
             ->where('meta.per_page', 25)
             ->where('empty_reason', null)
-            ->has('filters.statuses', 4));
+            ->has('filters.statuses', 5));
 });
 
 it('serves a screenshot to the workspace and 404s a report that has none', function (): void {

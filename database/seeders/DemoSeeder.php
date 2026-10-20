@@ -34,6 +34,7 @@ use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Authorization\ResourceGrantService;
 use App\Services\Entitlements\EntitlementService;
+use App\Services\Feedback\FeedbackService;
 use App\Services\Forms\FormBuilderService;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
@@ -1202,11 +1203,12 @@ class DemoSeeder extends Seeder
     }
 
     /**
-     * Feedback across all four statuses.
+     * Feedback across all five statuses — one per {@see FeedbackStatus} case (Confirmed since M179).
      *
      * `FeedbackReport` has `public $timestamps = false` and its timeline is `submitted_at`/`resolved_at`, so
-     * the spread needs no `forceFill` back-dating at all. There is no factory and no service — the
-     * controller's bare `create()` is the only writer in the tree, so this mirrors it.
+     * the spread needs no `forceFill` back-dating at all. Written with `forceCreate()` rather than through
+     * {@see FeedbackService::submit()}, which needs an open tenant context and a request's
+     * worth of input; the rows here only need to exist in every state.
      *
      * @param  array<string, User>  $people
      */
@@ -1218,6 +1220,8 @@ class DemoSeeder extends Seeder
             ['slot' => 'reviewer@demo.test', 'type' => FeedbackType::Suggestion, 'route' => '/submissions', 'status' => FeedbackStatus::Ongoing, 'ago' => 9, 'remarks' => 'Could the inbox remember my last filter?'],
             ['slot' => 'editor@demo.test', 'type' => FeedbackType::Question, 'route' => '/forms', 'status' => FeedbackStatus::Resolved, 'ago' => 21, 'remarks' => 'Duplicating a field lost its options — fixed now, thanks.'],
             ['slot' => 'viewer@demo.test', 'type' => null, 'route' => '/analytics', 'status' => FeedbackStatus::Declined, 'ago' => 40, 'remarks' => 'Please add a pie chart.'],
+            // M179 (`D151`): a fix a tester checked and confirmed with It works — resolved first, then confirmed.
+            ['slot' => 'editor@demo.test', 'type' => FeedbackType::Bug, 'route' => '/forms/builder', 'status' => FeedbackStatus::Confirmed, 'ago' => 30, 'remarks' => 'The label box was too small for a long question.'],
         ];
 
         foreach ($rows as $row) {
@@ -1229,7 +1233,9 @@ class DemoSeeder extends Seeder
 
             $id = self::fixtureUuid(self::FIXTURE_PREFIX.'feedback:'.$row['slot'].':'.$row['route']);
             $submittedAt = CarbonImmutable::now()->utc()->subDays($row['ago']);
-            $resolved = in_array($row['status'], [FeedbackStatus::Resolved, FeedbackStatus::Declined], true);
+            // A Confirmed report was Resolved first, so it keeps the resolution stamp and adds the confirmation.
+            $resolved = in_array($row['status'], [FeedbackStatus::Resolved, FeedbackStatus::Confirmed, FeedbackStatus::Declined], true);
+            $confirmed = $row['status'] === FeedbackStatus::Confirmed;
 
             $attributes = [
                 'user_id' => $user->getKey(),
@@ -1241,6 +1247,8 @@ class DemoSeeder extends Seeder
                 'submitted_at' => $submittedAt,
                 'resolved_at' => $resolved ? $submittedAt->addDays(2) : null,
                 'resolved_by' => $resolved ? ($people['owner@demo.test'] ?? $user)->getKey() : null,
+                'confirmed_at' => $confirmed ? $submittedAt->addDays(3) : null,
+                'confirmed_by' => $confirmed ? $user->getKey() : null,
             ];
 
             $existing = FeedbackReport::query()->whereKey($id)->first();

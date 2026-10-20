@@ -75,6 +75,10 @@ export const NOTIFICATION_VISUAL: Record<NotificationTypeKey, NotificationVisual
     // the top bar's Feedback button, so the bell row reads as the answer to that button. `info`: news about
     // something the reader sent, read in full on My reports either way.
     feedback_closed: { icon: 'feedback', variant: 'info' },
+    // M179 — the support team replied in a thread the reader is in. The `info` band, as `feedback_closed`: news
+    // about a report the reader sent or wrote on. Its own glyph — `mail`, a message addressed to the reader —
+    // because no two types share one (the popover is scanned by shape), and the bubble already means "your feedback".
+    feedback_reply: { icon: 'mail', variant: 'info' },
 };
 
 /**

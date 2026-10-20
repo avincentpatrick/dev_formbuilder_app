@@ -98,6 +98,29 @@ export interface EntitlementSnapshot {
     quotas: Record<string, { limit: number | null; used: number }>;
 }
 
+/** M181 (`R-c7247dbf`) — what an item says about a release; the badge reads New, Improved or Fixed. */
+export type WhatsNewItemKind = 'new' | 'improved' | 'fixed';
+
+/** One change in a release: plain words (never HTML) and, optionally, the page it concerns. */
+export interface WhatsNewItem {
+    kind: WhatsNewItemKind;
+    text: string;
+    href?: string;
+}
+
+/** One release from the `releases` table (data-dictionary §40): `released_at` is when it went live (ISO-8601). */
+export interface WhatsNewRelease {
+    version: string;
+    title: string;
+    released_at: string;
+    items: WhatsNewItem[];
+}
+
+/** The releases this person has not seen, newest first — the What's new prompt's content. */
+export interface WhatsNewPrompt {
+    entries: WhatsNewRelease[];
+}
+
 declare module '@inertiajs/core' {
     interface PageProps {
         /**
@@ -123,6 +146,11 @@ declare module '@inertiajs/core' {
          * Declined); null off-tenant. The Feedback panel points at them while it is above zero.
          */
         feedback?: { testing_round_open: number } | null;
+        /**
+         * M181 (`R-c7247dbf`, `D157`) — the releases this person has not seen, newest first; null when there is nothing
+         * to show (seen, off-tenant, in a support session). The app shell's prompt opens while it is set.
+         */
+        whatsNew?: WhatsNewPrompt | null;
         ui: {
             theme: UiTheme;
             /** The tenant's active brand ramp (H23a3), or null. Theme => role => #RRGGBB. */

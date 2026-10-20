@@ -14134,7 +14134,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The user's comment (2026-10-14): *"some pages only occupies the middle part of the page specially when screen is wide. can we make
   every page occupy the whole width? no content on the middle only"*. `resources/js/Layouts/AppLayout.vue` caps
   `.app-shell__inner` at 1200px, `:192` at 1600px for the `WIDE_PAGES` set (`:48-59`), `:197` none for the builder;
-  `resources/js/Layouts/AdminLayout.vue:199` caps `.admin__inner` at 1100px. `resources/js/Layouts/AppLayout.test.ts:68-90` pins the
+  `resources/js/Layouts/AdminLayout.vue:199` caps `.admin__inner` at 1100px. `resources/js/Layouts/AppLayout.test.ts:74-96` pins the
   set, `tests/e2e/list-layout.spec.ts` asserts `/settings` is exactly 1200px at a 1600px window,
   `packages/design-system/src/stories/ListPage.stories.ts:37` and `packages/design-system/src/stories/CardGrid.stories.ts:98`
   hard-code 1600px, and `docs/ux/design-system-reference.md:588` ("a consistent max-width") and `:1541` ("a padded,
@@ -14284,7 +14284,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (`resources/js/Pages/members/Index.vue:497`). The remedy is the same rule. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`nit` · Three uppercase micro-labels hard-code their tracking where `--mds-tracking-wide` exists.**
-  `resources/js/Pages/help/Index.vue:223` (0.04em), `resources/js/components/shell/Sidebar.vue:338` (0.06em) and
+  `resources/js/Pages/help/Index.vue:223` (0.04em), `resources/js/components/shell/Sidebar.vue:366` (0.06em) and
   `resources/js/Layouts/AdminLayout.vue:130` (0.04em); `packages/design-system/src/components/FilterBar/FilterBar.vue:58-61` records the
   token as the one letting for the product's micro-labels (the console workspace page's and the landing page's literals are taken by
   their own rows). The remedy is the token. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Narrowed 2026-10-15 by `M173`:** `M173` edits `resources/js/Layouts/AdminLayout.vue` for the shell row and takes its literal there, as the UI programme's plan intended; this row's remainder is `help/Index.vue` and `Sidebar.vue`.

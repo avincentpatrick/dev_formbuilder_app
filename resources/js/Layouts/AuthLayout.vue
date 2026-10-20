@@ -25,10 +25,16 @@
  * On a wide screen the panel fills the left half on the sunken surface and the card sits centred in the right half,
  * rather than a 400px card and a 26rem panel huddled in the middle of the glass. Below the threshold nothing changes.
  */
-import { Head } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import { Head, usePage } from '@inertiajs/vue3';
 import { MdsIcon } from '@meridian/design-system';
+import { versionLabel } from '@/components/whats-new/version-label';
 
 withDefaults(defineProps<{ title: string; variant?: 'card' | 'split' }>(), { variant: 'card' });
+
+// M181 (`R-c7247dbf`, `D124`): the release, at the card's foot — text only, since What's new is behind sign-in.
+const page = usePage();
+const version = computed(() => versionLabel(page.props.app?.version));
 
 /**
  * Compressed from `Pages/Welcome.vue`'s `capabilities`, deliberately — the landing page and the front
@@ -79,6 +85,7 @@ const pitch = [
                 <div class="auth__body">
                     <slot />
                 </div>
+                <p class="auth__version">Meridian {{ version }}</p>
             </main>
         </div>
     </div>
@@ -262,6 +269,15 @@ const pitch = [
         justify-self: center;
         margin-block: var(--mds-space-8);
     }
+}
+
+/* M181 (`D124`): the release at the card's foot — quiet, below everything the reader came to do. */
+.auth__version {
+    margin: var(--mds-space-6) 0 0;
+    font-size: var(--mds-type-caption-font-size);
+    line-height: var(--mds-type-caption-line-height);
+    color: var(--mds-color-text-secondary);
+    text-align: center;
 }
 </style>
 

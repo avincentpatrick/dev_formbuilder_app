@@ -27,6 +27,7 @@ import { MdsIcon, MdsTooltip, useInertBackground } from '@meridian/design-system
 import { navGroups, type NavItem } from './nav-model';
 import { useMemberStreak } from '@/composables/useMemberStreak';
 import { useSidebarCollapse } from '@/composables/useSidebarCollapse';
+import { versionLabel } from '@/components/whats-new/version-label';
 
 /** The one destination that carries a count badge. See `badgeFor()` for why this is a literal. */
 const ACHIEVEMENTS_KEY = 'achievements';
@@ -189,6 +190,10 @@ const showsRailTooltip = computed(() => isRail.value || (collapsed.value && !isM
 
 useInertBackground({ active: takesPage, root: wrap, initialFocus: '.sidebar__item' });
 
+// M181 (`R-c7247dbf`, `D124`): the release at the foot, and the words the rail's tooltip gives it.
+const version = computed(() => versionLabel(page.props.app?.version));
+const footTooltip = computed(() => `What's new · ${version.value}`);
+
 function onKeydown(event: KeyboardEvent): void {
     if (event.key === 'Escape' && props.drawerOpen) emit('close');
 }
@@ -298,6 +303,29 @@ function onKeydown(event: KeyboardEvent): void {
                         </MdsTooltip>
                     </li>
                 </ul>
+            </div>
+            <!--
+                M181 (`R-c7247dbf`, `D124`): the release and the way to What's new, at the foot — on every page, the builder
+                included (it has no footer). A <div> outside every list and never a `.sidebar__item`, so the nav's item
+                census, its `role="list"` rule and the drawer's first focus (`.sidebar__item`) all stay as they were. In
+                the rail only the glyph shows, and the tooltip carries the words, as for every item above.
+            -->
+            <div class="sidebar__foot">
+                <MdsTooltip :text="footTooltip" placement="right" block :disabled="!showsRailTooltip">
+                    <template #default="{ trigger }">
+                        <Link
+                            v-bind="trigger"
+                            href="/whats-new"
+                            class="sidebar__foot-link"
+                            :class="{ 'is-active': isActive('/whats-new') }"
+                            :aria-current="isActive('/whats-new') ? 'page' : undefined"
+                            @click="emit('close')"
+                        >
+                            <MdsIcon name="sparkle" size="md" />
+                            <span class="sidebar__foot-text">{{ version }} <span aria-hidden="true">·</span> What's new</span>
+                        </Link>
+                    </template>
+                </MdsTooltip>
             </div>
         </nav>
     </div>
@@ -636,6 +664,86 @@ a.sidebar__item:focus-visible {
     }
     .sidebar-wrap.is-collapsed .sidebar__collapse {
         margin-right: auto;
+    }
+}
+
+/* ── M181 (`R-c7247dbf`, `D124`): the foot — the release and What's new ──────────────────────────────────────────────
+   Appended, for the reason M128's block above gives. The sidebar becomes a column so the foot can sit at the bottom
+   of a tall screen (`margin-top: auto`) and simply follow the groups on a short one; it scrolls with them either way. */
+.sidebar {
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar__foot {
+    margin-top: auto;
+    padding-top: var(--mds-space-4);
+}
+
+.sidebar__foot-link {
+    /* The containing block for the clipped words in the rail below — the containment rule `.sidebar__item` keeps. */
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--mds-space-3);
+    min-height: 40px;
+    padding: 0 var(--mds-space-3);
+    border-top: 1px solid var(--mds-color-border-default);
+    border-radius: var(--mds-radius-md);
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+    color: var(--mds-color-text-secondary);
+    text-decoration: none;
+}
+
+.sidebar__foot-link:hover:not(.is-active) {
+    background-color: var(--mds-color-bg-sunken);
+}
+
+.sidebar__foot-link.is-active {
+    color: var(--mds-color-text-heading);
+    font-weight: var(--mds-font-weight-semibold);
+}
+
+.sidebar__foot-link:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: -2px;
+}
+
+/* The rail (481–1024, and a wide screen's collapsed sidebar): the glyph alone, the words to AT by the clip idiom and to
+   sight by the tooltip — as `.sidebar__label` above. The drawer below 480px shows the words again. */
+@media (min-width: 481px) and (max-width: 1024px) {
+    .sidebar__foot-link {
+        justify-content: center;
+        gap: 0;
+        padding: 0;
+    }
+    .sidebar__foot-text {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+}
+
+@media (min-width: 1025px) {
+    .sidebar-wrap.is-collapsed .sidebar__foot-link {
+        justify-content: center;
+        gap: 0;
+        padding: 0;
+    }
+    .sidebar-wrap.is-collapsed .sidebar__foot-text {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
     }
 }
 </style>

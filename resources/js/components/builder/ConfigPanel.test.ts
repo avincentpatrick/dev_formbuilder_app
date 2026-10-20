@@ -835,7 +835,7 @@ describe('ConfigPanel — the "Insert a question" picker (M178, R-75719ac4)', ()
 
     function mountPicker() {
         const earlier = field({ id: 'fld-0', uid: 'f0', key: 'name', label: 'Your name', sequence: 0 });
-        const selected = field({ id: 'fld-1', uid: 'f1', key: 'age', label: 'Age', field_type: 'integer', sequence: 1 });
+        const selected = reactive(field({ id: 'fld-1', uid: 'f1', key: 'age', label: 'Age', field_type: 'integer', sequence: 1 })) as LocalField;
         const later = field({ id: 'fld-2', uid: 'f2', key: 'later_one', label: 'Later one', sequence: 2 });
         const store = makeStore({ field: selected, fields: [later, selected, earlier] });
         (store as unknown as { palette: PaletteGroup[] }).palette = PICKER_PALETTE;

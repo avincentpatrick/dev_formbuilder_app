@@ -43,6 +43,7 @@ import {
     toSemanticInput,
     type EngineSchema,
 } from '../lib/schema-mapping';
+import { buildDefaults, type Defaults } from '../lib/defaults';
 import { buildPrefill } from '../lib/prefill';
 import { randomUuid, uuidv7 } from '../lib/uuid';
 import type { AnswerMap, RenderField, RenderModel, RenderSection, SchemaResponse } from '../lib/types';
@@ -211,6 +212,11 @@ export interface FormRuntime {
 
     setAnswer(key: string, value: EngineValue | CompositeAnswer | GeoAnswer | MediaAnswer | null): void;
     restoreAnswers(map: AnswerMap): void;
+    /**
+     * M180 (`R-20784770`) — restore a saved draft over a form whose defaults were filled in: a default the draft does not
+     * hold is taken out first, so one the respondent cleared before saving stays cleared.
+     */
+    restoreDraft(map: AnswerMap): void;
     markTouched(key: string): void;
     markManyTouched(keys: string[]): void;
     markSubmitAttempted(): void;
@@ -304,6 +310,13 @@ export interface RuntimeOptions {
      * question in a section is a calculation still sees the section; the guest form and manual entry never set it.
      */
     keepSilentPages?: boolean;
+    /**
+     * M180 (`R-20784770`, `D148`, `D154`) — fill each question's Default value in (`lib/defaults.ts`), worked out once
+     * against `now`. ONLY for a form opened fresh: the guest form with nothing to restore, staff keying a new response,
+     * and the builder preview. A resume, a paper copy, a version drift, a conflict review, a draft or a correction leave
+     * it off, because what they restore IS the respondent's answers. Restored answers win over a default either way.
+     */
+    seedDefaults?: boolean;
 }
 
 function isInstanceObject(value: unknown): value is InstanceAnswers {
@@ -365,6 +378,15 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
     // the respondent's submission was built against. Routing both through `restoreAnswers` also means the
     // prefill inherits its flat-key guard for free.
     restoreAnswers(buildPrefill(schema, opts.search ?? ''));
+    // M180 — the defaults, between the prefill and the restored answers, so a prefill and a restored answer both win.
+    const defaults: Defaults = opts.seedDefaults === true ? buildDefaults(schema, sessionNow) : { top: {}, members: {} };
+    const seededKeys = new Set<string>();
+    for (const [key, value] of Object.entries(defaults.top)) {
+        if (flatFieldKeys.has(key) && answers[key] === undefined) {
+            answers[key] = value;
+            seededKeys.add(key);
+        }
+    }
     restoreAnswers(opts.initialAnswers ?? {});
 
     // Snapshot-degrade wrapper: a malformed published expression THROWS (it is pre-validated by the F3 gate,
@@ -812,6 +834,16 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
         }
     }
 
+    function restoreDraft(map: AnswerMap): void {
+        for (const key of seededKeys) {
+            if (map[key] === undefined || map[key] === null) {
+                delete answers[key];
+            }
+        }
+        seededKeys.clear();
+        restoreAnswers(map);
+    }
+
     function markTouched(key: string): void {
         touched[key] = true;
     }
@@ -1038,7 +1070,9 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
             instanceUids[sectionKey] = [];
         }
         const arr = answers[sectionKey] as InstanceAnswers[];
-        arr.push({});
+        // M180 — a new entry starts from its members' defaults (an empty object when none are filled in).
+        const memberDefaults = defaults.members[sectionKey] ?? {};
+        arr.push(Object.fromEntries(Object.entries(memberDefaults).map(([key, value]) => [key, Array.isArray(value) ? [...value] : value])));
         instanceUids[sectionKey].push(randomUuid());
         clearSectionServerErrors(sectionKey);
         return arr.length - 1;
@@ -1365,6 +1399,7 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
         lastStepChange,
         setAnswer,
         restoreAnswers,
+        restoreDraft,
         markTouched,
         markManyTouched,
         markSubmitAttempted,

@@ -45,7 +45,8 @@ export type TemplateHost =
     | { kind: 'section'; key: string }
     | { kind: 'confirmation' };
 
-export type ReferenceSpot = { grammar: 'expression'; ownKey: string | null } | { grammar: 'template'; host: TemplateHost };
+/** M180: `earlierOnly` — a Default value's formula, worked out once when the form opens, before any calculation and any later answer. */
+export type ReferenceSpot = { grammar: 'expression'; ownKey: string | null; earlierOnly?: boolean } | { grammar: 'template'; host: TemplateHost };
 
 export interface ReferenceSource {
     fields: ReferenceField[];
@@ -103,6 +104,13 @@ export function referenceCandidates(source: ReferenceSource, spot: ReferenceSpot
         accepts = (field) => {
             const kind = typeOf(field)?.operand_kind;
             const row = source.kinds?.find((candidate) => candidate.value === kind);
+
+            if (spot.earlierOnly === true) {
+                const own = source.fields.find((candidate) => candidate.key === spot.ownKey);
+                if (kind === 'computed' || own === undefined || !precedes(positionOf(field), positionOf(own))) {
+                    return false;
+                }
+            }
 
             return field.key !== spot.ownKey && kind !== undefined && (row === undefined || row.offered);
         };

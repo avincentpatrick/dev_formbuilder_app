@@ -395,12 +395,17 @@ export function carryAnswers(previous: AnswerMap, before: SchemaResponse, after:
 
     const was = typeOf(before);
     const is = typeOf(after);
+    // M180 (`R-20784770`): a question whose default changed is not carried, so the new default fills in on the rebuild.
+    const defaultOf = (schema: SchemaResponse): Map<string, string> =>
+        new Map(schema.version.schema.fields.map((f) => [f.key, `${f.default_value_is_expression ? 'formula' : 'fixed'}:${f.default_value ?? ''}`]));
+    const defaultsBefore = defaultOf(before);
+    const defaultsAfter = defaultOf(after);
     const repeatsBefore = repeatable(before);
     const repeatsAfter = repeatable(after);
 
     const carried: AnswerMap = {};
     for (const [key, value] of Object.entries(previous)) {
-        const sameQuestion = was.has(key) && was.get(key) === is.get(key);
+        const sameQuestion = was.has(key) && was.get(key) === is.get(key) && defaultsBefore.get(key) === defaultsAfter.get(key);
         const sameRepeat = repeatsBefore.has(key) && repeatsAfter.has(key);
         if (sameQuestion || sameRepeat) carried[key] = value;
     }

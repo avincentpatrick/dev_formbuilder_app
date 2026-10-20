@@ -24,6 +24,7 @@ export function roundHalfAway(value: number, places: number): number {
 
 /** `value` rounded the same way and WRITTEN with exactly `places` decimals — "3.50", "34.0", never "-0.00". Mirrors PHP `Rounding::fixed()`. */
 export function fixedDecimal(value: number, places: number): string {
+    return value.toFixed(places);
     const [negative, scaled] = scaledDigits(value, places);
 
     return (negative && /[1-9]/.test(scaled) ? '-' : '') + placeDecimal(scaled, places);

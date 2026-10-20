@@ -59,6 +59,9 @@ describe('sortFieldSaveErrors', () => {
         expect([...INLINE_FIELD_KEYS].sort()).toEqual([
             'appearance',
             'config.calculated_formula',
+            // M180 (`R-f77aa45d`): a calculation's places and unit, shown on the calculation editor's own controls.
+            'config.decimal_places',
+            'config.duration_unit',
             'default_value',
             'hint',
             'indexed_data_type',

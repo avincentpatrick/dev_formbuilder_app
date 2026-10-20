@@ -97,7 +97,7 @@ function comparable(a: TemporalValue, b: TemporalValue): boolean {
 }
 
 /** Days from a fixed origin (0000-03-01) for a calendar-valid date, else null. */
-function daysFrom(year: number, month: number, day: number): number | null {
+export function daysFrom(year: number, month: number, day: number): number | null {
     if (year < 1 || month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month)) {
         return null;
     }
@@ -109,7 +109,7 @@ function daysFrom(year: number, month: number, day: number): number | null {
     return 365 * y + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) + Math.floor((153 * m + 2) / 5) + day - 1;
 }
 
-function daysInMonth(year: number, month: number): number {
+export function daysInMonth(year: number, month: number): number {
     if (month === 2) {
         return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 29 : 28;
     }
@@ -121,7 +121,7 @@ function secondsOfDay(hours: string, minutes: string, seconds: string | undefine
     return Number(hours) * 3600 + Number(minutes) * 60 + Number(seconds ?? '0');
 }
 
-function offsetSeconds(offset: string | undefined): number {
+export function offsetSeconds(offset: string | undefined): number {
     if (offset === undefined || offset === 'Z') {
         return 0;
     }
@@ -129,4 +129,21 @@ function offsetSeconds(offset: string | undefined): number {
     const magnitude = Number(offset.slice(1, 3)) * 3600 + Number(offset.slice(4, 6)) * 60;
 
     return offset[0] === '-' ? -magnitude : magnitude;
+}
+
+/**
+ * The calendar date of a day number from `daysFrom()` — its exact inverse (M180, `date-math.ts`), the civil-from-days
+ * algorithm over 400-year eras, integer arithmetic only. Null outside the years 0001-9999. Mirrors PHP `Temporal::civil()`.
+ */
+export function civil(day: number): [number, number, number] | null {
+    const era = Math.floor(day / 146097);
+    const dayOfEra = day - era * 146097;
+    const yearOfEra = Math.floor((dayOfEra - Math.floor(dayOfEra / 1460) + Math.floor(dayOfEra / 36524) - Math.floor(dayOfEra / 146096)) / 365);
+    const dayOfYear = dayOfEra - (365 * yearOfEra + Math.floor(yearOfEra / 4) - Math.floor(yearOfEra / 100));
+    const shiftedMonth = Math.floor((5 * dayOfYear + 2) / 153);
+    const date = dayOfYear - Math.floor((153 * shiftedMonth + 2) / 5) + 1;
+    const month = shiftedMonth < 10 ? shiftedMonth + 3 : shiftedMonth - 9;
+    const year = yearOfEra + era * 400 + (month <= 2 ? 1 : 0);
+
+    return year < 1 || year > 9999 ? null : [year, month, date];
 }

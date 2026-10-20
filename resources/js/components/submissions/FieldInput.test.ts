@@ -207,3 +207,19 @@ describe('FieldInput — a note with content blocks (M130, R-c9f50df2, D69)', ()
         expect(wrapper.text()).toContain('<script>alert(1)</script>');
     });
 });
+
+describe('a calculation shown by its Type (M180, R-f77aa45d)', () => {
+    const calculation = (display: Record<string, unknown> | null): EncodeField => ({
+        key: 'total', field_type: 'calculated', label: 'Total', hint: null, placeholder: null, required: false, options: [], calculation: display, supported: true,
+    });
+    const shown = (display: Record<string, unknown> | null, value: AnswerValue) =>
+        mount(FieldInput, { props: { field: calculation(display), modelValue: value } }).find('[data-computed] output').text();
+
+    it('writes a Number to its decimal places, a Duration with its unit, and an untyped one as before', () => {
+        expect(shown({ calculated_type: 'number', decimal_places: 2 }, 3.5)).toBe('3.50');
+        expect(shown({ calculated_type: 'duration', duration_unit: 'years' }, 34)).toBe('34 years');
+        expect(shown({ calculated_type: 'duration', duration_unit: 'years' }, 1)).toBe('1 year');
+        expect(shown(null, 3.5)).toBe('3.5');
+        expect(shown({ calculated_type: 'number', decimal_places: 2 }, null)).toBe('—');
+    });
+});

@@ -1,6 +1,6 @@
 {
   "grammar_version": "2.0",
-  "total": 180,
+  "total": 195,
   "files": {
     "relevance": 8,
     "required": 8,
@@ -8,7 +8,7 @@
     "patterns": 5,
     "conditional": 13,
     "repeats": 9,
-    "calculated": 8,
+    "calculated": 23,
     "membership": 11,
     "cascading": 8,
     "matrix": 8,

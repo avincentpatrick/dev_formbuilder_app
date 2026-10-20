@@ -429,6 +429,7 @@ function toRenderField(field: RawField): RenderField {
         media: buildMedia(field),
         appearance: field.appearance ?? null,
         content: field.field_type === 'note' && Array.isArray(field.config?.content) ? (field.config.content as unknown[]) : null,
+        calculation: calculationDisplayOf(field),
         visibility: visibilityOf(field),
         sequence: field.sequence,
         sectionSequence: field.section_sequence,
@@ -570,12 +571,35 @@ export function buildEngineSchema(schema: SchemaResponse): EngineSchema {
  * `passed()` is true because an irrelevant field is never required-checked, and the respondent gets a 201
  * with silently dropped answers. UTC costs only that `today()` is the machine's calendar day rather than the
  * respondent's — a narrowing that is visible and arguable, not a silent data fault.
+ *
+ * M180 (`D153`) closed that narrowing without reopening the fault: the clock is stamped in the FORM'S zone
+ * (`schedule.timezone`), and so is the server's (`App\Support\Forms\FormClock`) — both sides read the same calendar
+ * day again, now the respondent's. The offset comes from `Intl` for that instant (daylight saving included); an
+ * unknown zone falls back to UTC, as the server's does. Same shape: seconds, an explicit `±HH:MM`, never `Z`.
  */
-export function isoClock(at: Date): string {
+export function isoClock(at: Date, timeZone = 'UTC'): string {
     const pad = (n: number): string => String(n).padStart(2, '0');
+    const instant = Math.floor(at.getTime() / 1000) * 1000;
+    let offsetMinutes = 0;
 
-    return `${at.getUTCFullYear()}-${pad(at.getUTCMonth() + 1)}-${pad(at.getUTCDate())}`
-        + `T${pad(at.getUTCHours())}:${pad(at.getUTCMinutes())}:${pad(at.getUTCSeconds())}+00:00`;
+    try {
+        const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+        }).formatToParts(new Date(instant));
+        const part = (type: Intl.DateTimeFormatPartTypes): number => Number(parts.find((p) => p.type === type)?.value);
+        const wall = Date.UTC(part('year'), part('month') - 1, part('day'), part('hour'), part('minute'), part('second'));
+        offsetMinutes = Math.round((wall - instant) / 60000);
+    } catch {
+        offsetMinutes = 0; // an unknown zone: UTC, as the server falls back
+    }
+
+    const local = new Date(instant + offsetMinutes * 60000);
+    const sign = offsetMinutes < 0 ? '-' : '+';
+    const magnitude = Math.abs(offsetMinutes);
+
+    return `${local.getUTCFullYear()}-${pad(local.getUTCMonth() + 1)}-${pad(local.getUTCDate())}`
+        + `T${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}:${pad(local.getUTCSeconds())}`
+        + `${sign}${pad(Math.floor(magnitude / 60))}:${pad(magnitude % 60)}`;
 }
 
 /**
@@ -588,4 +612,23 @@ export function isoClock(at: Date): string {
  */
 export function toSemanticInput(engineSchema: EngineSchema, answers: AnswerMap, locale: string, now?: string | null): SemanticInput {
     return { ...engineSchema, answers, locale, now: now ?? null };
+}
+
+/**
+ * M180 (`R-f77aa45d`) — a calculation's display settings, as `displayValue()` reads them; null for any other type and for
+ * a calculation with none (it shows exactly as before). The mirror of `EncodeFormPresenter::calculationDisplay()`.
+ */
+function calculationDisplayOf(field: RawField): Record<string, unknown> | null {
+    if (field.field_type !== 'calculated' || field.config === null) {
+        return null;
+    }
+
+    const display: Record<string, unknown> = {};
+    for (const key of ['calculated_type', 'decimal_places', 'duration_unit']) {
+        if (field.config[key] !== undefined && field.config[key] !== null) {
+            display[key] = field.config[key];
+        }
+    }
+
+    return Object.keys(display).length > 0 ? display : null;
 }

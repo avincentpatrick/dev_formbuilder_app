@@ -511,4 +511,14 @@ group('the preview’s answers outlive a rebuild (M151)', () => {
 
         expect(carryAnswers({ hh: [{ m: 'a' }] }, before, after)).toEqual({});
     });
+
+    it('drops an answer whose question’s default changed, so the new default fills in (M180, R-20784770)', () => {
+        const withDefault = (value: string, formula = false) => buildPreviewModel(
+            input([field({ uid: 'u-town', key: 'town', default_value: value, default_value_is_expression: formula } as Parameters<typeof field>[0])]),
+        ).projection.schema;
+
+        expect(carryAnswers({ town: 'Pasig' }, withDefault('Pasig'), withDefault('Pasig'))).toEqual({ town: 'Pasig' });
+        expect(carryAnswers({ town: 'Pasig' }, withDefault('Pasig'), withDefault('Taguig'))).toEqual({});
+        expect(carryAnswers({ town: 'x' }, withDefault('today()'), withDefault('today()', true))).toEqual({});
+    });
 });

@@ -18,15 +18,26 @@
  */
 
 import { ABSENT, isEmpty, isNumericLike, toNumber, toStr, yesNoAnswer, type EngineValue, type MaybeAbsent } from './coercion';
+import { calculationOrder, type CalculationSource } from './calculation-order';
 import { EvaluationContext, type Answers } from './context';
+import { ExpressionSyntaxError } from './errors';
 import { ExpressionEvaluator, makeExpressionEvaluator } from './evaluator';
 import { fieldRendersNothing } from './field-roles';
 import { StructuredRuleLowering, type FieldKeysById } from './lowering';
 import { StructuredRuleEvaluator } from './structured-rule-evaluator';
-import type { CompositeAnswer, GeoAnswer, InstanceAnswers, MediaAnswer, SchemaField, SemanticInput, ValidationRow } from './schema';
+import type { CompositeAnswer, GeoAnswer, InstanceAnswers, MediaAnswer, SchemaField, SchemaSection, SemanticInput, ValidationRow } from './schema';
 
 /** The full effective-answers map: scalars/lists, repeat instances (G1), composite grids (G4b), geo (G5b1), media (G6). */
 type EffectiveAnswers = Record<string, EngineValue | InstanceAnswers[] | CompositeAnswer | GeoAnswer | MediaAnswer>;
+
+/** M180: the top-level calculations — the keys to work out in order with their formulas, every calculation's key, and those keys in field order. */
+type CalculationPlan = { order: [string, string][]; keys: Record<string, true>; fields: string[] };
+
+/** M180: the calculations' values and every calculation's key, laid over an expression context's answers. */
+type Calculated = { keys: Record<string, true>; values: Record<string, EngineValue> };
+
+/** M180: one relevant repeatable section, settled — what checkRepeats() reads. */
+type SettledRepeat = { section: SchemaSection; members: SchemaField[]; count: number; instances: [Record<string, boolean>, InstanceAnswers][] };
 
 /** The five media field types (Increment G6) — mirror of PHP `FieldType::isMedia()`. */
 const MEDIA_FIELD_TYPES = new Set(['file_upload', 'image_capture', 'audio_capture', 'video_capture', 'signature']);
@@ -141,45 +152,67 @@ export class SemanticValidator {
 
         const [topLevelFields, repeatMembersBySectionId] = this.partitionFields(input);
 
-        const [fieldRelevance, sectionRelevance] = this.settleRelevance(input, topLevelFields, ruleSets, fieldKeyById, fieldKeys, now);
-        const flatEffective = this.effectiveAnswers(input.answers, fieldRelevance);
-        const errors = this.collectErrors(topLevelFields, ruleSets, fieldRelevance, flatEffective, fieldKeyById, input.locale, now);
+        // M180 (`R-39dbce5b`, `D149`): conditions and rules read a calculation. The calculations are worked out in
+        // dependency order (`calculation-order.ts`) wherever an expression is evaluated, a calculation's own key never
+        // reads a raw answer, and each pass returns its own error list, so working them out earlier moves no error.
+        // Mirrors `SemanticValidator::evaluate()`.
+        const plan = this.calculationPlan(topLevelFields);
 
-        const [repeatEffective, repeatErrors, repeatRelevance] = this.processRepeats(
+        // Relevance (fields, sections, skip rules — and each repeat member's) reads the calculations as an inline
+        // formula would: over the raw repeat instances, inside the fixed point (settleRelevance()).
+        const [fieldRelevance, sectionRelevance, settledValues] = this.settleRelevance(input, topLevelFields, ruleSets, fieldKeyById, fieldKeys, plan, now);
+        const flatEffective = this.effectiveAnswers(input.answers, fieldRelevance);
+
+        const settledRepeats = this.settleRepeats(
             input,
             repeatMembersBySectionId,
             ruleSets,
             sectionRelevance,
-            flatEffective,
+            this.layered(flatEffective, { keys: plan.keys, values: settledValues }),
             fieldKeyById,
             fieldKeys,
             now,
         );
+
+        const repeatEffective: Record<string, InstanceAnswers[]> = {};
+        const repeatRelevance: Record<string, Record<string, boolean>[]> = {};
+        for (const settled of settledRepeats) {
+            for (const [instanceRelevance, instanceEffective] of settled.instances) {
+                (repeatEffective[settled.section.key] ??= []).push(instanceEffective);
+                (repeatRelevance[settled.section.key] ??= []).push(instanceRelevance);
+            }
+        }
 
         const effectiveAnswers: EffectiveAnswers = { ...flatEffective };
         for (const [sectionKey, instances] of Object.entries(repeatEffective)) {
             effectiveAnswers[sectionKey] = instances;
         }
 
+        // Calculated fields (grammar v2.0) are worked out over the full effective answers (flat + repeat instance
+        // arrays merged above, so a calc can `count(${section})`). Since M180 a calculation reads an earlier one, and
+        // every RULE below reads these values — the flat ones, a repeat member's, a grid's, a map's and a media
+        // question's required-when alike. See computeCalculated().
+        const computed = this.computeCalculated(plan, effectiveAnswers, fieldRelevance, now);
+        const calculated: Calculated = { keys: plan.keys, values: computed };
+
+        const errors = this.collectErrors(topLevelFields, ruleSets, fieldRelevance, flatEffective, this.layered(flatEffective, calculated), fieldKeyById, input.locale, now);
+        const repeatErrors = this.checkRepeats(input, settledRepeats, ruleSets, this.layered(flatEffective, calculated), fieldKeyById);
+
         // Composite (grid) fields (Increment G4b) are validated + pruned in their own pass, never routed
         // through the scalar collectFieldErrors path (isEmpty diverges on an empty object between the engines:
         // PHP isEmpty([]) === true vs TS isEmpty({}) === false). The pruned object replaces the raw answer.
-        const compositeErrors = this.processComposites(topLevelFields, fieldRelevance, effectiveAnswers, ruleSets, fieldKeyById, input.locale, now);
+        const compositeErrors = this.processComposites(topLevelFields, fieldRelevance, effectiveAnswers, ruleSets, fieldKeyById, input.locale, now, calculated);
 
         // Geospatial fields (Increment G5b1) are validated in their own pass (same reason as composites: an
         // object answer must not hit scalar isEmpty). Structural geometry checks only — no grammar change; an
         // empty envelope is deleted so effective answers stay byte-identical across the engines ({} vs []).
-        const geoErrors = this.processGeo(topLevelFields, fieldRelevance, effectiveAnswers, ruleSets, fieldKeyById, input.locale, now);
+        const geoErrors = this.processGeo(topLevelFields, fieldRelevance, effectiveAnswers, ruleSets, fieldKeyById, input.locale, now, calculated);
 
         // Media fields (Increment G6) are validated in their own pass (same reason as geo/composites: a
         // list-of-objects answer must not hit scalar isEmpty). DB-free rules only — required + min/max count;
         // an empty list is deleted so effective answers stay byte-identical across the engines. Existence/
         // ownership/scan are the server's PHP-only AttachmentReferenceValidator, not part of this mirror.
-        const mediaErrors = this.processMedia(topLevelFields, fieldRelevance, effectiveAnswers, ruleSets, fieldKeyById, input.locale, now);
-
-        // Calculated fields (grammar v2.0) are computed last, over the full effective answers (flat + repeat
-        // instance arrays merged above, so a calc can `count(${section})`). See computeCalculated().
-        const computed = this.computeCalculated(topLevelFields, effectiveAnswers, fieldRelevance, now);
+        const mediaErrors = this.processMedia(topLevelFields, fieldRelevance, effectiveAnswers, ruleSets, fieldKeyById, input.locale, now, calculated);
 
         return new SemanticResult(fieldRelevance, sectionRelevance, [...errors, ...repeatErrors, ...compositeErrors, ...geoErrors, ...mediaErrors], effectiveAnswers, computed, repeatRelevance);
     }
@@ -270,7 +303,7 @@ export class SemanticValidator {
         return units;
     }
 
-    private settleRelevance(input: SemanticInput, fields: SchemaField[], ruleSets: RuleSets, fieldKeyById: FieldKeysById, fieldKeys: Record<string, true>, now: string | null): [Record<string, boolean>, Record<string, boolean>] {
+    private settleRelevance(input: SemanticInput, fields: SchemaField[], ruleSets: RuleSets, fieldKeyById: FieldKeysById, fieldKeys: Record<string, true>, plan: CalculationPlan, now: string | null): [Record<string, boolean>, Record<string, boolean>, Record<string, EngineValue>] {
         let relevant: Record<string, boolean> = {};
         for (const field of fields) {
             relevant[field.key] = true; // start optimistic; prune from here
@@ -281,7 +314,10 @@ export class SemanticValidator {
         let sectionRelevantById: Record<string, boolean> = {};
 
         for (let iteration = 0; iteration < maxIterations; iteration++) {
-            const context = new EvaluationContext(this.relevanceContext(input, relevant, fieldKeys), undefined, now);
+            // M180: the calculations relevant under this mask, worked out over this context. The context stays a pure
+            // function of the answers and the mask, so the fixed-point compare below still tests the mask alone.
+            const [answers] = this.withCalculations(this.relevanceContext(input, relevant, fieldKeys), plan, relevant, now);
+            const context = new EvaluationContext(answers, undefined, now);
 
             [sectionRelevance, sectionRelevantById] = this.sectionMasks(input, context);
 
@@ -316,7 +352,8 @@ export class SemanticValidator {
         // Both halves are provably no-ops on the fixed-point path, which is why no golden vector moves: the
         // break fires BEFORE `relevant = next`, so `relevant` is exactly the map this context and this
         // section mask were already built from, and every key in it already passed the section gate.
-        const settled = new EvaluationContext(this.relevanceContext(input, relevant, fieldKeys), undefined, now);
+        const [settledAnswers] = this.withCalculations(this.relevanceContext(input, relevant, fieldKeys), plan, relevant, now);
+        const settled = new EvaluationContext(settledAnswers, undefined, now);
         [sectionRelevance, sectionRelevantById] = this.sectionMasks(input, settled);
 
         for (const field of fields) {
@@ -328,7 +365,10 @@ export class SemanticValidator {
             }
         }
 
-        return [this.fullMask(fields, relevant), sectionRelevance];
+        // M180: what a repeat member's condition reads — the calculations under the FINAL mask, over the raw instances.
+        const [, settledValues] = this.withCalculations(this.relevanceContext(input, relevant, fieldKeys), plan, relevant, now);
+
+        return [this.fullMask(fields, relevant), sectionRelevance, settledValues];
     }
 
     /**
@@ -431,7 +471,7 @@ export class SemanticValidator {
         return effective;
     }
 
-    private collectErrors(fields: SchemaField[], ruleSets: RuleSets, fieldRelevance: Record<string, boolean>, effectiveAnswers: Answers, fieldKeyById: FieldKeysById, locale: string, now: string | null): SemanticError[] {
+    private collectErrors(fields: SchemaField[], ruleSets: RuleSets, fieldRelevance: Record<string, boolean>, effectiveAnswers: Answers, contextAnswers: Answers, fieldKeyById: FieldKeysById, locale: string, now: string | null): SemanticError[] {
         const errors: SemanticError[] = [];
 
         for (const field of fields) {
@@ -439,7 +479,7 @@ export class SemanticValidator {
                 continue;
             }
 
-            this.collectFieldErrors(field, effectiveAnswers, effectiveAnswers, ruleSets, fieldKeyById, locale, now, errors, null, null);
+            this.collectFieldErrors(field, effectiveAnswers, contextAnswers, ruleSets, fieldKeyById, locale, now, errors, null, null);
         }
 
         return errors;
@@ -655,9 +695,10 @@ export class SemanticValidator {
         fieldKeyById: FieldKeysById,
         locale: string,
         now: string | null,
+        calculated: Calculated,
     ): SemanticError[] {
         const errors: SemanticError[] = [];
-        const context = new EvaluationContext(effectiveAnswers as Answers, undefined, now);
+        const context = new EvaluationContext(this.layered(effectiveAnswers, calculated), undefined, now);
 
         for (const field of fields) {
             if (field.field_type !== 'matrix' && field.field_type !== 'likert_matrix') {
@@ -802,9 +843,10 @@ export class SemanticValidator {
         fieldKeyById: FieldKeysById,
         locale: string,
         now: string | null,
+        calculated: Calculated,
     ): SemanticError[] {
         const errors: SemanticError[] = [];
-        const context = new EvaluationContext(effectiveAnswers as Answers, undefined, now);
+        const context = new EvaluationContext(this.layered(effectiveAnswers, calculated), undefined, now);
 
         for (const field of fields) {
             if (field.field_type !== 'geopoint' && field.field_type !== 'geotrace' && field.field_type !== 'geoshape') {
@@ -930,9 +972,10 @@ export class SemanticValidator {
         fieldKeyById: FieldKeysById,
         locale: string,
         now: string | null,
+        calculated: Calculated,
     ): SemanticError[] {
         const errors: SemanticError[] = [];
-        const context = new EvaluationContext(effectiveAnswers as Answers, undefined, now);
+        const context = new EvaluationContext(this.layered(effectiveAnswers, calculated), undefined, now);
 
         for (const field of fields) {
             if (!isMediaType(field.field_type)) {
@@ -985,7 +1028,14 @@ export class SemanticValidator {
         ];
     }
 
-    private processRepeats(
+    /**
+     * Settle every relevant repeatable section's instances — the mirror of `SemanticValidator::settleRepeats()`. A
+     * hidden repeatable section drops its whole array and enforces nothing (section-cascade). M180 split the old
+     * single pass in two: the calculations a member RULE reads need every group's pruned instances first
+     * (computeCalculated()), so the errors are collected afterwards by checkRepeats(), in the same order as before —
+     * per section, `max`, each instance's members, then `min`.
+     */
+    private settleRepeats(
         input: SemanticInput,
         repeatMembersBySectionId: Record<string, SchemaField[]>,
         ruleSets: RuleSets,
@@ -994,10 +1044,8 @@ export class SemanticValidator {
         fieldKeyById: FieldKeysById,
         fieldKeys: Record<string, true>,
         now: string | null,
-    ): [Record<string, InstanceAnswers[]>, SemanticError[], Record<string, Record<string, boolean>[]>] {
-        const effective: Record<string, InstanceAnswers[]> = {};
-        const errors: SemanticError[] = [];
-        const relevance: Record<string, Record<string, boolean>[]> = {};
+    ): SettledRepeat[] {
+        const settled: SettledRepeat[] = [];
 
         for (const section of input.sections) {
             if (section.is_repeatable !== true) {
@@ -1014,31 +1062,47 @@ export class SemanticValidator {
             const instances: InstanceAnswers[] = Array.isArray(rawInstances)
                 ? (rawInstances.filter((instance) => typeof instance === 'object' && instance !== null && !Array.isArray(instance)) as InstanceAnswers[])
                 : [];
-            const count = instances.length;
 
-            // `max` stays AHEAD of the per-instance settling — it is the abuse guard (a huge array is
-            // rejected before anything settles it) and it needs no step-visibility narrowing: a max
-            // violation means instances were submitted, so the respondent was shown the group.
-            const max = section.max_instances ?? null;
+            const results = instances.map((instanceAnswers) =>
+                this.settleInstanceRelevance(members, ruleSets, baseEffective, instanceAnswers, fieldKeyById, fieldKeys, sectionKey, instances, now),
+            );
+
+            settled.push({ section, members, count: instances.length, instances: results });
+        }
+
+        return settled;
+    }
+
+    /**
+     * The errors of every settled repeatable section — the mirror of `SemanticValidator::checkRepeats()`: the
+     * instance count against min/max and each instance's members, each checked in its own scope — the outside scope
+     * (now with the calculations' final values, M180) merged over that instance.
+     */
+    private checkRepeats(input: SemanticInput, settledRepeats: SettledRepeat[], ruleSets: RuleSets, baseEffective: Answers, fieldKeyById: FieldKeysById): SemanticError[] {
+        const errors: SemanticError[] = [];
+
+        for (const settled of settledRepeats) {
+            const sectionKey = settled.section.key;
+            const count = settled.count;
+
+            // `max` stays AHEAD of the per-instance errors — the abuse guard — and needs no step-visibility
+            // narrowing: a max violation means instances were submitted, so the respondent was shown the group.
+            const max = settled.section.max_instances ?? null;
             if (max !== null && count > max) {
                 errors.push({ fieldKey: sectionKey, rule: 'max_instances', message: this.maxInstancesMessage(max), sectionKey, instanceIndex: null });
             }
 
             const instanceMasks: Record<string, boolean>[] = [];
 
-            instances.forEach((instanceAnswers, index) => {
-                const [instanceRelevance, instanceEffective] = this.settleInstanceRelevance(members, ruleSets, baseEffective, instanceAnswers, fieldKeyById, fieldKeys, sectionKey, instances, now);
-
+            settled.instances.forEach(([instanceRelevance, instanceEffective], index) => {
                 const contextAnswers: Answers = { ...baseEffective, ...instanceEffective };
-                for (const field of members) {
+                for (const field of settled.members) {
                     if (instanceRelevance[field.key] !== true) {
                         continue;
                     }
-                    this.collectFieldErrors(field, instanceEffective, contextAnswers, ruleSets, fieldKeyById, input.locale, now, errors, sectionKey, index);
+                    this.collectFieldErrors(field, instanceEffective, contextAnswers, ruleSets, fieldKeyById, input.locale, input.now ?? null, errors, sectionKey, index);
                 }
 
-                (effective[sectionKey] ??= []).push(instanceEffective);
-                (relevance[sectionKey] ??= []).push(instanceRelevance);
                 instanceMasks.push(instanceRelevance);
             });
 
@@ -1047,13 +1111,13 @@ export class SemanticValidator {
             // beside `max`. Without the gate a repeatable section that vanished from `visibleSteps` still
             // demands instances — a permanent blocker that is INVISIBLE, because the error-summary banner
             // iterates the visible step list and the step is not in it.
-            const min = section.min_instances ?? null;
-            if (min !== null && min > 0 && count < min && this.repeatStepIsVisible(members, instanceMasks)) {
+            const min = settled.section.min_instances ?? null;
+            if (min !== null && min > 0 && count < min && this.repeatStepIsVisible(settled.members, instanceMasks)) {
                 errors.push({ fieldKey: sectionKey, rule: 'min_instances', message: this.minInstancesMessage(min), sectionKey, instanceIndex: null });
             }
         }
 
-        return [effective, errors, relevance];
+        return errors;
     }
 
     /**
@@ -1161,31 +1225,108 @@ export class SemanticValidator {
      * repeat instance arrays, so a calc can `count(${section})`). A hidden calc, a non-calc field, and a
      * blank formula contribute nothing; a blank/NaN result is omitted rather than stored as null. Calculated
      * fields inside a repeatable section are NOT computed in G3 (they are repeat members, not top-level).
+     *
+     * Since M180 (`D149`) a calculation reads an earlier one: they are worked out in the plan's dependency order,
+     * and a calculation never worked out (a cycle, or downstream of one) reads as blank. The map is returned in
+     * field order, as before. Mirrors `SemanticValidator::computeCalculated()`.
      */
-    private computeCalculated(fields: SchemaField[], effectiveAnswers: EffectiveAnswers, fieldRelevance: Record<string, boolean>, now: string | null): Record<string, EngineValue> {
+    private computeCalculated(plan: CalculationPlan, effectiveAnswers: EffectiveAnswers, fieldRelevance: Record<string, boolean>, now: string | null): Record<string, EngineValue> {
+        const [, values] = this.withCalculations(effectiveAnswers as Answers, plan, fieldRelevance, now);
+
         const computed: Record<string, EngineValue> = {};
-        const context = new EvaluationContext(effectiveAnswers as Answers, undefined, now);
-
-        for (const field of fields) {
-            if (field.field_type !== 'calculated') {
-                continue;
-            }
-            if (fieldRelevance[field.key] !== true) {
-                continue;
-            }
-
-            const formula = field.calculate ?? null;
-            if (formula === null || formula.trim() === '') {
-                continue;
-            }
-
-            const value = this.evaluator.evaluate(formula, context);
-            if (value !== null) {
-                computed[field.key] = value;
+        for (const key of plan.fields) {
+            if (hasOwn(values, key)) {
+                computed[key] = values[key];
             }
         }
 
         return computed;
+    }
+
+    /**
+     * The top-level calculations: the keys to work out in dependency order with their formulas (`calculation-order.ts`),
+     * every calculation's key (none of them may read a raw answer), and those keys in field order (M180). A formula the
+     * parser refuses names nothing here, so it is evaluated — and throws — exactly when it was before. Mirrors
+     * `SemanticValidator::calculationPlan()`.
+     */
+    private calculationPlan(fields: SchemaField[]): CalculationPlan {
+        const calculations: CalculationSource[] = [];
+        const formulas: Record<string, string> = {};
+        for (const field of fields) {
+            if (field.field_type !== 'calculated') {
+                continue;
+            }
+
+            const formula = field.calculate ?? null;
+            const usable = formula === null || formula.trim() === '' ? null : formula;
+            calculations.push({ key: field.key, formula: usable });
+            if (usable !== null) {
+                formulas[field.key] = usable;
+            }
+        }
+
+        const references = (formula: string): string[] => {
+            try {
+                return this.evaluator.referencedKeys(formula);
+            } catch (error) {
+                if (error instanceof ExpressionSyntaxError) {
+                    return [];
+                }
+                throw error;
+            }
+        };
+
+        const keys: Record<string, true> = {};
+        for (const calculation of calculations) {
+            keys[calculation.key] = true;
+        }
+
+        return {
+            order: calculationOrder(calculations, references).map((key): [string, string] => [key, formulas[key]]),
+            keys,
+            fields: Object.keys(keys),
+        };
+    }
+
+    /**
+     * The answers with every calculation's key taken out and the relevant calculations worked out back in, in the
+     * plan's order — each over the answers and the calculations before it. A calculation that is not relevant, or
+     * comes out blank, stays absent and reads as blank downstream (M180). Mirrors `SemanticValidator::withCalculations()`.
+     */
+    private withCalculations(answers: Answers, plan: CalculationPlan, relevant: Record<string, boolean>, now: string | null): [Answers, Record<string, EngineValue>] {
+        const out: Answers = {};
+        for (const [key, value] of Object.entries(answers)) {
+            if (!hasOwn(plan.keys, key)) {
+                out[key] = value;
+            }
+        }
+
+        const values: Record<string, EngineValue> = {};
+        for (const [key, formula] of plan.order) {
+            if (relevant[key] !== true) {
+                continue;
+            }
+
+            const value = this.evaluator.evaluate(formula, new EvaluationContext({ ...out }, undefined, now));
+            if (value !== null) {
+                out[key] = value;
+                values[key] = value;
+            }
+        }
+
+        return [out, values];
+    }
+
+    /** An expression context's answers with the calculations' values laid over them (M180). Mirrors `SemanticValidator::layered()`. */
+    private layered(answers: Answers | EffectiveAnswers, calculated: Calculated): Answers {
+        const out: Answers = {};
+        for (const [key, value] of Object.entries(answers)) {
+            if (!hasOwn(calculated.keys, key)) {
+                out[key] = value as EngineValue;
+            }
+        }
+
+        return { ...out, ...calculated.values };
     }
 
     private minInstancesMessage(min: number): string {

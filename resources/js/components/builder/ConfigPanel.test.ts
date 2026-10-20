@@ -645,20 +645,59 @@ describe('ConfigPanel — choices from another form (M133)', () => {
     });
 });
 
-describe('ConfigPanel — a formula default (M134, R-6d7b9ff7)', () => {
-    it('makes an imported formula default plain text the moment the author types over it', async () => {
+describe('ConfigPanel — a formula default (M134, R-6d7b9ff7; M180, R-20784770, R-fa3223d9)', () => {
+    const kind = (wrapper: ReturnType<typeof mountPanel>, value: 'fixed' | 'formula') =>
+        wrapper.findAll('input[type="radio"]').find((radio) => (radio.element as HTMLInputElement).value === value)!;
+
+    it('shows an imported formula default AS a formula, and keeps it one while the author edits it', async () => {
         const touch = vi.fn();
-        const visit = field({ default_value: 'today()', default_value_is_expression: true } as Partial<LocalField>);
+        const visit = field({ field_type: 'date', default_value: 'today()', default_value_is_expression: true } as Partial<LocalField>);
         const wrapper = mountPanel(makeStore({ field: visit, touch }));
         await wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Advanced')!.trigger('click');
 
-        const box = wrapper.findAll('input').find((input) => (input.element as HTMLInputElement).value === 'today()');
+        expect((kind(wrapper, 'formula').element as HTMLInputElement).checked).toBe(true);
+        const box = wrapper.findAll('textarea').find((area) => (area.element as HTMLTextAreaElement).value === 'today()');
         expect(box).toBeDefined();
-        await box!.setValue('2026-01-01');
+        await box!.setValue("date_add(today(), 1, 'days')");
 
-        expect(visit.default_value).toBe('2026-01-01');
-        expect((visit as LocalField & { default_value_is_expression: boolean }).default_value_is_expression).toBe(false);
+        expect(visit.default_value).toBe("date_add(today(), 1, 'days')");
+        expect((visit as LocalField & { default_value_is_expression: boolean }).default_value_is_expression).toBe(true);
         expect(touch).toHaveBeenLastCalledWith('f1', 'field');
+    });
+
+    it('clears the value when the author switches between a fixed answer and a formula', async () => {
+        const visit = field({ default_value: 'today()', default_value_is_expression: true } as Partial<LocalField>);
+        const wrapper = mountPanel(makeStore({ field: visit }));
+        await wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Advanced')!.trigger('click');
+
+        await kind(wrapper, 'fixed').trigger('change');
+
+        expect(visit.default_value).toBeNull();
+        expect((visit as LocalField & { default_value_is_expression: boolean }).default_value_is_expression).toBe(false);
+    });
+
+    it('offers a choice question its own options as a fixed default', async () => {
+        const colour = field({
+            field_type: 'single_select',
+            config: { options: [{ value: 'red', label: 'Red' }, { value: 'blue', label: 'Blue' }] },
+        } as Partial<LocalField>);
+        const wrapper = mountPanel(makeStore({ field: colour }));
+        await wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Advanced')!.trigger('click');
+
+        const select = wrapper.find('select[aria-label="Default value"], .config__default select');
+        expect(select.exists()).toBe(true);
+        expect(select.findAll('option').map((option) => option.text())).toContain('Red');
+        await select.setValue('blue');
+
+        expect(colour.default_value).toBe('blue');
+    });
+
+    it('gives a question that takes no default no Default value box', async () => {
+        const total = field({ field_type: 'calculated', config: { calculated_formula: '1 + 1' } } as Partial<LocalField>);
+        const wrapper = mountPanel(makeStore({ field: total }));
+        await wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Advanced')!.trigger('click');
+
+        expect(wrapper.text()).not.toContain('Default value');
     });
 });
 
@@ -796,7 +835,7 @@ describe('ConfigPanel — the "Insert a question" picker (M178, R-75719ac4)', ()
 
     function mountPicker() {
         const earlier = field({ id: 'fld-0', uid: 'f0', key: 'name', label: 'Your name', sequence: 0 });
-        const selected = field({ id: 'fld-1', uid: 'f1', key: 'age', label: 'Age', field_type: 'integer', sequence: 1 });
+        const selected = reactive(field({ id: 'fld-1', uid: 'f1', key: 'age', label: 'Age', field_type: 'integer', sequence: 1 })) as LocalField;
         const later = field({ id: 'fld-2', uid: 'f2', key: 'later_one', label: 'Later one', sequence: 2 });
         const store = makeStore({ field: selected, fields: [later, selected, earlier] });
         (store as unknown as { palette: PaletteGroup[] }).palette = PICKER_PALETTE;
@@ -816,12 +855,21 @@ describe('ConfigPanel — the "Insert a question" picker (M178, R-75719ac4)', ()
         expect(wrapper.findAll('[role="option"]').map((option) => option.text())).toEqual(['Your name · name']);
     });
 
-    it('leaves the Default value box without one, since nothing fills a default in yet (D148)', async () => {
+    it('puts the picker on a formula default only, offering the questions before this one and the dates (M180, D148)', async () => {
         const wrapper = mountPicker();
         await wrapper.findAll('[role="tab"]').at(-1)?.trigger('click');
 
         expect(wrapper.text()).toContain('Default value');
-        // None: the condition editor opens on its rows (its "Edit as text" box carries the picker), and the default has none.
+        // None on a fixed default: the condition editor opens on its rows (its "Edit as text" box carries the picker).
         expect(pickers(wrapper)).toHaveLength(0);
+
+        await wrapper.findAll('input[type="radio"]').find((radio) => (radio.element as HTMLInputElement).value === 'formula')!.trigger('change');
+        expect(pickers(wrapper)).toHaveLength(1);
+
+        await pickers(wrapper)[0].trigger('click');
+        const offered = wrapper.findAll('[role="option"]').map((option) => option.text());
+        expect(offered).toContain('Your name · name');
+        expect(offered).toContain('Today');
+        expect(offered).not.toContain('Later one · later_one');
     });
 });

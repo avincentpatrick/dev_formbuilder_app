@@ -24,6 +24,7 @@ import {
     MdsTextInput,
 } from '@meridian/design-system';
 import { computed, defineAsyncComponent, nextTick, ref, useId } from 'vue';
+import { displayValue } from '../../../public-runtime/engine/display-value';
 import MatrixGrid from './MatrixGrid.vue';
 import NoteContent from './NoteContent.vue';
 import { choiceLayoutFor } from './choice-layout';
@@ -141,6 +142,9 @@ export interface EncodeField {
     // A note's content blocks (M130, `R-c9f50df2`), carried RAW from `config.content` and read by
     // `renderableBlocks()`; null for every other type. With blocks, the note's label is the author's alone (`D69`).
     content?: unknown[] | null;
+    // M180 (`R-f77aa45d`) — a calculation's display settings (`calculated_type`, `decimal_places`, `duration_unit`), read by
+    // `displayValue()` so its value shows by its Type; null for every other type, and for an untyped calculation.
+    calculation?: Record<string, unknown> | null;
     supported: boolean;
 }
 
@@ -214,13 +218,18 @@ const readOnlyFiles = computed<MediaAttachmentRef[]>(() =>
     Array.isArray(props.modelValue) ? (props.modelValue as MediaAttachmentRef[]).filter((ref) => typeof ref === 'object' && ref !== null) : [],
 );
 
-/** M177 (`R-f44e9d00`): a calculation's value as text — a dash until the answers it reads are given. */
+/**
+ * M177 (`R-f44e9d00`): a calculation's value as text — a dash until the answers it reads are given. M180 (`R-f77aa45d`): by
+ * its Type when it has one — a Number to its decimal places, a Duration with its unit — through the same `displayValue()`
+ * the PDF, the inbox and piping use.
+ */
 const computedText = computed<string>(() => {
     const value = props.modelValue;
     if (value === null || value === undefined || value === '') return '—';
     if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    if (typeof value === 'object') return '—';
 
-    return typeof value === 'object' ? '—' : String(value);
+    return props.field.calculation ? displayValue('calculated', value, props.field.calculation) : String(value);
 });
 
 const control = computed<

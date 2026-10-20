@@ -1381,3 +1381,25 @@ describe('encode page — the sections beside the form (M174, `D136`)', () => {
         expect(wrapper.find('.encode__steps').exists()).toBe(false);
     });
 });
+
+describe('a question’s default value on the encode page (M180, R-20784770)', () => {
+    const town = (o: Partial<PayloadOptions> = {}) => payload({
+        fields: [field({ key: 'town', label: 'Town', sequence: 1, default_value: 'Pasig' })],
+        blocks: [{ key: null, label: null, fields: [blockField({ key: 'town', label: 'Town' })] }],
+        singlePage: true,
+        ...o,
+    });
+    const values = (wrapper: VueWrapper) => wrapper.findAll('input').map((input) => (input.element as HTMLInputElement).value);
+
+    it('fills it in on a new response, where the keyer can change it', () => {
+        expect(values(mountEncode(town()))).toContain('Pasig');
+    });
+
+    it('leaves a continued draft and a response being corrected as they were saved', () => {
+        const draft = { id: 'draft-1', client_submission_uuid: '0190e0a0-0000-7000-8000-000000000001', answers: {}, current_step: null, completeness_percent: null, last_saved_at: null, expires_at: null, baseline: null };
+        const editing = { id: 'sub-1', answers: {}, status: 'submitted', baseline: 'checksum-baseline-1', demotes_on_save: false };
+
+        expect(values(mountEncode(town({ draft })))).not.toContain('Pasig');
+        expect(values(mountEncode(town({ editing, update_url: '/submissions/sub-1/answers', draft_url: null })))).not.toContain('Pasig');
+    });
+});

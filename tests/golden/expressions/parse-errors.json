@@ -1,6 +1,6 @@
 [
   {"name":"err_unknown_function_contains","grammar_version":"2.0","expression":"contains(${a}, 'x')","context":{"answers":{}},"expected_error":"unknown_function"},
-  {"name":"err_unknown_function_sum","grammar_version":"2.0","expression":"sum(1, 2)","context":{"answers":{}},"expected_error":"unknown_function"},
+  {"name":"err_unknown_function_median","grammar_version":"2.0","expression":"median(1, 2)","context":{"answers":{}},"expected_error":"unknown_function"},
   {"name":"err_unknown_function_regex","grammar_version":"2.0","expression":"regex(${a}, '.+')","context":{"answers":{}},"expected_error":"unknown_function"},
   {"name":"err_malformed_reference_empty","grammar_version":"2.0","expression":"${} = 1","context":{"answers":{}},"expected_error":"malformed_reference"},
   {"name":"err_malformed_reference_badchar","grammar_version":"2.0","expression":"${a-b} = 1","context":{"answers":{}},"expected_error":"malformed_reference"},
@@ -41,5 +41,20 @@
   {"name":"err_boolean_selected_arg","grammar_version":"2.0","expression":"selected(selected(${a}, 'x'), 'y')","context":{"answers":{}},"expected_error":"non_value_operand"},
   {"name":"err_empty_expression","grammar_version":"2.0","expression":"   ","context":{"answers":{}},"expected_error":"empty_expression"},
   {"name":"err_expression_too_long","grammar_version":"2.0","expression_repeat":{"prefix":"${a} = 1 or ","times":400,"core":"${a} = 1","suffix":""},"context":{"answers":{}},"expected_error":"expression_too_long"},
+  {"name":"err_sum_no_arguments","grammar_version":"2.0","expression":"sum()","context":{"answers":{}},"expected_error":"arity_mismatch"},
+  {"name":"err_concat_no_arguments","grammar_version":"2.0","expression":"concat()","context":{"answers":{}},"expected_error":"arity_mismatch"},
+  {"name":"err_coalesce_one_argument","grammar_version":"2.0","expression":"coalesce(${a})","context":{"answers":{}},"expected_error":"arity_mismatch"},
+  {"name":"err_round_one_argument","grammar_version":"2.0","expression":"round(${a})","context":{"answers":{}},"expected_error":"arity_mismatch"},
+  {"name":"err_date_diff_two_arguments","grammar_version":"2.0","expression":"date_diff(${a}, ${b})","context":{"answers":{}},"expected_error":"arity_mismatch"},
+  {"name":"err_age_two_arguments","grammar_version":"2.0","expression":"age(${a}, ${b})","context":{"answers":{}},"expected_error":"arity_mismatch"},
+  {"name":"err_date_diff_unit_not_a_literal","grammar_version":"2.0","expression":"date_diff(${a}, ${b}, ${unit})","context":{"answers":{}},"expected_error":"invalid_argument"},
+  {"name":"err_date_diff_unknown_unit","grammar_version":"2.0","expression":"date_diff(${a}, ${b}, 'seconds')","context":{"answers":{}},"expected_error":"invalid_argument"},
+  {"name":"err_date_add_unknown_unit","grammar_version":"2.0","expression":"date_add(${a}, 1, 'day')","context":{"answers":{}},"expected_error":"invalid_argument"},
+  {"name":"err_round_places_not_a_literal","grammar_version":"2.0","expression":"round(${a}, ${p})","context":{"answers":{}},"expected_error":"invalid_argument"},
+  {"name":"err_round_places_out_of_range","grammar_version":"2.0","expression":"round(${a}, 11)","context":{"answers":{}},"expected_error":"invalid_argument"},
+  {"name":"err_round_places_not_whole","grammar_version":"2.0","expression":"round(${a}, 1.5)","context":{"answers":{}},"expected_error":"invalid_argument"},
+  {"name":"err_sum_boolean_argument","grammar_version":"2.0","expression":"sum(${a} > 1, 2)","context":{"answers":{}},"expected_error":"non_value_operand"},
+  {"name":"err_coalesce_boolean_argument","grammar_version":"2.0","expression":"coalesce(${a} = 1, 0)","context":{"answers":{}},"expected_error":"non_value_operand"},
+  {"name":"err_date_add_boolean_count","grammar_version":"2.0","expression":"date_add(${d}, ${a} > 1, 'days')","context":{"answers":{}},"expected_error":"non_value_operand"},
   {"name":"err_too_deeply_nested","grammar_version":"2.0","expression_repeat":{"prefix":"not(","times":65,"core":"${a} = 1","suffix":")"},"context":{"answers":{}},"expected_error":"too_deeply_nested"}
 ]

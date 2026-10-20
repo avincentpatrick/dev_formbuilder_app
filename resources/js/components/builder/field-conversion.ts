@@ -101,6 +101,10 @@ const CONFIG_SENTENCES: Record<string, string> = {
     prefill_source: 'Where its value comes from is removed.',
     url_param: 'The web-address setting that fills it in is removed.',
     calculated_formula: 'Its formula is removed.',
+    // M180 (`R-f77aa45d`): how a calculation's value is shown.
+    calculated_type: 'Its result type is removed.',
+    decimal_places: 'Its decimal places are removed.',
+    duration_unit: 'Its unit is removed.',
     capture_altitude: 'It no longer records height above sea level.',
     accuracy_threshold: 'Its accuracy target is removed.',
     default_center: 'Its default map centre is removed.',

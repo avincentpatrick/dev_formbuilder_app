@@ -509,22 +509,26 @@ it('hands the client the SUBMISSION\'S clock, not today, so both engines prune a
     $submission = seedEditable();
     $filedOn = now()->subYear();
     $submission->forceFill(['submitted_at' => $filedOn])->save();
+    // M180 (`D153`): stamped in the FORM'S zone, so `today()` is its calendar day — the same instant, Manila's offset.
+    $this->form->forceFill(['timezone' => 'Asia/Manila'])->save();
 
     $this->withoutVite()->actingAs($this->owner)
         ->get("http://acme.meridian.test/submissions/{$submission->id}/edit")
         ->assertInertia(fn ($page) => $page
             ->component('submissions/Encode', false)
-            ->where('version.now', $filedOn->toIso8601String()));
+            ->where('version.now', $filedOn->copy()->setTimezone('Asia/Manila')->toIso8601String()));
 });
 
 it('leaves the create page on the wall clock, so only editing replays', function (): void {
     // The control for the case above: a blank keying form must still stamp the real now, or a keyer working
     // near midnight gets a step list computed for the wrong day.
+    $this->form->forceFill(['timezone' => 'Asia/Manila'])->save();
+
     $this->withoutVite()->actingAs($this->owner)
         ->get("http://acme.meridian.test/forms/{$this->form->id}/submissions/create")
         ->assertInertia(fn ($page) => $page
             ->component('submissions/Encode', false)
-            ->where('version.now', fn (string $now): bool => abs(strtotime($now) - time()) < 120));
+            ->where('version.now', fn (string $now): bool => abs(strtotime($now) - time()) < 120 && str_ends_with($now, '+08:00')));
 });
 
 it('carries the concurrency baseline on the edit page', function (): void {

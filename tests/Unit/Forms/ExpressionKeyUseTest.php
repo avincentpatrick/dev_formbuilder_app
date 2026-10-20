@@ -59,3 +59,14 @@ it('tells an ordering from arithmetic, and an equality from a membership or a co
         ->and(keyUse('count(${k}) > 1', 'k'))->toMatchArray(['equality' => false, 'list' => true, 'ordering' => false])
         ->and(keyUse("selected(\${k}, 'a')", 'k'))->toMatchArray(['present' => true, 'equality' => false, 'list' => false]);
 });
+
+it('reads the new functions\' arguments as numbers, dates or pass-through values (M180)', function (): void {
+    expect(keyUse('sum(${k}, 2)', 'k'))->toMatchArray(['numeric' => true, 'arithmetic' => true, 'temporal' => false])
+        ->and(keyUse('round(${k}, 2)', 'k'))->toMatchArray(['numeric' => true, 'arithmetic' => true])
+        ->and(keyUse("date_add(\${d}, \${k}, 'days')", 'k'))->toMatchArray(['numeric' => true, 'arithmetic' => true, 'temporal' => false])
+        ->and(keyUse("date_add(\${d}, \${k}, 'days')", 'd'))->toMatchArray(['present' => true, 'temporal' => true, 'numeric' => false])
+        ->and(keyUse("date_diff(\${k}, today(), 'days')", 'k'))->toMatchArray(['temporal' => true, 'numeric' => false])
+        ->and(keyUse('age(${k}) >= 18', 'k'))->toMatchArray(['temporal' => true, 'ordering' => false])
+        ->and(keyUse('coalesce(${k}, 0)', 'k'))->toMatchArray(['present' => true, 'numeric' => false, 'temporal' => false])
+        ->and(keyUse("concat(\${k}, ' ')", 'k'))->toMatchArray(['present' => true, 'numeric' => false, 'list' => false]);
+});

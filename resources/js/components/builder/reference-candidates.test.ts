@@ -77,17 +77,30 @@ describe('referenceCandidates — a formula spot', () => {
         kinds: KINDS,
     };
 
-    it('offers every question a formula may name, later ones too, but not itself, a grid, a note or — before R4 — a calculation', () => {
-        const offered = referenceCandidates(source, { grammar: 'expression', ownKey: 'age' }).map((candidate) => candidate.key);
+    it('offers every question a formula may name — later ones and calculations too (D149) — but not itself, a grid or a note', () => {
+        const offered = referenceCandidates(source, { grammar: 'expression', ownKey: 'age' }).filter((candidate) => candidate.group !== DATE_GROUP).map((candidate) => candidate.key);
 
-        expect(offered).toEqual(['later', 'today()']);
+        expect(offered).toEqual(['total', 'later']);
     });
 
-    it('ends with Today, which writes today()', () => {
-        const offered = referenceCandidates(source, { grammar: 'expression', ownKey: null });
-        const today = offered[offered.length - 1];
+    it('ends with the dates — Today, then the ones worked out from it (R-da02fe03) — each writing its formula', () => {
+        const dates = referenceCandidates(source, { grammar: 'expression', ownKey: null }).filter((candidate) => candidate.group === DATE_GROUP);
 
-        expect([today.group, today.label, today.insert]).toEqual([DATE_GROUP, 'Today', 'today()']);
+        expect(dates.map((date) => [date.label, date.insert])).toEqual([
+            ['Today', 'today()'],
+            ['Yesterday', "date_add(today(), -1, 'days')"],
+            ['Tomorrow', "date_add(today(), 1, 'days')"],
+            ['N days from now', "date_add(today(), 7, 'days')"],
+            ['N days ago', "date_add(today(), -7, 'days')"],
+            ['One month from now', "date_add(today(), 1, 'months')"],
+        ]);
+        expect(new Set(dates.map((date) => date.key)).size).toBe(dates.length);
+    });
+
+    it('keeps the dates out of a text spot, which takes no functions', () => {
+        const offered = referenceCandidates(source, { grammar: 'template', host: { kind: 'confirmation' } });
+
+        expect(offered.some((candidate) => candidate.group === DATE_GROUP)).toBe(false);
     });
 });
 

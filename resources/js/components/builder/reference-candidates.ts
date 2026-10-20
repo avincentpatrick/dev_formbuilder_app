@@ -5,8 +5,8 @@
  * TWO GRAMMARS, TWO RULES, BOTH READ FROM TRANSMITTED FACTS:
  *   - a FORMULA spot (a calculation, a rule's expression, a condition as text) takes any question an expression may
  *     name — its operand kind `offered` (`OperandKind::offered()`: never a grid, a map, a note or a page break) — wherever
- *     it sits, since a formula may read a later answer. A calculation is left out: no condition, rule or calculation
- *     reads one before R4 (`D149`). "Today" is offered too; the other date presets need R4's date functions (`R-da02fe03`).
+ *     it sits, since a formula may read a later answer. Since M180 a calculation is offered too — conditions, rules and
+ *     other calculations read one (`D149`) — but never in its own formula. The date presets follow (`R-da02fe03`).
  *   - a TEXT spot (a label, help, a placeholder, a section's title or description, the thank-you message) takes only
  *     what the publish gate lets a template name — `pipeable` (`PipingEligibility`), and `TemplateScopeResolver`'s
  *     scope: a question strictly EARLIER than the text (positions `[section sequence | -1, sequence]`, a tie refused), and
@@ -45,7 +45,8 @@ export type TemplateHost =
     | { kind: 'section'; key: string }
     | { kind: 'confirmation' };
 
-export type ReferenceSpot = { grammar: 'expression'; ownKey: string | null } | { grammar: 'template'; host: TemplateHost };
+/** M180: `earlierOnly` — a Default value's formula, worked out once when the form opens, before any calculation and any later answer. */
+export type ReferenceSpot = { grammar: 'expression'; ownKey: string | null; earlierOnly?: boolean } | { grammar: 'template'; host: TemplateHost };
 
 export interface ReferenceSource {
     fields: ReferenceField[];
@@ -68,6 +69,18 @@ export interface ReferenceCandidate {
 export const LEAD_GROUP = 'Not in a section';
 export const DATE_GROUP = 'Dates';
 export const TODAY: ReferenceCandidate = { key: 'today()', label: 'Today', group: DATE_GROUP, insert: 'today()' };
+
+/** M180 (`R-da02fe03`): Today, then the dates worked out from it — a formula spot's last group. A number to change is 7. */
+export const DATES: ReferenceCandidate[] = [
+    TODAY,
+    ...([
+        ['Yesterday', "date_add(today(), -1, 'days')"],
+        ['Tomorrow', "date_add(today(), 1, 'days')"],
+        ['N days from now', "date_add(today(), 7, 'days')"],
+        ['N days ago', "date_add(today(), -7, 'days')"],
+        ['One month from now', "date_add(today(), 1, 'months')"],
+    ] as const).map(([label, insert]): ReferenceCandidate => ({ key: insert, label, group: DATE_GROUP, insert })),
+];
 
 type Position = [number, number];
 
@@ -92,7 +105,14 @@ export function referenceCandidates(source: ReferenceSource, spot: ReferenceSpot
             const kind = typeOf(field)?.operand_kind;
             const row = source.kinds?.find((candidate) => candidate.value === kind);
 
-            return field.key !== spot.ownKey && kind !== undefined && kind !== 'computed' && (row === undefined || row.offered);
+            if (spot.earlierOnly === true) {
+                const own = source.fields.find((candidate) => candidate.key === spot.ownKey);
+                if (kind === 'computed' || own === undefined || !precedes(positionOf(field), positionOf(own))) {
+                    return false;
+                }
+            }
+
+            return field.key !== spot.ownKey && kind !== undefined && (row === undefined || row.offered);
         };
     } else {
         const host = hostScope(spot.host, source, sectionById);
@@ -122,7 +142,7 @@ export function referenceCandidates(source: ReferenceSource, spot: ReferenceSpot
         };
     });
 
-    return spot.grammar === 'expression' ? [...candidates, TODAY] : candidates;
+    return spot.grammar === 'expression' ? [...candidates, ...DATES] : candidates;
 }
 
 function hostScope(

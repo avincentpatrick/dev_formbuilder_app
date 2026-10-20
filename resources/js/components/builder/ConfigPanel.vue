@@ -33,6 +33,8 @@ import CascadingEditor from './CascadingEditor.vue';
 import ChoicesEditor from './ChoicesEditor.vue';
 import ConditionEditor from './ConditionEditor.vue';
 import ReferenceInput from './ReferenceInput.vue';
+import CalculationEditor from './CalculationEditor.vue';
+import type { CalculationQuestion } from './calculation-presets';
 import ContentBlocksEditor from './ContentBlocksEditor.vue';
 import FieldTypeControl from './FieldTypeControl.vue';
 import GeoEditor from './GeoEditor.vue';
@@ -45,6 +47,7 @@ import MediaEditor from './MediaEditor.vue';
 import PrefillEditor from './PrefillEditor.vue';
 import ValidationEditor from './ValidationEditor.vue';
 import { referenceCandidates, type ReferenceSource } from './reference-candidates';
+import { TAKES_NO_DEFAULT } from '../../../public-runtime/lib/defaults';
 import type { ContentBlock } from './content-blocks';
 import { describeSavePath, freeKeyFor, sortFieldSaveErrors, tabForSavePath } from './field-save-errors';
 import { LABEL_COUNT_FROM, LABEL_MAX, oneLine } from './label-text';
@@ -296,7 +299,16 @@ const layoutSelectOptions = computed<EnumOption[]>(() => [
 ]);
 const advanced = computed(() => (field.value ? advancedTypes.has(field.value.field_type) : false));
 const isCalculated = computed(() => field.value?.field_type === 'calculated');
-const calculatedFormula = computed<string>(() => (field.value?.config.calculated_formula as string | undefined) ?? '');
+// M180 (`R-f77aa45d`) — the questions a calculation's presets may read: every other question, in canvas order.
+const calculationQuestions = computed<CalculationQuestion[]>(() => {
+    const sequenceOf = new Map(props.store.sections.value.map((s) => [s.id, s.sequence]));
+    const position = (f: LocalField): [number, number] => [f.form_section_id === null ? -1 : (sequenceOf.get(f.form_section_id) ?? -1), f.sequence];
+
+    return props.store.fields.value
+        .filter((f) => f.key !== '' && f.key !== field.value?.key)
+        .sort((a, b) => position(a)[0] - position(b)[0] || position(a)[1] - position(b)[1])
+        .map((f) => ({ key: f.key, label: f.label, fieldType: f.field_type }));
+});
 const choices = computed<Choice[]>(() => (field.value?.config.options as Choice[] | undefined) ?? []);
 // A cascading field keeps its LEVELS + parented OPTIONS under distinct config keys (Increment G4a).
 const cascadeLevels = computed<CascadeLevel[]>(() => (field.value?.config.levels as CascadeLevel[] | undefined) ?? []);
@@ -392,10 +404,40 @@ const formulaReferences = computed(() => referenceCandidates(referenceSource.val
 const fieldTextReferences = computed(() => (field.value === null ? [] : referenceCandidates(referenceSource.value, { grammar: 'template', host: { kind: 'field', key: field.value.key } })));
 const sectionTextReferences = computed(() => (section.value === null ? [] : referenceCandidates(referenceSource.value, { grammar: 'template', host: { kind: 'section', key: section.value.key } })));
 
+// M180 (`R-20784770`, `R-fa3223d9`, `D154`) — the Default value: Fixed (an answer typed, or a choice's own option) or Formula
+// (worked out once when the form opens, with the picker over the questions before this one and the dates). Switching
+// clears the value, so a formula never sits in a fixed box. A question that takes no default has no box.
+const takesDefault = computed(() => field.value !== null && !TAKES_NO_DEFAULT.has(field.value.field_type));
+const defaultReferences = computed(() => (field.value === null ? [] : referenceCandidates(referenceSource.value, { grammar: 'expression', ownKey: field.value.key, earlierOnly: true })));
+const defaultKindOptions = [{ value: 'fixed', label: 'Fixed' }, { value: 'formula', label: 'Formula' }];
+const defaultChoices = computed<EnumOption[] | null>(() => {
+    const current = field.value;
+    if (current === null) return null;
+    if (current.field_type === 'yes_no') return [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
+    const options = current.config.options;
+    if (!['single_select', 'dropdown', 'likert_scale'].includes(current.field_type) || current.config.options_source != null || !Array.isArray(options) || options.length === 0) return null;
+
+    return (options as Array<{ value: string; label?: string }>).map((option) => ({ value: option.value, label: option.label || option.value }));
+});
+function setDefaultKind(kind: string): void {
+    const target = field.value;
+    if (!target) return;
+    target.default_value_is_expression = kind === 'formula';
+    target.default_value = null;
+    props.store.touch(target.uid, 'field');
+}
+
 function setField<K extends keyof LocalField>(key: K, value: LocalField[K]): void {
     const target = field.value;
     if (!target) return;
     target[key] = value;
+    props.store.touch(target.uid, 'field');
+}
+/** Several config keys as ONE edit — one save, one undo step (the calculation editor's patches). */
+function patchConfig(patch: Record<string, unknown>): void {
+    const target = field.value;
+    if (!target) return;
+    target.config = { ...target.config, ...patch };
     props.store.touch(target.uid, 'field');
 }
 function setConfig(key: string, value: unknown): void {
@@ -574,21 +616,18 @@ watch(librarySaved, (value) => {
                                 @update:model-value="setField('label', oneLine($event))"
                             />
                         </MdsFormField>
-                        <MdsFormField
+                        <!-- M180 (`R-f77aa45d`): Type, Build it / Formula and the formula — CalculationEditor.vue. -->
+                        <CalculationEditor
                             v-if="isCalculated"
-                            label="Calculation formula" :error="fieldSaveErrors.inline['config.calculated_formula']"
-                            help="Worked out from other answers. Click Insert a question, or type @, to use another question's answer, and use + - * /, comparisons, or if(), count(), int(), today() and now()."
-                            v-slot="{ id, describedby, invalid }"
-                        >
-                            <ReferenceInput
-                                :id="id" :candidates="formulaReferences"
-                                :describedby="describedby" :invalid="invalid"
-                                :model-value="calculatedFormula"
-                                :rows="2"
-                                placeholder="e.g. ${quantity} * ${unit_price}"
-                                @update:model-value="setConfig('calculated_formula', $event || null)"
-                            />
-                        </MdsFormField>
+                            :key="field.uid"
+                            :config="field.config"
+                            :questions="calculationQuestions"
+                            :candidates="formulaReferences"
+                            :formula-error="fieldSaveErrors.inline['config.calculated_formula']"
+                            :places-error="fieldSaveErrors.inline['config.decimal_places']"
+                            :unit-error="fieldSaveErrors.inline['config.duration_unit']"
+                            @patch="patchConfig($event)"
+                        />
                         <MdsFormField label="Help text" :error="fieldSaveErrors.inline.hint" v-slot="{ id, describedby, invalid }">
                             <ReferenceInput
                                 :id="id" :describedby="describedby" :invalid="invalid" :candidates="fieldTextReferences"
@@ -797,13 +836,40 @@ watch(librarySaved, (value) => {
                             </p>
                             <MdsButton size="sm" variant="secondary" @click="setField('appearance', null)">Remove appearance</MdsButton>
                         </div>
-                        <MdsFormField label="Default value" :error="fieldSaveErrors.inline.default_value" v-slot="{ id, describedby, invalid }">
-                            <MdsTextInput
-                                :id="id" :describedby="describedby" :invalid="invalid"
-                                :model-value="field.default_value ?? ''"
-                                @update:model-value="setField('default_value_is_expression', false); setField('default_value', $event || null)"
+                        <div v-if="takesDefault" class="config__default">
+                            <MdsSegmentedControl
+                                compact
+                                :model-value="field.default_value_is_expression ? 'formula' : 'fixed'"
+                                :options="defaultKindOptions"
+                                ariaLabel="Default value kind"
+                                @update:model-value="setDefaultKind($event)"
                             />
-                        </MdsFormField>
+                            <MdsFormField
+                                label="Default value"
+                                :help="field.default_value_is_expression ? 'Worked out once, when the form opens. Click Insert a question, or type @, to use an earlier answer or a date.' : 'Filled in when the form opens. The respondent can change it.'"
+                                :error="fieldSaveErrors.inline.default_value"
+                                v-slot="{ id, describedby, invalid }"
+                            >
+                                <ReferenceInput
+                                    v-if="field.default_value_is_expression"
+                                    :id="id" :describedby="describedby" :invalid="invalid" :candidates="defaultReferences" :rows="2"
+                                    :model-value="field.default_value ?? ''" placeholder="e.g. today()"
+                                    @update:model-value="setField('default_value', $event || null)"
+                                />
+                                <MdsSelect
+                                    v-else-if="defaultChoices !== null"
+                                    :id="id" :describedby="describedby" :invalid="invalid" :options="defaultChoices" placeholder="No default"
+                                    :model-value="field.default_value ?? ''"
+                                    @update:model-value="setField('default_value', $event || null)"
+                                />
+                                <MdsTextInput
+                                    v-else
+                                    :id="id" :describedby="describedby" :invalid="invalid"
+                                    :model-value="field.default_value ?? ''"
+                                    @update:model-value="setField('default_value', $event || null)"
+                                />
+                            </MdsFormField>
+                        </div>
                         <div class="config__checks">
                             <MdsCheckbox
                                 :model-value="field.is_pii"
@@ -1046,6 +1112,12 @@ watch(librarySaved, (value) => {
     display: flex;
     flex-direction: column;
     gap: var(--mds-space-1);
+}
+/* M180: the Default value — its Fixed · Formula switch above its box. */
+.config__default {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-2);
 }
 
 /* Save-to-library affordance (Increment G9b) — set off from the field settings above it. */

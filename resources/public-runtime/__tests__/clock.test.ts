@@ -54,6 +54,17 @@ describe('the session clock', () => {
         expect(isoClock(at)).toBe('2026-12-31T23:59:59+00:00');
     });
 
+    it('stamps the FORM\'S zone when given one, so today() is the form\'s calendar day (M180, D153)', () => {
+        // 23:30 UTC on the 20th is 07:30 on the 21st in Manila — the server's FormClock::at() says the same.
+        expect(isoClock(new Date(Date.UTC(2026, 9, 20, 23, 30, 0)), 'Asia/Manila')).toBe('2026-10-21T07:30:00+08:00');
+        expect(isoClock(new Date(Date.UTC(2026, 6, 11, 9, 30, 0)), 'America/New_York')).toBe('2026-07-11T05:30:00-04:00');
+        expect(isoClock(new Date(Date.UTC(2026, 6, 11, 9, 30, 0)), 'UTC')).toBe('2026-07-11T09:30:00+00:00');
+    });
+
+    it('falls back to UTC for a zone the browser does not know', () => {
+        expect(isoClock(new Date(Date.UTC(2026, 6, 11, 9, 30, 0)), 'Mars/Olympus_Mons')).toBe('2026-07-11T09:30:00+00:00');
+    });
+
     it('threads the clock into SemanticInput, and keeps null when none is given', () => {
         const engineSchema = { fields: [], sections: [], validations: [] };
 

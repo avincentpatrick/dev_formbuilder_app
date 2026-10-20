@@ -13,6 +13,7 @@ use App\Models\FormField;
 use App\Models\FormVersion;
 use App\Services\Expressions\Coercion;
 use App\Services\Expressions\ExpressionParser;
+use App\Services\Validation\CalculationOrder;
 use App\Services\Validation\StructuredRuleEvaluator;
 
 /**
@@ -105,7 +106,7 @@ final class ExpressionValidationGate
             $violations[] = $this->capture(fn () => $this->assertRuleValue($validation->rule_type, (string) ($validation->rule_value ?? ''), $ownerKey));
         }
 
-        $violations = array_values(array_filter([...$violations, ...$this->orderingViolations($version)]));
+        $violations = array_values(array_filter([...$violations, ...$this->orderingViolations($version), ...$this->calculationCycleViolations($fields)]));
 
         if ($violations !== []) {
             throw PublishValidationException::several($violations);
@@ -308,5 +309,97 @@ final class ExpressionValidationGate
         }
 
         return array_values(array_filter($violations));
+    }
+
+    /**
+     * Every calculation that uses its own value, directly or through other calculations (M180, `R-39dbce5b`, `D149`).
+     * Both engines work calculations out in dependency order ({@see CalculationOrder}), so such a calculation is never
+     * worked out and stays blank in every submission — refused here, one refusal per loop, naming every calculation in
+     * it. A calculation that only USES one of them is blank too, but is not reported: fixing the loop fixes it.
+     *
+     * ⚠️ APPENDED, AND THE CALL FOLDED INTO THE EXISTING `$violations` LINE, ON PURPOSE — this file is cited by line.
+     * A formula that does not parse names nothing here; {@see check()} has already refused it.
+     *
+     * @param  iterable<FormField>  $fields
+     * @return list<PublishValidationException>
+     */
+    private function calculationCycleViolations(iterable $fields): array
+    {
+        /** @var list<array{key: string, formula: ?string}> $calculations */
+        $calculations = [];
+        /** @var array<string, list<string>> $dependencies */
+        $dependencies = [];
+        foreach ($fields as $field) {
+            if ($field->field_type !== FieldType::Calculated) {
+                continue;
+            }
+
+            $formula = $this->calculateFormula($field);
+            $formula = $formula === null || trim($formula) === '' ? null : $formula;
+            $calculations[] = ['key' => $field->key, 'formula' => $formula];
+            $dependencies[$field->key] = $formula === null ? [] : $this->references($formula);
+        }
+
+        $workedOut = array_flip(CalculationOrder::order($calculations, fn (string $formula): array => $this->references($formula)));
+
+        /** @var array<string, true> $never */
+        $never = [];
+        foreach ($calculations as $calculation) {
+            if ($calculation['formula'] !== null && ! isset($workedOut[$calculation['key']])) {
+                $never[$calculation['key']] = true;
+            }
+        }
+
+        // The calculations each one reaches through the others never worked out; a loop is the set that reach each other.
+        $reach = [];
+        foreach (array_keys($never) as $start) {
+            $seen = [];
+            $stack = [$start];
+            while ($stack !== []) {
+                $key = array_pop($stack);
+                foreach ($dependencies[$key] ?? [] as $next) {
+                    if (isset($never[$next]) && ! isset($seen[$next])) {
+                        $seen[$next] = true;
+                        $stack[] = $next;
+                    }
+                }
+            }
+            $reach[$start] = $seen;
+        }
+
+        $violations = [];
+        $reported = [];
+        foreach ($calculations as $calculation) {
+            $key = $calculation['key'];
+            if (! isset($never[$key]) || isset($reported[$key]) || ! isset($reach[$key][$key])) {
+                continue;
+            }
+
+            $loop = [];
+            foreach ($calculations as $other) {
+                if (isset($reach[$key][$other['key']], $reach[$other['key']][$key])) {
+                    $loop[] = $other['key'];
+                    $reported[$other['key']] = true;
+                }
+            }
+
+            $violations[] = PublishValidationException::calculationCycle($loop);
+        }
+
+        return $violations;
+    }
+
+    /**
+     * The keys a formula names, or none when it does not parse.
+     *
+     * @return list<string>
+     */
+    private function references(string $formula): array
+    {
+        try {
+            return $this->parser->referencedKeys($this->parser->parse($formula));
+        } catch (ExpressionSyntaxException) {
+            return [];
+        }
     }
 }

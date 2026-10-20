@@ -456,7 +456,7 @@ quote it*, now on its fourth gate.
   respondent can be on step 5 having never seen step 3). Put that rule in §3.9 before generalising.
   Migrating it puts **17 assertions** at risk across `resources/public-runtime/__tests__/components.test.ts`
   and `public-runtime-axe.spec.ts`, inside a separate Vue SPA that imports eight design-system components.
-  The second consumer is `Pages/submissions/Encode.vue:933-935` — a bare `p aria-live="polite"` reading
+  The second consumer is `Pages/submissions/Encode.vue:935-937` — a bare `p aria-live="polite"` reading
   "Step 3 of 5" with no landmark and no navigable steps, pinned by nine assertions in `encode.test.ts`.
 
 - **A `--mds-person-identity-*` scale** — `MdsAvatar` is monochrome, and DSR §3.12 records why reusing the
@@ -672,7 +672,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   👤 **What is left is a decision, and it is filed rather than guessed**, because the component-level fix
   touches 13 call sites and the only instrument that can settle it is an e2e run in the container. ⚠️ **A
   fourth option nobody had raised**: `Settings/Index.vue` already solves this at the HOST, with a comment
-  saying so, and three call sites are guarded by it today. Corrected by `M87`. ✅ **CLOSED BY `M109` (2026-09-25), BESIDE `R-6c429d4e` UNDER RECORDED `D13` EXCEPTION #2** — `flex-wrap: wrap` on the hosted control, declared at each of the four stretch-clamped hosts, which is `D28`'s chosen option 3 with the illustration its own row corrects. Every CSS claim above verified against the source. ⚠️ **Two citations had drifted and are repaired here:** the Requiredness control is at `ConfigPanel.vue:314-322` (cited `307-312`) and `.config` at `:557-564` (cited `546-553`). ⛔ **THE 30px IS UN-STRUCK, AND IT IS EXACTLY 30.** This row struck the figure as unprovenanced and `D28:1603` agreed — *"no test, fixture or snapshot records it"*. The new element-level assertion on `.config` measured the spill at **30px** on the first run that could see it, which is the first provenance the number has ever had. ⛔ **AND THE ASSERTION IS LIVE AT ONE PROJECT OF THREE — MEASURED, NOT ASSUMED.** With the `.config__group` rule deliberately disarmed and the build regenerated, the case is **CAUGHT at `mobile` (30px)** and **SURVIVES at `desktop` and `tablet`**, where the pane is wide enough that the control fits. A green run on the two wide projects proves nothing about this defect, which is exactly the property `assertNoHorizontalOverflow` lacks here: `.config` is `overflow-y: auto`, so `overflow-x` computes to `auto`, and the document-level gate files the spill as `absorbed` — `axe.ts:183-191` already named this control as that case. ⚠️ **The first version of the assertion was vacuous and its own guard caught it:** the builder is compact at `extra_large` even on the desktop project, so after `forcePersonalization` the config pane was no longer on screen, where `.config` is still in the DOM and `scrollWidth - clientWidth` reads 0. The guard is now `toBeVisible`, not `toHaveCount(1)`. ➕ **Filed rather than fixed:** three of the four host rules — `.mds-field`, `.sheets-fields`, `.encode-field` — ship with no assertion of their own.
+  saying so, and three call sites are guarded by it today. Corrected by `M87`. ✅ **CLOSED BY `M109` (2026-09-25), BESIDE `R-6c429d4e` UNDER RECORDED `D13` EXCEPTION #2** — `flex-wrap: wrap` on the hosted control, declared at each of the four stretch-clamped hosts, which is `D28`'s chosen option 3 with the illustration its own row corrects. Every CSS claim above verified against the source. ⚠️ **Two citations had drifted and are repaired here:** the Requiredness control is at `ConfigPanel.vue:326-334` (cited `307-312`) and `.config` at `:599-606` (cited `546-553`). ⛔ **THE 30px IS UN-STRUCK, AND IT IS EXACTLY 30.** This row struck the figure as unprovenanced and `D28:1603` agreed — *"no test, fixture or snapshot records it"*. The new element-level assertion on `.config` measured the spill at **30px** on the first run that could see it, which is the first provenance the number has ever had. ⛔ **AND THE ASSERTION IS LIVE AT ONE PROJECT OF THREE — MEASURED, NOT ASSUMED.** With the `.config__group` rule deliberately disarmed and the build regenerated, the case is **CAUGHT at `mobile` (30px)** and **SURVIVES at `desktop` and `tablet`**, where the pane is wide enough that the control fits. A green run on the two wide projects proves nothing about this defect, which is exactly the property `assertNoHorizontalOverflow` lacks here: `.config` is `overflow-y: auto`, so `overflow-x` computes to `auto`, and the document-level gate files the spill as `absorbed` — `axe.ts:183-191` already named this control as that case. ⚠️ **The first version of the assertion was vacuous and its own guard caught it:** the builder is compact at `extra_large` even on the desktop project, so after `forcePersonalization` the config pane was no longer on screen, where `.config` is still in the DOM and `scrollWidth - clientWidth` reads 0. The guard is now `toBeVisible`, not `toHaveCount(1)`. ➕ **Filed rather than fixed:** three of the four host rules — `.mds-field`, `.sheets-fields`, `.encode-field` — ship with no assertion of their own.
 
 ### Connectors & webhooks
 
@@ -1152,7 +1152,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   sentence **byte-identical**, which makes this a narrowing rather than a rewrite. Filed by `M14`.
   ✅ **THE ROW WAS RIGHT AND THE CODEBASE ALREADY AGREED WITH IT.** *"…no longer available"* has three
   first-party sites and the other two are bound to a real 404 — `GuestDraftResumeController.php` emits it
-  as `404 draft_not_found`, and `App.vue:236-242` emits its variant only behind `kind === 'terminal'`. This
+  as `404 draft_not_found`, and `App.vue:239-245` emits its variant only behind `kind === 'terminal'`. This
   was the sole site saying it without having established the cause, and the fix needed nothing new:
   `error instanceof ApiError` is the discriminator this component already uses 76 lines below the defect.
   ⚠️ **Its citation had rotted by 33 lines** — `handleDrift` is at `:193-201`; `:160-168` is the `onMounted`
@@ -1249,7 +1249,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M15` (2026-08-26) — `major` · ~~The device-wide outbox is mounted above the phase machine
   on an unauthenticated page.~~** Filed 2026-08-25. **Every file:line in the row was verified before it was
   planned against, and four of six had drifted** — all of them caused by M14 growing `App.vue`:
-  `<SyncStatus />` is at `App.vue:460` inside `.app-shell__banner` (`:458-461`), not `:382-386`; the kiosk
+  `<SyncStatus />` is at `App.vue:463` inside `.app-shell__banner` (`:461-464`), not `:385-389`; the kiosk
   threat note is `outbox.ts:12`, not `:9-18`; the cross-form rationale is `:175-177`, not `:180-186`;
   `canDiscard` on `needs_attention` is `outbox-status.ts:128`, not `:123-130`. **As built:** a *visit* — a
   UUIDv7 in `sessionStorage`, rotated on "Submit another response" and after ten minutes of idle — is
@@ -1263,7 +1263,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (`SubmissionOutbox.vue:161`), on a cross-form **conflict** row. But the sweep found **two exposures the
   row never named**: (a) `useSyncOutbox.conflictRow()` bypasses the `listSubmissions` answer-scrub
   (`outbox.ts:181-183`, *"nothing that renders a list should be handed answer data at all"*) and hands the
-  raw row to `App.vue:384`, which seeds a fill session with `row.answers` — so **Review rendered a
+  raw row to `App.vue:387`, which seeds a fill session with `row.answers` — so **Review rendered a
   stranger's answers field by field**, two clicks from an always-visible banner; and (b)
   `useSyncOutbox.ts:127-128` writes *"Response sent — reference …"* into an `aria-live` region, so a
   background replay of an earlier respondent's row **read their server reference aloud**. Eight-for-eight on
@@ -1271,7 +1271,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ **THE ROW'S "PRE-EXISTING vs NEW" SPLIT IS PARTLY TRUE, AND VERIFYING IT DECIDED THE SCOPE.** Review
   genuinely is pre-existing (G8c, `6211916`, 2026-07-16, PR #41) and was reachable by a second respondent
   from that day. But **destroying a stranger's parked answers was also already possible pre-I10d**, via
-  Review → *"Discard this response instead"* (`App.vue:406-428`); what I10d added is Discard *without*
+  Review → *"Discard this response instead"* (`App.vue:409-431`); what I10d added is Discard *without*
   entering review. And **the server reference did not persist on the device at all before I10d** —
   `markSynced()` used to *delete* the row — so the single most identifying datum in the list is new. The
   practical consequence: hiding the LIST without scoping `listConflicts`/`conflictRow`/`conflictHere` would
@@ -1319,7 +1319,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the previous respondent's queued photo or signature onto this submission, its docblock having claimed
   *"still-unassigned"* since G8b while the `.modify()` never filtered on it; M21 narrows that write too.
   ⚠️ **Six of its ten citations had drifted forward** (`db.ts:127`→`:130`/`:139`; the three `clear()` sites
-  `:262/:313/:344`→`:267/:322/:353`; the banner `:471`→`:481`; `App.vue:230`→`:249`). Every claim was true;
+  `:262/:313/:344`→`:267/:322/:353`; the banner `:471`→`:481`; `App.vue:233`→`:252`). Every claim was true;
   the line numbers were not. Full reasoning in `docs/adr/0021-respondent-scoped-device-outbox.md`, amended. Filed by `M15`.
 
 - ~~**`minor` · `reconcile.ts:43`'s local-wins note tells a respondent a stranger's answers are theirs.**~~
@@ -7313,12 +7313,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `M72` tenants-column row, and this is the DEFAULT half, which is not. ⚠️ It is also the single live drift
   the deferred documented-literal gate would find, so the two are worth taking together. **Live.** Filed by `M78`.
 
-- **`minor` · `forms.timezone` is documented as defaulting to NULL and the database defaults it to `'UTC'`.**
+- ✅ **CLOSED BY `M180` (2026-10-20) — ****`minor` · `forms.timezone` is documented as defaulting to NULL and the database defaults it to `'UTC'`.**
   Measured by `M78`'s fan-out (2026-09-06) against the live schema; the default is set in the
   add-schedule-to-forms migration. ⚠️ **Filed separately from the `tenants.status` row because it hides in a
   different bucket**: the documented cell reads `NULL`, so a literal-vs-literal comparison skips it entirely
   and only a NULL-policy rule can see it. A gate built for the literal half alone would still miss this
-  one. **Live.** Filed by `M78`. **Tier: after-launch.**
+  one. **Live.** Filed by `M78`. **Tier: after-launch.** ✅ **CLOSED BY `M180` (2026-10-20):** the cell now reads `varchar(64)`, not null, `'Asia/Manila'` — the default `M180` set (`D153`), with what the column now decides. Built and held for merge point 3 (`D137`), not yet live.
 
 - **`minor` · Two columns are documented under the wrong table in the data dictionary.** Measured by `M78`'s
   fan-out (2026-09-06). `draft_expires_at` and `draft_current_step` are documented inside the
@@ -8281,7 +8281,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   it falsifies a dated record. **The prescribed sequence is not available.** The ceiling therefore moves
   17 → 18 — a raise, which the constant permits with the reason stated, and the reason is that the ledger
   did not change at all. The resolver got better and the rot was always there.
-  ⚠️ **THE ROW'S FLAGSHIP TIER-1 INSTANCE IS ALIVE.** `Pages/submissions/Encode.vue:933` resolves and
+  ⚠️ **THE ROW'S FLAGSHIP TIER-1 INSTANCE IS ALIVE.** `Pages/submissions/Encode.vue:935` resolves and
   line 897 is not blank, so widening leaves tier 1 at **0 rotten** and buys zero new tier-1 detections.
   That citation is substantively wrong — it describes a control ~350 lines away — but that is the class
   this gate cannot see by design, and an open row already owns it.
@@ -9129,9 +9129,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ~~**`minor` · Four PHP-enum mirrors live in Vue SFCs and one adds a member its enum does not have, and the
   new mirror gate cannot reach any of them.**~~ Measured by `M89` (2026-09-10) while building
   `DocumentedEnumMirrorDriftTest`. The gate declares twenty mirrors across `.ts` and `.d.ts` files; the
-  census also found unions inside `.vue` files — `resources/js/components/submissions/FieldInput.vue:129`
+  census also found unions inside `.vue` files — `resources/js/components/submissions/FieldInput.vue:130`
   (`prefill`) and `:156` (`RequiredMarker`) — plus
-  `resources/public-runtime/composables/useFormRuntime.ts:61`'s `Marker`. ⛔ **`RequiredMarker` and `Marker`
+  `resources/public-runtime/composables/useFormRuntime.ts:62`'s `Marker`. ⛔ **`RequiredMarker` and `Marker`
   each carry a `none` that `RequiredMode` does not**, so they are near-mirrors rather than mirrors and a
   set-equality gate would redden on arrival; whether the extra member is a rendering concern or a
   vocabulary divergence is the question nobody has answered. ⚠️ **A fourth copy of `bot_challenge` sits in
@@ -11264,7 +11264,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ~~**`major` · Every `config` key that `UpdateFieldRequest::configRules()` does not enumerate is silently dropped
   on every field save, with a 200 OK.**~~ Filed 2026-09-25 by `M110` from a user-directed exploration of the running
   system, whose report was *"some of the input types are not working properly or not saving when I click publish"*.
-  `UpdateFieldRequest.php:63` declares `config` as `present, array` **alongside** nested `config.*` rules, and
+  `UpdateFieldRequest.php:65` declares `config` as `present, array` **alongside** nested `config.*` rules, and
   Laravel's `Validator::$excludeUnvalidatedArrayKeys` defaults to `true` (`Factory.php:74`), so `validated()`
   skips the top-level key (`Validator.php:659-664`) and rebuilds `config` from the enumerated paths only.
   `FormBuilderService::writeField()` then whole-column-replaces with the result. ⛔ **THIS IS REACHABLE DATA LOSS, NOT A
@@ -11328,7 +11328,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   come from `BuilderPresenter::enums()`, which is `ucfirst` over an underscore replacement. ⚠️ **The app already
   knows how to do both, two tabs away:** `ConditionRow.vue:180-210` ships `has at least`, `is blank`,
   `does not include`, and filters by context. The validation editor simply never got it. ⛔ **One paired change
-  must ship in the same increment or this is a net weakening:** `Encode.vue:1263` has no `novalidate` while
+  must ship in the same increment or this is a net weakening:** `Encode.vue:1265` has no `novalidate` while
   `PageView.vue:144` and `StepView.vue:203` do, so a bad email is rejected for a staff keyer and accepted from a
   respondent on the same form. Adding `novalidate` aligns them and removes the only enforcement that exists —
   which is safe only once the per-type `pattern` defaults land beside it. **Live.** Filed by `M110`.
@@ -11338,7 +11338,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   should open writes the wrong thing.~~** Filed 2026-09-25 by `M110`, from the report *"can we make that a radio
   button and then show the condition settings when the user selected the conditional instead of going to the
   validation tab and creating rules"*. Requiredness is an `MdsSegmentedControl` in the **Basics** tab
-  (`ConfigPanel.vue:314-322`); the condition editor is in **Advanced** (`:426-432`), with no path between them.
+  (`ConfigPanel.vue:326-334`); the condition editor is in **Advanced** (`:468-474`), with no path between them.
   ⛔ **BUT THE LITERAL READING OF THE REQUEST BUILDS THE WRONG FEATURE.** The Advanced editor writes
   `relevant_expression`, which **hides** a field; `RequiredMode::Conditional` **requires** it. Confirmed at
   `SemanticValidator::requiredState()` (`:1403-1420`): `Conditional` is honoured only where a `required_*` unit
@@ -11443,11 +11443,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   being incomplete, and never paper over a gap — it substitutes a legible placeholder and records an issue, which
   is also how *"show what is wrong to the user"* gets delivered **before** publish rather than at it. ⛔ **One of
   the eight draft-only states is load-bearing and the rest are bookkeeping:** `safeEvaluate()`
-  (`useFormRuntime.ts:310-319`) catches a parser throw, degrades the **whole form** to everything-relevant, and
+  (`useFormRuntime.ts:323-332`) catches a parser throw, degrades the **whole form** to everything-relevant, and
   sets `engineFailed` permanently true for the session. A half-typed condition must therefore be pre-parsed and
   emitted as `null`, never handed to the engine. ✅ `condition-model.ts:85` already exports a bare
   `parseExpression()`, so that check is a direct call and not a second parser. **Live.** Filed by `M110`.
-  **Tier: early-testing.** ✅ **CLOSED BY `M112` (2026-09-26) — `B6`, AND IT SHIPPED A GATE THE ROW DID NOT ASK FOR.** `resources/js/components/builder/draft-snapshot.ts` exports `projectDraft()`, which creates one new file and edits none. ✅ **EVERY CITATION HELD.** `condition-model.ts:85` does export a bare `parseExpression()`, so the pre-parse is a direct call and not a second parser; `useFormRuntime.ts:310-319`'s `safeEvaluate()` does catch a parser throw, degrade the WHOLE FORM to everything-relevant and latch `engineFailed` true for the session — which is what makes the pre-parse load-bearing rather than tidy. ⛔ **A SHAPE GAP THE ROW DOES NOT MENTION, MEASURED AT SOURCE RATHER THAN INFERRED: the builder's model is missing EVERY translation column the runtime's model requires.** `ServerField` carries no `label_translations`, `hint_translations` or `default_value_is_expression`; `ServerSection` carries no `label_translations`/`description_translations`; `BuilderValidation` carries no `error_message_translations`, `logic_group_ordinal` or `logic_operator` — while `RawField`, `RawSection` and `RawValidation` require all of them. A grep of `BuilderPresenter.php` finds **no `*_translations` key at all**. They are synthesized as `null`, so **the preview renders the default locale only** — filed below rather than left for `B7` to discover. ✅ **`shape` EXCLUDES LABELS, HINTS, PLACEHOLDERS AND TRANSLATIONS BY CONSTRUCTION, AND INCLUDES OPTION *VALUES* BUT NOT OPTION *LABELS*** — the property `B7` depends on to rebuild the runtime on structural change rather than on every keystroke, asserted in both directions so neither half can pass trivially. ⛔ **THE REAL DELIVERABLE IS `tests/Feature/Docs/DraftProjectionMirrorDriftTest.php`**, which turns a hand-mirror into a guarded one — this repository has ten unguarded ones in this very area. **It catches the gap TypeScript cannot:** an OPTIONAL member added to `RawField` compiles clean while the projection silently omits it, proved by mutation. ⚠️ **AND THE GATE CAUGHT A DEFECT IN ITSELF ON ITS FIRST RUN** — `key,` and `config,` are ES shorthand, so a colon-only regex silently missed two of `RawField`'s seventeen members; it now matches both forms and holds a measured member-count floor. ✅ **19 Vitest cases and 4 Pest cases; four mutations CAUGHT with disjoint kill sets** — reversing the field sort comparator reddens ONLY the duplicate-key case (which is why that case asserts by LABEL, not by position), leaking the label into `shape` reddens ONLY the no-remount property, an optional member added to `RawField` reddens the mirror and the floor, and renaming the `// mirror:` anchor reddens the anti-vacuity arm rather than reporting a clean mirror while blind.
+  **Tier: early-testing.** ✅ **CLOSED BY `M112` (2026-09-26) — `B6`, AND IT SHIPPED A GATE THE ROW DID NOT ASK FOR.** `resources/js/components/builder/draft-snapshot.ts` exports `projectDraft()`, which creates one new file and edits none. ✅ **EVERY CITATION HELD.** `condition-model.ts:85` does export a bare `parseExpression()`, so the pre-parse is a direct call and not a second parser; `useFormRuntime.ts:323-332`'s `safeEvaluate()` does catch a parser throw, degrade the WHOLE FORM to everything-relevant and latch `engineFailed` true for the session — which is what makes the pre-parse load-bearing rather than tidy. ⛔ **A SHAPE GAP THE ROW DOES NOT MENTION, MEASURED AT SOURCE RATHER THAN INFERRED: the builder's model is missing EVERY translation column the runtime's model requires.** `ServerField` carries no `label_translations`, `hint_translations` or `default_value_is_expression`; `ServerSection` carries no `label_translations`/`description_translations`; `BuilderValidation` carries no `error_message_translations`, `logic_group_ordinal` or `logic_operator` — while `RawField`, `RawSection` and `RawValidation` require all of them. A grep of `BuilderPresenter.php` finds **no `*_translations` key at all**. They are synthesized as `null`, so **the preview renders the default locale only** — filed below rather than left for `B7` to discover. ✅ **`shape` EXCLUDES LABELS, HINTS, PLACEHOLDERS AND TRANSLATIONS BY CONSTRUCTION, AND INCLUDES OPTION *VALUES* BUT NOT OPTION *LABELS*** — the property `B7` depends on to rebuild the runtime on structural change rather than on every keystroke, asserted in both directions so neither half can pass trivially. ⛔ **THE REAL DELIVERABLE IS `tests/Feature/Docs/DraftProjectionMirrorDriftTest.php`**, which turns a hand-mirror into a guarded one — this repository has ten unguarded ones in this very area. **It catches the gap TypeScript cannot:** an OPTIONAL member added to `RawField` compiles clean while the projection silently omits it, proved by mutation. ⚠️ **AND THE GATE CAUGHT A DEFECT IN ITSELF ON ITS FIRST RUN** — `key,` and `config,` are ES shorthand, so a colon-only regex silently missed two of `RawField`'s seventeen members; it now matches both forms and holds a measured member-count floor. ✅ **19 Vitest cases and 4 Pest cases; four mutations CAUGHT with disjoint kill sets** — reversing the field sort comparator reddens ONLY the duplicate-key case (which is why that case asserts by LABEL, not by position), leaking the label into `shape` reddens ONLY the no-remount property, an optional member added to `RawField` reddens the mirror and the floor, and renaming the `// mirror:` anchor reddens the anti-vacuity arm rather than reporting a clean mirror while blind.
 
 - ✅ **CLOSED BY `M118` (2026-09-28) — `minor` · The builder's middle pane is a structural outline that renders no input control of any kind, so an
   author cannot see the form until it is published.** Filed 2026-09-25 by `M110`, from the same report.
@@ -11471,7 +11471,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `FieldRow → FieldControl → FieldInput` chain. Nothing is mirrored and no respondent-facing component was
   edited. ⛔ **THE PREMISE FINDING THAT DECIDED THE ARCHITECTURE: `createFormRuntime(schema)` TAKES A FROZEN
   SNAPSHOT.** `buildRenderModel()`, `buildEngineSchema()` and `buildTemplateSources()` all run once inside the
-  factory (`useFormRuntime.ts:250-256`) and `templateSources` is documented as *"deliberately never wrapped in
+  factory (`useFormRuntime.ts:256-262`) and `templateSources` is documented as *"deliberately never wrapped in
   `reactive()`"*, so a schema change means a NEW runtime. ⛔ **And `shape` — the plan's prescribed rebuild
   trigger — excludes far more than labels: `shapeOf()` omits hints, placeholders, section descriptions, every
   `*_translations` map, `appearance`, `error_message` AND the whole of `config` except option *values*.** So
@@ -11488,7 +11488,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   in this repository could see it** — `.builder__pane { overflow: hidden }` CLIPS the spill instead of
   scrolling it, so `assertNoHorizontalOverflow`'s `.app-shell__content` read is flat over it, axe has no rule,
   and `personalization-axe` had element-level reads for the pane switcher (`M19`) and the config pane (`M109`)
-  but never for this control. Fixed with the host-level `flex-wrap` `ConfigPanel.vue:748` already applies to
+  but never for this control. Fixed with the host-level `flex-wrap` `ConfigPanel.vue:787` already applies to
   the Requiredness control — `D28`'s measured affordance. ⛔ **THE ROW'S OWN EVIDENCE: ONE CITATION FALSE, FOUR
   ROTTED, AND ONE CLAIM FALSE.** `ConfirmationModal.vue:11` names a file `M117` renamed and a sentence it
   deleted (the in-tree statement moved to `draft-snapshot.ts:7`); `Builder.vue:537-543` and `:462-471` are both
@@ -11547,7 +11547,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M130` (2026-10-04) — `minor` · The "Appearance hint" field is a free-text box in the builder that changes nothing about how any
   form renders.** Filed 2026-09-25 by `M110`, answering the report *"can you also clarify to me what the
-  appearance hint do?"* — measured answer: at render time, nothing. `ConfigPanel.vue:433-439` writes
+  appearance hint do?"* — measured answer: at render time, nothing. `ConfigPanel.vue:475-481` writes
   `form_fields.appearance` as unguided free text with no help and no vocabulary; `public-runtime/lib/types.ts:67`
   declares it on the render model and `toRenderField()` (in `schema-mapping.ts`) never reads it, so it
   reaches neither `FieldRow.vue` nor `FieldControl.vue` nor the encode channel. An author who types `vertical` or
@@ -11572,7 +11572,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M129` (2026-10-04) — `minor` · A form can hold no author-composed content — no welcome page, no instructions, no image, no
   divider — because `note` renders one line of plain text and has no config editor.** Filed 2026-09-25 by `M110`,
   from the report asking for *"a page where they can put image, welcome notes, instructions, that they can easily
-  layout"*. `FieldInput.vue:506` is the entire renderer (`<p>{{ field.label }}</p>`), and `FieldType::configEditor()`
+  layout"*. `FieldInput.vue:515` is the entire renderer (`<p>{{ field.label }}</p>`), and `FieldType::configEditor()`
   returns `null` for `Note`, so the only authored content is the label column. ⛔ **THE STORAGE FORMAT IS THE WHOLE
   DECISION AND IT MUST NOT BE AN HTML STRING.** `docs/piping-output-encoding-design.md` §1 states that **CSP is not
   a defence for this threat** — `PublicRuntimeSecurityHeaders` deliberately sets no `default-src`/`script-src`, and
@@ -11749,14 +11749,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   which must not become a seventh. The PHP `FieldType` enum is authoritative and the builder palette is fully
   server-driven — but the **renderers** carry six hand-written mirrors: `schema-mapping.ts:48-59` (`SUPPORTED`,
   whose own comment admits it mirrors `EncodeFormPresenter::SUPPORTED`), `:72` (`HAS_OPTIONS`), `:75`
-  (`TEXT_TYPES`), `FieldInput.vue` (`MEDIA_TYPES`) and `ConfigPanel.vue:190` (`NUMERIC_TYPES`). ✅ **Only
+  (`TEXT_TYPES`), `FieldInput.vue` (`MEDIA_TYPES`) and `ConfigPanel.vue:193` (`NUMERIC_TYPES`). ✅ **Only
   `field-roles.ts`'s `RENDERS_NOTHING` is pinned**, by `tests/Unit/Forms/PdfFieldRoleTest.php`, which regex-parses
   the TypeScript from PHP and asserts set equality — so the instrument already exists in this repository and needs
   copying, not inventing. ⚠️ **`EncodeFormPresenter`'s own docblock (`:64-72`) admits the duplication and records
   that collapsing it was deliberately declined** — which makes a parity test the right answer rather than a
   refactor: it converts five unguarded mirrors into guarded ones **without deleting any of them**. ⚠️ A gate
   written here is green on arrival and therefore proves nothing until a committed mutation — removing one type
-  from one mirror — turns it red. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AS A PROVEN STRICT SUBSET OF `R-09f73330`, NOT WORKED SEPARATELY.** ✅ Its citations hold, with two off-by-N: `HAS_OPTIONS` is declared at `schema-mapping.ts:73`, not `:72` (`:72` is the comment), and the `EncodeFormPresenter` docblock admission runs `:64-69`, not `:64-72`. ⛔ **ALL FIVE GAPS IT NAMES APPEAR IN `R-09f73330` VERBATIM, AT THE SAME FILE AND LINE** — `schema-mapping.ts:48`/`:73`/`:75`, `FieldInput.vue`'s `MEDIA_TYPES` and `ConfigPanel.vue:190` — and it names **no** declaration that row does not. (It also cites `field-roles.ts`'s `RENDERS_NOTHING`, but as already-gated *evidence*, not as a gap.) So the single gate written for `R-09f73330` necessarily closes this one too, and **working both would have collided on three production files** under `D13` clause 1. ⚠️ **Its *"six copies, five ungated"* is a FLOOR:** there are **ten** ungated declarations by declaration count, and an eleventh that was already gated. ⚠️ **And its supporting citation is mis-aimed, though its conclusion survives:** `EncodeFormPresenter`'s docblock at `:64-69` declines collapsing the *builder functions*, not the `SUPPORTED` constant — the admission that actually supports the row is on the TypeScript side, at `schema-mapping.ts:46`. ⚠️ **Its *"the instrument exists and needs copying"* is now UNDERSTATED:** the technique has been copied three further times since it was filed — `DraftProjectionMirrorDriftTest`, `DocumentedEnumMirrorDriftTest` (a table-driven generalisation over three grammars) and the `NotificationType`/`ShellAbility` parity tests.
+  from one mirror — turns it red. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AS A PROVEN STRICT SUBSET OF `R-09f73330`, NOT WORKED SEPARATELY.** ✅ Its citations hold, with two off-by-N: `HAS_OPTIONS` is declared at `schema-mapping.ts:73`, not `:72` (`:72` is the comment), and the `EncodeFormPresenter` docblock admission runs `:64-69`, not `:64-72`. ⛔ **ALL FIVE GAPS IT NAMES APPEAR IN `R-09f73330` VERBATIM, AT THE SAME FILE AND LINE** — `schema-mapping.ts:48`/`:73`/`:75`, `FieldInput.vue`'s `MEDIA_TYPES` and `ConfigPanel.vue:193` — and it names **no** declaration that row does not. (It also cites `field-roles.ts`'s `RENDERS_NOTHING`, but as already-gated *evidence*, not as a gap.) So the single gate written for `R-09f73330` necessarily closes this one too, and **working both would have collided on three production files** under `D13` clause 1. ⚠️ **Its *"six copies, five ungated"* is a FLOOR:** there are **ten** ungated declarations by declaration count, and an eleventh that was already gated. ⚠️ **And its supporting citation is mis-aimed, though its conclusion survives:** `EncodeFormPresenter`'s docblock at `:67-72` declines collapsing the *builder functions*, not the `SUPPORTED` constant — the admission that actually supports the row is on the TypeScript side, at `schema-mapping.ts:46`. ⚠️ **Its *"the instrument exists and needs copying"* is now UNDERSTATED:** the technique has been copied three further times since it was filed — `DraftProjectionMirrorDriftTest`, `DocumentedEnumMirrorDriftTest` (a table-driven generalisation over three grammars) and the `NotificationType`/`ShellAbility` parity tests.
 
 - **`minor` · Three more request paths prune an array key by the same mechanism `B0` just fixed, and one of
   them may be doing it on purpose.** Found by `M111` (2026-09-25) while sweeping for the CLASS behind
@@ -11814,17 +11814,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M113` (2026-09-26) — `minor` · Ten client-side copies of the field-type catalogue have no parity test, and two of them mirror no
   PHP counterpart at all.** Found by `M112` (2026-09-26) while verifying `R-54a19217`; the row it was verified
   for says "five", counted by file. By declaration there are ten: `schema-mapping.ts:48-61` `SUPPORTED`, `:73`
-  `HAS_OPTIONS`, `:75` `TEXT_TYPES`; `display-value.ts:44` `HAS_OPTIONS` (a second copy), `:47` `GEO_TYPES`,
-  `:55` `MEDIA_TYPES`; `semantic-validator.ts:32` `MEDIA_FIELD_TYPES` (a third copy of the media set);
+  `HAS_OPTIONS`, `:75` `TEXT_TYPES`; `display-value.ts:48` `HAS_OPTIONS` (a second copy), `:51` `GEO_TYPES`,
+  `:55` `MEDIA_TYPES`; `semantic-validator.ts:43` `MEDIA_FIELD_TYPES` (a third copy of the media set);
   `FieldInput.vue`'s `MEDIA_TYPES` (a fourth) and its inline text-type literal (a second `TEXT_TYPES`);
-  and `ConfigPanel.vue:190` `NUMERIC_TYPES`. ⛔ **`TEXT_TYPES` and `NUMERIC_TYPES` MIRROR NOTHING** — there is no
+  and `ConfigPanel.vue:193` `NUMERIC_TYPES`. ⛔ **`TEXT_TYPES` and `NUMERIC_TYPES` MIRROR NOTHING** — there is no
   PHP predicate or registry either one corresponds to, so they cannot drift from a source; they ARE a source, and
   an undeclared one. ✅ **The technique is proven and is now used twice:** `tests/Unit/Forms/PdfFieldRoleTest.php`
   parses `field-roles.ts` by regex with two anti-vacuity arms, and `M112` built
   `tests/Feature/Docs/DraftProjectionMirrorDriftTest.php` on the same pattern. ⚠️ **Not a gap:** the rule-type and
   operator vocabularies in `enums.ts` are ALREADY gated bidirectionally by `DocumentedEnumMirrorDriftTest.php`
   with a shrink floor — the ungated ones are the field-type SUBSETS. **Live.** Filed by `M112`.
-  **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — TEN DECLARATIONS GATED BY ONE NEW TEST FILE THAT EDITS NO PRODUCTION CODE, AND IT CLOSES `R-c5858976` WITH IT.** ✅ **ALL TEN CITATIONS HELD EXACTLY, ZERO OFF-BY-ONE.** `tests/Unit/Forms/FieldTypeMirrorDriftTest.php` copies `PdfFieldRoleTest`'s instrument rather than inventing one — no DB, no container, path from `dirname(__DIR__, 3)` and never `base_path()` — with **three grammars, because the tree really uses three**: `new Set<string>([…])`, `new Set([…])`, a plain array, plus one **unnamed** inline literal anchored on the statement it governs. Four arms per declaration: the parse must match (a rename or shape change fails **here** rather than yielding an empty list), members non-empty, a measured **count floor**, and `toEqualCanonicalizing` against a PHP set **derived** from `FieldType::cases()` and never transcribed. ✅ **Eight of the ten agree with PHP today**, which is exactly why the gate proves nothing until a mutation reddens it. ⛔ **`NUMERIC_TYPES` NO LONGER MIRRORS NOTHING, AND THE ROW WENT STALE INSIDE THE INCREMENT THAT FILED IT.** `M112`'s `ValueShape::allowsOperator()` answers the identical question for the ordered operators and answers it **differently** — `Number` plus `Duration` plus `Scale` is five types and `NUMERIC_TYPES` is four, **omitting `duration`**. Pinned as a **declared divergence** with its membership stated rather than silently reconciled; reconciling it is filed as its own row. ✅ **`TEXT_TYPES` genuinely mirrors nothing, verified against the three strongest candidates** — `ValueShape::Text` (6 members, different), `FieldCategory::Text` (5) and `PrintAnswerArea::Comb` (11); none is its 7. It and the `FieldInput.vue:237` inline literal are pinned **against each other** (byte-identical today, and a silent divergence would give the guest runtime and the encode page different controls) and against the catalogue, which catches a typo'd type string — a defect **nothing** in this repository caught before. ⚠️ **The row undercounts itself:** the census found an **eleventh** named declaration (`field-roles.ts`'s already-gated `RENDERS_NOTHING`) and roughly **seventeen unnamed inline disjunctions** neither row names, including a fourth media set and a second and third geo triple. Filed as the residue rather than absorbed. ⚠️ **The row's *"the row it was verified for says five, counted by file"* is FALSE** — `R-c5858976` counts by *declaration* (5 declarations across 3 files); counted by file it would have said three. ⚠️ **Two defects in this gate's own first draft, both caught by running it:** Pest's `toContain()` is **variadic**, so a "failure message" argument became a second expected *value*; and `array_diff` **preserves keys**, so a diff must be re-indexed before comparison. ✅ **Two mutations CAUGHT with different kill sets:** `m113-geo-mirror` (duplicate a member, keeping the count and the catalogue valid) reddens **the geo equality case alone**, isolating it from the floor and catalogue arms; and `m113-geo-renamed` reddens **three cases with the anti-vacuity arm first**, which is the control that matters for a parsing gate — a declaration it can no longer find must fail loudly rather than report a clean mirror while blind.
+  **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — TEN DECLARATIONS GATED BY ONE NEW TEST FILE THAT EDITS NO PRODUCTION CODE, AND IT CLOSES `R-c5858976` WITH IT.** ✅ **ALL TEN CITATIONS HELD EXACTLY, ZERO OFF-BY-ONE.** `tests/Unit/Forms/FieldTypeMirrorDriftTest.php` copies `PdfFieldRoleTest`'s instrument rather than inventing one — no DB, no container, path from `dirname(__DIR__, 3)` and never `base_path()` — with **three grammars, because the tree really uses three**: `new Set<string>([…])`, `new Set([…])`, a plain array, plus one **unnamed** inline literal anchored on the statement it governs. Four arms per declaration: the parse must match (a rename or shape change fails **here** rather than yielding an empty list), members non-empty, a measured **count floor**, and `toEqualCanonicalizing` against a PHP set **derived** from `FieldType::cases()` and never transcribed. ✅ **Eight of the ten agree with PHP today**, which is exactly why the gate proves nothing until a mutation reddens it. ⛔ **`NUMERIC_TYPES` NO LONGER MIRRORS NOTHING, AND THE ROW WENT STALE INSIDE THE INCREMENT THAT FILED IT.** `M112`'s `ValueShape::allowsOperator()` answers the identical question for the ordered operators and answers it **differently** — `Number` plus `Duration` plus `Scale` is five types and `NUMERIC_TYPES` is four, **omitting `duration`**. Pinned as a **declared divergence** with its membership stated rather than silently reconciled; reconciling it is filed as its own row. ✅ **`TEXT_TYPES` genuinely mirrors nothing, verified against the three strongest candidates** — `ValueShape::Text` (6 members, different), `FieldCategory::Text` (5) and `PrintAnswerArea::Comb` (11); none is its 7. It and the `FieldInput.vue:246` inline literal are pinned **against each other** (byte-identical today, and a silent divergence would give the guest runtime and the encode page different controls) and against the catalogue, which catches a typo'd type string — a defect **nothing** in this repository caught before. ⚠️ **The row undercounts itself:** the census found an **eleventh** named declaration (`field-roles.ts`'s already-gated `RENDERS_NOTHING`) and roughly **seventeen unnamed inline disjunctions** neither row names, including a fourth media set and a second and third geo triple. Filed as the residue rather than absorbed. ⚠️ **The row's *"the row it was verified for says five, counted by file"* is FALSE** — `R-c5858976` counts by *declaration* (5 declarations across 3 files); counted by file it would have said three. ⚠️ **Two defects in this gate's own first draft, both caught by running it:** Pest's `toContain()` is **variadic**, so a "failure message" argument became a second expected *value*; and `array_diff` **preserves keys**, so a diff must be re-indexed before comparison. ✅ **Two mutations CAUGHT with different kill sets:** `m113-geo-mirror` (duplicate a member, keeping the count and the catalogue valid) reddens **the geo equality case alone**, isolating it from the floor and catalogue arms; and `m113-geo-renamed` reddens **three cases with the anti-vacuity arm first**, which is the control that matters for a parsing gate — a declaration it can no longer find must fail loudly rather than report a clean mirror while blind.
 
 - ✅ **CLOSED BY `M113` (2026-09-26) — `minor` · A date field can be given `min_value` or `greater_than_field`, and the rule then fails CLOSED —
   every non-empty answer becomes invalid and the field is unanswerable.** Found by `M112` (2026-09-26) while
@@ -11840,7 +11840,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   nothing reports it. Real temporal ordering means either a date-aware comparison in both engines with golden
   vectors, or a documented refusal at publish. ⚠️ `duration` is NOT affected: `XlsformTypeMap.php:64` maps it to
   `decimal` and its stored answer really is a number, which is why `ValueShape` splits it out. **Live.**
-  Filed by `M112`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — REFUSED AT PUBLISH, AND THE ROW'S PREMISE WAS OVERSTATED IN THE ONE CLAUSE THE REMEDY RESTS ON.** ⛔ **`ValueShape::allows()` AND `allowsOperator()` HAD ZERO PRODUCTION CALLERS.** A whole-`app/` grep for `ValueShape` returned three hits — the `use` and the `carriesOptionList()` call in `StructuralValidationGate.php`, and a docblock mention in `DefaultFieldRules.php` — and `UpdateFieldRequest.php:71` validates `rule_type` as a bare `Rule::enum()` with no field-type cross-check. `M112` shipped the table and wired it to nothing, so *"the authoring half is closed"* was false on both sides. This increment is its **first production caller**. ⛔ **AND THE LIVE DEFECT WAS NARROWER AND SHARPER THAN THE ROW.** `ExpressionValidationGate.php:189-191` already refuses `min_value`/`max_value` whose `rule_value` is not numeric-like, so `min_value = '2026-01-01'` on a date was **already** refused; what had no check anywhere is `greater_than_field`/`less_than_field`, which takes no `rule_value` at all — so `end_date > start_date`, the row's own *"single most natural temporal rule"*, published clean and refused every submission. ✅ **Both engines fail closed identically** (`coercion.ts:27` is byte-identical to `NUMERIC_RE`; `evaluator.ts:112` returns false on NaN), so it is a correctness defect and not a parity one. ⛔ **THE GAP THE ROW DID NOT NAME, FOUND BY REDDENING AN EXISTING TEST RATHER THAN BY READING:** `form_field_validations` carries a DB CHECK enforcing `expression` XOR `rule_type`, so every raw-expression row has a **null** `rule_type`; passing that to `allows()` — whose parameter is not nullable — escaped the gate as a **TypeError** rather than a refusal and reddened `ExpressionValidationGateTest`'s unparseable-expression case. Guarded, and pinned by its own regression case. ✅ **Blast radius measured at ZERO and it held**: no seeder writes any validation row, `database/**` and `tests/fixtures/**` carry no `min_value`/`greater_than_field`, both `greater_than_field` golden vectors are `integer`, and `DefaultFieldRules.php:68-80` seeds `[]` for all four temporal types — 954 tests across `Forms`, `Submissions` and `Unit/Forms` stayed green. ⚠️ **Save-time rejection in `UpdateFieldRequest` was deliberately refused** — it would block an author mid-edit and strays onto `R-e878d49a`'s surface. ⚠️ **The row's OTHER remedy is filed, not dropped:** real temporal ordering is now its own row, because `ValueShape.php:46` claims one already exists and it did not. ✅ **Mutation `m113-temporal-allowed` CAUGHT** — letting `Temporal` take `GreaterThanField` reddens the ordered-rule case and the every-violation case while **the `min_value` case stays green**, because that is a different `match` arm: the two halves are proved separately rather than read as one gap.
+  Filed by `M112`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — REFUSED AT PUBLISH, AND THE ROW'S PREMISE WAS OVERSTATED IN THE ONE CLAUSE THE REMEDY RESTS ON.** ⛔ **`ValueShape::allows()` AND `allowsOperator()` HAD ZERO PRODUCTION CALLERS.** A whole-`app/` grep for `ValueShape` returned three hits — the `use` and the `carriesOptionList()` call in `StructuralValidationGate.php`, and a docblock mention in `DefaultFieldRules.php` — and `UpdateFieldRequest.php:73` validates `rule_type` as a bare `Rule::enum()` with no field-type cross-check. `M112` shipped the table and wired it to nothing, so *"the authoring half is closed"* was false on both sides. This increment is its **first production caller**. ⛔ **AND THE LIVE DEFECT WAS NARROWER AND SHARPER THAN THE ROW.** `ExpressionValidationGate.php:190-192` already refuses `min_value`/`max_value` whose `rule_value` is not numeric-like, so `min_value = '2026-01-01'` on a date was **already** refused; what had no check anywhere is `greater_than_field`/`less_than_field`, which takes no `rule_value` at all — so `end_date > start_date`, the row's own *"single most natural temporal rule"*, published clean and refused every submission. ✅ **Both engines fail closed identically** (`coercion.ts:27` is byte-identical to `NUMERIC_RE`; `evaluator.ts:119` returns false on NaN), so it is a correctness defect and not a parity one. ⛔ **THE GAP THE ROW DID NOT NAME, FOUND BY REDDENING AN EXISTING TEST RATHER THAN BY READING:** `form_field_validations` carries a DB CHECK enforcing `expression` XOR `rule_type`, so every raw-expression row has a **null** `rule_type`; passing that to `allows()` — whose parameter is not nullable — escaped the gate as a **TypeError** rather than a refusal and reddened `ExpressionValidationGateTest`'s unparseable-expression case. Guarded, and pinned by its own regression case. ✅ **Blast radius measured at ZERO and it held**: no seeder writes any validation row, `database/**` and `tests/fixtures/**` carry no `min_value`/`greater_than_field`, both `greater_than_field` golden vectors are `integer`, and `DefaultFieldRules.php:68-80` seeds `[]` for all four temporal types — 954 tests across `Forms`, `Submissions` and `Unit/Forms` stayed green. ⚠️ **Save-time rejection in `UpdateFieldRequest` was deliberately refused** — it would block an author mid-edit and strays onto `R-e878d49a`'s surface. ⚠️ **The row's OTHER remedy is filed, not dropped:** real temporal ordering is now its own row, because `ValueShape.php:46` claims one already exists and it did not. ✅ **Mutation `m113-temporal-allowed` CAUGHT** — letting `Temporal` take `GreaterThanField` reddens the ordered-rule case and the every-violation case while **the `min_value` case stays green**, because that is a different `match` arm: the two halves are proved separately rather than read as one gap.
 
 - **`minor` · `BuilderPresenter` emits no `*_translations` column at all, so the builder cannot show a form in
   any locale but the default — and the live preview inherits that.** Found by `M112` (2026-09-26) while building
@@ -11867,7 +11867,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   easy to write WRONG:** `M112`'s first attempt transcribed the patterns into the test and was defeated by the
   documented doubled-backslash collapse — it passes only because it reads the shipped constants rather than a
   copy of them, which is the property any gate here must keep. A Vitest case importing the exported JSON, or a
-  golden-vector entry, would both work. **Live.** Filed by `M112`. **Tier: early-testing.** ✅ **CLOSED BY `M115` (2026-09-27) — GATED IN THE ENGINE THAT CANNOT SEE PCRE, AND THE GATE CAUGHT THE DEFECT ON DEMAND.** `resources/public-runtime/engine/__tests__/default-field-patterns.test.ts` reads the three bodies **out of `app/Support/Forms/DefaultFieldRules.php` itself** — `readFileSync` + a regex over the `private const` lines, the idiom `resources/js/composables/__tests__/useServerAutosave.test.ts:853-886` already uses — compiles each through the real `StructuredRuleEvaluator.compilePattern()` in V8, and drives the same accept/reject table the PHP half drives. The samples moved to `tests/fixtures/default-field-patterns.json`, read by both engines, so the table has one copy: 23 Vitest cases and 23 Pest cases over 18 shared vectors. ⛔ **`tests/golden/validation/` WAS THE WRONG HOME AND THAT IS WHY IT IS NOT THERE:** `patterns` is pinned at 5 and the validation total at 114 in that corpus's `manifest.json`, restated in `docs/testing-strategy.md:56` and two further documents, so adding vectors there would have spread the change across four files for no gain. ⛔ **THE ROW UNDERSTATED THE FAILURE MODE AND THE CORRECTION IS THE WHOLE VALUE.** It says a JS-incompatible body makes the client throw "while the server validates happily". Measured: the throw is swallowed **two layers below** the degradation path — `matchesPattern()` catches it and returns `false` (`resources/public-runtime/engine/structured-rule-evaluator.ts:126-129`), so `safeEvaluate()`'s `engineFailed` latch (`useFormRuntime.ts:310-319`) **never fires and the degraded banner never renders**. The field silently rejects every non-empty answer with no diagnostic anywhere, and the publish gate cannot help: `StructuredRuleEvaluator::isCompilablePattern()` (`:143-146`, called at `ExpressionValidationGate.php:185`) runs **PCRE**, so it agrees with the server rather than with V8. ✅ **PROVED BY TWO MUTATIONS WITH DISJOINT KILL SETS, BOTH RUN BY HAND BECAUSE `mutate.php` DRIVES PEST ONLY (`R-eecdb678`), BOTH RESTORED BY SHA256 COMPARISON.** (a) A possessive quantifier `{5,19}+` on the phone body — identical PCRE verdicts on every sample, a `SyntaxError` in V8: **Vitest 4 failed, Pest 23 passed**, which is the parity defect itself reproduced on demand. (b) A doubled backslash in the email body — PHP stores it as one so its verdicts are unchanged: **the escape-refusal arm fired by name, Pest stayed green**, proving that arm guards a READER defect rather than a behaviour change. ⚠️ **AND THE SECOND MUTATION'S FIRST ATTEMPT WAS THE `M31` TRAP, LIVE:** the first `\s` in that file is in the **class docblock**, so the token matched prose, the sha256 moved, and both suites stayed green — a mutation that never reached the target reads exactly like a gate that works. Only re-reading the mutated LINE caught it, which is why `mutate.php` prints it.
+  golden-vector entry, would both work. **Live.** Filed by `M112`. **Tier: early-testing.** ✅ **CLOSED BY `M115` (2026-09-27) — GATED IN THE ENGINE THAT CANNOT SEE PCRE, AND THE GATE CAUGHT THE DEFECT ON DEMAND.** `resources/public-runtime/engine/__tests__/default-field-patterns.test.ts` reads the three bodies **out of `app/Support/Forms/DefaultFieldRules.php` itself** — `readFileSync` + a regex over the `private const` lines, the idiom `resources/js/composables/__tests__/useServerAutosave.test.ts:853-886` already uses — compiles each through the real `StructuredRuleEvaluator.compilePattern()` in V8, and drives the same accept/reject table the PHP half drives. The samples moved to `tests/fixtures/default-field-patterns.json`, read by both engines, so the table has one copy: 23 Vitest cases and 23 Pest cases over 18 shared vectors. ⛔ **`tests/golden/validation/` WAS THE WRONG HOME AND THAT IS WHY IT IS NOT THERE:** `patterns` is pinned at 5 and the validation total at 114 in that corpus's `manifest.json`, restated in `docs/testing-strategy.md:56` and two further documents, so adding vectors there would have spread the change across four files for no gain. ⛔ **THE ROW UNDERSTATED THE FAILURE MODE AND THE CORRECTION IS THE WHOLE VALUE.** It says a JS-incompatible body makes the client throw "while the server validates happily". Measured: the throw is swallowed **two layers below** the degradation path — `matchesPattern()` catches it and returns `false` (`resources/public-runtime/engine/structured-rule-evaluator.ts:126-129`), so `safeEvaluate()`'s `engineFailed` latch (`useFormRuntime.ts:323-332`) **never fires and the degraded banner never renders**. The field silently rejects every non-empty answer with no diagnostic anywhere, and the publish gate cannot help: `StructuredRuleEvaluator::isCompilablePattern()` (`:144-147`, called at `ExpressionValidationGate.php:186`) runs **PCRE**, so it agrees with the server rather than with V8. ✅ **PROVED BY TWO MUTATIONS WITH DISJOINT KILL SETS, BOTH RUN BY HAND BECAUSE `mutate.php` DRIVES PEST ONLY (`R-eecdb678`), BOTH RESTORED BY SHA256 COMPARISON.** (a) A possessive quantifier `{5,19}+` on the phone body — identical PCRE verdicts on every sample, a `SyntaxError` in V8: **Vitest 4 failed, Pest 23 passed**, which is the parity defect itself reproduced on demand. (b) A doubled backslash in the email body — PHP stores it as one so its verdicts are unchanged: **the escape-refusal arm fired by name, Pest stayed green**, proving that arm guards a READER defect rather than a behaviour change. ⚠️ **AND THE SECOND MUTATION'S FIRST ATTEMPT WAS THE `M31` TRAP, LIVE:** the first `\s` in that file is in the **class docblock**, so the token matched prose, the sha256 moved, and both suites stayed green — a mutation that never reached the target reads exactly like a gate that works. Only re-reading the mutated LINE caught it, which is why `mutate.php` prints it.
 
 - **`minor` · Ordered comparison of dates and times is refused rather than supported, so `end_date >
   start_date` is a rule an author cannot express at all.** Found by `M113` (2026-09-26) while closing
@@ -11888,7 +11888,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **Three sub-questions to settle before writing a line, none of them answered here:** timezone handling,
   `time` versus `date` versus `datetime` comparability, and partial values. ⚠️ **And two things flip when it
   lands:** `ValueShape::allows()`/`allowsOperator()` must admit `Temporal`,
-  `ExpressionValidationGate.php:189-191`'s `non_numeric_threshold` arm must stop refusing a date-shaped
+  `ExpressionValidationGate.php:190-192`'s `non_numeric_threshold` arm must stop refusing a date-shaped
   threshold on a temporal field, and `ValueShapeTest`'s case titled *"refuses min_value and greater_than_field
   on a temporal shape, because both fail CLOSED"* INVERTS. **Live.** Filed by `M113`.
   **Tier: during-testing.** ⚠️ **`M134` (2026-10-05) SHIPPED THIS ROW'S ENGINE HALF THROUGH `R-62b638e1`; THE STRUCTURED HALF STAYS OPEN.** Both engines now order ISO dates, times and date-times through a separate `Temporal` path reached only from `numericCompare()`'s NaN branch (`Coercion` untouched, as this row asked), and the three sub-questions are answered there: no time zone (a naive answer never orders against the UTC `now()`, `D89`), a time orders only against a time while a date reads as its midnight beside a date-time, and a partial or malformed value is not a date. So an EXPRESSION `. > ${start_date}` now publishes and holds, while the STRUCTURED `greater_than_field` / `min_value` on a temporal shape is still refused by `ValueShape` — and a `greater_than_field` between dates on a version published before `M113` now orders chronologically at runtime. What remains is the `ValueShape`/`allowsOperator()` flip, the `non_numeric_threshold` arm and `StructuredRuleEvaluator`'s `MinValue`/`MaxValue` arms, which use `Coercion` directly and so do not reach the new path.
@@ -11912,7 +11912,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · The builder and PHP disagree about whether a duration field takes an ordered comparison, and the
   disagreement is now pinned rather than resolved.** Found by `M113` (2026-09-26) while building the client
-  field-type mirror census. `ConfigPanel.vue:192`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
+  field-type mirror census. `ConfigPanel.vue:195`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
   'likert_scale']` — four members. `ValueShape::allowsOperator()` (`ValueShape.php:218-242`) permits
   `gt`/`lt`/`gte`/`lte` for `Number`, `Duration` and `Scale`, which is **five** types: the same four plus
   `duration`. ⛔ **`R-09f73330` SAYS THIS SET "MIRRORS NOTHING", AND THAT STOPPED BEING TRUE IN THE INCREMENT
@@ -11997,7 +11997,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   form ever receives.~~** Found by `M115` (2026-09-27) while building the validation editor's operator half, by
   opening all three doors rather than the one the work needed. ⛔ **Nothing refuses it at any of them.**
   (a) The save door: `UpdateFieldRequest` declares `validations.*.operator` and `validations.*.related_field_key`
-  as plain `nullable` with no cross-field rule (`app/Http/Requests/Forms/UpdateFieldRequest.php:71-76`), so a
+  as plain `nullable` with no cross-field rule (`app/Http/Requests/Forms/UpdateFieldRequest.php:73-78`), so a
   `required_if` row with neither is written as-is. (b) The publish door: `StructuralValidationGate` checks only
   that a **non-null** `related_form_field_id` belongs to the version (`:156`) and that the rule suits the owning
   field's shape (`:185`) — it never asks whether a rule that NEEDS a related field or an operator has one.
@@ -12050,7 +12050,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M134` (2026-10-05) — **`minor` · The encode page still enforces four families of native browser validation the guest runtime does
   not, and nothing in the repository can turn that difference red.** Filed 2026-09-27 by `M115`, split out of
-  `R-e878d49a` on the user's decision when the blast radius measured wider than that row's framing. `Encode.vue:1263`
+  `R-e878d49a` on the user's decision when the blast radius measured wider than that row's framing. `Encode.vue:1265`
   has no `novalidate` while `PageView.vue:144` and `StepView.vue:203` do, so one form rejects an answer from a
   staff keyer and accepts it from a respondent. ⛔ **Adding `novalidate` removes FOUR families, not one**, and
   `DefaultFieldRules` replaces exactly one of them: `type="email"`/`type="url"` mismatch (replaced by a seeded
@@ -12100,14 +12100,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M121` (2026-10-01) — `minor` · A respondent is never told the rule engine failed — every conditional question is shown with no
   conditions applied, and the submit guard lets them submit anyway.** Found by `M116` (2026-09-28), beside
-  the row above. `useFormRuntime.safeEvaluate()` (`resources/public-runtime/composables/useFormRuntime.ts:307-319`)
+  the row above. `useFormRuntime.safeEvaluate()` (`resources/public-runtime/composables/useFormRuntime.ts:320-332`)
   catches any evaluation throw, sets `engineFailed` and returns a degraded result in which everything is
   relevant and there are zero field errors. ⛔ **THE DEGRADE IS INVISIBLE AND IT DEFEATS THE GUARD.** Because
   the degraded result carries no errors, `passed` is `true`, so `RuntimeSession.vue`'s `submit()` does not
   stop on `field-errors`; the respondent fills a form whose skip logic and conditional requiredness are
   silently inert, submits, and meets the server's generic 422. ⛔ **AND THE BANNER EXISTS, ON THE WRONG
   PAGE.** `engineFailed` has exactly one consumer — the staff encode page's *"Conditions could not be
-  applied"* notice (`resources/js/Pages/submissions/Encode.vue:1250-1255`) — and grep finds no consumer under
+  applied"* notice (`resources/js/Pages/submissions/Encode.vue:1252-1257`) — and grep finds no consumer under
   `resources/public-runtime/components` or `App.vue` at all. So a keyer is warned and a respondent is not.
   ⚠️ **Whether the guest surface should warn or REFUSE is a product question this row must settle**, because
   a form whose conditions are inert may be collecting answers to questions that should have been skipped.
@@ -12340,7 +12340,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`minor` · `useFormRuntime.ts` contains a NUL byte, so ripgrep classifies it as binary and silently drops
   it from every sweep run without `--text` — including the runtime's own read of `single_page_mode`.** Measured
   by `M120` while verifying `R-f1332829`'s census: an exhaustive grep for `single_page_mode` across the tree
-  missed `resources/public-runtime/composables/useFormRuntime.ts:134` (the declaration
+  missed `resources/public-runtime/composables/useFormRuntime.ts:135` (the declaration
   `readonly singlePageMode: boolean`) and `:1156` (the read `singlePageMode: schema.form.single_page_mode`),
   both of which are load-bearing — `:1156` is the line the whole guest single-page branch hangs on. ⛔ **THE
   FAILURE MODE IS SILENCE, WHICH IS WHAT MAKES THIS FILABLE RATHER THAN A CURIOSITY.** `rg` prints no warning
@@ -12434,16 +12434,16 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `M121` recorded both at the rows in prose, which the generator cannot read. The remedy is a `Needs R-xxxxxxxx`
   token with a lint arm that refuses an unknown or closed target. **Live.** Filed by `M121`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **`M122` (2026-10-01) moved both examples:** `R-a367bf9e`'s precondition now holds (the routes shipped), and `R-c9f50df2` lost its `Awaits D69` token when `D69` was answered — so it now reads `ready` while still needing `R-6dedc3a9`, which makes it the live case of this defect.
 
-- **`nit` · The builder's draft projection checks a calculated question's formula under a key nothing writes, so its
+- ✅ **CLOSED BY `M180` (2026-10-20) — ****`nit` · The builder's draft projection checks a calculated question's formula under a key nothing writes, so its
   "no formula yet" issue fires for every calculated question and a blank formula reaches the preview engine.** Measured
   by `M122` while closing `R-244d53dc`. `draft-snapshot.ts`'s state 7 reads `config.formula` (`:248-251`), but the
   builder writes `config.calculated_formula` (`ConfigPanel.vue`) and nothing maps one to the other — so the
   guard's `delete` never removes a blank formula, and `missing_formula` is recorded for every calculated question,
   formula or not. `draft-snapshot.test.ts`'s case 7 (“omits a calculated field’s formula KEY…”) pins the wrong key, which is why it is green. ⚠️ **Invisible today:**
-  an issue renders only beside its field's own control (`PreviewRuntime.vue:432`), a calculated question renders nothing
+  an issue renders only beside its field's own control (`PreviewRuntime.vue:436`), a calculated question renders nothing
   in the preview, nothing counts the issues, and the engine skips a blank formula anyway. It becomes visible the moment
   the preview summarises its issues or shows a calculated value. A hub file, so filed rather than taken. **Latent.**
-  Filed by `M122`. **Tier: during-testing.**
+  Filed by `M122`. **Tier: during-testing.** ✅ **CLOSED BY `M180` (2026-10-20) — found already fixed:** `M177` closed the same slip as `R-f7a18b7a` — `resources/js/components/builder/draft-snapshot.ts` reads `calculated_formula`, and its test pins that key. Nothing left to do.
 
 - **`minor` · The Decision Board has drifted from `docs/claims/decisions.md` in both directions, and the line sends the
   user to it for decisions it does not hold.** Measured by `M122` (2026-10-01) while recording `D68` and `D69`, which
@@ -13066,14 +13066,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   joined into one cell, or one row per instance. **Live.** It needs a published form with a repeatable section and a
   response to it. Filed by `M133`. **Tier: during-testing.** ✅ **CLOSED BY `M146` (2026-10-08), PR #339, `D100` A:** `SubmissionRowProjector::resolveColumns()` records each repeat member's section key in the resolution map and `answerValues()` reads the section's instance list, formats each instance through `displayValue()` (a multi-select keeps its `; `) and joins with ` | ` IN POSITION — an instance that left the member blank still contributes a part, so the member columns line up; all-empty is `''`. Every channel inherits it; the column keys stay the raw member keys (a Sheets or Airtable mapping persists them). ⚠️ **Premise addition:** both seeders wrote repeat members FLAT, a shape a real submit refuses, which is why the dev export showed values while the inbox and PDF showed blanks — now nested as one instance. A calculated question inside a repeat is never stored at all (`R-1c31e7cf`, not this row). Three export cases and the webhook case red first; three mutants caught.
 
-- **`minor` · There is no workspace time zone, so `today()` is the UTC calendar day and a date or time cannot be
+- ✅ **CLOSED BY `M180` (2026-10-20) — ****`minor` · There is no workspace time zone, so `today()` is the UTC calendar day and a date or time cannot be
   compared with `now()`.** Queued on the user's answer to `D89`. Both engines stamp the clock in UTC
   (`isoClock()`, `SemanticValidator::validate()`), so in the Philippines `today()` is still yesterday until 08:00 local:
   a date constraint `. <= today()` refuses today's local date for the first eight hours of the day, and `${d} = today()`
   misses it. A date-time answer is the browser's `datetime-local` value, wall-clock with no offset, so it cannot be
   ordered against the UTC `now()` at all — publish refuses that ordering as "not supported yet" (`D89`). The remedy is a
   workspace time-zone setting that the clock stamp, `today()` and the reading of a date-time answer all honour, in both
-  engines with golden vectors, then lifting the `now()` refusal. **Live.** Filed by `M134`. **Tier: during-testing.**
+  engines with golden vectors, then lifting the `now()` refusal. **Live.** Filed by `M134`. **Tier: during-testing.** **SPLIT BY `D153` (2026-10-20):** the time zone is the form's own (`forms.timezone`; new forms and the forms still on UTC move to Asia/Manila), not a workspace setting. `M180` takes the clock half — both clocks stamp the form's zone, so `today()` is the form's calendar day; comparing a date or time answer with `now()` is filed as `R-ba47e460`. ✅ **CLOSED BY `M180` (2026-10-20):** the clock half (`D153`): both clocks stamp the FORM'S zone (`App\Support\Forms\FormClock`, `isoClock(at, zone)`), so `today()` is the form's calendar day; new forms start on Asia/Manila and the forms still on UTC are moved (`2026_08_17_000141`, `2026_08_17_000142`, through `pgsql_privileged` with a guard). Comparing a date or time answer with `now()` is `R-ba47e460`. Red first: 10 Pest, 1 Vitest. Mutants: 4 of 4 caught. Built and held for merge point 3 (`D137`), not yet live.
 
 - **`minor` · An XLSForm export of "greater than another question" refuses every answer in ODK while the other question
   is blank.** Found by `M134` while closing `R-6202e694`. `XlsformExporter` writes a `greater_than_field` or
@@ -13108,10 +13108,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   contract without that case. The remedy is `\z` in PHP and a golden vector for it. **Latent.** No first-party control
   sends a trailing newline in a number; the API and an import can. Filed by `M134`. **Tier: during-testing.**
 
-- **`nit` · The builder shows a formula default as plain text.** Found by `M134` while closing `R-6d7b9ff7`. A default
+- ✅ **CLOSED BY `M180` (2026-10-20) — ****`nit` · The builder shows a formula default as plain text.** Found by `M134` while closing `R-6d7b9ff7`. A default
   imported from an XLSForm `calculation` column — `today()` — sits in the Default value box with nothing saying it is a
   formula, and since `M134` editing the box makes it plain text. **Live.** It needs an imported formula default.
-  Filed by `M134`. **Tier: during-testing.**
+  Filed by `M134`. **Tier: during-testing.** **Taken by `M180` (2026-10-20)** with `R-20784770`: the Default value box gains Fixed · Formula, and typing in a formula keeps it a formula. ✅ **CLOSED BY `M180` (2026-10-20):** with `R-20784770` — the Default value box shows a formula as **Formula**, and typing in it keeps it one (`M134`'s "typing makes it plain text" is reversed on purpose). Built and held for merge point 3 (`D137`), not yet live.
 
 - **`nit` · The condition editor cannot write `today()`.** Found by `M134` while building `R-910d2286`. A condition row
   compares a question with another question or a typed value (`condition-model.ts` `operandOf()`), so "date of birth is
@@ -14272,10 +14272,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `resources/js/components/builder/LogicRail.vue:228`, `resources/js/components/shell/FeedbackButton.vue:453`) and the uses remain:
   `resources/js/Pages/forms/Builder.vue:863`, `resources/js/components/webhooks/WebhookFormModal.vue:197`,
   `resources/js/components/scopes/GrantModal.vue:256`, `resources/js/components/scopes/DeleteNodeModal.vue:120`,
-  `resources/js/components/builder/ConfigPanel.vue:798`, `resources/js/components/submissions/MediaInput.vue:420`, `:557`, `:583`,
+  `resources/js/components/builder/ConfigPanel.vue:837`, `resources/js/components/submissions/MediaInput.vue:420`, `:557`, `:583`,
   `:589`, `resources/js/components/submissions/MatrixGrid.vue:290`, `resources/js/components/submissions/GeoInput.vue:637`, `:742`,
-  `resources/js/components/submissions/FieldInput.vue:706`, `resources/js/components/integrations/RuleFormModal.vue:448`,
-  `resources/js/components/builder/PreviewRuntime.vue:665` (the OCR pages' and the encode page's uses are taken by their own rows).
+  `resources/js/components/submissions/FieldInput.vue:715`, `resources/js/components/integrations/RuleFormModal.vue:448`,
+  `resources/js/components/builder/PreviewRuntime.vue:669` (the OCR pages' and the encode page's uses are taken by their own rows).
   Only the dark axe sweep can see it, and `/admin/*` is outside the sweep. The remedy is `--mds-color-status-danger-fg`, the
   on-surface pair with a measured ratio, in every one. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
@@ -14305,7 +14305,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M172` (2026-10-15) — ****`major` · A builder tab left open across a publish refuses every edit with "The key has already been taken", then "That item belongs to a published version" once the key is changed, and a reload loses the unsaved edits.**
   The testers' report (2026-10-14, relayed 2026-10-15): *"The key has already been taken. ************ has a change that was not saved.
   Select it to see why"*, and on a delete *"That item belongs to a published version and can no longer be edited"*. Measured on
-  `0432d03b`: `app/Http/Requests/Forms/UpdateFieldRequest.php:53-58` checks the key against the form's CURRENT draft, ignoring only
+  `0432d03b`: `app/Http/Requests/Forms/UpdateFieldRequest.php:55-60` checks the key against the form's CURRENT draft, ignoring only
   the bound field's id, and a FormRequest runs before `FormBuilderService::assertDraftChild()`
   (`app/Services/Forms/FormBuilderService.php:652-657`); a publish clones the draft into a new one with new ids and the same keys
   (`app/Services/Forms/PublishService.php:175-186`). So a tab still holding the old ids — a publish from the hub
@@ -14333,7 +14333,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   undo (`resources/js/components/builder/useBuilderStore.ts:287-305`) or the journal's put-back (`:986-1010`) re-sends a key freed
   and retaken meanwhile. The server's own keys never clash (`app/Services/Forms/FormBuilderService.php:903-928`, `uniqueKey()` and
   `copyKey()`); the client never creates one. The refusal is shown under Field key on the Advanced tab only
-  (`resources/js/components/builder/ConfigPanel.vue:605-612`), while selecting a question always opens Basics (`:165-170`); the
+  (`resources/js/components/builder/ConfigPanel.vue:644-651`), while selecting a question always opens Basics (`:168-173`); the
   alert names every other refused question as "has a change that was not saved. Select it to see why" (`:80`) with no reason and
   no badge on the tab; a validation refusal is not counted as unsaved, so there is no Retry (`useBuilderStore.ts:948-956`).
   `docs/form-versioning-schema-migration.md:129` says a key is never renamed, and nothing enforces it. `D132` (the user,
@@ -14380,7 +14380,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   kobo, every cell can be configured separately, it can pick different type of questions and different set of options for each"*.
   Measured: `resources/js/components/builder/MatrixEditor.vue:46` says "Each cell is a single choice from this shared list";
   `config.cells` is that list (`docs/data-dictionary.md:382`), the request validates rows, columns and cells as value/label lists
-  only (`app/Http/Requests/Forms/UpdateFieldRequest.php:277-309`), the normalizer rejects unknown rows or columns and nothing else
+  only (`app/Http/Requests/Forms/UpdateFieldRequest.php:292-324`), the normalizer rejects unknown rows or columns and nothing else
   (`app/Services/Submissions/StructuralAnswerNormalizer.php:548-593`), publish checks the three lists non-empty and distinct
   (`app/Services/Forms/StructuralValidationGate.php:532-562`), and `app/Enums/FieldType.php:12` claims each cell is
   "independently typed", which is false. KoboToolbox's Question Matrix gives every column its own response type (Select One,
@@ -14398,14 +14398,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`minor` · A grid is drawn as a stack of row cards, never as a table, on the web form, manual entry and the builder preview.**
   `resources/js/components/submissions/MatrixGrid.vue:9-13` states "NO `<table>` — each row is its own nested `<fieldset>`", and
   `:118-135` lays one card per row with a labelled select per column; the same component serves the public form, the encode page
-  and the preview (`resources/js/components/submissions/FieldInput.vue:260-261`). Only the printed PDF draws a table
+  and the preview (`resources/js/components/submissions/FieldInput.vue:269-270`). Only the printed PDF draws a table
   (`app/Enums/PrintAnswerArea.php:92`). The testers want "a grid"; Kobo's matrix is a table in the Grid theme. The remedy: a real
   `<table>` (`<th scope="col">`, `<th scope="row">`, one control per cell by column type from the design system's inputs) from
   48em, the existing stacked fieldsets below it, `config.layout = table | stacked` for an author who wants cards everywhere;
   `likert_matrix` takes the same table. **Live.** Filed by `M172`. **Tier: early-testing.**
 
 - **`minor` · A grid answer reaches a spreadsheet as one cell, so a Sheets or Airtable column cannot map a single cell of it.**
-  `app/Services/Submissions/SchemaValueFormatter.php:304-342` renders a matrix into one cell as `row: col=cell; …`, the header union
+  `app/Services/Submissions/SchemaValueFormatter.php:338-376` renders a matrix into one cell as `row: col=cell; …`, the header union
   in `app/Services/Submissions/SubmissionRowProjector.php:82` carries one column per grid question, and
   `app/Services/Connectors/MappableColumnCatalog.php` offers only that column to Google Sheets and Airtable; the XLSForm export
   already flattens a grid to one question per cell (`docs/xlsform-interop-spec.md:71`), as Kobo does ("Each cell in the matrix
@@ -14417,8 +14417,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · Only a Single choice or Dropdown can take its choices from another form's answers; a Multiple choice cannot.**
   `app/Services/Forms/LinkedChoiceService.php:39` limits a link to single choice and dropdown, and
-  `app/Http/Requests/Forms/UpdateFieldRequest.php:322-334` accepts `config.options_source` for those two only; the Options tab
-  offers the link through `resources/js/components/builder/LinkedChoicesEditor.vue` (`ConfigPanel.vue:510-526`). The testers'
+  `app/Http/Requests/Forms/UpdateFieldRequest.php:337-349` accepts `config.options_source` for those two only; the Options tab
+  offers the link through `resources/js/components/builder/LinkedChoicesEditor.vue` (`ConfigPanel.vue:552-568`). The testers'
   comment (2026-10-15): *"All input forms that has options like radio button, checkboxes, select options … must have an option to
   populate options thru the connection to responses from other forms"*. Split out of `R-5fdbc47c`, which named multi-select as
   the remainder's. The remedy: `multi_select` joins `LINKABLE_TYPES`, the request accepts the source for it, and the link is
@@ -14438,10 +14438,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · A text box cannot offer suggestions from a list file or another form's answers.**
   The testers' comment (2026-10-15): *"sometimes even the textbox must have an option to populate options thru the connection to
-  responses from other forms"*. `resources/js/components/submissions/FieldInput.vue:217-265` renders a text question as a plain
-  input, and `app/Http/Requests/Forms/UpdateFieldRequest.php:322-334` accepts no source on it. The remedy: `config.suggestions_source
+  responses from other forms"*. `resources/js/components/submissions/FieldInput.vue:221-274` renders a text question as a plain
+  input, and `app/Http/Requests/Forms/UpdateFieldRequest.php:337-349` accepts no source on it. The remedy: `config.suggestions_source
   = {kind: list | form, …}` on Short text gives a type-ahead (a `<datalist>`-backed combobox) on the web form, the encode page
-  (`app/Services/Submissions/EncodeFormPresenter.php:606-632` already serves linked lists there) and the preview, while free text
+  (`app/Services/Submissions/EncodeFormPresenter.php:629-655` already serves linked lists there) and the preview, while free text
   stays accepted and the server never checks it; the chooser reads "Suggestions come from" on a text question. **Live.** Filed by `M172`.
   **Tier: early-testing.**
 
@@ -14494,7 +14494,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   recorded value in a source form?"*. `app/Support/Forms/ShareableQuestions.php:31-39` never offers a `cascading_select` for
   sharing; a link feeds a flat list of answers for one key (`app/Services/Forms/LinkedChoiceService.php:258-275`, served by
   `app/Http/Controllers/Public/PublicFormSchemaController.php:60-77`) and nothing filters an existing option list by it; the
-  cascade control shows every child of the chosen parent (`resources/js/components/submissions/FieldInput.vue:344-381`). The
+  cascade control shows every child of the chosen parent (`resources/js/components/submissions/FieldInput.vue:353-390`). The
   remedy: `config.levels[i].filter` and, on a list- or form-sourced choice question, `config.options_filter = {form_id, field_key,
   mode: present | absent}`; `ShareableQuestions` admits the cascade (its shared value set is per level); the linked-choices
   endpoint gains `sets` beside the schema with their own stamp (`D60` A), cached by the worker per version
@@ -14505,18 +14505,18 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`nit` · The palette's "Adv" tooltip promises an advanced editor "coming with the form engine", and the settings panel carries a baseline note no type can reach any more.**
   `resources/js/components/builder/FieldPalette.vue:102` titles every advanced type "baseline settings (advanced editor coming
-  with the form engine)" beside the badge at `:106`; `resources/js/components/builder/ConfigPanel.vue:443-446` shows "Baseline
+  with the form engine)" beside the badge at `:106`; `resources/js/components/builder/ConfigPanel.vue:485-488` shows "Baseline
   settings for this advanced field type" only when an advanced type has no editor, and every one has had its editor since the
   form engine landed; `app/Enums/FieldType.php:122-124` says the same. The testers asked whether the Adv types are ready
   (2026-10-15); they are, and the tooltip says otherwise. The remedy: the tooltip says what the Help page says
-  (`resources/js/components/help/manual.ts:649`), the note and the docblock go. **Live.** Filed by `M172`. **Tier: early-testing.**
+  (`resources/js/components/help/manual.ts:650`), the note and the docblock go. **Live.** Filed by `M172`. **Tier: early-testing.**
 
 - **`minor` · Nothing tells an author what each question type can do on each surface, and the testers asked whether the advanced types are ready to use.**
   The testers' question (2026-10-15): *"are the adv questions ready to use?"*. The answer lives only in code: the eleven badged
   types (`app/Enums/FieldType.php:123-131`) render everywhere, while `duration` and `signature` are placed by the palette and
   refused by both channels (`resources/public-runtime/lib/schema-mapping.ts:48-60`, pinned to the encode presenter by
   `tests/Unit/Forms/FieldTypeMirrorDriftTest.php` — `R-af2d278b`), grids are excluded from conditions, piping, OCR and analytics,
-  and the Help page says only that an Adv type's settings are more technical (`resources/js/components/help/manual.ts:299`). The
+  and the Help page says only that an Adv type's settings are more technical (`resources/js/components/help/manual.ts:300`). The
   remedy: a readiness table in Help → Builder reference, one row per type across the builder, the preview, the web form, manual
   entry, paper and scan, the PDF, the spreadsheet export, Sheets and Airtable, analytics and conditions — pinned by the mirror
   drift test and `manual.test.ts` so it cannot rot — written with the two controls `D134` builds. **Live.** Filed by `M172`.
@@ -14524,7 +14524,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · A condition, a calculation or answer piping cannot read a grid cell.**
   `docs/data-dictionary.md:383` records that no expression may reference a grid (`app/Services/Forms/ExpressionValidationGate.php`),
-  `app/Enums/PipingEligibility.php:110` excludes it from piping, and `resources/js/components/help/manual.ts:1122` tells authors so.
+  `app/Enums/PipingEligibility.php:110` excludes it from piping, and `resources/js/components/help/manual.ts:1126` tells authors so.
   With typed cells (the grid rows above) a cell becomes a scalar an expression could read as `${grid.row.column}`; both engines
   and their golden vectors would learn it together. Filed so the gap the typed grid opens is queued rather than left in prose.
   **Live.** Filed by `M172`. **Tier: during-testing.**
@@ -14647,18 +14647,18 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The testers' comment (2026-10-11, comment 3): *"“+ Add question here” button not working"*. `resources/js/Pages/forms/Builder.vue` (line 200 at `cef2a9b0`, before `M176`)
   (`openPaletteFor()`) selects the section, switches a pane that matters only in the compact layout, and focuses the first palette
   button — which is disabled while a save runs, so the focus silently fails; nothing is added. The buttons are
-  `resources/js/components/builder/BuilderCanvas.vue:260` and `resources/js/components/builder/PreviewRuntime.vue:451`, and
-  `resources/js/components/help/manual.ts:274` promises the click adds a question. The remedy: the button opens the palette's
+  `resources/js/components/builder/BuilderCanvas.vue:260` and `resources/js/components/builder/PreviewRuntime.vue:455`, and
+  `resources/js/components/help/manual.ts:275` promises the click adds a question. The remedy: the button opens the palette's
   types as a menu at the button and adds the chosen type into that section at that place (Structure and Preview, the untitled block
   too); the manual's sentence becomes true; the tests assert a question is created, not only that focus moved.
   **Live.** Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M176` (2026-10-18):** `D142` A — the button opens the question types right there as an inline list (`AddQuestionHere.vue`, a disclosure sharing the palette's grouping, `palette-groups.ts`), and the chosen type is added in that spot: Structure into the empty section, Preview at the end of the page the button stands on (`previewInsertPlacement`), at a section's end or at the top of an empty form — one undo entry; the store places it and saves the order only when the arrangement moved. Not a pop-up: `MdsMenu` may not sit in a scroll container (DSR §3.4b). The manual's sentence is now true. Red first: 4 cases. Mutants caught: placement dropped, section dropped. Built and held for merge point 2 (`D137`), not yet live.
 
 - ✅ **CLOSED BY `M176` (2026-10-18) — ****`minor` · A refused question save shows its first error twice — as the lead line and again as the first bullet — and numbers its rules by their place in the request, not on screen.**
   The testers' comment (2026-10-11, comment 2): *"Instructions repeat"* — *"A validation rule must be either a structured rule or an
-  expression — not both, not neither."* above *"Rule 1: A validation rule must be …"*. `resources/js/components/builder/ConfigPanel.vue:487`
+  expression — not both, not neither."* above *"Rule 1: A validation rule must be …"*. `resources/js/components/builder/ConfigPanel.vue:529`
   prints the reply's `message`, which Laravel fills with the first error, and `:489` lists every error including that one;
-  `resources/js/components/builder/field-save-errors.ts:79` names `validations.N` by its position in the request after unfinished
-  rows are withheld, so "Rule 1" can point at the wrong row. The message itself (`app/Http/Requests/Forms/UpdateFieldRequest.php:376`)
+  `resources/js/components/builder/field-save-errors.ts:86` names `validations.N` by its position in the request after unfinished
+  rows are withheld, so "Rule 1" can point at the wrong row. The message itself (`app/Http/Requests/Forms/UpdateFieldRequest.php:391`)
   speaks of structured rules and expressions. The remedy: a neutral lead line ("This question was not saved. Fix the items below.")
   whenever the reply carries an errors map; rule numbers from the editor's rows; the message in plain words ("Rule 1 is empty.
   Choose what it checks, or remove it."). **Live.** Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M176` (2026-10-18):** a refusal with a list of items leads with "This question was not saved. Fix the items below." ("the marked items" when they are all marked in place), never Laravel's copy of the first item; a rule is numbered as the Validation tab numbers it (the store records, at send time, the editor row of each sent rule — the tab lists every rule, Required-when ones included); a check set back to the empty choice is withheld like one never chosen; and the server's XOR message is split into "Empty. Choose what it checks, or remove it." and "Has both a check and an expression. Keep one of them." Red first: Pest 2/2, Vitest 5. Mutants caught: the lead back to the reply's message, the row map dropped, the XOR one message. Built and held for merge point 2 (`D137`), not yet live.
@@ -14666,7 +14666,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M176` (2026-10-18) — ****`minor` · "Allow negative numbers" is a Basics checkbox that is really a hidden "Minimum value 0" rule, so removing that rule turns negatives back on.**
   The user (2026-10-16): *"when they removed the allow negative, the other settings will be saved, but when they removed the
   validation rules, the allow negative returned … include the allow negative in the rules since it is really a validation rule"*.
-  `resources/js/components/builder/field-conversion.ts:246` (`negativeFloor()`) derives the checkbox from whether a `min_value 0` row
+  `resources/js/components/builder/field-conversion.ts:250` (`negativeFloor()`) derives the checkbox from whether a `min_value 0` row
   exists and `:261` (`withNegativesAllowed()`) adds or removes that row; `resources/js/components/builder/FieldTypeControl.vue:316`
   binds the checkbox to it. Unticking adds a visible "Minimum value 0" rule; deleting that rule on the Validation tab ticks the box
   again; editing its value disables the box. The remedy: the Basics checkbox goes; the Validation tab's rule menu offers **No
@@ -14685,7 +14685,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M176` (2026-10-18) — ****`minor` · The "Change question type" dialog speaks in developer words and repeats the type as the question's name.**
   The testers' comment (2026-10-11, comment 1): *"Make the text/instructions more “smart highschooler” friendly"*, on a screenshot of
   this dialog. `resources/js/components/builder/ConvertFieldDialog.vue:39` says *"It keeps its key, so conditions, calculations and
-  text that mention it still point to it"*; `resources/js/components/builder/field-conversion.ts:199` and
+  text that mention it still point to it"*; `resources/js/components/builder/field-conversion.ts:203` and
   `app/Enums/ConversionWarning.php:50` carry the rest, with `app/Enums/ConversionDropReason.php` and `app/Enums/ConversionImpact.php`;
   a new question's label is its type's label (`app/Services/Forms/FormBuilderService.php:137`), so the dialog reads *"Current type of
   “Date & time”: Date & time"*. The remedy: `docs/ux/design-system-reference.md` gains a voice rule — write for a smart
@@ -14715,7 +14715,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M177` (2026-10-19) — ****`minor` · The palette offers Duration, which no respondent can answer, while authors want a duration worked out from two dates.**
   The user (2026-10-16): *"remove the duration question type, that can also be covered in the calculate"*. A Duration question has
-  no control on the web form or manual entry (`resources/js/components/submissions/FieldInput.vue:604`, "Not available for manual
+  no control on the web form or manual entry (`resources/js/components/submissions/FieldInput.vue:613`, "Not available for manual
   entry yet"); `R-af2d278b` planned to build one (`D134`). The remedy (`D140`, which changes `D134`): Duration leaves the palette the
   way Yes/No does; existing Duration questions keep their place; `R-af2d278b` keeps Signature only; a duration is worked out by the
   calculation editor (a Start, an End and Units). **Live.** Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M177` (2026-10-19):** with `R-0b7db001` — Duration leaves the palette and cannot be added or converted into; an existing one says it is retired, that respondents can't answer it, and that a duration will be worked out by a calculation (R4's `R-f77aa45d`). Live on staging since merge point 2 (PR #370, `a5b718bb`).
@@ -14743,9 +14743,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M177` (2026-10-19) — ****`minor` · The builder preview leaves out a section whose questions are all hidden or calculated, so the author cannot see the section they made.**
   The user (2026-10-16): *"if a type of question is calculated, and it is the only question in a section, the section itself will
-  be hidden in the section tab, making the user confuse"*. `resources/public-runtime/composables/useFormRuntime.ts:482` (`pagesOf()`)
+  be hidden in the section tab, making the user confuse"*. `resources/public-runtime/composables/useFormRuntime.ts:504` (`pagesOf()`)
   keeps a page only when one of its fields renders (`:503`), and the builder preview runs the same engine;
-  `resources/js/components/builder/PreviewPane.vue:234` counts as empty only a section with no fields at all; only the Logic view
+  `resources/js/components/builder/PreviewPane.vue:239` counts as empty only a section with no fields at all; only the Logic view
   says *"Nobody filling the form sees this section"* (`resources/js/components/builder/LogicRail.vue:150`). The remedy: the preview
   shows such a section as a card — "Respondents won't see this section: every question in it is hidden" — with its questions dimmed
   and editable, and the step strip marks it; respondents' forms are unchanged. **Live.** Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M177` (2026-10-19):** the runtime's `keepSilentPages` (the builder preview only) keeps such a block as a silent step: a card saying respondents won't see it, its questions listed and selectable, the step strip marking it "(hidden from respondents)"; the guest form and manual entry are unchanged. Red first: 4. Mutant caught: the option ignored. Live on staging since merge point 2 (PR #370, `a5b718bb`).
@@ -14759,7 +14759,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M177` (2026-10-19) — ****`minor` · The builder's help text and messages use words a first-time author does not know.**
   The testers' comment (2026-10-11, comment 1) asks for wording a smart high-schooler understands, and its screenshot is one dialog
-  of many: `resources/js/components/builder/ConfigPanel.vue:524` (*"Evaluated on the server. Use ${field} references …"*) and `:683`
+  of many: `resources/js/components/builder/ConfigPanel.vue:566` (*"Evaluated on the server. Use ${field} references …"*) and `:722`
   (*"Referenced in expressions and exports"*), the help texts of the builder's other editors, the store's messages and the preview's
   list of limits all speak of keys, expressions and references. The remedy: the voice rule that the type-dialog row writes into
   `docs/ux/design-system-reference.md`, applied to every builder help text and message; `manual.ts` follows.
@@ -14778,39 +14778,39 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M178` (2026-10-19) — ****`minor` · A number's minimum or maximum cannot be another question's answer, the question-against-question rules are strictly greater or less, and an expression comparing with a blank answer refuses every answer.**
   The testers' comment (2026-10-11, comment 6): *"Validation rules for number field should be able to reference answers/responses
-  from previous questions"*. A minimum or maximum takes a number only (`app/Services/Forms/ExpressionValidationGate.php:191`);
+  from previous questions"*. A minimum or maximum takes a number only (`app/Services/Forms/ExpressionValidationGate.php:192`);
   `greater_than_field` and `less_than_field` are strict (`app/Enums/ValidationRuleType.php`, line 199 at `617f12d0`, before `M178`); the only way to say "at most
   `field_2`" is the expression `. <= ${field_2}`, which fails while `field_2` is blank because a blank side is NaN and NaN compares
-  false (`app/Services/Expressions/ExpressionEvaluator.php:152`) — `M134` made only the structured rules pass on a blank
+  false (`app/Services/Expressions/ExpressionEvaluator.php:164`) — `M134` made only the structured rules pass on a blank
   (`app/Services/Validation/StructuredRuleEvaluator.php:176`). The remedy: a minimum or maximum may be "a number or another
   question's answer" (the picker); "at least" and "at most" join the two strict rules; an expression comparison with a blank side
   passes, in both engines with golden vectors and the corpus line in `docs/architecture/technical-architecture.md`.
   **Live.** Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M178` (2026-10-19):** two rule types, `at_least_field` and `at_most_field` ("At least / At most another question"), mirroring the strict pair in both engines — M134's "a blank compared answer passes" included — and the Validation tab's Minimum and Maximum offer "A number · Another question's answer", which switches the stored rule to the counterpart the server names (`bound_counterpart`) and clears the value; the compared-question lists leave calculations out until R4 (`D149`). An Expression rule comparing with a blank answer now passes: `ExpressionEvaluator::evaluateConstraint()` and its twin walk the boolean spine three-valued (Kleene `not`/`and`/`or`; a blank side, empty or NaN, is unknown) and are called only from a rule's own expression row, so the verdict is today's or unknown and can only remove a refusal — `. >= 0 and . <= ${q}` still refuses −1. Golden vectors: 6 + 7 validation and 2 leak guards (relevance and `required_if` still read a blank as false), and an 11-vector `constraint` mode in the expression corpus. The planned `if()`-branch case proved impossible: the grammar refuses a comparison as an `if()` branch. Red first on both engines; 11 mutants caught (at least made strict in the PHP enum, the TS map and the export; unknown read as a refusal on both engines; `or` dropping unknown; the walk wired into relevance; NaN not blank; the Minimum switch; the calculation filter; the preview's screen). Built and held for merge point 3 (`D137`), not yet live.
 
-- **`minor` · A calculation is a typed formula with no picker, no presets and no result type, and it cannot use another calculation.**
+- ✅ **CLOSED BY `M180` (2026-10-20) — ****`minor` · A calculation is a typed formula with no picker, no presets and no result type, and it cannot use another calculation.**
   The user (2026-10-16): *"lets make the calculate referenced … create a calculated field using the form's own questions by clicking
   or selecting, not by purely typing. not all users are technical. but make sure that formula can still be typed … put presets"*,
   with Fillout's calculation screens (number, text and duration; a duration from a Start and an End in years, months, weeks, days,
-  hours or minutes). `resources/js/components/builder/ConfigPanel.vue:579` is a two-row text box whose help says *"Evaluated on the
+  hours or minutes). `resources/js/components/builder/ConfigPanel.vue:620` is a two-row text box whose help says *"Evaluated on the
   server"* though both engines compute it; `config.calculated_formula` is the only setting; `tests/golden/validation/calculated.json`
   pins that a calculation cannot read another. The remedy: a Type (**Number · Text · Date · Duration**, decimal places for Number)
   and two modes — **Build it** (presets: Sum, Difference, Average, Count answered, Age from a birth date, Duration between two dates
   or times with Start, End and Units, a date N days from a date, If … then …) and **Formula** (typed, with the reference picker); a
   preset writes the formula shown beneath it, and editing that formula switches to Formula; a calculation may use an earlier one,
-  in dependency order, cycles refused. **Live.** Filed by `M174`. **Tier: early-testing.**
+  in dependency order, cycles refused. **Live.** Filed by `M174`. **Tier: early-testing.** **AMENDED BY `M180` (2026-10-20):** `D156` adds a **Join answers** preset (`concat`) for the Text type. Taken by `M180`. ✅ **CLOSED BY `M180` (2026-10-20):** `CalculationEditor.vue` on Basics — a Result type (Number · Text · Date · Duration), **Build it** with nine presets (`calculation-presets.ts`: each writes a canonical formula that reads back as the preset) and **Formula** with the picker; typing in the formula switches to it; decimal places for a Number and a unit for a Duration, shown by its Type wherever the value is (`displayValue()` on both sides, the template corpus). A calculation may use an earlier one (`R-39dbce5b`). Red first: the presets and the editor by absence, 1 field case, 8 template vectors on both runners, 4 request cases. Mutants: 4 of 4 caught. Built and held for merge point 3 (`D137`), not yet live.
 
-- **`minor` · The expression engines have no date arithmetic, so an age or a duration cannot be calculated, though the Help page promises "an age from a birth date".**
+- ✅ **CLOSED BY `M180` (2026-10-20) — ****`minor` · The expression engines have no date arithmetic, so an age or a duration cannot be calculated, though the Help page promises "an age from a birth date".**
   `app/Services/Expressions/FunctionRegistry.php` offers `selected`, `if`, `count`, `int`, `today` and `now` only; arithmetic on a
   date is NaN and publish refuses it (`app/Services/Forms/ExpressionOperandJudge.php`, "not supported yet");
-  `resources/js/components/help/manual.ts:894` describes a calculation as *"a total, an age from a birth date"*. Duration leaves the
+  `resources/js/components/help/manual.ts:895` describes a calculation as *"a total, an age from a birth date"*. Duration leaves the
   palette for a calculation (`D140`), so the calculation has to do it. The remedy: `date_diff(start, end, unit)` (years, months,
   weeks, days, hours, minutes), `date_add(date, n, unit)`, `age(date)`, `round(n, places)`, `sum(…)` and `coalesce(a, b)` in both
   engines, with golden vectors, the operand judge and the function list in `docs/architecture/technical-architecture.md`.
-  **Live.** Filed by `M174`. **Tier: early-testing.** **AMENDED BY `M178` (2026-10-19):** the "Insert a question" picker (`R-75719ac4`) offers only **Today**, the one date the engines can produce (`today() - 1` is NaN, and a label takes no functions); this row's `date_add` brings the picker's other date presets — Yesterday, Tomorrow, N days from now, N days ago, One month from now — which R4 adds to the picker in the same change.
+  **Live.** Filed by `M174`. **Tier: early-testing.** **AMENDED BY `M178` (2026-10-19):** the "Insert a question" picker (`R-75719ac4`) offers only **Today**, the one date the engines can produce (`today() - 1` is NaN, and a label takes no functions); this row's `date_add` brings the picker's other date presets — Yesterday, Tomorrow, N days from now, N days ago, One month from now — which R4 adds to the picker in the same change. **AMENDED BY `M180` (2026-10-20):** `D155` — `date_diff` and `age` count whole completed units; `D156` — `concat(…)` joins answers as text. Taken by `M180`, with `R-9fb95b45`'s clock half (`D153`). ✅ **CLOSED BY `M180` (2026-10-20):** `date_diff`, `date_add`, `age`, `round`, `sum`, `coalesce` and `concat` in both engines — whole completed units (`D155`), `concat` for a Text calculation (`D156`), one rounding algorithm on the shortest decimal — with a registry mirror test, the operand judge reading each (a number question read as a date is refused), and the picker's Yesterday, Tomorrow, N days from now, N days ago and One month from now; the Help page's "an age from a birth date" is now true. Red first: the same 100 vectors on both runners and the 2 mirror cases, 5 gate and key-use cases, 1 picker case. Mutants: 9 of 9 caught. Built and held for merge point 3 (`D137`), not yet live.
 
 - ✅ **CLOSED BY `M177` (2026-10-19) — ****`nit` · The builder's draft check looks for a calculation's formula under the wrong key, so every calculated question would read "no formula yet".**
   `resources/js/components/builder/draft-snapshot.ts:402` reads `config.formula`, but the formula lives in
-  `config.calculated_formula` (`resources/js/components/builder/ConfigPanel.vue:274`); `resources/js/components/builder/draft-snapshot.test.ts`
+  `config.calculated_formula` (`resources/js/components/builder/ConfigPanel.vue:277`); `resources/js/components/builder/draft-snapshot.test.ts`
   pins the wrong key. Nothing shows it today only because the preview never draws a calculated question; it will once a calculation
   can be shown. The remedy: read `calculated_formula`, and the test with it. **Latent.** It surfaces once a calculated question can be
   shown. Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M177` (2026-10-19):** taken by `M177` because `R-f44e9d00` made it live — `draft-snapshot.ts` reads `calculated_formula`, and the preview rebuilds on visibility and the formula. Red first: 2. Mutant caught. Live on staging since merge point 2 (PR #370, `a5b718bb`).
@@ -14818,7 +14818,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`minor` · A Likert matrix is drawn as stacked cards that repeat the scale in every row, and a Likert scale as loose chips; neither looks like a Likert scale.**
   The user (2026-10-16): *"the likert matrix doesnt look like likert matrix, make a deep research on how kobo make the likert
   matrix"*. `resources/js/components/submissions/MatrixGrid.vue:94` draws each statement as its own card with the scale's words
-  repeated beside its radios (no `<table>`, by the docblock at `:9`); `resources/js/components/submissions/FieldInput.vue:258` sends
+  repeated beside its radios (no `<table>`, by the docblock at `:9`); `resources/js/components/submissions/FieldInput.vue:267` sends
   a Likert scale to the chip-row control. KoboToolbox's Rating question is one grid — a header row of scale words over equal-width
   columns, a statement column about a third wide, one centred radio per cell (Enketo's `label` / `list-nolabel` table) — and its
   `likert` appearance draws one scale as radios on a joined line with the words centred beneath. The remedy, with the grid's table
@@ -14933,19 +14933,52 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   puts such a reference one click away. The remedy (`D147` A): on the blank paper form each reference prints as a blank line
   `________` for the person filling it to write in; an escaped `$${` stays literal. **Live.** Filed by `M178`. **Tier: early-testing.** ✅ **CLOSED BY `M178` (2026-10-19):** `BlankFormPrintPresenter::paperText()` prints each reference in a field's label and hint and a section's title and description as `________`, through the render path's own lenient template parser (so `$${` stays literal and a malformed hole prints nothing, as on screen), before the view escapes the text. Red first: 1 Pest case. Built and held for merge point 3 (`D137`), not yet live.
 
-- **`minor` · A question's Default value is saved but never filled in for a respondent, though the Help page says it is.**
-  The Advanced tab's **Default value** (`resources/js/components/builder/ConfigPanel.vue:800`) saves `default_value`, but nothing reads it
+- ✅ **CLOSED BY `M180` (2026-10-20) — ****`minor` · A question's Default value is saved but never filled in for a respondent, though the Help page says it is.**
+  The Advanced tab's **Default value** (`resources/js/components/builder/ConfigPanel.vue:839`) saves `default_value`, but nothing reads it
   when a form opens — `resources/public-runtime/lib/prefill.ts` seeds only a hidden question's fixed value — and it reaches only the
-  XLSForm export (`app/Services/Xlsform/XlsformExporter.php:283`). `resources/js/components/help/manual.ts:814` says *"an answer filled
+  XLSForm export (`app/Services/Xlsform/XlsformExporter.php:283`). `resources/js/components/help/manual.ts:815` says *"an answer filled
   in before the respondent starts, which they can change"*. The remedy (`D148` A, taken by R4): the default fills the answer when the
   form opens — the public form, the preview and manual entry — and the respondent can change it; a default written as a formula is
-  worked out like a calculation, with the picker. **Live.** Filed by `M178`. **Tier: early-testing.**
+  worked out like a calculation, with the picker. **Live.** Filed by `M178`. **Tier: early-testing.** **AMENDED BY `M180` (2026-10-20):** `D154` — a formula default is worked out once, when the form opens, and is then the respondent's answer. Taken by `M180` with `R-fa3223d9` (the same box). ✅ **CLOSED BY `M180` (2026-10-20):** the browser fills a default in when a form opens fresh — the guest form with nothing to restore, staff keying a new response, the builder preview — worked out ONCE (`D154`) and shaped for its control (`resources/public-runtime/lib/defaults.ts`); a draft restored afterwards drops a seeded default it does not hold, so a cleared one stays cleared; each new repeat entry starts from its members' defaults; the box is **Fixed · Formula**, a choice offering its own options, the picker on a formula over the questions before it and the dates. The server injects nothing. Red first: 14 Vitest (the defaults module by absence). Mutants: 5 of 5 caught. Built and held for merge point 3 (`D137`), not yet live.
 
-- **`minor` · A condition or a rule can name a calculated question, but always reads it as blank.**
+- ✅ **CLOSED BY `M180` (2026-10-20) — ****`minor` · A condition or a rule can name a calculated question, but always reads it as blank.**
   Both engines work out calculations last and never feed them back into relevance or constraints
-  (`app/Services/Validation/SemanticValidator.php:153`, `resources/public-runtime/engine/semantic-validator.ts:180`), yet the condition
-  editor offers every calculated question (`resources/js/components/builder/ConfigPanel.vue:354`) and the compared-question lists do too,
+  (`app/Services/Validation/SemanticValidator.php:126`, `resources/public-runtime/engine/semantic-validator.ts:155`), yet the condition
+  editor offers every calculated question (`resources/js/components/builder/ConfigPanel.vue:366`) and the compared-question lists do too,
   because a calculation's value shape is a number (`app/Enums/ValueShape.php:109`) — so "show when the total is over 10" never shows,
   and a rule against a total never checks. The remedy (`D149` A, taken by R4 with its dependency order): conditions and rules read a
   calculation's value, the calculations worked out before what reads them, cycles refused at publish. Until then R3's lists leave
-  calculations out. **Live.** Filed by `M178`. **Tier: early-testing.**
+  calculations out. **Live.** Filed by `M178`. **Tier: early-testing.** ✅ **CLOSED BY `M180` (2026-10-20):** both engines work calculations out in dependency order (`CalculationOrder` / `calculation-order.ts`, one shared fixture) and lay their values over every expression context — relevance, sections, skip rules and each repeat member's inside the relevance fixed point (over the raw repeat instances, as the formula written inline would read them), and every rule and required-when, a grid's, a map's and a media question's too, over the final values; a self-reference or a loop is never worked out and publish refuses it, naming the loop (`calculation_cycle`); R3's two filters are gone. Red first: the same 11 validation vectors on both runners and the order fixture, 3 gate cases, 2 Vitest. Mutants: 8 of 8 caught. Built and held for merge point 3 (`D137`), not yet live.
+
+- **`minor` · A date or time answer cannot be compared with `now()`, so publish refuses that comparison as not supported yet.**
+  Split from `R-9fb95b45` by `D153` (2026-10-20). `M180` stamps both clocks in the form's time zone, so `today()` is the form's
+  calendar day; but a date-time answer is the browser's `datetime-local` value, wall clock with no offset, while `now()` carries the
+  zone's offset, and `app/Services/Expressions/Temporal.php` never orders a naive value against a zoned one (`D89`) — so
+  `app/Services/Forms/ExpressionOperandJudge.php` still refuses `${d} < now()` at publish as "not supported yet". The remedy: read a
+  naive answer as wall clock in the form's time zone where it meets the clock, in both engines with golden vectors, then lift the
+  refusal (`expressionOrdersDateAgainstClock` in `app/Exceptions/Forms/PublishValidationException.php`). **Live.** Filed by `M180`.
+  **Tier: during-testing.**
+
+- **`minor` · An exported formula Default value becomes an XLSForm `calculation`, which ODK recalculates live, while this app works it out once when the form opens.**
+  Found with `D154`. `app/Services/Xlsform/XlsformExporter.php` writes a default marked as a formula to the `calculation`
+  column (`applyDefault`), and `app/Services/Xlsform/XlsformImportParser.php` reads a non-calculate question's `calculation` back as a
+  formula default, so the round trip holds — but ODK Collect recalculates a visible question's `calculation` as the other answers
+  change and overwrites what the respondent typed, while `D154` works the default out once. The remedy: export a formula default to the
+  `default` column (ODK's dynamic default, worked out once), read a dynamic `default` back as a formula, and say so in
+  `docs/xlsform-interop-spec.md`. **Live.** It needs an export of a form with a formula default. Filed by `M180`.
+  **Tier: during-testing.**
+
+- **`nit` · A formula Default value is never checked at publish, so one with an unknown function is saved and quietly fills nothing in.**
+  Found by `M180` while building `R-20784770`. `app/Services/Forms/ExpressionValidationGate.php` checks every relevance, constraint and
+  calculation formula, but never `default_value` when `default_value_is_expression` is set; an XLSForm import stores a `calculation`
+  on an ordinary question as such a default even with a function the engines do not have, and the browser skips a default it cannot
+  work out (`resources/public-runtime/lib/defaults.ts`), so the author is never told. The remedy: check a formula default at publish
+  as a notice (never a refusal — imported forms already carry them), and show it in the builder beside the box. **Live.**
+  Filed by `M180`. **Tier: during-testing.**
+
+- **`nit` · The Logic rail's loop notice cannot see a loop that runs through a calculation's formula.**
+  Found by `M180` while building `R-39dbce5b`. `app/Services/Forms/StepGraphInspector.php` draws its edges from relevance
+  expressions, containment and skip rules only, so "show when the total is over 10" on a question that the total itself reads is a
+  loop the rail never names; the engines settle it within their bound, and publish refuses only a loop of calculations
+  (`calculation_cycle`). The remedy: add each calculation's formula references as edges, worded for a loop through a calculation.
+  **Live.** Filed by `M180`. **Tier: during-testing.**

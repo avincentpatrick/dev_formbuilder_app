@@ -135,6 +135,8 @@ const runtime = createFormRuntime(props.schema, {
     // Increment M124 (`D57`, amended) — page breaks paginate a stepped form. The schema is fixed for the session
     // (a version drift remounts), so a plain boolean is exact; a single-page form never splits.
     paginateAtPageBreaks: !props.schema.form.single_page_mode,
+    // M180 (`R-20784770`) — defaults only on a form opened fresh: nothing restored, resumed, read from paper or reviewed.
+    seedDefaults: props.initialAnswers === undefined && !props.resume && !props.paperReview && !props.resolving,
 });
 const announcer = createAnnouncer();
 
@@ -208,7 +210,7 @@ onMounted(async () => {
     if (props.initialAnswers === undefined) {
         const draft = await autosave.restore();
         if (draft !== null) {
-            runtime.restoreAnswers(draft.answers);
+            runtime.restoreDraft(draft.answers); // M180: a default the draft does not hold was cleared — keep it cleared
             runtime.locale.value = draft.locale;
             runtime.goToStep(draft.currentStepKey);
         }

@@ -42,6 +42,7 @@ import type { BuilderStore } from './useBuilderStore';
 import type { BuilderPageProps } from './types';
 import { useFlipReorder } from './useFlipReorder';
 import { usePreviewReorder } from './usePreviewReorder';
+import { isoClock } from '../../../public-runtime/lib/schema-mapping';
 import type { AnswerMap, SchemaResponse } from '../../../public-runtime/lib/types';
 
 const props = defineProps<{
@@ -85,6 +86,10 @@ const runtimeHost = ref<InstanceType<typeof PreviewRuntime> | null>(null);
 
 /** The answers handed to the next engine, so a rebuild does not wipe what the author typed to try the form out (M151). */
 const carried = ref<AnswerMap>({});
+// M180 (`D153`) — the preview's clock: the moment the pane opened, stamped in the form's zone, so `today()`, an age and a date
+// default read as the respondent will see them. One instant for every rebuild, as one session keeps one clock.
+const previewInstant = new Date();
+const previewNow = computed(() => isoClock(previewInstant, props.form.timezone));
 
 let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -318,6 +323,7 @@ function onRename(key: string, value: string, via: 'key' | 'blur'): void {
             ref="runtimeHost"
             :key="engine.shape"
             :snapshot="engine.schema"
+            :now="previewNow"
             :model="model.renderModel"
             :issues-by-key="model.issuesByKey"
             :selected-key="selectedKey"

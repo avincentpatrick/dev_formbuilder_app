@@ -40,6 +40,10 @@
  *     31-string catalog above.
  */
 
+import { isNumericLike, toNumber } from './coercion';
+import { UNITS } from './date-math';
+import { fixedDecimal, MAX_PLACES, plainDecimal } from './rounding';
+
 /** Mirror of `FieldType::hasOptions()` — the types carrying an author-defined option list. */
 const HAS_OPTIONS = new Set(['single_select', 'multi_select', 'dropdown', 'likert_scale']);
 
@@ -350,6 +354,26 @@ function formatScoreGrid(answer: unknown): string {
  *                projection, which has already dropped what this reads
  * @param locale  resolves choice-option `label_translations` (amendment A8); omit for the base label
  */
+/** A calculation's value by its Type (M180); null when its Type writes nothing different. Mirrors PHP `SchemaValueFormatter::calculated()`. */
+function calculatedValue(answer: unknown, config: Record<string, unknown>): string | null {
+    if (!(typeof answer === 'number' || (typeof answer === 'string' && isNumericLike(answer)))) {
+        return null;
+    }
+
+    const number = toNumber(answer);
+    const places = config.decimal_places;
+    const unit = config.duration_unit;
+
+    switch (config.calculated_type) {
+        case 'number':
+            return typeof places === 'number' && Number.isInteger(places) && places >= 0 && places <= MAX_PLACES ? fixedDecimal(number, places) : null;
+        case 'duration':
+            return typeof unit === 'string' && UNITS.includes(unit) ? `${plainDecimal(number)} ${Math.abs(number) === 1 ? unit.slice(0, -1) : unit}` : null;
+        default:
+            return null;
+    }
+}
+
 export function displayValue(
     type: string,
     answer: unknown,
@@ -367,6 +391,15 @@ export function displayValue(
 
     if (type === 'yes_no') {
         return boolLabel(answer);
+    }
+
+    // M180 (`R-f77aa45d`): a calculation shown by its Type — a Number to its decimal places, a Duration with its unit.
+    // Untyped, or not a number, it falls through to the rules below, exactly as before.
+    if (type === 'calculated') {
+        const typed = calculatedValue(answer, config);
+        if (typed !== null) {
+            return typed;
+        }
     }
 
     if (GEO_TYPES.has(type)) {

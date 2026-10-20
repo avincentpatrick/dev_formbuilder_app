@@ -63,6 +63,8 @@ import { dropIdOf } from './usePreviewReorder';
 const props = defineProps<{
     /** The frozen snapshot this engine was built from. Never mutated; a new one arrives as a remount. */
     snapshot: SchemaResponse;
+    /** M180 (`D153`) — the clock `today()` reads, stamped in the form's zone by the pane (`isoClock()`); none, none. */
+    now?: string | null;
     /** The LIVE render model. Updates in place on every store change, with no remount. */
     model: RenderModel;
     issuesByKey: Record<string, ProjectionIssue[]>;
@@ -123,9 +125,11 @@ const emit = defineEmits<{
 
 const runtime = createFormRuntime(props.snapshot, {
     initialLocale: props.snapshot.form.default_locale,
-    // No query string and no frozen clock: a preview has no URL prefill to honour, and `now`/`today` staying
-    // unavailable matches the pre-H21a behaviour rather than inventing an authoring clock.
+    // No query string: a preview has no URL prefill to honour. M180 (`D153`, `R-20784770`): a clock in the form's zone,
+    // so `today()`, an age and a date default show here as the respondent will see them, and the defaults filled in.
     search: '',
+    now: props.now ?? null,
+    seedDefaults: true,
     // Increment M124 — page breaks paginate a stepped form here exactly as for the respondent. A COMPUTED off
     // the live model, never a getter: `props.model` is a fresh object on every store change, so a getter would
     // re-run the step list on every keystroke, while this invalidates only when the mode itself flips — and it

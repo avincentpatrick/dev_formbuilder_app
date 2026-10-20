@@ -52,6 +52,18 @@ final class ExpressionSyntaxException extends ExpressionException
         return new self("Function “{$name}” expects {$expected} argument(s), got {$got}.", 'arity_mismatch');
     }
 
+    /** M180: a variadic function (`sum`, `concat`) called with fewer than its minimum — the same stable slug. */
+    public static function arityAtLeast(string $name, int $min, int $got): self
+    {
+        return new self("Function “{$name}” expects at least {$min} argument(s), got {$got}.", 'arity_mismatch');
+    }
+
+    /** M180: an argument the function needs as a fixed value — a unit, a number of decimal places — is not one. */
+    public static function invalidArgument(string $name, string $detail): self
+    {
+        return new self("Function “{$name}” {$detail}", 'invalid_argument');
+    }
+
     public static function nonValueOperand(string $context): self
     {
         return new self("A boolean-valued sub-expression cannot be used as {$context}.", 'non_value_operand');

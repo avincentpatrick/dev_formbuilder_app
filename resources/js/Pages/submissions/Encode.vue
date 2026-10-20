@@ -216,6 +216,8 @@ const runtime = createFormRuntime(props as unknown as SchemaResponse, {
     // request that already has an authorized one.
     initialAnswers: (props.draft?.answers ?? props.editing?.answers ?? props.scan?.answers) as Record<string, never> | undefined,
     initialClientSubmissionUuid: props.draft?.client_submission_uuid,
+    // M180 (`R-20784770`) — a new response starts from the questions' defaults; a draft, a correction and a scan do not.
+    seedDefaults: (props.draft ?? props.editing ?? props.scan ?? null) === null,
 });
 
 // Seed each repeatable section's `min_instances` starter rows. The GUEST deliberately opens a repeat group

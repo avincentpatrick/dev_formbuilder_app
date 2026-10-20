@@ -421,7 +421,7 @@ export function projectDraft(input: DraftProjectionInput): DraftProjection {
             hint_translations: null,
             placeholder: f.placeholder,
             default_value: f.default_value,
-            default_value_is_expression: false,
+            default_value_is_expression: f.default_value_is_expression ?? false, // M180: a formula default is worked out in the preview
             is_required: requiredModeOf(f.is_required),
             // State 5: the load-bearing one.
             relevant_expression: parsedOrNull(f.relevant_expression, () =>
@@ -514,6 +514,7 @@ export function shapeOf(snapshot: RawSchemaSnapshot): string {
         f.is_required,
         f.relevant_expression,
         f.default_value,
+        f.default_value_is_expression ?? false,
         optionValuesOf(f.config),
         // M177 (`R-f44e9d00`): Show to respondents decides what renders, and an Always calculation shows its formula's
         // value — so both rebuild the runtime, as an option value does.

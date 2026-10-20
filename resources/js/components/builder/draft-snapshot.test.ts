@@ -536,3 +536,13 @@ group('9. rule rows — screened through the engine’s own lowering (M145, R-55
         expect(issues).toHaveLength(1);
     });
 });
+
+group('a formula default reaches the preview (M180, R-20784770)', () => {
+    it('projects the default\'s formula flag, and a change to it alone moves the shape', () => {
+        const fixed = projectDraft(input([field({ uid: 'u1', default_value: 'today()' })]));
+        const formula = projectDraft(input([field({ uid: 'u1', default_value: 'today()', default_value_is_expression: true } as Partial<LocalField> & { uid: string })]));
+
+        expect(formula.schema.version.schema.fields[0].default_value_is_expression).toBe(true);
+        expect(shapeOf(formula.schema.version.schema)).not.toBe(shapeOf(fixed.schema.version.schema));
+    });
+});

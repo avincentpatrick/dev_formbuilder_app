@@ -17,6 +17,7 @@ use App\Models\SubmissionAnswer;
 use App\Services\Entitlements\EntitlementService;
 use App\Services\Webhooks\WebhookEventDispatcher;
 use App\Support\Entitlements\FeatureAdmission;
+use App\Support\Forms\FormClock;
 use App\Support\Tenancy\TenantContext;
 
 /**
@@ -78,7 +79,9 @@ final class FormAutomationDispatcher
 
                     $skip = null;
                     try {
-                        $skip = $this->conditions->matches($automation->condition, $answers, $event->submittedAt) ? null : 'condition_not_met';
+                        // M180 (`D153`): the response's own time, in the form's zone, so `today()` is the form's calendar day.
+                        $now = $event->submittedAt === null ? null : FormClock::at($event->submittedAt, $automation->form?->timezone);
+                        $skip = $this->conditions->matches($automation->condition, $answers, $now) ? null : 'condition_not_met';
                     } catch (ExpressionException $e) {
                         report($e);
                         $skip = 'condition_error';

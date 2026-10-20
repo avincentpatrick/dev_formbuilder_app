@@ -16,7 +16,64 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M180`, R4 of the testers' round 2: calculations by clicking (`R-39dbce5b`, `R-da02fe03`, `R-20784770`, `R-f77aa45d`, plus `R-9fb95b45`'s clock and `R-fa3223d9`) (m180-r4-calculations)
+## Status: NO ACTIVE CLAIM — `M178` (R3) and `M180` (R4) are merged and live on staging, released together at merge point 3 (`D137`; below). The next claim is UI5 — versioning and What's new (`D123`, `D138`), held green for merge point 4. Merge only at a planned merge point.
+
+## RELEASED — `M180`, R4 of the testers' round 2: calculations by clicking (`R-39dbce5b`, `R-da02fe03`, `R-20784770`, `R-f77aa45d`, plus `R-9fb95b45`'s clock and `R-fa3223d9`) (merged as PR #373, `40a4ad85`, last at merge point 3, rebased onto the trunk after `M178`; 6/6 green with real step counts on its rebased run at `36322c16` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `40a4ad85` the same)
+
+Built and released 2026-10-20 by one session (Opus) from the plan of record (`~/.claude/plans/here-are-added-comments-peppy-quill.md` §B
+R4, §E) and the build plan (`~/.claude/plans/pasted-content-id-ce0d-read-claude-md-composed-moon.md`). **Released last at merge point 3,
+after `M178`:** before either merge, the user's census (08:49 UTC: tenants 1 · users 6 · forms 11 · form_versions 27 · submissions 22 ·
+attachments 62 · feedback_reports 31 · notifications 62), the backup block the trunk still asked for until `M178` landed (`Result: 0`,
+`staging-2026-10-20-085056.dump`, 459,590 B), and a read-only check on the box of what R4 changes on deploy (08:52 UTC: 11 forms, all on
+UTC; 5 calculations — 1 published, 4 in drafts — none reading another, none in a loop; no condition, section, skip or rule naming a
+calculation; no question outside Hidden with a Default value — so nothing live changed meaning but the 11 forms' zone). `M178` merged and
+deployed; this branch rebased onto the trunk by its own 56 commits (`git rebase --onto origin/main ad40d39d` — the tree byte-identical
+before and after, since the claim-merge commit's tree equalled the new trunk's) and re-ran 6/6 (run 39399195045); squash-merged as
+`40a4ad85` with an explicit body; the trunk's CI 6/6 (run 39404084057); the deploy (run 39407669603) backed up to
+`deploy-20261020-102527.dump` (459,649 B), counted 67 tables and 9,918 rows, ran `000141` and `000142`, and found every table at least as
+full after; `/up` 200. ⚠️ The whole-database count before R4's migration was 25 rows below the one R3's deploy took 33 minutes earlier —
+the guard compares only across its own migration; the user's census after (10:59 UTC) matched the one before table for table, so the drop
+was transient rows (sessions, cache, the queue). The feedback pull read 0 reports, 0 reopened and 0 new comments at the start and at the
+close. Rows taken: the four, `R-9fb95b45`'s clock half and `R-fa3223d9`, with `R-f20f07f4` (the data dictionary's `forms.timezone`) — all
+closed on the branch; `R-c32e2c6a` closed as already fixed. Filed, not fixed: `R-ba47e460` and `R-ddbf337d` (planning), `R-5ec49f06` and
+`R-f4e06110` (building), `R-80a26ecb` (the browser look). Relayed `U4` (with PDF comment 6) resolved at `ef6c4413` and `U8` at
+`40a4ad85`, the stock note only (relayed: 15 Resolved · 10 Ongoing · 6 Confirmed working).
+
+**Measured against the prediction:**
+- **Red first, row by row — held.** Each row's tests went red on both runners before its fix: the calculation vectors (11 validation
+  vectors on both engines, the order fixture, 3 gate cases); the functions (100 expression vectors on both runners, the registry mirror, 5
+  gate and key-use cases, the picker); the clock (10 Pest, 1 Vitest); the Default value (14 Vitest, the defaults module by absence); the
+  editor (the presets and the editor by absence, 8 of the 12 new template vectors on both runners, 4 request cases, 1 field case).
+- **Mutants: 32 committed, 31 caught, each red set the one written down first** — 8 for the calculation order, 9 for the functions and
+  their publish side, 4 for the clock, 5 for the Default value, 4 for the editor, through `scripts/mutate.php` or committed and reverted.
+  ⛔ **The survivor was the new e2e's first form:** it cleared only a TEXT default, and a merging restore (`restoreAnswers` for
+  `restoreDraft` in `RuntimeSession.vue`) left it green — a cleared text box is saved as `''`, which a merge writes back anyway; only a
+  cleared NUMBER (saved as null, which a merge skips) reaches `restoreDraft`'s delete. With a number default added, the same mutant failed
+  exactly at the last check.
+- **"Most likely wrong: the `processRepeats` split keeps every vector byte-identical" — not wrong.** The 180 earlier validation vectors and
+  3,387 Pest stayed green on the first run; only `calc_no_chaining_between_calcs` moved (now `calc_reads_earlier_calc`). The vectors compare
+  errors sorted, so error order was never what they pinned.
+- **Runner-up, `round()` parity — not wrong:** one algorithm (the shortest round-tripping decimal, then half away from zero) gave the 35
+  math vectors on both runners at the first green. **"About 20 mutants" — 32.**
+- **What no prediction named:** (1) two migration prefixes, not the one the claim named — `000141` (the default) and `000142` (the
+  privileged switch, whose guard throws if a UTC form is left); measured on the dev database before the merge (335 forms moved, 0 left);
+  (2) two `EncodeStepPayloadTest` cases pinned UTC for a new form; (3) the planning pass's leap-day ages were off by one (2004-02-29 is 21
+  on 2026-02-28 and 22 on 2026-03-01 — DATEDIF agrees); (4) ⛔ `BacklogProvenanceTest` refused two rows I filed (a filer named twice, one
+  wrapped across a line) — caught only by the full Pest run, the second increment in a row with this miss: run `tests/Feature/Docs` after
+  every tracker edit; (5) the e2e's share and archive calls answer with a redirect Playwright followed (a PATCH to a GET page; the archive
+  onto a guest form that 404s once archived) — `maxRedirects: 0`, the archive helper's for every spec; (6) a scheduled CI run on `main`
+  redeployed the unchanged trunk at 08:50 UTC, the minute of the user's census and backup — harmless, but a schedule on `main` deploys.
+- **Dropped or filed, not built:** a preview issue on each cycle member (publish refuses a loop by name; the preview draws a calculation
+  only when it is Always); calculation edges in the Logic rail (`R-f4e06110`); a publish notice for a bad formula default (`R-5ec49f06`).
+- **The real-browser look** (a throwaway desktop spec; screenshots in the git-ignored `storage/app/m180-look/`): Age on Build it, a
+  duration between two date-times in hours, Join answers on a Text calculation, the same as a typed formula, the Default value Fixed then
+  Formula, the preview. One finding, filed: `R-80a26ecb` (the Default value's switch carries no visible label).
+- **Local gates on the final tree:** Vitest 4,083 (one token-scan file timed out beside a browser run, 4 of 4 alone); type-check; Pint
+  bare; host PHPStan 0 (the container's 44 are migration-typed false positives); the host lints; Pest 5,935 plus the 80 files the
+  container's collector misses (`tests/Feature/Forms`, `tests/Feature/Submissions`) by explicit list — 1,012 with the provenance file; the
+  first full run hit the CLI's 128 MB cap. E2E: the new `calculations-and-defaults`, then `builder-insert-question`,
+  `builder-preview-authoring`, `builder-axe`, `encode-validation` and `public-runtime-axe` at all three widths — 165 passed, 2 skipped, 1
+  desktop miss in `encode-validation` (the summary listed the field, its inline words never drew) that passed 9 of 9 alone.
 
 Taken 2026-10-20. Branch `m180-r4-calculations`, **stacked**: cut from `origin/m178-r3-references` at `1b2c53c8` (R3 with the trunk merged
 in), with `origin/main` merged on top to bring this claim — that merge is the claim-merge commit, and R4's own commits start after it. PR
@@ -249,14 +306,18 @@ end-to-end transition spec** — the first in the repository that walks a status
 CI's plain-HTTP host. Runner-up: the two CHECK rebuilds, which no fresh database can see — hence `FeedbackCheckWideningTest` and the dev-stack
 rehearsal.
 
-## HELD — `M178`, R3 of the testers' round 2: references everywhere (`R-75719ac4`, `R-917496f9`, plus `R-2d921bbe`'s last step) (m178-r3-references)
+## RELEASED — `M178`, R3 of the testers' round 2: references everywhere (`R-75719ac4`, `R-917496f9`, plus `R-2d921bbe`'s last step) (merged as PR #371, `ef6c4413`, first at merge point 3, 6/6 green with real step counts on its run at `1b2c53c8` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `ef6c4413` the same)
 
-**BUILT — PR #371, CI 6/6 green with real step counts (run 39261448121 at `44951a80`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the only skips are the two main-only staging-header steps and the failure-only report upload) — AND NOT MERGED.** ⛔ **Held for merge point 3 (`D137`, `D138`):**
-this PR merges with R4's, between the user's census before and after. **V comes first** (`M179`, the user, 2026-10-19): released alone at its green,
-branched from `origin/main` beside this held branch; R4 then stacks on this branch with `origin/main` merged in. The branch carries the two rows'
-closures, `R-2d921bbe`'s, `D147`–`D149`, three filed rows (the paper form's, closed here; the Default value's and the calculations', for R4),
-`R-da02fe03` amended, the status bullet, the regenerated line and hand-off. ⚠️ The backup block's retirement takes effect only when this merges —
-until then the trunk's `CLAUDE.md` still asks for it, so V's lone release runs it.
+**RELEASED FIRST AT MERGE POINT 3 (`D137`, `D138`), 2026-10-20, by the R4 session.** Built green on 2026-10-19 (run 39261448121 at
+`44951a80`), then held while V (`M179`) went live alone — the user checked V on 2026-10-20 ("Checked — all good"). Brought up to date by
+merging the trunk (`1b2c53c8`; four mechanical conflicts — `decisions.md`, `feature-backlog.md`, `pipeline.md`, `PROGRESS.md`) and re-run
+6/6 (run 39368553660). At merge point 3: the user's census at 08:49 UTC (tenants 1 · users 6 · forms 11 · form_versions 27 · submissions
+22 · attachments 62 · feedback_reports 31 · notifications 62) and, because the trunk still asked for it until this PR landed, the backup
+block (`Result: 0`, `staging-2026-10-20-085056.dump`, 459,590 B) — the last time it was owed; squash-merged as `ef6c4413` with an explicit
+body; the trunk's CI 6/6 (run 39399122098); the deploy (run 39403424620) backed up to `deploy-20261020-095228.dump` (461,973 B), counted
+67 tables and 9,943 rows, found nothing to migrate and every table at least as full after; `/up` 200. `M180` (R4) then merged on top, the
+first merge under the routine this PR set — the user's census before and after, no backup by hand — and the census after (10:59 UTC)
+matched the one before exactly. Relayed `U4` (with PDF comment 6) resolved at `ef6c4413`, the stock note only. The build's record follows.
 
 **Measured against the prediction:**
 - **Red first, row by row, where predicted** — the retired block's docs test 4 of 4; the two rule types 14 Pest (six golden vectors on PHP, the

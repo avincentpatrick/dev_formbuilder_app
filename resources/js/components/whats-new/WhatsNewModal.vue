@@ -63,7 +63,8 @@ function close(then?: () => void): void {
 }
 
 function seeAll(): void {
-    close(() => router.visit('/whats-new'));
+    router.visit('/whats-new');
+    close();
 }
 </script>
 

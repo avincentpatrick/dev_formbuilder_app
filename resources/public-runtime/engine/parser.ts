@@ -12,7 +12,9 @@
 
 import type { ArithmeticOperator, ComparisonOperator } from './enums';
 import { ExpressionSyntaxError } from './errors';
+import { UNITS } from './date-math';
 import { FunctionRegistry } from './function-registry';
+import { MAX_PLACES } from './rounding';
 import { fieldRef, kind, numberLiteral, stringLiteral, type Node } from './ast';
 import { ExpressionLexer } from './lexer';
 import type { Token, TokenType } from './tokens';
@@ -299,9 +301,12 @@ export class ExpressionParser {
         this.expect('rparen');
         this.ascend();
 
-        const arity = this.functions.arity(name);
-        if (arity !== null && args.length !== arity) {
-            throw ExpressionSyntaxError.arityMismatch(name, arity, args.length);
+        // M180: an arity is a range — `sum` and `concat` take any number from one.
+        const [min, max] = this.functions.arity(name) ?? [args.length, args.length];
+        if (args.length < min || (max !== null && args.length > max)) {
+            throw max === min
+                ? ExpressionSyntaxError.arityMismatch(name, min, args.length)
+                : ExpressionSyntaxError.arityAtLeast(name, min, args.length);
         }
 
         this.validateCallArgs(name, args);
@@ -331,8 +336,43 @@ export class ExpressionParser {
             case 'int':
                 requireValue(args[0], 'an int() argument');
                 break;
+            case 'date_diff':
+            case 'date_add':
+                // M180: `date_diff(start, end, unit)` and `date_add(date, n, unit)` — the unit is a fixed word.
+                requireValue(args[0], `a ${name}() argument`);
+                requireValue(args[1], `a ${name}() argument`);
+                this.requireUnit(name, args[2]);
+                break;
+            case 'age':
+                requireValue(args[0], 'an age() argument');
+                break;
+            case 'round':
+                // M180: `round(n, places)` — the places are a fixed whole number, 0 to 10.
+                requireValue(args[0], 'a round() argument');
+                this.requirePlaces(args[1]);
+                break;
+            case 'sum':
+            case 'coalesce':
+            case 'concat':
+                args.forEach((arg) => requireValue(arg, `a ${name}() argument`));
+                break;
             default:
                 break; // today/now take no args
+        }
+    }
+
+    /** M180: a date function's unit must be one of `UNITS`, written as a quoted word. Mirrors PHP `requireUnit()`. */
+    private requireUnit(name: string, node: Node): void {
+        if (node.type !== 'literal' || node.literalKind !== 'string' || !UNITS.includes(String(node.value))) {
+            throw ExpressionSyntaxError.invalidArgument(name, "takes its unit as one of 'years', 'months', 'weeks', 'days', 'hours' or 'minutes'.");
+        }
+    }
+
+    /** M180: `round()`'s decimal places must be a written whole number from 0 to `MAX_PLACES`. Mirrors PHP `requirePlaces()`. */
+    private requirePlaces(node: Node): void {
+        if (node.type !== 'literal' || node.literalKind !== 'number' || typeof node.value !== 'number'
+            || !Number.isInteger(node.value) || node.value < 0 || node.value > MAX_PLACES) {
+            throw ExpressionSyntaxError.invalidArgument('round', `takes its decimal places as a whole number from 0 to ${MAX_PLACES}.`);
         }
     }
 

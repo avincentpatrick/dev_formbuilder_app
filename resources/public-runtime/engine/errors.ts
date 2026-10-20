@@ -50,6 +50,16 @@ export class ExpressionSyntaxError extends Error {
         return new ExpressionSyntaxError(`Function “${name}” expects ${expected} argument(s), got ${got}.`, 'arity_mismatch');
     }
 
+    /** M180: a variadic function (`sum`, `concat`) called with fewer than its minimum — the same stable slug. */
+    static arityAtLeast(name: string, min: number, got: number): ExpressionSyntaxError {
+        return new ExpressionSyntaxError(`Function “${name}” expects at least ${min} argument(s), got ${got}.`, 'arity_mismatch');
+    }
+
+    /** M180: an argument the function needs as a fixed value — a unit, a number of decimal places — is not one. */
+    static invalidArgument(name: string, detail: string): ExpressionSyntaxError {
+        return new ExpressionSyntaxError(`Function “${name}” ${detail}`, 'invalid_argument');
+    }
+
     static nonValueOperand(context: string): ExpressionSyntaxError {
         return new ExpressionSyntaxError(`A boolean-valued sub-expression cannot be used as ${context}.`, 'non_value_operand');
     }

@@ -457,9 +457,12 @@ final class ExpressionParser
         $this->expect(TokenType::RParen);
         $this->ascend();
 
-        $arity = $this->functions->publicArity($name);
-        if ($arity !== null && count($args) !== $arity) {
-            throw ExpressionSyntaxException::arityMismatch($name, $arity, count($args));
+        // M180: an arity is a range — `sum` and `concat` take any number from one.
+        [$min, $max] = $this->functions->arity($name) ?? [count($args), count($args)];
+        if (count($args) < $min || ($max !== null && count($args) > $max)) {
+            throw $max === $min
+                ? ExpressionSyntaxException::arityMismatch($name, $min, count($args))
+                : ExpressionSyntaxException::arityAtLeast($name, $min, count($args));
         }
 
         $this->validateCallArgs($name, $args);
@@ -482,6 +485,38 @@ final class ExpressionParser
             $this->requireValueOperand($args[0], 'a count() argument');
         } elseif ($name === 'int') {
             $this->requireValueOperand($args[0], 'an int() argument');
+        } elseif ($name === 'date_diff' || $name === 'date_add') {
+            // M180: `date_diff(start, end, unit)` and `date_add(date, n, unit)` — the unit is a fixed word.
+            $this->requireValueOperand($args[0], "a {$name}() argument");
+            $this->requireValueOperand($args[1], "a {$name}() argument");
+            $this->requireUnit($name, $args[2]);
+        } elseif ($name === 'age') {
+            $this->requireValueOperand($args[0], 'an age() argument');
+        } elseif ($name === 'round') {
+            // M180: `round(n, places)` — the places are a fixed whole number, 0 to 10.
+            $this->requireValueOperand($args[0], 'a round() argument');
+            $this->requirePlaces($args[1]);
+        } elseif ($name === 'sum' || $name === 'coalesce' || $name === 'concat') {
+            foreach ($args as $arg) {
+                $this->requireValueOperand($arg, "a {$name}() argument");
+            }
+        }
+    }
+
+    /** M180: a date function's unit must be one of {@see DateMath::UNITS}, written as a quoted word. */
+    private function requireUnit(string $name, Node $node): void
+    {
+        if (! $node instanceof LiteralNode || ! $node->isStringLiteral() || ! in_array($node->value, DateMath::UNITS, true)) {
+            throw ExpressionSyntaxException::invalidArgument($name, "takes its unit as one of 'years', 'months', 'weeks', 'days', 'hours' or 'minutes'.");
+        }
+    }
+
+    /** M180: `round()`'s decimal places must be a written whole number from 0 to {@see Rounding::MAX_PLACES}. */
+    private function requirePlaces(Node $node): void
+    {
+        if (! $node instanceof LiteralNode || $node->isStringLiteral() || ! is_float($node->value)
+            || floor($node->value) !== $node->value || $node->value < 0 || $node->value > Rounding::MAX_PLACES) {
+            throw ExpressionSyntaxException::invalidArgument('round', 'takes its decimal places as a whole number from 0 to '.Rounding::MAX_PLACES.'.');
         }
     }
 

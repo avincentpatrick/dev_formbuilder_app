@@ -252,8 +252,116 @@ final class ExpressionEvaluator
             'int' => $this->intCast($this->eval($this->arg($node, 0), $context)),
             'today' => $this->today($context),
             'now' => $context->hasNow() ? $context->now : Marker::Absent,
+            // M180 (`R-da02fe03`, `D155`, `D156`): the date and number library.
+            'date_diff' => DateMath::diff($this->eval($this->arg($node, 0), $context), $this->eval($this->arg($node, 1), $context), $this->unit($node)),
+            'date_add' => DateMath::add($this->eval($this->arg($node, 0), $context), $this->eval($this->arg($node, 1), $context), $this->unit($node)),
+            'age' => DateMath::age($this->eval($this->arg($node, 0), $context), $context->hasNow() ? (string) $context->now : null),
+            'round' => $this->roundOf($node, $context),
+            'sum' => $this->sumOf($node, $context),
+            'coalesce' => $this->coalesce($node, $context),
+            'concat' => $this->concatOf($node, $context),
             default => throw ExpressionEvaluationException::unevaluable('function '.$node->name),
         };
+    }
+
+    /** A date function's unit — the parser accepts only a quoted word from {@see DateMath::UNITS}. */
+    private function unit(FunctionCallNode $node): string
+    {
+        $unit = $this->arg($node, 2);
+
+        return $unit instanceof LiteralNode && is_string($unit->value)
+            ? $unit->value
+            : throw ExpressionEvaluationException::unevaluable("{$node->name} unit");
+    }
+
+    /** A blank: empty ({@see Coercion::isEmpty()}) or a NaN arithmetic result — what `sum()` skips and `coalesce()` passes over. */
+    private function isBlank(mixed $value): bool
+    {
+        return Coercion::isEmpty($value) || (is_float($value) && is_nan($value));
+    }
+
+    /** `round(n, places)` — {@see Rounding}; blank for a blank or a non-number. */
+    private function roundOf(FunctionCallNode $node, EvaluationContext $context): mixed
+    {
+        $value = $this->eval($this->arg($node, 0), $context);
+        $places = $this->arg($node, 1);
+
+        if ($this->isBlank($value) || ! $places instanceof LiteralNode || is_string($places->value)) {
+            return Marker::Absent;
+        }
+
+        return Rounding::round(Coercion::toNumber($value), (int) $places->value);
+    }
+
+    /** `sum(a, …)` — the numbers added; a blank is skipped, anything else that is not a number makes it blank, and so does nothing to add. */
+    private function sumOf(FunctionCallNode $node, EvaluationContext $context): mixed
+    {
+        $total = 0.0;
+        $added = false;
+
+        foreach ($node->args as $arg) {
+            $value = $this->eval($arg, $context);
+
+            if ($this->isBlank($value)) {
+                continue;
+            }
+
+            if (! Coercion::isNumericLike($value)) {
+                return NAN;
+            }
+
+            $total += Coercion::toNumber($value);
+            $added = true;
+        }
+
+        return $added ? $total : Marker::Absent;
+    }
+
+    /** `coalesce(a, b)` — a, unless it is blank; then b. b is evaluated only when it is needed. */
+    private function coalesce(FunctionCallNode $node, EvaluationContext $context): mixed
+    {
+        $first = $this->eval($this->arg($node, 0), $context);
+
+        return $this->isBlank($first) ? $this->eval($this->arg($node, 1), $context) : $first;
+    }
+
+    /**
+     * `concat(a, …)` — the values joined as text (`D156`): a blank is empty text, a Yes/No answer is `yes` or `no`, a
+     * list answer its values joined by spaces (XLSForm's), a number its plain shortest decimal ({@see Rounding::plain()},
+     * so both engines write the same digits). Nothing at all to join is blank.
+     */
+    private function concatOf(FunctionCallNode $node, EvaluationContext $context): mixed
+    {
+        $text = '';
+
+        foreach ($node->args as $arg) {
+            $text .= $this->asText($this->eval($arg, $context));
+        }
+
+        return $text === '' ? Marker::Absent : $text;
+    }
+
+    private function asText(mixed $value): string
+    {
+        if (is_bool($value)) {
+            return $value ? 'yes' : 'no';
+        }
+
+        if (is_float($value)) {
+            return is_nan($value) || is_infinite($value) ? '' : Rounding::plain($value);
+        }
+
+        if (is_array($value)) {
+            foreach ($value as $item) {
+                if (is_array($item)) {
+                    return ''; // repeat instances, or anything else that is not a list of values
+                }
+            }
+
+            return implode(' ', array_map(fn (mixed $item): string => $this->asText($item), $value));
+        }
+
+        return Coercion::toStr($value);
     }
 
     private function evalMembershipFunction(FunctionCallNode $node, EvaluationContext $context): bool

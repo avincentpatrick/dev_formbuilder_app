@@ -117,7 +117,7 @@ final class Temporal
     }
 
     /** Days from a fixed origin (0000-03-01) for a calendar-valid date, else null — integer arithmetic only, never a DateTime. */
-    private static function days(int $year, int $month, int $day): ?int
+    public static function days(int $year, int $month, int $day): ?int
     {
         if ($year < 1 || $month < 1 || $month > 12 || $day < 1 || $day > self::daysInMonth($year, $month)) {
             return null;
@@ -130,7 +130,7 @@ final class Temporal
         return 365 * $y + intdiv($y, 4) - intdiv($y, 100) + intdiv($y, 400) + intdiv(153 * $m + 2, 5) + $day - 1;
     }
 
-    private static function daysInMonth(int $year, int $month): int
+    public static function daysInMonth(int $year, int $month): int
     {
         if ($month === 2) {
             return ($year % 4 === 0 && ($year % 100 !== 0 || $year % 400 === 0)) ? 29 : 28;
@@ -144,7 +144,7 @@ final class Temporal
         return (int) $hours * 3600 + (int) $minutes * 60 + (int) ($seconds ?? '0');
     }
 
-    private static function offsetSeconds(?string $offset): int
+    public static function offsetSeconds(?string $offset): int
     {
         if ($offset === null || $offset === 'Z') {
             return 0;
@@ -153,5 +153,25 @@ final class Temporal
         $magnitude = (int) substr($offset, 1, 2) * 3600 + (int) substr($offset, 4, 2) * 60;
 
         return $offset[0] === '-' ? -$magnitude : $magnitude;
+    }
+
+    /**
+     * The calendar date of a day number from {@see days()} — its exact inverse (M180, `DateMath`), the civil-from-days
+     * algorithm over 400-year eras, integer arithmetic only. Null outside the years 0001-9999.
+     *
+     * @return array{0: int, 1: int, 2: int}|null [year, month, day]
+     */
+    public static function civil(int $day): ?array
+    {
+        $era = intdiv($day, 146097) - (($day % 146097 !== 0 && $day < 0) ? 1 : 0);
+        $dayOfEra = $day - $era * 146097;
+        $yearOfEra = intdiv($dayOfEra - intdiv($dayOfEra, 1460) + intdiv($dayOfEra, 36524) - intdiv($dayOfEra, 146096), 365);
+        $dayOfYear = $dayOfEra - (365 * $yearOfEra + intdiv($yearOfEra, 4) - intdiv($yearOfEra, 100));
+        $shiftedMonth = intdiv(5 * $dayOfYear + 2, 153);
+        $date = $dayOfYear - intdiv(153 * $shiftedMonth + 2, 5) + 1;
+        $month = $shiftedMonth < 10 ? $shiftedMonth + 3 : $shiftedMonth - 9;
+        $year = $yearOfEra + $era * 400 + ($month <= 2 ? 1 : 0);
+
+        return $year < 1 || $year > 9999 ? null : [$year, $month, $date];
     }
 }

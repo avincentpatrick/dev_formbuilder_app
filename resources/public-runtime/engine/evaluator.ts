@@ -17,6 +17,8 @@ import { ExpressionEvaluationError } from './errors';
 import { ExpressionLexer } from './lexer';
 import { ExpressionParser } from './parser';
 import { FunctionRegistry } from './function-registry';
+import { age, dateAdd, dateDiff } from './date-math';
+import { plainDecimal, roundHalfAway } from './rounding';
 import { ordersTemporally } from './temporal';
 export const GRAMMAR_VERSION = '2.0';
 
@@ -209,9 +211,112 @@ export class ExpressionEvaluator {
                 return this.today(context);
             case 'now':
                 return context.hasNow() ? (context.now as string) : ABSENT;
+            // M180 (`R-da02fe03`, `D155`, `D156`): the date and number library. Mirrors PHP `evalFunction()`.
+            case 'date_diff':
+                return dateDiff(this.evalNode(this.arg(node, 0), context), this.evalNode(this.arg(node, 1), context), this.unit(node));
+            case 'date_add':
+                return dateAdd(this.evalNode(this.arg(node, 0), context), this.evalNode(this.arg(node, 1), context), this.unit(node));
+            case 'age':
+                return age(this.evalNode(this.arg(node, 0), context), context.hasNow() ? (context.now as string) : null);
+            case 'round':
+                return this.roundOf(node, context);
+            case 'sum':
+                return this.sumOf(node, context);
+            case 'coalesce':
+                return this.coalesce(node, context);
+            case 'concat':
+                return this.concatOf(node, context);
             default:
                 throw ExpressionEvaluationError.unevaluable(`function ${node.name}`);
         }
+    }
+
+    /** A date function's unit — the parser accepts only a quoted word from `UNITS`. */
+    private unit(node: Extract<Node, { type: 'call' }>): string {
+        const unit = this.arg(node, 2);
+        if (unit.type !== 'literal' || typeof unit.value !== 'string') {
+            throw ExpressionEvaluationError.unevaluable(`${node.name} unit`);
+        }
+
+        return unit.value;
+    }
+
+    /** A blank: empty (`isEmpty`) or a NaN arithmetic result — what `sum()` skips and `coalesce()` passes over. */
+    private isBlank(value: MaybeAbsent): boolean {
+        return isEmpty(value) || (typeof value === 'number' && Number.isNaN(value));
+    }
+
+    /** `round(n, places)` — `rounding.ts`; blank for a blank or a non-number. */
+    private roundOf(node: Extract<Node, { type: 'call' }>, context: EvaluationContext): MaybeAbsent {
+        const value = this.evalNode(this.arg(node, 0), context);
+        const places = this.arg(node, 1);
+
+        if (this.isBlank(value) || places.type !== 'literal' || typeof places.value !== 'number') {
+            return ABSENT;
+        }
+
+        return roundHalfAway(toNumber(value), places.value);
+    }
+
+    /** `sum(a, …)` — the numbers added; a blank is skipped, anything else that is not a number makes it blank, and so does nothing to add. */
+    private sumOf(node: Extract<Node, { type: 'call' }>, context: EvaluationContext): MaybeAbsent {
+        let total = 0;
+        let added = false;
+
+        for (const arg of node.args) {
+            const value = this.evalNode(arg, context);
+
+            if (this.isBlank(value)) {
+                continue;
+            }
+
+            if (!isNumericLike(value)) {
+                return Number.NaN;
+            }
+
+            total += toNumber(value);
+            added = true;
+        }
+
+        return added ? total : ABSENT;
+    }
+
+    /** `coalesce(a, b)` — a, unless it is blank; then b. b is evaluated only when it is needed. */
+    private coalesce(node: Extract<Node, { type: 'call' }>, context: EvaluationContext): MaybeAbsent {
+        const first = this.evalNode(this.arg(node, 0), context);
+
+        return this.isBlank(first) ? this.evalNode(this.arg(node, 1), context) : first;
+    }
+
+    /** `concat(a, …)` — the values joined as text (`D156`). Mirrors PHP `concatOf()`. */
+    private concatOf(node: Extract<Node, { type: 'call' }>, context: EvaluationContext): MaybeAbsent {
+        let text = '';
+
+        for (const arg of node.args) {
+            text += this.asText(this.evalNode(arg, context));
+        }
+
+        return text === '' ? ABSENT : text;
+    }
+
+    private asText(value: MaybeAbsent): string {
+        if (typeof value === 'boolean') {
+            return value ? 'yes' : 'no';
+        }
+
+        if (typeof value === 'number') {
+            return Number.isFinite(value) ? plainDecimal(value) : '';
+        }
+
+        if (Array.isArray(value)) {
+            if (value.some((item) => Array.isArray(item) || (typeof item === 'object' && item !== null))) {
+                return ''; // repeat instances, or anything else that is not a list of values
+            }
+
+            return value.map((item) => this.asText(item as MaybeAbsent)).join(' ');
+        }
+
+        return toStr(value);
     }
 
     private evalMembershipFunction(node: Extract<Node, { type: 'call' }>, context: EvaluationContext): boolean {

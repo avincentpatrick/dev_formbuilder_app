@@ -611,3 +611,40 @@ it('publishes a chain of calculations in any order (M180)', function (): void {
 
     expect($published->status)->toBe(FormVersionStatus::Published);
 });
+
+it('publishes a date compared with a date worked out from today (M180)', function (): void {
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'dob', FieldType::Date);
+    addFormField($draft, $this->user, 'adult', FieldType::ShortText, 1, ['relevant_expression' => "\${dob} <= date_add(today(), -18, 'years')"]);
+
+    expect(orderingGateRefusals($this->gate, $draft))->toBe([]);
+});
+
+it('refuses a date compared with a number a function works out, naming it as a number (M180)', function (): void {
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'dob', FieldType::Date);
+    addFormField($draft, $this->user, 'start', FieldType::Date, 1);
+    addFormField($draft, $this->user, 'shown', FieldType::ShortText, 2, ['relevant_expression' => '${start} > age(${dob})']);
+
+    expect(implode(' ', orderingGateMessages($this->gate, $draft)))->toContain('age(), which is a number');
+});
+
+it('refuses a number question read as a date by a date function, naming it (M180)', function (): void {
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'count', FieldType::Integer);
+    addFormField($draft, $this->user, 'days', FieldType::Calculated, 1, ['config' => ['calculated_formula' => "date_diff(\${count}, today(), 'days')"]]);
+
+    expect(orderingGateRefusals($this->gate, $draft))->toBe([['days', 'expression_reads_number_as_date']]);
+});
+
+it('refuses arithmetic on a date inside sum() (M180)', function (): void {
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'd', FieldType::Date);
+    addFormField($draft, $this->user, 'total', FieldType::Calculated, 1, ['config' => ['calculated_formula' => 'sum(${d}, 1)']]);
+
+    expect(orderingGateRefusals($this->gate, $draft))->toBe([['total', 'expression_orders_date']]);
+});

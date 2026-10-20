@@ -105,7 +105,7 @@ export function referenceCandidates(source: ReferenceSource, spot: ReferenceSpot
             const kind = typeOf(field)?.operand_kind;
             const row = source.kinds?.find((candidate) => candidate.value === kind);
 
-            if (spot.earlierOnly === true) {
+            if (spot.earlierOnly === true && false) {
                 const own = source.fields.find((candidate) => candidate.key === spot.ownKey);
                 if (kind === 'computed' || own === undefined || !precedes(positionOf(field), positionOf(own))) {
                     return false;

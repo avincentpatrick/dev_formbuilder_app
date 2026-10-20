@@ -7,10 +7,13 @@ import { archive, createForm } from './support/builder';
  *
  * ⛔ THE CASE ONLY A BROWSER CAN SETTLE: a default the respondent cleared must stay cleared across a reload. The guest's
  * own draft is restored from IndexedDB AFTER the form opened and filled its defaults (`RuntimeSession`'s `restoreDraft`),
- * so a merge there would bring the default back — the unit tests drive the store, not that wiring.
+ * so a merge there would bring the default back — the unit tests drive the store, not that wiring. It is the NUMBER that
+ * proves it: a cleared number box is saved as null, which a merging restore skips; a cleared text box is saved as '',
+ * which a merge writes back anyway (measured: a merging restore kept this spec green until the number was added).
  *
  * The form is made through the routes the builder itself calls (the `media-input-hidden-text` precedent): a date of birth,
- * an Age calculation shown as a Duration in years (Always), a Town with the default Pasig, and a question shown only
+ * an Age calculation shown as a Duration in years (Always), a Town with the default Pasig, a Household size with the
+ * default 4, and a question shown only
  * when the age is 18 or more — a condition reading a calculation. Desktop only; it archives its form. Labels match by
  * substring: an optional question is named "Town (optional)".
  */
@@ -66,6 +69,7 @@ test('Calculations and defaults — an age by its Type, a condition reading it, 
             config: { calculated_formula: 'age(${dob})', calculated_type: 'duration', duration_unit: 'years', visibility: 'shown' },
         });
         await question(page, formId, draft, 'short_text', { key: 'town', label: 'Town', default_value: 'Pasig', default_value_is_expression: false });
+        await question(page, formId, draft, 'integer', { key: 'household', label: 'Household size', default_value: '4', default_value_is_expression: false });
         await question(page, formId, draft, 'short_text', { key: 'note', label: 'Anything else', relevant_expression: '${age} >= 18' });
 
         const published = await page.request.post(`/forms/${formId}/publish`, { headers: await xsrf(page), data: {} });
@@ -86,6 +90,8 @@ test('Calculations and defaults — an age by its Type, a condition reading it, 
         await page.goto(`/f/${slug}`, { waitUntil: 'networkidle' });
         const town = page.getByLabel('Town');
         await expect(town).toHaveValue('Pasig');
+        const household = page.getByLabel('Household size');
+        await expect(household).toHaveValue('4');
         await expect(page.getByLabel('Anything else')).toHaveCount(0);
 
         await page.getByLabel('Date of birth').fill(thirtyYearsAgo());
@@ -94,10 +100,12 @@ test('Calculations and defaults — an age by its Type, a condition reading it, 
 
         // Cleared, saved in this browser, reloaded: it stays cleared — the restored draft wins over the default.
         await town.fill('');
+        await household.fill('');
         await page.waitForTimeout(2_500); // the browser's own draft is written after a short pause
         await page.reload({ waitUntil: 'networkidle' });
         await expect(page.getByLabel('Date of birth')).toHaveValue(thirtyYearsAgo());
         await expect(page.getByLabel('Town')).toHaveValue('');
+        await expect(page.getByLabel('Household size')).toHaveValue('');
     } finally {
         await archive(page, formId);
     }

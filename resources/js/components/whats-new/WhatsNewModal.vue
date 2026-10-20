@@ -34,7 +34,7 @@ watch(
         }
 
         entries.value = prompt.entries;
-        open.value = false;
+        open.value = true;
     },
     { immediate: true },
 );

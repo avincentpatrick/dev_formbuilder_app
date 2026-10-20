@@ -16,7 +16,93 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M178` (R3) and `M180` (R4) are merged and live on staging, released together at merge point 3 (`D137`; below). The next claim is UI5 — versioning and What's new (`D123`, `D138`), held green for merge point 4. Merge only at a planned merge point.
+## Status: ACTIVE CLAIM — `M181`, UI5 of the UI programme: versioning and What's new (`R-c7247dbf`) (m181-ui5-versioning-whats-new)
+
+Taken 2026-10-20. Branch `m181-ui5-versioning-whats-new`, cut from origin/main at `43e96656`, PR into main. ⛔ **NOT MERGED THIS
+SESSION:** it is held green for merge point 4 with UI6 and T2 + Likert (`D137`, `D138`: UI5 → UI6 → T2 + Likert → merge point 4).
+The plan of record is `~/.claude/plans/hi-let-s-conduct-a-mutable-goose.md` (§C, §E row 5); the build plan is
+`~/.claude/plans/pasted-content-id-776b-read-claude-md-quizzical-conway.md`.
+Row: `R-c7247dbf` — *"The product shows no user-facing version and has no "What's new""*, built to `D124` A (0.9.0 now, 1.0.0 at
+launch), `D125` C (the notes written with each change and saved in a `releases` table by every deploy; the prompt on the first page
+after sign-in) and `D126` A (any close marks it seen).
+
+**The owed check is done: the user checked R3 (`M178`) and R4 (`M180`) on staging on 2026-10-20 — "Checked — all good"** (Insert a
+question and the codes in every list, a limit from another answer, Build it with the Age and Join answers presets, the Default value,
+a condition on a calculation, Schedule → Time zone Asia/Manila) — never re-ask. The session-start pull read 0 reports, 0 reopened and
+0 new comments (relayed 31: 15 Resolved · 10 Ongoing · 6 Confirmed working), so nothing was triaged. **Asked and answered in planning
+(the user, 2026-10-20, in chat):** **`D157` A** — the first prompt a person sees lists every release since their account was created,
+and a brand-new user still sees only the newest (it refines `D126`'s "a brand-new user sees only the latest entry", so the testers
+see UI5's, UI6's and T2's notes together at merge point 4); recorded on this branch's first commit. **The 0.9.0 notes' wording was
+approved by the user** — the version that also sums up the testing rounds so far (five items, verbatim in the build plan).
+
+### Evidence verified
+Read on `43e96656` by three read-only passes plus my own reads.
+- `config/app.php:32` (`env('APP_VERSION', 'dev')`) — held. `app/Support/Platform/BuildInfo.php:28-33` (`version()` passes it
+  through) — held. `.env.example:22` (`APP_VERSION=` blank) — held. `deploy.ps1` never sets it — held (its one mention, `:355`, is
+  the bundle's `__APP_VERSION__`).
+- `resources/js/Layouts/AppLayout.vue:80-83` (the slot, no footer) — held. `resources/js/components/shell/nav-model.ts:140` (Help
+  last) — held. `resources/js/components/shell/AccountMenu.vue:27-30` — **moved** to `:27-35`: `M175`/`M179` added "Feedback &
+  testing" between Settings and Log out.
+- The gap-table row (`docs/feature-backlog.md`, "In-app product announcements / changelog") — held, tagged "Queued (`M171`)".
+
+### Premise verified
+- **No modal opens by itself anywhere today** — this is the first. `users.welcomed_at` guards the welcome EMAIL, not a screen; the
+  nearest UI precedent is the dashboard checklist's `POST /onboarding/dismiss`. `MdsModal` makes the rest of the page inert, so a
+  prompt for a seeded e2e user would block every click after a `goto`: `global-setup.ts` signs demo@ in once for every spec, and CI
+  never syncs releases (the e2e job runs `migrate` + `E2eSeeder` only). The seeder therefore syncs, stamps its users at the newest
+  version, and adds one user left unseen for the prompt's own spec.
+- **`users` is FORCE RLS:** an UPDATE with no `app.current_user_id` lands zero rows with no error; the tenant group sets the GUC, so
+  `POST /whats-new/seen` stays inside it and its test reads the row back. `User` is `#[Fillable]`-closed (name, email, password):
+  the write is `forceFill`.
+- **`/whats-new` is behind `auth`** (as `/help` is), so the sign-in card and the landing page (central host) show the version as text
+  only. The builder's `main` is `overflow:hidden`, so a fluid page gets no footer — the sidebar foot carries the version there.
+- **A changed `deploy.ps1` takes effect one deploy late** (its own header): UI5's own deploy will NOT run `releases:sync`; the first
+  sync is UI6's deploy at merge point 4. **A notes file under `docs/` would take step 2b's no-window path**, so it lives in
+  `database/data/`.
+- `config('app.version')` defaults to `'dev'`, which would hide a `VERSION` file: the default becomes null.
+- No Ziggy (pages use literal paths); no route, page, table or command census gate; `TenantExtractColumnDriftTest` censuses `users`
+  column for column; `DocumentedDefaultDriftTest` checks whatever the data dictionary documents. `feature-backlog.md` sits at its
+  citation-liveness ceiling, and this row cites `AppLayout.vue:80-83` — the lint is re-run after every shell edit.
+- One session only; lane B retired; no other claim, held block or forward queue in either claim file.
+
+### Remedy verdict
+**Works, reshaped in three places:** (1) `released_at` is stamped by the first sync — when the release went live — rather than
+written in the file, and never rewritten; (2) `D157`: a person who has never seen a release gets every release since they joined
+(at least the newest), not only the latest; (3) no prompt during an impersonation, so a support session never uses up the member's
+notice. Kept as prescribed: `VERSION` read by `BuildInfo` under the env override and shared to every page; the version in the
+sidebar foot, a footer under every page, the sign-in card, the console bar and the landing page; the notes in one JSON file with a
+test that the newest entry matches `VERSION` and versions descend; a central `releases` table filled by an idempotent
+`releases:sync` that `deploy.ps1` runs after `migrate --force` (upsert by version, never a delete); `/whats-new` and the prompt read
+the table; `users.whats_new_seen_version` (nullable, no backfill, withheld from tenant extracts); any close marks it seen through
+`POST /whats-new/seen`; one close-out sentence in `CLAUDE.md`; the RBAC §6 users row.
+
+Files: `VERSION` (new), `config/app.php`, `app/Support/Platform/BuildInfo.php`, new `app/Support/Platform/WhatsNew.php`,
+`app/Http/Middleware/HandleInertiaRequests.php`, new `app/Models/Release.php`, new `app/Console/Commands/SyncReleasesCommand.php`,
+new `app/Http/Controllers/Tenant/WhatsNewController.php`, `routes/tenant.php`, `app/Support/Tenancy/TenantExtractColumns.php`,
+two new migrations, new `database/data/releases.json`, `database/seeders/E2eSeeder.php`, `deploy.ps1`; `resources/js/types/inertia.d.ts`,
+`resources/js/Layouts/AppLayout.vue`, `AuthLayout.vue`, `AdminLayout.vue`, `resources/js/components/shell/Sidebar.vue`,
+`resources/js/Pages/Welcome.vue`, new `resources/js/components/whats-new/` (`ReleaseNotes.vue`, `WhatsNewModal.vue`, `types.ts`,
+`version-label.ts`), new `resources/js/Pages/whats-new/Index.vue`; `CLAUDE.md`, `scripts/next.php`; the tests beside each — new
+`tests/Unit/Platform/BuildInfoTest.php`, `tests/Feature/Releases/` (`ReleaseNotesFileTest`, `SyncReleasesCommandTest`),
+`tests/Feature/WhatsNew/WhatsNewTest.php`, a deploy-order test, `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php`, the
+Vitest files beside the components and layouts.
+Shared artefacts taken: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/data-dictionary.md`,
+`docs/multi-tenancy-rbac-design.md`, `docs/ACCESS-MATRIX.md`, `docs/deployment-infrastructure.md`, `tests/e2e/whats-new.spec.ts`
+(new), `tests/e2e/responsive-axe.spec.ts` and the specs the diff reaches, `PROGRESS.md` (own block and the Standing Rules reason).
+Paired files taken: `routes/tenant.php` ↔ `docs/ACCESS-MATRIX.md` (§5); the migration ↔ `TenantExtractColumns` ↔ its drift census;
+`deploy.ps1` ↔ `docs/deployment-infrastructure.md`.
+Hubs (`D128`: overlap allowed, every hub named): `routes/tenant.php`, `CLAUDE.md`, `HandleInertiaRequests.php`, `AppLayout.vue`,
+`docs/data-dictionary.md`, `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`, `PROGRESS.md`.
+Namespaces spent: `D157` (asked and answered in planning); migration prefixes `2026_08_17_000143` (the `releases` table) and
+`2026_08_17_000144` (the seen column); no ADR.
+E2E specs the diff reaches, run locally: a new `whats-new`, `responsive-axe`, `auth-axe`, `admin-console-axe`, `list-layout`,
+`impersonation`, `feedback-testing-round`, `help-contents`; CI runs every spec.
+Prediction: red first commit by commit — `BuildInfoTest` (the file read), the notes-file and sync tests and the deploy-order test by
+absence, the extract census by the new column, `WhatsNewTest` (the page 404s, the shared prop absent, the seen write), then the Vitest
+cases for the modal, the page, the footer, the sidebar foot and the sign-in card, and the new e2e in a real browser. All green after.
+About 10 mutants, each turning only its named cases. **Most likely wrong:** that the seeder's new member and the stamps leave every
+other spec and Pest count unchanged (members, grant recipients, search, the seeder's idempotency test). Runner-up: the footer moves a
+`list-layout.spec.ts` fill measurement, or the sidebar foot does not fit the 64px rail.
 
 ## RELEASED — `M180`, R4 of the testers' round 2: calculations by clicking (`R-39dbce5b`, `R-da02fe03`, `R-20784770`, `R-f77aa45d`, plus `R-9fb95b45`'s clock and `R-fa3223d9`) (merged as PR #373, `40a4ad85`, last at merge point 3, rebased onto the trunk after `M178`; 6/6 green with real step counts on its rebased run at `36322c16` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `40a4ad85` the same)
 

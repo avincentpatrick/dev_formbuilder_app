@@ -22,14 +22,44 @@ use Illuminate\Support\Carbon;
  * That is a fact about this deployment rather than a value someone has to remember to set — and when the
  * manifest is absent (a `vite dev` session, a fresh checkout) it answers null rather than inventing one,
  * which the card renders as "development build".
+ *
+ * ── The version is the committed `VERSION` file (M181, `D124`) ──────────────────────────────────────────
+ * Three numbers (0.9.0 now, 1.0.0 at launch): a fix a person can see bumps the last, a new feature the
+ * middle one, and the same pull request adds that release's What's new entry (`database/data/releases.json`,
+ * whose newest entry `ReleaseNotesFileTest` holds equal to this file). `APP_VERSION` still overrides it, to
+ * label a build the file does not describe; with neither, `dev`. Read at runtime rather than through config,
+ * so `config:cache` cannot freeze an old release into the cached config.
  */
 final class BuildInfo
 {
+    /** Three dot-separated numbers — the shape the `releases.version` CHECK holds the table to. */
+    public const SEMVER = '/^\d+\.\d+\.\d+$/';
+
+    public function __construct(private readonly ?string $versionFile = null) {}
+
     public function version(): string
     {
         $version = config('app.version');
 
-        return is_string($version) && $version !== '' ? $version : 'dev';
+        if (is_string($version) && trim($version) !== '') {
+            return trim($version);
+        }
+
+        return $this->fileVersion() ?? 'dev';
+    }
+
+    /** The committed `VERSION` file's version, or null when the file is missing or holds anything else. */
+    public function fileVersion(): ?string
+    {
+        $path = $this->versionFile ?? base_path('VERSION');
+
+        if (! is_file($path)) {
+            return null;
+        }
+
+        $version = trim((string) file_get_contents($path));
+
+        return preg_match(self::SEMVER, $version) === 1 ? $version : null;
     }
 
     public function commit(): ?string

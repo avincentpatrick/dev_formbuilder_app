@@ -27,9 +27,14 @@ return [
     | data-dictionary §7), and conflating the two would make a server-side support
     | answer depend on when the assets were last built.
     |
+    | M181 (`D124`): the release is named by the committed `VERSION` file, which
+    | BuildInfo reads when this is unset — so it defaults to null, not to `dev`,
+    | or an unset environment would hide the file. Set it only to label a build
+    | the file does not describe (a hotfix).
+    |
     */
 
-    'version' => env('APP_VERSION', 'dev'),
+    'version' => env('APP_VERSION'),
 
     'commit' => env('APP_COMMIT'),
 

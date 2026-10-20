@@ -100,6 +100,11 @@ export interface EntitlementSnapshot {
 
 declare module '@inertiajs/core' {
     interface PageProps {
+        /**
+         * M181 (`D124`) — the release this page belongs to: the committed VERSION file (three numbers) under the
+         * APP_VERSION override, or `dev`. Shared on every page, the sign-in and console pages included.
+         */
+        app: { version: string };
         auth: {
             user: AppUser | null;
             can: AppAbilities;

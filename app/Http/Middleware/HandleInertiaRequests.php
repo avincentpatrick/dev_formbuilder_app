@@ -8,6 +8,7 @@ use App\Services\Entitlements\EntitlementService;
 use App\Services\Feedback\FeedbackPresenter;
 use App\Support\Audit\ImpersonationContext;
 use App\Support\Authorization\ShellAbilities;
+use App\Support\Platform\BuildInfo;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -52,6 +53,12 @@ class HandleInertiaRequests extends Middleware
 
         return [
             ...parent::share($request),
+            // M181 (`R-c7247dbf`, `D124`) — the release a person is looking at, on EVERY page (the sidebar foot, the
+            // footer under each page, the sign-in card, the console bar, the landing page). The committed VERSION
+            // file under the APP_VERSION override; never the bundle's `__APP_VERSION__` sha (see BuildInfo).
+            'app' => [
+                'version' => app(BuildInfo::class)->version(),
+            ],
             'auth' => [
                 'user' => $user ? [
                     'id' => $user->id,

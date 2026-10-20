@@ -68,7 +68,7 @@ function seeAll(): void {
 </script>
 
 <template>
-    <MdsModal :open="open" :title="title" size="lg" @close="open = false">
+    <MdsModal :open="open" :title="title" size="lg" @close="close()">
         <p v-if="entries.length > 1" class="whats-new__lede">
             {{ entries.length }} releases since you last looked, newest first.
         </p>

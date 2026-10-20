@@ -16,7 +16,123 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M179` (V) is merged and live on staging, released alone at its green (`D152`; below). `M178` (R3) stays HELD for merge point 3 with R4, the next claim. Merge only at a planned merge point.
+## Status: ACTIVE CLAIM — `M180`, R4 of the testers' round 2: calculations by clicking (`R-39dbce5b`, `R-da02fe03`, `R-20784770`, `R-f77aa45d`, plus `R-9fb95b45`'s clock and `R-fa3223d9`) (m180-r4-calculations)
+
+Taken 2026-10-20. Branch `m180-r4-calculations`, **stacked**: cut from `origin/m178-r3-references` at `1b2c53c8` (R3 with the trunk merged
+in), with `origin/main` merged on top to bring this claim — that merge is the claim-merge commit, and R4's own commits start after it. PR
+into main. ⛔ **NOT MERGED ALONE:** it completes merge point 3 with `M178` (`D137`, `D138`) — the user's census (and, until #371 lands,
+the backup block the trunk's `CLAUDE.md` still asks for), #371 merged, its deploy and `/up`, then this branch rebased onto the trunk by
+its own commits only and merged, the census after. The plan of record is `~/.claude/plans/here-are-added-comments-peppy-quill.md` (§B
+R4, §E); the build plan is `~/.claude/plans/pasted-content-id-ce0d-read-claude-md-composed-moon.md`.
+
+**The owed check is done: the user checked V (`M179`) on staging on 2026-10-20 — "Checked — all good"** (a non-admin sees
+Testing-round comments; It works turns an item Confirmed working) — never re-ask. The session-start pull read 0 New, 0 reopened, 0 new
+comments (relayed 31: 13 Resolved · 12 Ongoing · 6 Confirmed), so nothing was triaged. **Four questions were asked and answered in
+planning (the user, 2026-10-20, in chat), each the recommended option, recorded on this branch's first commit:** **`D153` A** — Today
+follows the form's time zone; new forms start on Asia/Manila and existing forms still on UTC are switched (an additive migration);
+**`D154` A** — a formula Default value is worked out once, when the form opens; **`D155` A** — `date_diff` and `age` count whole
+completed units; **`D156` A** — `concat()` and a Join answers preset. `D147`–`D149` are `M178`'s (now on `main` only through its branch);
+`state.php` prints next `M180` correctly this time (it counts RELEASED headings; `M178` is HELD, `M179` released).
+
+Rows taken, in build order, each its own commits (`D75`): **`R-39dbce5b`** (a condition or a rule can name a calculated question but
+always reads it as blank — `D149`), **`R-da02fe03`** (no date arithmetic; with `D155`, `D156` and the picker's other date presets), with
+**`R-9fb95b45`'s clock half** (`D153`: Today in the form's zone — its other half, comparing a date or time answer with `now()`, is filed
+as `R-ba47e460`, `during-testing`), **`R-20784770`** (the Default value is never filled in — `D148`, `D154`) with **`R-fa3223d9`** (a
+formula default shows as plain text — the same box), **`R-f77aa45d`** (the calculation editor). Filed here: `R-ba47e460` (above) and
+`R-ddbf337d` (an exported formula default becomes an XLSForm `calculation`, which ODK recalculates live, while `D154` works it out once —
+`during-testing`). Closed here as already fixed: **`R-c32e2c6a`** (the draft projection read `config.formula` — `M177` fixed it under
+`R-f7a18b7a`; `draft-snapshot.ts` reads `calculated_formula`).
+
+### Evidence verified
+Read on `1b2c53c8` (R3 + the trunk) by four read-only passes plus my own reads.
+- `R-39dbce5b`: `SemanticValidator.php:153` (calculations last, "do not feed back", `:152-155`) — held. `semantic-validator.ts:180` — held.
+  `ConfigPanel.vue:354` (the catalogue the condition editor lists, `:350-368`) — held. `ValueShape.php:109` (Calculated → Number) — held.
+- `R-da02fe03`: `FunctionRegistry.php` (`selected, if, count, int, today, now`; `contains` internal) — held. `ExpressionOperandJudge.php`
+  "not supported yet" (the message in `PublishValidationException.php:437`) — held. `manual.ts:894` — **moved** to `:904-912` (the
+  calculation paragraph; `:894` is now the Number type's list). The `M178` amendment (Today only in the picker) — held
+  (`reference-candidates.ts`, `TODAY`).
+- `R-20784770`: `ConfigPanel.vue:800` (Default value, a plain `MdsTextInput`, `:800-806`) — held. `prefill.ts` (`buildPrefill`, hidden
+  fixed values only, `:68-94`) — held. `XlsformExporter.php:283` — held. `manual.ts:814` — held.
+- `R-f77aa45d`: `ConfigPanel.vue:579` (the Calculation formula, now R3's `ReferenceInput`, `:577-591`) — held; its help no longer says
+  "evaluated on the server" (`M177` rewrote it). `calculated.json` pins that a calculation cannot read another
+  (`calc_no_chaining_between_calcs`) — held.
+- `R-9fb95b45`: `isoClock()` (`schema-mapping.ts:574-579`) and `SemanticValidator::validate()` (`:76`) stamp UTC — held.
+- `R-fa3223d9`: typing in the Default value box clears `default_value_is_expression` (`ConfigPanel.vue:804`) — held.
+
+### Premise verified
+- One session only; lane B retired; no other claim, held block or forward queue in either claim file besides `M178` HELD. R3's branch is
+  current with the trunk (`1b2c53c8`, merge only; four mechanical conflicts) and #371 is re-running on it.
+- **Defaults already travel everywhere:** both columns are in the published snapshot (`SchemaSnapshotSerializer.php:160-161`) and every
+  runtime receives them — only the seeding is missing. **The server must not inject an ordinary default** (only a hidden question's fixed
+  value, `StructuralAnswerNormalizer::applyFixedPrefills`), and **every restore merges** (a cleared answer is an absent key), so a naive seed
+  would bring a cleared default back after a draft restore (`RuntimeSession.vue:196-215` restores after creation).
+- **Encode needs no PHP mirror:** its step rail is the store's `visibleSteps`; the server's `steps` and piped labels on the blank page are
+  built from `[]` and `EncodeStepParityTest` compares them under `[]`.
+- **Calculations feed nothing and chain to nothing today** in either engine; no cycle check exists anywhere except `StepGraphInspector`
+  (notices only, `relevant_expression` edges only). A cycle refusal at publish can make a live form un-republishable — counted on staging
+  before merge point 3 (calculated formulas naming a calculation); if one exists, the user decides whether it is a notice instead.
+- **Dates are ISO strings, `Temporal` orders only** (no inverse), arithmetic on a date is NaN, naive and zoned never compare (`D89`, kept).
+  The grammar already lexes string literals and loops over any argument count; only the arity check is fixed. No test pins the function
+  list across languages (one is added). Three tests pin `sum` as an unknown function (`parse-errors.json`, `ExpressionParserTest.php`,
+  `engine.test.ts`) — they move to `median`.
+- **`forms.timezone` exists** (IANA, default `'UTC'`, set on a form's Schedule), read for display only; the clock is UTC by design
+  (`isoClock()`'s docblock: client and server must agree). Both will stamp the form's zone, so they still agree. `forms` carries strict RLS:
+  the migration's `UPDATE` must prove its own count (`project_postgres_write_traps`).
+- **The settings panel may hold exactly one tablist** (`ConfigPanel.vue` docblock) and no floating menu (DSR §3.4b), so the editor's
+  switches are `MdsSegmentedControl`s and its lists `MdsSelect`s.
+
+### Remedy verdict
+- `R-39dbce5b`: **works, as prescribed** — calculations in dependency order inside relevance settling and before every rule; cycles blank
+  at runtime, refused at publish (`calculation_cycle`); R3's two filters removed.
+- `R-da02fe03`: **works, widened** — the six functions, `concat` (`D156`), whole units (`D155`), one shared rounding algorithm, the judge,
+  the five date presets.
+- `R-9fb95b45`: **split** — the clock half (`D153`) here; comparing a date-time answer with `now()` needs a rule for naive values, filed.
+- `R-20784770` + `R-fa3223d9`: **works, reshaped** — worked out once (`D154`), seeded only on a fresh form, a cleared default stays
+  cleared, Fixed · Formula in the builder; a bad formula default is a notice, never a refusal (imported forms carry them).
+- `R-f77aa45d`: **works** — Type, Build it / Formula, nine presets, decimal places, display by type.
+
+Files: `R-39dbce5b` — `app/Services/Validation/SemanticValidator.php`, new `CalculationOrder.php`; `resources/public-runtime/engine/
+semantic-validator.ts`, new `calculation-order.ts` and a `referencedKeys` walker; `app/Services/Forms/ExpressionValidationGate.php`,
+`StepGraphInspector.php`, `app/Exceptions/Forms/PublishValidationException.php`; `resources/js/components/builder/ValidationEditor.vue`,
+`reference-candidates.ts`, `draft-snapshot.ts`; `tests/golden/validation/` (vectors, manifest) and a new `tests/fixtures/calculation-
+order.json`. `R-da02fe03` — `app/Services/Expressions/FunctionRegistry.php`, `ExpressionParser.php`, `ExpressionEvaluator.php`,
+`Temporal.php`, `ExpressionKeyUse.php`, `ExpressionSyntaxException.php`, new `DateMath.php`, `Rounding.php`; `app/Services/Forms/
+ExpressionOperandJudge.php`; the TS `function-registry.ts`, `parser.ts`, `evaluator.ts`, `temporal.ts`, `errors.ts`, new `date-math.ts`,
+`rounding.ts`; `tests/golden/expressions/` (new `date-functions.json`, `math-functions.json`, `parse-errors.json`, manifest).
+`R-9fb95b45` — a new migration, `SemanticValidator.php`, `EncodeFormPresenter.php`, `app/Services/Automations/AutomationCondition.php`,
+`PublicFormPresenter.php`, `resources/public-runtime/lib/schema-mapping.ts`, `App.vue`, the builder preview. `R-20784770` + `R-fa3223d9` —
+new `resources/public-runtime/lib/defaults.ts`, `useFormRuntime.ts`, `RuntimeSession.vue`, `App.vue`; `resources/js/Pages/submissions/
+Encode.vue`; `resources/js/components/builder/PreviewPane.vue`, `PreviewRuntime.vue`, `preview-model.ts`, `draft-snapshot.ts`,
+`ConfigPanel.vue`. `R-f77aa45d` — new `CalculationEditor.vue`, `calculation-presets.ts`; `ConfigPanel.vue`, `field-save-errors.ts`,
+`field-conversion.ts`; `app/Http/Requests/Forms/UpdateFieldRequest.php`; `app/Services/Submissions/SchemaValueFormatter.php`,
+`resources/public-runtime/engine/display-value.ts`, `FieldInput.vue`, `FieldControl.vue`, `EncodeFormPresenter.php`; `tests/golden/
+templates/`. Every row: `resources/js/components/help/manual.ts`, the pinned Pest and Vitest files.
+Close-out: `docs/feature-backlog.md`, `PROGRESS.md` (own block), `docs/pipeline.md`, `docs/claims/decisions.md`; this file on main; gate
+baselines from the post-merge run.
+Shared artefacts taken: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/data-dictionary.md`,
+`docs/architecture/technical-architecture.md`, `docs/xlsform-interop-spec.md`, `tests/e2e/calculations-and-defaults.spec.ts` (new) and the
+specs the diff reaches, `PROGRESS.md` (own block).
+Hubs (`D128`: overlap allowed, every hub named): both engines' registry, parser, evaluator, `Temporal` and semantic validator,
+`ExpressionValidationGate.php`, `ExpressionOperandJudge.php`, `ExpressionKeyUse.php`, `StepGraphInspector.php`, `PublishValidationException.php`,
+`useFormRuntime.ts`, `ConfigPanel.vue`, `FieldInput.vue`, `SchemaValueFormatter.php`, `display-value.ts`, `EncodeFormPresenter.php`,
+`UpdateFieldRequest.php`, `manual.ts`, `docs/data-dictionary.md`, `docs/architecture/technical-architecture.md`, `docs/xlsform-interop-spec.md`,
+`docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`, `PROGRESS.md`.
+Paired files taken: the two engines through the golden vectors (`SemanticValidator.php` ↔ `semantic-validator.ts`, `ExpressionEvaluator.php`
+↔ `evaluator.ts`, `ExpressionParser.php` ↔ `parser.ts`, `FunctionRegistry.php` ↔ `function-registry.ts` — now also a mirror test,
+`Temporal`/`DateMath`/`Rounding` ↔ their TS twins), `CalculationOrder.php` ↔ `calculation-order.ts` (a shared fixture),
+`SchemaValueFormatter.php` ↔ `display-value.ts` (the template formatting vectors), the server clock ↔ `isoClock()`.
+Namespaces spent: `D153`–`D156` (asked and answered in planning); migration prefix `2026_08_17_000141` (forms' time zone); no ADR.
+E2E specs the diff reaches, run locally: a new `calculations-and-defaults`, `builder-insert-question`, `builder-preview-authoring`,
+`builder-axe`, `encode-validation`, `public-runtime-axe`, named at the release; CI runs every spec.
+Prediction: red first on this head, row by row — the calculation vectors (a calculation read by relevance, a section, a skip, Required
+when, a rule, a member rule; chains out of order; cycles blank; `count()` raw for a condition and final for a rule) on BOTH engines, the
+order fixture on both, the gate's `calculation_cycle`, R3's two filters; the new expression vectors (by absence, then by value), `sum` as
+unknown, the registry mirror test, the judge's default arm refusing `date_add`, the five presets; the clock (Manila at the UTC day
+boundary, both sides) and the migration; the seeded defaults on each surface, a cleared default staying cleared, the M134 "typing clears
+the formula" case flipped; the presets' round trip, the mode switch, display by type in both formatters. All green after. About 20 mutants,
+each turning only its named cases. **Most likely wrong:** that splitting `processRepeats` into settle-then-check keeps every existing
+validation vector byte-identical, error order included — only `calc_no_chaining_between_calcs` should move. Runner-up: `round()` parity
+where PHP's float formatting differs from JavaScript's.
 
 ## RELEASED — `M179`, V: the testers follow every relayed comment and check our fixes inside Feedback (`R-db9dec62`, `R-129c44c3`, `R-e727ca94`) (merged as PR #372, `aec68222`, released alone (`D152`), 6/6 green with real step counts on its final run at `3337c4dd` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `aec68222` the same)
 

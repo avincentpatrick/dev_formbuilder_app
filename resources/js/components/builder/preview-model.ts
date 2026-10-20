@@ -405,7 +405,7 @@ export function carryAnswers(previous: AnswerMap, before: SchemaResponse, after:
 
     const carried: AnswerMap = {};
     for (const [key, value] of Object.entries(previous)) {
-        const sameQuestion = was.has(key) && was.get(key) === is.get(key);
+        const sameQuestion = was.has(key) && was.get(key) === is.get(key) && defaultsBefore.get(key) === defaultsAfter.get(key);
         const sameRepeat = repeatsBefore.has(key) && repeatsAfter.has(key);
         if (sameQuestion || sameRepeat) carried[key] = value;
     }

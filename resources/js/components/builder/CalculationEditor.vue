@@ -115,7 +115,6 @@ const operandValue = (operand: DateOperand): string => ('today' in operand ? TOD
 const operandOf = (value: string): DateOperand => (value === TODAY ? { today: true } : { key: value });
 
 function onFormula(value: string): void {
-    mode.value = 'formula';
     emit('patch', { calculated_formula: value === '' ? null : value });
 }
 </script>

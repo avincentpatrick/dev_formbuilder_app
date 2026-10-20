@@ -35,7 +35,8 @@
        during the window (public\index.php echoes it without loading vendor\). Inside it:
        git reset --hard to the commit; move live vendor\ and public\build aside to .prev and
        the staged ones in; delete the bootstrap\cache files that describe the old vendor\ and
-       routes; package:discover; migrate --force; config:cache, route:cache, view:cache and
+       routes; package:discover; migrate --force; releases:sync, which copies the committed
+       What's new notes into the releases table; config:cache, route:cache, view:cache and
        event:cache; queue:restart last.
     6. artisan up, then record the commit in storage\framework\deployed-sha.
     7. Start the worker service if, and only if, it is Stopped.
@@ -521,6 +522,17 @@ try {
     }
     else {
         Write-Warning 'This release predates the row census (a -Ref rollback to it?), so the rows after its migration were not compared.'
+    }
+
+    # M181 (R-c7247dbf, D125): copy the committed What's new notes into the releases table, which the prompt and the
+    # page read. After the count, so it measures the migration alone; inside the window, so a malformed notes file
+    # leaves the site down like any failed step. It adds and corrects, never deletes. A release older than the
+    # command (a -Ref rollback to it) cannot copy, and says so rather than failing.
+    if (Test-Path -LiteralPath (Join-Path $AppPath 'app\Console\Commands\SyncReleasesCommand.php')) {
+        Invoke-Native php @('artisan', 'releases:sync')
+    }
+    else {
+        Write-Warning 'This release predates the What''s new notes (a -Ref rollback to it?), so no release notes were copied.'
     }
     Invoke-Native php @('artisan', 'config:cache')
     Invoke-Native php @('artisan', 'route:cache')

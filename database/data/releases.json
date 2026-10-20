@@ -1,0 +1,28 @@
+[
+    {
+        "version": "0.9.0",
+        "title": "Version numbers, What's new, and the testing rounds so far",
+        "items": [
+            {
+                "kind": "new",
+                "text": "Version number in the sidebar, under every page and on the sign-in page."
+            },
+            {
+                "kind": "new",
+                "text": "What's new opens after you sign in when something changed; always one click away at the foot of every page."
+            },
+            {
+                "kind": "improved",
+                "text": "Feedback: tag a report as a bug, a suggestion or a question, and follow every testing-round comment under Feedback & testing."
+            },
+            {
+                "kind": "improved",
+                "text": "The builder: insert a question into a formula or a label, use another question's answer as a limit, and build a calculation from presets such as Age and Join answers."
+            },
+            {
+                "kind": "improved",
+                "text": "Default values fill in when a form opens, and Today follows the form's time zone."
+            }
+        ]
+    }
+]

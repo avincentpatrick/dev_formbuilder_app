@@ -1282,7 +1282,7 @@ export class SemanticValidator {
         }
 
         return {
-            order: calculationOrder(calculations, references).map((key): [string, string] => [key, formulas[key]]),
+            order: calculations.filter((c) => c.formula !== null).map((c): [string, string] => [c.key, c.formula as string]),
             keys,
             fields: Object.keys(keys),
         };

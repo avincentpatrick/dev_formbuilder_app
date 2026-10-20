@@ -363,7 +363,7 @@ export class ExpressionParser {
 
     /** M180: a date function's unit must be one of `UNITS`, written as a quoted word. Mirrors PHP `requireUnit()`. */
     private requireUnit(name: string, node: Node): void {
-        if (node.type !== 'literal' || node.literalKind !== 'string' || typeof node.value !== 'string') {
+        if (node.type !== 'literal' || node.literalKind !== 'string' || !UNITS.includes(String(node.value))) {
             throw ExpressionSyntaxError.invalidArgument(name, "takes its unit as one of 'years', 'months', 'weeks', 'days', 'hours' or 'minutes'.");
         }
     }

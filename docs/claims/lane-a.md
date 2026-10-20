@@ -95,6 +95,14 @@ Hubs (`D128`: overlap allowed, every hub named): `routes/tenant.php`, `CLAUDE.md
 `docs/data-dictionary.md`, `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`, `PROGRESS.md`.
 Namespaces spent: `D157` (asked and answered in planning); migration prefixes `2026_08_17_000143` (the `releases` table) and
 `2026_08_17_000144` (the seen column); no ADR.
+**Extended 2026-10-20, mid-build, before the files below were opened (pushed alone):** `packages/design-system/src/components/
+Badge/status-variant.ts` (the release kinds' badges — the one map §3.8 allows; `new` already reads New/info, so only `improved`
+and `fixed` are added), `packages/design-system/src/components/Icon/icons.ts` (a `sparkle` glyph for What's new in the sidebar's
+rail, under Appendix B's registry-growth rule — `help` and `award` are its precedents) and `docs/ux/design-system-reference.md`
+(a HUB: Appendix B's glyph note and the shell's footer). ⚠️ Two files were written BEFORE this extension and are recorded rather
+than hidden: `app/Support/Platform/ReleaseNotes.php` (the notes file's reader, split out of the sync command so the file test and
+the command share one check) and `tests/Feature/Deploy/DeploySkipAllowlistTest.php` (`VERSION` added to the paths the running
+site loads).
 E2E specs the diff reaches, run locally: a new `whats-new`, `responsive-axe`, `auth-axe`, `admin-console-axe`, `list-layout`,
 `impersonation`, `feedback-testing-round`, `help-contents`; CI runs every spec.
 Prediction: red first commit by commit — `BuildInfoTest` (the file read), the notes-file and sync tests and the deploy-order test by

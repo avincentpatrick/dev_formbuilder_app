@@ -44,7 +44,7 @@ describe('form-runtime engine public API', () => {
     it('surfaces a stable slug for an authoring error', () => {
         const engine = makeExpressionEvaluator();
 
-        expect(() => engine.evaluateBoolean('sum(1, 2)', new EvaluationContext({}))).toThrowError(ExpressionSyntaxError);
+        expect(() => engine.evaluateBoolean('median(1, 2)', new EvaluationContext({}))).toThrowError(ExpressionSyntaxError);
     });
 
     it('runs the semantic validator: relevance mask, effective answers, and a required error', () => {

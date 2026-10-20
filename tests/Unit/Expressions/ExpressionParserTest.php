@@ -47,7 +47,7 @@ it('rejects each malformed expression with the right slug', function (string $so
     'unbalanced paren' => ['(${a} = 1', 'unexpected_token'],
     'bare word operand' => ['${a} = bar', 'unexpected_token'],
     'not without parens' => ['not ${a}', 'unexpected_token'],
-    'unknown function sum' => ['sum(1, 2)', 'unknown_function'],
+    'unknown function median' => ['median(1, 2)', 'unknown_function'],
     'unknown function contains' => ['contains(${a}, \'x\')', 'unknown_function'],
     'selected too few' => ['selected(${m})', 'arity_mismatch'],
     'selected too many' => ['selected(${m}, \'a\', \'b\')', 'arity_mismatch'],

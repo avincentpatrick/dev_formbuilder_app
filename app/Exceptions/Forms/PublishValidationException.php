@@ -529,6 +529,36 @@ final class PublishValidationException extends RuntimeException
     }
 
     /** One violation, which is what every named factory above produces. */
+    /**
+     * A calculation that uses its own value, directly or in a loop through other calculations (M180, `R-39dbce5b`,
+     * `D149`) — never worked out, so blank in every submission. `$keys` is the loop, in field order.
+     *
+     * @param  list<string>  $keys
+     */
+    public static function calculationCycle(array $keys): self
+    {
+        $quoted = array_map(static fn (string $key): string => "“{$key}”", $keys);
+
+        if (count($keys) === 1) {
+            return self::one(
+                $keys[0],
+                'calculation_cycle',
+                "The calculation {$quoted[0]} uses its own value, so it can never be worked out. Take \${{$keys[0]}} out of its formula.",
+            );
+        }
+
+        $names = count($quoted) === 2
+            ? "{$quoted[0]} and {$quoted[1]}"
+            : implode(', ', array_slice($quoted, 0, -1)).' and '.$quoted[count($quoted) - 1];
+        [$which, $rest] = count($keys) === 2 ? ['neither', 'the other'] : ['none of them', 'the others'];
+
+        return self::one(
+            $keys[0],
+            'calculation_cycle',
+            "The calculations {$names} use each other, so {$which} can be worked out. Change one formula so it no longer uses {$rest}.",
+        );
+    }
+
     private static function one(?string $field, string $code, string $message): self
     {
         return new self($message, [['field' => $field, 'code' => $code, 'message' => $message]]);

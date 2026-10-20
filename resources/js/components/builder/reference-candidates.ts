@@ -5,8 +5,8 @@
  * TWO GRAMMARS, TWO RULES, BOTH READ FROM TRANSMITTED FACTS:
  *   - a FORMULA spot (a calculation, a rule's expression, a condition as text) takes any question an expression may
  *     name — its operand kind `offered` (`OperandKind::offered()`: never a grid, a map, a note or a page break) — wherever
- *     it sits, since a formula may read a later answer. A calculation is left out: no condition, rule or calculation
- *     reads one before R4 (`D149`). "Today" is offered too; the other date presets need R4's date functions (`R-da02fe03`).
+ *     it sits, since a formula may read a later answer. Since M180 a calculation is offered too — conditions, rules and
+ *     other calculations read one (`D149`) — but never in its own formula. The date presets follow (`R-da02fe03`).
  *   - a TEXT spot (a label, help, a placeholder, a section's title or description, the thank-you message) takes only
  *     what the publish gate lets a template name — `pipeable` (`PipingEligibility`), and `TemplateScopeResolver`'s
  *     scope: a question strictly EARLIER than the text (positions `[section sequence | -1, sequence]`, a tie refused), and
@@ -92,7 +92,7 @@ export function referenceCandidates(source: ReferenceSource, spot: ReferenceSpot
             const kind = typeOf(field)?.operand_kind;
             const row = source.kinds?.find((candidate) => candidate.value === kind);
 
-            return field.key !== spot.ownKey && kind !== undefined && kind !== 'computed' && (row === undefined || row.offered);
+            return field.key !== spot.ownKey && kind !== undefined && (row === undefined || row.offered);
         };
     } else {
         const host = hostScope(spot.host, source, sectionById);

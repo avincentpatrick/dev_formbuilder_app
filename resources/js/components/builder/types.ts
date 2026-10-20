@@ -254,8 +254,8 @@ export interface ComparableField {
     key: string;
     label: string;
     value_shape: string;
-    // M178 — a calculated question (operand kind `computed`). No rule reads one yet (`D149`, R4), so a rule's compared-
-    // question list leaves it out; a row that already names one keeps it, marked unavailable.
+    // M178 — a calculated question (operand kind `computed`). M178 left it out of a rule's compared-question list; since
+    // M180 a rule reads one (`D149`), so the list offers it like any number and nothing reads this flag to filter.
     computed: boolean;
 }
 

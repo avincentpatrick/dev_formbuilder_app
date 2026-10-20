@@ -22,6 +22,44 @@ Taken 2026-10-20. Branch `m181-ui5-versioning-whats-new`, cut from origin/main a
 SESSION:** it is held green for merge point 4 with UI6 and T2 + Likert (`D137`, `D138`: UI5 → UI6 → T2 + Likert → merge point 4).
 The plan of record is `~/.claude/plans/hi-let-s-conduct-a-mutable-goose.md` (§C, §E row 5); the build plan is
 `~/.claude/plans/pasted-content-id-776b-read-claude-md-quizzical-conway.md`.
+**BUILT — PR #374, CI 6/6 green with real step counts (run 39450434249 at `9dc6fdaf`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 ·
+Pest 11 · axe 11; the only skips are the two main-only staging-header steps and the failure-only report upload) — AND NOT MERGED.** ⛔ **Held for
+merge point 4 (`D137`, `D138`):** UI5 first, then UI6, then T2 + Likert, between the user's census before and after. ⛔ **UI6 stacks on this branch**
+(it bumps a `VERSION` that exists only here) and is `M182` — `state.php`'s next free still prints `M181`, because it counts RELEASED headings
+and this one is held; UI6's claim moves this block under a HELD heading. ⚠️ **At merge point 4:** this PR's own deploy runs the OLD `deploy.ps1`
+(a changed script runs one deploy late), so it copies no notes — the first `releases:sync` is UI6's deploy; check `/whats-new` after that one.
+Relayed **`UI4`** (the same comment, Ongoing, "Planned for batch 4") is resolved by its reference only once live, and the comment is announced by
+name at that close-out with the clicks to check it. The branch carries the row's closure, `D157`, two filed rows, the status bullet, the
+regenerated line and the hand-off.
+
+**Measured against the prediction:**
+- **Red first, commit by commit — held.** `BuildInfoTest` 5 of 8 (the three green ones pin what must survive); the notes, sync and deploy-order
+  tests 27 of 29 by absence; `WhatsNewTest` all 19 plus the users extract census; Vitest 3 new files by absence and 7 new AppLayout/Sidebar
+  cases; the e2e by absence.
+- **Mutants: 11 committed, 11 caught, each red set the one written down first** — through `scripts/mutate.php`: BuildInfo ignores the file; the
+  sync deletes what the file dropped; insert instead of upsert; the deploy line dropped; `pending` ignores the seen version; the seen version
+  moves back; a never-seen person gets only the newest. Committed and reverted: only Got it records (3 red); a footer on the builder; See all
+  changes visits before the post; **and the prompt never opening, red in a real browser at the line that expects it.**
+- **"Most likely wrong: the seeder's new member and the stamps leave every other spec and Pest count unchanged" — not wrong.** Seeders and the
+  auth fixtures green; `feedback-testing-round` (reviewer@, stamped) green; CI's E2E 6/6. **Runner-up — not wrong either:** `list-layout`
+  green, and the rail shows the glyph alone in the look.
+- **What no prediction named:** (1) `jsonb` keeps object keys in its own order, so Eloquent's strict dirty check rewrote an unchanged release with
+  a link on every sync — compared key-sorted now; (2) `pgsql_privileged` cannot see RefreshDatabase rows — the test helpers write and read under
+  the person's own GUC; (3) ⛔ five ledger citations my line inserts shifted onto blank lines, each re-pointed to the line it meant, and
+  `config/app.php` kept its line count; (4) ⛔ the tool layer collapsed an escaped apostrophe three times (PHP and JS strings); (5) ⛔ **CI's
+  first run was red twice, both mine:** PHPStan level 8 read `->values()->all()` as `array<int,…>` (I had run PHPStan only in CI), and
+  `VerifyEmail.test.ts`'s Inertia mock had no `usePage` once `AuthLayout` called it (I had run Vitest only over the folders I touched) — fixed,
+  and the full suites run locally after; (6) `TenantAppSettingsTest` leaks a tenant into `PlatformSettingsConsoleTest` when it runs first —
+  measured on the trunk, filed; (7) the real-browser look found the sidebar foot's rule curved by its link's radius — moved onto the foot;
+  (8) the relayed copy of the comment (`UI4`), found at the close — cited on the row.
+- **Local gates on the final tree:** full Vitest 256 of 256 files; type-check; Pint bare; host PHPStan 0; the host lints (citation-liveness 15 of
+  16); Pest — Releases, WhatsNew, Platform, Deploy, Tenancy extract census, Seeders, Settings, Admin settings, Feedback, Docs (only the known
+  `SuiteCollectionFloorTest` bind-mount artefact). E2E at one worker: `whats-new`, `feedback-testing-round`, `auth-axe`, `impersonation` — 47
+  passed, 12 skipped (desktop-only), 1 failed (`impersonation`'s host hop, the recorded local trap); `whats-new`, `responsive-axe`,
+  `list-layout`, `admin-console-axe`, `help-contents` — 293 passed, 40 skipped, 6 failed (*Sheets rule detail — drift* at every width: the dev
+  stack's worker had dead-lettered the seeded blocked delivery; green on CI). The look: 9 screenshots at three widths (the prompt, the footer,
+  the page, the rail and its tooltip, the drawer, the sign-in card, the console bar).
+
 Row: `R-c7247dbf` — *"The product shows no user-facing version and has no "What's new""*, built to `D124` A (0.9.0 now, 1.0.0 at
 launch), `D125` C (the notes written with each change and saved in a `releases` table by every deploy; the prompt on the first page
 after sign-in) and `D126` A (any close marks it seen).

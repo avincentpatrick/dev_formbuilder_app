@@ -108,6 +108,7 @@ const PALETTE = 'resources/js/components/builder/FieldPalette.vue';
 const SAVE_LABEL = 'resources/js/components/builder/save-label.ts';
 const CANVAS = 'resources/js/components/builder/BuilderCanvas.vue';
 const CONFIG = 'resources/js/components/builder/ConfigPanel.vue';
+const CALCULATION_EDITOR = 'resources/js/components/builder/CalculationEditor.vue';
 const TYPE_CONTROL = 'resources/js/components/builder/FieldTypeControl.vue';
 const FIELD_TYPES = 'app/Enums/FieldType.php';
 const CATEGORIES = 'app/Enums/FieldCategory.php';
@@ -748,7 +749,7 @@ const reference: ChapterDraft[] = [
                         [ui('Question type', TYPE_CONTROL), ' and ', ui('Change type', TYPE_CONTROL), ' — see ', link('Change a question’s type', '#change-type'), '.'],
                         ['A ', ui('format', TYPE_CONTROL), ' switch, on text and number questions only: ', ui('Short text', FIELD_TYPES), ' or ', ui('Long text', FIELD_TYPES), ', ', ui('Whole number', FIELD_TYPES), ' or ', ui('Decimal number', FIELD_TYPES), '.'],
                         [ui('Label', CONFIG), ', ', ui('Help text', CONFIG), ' and ', ui('Placeholder', CONFIG), ' — the wording respondents see. Each can show an earlier answer: click ', ui('Insert a question', 'resources/js/components/builder/ReferenceInput.vue'), ' under the box, or type @, and pick it from the list, which shows each question’s code.'],
-                        [ui('Calculation formula', CONFIG), ' — ', ui('Calculated', FIELD_TYPES), ' questions only. See ', link('Calculated', '#type-calculated'), '.'],
+                        [ui('Calculation formula', CALCULATION_EDITOR), ', with its ', ui('Result type', CALCULATION_EDITOR), ' and ', ui('Build it', CALCULATION_EDITOR), ' — ', ui('Calculated', FIELD_TYPES), ' questions only. See ', link('Calculated', '#type-calculated'), '.'],
                         [
                             ui('Requiredness', CONFIG), ': ', ui('Optional', PRESENTER), ', ', ui('Required', PRESENTER), ' or ', ui('Conditional', PRESENTER),
                             '. Conditional opens a box, ', ui('Required when…', CONFIG), ': click ', ui('Add condition', CONFIG), ' and choose when the answer becomes required — for example, when an earlier question is answered Yes.',
@@ -906,8 +907,11 @@ const reference: ChapterDraft[] = [
                         ' under ', ui('Show to respondents', CONFIG), ' on its ', ui('Advanced', CONFIG), ' tab: then they see its value, read-only, as they answer. Either way it is worked out again when the response is saved.',
                     ),
                     list(
-                        ['Write the formula in ', ui('Calculation formula', CONFIG), '. Click ', ui('Insert a question', 'resources/js/components/builder/ReferenceInput.vue'), ' or type @ to add another question by its ', ui('Field key', CONFIG), ', which is written inside ${ } — for example ', ui('e.g. ${quantity} * ${unit_price}', CONFIG), '.'],
-                        ['Use + − * / for arithmetic, and if(), count(), int() or today() for more.'],
+                        ['Choose its ', ui('Result type', CALCULATION_EDITOR), ' — ', ui('Number', CALCULATION_EDITOR), ', ', ui('Text', CALCULATION_EDITOR), ', ', ui('Date', CALCULATION_EDITOR), ' or ', ui('Duration', CALCULATION_EDITOR), '. It decides how the value is shown: a number to its ', ui('Decimal places', CALCULATION_EDITOR), ', a duration with its unit, such as 34 years.'],
+                        [ui('Build it', CALCULATION_EDITOR), ' builds the formula for you: pick a ', ui('Preset', CALCULATION_EDITOR), ' — Sum, Difference, Average, Count answered, If … then …, Join answers, Age from a birth date, Duration between two dates or times, or A date N days from a date — then pick its questions from the lists. The formula it writes is shown beneath it.'],
+                        [ui('Formula', CALCULATION_EDITOR), ' lets you type your own in ', ui('Calculation formula', CALCULATION_EDITOR), '; typing in the formula under a preset switches to it. Click ', ui('Insert a question', 'resources/js/components/builder/ReferenceInput.vue'), ' or type @ to add another question by its ', ui('Field key', CONFIG), ', which is written inside ${ } — for example ', ui('e.g. ${quantity} * ${unit_price}', CALCULATION_EDITOR), '.'],
+                        ['Use + − * / for arithmetic, and sum(), round(), if(), count(), coalesce() and concat(); for dates, today(), age(), date_diff() and date_add(). A duration counts whole units only: from 8:30 to 17:00 is 8 hours.'],
+                        ['A calculation may use another one, and a condition or a rule may read a calculation. Two calculations that use each other can never be worked out, so publishing refuses them.'],
                         ['It has no ', ui('Placeholder', CONFIG), ' or ', ui('Requiredness', CONFIG), ', and publishing refuses it without a formula.'],
                     ),
                 ],

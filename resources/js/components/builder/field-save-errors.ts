@@ -20,6 +20,10 @@ export const INLINE_FIELD_KEYS = [
     'default_value',
     'indexed_data_type',
     'config.calculated_formula',
+    // M180 (`R-f77aa45d`): a calculation's places and unit, refused beside the editor that sets them. Its Type is not
+    // inline: the switch cannot send a wrong one, so a refusal of it (an API client's) is listed in the pane's alert.
+    'config.decimal_places',
+    'config.duration_unit',
 ] as const;
 
 export type InlineFieldKey = (typeof INLINE_FIELD_KEYS)[number];
@@ -46,6 +50,9 @@ const NAMES: Record<string, string> = {
     default_value: 'Default value',
     indexed_data_type: 'Indexed data type',
     'config.calculated_formula': 'Calculation formula',
+    'config.calculated_type': 'Result type',
+    'config.decimal_places': 'Decimal places',
+    'config.duration_unit': 'Units',
     // M129: a note's content blocks, named by the tab that edits them — the refusal is one sentence for the whole
     // list (`ContentBlocks` answers "block 3 …"), so the pane's alert says it once, above every tab.
     'config.content': 'Content',
@@ -115,6 +122,8 @@ const TAB_BY_PATH: Record<string, string> = {
     placeholder: 'basics',
     is_required: 'basics',
     'config.calculated_formula': 'basics',
+    'config.decimal_places': 'basics',
+    'config.duration_unit': 'basics',
     key: 'advanced',
     default_value: 'advanced',
     indexed_data_type: 'advanced',

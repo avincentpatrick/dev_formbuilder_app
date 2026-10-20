@@ -429,6 +429,7 @@ function toRenderField(field: RawField): RenderField {
         media: buildMedia(field),
         appearance: field.appearance ?? null,
         content: field.field_type === 'note' && Array.isArray(field.config?.content) ? (field.config.content as unknown[]) : null,
+        calculation: calculationDisplayOf(field),
         visibility: visibilityOf(field),
         sequence: field.sequence,
         sectionSequence: field.section_sequence,
@@ -611,4 +612,23 @@ export function isoClock(at: Date, timeZone = 'UTC'): string {
  */
 export function toSemanticInput(engineSchema: EngineSchema, answers: AnswerMap, locale: string, now?: string | null): SemanticInput {
     return { ...engineSchema, answers, locale, now: now ?? null };
+}
+
+/**
+ * M180 (`R-f77aa45d`) — a calculation's display settings, as `displayValue()` reads them; null for any other type and for
+ * a calculation with none (it shows exactly as before). The mirror of `EncodeFormPresenter::calculationDisplay()`.
+ */
+function calculationDisplayOf(field: RawField): Record<string, unknown> | null {
+    if (field.field_type !== 'calculated' || field.config === null) {
+        return null;
+    }
+
+    const display: Record<string, unknown> = {};
+    for (const key of ['calculated_type', 'decimal_places', 'duration_unit']) {
+        if (field.config[key] !== undefined && field.config[key] !== null) {
+            display[key] = field.config[key];
+        }
+    }
+
+    return Object.keys(display).length > 0 ? display : null;
 }

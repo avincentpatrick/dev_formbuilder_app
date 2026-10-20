@@ -7,6 +7,9 @@ namespace App\Services\Submissions;
 use App\Enums\AnswerEnvelope;
 use App\Enums\FieldType;
 use App\Models\FormField;
+use App\Services\Expressions\Coercion;
+use App\Services\Expressions\DateMath;
+use App\Services\Expressions\Rounding;
 use App\Support\Forms\LocaleVariant;
 
 /**
@@ -32,6 +35,31 @@ final class SchemaValueFormatter
     }
 
     /**
+     * A calculation's value by its Type (M180): `decimal_places` on a Number, `duration_unit` on a Duration ("1 year",
+     * "34 years"); null when its Type writes nothing different. Mirrors `calculatedValue()` in `display-value.ts`.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    private function calculated(mixed $answer, array $config): ?string
+    {
+        if (! Coercion::isNumericLike($answer)) {
+            return null;
+        }
+
+        $number = Coercion::toNumber($answer);
+        $places = $config['decimal_places'] ?? null;
+        $unit = $config['duration_unit'] ?? null;
+
+        return match ($config['calculated_type'] ?? null) {
+            'number' => is_int($places) && $places >= 0 && $places <= Rounding::MAX_PLACES ? Rounding::fixed($number, $places) : null,
+            'duration' => in_array($unit, DateMath::UNITS, true)
+                ? Rounding::plain($number).' '.(abs($number) === 1.0 ? substr($unit, 0, -1) : $unit)
+                : null,
+            default => null,
+        };
+    }
+
+    /**
      * Format one answer for display/export. Choice values resolve to their option labels; multi-select arrays
      * join with "; " (a repeat group joins per instance in SubmissionRowProjector); yes/no renders Yes/No; else stringifies. Empty → ''.
      *
@@ -52,6 +80,12 @@ final class SchemaValueFormatter
 
         if ($type === FieldType::YesNo) {
             return $this->boolLabel($answer);
+        }
+
+        // M180 (`R-f77aa45d`): a calculation shown by its Type — a Number to its decimal places, a Duration with its unit.
+        // Untyped, or not a number, it falls through to the rules below, exactly as before.
+        if ($type === FieldType::Calculated && ($typed = $this->calculated($answer, $config)) !== null) {
+            return $typed;
         }
 
         // ── OBJECT-VALUED ANSWERS (G5b1 geo; M74 media and the two grids).

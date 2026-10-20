@@ -13,6 +13,8 @@ use App\Enums\RequiredMode;
 use App\Enums\ValidationRuleType;
 use App\Models\FormField;
 use App\Rules\ContentBlocks;
+use App\Services\Expressions\DateMath;
+use App\Services\Expressions\Rounding;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -181,6 +183,10 @@ final class UpdateFieldRequest extends FormRequest
             'config.default_zoom' => 'default zoom',
             // Choices, cascading select (its levels, and the level and parent on each choice), and a linked list.
             'config.visibility' => 'Show to respondents',
+            // M180 — a calculation's display settings, named as the calculation editor names them.
+            'config.calculated_type' => 'result type',
+            'config.decimal_places' => 'decimal places',
+            'config.duration_unit' => 'units',
             'config.options' => 'choices',
             'config.other_specify_key' => 'Please specify question',
             'config.options.*.value' => 'choice value',
@@ -250,6 +256,15 @@ final class UpdateFieldRequest extends FormRequest
                 'config.default_center.lat' => ['nullable', 'numeric', 'between:-90,90'],
                 'config.default_center.lon' => ['nullable', 'numeric', 'between:-180,180'],
                 'config.default_zoom' => ['nullable', 'integer', 'between:0,22'],
+            ];
+        }
+
+        // M180 (`R-f77aa45d`): a calculation's Type, a Number's decimal places and a Duration's unit — how its value is shown.
+        if ($type === FieldType::Calculated) {
+            return [
+                'config.calculated_type' => ['sometimes', 'nullable', Rule::in(['number', 'text', 'date', 'duration'])],
+                'config.decimal_places' => ['sometimes', 'nullable', 'integer', 'between:0,'.Rounding::MAX_PLACES],
+                'config.duration_unit' => ['sometimes', 'nullable', Rule::in(DateMath::UNITS)],
             ];
         }
 

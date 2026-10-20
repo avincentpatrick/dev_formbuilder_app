@@ -312,6 +312,26 @@ final class EncodeFormPresenter
      * Falls back to now() when `submitted_at` is null, which no EDITABLE status should ever have (all four
      * are finalized) — a defensive default rather than a reachable branch.
      */
+    /**
+     * A calculation's display settings — its Type, decimal places and unit — or null for any other type and for a
+     * calculation with none (M180). The mirror of `calculationDisplayOf()` in `schema-mapping.ts`.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function calculationDisplay(FormField $field): ?array
+    {
+        if ($field->field_type !== FieldType::Calculated) {
+            return null;
+        }
+
+        $display = array_filter(
+            array_intersect_key($field->config ?? [], array_flip(['calculated_type', 'decimal_places', 'duration_unit'])),
+            static fn (mixed $value): bool => $value !== null,
+        );
+
+        return $display === [] ? null : $display;
+    }
+
     private function clock(Form $form, ?Submission $editing = null): string
     {
         // M180 (`D153`): in the form's zone, as the server's own clock is — so `today()` is the form's calendar day.
@@ -445,6 +465,8 @@ final class EncodeFormPresenter
             // M130 (`R-c9f50df2`) — a note's content blocks, raw as the version holds them; FieldInput draws them in
             // place of the note's label (`D69`). Null for every other type, as the guest adapters send it.
             'content' => $type === FieldType::Note && is_array($field->config['content'] ?? null) ? $field->config['content'] : null,
+            // M180 (`R-f77aa45d`) — a calculation's display settings, so its value shows by its Type, as on the guest form.
+            'calculation' => $this->calculationDisplay($field),
             // `note` is display-only (handled by the page), never an input; a repeatable section's fields are
             // supported and render inside the add/remove-instance loop (Increment G2). A hidden field is
             // keyable ONLY when it is externally sourced — a `fixed` or source-less one has no answer this

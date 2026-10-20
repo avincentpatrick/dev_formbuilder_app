@@ -33,6 +33,8 @@ import CascadingEditor from './CascadingEditor.vue';
 import ChoicesEditor from './ChoicesEditor.vue';
 import ConditionEditor from './ConditionEditor.vue';
 import ReferenceInput from './ReferenceInput.vue';
+import CalculationEditor from './CalculationEditor.vue';
+import type { CalculationQuestion } from './calculation-presets';
 import ContentBlocksEditor from './ContentBlocksEditor.vue';
 import FieldTypeControl from './FieldTypeControl.vue';
 import GeoEditor from './GeoEditor.vue';
@@ -297,7 +299,16 @@ const layoutSelectOptions = computed<EnumOption[]>(() => [
 ]);
 const advanced = computed(() => (field.value ? advancedTypes.has(field.value.field_type) : false));
 const isCalculated = computed(() => field.value?.field_type === 'calculated');
-const calculatedFormula = computed<string>(() => (field.value?.config.calculated_formula as string | undefined) ?? '');
+// M180 (`R-f77aa45d`) — the questions a calculation's presets may read: every other question, in canvas order.
+const calculationQuestions = computed<CalculationQuestion[]>(() => {
+    const sequenceOf = new Map(props.store.sections.value.map((s) => [s.id, s.sequence]));
+    const position = (f: LocalField): [number, number] => [f.form_section_id === null ? -1 : (sequenceOf.get(f.form_section_id) ?? -1), f.sequence];
+
+    return props.store.fields.value
+        .filter((f) => f.key !== '' && f.key !== field.value?.key)
+        .sort((a, b) => position(a)[0] - position(b)[0] || position(a)[1] - position(b)[1])
+        .map((f) => ({ key: f.key, label: f.label, fieldType: f.field_type }));
+});
 const choices = computed<Choice[]>(() => (field.value?.config.options as Choice[] | undefined) ?? []);
 // A cascading field keeps its LEVELS + parented OPTIONS under distinct config keys (Increment G4a).
 const cascadeLevels = computed<CascadeLevel[]>(() => (field.value?.config.levels as CascadeLevel[] | undefined) ?? []);
@@ -420,6 +431,13 @@ function setField<K extends keyof LocalField>(key: K, value: LocalField[K]): voi
     const target = field.value;
     if (!target) return;
     target[key] = value;
+    props.store.touch(target.uid, 'field');
+}
+/** Several config keys as ONE edit — one save, one undo step (the calculation editor's patches). */
+function patchConfig(patch: Record<string, unknown>): void {
+    const target = field.value;
+    if (!target) return;
+    target.config = { ...target.config, ...patch };
     props.store.touch(target.uid, 'field');
 }
 function setConfig(key: string, value: unknown): void {
@@ -598,21 +616,18 @@ watch(librarySaved, (value) => {
                                 @update:model-value="setField('label', oneLine($event))"
                             />
                         </MdsFormField>
-                        <MdsFormField
+                        <!-- M180 (`R-f77aa45d`): Type, Build it / Formula and the formula — CalculationEditor.vue. -->
+                        <CalculationEditor
                             v-if="isCalculated"
-                            label="Calculation formula" :error="fieldSaveErrors.inline['config.calculated_formula']"
-                            help="Worked out from other answers. Click Insert a question, or type @, to use another question's answer, and use + - * /, comparisons, or if(), count(), int(), today() and now()."
-                            v-slot="{ id, describedby, invalid }"
-                        >
-                            <ReferenceInput
-                                :id="id" :candidates="formulaReferences"
-                                :describedby="describedby" :invalid="invalid"
-                                :model-value="calculatedFormula"
-                                :rows="2"
-                                placeholder="e.g. ${quantity} * ${unit_price}"
-                                @update:model-value="setConfig('calculated_formula', $event || null)"
-                            />
-                        </MdsFormField>
+                            :key="field.uid"
+                            :config="field.config"
+                            :questions="calculationQuestions"
+                            :candidates="formulaReferences"
+                            :formula-error="fieldSaveErrors.inline['config.calculated_formula']"
+                            :places-error="fieldSaveErrors.inline['config.decimal_places']"
+                            :unit-error="fieldSaveErrors.inline['config.duration_unit']"
+                            @patch="patchConfig($event)"
+                        />
                         <MdsFormField label="Help text" :error="fieldSaveErrors.inline.hint" v-slot="{ id, describedby, invalid }">
                             <ReferenceInput
                                 :id="id" :describedby="describedby" :invalid="invalid" :candidates="fieldTextReferences"

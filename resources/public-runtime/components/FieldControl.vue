@@ -48,6 +48,8 @@ const encodeField = computed<EncodeField>(() => ({
     appearance: props.field.appearance,
     // M130 — a note's content blocks, raw; FieldInput draws them and, with any, keeps the label for the author.
     content: props.field.content,
+    // M180 (`R-f77aa45d`) — a calculation set to Always shows its value by its Type.
+    calculation: props.field.calculation,
     supported: props.field.supported,
 }));
 

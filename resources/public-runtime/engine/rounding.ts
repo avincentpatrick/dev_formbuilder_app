@@ -17,8 +17,22 @@ export function roundHalfAway(value: number, places: number): number {
         return Number.NaN;
     }
 
+    const [negative, scaled] = scaledDigits(value, places);
+
+    return Number((negative ? '-' : '') + placeDecimal(scaled, places));
+}
+
+/** `value` rounded the same way and WRITTEN with exactly `places` decimals — "3.50", "34.0", never "-0.00". Mirrors PHP `Rounding::fixed()`. */
+export function fixedDecimal(value: number, places: number): string {
+    const [negative, scaled] = scaledDigits(value, places);
+
+    return (negative && /[1-9]/.test(scaled) ? '-' : '') + placeDecimal(scaled, places);
+}
+
+/** |value| × 10^places rounded half away from zero on its shortest decimal, as a digit string, with its sign. */
+function scaledDigits(value: number, places: number): [boolean, string] {
     if (value === 0) {
-        return 0;
+        return [false, '0'];
     }
 
     const [negative, digits, exponent] = shortest(value);
@@ -38,7 +52,7 @@ export function roundHalfAway(value: number, places: number): number {
         }
     }
 
-    return Number((negative ? '-' : '') + placeDecimal(scaled, places));
+    return [negative, scaled];
 }
 
 /** A number as plain decimal text — its shortest decimal, never an exponent — the same on both engines. */

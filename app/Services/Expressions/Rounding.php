@@ -31,8 +31,31 @@ final class Rounding
             return NAN;
         }
 
+        [$negative, $scaled] = self::scaled($value, $places);
+
+        return (float) (($negative ? '-' : '').self::placeDecimal($scaled, $places));
+    }
+
+    /**
+     * `value` rounded the same way and WRITTEN with exactly `places` decimals — "3.50", "34.0", never "-0.00" (M180, a
+     * calculation shown as a Number). The text is the point: a float cannot carry a trailing zero.
+     */
+    public static function fixed(float $value, int $places): string
+    {
+        [$negative, $scaled] = self::scaled($value, $places);
+
+        return ($negative && trim($scaled, '0') !== '' ? '-' : '').self::placeDecimal($scaled, $places);
+    }
+
+    /**
+     * |value| × 10^places rounded half away from zero on its shortest decimal, as a digit string, with its sign.
+     *
+     * @return array{0: bool, 1: string}
+     */
+    private static function scaled(float $value, int $places): array
+    {
         if ($value == 0.0) {
-            return 0.0;
+            return [false, '0'];
         }
 
         [$negative, $digits, $exponent] = self::shortest($value);
@@ -51,7 +74,7 @@ final class Rounding
             }
         }
 
-        return (float) (($negative ? '-' : '').self::placeDecimal($scaled, $places));
+        return [$negative, $scaled];
     }
 
     /** A number as plain decimal text — its shortest decimal, never an exponent — the same on both engines. */

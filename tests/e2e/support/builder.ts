@@ -19,7 +19,8 @@ export async function createForm(page: Page, title: string): Promise<string> {
 
 export async function archive(page: Page, formId: string): Promise<void> {
     const xsrf = (await page.context().cookies()).find((cookie) => cookie.name === 'XSRF-TOKEN')?.value ?? '';
-    const response = await page.request.post(`/forms/${formId}/archive`, { headers: { 'X-XSRF-TOKEN': decodeURIComponent(xsrf) } });
+    // It answers with `back()`: followed, that is whatever page the spec left open — a guest form 404s once archived.
+    const response = await page.request.post(`/forms/${formId}/archive`, { headers: { 'X-XSRF-TOKEN': decodeURIComponent(xsrf) }, maxRedirects: 0 });
     expect(response.status(), 'the form this spec made is archived again').toBeLessThan(400);
 }
 

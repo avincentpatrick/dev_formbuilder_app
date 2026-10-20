@@ -19,10 +19,10 @@ use App\Services\Templates\TemplateRenderer;
 use App\Services\Templates\TemplateSources;
 use App\Services\Validation\SemanticValidator;
 use App\Support\Forms\FieldVisibility;
+use App\Support\Forms\FormClock;
 use App\Support\Forms\FormScheduleView;
 use App\Support\Forms\StepDescriptor;
 use App\Support\Forms\StepProjection;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 /**
@@ -203,7 +203,7 @@ final class EncodeFormPresenter
             ];
         }
 
-        $now = $this->clock($editing);
+        $now = $this->clock($form, $editing);
 
         return [
             'form' => [
@@ -312,9 +312,10 @@ final class EncodeFormPresenter
      * Falls back to now() when `submitted_at` is null, which no EDITABLE status should ever have (all four
      * are finalized) — a defensive default rather than a reachable branch.
      */
-    private function clock(?Submission $editing = null): string
+    private function clock(Form $form, ?Submission $editing = null): string
     {
-        return $editing?->submitted_at?->toIso8601String() ?? Carbon::now()->toIso8601String();
+        // M180 (`D153`): in the form's zone, as the server's own clock is — so `today()` is the form's calendar day.
+        return FormClock::at($editing?->submitted_at?->toIso8601String(), $form->timezone);
     }
 
     /**

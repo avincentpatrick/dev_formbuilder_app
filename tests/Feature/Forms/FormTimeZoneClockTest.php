@@ -10,6 +10,7 @@ use App\Services\Forms\FormService;
 use App\Services\Validation\SemanticValidator;
 use App\Support\Migrations\FormTimeZoneSwitch;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 
@@ -61,4 +62,13 @@ it('switches the forms still on UTC to Asia/Manila, and leaves a form an author 
     expect($switched)->toBe(1)
         ->and(Form::query()->findOrFail($utc->id)->timezone)->toBe('Asia/Manila')
         ->and(Form::query()->findOrFail($york->id)->timezone)->toBe('America/New_York');
+});
+
+it('refuses to report success when a form is still on UTC after the write, rather than migrating green over nothing', function (): void {
+    $connection = Mockery::mock(ConnectionInterface::class);
+    $connection->shouldReceive('update')->once()->andReturn(0);
+    $connection->shouldReceive('table->where->count')->once()->andReturn(3);
+
+    expect(fn () => (new FormTimeZoneSwitch)($connection))
+        ->toThrow(RuntimeException::class, '3 form(s) are still on UTC');
 });

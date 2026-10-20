@@ -132,7 +132,8 @@ it('stamps the session clock in Carbon\'s exact ISO-8601 shape', function (): vo
     // Byte-identical to `isoClock()`'s output (H21a amendment A1): seconds precision, explicit offset, never
     // a `Z`, never milliseconds. `today()` takes a 10-character slice of this, so a differing shape is not a
     // formatting nit — it is a different DATE.
-    expect($now)->toBe('2026-07-11T09:30:00+00:00')
+    // M180 (`D153`): a new form keeps Manila time, so the same instant carries Manila's offset.
+    expect($now)->toBe('2026-07-11T17:30:00+08:00')
         ->and($now)->not->toContain('Z')
         ->and($now)->not->toContain('.');
 });
@@ -168,7 +169,7 @@ it('projects the steps against the SERVER clock, not the request date', function
     // its own would disagree with this list near midnight or on a skewed machine.
     expect(array_column($onTheDay['steps'], 'key'))->toBe(['__lead__', 'later'])
         ->and(array_column($theNextDay['steps'], 'key'))->toBe(['__lead__'])
-        ->and($onTheDay['version']['now'])->toBe('2026-07-11T09:30:00+00:00');
+        ->and($onTheDay['version']['now'])->toBe('2026-07-11T17:30:00+08:00'); // M180 (`D153`): Manila time, the same instant
 });
 
 it('drops a hidden-only section from the steps while KEEPING its keyable row in blocks', function (): void {

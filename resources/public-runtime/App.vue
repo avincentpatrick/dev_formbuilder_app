@@ -4,7 +4,7 @@
  * an error terminal — around one long-lived, stateful `ApiClient`. It fetches the schema once, hosts the fill
  * session (re-keyed on a version-drift `reschema` so the store rebuilds cleanly), and shows the confirmation.
  */
-import { onMounted, provide, ref, shallowRef, watch } from 'vue';
+import { computed, onMounted, provide, ref, shallowRef, watch } from 'vue';
 import { MdsEmptyState, MdsSpinner } from '@meridian/design-system';
 import { ContentImageUrlKey } from '@/components/submissions/note-content';
 import ConfirmationScreen from './components/ConfirmationScreen.vue';
@@ -141,7 +141,10 @@ const initialSearch = typeof window === 'undefined' ? '' : window.location.searc
 //
 // Module scope, not per-session, so a version-drift remount or a conflict review keeps the clock the
 // respondent started under rather than silently jumping it mid-session.
-const sessionNow = isoClock(new Date());
+// M180 (`D153`): the instant is read here, once; it is STAMPED in the form's zone once the schema is in, so `today()` is
+// the form's calendar day — and a remount still keeps the instant the respondent started under.
+const sessionInstant = new Date();
+const sessionNow = computed(() => isoClock(sessionInstant, schema.value?.form.schedule?.timezone ?? 'UTC'));
 
 // Increment G8b — the offline database + replay driver are created once here and shared with every session
 // (and, via the same DB name, with the service worker's Background-Sync replay). The slug scopes G8c conflict

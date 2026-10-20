@@ -19,7 +19,7 @@ use App\Services\Expressions\EvaluationContext;
 use App\Services\Expressions\ExpressionEvaluator;
 use App\Services\Expressions\Marker;
 use App\Support\Forms\FieldVisibility;
-use Illuminate\Support\Carbon;
+use App\Support\Forms\FormClock;
 use Illuminate\Support\Collection;
 
 /**
@@ -75,8 +75,16 @@ final class SemanticValidator
             $version->validations()->orderBy('sequence')->get(),
             $answers,
             $locale,
-            $now ?? Carbon::now()->toIso8601String(), // the authoritative clock for today()/now() (Increment G3)
+            FormClock::at($now, $this->formTimezone($version)), // the clock for today()/now() (G3), in the form's zone (M180, `D153`)
         ));
+    }
+
+    /** The form's time zone (M180, `D153`) — the zone its clock is stamped in, so `today()` is its calendar day. */
+    private function formTimezone(FormVersion $version): ?string
+    {
+        $timezone = $version->form()->value('timezone');
+
+        return is_string($timezone) ? $timezone : null;
     }
 
     /** The form's default locale, read null-safely off the relation query (belongs-to may be absent in theory). */

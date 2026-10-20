@@ -36,12 +36,17 @@ use App\Services\Expressions\Temporal;
 final class ExpressionOperandJudge
 {
     /**
-     * @param  array{present: bool, numeric: bool, list: bool, ordering: bool, arithmetic: bool, equality: bool, against: list<Node>}  $use
+     * @param  array{present: bool, numeric: bool, list: bool, ordering: bool, arithmetic: bool, equality: bool, temporal: bool, against: list<Node>}  $use
      * @param  array<string, FieldType>  $typeByKey
      */
     public static function judge(string $ownerKey, string $key, FieldType $type, array $use, ?string $selfKey, array $typeByKey): ?PublishValidationException
     {
         $kind = OperandKind::for($type);
+
+        // M180: a number question read AS A DATE by date_diff(), date_add() or age() is never one — always blank.
+        if ($use['temporal'] && $kind === OperandKind::Number) {
+            return PublishValidationException::expressionReadsNumberAsDate($ownerKey, $key, $type->label());
+        }
 
         if ($kind->isTemporal()) {
             return self::temporal($ownerKey, $key, $type, $kind, $use, $selfKey, $typeByKey);
@@ -62,7 +67,7 @@ final class ExpressionOperandJudge
     }
 
     /**
-     * @param  array{present: bool, numeric: bool, list: bool, ordering: bool, arithmetic: bool, equality: bool, against: list<Node>}  $use
+     * @param  array{present: bool, numeric: bool, list: bool, ordering: bool, arithmetic: bool, equality: bool, temporal: bool, against: list<Node>}  $use
      * @param  array<string, FieldType>  $typeByKey
      */
     private static function temporal(string $ownerKey, string $key, FieldType $type, OperandKind $kind, array $use, ?string $selfKey, array $typeByKey): ?PublishValidationException
@@ -127,8 +132,9 @@ final class ExpressionOperandJudge
             return match ($other->name) {
                 'now' => 'clock',
                 'today' => $kind === OperandKind::Time ? 'today()' : null,
-                'if' => null, // its value is whichever branch is taken; the gate does not guess
-                'count', 'int' => "{$other->name}(), which is a number",
+                // its value is whichever branch is taken, or a date, or text that may be one: the gate does not guess (M180)
+                'if', 'coalesce', 'date_add', 'concat' => null,
+                'count', 'int', 'age', 'date_diff', 'round', 'sum' => "{$other->name}(), which is a number",
                 default => "{$other->name}(), which is true or false",
             };
         }

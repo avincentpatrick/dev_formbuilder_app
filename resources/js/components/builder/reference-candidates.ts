@@ -69,6 +69,18 @@ export const LEAD_GROUP = 'Not in a section';
 export const DATE_GROUP = 'Dates';
 export const TODAY: ReferenceCandidate = { key: 'today()', label: 'Today', group: DATE_GROUP, insert: 'today()' };
 
+/** M180 (`R-da02fe03`): Today, then the dates worked out from it — a formula spot's last group. A number to change is 7. */
+export const DATES: ReferenceCandidate[] = [
+    TODAY,
+    ...([
+        ['Yesterday', "date_add(today(), -1, 'days')"],
+        ['Tomorrow', "date_add(today(), 1, 'days')"],
+        ['N days from now', "date_add(today(), 7, 'days')"],
+        ['N days ago', "date_add(today(), -7, 'days')"],
+        ['One month from now', "date_add(today(), 1, 'months')"],
+    ] as const).map(([label, insert]): ReferenceCandidate => ({ key: insert, label, group: DATE_GROUP, insert })),
+];
+
 type Position = [number, number];
 
 function precedes(source: Position, host: Position): boolean {
@@ -122,7 +134,7 @@ export function referenceCandidates(source: ReferenceSource, spot: ReferenceSpot
         };
     });
 
-    return spot.grammar === 'expression' ? [...candidates, TODAY] : candidates;
+    return spot.grammar === 'expression' ? [...candidates, ...DATES] : candidates;
 }
 
 function hostScope(

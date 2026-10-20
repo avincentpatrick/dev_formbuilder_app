@@ -29,16 +29,19 @@ use App\Services\Expressions\Ast\SelfReferenceNode;
  * arithmetic / `int()`), and `list` still includes `equality` (an `=` or `!=` against anything but `''`). `against`
  * holds the OTHER side of every ordering that names the key, so the gate can judge a date against what it is
  * compared with — the one place a pair, not a position, decides.
+ *
+ * `M180` (`R-da02fe03`) adds `temporal`: the key is read AS A DATE by `date_diff()`, `date_add()` or `age()`, so the gate
+ * can refuse a number question there. `sum()` and `round()` read a number, as `int()` does; `date_add()`'s count too.
  */
 final class ExpressionKeyUse
 {
     /**
      * @param  bool  $selfIsKey  whether `.` names $key too — true only on that field's own constraint
-     * @return array{present: bool, numeric: bool, list: bool, ordering: bool, arithmetic: bool, equality: bool, against: list<Node>}
+     * @return array{present: bool, numeric: bool, list: bool, ordering: bool, arithmetic: bool, equality: bool, temporal: bool, against: list<Node>}
      */
     public static function of(Node $node, string $key, bool $selfIsKey): array
     {
-        $use = ['present' => false, 'numeric' => false, 'list' => false, 'ordering' => false, 'arithmetic' => false, 'equality' => false, 'against' => []];
+        $use = ['present' => false, 'numeric' => false, 'list' => false, 'ordering' => false, 'arithmetic' => false, 'equality' => false, 'temporal' => false, 'against' => []];
         self::walk($node, $key, $selfIsKey, $use);
 
         return $use;
@@ -48,7 +51,7 @@ final class ExpressionKeyUse
      * Mark how $node uses the key. A direct use is classified by the position it sits in; anything else is
      * walked, so `${k} + 1 > 3` is a numeric use through the arithmetic, and parentheses are already gone.
      *
-     * @param  array{present: bool, numeric: bool, list: bool, ordering: bool, arithmetic: bool, equality: bool, against: list<Node>}  $use
+     * @param  array{present: bool, numeric: bool, list: bool, ordering: bool, arithmetic: bool, equality: bool, temporal: bool, against: list<Node>}  $use
      */
     private static function walk(Node $node, string $key, bool $selfIsKey, array &$use): void
     {
@@ -59,14 +62,8 @@ final class ExpressionKeyUse
             self::classify($node->left, ['numeric', 'arithmetic'], $key, $selfIsKey, $use);
             self::classify($node->right, ['numeric', 'arithmetic'], $key, $selfIsKey, $use);
         } elseif ($node instanceof FunctionCallNode) {
-            $kinds = match ($node->name) {
-                'contains', 'count' => ['list'],
-                'int' => ['numeric', 'arithmetic'],
-                default => [], // `selected()` reads a list and a value alike; `if()` passes its value through
-            };
-
-            foreach ($node->args as $arg) {
-                self::classify($arg, $kinds, $key, $selfIsKey, $use);
+            foreach ($node->args as $index => $arg) {
+                self::classify($arg, self::argumentUse($node->name, $index), $key, $selfIsKey, $use);
             }
         } elseif ($node instanceof LogicalNode) {
             self::classify($node->left, [], $key, $selfIsKey, $use);
@@ -77,8 +74,8 @@ final class ExpressionKeyUse
     }
 
     /**
-     * @param  list<'numeric'|'list'|'ordering'|'arithmetic'|'equality'>  $kinds
-     * @param  array{present: bool, numeric: bool, list: bool, ordering: bool, arithmetic: bool, equality: bool, against: list<Node>}  $use
+     * @param  list<'numeric'|'list'|'ordering'|'arithmetic'|'equality'|'temporal'>  $kinds
+     * @param  array{present: bool, numeric: bool, list: bool, ordering: bool, arithmetic: bool, equality: bool, temporal: bool, against: list<Node>}  $use
      * @param  Node|null  $other  the other side, when $operand is one side of a comparison
      */
     private static function classify(Node $operand, array $kinds, string $key, bool $selfIsKey, array &$use, ?Node $other = null): void
@@ -120,6 +117,22 @@ final class ExpressionKeyUse
             ComparisonOperator::Eq, ComparisonOperator::Neq => $againstEmpty ? [] : ['list', 'equality'],
             ComparisonOperator::Contains => $againstEmpty ? [] : ['list'],
             ComparisonOperator::IsNull => [],
+        };
+    }
+
+    /**
+     * How a function reads its argument at $index (M180 adds the date and number library).
+     *
+     * @return list<'numeric'|'list'|'arithmetic'|'temporal'>
+     */
+    private static function argumentUse(string $name, int $index): array
+    {
+        return match ($name) {
+            'contains', 'count' => ['list'],
+            'int', 'sum', 'round' => ['numeric', 'arithmetic'],
+            'date_add' => $index === 1 ? ['numeric', 'arithmetic'] : ['temporal'],
+            'date_diff', 'age' => ['temporal'],
+            default => [], // `selected()` reads a list and a value alike; `if()`, `coalesce()` and `concat()` pass a value through
         };
     }
 }

@@ -559,6 +559,19 @@ final class PublishValidationException extends RuntimeException
         );
     }
 
+    /**
+     * A number question read as a date by `date_diff()`, `date_add()` or `age()` (M180, `R-da02fe03`) — its answers are
+     * never dates, so the expression is always blank.
+     */
+    public static function expressionReadsNumberAsDate(string $ownerKey, string $key, string $typeLabel): self
+    {
+        return self::one(
+            $ownerKey,
+            'expression_reads_number_as_date',
+            "The expression on “{$ownerKey}” reads the {$typeLabel} question “{$key}” as a date, but its answers are numbers, so it is always blank. Use a date question, or today().",
+        );
+    }
+
     private static function one(?string $field, string $code, string $message): self
     {
         return new self($message, [['field' => $field, 'code' => $code, 'message' => $message]]);

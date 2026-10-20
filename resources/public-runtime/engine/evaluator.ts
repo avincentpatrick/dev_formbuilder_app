@@ -255,7 +255,7 @@ export class ExpressionEvaluator {
             return ABSENT;
         }
 
-        return Math.round(toNumber(value) * 10 ** places.value) / 10 ** places.value;
+        return roundHalfAway(toNumber(value), places.value);
     }
 
     /** `sum(a, …)` — the numbers added; a blank is skipped, anything else that is not a number makes it blank, and so does nothing to add. */

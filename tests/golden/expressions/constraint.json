@@ -1,0 +1,13 @@
+[
+  {"name":"constraint_lte_blank_side_passes","grammar_version":"2.0","eval":"constraint","expression":". <= ${q}","context":{"answers":{},"self":5},"expected":true},
+  {"name":"constraint_lte_answered_refuses","grammar_version":"2.0","eval":"constraint","expression":". <= ${q}","context":{"answers":{"q":3},"self":5},"expected":false},
+  {"name":"constraint_lte_answered_passes","grammar_version":"2.0","eval":"constraint","expression":". <= ${q}","context":{"answers":{"q":5},"self":3},"expected":true},
+  {"name":"constraint_and_false_side_still_refuses","grammar_version":"2.0","eval":"constraint","expression":". >= 0 and . <= ${q}","context":{"answers":{},"self":-1},"expected":false},
+  {"name":"constraint_and_true_side_passes","grammar_version":"2.0","eval":"constraint","expression":". >= 0 and . <= ${q}","context":{"answers":{},"self":5},"expected":true},
+  {"name":"constraint_or_blank_side_passes","grammar_version":"2.0","eval":"constraint","expression":". > 0 or . <= ${q}","context":{"answers":{},"self":-1},"expected":true},
+  {"name":"constraint_not_blank_side_passes","grammar_version":"2.0","eval":"constraint","expression":"not(. > ${q})","context":{"answers":{},"self":5},"expected":true},
+  {"name":"constraint_arithmetic_blank_side_passes","grammar_version":"2.0","eval":"constraint","expression":". <= ${a} + ${b}","context":{"answers":{"a":2},"self":5},"expected":true},
+  {"name":"constraint_if_condition_stays_two_valued","grammar_version":"2.0","eval":"constraint","expression":". <= if(${q} > 5, 1000, 100)","context":{"answers":{},"self":500},"expected":false},
+  {"name":"constraint_text_side_still_refuses","grammar_version":"2.0","eval":"constraint","expression":". <= ${name}","context":{"answers":{"name":"abc"},"self":5},"expected":false},
+  {"name":"constraint_equality_unchanged_on_blank","grammar_version":"2.0","eval":"constraint","expression":". = ${q}","context":{"answers":{},"self":5},"expected":false}
+]

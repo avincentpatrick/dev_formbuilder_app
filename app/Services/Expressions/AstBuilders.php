@@ -15,20 +15,10 @@ use App\Services\Expressions\Ast\NotNode;
  * Static AST-construction helpers (technical-architecture.md §4.3 §6.7) shared by
  * {@see StructuredRuleLowering} and, later, F3's conditional-family lowering. Producing the SAME AST a
  * parsed expression would yield means a structured rule and its `${…}` string equivalent evaluate
- * identically. F2's own lowering path uses only fieldGt/fieldLt; isNull/contains exist for F3.
+ * identically. The field comparisons lower through fieldComparison(); isNull/contains exist for F3.
  */
 final class AstBuilders
 {
-    public static function fieldGt(string $fieldKey, string $relatedKey): ComparisonNode
-    {
-        return new ComparisonNode(ComparisonOperator::Gt, new FieldReferenceNode($fieldKey), new FieldReferenceNode($relatedKey));
-    }
-
-    public static function fieldLt(string $fieldKey, string $relatedKey): ComparisonNode
-    {
-        return new ComparisonNode(ComparisonOperator::Lt, new FieldReferenceNode($fieldKey), new FieldReferenceNode($relatedKey));
-    }
-
     /** IsNull ≡ "field equals the empty string" (Eq rule 1/2 → isEmpty). For F3. */
     public static function isNull(string $fieldKey): ComparisonNode
     {
@@ -64,5 +54,14 @@ final class AstBuilders
     public static function isNotNull(string $fieldKey): NotNode
     {
         return new NotNode(self::isNull($fieldKey));
+    }
+
+    /**
+     * A field-vs-field comparison with any ordering operator — the four field-comparison rules lower through it
+     * (M178: `>=` and `<=` joined `>` and `<`), each with the operator `ValidationRuleType::relatedComparison()` names.
+     */
+    public static function fieldComparison(ComparisonOperator $op, string $fieldKey, string $relatedKey): ComparisonNode
+    {
+        return new ComparisonNode($op, new FieldReferenceNode($fieldKey), new FieldReferenceNode($relatedKey));
     }
 }

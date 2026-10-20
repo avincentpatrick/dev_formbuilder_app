@@ -14,6 +14,7 @@
 import { MdsButton, MdsModal } from '@meridian/design-system';
 import FormSettingsSections from '@/components/forms/FormSettingsSections.vue';
 import type { AutomationsProps, DataSharingProps, FormSettingsForm, OcrScanningProps, ReferenceFileRow, ShareProps } from '@/components/forms/types';
+import type { ReferenceCandidate } from './reference-candidates';
 
 const props = defineProps<{
     open: boolean;
@@ -31,6 +32,8 @@ const props = defineProps<{
     automations?: AutomationsProps | null;
     /** The Data sharing section (M133), or null/absent for a reader who cannot read the responses. */
     dataSharing?: DataSharingProps | null;
+    /** M178 (`R-75719ac4`) — the thank-you message's "Insert a question" list. */
+    confirmationReferences?: ReferenceCandidate[];
 }>();
 
 const emit = defineEmits<{ 'update:open': [value: boolean] }>();
@@ -54,7 +57,7 @@ const emit = defineEmits<{ 'update:open': [value: boolean] }>();
             :ocr-scanning="props.ocrScanning"
             :reference-files="props.referenceFiles"
             :automations="props.automations"
-            :data-sharing="props.dataSharing"
+            :data-sharing="props.dataSharing" :confirmation-references="props.confirmationReferences"
         />
 
         <template #actions>

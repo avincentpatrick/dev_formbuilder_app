@@ -138,6 +138,9 @@ export interface PaletteType {
     value_shape: string;
     // M134 (`R-910d2286`) — what an EXPRESSION may compare this type's answer with, `OperandKind::for()` transmitted.
     operand_kind: string;
+    // M178 (`R-75719ac4`) — whether a label, help text or message may show this type's answer (`PipingEligibility`), so
+    // the "Insert a question" picker offers in a text spot what the publish gate accepts there. Optional: a fixture omits it.
+    pipeable?: boolean;
     // The palette group this type is one variant of (M125) — `FieldVariantGroup` via BuilderPresenter, or null.
     // The palette shows ONE entry per group (its primary) and the Basics tab switches between the members.
     // Optional: a hand-built palette in a test may carry none, and absent reads as ungrouped.
@@ -197,6 +200,9 @@ export interface RuleTypeOption extends EnumOption {
     // M131 (`R-799d60f5`) — the skip pair. With `governs_requiredness` it splits the rules into the three families
     // both engines fold a group within; `rule-grouping.ts` reads the two, never a list of names.
     governs_relevance: boolean;
+    // M178 (`R-917496f9`) — the rule stating the same limit against another question's answer (`min_value` ↔
+    // `at_least_field`, `max_value` ↔ `at_most_field`; `ValidationRuleType::boundCounterpart()`), null otherwise.
+    bound_counterpart: string | null;
 }
 
 // One comparison operator as a rule row shows it (M115). `label` carries its symbol inside the string
@@ -248,6 +254,9 @@ export interface ComparableField {
     key: string;
     label: string;
     value_shape: string;
+    // M178 — a calculated question (operand kind `computed`). No rule reads one yet (`D149`, R4), so a rule's compared-
+    // question list leaves it out; a row that already names one keeps it, marked unavailable.
+    computed: boolean;
 }
 
 // A question-library item as the picker shows it (Increment G9b). Mirrors BuilderPresenter::libraryItem —

@@ -30,11 +30,13 @@
  * would be editing a rule they cannot see. Same posture as `ConditionRow.vue`'s disabled `selected()`
  * options, and the same reason.
  */
-import { MdsButton, MdsCallout, MdsFormField, MdsIconButton, MdsSelect, MdsTextInput, MdsTextarea } from '@meridian/design-system';
+import { MdsButton, MdsCallout, MdsFormField, MdsIconButton, MdsSelect, MdsTextInput } from '@meridian/design-system';
 import { computed } from 'vue';
 import type { BuilderValidation, ComparableField, EnumOption, OperatorOption, RuleTypeOption } from './types';
 import { isNoNegativesRule, NEGATIVE_FLOOR_RULE, NO_NEGATIVES_LABEL } from './field-conversion';
 import { mayCompare, operatorReads, repointPatch, ruleChangePatch } from './validation-options';
+import ReferenceInput from './ReferenceInput.vue';
+import type { ReferenceCandidate } from './reference-candidates';
 import {
     FAMILY_DEFAULT,
     applyCombinator,
@@ -55,6 +57,8 @@ const props = withDefaults(
         valueShape: string;
         /** Every other field in the draft, for the rules that name one. */
         comparableFields: ComparableField[];
+        /** M178 (`R-75719ac4`) — what an Expression rule's "Insert a question" picker offers; none, no picker. */
+        references?: ReferenceCandidate[];
         disabled?: boolean;
         /**
          * Narrow this instance to a subset of rule kinds (M116). Undefined — the Validation tab — means
@@ -238,8 +242,10 @@ function ruleOptionsFor(row: BuilderValidation): SelectOption[] {
  */
 function relatedOptionsFor(row: BuilderValidation): SelectOption[] {
     const rule = ruleTypeOf(row);
-    const offered = rule === null ? props.comparableFields : props.comparableFields.filter((field) => mayCompare(rule, props.operators, field));
-    const options: SelectOption[] = offered.map((field) => ({ value: field.key, label: field.label }));
+    // M178: a calculation is left out — no rule reads one before R4 (`D149`); a row already naming one keeps it below.
+    const readable = props.comparableFields.filter((field) => !field.computed);
+    const offered = rule === null ? readable : readable.filter((field) => mayCompare(rule, props.operators, field));
+    const options: SelectOption[] = offered.map((field) => ({ value: field.key, label: codedLabel(field) }));
 
     const key = row.related_field_key;
 
@@ -257,6 +263,11 @@ function relatedOptionsFor(row: BuilderValidation): SelectOption[] {
     }
 
     return options;
+}
+
+/** M178 (`R-75719ac4`) — a question as a list names it: its label and its code, or the code alone when it has no label. */
+function codedLabel(field: ComparableField): string {
+    return field.label === field.key ? field.key : `${field.label} · ${field.key}`;
 }
 
 /**
@@ -355,14 +366,48 @@ function setRuleType(index: number, chosen: string): void {
           ? { shown_as: 'rule', ...(isNoNegativesRule(props.validations[index]) ? { rule_value: null } : {}) }
           : {};
     const rule = props.ruleTypes.find((candidate) => candidate.value === value) ?? null;
+    // M178: a rule comparing two answers reads no value, so one left from a Minimum would return on switching back.
+    const comparesAnswers = rule !== null && rule.takes_related_field && !rule.takes_operator ? { rule_value: null } : {};
 
     // M131: the compared question survives only if the NEW kind can be judged by it, and the operator only if
     // the new kind reads one that can read that question — `required_if` on text → `greater_than_field` used to
     // keep the text question, which publish refuses.
     const current = props.validations[index];
-    const patch = { ...ruleChangePatch(current, rule, props.comparableFields, props.operators), rule_type: value, ...extra };
+    const patch = { ...ruleChangePatch(current, rule, props.comparableFields, props.operators), rule_type: value, ...comparesAnswers, ...extra };
 
     update(index, { ...patch, ...regroupFor(current, { ...current, ...patch }) });
+}
+
+/**
+ * M178 (`R-917496f9`) — a Minimum or Maximum compares with "A number" or "Another question's answer". The second is the
+ * row's counterpart rule (`bound_counterpart`: `min_value` ↔ `at_least_field`, `max_value` ↔ `at_most_field`), so the
+ * choice switches the stored rule. Offered only where the counterpart can take this question (not a Likert scale, whose
+ * minimum has no field comparison) and never for "No negative numbers", whose value is fixed.
+ */
+const COMPARE_NUMBER = 'number';
+const COMPARE_ANSWER = 'answer';
+const compareOptions: EnumOption[] = [
+    { value: COMPARE_NUMBER, label: 'A number' },
+    { value: COMPARE_ANSWER, label: 'Another question’s answer' },
+];
+
+function counterpartOf(row: BuilderValidation): RuleTypeOption | null {
+    const counterpart = ruleTypeOf(row)?.bound_counterpart ?? null;
+
+    if (counterpart === null || kindOf(row) === NO_NEGATIVES) return null;
+
+    return allowedRuleTypes.value.find((rule) => rule.value === counterpart) ?? null;
+}
+
+function compareSourceOf(row: BuilderValidation): string {
+    return ruleTypeOf(row)?.takes_related_field === true ? COMPARE_ANSWER : COMPARE_NUMBER;
+}
+
+function setCompareSource(index: number, source: string): void {
+    const row = props.validations[index];
+    const counterpart = counterpartOf(row);
+
+    if (counterpart !== null && source !== compareSourceOf(row)) setRuleType(index, counterpart.value);
 }
 
 /** Re-pointing clears an operator the new question cannot take, and the value it compared against (M131). */
@@ -466,6 +511,14 @@ const modeOptions: EnumOption[] = [
                     @update:model-value="setRuleType(i, $event)"
                 />
                 <MdsSelect
+                    v-if="counterpartOf(row) !== null"
+                    :model-value="compareSourceOf(row)"
+                    :options="compareOptions"
+                    :disabled="disabled"
+                    :aria-label="`Rule ${i + 1} compares with`"
+                    @update:model-value="setCompareSource(i, $event)"
+                />
+                <MdsSelect
                     v-if="ruleTypeOf(row)?.takes_related_field"
                     :model-value="row.related_field_key ?? ''"
                     :options="relatedOptionsFor(row)"
@@ -493,8 +546,8 @@ const modeOptions: EnumOption[] = [
                 />
             </template>
 
-            <MdsTextarea
-                v-else
+            <ReferenceInput
+                v-else :candidates="references ?? []"
                 :model-value="row.expression ?? ''"
                 :rows="2"
                 placeholder="e.g. ${age} >= 18"

@@ -13,7 +13,7 @@ export type ArithmeticOperator = 'add' | 'sub' | 'mul' | 'div';
 /** app/Enums/LogicOperator.php */
 export type LogicOperator = 'and' | 'or';
 
-/** app/Enums/ValidationRuleType.php (the 11 cases in 3 families). */
+/** app/Enums/ValidationRuleType.php (the 13 cases in 3 families; `at_least_field` / `at_most_field` added by M178). */
 export type ValidationRuleType =
     | 'min_value'
     | 'max_value'
@@ -25,7 +25,9 @@ export type ValidationRuleType =
     | 'skip_if'
     | 'skip_with'
     | 'greater_than_field'
-    | 'less_than_field';
+    | 'less_than_field'
+    | 'at_least_field'
+    | 'at_most_field';
 
 /** app/Enums/RequiredMode.php */
 export type RequiredMode = 'required' | 'optional' | 'conditional';
@@ -35,3 +37,17 @@ export type LiteralKind = 'number' | 'string';
 
 /** app/Services/Expressions/NodeKind.php — a node yields a plain value or a boolean. */
 export type NodeKind = 'value' | 'boolean';
+
+/** The four field-comparison rules — those that ORDER the owner's answer against another question's. */
+export type FieldComparisonRuleType = 'greater_than_field' | 'less_than_field' | 'at_least_field' | 'at_most_field';
+
+/**
+ * The comparison each field-comparison rule makes — the mirror of `ValidationRuleType::relatedComparison()` for
+ * these four (M178). The lowering reads it, so "at least" cannot lower to a strict `>`.
+ */
+export const FIELD_COMPARISON_OPERATOR: Readonly<Record<FieldComparisonRuleType, ComparisonOperator>> = {
+    greater_than_field: 'gt',
+    less_than_field: 'lt',
+    at_least_field: 'gte',
+    at_most_field: 'lte',
+};

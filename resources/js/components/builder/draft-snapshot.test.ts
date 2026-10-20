@@ -449,6 +449,20 @@ group('9. rule rows — screened through the engine’s own lowering (M145, R-55
         expect(issues.map((i) => i.code)).toEqual(['incomplete_rule']);
     });
 
+    it('9e2. omits an at least / at most rule with no compared question, and keeps one that names it (M178)', () => {
+        // The screen's switch falls through to "keep" for a rule type it does not know, so an unfinished
+        // "At least another question" would reach the engine, which throws, and the whole preview would degrade.
+        for (const rule_type of ['at_least_field', 'at_most_field'] as const) {
+            const unfinished = projectDraft(input([earlier, trigger([rule({ rule_type })]), later]));
+            expect(rulesOf(unfinished.schema), rule_type).toHaveLength(0);
+            expect(unfinished.issues.map((i) => i.code), rule_type).toEqual(['incomplete_rule']);
+
+            const finished = projectDraft(input([earlier, trigger([rule({ rule_type, related_field_key: 'earlier' })]), later]));
+            expect(rulesOf(finished.schema), rule_type).toHaveLength(1);
+            expect(finished.issues, rule_type).toHaveLength(0);
+        }
+    });
+
     it('9f. omits a half-typed free-text rule rather than nulling it, and keeps one that parses', () => {
         const { schema, issues } = projectDraft(
             input([

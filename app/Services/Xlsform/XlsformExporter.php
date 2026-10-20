@@ -341,8 +341,8 @@ final class XlsformExporter
         return match ($validation['rule_type'] ?? null) {
             'min_value' => is_numeric($value) ? '. >= '.$value : null,
             'max_value' => is_numeric($value) ? '. <= '.$value : null,
-            'greater_than_field' => $relatedKey !== null ? '. > ${'.$relatedKey.'}' : null,
-            'less_than_field' => $relatedKey !== null ? '. < ${'.$relatedKey.'}' : null,
+            'greater_than_field', 'less_than_field' => $relatedKey !== null ? '. '.($validation['rule_type'] === 'greater_than_field' ? '>' : '<').' ${'.$relatedKey.'}' : null,
+            'at_least_field', 'at_most_field' => $relatedKey !== null ? '. '.($validation['rule_type'] === 'at_least_field' ? '>=' : '<=').' ${'.$relatedKey.'}' : null,
             default => null, // pattern / length / required_if / … : documented export limitation
         };
     }

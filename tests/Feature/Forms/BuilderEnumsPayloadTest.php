@@ -68,7 +68,7 @@ function ruleTypeOptions(array $payload): array
 it('ships every rule type with a label, its shapes and the three column facts', function (): void {
     $options = ruleTypeOptions($this->payload);
 
-    expect($options)->toHaveCount(11);
+    expect($options)->toHaveCount(13);
 
     foreach (ValidationRuleType::cases() as $type) {
         $option = $options[$type->value] ?? null;
@@ -101,7 +101,11 @@ it('offers the value bounds only to the three shapes whose stored answer really 
     expect($options['min_value']['shapes'])->toEqualCanonicalizing(['number', 'duration', 'scale'])
         ->and($options['max_value']['shapes'])->toEqualCanonicalizing(['number', 'duration', 'scale'])
         ->and($options['greater_than_field']['shapes'])->toEqualCanonicalizing(['number', 'duration'])
-        ->and($options['less_than_field']['shapes'])->toEqualCanonicalizing(['number', 'duration']);
+        ->and($options['less_than_field']['shapes'])->toEqualCanonicalizing(['number', 'duration'])
+        // M178 (`R-917496f9`): "at least" / "at most" another answer take the strict pair's shapes, not the bounds' —
+        // a Likert scale may have a numeric minimum but is never the owner of a field comparison.
+        ->and($options['at_least_field']['shapes'])->toEqualCanonicalizing(['number', 'duration'])
+        ->and($options['at_most_field']['shapes'])->toEqualCanonicalizing(['number', 'duration']);
 });
 
 it('offers the conditional family to every shape that can hold an answer, and to no_answer never', function (): void {
@@ -123,6 +127,7 @@ it('marks exactly the four conditional rules as reading an operator, and the six
     expect($withOperator)->toEqualCanonicalizing(['required_if', 'required_with', 'skip_if', 'skip_with'])
         ->and($withRelated)->toEqualCanonicalizing([
             'required_if', 'required_with', 'skip_if', 'skip_with', 'greater_than_field', 'less_than_field',
+            'at_least_field', 'at_most_field',
         ])
         ->and($emptyOk)->toEqualCanonicalizing(['required_with', 'skip_with']);
 });
@@ -163,9 +168,34 @@ it('ships the related comparison of each rule exactly as the gate judges a compa
 
     expect($options['greater_than_field']['related_comparison'])->toBe('gt')
         ->and($options['less_than_field']['related_comparison'])->toBe('lt')
+        ->and($options['at_least_field']['related_comparison'])->toBe('gte')
+        ->and($options['at_most_field']['related_comparison'])->toBe('lte')
         ->and($options['required_with']['related_comparison'])->toBe('is_null')
         ->and($options['required_if']['related_comparison'])->toBeNull()
         ->and($options['min_length']['related_comparison'])->toBeNull();
+});
+
+it('pairs each number limit with its rule against another answer, both ways, and nothing else', function (): void {
+    // M178 (`R-917496f9`). The Minimum row's "A number · Another question's answer" choice switches the stored rule to
+    // its counterpart. The pairing is TRANSMITTED, never a client literal (the `M115` lesson), and it must be symmetric
+    // or switching back would land on a third rule.
+    $options = ruleTypeOptions($this->payload);
+
+    expect($options['min_value']['bound_counterpart'])->toBe('at_least_field')
+        ->and($options['at_least_field']['bound_counterpart'])->toBe('min_value')
+        ->and($options['max_value']['bound_counterpart'])->toBe('at_most_field')
+        ->and($options['at_most_field']['bound_counterpart'])->toBe('max_value');
+
+    foreach (ValidationRuleType::cases() as $type) {
+        $counterpart = $type->boundCounterpart();
+        expect($options[$type->value]['bound_counterpart'])->toBe($counterpart?->value, $type->value);
+        if ($counterpart !== null) {
+            expect($counterpart->boundCounterpart())->toBe($type, "{$type->value} is not its counterpart's counterpart");
+        }
+    }
+
+    $paired = array_keys(array_filter($options, static fn (array $o): bool => $o['bound_counterpart'] !== null));
+    expect($paired)->toEqualCanonicalizing(['min_value', 'max_value', 'at_least_field', 'at_most_field']);
 });
 
 it('marks exactly the skip pair as governing relevance, and partitions the rules as the validator folds them', function (): void {
@@ -354,5 +384,23 @@ it('transmits what a condition may compare each kind with, written out row by ro
         $row('attachment', true, false, false, false, [], null),
         $row('object', false, false, false, false, [], null),
         $row('none', false, false, false, false, [], null),
+    ]);
+});
+
+it('says of every palette entry whether a label may show its answer, written out type by type (M178)', function (): void {
+    // The "Insert a question" picker offers a text spot exactly these; publish refuses the rest (`PipingEligibility`).
+    // Transcribed independently of PipingEligibility::for(), so this census can fail.
+    $pipeable = [];
+    foreach ($this->payload['palette'] as $group) {
+        foreach ($group['types'] as $type) {
+            if ($type['pipeable']) {
+                $pipeable[] = $type['value'];
+            }
+        }
+    }
+
+    expect($pipeable)->toEqualCanonicalizing([
+        'short_text', 'long_text', 'email', 'phone', 'url', 'integer', 'decimal', 'date', 'time', 'datetime', 'duration',
+        'single_select', 'multi_select', 'dropdown', 'yes_no', 'cascading_select', 'likert_scale', 'calculated', 'hidden',
     ]);
 });

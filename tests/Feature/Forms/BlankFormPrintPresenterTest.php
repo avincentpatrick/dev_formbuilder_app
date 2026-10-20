@@ -656,3 +656,31 @@ it('gives a yes/no question its two tick boxes, not the write-in box of a broken
     expect(Coercion::yesNoAnswer($consent['options'][0]['value']))->toBeTrue()
         ->and(Coercion::yesNoAnswer($consent['options'][1]['value']))->toBeFalse();
 });
+
+it('prints a reference to another answer as a blank line to write in, on a label, a hint and section text (M178, D147)', function (): void {
+    // Every other channel pipes `${name}` into the answer; a blank paper form has no answer to pipe, and printed
+    // the code as typed. D147 A: a blank line for the person filling the paper. An escaped `$${` stays literal.
+    [$form, $version] = printFixture([
+        'sections' => [
+            ['key' => 'about', 'label' => 'About ${name}', 'description' => '${name} and ${other} only', 'sequence' => 1, 'is_repeatable' => false],
+        ],
+        'fields' => [
+            printField('name', 'short_text', ['section_key' => null, 'sequence' => 0]),
+            printField('age', 'integer', [
+                'section_key' => 'about', 'sequence' => 1,
+                'label' => 'How old is ${name}?', 'hint' => 'Ask ${name} directly',
+            ]),
+            printField('cost', 'short_text', ['section_key' => 'about', 'sequence' => 2, 'label' => 'Write it as $${price}']),
+        ],
+    ]);
+
+    $model = $this->present->present($form, $version);
+    $about = collect($model['blocks'])->firstWhere('label', '!==', null);
+    $fields = collect($about['fields'])->keyBy('key');
+
+    expect($about['label'])->toBe('About ________')
+        ->and($about['description'])->toBe('________ and ________ only')
+        ->and($fields['age']['label'])->toBe('How old is ________?')
+        ->and($fields['age']['hint'])->toBe('Ask ________ directly')
+        ->and($fields['cost']['label'])->toBe('Write it as ${price}');
+});

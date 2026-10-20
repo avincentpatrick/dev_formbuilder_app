@@ -314,4 +314,72 @@ final class ExpressionEvaluator
 
         return Coercion::toStr($value) === $needle;
     }
+
+    /**
+     * A VALIDATION RULE's verdict (M178, `R-917496f9`): the expression passes unless it is definitely false, and an
+     * ordering comparison (`>`, `<`, `>=`, `<=`) with a BLANK side is not yet known. "At most ${limit}" therefore lets
+     * an answer through while `limit` is unanswered — as the structured field comparisons have since M134 — instead
+     * of refusing every answer because a blank side is NaN and NaN compares false.
+     *
+     * ⛔ THREE-VALUED ON THE BOOLEAN SPINE ONLY, AND ONLY HERE. `not`, `and`, `or` follow Kleene's rules (unknown and
+     * false is false, so `. >= 0 and . <= ${q}` still refuses -1; `not(unknown)` stays unknown, so `not(. > ${q})`
+     * cannot invert the pass into a refusal); every other node — an `if()` included, whose branches the grammar
+     * keeps to values (`ExpressionParser`) — is `toBool(eval(node))`, exactly today's value. So the result is either today's
+     * verdict or unknown — this can only REMOVE a refusal, never add one. Relevance, skip, Required when, calculations
+     * and automations keep `evaluateBoolean()` and "a blank compares false": nothing outside a rule's own
+     * expression row (`StructuredRuleEvaluator::passesConstraint()`) calls this.
+     *
+     * "Blank" is `Coercion::isEmpty()` OR a NaN — arithmetic over a blank answer yields a raw NaN inside the tree
+     * (normalised to null only at the boundary), so `. <= ${a} + ${b}` with `b` unanswered is unknown too. A present
+     * answer that is not a number ('abc') is not blank and still compares false. Appended, because this file is
+     * cited by line. Mirrored by `evaluator.ts`; pinned by `tests/golden/expressions/constraint.json`.
+     *
+     * @throws ExpressionSyntaxException
+     */
+    public function evaluateConstraint(string $expression, EvaluationContext $context): bool
+    {
+        return $this->constraintTruth($this->parser->parse($expression), $context) !== false;
+    }
+
+    /** True or false, or null for "not yet known" — see {@see self::evaluateConstraint()}. */
+    private function constraintTruth(Node $node, EvaluationContext $context): ?bool
+    {
+        if ($node instanceof NotNode) {
+            $operand = $this->constraintTruth($node->operand, $context);
+
+            return $operand === null ? null : ! $operand;
+        }
+
+        if ($node instanceof LogicalNode) {
+            $decides = $node->op === LogicOperator::Or;
+            $left = $this->constraintTruth($node->left, $context);
+
+            if ($left === $decides) {
+                return $decides; // the short-circuit evaluate() takes: false decides an `and`, true an `or`
+            }
+
+            $right = $this->constraintTruth($node->right, $context);
+
+            if ($right === $decides) {
+                return $decides;
+            }
+
+            return $left === null || $right === null ? null : ! $decides;
+        }
+
+        if ($node instanceof ComparisonNode
+            && in_array($node->op, [ComparisonOperator::Gt, ComparisonOperator::Lt, ComparisonOperator::Gte, ComparisonOperator::Lte], true)) {
+            $left = $this->eval($node->left, $context);
+            $right = $this->eval($node->right, $context);
+
+            return $this->isBlankSide($left) || $this->isBlankSide($right) ? null : $this->numericCompare($left, $right, $node->op);
+        }
+
+        return Coercion::toBool($this->eval($node, $context));
+    }
+
+    private function isBlankSide(mixed $value): bool
+    {
+        return Coercion::isEmpty($value) || (is_float($value) && is_nan($value));
+    }
 }

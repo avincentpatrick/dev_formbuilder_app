@@ -90,9 +90,14 @@ it('matches the golden vector', function (array $case): void {
         return;
     }
 
-    $result = ($case['eval'] ?? 'bool') === 'value'
-        ? $engine->evaluate($expression, $evaluationContext)
-        : $engine->evaluateBoolean($expression, $evaluationContext);
+    // M178: exhaustive — a mode spelled wrong throws rather than silently running as `bool`. `constraint` is a
+    // validation rule's verdict, where a comparison with a blank side is not yet known and passes.
+    $result = match ($case['eval'] ?? 'bool') {
+        'value' => $engine->evaluate($expression, $evaluationContext),
+        'bool' => $engine->evaluateBoolean($expression, $evaluationContext),
+        'constraint' => $engine->evaluateConstraint($expression, $evaluationContext),
+        default => throw new UnexpectedValueException("unknown eval mode in vector {$case['name']}"),
+    };
 
     expect($result)->toEqual($case['expected']);
 })->with('expression vectors');

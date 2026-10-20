@@ -24,7 +24,7 @@ type ExpressionVector = {
     expression?: string;
     expression_repeat?: { prefix: string; times: number; core: string; suffix: string };
     context?: { answers?: Record<string, unknown>; self?: unknown };
-    eval?: 'bool' | 'value';
+    eval?: 'bool' | 'value' | 'constraint';
     expected?: unknown;
     expected_error?: string;
 };
@@ -76,9 +76,13 @@ describe('golden expression vectors (PHP ⇄ TS drift contract)', () => {
                 return;
             }
 
-            const result = (vector.eval ?? 'bool') === 'value'
-                ? engine.evaluate(expression, context)
-                : engine.evaluateBoolean(expression, context);
+            // M178: exhaustive — a mode spelled wrong throws rather than silently running as `bool`.
+            const mode = vector.eval ?? 'bool';
+            const result =
+                mode === 'value' ? engine.evaluate(expression, context)
+                : mode === 'bool' ? engine.evaluateBoolean(expression, context)
+                : mode === 'constraint' ? engine.evaluateConstraint(expression, context)
+                : (() => { throw new Error(`unknown eval mode in vector ${vector.name}`); })();
 
             expect(result).toEqual(vector.expected);
         });

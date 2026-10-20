@@ -33,7 +33,9 @@
  */
 import { computed, useId, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
-import { MdsButton, MdsFormField, MdsRadio, MdsSelect, MdsTextarea, MdsTextInput } from '@meridian/design-system';
+import { MdsButton, MdsFormField, MdsRadio, MdsSelect, MdsTextInput } from '@meridian/design-system';
+import ReferenceInput from './ReferenceInput.vue';
+import type { ReferenceCandidate } from './reference-candidates';
 import type { RedirectKind, RedirectTargetOption } from '@/components/forms/types';
 
 const props = defineProps<{
@@ -57,6 +59,8 @@ const props = defineProps<{
         default_locale: string;
         supported_locales: string[];
     };
+    /** M178 (`R-75719ac4`) — what the message's "Insert a question" picker offers; the hub's settings page sends none. */
+    references?: ReferenceCandidate[];
 }>();
 
 const form = useForm<{
@@ -212,8 +216,8 @@ function submit(clear: boolean): void {
             help="Leave it empty to use the standard thank-you message."
             :error="form.errors.confirmation_message"
         >
-            <MdsTextarea
-                :id="id"
+            <ReferenceInput
+                :id="id" :candidates="props.references ?? []"
                 v-model="form.confirmation_message"
                 :rows="3"
                 placeholder="Thanks — your response has been recorded."
@@ -230,8 +234,8 @@ function submit(clear: boolean): void {
             help="Leave it empty to show the message above."
             :error="form.errors[`confirmation_message_translations.${locale}`]"
         >
-            <MdsTextarea
-                :id="id"
+            <ReferenceInput
+                :id="id" :candidates="props.references ?? []"
                 v-model="form.confirmation_message_translations[locale]"
                 :rows="3"
                 :describedby="describedby"

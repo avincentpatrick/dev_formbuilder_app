@@ -82,5 +82,12 @@
     "schema": {"fields": [{"key": "age", "field_type": "integer"}, {"key": "consent"}, {"key": "code", "is_required": "conditional", "rules": [{"id": "r0", "rule_type": "required_if", "operator": "gt", "related": "age", "rule_value": "17", "sequence": 0, "logic_group": "r"}, {"id": "r1", "rule_type": "required_if", "operator": "eq", "related": "consent", "rule_value": "yes", "sequence": 1, "logic_group": "r", "logic_operator": "and"}, {"id": "k0", "rule_type": "min_length", "rule_value": "3", "sequence": 2, "logic_group": "k"}, {"id": "k1", "rule_type": "pattern", "rule_value": "X.*", "sequence": 3, "logic_group": "k", "logic_operator": "or"}]}]},
     "answers": {"age": 20, "consent": "yes", "code": "AB"},
     "expected": {"relevance": {"fields": {"age": true, "consent": true, "code": true}, "sections": {}}, "errors": [{"field": "code", "rule": "min_length"}], "effective_answers": {"age": 20, "consent": "yes", "code": "AB"}, "computed": {}}
+  },
+  {
+    "name": "required_if_gt_compared_blank_stays_optional",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "q", "field_type": "integer"}, {"key": "r", "is_required": "conditional", "rules": [{"rule_type": "required_if", "operator": "gt", "related": "q", "rule_value": "5"}]}]},
+    "answers": {},
+    "expected": {"relevance": {"fields": {"q": true, "r": true}, "sections": {}}, "errors": [], "effective_answers": {}, "computed": {}}
   }
 ]

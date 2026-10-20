@@ -472,8 +472,8 @@ Invoke-Native php @('artisan', 'down', '--retry=15', '--render=deploy-window')
 # 5a. THE DATA GUARD (M176, R-a11cc78a, D137, D143). A backup of the database and a count of every table's rows, taken
 #     once the site is down — so nothing writes between them and the migration — and BEFORE anything is replaced, from
 #     the live checkout as it stands. If either fails, nothing has changed yet: the site comes back up on the old code
-#     and the deploy refuses to migrate. ⚠️ Unproven on the box until merge point 2 (D143): the runner's account had
-#     never run pg_dump there. The backup's path is printed in this log; docs/deployment-infrastructure.md restores it.
+#     and the deploy refuses to migrate. Proven on the box at merge point 2 (D143, run 39190622862): the runner's account
+#     ran pg_dump with no rights changed. The backup's path is printed in this log; docs/deployment-infrastructure.md restores it.
 try {
     Invoke-Native php @('artisan', 'deploy:backup')
     Invoke-Native php @('artisan', 'deploy:census', "--write=$CensusFile")

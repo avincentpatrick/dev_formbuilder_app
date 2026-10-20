@@ -747,7 +747,7 @@ const reference: ChapterDraft[] = [
                     list(
                         [ui('Question type', TYPE_CONTROL), ' and ', ui('Change type', TYPE_CONTROL), ' — see ', link('Change a question’s type', '#change-type'), '.'],
                         ['A ', ui('format', TYPE_CONTROL), ' switch, on text and number questions only: ', ui('Short text', FIELD_TYPES), ' or ', ui('Long text', FIELD_TYPES), ', ', ui('Whole number', FIELD_TYPES), ' or ', ui('Decimal number', FIELD_TYPES), '.'],
-                        [ui('Label', CONFIG), ', ', ui('Help text', CONFIG), ' and ', ui('Placeholder', CONFIG), ' — the wording respondents see.'],
+                        [ui('Label', CONFIG), ', ', ui('Help text', CONFIG), ' and ', ui('Placeholder', CONFIG), ' — the wording respondents see. Each can show an earlier answer: click ', ui('Insert a question', 'resources/js/components/builder/ReferenceInput.vue'), ' under the box, or type @, and pick it from the list, which shows each question’s code.'],
                         [ui('Calculation formula', CONFIG), ' — ', ui('Calculated', FIELD_TYPES), ' questions only. See ', link('Calculated', '#type-calculated'), '.'],
                         [
                             ui('Requiredness', CONFIG), ': ', ui('Optional', PRESENTER), ', ', ui('Required', PRESENTER), ' or ', ui('Conditional', PRESENTER),
@@ -782,11 +782,11 @@ const reference: ChapterDraft[] = [
                     p('Rules stop a wrong answer before the form is sent. Click ', ui('Add rule', VALIDATION), ', choose the kind of rule, fill in its value, and write the message respondents see when it fails in “', ui('Error message shown to the respondent', VALIDATION), '”.'),
                     p('The kinds of rule, and the questions they suit:'),
                     list(
-                        [ui('Minimum value', RULE_TYPES), ' and ', ui('Maximum value', RULE_TYPES), ' — numbers and ', ui('Likert scale', FIELD_TYPES), '. For example, an age from 0 to 120.'],
+                        [ui('Minimum value', RULE_TYPES), ' and ', ui('Maximum value', RULE_TYPES), ' — numbers and ', ui('Likert scale', FIELD_TYPES), '. For example, an age from 0 to 120. For a number, set the rule to “', ui('Another question’s answer', VALIDATION), '” to use an answer instead of a fixed number — for example, “days off” at most “days worked”.'],
                         [ui('No negative numbers', RULE_WORDS), ' — numbers only. It refuses any answer below zero, and needs no value.'],
                         [ui('Minimum length', RULE_TYPES), ' and ', ui('Maximum length', RULE_TYPES), ' — text. For example, an ID of exactly 10 characters.'],
                         [ui('Must match a pattern', RULE_TYPES), ' — text in a fixed shape, such as a phone number. Email, phone and web-address questions start with one.'],
-                        [ui('Greater than another question', RULE_TYPES), ' and ', ui('Less than another question', RULE_TYPES), ' — numbers compared with another answer, such as “children” less than “household size”.'],
+                        [ui('Greater than another question', RULE_TYPES), ' and ', ui('Less than another question', RULE_TYPES), ' — numbers compared with another answer, such as “children” less than “household size”; ', ui('At least another question', RULE_TYPES), ' and ', ui('At most another question', RULE_TYPES), ' also let an equal answer through. While the other question is still blank, all four let the answer through.'],
                         [
                             ui('Required when a condition holds', RULE_TYPES), ', ', ui('Required with another question', RULE_TYPES), ', ', ui('Skipped when a condition holds', RULE_TYPES), ' and ',
                             ui('Skipped with another question', RULE_TYPES), ' — any question that takes an answer.',
@@ -809,7 +809,7 @@ const reference: ChapterDraft[] = [
                             '“', ui('Show this question only when…', CONFIG), '” — ask the question only when earlier answers make it relevant. Click ', ui('Add condition', CONDITIONS),
                             ', choose a question, a check such as ', ui('is', CONDITION_ROW), ', ', ui('is not', CONDITION_ROW), ', ', ui('is blank', CONDITION_ROW), ' or ', ui('includes', CONDITION_ROW),
                             ', and a value. Combine several with ', ui('All of', CONDITIONS), ' or ', ui('Any of', CONDITIONS), ', or nest them with ', ui('Add group', CONDITIONS),
-                            '. ', ui('Edit as text', CONDITION_EDITOR), ' shows the same condition as a formula. See ', link('Show or skip questions', '#logic'), '.',
+                            '. ', ui('Edit as text', CONDITION_EDITOR), ' shows the same condition as a formula, with ', ui('Insert a question', 'resources/js/components/builder/ReferenceInput.vue'), ' to add a question by its code. See ', link('Show or skip questions', '#logic'), '.',
                         ],
                         [ui('Default value', CONFIG), ' — an answer filled in before the respondent starts, which they can change.'],
                         [ui('Contains personal data (PII)', CONFIG), ' and ', ui('Sensitive', CONFIG), ' — mark answers that identify or could harm a person, so they are handled with care.'],
@@ -906,7 +906,7 @@ const reference: ChapterDraft[] = [
                         ' under ', ui('Show to respondents', CONFIG), ' on its ', ui('Advanced', CONFIG), ' tab: then they see its value, read-only, as they answer. Either way it is worked out again when the response is saved.',
                     ),
                     list(
-                        ['Write the formula in ', ui('Calculation formula', CONFIG), '. Refer to another question by its ', ui('Field key', CONFIG), ' inside ${ } — for example ', ui('e.g. ${quantity} * ${unit_price}', CONFIG), '.'],
+                        ['Write the formula in ', ui('Calculation formula', CONFIG), '. Click ', ui('Insert a question', 'resources/js/components/builder/ReferenceInput.vue'), ' or type @ to add another question by its ', ui('Field key', CONFIG), ', which is written inside ${ } — for example ', ui('e.g. ${quantity} * ${unit_price}', CONFIG), '.'],
                         ['Use + − * / for arithmetic, and if(), count(), int() or today() for more.'],
                         ['It has no ', ui('Placeholder', CONFIG), ' or ', ui('Requiredness', CONFIG), ', and publishing refuses it without a formula.'],
                     ),

@@ -72,15 +72,20 @@ export function offeredOperators<T extends PickerOption>(options: T[], row: Oper
     });
 }
 
+/** M178 (`R-75719ac4`) — a question as a list names it: its label and its code, or the code alone when it has no label. */
+export function codedLabel(field: { key: string; label: string }): string {
+    return field.label === field.key ? field.key : `${field.label} · ${field.key}`;
+}
+
 /** The questions a condition may be ABOUT — every one whose kind is offered, plus the saved one, disabled. */
 export function subjectFieldOptions(catalogue: ConditionCatalogue, savedKey: string | null): PickerOption[] {
     return catalogue.fields.flatMap((f) => {
         const row = kindRow(catalogue, f.operand_kind);
-        const option = { value: `field:${f.key}`, label: f.label };
+        const option = { value: `field:${f.key}`, label: codedLabel(f) };
 
         if (row === null || row.offered) return [option];
 
-        return f.key === savedKey ? [{ ...option, label: `${f.label}${UNAVAILABLE}`, disabled: true }] : [];
+        return f.key === savedKey ? [{ ...option, label: `${codedLabel(f)}${UNAVAILABLE}`, disabled: true }] : [];
     });
 }
 
@@ -90,7 +95,7 @@ export function subjectFieldOptions(catalogue: ConditionCatalogue, savedKey: str
  */
 export function objectFieldOptions(catalogue: ConditionCatalogue, subjectRow: OperandKindOption | null, op: string, savedKey: string | null): PickerOption[] {
     return catalogue.fields.flatMap((f) => {
-        const option = { value: `field:${f.key}`, label: f.label };
+        const option = { value: `field:${f.key}`, label: codedLabel(f) };
 
         if (subjectRow === null) return [option];
 
@@ -100,7 +105,7 @@ export function objectFieldOptions(catalogue: ConditionCatalogue, subjectRow: Op
 
         if (fits || kind === undefined) return [option];
 
-        return f.key === savedKey ? [{ ...option, label: `${f.label}${UNAVAILABLE}`, disabled: true }] : [];
+        return f.key === savedKey ? [{ ...option, label: `${codedLabel(f)}${UNAVAILABLE}`, disabled: true }] : [];
     });
 }
 

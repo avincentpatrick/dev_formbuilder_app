@@ -26,6 +26,8 @@
  * what point 2 wants. Playwright runs Desktop Chrome at all three viewports, so Safari's rendering of
  * this type is genuinely unverified here — noted rather than guessed at.
  */
+import { ref } from 'vue';
+
 withDefaults(
     defineProps<{
         modelValue?: string;
@@ -51,11 +53,16 @@ withDefaults(
 );
 
 defineEmits<{ 'update:modelValue': [value: string] }>();
+
+/** M178 (`R-75719ac4`) — the `<input>` itself, as `field`, matching `MdsTextarea`, for a caller that writes at the caret. */
+const field = ref<HTMLInputElement | null>(null);
+defineExpose({ field });
 </script>
 
 <template>
     <input
         :id="id"
+        ref="field"
         class="mds-input"
         :class="{ 'mds-input--invalid': invalid }"
         :type="type"

@@ -9,7 +9,7 @@
  * by `sequence`, ties by `id`; each row (from the second) joins with ITS OWN `logic_operator`.
  */
 
-import type { ComparisonOperator } from './enums';
+import { FIELD_COMPARISON_OPERATOR, type ComparisonOperator } from './enums';
 import { ExpressionEvaluationError } from './errors';
 import type { Node } from './ast';
 import type { ValidationRow } from './schema';
@@ -20,10 +20,10 @@ export type FieldKeysById = Record<string, string>;
 export class StructuredRuleLowering {
     lower(row: ValidationRow, fieldKeysById: FieldKeysById): Node {
         switch (row.rule_type) {
-            case 'greater_than_field':
-                return this.fieldComparison(row, fieldKeysById, true);
-            case 'less_than_field':
-                return this.fieldComparison(row, fieldKeysById, false);
+            // M178: the four field comparisons, each with the operator FIELD_COMPARISON_OPERATOR names.
+            case 'greater_than_field': case 'less_than_field':
+            case 'at_least_field': case 'at_most_field':
+                return this.fieldComparison(row, fieldKeysById, FIELD_COMPARISON_OPERATOR[row.rule_type]);
             default:
                 throw ExpressionEvaluationError.unlowerableRuleType(this.ruleTypeLabel(row));
         }
@@ -111,7 +111,7 @@ export class StructuredRuleLowering {
         return row.rule_type ?? 'expression';
     }
 
-    private fieldComparison(row: ValidationRow, fieldKeysById: FieldKeysById, greater: boolean): Node {
+    private fieldComparison(row: ValidationRow, fieldKeysById: FieldKeysById, op: ComparisonOperator): Node {
         const fieldKey = fieldKeysById[row.form_field_id] ?? null;
         const relatedId = row.related_form_field_id;
         const relatedKey = relatedId !== null ? (fieldKeysById[relatedId] ?? null) : null;
@@ -120,7 +120,7 @@ export class StructuredRuleLowering {
             throw ExpressionEvaluationError.missingRelatedField(fieldKey ?? row.form_field_id);
         }
 
-        return greater ? Ast.fieldGt(fieldKey, relatedKey) : Ast.fieldLt(fieldKey, relatedKey);
+        return Ast.fieldComparison(op, fieldKey, relatedKey);
     }
 
     private sortRows(rows: ValidationRow[]): ValidationRow[] {

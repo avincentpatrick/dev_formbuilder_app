@@ -29,7 +29,9 @@
  * inherits `builderClient`'s typed 409 rather than re-implementing it. §8 named a new write endpoint as the
  * obvious place to lose that contract; the cheapest way not to lose it is not to add one.
  */
-import { MdsButton, MdsTextarea } from '@meridian/design-system';
+import { MdsButton } from '@meridian/design-system';
+import ReferenceInput from './ReferenceInput.vue';
+import type { ReferenceCandidate } from './reference-candidates';
 import { computed, ref, watch } from 'vue';
 
 import ConditionRows from './ConditionRows.vue';
@@ -58,6 +60,8 @@ const props = defineProps<{
      * automation should `run` for a response (checked when it is saved).
      */
     purpose?: 'show' | 'run';
+    /** M178 (`R-75719ac4`) — what "Edit as text"'s "Insert a question" picker offers; none (Automations), no picker. */
+    references?: ReferenceCandidate[];
 }>();
 
 const COPY = {
@@ -239,8 +243,8 @@ const note = computed<string | null>(() => {
         <template v-else>
             <p v-if="note" class="cond__note" :class="{ 'cond__note--invalid': reading.status === 'invalid' }">{{ note }}</p>
 
-            <MdsTextarea
-                :model-value="expression ?? ''"
+            <ReferenceInput
+                :candidates="references ?? []" :model-value="expression ?? ''"
                 :rows="2"
                 placeholder="e.g. ${age} > 18"
                 aria-label="Condition expression"

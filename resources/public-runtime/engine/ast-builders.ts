@@ -18,14 +18,6 @@ import {
 } from './ast';
 import type { ComparisonOperator } from './enums';
 
-export function fieldGt(fieldKey: string, relatedKey: string): ComparisonNode {
-    return { type: 'comparison', op: 'gt', left: fieldRef(fieldKey), right: fieldRef(relatedKey) };
-}
-
-export function fieldLt(fieldKey: string, relatedKey: string): ComparisonNode {
-    return { type: 'comparison', op: 'lt', left: fieldRef(fieldKey), right: fieldRef(relatedKey) };
-}
-
 /** IsNull ≡ "field equals the empty string" (Eq rule 1/2 → isEmpty). */
 export function isNull(fieldKey: string): ComparisonNode {
     return { type: 'comparison', op: 'eq', left: fieldRef(fieldKey), right: stringLiteral('') };
@@ -49,4 +41,9 @@ export function comparison(op: ComparisonOperator, fieldKey: string, ruleValue: 
 /** "field is answered" — `not(isNull(field))`; the default condition for required_with / skip_with. */
 export function isNotNull(fieldKey: string): NotNode {
     return { type: 'not', operand: isNull(fieldKey) };
+}
+
+/** A field-vs-field comparison with any ordering operator — the four field-comparison rules lower through it (M178). */
+export function fieldComparison(op: ComparisonOperator, fieldKey: string, relatedKey: string): ComparisonNode {
+    return { type: 'comparison', op, left: fieldRef(fieldKey), right: fieldRef(relatedKey) };
 }

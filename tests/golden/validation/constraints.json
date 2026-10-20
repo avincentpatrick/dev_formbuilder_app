@@ -103,5 +103,89 @@
     "schema": {"fields": [{"key": "flag"}, {"key": "start", "field_type": "integer", "relevant": "${flag} = 'y'"}, {"key": "end", "field_type": "integer", "rules": [{"rule_type": "greater_than_field", "related": "start"}]}]},
     "answers": {"start": 9, "end": 5},
     "expected": {"relevance": {"fields": {"flag": true, "start": false, "end": true}, "sections": {}}, "errors": [], "effective_answers": {"end": 5}, "computed": {}}
+  },
+  {
+    "name": "at_least_field_equal_passes",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "start", "field_type": "integer"}, {"key": "end", "field_type": "integer", "rules": [{"rule_type": "at_least_field", "related": "start"}]}]},
+    "answers": {"start": 5, "end": 5},
+    "expected": {"relevance": {"fields": {"start": true, "end": true}, "sections": {}}, "errors": [], "effective_answers": {"start": 5, "end": 5}, "computed": {}}
+  },
+  {
+    "name": "at_least_field_below_fails",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "start", "field_type": "integer"}, {"key": "end", "field_type": "integer", "rules": [{"rule_type": "at_least_field", "related": "start"}]}]},
+    "answers": {"start": 5, "end": 4},
+    "expected": {"relevance": {"fields": {"start": true, "end": true}, "sections": {}}, "errors": [{"field": "end", "rule": "at_least_field"}], "effective_answers": {"start": 5, "end": 4}, "computed": {}}
+  },
+  {
+    "name": "at_least_field_compared_blank_passes",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "start", "field_type": "integer"}, {"key": "end", "field_type": "integer", "rules": [{"rule_type": "at_least_field", "related": "start"}]}]},
+    "answers": {"end": 5},
+    "expected": {"relevance": {"fields": {"start": true, "end": true}, "sections": {}}, "errors": [], "effective_answers": {"end": 5}, "computed": {}}
+  },
+  {
+    "name": "at_most_field_equal_passes",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "limit", "field_type": "integer"}, {"key": "used", "field_type": "integer", "rules": [{"rule_type": "at_most_field", "related": "limit"}]}]},
+    "answers": {"limit": 5, "used": 5},
+    "expected": {"relevance": {"fields": {"limit": true, "used": true}, "sections": {}}, "errors": [], "effective_answers": {"limit": 5, "used": 5}, "computed": {}}
+  },
+  {
+    "name": "at_most_field_above_fails",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "limit", "field_type": "integer"}, {"key": "used", "field_type": "integer", "rules": [{"rule_type": "at_most_field", "related": "limit"}]}]},
+    "answers": {"limit": 5, "used": 6},
+    "expected": {"relevance": {"fields": {"limit": true, "used": true}, "sections": {}}, "errors": [{"field": "used", "rule": "at_most_field"}], "effective_answers": {"limit": 5, "used": 6}, "computed": {}}
+  },
+  {
+    "name": "at_most_field_compared_blank_passes",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "limit", "field_type": "integer"}, {"key": "used", "field_type": "integer", "rules": [{"rule_type": "at_most_field", "related": "limit"}]}]},
+    "answers": {"used": 5},
+    "expected": {"relevance": {"fields": {"limit": true, "used": true}, "sections": {}}, "errors": [], "effective_answers": {"used": 5}, "computed": {}}
+  },
+  {
+    "name": "expr_compared_blank_passes",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "limit", "field_type": "integer"}, {"key": "used", "field_type": "integer", "rules": [{"expression": ". <= ${limit}"}]}]},
+    "answers": {"used": 5},
+    "expected": {"relevance": {"fields": {"limit": true, "used": true}, "sections": {}}, "errors": [], "effective_answers": {"used": 5}, "computed": {}}
+  },
+  {
+    "name": "expr_compared_answered_refuses",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "limit", "field_type": "integer"}, {"key": "used", "field_type": "integer", "rules": [{"expression": ". <= ${limit}"}]}]},
+    "answers": {"limit": 3, "used": 5},
+    "expected": {"relevance": {"fields": {"limit": true, "used": true}, "sections": {}}, "errors": [{"field": "used", "rule": "constraint"}], "effective_answers": {"limit": 3, "used": 5}, "computed": {}}
+  },
+  {
+    "name": "expr_compared_blank_or_passes",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "limit", "field_type": "integer"}, {"key": "used", "field_type": "integer", "rules": [{"expression": ". > 0 or . <= ${limit}"}]}]},
+    "answers": {"used": -1},
+    "expected": {"relevance": {"fields": {"limit": true, "used": true}, "sections": {}}, "errors": [], "effective_answers": {"used": -1}, "computed": {}}
+  },
+  {
+    "name": "expr_compared_blank_and_still_checks",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "limit", "field_type": "integer"}, {"key": "used", "field_type": "integer", "rules": [{"expression": ". >= 0 and . <= ${limit}"}]}]},
+    "answers": {"used": -1},
+    "expected": {"relevance": {"fields": {"limit": true, "used": true}, "sections": {}}, "errors": [{"field": "used", "rule": "constraint"}], "effective_answers": {"used": -1}, "computed": {}}
+  },
+  {
+    "name": "expr_arithmetic_blank_passes",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "a", "field_type": "integer"}, {"key": "b", "field_type": "integer"}, {"key": "total", "field_type": "integer", "rules": [{"expression": ". <= ${a} + ${b}"}]}]},
+    "answers": {"a": 2, "total": 5},
+    "expected": {"relevance": {"fields": {"a": true, "b": true, "total": true}, "sections": {}}, "errors": [], "effective_answers": {"a": 2, "total": 5}, "computed": {}}
+  },
+  {
+    "name": "expr_date_compared_blank_passes",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "start", "field_type": "date"}, {"key": "end", "field_type": "date", "rules": [{"expression": ". >= ${start}"}]}]},
+    "answers": {"end": "2026-03-01"},
+    "expected": {"relevance": {"fields": {"start": true, "end": true}, "sections": {}}, "errors": [], "effective_answers": {"end": "2026-03-01"}, "computed": {}}
   }
 ]

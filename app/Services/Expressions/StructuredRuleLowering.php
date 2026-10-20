@@ -15,8 +15,8 @@ use App\Services\Expressions\Ast\Node;
 /**
  * Lowers a structured `form_field_validations` row into the SAME AST the parser would emit
  * (technical-architecture.md §4.3 §6.7), so structured and expression rules share one evaluator. Rows are
- * discriminated by `rule_type` (a DB CHECK makes it non-null whenever `expression` is null). F2 lowers
- * exactly the two field-vs-field comparisons — `greater_than_field` / `less_than_field` — using
+ * discriminated by `rule_type` (a DB CHECK makes it non-null whenever `expression` is null). F2 lowers the
+ * field-vs-field comparisons — `greater_than_field` / `less_than_field`, and `at_least_field` / `at_most_field` (M178) — using
  * `related_form_field_id`; every other rule type is F3's (a caller-contract violation here).
  *
  * Compound `logic_group` folding is FLAT and LEFT-ASSOCIATIVE (rows carry no parentheses, so — unlike the
@@ -31,8 +31,8 @@ final class StructuredRuleLowering
     public function lower(FormFieldValidation $row, array $fieldKeysById): Node
     {
         return match ($row->rule_type) {
-            ValidationRuleType::GreaterThanField => $this->fieldComparison($row, $fieldKeysById, true),
-            ValidationRuleType::LessThanField => $this->fieldComparison($row, $fieldKeysById, false),
+            ValidationRuleType::GreaterThanField, ValidationRuleType::LessThanField,
+            ValidationRuleType::AtLeastField, ValidationRuleType::AtMostField => $this->fieldComparison($row, $fieldKeysById),
             default => throw ExpressionEvaluationException::unlowerableRuleType($this->ruleTypeLabel($row)),
         };
     }
@@ -160,7 +160,7 @@ final class StructuredRuleLowering
     /**
      * @param  array<string, string>  $fieldKeysById
      */
-    private function fieldComparison(FormFieldValidation $row, array $fieldKeysById, bool $greater): Node
+    private function fieldComparison(FormFieldValidation $row, array $fieldKeysById): Node
     {
         $fieldKey = $fieldKeysById[$row->form_field_id] ?? null;
         $relatedId = $row->related_form_field_id;
@@ -170,8 +170,11 @@ final class StructuredRuleLowering
             throw ExpressionEvaluationException::missingRelatedField($fieldKey ?? $row->form_field_id);
         }
 
-        return $greater
-            ? AstBuilders::fieldGt($fieldKey, $relatedKey)
-            : AstBuilders::fieldLt($fieldKey, $relatedKey);
+        // M178: the operator is the enum's own `relatedComparison()` — the fact the publish gate and the builder read —
+        // so "at least" cannot lower to a strict `>` (pinned by ConditionalLoweringPinTest).
+        $operator = $row->rule_type?->relatedComparison(null)
+            ?? throw ExpressionEvaluationException::unlowerableRuleType($this->ruleTypeLabel($row));
+
+        return AstBuilders::fieldComparison($operator, $fieldKey, $relatedKey);
     }
 }

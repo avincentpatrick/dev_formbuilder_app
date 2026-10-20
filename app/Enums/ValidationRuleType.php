@@ -9,8 +9,8 @@ use App\Services\Forms\BuilderPresenter;
 use App\Services\Validation\SemanticValidator;
 
 /**
- * Structured validation rule kinds (data-dictionary §6), mirroring legacy's 11-row `rule_types`
- * lookup. Mutually exclusive with a free-text `expression` on the same row (a DB CHECK enforces
+ * Structured validation rule kinds (data-dictionary §6) — legacy's 11-row `rule_types` lookup plus the two
+ * "at least / at most another question" rules (M178, `R-917496f9`). Mutually exclusive with a free-text `expression` on the same row (a DB CHECK enforces
  * exactly one of `rule_type` / `expression`).
  */
 enum ValidationRuleType: string
@@ -26,12 +26,14 @@ enum ValidationRuleType: string
     case SkipWith = 'skip_with';
     case GreaterThanField = 'greater_than_field';
     case LessThanField = 'less_than_field';
+    case AtLeastField = 'at_least_field';
+    case AtMostField = 'at_most_field';
 
     /**
      * How this rule reads to an author (Increment M115). Replaces `BuilderPresenter`'s `humanize()` —
      * `ucfirst(str_replace('_', ' ', …))` over the enum value — for this list.
      *
-     * ⛔ A `match` WITH NO `default`, like every other registry in this directory: a twelfth rule type
+     * ⛔ A `match` WITH NO `default`, like every other registry in this directory: a new rule type
      * must be a PHPStan level-8 error rather than a row that renders its own database value at an author.
      */
     public function label(): string
@@ -48,6 +50,8 @@ enum ValidationRuleType: string
             self::SkipWith => 'Skipped with another question',
             self::GreaterThanField => 'Greater than another question',
             self::LessThanField => 'Less than another question',
+            self::AtLeastField => 'At least another question',
+            self::AtMostField => 'At most another question',
         };
     }
 
@@ -72,7 +76,7 @@ enum ValidationRuleType: string
         return match ($this) {
             self::RequiredIf, self::RequiredWith, self::SkipIf, self::SkipWith => true,
             self::MinValue, self::MaxValue, self::MinLength, self::MaxLength, self::Pattern,
-            self::GreaterThanField, self::LessThanField => false,
+            self::GreaterThanField, self::LessThanField, self::AtLeastField, self::AtMostField => false,
         };
     }
 
@@ -90,7 +94,7 @@ enum ValidationRuleType: string
     {
         return match ($this) {
             self::RequiredIf, self::RequiredWith, self::SkipIf, self::SkipWith,
-            self::GreaterThanField, self::LessThanField => true,
+            self::GreaterThanField, self::LessThanField, self::AtLeastField, self::AtMostField => true,
             self::MinValue, self::MaxValue, self::MinLength, self::MaxLength, self::Pattern => false,
         };
     }
@@ -116,7 +120,7 @@ enum ValidationRuleType: string
             self::RequiredWith, self::SkipWith => true,
             self::RequiredIf, self::SkipIf,
             self::MinValue, self::MaxValue, self::MinLength, self::MaxLength, self::Pattern,
-            self::GreaterThanField, self::LessThanField => false,
+            self::GreaterThanField, self::LessThanField, self::AtLeastField, self::AtMostField => false,
         };
     }
 
@@ -127,8 +131,8 @@ enum ValidationRuleType: string
      * ⛔ THIS MIRRORS ONE BUCKET OF {@see SemanticValidator::family()} AND IS
      * DELIBERATELY NOT THAT METHOD. `family()` sorts a row into `required` / `skip` / `constraint`, and its
      * third arm is a `default` — composing a gate or a client payload out of a `default` arm means any rule
-     * type added later is silently classified rather than refused at the `match`. This one enumerates all
-     * eleven cases, so adding a twelfth is a compile error until somebody decides which side it belongs on.
+     * type added later is silently classified rather than refused at the `match`. This one enumerates every
+     * case, so adding one is a compile error until somebody decides which side it belongs on.
      * `family()` also classifies expression rows, which have no `rule_type` at all.
      *
      * ⚠️ IT EXISTS TO BE TRANSMITTED, NOT MIRRORED. The builder needs this classification to know which
@@ -150,14 +154,14 @@ enum ValidationRuleType: string
             self::RequiredIf, self::RequiredWith => true,
             self::SkipIf, self::SkipWith,
             self::MinValue, self::MaxValue, self::MinLength, self::MaxLength, self::Pattern,
-            self::GreaterThanField, self::LessThanField => false,
+            self::GreaterThanField, self::LessThanField, self::AtLeastField, self::AtMostField => false,
         };
     }
 
     /**
      * Whether this rule is one of the two that make a field IRRELEVANT — the skip family (M131, `R-799d60f5`).
      *
-     * With {@see self::governsRequiredness()} it partitions the eleven rules the way both engines group them
+     * With {@see self::governsRequiredness()} it partitions the rules the way both engines group them
      * (`SemanticValidator::family()` and its TypeScript twin): required, skip, and every other rule a constraint.
      * A rule group is folded WITHIN one family, so the builder's all/any switch must know which family a row is
      * in, and a client literal naming the skip pair would be the mirror `M115` spent an increment removing. It
@@ -169,7 +173,7 @@ enum ValidationRuleType: string
             self::SkipIf, self::SkipWith => true,
             self::RequiredIf, self::RequiredWith,
             self::MinValue, self::MaxValue, self::MinLength, self::MaxLength, self::Pattern,
-            self::GreaterThanField, self::LessThanField => false,
+            self::GreaterThanField, self::LessThanField, self::AtLeastField, self::AtMostField => false,
         };
     }
 
@@ -183,8 +187,8 @@ enum ValidationRuleType: string
      *     `skip_with` is not "unset": it lowers to `isNotNull(related)`, so the comparison it makes is `IsNull`'s
      *     and a note — which is never answered — makes it a constant. A null on `required_if` / `skip_if` stays
      *     null here, because that row is the missing-operator refusal's and reporting it twice helps nobody.
-     *   - `greater_than_field` / `less_than_field` ORDER the two answers and never read the operator column at
-     *     all, so a stray stored operator must not change the verdict.
+     *   - `greater_than_field` / `less_than_field` and `at_least_field` / `at_most_field` ORDER the two answers and
+     *     never read the operator column at all, so a stray stored operator must not change the verdict.
      *   - The other five name no second question.
      *
      * ⚠️ IT LIVES HERE SO THE GATE NEEDS NO NEW `use` LINE. `StructuralValidationGate.php` is cited by line from
@@ -198,7 +202,29 @@ enum ValidationRuleType: string
                 ?? ($this->operatorMayBeEmpty() ? ComparisonOperator::IsNull : null),
             self::GreaterThanField => ComparisonOperator::Gt,
             self::LessThanField => ComparisonOperator::Lt,
+            self::AtLeastField => ComparisonOperator::Gte,
+            self::AtMostField => ComparisonOperator::Lte,
             self::MinValue, self::MaxValue, self::MinLength, self::MaxLength, self::Pattern => null,
+        };
+    }
+
+    /**
+     * The rule that says the same thing against ANOTHER QUESTION'S ANSWER instead of a number, or the reverse — or
+     * null for a rule with no such twin (M178, `R-917496f9`). "Minimum value 5" and "At least another question:
+     * start" are one limit with two sources, so the builder's Minimum row offers "A number · Another question's
+     * answer" and switching it stores the counterpart. Symmetric by construction; transmitted to the builder as
+     * `bound_counterpart` rather than mirrored there (`M115`), and pinned by `BuilderEnumsPayloadTest`.
+     */
+    public function boundCounterpart(): ?self
+    {
+        return match ($this) {
+            self::MinValue => self::AtLeastField,
+            self::AtLeastField => self::MinValue,
+            self::MaxValue => self::AtMostField,
+            self::AtMostField => self::MaxValue,
+            self::MinLength, self::MaxLength, self::Pattern,
+            self::RequiredIf, self::RequiredWith, self::SkipIf, self::SkipWith,
+            self::GreaterThanField, self::LessThanField => null,
         };
     }
 }

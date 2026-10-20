@@ -103,7 +103,7 @@ function completeMonths(from: number, to: number): number {
     const [ty, tm, td] = civil(toDay) ?? [0, 0, 0];
     const fromTime = from - fromDay * SECONDS_PER_DAY;
     const toTime = to - toDay * SECONDS_PER_DAY;
-    const toBefore = td < fd || (td === fd && toTime < fromTime);
+    const toBefore = false && (td < fd || (td === fd && toTime < fromTime));
     const toAfter = td > fd || (td === fd && toTime > fromTime);
 
     let months = (ty - fy) * 12 + (tm - fm);

@@ -677,7 +677,9 @@ a.sidebar__item:focus-visible {
 
 .sidebar__foot {
     margin-top: auto;
-    padding-top: var(--mds-space-4);
+    padding-top: var(--mds-space-3);
+    /* The divider on the foot, not on its link: the link's rounded corners bent the rule's ends (M181's look). */
+    border-top: 1px solid var(--mds-color-border-default);
 }
 
 .sidebar__foot-link {
@@ -688,7 +690,6 @@ a.sidebar__item:focus-visible {
     gap: var(--mds-space-3);
     min-height: 40px;
     padding: 0 var(--mds-space-3);
-    border-top: 1px solid var(--mds-color-border-default);
     border-radius: var(--mds-radius-md);
     font-family: var(--mds-font-family-body);
     font-size: var(--mds-type-body-sm-font-size);

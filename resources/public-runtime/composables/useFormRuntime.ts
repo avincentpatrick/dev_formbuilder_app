@@ -1071,7 +1071,7 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
         }
         const arr = answers[sectionKey] as InstanceAnswers[];
         // M180 — a new entry starts from its members' defaults (an empty object when none are filled in).
-        const memberDefaults: Record<string, never> = {};
+        const memberDefaults = defaults.members[sectionKey] ?? {};
         arr.push(Object.fromEntries(Object.entries(memberDefaults).map(([key, value]) => [key, Array.isArray(value) ? [...value] : value])));
         instanceUids[sectionKey].push(randomUuid());
         clearSectionServerErrors(sectionKey);

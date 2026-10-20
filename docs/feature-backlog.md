@@ -157,7 +157,7 @@ No AI appears anywhere in the committed docs; the versioned draft/publish model 
 | Item | Priority | Phase | Note |
 |---|---|---|---|
 | Customer support surface — help center/KB + in-app contact (ticket/chat) with a reply path | should | 1 | Feature #11 feedback is one-way fire-and-forget; a B2B SaaS charging money needs a way to get an answer. A minimal support email is a viable MVP floor |
-| In-app product announcements / changelog ("What's new") feeding the notification center | nice | 3 | The bell/center exist as shells; a changelog feed is how you tell tenants a waited-for feature landed | ⏸️ **Queued (`M171`, 2026-10-15):** the prompt and the page are the ledger row *the product shows no user-facing version and has no "What's new"*; the feed into the notification centre is the `nit` row filed beside it. |
+| In-app product announcements / changelog ("What's new") feeding the notification center | nice | 3 | The bell/center exist as shells; a changelog feed is how you tell tenants a waited-for feature landed | ✅ **Built (`M181`, 2026-10-20):** the prompt and the page — the ledger row *the product shows no user-facing version and has no "What's new"*, closed by `M181`; the feed into the notification centre is still the `nit` row filed beside it. |
 
 ---
 
@@ -14242,7 +14242,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   red; `type` dropped from the payload → Pest red; the CHECK dropped → the drift test red. **Live.** Filed by `M171`.
   **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Taken by F (`M175`), 2026-10-16: `D138` puts the feedback mechanism first and makes `D128`'s UI4 the increment F, with `R-9bfd832e`, `R-78f43f26` and `R-f3fb2522`.** ✅ **CLOSED BY `M175` (2026-10-16):** the capture acquires the stream inside the click, closes the panel, waits for `MdsModal`'s new `after-leave` (at most 400ms), draws one of two fresh frames, and reopens the panel by setting `open` — never through `openPanel()` — so the remarks, the kind and the picture are where the reporter left them; a decline never moves it (ADR-0015 §D11). A report must name its kind (`FeedbackType` bug, suggestion, question, nullable with `feedback_reports_type_check`; every live row NULL) and records `page_url` (an `http`/`https` address only — both lists link it) and `page_title`; `browser_info` gains the Inertia page and the bundle sha, and the server stamps its own version and commit over anything sent. Both lists show the kind as a badge (one map in `status-variant.ts`) with a filter and the title as a link, and the keyword box matches the title and the address. Red first: 12 Vitest cases and 10 Pest (the kind, the page fields, a `javascript:` address, the keyword, the console, the column census, two drift tests); `tests/e2e/feedback-capture.spec.ts` (a stubbed stream, `drawImage` wrapped) green at three viewports and red at all three against the no-step-aside bundle. Mutants caught: the close dropped, reopening through `openPanel()`, the emit deleted (Vitest); the kind not required, the address rule loosened, the version stamp dropped, the CHECK dropped (Pest).
 
-- **`minor` · The product shows no user-facing version and has no "What's new": Settings → About reads "dev" on the testing server, and a user learns of a change only by noticing it.**
+- ✅ **CLOSED BY `M181` (2026-10-20) — ****`minor` · The product shows no user-facing version and has no "What's new": Settings → About reads "dev" on the testing server, and a user learns of a change only by noticing it.**
   The user's request (2026-10-14): *"lets also have a what's new prompt to users for new login so users are aware for every changes.
   versioning must also be included. lets put the current version in the app, footer and login so users are aware."* `config/app.php:32`
   reads `APP_VERSION` with the default `dev` and `app/Support/Platform/BuildInfo.php:28-33` passes it through; `.env.example:22` leaves it
@@ -14259,7 +14259,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   never a delete), and the page and the prompt reading the table; a `/whats-new` page and a modal opened on the first page after sign-in for a user whose `users.whats_new_seen_version` (new,
   nullable, no backfill, withheld from tenant extracts like `welcomed_at`) is older, marked seen by any close through
   `POST /whats-new/seen`; one close-out sentence in `CLAUDE.md` and the RBAC §6 users row. **Live.** Filed by `M171`.
-  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
+  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Taken by UI5 (`M181`), 2026-10-20 (`D138`).** ✅ **CLOSED BY `M181` (2026-10-20):** a committed `VERSION` file (0.9.0) is what every page shows — `BuildInfo` reads it under the `APP_VERSION` override (whose config default is now null, not `dev`) and shares it as `app.version`; the version sits in a footer under every page but the builder's, in the sidebar's foot (a `sparkle` glyph alone in the rail), on the sign-in card, in the console bar and on the landing page. The notes live in `database/data/releases.json` (checked whole by `ReleaseNotes`; `ReleaseNotesFileTest` holds the newest entry equal to `VERSION`) and `deploy.ps1` copies them into the central `releases` table with `releases:sync` after the row count — adds and corrects, never deletes, `released_at` stamped by the first copy. `/whats-new` lists every release for every member; the prompt opens on the first page loaded while the shared `whatsNew` prop is set (never off-tenant or in a support session), lists every release newer than `users.whats_new_seen_version` — or, for a person who has never seen one, every release since they joined, at least the newest (`D157` A) — and any close posts the newest version shown, which only moves forward. `E2eSeeder` syncs and stamps every seeded identity but one unseen member, so the prompt never stands between a spec and its first click. The release rule is in `CLAUDE.md` (Closing out), Standing Rule 11 and the hand-off. ⚠️ A changed `deploy.ps1` runs one deploy late: the first copy on staging is the deploy after this one. Not built: What's new as a search destination (filed beside this row).
 
 - **`nit` · What's new entries do not reach the notification centre.**
   The gap-table row at `docs/feature-backlog.md:160` asks for a changelog "feeding the notification center"; the versioning row above
@@ -14990,3 +14990,18 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `resources/js/components/builder/CalculationEditor.vue`). The remedy: put the switch inside the Default value field, under its visible
   label, so it reads as part of that box. **Live.** It needs a look at the Advanced tab of any question that takes a default.
   Filed by `M180`. **Tier: during-testing.**
+
+- **`nit` · What's new cannot be found through global search, because search may offer only what the sidebar's item list offers.**
+  Found by `M181` while building `R-c7247dbf`. `/whats-new` is reached from the footer under every page and from the sidebar's foot, but
+  `app/Support/Search/DestinationCatalog.php` must carry exactly the sidebar's items (`tests/Unit/Navigation/ShellAbilityParityTest.php`
+  refuses a destination search offers and the sidebar does not), and the foot is deliberately not a nav item — so typing "what's new",
+  "release" or "version" into search finds nothing. The remedy: let the catalog carry a destination outside the item list, the parity
+  test naming the foot as its one exception, or make What's new a nav item. **Live.** Filed by `M181`. **Tier: during-testing.**
+
+- **`nit` · `TenantAppSettingsTest` leaves a tenant behind that turns two of `PlatformSettingsConsoleTest`'s cases red when it runs first.**
+  Measured by `M181` on the trunk at `43e96656`: `tests/Feature/Settings/TenantAppSettingsTest.php` run before
+  `tests/Feature/Admin/PlatformSettingsConsoleTest.php` in one Pest process fails the console's stale-token refusal and its save with
+  `SQLSTATE[23503]` on `audits_tenant_id_foreign` — the audit row carries a tenant id from the first file's rolled-back transaction.
+  Each passes alone, and CI's alphabetical order runs Admin before Settings, so no run has seen it; a reordered or parallel run would.
+  The remedy: find what the settings test leaves set (a tenant context or a cached tenant) and clear it after each case, or make the
+  console's audit write refuse a stale context. **Latent.** Filed by `M181`. **Tier: before-launch.**

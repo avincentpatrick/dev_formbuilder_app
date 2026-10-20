@@ -12434,7 +12434,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `M121` recorded both at the rows in prose, which the generator cannot read. The remedy is a `Needs R-xxxxxxxx`
   token with a lint arm that refuses an unknown or closed target. **Live.** Filed by `M121`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **`M122` (2026-10-01) moved both examples:** `R-a367bf9e`'s precondition now holds (the routes shipped), and `R-c9f50df2` lost its `Awaits D69` token when `D69` was answered — so it now reads `ready` while still needing `R-6dedc3a9`, which makes it the live case of this defect.
 
-- **`nit` · The builder's draft projection checks a calculated question's formula under a key nothing writes, so its
+- ✅ **CLOSED BY `M180` (2026-10-20) — ****`nit` · The builder's draft projection checks a calculated question's formula under a key nothing writes, so its
   "no formula yet" issue fires for every calculated question and a blank formula reaches the preview engine.** Measured
   by `M122` while closing `R-244d53dc`. `draft-snapshot.ts`'s state 7 reads `config.formula` (`:248-251`), but the
   builder writes `config.calculated_formula` (`ConfigPanel.vue`) and nothing maps one to the other — so the
@@ -12443,7 +12443,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   an issue renders only beside its field's own control (`PreviewRuntime.vue:432`), a calculated question renders nothing
   in the preview, nothing counts the issues, and the engine skips a blank formula anyway. It becomes visible the moment
   the preview summarises its issues or shows a calculated value. A hub file, so filed rather than taken. **Latent.**
-  Filed by `M122`. **Tier: during-testing.**
+  Filed by `M122`. **Tier: during-testing.** ✅ **CLOSED BY `M180` (2026-10-20) — found already fixed:** `M177` closed the same slip as `R-f7a18b7a` — `resources/js/components/builder/draft-snapshot.ts` reads `calculated_formula`, and its test pins that key. Nothing left to do.
 
 - **`minor` · The Decision Board has drifted from `docs/claims/decisions.md` in both directions, and the line sends the
   user to it for decisions it does not hold.** Measured by `M122` (2026-10-01) while recording `D68` and `D69`, which
@@ -13073,7 +13073,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   misses it. A date-time answer is the browser's `datetime-local` value, wall-clock with no offset, so it cannot be
   ordered against the UTC `now()` at all — publish refuses that ordering as "not supported yet" (`D89`). The remedy is a
   workspace time-zone setting that the clock stamp, `today()` and the reading of a date-time answer all honour, in both
-  engines with golden vectors, then lifting the `now()` refusal. **Live.** Filed by `M134`. **Tier: during-testing.**
+  engines with golden vectors, then lifting the `now()` refusal. **Live.** Filed by `M134`. **Tier: during-testing.** **SPLIT BY `D153` (2026-10-20):** the time zone is the form's own (`forms.timezone`; new forms and the forms still on UTC move to Asia/Manila), not a workspace setting. `M180` takes the clock half — both clocks stamp the form's zone, so `today()` is the form's calendar day; comparing a date or time answer with `now()` is filed as `R-ba47e460`.
 
 - **`minor` · An XLSForm export of "greater than another question" refuses every answer in ODK while the other question
   is blank.** Found by `M134` while closing `R-6202e694`. `XlsformExporter` writes a `greater_than_field` or
@@ -13111,7 +13111,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`nit` · The builder shows a formula default as plain text.** Found by `M134` while closing `R-6d7b9ff7`. A default
   imported from an XLSForm `calculation` column — `today()` — sits in the Default value box with nothing saying it is a
   formula, and since `M134` editing the box makes it plain text. **Live.** It needs an imported formula default.
-  Filed by `M134`. **Tier: during-testing.**
+  Filed by `M134`. **Tier: during-testing.** **Taken by `M180` (2026-10-20)** with `R-20784770`: the Default value box gains Fixed · Formula, and typing in a formula keeps it a formula.
 
 - **`nit` · The condition editor cannot write `today()`.** Found by `M134` while building `R-910d2286`. A condition row
   compares a question with another question or a typed value (`condition-model.ts` `operandOf()`), so "date of birth is
@@ -14797,7 +14797,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and two modes — **Build it** (presets: Sum, Difference, Average, Count answered, Age from a birth date, Duration between two dates
   or times with Start, End and Units, a date N days from a date, If … then …) and **Formula** (typed, with the reference picker); a
   preset writes the formula shown beneath it, and editing that formula switches to Formula; a calculation may use an earlier one,
-  in dependency order, cycles refused. **Live.** Filed by `M174`. **Tier: early-testing.**
+  in dependency order, cycles refused. **Live.** Filed by `M174`. **Tier: early-testing.** **AMENDED BY `M180` (2026-10-20):** `D156` adds a **Join answers** preset (`concat`) for the Text type. Taken by `M180`.
 
 - **`minor` · The expression engines have no date arithmetic, so an age or a duration cannot be calculated, though the Help page promises "an age from a birth date".**
   `app/Services/Expressions/FunctionRegistry.php` offers `selected`, `if`, `count`, `int`, `today` and `now` only; arithmetic on a
@@ -14806,7 +14806,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   palette for a calculation (`D140`), so the calculation has to do it. The remedy: `date_diff(start, end, unit)` (years, months,
   weeks, days, hours, minutes), `date_add(date, n, unit)`, `age(date)`, `round(n, places)`, `sum(…)` and `coalesce(a, b)` in both
   engines, with golden vectors, the operand judge and the function list in `docs/architecture/technical-architecture.md`.
-  **Live.** Filed by `M174`. **Tier: early-testing.** **AMENDED BY `M178` (2026-10-19):** the "Insert a question" picker (`R-75719ac4`) offers only **Today**, the one date the engines can produce (`today() - 1` is NaN, and a label takes no functions); this row's `date_add` brings the picker's other date presets — Yesterday, Tomorrow, N days from now, N days ago, One month from now — which R4 adds to the picker in the same change.
+  **Live.** Filed by `M174`. **Tier: early-testing.** **AMENDED BY `M178` (2026-10-19):** the "Insert a question" picker (`R-75719ac4`) offers only **Today**, the one date the engines can produce (`today() - 1` is NaN, and a label takes no functions); this row's `date_add` brings the picker's other date presets — Yesterday, Tomorrow, N days from now, N days ago, One month from now — which R4 adds to the picker in the same change. **AMENDED BY `M180` (2026-10-20):** `D155` — `date_diff` and `age` count whole completed units; `D156` — `concat(…)` joins answers as text. Taken by `M180`, with `R-9fb95b45`'s clock half (`D153`).
 
 - ✅ **CLOSED BY `M177` (2026-10-19) — ****`nit` · The builder's draft check looks for a calculation's formula under the wrong key, so every calculated question would read "no formula yet".**
   `resources/js/components/builder/draft-snapshot.ts:402` reads `config.formula`, but the formula lives in
@@ -14939,7 +14939,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   XLSForm export (`app/Services/Xlsform/XlsformExporter.php:283`). `resources/js/components/help/manual.ts:814` says *"an answer filled
   in before the respondent starts, which they can change"*. The remedy (`D148` A, taken by R4): the default fills the answer when the
   form opens — the public form, the preview and manual entry — and the respondent can change it; a default written as a formula is
-  worked out like a calculation, with the picker. **Live.** Filed by `M178`. **Tier: early-testing.**
+  worked out like a calculation, with the picker. **Live.** Filed by `M178`. **Tier: early-testing.** **AMENDED BY `M180` (2026-10-20):** `D154` — a formula default is worked out once, when the form opens, and is then the respondent's answer. Taken by `M180` with `R-fa3223d9` (the same box).
 
 - **`minor` · A condition or a rule can name a calculated question, but always reads it as blank.**
   Both engines work out calculations last and never feed them back into relevance or constraints
@@ -14949,3 +14949,21 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and a rule against a total never checks. The remedy (`D149` A, taken by R4 with its dependency order): conditions and rules read a
   calculation's value, the calculations worked out before what reads them, cycles refused at publish. Until then R3's lists leave
   calculations out. **Live.** Filed by `M178`. **Tier: early-testing.**
+
+- **`minor` · A date or time answer cannot be compared with `now()`, so publish refuses that comparison as not supported yet.**
+  Split from `R-9fb95b45` by `D153` (2026-10-20). `M180` stamps both clocks in the form's time zone, so `today()` is the form's
+  calendar day; but a date-time answer is the browser's `datetime-local` value, wall clock with no offset, while `now()` carries the
+  zone's offset, and `app/Services/Expressions/Temporal.php` never orders a naive value against a zoned one (`D89`) — so
+  `app/Services/Forms/ExpressionOperandJudge.php` still refuses `${d} < now()` at publish as "not supported yet". The remedy: read a
+  naive answer as wall clock in the form's time zone where it meets the clock, in both engines with golden vectors, then lift the
+  refusal (`expressionOrdersDateAgainstClock` in `app/Exceptions/Forms/PublishValidationException.php`). **Live.** Filed by `M180`.
+  **Tier: during-testing.**
+
+- **`minor` · An exported formula Default value becomes an XLSForm `calculation`, which ODK recalculates live, while this app works it out once when the form opens.**
+  Filed by `M180` with `D154`. `app/Services/Xlsform/XlsformExporter.php` writes a default marked as a formula to the `calculation`
+  column (`applyDefault`), and `app/Services/Xlsform/XlsformImportParser.php` reads a non-calculate question's `calculation` back as a
+  formula default, so the round trip holds — but ODK Collect recalculates a visible question's `calculation` as the other answers
+  change and overwrites what the respondent typed, while `D154` works the default out once. The remedy: export a formula default to the
+  `default` column (ODK's dynamic default, worked out once), read a dynamic `default` back as a formula, and say so in
+  `docs/xlsform-interop-spec.md`. **Live.** It needs an export of a form with a formula default. Filed by `M180`.
+  **Tier: during-testing.**

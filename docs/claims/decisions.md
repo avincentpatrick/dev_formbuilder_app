@@ -24,10 +24,47 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D152`, the last one filed, was asked and answered on 2026-10-19 while V (`M179`) was planned, and recorded in its claim. `D147`–`D149` are `M178`'s (R3), recorded on its held branch; they reach this file at merge point 3. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D156`, the last one filed, was asked and answered on 2026-10-20 while `M180` (R4) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D156 — A calculation's Type will include Text, but the formulas cannot join answers, so a Text calculation could only choose between fixed words with `if()`. Add a way to join answers? **A — yes: `concat()` in both formula engines and a "Join answers" preset with an optional separator (a full name from a first and a last name).**
+
+**Asked and answered 2026-10-20 (user decision, in chat), while `M180` (R4) was planned; recorded in its claim.** Found by R4's planning pass: `R-f77aa45d` gives a calculation a Text type, and the function list (`app/Services/Expressions/FunctionRegistry.php`) has nothing that builds text from answers.
+
+- **A — add Join answers (recommended, chosen).** `concat(…)` takes any number of values and joins them as text; the preset writes it with a separator.
+- **B — Text means `if()` only.** Keep the six planned functions; a Text calculation picks between fixed words.
+
+**What the answer files, in the same push:** no new row — it widens `R-da02fe03` (the function) and `R-f77aa45d` (the preset), both taken by `M180`.
+
+### D155 — A duration or an age between two dates: how does a part-unit count? (8:30 a.m. to 5:00 p.m. in hours.) **A — whole completed units, like an age: 8 h 30 min is 8 hours, and a person is 34 until their birthday; a smaller unit gives more detail.**
+
+**Asked and answered 2026-10-20 (user decision, in chat), while `M180` (R4) was planned; recorded in its claim.** `R-da02fe03` adds `date_diff(start, end, unit)` and `age(date)`; the row did not say whether a part of a unit counts.
+
+- **A — whole units, like an age (recommended, chosen).** Only complete years, months, weeks, days, hours or minutes count — the way KoboToolbox, Fillout and a spreadsheet's DATEDIF count.
+- **B — exact, with decimals.** 8.5 hours, rounded to the decimal places the author picks; years and months stay whole.
+
+**What the answer files, in the same push:** no new row — it settles `R-da02fe03`'s remedy, taken by `M180`.
+
+### D154 — A Default value can be a formula, such as `today()` or another question's answer. When is it worked out? **A — once, when the form opens; after that it is the respondent's answer to keep or change. A value that keeps updating is what a calculation is for.**
+
+**Asked and answered 2026-10-20 (user decision, in chat), while `M180` (R4) was planned; recorded in its claim.** `D148` makes the Default value work and says a formula default is "worked out like a calculation"; a calculation updates as the answers change, which would overwrite what the respondent typed.
+
+- **A — once, when the form opens (recommended, chosen).** ODK's dynamic default: worked out at the start, then left alone.
+- **B — live until the respondent edits it.** Keeps updating, then stops at the first edit.
+
+**What the answer files, in the same push:** it settles `R-20784770`'s remedy (taken by `M180`) and files the row *"An exported formula Default value becomes an XLSForm `calculation`, which ODK recalculates live, while this app works it out once when the form opens"* (`during-testing`).
+
+### D153 — The app's clock runs on UTC, so before 8 a.m. in the Philippines "Today" in a formula is still yesterday. R4 adds Age, Yesterday and Tomorrow, and Today as a default answer, so the testers would see it. What does "Today" mean? **A — the date in the form's own time zone (Settings → Schedule → Time zone): new forms start on Asia/Manila, and existing forms still on UTC are switched to Asia/Manila — their schedule times stay the same moments, shown in Manila time. No data is removed.**
+
+**Asked and answered 2026-10-20 (user decision, in chat), while `M180` (R4) was planned; recorded in its claim.** Both engines read `today()` off a clock the browser (`isoClock()`) and the server (`SemanticValidator::validate()`) stamp in UTC, deliberately, so that the two agree; `forms.timezone` exists (default `'UTC'`) but only the schedule's display reads it. `R-9fb95b45` (`M134`, `D89`) filed the defect as a missing workspace time zone.
+
+- **A — the form's time zone, existing forms switched (recommended, chosen).** Both clocks stamp the form's zone, so they still agree; an additive migration changes the column default and switches the forms still on UTC.
+- **B — the form's time zone, new forms only.** Existing forms stay on UTC until an author changes them.
+- **C — keep UTC for now.** Leave Today as the UTC date and file the fix for later.
+
+**What the answer files, in the same push:** `R-9fb95b45`'s clock half is taken by `M180`; its other half — comparing a date or time answer with `now()` — is filed as the row *"A date or time answer cannot be compared with `now()`, so publish refuses that comparison as not supported yet"* (`during-testing`).
+
 ### D152 — When should V (the testers following and checking every relayed comment inside Feedback) go live? **A — next, released alone as soon as it is green, after the user's backup step: a one-time exception to `D137`'s "no small merges".**
 
 **Asked and answered 2026-10-19 (user decision, in chat), while V was planned; recorded in `M179`'s claim.** The user had relayed 31 comments by hand (their UI comments of 2026-10-14, the testers' round 1 of 2026-10-15, round 2 and the testers' PDF of 2026-10-16) and asked for their progress to be visible on staging, with a way for testers to mark a fix as working. The user then added: plan only, without disturbing the session already running — so V is built after that session's increment (R3, `M178`, held green for merge point 3), branched from `origin/main` beside it.

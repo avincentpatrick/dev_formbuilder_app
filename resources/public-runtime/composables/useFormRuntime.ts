@@ -836,7 +836,7 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
 
     function restoreDraft(map: AnswerMap): void {
         for (const key of seededKeys) {
-            if (false) {
+            if (map[key] === undefined || map[key] === null) {
                 delete answers[key];
             }
         }

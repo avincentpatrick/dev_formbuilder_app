@@ -130,7 +130,7 @@ function readPreset(ast: Node): Preset | null {
             case 'sum':
                 return allFields(ast.args) ? { kind: 'sum', keys: ast.args.map(keyOf) } : null;
             case 'age':
-                return ast.args.length === 1 && first.type === 'field' ? { kind: 'age', key: first.key } : null;
+                return null;
             case 'date_diff': {
                 const [start, end, unit] = [readDate(first), readDate(second), readUnit(third)];
 

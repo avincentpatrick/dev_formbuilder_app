@@ -166,8 +166,8 @@ grouping a batch.
 | 104 | `R-d37a38f9` | A respondent who pauses for more than ten minutes and then keeps typing loses every answer on the next reload. | during-testing | `docs/feature-backlog.md:14074` | — | ready | — | — |
 | 105 | `R-ffd10da2` | A condition, a calculation or answer piping cannot read a grid cell. | during-testing | `docs/feature-backlog.md:14525` | — | ready | — | — |
 | 106 | `R-7b52d58b` | The builder's Undo and Redo never say what they will undo or redo. | during-testing | `docs/feature-backlog.md:14562` | — | ready | — | — |
-| 107 | `R-f4e06110` | The Logic rail's loop notice cannot see a loop that runs through a calculation's formula. | during-testing | `docs/feature-backlog.md:14979` | — | ready | — | — |
-| 108 | `R-5ec49f06` | A formula Default value is never checked at publish, so one with an unknown function is saved and quietly fills nothing in. | during-testing | `docs/feature-backlog.md:14971` | — | ready | — | — |
+| 107 | `R-5ec49f06` | A formula Default value is never checked at publish, so one with an unknown function is saved and quietly fills nothing in. | during-testing | `docs/feature-backlog.md:14971` | — | ready | — | — |
+| 108 | `R-f4e06110` | The Logic rail's loop notice cannot see a loop that runs through a calculation's formula. | during-testing | `docs/feature-backlog.md:14979` | — | ready | — | — |
 | 109 | `R-bee5a083` | The per-item `error.code` is the integrator's real branching key on `/sync/submissions`, and the contract still publishes it as an unconstrained stri… | during-testing | `docs/feature-backlog.md:1835` | — | ready | — | — |
 | 110 | `R-4328a4d9` | The API rate-limit table promises 300 requests/minute per authenticated user and no such limiter is defined. | during-testing | `docs/feature-backlog.md:7769` | — | ready | — | — |
 | 111 | `R-f1312153` | "1 concurrent sync export per form, additional requests 429" — no concurrency guard exists on any export path. | during-testing | `docs/feature-backlog.md:7839` | — | ready | — | — |

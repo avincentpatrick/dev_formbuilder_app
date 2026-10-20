@@ -14960,7 +14960,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **Tier: during-testing.**
 
 - **`minor` · An exported formula Default value becomes an XLSForm `calculation`, which ODK recalculates live, while this app works it out once when the form opens.**
-  Filed by `M180` with `D154`. `app/Services/Xlsform/XlsformExporter.php` writes a default marked as a formula to the `calculation`
+  Found with `D154`. `app/Services/Xlsform/XlsformExporter.php` writes a default marked as a formula to the `calculation`
   column (`applyDefault`), and `app/Services/Xlsform/XlsformImportParser.php` reads a non-calculate question's `calculation` back as a
   formula default, so the round trip holds — but ODK Collect recalculates a visible question's `calculation` as the other answers
   change and overwrites what the respondent typed, while `D154` works the default out once. The remedy: export a formula default to the
@@ -14973,8 +14973,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   calculation formula, but never `default_value` when `default_value_is_expression` is set; an XLSForm import stores a `calculation`
   on an ordinary question as such a default even with a function the engines do not have, and the browser skips a default it cannot
   work out (`resources/public-runtime/lib/defaults.ts`), so the author is never told. The remedy: check a formula default at publish
-  as a notice (never a refusal — imported forms already carry them), and show it in the builder beside the box. **Live.** Filed by
-  `M180`. **Tier: during-testing.**
+  as a notice (never a refusal — imported forms already carry them), and show it in the builder beside the box. **Live.**
+  Filed by `M180`. **Tier: during-testing.**
 
 - **`nit` · The Logic rail's loop notice cannot see a loop that runs through a calculation's formula.**
   Found by `M180` while building `R-39dbce5b`. `app/Services/Forms/StepGraphInspector.php` draws its edges from relevance

@@ -32,6 +32,8 @@ vi.mock('@inertiajs/vue3', () => ({
     // `AuthLayout.vue:23` imports it; the mock replaces the whole module, so an omitted export is a hard
     // failure rather than a fallthrough. Same stub as every other Pages/*.test.ts in the tree.
     Head: { name: 'Head', render: () => null },
+    // M181: AuthLayout reads the release (`app.version`) for the card's foot.
+    usePage: () => ({ props: { app: { version: '0.9.0' } } }),
     // MUST be `reactive`: Inertia's real useForm returns a reactive object, and a frozen stand-in freezes
     // `processing` against its initial snapshot. Same reasoning as `shell/FeedbackButton.test.ts`.
     useForm: (initial: Record<string, unknown>) =>

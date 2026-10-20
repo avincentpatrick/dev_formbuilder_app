@@ -36,7 +36,7 @@ final class WhatsNew
      */
     public function all(): array
     {
-        return $this->releases()->map(fn (Release $release): array => self::present($release))->values()->all();
+        return array_values($this->releases()->map(fn (Release $release): array => self::present($release))->all());
     }
 
     /**
@@ -71,7 +71,7 @@ final class WhatsNew
             return null;
         }
 
-        return ['entries' => $unseen->map(fn (Release $release): array => self::present($release))->values()->all()];
+        return ['entries' => array_values($unseen->map(fn (Release $release): array => self::present($release))->all())];
     }
 
     /**

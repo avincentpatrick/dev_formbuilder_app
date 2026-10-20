@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Tenant;
 
+use App\Enums\FeedbackSource;
 use App\Enums\FeedbackType;
 use App\Http\Controllers\Concerns\ReadsKeywordFilter;
 use App\Http\Controllers\Controller;
@@ -34,32 +35,43 @@ final class FeedbackController extends Controller
 
     public function __construct(private readonly FeedbackPresenter $presenter) {}
 
-    /** The workspace's own reports — read-only; the status lifecycle belongs to the platform console. */
+    /**
+     * The workspace's own reports. The SUPPORT lifecycle belongs to the platform console; since M179 each row says
+     * what the viewer may do as a tester (It works, Still a problem, a comment), through FeedbackThreadController.
+     */
     public function index(Request $request): Response
     {
         $status = $request->query('status');
         $type = $request->query('type');
+        $source = $request->query('source');
+
+        /** @var User $user */
+        $user = $request->user();
 
         return Inertia::render('feedback/Index', $this->presenter->index([
             'status' => is_string($status) && $status !== '' ? $status : null,
             // Only a kind the enum knows — anything else reads as no filter rather than as an empty list.
             'type' => is_string($type) ? FeedbackType::tryFrom($type)?->value : null,
+            'source' => is_string($source) ? FeedbackSource::tryFrom($source)?->value : null,
             'q' => $this->keyword($request),
-        ]));
+        ], $user));
     }
 
     /**
-     * The signed-in member's OWN reports (M175, `R-9bfd832e`) — every role may open it; the narrowing is the
-     * presenter's `user_id` predicate, because RLS on this table is tenant-wide.
+     * A member's Feedback page (M175, `R-9bfd832e`; M179, `D150`) — their OWN reports, and the workspace's
+     * testing-round comments. Every role may open it; the narrowing is the presenter's two predicates, because
+     * RLS on this table is tenant-wide. `?view=testing` opens on the testing round.
      */
     public function mine(Request $request): Response
     {
         /** @var User $user */
         $user = $request->user();
+        $view = $request->query('view');
 
         return Inertia::render('feedback/Mine', $this->presenter->mine(
-            (string) $user->getKey(),
+            $user,
             (int) $request->query('page', '1'),
+            is_string($view) ? $view : null,
         ));
     }
 

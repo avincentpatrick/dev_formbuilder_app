@@ -10,6 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\Admin\SuperAdminService;
 use App\Services\Feedback\FeedbackConsolePresenter;
+use App\Services\Feedback\FeedbackLifecycle;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -20,8 +21,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * The platform support console for in-app feedback (Increment I7a) — PRD Feature #11's "dedicated internal
- * view … with a simple status lifecycle (New → Reviewed → Resolved)", and RBAC §9's `feedback_reports`
- * review queue. Central host only, behind `superadmin` + `superadmin.mfa`.
+ * view … with a simple status lifecycle (New → Reviewed → Resolved)" — as built New · Ongoing · Resolved · Declined (M175),
+ * with a tester's Confirmed and a thread since M179 — and RBAC §9's `feedback_reports` review queue. Central host only, behind `superadmin` + `superadmin.mfa`.
  *
  * ⚠️ **THE ROUTE PARAMETER IS A RAW UUID, NOT A BOUND MODEL, AND THAT IS LOAD-BEARING.** Route-model
  * binding would resolve `FeedbackReport` on the app connection, which on the central host carries NO
@@ -77,6 +78,27 @@ final class FeedbackConsoleController extends Controller
         );
 
         return back()->with('toast', ['type' => 'success', 'message' => 'Feedback updated']);
+    }
+
+    /**
+     * Reply in a report's thread, as the support team (M179, `R-129c44c3`, `D151`) — moves nothing; tells the
+     * reporter and everyone who wrote in the thread. See {@see SuperAdminService::replyToFeedback()}.
+     */
+    public function reply(Request $request, string $feedback): RedirectResponse
+    {
+        $validated = $request->validate([
+            'body' => ['required', 'string', 'max:'.FeedbackLifecycle::BODY_MAX],
+        ]);
+
+        $report = $this->superAdmin->findFeedback($feedback);
+        abort_if($report === null, 404);
+
+        /** @var User $actor */
+        $actor = $request->user();
+
+        $this->superAdmin->replyToFeedback($report, $actor, (string) $validated['body']);
+
+        return back()->with('toast', ['type' => 'success', 'message' => 'Reply sent']);
     }
 
     /** Stream a report's screenshot — see {@see SuperAdminService::feedbackScreenshot()} for why no bypass. */

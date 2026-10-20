@@ -124,7 +124,9 @@ const pages = [
     { name: 'Feedback', path: '/feedback' },
     // M175 (`R-9bfd832e`) — every member's own reports: the status, the kind and the support team's reply.
     // The E2E owner has sent two of the four fixture reports, one of them closed with a reply.
-    { name: 'My feedback', path: '/feedback/mine' },
+    { name: 'Feedback & testing', path: '/feedback/mine' },
+    // M179 (`D150`): the testing-round tab, opened by its link — it renders only while a relayed report is open.
+    { name: 'Feedback & testing — testing round', path: '/feedback/mine?view=testing' },
     // The step-up re-authentication page (I8c, scanning what I8a made load-bearing). It sits behind
     // `auth`, which is why it is HERE and not in auth-axe.spec.ts with the genuinely unauthenticated
     // pages — a no-storageState visit would be redirected to /login and would scan that instead, passing

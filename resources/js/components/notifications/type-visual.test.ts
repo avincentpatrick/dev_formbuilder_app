@@ -67,7 +67,8 @@ describe('notificationVisual', () => {
         expect(byVariant('success')).toEqual(['badge_earned', 'export_ready', 'submission_approved']);
         // M175 adds `feedback_closed` to info: news about a report the reader sent — resolved or declined, the
         // reader reads the note either way, so neither the success nor the warning band's question fits it.
-        expect(byVariant('info')).toEqual(['feedback_closed', 'member_invited', 'member_joined', 'submission_received']);
+        // M179 adds `feedback_reply` beside it, for the same reason: a reply to something the reader is part of.
+        expect(byVariant('info')).toEqual(['feedback_closed', 'feedback_reply', 'member_invited', 'member_joined', 'submission_received']);
     });
 
     it('gives the invited/joined pair different glyphs, because they are a sequence and not a synonym', () => {

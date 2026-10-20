@@ -103,6 +103,9 @@ Route::domain((string) config('tenancy.central_domain'))
             Route::get('/feedback', [FeedbackConsoleController::class, 'index'])->name('admin.feedback.index');
             Route::patch('/feedback/{feedback}', [FeedbackConsoleController::class, 'update'])
                 ->whereUuid('feedback')->name('admin.feedback.update');
+            // M179 (`D151`) — the support team's reply in a report's thread, through the same adopt-context door.
+            Route::post('/feedback/{feedback}/comments', [FeedbackConsoleController::class, 'reply'])
+                ->whereUuid('feedback')->name('admin.feedback.comments.store');
             Route::get('/feedback/{feedback}/screenshot', [FeedbackConsoleController::class, 'screenshot'])
                 ->whereUuid('feedback')->name('admin.feedback.screenshot');
 

@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Enums\AttachmentKind;
+use App\Enums\FeedbackCommentAction;
+use App\Enums\FeedbackParty;
 use App\Enums\FeedbackStatus;
 use App\Enums\FieldType;
 use App\Enums\FormVersionStatus;
@@ -16,6 +18,7 @@ use App\Enums\SubmissionStatus;
 use App\Enums\TenantUserStatus;
 use App\Models\Attachment;
 use App\Models\Domain;
+use App\Models\FeedbackComment;
 use App\Models\FeedbackReport;
 use App\Models\Form;
 use App\Models\FormField;
@@ -819,6 +822,7 @@ function purgeCommittedFeedbackFixtures(): void
         // belt and braces, since `users.id` is an FK target and the delete below would otherwise fail).
         $connection->table('feedback_reports')->whereIn('user_id', $userIds)->delete();
         $connection->table('feedback_reports')->whereIn('resolved_by', $userIds)->update(['resolved_by' => null]);
+        $connection->table('feedback_reports')->whereIn('confirmed_by', $userIds)->update(['confirmed_by' => null]);
     }
 
     if ($tenantIds !== []) {
@@ -905,6 +909,28 @@ function consoleReport(Tenant $tenant, User $user, FeedbackStatus $status, strin
     ]);
 
     return $report;
+}
+
+/**
+ * A COMMITTED message in a committed report's thread (M179) — `$author` null for a support reply. Nothing is
+ * added to {@see purgeCommittedFeedbackFixtures()}: the comment's composite key to its report cascades, and the
+ * purge deletes the reports, so the thread goes with them.
+ */
+function consoleComment(FeedbackReport $report, ?User $author, FeedbackParty $side, string $body, ?FeedbackCommentAction $action = null, ?DateTimeInterface $at = null): FeedbackComment
+{
+    /** @var FeedbackComment $comment */
+    $comment = FeedbackComment::on('pgsql_privileged')->forceCreate([
+        'id' => Uuid::uuid7()->toString(),
+        'tenant_id' => $report->tenant_id,
+        'feedback_report_id' => $report->id,
+        'user_id' => $author?->id,
+        'author_kind' => $side->value,
+        'action' => $action?->value,
+        'body' => $body,
+        'created_at' => $at ?? now(),
+    ]);
+
+    return $comment;
 }
 
 /** The bytes {@see consoleScreenshot()} stores, so a case can assert the body it got is the body it wrote. */

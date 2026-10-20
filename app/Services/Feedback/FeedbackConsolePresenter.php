@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Feedback;
 
+use App\Enums\FeedbackParty;
 use App\Enums\FeedbackStatus;
 use App\Enums\FeedbackType;
 use App\Models\Tenant;
@@ -99,7 +100,7 @@ final class FeedbackConsolePresenter
                 'tenant_name' => $tenantNames[(string) $row['tenant_id']] ?? 'Unknown workspace',
                 'transitions' => array_map(
                     static fn (FeedbackStatus $to): array => ['value' => $to->value, 'label' => $to->label()],
-                    $status->allowedTransitions(),
+                    $status->allowedTransitions(FeedbackParty::Support),
                 ),
             ];
         }, $rows);

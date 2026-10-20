@@ -87,6 +87,9 @@ final class AuditRedactor
         // the tester's words into the append-only ledger by quotation. The ledger records THAT a reply was
         // written (`redacted_fields`); the words stay on the report, where the reporter reads them.
         'feedback_reports' => ['remarks', 'browser_info', 'resolution_note'],
+        // M179. A thread message is the same kind of text as the report it answers — and a support reply quotes
+        // the tester as readily as `resolution_note` does — so its body is redacted on the same reasoning.
+        'feedback_comments' => ['body'],
         // M132. The addresses an email automation sends to, typed by an author.
         'form_automation' => ['recipients'],
     ];

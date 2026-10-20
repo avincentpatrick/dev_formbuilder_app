@@ -5,14 +5,17 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Platform;
 
 use App\Enums\AuditEvent;
+use App\Enums\FeedbackSource;
 use App\Enums\FeedbackStatus;
 use App\Enums\FeedbackType;
 use App\Exceptions\Admin\SuperAdminException;
+use App\Exceptions\Feedback\FeedbackRelayException;
 use App\Http\Controllers\Controller;
 use App\Models\PlatformApiToken;
 use App\Models\User;
 use App\Services\Admin\SuperAdminService;
 use App\Services\Feedback\FeedbackConsolePresenter;
+use App\Services\Feedback\FeedbackLifecycle;
 use App\Support\Api\ApiErrorResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -49,7 +52,10 @@ final class FeedbackApiController extends Controller
         private readonly FeedbackConsolePresenter $presenter,
     ) {}
 
-    /** `GET /api/platform/v1/feedback` — filters `status` (comma list of stored values), `type`, `since`. */
+    /**
+     * `GET /api/platform/v1/feedback` — filters `status` (comma list of stored values), `type`, `since`; since M179
+     * also `source`, `reference` and `commented_since` (reports with a member's message newer than that).
+     */
     public function index(Request $request): JsonResponse
     {
         $statuses = array_values(array_filter(explode(',', (string) $request->query('status', ''))));
@@ -60,15 +66,22 @@ final class FeedbackApiController extends Controller
             'statuses.*' => [Rule::enum(FeedbackStatus::class)],
             'type' => ['nullable', Rule::enum(FeedbackType::class)],
             'since' => ['nullable', 'date'],
+            'source' => ['nullable', Rule::enum(FeedbackSource::class)],
+            'reference' => ['nullable', 'string', 'max:30'],
+            'commented_since' => ['nullable', 'date'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:'.self::PER_PAGE_MAX],
         ]);
 
         $since = $validated['since'] ?? null;
+        $commentedSince = $validated['commented_since'] ?? null;
         $result = $this->superAdmin->listFeedback([
             'statuses' => $statuses,
             'type' => $validated['type'] ?? null,
             'since' => is_string($since) ? Carbon::parse($since) : null,
+            'source' => $validated['source'] ?? null,
+            'reference' => $validated['reference'] ?? null,
+            'commented_since' => is_string($commentedSince) ? Carbon::parse($commentedSince) : null,
         ], (int) ($validated['per_page'] ?? self::PER_PAGE_DEFAULT), (int) ($validated['page'] ?? 1));
 
         $this->audit($request, AuditEvent::Exported, ['endpoint' => 'feedback.index', 'returned' => count($result['rows'])]);
@@ -131,6 +144,73 @@ final class FeedbackApiController extends Controller
         ]);
 
         return response()->json(['data' => $this->presenter->decorate([$this->superAdmin->describeFeedback($written)])[0]]);
+    }
+
+    /**
+     * `POST /api/platform/v1/feedback/relayed` — load comments that reached the team outside the Feedback button
+     * (M179, `R-e727ca94`, `D150`; ADR-0023 §D7). Creates or updates by reference, never rewrites a status after
+     * creation, tells no one; answers each item's outcome (`created`, `updated`, `unchanged`) in the file's order.
+     */
+    public function relay(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'tenant' => ['required', 'string', 'max:100'],
+            'reporter_email' => ['nullable', 'string', 'email', 'max:255'],
+            'items' => ['required', 'array', 'min:1', 'max:100'],
+            'items.*.reference' => ['required', 'string', 'max:30', 'regex:/^[A-Za-z0-9][A-Za-z0-9.\-]*$/', 'distinct'],
+            'items.*.title' => ['required', 'string', 'max:200'],
+            'items.*.remarks' => ['required', 'string', 'max:5000'],
+            'items.*.source_label' => ['nullable', 'string', 'max:255'],
+            'items.*.status' => ['nullable', Rule::enum(FeedbackStatus::class)],
+            'items.*.note' => ['nullable', 'string', 'max:1000'],
+            'items.*.type' => ['nullable', Rule::enum(FeedbackType::class)],
+            'items.*.received_at' => ['nullable', 'date'],
+            'items.*.confirmed_at' => ['nullable', 'date'],
+        ]);
+
+        /** @var User $actor */
+        $actor = $request->user();
+        $email = $validated['reporter_email'] ?? null;
+
+        /** @var list<array{reference: string, title: string, remarks: string, source_label?: ?string, status?: ?string, note?: ?string, type?: ?string, received_at?: ?string, confirmed_at?: ?string}> $items */
+        $items = array_values((array) $validated['items']);
+
+        try {
+            $results = $this->superAdmin->relayFeedback((string) $validated['tenant'], is_string($email) ? $email : null, $items, $actor);
+        } catch (FeedbackRelayException $e) {
+            return ApiErrorResponse::make(422, $e->errorCode(), $e->getMessage());
+        }
+
+        $this->audit($request, AuditEvent::Created, [
+            'endpoint' => 'feedback.relay',
+            'tenant' => $validated['tenant'],
+            'created' => count(array_filter($results, static fn (array $r): bool => $r['outcome'] === 'created')),
+            'updated' => count(array_filter($results, static fn (array $r): bool => $r['outcome'] === 'updated')),
+        ]);
+
+        return response()->json(['data' => $results]);
+    }
+
+    /**
+     * `POST /api/platform/v1/feedback/{id}/comments` — the support team's reply in a report's thread (M179,
+     * `D151`). Moves nothing; tells the reporter and everyone who wrote in the thread.
+     */
+    public function reply(Request $request, string $feedback): JsonResponse
+    {
+        $validated = $request->validate([
+            'body' => ['required', 'string', 'max:'.FeedbackLifecycle::BODY_MAX],
+        ]);
+
+        $report = $this->superAdmin->findFeedback($feedback);
+        abort_if($report === null, 404);
+
+        /** @var User $actor */
+        $actor = $request->user();
+        $comment = $this->superAdmin->replyToFeedback($report, $actor, (string) $validated['body']);
+
+        $this->audit($request, AuditEvent::Created, ['endpoint' => 'feedback.reply', 'feedback_report_id' => $feedback]);
+
+        return response()->json(['data' => $this->superAdmin->commentRow($comment)]);
     }
 
     /**

@@ -139,15 +139,58 @@ final class NotificationCopy
             // M175 — written to the reporter. The reply, when the support team wrote one, is quoted from the
             // mail context; the page is named by its title when the report recorded one.
             NotificationType::FeedbackClosed => [
-                'headline' => 'Your feedback was '.self::feedbackOutcome($data).'.',
+                'headline' => self::feedbackSubject($data, 'was '.self::feedbackOutcome($data)).'.',
                 'body' => trim(
-                    'The platform support team marked your feedback'
-                    .(self::string($data, 'page_title') === null ? '' : ' about "'.self::string($data, 'page_title').'"')
+                    'The platform support team marked '
+                    .(self::isThreadReader($data) ? 'a report you commented on' : 'your feedback')
+                    .(self::feedbackTopic($data) === null ? '' : ' about "'.self::feedbackTopic($data).'"')
                     .' as '.self::feedbackOutcome($data).' in '.$tenantName.'.'
                     .(self::string($mailContext, 'note') === null ? '' : ' Their reply: "'.self::string($mailContext, 'note').'"'),
                 ),
             ],
+            // M179 (`D151`) — the support team replied in the thread. The reply itself rides as mail-only context.
+            NotificationType::FeedbackReply => [
+                'headline' => 'The support team replied to '.(self::isThreadReader($data) ? 'a report you commented on' : 'your feedback').'.',
+                'body' => trim(
+                    'The platform support team wrote'
+                    .(self::feedbackTopic($data) === null ? '' : ' about "'.self::feedbackTopic($data).'"')
+                    .' in '.$tenantName.'.'
+                    .(self::string($mailContext, 'note') === null ? '' : ' "'.self::string($mailContext, 'note').'"'),
+                ),
+            ],
         };
+    }
+
+    /**
+     * Whether this copy goes to someone who wrote in a report's thread rather than to its reporter (M179) — the
+     * lifecycle dispatches the two audiences separately and says which in `data.audience`.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private static function isThreadReader(array $data): bool
+    {
+        return self::string($data, 'audience') === 'thread';
+    }
+
+    /**
+     * "Your feedback was resolved" to the reporter, "A report you commented on was resolved" to the thread.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private static function feedbackSubject(array $data, string $predicate): string
+    {
+        return (self::isThreadReader($data) ? 'A report you commented on ' : 'Your feedback ').$predicate;
+    }
+
+    /**
+     * What the report is about: its page's title (a button report), or its own title (a relayed one, which has no
+     * page). Null when it has neither.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private static function feedbackTopic(array $data): ?string
+    {
+        return self::string($data, 'page_title') ?? self::string($data, 'title');
     }
 
     /**
@@ -235,7 +278,9 @@ final class NotificationCopy
                 ? 'You earned a badge.'
                 : 'You earned the '.self::badge($data)->label().' badge.',
             // M175 — the outcome only. The reply is never in `data`, so it cannot reach the bell even by mistake.
-            NotificationType::FeedbackClosed => 'Your feedback was '.self::feedbackOutcome($data).'.',
+            NotificationType::FeedbackClosed => self::feedbackSubject($data, 'was '.self::feedbackOutcome($data)).'.',
+            // M179 — that a reply exists; its words are read on the Feedback page.
+            NotificationType::FeedbackReply => 'The support team replied to '.(self::isThreadReader($data) ? 'a report you commented on' : 'your feedback').'.',
         };
     }
 

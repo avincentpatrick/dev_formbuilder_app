@@ -18,6 +18,7 @@ use App\Http\Controllers\Tenant\ConnectorAuthController;
 use App\Http\Controllers\Tenant\DashboardController;
 use App\Http\Controllers\Tenant\DomainController;
 use App\Http\Controllers\Tenant\FeedbackController;
+use App\Http\Controllers\Tenant\FeedbackThreadController;
 use App\Http\Controllers\Tenant\FormAnalyticsController;
 use App\Http\Controllers\Tenant\FormBuilderController;
 use App\Http\Controllers\Tenant\FormConfirmationMessageController;
@@ -448,7 +449,8 @@ Route::middleware([
 
     // In-app feedback (Feature #11). Every role may SUBMIT (can:feedback.submit); Owner/Admin may VIEW
     // the workspace's own reports (can:feedback.view — seeded since Phase 0, first consumed in I7a). The
-    // status lifecycle is deliberately absent here: it belongs to the platform support console.
+    // SUPPORT side of the lifecycle — triage, Resolved, Declined — belongs to the platform support console and
+    // the support API; since M179 (`D151`) the testers have a door of their own, below.
     Route::get('/feedback', [FeedbackController::class, 'index'])
         ->middleware('can:feedback.view')->name('feedback.index');
     // M175 (`R-9bfd832e`, `D139`) — every member's OWN reports, with the status and the support team's reply.
@@ -459,6 +461,20 @@ Route::middleware([
         ->middleware('can:feedback.view')->name('feedback.screenshot');
     Route::post('/feedback', [FeedbackController::class, 'store'])
         ->middleware('can:feedback.submit')->name('feedback.store');
+
+    // M179 (`R-129c44c3`, `D151`) — the testers' door: It works, Still a problem, and a comment. Who may act is
+    // FeedbackReportPolicy::participate() (the reporter, any member on a relayed report, Owner/Admin), on top of
+    // `feedback.submit`, which every role holds. The report binds under the request's tenant context, so another
+    // workspace's report is a 404 before the policy runs. Throttled: each POST writes to a thread others read.
+    Route::middleware(['can:feedback.submit', 'can:participate,feedbackReport', 'throttle:feedback-thread'])->group(function (): void {
+        Route::post('/feedback/{feedbackReport}/confirm', [FeedbackThreadController::class, 'confirm'])->name('feedback.confirm');
+        Route::post('/feedback/{feedbackReport}/reopen', [FeedbackThreadController::class, 'reopen'])->name('feedback.reopen');
+        Route::post('/feedback/{feedbackReport}/comments', [FeedbackThreadController::class, 'comment'])->name('feedback.comments.store');
+    });
+    // A comment's picture, under `feedback.view` like every feedback screenshot (ADR-0015 §D9); the comment binds
+    // scoped to its report.
+    Route::get('/feedback/{feedbackReport}/comments/{comment}/screenshot', [FeedbackThreadController::class, 'commentScreenshot'])
+        ->middleware('can:feedback.view')->scopeBindings()->name('feedback.comments.screenshot');
 
     // Scoping hierarchy (Increment G10b2) — the UI over the G10b1 backend, and the surface that makes the
     // Reviewer role assignable. Gates mirror ScopeNodePolicy (every method = `scopes.manage`) and

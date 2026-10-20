@@ -74,6 +74,9 @@ const STATUS: Record<string, StatusDescriptor> = {
     new: { variant: 'info', label: 'New' },
     reviewed: { variant: 'warning', label: 'Ongoing' },
     resolved: { variant: 'success', label: 'Resolved' },
+    // M179 (`D151`): a tester pressed "It works" on a Resolved report — the fix is checked, not just shipped.
+    // Success like Resolved; the word carries the difference (WCAG 1.4.1). `confirmed` was a first use.
+    confirmed: { variant: 'success', label: 'Confirmed working' },
     wont_fix: { variant: 'neutral', label: 'Declined' },
     // What kind a feedback report is (M175, `R-2ce2f274`): FeedbackType (bug/suggestion/question), shown
     // beside the status on both feedback lists. A bug is danger because something is broken; a suggestion

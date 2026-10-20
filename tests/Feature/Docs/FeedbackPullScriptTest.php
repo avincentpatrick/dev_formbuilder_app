@@ -139,11 +139,12 @@ it('downloads New and Ongoing reports with their screenshots, and prints a diges
         ->and(json_decode((string) file_get_contents($out.'/feedback.json'), true))->toHaveCount(2);
 });
 
-it('counts New reports in one line, for preflight', function (): void {
-    [$status, $output] = feedbackPull(['--config='.$this->config, '--count']);
+it('counts New reports, the reopened ones and the members\' new comments in one line, for preflight', function (): void {
+    [$status, $output] = feedbackPull(['--config='.$this->config, '--count', '--since=2026-10-19T00:00:00Z']);
 
+    // `new=` stays first and unchanged — preflight's regex reads it — and our own reply is not counted.
     expect($status)->toBe(FEEDBACK_PULL_OK)
-        ->and(trim($output))->toBe('new=3');
+        ->and(trim($output))->toBe('new=3 reopened=1 comments=1');
 });
 
 it('tells a refused token from an unreachable server, by exit code', function (): void {
@@ -188,4 +189,87 @@ it('says when the lifecycle refuses a step, and exits 7', function (): void {
 
     expect($status)->toBe(FEEDBACK_PULL_INVALID_TRANSITION)
         ->and($output)->toContain('cannot go from Resolved to Declined');
+});
+
+/** @return list<array{method: string, path: string, body: array<string, mixed>}> every POST the fixture received */
+function feedbackPullPosts(string $log): array
+{
+    return array_values(array_filter(
+        feedbackPullPatches($log),
+        static fn (array $entry): bool => ($entry['method'] ?? null) === 'POST',
+    ));
+}
+
+/*
+| M179 (`R-e727ca94`, `D151`) — the threads, the relay, the reply, and references wherever an id is taken.
+*/
+
+it('shows REOPENED reports and the members\' new comments since the last pull, never our replies, and nothing new the second time', function (): void {
+    $out = $this->scratch.'/pull';
+
+    [$status, $output] = feedbackPull(['--config='.$this->config, '--out='.$out]);
+
+    expect($status)->toBe(FEEDBACK_PULL_OK)
+        ->and($output)->toContain('REOPENED')
+        ->and($output)->toContain('U8')
+        ->and($output)->toContain('Still cut off on the tablet.')
+        ->and($output)->toContain('Same on my phone.')
+        ->and($output)->not->toContain('Which tablet, please?')
+        ->and($output)->toContain('relayed: 4 — 2 Resolved, 1 Ongoing, 1 Confirmed working')
+        ->and(is_file($this->scratch.'/feedback-pull-state.json'))->toBeTrue();
+
+    [, $again] = feedbackPull(['--config='.$this->config, '--out='.$out]);
+    expect($again)->toContain('no reopened reports and no new comments')
+        ->and($again)->not->toContain('Still cut off on the tablet.');
+});
+
+it('relays a file of comments only with the user\'s approval, and says what happened to each', function (): void {
+    $file = $this->scratch.'/relayed.json';
+    file_put_contents($file, json_encode(['items' => [
+        ['reference' => 'U1', 'title' => 'Allow negative', 'remarks' => 'The comment.', 'status' => 'resolved'],
+        ['reference' => 'U8', 'title' => 'Calculations', 'remarks' => 'The comment.', 'status' => 'reviewed'],
+    ]]));
+
+    [$refused] = feedbackPull(['--config='.$this->config, '--relay='.$file, '--tenant=staging']);
+    expect($refused)->toBe(FEEDBACK_PULL_NEEDS_APPROVAL)
+        ->and(feedbackPullPosts($this->log))->toBe([]);
+
+    [$status, $output] = feedbackPull(['--config='.$this->config, '--relay='.$file, '--tenant=staging', '--reporter=owner@staging.example.test', '--user-approved']);
+    $posts = feedbackPullPosts($this->log);
+
+    expect($status)->toBe(FEEDBACK_PULL_OK)
+        ->and($output)->toContain('relayed 2 item(s): 2 created, 0 updated, 0 unchanged')
+        ->and($posts)->toHaveCount(1)
+        ->and($posts[0]['path'])->toBe('/api/platform/v1/feedback/relayed')
+        ->and($posts[0]['body']['tenant'])->toBe('staging')
+        ->and($posts[0]['body']['reporter_email'])->toBe('owner@staging.example.test')
+        ->and(array_column($posts[0]['body']['items'], 'reference'))->toBe(['U1', 'U8']);
+});
+
+it('replies in a thread by reference, and only with the user\'s approval', function (): void {
+    [$refused] = feedbackPull(['--config='.$this->config, '--comment=U1', '--note=Which browser?']);
+    expect($refused)->toBe(FEEDBACK_PULL_NEEDS_APPROVAL)
+        ->and(feedbackPullPosts($this->log))->toBe([]);
+
+    [$status] = feedbackPull(['--config='.$this->config, '--comment=U1', '--note=Which browser?', '--user-approved']);
+    $posts = feedbackPullPosts($this->log);
+
+    expect($status)->toBe(FEEDBACK_PULL_OK)
+        ->and($posts[0]['path'])->toBe('/api/platform/v1/feedback/0192e2e0-0000-7000-8000-000000000011/comments')
+        ->and($posts[0]['body'])->toBe(['body' => 'Which browser?']);
+});
+
+it('resolves by reference, and refuses a reference that names no report or more than one', function (): void {
+    expect(feedbackPull(['--config='.$this->config, '--resolve=U1', '--version=abc1234'])[0])->toBe(FEEDBACK_PULL_OK);
+
+    $patches = feedbackPullPatches($this->log);
+    expect($patches[0]['id'])->toBe('0192e2e0-0000-7000-8000-000000000011')
+        ->and($patches[0]['body'])->toBe(['status' => 'resolved', 'note' => 'Fixed in version abc1234, live on staging.']);
+
+    [$none, $noneOut] = feedbackPull(['--config='.$this->config, '--resolve=NONE', '--version=abc1234']);
+    [$dup, $dupOut] = feedbackPull(['--config='.$this->config, '--resolve=DUP', '--version=abc1234']);
+
+    expect($none)->toBe(2)->and($noneOut)->toContain('no report has the reference NONE')
+        ->and($dup)->toBe(2)->and($dupOut)->toContain('more than one report')
+        ->and(feedbackPullPatches($this->log))->toHaveCount(1);
 });

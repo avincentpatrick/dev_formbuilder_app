@@ -31,7 +31,9 @@ export type NotificationTypeKey =
     | 'impersonation_started'
     | 'member_joined'
     | 'badge_earned'
-    | 'feedback_closed';
+    | 'feedback_closed'
+    // M179 (`D151`) — the support team replied in a feedback report's thread. Appended, as on the server.
+    | 'feedback_reply';
 
 /** One row of `GET /notifications`. Every string here is SERVER-authored — see NotificationPresenter. */
 export type NotificationRow = {

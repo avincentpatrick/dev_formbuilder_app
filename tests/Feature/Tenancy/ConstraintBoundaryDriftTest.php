@@ -265,6 +265,10 @@ it('keeps the composite shape it recommends, so the remedy in every failure mess
     expect(boundarySorted(array_map(static fn (object $r): string => (string) $r->conname, $rows)))->toBe([
         'connection_subscriptions_connection_fk',
         'connection_subscriptions_form_fk',
+        // M179: a feedback comment's report and its screenshot, each pinned to the comment's own tenant. Deleting
+        // the report takes its thread; deleting the screenshot clears it from the comment (SET NULL on that column).
+        'feedback_comments_report_fk',
+        'feedback_comments_screenshot_fk',
         // M131: a form's folder, pinned to the form's own tenant; deleting the folder unfiles, never deletes.
         // M132: an automation's form, and a run's automation, each pinned to its own tenant.
         'form_automation_runs_automation_fk',

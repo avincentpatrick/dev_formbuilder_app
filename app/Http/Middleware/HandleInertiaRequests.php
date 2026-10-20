@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\User;
 use App\Services\Branding\TenantBrandingService;
 use App\Services\Entitlements\EntitlementService;
+use App\Services\Feedback\FeedbackPresenter;
 use App\Support\Audit\ImpersonationContext;
 use App\Support\Authorization\ShellAbilities;
 use Illuminate\Http\Request;
@@ -102,6 +103,12 @@ class HandleInertiaRequests extends Middleware
             // ui.theme above. FAIL-CLOSED off-tenant: EntitlementService::snapshot() returns null when
             // there is no active tenant context (guest/central routes), so no query runs and no plan leaks.
             'entitlements' => app(EntitlementService::class)->snapshot(),
+            // M179 (`D150`) — how many testing-round comments are still open in this workspace, so the Feedback
+            // panel can point at them while there is something to check. Lazy (one COUNT, only on a full page
+            // render) and null off-tenant, like `entitlements` above.
+            'feedback' => fn (): ?array => ($open = app(FeedbackPresenter::class)->testingRoundOpen()) === null
+                ? null
+                : ['testing_round_open' => $open],
             // One-shot flash → toast bridge (design-system §3.7). Controllers signal an outcome with
             // ->with('toast', ['type' => 'success'|'error'|'info', 'message' => '…']); the app shell's
             // ToastHost raises it once, then the session flash is gone.

@@ -6,24 +6,31 @@ namespace App\Services\Admin;
 
 use App\Enums\AuditEvent;
 use App\Enums\BillingInterval;
+use App\Enums\FeedbackParty;
 use App\Enums\FeedbackStatus;
-use App\Enums\NotificationType;
 use App\Enums\SettingKey;
 use App\Enums\SettingScope;
 use App\Enums\TenantStatus;
+use App\Enums\TenantUserStatus;
 use App\Exceptions\Admin\SuperAdminException;
+use App\Exceptions\Feedback\FeedbackLifecycleException;
+use App\Exceptions\Feedback\FeedbackRelayException;
 use App\Exceptions\Settings\PlatformSettingsConflictException;
 use App\Models\Attachment;
 use App\Models\Audit;
 use App\Models\Concerns\BelongsToTenant;
+use App\Models\FeedbackComment;
 use App\Models\FeedbackReport;
 use App\Models\Plan;
 use App\Models\Setting;
 use App\Models\Subscription;
 use App\Models\Tenant;
+use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Audit\AuditLogPresenter;
 use App\Services\Entitlements\EntitlementService;
+use App\Services\Feedback\FeedbackLifecycle;
+use App\Services\Feedback\FeedbackRelay;
 use App\Services\Notifications\NotificationDispatcher;
 use App\Services\Settings\PlatformSettings;
 use App\Support\Audit\AuditLogger;
@@ -34,6 +41,7 @@ use Carbon\CarbonInterface;
 use Closure;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * The one narrow, named super-admin service (RBAC §9 / ADR-0002 §D3): every cross-tenant platform
@@ -74,7 +82,8 @@ final class SuperAdminService
 {
     public function __construct(
         private readonly AuditLogger $audit,
-        private readonly NotificationDispatcher $notifications,
+        private readonly FeedbackLifecycle $feedback,
+        private readonly FeedbackRelay $relay,
     ) {}
 
     /**
@@ -512,7 +521,12 @@ final class SuperAdminService
      * M175 (`R-78f43f26`) adds the platform support API's two filters: `statuses`, a SET of stored values (the
      * pull asks for New and Ongoing at once), and `since`, the earliest `submitted_at`.
      *
-     * @param  array{status?: ?string, statuses?: list<string>, tenant_id?: ?string, type?: ?string, since?: ?CarbonInterface}  $filters
+     * M179 (`R-e727ca94`) adds three more — `source`, `reference`, and `commented_since`: reports with a MEMBER's
+     * message newer than that, so the pull sees a reopen or a tester's comment and never our own replies as news —
+     * and every row carries its thread, read through `feedback_comments`' own SELECT carve-out with the ORM tenant
+     * scope dropped for the reason above.
+     *
+     * @param  array{status?: ?string, statuses?: list<string>, tenant_id?: ?string, type?: ?string, since?: ?CarbonInterface, source?: ?string, reference?: ?string, commented_since?: ?CarbonInterface}  $filters
      * @return array{rows: list<array<string, mixed>>, meta: array{current_page: int, last_page: int, total: int, per_page: int}}
      */
     public function listFeedback(array $filters, int $perPage, int $page): array
@@ -526,6 +540,17 @@ final class SuperAdminService
                 ->when($filters['tenant_id'] ?? null, fn ($q, $v) => $q->where('tenant_id', $v))
                 ->when($filters['type'] ?? null, fn ($q, $v) => $q->where('type', $v))
                 ->when($filters['since'] ?? null, fn ($q, $v) => $q->where('submitted_at', '>=', $v))
+                ->when($filters['source'] ?? null, fn ($q, $v) => $q->where('source', $v))
+                // Table-qualified: a support handle (`U8`), never `submissions.reference`, which J2e's disclosure
+                // test keeps to one lookup site.
+                ->when($filters['reference'] ?? null, fn ($q, $v) => $q->where('feedback_reports.reference', $v))
+                ->when($filters['commented_since'] ?? null, fn ($q, $v) => $q->whereExists(
+                    fn ($sub) => $sub->selectRaw('1')
+                        ->from('feedback_comments')
+                        ->whereColumn('feedback_comments.feedback_report_id', 'feedback_reports.id')
+                        ->where('feedback_comments.author_kind', FeedbackParty::Member->value)
+                        ->where('feedback_comments.created_at', '>', $v)
+                ))
                 ->orderByDesc('submitted_at');
 
             $total = (clone $query)->count();
@@ -535,10 +560,11 @@ final class SuperAdminService
             /** @var Collection<int, FeedbackReport> $reports */
             $reports = $query->forPage($current, $perPage)->get();
 
-            $names = $this->reporterNames($reports);
+            $threads = $this->threadsFor($reports);
+            $names = $this->reporterNames($reports, $threads);
 
             return [
-                'rows' => array_values($reports->map(fn (FeedbackReport $r): array => $this->feedbackRow($r, $names))->all()),
+                'rows' => array_values($reports->map(fn (FeedbackReport $r): array => $this->feedbackRow($r, $names, $threads[(string) $r->getKey()] ?? []))->all()),
                 'meta' => [
                     'current_page' => $current,
                     'last_page' => $lastPage,
@@ -561,17 +587,58 @@ final class SuperAdminService
      */
     public function describeFeedback(FeedbackReport $report): array
     {
+        /** @var list<FeedbackComment> $thread */
+        $thread = $report->relationLoaded('comments') ? array_values($report->comments->all()) : [];
+
         return $this->feedbackRow(
             $report,
-            $this->userNames(array_values(array_filter([$report->user_id, $report->resolved_by]))),
+            $this->userNames(array_values(array_unique(array_filter([
+                $report->user_id,
+                $report->resolved_by,
+                $report->confirmed_by,
+                ...array_map(static fn (FeedbackComment $c): ?string => $c->user_id, $thread),
+            ])))),
+            $thread,
         );
     }
 
     /**
+     * Every listed report's thread, oldest first, keyed by report id — one query through `feedback_comments`'
+     * SELECT carve-out, inside the caller's elevated transaction (M179).
+     *
+     * @param  Collection<int, FeedbackReport>  $reports
+     * @return array<string, list<FeedbackComment>>
+     */
+    private function threadsFor(Collection $reports): array
+    {
+        $ids = $reports->map(fn (FeedbackReport $r): string => (string) $r->getKey())->all();
+
+        if ($ids === []) {
+            return [];
+        }
+
+        /** @var Collection<int, FeedbackComment> $comments */
+        $comments = FeedbackComment::on(SuperAdminContext::CONNECTION)
+            ->withoutGlobalScope(FeedbackComment::$tenantScope)
+            ->whereIn('feedback_report_id', $ids)
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get();
+
+        $threads = [];
+        foreach ($comments as $comment) {
+            $threads[(string) $comment->feedback_report_id][] = $comment;
+        }
+
+        return $threads;
+    }
+
+    /**
      * @param  array<string, array{name: string, email: string}>  $names
+     * @param  list<FeedbackComment>  $thread
      * @return array<string, mixed>
      */
-    private function feedbackRow(FeedbackReport $r, array $names): array
+    private function feedbackRow(FeedbackReport $r, array $names, array $thread = []): array
     {
         return [
             'id' => (string) $r->getKey(),
@@ -591,6 +658,36 @@ final class SuperAdminService
             'reporter_role' => $r->reporter_role,
             'resolver' => $r->resolved_by === null ? null : ($names[$r->resolved_by] ?? null),
             'has_screenshot' => $r->screenshot_attachment_id !== null,
+            // M179 (`R-e727ca94`) — where it came from, the code the testers know it by, who confirmed the fix,
+            // and the thread. A support reply has no author (`user_id` NULL); a member's names their account.
+            'source' => $r->source->value,
+            'source_label' => $r->source_label,
+            'reference' => $r->reference,
+            'title' => $r->title,
+            'confirmed_at' => $r->confirmed_at?->toIso8601String(),
+            'confirmer' => $r->confirmed_by === null ? null : ($names[$r->confirmed_by] ?? null),
+            'last_comment_at' => $r->last_comment_at?->toIso8601String(),
+            'comments' => array_map(fn (FeedbackComment $c): array => $this->commentRow($c, $names), $thread),
+        ];
+    }
+
+    /**
+     * One thread message in the support API's shape (M179) — also the answer to a support reply.
+     *
+     * @param  array<string, array{name: string, email: string}>  $names
+     * @return array<string, mixed>
+     */
+    public function commentRow(FeedbackComment $c, array $names = []): array
+    {
+        return [
+            'id' => (string) $c->getKey(),
+            'feedback_report_id' => (string) $c->feedback_report_id,
+            'author_kind' => $c->author_kind->value,
+            'author' => $c->user_id === null ? null : ($names[$c->user_id] ?? null),
+            'action' => $c->action?->value,
+            'body' => $c->body,
+            'created_at' => $c->created_at->toIso8601String(),
+            'has_screenshot' => $c->screenshot_attachment_id !== null,
         ];
     }
 
@@ -599,12 +696,23 @@ final class SuperAdminService
      * SELECT bypass (2026_07_05_040100), inside the caller's already-open elevated transaction.
      *
      * @param  Collection<int, FeedbackReport>  $reports
+     * @param  array<string, list<FeedbackComment>>  $threads
      * @return array<string, array{name: string, email: string}>
      */
-    private function reporterNames(Collection $reports): array
+    private function reporterNames(Collection $reports, array $threads = []): array
     {
+        $commenters = [];
+        foreach ($threads as $thread) {
+            foreach ($thread as $comment) {
+                if ($comment->user_id !== null) {
+                    $commenters[] = (string) $comment->user_id;
+                }
+            }
+        }
+
         $ids = $reports
-            ->flatMap(fn (FeedbackReport $r): array => array_filter([$r->user_id, $r->resolved_by]))
+            ->flatMap(fn (FeedbackReport $r): array => array_filter([$r->user_id, $r->resolved_by, $r->confirmed_by]))
+            ->merge(array_filter($commenters))
             ->unique()
             ->values()
             ->all();
@@ -915,7 +1023,8 @@ final class SuperAdminService
      *
      * ── THE REPORTER IS TOLD (M175, `R-9bfd832e`, `D139`) ──────────────────────────────────────────────────
      * `$note` is the support team's reply, stored on the report (`resolution_note`) whenever one is given and
-     * kept when none is. Reaching Resolved or Declined dispatches `feedback_closed` to the REPORTER alone — inside
+     * kept when none is. Reaching Resolved or Declined dispatches `feedback_closed` to the REPORTER (since M179 also to
+     * every member who wrote in the thread — `FeedbackLifecycle::tell()`) — inside
      * this transaction, so the bell row, the preference lookup and the reporter's address all pass the strict
      * policies under the adopted context, and the queued email waits for the commit (`after_commit`). The reply
      * reaches the email as mail-only context, never `data` ({@see NotificationDispatcher::dispatch()}), and the
@@ -924,86 +1033,117 @@ final class SuperAdminService
      * Returns the row as written, so the platform support API can answer with it without re-reading it on
      * another connection before the write is committed (M175).
      *
-     * @throws SuperAdminException on a transition the lifecycle does not offer
+     * ── THE MOVE ITSELF LIVES IN THE FEEDBACK LIFECYCLE (M179, `R-129c44c3`) ──────────────────────────────────
+     * This method is the support DOOR: it adopts the tenant context and hands the move to
+     * {@see FeedbackLifecycle::support()}, which the testers' door shares. Until M179 the guard ran here, before
+     * the transaction, against the model the caller held — and the row was then re-read with no lock, so two
+     * moves at once could both pass a guard against a status that no longer held, and the audit recorded the
+     * stale status as the old one. The lifecycle reads the row `FOR UPDATE` under this adopted context and judges
+     * the move by it. `$report` now only says WHICH report and in WHICH workspace.
+     *
+     * @throws SuperAdminException on a transition the lifecycle does not offer from the row's real status
      */
     public function transitionFeedback(FeedbackReport $report, FeedbackStatus $to, User $actor, ?string $note = null): FeedbackReport
     {
-        $from = $report->status;
-
-        if (! $from->canTransitionTo($to)) {
-            throw SuperAdminException::invalidFeedbackTransition($from, $to);
-        }
-
         $note = $note === null || trim($note) === '' ? null : trim($note);
 
-        /** @var FeedbackReport $written */
-        $written = DB::transaction(function () use ($report, $from, $to, $actor, $note): FeedbackReport {
-            $savedTenant = TenantContext::currentTenantId();
-            $savedUser = TenantContext::currentUserId();
-            TenantContext::applyLocal($report->tenant_id);
+        try {
+            /** @var FeedbackReport $written */
+            $written = DB::transaction(function () use ($report, $to, $actor, $note): FeedbackReport {
+                $savedTenant = TenantContext::currentTenantId();
+                $savedUser = TenantContext::currentUserId();
+                TenantContext::applyLocal($report->tenant_id);
 
-            try {
-                /** @var FeedbackReport $row */
-                $row = FeedbackReport::query()->findOrFail($report->getKey());
-
-                $old = [
-                    'status' => $from->value,
-                    'resolved_at' => $row->resolved_at?->toIso8601String(),
-                    'resolved_by' => $row->resolved_by,
-                    'resolution_note' => $row->resolution_note,
-                ];
-
-                // Re-opening CLEARS the resolution stamp rather than preserving it: those two columns mean
-                // "when, and by whom, was this closed", and a re-opened report is not closed. The history
-                // is not lost — it is in the audit row this method writes. The reply is kept unless a new one
-                // is written: it is what the reporter last read, and re-opening says nothing new to them.
-                $resolvedAt = $to->isTerminal() ? now() : null;
-                $resolvedBy = $to->isTerminal() ? (string) $actor->getKey() : null;
-                $resolutionNote = $note ?? $row->resolution_note;
-
-                $row->forceFill([
-                    'status' => $to,
-                    'resolved_at' => $resolvedAt,
-                    'resolved_by' => $resolvedBy,
-                    'resolution_note' => $resolutionNote,
-                ])->save();
-
-                $this->audit->record(
-                    AuditEvent::Updated,
-                    'feedback_reports',
-                    (string) $row->getKey(),
-                    old: $old,
-                    new: [
-                        'status' => $to->value,
-                        'resolved_at' => $resolvedAt?->toIso8601String(),
-                        'resolved_by' => $resolvedBy,
-                        'resolution_note' => $resolutionNote,
-                    ],
-                    actorId: (string) $actor->getKey(),
-                );
-
-                // Resolved or Declined: the reporter is told — by bell and, unless they switched it off, by
-                // email. Ids and labels only in `data`; the reply rides as mail-only context.
-                if ($to->isTerminal()) {
-                    $this->notifications->dispatch(
-                        NotificationType::FeedbackClosed,
-                        [(string) $row->user_id],
-                        array_filter([
-                            'feedback_report_id' => (string) $row->getKey(),
-                            'status' => $to->value,
-                            'page_title' => $row->page_title,
-                        ], static fn (?string $value): bool => $value !== null),
-                        $resolutionNote === null ? [] : ['note' => $resolutionNote],
-                    );
+                try {
+                    // The thread is loaded HERE, under the adopted context: after the commit the API holds no
+                    // tenant context, and the elevated connection cannot see an uncommitted write.
+                    return $this->feedback->support((string) $report->getKey(), $to, $actor, $note)->load('comments');
+                } finally {
+                    TenantContext::applyLocal($savedTenant, $savedUser);
                 }
-
-                return $row;
-            } finally {
-                TenantContext::applyLocal($savedTenant, $savedUser);
-            }
-        });
+            });
+        } catch (FeedbackLifecycleException $refused) {
+            throw new SuperAdminException($refused->getMessage(), previous: $refused);
+        }
 
         return $written;
+    }
+
+    /**
+     * Load comments relayed outside the Feedback button into one workspace (M179, `R-e727ca94`, `D150`; ADR-0023
+     * §D7) — the support API's `POST /feedback/relayed`, and its only caller. Resolves the workspace (by slug or
+     * id) and the reporter (an ACTIVE member of it, by email; the workspace's owner when none is named), then
+     * adopts that workspace's tenant context and hands the batch to {@see FeedbackRelay}: create or update by
+     * reference, never rewriting a status, telling no one, every item audited in the workspace's own ledger.
+     * All or nothing: one transaction.
+     *
+     * @param  list<array{reference: string, title: string, remarks: string, source_label?: ?string, status?: ?string, note?: ?string, type?: ?string, received_at?: ?string, confirmed_at?: ?string}>  $items
+     * @return list<array{reference: string, id: string, outcome: string}>
+     *
+     * @throws FeedbackRelayException for an unknown workspace or a reporter who is not an active member of it
+     */
+    public function relayFeedback(string $tenantKey, ?string $reporterEmail, array $items, User $actor): array
+    {
+        /** @var Tenant|null $tenant */
+        $tenant = Str::isUuid($tenantKey)
+            ? Tenant::query()->find($tenantKey)
+            : Tenant::query()->where('slug', $tenantKey)->first();
+
+        if ($tenant === null) {
+            throw FeedbackRelayException::unknownTenant($tenantKey);
+        }
+
+        // `runFor()`, not the save/apply/`finally`-restore shape `transitionFeedback()` above still carries: a
+        // database error inside the batch must reach the caller as itself, not as the 25P02 a restore issued on
+        // an aborted transaction would replace it with (the open row the M3 adversarial pass filed on that shape).
+        /** @var list<array{reference: string, id: string, outcome: string}> $results */
+        $results = TenantContext::runFor(
+            (string) $tenant->getKey(),
+            fn (): array => $this->relay->relay($this->relayReporter($tenant, $reporterEmail), $items, $actor),
+        );
+
+        return $results;
+    }
+
+    /** The relayed reports' reporter: an active member named by email, or the workspace's owner. */
+    private function relayReporter(Tenant $tenant, ?string $email): User
+    {
+        $userId = $email === null || trim($email) === ''
+            ? $tenant->owner_user_id
+            : User::query()->whereRaw('lower(email) = lower(?)', [trim($email)])->value('id');
+
+        $active = $userId !== null && TenantUser::query()
+            ->where('user_id', $userId)
+            ->where('status', TenantUserStatus::Active->value)
+            ->exists();
+
+        /** @var User|null $user */
+        $user = $active ? User::query()->find($userId) : null;
+
+        if ($user === null) {
+            throw FeedbackRelayException::unknownReporter();
+        }
+
+        return $user;
+    }
+
+    /**
+     * The support team's reply in a report's thread (M179, `R-129c44c3`, `D151`) — the console's reply box and
+     * the support API's `POST /feedback/{id}/comments`. The same door as {@see self::transitionFeedback()}: adopt
+     * the report's tenant context on the ordinary connection, so the message and its audit pass the strict
+     * policies and the audit lands in that workspace's own ledger; {@see FeedbackLifecycle::supportReply()} does
+     * the rest, and tells the reporter and the thread.
+     */
+    public function replyToFeedback(FeedbackReport $report, User $actor, ?string $body): FeedbackComment
+    {
+        // `runFor()`, for the reason {@see self::relayFeedback()} gives.
+        /** @var FeedbackComment $comment */
+        $comment = TenantContext::runFor(
+            (string) $report->tenant_id,
+            fn (): FeedbackComment => $this->feedback->supportReply((string) $report->getKey(), $actor, $body),
+        );
+
+        return $comment;
     }
 
     /**

@@ -32,6 +32,12 @@ describe('statusVariant — feedback triage tokens (I7a)', () => {
         expect(statusVariant('resolved')).toEqual({ variant: 'success', label: 'Resolved' });
     });
 
+    it('reads a tester-confirmed fix as Confirmed working, in the colour of a fix done well', () => {
+        // M179 (`D151`): `confirmed` is reached only by a tester's "It works" on a Resolved report — the fix
+        // is not just shipped but checked, so it is success like Resolved, with the word saying the difference.
+        expect(statusVariant('confirmed')).toEqual({ variant: 'success', label: 'Confirmed working' });
+    });
+
     it("colours wont_fix neutral, not danger — a settled decision is not a failure", () => {
         // M175 (`D139`): the stored `wont_fix` READS Declined.
         expect(statusVariant('wont_fix')).toEqual({ variant: 'neutral', label: 'Declined' });

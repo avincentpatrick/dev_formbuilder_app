@@ -33,14 +33,20 @@ it('starts every session with the feedback pull, into the session scratchpad', f
 
     expect($start)->toContain('php scripts/feedback-pull.php --out=')
         ->and($start)->toMatch('/scratchpad/i')
-        ->and($start)->toMatch('/triage/i');
+        ->and($start)->toMatch('/triage/i')
+        // M179 (`D151`): what the testers said since the last pull is triaged like a new report.
+        ->and($start)->toMatch('/REOPENED/')
+        ->and($start)->toMatch('/comment/i')
+        ->and($start)->toContain('--comment=');
 });
 
 it('closes out by marking the fixed reports Resolved, and only once the deploy is live', function (): void {
     $close = sessionStartSection('CLAUDE.md', 'Closing out');
 
     expect($close)->toContain('feedback-pull.php --resolve=')
-        ->and($close)->toMatch('/only once the deploy is live/i');
+        ->and($close)->toMatch('/only once the deploy is live/i')
+        // M179: a relayed report is resolved by the reference its row cites.
+        ->and($close)->toContain('--resolve=<id|reference>');
 });
 
 it('records the triage rule and its reason among the Standing Rules', function (): void {
@@ -51,7 +57,11 @@ it('records the triage rule and its reason among the Standing Rules', function (
         ->and($rules)->toMatch('/already queued/i')
         ->and($rules)->toContain('early-testing')
         ->and($rules)->toContain('during-testing')
-        ->and($rules)->toContain('--user-approved');
+        ->and($rules)->toContain('--user-approved')
+        // M179: the threads and the relayed comments are part of the rule.
+        ->and($rules)->toContain('D151')
+        ->and($rules)->toMatch('/reopened/i')
+        ->and($rules)->toMatch('/by reference/i');
 });
 
 it('prints the New count in preflight, before the result, and never blocks on it', function (): void {
@@ -66,6 +76,8 @@ it('prints the New count in preflight, before the result, and never blocks on it
     $block = substr($source, (int) $feedback, (int) $result - (int) $feedback);
     expect($block)->toContain('feedback-pull.php')
         ->and($block)->toContain('--count')
+        // M179: the reopened reports and the members' new comments are counted too.
+        ->and($block)->toContain('reopened=')
         // ⛔ The one property that matters: a testing server that is down, or a token that expired, must not
         // stop a session from building — so this section may inform and warn, and never fail.
         ->and($block)->not->toContain('$failures[]');

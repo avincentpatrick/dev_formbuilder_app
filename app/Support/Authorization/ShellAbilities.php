@@ -104,8 +104,9 @@ final class ShellAbilities
             // unlike its four neighbours above, this one turns on a permission alone.
             'viewAuditLog' => (bool) $user?->can('viewAny', Audit::class),
             // Gates the Feedback nav item + the /feedback list (I7a). The BARE PERMISSION, not a
-            // policy, for the reason `manageDomains` gives: `feedback_reports` has no model policy
-            // — the page is a tenant-scoped list with no per-instance authorization question, and
+            // policy, for the reason `manageDomains` gives: the LIST has no per-instance authorization
+            // question (M179's `FeedbackReportPolicy` answers a per-REPORT one — who may take part in a
+            // thread — and does not gate this item), and
             // RLS already answers "whose rows are these". No companion plan feature, on the audit
             // ledger's reasoning: seeing what your own people reported about the product is a
             // baseline, not a tier.

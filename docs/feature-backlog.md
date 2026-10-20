@@ -742,7 +742,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   — class, message, SQLSTATE — reads the wrong one. `runFor()` avoids it by restoring the PHP mirror only
   on the throw path, where the database has already reverted itself.
   **The twelve, measured rather than estimated** (`grep -rn "savedTenant = TenantContext::currentTenantId()\|previousTenant = TenantContext::currentTenantId()" app/`):
-  `SendWelcomeEmail.php:109` · `ImpersonationService.php:119,241` · `SuperAdminService.php:125,162,257,702,748`
+  `SendWelcomeEmail.php:109` · `ImpersonationService.php:119,241` · `SuperAdminService.php:141,178,273,987,1051`
   · `GoogleAuthRequestService.php:82` · `TenantSettingRegistry.php:98` · `TenantMembershipService.php:314` ·
   `TenantExtractService.php:64`. **Latent, not live**: it needs the enclosed work to fail at the database,
   and each site's work is a narrow read or write that does not today. ⚠️ **Two of the twelve cannot simply
@@ -3562,7 +3562,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   controller and streams the bytes. The other three arms answer with a redirect, which no 404 can be confused
   with, and say so rather than paying for a fixture they do not need.
   ⛔ **AND ASKING THE KILLER QUESTION OF EVERY GATE ON THE ROUTE — NOT ONLY THE ONES THE ROW NAMES — FOUND A
-  THIRD NAKED ONE.** `FeedbackConsoleController.php:95`'s `abort_unless(...->servable(), 409)` was asserted
+  THIRD NAKED ONE.** `FeedbackConsoleController.php:117`'s `abort_unless(...->servable(), 409)` was asserted
   by **nothing**: M34 pinned that guard on the two routes it was looking at (`FeedbackController.php:94`,
   `AttachmentController::show()`'s scan-status guard) and this console copy is the third, so quarantined bytes could be served to
   the one principal who reads across every tenant with the whole repository green. Covered here, with the
@@ -5247,11 +5247,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (`config/app.php:120-124`, not `:99-106`); `docs/adr/0009:168` again (the "stock `slack` block" pointer
   now lands on the **Google sign-in** block this branch added — the exact conflation the sentence forbids);
   `docs/adr/0016:133,:135,:147` (ADR-0019 §D6b, not §D7); `docs/adr/0020:43`; `docs/adr/0011:8,:111`
-  (`MdsTabs` exists as of J4c1); `docs/audit-compliance-logging-spec.md:55`;
+  (`MdsTabs` exists as of J4c1); `docs/audit-compliance-logging-spec.md:56`;
   `docs/piping-output-encoding-design.md:181` (was `:180`; **M57 moved it by one line and the citation
   linter caught it in the same run** — the ledger tier went 18 → 19 and named this pointer, which is the
   clearest evidence yet for the rule this very row is about); `docs/offline-first-sync-design.md:128`;
-  `docs/data-dictionary.md:63` (§28, not §31 — the pointer currently lands on a note arguing the opposite
+  `docs/data-dictionary.md:66` (§28, not §31 — the pointer currently lands on a note arguing the opposite
   case); `docs/api-specification.md:179` (`read:audit_log` is orphaned four blockquotes below its table
   and renders outside it); `docs/ux/design-system-reference.md:812,:843`;
   `docs/pricing-feature-gating-matrix.md:56` (Business is seeded `unlimited`, not 25 endpoints);
@@ -7489,20 +7489,20 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Measured by `M79`'s sweeps (2026-09-06), joined and refuted by `M80`. Five sites hold the name and none
   consults it: `app/Models/Form.php:83` (`$fillable`), `app/Models/Form.php:115` (cast),
   `database/migrations/2026_07_06_000201_create_forms_table.php:41` (default `true`),
-  `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php:53` (a column-name census) and the documenting
-  row at `docs/data-dictionary.md:217`. The two places that would consult it gate on something else —
+  `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php:54` (a column-name census) and the documenting
+  row at `docs/data-dictionary.md:221`. The two places that would consult it gate on something else —
   `app/Policies/SubmissionPolicy.php:42` returns `submissions.create` with the published-version and
   Editor-grant conjuncts on the lines below, summarised at `app/Policies/SubmissionPolicy.php:33`, and no
-  conjunct is this flag; the encode routes at `routes/tenant.php:660` reason explicitly about two *other*
+  conjunct is this flag; the encode routes at `routes/tenant.php:676` reason explicitly about two *other*
   omitted gates without mentioning it. ⚠️ **TWO CORRECTIONS THE JOIN MADE TO THE FINDING, AND BOTH CHANGE
   THE ROW.** (a) It is one of **five** unread flags — `allow_api_import`, `allow_offline_sync`,
   `allow_ocr_single` and `allow_ocr_linelist` are equally reader-less. The other four sit ahead of unbuilt
-  or held features and `docs/data-dictionary.md:218` carries that rationale explicitly; this one's feature
+  or held features and `docs/data-dictionary.md:222` carries that rationale explicitly; this one's feature
   is built, which is what makes it filable rather than a ratified absence. (b) The `$fillable` entry is
   **not** a mass-assignment risk: `app/Services/Forms/FormService.php` opens an explicit six-key array,
   so nothing can set it either. ⚠️ **The remedy is genuinely two-directional** — `docs/PRD.md:252` opens
   Feature #7 and its acceptance criteria never ask for a per-form off switch, so narrowing
-  `docs/data-dictionary.md:217` is as defensible as wiring the gate, and the row should be taken with both
+  `docs/data-dictionary.md:221` is as defensible as wiring the gate, and the row should be taken with both
   priced. Precedent for the shape: `users.last_active_tenant_id`, already in this file. **Live.**
   Filed by `M80`. **Tier: during-testing.**
 
@@ -7510,8 +7510,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   install entry honours the per-form offline gate that two documents describe, and it defaults to `true`.**
   Measured by `M79`'s sweeps (2026-09-06), joined and refuted by `M80`. Seven hits, all declaration:
   `database/migrations/2026_07_06_000201_create_forms_table.php:45`, `app/Models/Form.php:87` and `:119`,
-  `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php:53`, and the three documenting lines
-  `docs/data-dictionary.md:221`, `docs/erd.md` (inside the `forms` entity block) and
+  `tests/Feature/Tenancy/TenantExtractColumnDriftTest.php:54`, and the three documenting lines
+  `docs/data-dictionary.md:225`, `docs/erd.md` (inside the `forms` entity block) and
   `docs/ux/form-filling-ux-flow.md:49`. ⛔ **THE SWEEP NAMED THE MANIFEST AND MISSED THE LOAD-BEARING
   HALF.** Both surfaces gate on the **plan** entitlement instead: `routes/api.php:293` carries
   `feature:offline_sync` and `app/Http/Controllers/Api/V1/SyncManifestController.php:69` never touches the
@@ -7537,7 +7537,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/Enums/QueueName.php:40` (`Exports`), `app/Jobs/Submissions/GeneratePdfJob.php:59` which carries that
   queue and whose docblock at `:30` records the queue "has existed with none since H2", the dispatcher at
   `routes/tenant.php`, `AttachmentKind::export_artifact` at `docs/data-dictionary.md:41` and
-  `NotificationType::export_ready` at `docs/data-dictionary.md:56`, the `exports_count` meter, and a 12/min
+  `NotificationType::export_ready` at `docs/data-dictionary.md:59`, the `exports_count` meter, and a 12/min
   fairness ceiling at `config/queue-fairness.php:68`. ⚠️ **One named piece does NOT ship, and the row would
   overstate itself by claiming otherwise:** §7.3 also says completion is signalled by a realtime Reverb
   push, and there is no broadcasting config in the tree at all —
@@ -7552,16 +7552,16 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (2026-09-06), joined and refuted by `M80`. Not one of the 68 route registrations in `routes/api.php`
   contains `users` or `roles`; `app/Http/Controllers/Api/V1/` holds 22 controllers and none is a user, role
   or member controller; no `read:users` / `write:roles` Sanctum ability exists. The capability ships on the
-  web surface only — `routes/tenant.php:411`, `:411`, `:417`, `:419`, `:421`. ⛔ **THE CODE ALREADY NAMES
+  web surface only — `routes/tenant.php:412`, `:411`, `:417`, `:419`, `:421`. ⛔ **THE CODE ALREADY NAMES
   THE CONSEQUENCE:** `app/Http/Resources/Api/V1/AuditResource.php:28` says in as many words that there is
   no `/api/v1/users` endpoint, so an API-only consumer of `GET /api/v1/audits` receives `user_id` and
   `acting_as_user_id` UUIDs it cannot resolve. ⛔ **AND THE ENDPOINT WAS NEVER RETRACTED — IT SHAPED THE
   SCHEMA.** `docs/multi-tenancy-rbac-design.md:56` gives the forward reference to `GET /api/v1/roles` as
   the reason roles use UUIDv7 rather than Spatie's bigint PKs, echoed at `app/Models/Role.php:13` and in
   the comment opening at `config/permission.php:20`. ⚠️ **The one near-miss is a circular pointer, not a
-  deferral**: `docs/multi-tenancy-rbac-design.md:742` defers the request/response *shapes* to Doc #14, and
+  deferral**: `docs/multi-tenancy-rbac-design.md:744` defers the request/response *shapes* to Doc #14, and
   `docs/api-specification.md:13` points straight back at §7.1 as the authoritative inventory. Neither
-  defers the build. This repository builds `/api/v1` twins deliberately — `routes/tenant.php:771` says
+  defers the build. This repository builds `/api/v1` twins deliberately — `routes/tenant.php:787` says
   so — so the web surface does not discharge it. **Live.** Filed by `M80`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.** ⛔ **THIS IS THE ROW THAT MADE THE ANSWER `C` RATHER THAN `A`.** `D38`'s premise sentence *"nothing shipped depends on them"* is false here: the documented `GET /api/v1/roles` is the stated reason roles use UUIDv7 primary keys rather than Spatie's bigints, cited at `docs/multi-tenancy-rbac-design.md:56`, `app/Models/Role.php:13` and `config/permission.php:20-21`. **That schema shipped**, so a plain trim orphans the rationale for a decision already paid for.
 
 - **`minor` · §7.1's `Form draft` row pins four `/api/v1` builder endpoints registered nowhere, and the
@@ -7613,7 +7613,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`minor` · §7.1's flat webhook-delivery paths and §7.4's per-tenant delivery-log UI both contradict the
   same document's per-endpoint spec, and only the per-endpoint form was built.** Measured by `M79`'s sweeps
   (2026-09-06), joined and refuted by `M80`. Every delivery listing in the tree is parent-scoped —
-  `routes/api.php:323`, `routes/api.php:328`, `routes/tenant.php:774`, and the query chains opening at
+  `routes/api.php:323`, `routes/api.php:328`, `routes/tenant.php:790`, and the query chains opening at
   `app/Http/Controllers/Api/V1/WebhookDeliveryController.php:31` and
   `app/Services/Webhooks/WebhookEndpointPresenter.php:105`, whose `webhook_endpoint_id` predicates sit on
   the following line in each — and `openapi.json` carries the nested pair only. ⛔ **DO NOT TAKE THIS AS
@@ -7673,7 +7673,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/Services/Connectors/ConnectionSubscriptionService.php:114` each soft-delete and say so in a trailing
   comment — so a taker should settle whether §8 is scoped to its three named entities before sizing the
   job. ⚠️ **Two more places in one further document promise the same unbuilt jobs** —
-  `docs/data-dictionary.md:132` and `docs/data-dictionary.md` §10, the latter an S3 object-deletion job
+  `docs/data-dictionary.md:136` and `docs/data-dictionary.md` §10, the latter an S3 object-deletion job
   that does not exist, which is the half carrying real future cost since orphaned objects outlive their
   rows. ⚠️ **Take it with `D14`, not independently**: `D14` recommends leaving the submission
   delete/restore surface unbuilt, decides the surface rather than the grace period, and says nothing about
@@ -7693,7 +7693,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (`app/Services/Gamification/PointsRecorder.php:155`). None is Redis-backed, none has a 24-hour TTL, none
   replays a stored response. ⛔ **THE ODD-ONE-OUT ARGUMENT IS WHAT MAKES THIS FILABLE:** §2.4's immediate
   neighbour §2.5 **is** built, and the honest citation for that is the limiter registrations rather than
-  the quota middleware — `app/Providers/AppServiceProvider.php:374` names §2.5 by name in its comment and
+  the quota middleware — `app/Providers/AppServiceProvider.php:380` names §2.5 by name in its comment and
   `:377` registers the 600/min `api` limiter it pins, with the guest arm at `:400` and
   `EnforceGuestFormRateLimit` for the per-form dial. (`EnforceApiRequestQuota` enforces the *monthly*
   ADR-0008 quota and `MeterApiUsage` explicitly disclaims enforcement, so neither is a §2.5 implementation
@@ -7701,7 +7701,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   THE JOIN SURFACED RATHER THAN BURIED.** `PROGRESS_ARCHIVE.md:322` records "Idempotency-Key (§2.4)
   deferred" inside Increment E's documented-not-fixed list. It names no reason, it targets **Phase 1** —
   long closed — and it was never converted into a queue row, nor were its three siblings from the same
-  sentence. `docs/api-specification.md:324` is §4 Out of Scope and does not carry it. That archive note is
+  sentence. `docs/api-specification.md:326` is §4 Out of Scope and does not carry it. That archive note is
   the record of a deferral nobody filed, which is exactly what this row corrects. **Live.**
   Filed by `M80`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.** ⚠️ **`M105` re-measured one clause:** *"exactly two hits repository-wide"* now returns six, because the ledger rows quoting the sentence are themselves hits. The two substantive hits are unchanged. Note also that `PROGRESS_ARCHIVE.md:322` records `Idempotency-Key (§2.4) deferred` — this is a **lapsed deferral**, not an unbacked promise.
 
@@ -7779,10 +7779,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   registration was read for its per-minute value and none is 300, none is user-keyed at that figure.
   ⚠️ **"The only throttle on an authenticated tenant route" is likewise too strong** —
   `routes/tenant.php`'s `throttle:120,1` was the only *numeric-literal* throttle in the `auth` group (`M128` added `throttle:20,1`),
-  while `routes/tenant.php:385` and `:395` carry named limiters in the same group, both 20/min. Neither is
+  while `routes/tenant.php:386` and `:395` carry named limiters in the same group, both 20/min. Neither is
   300, so the conclusion survives; a taker grepping `throttle:` will get three hits and should not read
   that as the row being overtaken. ⚠️ **Premise for whoever writes the remedy:**
-  `app/Providers/AppServiceProvider.php:374` records that `throttle:api` is priority-sorted *ahead of*
+  `app/Providers/AppServiceProvider.php:380` records that `throttle:api` is priority-sorted *ahead of*
   authentication, so `$request->user()` is unresolved inside that closure and it keys on the token hash — a
   per-user 300/min limiter has to solve that ordering rather than copy the `api` shape. **Live.**
   Filed by `M80`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.**
@@ -7826,7 +7826,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `docs/api-specification.md:65`, a table introduced as "Concrete numbers" at
   `docs/api-specification.md:67` pins "Guest respondent (per IP, across all tokens) | 100 requests/minute"
   at `docs/api-specification.md:72`. The guest submit surface's per-IP arm resolves through
-  `app/Providers/AppServiceProvider.php:417` to `config/guest.php:40`, which is 60. ⚠️ **Say "the surface
+  `app/Providers/AppServiceProvider.php:430` to `config/guest.php:40`, which is 60. ⚠️ **Say "the surface
   that row describes", not "the only per-IP ceiling"** — `config/guest.php` defines three:
   `submit_per_ip` 60 (`:40`), `mint_per_ip` 30 (`:41`) and `challenge_per_ip` 90 (`:49`). None is 100.
   ⚠️ **And they are env-overridable defaults, not fixed definitions** — each is written
@@ -11110,8 +11110,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   two migrations changed nothing. ⛔ **Cleaning it is not a matter of adding `@property` lines one at a
   time** — `M107` added two and cleared three errors, which is a symptom, not a remedy. The remedy is to
   establish why the container's schema resolution differs from CI's, and then either fix it or record in the
-  gate table that PHPStan is CI-only on this host, the way Storybook axe and Vitest already are. **Live** —
-  it is the state of the gate today. Filed by `M107`. **Tier: after-launch.**
+  gate table that PHPStan is CI-only on this host, the way Storybook axe and Vitest already are. ➕ **`M179`
+  measured the third option:** on one tree, the container's full `phpstan analyse` gave 44 errors of this
+  shape, and the HOST's (`php vendor/bin/phpstan analyse --memory-limit=4G`) gave **0**, which is CI's number.
+  So the remedy is to run it on the host and correct `CLAUDE.md`'s gate table, which still says "container
+  only". **Live** — it is the state of the gate today. Filed by `M107`. **Tier: after-launch.**
 
 - **`nit` · `PROGRESS.md`'s `M101` bullet records a state of the tree that does not exist.** Found by `M106`
   (2026-09-20) while verifying `R-06228b4f`'s premise. That bullet ends *"`R-06228b4f` now says `Awaits D54` instead of
@@ -14266,7 +14269,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · Fifteen files set small error text in `--mds-color-danger-text`, which resolves to `danger-300` in dark and measures 4.22:1 on the surface.**
   The repository's own notes say so (`resources/js/Pages/admin/AuditLog.vue:287`, `resources/js/Pages/admin/TenantDetail.vue:547`,
-  `resources/js/components/builder/LogicRail.vue:228`, `resources/js/components/shell/FeedbackButton.vue:445`) and the uses remain:
+  `resources/js/components/builder/LogicRail.vue:228`, `resources/js/components/shell/FeedbackButton.vue:453`) and the uses remain:
   `resources/js/Pages/forms/Builder.vue:857`, `resources/js/components/webhooks/WebhookFormModal.vue:197`,
   `resources/js/components/scopes/GrantModal.vue:256`, `resources/js/components/scopes/DeleteNodeModal.vue:120`,
   `resources/js/components/builder/ConfigPanel.vue:787`, `resources/js/components/submissions/MediaInput.vue:420`, `:557`, `:583`,
@@ -14376,7 +14379,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The testers' comment (2026-10-15): *"it can only have a single set of options and also there is also 1 type of question unlike in
   kobo, every cell can be configured separately, it can pick different type of questions and different set of options for each"*.
   Measured: `resources/js/components/builder/MatrixEditor.vue:46` says "Each cell is a single choice from this shared list";
-  `config.cells` is that list (`docs/data-dictionary.md:378`), the request validates rows, columns and cells as value/label lists
+  `config.cells` is that list (`docs/data-dictionary.md:382`), the request validates rows, columns and cells as value/label lists
   only (`app/Http/Requests/Forms/UpdateFieldRequest.php:277-309`), the normalizer rejects unknown rows or columns and nothing else
   (`app/Services/Submissions/StructuralAnswerNormalizer.php:548-593`), publish checks the three lists non-empty and distinct
   (`app/Services/Forms/StructuralValidationGate.php:532-562`), and `app/Enums/FieldType.php:12` claims each cell is
@@ -14446,7 +14449,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Left by `M133`'s v1 and `M141` and recorded on `R-5fdbc47c`: the preview runtime (`resources/js/components/builder/PreviewRuntime.vue`)
   is built from the draft's props, which carry `linkable_sources` (`app/Services/Forms/BuilderPresenter.php:105-107`) but never a
   list's rows or a link's answers, so an author checks a PSGC cascade or a linked list only on the published form. The remedy: a
-  tenant route beside the choice-list routes (`routes/tenant.php:1102-1111`) returns the draft's linked lists and the first 200 rows
+  tenant route beside the choice-list routes (`routes/tenant.php:1118-1127`) returns the draft's linked lists and the first 200 rows
   of each list-bound question with "showing 200 of N", and the preview merges them the way the guest runtime does
   (`resources/public-runtime/lib/linked-choices.ts:89-112`). **Live.** Filed by `M172`. **Tier: early-testing.** **Amended 2026-10-15 by `M172`:** an old version opened read-only from the hub (`resources/js/Pages/forms/VersionView.vue`) draws `schemaWithoutListOptions()` through the same preview, so a list-backed cascade shows no choices there either; the same route closes both.
 
@@ -14473,12 +14476,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The testers' question (2026-10-15): *"Does the platform support cascading options linked to the Philippine Standard Geographic
   code (PSGC)?"*. `M141` made a PSGC-sized cascade work from uploaded CSV files (measured at 43,739 options), but no PSGC data
   exists in the repository, each form re-uploads its own lists (`app/Services/Forms/ChoiceListMaterializer.php:148` reads them by
-  version), `docs/PRD.md:442` declined a national geography, and `docs/data-dictionary.md:371` says a reference-dataset table is
+  version), `docs/PRD.md:442` declined a national geography, and `docs/data-dictionary.md:375` says a reference-dataset table is
   "deliberately not introduced here". The Philippine Statistics Authority publishes the PSGC Publication Datafile each quarter
   (3Q 2026 released 2026-10-12; ten-digit codes kept as text; region, province or independent city, city or municipality,
   barangay). `D131` (the user, 2026-10-15): built in, free. The remedy: a platform-wide read-only `psgc_places` table (code, name,
   level, parent code, publication) exempt from row-level security under the shared-lookup rule
-  (`docs/adr/0002-multi-tenancy-shared-db-rls.md:73`; the platform list in `app/Support/Tenancy/TenantScopedTables.php:131`); a
+  (`docs/adr/0002-multi-tenancy-shared-db-rls.md:73`; the platform list in `app/Support/Tenancy/TenantScopedTables.php:134`); a
   repository CSV built from the PSA file by `psgc:build` (downloaded in a browser — the PSA site blocks scripts — PSA credited),
   loaded idempotently by `psgc:sync` on every deploy and refusing a build whose per-level totals differ from the PSA summary; a
   "Philippine places (PSGC)" preset in the Levels tab (`resources/js/components/builder/CascadingEditor.vue:58-102`) binding four
@@ -14520,14 +14523,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **Tier: early-testing.**
 
 - **`minor` · A condition, a calculation or answer piping cannot read a grid cell.**
-  `docs/data-dictionary.md:379` records that no expression may reference a grid (`app/Services/Forms/ExpressionValidationGate.php`),
+  `docs/data-dictionary.md:383` records that no expression may reference a grid (`app/Services/Forms/ExpressionValidationGate.php`),
   `app/Enums/PipingEligibility.php:110` excludes it from piping, and `resources/js/components/help/manual.ts:1122` tells authors so.
   With typed cells (the grid rows above) a cell becomes a scalar an expression could read as `${grid.row.column}`; both engines
   and their golden vectors would learn it together. Filed so the gap the typed grid opens is queued rather than left in prose.
   **Live.** Filed by `M172`. **Tier: during-testing.**
 
 - **`minor` · A grid cannot sit inside a repeatable section.**
-  `app/Services/Forms/StructuralValidationGate.php:147-154` refuses it at publish, and `docs/data-dictionary.md:379` records the
+  `app/Services/Forms/StructuralValidationGate.php:147-154` refuses it at publish, and `docs/data-dictionary.md:383` records the
   rule. A table of tables is rare; a grid per household member is not. Needs the repeat-group answer shape to carry an object per
   instance in both engines and in every export. **Live.** Filed by `M172`. **Tier: during-testing.**
 
@@ -14567,7 +14570,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · A keyer on the manual-entry page cannot open the reference files the form's version carries.**
   Found by `M174` while verifying `R-66952d33`: a version's reference files (`M132`; hidden from respondents since `M138`, `D92` A)
-  are listed only to whoever may edit the form (`routes/tenant.php:1097`, `can:update,form`, on the draft), and
+  are listed only to whoever may edit the form (`routes/tenant.php:1113`, `can:update,form`, on the draft), and
   `app/Services/Submissions/EncodeFormPresenter.php:203-233` sends none, so a staff member keying a paper response cannot open the
   instructions or the blank the author attached. `D136` A (the user, 2026-10-16) put the manual-entry side panel's facts and steps in
   `M174` and filed this as its own row. The remedy: the presenter sends the entered version's reference files (name, size, a download
@@ -14880,3 +14883,44 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   trunk's `docs/claims/decisions.md` holds one ESC byte (0x1B) that `M176` did not write. Harmless to every renderer measured, but a
   byte nobody can see is a byte nobody can review. The remedy: find it by byte offset and remove it in a docs-only change, then check
   the file for others. **Live.** Filed by `M176`. **Tier: after-launch.**
+
+- **`minor` · A comment that reached us outside the Feedback button cannot be seen, followed or checked by the testers in the app.**
+  The user relayed 31 comments by hand — their UI comments of 2026-10-14, the testers' round 1 of 2026-10-15, round 2 and the testers' PDF
+  of 2026-10-16 — and asked on 2026-10-19 for their progress to be visible on staging, with a way for testers to mark a fix as working. None
+  of them is a report: `FeedbackService::submit()` (`app/Services/Feedback/FeedbackService.php:71`) is the only writer of `feedback_reports`,
+  and it writes one report per press of the Feedback button. A member's list is their own rows only
+  (`app/Services/Feedback/FeedbackPresenter.php:169`), so a report nobody sent through the button is seen by no one. The remedy (`D150` A):
+  a report gains a source (`button` | `relayed`), a reference (`R1-7a`, `U4`, …), a title and a source line; a relayed report is visible to
+  every member of its workspace under a **Testing-round comments** tab on Feedback, shown while one is still open; the 31 are loaded from a
+  committed file through the support API (`R-e727ca94`). **Live.** Filed by `M179`. **Tier: early-testing.**
+
+- **`minor` · A tester cannot confirm a fix, say it is still a problem, or comment on a report; our reply is the only message, and the Owner/Admin list never shows it.**
+  A member's Feedback page is read-only (`resources/js/Pages/feedback/Mine.vue:82-86`): the status and our one reply. No comment, confirm or
+  reopen exists anywhere. The Owner/Admin list never carries our reply (`app/Services/Feedback/FeedbackPresenter.php:57` builds its rows
+  without `resolution_note`). The only transition writer, `SuperAdminService::transitionFeedback()`
+  (`app/Services/Admin/SuperAdminService.php:929`), checks the status on the model it was handed, before its transaction, then re-reads the
+  row with no lock (`:947`) — so two moves at once can both pass a guard against a status that no longer holds, and the audit records that
+  stale status as the old one. The remedy (`D151` A): a new status **Confirmed** ("Confirmed working"), reachable only by a tester from
+  Resolved through **It works**; **Still a problem** returns a Resolved or Confirmed report to Ongoing and needs a comment (a screenshot
+  optional); a comment thread on every report, which anyone who can see it may add to; support alone marks Resolved and never Confirmed; one
+  lifecycle service for both doors, which re-reads the row under `lockForUpdate()` inside the transaction; and the Owner/Admin list shows our
+  note and the thread. **Live.** Filed by `M179`. **Tier: early-testing.**
+
+- **`minor` · The support API and the pull script cannot create a relayed report, post a reply, or see a reopen or a tester's comment.**
+  The platform support API has one write, a status change (`routes/platform-api.php:40`; ADR-0023 §D3), and `scripts/feedback-pull.php`
+  pulls only New and Ongoing reports (`:146`) and accepts only an id of 8 to 64 characters (`:93`), so `U1` cannot be named. Once testers can
+  reopen and comment (`R-129c44c3`), nothing would bring that back to a session, and nothing can load the 31 relayed comments
+  (`R-db9dec62`). The remedy (`D150`, `D151`; ADR-0023 §D7): the list carries the source, reference, title, who confirmed and the thread, and
+  filters by source, reference and comments since; `POST /feedback/relayed` creates or updates relayed reports by reference, never
+  rewriting a status after creation and telling no one; `POST /feedback/{id}/comments` posts a support reply; the pull script gains
+  `--relay`, `--comment` and references wherever it takes an id, its digest shows REOPENED reports and new comments, and preflight counts the
+  reopened. Every new write needs `--user-approved`. **Live.** Filed by `M179`. **Tier: early-testing.**
+
+- **`minor` · A relayed report is listed by its quoted original, not its reference and title, on both Feedback lists.**
+  Found by `M179`'s real-browser look (2026-10-20). The console's list and the Owner/Admin `/feedback` list show every report by an
+  excerpt of its remarks (`resources/js/Pages/admin/Feedback.vue:259`, `resources/js/Pages/feedback/Index.vue:204`), and a relayed
+  report's remarks are the tester's original, quoted — so the 31 relayed comments read as a column of long quotes with no `U8` or title
+  to find one by, while the testers' own page and both detail views lead with the reference and title. The console has no source filter
+  either (`/feedback` has one). The remedy: for a relayed row, the remarks cell shows the reference badge and the title (the detail
+  views' shape), and the console gains the From filter. The testers never see either list, so V shipped without it.
+  **Live.** Filed by `M179`. **Tier: during-testing.**

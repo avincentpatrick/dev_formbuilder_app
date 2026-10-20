@@ -540,3 +540,74 @@ it('still lets an expression test a list for an answer, for a choice, or for how
     'a photo taken' => ["\${photo} != ''"],
     'a single choice still equals one value' => ["\${colour} = 'red'"],
 ]);
+
+/** M180 (`R-39dbce5b`, `D149`): the refusals of one draft, as [field, code, message] triples. */
+function calculationCycleRefusals(ExpressionValidationGate $gate, FormVersion $draft): array
+{
+    try {
+        $gate->assertExpressionsResolve($draft->refresh());
+
+        return [];
+    } catch (PublishValidationException $e) {
+        return array_values(array_filter(
+            array_map(static fn (array $v): array => [$v['field'], $v['code'], $v['message']], $e->violations()),
+            static fn (array $v): bool => $v[1] === 'calculation_cycle',
+        ));
+    }
+}
+
+it('refuses a calculation that uses its own value, naming it (M180)', function (): void {
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'a', FieldType::Integer, 0);
+    addFormField($draft, $this->user, 'total', FieldType::Calculated, 1, ['config' => ['calculated_formula' => '${total} + ${a}']]);
+
+    expect(calculationCycleRefusals($this->gate, $draft))->toBe([[
+        'total',
+        'calculation_cycle',
+        'The calculation “total” uses its own value, so it can never be worked out. Take ${total} out of its formula.',
+    ]]);
+});
+
+it('refuses two calculations that use each other once, naming both, and not the one that only uses them (M180)', function (): void {
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'a', FieldType::Integer, 0);
+    addFormField($draft, $this->user, 'c1', FieldType::Calculated, 1, ['config' => ['calculated_formula' => '${c2} + 1']]);
+    addFormField($draft, $this->user, 'c2', FieldType::Calculated, 2, ['config' => ['calculated_formula' => '${c1} + ${a}']]);
+    addFormField($draft, $this->user, 'c3', FieldType::Calculated, 3, ['config' => ['calculated_formula' => '${c1} * 2']]);
+
+    expect(calculationCycleRefusals($this->gate, $draft))->toBe([[
+        'c1',
+        'calculation_cycle',
+        'The calculations “c1” and “c2” use each other, so neither can be worked out. Change one formula so it no longer uses the other.',
+    ]]);
+});
+
+it('names every calculation in a longer loop (M180)', function (): void {
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'x', FieldType::Calculated, 0, ['config' => ['calculated_formula' => '${z} + 1']]);
+    addFormField($draft, $this->user, 'y', FieldType::Calculated, 1, ['config' => ['calculated_formula' => '${x} + 1']]);
+    addFormField($draft, $this->user, 'z', FieldType::Calculated, 2, ['config' => ['calculated_formula' => '${y} + 1']]);
+
+    expect(calculationCycleRefusals($this->gate, $draft))->toBe([[
+        'x',
+        'calculation_cycle',
+        'The calculations “x”, “y” and “z” use each other, so none of them can be worked out. Change one formula so it no longer uses the others.',
+    ]]);
+});
+
+it('publishes a chain of calculations in any order (M180)', function (): void {
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'a', FieldType::Integer, 0);
+    addFormField($draft, $this->user, 'doubled', FieldType::Calculated, 1, ['config' => ['calculated_formula' => '${plus_one} * 2']]);
+    addFormField($draft, $this->user, 'plus_one', FieldType::Calculated, 2, ['config' => ['calculated_formula' => '${a} + 1']]);
+
+    expect(calculationCycleRefusals($this->gate, $draft))->toBe([]);
+
+    $published = $this->publisher->publish($form->refresh(), $this->user);
+
+    expect($published->status)->toBe(FormVersionStatus::Published);
+});

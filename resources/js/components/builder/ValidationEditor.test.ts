@@ -613,11 +613,11 @@ describe('ValidationEditor — a number limit that may be another question’s a
         expect(scale.find('[aria-label="Rule 1 compares with"]').exists()).toBe(false);
     });
 
-    it('leaves a calculation out of the compared questions, since no rule reads one yet (D149), and keeps one a row already names', () => {
+    it('offers a calculation among the compared questions, now that a rule reads one (D149), and keeps one a row already names', () => {
         const fresh = mountBounds('number', [row({ rule_type: 'at_least_field' })]);
         const offered = optionLabels(fresh, 'Rule 1 compared field');
         expect(offered.some((label) => label.startsWith('Your age'))).toBe(true);
-        expect(offered.some((label) => label.startsWith('Total'))).toBe(false);
+        expect(offered.some((label) => label.startsWith('Total'))).toBe(true);
 
         const named = mountBounds('number', [row({ rule_type: 'at_least_field', related_field_key: 'total' })]);
         expect(optionLabels(named, 'Rule 1 compared field').some((label) => label.startsWith('Total'))).toBe(true);

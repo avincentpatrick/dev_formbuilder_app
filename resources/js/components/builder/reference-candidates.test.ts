@@ -77,10 +77,10 @@ describe('referenceCandidates — a formula spot', () => {
         kinds: KINDS,
     };
 
-    it('offers every question a formula may name, later ones too, but not itself, a grid, a note or — before R4 — a calculation', () => {
+    it('offers every question a formula may name — later ones and calculations too (D149) — but not itself, a grid or a note', () => {
         const offered = referenceCandidates(source, { grammar: 'expression', ownKey: 'age' }).map((candidate) => candidate.key);
 
-        expect(offered).toEqual(['later', 'today()']);
+        expect(offered).toEqual(['total', 'later', 'today()']);
     });
 
     it('ends with Today, which writes today()', () => {

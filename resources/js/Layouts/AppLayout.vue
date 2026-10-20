@@ -89,7 +89,7 @@ watch(() => page.url, () => {
                      Inside the scroll region, after the page, so it sits at the foot of a short page and after a long
                      one. Not on a fluid page: the builder owns the whole region and its scroll, and its version is in
                      the sidebar's foot. Inside <main>, so it is no `contentinfo` landmark of its own. -->
-                <footer v-if="true" class="app-shell__footer">
+                <footer v-if="!fluid" class="app-shell__footer">
                     <span>Meridian {{ version }}</span>
                     <span aria-hidden="true">·</span>
                     <Link href="/whats-new" class="app-shell__footer-link">What's new</Link>

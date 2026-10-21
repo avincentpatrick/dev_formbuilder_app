@@ -15,6 +15,7 @@
 import type {
     CascadeConfig,
     ComparisonOperator,
+    GridColumnSpec,
     GridConfig,
     LogicOperator,
     RenderSources,
@@ -253,15 +254,25 @@ function buildCascade(field: RawField): RenderCascade | null {
     return { levels, options };
 }
 
+/** A grid column as the shared `FieldInput.vue` grid draws it (labels resolved; the three rules only on a `matrix`). */
+export interface ResolvedMatrixColumn {
+    value: string;
+    label: string;
+    type?: string;
+    options?: { value: string; label: string }[];
+    required?: boolean;
+}
+
 /**
  * Resolve a composite grid's row/column/cell labels into the current locale, producing the flat shape the
  * shared `FieldInput.vue` grid controls consume (Increment G4b). Used by both the flat + repeat SPA adapters
- * so translation resolution lives in one place. `cells` is empty for `likert_matrix`.
+ * so translation resolution lives in one place. `cells` is empty for `likert_matrix`. M183: a matrix column keeps
+ * its type, its (resolved) choices and its required flag, and the grid its layout.
  */
 export function resolveMatrix(
     matrix: RenderMatrix | null,
     locale: string,
-): { rows: { value: string; label: string }[]; columns: { value: string; label: string }[]; cells: { value: string; label: string }[] } | null {
+): { rows: { value: string; label: string }[]; columns: ResolvedMatrixColumn[]; cells: { value: string; label: string }[]; layout: 'table' | 'stacked' } | null {
     if (matrix === null) {
         return null;
     }
@@ -269,12 +280,22 @@ export function resolveMatrix(
     const resolve = (options: RenderOption[]): { value: string; label: string }[] =>
         options.map((option) => ({ value: option.value, label: resolveText(option.label, option.labelTranslations, locale) }));
 
-    return { rows: resolve(matrix.rows), columns: resolve(matrix.columns), cells: resolve(matrix.cells) };
+    const columns = matrix.columns.map((column): ResolvedMatrixColumn => ({
+        value: column.value,
+        label: resolveText(column.label, column.labelTranslations, locale),
+        ...(column.type !== undefined ? { type: column.type, options: resolve(column.options ?? []), required: column.required === true } : {}),
+    }));
+
+    return { rows: resolve(matrix.rows), columns, cells: resolve(matrix.cells), layout: matrix.layout };
 }
 
 /** A `config.<key>` option-value list (as strings) the engine grid membership check reads. */
 function configValueList(field: RawField, key: string): string[] {
-    const raw = field.config?.[key];
+    return optionValues(field.config?.[key]);
+}
+
+/** The values of a stored option list (as strings), skipping entries with none. */
+function optionValues(raw: unknown): string[] {
     if (!Array.isArray(raw)) {
         return [];
     }
@@ -293,18 +314,52 @@ function configValueList(field: RawField, key: string): string[] {
     return out;
 }
 
-/** Project a composite grid field's `config.rows`/`columns`/`cells` into the engine's {@link GridConfig}. */
+/** The types a matrix column may take (M183, `R-5033e87e`; mirror of PHP `MatrixColumns::TYPES`). */
+const MATRIX_COLUMN_TYPES = ['single_select', 'multi_select', 'short_text', 'integer', 'decimal', 'date'];
+
+/** A grid's stored column objects, skipping anything that is not one. */
+function rawColumns(field: RawField): Record<string, unknown>[] {
+    const raw = field.config?.columns;
+
+    return Array.isArray(raw) ? raw.filter((c): c is Record<string, unknown> => c !== null && typeof c === 'object') : [];
+}
+
+/**
+ * Project a composite grid field's `config.rows`/`columns`/`cells` into the engine's {@link GridConfig}. M183: a
+ * matrix column that carries a type, choices of its own or a required flag hands the engine its rule under
+ * `column_specs` (the shape PHP `SemanticValidator::columnSpecs` reads); a grid with none projects exactly as before.
+ */
 function engineGridConfig(field: RawField): GridConfig {
-    return {
+    const grid: GridConfig = {
         rows: configValueList(field, 'rows'),
         columns: configValueList(field, 'columns'),
         cells: configValueList(field, 'cells'),
     };
+    if (field.field_type !== 'matrix') {
+        return grid;
+    }
+
+    const specs: Record<string, GridColumnSpec> = {};
+    for (const column of rawColumns(field)) {
+        const type = typeof column.type === 'string' && column.type !== '' ? column.type : null;
+        const options = optionValues(column.options);
+        const required = column.required === true;
+        if (column.value === undefined || column.value === null || (type === null && options.length === 0 && !required)) {
+            continue;
+        }
+        specs[String(column.value)] = { type, options, required };
+    }
+
+    return Object.keys(specs).length > 0 ? { ...grid, column_specs: specs } : grid;
 }
 
 /** A `config.<key>` option list projected to render {value,label} pairs (labels/translations kept). */
 function configOptionPairs(field: RawField, key: string): RenderOption[] {
-    const raw = field.config?.[key];
+    return optionPairs(field.config?.[key]);
+}
+
+/** A stored option list projected to render {value,label} pairs (labels/translations kept). */
+function optionPairs(raw: unknown): RenderOption[] {
     if (!Array.isArray(raw)) {
         return [];
     }
@@ -328,19 +383,39 @@ function configOptionPairs(field: RawField, key: string): RenderOption[] {
     return out;
 }
 
-/** The UI-facing composite grid config (labels + translations kept for the render layer to resolve). */
+/**
+ * The UI-facing composite grid config (labels + translations kept for the render layer to resolve). M183: a matrix
+ * column carries its answer rule resolved — its type (a single choice when none was set), its choices (its own, else
+ * the shared `cells`) and its required flag — so the grid never resolves the fallback itself; mirror of PHP
+ * `EncodeFormPresenter::matrix()`.
+ */
 function buildMatrix(field: RawField): RenderMatrix | null {
     if (field.field_type !== 'matrix' && field.field_type !== 'likert_matrix') {
         return null;
     }
 
+    const cells = field.field_type === 'matrix' ? configOptionPairs(field, 'cells') : [];
+    const columns = field.field_type === 'likert_matrix'
+        ? configOptionPairs(field, 'columns')
+        : rawColumns(field).flatMap((column) => {
+            const [pair] = optionPairs([column]);
+            if (pair === undefined) {
+                return [];
+            }
+            const type = typeof column.type === 'string' && MATRIX_COLUMN_TYPES.includes(column.type) ? column.type : 'single_select';
+            const own = optionPairs(column.options);
+            const options = type === 'single_select' || type === 'multi_select' ? (own.length > 0 ? own : cells) : [];
+
+            return [{ ...pair, type, options, required: column.required === true }];
+        });
+
     return {
         rows: configOptionPairs(field, 'rows'),
-        columns: configOptionPairs(field, 'columns'),
-        cells: field.field_type === 'matrix' ? configOptionPairs(field, 'cells') : [],
+        columns,
+        cells,
+        layout: field.config?.layout === 'stacked' ? 'stacked' : 'table',
     };
 }
-
 /** Read a `config.<key>` value coerced to a finite number, or null. */
 function configNumber(field: RawField, key: string): number | null {
     const raw = field.config?.[key];

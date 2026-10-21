@@ -60,6 +60,7 @@ export type {
     SemanticInput,
     InstanceAnswers,
     CascadeConfig,
+    GridColumnSpec,
     GridConfig,
     CompositeAnswer,
     LikertMatrixAnswer,

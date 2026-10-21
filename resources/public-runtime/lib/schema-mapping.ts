@@ -406,7 +406,7 @@ function buildMatrix(field: RawField): RenderMatrix | null {
             const own = optionPairs(column.options);
             const options = type === 'single_select' || type === 'multi_select' ? (own.length > 0 ? own : cells) : [];
 
-            return [{ ...pair, options, required: column.required === true }];
+            return [{ ...pair, type, options, required: column.required === true }];
         });
 
     return {

@@ -284,8 +284,8 @@ function summarize(row: AuditRow): string {
  * affordance is an MdsButton, so the rule currently has no subject — it is written down because /admin/*
  * is never axe-scanned and the light theme cannot catch this class of defect.
  *
- * `--mds-color-status-danger-fg`, not `--mds-color-danger-text`: the latter resolves to danger-300 in dark
- * and fails contrast on bg-surface (recorded as a found defect on StatTile).
+ * `--mds-color-status-danger-fg`, the on-surface pair. Since M182 `--mds-color-danger-text` names the same
+ * step in both themes (`D158`); its old dark step failed on the pre-JR1 surface (found on StatTile).
  */
 
 /* The three `.admin-audit__filters*` rules moved into MdsFilterBar verbatim (J2e) — geometry unchanged. */

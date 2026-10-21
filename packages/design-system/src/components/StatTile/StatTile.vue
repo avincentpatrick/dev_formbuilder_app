@@ -19,8 +19,8 @@
  *    answer, and suppression rendered as 0% is the same defect wearing a different hat).
  *  · `caption` — §D5 again: both draft metrics must state their denominator on the face of the tile.
  *
- * The delta is an `MdsBadge` rather than coloured text on purpose. `--mds-color-danger-text` resolves to
- * `danger-300` in dark and fails contrast on `bg-surface` at this size (found in H21d1); the badge's
+ * The delta is an `MdsBadge` rather than coloured text on purpose. `--mds-color-danger-text` once failed
+ * contrast on the dark surface at this size (found in H21d1, on the pre-JR1 ground); the badge's
  * `status-*-fg` on `status-*-bg` is the pairing that is actually verified. The arrow glyph is the
  * redundant channel, so direction never depends on colour alone (WCAG 1.4.1).
  *

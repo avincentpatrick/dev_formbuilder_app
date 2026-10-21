@@ -47,7 +47,7 @@ watch(
 
 <template>
     <MdsModal :open="open" title="Delete scope" @close="emit('update:open', false)">
-        <p class="delete-node__lead">
+        <p>
             Delete <strong>{{ node.name }}</strong>?
         </p>
 

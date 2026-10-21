@@ -223,3 +223,31 @@ describe('a calculation shown by its Type (M180, R-f77aa45d)', () => {
         expect(shown({ calculated_type: 'number', decimal_places: 2 }, null)).toBe('—');
     });
 });
+
+// M183 (`R-f03cf999`): a Likert scale is KoboToolbox's `likert` line — the points on one joined line, each word centred
+// under its radio — at every width, and its radios carry the group's error as every other group's do.
+describe('FieldInput — a Likert scale as the joined line (M183)', () => {
+    it('draws the points on one line, and marks each radio with the error', () => {
+        const wrapper = mount(FieldInput, {
+            props: { field: choiceField({ field_type: 'likert_scale', hint: 'Pick one.' }), modelValue: 'blue', error: 'Choose a point.' },
+        });
+        const line = wrapper.get('[data-likert-line]');
+        const error = wrapper.get('.encode-field__error');
+
+        expect(line.findAll('input[type="radio"]').map((r) => r.attributes('value'))).toEqual(['red', 'blue', 'green']);
+        expect(line.findAll('.likert-line__label').map((l) => l.text())).toEqual(['Red', 'Blue', 'Green']);
+        expect((line.findAll('input[type="radio"]')[1].element as HTMLInputElement).checked).toBe(true);
+        for (const radio of line.findAll('input[type="radio"]')) {
+            expect(radio.attributes('aria-invalid')).toBe('true');
+            expect(radio.attributes('aria-describedby')).toBe(error.attributes('id'));
+        }
+    });
+
+    it('writes the point chosen', async () => {
+        const wrapper = mount(FieldInput, { props: { field: choiceField({ field_type: 'likert_scale' }), modelValue: '' } });
+
+        await wrapper.get('[data-likert-line]').findAll('input[type="radio"]')[2].setValue(true);
+
+        expect(wrapper.emitted('update:modelValue')).toEqual([['green']]);
+    });
+});

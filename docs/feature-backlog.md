@@ -15015,3 +15015,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   it is not `M182`'s dialog change. CI passes because its fresh database starts the node two levels down. The remedy: find what the
   phone layout changes between the confirm and the refreshed rows (a visit that never fires, or rows that arrive unchanged and are not
   watched), then announce the unchanged case too. **Latent.** Filed by `M182`. **Tier: during-testing.**
+
+- **`nit` · The builder canvas's question labels start at different points, because the type label before each one is wider than its 84px column for the longer types.**
+  Seen by `M182`'s real-browser look at 1920px: `.canvas__field-type` in `resources/js/components/builder/BuilderCanvas.vue` is
+  `min-width: 84px` and `flex-shrink: 0`, so "SHORT TEXT", "DATE" and "YES / NO" leave their labels at one x while "WHOLE NUMBER",
+  "SINGLE CHOICE" and "MULTIPLE CHOICE" push theirs 20–35px further right, and the column of labels reads ragged. Already so before
+  `M182`; its tracking token widened the longest by about 4px. The remedy: a type column wide enough for the longest label in the
+  catalogue (measured, in `ch` or `em` so it follows the type scale), or the type moved after the label as a badge.
+  **Live.** Filed by `M182`. **Tier: during-testing.**

@@ -273,7 +273,7 @@ function formatDate(iso: string | null): string {
                             {{ (row as DeliveryRow).attempt_count }} / {{ (row as DeliveryRow).max_attempts }}
                         </template>
                         <template #cell-response_body_excerpt="{ row }">
-                            <span class="detail__result" :title="(row as DeliveryRow).response_body_excerpt ?? undefined">{{ (row as DeliveryRow).response_body_excerpt ?? '—' }}</span>
+                            <span class="detail__result">{{ (row as DeliveryRow).response_body_excerpt ?? '—' }}</span>
                         </template>
                         <template #cell-created_at="{ row }">
                             {{ formatDate((row as DeliveryRow).created_at) }}

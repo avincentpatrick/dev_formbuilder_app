@@ -14277,23 +14277,23 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `resources/js/components/submissions/FieldInput.vue:715`, `resources/js/components/integrations/RuleFormModal.vue:448`,
   `resources/js/components/builder/PreviewRuntime.vue:669` (the OCR pages' and the encode page's uses are taken by their own rows).
   Only the dark axe sweep can see it, and `/admin/*` is outside the sweep. The remedy is `--mds-color-status-danger-fg`, the
-  on-surface pair with a measured ratio, in every one. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
+  on-surface pair with a measured ratio, in every one. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Taken by UI6 (`M182`), 2026-10-21 (`D138`); its remedy reshaped by `D158`.**
 
 - **`nit` · The console's "Reset two-step sign-in" dialog relies on browser-default paragraph margins.**
   `resources/js/Pages/admin/Users.vue:91-97` renders three paragraphs with no class, while every tenant dialog styles a `__prose` rule
-  (`resources/js/Pages/members/Index.vue:497`). The remedy is the same rule. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
+  (`resources/js/Pages/members/Index.vue:497`). The remedy is the same rule. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Taken by UI6 (`M182`), 2026-10-21 (`D138`), with the two scope dialogs (`D159`).**
 
 - **`nit` · Three uppercase micro-labels hard-code their tracking where `--mds-tracking-wide` exists.**
   `resources/js/Pages/help/Index.vue:223` (0.04em), `resources/js/components/shell/Sidebar.vue:366` (0.06em) and
   `resources/js/Layouts/AdminLayout.vue:130` (0.04em); `packages/design-system/src/components/FilterBar/FilterBar.vue:58-61` records the
   token as the one letting for the product's micro-labels (the console workspace page's and the landing page's literals are taken by
-  their own rows). The remedy is the token. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Narrowed 2026-10-15 by `M173`:** `M173` edits `resources/js/Layouts/AdminLayout.vue` for the shell row and takes its literal there, as the UI programme's plan intended; this row's remainder is `help/Index.vue` and `Sidebar.vue`.
+  their own rows). The remedy is the token. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Narrowed 2026-10-15 by `M173`:** `M173` edits `resources/js/Layouts/AdminLayout.vue` for the shell row and takes its literal there, as the UI programme's plan intended; this row's remainder is `help/Index.vue` and `Sidebar.vue`. **Taken by UI6 (`M182`), 2026-10-21 (`D138`), with the builder's three (`D159`).**
 
 - **`nit` · Three truncated values offer no way to read the whole text where they are shown.**
   `resources/js/Pages/webhooks/Index.vue:224-236` (`.webhooks__url`), `resources/js/Pages/integrations/Index.vue:456-468`
   (`.connection__channel`) and `resources/js/Pages/integrations/RuleShow.vue:432-442` (`.detail__result`) clip with an ellipsis and
   carry no `title`. The remedy is a `title` with the full value — allowed because the same text is on the row's detail page, so no
-  tooltip component is owed. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
+  tooltip component is owed. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Taken by UI6 (`M182`), 2026-10-21 (`D138`), with the eight more clipped values (`D159`).**
 
 - **`nit` · The root lockfile records the design system's `vue` range as `^3.5.39` while its `package.json` says `^3.5.43`, so the node container's `npm install` rewrites `package-lock.json` and dirties the working tree.**
   Found by `M171`: after the stack started, `git status` showed `package-lock.json` changed by one line — the `packages/design-system`

@@ -24,10 +24,30 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D157`, the last one filed, was asked and answered on 2026-10-20 while `M181` (UI5) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D158` and `D159`, the last two filed, were asked and answered on 2026-10-21 while `M182` (UI6) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D159 — The four consistency rows turned out to be floors: two more dialogs open on browser-default margins (Move scope, Delete scope), three builder labels hard-code their letter spacing, and eight more cut-off names and titles cannot be read in full. Fix them in UI6 too? **A — yes, every one, with two sweep tests so new ones cannot creep back.**
+
+**Asked and answered 2026-10-21 (user decision, in chat), while `M182` (UI6) was planned; recorded in its claim.** Found by the planning pass on UI5's tree: `R-3ca62317` says every tenant dialog styles its paragraphs, and two do not; `R-f724595b` names three literals, and the builder's palette, choices editor and canvas carry three more; `R-9d3c2439` names three clipped values, and a sweep of `text-overflow: ellipsis` finds eleven with no `title` (two more are static words).
+
+- **A — fix them all in UI6 (recommended, chosen).** Each is a one-line change; UI6 is the consistency increment; a tracking sweep and a title sweep hold the line.
+- **B — the dialogs and labels here, the eight cut-off values filed as a new row.**
+- **C — the four rows as written, everything else filed.**
+
+**What the answer files, in the same push:** no new row — the cases join the three rows' remedies, taken by `M182`.
+
+### D158 — The dark error red no longer fails contrast: 4.22:1 was measured on the dark surface before the JR1 re-skin, and today the same red is 5.23:1. But dark mode shows two error reds — field errors and 24 other uses at one shade, 32 page errors at a brighter one. What does UI6 do? **A — one red, at the source: the dark `--mds-color-danger-text` names the same step as `--mds-color-status-danger-fg`; light is unchanged.**
+
+**Asked and answered 2026-10-21 (user decision, in chat), while `M182` (UI6) was planned; recorded in its claim.** `R-49813d21` prescribed swapping each use to `status-danger-fg` because `danger-text` "measures 4.22:1 on the surface". That is `#D07D6A` on `#123350`; JR1 moved the dark surface to `#1a2130`, where it is 5.23:1 (6.04:1 on sunken) — the defect is dead, the two reds are not. In light both tokens are danger-700.
+
+- **A — one red, at the source (recommended, chosen).** Two lines in `packages/design-system/src/theme/theme-overrides.css` (both dark blocks) re-point `danger-text` to danger-200 — 7.91:1 on the surface — so every error in dark, the guest runtime and the design system's own field error included, shares one red; a contrast case in the theme test pins it; the stale "4.22:1" notes are corrected.
+- **B — swap file by file,** as the row says: some twenty files and a sweep test; the same picture, far more code.
+- **C — close as already fixed:** no code; only the notes corrected; dark keeps two reds.
+
+**What the answer files, in the same push:** no new row — it reshapes `R-49813d21`'s remedy, taken by `M182`.
+
 ### D157 — Nobody has seen a What's new yet, and at merge point 4 three releases go live together (UI5, UI6, then T2 + Likert). The first time someone sees the prompt, what should it list? **A — every release since the person's account was created; a brand-new user still sees only the newest one.**
 
 **Asked and answered 2026-10-20 (user decision, in chat), while `M181` (UI5) was planned; recorded in its claim.** `D126` recorded "a brand-new user sees only the latest entry", and the plan of record (`~/.claude/plans/hi-let-s-conduct-a-mutable-goose.md` §C) applied it to every user whose `users.whats_new_seen_version` is NULL — which on the day the prompt ships is every tester, so they would have seen only T2's notes and missed UI5's and UI6's.

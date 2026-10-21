@@ -100,6 +100,13 @@ Paired files taken: none (no route, migration or deploy script).
 Hubs (`D128`: overlap allowed, every hub named): `resources/js/Pages/forms/Builder.vue`, `resources/js/components/builder/BuilderCanvas.vue`,
 `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`, `PROGRESS.md`.
 Namespaces spent: `D158`, `D159` (asked and answered in planning); no migration prefix; no ADR.
+**Extended 2026-10-21, mid-build, before the file below was opened (pushed alone; the `M172` precedent):** `package-lock.json` — a
+patch-level update of `follow-redirects` 1.16.0 → 1.16.1 (under axios; GHSA-q3jh-wrc6-jgq8, GHSA-8r9p-f939-6h3c) and of the design
+system's `vite` 6.4.3 → 6.4.4 (within its `^6.3.0`; GHSA-698v-4r3x-3vcv, GHSA-r825-w8mm-5pxw, GHSA-587h-7wmj-h5pm): advisories published
+during the build that red CI's `npm audit` gate (high, production) on every branch and on the trunk — PR #375's first run, at `db99b668`.
+The regenerated lock also carries the design system's `vue` range as `^3.5.43`, which closes `R-e5716b29` and `R-d88fcfa1` (the same
+line, filed twice). ⚠️ #374 (UI5, held) predates the advisories and will red on the same gate when it next runs: it needs this lock
+commit before merge point 4 — the user is asked at this session's close.
 E2E specs the diff reaches, run locally: `whats-new` (two releases now), `responsive-axe`, `scopes-axe`, `builder-axe`,
 `admin-console-axe`, `public-runtime-axe`; CI runs every spec, and CI's Storybook axe scans `FormField`'s dark error story.
 Prediction: red first commit by commit — the theme test's same-step cases (both dark blocks) red, its 4.5:1 cases GREEN on the old step

@@ -198,7 +198,7 @@
         --mds-color-action-primary-tint: rgba(88, 155, 253, 0.18);
         --mds-color-action-danger-bg: var(--mds-danger-500);
         --mds-color-action-danger-bg-hover: var(--mds-danger-400);
-        --mds-color-danger-text: var(--mds-danger-300); /* on #1a2130 7.91:1 — one red with status-danger-fg (M182, D158) */
+        --mds-color-danger-text: var(--mds-danger-200); /* on #1a2130 7.91:1 — one red with status-danger-fg (M182, D158) */
         --mds-color-input-border: var(--mds-neutral-400);
         --mds-color-input-border-hover: var(--mds-neutral-500);
         --mds-color-focus-ring: var(--mds-primary-300);

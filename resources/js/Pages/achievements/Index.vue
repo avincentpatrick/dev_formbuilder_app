@@ -323,7 +323,7 @@ function earnedDate(iso: string): string {
                     <ul class="ach__ladder" role="list">
                         <li v-for="entry in scoreboard.entries" :key="entry.user_id" class="ach__ladder-row">
                             <span class="ach__ladder-rank">{{ ordinal(entry.rank) }}</span>
-                            <span class="ach__ladder-name">{{ entry.name }}</span>
+                            <span class="ach__ladder-name" :title="entry.name">{{ entry.name }}</span>
                             <!-- Both figures name their own unit. An award glyph beside a bare "3" is an
                                  unlabelled number to anybody not looking at it, and there is no shared
                                  `.sr-only` in this repository to caption it with — every component that needs

@@ -203,7 +203,7 @@ async function requestDelete(field: LocalField): Promise<void> {
                         @click="pick({ kind: 'section', uid: group.section.uid })"
                     >
                         <MdsIcon name="layout" size="sm" />
-                        <span class="canvas__section-label">{{ group.section.label }}</span>
+                        <span class="canvas__section-label" :title="group.section.label">{{ group.section.label }}</span>
                         <MdsBadge v-if="group.section.is_repeatable" v-bind="statusVariant('draft')" label="Repeatable" />
                     </button>
                     <div class="canvas__section-actions">
@@ -264,7 +264,7 @@ async function requestDelete(field: LocalField): Promise<void> {
                                 @dblclick="startEdit(field.uid)"
                             >
                                 <span class="canvas__field-type">{{ typeLabel(field) }}</span>
-                                <span class="canvas__field-label">{{ field.label || '(untitled)' }}</span>
+                                <span class="canvas__field-label" :title="field.label || '(untitled)'">{{ field.label || '(untitled)' }}</span>
                                 <MdsBadge
                                     v-if="requiredBadge(field)"
                                     v-bind="statusVariant('published')"

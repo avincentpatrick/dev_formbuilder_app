@@ -367,7 +367,7 @@ function submitImport(): void {
             <div class="builder__title-group">
                 <MdsBreadcrumb :items="crumbs" :link-component="Link" />
                 <div class="builder__title-row">
-                    <h1 class="builder__title">{{ form.title }}</h1>
+                    <h1 class="builder__title" :title="form.title">{{ form.title }}</h1>
                     <span v-if="draft" class="builder__version">Draft v{{ draft.version_number }}</span>
                 </div>
             </div>

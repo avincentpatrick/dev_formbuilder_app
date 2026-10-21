@@ -268,7 +268,7 @@ defineExpose({ rememberFocusAnchor, focusRow, expand: (id: string) => expanded.v
                     <MdsIcon v-if="row.has_children" :name="expanded.has(row.id) ? 'chevron-down' : 'chevron-right'" size="sm" />
                 </span>
 
-                <span :id="`scope-name-${row.id}`" class="scopes__name">{{ row.name }}</span>
+                <span :id="`scope-name-${row.id}`" class="scopes__name" :title="row.name">{{ row.name }}</span>
 
                 <MdsBadge v-if="!row.is_active" variant="neutral" label="Inactive" />
                 <span v-if="row.form_count > 0" class="scopes__count">{{ row.form_count }} forms</span>

@@ -213,6 +213,14 @@ describe('the destination column', () => {
         expect(wrapper.text()).not.toContain('Not set');
         wrapper.unmount();
     });
+
+    it('carries the whole label in a title, since the cell clips a long one with an ellipsis (M182)', () => {
+        const label = 'Quarterly intake for the northern district clinics · Responses received since July';
+        const wrapper = render({ connections: [connection({ rules: [rule({ destination_label: label })] })] });
+
+        expect(wrapper.get('.connection__channel').attributes('title')).toBe(label);
+        wrapper.unmount();
+    });
 });
 
 describe('opening the rule modal', () => {

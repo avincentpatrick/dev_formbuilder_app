@@ -172,7 +172,7 @@ function selectOptions(column: MatrixColumn): MatrixOption[] {
                                     <input
                                         type="radio"
                                         class="mds-grid__radio"
-                                        :name="`lm-${field.key}-${row.value}`"
+                                        :name="rowId(i)"
                                         :value="col.value"
                                         :checked="likertValue[row.value] === col.value"
                                         :aria-labelledby="nameFor(i, j)"

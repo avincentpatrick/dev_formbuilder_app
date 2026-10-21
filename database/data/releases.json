@@ -1,5 +1,23 @@
 [
     {
+        "version": "0.9.1",
+        "title": "Small fixes for a tidier, more consistent look",
+        "items": [
+            {
+                "kind": "fixed",
+                "text": "Error messages are easier to read in dark mode, in one shade of red everywhere, including the forms people fill in."
+            },
+            {
+                "kind": "fixed",
+                "text": "Dialogs space their paragraphs evenly, such as Move scope and Delete scope."
+            },
+            {
+                "kind": "improved",
+                "text": "Point at a cut-off name, web address or reply to read it in full."
+            }
+        ]
+    },
+    {
         "version": "0.9.0",
         "title": "Version numbers, What's new, and the testing rounds so far",
         "items": [

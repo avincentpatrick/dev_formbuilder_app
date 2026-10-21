@@ -127,8 +127,13 @@ describe('MatrixGrid — one table, a control per column type (M183, R-1c1d7266,
     });
 
     it('keeps the cards at every width when the author chose them', () => {
-        expect(grid(typedGrid({}, 'stacked')).classes()).toContain('mds-grid--stacked');
-        expect(grid(typedGrid()).classes()).not.toContain('mds-grid--stacked');
+        const cards = grid(typedGrid({}, 'stacked'));
+        const table = grid(typedGrid());
+
+        expect(cards.classes()).toContain('mds-grid--stacked');
+        expect(table.classes()).not.toContain('mds-grid--stacked');
+        cards.unmount();
+        table.unmount();
     });
 
     it('describes the grid with its hint and its error, and marks each control with the error', () => {

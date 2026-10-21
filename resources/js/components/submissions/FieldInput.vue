@@ -25,6 +25,7 @@ import {
 } from '@meridian/design-system';
 import { computed, defineAsyncComponent, nextTick, ref, useId } from 'vue';
 import { displayValue } from '../../../public-runtime/engine/display-value';
+import LikertLine from './LikertLine.vue';
 import MatrixGrid from './MatrixGrid.vue';
 import NoteContent from './NoteContent.vue';
 import { choiceLayoutFor } from './choice-layout';
@@ -54,10 +55,19 @@ export interface MatrixOption {
     label: string;
 }
 
+// M183 (`R-5033e87e`): a matrix column carries its type, its choices (its own, else the cells) and its required flag;
+// a Likert matrix's column is a scale point and carries none. `layout` (`R-1c1d7266`): `stacked` = cards everywhere.
+export interface MatrixColumn extends MatrixOption {
+    type?: string;
+    options?: MatrixOption[];
+    required?: boolean;
+}
+
 export interface MatrixConfig {
     rows: MatrixOption[];
-    columns: MatrixOption[];
+    columns: MatrixColumn[];
     cells: MatrixOption[];
+    layout?: 'table' | 'stacked';
 }
 
 // A GeoJSON geometry envelope (Increment G5b2): coordinates in [lon, lat(, alt)] order (the frozen G5b1
@@ -151,14 +161,14 @@ export interface EncodeField {
 // The value shapes an answer slot can hold across the encode controls (list for multi-select, an object for
 // the G4b grids, number for numeric fields, "" otherwise). Kept concrete (not `unknown`) so Inertia's useForm
 // accepts the form data. `Record<string,string>` = a likert_matrix `{row:score}`; the nested record = a
-// matrix `{row:{col:cell}}`.
+// matrix `{row:{col:cell}}`, whose cell (M183) is a string, a number or a list, by its column's type.
 export type AnswerValue =
     | string
     | number
     | boolean
     | string[]
     | Record<string, string>
-    | Record<string, Record<string, string>>
+    | Record<string, Record<string, string | number | string[]>>
     // A geospatial answer envelope (Increment G5b2).
     | GeoEnvelope
     // A media answer: a list of attachment references (Increment G6).
@@ -481,26 +491,18 @@ function setCascadeLevel(index: number, value: string): void {
                 @update:model-value="emit('update:modelValue', $event)"
             />
         </div>
-        <!-- Likert scale: a single-choice radio group (native radios share a name, so arrow keys move within
-             the scale); wraps at narrow viewports so it never forces horizontal page overflow. -->
-        <div v-else-if="control === 'scale'" class="encode-scale">
-            <label
-                v-for="opt in field.options"
-                :key="opt.value"
-                class="encode-scale__option"
-                :class="{ 'encode-scale__option--active': stringValue === opt.value }"
-            >
-                <input
-                    type="radio"
-                    class="encode-scale__radio"
-                    :name="groupName"
-                    :value="opt.value"
-                    :checked="stringValue === opt.value"
-                    @change="emit('update:modelValue', opt.value)"
-                />
-                <span class="encode-scale__label">{{ opt.label }}</span>
-            </label>
-        </div>
+        <!-- Likert scale (M183, `R-f03cf999`): KoboToolbox's `likert` line — the points on one joined line, each
+             word under its radio, at every width; native radios sharing this copy's name, so the arrow keys move
+             along the scale; marked with the group's error as the round buttons above are. -->
+        <LikertLine
+            v-else-if="control === 'scale'"
+            :name="groupName"
+            :options="field.options"
+            :model-value="stringValue"
+            :invalid="Boolean(error)"
+            :describedby="error ? errorId : undefined"
+            @update:model-value="emit('update:modelValue', $event)"
+        />
         <!-- Cascading select: one dependent select per level, each filtered by the parent level's choice. -->
         <div v-else-if="control === 'cascading'" class="encode-cascade">
             <MdsFormField
@@ -680,40 +682,6 @@ function setCascadeLevel(index: number, value: string): void {
     display: flex;
     flex-direction: column;
     gap: var(--mds-space-1);
-}
-
-/* Likert scale — a wrapping row of radio chips (never overflows the page at narrow viewports). */
-.encode-scale {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--mds-space-2);
-    min-width: 0;
-}
-
-.encode-scale__option {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--mds-space-1);
-    padding: var(--mds-space-1) var(--mds-space-3);
-    border: 1px solid var(--mds-color-border-default);
-    border-radius: var(--mds-radius-md);
-    background-color: var(--mds-color-bg-surface);
-    font-family: var(--mds-font-family-body);
-    font-size: var(--mds-type-body-sm-font-size);
-    line-height: var(--mds-type-body-sm-line-height);
-    color: var(--mds-color-text-body);
-    cursor: pointer;
-}
-
-.encode-scale__option--active {
-    border-color: var(--mds-color-border-strong);
-    background-color: var(--mds-color-bg-sunken);
-    font-weight: var(--mds-font-weight-medium);
-}
-
-.encode-scale__radio {
-    margin: 0;
-    accent-color: currentColor;
 }
 
 /* Cascading select — one stacked select per level. */

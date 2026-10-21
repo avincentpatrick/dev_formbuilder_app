@@ -6618,7 +6618,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   cost hiding in it** — a mapped column that changes identity is a broken sync, not a re-render, and that is
   why it is a row rather than a refinement. ⚠️ **Also unresolved and cheaper:** the grid arms render row and
   column VALUES, not their author-defined LABELS, because resolving those needs the field's `config` threaded
-  into `displayValue()`. **Live.** Filed by `M74`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: `D130` answers question (2) — one column per cell beside today's summary — and the grid's first increment takes it; question (1), the signed link, stays open here (`D128`).**
+  into `displayValue()`. **Live.** Filed by `M74`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: `D130` answers question (2) — one column per cell beside today's summary — and the grid's first increment takes it; question (1), the signed link, stays open here (`D128`).** **Question (2) taken by T2 (`M183`), 2026-10-22, with `R-51e044a6`; this row stays open for (1).**
 
 - ✅ **CLOSED BY `M75` (2026-09-06) — `minor` · ~~`gate-baselines.php` writes the file BEFORE it judges
   whether every metric was found, so a NOT FOUND row ships and is reported afterwards.~~** ✅ **The mechanism
@@ -14393,7 +14393,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `docs/architecture/technical-architecture.md`) check membership per column list; `ValueShape` (`app/Enums/ValueShape.php:171-191`)
   and the gates learn the column shape; the Grid tab's editor gains the per-column type; the data dictionary and the enum
   docblock say what is true. **Live.** Filed by `M172`. **Tier: early-testing.** **Amended 2026-10-16 by `D140`: Yes/No leaves the
-  palette, so a column offers no `yes_no` type — a yes/no column is a Single choice column with the Yes / No options preset.**
+  palette, so a column offers no `yes_no` type — a yes/no column is a Single choice column with the Yes / No options preset.** **Taken by T2 (`M183`), 2026-10-22 (`D138`).**
 
 - **`minor` · A grid is drawn as a stack of row cards, never as a table, on the web form, manual entry and the builder preview.**
   `resources/js/components/submissions/MatrixGrid.vue:9-13` states "NO `<table>` — each row is its own nested `<fieldset>`", and
@@ -14402,7 +14402,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (`app/Enums/PrintAnswerArea.php:92`). The testers want "a grid"; Kobo's matrix is a table in the Grid theme. The remedy: a real
   `<table>` (`<th scope="col">`, `<th scope="row">`, one control per cell by column type from the design system's inputs) from
   48em, the existing stacked fieldsets below it, `config.layout = table | stacked` for an author who wants cards everywhere;
-  `likert_matrix` takes the same table. **Live.** Filed by `M172`. **Tier: early-testing.**
+  `likert_matrix` takes the same table. **Live.** Filed by `M172`. **Tier: early-testing.** **Taken by T2 (`M183`), 2026-10-22 (`D138`), with `R-f03cf999`; "from 48em" reshaped to a container query on the grid (the form column is at most 45rem).**
 
 - **`minor` · A grid answer reaches a spreadsheet as one cell, so a Sheets or Airtable column cannot map a single cell of it.**
   `app/Services/Submissions/SchemaValueFormatter.php:338-376` renders a matrix into one cell as `row: col=cell; …`, the header union
@@ -14413,7 +14413,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `<question>.<row>.<column>` column per cell joins the header union and the catalog beside the summary column, so no existing
   mapping changes identity; the XLSForm export emits typed per-cell questions under the existing `{row_key}_{column_key}` names;
   the PDF and the printed form draw typed cells (a write-in box for text and number cells, tick boxes for choices). Closes
-  `R-c64d0afd`'s second question; its first, a signed link in a cell, stays there. **Live.** Filed by `M172`. **Tier: early-testing.**
+  `R-c64d0afd`'s second question; its first, a signed link in a cell, stays there. **Live.** Filed by `M172`. **Tier: early-testing.** **Taken by T2 (`M183`), 2026-10-22 (`D138`); the XLSForm names are `{key}_{row}_{col}`, not the ones written here.**
 
 - **`minor` · Only a Single choice or Dropdown can take its choices from another form's answers; a Multiple choice cannot.**
   `app/Services/Forms/LinkedChoiceService.php:39` limits a link to single choice and dropdown, and
@@ -14824,7 +14824,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `likert` appearance draws one scale as radios on a joined line with the words centred beneath. The remedy, with the grid's table
   row (`R-1c1d7266`): the Likert matrix is that grid from 48em and, below it, each statement's scale is the joined line; a Likert
   scale takes the joined line at every width; the web form, manual entry and the preview share it; the PDF and print draw the grid
-  with tick boxes; answers stay `{row: score}`. **Live.** Filed by `M174`. **Tier: early-testing.**
+  with tick boxes; answers stay `{row: score}`. **Live.** Filed by `M174`. **Tier: early-testing.** **Taken by T2 (`M183`), 2026-10-22 (`D138`), with `R-1c1d7266`; the printed Likert matrix already is that grid, and a Likert scale's paper stays as it is (the scanner reads it).**
 
 - **`minor` · A question keeps no history of its changes, so an author cannot see which setting changed, from what, or put one change back.**
   The testers' comment (2026-10-11, comment 5): *"it is best to have a ledger/list/log of the nitty-gritty changes per field … An
@@ -15023,3 +15023,23 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `M182`; its tracking token widened the longest by about 4px. The remedy: a type column wide enough for the longest label in the
   catalogue (measured, in `ch` or `em` so it follows the type scale), or the type moved after the label as a badge.
   **Live.** Filed by `M182`. **Tier: during-testing.**
+
+- **`minor` · A grid shows one error for the whole question, so a respondent is not told which cell is wrong.**
+  Both engines report a grid's errors per cell, with the cell's path (`resources/public-runtime/engine/semantic-validator.ts`,
+  `processMatrix` and `processLikertMatrix`: `field_required` and `choice_not_in_options` at `<row>.<column>`), but the runtime
+  hands a question only its first message (`resources/public-runtime/composables/useFormRuntime.ts:877-890`, `errorFor()`), and
+  the grid draws one error under the whole table. With typed columns (`M183`) a grid can be wrong in more ways — a number cell
+  holding text, a required column left empty — and the respondent still sees "This field is required" with no cell marked. Found
+  by `M183` beside `R-1c1d7266`. The remedy: an `errorsFor(key)` that keeps the cell paths, the grid marking the cell or cells at
+  fault (`aria-invalid` on the control, the message naming the row and column), and the encode page doing the same.
+  **Live.** Filed by `M183`. **Tier: during-testing.**
+
+- **`minor` · A grid answer reads as one line of codes on the response page and in the response PDF.**
+  The response page prints every answer as one string (`resources/js/Pages/submissions/Show.vue:364`), and the response PDF the same
+  (`resources/views/pdf/submission.blade.php:89-90`); for a grid that string is `SchemaValueFormatter::formatGrid()`'s summary —
+  `row: col=cell, col=cell; …` in the row, column and choice CODES, not their labels — so a reviewer reads `a: q1=ok, q2=good` where
+  the form said "Consultation — Morning: OK". The spreadsheet summary keeps that shape on purpose (`D130`: no mapped column changes
+  identity), but the page and the PDF have no such constraint. Found by `M183` beside `R-51e044a6`. The remedy: the response page
+  and the response PDF draw a grid answer as a table — rows down, columns across, each cell's answer by its label (a Likert matrix
+  marks the chosen point) — from the version's own config.
+  **Live.** Filed by `M183`. **Tier: during-testing.**

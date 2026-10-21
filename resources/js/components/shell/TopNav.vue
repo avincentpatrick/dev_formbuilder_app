@@ -284,7 +284,7 @@ const activeQuery = computed(() => {
     font-size: var(--mds-type-heading-4-font-size);
     font-weight: var(--mds-font-weight-bold);
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: var(--mds-tracking-wide);
     color: var(--mds-color-action-primary-fg);
     /* Truncate rather than force the bar wide (see .topnav__left). */
     overflow: hidden;

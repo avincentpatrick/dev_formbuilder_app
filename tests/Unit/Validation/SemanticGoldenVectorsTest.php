@@ -86,10 +86,22 @@ function buildSemanticInput(array $schema, array $answers, string $locale, ?stri
         // Composite grid config (G4b): a vector's `grid.rows`/`columns`/`cells` value lists → config option
         // objects (`{value}`), the shape the real FormField.config carries + the PHP engine reads. The TS
         // mirror consumes the same `grid` fragment directly (its SchemaField.grid is the value lists).
+        // M183 (`R-5033e87e`): a vector's `grid.column_specs` (keyed by column value) → that column object's own
+        // `type`, `options` (as `{value}` objects) and `required`, the shape the builder saves.
         if (isset($field['grid'])) {
+            $specs = $field['grid']['column_specs'] ?? [];
             $gridConfig = [
                 'rows' => array_map(static fn (string $v): array => ['value' => $v], $field['grid']['rows'] ?? []),
-                'columns' => array_map(static fn (string $v): array => ['value' => $v], $field['grid']['columns'] ?? []),
+                'columns' => array_map(static fn (string $v): array => [
+                    'value' => $v,
+                    ...array_filter([
+                        'type' => $specs[$v]['type'] ?? null,
+                        'options' => isset($specs[$v]['options'])
+                            ? array_map(static fn (string $o): array => ['value' => $o], $specs[$v]['options'])
+                            : null,
+                        'required' => $specs[$v]['required'] ?? null,
+                    ], static fn (mixed $x): bool => $x !== null),
+                ], $field['grid']['columns'] ?? []),
             ];
             if (isset($field['grid']['cells'])) {
                 $gridConfig['cells'] = array_map(static fn (string $v): array => ['value' => $v], $field['grid']['cells']);

@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { EngineValue } from '../coercion';
 import { GRAMMAR_VERSION } from '../evaluator';
-import type { CompositeAnswer, InstanceAnswers, SchemaField, SchemaSection, SemanticInput, ValidationRow } from '../schema';
+import type { CompositeAnswer, GridColumnSpec, InstanceAnswers, SchemaField, SchemaSection, SemanticInput, ValidationRow } from '../schema';
 import type { ComparisonOperator, LogicOperator, RequiredMode, ValidationRuleType } from '../enums';
 import { errorPath, makeSemanticValidator } from '../semantic-validator';
 
@@ -48,8 +48,8 @@ type FieldFragment = {
     // Choice-membership + cascading config (G4a) — mirror of the PHP builder's config injection.
     options?: string[];
     cascade?: { levels: string[]; options: { value: string; level: string; parent: string | null }[] };
-    // Composite grid config (G4b): row/column (and, for matrix, cell) VALUE keys.
-    grid?: { rows: string[]; columns: string[]; cells?: string[] };
+    // Composite grid config (G4b): row/column (and, for matrix, cell) VALUE keys; M183: a matrix column's own spec.
+    grid?: { rows: string[]; columns: string[]; cells?: string[]; column_specs?: Record<string, GridColumnSpec> };
     // Media count bounds (G6): min/max attachment count.
     media?: { min?: number; max?: number };
     // M177 (`R-f44e9d00`): Show to respondents — Never (`hidden`) or Always (`shown`); absent keeps the type's own rule.

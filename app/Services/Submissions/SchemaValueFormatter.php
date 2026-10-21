@@ -365,7 +365,12 @@ final class SchemaValueFormatter
             $pairs = [];
 
             foreach ($this->sortedKeys($cells) as $colKey) {
-                $pairs[] = $colKey.'='.$this->scalarString($this->scalar($cells[$colKey]));
+                $cell = $cells[$colKey];
+                // M183 (`R-5033e87e`): a multiple-choice column stores a list; its choices join with a slash, since a
+                // comma already separates the columns and a semicolon the rows.
+                $pairs[] = $colKey.'='.(is_array($cell) && array_is_list($cell)
+                    ? implode('/', array_map(fn (mixed $v): string => $this->scalarString($this->scalar($v)), $cell))
+                    : $this->scalarString($this->scalar($cell)));
             }
 
             if ($pairs !== []) {

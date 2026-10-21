@@ -15005,3 +15005,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Each passes alone, and CI's alphabetical order runs Admin before Settings, so no run has seen it; a reordered or parallel run would.
   The remedy: find what the settings test leaves set (a tenant context or a cached tenant) and clear it after each case, or make the
   console's audit write refuse a stale context. **Latent.** Filed by `M181`. **Tier: before-launch.**
+
+- **`nit` · At a phone width, a keyboard move of a scope already at the top level, back to the top level, never announces an outcome.**
+  Measured by `M182` with `tests/e2e/scopes-axe.spec.ts` ("keyboard move announces grab, target and outcome") on the dev stack: once
+  the seeded Movable District is a top-level row, the 375px project's run grabs it, drops it on the top level, confirms Move scope, and
+  the live region still reads "Grabbed Movable District…" ten seconds later — neither "Moved" nor "That move was refused", so
+  `settleIfPending()` in `resources/js/components/scopes/useScopeTreeMove.ts` never ran. The 834px and 1440px runs pass from the same
+  state, and so does the same case on UI5's tree (measured: the pre-`M182` `resources/js/Pages/scopes/Index.vue` fails identically), so
+  it is not `M182`'s dialog change. CI passes because its fresh database starts the node two levels down. The remedy: find what the
+  phone layout changes between the confirm and the refreshed rows (a visit that never fires, or rows that arrive unchanged and are not
+  watched), then announce the unchanged case too. **Latent.** Filed by `M182`. **Tier: during-testing.**

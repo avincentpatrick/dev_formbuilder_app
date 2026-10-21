@@ -21,6 +21,7 @@ use App\Services\Validation\SemanticValidator;
 use App\Support\Forms\FieldVisibility;
 use App\Support\Forms\FormClock;
 use App\Support\Forms\FormScheduleView;
+use App\Support\Forms\MatrixColumns;
 use App\Support\Forms\StepDescriptor;
 use App\Support\Forms\StepProjection;
 use Illuminate\Support\Collection;
@@ -522,7 +523,11 @@ final class EncodeFormPresenter
      * grid controls consume; null for every non-grid type. Single-locale (labels as authored), like
      * {@see cascade()}/{@see options()}.
      *
-     * @return array{rows: list<array{value: string, label: string}>, columns: list<array{value: string, label: string}>, cells: list<array{value: string, label: string}>}|null
+     * M183 (`R-5033e87e`, `R-1c1d7266`): a `matrix` column also carries its `type`, its `options` — its own, else the
+     * shared `cells` for a choice column, so the grid never resolves the fallback itself — and `required`; and both
+     * grids carry `layout` (`table`, or `stacked` for cards at every width). Mirrors `schema-mapping.ts buildMatrix`.
+     *
+     * @return array{rows: list<array{value: string, label: string}>, columns: list<array<string, mixed>>, cells: list<array{value: string, label: string}>, layout: string}|null
      */
     private function matrix(FormField $field): ?array
     {
@@ -533,9 +538,37 @@ final class EncodeFormPresenter
 
         return [
             'rows' => $this->optionPairs($field, 'rows'),
-            'columns' => $this->optionPairs($field, 'columns'),
+            'columns' => $type === FieldType::Matrix ? $this->matrixColumns($field) : $this->optionPairs($field, 'columns'),
             'cells' => $type === FieldType::Matrix ? $this->optionPairs($field, 'cells') : [],
+            'layout' => data_get($field->config, 'layout') === 'stacked' ? 'stacked' : 'table',
         ];
+    }
+
+    /**
+     * A matrix's columns with their answer rules resolved (M183, {@see MatrixColumns}).
+     *
+     * @return list<array{value: string, label: string, type: string, options: list<array{value: string, label: string}>, required: bool}>
+     */
+    private function matrixColumns(FormField $field): array
+    {
+        /** @var array<string, mixed> $config */
+        $config = (array) $field->config;
+        $columns = [];
+        foreach (MatrixColumns::columns($config) as $column) {
+            if (! isset($column['value']) || $column['value'] === '') {
+                continue;
+            }
+            $value = (string) $column['value'];
+            $columns[] = [
+                'value' => $value,
+                'label' => (string) ($column['label'] ?? $value),
+                'type' => MatrixColumns::type($column)->value,
+                'options' => $this->pairs(MatrixColumns::choices($column, $config)),
+                'required' => ($column['required'] ?? false) === true,
+            ];
+        }
+
+        return $columns;
     }
 
     /**
@@ -608,8 +641,17 @@ final class EncodeFormPresenter
      */
     private function optionPairs(FormField $field, string $configKey): array
     {
+        return $this->pairs((array) data_get($field->config, $configKey, []));
+    }
+
+    /**
+     * @param  array<mixed>  $options
+     * @return list<array{value: string, label: string}>
+     */
+    private function pairs(array $options): array
+    {
         $pairs = [];
-        foreach ((array) data_get($field->config, $configKey, []) as $option) {
+        foreach ($options as $option) {
             if (! is_array($option) || ! isset($option['value']) || $option['value'] === '') {
                 continue;
             }

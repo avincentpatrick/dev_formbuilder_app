@@ -300,6 +300,9 @@ final class FieldTypeConversion
 
         if ($to === FieldType::LikertMatrix) {
             unset($config['cells']);
+            // M183 (`R-5033e87e`): a Likert matrix's columns ARE its scale, so a column's own type, choices and
+            // required flag have nothing to mean there.
+            $config['columns'] = MatrixColumns::asScale($config);
         }
 
         return $config;
@@ -521,8 +524,9 @@ final class FieldTypeConversion
             // M133: a question that takes its choices from another form has none typed here, and is finished.
             ValueShape::for($type)->carriesOptionList() => self::emptyList($config['options'] ?? null) && ! LinkedChoiceService::declaresLink($config),
             $type === FieldType::CascadingSelect => self::emptyList($config['levels'] ?? null) || self::emptyList($config['options'] ?? null),
+            // M183: the shared cells are needed only while a choice column draws from them — the publish gate's own question.
             $type === FieldType::Matrix => self::emptyList($config['rows'] ?? null) || self::emptyList($config['columns'] ?? null)
-                || self::emptyList($config['cells'] ?? null),
+                || (MatrixColumns::needsSharedCells($config) && self::emptyList($config['cells'] ?? null)),
             $type === FieldType::LikertMatrix => self::emptyList($config['rows'] ?? null) || self::emptyList($config['columns'] ?? null),
             default => false,
         };

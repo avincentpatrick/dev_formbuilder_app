@@ -793,7 +793,7 @@ export class SemanticValidator {
                     continue;
                 }
 
-                const choiceSet = new Set(spec.options.length > 0 ? spec.options : cells);
+                const choiceSet = new Set(cells);
 
                 if (spec.type === 'multi_select') {
                     prunedRow[colKey] = cell as EngineValue;

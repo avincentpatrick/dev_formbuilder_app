@@ -127,6 +127,10 @@ Hubs (`D128`: overlap allowed, every hub named): `resources/js/components/submis
 `docs/architecture/technical-architecture.md` (the golden corpora), `openapi.json`, `resources/js/components/builder/field-save-errors.ts`,
 `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md`. `ConfigPanel.vue` is not touched (the Grid tab already writes `config.columns`).
 Namespaces spent: nothing from either namespace — no decision, no migration prefix, no ADR.
+**Extended 2026-10-22, mid-build, before the file below was opened (pushed alone; the `M172` precedent):**
+`resources/js/components/builder/ConfigPanel.vue` (a hub) — the sentence above was wrong: the row's `config.layout` needs the two grid
+editors' mounts to pass the layout and its event (two lines each), since the editors read only the props ConfigPanel hands them; and a
+new `resources/js/components/builder/GridLayoutSelect.vue` both editors share, so its label lives in one file for the Help manual's pin.
 E2E specs the diff reaches, run locally: `public-runtime-axe` (the grid cases), `builder-axe` (the grid editor), `encode-validation` (the
 Showcase renders its grids), `whats-new` (three releases now); CI runs every spec.
 Prediction: red first commit by commit — the new golden vectors red in BOTH runners until the engines move (about six); the normaliser,

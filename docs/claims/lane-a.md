@@ -31,7 +31,7 @@ RELEASED headings and `M181` is HELD — this is `M182`.
 staging-header steps and the failure-only report upload) — AND NOT MERGED.** ⛔ **Held for merge point 4 (`D137`, `D138`):** #374 (UI5)
 first, then this branch rebased onto the trunk by its own commits only, then T2 + Likert, between the user's census before and after.
 ⛔ **#374 needs this branch's lock commit before it can go green again** — two `npm audit` advisories published during this build (the
-extension above) red its gate as they red every branch; asked of the user at this session's close. ⚠️ At merge point 4, UI6's deploy is
+extension above) red its gate as they red every branch. ✅ **Done on the user's word (2026-10-21, "Yes, add it to #374 now"):** the lock, byte for byte, is `773ae1aa` on #374, whose CI is 6/6 again (run 39539791790: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11). This branch is NOT re-merged onto it (it would re-run CI for an identical lock); at merge point 4 the rebase drops the duplicate hunk. ⚠️ At merge point 4, UI6's deploy is
 the first to run `releases:sync` (UI5's changed `deploy.ps1` runs one deploy late), so check `/whats-new` after it: 0.9.0 and 0.9.1.
 
 **Measured against the prediction:**
@@ -152,7 +152,7 @@ system's `vite` 6.4.3 → 6.4.4 (within its `^6.3.0`; GHSA-698v-4r3x-3vcv, GHSA-
 during the build that red CI's `npm audit` gate (high, production) on every branch and on the trunk — PR #375's first run, at `db99b668`.
 The regenerated lock also carries the design system's `vue` range as `^3.5.43`, which closes `R-e5716b29` and `R-d88fcfa1` (the same
 line, filed twice). ⚠️ #374 (UI5, held) predates the advisories and will red on the same gate when it next runs: it needs this lock
-commit before merge point 4 — the user is asked at this session's close.
+commit before merge point 4 — asked, answered yes, and done (`773ae1aa`; the BUILT paragraph above).
 E2E specs the diff reaches, run locally: `whats-new` (two releases now), `responsive-axe`, `scopes-axe`, `builder-axe`,
 `admin-console-axe`, `public-runtime-axe`; CI runs every spec, and CI's Storybook axe scans `FormField`'s dark error story.
 Prediction: red first commit by commit — the theme test's same-step cases (both dark blocks) red, its 4.5:1 cases GREEN on the old step
@@ -168,7 +168,7 @@ Taken 2026-10-20. Branch `m181-ui5-versioning-whats-new`, cut from origin/main a
 SESSION:** it is held green for merge point 4 with UI6 and T2 + Likert (`D137`, `D138`: UI5 → UI6 → T2 + Likert → merge point 4).
 The plan of record is `~/.claude/plans/hi-let-s-conduct-a-mutable-goose.md` (§C, §E row 5); the build plan is
 `~/.claude/plans/pasted-content-id-776b-read-claude-md-quizzical-conway.md`.
-**BUILT — PR #374, CI 6/6 green with real step counts (run 39450434249 at `9dc6fdaf`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 ·
+✅ **2026-10-21 (`M182`, the user's word): `773ae1aa` adds `M182`'s npm-audit lock fix to this branch; CI 6/6 again (run 39539791790), the same step counts.** **BUILT — PR #374, CI 6/6 green with real step counts (run 39450434249 at `9dc6fdaf`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 ·
 Pest 11 · axe 11; the only skips are the two main-only staging-header steps and the failure-only report upload) — AND NOT MERGED.** ⛔ **Held for
 merge point 4 (`D137`, `D138`):** UI5 first, then UI6, then T2 + Likert, between the user's census before and after. ⛔ **UI6 stacks on this branch**
 (it bumps a `VERSION` that exists only here) and is `M182` — `state.php`'s next free still prints `M181`, because it counts RELEASED headings

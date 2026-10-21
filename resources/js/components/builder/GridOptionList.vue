@@ -1,28 +1,27 @@
-<script setup lang="ts">
+<script setup lang="ts" generic="T extends { value: string; label: string }">
 /**
  * A single `{value, label}[]` list editor (Increment G4b) — the shared building block for the grid config
  * editors ({@link MatrixEditor}/{@link LikertMatrixEditor}): the rows, columns, and (matrix) cell-choice
  * lists are all this same value/label list. Emits a fresh array on every change so the builder store records
  * one debounced history entry (same lenient contract as ChoicesEditor/CascadingEditor — completeness +
  * distinctness are enforced at publish, not per keystroke).
+ *
+ * M183 (`R-5033e87e`): generic over the entry, so an edit keeps every key an entry already had (a matrix column's
+ * type, choices and required flag), and a `details` slot draws an entry's own settings under its row.
  */
 import { MdsButton, MdsIconButton, MdsTextInput } from '@meridian/design-system';
-
-interface Option {
-    value: string;
-    label: string;
-}
 
 const props = defineProps<{
     heading: string;
     singular: string;
     prefix: string;
     hint?: string;
-    options: Option[];
+    options: T[];
 }>();
-const emit = defineEmits<{ 'update:options': [value: Option[]] }>();
+const emit = defineEmits<{ 'update:options': [value: T[]] }>();
+defineSlots<{ details?: (props: { option: T; index: number }) => unknown }>();
 
-function updateOption(index: number, patch: Partial<Option>): void {
+function updateOption(index: number, patch: Partial<Pick<T, 'value' | 'label'>>): void {
     emit(
         'update:options',
         props.options.map((option, i) => (i === index ? { ...option, ...patch } : option)),
@@ -32,7 +31,7 @@ function addOption(): void {
     const existing = new Set(props.options.map((option) => option.value));
     let n = props.options.length + 1;
     while (existing.has(`${props.prefix}_${n}`)) n++;
-    emit('update:options', [...props.options, { value: `${props.prefix}_${n}`, label: `${props.singular} ${n}` }]);
+    emit('update:options', [...props.options, { value: `${props.prefix}_${n}`, label: `${props.singular} ${n}` } as T]);
 }
 function removeOption(index: number): void {
     emit('update:options', props.options.filter((_, i) => i !== index));
@@ -44,24 +43,27 @@ function removeOption(index: number): void {
         <h3 class="grid-list__heading">{{ heading }}</h3>
         <p v-if="hint" class="grid-list__hint">{{ hint }}</p>
         <div class="grid-list__rows">
-            <div v-for="(option, i) in options" :key="i" class="grid-list__row">
-                <MdsTextInput
-                    :model-value="option.value"
-                    :aria-label="`${singular} ${i + 1} value`"
-                    @update:model-value="updateOption(i, { value: $event })"
-                />
-                <MdsTextInput
-                    :model-value="option.label"
-                    :aria-label="`${singular} ${i + 1} label`"
-                    @update:model-value="updateOption(i, { label: $event })"
-                />
-                <MdsIconButton
-                    icon="trash"
-                    :label="`Remove ${singular.toLowerCase()} ${i + 1}`"
-                    variant="danger"
-                    size="sm"
-                    @click="removeOption(i)"
-                />
+            <div v-for="(option, i) in options" :key="i" class="grid-list__item">
+                <div class="grid-list__row">
+                    <MdsTextInput
+                        :model-value="option.value"
+                        :aria-label="`${singular} ${i + 1} value`"
+                        @update:model-value="updateOption(i, { value: $event })"
+                    />
+                    <MdsTextInput
+                        :model-value="option.label"
+                        :aria-label="`${singular} ${i + 1} label`"
+                        @update:model-value="updateOption(i, { label: $event })"
+                    />
+                    <MdsIconButton
+                        icon="trash"
+                        :label="`Remove ${singular.toLowerCase()} ${i + 1}`"
+                        variant="danger"
+                        size="sm"
+                        @click="removeOption(i)"
+                    />
+                </div>
+                <slot name="details" :option="option" :index="i" />
             </div>
             <p v-if="options.length === 0" class="grid-list__empty">Nothing yet.</p>
         </div>
@@ -94,6 +96,13 @@ function removeOption(index: number): void {
 }
 
 .grid-list__rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-2);
+    min-width: 0;
+}
+
+.grid-list__item {
     display: flex;
     flex-direction: column;
     gap: var(--mds-space-2);

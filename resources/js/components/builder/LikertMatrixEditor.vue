@@ -4,8 +4,9 @@
  * statement to rate) and the shared COLUMNS scale (the ordered rating points, lowest → highest); each row
  * renders one radio group over the scale. The publish gate verifies rows + columns are each non-empty with
  * distinct values. Each list is a plain `{value,label}[]` edited via the shared {@link GridOptionList};
- * every change emits a fresh array (one debounced history entry).
+ * every change emits a fresh array (one debounced history entry). M183 (`R-1c1d7266`): a Layout too ({@link GridLayoutSelect}).
  */
+import GridLayoutSelect from './GridLayoutSelect.vue';
 import GridOptionList from './GridOptionList.vue';
 
 interface Option {
@@ -13,10 +14,11 @@ interface Option {
     label: string;
 }
 
-defineProps<{ rows: Option[]; columns: Option[] }>();
+defineProps<{ rows: Option[]; columns: Option[]; layout?: string | null }>();
 const emit = defineEmits<{
     'update:rows': [value: Option[]];
     'update:columns': [value: Option[]];
+    'update:layout': [value: string | null];
 }>();
 </script>
 
@@ -38,6 +40,7 @@ const emit = defineEmits<{
             :options="columns"
             @update:options="emit('update:columns', $event)"
         />
+        <GridLayoutSelect :layout="layout ?? null" @update:layout="emit('update:layout', $event)" />
     </div>
 </template>
 

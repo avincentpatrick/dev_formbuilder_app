@@ -16,7 +16,126 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M182`, UI6 of the UI programme: consistency (`R-49813d21`, `R-3ca62317`, `R-f724595b`, `R-9d3c2439`) (m182-ui6-consistency)
+## Status: ACTIVE CLAIM — `M183`, T2 + Likert: typed grid columns, grids drawn as tables, a spreadsheet column per cell, and Kobo's Likert (`R-5033e87e`, `R-1c1d7266`, `R-f03cf999`, `R-51e044a6`) (m183-t2-grid-likert)
+
+Taken 2026-10-22. Branch `m183-t2-grid-likert`, **stacked**: cut from `origin/m182-ui6-consistency` at `96b00643` (UI6, built and
+held), with `origin/main` merged on top to bring this claim — that merge is the claim-merge commit, and T2's own commits start after it.
+It stacks because it bumps a `VERSION` that exists only on the UI5/UI6 stack (Standing Rule 11). PR into main. ⛔ **NOT MERGED THIS
+SESSION:** held green for merge point 4 (`D137`, `D138`: UI5 #374 → UI6 #375 → T2 + Likert) — the user's census before, #374 and #375
+merged and live, this branch rebased onto the trunk by its own commits only and merged, then the census after. The plans of record are
+`~/.claude/plans/i-have-intial-comments-quirky-pascal.md` (§B7, §E row 7: T2, grid part 1) and
+`~/.claude/plans/here-are-added-comments-peppy-quill.md` (§B "T2 addition", §E row 8); the build plan is
+`~/.claude/plans/pasted-content-id-1746-read-claude-md-majestic-moler.md`. `state.php` prints next free `M181` because it counts RELEASED
+headings and `M181`/`M182` are HELD — this is `M183`.
+
+**No check is owed:** UI5 and UI6 are not live; R3 and R4 were confirmed on 2026-10-20. The session-start pull read 0 reports, 0
+reopened and 0 new comments (relayed 31: 15 Resolved · 10 Ongoing · 6 Confirmed working), so nothing was triaged. **Asked and answered
+in planning (the user, 2026-10-22, in chat):** the 0.10.0 What's new notes, approved as written (five items, verbatim in the build
+plan). No decision was needed: every design call below follows a row, a decision already answered (`D129`, `D130`, `D140`) or a
+convention the code already keeps.
+
+Rows taken, in build order, each its own commits (`D75`): **`R-5033e87e`** (typed columns, `D129`, no yes/no column by `D140`),
+**`R-1c1d7266`** (the table), **`R-f03cf999`** (Kobo's Likert, beside the table), **`R-51e044a6`** (a spreadsheet column per cell,
+`D130`; closes `R-c64d0afd`'s second question); then Help, the seeds and the e2e cases; then the release (0.10.0).
+
+### Evidence verified
+Read on `96b00643` (UI6's tree) by three read-only passes plus my own reads.
+- `R-5033e87e`: `MatrixEditor.vue:46` ("Each cell is a single choice from this shared list") — held. `UpdateFieldRequest.php:292-324` —
+  **moved** to `:290-323` (the matrix arm `:290-308`, likert `:310-323`); value/label/translations only — held.
+  `StructuralAnswerNormalizer.php:548-593` — held. `StructuralValidationGate.php:532-562` — held (`:528-562`). `FieldType.php:12` —
+  **moved** to `:14-17`; still claims cells are "independently typed", and `openapi.json:6617` copies it. `ValueShape.php:171-191` —
+  held (`Grid` allows only the required/skip rules). `docs/data-dictionary.md:382` — held.
+- `R-1c1d7266`: `MatrixGrid.vue:9-13` ("NO `<table>`") and `:118-135` — held (`:117-135`). `FieldInput.vue:269-270` — **moved**: the
+  mount is `:547-556`, the type switch `:282-283`. `PrintAnswerArea.php:92` — held.
+- `R-f03cf999`: `MatrixGrid.vue:94` — held (the likert row card, `:93-115`). `FieldInput.vue:267` — **moved** to `:280` (the switch) and
+  `:484-503` (the chip row).
+- `R-51e044a6`: `SchemaValueFormatter.php:338-376` — held (`formatGrid` `:350-377`). `SubmissionRowProjector.php:82` — held
+  (`resolveColumns` `:82-127`). `MappableColumnCatalog.php` — held (`:54-70`, the projector's columns). `docs/xlsform-interop-spec.md:71`
+  — held as text, **false as a fact** (premise 4).
+
+### Premise verified
+1. **"From 48em" (`R-1c1d7266`) is dead on arrival.** The guest column is `max-width: 44rem` (`RuntimeShell.vue:56`), the encode page's
+   45rem (`Encode.vue:1658`), halved beside a scanned paper (`Encode.vue:2121-2130`, `RuntimeSession.vue:827-832`), and the builder
+   preview is a side pane. A 48em rule on the grid's own width would never draw a table; a viewport rule would draw one beside a scan
+   and in the preview where it does not fit. The codebase's convention is `@container` in em (`DataTable.vue:636-652` argues against
+   48em by name). Reshaped: a container query on the grid, the table from 30em of its own width, the table box scrolling inside itself
+   when a wide grid still does not fit — never the page.
+2. **One renderer — true.** `MatrixGrid.vue` is imported only by `FieldInput.vue:28`; the guest runtime (`FieldControl.vue:84`), the
+   encode page and the OCR review (`Encode.vue`), the builder preview (`PreviewRuntime.vue` → `FieldRow`) and Version View all reach it.
+   Repeat instances build no matrix (`InstanceField.vue:40-55`; grids are refused in repeats).
+3. **"The request validates value/label only" (`R-5033e87e`) — true, and not the whole story.** `payload()` (`UpdateFieldRequest.php:116-129`)
+   merges the raw config back over the validated tree, so a new column key is SAVED unvalidated. **Three projections strip it:** the
+   TypeScript engine's `GridConfig` (`schema-mapping.ts:276-303`, `schema.ts:22-26`), the render model (`schema-mapping.ts:306-342`,
+   `EncodeFormPresenter.php:527-539`) and the print presenter (`BlankFormPrintPresenter.php:404-407`). Both engines refuse or blank a list
+   cell (`StructuralAnswerNormalizer.php:581-584`, `expected_scalar`, every leaf `toStr`; `Coercion::toStr` of an array is `''` on both
+   sides). The gate's cells rule is restated in `FieldTypeConversion.php:524-526`, and `gridConfig()` (`:297-306`) would carry typed
+   columns into a Likert matrix.
+4. **"The existing `{row_key}_{column_key}` names" (`R-51e044a6`) — false.** The exporter writes `{key}_{row}_{col}`
+   (`XlsformExporter.php:202`, pinned as `grid_q1_c1`); the spec line is wrong too, and is corrected. Per-cell values added in
+   `answerValues()` also reach the **automation webhook** (`FormAutomationWebhookPayload.php:48,65`), a third consumer the row does not
+   name — additive, and documented. The Sheets/Airtable mapping rule caps `field_key` at 100 (`SubscriptionConfigRules.php:140`) while a
+   per-cell key can be far longer (a key of 150 and two values of 255). A `.` inside a row or column value can give two cells one key.
+   A Likert matrix has no column level (`<question>.<row>`). `M146`'s repeats added no columns — its per-version `$fieldMeta` threading
+   (`SubmissionRowProjector.php:114-118`, `:156-160`) is the precedent. **The paper:** `config.cells` never reaches the print presenter,
+   so a printed matrix today is empty boxes with no choices anywhere on the page.
+5. **`R-f03cf999`: the printed Likert matrix already IS the grid** (`blank-form.blade.php:173-189`: rows × the scale, a box per cell) —
+   nothing to do. **A Likert scale is read by the scanner** through the Choices arm (`OcrFieldEligibility.php:71`,
+   `PrintedFormMatcher.php:458`), so its paper stays exactly as it is. The Likert matrix's radios are named after the field key
+   (`MatrixGrid.vue:106`), the pattern `R-de624bb1` fixed elsewhere (`FieldInput.vue:319-322`) — each copy gets its own name.
+6. **The floor beside the citations.** MatrixGrid has no hint or error id, no `aria-describedby`, no `aria-invalid`, and the Likert scale's
+   radios neither — fixed in the rewrite. Not fixed here, filed `during-testing`: a per-cell error never reaches the grid
+   (`useFormRuntime.ts:877-890` returns one message per field); the response page and the response PDF show a grid as one line of codes
+   (`Show.vue:364`, `submission.blade.php:86-91`). No Vitest file mounts MatrixGrid or MatrixEditor; the axe spec's locators depend on
+   each row being a `group` (`public-runtime-axe.spec.ts:115-119`).
+- One session only; lane B retired; no other claim or forward queue in either claim file beyond `M182`'s and `M181`'s held blocks, below.
+
+### Remedy verdict
+**Works, reshaped in four places:** (1) the table from 30em of the grid's own width by a container query, not 48em; (2) the XLSForm
+names stay `{key}_{row}_{col}` and the spec is corrected; (3) the mapping rule's `field_key` cap rises to fit a per-cell key, and the
+webhook's `answers` gain the per-cell keys, documented; (4) a Likert scale's paper is unchanged. Kept as prescribed: `config.columns[]`
+gains `type` (single_select, multi_select, short_text, integer, decimal, date — no `yes_no`, `D140`), its own `options` and `required`;
+`config.cells` stays the choices of a choice column with none of its own, so every existing grid loads unchanged; the answer keeps
+`{row:{col:value}}`, typed by its column, in both engines and the golden vectors; a real `<table>` with `th` scopes and today's cards
+below, `config.layout: stacked` for cards everywhere; the Likert matrix as Kobo's grid and a Likert scale as the joined line; one column
+per cell beside the summary, unioned across versions; typed per-cell XLSForm questions; typed cells on the printed form.
+
+Files: `app/Enums/FieldType.php` (docblock), `app/Http/Requests/Forms/UpdateFieldRequest.php`, `app/Services/Forms/StructuralValidationGate.php`,
+`app/Support/Forms/FieldTypeConversion.php`, `app/Services/Submissions/StructuralAnswerNormalizer.php`,
+`app/Services/Validation/SemanticValidator.php`, `app/Services/Submissions/SchemaValueFormatter.php`,
+`app/Services/Submissions/EncodeFormPresenter.php`, `app/Services/Submissions/SubmissionRowProjector.php`,
+`app/Services/Submissions/SubmissionExporter.php`, `app/Support/Connectors/SubscriptionConfigRules.php`,
+`app/Services/Xlsform/XlsformExporter.php`, `app/Services/Xlsform/XlsformImportParser.php`, `app/Services/Forms/BlankFormPrintPresenter.php`,
+`resources/views/pdf/blank-form.blade.php`, `resources/views/pdf/_blank-form-styles.blade.php`; `resources/public-runtime/engine/semantic-validator.ts`,
+`schema.ts`, `display-value.ts`; `resources/public-runtime/lib/schema-mapping.ts`, `types.ts`;
+`resources/js/components/submissions/MatrixGrid.vue`, `FieldInput.vue`, new `LikertLine.vue`; `resources/js/components/builder/MatrixEditor.vue`,
+`LikertMatrixEditor.vue`, `GridOptionList.vue`, `field-save-errors.ts`; `resources/js/components/help/manual.ts`;
+`database/seeders/E2eSeeder.php`; `VERSION`, `database/data/releases.json`; `openapi.json` (regenerated); the tests — `tests/golden/validation/matrix.json`,
+`manifest.json`, `tests/golden/templates/formatting.json`, `tests/Unit/Validation/SemanticGoldenVectorsTest.php`,
+`resources/public-runtime/engine/__tests__/golden-validation.test.ts`, `golden-templates.test.ts` (if its fragment moves),
+`tests/Feature/Submissions/G4FieldTypesTest.php`, `SubmissionExportTest.php`, the Forms gate, conversion, request and print tests,
+`tests/Feature/Connectors/MappableColumnCatalogTest.php`, `SubscriptionConfigRulesTest.php`, the automation webhook payload test,
+`tests/Feature/Xlsform/XlsformExportTest.php`, `tests/Unit/Xlsform/XlsformImportParserTest.php`,
+`resources/public-runtime/__tests__/components.test.ts`, `resources/js/components/submissions/FieldInput.test.ts`, new `MatrixGrid.test.ts`
+and `MatrixEditor.test.ts`, `tests/e2e/public-runtime-axe.spec.ts`, `tests/e2e/builder-axe.spec.ts`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/data-dictionary.md`, `docs/xlsform-interop-spec.md`,
+`docs/architecture/technical-architecture.md`, `docs/webhook-integration-design.md`, `openapi.json`, `PROGRESS.md` (own block, the
+hand-off), the e2e specs above.
+Paired files taken: none edited by intent; `packages/design-system/src/theme/__tests__/clipped-node-containment.test.ts` scans
+`resources/js` and may move if the grid's scroll box counts as a clipped node — named so it is not a surprise.
+Hubs (`D128`: overlap allowed, every hub named): `resources/js/components/submissions/FieldInput.vue`,
+`app/Http/Requests/Forms/UpdateFieldRequest.php`, `app/Services/Xlsform/XlsformExporter.php`, `docs/data-dictionary.md`,
+`docs/architecture/technical-architecture.md` (the golden corpora), `openapi.json`, `resources/js/components/builder/field-save-errors.ts`,
+`docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md`. `ConfigPanel.vue` is not touched (the Grid tab already writes `config.columns`).
+Namespaces spent: nothing from either namespace — no decision, no migration prefix, no ADR.
+E2E specs the diff reaches, run locally: `public-runtime-axe` (the grid cases), `builder-axe` (the grid editor), `encode-validation` (the
+Showcase renders its grids), `whats-new` (three releases now); CI runs every spec.
+Prediction: red first commit by commit — the new golden vectors red in BOTH runners until the engines move (about six); the normaliser,
+request, gate, conversion and presenter Pest cases red; the MatrixGrid and FieldInput Vitest cases red; the export, catalog, mapping-rule,
+webhook, XLSForm and print Pest cases red. All green after. About twelve mutants, each turning only its named cases. **Most likely
+wrong:** the e2e no-horizontal-overflow check on a wide typed grid at 834 — the inner scroll box may still count. Runner-up: the
+citation-liveness ceiling after the MatrixGrid and FieldInput rewrites (cited lines going blank).
+
+## HELD — `M182`, UI6 of the UI programme: consistency (`R-49813d21`, `R-3ca62317`, `R-f724595b`, `R-9d3c2439`) (m182-ui6-consistency)
 
 Taken 2026-10-21. Branch `m182-ui6-consistency`, **stacked**: cut from `origin/m181-ui5-versioning-whats-new` at `9dc6fdaf` (UI5, built
 and held), with `origin/main` merged on top to bring this claim — that merge is the claim-merge commit, and UI6's own commits start

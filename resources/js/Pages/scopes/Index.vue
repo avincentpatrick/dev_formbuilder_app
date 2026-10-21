@@ -361,11 +361,11 @@ function startKeyboardMove(): void {
         />
 
         <MdsModal v-if="move.confirming.value" :open="true" title="Move scope" @close="move.cancel()">
-            <p>
+            <p class="scopes__prose">
                 Move <strong>{{ move.movingName.value }}</strong>
                 {{ move.targetName.value ? `under ${move.targetName.value}` : 'to the top level' }}?
             </p>
-            <p class="scopes__hint">
+            <p class="scopes__prose scopes__hint">
                 Everything beneath it moves too. Access granted on a branch follows the branch, so this can
                 change who reaches the forms below.
             </p>
@@ -434,6 +434,18 @@ function startKeyboardMove(): void {
 .scopes__meta,
 .scopes__hint {
     color: var(--mds-color-text-secondary);
+}
+
+/* M182 (`D159`): the Move scope dialog's two paragraphs, as every tenant dialog styles its own — bare, they took the
+   browser's default margins. No colour here, so the hint keeps its secondary text. */
+.scopes__prose {
+    margin: 0;
+    font-size: var(--mds-type-body-md-font-size);
+    line-height: var(--mds-type-body-md-line-height);
+}
+
+.scopes__prose + .scopes__prose {
+    margin-top: var(--mds-space-3);
 }
 
 .scopes__actions {

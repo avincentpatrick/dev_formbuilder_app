@@ -120,10 +120,6 @@ function openReset(row: ConsoleUser): void {
     color: var(--mds-color-text-body);
 }
 
-.admin-users__prose + .admin-users__prose {
-    margin-top: var(--mds-space-3);
-}
-
 .admin-users__error {
     color: var(--mds-color-status-danger-fg);
 }

@@ -27,6 +27,52 @@ branch rebased onto the trunk by its own commits only and merged, then T2 + Like
 `~/.claude/plans/read-claude-md-then-claude-plans-hi-let-enumerated-cherny.md`. `state.php` prints next free `M181` because it counts
 RELEASED headings and `M181` is HELD — this is `M182`.
 
+**BUILT — PR #375, CI 6/6 green with real step counts (run 39536256418 at `96b00643`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the only skips are the two main-only
+staging-header steps and the failure-only report upload) — AND NOT MERGED.** ⛔ **Held for merge point 4 (`D137`, `D138`):** #374 (UI5)
+first, then this branch rebased onto the trunk by its own commits only, then T2 + Likert, between the user's census before and after.
+⛔ **#374 needs this branch's lock commit before it can go green again** — two `npm audit` advisories published during this build (the
+extension above) red its gate as they red every branch; asked of the user at this session's close. ⚠️ At merge point 4, UI6's deploy is
+the first to run `releases:sync` (UI5's changed `deploy.ps1` runs one deploy late), so check `/whats-new` after it: 0.9.0 and 0.9.1.
+
+**Measured against the prediction:**
+- **Red first, commit by commit — held, to the count.** The theme test: the two same-step cases red (`300` against `200`), the four
+  4.5:1 cases and the light case green on the old step, as written. The dialog test: 7 of 7 red. The tracking sweep: exactly the five
+  named sites. The title sweep: eleven sites — after one parser fix (below). The two mount proofs red at the title, their floors green.
+- **Mutants: 7 committed, 7 caught, each red set the one written down first** — the system dark block left on danger-300 (its same-step
+  case, and the existing blocks-identical guard too); the reset dialog's sibling gap dropped; Delete scope's lead unclassed; the sidebar's
+  literal restored; a kept wordmark literal removed while its allow-list entry stayed (the shrink-only case); RuleShow's title dropped;
+  the destination's title bound to the column name (the mount proof red, the sweep green — the reason the proof exists). "About eight" —
+  seven; no `scripts/mutate.php` run, since nothing in the diff is Pest-reachable.
+- **"Most likely wrong: the title sweep's template matching" — right, in a way I did not name.** The first red set held eleven, but
+  RuleShow's read "no element in the template carries it": a template COMMENT in `RuleShow.vue` mentions "the `<style>` block", so
+  `indexOf('<style')` cut the template short. The sweep now finds the block at column 0. No `:class` miss and no double count.
+- **Runner-up — not wrong:** `whats-new.spec.ts` passed with two releases in the table (its unseen member sees both; the newest heading
+  is what it checks).
+- **What no prediction named:** (1) ⛔ two `npm audit` advisories published mid-build red CI's Static-analysis job at the first push —
+  fixed by a hand-edited, npm-verified lock entry (a root `npm update vite` would have moved the whole vite 8 / rolldown tree), and #374
+  inherits the red; (2) the lock regeneration closed `R-e5716b29` and `R-d88fcfa1`, one lock line filed twice; (3) closing a row needs
+  the `- ✅ **CLOSED BY …** — ****` prefix on its TITLE line — a body note alone left all four in the line until I read
+  `scripts/backlog-triage.php`; (4) `python3` on this host opens the Store stub and hangs — PHP and perl only; (5) the local e2e stack
+  cannot reach Vite from the app's network, so `public/hot` goes aside and the bundle is built (the recorded recipe; the first run
+  without it died in global setup); (6) the dev database's seen-version stamps had to be re-seeded to 0.9.1, or every spec would have met
+  the prompt; (7) at 375px the scopes keyboard-move case fails locally — measured on UI5's tree too, so not this increment's dialog edit;
+  filed as `R-43cd87e6`; CI passes it from a fresh database; (8) ⛔ `BacklogProvenanceTest` refused my second filed row — its
+  `Filed by` wrapped across a line, the miss `M180` recorded — caught because `tests/Feature/Docs` ran after the tracker edit, as `M180`
+  prescribed.
+- **Local gates on the final tree:** full Vitest 260 of 260 files (= disk), 4,131 tests; `vue-tsc`; Pint bare; host lints (pipeline,
+  tracker, citation-liveness — ledger tier 15 of 16); Pest — Releases, WhatsNew, BuildInfo, Deploy, Docs (only the known
+  `SuiteCollectionFloorTest` bind-mount artefact). PHPStan unmoved: the diff touches no `app/`, `database/` or `routes/` file. E2E at one
+  worker, built bundle: `whats-new`, `scopes-axe`, `admin-console-axe`, `public-runtime-axe`, `builder-axe`, `responsive-axe` — 414
+  passed, 2 skipped, 10 failed: six *Sheets rule detail — drift* (every width; the dev worker's dead-lettered seed delivery, as `M181`
+  recorded; green on CI), three mobile builder cases on the cold first load (all three green on a re-run), and the scopes move at 375px
+  (`R-43cd87e6`).
+- **The look** (a throwaway desktop spec, deleted; screenshots in the git-ignored `storage/app/m182-look/`): the sign-in card's field
+  error is `rgb(226, 168, 156)` in dark and `rgb(138, 46, 32)` in light; the guest runtime's own bundle paints both tokens
+  `rgb(226, 168, 156)` in dark; Move scope's paragraphs 0 then 12px, Delete scope's lead 0, the reset dialog 0 then 12px (and in dark);
+  Help's, the sidebar's and the canvas's labels 0.06em; every destination, leaderboard and canvas title equal to its text; the version
+  reads v0.9.1 in the sidebar and on the sign-in card. Filed from the look: `R-c1eaa8b5` — the canvas's question labels start 20–35px
+  apart after the longer type labels (already so; the tracking token widened the longest by about 4px).
+
 **No check is owed:** R3 and R4 were confirmed on 2026-10-20 and UI5 is not live. The session-start pull read 0 reports, 0 reopened and
 0 new comments (relayed 31: 15 Resolved · 10 Ongoing · 6 Confirmed working), so nothing was triaged. **Asked and answered in planning
 (the user, 2026-10-21, in chat), each the recommended option, recorded on this branch's first commit:** **`D158` A** — one red at the

@@ -127,7 +127,7 @@ const cellChoiceUsers = computed(() =>
                                 :data-column-type="index"
                                 :model-value="typeOf(option)"
                                 :options="COLUMN_TYPES"
-                                
+                                @update:model-value="setType(index, $event)"
                             />
                         </template>
                     </MdsFormField>

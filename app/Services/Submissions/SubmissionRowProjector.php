@@ -10,6 +10,7 @@ use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Services\Templates\TemplateRenderer;
 use App\Services\Templates\TemplateSources;
+use App\Support\Forms\MatrixColumns;
 use App\Support\Mapping\ColumnMapping;
 use App\Support\Submissions\SubmissionReference;
 use Illuminate\Support\Collection;
@@ -77,7 +78,7 @@ final class SubmissionRowProjector
      * one column no matter which versions carry it.
      *
      * @param  Collection<int, FormVersion>  $versions
-     * @return array{0: array<string, string>, 1: array<string, array<string, array{type: FieldType, config: array<string, mixed>, repeat: string|null}>>}
+     * @return array{0: array<string, string>, 1: array<string, array<string, array{type: FieldType, config: array<string, mixed>, repeat: string|null, cell?: array{field: string, row: string, column: string|null}}>>}
      */
     public function resolveColumns(Collection $versions, string $locale): array
     {
@@ -120,10 +121,87 @@ final class SubmissionRowProjector
                 if (! array_key_exists($key, $columns)) {
                     $columns[$key] = $this->header($field, $locale, $key, $sources);
                 }
+
+                // M183 (`R-51e044a6`, `D130` A): a grid's cells, one column each, right after its summary — which stays,
+                // so no Sheets or Airtable mapping of it changes identity. A cell a later version dropped keeps its
+                // column for the responses that answered it, exactly as a dropped question does.
+                if ($type === FieldType::Matrix || $type === FieldType::LikertMatrix) {
+                    foreach ($this->gridCells($type, $config, $key, $locale) as $cellKey => $cell) {
+                        $fieldMeta[$version->id][$cellKey] = $cell['meta'];
+                        if (! array_key_exists($cellKey, $columns)) {
+                            $columns[$cellKey] = $columns[$key].' — '.$cell['header'];
+                        }
+                    }
+                }
             }
         }
 
         return [$columns, $fieldMeta];
+    }
+
+    /**
+     * A grid's cell columns (M183, `R-51e044a6`), in the author's order: `<key>.<row>.<column>` for a matrix — each read
+     * as a question of its column's type ({@see MatrixColumns}), its choices by their labels — and `<key>.<row>` for a
+     * Likert matrix, read as a Likert scale over its columns. A field key never holds a point, so no cell key can be a
+     * question's or a `__` metadata key; but a row or column value MAY, and two cells can then make one key — the first
+     * in the author's order keeps it.
+     *
+     * @param  array<string, mixed>  $config
+     * @return array<string, array{header: string, meta: array{type: FieldType, config: array<string, mixed>, repeat: null, cell: array{field: string, row: string, column: string|null}}}>
+     */
+    private function gridCells(FieldType $type, array $config, string $key, string $locale): array
+    {
+        $cells = [];
+        /** @var list<array<string, mixed>> $rows */
+        $rows = array_filter((array) ($config['rows'] ?? []), fn (mixed $row): bool => is_array($row) && (string) ($row['value'] ?? '') !== '');
+
+        foreach ($rows as $row) {
+            $rowValue = (string) $row['value'];
+
+            if ($type === FieldType::LikertMatrix) {
+                $cells["{$key}.{$rowValue}"] ??= [
+                    'header' => $this->optionLabel($row, $locale),
+                    'meta' => ['type' => FieldType::LikertScale, 'config' => ['options' => MatrixColumns::columns($config)], 'repeat' => null, 'cell' => ['field' => $key, 'row' => $rowValue, 'column' => null]],
+                ];
+
+                continue;
+            }
+
+            foreach (MatrixColumns::columns($config) as $column) {
+                $columnValue = (string) ($column['value'] ?? '');
+                if ($columnValue === '') {
+                    continue;
+                }
+                $cells["{$key}.{$rowValue}.{$columnValue}"] ??= [
+                    'header' => $this->optionLabel($row, $locale).' — '.$this->optionLabel($column, $locale),
+                    'meta' => [
+                        'type' => MatrixColumns::type($column),
+                        'config' => ['options' => MatrixColumns::choices($column, $config)],
+                        'repeat' => null,
+                        'cell' => ['field' => $key, 'row' => $rowValue, 'column' => $columnValue],
+                    ],
+                ];
+            }
+        }
+
+        return $cells;
+    }
+
+    /**
+     * A grid row's or column's words in the reading language, as a choice's label is read ({@see SchemaValueFormatter}).
+     *
+     * @param  array<string, mixed>  $option
+     */
+    private function optionLabel(array $option, string $locale): string
+    {
+        $translated = $option['label_translations'][$locale] ?? null;
+        if (is_string($translated) && $translated !== '') {
+            return $translated;
+        }
+
+        $label = $option['label'] ?? null;
+
+        return is_string($label) && $label !== '' ? $label : (string) ($option['value'] ?? '');
     }
 
     /**
@@ -141,7 +219,7 @@ final class SubmissionRowProjector
      * A repeat member (M146, `D100` A) is read from its section's instance list and joined into one cell by
      * {@see repeatCell()}; the column keeps the member's own key, because a Sheets or Airtable mapping persists it.
      *
-     * @param  array<string, array<string, array{type: FieldType, config: array<string, mixed>, repeat: string|null}>>  $fieldMeta
+     * @param  array<string, array<string, array{type: FieldType, config: array<string, mixed>, repeat: string|null, cell?: array{field: string, row: string, column: string|null}}>>  $fieldMeta
      * @return array<string, string>
      */
     public function answerValues(Submission $submission, array $fieldMeta, string $locale): array
@@ -154,12 +232,38 @@ final class SubmissionRowProjector
         $values = [];
 
         foreach ($versionMap as $key => $meta) {
+            // M183 (`R-51e044a6`): a grid cell's column, read from its grid's answer as a question of its type is read.
+            if (isset($meta['cell'])) {
+                $values[$key] = $this->formatter->displayValue($meta['type'], $this->cellAnswer($answers, $meta['cell']), $meta['config'], $locale);
+
+                continue;
+            }
+
             $values[$key] = $meta['repeat'] === null
                 ? $this->formatter->displayValue($meta['type'], $answers[$key] ?? null, $meta['config'], $locale)
                 : $this->repeatCell($meta['type'], $meta['config'], $this->instancesOf($answers, $meta['repeat']), $key, $locale);
         }
 
         return $values;
+    }
+
+    /**
+     * One cell of a stored grid answer (M183): `{row: {col: cell}}` for a matrix, `{row: score}` for a Likert matrix.
+     * Fail-closed: anything else is no answer.
+     *
+     * @param  array<string, mixed>  $answers
+     * @param  array{field: string, row: string, column: string|null}  $cell
+     */
+    private function cellAnswer(array $answers, array $cell): mixed
+    {
+        $grid = $answers[$cell['field']] ?? null;
+        $row = is_array($grid) && ! array_is_list($grid) ? ($grid[$cell['row']] ?? null) : null;
+
+        if ($cell['column'] === null) {
+            return $row;
+        }
+
+        return is_array($row) && ! array_is_list($row) ? ($row[$cell['column']] ?? null) : null;
     }
 
     /**

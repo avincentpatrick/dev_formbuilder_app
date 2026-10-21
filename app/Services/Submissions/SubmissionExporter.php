@@ -75,9 +75,12 @@ final class SubmissionExporter
         // M172 (`R-a44638b6`, `D133`): a question the current version no longer asks keeps its column and its answers,
         // headed with the version that removed it. Here and not in resolveColumns(): the connectors' column catalog reads
         // that too, and a mapped column must not change its name.
+        // M183 (`R-51e044a6`): a retired grid's cell columns (`<key>.<row>[.<column>]`) say so too; a key never holds a point.
         foreach ($this->retiredKeys->for($form) as $key => $removedIn) {
-            if (isset($columns[$key])) {
-                $columns[$key] .= " (removed from the form in version {$removedIn})";
+            foreach (array_keys($columns) as $column) {
+                if ($column === $key || str_starts_with((string) $column, $key.'.')) {
+                    $columns[$column] .= " (removed from the form in version {$removedIn})";
+                }
             }
         }
         $headerRow = array_merge(array_values(SubmissionRowProjector::metaLabels()), array_values($columns));
@@ -136,7 +139,7 @@ final class SubmissionExporter
      * rather than guessing at a value for a field this submission never had.
      *
      * @param  list<string>  $keys
-     * @param  array<string, array<string, array{type: FieldType, config: array<string, mixed>, repeat: string|null}>>  $fieldMeta
+     * @param  array<string, array<string, array{type: FieldType, config: array<string, mixed>, repeat: string|null, cell?: array{field: string, row: string, column: string|null}}>>  $fieldMeta
      * @return list<string>
      */
     private function row(Submission $submission, array $keys, array $fieldMeta, string $locale): array

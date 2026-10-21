@@ -137,7 +137,9 @@ final class SubscriptionConfigRules
             'config.mapping.fingerprint' => ['nullable', 'string', 'max:64'],
             'config.mapping.columns' => ['nullable', 'array', 'min:1'],
             'config.mapping.columns.*.header' => ['present', 'string', 'max:255'],
-            'config.mapping.columns.*.field_key' => ['nullable', 'string', 'max:100'],
+            // M183 (`R-51e044a6`): a grid cell's column is `<key>.<row>.<column>` — a key of up to 150 and two values
+            // of up to 255 (`UpdateFieldRequest`), joined by two points — so 100 refused the longest ones.
+            'config.mapping.columns.*.field_key' => ['nullable', 'string', 'max:662'],
         ];
     }
 

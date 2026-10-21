@@ -165,7 +165,7 @@ function selectOptions(column: MatrixColumn): MatrixOption[] {
                     </thead>
                     <tbody>
                         <tr v-for="(row, i) in rows" :key="row.value" class="mds-grid__row">
-                            <th :id="rowId(i)" scope="row" class="mds-grid__row-label">{{ row.label }}</th>
+                            <td :id="rowId(i)" class="mds-grid__row-label">{{ row.label }}</td>
                             <td v-for="(col, j) in columns" :key="col.value" class="mds-grid__cell">
                                 <!-- likert_matrix: one radio per point; the row's points are one native group. -->
                                 <label v-if="kind === 'likert-matrix'" class="mds-grid__point">

@@ -539,7 +539,7 @@ li[data-dragging='true'] .canvas__field {
     color: var(--mds-color-text-secondary);
     font-size: var(--mds-type-caption-font-size);
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: var(--mds-tracking-wide);
 }
 
 .canvas__field-label {

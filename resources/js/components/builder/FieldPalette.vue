@@ -141,7 +141,7 @@ watch(() => props.palette, () => queueMicrotask(measure), { deep: false });
     font-size: var(--mds-type-caption-font-size);
     font-weight: var(--mds-font-weight-semibold);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: var(--mds-tracking-wide);
 }
 
 .palette__list {

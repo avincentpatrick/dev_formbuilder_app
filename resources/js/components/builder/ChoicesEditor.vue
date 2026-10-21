@@ -100,7 +100,7 @@ function addYesNo(): void {
     font-weight: var(--mds-font-weight-semibold);
     color: var(--mds-color-text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: var(--mds-tracking-wide);
 }
 
 .choices__actions {

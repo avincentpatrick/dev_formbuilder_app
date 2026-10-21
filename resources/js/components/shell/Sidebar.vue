@@ -363,7 +363,7 @@ function onKeydown(event: KeyboardEvent): void {
     font-size: var(--mds-type-caption-font-size);
     line-height: var(--mds-type-caption-line-height);
     font-weight: var(--mds-font-weight-semibold);
-    letter-spacing: var(--mds-tracking-wide);
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--mds-color-text-secondary);
 }

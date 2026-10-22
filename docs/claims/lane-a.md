@@ -28,6 +28,46 @@ merged and live, this branch rebased onto the trunk by its own commits only and 
 `~/.claude/plans/pasted-content-id-1746-read-claude-md-majestic-moler.md`. `state.php` prints next free `M181` because it counts RELEASED
 headings and `M181`/`M182` are HELD — this is `M183`.
 
+**BUILT — PR #376, CI 6/6 green with real step counts (run 39705250871 at `84974a74`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the only skips are the two main-only
+staging-header steps and the failure-only report upload) — AND NOT MERGED.** ⛔ **Held for merge point 4 (`D137`, `D138`):** the user's
+census before, #374 (UI5), then #375 (UI6), then this branch rebased onto the trunk by its own commits only, then the census after. This
+branch is NOT re-merged with the trunk's claim commits (that would re-run CI for docs alone); the rebase carries them. ⚠️ After its deploy,
+`/whats-new` should list 0.9.0, 0.9.1 and 0.10.0.
+
+**Measured against the prediction:**
+- **Red first, commit by commit — held.** Golden validation: five of six red in EACH engine — the sixth (a multiple-choice cell with
+  nothing ticked is unanswered) already held, since both `isEmpty` treat `[]` as empty; kept as a pin. Server Pest: 14 of 18 red (three
+  pins written to stay green; the required column already held by the engines' commit, which its golden vector had turned red first).
+  Projections 2, the summary's template vector 1 (red in both; PHP wrote the list as JSON), the Grid tab 6, save routing 1, the grid and
+  Likert 11, the cell columns 6 (each for its own reason), XLSForm 2, print 2. "About six golden" — six written, five red.
+- **Mutants: 12, 12 caught, each red set the one named.** Through `scripts/mutate.php`: the PHP engine ignoring a column's own choices (2
+  red), Stage 1 refusing list cells (2), the gate skipping a column's own choices (1), the cell columns dropped (5), the mapping cap back
+  to 100 (1), XLSForm cells untyped (1), the print dropping a column's choices (2). Committed then reverted: the TS engine ignoring own
+  choices (2), the render model dropping a column's type (1), the Type select writing nothing (2), the row header a plain cell (3), the
+  Likert radios named after the key (1). "About twelve" — twelve.
+- **"Most likely wrong: the overflow check on a wide typed grid at 834" — wrong, in the safe direction.** No grid needed its inner scroll
+  box at any width (the four-column Showcase grid fits its 704px column); both overflow checks passed locally and in CI.
+- **Runner-up, citation-liveness — right.** The rewrites took the ledger to 20, then 16, then 16 again (lines shifted in `schema-mapping.ts`,
+  `ConfigPanel.vue`, `FieldInput.vue`, `XlsformExporter.php`); each time repaired line-count-neutrally, at the true target, to 15 of 16.
+- **What no prediction named:** (1) ⛔ a comment above a validation rule is Scramble's field description: CI's contract job red on the
+  first run, because the export ran before the mapping cap moved — regenerated, the comment rewritten for an API reader; (2) the full
+  Vitest run's token-references gate refuses a custom property in the `--mds-` namespace that is not a token (the grid's own; renamed
+  `--matrix-grid-*`); (3) `vue-tsc`: `InstanceField.vue`'s repeat cast named the old grid answer type (the claim extended a second time,
+  before editing) and an index signature on the editor's `Column`; (4) "`ConfigPanel.vue` is not touched" was wrong (extended before
+  opening); (5) PowerShell reads curly quotes as string delimiters — every edit holding one went through the Edit tool or a PHP script;
+  (6) PHPStan locally: 47 on UI6's head and 47 on this one, all model-property reads of untouched lines — a local artefact; CI's static
+  analysis is green; (7) nine Pest directories in one process exhausted PHP's 128MB — rerun at 3G; (8) the dev database's two grid fixtures
+  predate the seeder change, and a wipe would have taken the demo tenant's own 7 forms and 499 responses — refreshed instead through the
+  app's own services (the Showcase published as its version 2); (9) the first local desktop pass of `encode-validation`'s whole-number case
+  failed once (the refusal shown, its words not found) and passed 3 of 3 on a rerun — a flake; CI passed it.
+- **Local gates on the final tree:** Vitest 262 of 262 files (= disk), 4,158 tests; `vue-tsc` clean; Pint bare; Pest 3,039 (Submissions,
+  Forms, Xlsform, Connectors, Releases, WhatsNew, Automations, Seeders, Unit); Docs 169 (only the known `SuiteCollectionFloorTest`
+  bind-mount artefact); host lints (pipeline, tracker, citation-liveness 15 of 16, `state.php --check`). E2E at one worker, built bundle:
+  `public-runtime-axe`, `builder-axe`, `encode-validation`, `whats-new` — 153 passed, 2 skipped, 1 flaky (above).
+- **The look** (a throwaway spec, deleted; screenshots in the git-ignored `storage/app/m183-look/`): the Likert matrix a table at 834 and
+  1440 and cards with the joined line at 375; the typed matrix a table of selects, a number box and tick boxes, and cards on the phone;
+  light and dark. The joined line is the decorative `border-strong` grey — faint on white (about 1.4:1); each radio carries its own ring.
+
 **No check is owed:** UI5 and UI6 are not live; R3 and R4 were confirmed on 2026-10-20. The session-start pull read 0 reports, 0
 reopened and 0 new comments (relayed 31: 15 Resolved · 10 Ongoing · 6 Confirmed working), so nothing was triaged. **Asked and answered
 in planning (the user, 2026-10-22, in chat):** the 0.10.0 What's new notes, approved as written (five items, verbatim in the build

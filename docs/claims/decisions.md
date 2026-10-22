@@ -24,10 +24,20 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D158` and `D159`, the last two filed, were asked and answered on 2026-10-21 while `M182` (UI6) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D160`, the last filed, was asked and answered on 2026-10-23 while `M184` (T3) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D160 — A question can now take its choices from an uploaded list file, and a list file can easily hold hundreds of rows. On the paper form, a question whose choices are typed in prints every choice as a tick box, however many there are. How should a list-fed question print? **A — like typed choices: every choice a tick box, so the scan reads the ticks as today; the builder warns when a list is long; a write-in box for long lists is filed for later.**
+
+**Asked and answered 2026-10-23 (user decision, in chat), while `M184` (T3) was planned; recorded in its claim.** T3 writes a list-bound question's choices into the published version (`ChoiceListMaterializer`), so every reader — the paper form's `BlankFormPrintPresenter::choiceOptions()` among them — sees plain options. A question linked to another form already prints a write-in box, because its list is live and its stored options are empty.
+
+- **A — like typed choices (recommended, chosen).** Nothing changes on paper; the "A list file" arm says, above 30 rows on a Single or Multiple choice: *"This list has N choices. A Dropdown is easier to use, and the paper form prints every choice."*
+- **B — a write-in box above 30 choices for every choice question,** typed or from a list, with the scan matching the writing to the nearest choice and a "may be wrong" note; built in T3.
+- **C — a write-in box for every list-fed question,** whatever its length, matched the same way; built in T3.
+
+**What the answer files, in the same push:** one `during-testing` row — a long list prints every choice as a tick box on paper; the remedy is B's write-in box and nearest-choice scan.
+
 ### D159 — The four consistency rows turned out to be floors: two more dialogs open on browser-default margins (Move scope, Delete scope), three builder labels hard-code their letter spacing, and eight more cut-off names and titles cannot be read in full. Fix them in UI6 too? **A — yes, every one, with two sweep tests so new ones cannot creep back.**
 
 **Asked and answered 2026-10-21 (user decision, in chat), while `M182` (UI6) was planned; recorded in its claim.** Found by the planning pass on UI5's tree: `R-3ca62317` says every tenant dialog styles its paragraphs, and two do not; `R-f724595b` names three literals, and the builder's palette, choices editor and canvas carry three more; `R-9d3c2439` names three clipped values, and a sweep of `text-overflow: ellipsis` finds eleven with no `title` (two more are static words).

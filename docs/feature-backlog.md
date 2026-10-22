@@ -14423,7 +14423,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   populate options thru the connection to responses from other forms"*. Split out of `R-5fdbc47c`, which named multi-select as
   the remainder's. The remedy: `multi_select` joins `LINKABLE_TYPES`, the request accepts the source for it, and the link is
   offered through the one "Options come from" chooser (Typed here · A list file · Another form's answers) that replaces the
-  editor for every choice question. **Live.** Filed by `M172`. **Tier: early-testing.**
+  editor for every choice question. **Live.** Filed by `M172`. **Tier: early-testing.** **Taken by T3 (`M184`), 2026-10-23 (`D138`), for relayed `R1-1b` and `R1-3b`; the request already accepts the source for a Multiple choice (`UpdateFieldRequest`'s `choices` arm covers it), which is refused only at publish — and the chooser keeps its shipped label, "Choices come from".**
 
 - **`minor` · A list file can feed a cascade's levels but not a plain choice question, and only CSV is accepted, so a list in Excel must be converted first.**
   `app/Services/Forms/ChoiceListMaterializer.php:136-146` materialises a version's choice lists for `cascading_select` levels only
@@ -14434,7 +14434,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   list (`name,label` columns, the parent column optional), materialised at publish exactly as a cascade's so every server-side
   reader stays plain; the upload accepts Excel (`.xlsx`, first sheet) through the spreadsheet reader the XLSForm importer already
   uses (`app/Services/Xlsform/XlsformImporter.php`), reading codes as text; the chooser's "A list file" arm offers the version's
-  lists. Takes `R-1059e9bd` (its sentence lands beside the same upload control). **Live.** Filed by `M172`. **Tier: early-testing.**
+  lists. Takes `R-1059e9bd` (its sentence lands beside the same upload control). **Live.** Filed by `M172`. **Tier: early-testing.** **Taken by T3 (`M184`), 2026-10-23 (`D138`), for relayed `R1-3b`; the options stay in the schema the browser gets (a cached app after a deploy merges cascades only), capped at 5,000 rows, and a list-fed question prints like typed choices (`D160`).**
 
 - **`minor` · A text box cannot offer suggestions from a list file or another form's answers.**
   The testers' comment (2026-10-15): *"sometimes even the textbox must have an option to populate options thru the connection to
@@ -14443,7 +14443,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   = {kind: list | form, …}` on Short text gives a type-ahead (a `<datalist>`-backed combobox) on the web form, the encode page
   (`app/Services/Submissions/EncodeFormPresenter.php:629-655` already serves linked lists there) and the preview, while free text
   stays accepted and the server never checks it; the chooser reads "Suggestions come from" on a text question. **Live.** Filed by `M172`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** **Taken by T3 (`M184`), 2026-10-23 (`D138`), for relayed `R1-3b`.**
 
 - **`minor` · The builder preview shows neither a list-backed cascade's choices nor a list taken from another form; it says the choices show on the live form.**
   Left by `M133`'s v1 and `M141` and recorded on `R-5fdbc47c`: the preview runtime (`resources/js/components/builder/PreviewRuntime.vue`)
@@ -14451,7 +14451,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   list's rows or a link's answers, so an author checks a PSGC cascade or a linked list only on the published form. The remedy: a
   tenant route beside the choice-list routes (`routes/tenant.php:1118-1127`) returns the draft's linked lists and the first 200 rows
   of each list-bound question with "showing 200 of N", and the preview merges them the way the guest runtime does
-  (`resources/public-runtime/lib/linked-choices.ts:89-112`). **Live.** Filed by `M172`. **Tier: early-testing.** **Amended 2026-10-15 by `M172`:** an old version opened read-only from the hub (`resources/js/Pages/forms/VersionView.vue`) draws `schemaWithoutListOptions()` through the same preview, so a list-backed cascade shows no choices there either; the same route closes both.
+  (`resources/public-runtime/lib/linked-choices.ts:89-112`). **Live.** Filed by `M172`. **Tier: early-testing.** **Amended 2026-10-15 by `M172`:** an old version opened read-only from the hub (`resources/js/Pages/forms/VersionView.vue`) draws `schemaWithoutListOptions()` through the same preview, so a list-backed cascade shows no choices there either; the same route closes both. **Taken by T3 (`M184`), 2026-10-23 (`D138`), for relayed `R1-1b` and `R1-3b`; two routes, not one — the builder needs edit access and the version view only view access.**
 
 - **`minor` · A grid's rows, columns and choices must be typed by hand: none can come from a list file or another form's answers, so a grid of barangays or facilities is retyped on every form.**
   The testers' comment (2026-10-15): *"rows can be determined thru the list from the shared responses from other form or uploaded
@@ -15043,3 +15043,29 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and the response PDF draw a grid answer as a table — rows down, columns across, each cell's answer by its label (a Likert matrix
   marks the chosen point) — from the version's own config.
   **Live.** Filed by `M183`. **Tier: during-testing.**
+
+- **`minor` · A choice question with a long list prints every choice as a tick box on the paper form, so a list of hundreds runs to pages.**
+  `app/Services/Forms/BlankFormPrintPresenter.php` (`choiceOptions()`) prints every option of a Single choice, Multiple choice or
+  Dropdown as a tick box, however many there are. A typed list does it today; a question whose choices come from a list file (`M184`)
+  carries its whole list in the published version and prints the same way — `D160` A kept it so, for the scan reads ticks as today, and
+  the builder warns above 30 choices. A question linked to another form already prints a write-in box, its list being live. The remedy
+  (`D160`'s B): past a threshold, a write-in box, and the scan matches the writing to the nearest choice with a "may be wrong" note
+  (`app/Services/Ocr/OcrAnswerReader.php`'s `nearestOption()`, as a cascade's written levels are matched).
+  **Live.** Filed by `M184` (`D160`). **Tier: during-testing.**
+
+- **`minor` · A Multiple choice question cannot be the source of another form's choices.**
+  `app/Support/Forms/ShareableQuestions.php:31-39` shares short text, numbers, calculations, hidden values, Single choice and
+  Dropdown — not Multiple choice — and `LinkedChoiceService`'s `distinctAnswers()` keeps only string and number answers
+  (`jsonb_typeof`), so a list answer would be dropped even if it were shared. `M184` lets a Multiple choice *take* its choices from
+  another form; a "services offered" checklist in one form still cannot feed another. The remedy: share a Multiple choice, and build
+  the distinct set from each answer's elements (`jsonb_array_elements_text`), with labels from the source's options.
+  **Live.** Filed by `M184`. **Tier: during-testing.**
+
+- **`minor` · A list file of more than 5,000 rows cannot feed a plain choice question or a text box's suggestions.**
+  `M184` writes a list-bound question's choices into the published version, so every reader stays plain and an app cached before a
+  deploy still shows them, and caps such a list at 5,000 rows to bound the form a browser downloads; a longer list is refused at
+  publish and pointed at a cascade. KoboToolbox's `select_one_from_file` reads a list of any size. The remedy: serve a long flat list
+  beside the schema as a cascade's is (`ChoiceListMaterializer::listsForBrowser()`, the choice-lists endpoint,
+  `resources/public-runtime/lib/choice-lists.ts`'s `mergeChoiceLists()` taught flat lists), once the runtimes cached on devices merge
+  flat lists. **Not live** on the trunk until `M184` merges at merge point 5 — the cap arrives with it.
+  Filed by `M184`. **Tier: during-testing.**

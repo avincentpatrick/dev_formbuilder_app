@@ -131,6 +131,9 @@ Namespaces spent: nothing from either namespace — no decision, no migration pr
 `resources/js/components/builder/ConfigPanel.vue` (a hub) — the sentence above was wrong: the row's `config.layout` needs the two grid
 editors' mounts to pass the layout and its event (two lines each), since the editors read only the props ConfigPanel hands them; and a
 new `resources/js/components/builder/GridLayoutSelect.vue` both editors share, so its label lives in one file for the Help manual's pin.
+**Extended again 2026-10-22, after reading and before editing (pushed alone):** `resources/public-runtime/components/InstanceField.vue`
+— one cast. `vue-tsc` found it: a grid cell is now a string, a number or a list, so the shared answer type's grid member changed, and
+this file's cast (which excludes the grid from a repeat instance's answer — grids are refused in repeats) names the old member.
 E2E specs the diff reaches, run locally: `public-runtime-axe` (the grid cases), `builder-axe` (the grid editor), `encode-validation` (the
 Showcase renders its grids), `whats-new` (three releases now); CI runs every spec.
 Prediction: red first commit by commit — the new golden vectors red in BOTH runners until the engines move (about six); the normaliser,

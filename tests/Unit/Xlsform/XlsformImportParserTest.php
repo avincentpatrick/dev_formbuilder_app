@@ -277,8 +277,10 @@ it('downgrades a matrix grid marker to single selects with a warning', function 
         ],
     ));
 
+    // M183: a typed grid's cells come back as questions of their columns' types, so the warning no longer says single-select.
     expect(xlsformField($plan, 'grid_q1_c1')->fieldType)->toBe(FieldType::SingleSelect)
-        ->and(implode(' ', $plan->warnings))->toContain('not importable');
+        ->and(implode(' ', $plan->warnings))->toContain('not importable')
+        ->and(implode(' ', $plan->warnings))->toContain('its cells were imported as separate questions, each of its column\'s type');
 });
 
 it('nests fields under a group and maps settings without a version', function (): void {

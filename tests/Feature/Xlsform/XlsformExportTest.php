@@ -186,6 +186,43 @@ it('expands the lossy grid + structural types (§3)', function (): void {
     expect(surveyRow($sheets, 'members'))->toMatchArray(['type' => 'begin repeat', 'repeat_count' => 5]);
 });
 
+it('writes each cell of a typed grid as a question of its column\'s type, with the column\'s own list (M183)', function (): void {
+    // M183 (`R-51e044a6`, `D129`): the per-cell names stay `{key}_{row}_{col}` (the names the export has always
+    // written — not `{row_key}_{column_key}`, as the row once said); what changes is the type and list behind each.
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    $form = makeForm($owner, 'Clinic roster');
+    $version = makeDraftVersion($form);
+    addFormField($version, $owner, 'g', FieldType::Matrix, 0, ['config' => [
+        'rows' => [['value' => 'a', 'label' => 'Clinic A']],
+        'columns' => [
+            ['value' => 'staff', 'label' => 'Staff', 'type' => 'integer', 'required' => true],
+            ['value' => 'open', 'label' => 'Opened', 'type' => 'date'],
+            ['value' => 'note', 'label' => 'Note', 'type' => 'short_text'],
+            ['value' => 'kg', 'label' => 'Weight', 'type' => 'decimal'],
+            ['value' => 'svc', 'label' => 'Services', 'type' => 'multi_select', 'options' => [['value' => 'lab', 'label' => 'Lab'], ['value' => 'xray', 'label' => 'X-ray']]],
+            ['value' => 'rate', 'label' => 'Rating'],
+        ],
+        'cells' => [['value' => 'poor', 'label' => 'Poor'], ['value' => 'good', 'label' => 'Good']],
+    ]]);
+
+    $sheets = app(XlsformExporter::class)->build($form, $version->refresh());
+
+    expect(surveyRow($sheets, 'g_a_staff'))->toMatchArray(['type' => 'integer', 'required' => 'yes', 'label' => 'Clinic A — Staff'])
+        ->and(surveyRow($sheets, 'g_a_open')['type'])->toBe('date')
+        ->and(surveyRow($sheets, 'g_a_note')['type'])->toBe('text')
+        ->and(surveyRow($sheets, 'g_a_kg')['type'])->toBe('decimal')
+        ->and(surveyRow($sheets, 'g_a_svc')['type'])->toBe('select_multiple g_svc_choices')
+        ->and(surveyRow($sheets, 'g_a_rate')['type'])->toBe('select_one g_cells')
+        ->and(surveyRow($sheets, 'g_a_open')['required'] ?? '')->toBe('');
+
+    $lists = collect($sheets['choices']['rows'])->groupBy('list_name')->map(fn ($rows) => $rows->pluck('name')->all())->all();
+    expect($lists['g_svc_choices'])->toBe(['lab', 'xray'])
+        ->and($lists['g_cells'])->toBe(['poor', 'good']);
+});
+
 it('assembles the choices + settings sheets', function (): void {
     $tenant = inboxTenant();
     $owner = User::factory()->create();

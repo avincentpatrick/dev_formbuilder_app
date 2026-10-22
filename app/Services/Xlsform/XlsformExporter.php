@@ -9,6 +9,7 @@ use App\Models\Form;
 use App\Models\FormVersion;
 use App\Services\Forms\SchemaSnapshotSerializer;
 use App\Services\Submissions\SubmissionExporter;
+use App\Support\Forms\MatrixColumns;
 use Illuminate\Support\Str;
 use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -179,8 +180,13 @@ final class XlsformExporter
     }
 
     /**
-     * matrix → one `select_one` per (row × column) cell, named `{key}_{row}_{col}` (§3), all sharing a
-     * synthesized cells list. The grid is not natively importable; the `#meridian` marker documents its origin.
+     * matrix → one question per (row × column) cell, named `{key}_{row}_{col}` (§3). The grid is not natively
+     * importable; the `#meridian` marker documents its origin.
+     *
+     * M183 (`R-51e044a6`, `D129`): each cell is a question of its column's type ({@see MatrixColumns}) — `integer`,
+     * `decimal`, `date`, `text`, or a `select_one`/`select_multiple` over the column's own list (`{key}_{col}_choices`)
+     * or, for a choice column with none, the synthesized shared `{key}_cells` list — and a required column's cells, or
+     * every cell of a required grid, are required.
      *
      * @param  array<string, mixed>  $field
      * @param  list<string>  $langs
@@ -192,15 +198,40 @@ final class XlsformExporter
     {
         $key = (string) $field['key'];
         $config = is_array($field['config'] ?? null) ? $field['config'] : [];
-        $listName = $key.'_cells';
-        $this->pushPairList($listName, $this->pairs($config, 'cells'), $locale, $langs, $choices, $listsSeen);
+        $sharedList = $key.'_cells';
+        if (MatrixColumns::needsSharedCells($config)) {
+            $this->pushPairList($sharedList, $this->pairs($config, 'cells'), $locale, $langs, $choices, $listsSeen);
+        }
+        $gridRequired = in_array($field['is_required'] ?? 'optional', ['required', 'conditional'], true);
+
+        /** @var array<string, array{type: string, required: bool}> $cellTypes keyed by column value */
+        $cellTypes = [];
+        foreach (MatrixColumns::columns($config) as $column) {
+            $value = (string) ($column['value'] ?? '');
+            if ($value === '' || isset($cellTypes[$value])) {
+                continue;
+            }
+            $type = MatrixColumns::type($column);
+            $token = $this->types->toXlsform($type)->type;
+            if (MatrixColumns::isChoice($type)) {
+                $own = $this->pairs($column, 'options');
+                $list = $own !== [] ? $key.'_'.$value.'_choices' : $sharedList;
+                if ($own !== []) {
+                    $this->pushPairList($list, $own, $locale, $langs, $choices, $listsSeen);
+                }
+                $token .= ' '.$list;
+            }
+            $cellTypes[$value] = ['type' => $token, 'required' => $gridRequired || ($column['required'] ?? false) === true];
+        }
 
         foreach ($this->pairs($config, 'rows') as $rowOpt) {
             foreach ($this->pairs($config, 'columns') as $colOpt) {
+                $cell = $cellTypes[$colOpt['value']] ?? ['type' => 'select_one '.$sharedList, 'required' => $gridRequired];
                 $survey[] = [
-                    'type' => 'select_one '.$listName,
+                    'type' => $cell['type'],
                     'name' => $key.'_'.$rowOpt['value'].'_'.$colOpt['value'],
                     'label' => trim($rowOpt['label'].' — '.$colOpt['label']),
+                    'required' => $cell['required'] ? 'yes' : '',
                     '#meridian' => XlsformTypeMap::MARKER_MATRIX.':'.$key,
                 ];
             }

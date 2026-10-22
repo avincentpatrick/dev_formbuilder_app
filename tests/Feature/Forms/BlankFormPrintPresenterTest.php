@@ -338,6 +338,36 @@ it('prints a grid with both axes resolved, though the version is not OCR eligibl
         ->and($model['ocr_compatible'])->toBeFalse();
 });
 
+it('prints each matrix cell by its column: tick boxes for its choices, a writing box otherwise; a Likert cell one box (M183)', function (): void {
+    // M183 (`R-51e044a6`): until now `config.cells` never reached the paper, so a printed matrix was a grid of empty
+    // boxes with its choices written nowhere on the page.
+    [$form, $version] = printFixture([
+        'sections' => [],
+        'fields' => [
+            printField('g', 'matrix', ['config' => [
+                'rows' => [['value' => 'a', 'label' => 'Clinic A']],
+                'columns' => [
+                    ['value' => 'staff', 'label' => 'Staff', 'type' => 'integer'],
+                    ['value' => 'svc', 'label' => 'Services', 'type' => 'multi_select', 'options' => [['value' => 'lab', 'label' => 'Lab']]],
+                    ['value' => 'rate', 'label' => 'Rating'],
+                ],
+                'cells' => [['value' => 'poor', 'label' => 'Poor'], ['value' => 'good', 'label' => 'Good']],
+            ]]),
+            printField('sat', 'likert_matrix', ['config' => [
+                'rows' => [['value' => 'svc', 'label' => 'Service']],
+                'columns' => [['value' => '1', 'label' => 'Low']],
+            ]]),
+        ],
+    ]);
+
+    $fields = $this->present->present($form, $version)['blocks'][0]['fields'];
+
+    expect($fields[0]['grid']['columns'])->toBe([
+        ['value' => 'staff', 'label' => 'Staff', 'kind' => 'write', 'options' => []],
+        ['value' => 'svc', 'label' => 'Services', 'kind' => 'choices', 'options' => [['value' => 'lab', 'label' => 'Lab']]],
+        ['value' => 'rate', 'label' => 'Rating', 'kind' => 'choices', 'options' => [['value' => 'poor', 'label' => 'Poor'], ['value' => 'good', 'label' => 'Good']]],
+    ])->and($fields[1]['grid']['columns'])->toBe([['value' => '1', 'label' => 'Low', 'kind' => 'tick', 'options' => []]]);
+});
 it('resolves field labels and option labels into the form default locale', function (): void {
     [$form, $version] = printFixture([
         'sections' => [],

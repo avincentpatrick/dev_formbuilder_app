@@ -380,6 +380,31 @@ it('survives a form far taller than one page, grids included', function (): void
         ->and(strlen($bytes))->toBeGreaterThan(strlen($smallBytes));
 });
 
+it('draws a typed grid cell by cell: a box per choice beside its words, or a writing box (M183)', function (): void {
+    $form = app(FormService::class)->create($this->tenant, $this->user, 'Clinic roster');
+    addFormField($form->draftVersion, $this->user, 'g', FieldType::Matrix, 0, ['config' => [
+        'rows' => [['value' => 'a', 'label' => 'Clinic A']],
+        'columns' => [
+            ['value' => 'staff', 'label' => 'Staff', 'type' => 'integer'],
+            ['value' => 'svc', 'label' => 'Services', 'type' => 'multi_select', 'options' => [['value' => 'lab', 'label' => 'Lab']]],
+            ['value' => 'rate', 'label' => 'Rating'],
+        ],
+        'cells' => [['value' => 'poor', 'label' => 'Poor'], ['value' => 'good', 'label' => 'Good']],
+    ]]);
+    $published = app(PublishService::class)->publish($form->refresh(), $this->user);
+
+    $dom = new DOMDocument;
+    @$dom->loadHTML($this->renderer->html($form->refresh(), $published));
+    $xpath = new DOMXPath($dom);
+    $cells = $xpath->query('//table[@class="grid"]//td[@class="grid__cell"]');
+
+    expect($cells->length)->toBe(3)
+        ->and($xpath->query('.//div[@class="grid__line"]', $cells->item(0))->length)->toBe(1)
+        ->and($xpath->query('.//span[@class="choice__box"]', $cells->item(1))->length)->toBe(1)
+        ->and(trim($cells->item(1)->textContent))->toBe('Lab')
+        ->and($xpath->query('.//span[@class="choice__box"]', $cells->item(2))->length)->toBe(2)
+        ->and($this->renderer->render($form->refresh(), $published))->toStartWith('%PDF-');
+});
 it('slugs the download filename, and falls back rather than emitting a bare version', function (): void {
     // The title is tenant-authored free text and reaches a Content-Disposition header. Slugging
     // leaves nothing to inject with; the fallback covers a title that slugs to the empty string.

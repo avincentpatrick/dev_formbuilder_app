@@ -1,5 +1,31 @@
 [
     {
+        "version": "0.10.0",
+        "title": "Grids that work like tables",
+        "items": [
+            {
+                "kind": "new",
+                "text": "Grids: give each column its own type (one choice, several choices, text, a number or a date) and its own list of choices."
+            },
+            {
+                "kind": "improved",
+                "text": "Grids and Likert matrices are drawn as tables on computers and tablets, and as cards on phones."
+            },
+            {
+                "kind": "improved",
+                "text": "A Likert scale is drawn as one line of points with the words underneath."
+            },
+            {
+                "kind": "new",
+                "text": "Spreadsheets, Google Sheets and Airtable get a column for every grid cell, beside the usual summary column."
+            },
+            {
+                "kind": "improved",
+                "text": "The printed form shows each grid cell's choices as tick boxes, and a writing box for text, numbers and dates."
+            }
+        ]
+    },
+    {
         "version": "0.9.1",
         "title": "Small fixes for a tidier, more consistent look",
         "items": [

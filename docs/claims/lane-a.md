@@ -16,7 +16,30 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M183`, T2 + Likert: typed grid columns, grids drawn as tables, a spreadsheet column per cell, and Kobo's Likert (`R-5033e87e`, `R-1c1d7266`, `R-f03cf999`, `R-51e044a6`) (m183-t2-grid-likert)
+## Status: NO ACTIVE CLAIM — `M181` (UI5), `M182` (UI6) and `M183` (T2 + Likert) are merged and live on staging, released together at merge point 4 (`D137`; below). The next claim is T3 — options from anywhere (`D138`), held green for merge point 5 with T4. Merge only at a planned merge point.
+
+## RELEASED — `M183`, T2 + Likert: typed grid columns, grids drawn as tables, a spreadsheet column per cell, and Kobo's Likert (`R-5033e87e`, `R-1c1d7266`, `R-f03cf999`, `R-51e044a6`) (merged as PR #376, `dba337b7`, last at merge point 4, rebased onto the trunk after `M182`; 6/6 green with real step counts on its rebased run at `f5dae98b` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+**RELEASED LAST AT MERGE POINT 4 (`D137`, `D138`), 2026-10-22, by the merge-point-4 session** (plan
+`~/.claude/plans/pasted-content-id-53ff-read-claude-md-calm-duckling.md`). The session-start pull read 0 reports, 0 reopened and 0 new
+comments. **The user's census before (06:38 UTC): tenants 1 · users 6 · forms 11 · form_versions 27 · submissions 22 · attachments 62 ·
+feedback_reports 31 · notifications 64** (notifications 2 above merge point 3's). `M181` merged first (`179be432`) and `M182` second
+(`1dacf82f`), each only after the one before had deployed and `/up` answered 200 (their blocks below). Built green on 2026-10-22 (run
+39705250871 at `84974a74`); after `M182` merged, rebased onto the trunk by its own 40 commits (`git rebase --onto origin/main ba79ec8e`) —
+two of main's claim commits sat in the replay list (`0e12be58` and `e472a174`, brought in by this branch's two later merges of the trunk):
+the first conflicted on `docs/claims/lane-a.md` and was skipped, the second dropped as already upstream. The tree byte-identical to the
+one CI passed apart from `docs/claims/lane-a.md` (`git diff 84974a74 f5dae98b`); re-run 6/6 at `f5dae98b` (run 39742511698, the same step
+counts); squash-merged as `dba337b7` with an explicit body once `M182`'s deploy had finished and `/up` answered 200; the trunk's CI 6/6
+(run 39747316207 — the run `docs/gate-baselines.md` is now measured from); the deploy (run 39751549543, 2 minutes) backed up to
+`deploy-20261022-085751.dump` (463,587 B), counted 68 tables and 9,977 rows, found nothing to migrate and every table at least as full
+after, and copied the notes: `releases: 1 added, 0 updated, 2 unchanged; 3 in the table, none removed (newest 0.10.0)`; `/up` 200, the
+sign-in page's shared version `0.10.0`. **The user's census after (13:53 UTC) matched the one before exactly, table for table.** Relayed
+`UI4` resolved at `179be432`, `UI5` at `1dacf82f`, `R1-7a` (the testers' round-1 grid comment) and `U9` (the team's Likert item) at
+`dba337b7` — the stock note only, each confirmed Resolved by reference through the support API (relayed: 19 Resolved · 6 Ongoing · 6
+Confirmed working). ⚠️ The four resolves printed one id prefix (`01a156dc`): the relayed reports were created in one batch and their
+time-ordered ids share their first eight characters — read the counts, never the prefix. Owed at the next session's start: the user's
+check of the four on staging, and of `/whats-new` listing 0.10.0, 0.9.1 and 0.9.0 (the deploy logs prove only the table's three rows).
+The build's record follows.
 
 Taken 2026-10-22. Branch `m183-t2-grid-likert`, **stacked**: cut from `origin/m182-ui6-consistency` at `96b00643` (UI6, built and
 held), with `origin/main` merged on top to bring this claim — that merge is the claim-merge commit, and T2's own commits start after it.
@@ -28,11 +51,9 @@ merged and live, this branch rebased onto the trunk by its own commits only and 
 `~/.claude/plans/pasted-content-id-1746-read-claude-md-majestic-moler.md`. `state.php` prints next free `M181` because it counts RELEASED
 headings and `M181`/`M182` are HELD — this is `M183`.
 
-**BUILT — PR #376, CI 6/6 green with real step counts (run 39705250871 at `84974a74`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the only skips are the two main-only
-staging-header steps and the failure-only report upload) — AND NOT MERGED.** ⛔ **Held for merge point 4 (`D137`, `D138`):** the user's
-census before, #374 (UI5), then #375 (UI6), then this branch rebased onto the trunk by its own commits only, then the census after. This
-branch is NOT re-merged with the trunk's claim commits (that would re-run CI for docs alone); the rebase carries them. ⚠️ After its deploy,
-`/whats-new` should list 0.9.0, 0.9.1 and 0.10.0.
+Built: PR #376, CI 6/6 green with real step counts (run 39705250871 at `84974a74`: Static analysis 32 · E2E 20 · Contract 16 · Frontend
+12 · Pest 11 · axe 11; the only skips are the two main-only staging-header steps and the failure-only report upload). The branch was not
+re-merged with the trunk's claim commits before merge point 4 (that would have re-run CI for docs alone); the rebase carried them.
 
 **Measured against the prediction:**
 - **Red first, commit by commit — held.** Golden validation: five of six red in EACH engine — the sixth (a multiple-choice cell with
@@ -182,7 +203,23 @@ webhook, XLSForm and print Pest cases red. All green after. About twelve mutants
 wrong:** the e2e no-horizontal-overflow check on a wide typed grid at 834 — the inner scroll box may still count. Runner-up: the
 citation-liveness ceiling after the MatrixGrid and FieldInput rewrites (cited lines going blank).
 
-## HELD — `M182`, UI6 of the UI programme: consistency (`R-49813d21`, `R-3ca62317`, `R-f724595b`, `R-9d3c2439`) (m182-ui6-consistency)
+## RELEASED — `M182`, UI6 of the UI programme: consistency (`R-49813d21`, `R-3ca62317`, `R-f724595b`, `R-9d3c2439`) (merged as PR #375, `1dacf82f`, second at merge point 4, rebased onto the trunk after `M181`; 6/6 green with real step counts on its rebased run at `6ed4f737` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+**RELEASED SECOND AT MERGE POINT 4 (`D137`, `D138`), 2026-10-22, by the merge-point-4 session.** Built green on 2026-10-21 (run
+39536256418 at `96b00643`), its lock commit added to #374 on the user's word as `773ae1aa`. After `M181` merged (`179be432`): rebased
+onto the trunk by its own 25 commits (`git rebase --onto origin/main 9724a276`). ⚠️ Two things the plan did not predict: the replay list
+also carried one of main's claim commits (`94366f78`, brought in by this branch's SECOND merge of the trunk, `8e8d5aab`), which conflicted
+on `docs/claims/lane-a.md` and was skipped as already on the trunk; and the lock commit `8094477d` did not drop — its lock half was
+already upstream, so it replayed as `6f18a91b` carrying only its two backlog closes and the regenerated line. The tree byte-identical to
+the one CI passed apart from `docs/claims/lane-a.md` (`git diff 96b00643 6ed4f737`); re-run 6/6 at `6ed4f737` (run 39737439005, the same
+step counts); squash-merged as `1dacf82f` with an explicit body once `M181`'s deploy had finished and `/up` answered 200; the trunk's CI
+6/6 (run 39742414316); the deploy (run 39746707729, 4 minutes) backed up to `deploy-20261022-082132.dump` (462,295 B), counted 68 tables
+and 9,968 rows (11 below `M181`'s count 40 minutes earlier — transient sessions, cache and queue rows; the guard compares only across its
+own migration), found nothing to migrate and every table at least as full after, and ran the **first `releases:sync` on staging:
+`releases: 2 added, 0 updated, 0 unchanged; 2 in the table, none removed (newest 0.9.1)`**; `/up` 200, the sign-in page's shared version
+`0.9.1`. Relayed `UI5` (the testers' copy of the UI comments of 2026-10-14 — "please check everything and make our UI better") resolved
+at `1dacf82f`, the stock note only, on the user's word in planning (2026-10-22): UI6 was the last slice of the audit that comment asked
+for. The census before and after are in `M183`'s block above. The build's record follows.
 
 Taken 2026-10-21. Branch `m182-ui6-consistency`, **stacked**: cut from `origin/m181-ui5-versioning-whats-new` at `9dc6fdaf` (UI5, built
 and held), with `origin/main` merged on top to bring this claim — that merge is the claim-merge commit, and UI6's own commits start
@@ -193,12 +230,10 @@ branch rebased onto the trunk by its own commits only and merged, then T2 + Like
 `~/.claude/plans/read-claude-md-then-claude-plans-hi-let-enumerated-cherny.md`. `state.php` prints next free `M181` because it counts
 RELEASED headings and `M181` is HELD — this is `M182`.
 
-**BUILT — PR #375, CI 6/6 green with real step counts (run 39536256418 at `96b00643`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the only skips are the two main-only
-staging-header steps and the failure-only report upload) — AND NOT MERGED.** ⛔ **Held for merge point 4 (`D137`, `D138`):** #374 (UI5)
-first, then this branch rebased onto the trunk by its own commits only, then T2 + Likert, between the user's census before and after.
-⛔ **#374 needs this branch's lock commit before it can go green again** — two `npm audit` advisories published during this build (the
-extension above) red its gate as they red every branch. ✅ **Done on the user's word (2026-10-21, "Yes, add it to #374 now"):** the lock, byte for byte, is `773ae1aa` on #374, whose CI is 6/6 again (run 39539791790: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11). This branch is NOT re-merged onto it (it would re-run CI for an identical lock); at merge point 4 the rebase drops the duplicate hunk. ⚠️ At merge point 4, UI6's deploy is
-the first to run `releases:sync` (UI5's changed `deploy.ps1` runs one deploy late), so check `/whats-new` after it: 0.9.0 and 0.9.1.
+Built: PR #375, CI 6/6 green with real step counts (run 39536256418 at `96b00643`: Static analysis 32 · E2E 20 · Contract 16 · Frontend
+12 · Pest 11 · axe 11; the only skips are the two main-only staging-header steps and the failure-only report upload). Two `npm audit`
+advisories published during this build red every branch; on the user's word (2026-10-21, "Yes, add it to #374 now") the lock went to
+#374 byte for byte as `773ae1aa` (CI 6/6 again, run 39539791790), and the rebase at merge point 4 dropped the duplicate hunk.
 
 **Measured against the prediction:**
 - **Red first, commit by commit — held, to the count.** The theme test: the two same-step cases red (`300` against `200`), the four
@@ -328,21 +363,27 @@ About eight mutants, each turning only its named cases. **Most likely wrong:** t
 through a `:class` binding, or by two elements, makes it miss a site or count one twice, so the first red set will not be exactly eleven.
 Runner-up: with two releases in the table, `whats-new.spec.ts`'s unseen member sees both, and a check written for one entry fails.
 
-## HELD — `M181`, UI5 of the UI programme: versioning and What's new (`R-c7247dbf`) (m181-ui5-versioning-whats-new)
+## RELEASED — `M181`, UI5 of the UI programme: versioning and What's new (`R-c7247dbf`) (merged as PR #374, `179be432`, first at merge point 4, 6/6 green with real step counts on its run at `773ae1aa` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
+
+**RELEASED FIRST AT MERGE POINT 4 (`D137`, `D138`), 2026-10-22, by the merge-point-4 session.** Built green on 2026-10-20/21 (run
+39450434249 at `9dc6fdaf`), then `M182`'s npm-audit lock fix added on the user's word as `773ae1aa`, CI 6/6 again (run 39539791790,
+re-read at the merge: the six jobs and their step counts). After the user's census (06:38 UTC, in `M183`'s block above): squash-merged as
+`179be432` with an explicit body, with no rebase (no stacked base; the trunk had moved only by claim commits); the trunk's CI 6/6 (run
+39737352055); the deploy (run 39740604549) took 15 minutes — ⚠️ the build stage alone about 10, the first install after the lock change,
+while the site stayed up on the old release (`/up` 200 midway) — backed up to `deploy-20261022-074138.dump` (461,800 B), counted 67
+tables and 9,979 rows, ran `000143` (the releases table) and `000144` (`users.whats_new_seen_version`), and found every table at least as
+full after (68 tables); **no `releases:` line, as predicted** — the old `deploy.ps1` ran, so the first copy was `M182`'s deploy; `/up`
+200, the sign-in page's shared version `0.9.0`. Relayed `UI4` (the same comment) resolved at `179be432`, the stock note only. The build's
+record follows.
 
 Taken 2026-10-20. Branch `m181-ui5-versioning-whats-new`, cut from origin/main at `43e96656`, PR into main. ⛔ **NOT MERGED THIS
 SESSION:** it is held green for merge point 4 with UI6 and T2 + Likert (`D137`, `D138`: UI5 → UI6 → T2 + Likert → merge point 4).
 The plan of record is `~/.claude/plans/hi-let-s-conduct-a-mutable-goose.md` (§C, §E row 5); the build plan is
 `~/.claude/plans/pasted-content-id-776b-read-claude-md-quizzical-conway.md`.
-✅ **2026-10-21 (`M182`, the user's word): `773ae1aa` adds `M182`'s npm-audit lock fix to this branch; CI 6/6 again (run 39539791790), the same step counts.** **BUILT — PR #374, CI 6/6 green with real step counts (run 39450434249 at `9dc6fdaf`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 ·
-Pest 11 · axe 11; the only skips are the two main-only staging-header steps and the failure-only report upload) — AND NOT MERGED.** ⛔ **Held for
-merge point 4 (`D137`, `D138`):** UI5 first, then UI6, then T2 + Likert, between the user's census before and after. ⛔ **UI6 stacks on this branch**
-(it bumps a `VERSION` that exists only here) and is `M182` — `state.php`'s next free still prints `M181`, because it counts RELEASED headings
-and this one is held; UI6's claim moves this block under a HELD heading. ⚠️ **At merge point 4:** this PR's own deploy runs the OLD `deploy.ps1`
-(a changed script runs one deploy late), so it copies no notes — the first `releases:sync` is UI6's deploy; check `/whats-new` after that one.
-Relayed **`UI4`** (the same comment, Ongoing, "Planned for batch 4") is resolved by its reference only once live, and the comment is announced by
-name at that close-out with the clicks to check it. The branch carries the row's closure, `D157`, two filed rows, the status bullet, the
-regenerated line and the hand-off.
+Built: PR #374, CI 6/6 green with real step counts (run 39450434249 at `9dc6fdaf`: Static analysis 32 · E2E 20 · Contract 16 · Frontend
+12 · Pest 11 · axe 11; the only skips are the two main-only staging-header steps and the failure-only report upload). UI6 (`M182`) stacked
+on this branch, since it bumps a `VERSION` that existed only here. The branch carried the row's closure, `D157`, two filed rows, the status
+bullet, the regenerated line and the hand-off.
 
 **Measured against the prediction:**
 - **Red first, commit by commit — held.** `BuildInfoTest` 5 of 8 (the three green ones pin what must survive); the notes, sync and deploy-order

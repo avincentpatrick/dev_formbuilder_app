@@ -291,6 +291,12 @@ for (const theme of themes) {
         // The auto-selected matrix field exposes a "Grid" tab → MatrixEditor (rows + columns + cell choices).
         await page.getByRole('tab', { name: 'Grid' }).click();
         await expect(page.getByRole('heading', { name: 'Cell choices' })).toBeVisible({ timeout: 10_000 });
+        // M183 (`R-5033e87e`): each column's Type and Required, a choice column's own list, and the grid's Layout —
+        // the seeded second column takes several choices of its own and is required.
+        await expect(page.getByRole('combobox', { name: 'Type' })).toHaveCount(2);
+        await expect(page.getByRole('heading', { name: 'Choices for Column 2' })).toBeVisible();
+        await expect(page.getByRole('checkbox', { name: 'Required in every row' }).nth(1)).toBeChecked();
+        await expect(page.getByRole('combobox', { name: 'Layout' })).toBeVisible();
         await scan(page, 'matrix config editor');
 
         const fieldTabs = page.locator('[role="tab"]');

@@ -110,14 +110,23 @@ for (const theme of themes) {
         // Choose a region → the dependent province select enables + lists NCR's children.
         await page.getByRole('combobox', { name: 'Region' }).selectOption('ncr');
 
-        // Likert matrix: pick a score in one row (each row is a group named by its legend). `exact` avoids the
-        // "Good" ⊂ "Very good" substring ambiguity across the scale radios.
-        await page.getByRole('group', { name: 'Cleanliness' }).getByRole('radio', { name: 'Good', exact: true }).check();
-        // Matrix: pick a cell value in one row×column (row group + column-labelled select).
-        await page
-            .getByRole('group', { name: 'Consultation' })
-            .getByRole('combobox', { name: 'Morning', exact: true })
-            .selectOption('available');
+        // M183 (`R-1c1d7266`, `R-f03cf999`): a grid is a TABLE wherever the grid itself has 30em — the tablet and the
+        // desktop here — and a card per row on the phone; the column headers are drawn only by the table (they stay
+        // in the DOM as every control's name). A Likert scale is the joined line at every width.
+        const wide = (page.viewportSize()?.width ?? 0) >= 834;
+        for (const head of await page.locator('[data-matrix-grid] .mds-grid__head').all()) {
+            expect(await head.evaluate((el) => getComputedStyle(el).position)).toBe(wide ? 'static' : 'absolute');
+        }
+        await expect(page.locator('[data-likert-line]').first()).toBeVisible();
+
+        // Likert matrix: pick a score in one row. Every control is named by its row and its column, in either
+        // drawing; `exact` avoids "Good" ⊂ "Very good".
+        await page.getByRole('radio', { name: 'Cleanliness Good', exact: true }).check();
+        // Matrix: a cell of each kind — an untyped choice, a whole number, a tick box of a column's own choices.
+        await page.getByRole('combobox', { name: 'Consultation Morning', exact: true }).selectOption('available');
+        await page.getByRole('spinbutton', { name: 'Consultation Doctors on duty', exact: true }).fill('3');
+        await page.getByRole('group', { name: 'Consultation Payment taken' }).getByText('Cash', { exact: true }).click();
+        await expect(page.getByRole('group', { name: 'Consultation Payment taken' }).getByRole('checkbox', { name: 'Cash' })).toBeChecked();
 
         // Geo (G5b2): type a coordinate into the geopoint's manual inputs, and add a geotrace vertex — the
         // interactive vertex list + accuracy readout must stay axe-clean.

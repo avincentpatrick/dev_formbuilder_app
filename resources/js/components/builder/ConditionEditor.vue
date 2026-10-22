@@ -295,8 +295,8 @@ const note = computed<string | null>(() => {
     font-style: italic;
 }
 
-/* `status-danger-fg` and NOT `danger-text`: the latter is `danger-300` in dark, which is 4.22:1 on
-   `bg-surface` at this size — the real contrast violation the dark builder-axe scan caught in H21d1. */
+/* `status-danger-fg`: H21d1's dark builder-axe scan caught `danger-text` at 4.22:1 here, on the pre-JR1
+   surface; since M182 (`D158`) the two tokens name the same step in both themes. */
 .cond__error,
 .cond__note--invalid {
     color: var(--mds-color-status-danger-fg);

@@ -453,8 +453,8 @@ onBeforeUnmount(releasePreview);
     outline-offset: 2px;
 }
 
-/* status-danger-fg, not danger-text: the latter resolves to danger-300 in dark, which is 4.22:1 on
-   bg-surface at this size — a real contrast failure only the dark axe sweep sees. */
+/* status-danger-fg, the on-surface pair; since M182 (`D158`) danger-text names the same step in both
+   themes — the 4.22:1 it was once measured at was the dark surface before JR1. */
 .fb__shot-error {
     margin: 0;
     color: var(--mds-color-status-danger-fg);

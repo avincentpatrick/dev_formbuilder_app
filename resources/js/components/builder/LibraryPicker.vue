@@ -72,7 +72,7 @@ function typeLabel(value: string): string {
                     @click="emit('insert', item.id)"
                 >
                     <span class="library__item-main">
-                        <span class="library__item-name">{{ item.name }}</span>
+                        <span class="library__item-name" :title="item.name">{{ item.name }}</span>
                         <span class="library__item-type">{{ typeLabel(item.field_type) }}</span>
                     </span>
                     <MdsBadge v-if="item.is_platform" label="Meridian" variant="info" />

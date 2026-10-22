@@ -360,7 +360,7 @@ onBeforeUnmount(revokeAll);
                 </div>
 
                 <div class="media__meta">
-                    <span class="media__name">{{ item.name }}</span>
+                    <span class="media__name" :title="item.name">{{ item.name }}</span>
 
                     <!-- J4a: was a bare `progress` element with NO accessible name — the filename is a
                          sibling above it, not a label, so a screen reader announced a nameless bar. The

@@ -128,9 +128,9 @@ function confirmAction(): void {
 
 <style scoped>
 /*
- * `status-danger-fg`, not `danger-text`: the latter resolves to danger-300 in dark and fails contrast on
- * bg-surface — recorded as a found defect on StatTile, and already fixed on admin/Feedback.vue. This was
- * the last admin page still disagreeing. /admin/* is excluded from the axe sweep, so nothing would catch it.
+ * `status-danger-fg`, the on-surface pair the console agrees on (StatTile, admin/Feedback.vue). Since M182
+ * (`D158`) `danger-text` names the same step in both themes; its old dark step failed on the pre-JR1
+ * surface. Of /admin/*, only /admin/settings and /admin/feedback are in the axe sweep.
  */
 
 /* Always underlined, not hover-only: /admin/* is never axe-scanned, so a colour-only link would be

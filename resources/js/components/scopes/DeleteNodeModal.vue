@@ -47,7 +47,7 @@ watch(
 
 <template>
     <MdsModal :open="open" title="Delete scope" @close="emit('update:open', false)">
-        <p>
+        <p class="delete-node__lead">
             Delete <strong>{{ node.name }}</strong>?
         </p>
 
@@ -100,6 +100,14 @@ watch(
 </template>
 
 <style scoped>
+/* M182 (`D159`): the question above the impact box, as every tenant dialog styles its paragraphs — bare, it took the
+   browser's default margins; the box below carries the gap. */
+.delete-node__lead {
+    margin: 0;
+    font-size: var(--mds-type-body-md-font-size);
+    line-height: var(--mds-type-body-md-line-height);
+}
+
 .delete-node__impact {
     margin-block-start: var(--mds-space-4);
     padding: var(--mds-space-3);

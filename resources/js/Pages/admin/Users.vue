@@ -88,13 +88,13 @@ function openReset(row: ConsoleUser): void {
             title="Reset two-step sign-in"
             @close="twoFactorTarget = null"
         >
-            <p>
+            <p class="admin-users__prose">
                 Turn off two-step sign-in for <strong>{{ twoFactorTarget?.name }}</strong>
                 ({{ twoFactorTarget?.email }})? They will sign in with their password alone until they set
                 it up again, and their existing recovery codes stop working.
             </p>
-            <p>This is recorded in the platform audit log against your account.</p>
-            <p v-if="resetError" role="alert">{{ resetError }}</p>
+            <p class="admin-users__prose">This is recorded in the platform audit log against your account.</p>
+            <p v-if="resetError" class="admin-users__prose admin-users__error" role="alert">{{ resetError }}</p>
             <template #actions>
                 <MdsButton variant="tertiary" @click="twoFactorTarget = null">Cancel</MdsButton>
                 <MdsButton
@@ -109,3 +109,22 @@ function openReset(row: ConsoleUser): void {
         </MdsModal>
     </AdminLayout>
 </template>
+
+<style scoped>
+/* M182 (`R-3ca62317`): the dialog's paragraphs, as every console and tenant dialog styles its own (`admin-td__prose`)
+   — bare, they took the browser's default margins. The second and the error line keep a gap of their own. */
+.admin-users__prose {
+    margin: 0;
+    font-size: var(--mds-type-body-md-font-size);
+    line-height: var(--mds-type-body-md-line-height);
+    color: var(--mds-color-text-body);
+}
+
+.admin-users__prose + .admin-users__prose {
+    margin-top: var(--mds-space-3);
+}
+
+.admin-users__error {
+    color: var(--mds-color-status-danger-fg);
+}
+</style>

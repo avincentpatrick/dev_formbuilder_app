@@ -225,10 +225,10 @@ function summary(reading: ConditionReading): string {
     font-size: var(--mds-type-body-sm-font-size);
 }
 
-/* `--mds-color-status-danger-fg`, NOT `--mds-color-danger-text`. The latter is `danger-300` in dark, which
-   is 4.22:1 on `bg-surface` at 13px — a real `color-contrast` violation the dark builder-axe scan caught
-   here. The status-* family is the on-surface pair (8.43:1 light, 6.39:1 dark) and is what this scale is
-   for; `danger-text` is sized for the places the design system uses it, not for 13px body copy. */
+/* `--mds-color-status-danger-fg`, the on-surface pair (8.43:1 light, 7.91:1 dark). H21d1's dark builder-axe
+   scan caught `--mds-color-danger-text` here at 4.22:1 — danger-300 on the dark surface of the day,
+   `#123350`. JR1 moved that surface, and since M182 (`D158`) both tokens name the same step in both
+   themes, so either reads the same; this rule keeps the status-* name. */
 .rail__status-error {
     display: inline-flex;
     align-items: center;

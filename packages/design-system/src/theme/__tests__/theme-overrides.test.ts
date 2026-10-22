@@ -548,6 +548,81 @@ describe('neutral ramp ordering', () => {
     });
 });
 
+/**
+ * M182 (`R-49813d21`, `D158`) — one error red, in both themes.
+ *
+ * Two tokens carry small error text: `--mds-color-danger-text` (FormField's error, the guest runtime, the
+ * builder) and `--mds-color-status-danger-fg` (the on-surface pair the app reached for after H21d1 found
+ * `danger-text` at 4.22:1 on the dark surface of the day, `#123350`). JR1 moved that surface to `#1a2130`,
+ * where the old step passes — so the failure was gone and two reds were left: danger-300 beside danger-200.
+ * The same-step case is the one that pins the decision; the contrast case pins what must survive it, and
+ * would stay green on danger-300 too.
+ */
+describe('on-surface error text', () => {
+    function luminance(hex: string): number {
+        const channel = (v: number): number => {
+            const c = v / 255;
+            return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+        };
+        const n = hex.replace('#', '');
+        const [r, g, b] = [0, 2, 4].map((i) => parseInt(n.slice(i, i + 2), 16));
+        return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+    }
+
+    function contrast(a: string, b: string): number {
+        const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+        return (hi + 0.05) / (lo + 0.05);
+    }
+
+    const DARK_BLOCKS = [
+        `:root\\[data-theme-mode='dark'\\]`,
+        `:root:not\\(\\[data-theme-mode='light'\\]\\):not\\(\\[data-theme-mode='dark'\\]\\)`,
+    ];
+
+    /** The value a block assigns to a custom property, e.g. `var(--mds-danger-200)` or `#1a2130`. */
+    function valueIn(selector: string, property: string): string {
+        const declaration = block(selector).find((d) => d.startsWith(`${property}:`));
+        expect(declaration, `${property} is not set in ${selector}`).toBeDefined();
+
+        return declaration!.slice(property.length + 1).trim();
+    }
+
+    /** `var(--mds-danger-200)` → the danger primitive's step, `200`. */
+    function dangerStep(value: string): string {
+        const step = value.match(/^var\(--mds-danger-(\d+)\)$/)?.[1];
+        expect(step, `${value} is not a danger primitive`).toBeDefined();
+
+        return step!;
+    }
+
+    it.each(DARK_BLOCKS)('gives danger-text the same step as status-danger-fg in %s', (selector) => {
+        expect(dangerStep(valueIn(selector, '--mds-color-danger-text'))).toBe(
+            dangerStep(valueIn(selector, '--mds-color-status-danger-fg')),
+        );
+    });
+
+    it.each(DARK_BLOCKS)('keeps both at 4.5:1 on the dark surface and the sunken ground in %s', (selector) => {
+        const grounds = ['--mds-neutral-100', '--mds-neutral-50'].map((p) => valueIn(selector, p));
+        expect(grounds).toEqual(['#1a2130', '#0f131c']);
+
+        for (const property of ['--mds-color-danger-text', '--mds-color-status-danger-fg']) {
+            const hex = primitives['danger'][dangerStep(valueIn(selector, property))].value;
+            for (const ground of grounds) {
+                expect(contrast(hex, ground), `${property} (${hex}) on ${ground}`).toBeGreaterThanOrEqual(4.5);
+            }
+        }
+    });
+
+    it('gives both the same step in light, where the theme file leaves them to the tokens', () => {
+        const semantic = JSON.parse(readFileSync(here('../../../tokens/semantic.json'), 'utf8')) as {
+            color: { danger: { text: { value: string } }; status: { danger: { fg: { value: string } } } };
+        };
+
+        expect(semantic.color.danger.text.value).toBe('{danger.700}');
+        expect(semantic.color.status.danger.fg.value).toBe(semantic.color.danger.text.value);
+    });
+});
+
 describe('dyslexia font', () => {
     it('re-points only the body family alias, never display or mono', () => {
         const rule = block(`:root\\[data-dyslexia-font='true'\\]`);

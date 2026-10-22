@@ -341,6 +341,7 @@ watch(
                 target="_blank"
                 rel="noopener noreferrer"
                 class="airtable-fields__link"
+                :title="destination.title"
             >
                 {{ destination.title }}
             </a>

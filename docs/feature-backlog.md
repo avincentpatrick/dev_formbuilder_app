@@ -13949,14 +13949,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the bake-off scorer stops counting a withheld value. A scan read before the change keeps its null and its old note.
   **Live.** Filed by `M156`. **Tier: early-testing.** ✅ **CLOSED BY `M156` (2026-10-10):** `PrintedFormMatcher::result()` keeps the value of a `manual`-tier read, so `OcrAnswerCarry` fills it like any other; `readNote()` says *"This may be wrong: it was read at N% confidence. Check it against the paper."* in the danger tone for a filled `manual` answer, and keeps "Needs manual entry: the scan read …" for a scan read before this change (its value is still null). The bake-off scorer counts what the reviewer is shown at every confidence: the two `withheld_*` causes are gone (a wrong `manual` value is `wrong_flagged`), "flagged" is every value below auto, and the review-threshold sweep is gone because it no longer changes what is shown. Round 1 re-scored offline: 57 of 180 (31.7%, was 42.2%), 0 silent. §3, ADR-0010 §D3 and the `ocr_scans.extraction` row amended. Proof: 9 Pest cases and 1 Vitest case red on the trunk; 5 Pest mutants and 2 Vitest mutants, each caught by its own case; `ocr-review-axe.spec.ts` asserts the new note on a seeded `manual` multi-select. **Found beside it and filed:** `D110` — the PRD asked for each low-confidence answer to be confirmed on its own, and the review screen has never done that; answered A in the same session (one Save confirms the whole form) and the PRD line amended in `M156`.
 
-- **`nit` · The root lockfile still records the design system's `vue` dev dependency as `^3.5.39`, so every local `npm` run rewrites it.**
+- ✅ **CLOSED BY `M182` (2026-10-21) — ****`nit` · The root lockfile still records the design system's `vue` dev dependency as `^3.5.39`, so every local `npm` run rewrites it.**
   Found by `M156` building assets for a local E2E run: `npm run build` in the node container left `package-lock.json` modified
   in one line — the `packages/design-system` workspace entry's `"vue": "^3.5.39"` became `"^3.5.43"`, which is what
   `packages/design-system/package.json` has declared since `M137` bumped it (the trunk-wide audit fix) without regenerating that
   entry. CI is green because `npm ci` tolerates it; locally the stray diff turns up in `git status` after any install or build
   and can ride into an unrelated commit. The remedy is one `npm install` at the root, committing only that line, with the
   Frontend and axe jobs as the check. `M156` reverted the line rather than widen its increment. **Live.** Filed by `M156`.
-  **Tier: during-testing.**
+  **Tier: during-testing.** ✅ **CLOSED BY `M182` (2026-10-21):** the line rode a lock regeneration `M182` owed anyway — `follow-redirects` 1.16.1 and the design system's `vite` 6.4.4 for advisories that red CI's `npm audit` (the claim's extension) — so the entry now reads `^3.5.43` and `npm install --package-lock-only` leaves the lock byte-identical. `R-d88fcfa1` was the same line, filed again by `M171`, and closed with it.
 
 - ✅ **CLOSED BY `M157` (2026-10-11) — ****`minor` · A tick question whose mark the scan never saw is shown on the review screen as "Left blank on the paper".**
   The user's report on the staging scan of sample sheet 08 (2026-10-11): *"i uploaded the no 8 oct. and the sex and vaccinated
@@ -14267,7 +14267,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   producer for a platform-wide notice and `App\Enums\NotificationType` would need a new case with a catalog row. Filed so the half
   not built is queued rather than left in prose. **Live.** Filed by `M171`. **Tier: after-launch.**
 
-- **`minor` · Fifteen files set small error text in `--mds-color-danger-text`, which resolves to `danger-300` in dark and measures 4.22:1 on the surface.**
+- ✅ **CLOSED BY `M182` (2026-10-21) — ****`minor` · Fifteen files set small error text in `--mds-color-danger-text`, which resolves to `danger-300` in dark and measures 4.22:1 on the surface.**
   The repository's own notes say so (`resources/js/Pages/admin/AuditLog.vue:287`, `resources/js/Pages/admin/TenantDetail.vue:547`,
   `resources/js/components/builder/LogicRail.vue:228`, `resources/js/components/shell/FeedbackButton.vue:453`) and the uses remain:
   `resources/js/Pages/forms/Builder.vue:863`, `resources/js/components/webhooks/WebhookFormModal.vue:197`,
@@ -14277,30 +14277,30 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `resources/js/components/submissions/FieldInput.vue:715`, `resources/js/components/integrations/RuleFormModal.vue:448`,
   `resources/js/components/builder/PreviewRuntime.vue:669` (the OCR pages' and the encode page's uses are taken by their own rows).
   Only the dark axe sweep can see it, and `/admin/*` is outside the sweep. The remedy is `--mds-color-status-danger-fg`, the
-  on-surface pair with a measured ratio, in every one. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
+  on-surface pair with a measured ratio, in every one. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Taken by UI6 (`M182`), 2026-10-21 (`D138`); its remedy reshaped by `D158`.** ✅ **CLOSED BY `M182` (2026-10-21):** ⛔ the failure this row names was already gone — 4.22:1 is danger-300 on `#123350`, the dark surface before JR1; on today's `#1a2130` it is 5.23:1 — but dark mode showed two error reds, so `D158` A re-pointed the dark `--mds-color-danger-text` to danger-200, the `status-danger-fg` step (7.91:1), in both dark blocks of `packages/design-system/src/theme/theme-overrides.css`. Every use is covered by the one change — the eleven files named here, the guest runtime, the feedback verdict, the design system's field error and tab dot; light was already one red. `theme-overrides.test.ts` pins the two tokens to one step in each dark block and both at 4.5:1 on the surface and the sunken ground. The seven code notes and the dark-palette note in `PROGRESS.md` that repeated 4.22:1 were re-measured in place. No axe spec renders an error state, so the theme test is the gate.
 
-- **`nit` · The console's "Reset two-step sign-in" dialog relies on browser-default paragraph margins.**
+- ✅ **CLOSED BY `M182` (2026-10-21) — ****`nit` · The console's "Reset two-step sign-in" dialog relies on browser-default paragraph margins.**
   `resources/js/Pages/admin/Users.vue:91-97` renders three paragraphs with no class, while every tenant dialog styles a `__prose` rule
-  (`resources/js/Pages/members/Index.vue:497`). The remedy is the same rule. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
+  (`resources/js/Pages/members/Index.vue:497`). The remedy is the same rule. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Taken by UI6 (`M182`), 2026-10-21 (`D138`), with the two scope dialogs (`D159`).** ✅ **CLOSED BY `M182` (2026-10-21):** the dialog's paragraphs take `.admin-users__prose` — `TenantDetail.vue`'s rule, the second paragraph keeping a gap, since `members/Index.vue`'s margin 0 alone would butt them together — and the error line `status-danger-fg`. ⚠️ "Every tenant dialog styles a `__prose` rule" was false for two: Move scope (`resources/js/Pages/scopes/Index.vue`) and Delete scope (`resources/js/components/scopes/DeleteNodeModal.vue`) opened on a bare paragraph, and now class it (`D159`). `resources/js/__tests__/dialog-prose.test.ts` pins all three.
 
-- **`nit` · Three uppercase micro-labels hard-code their tracking where `--mds-tracking-wide` exists.**
+- ✅ **CLOSED BY `M182` (2026-10-21) — ****`nit` · Three uppercase micro-labels hard-code their tracking where `--mds-tracking-wide` exists.**
   `resources/js/Pages/help/Index.vue:223` (0.04em), `resources/js/components/shell/Sidebar.vue:366` (0.06em) and
   `resources/js/Layouts/AdminLayout.vue:130` (0.04em); `packages/design-system/src/components/FilterBar/FilterBar.vue:58-61` records the
   token as the one letting for the product's micro-labels (the console workspace page's and the landing page's literals are taken by
-  their own rows). The remedy is the token. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Narrowed 2026-10-15 by `M173`:** `M173` edits `resources/js/Layouts/AdminLayout.vue` for the shell row and takes its literal there, as the UI programme's plan intended; this row's remainder is `help/Index.vue` and `Sidebar.vue`.
+  their own rows). The remedy is the token. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Narrowed 2026-10-15 by `M173`:** `M173` edits `resources/js/Layouts/AdminLayout.vue` for the shell row and takes its literal there, as the UI programme's plan intended; this row's remainder is `help/Index.vue` and `Sidebar.vue`. **Taken by UI6 (`M182`), 2026-10-21 (`D138`), with the builder's three (`D159`).** ✅ **CLOSED BY `M182` (2026-10-21):** the Help page's contents labels and the sidebar's group names take `--mds-tracking-wide` (0.06em — invisible on the sidebar, which had the same literal; Help's widen from 0.04em), and so do the builder's palette, choices and canvas type labels (0.03–0.04em, `D159`). `resources/js/__tests__/letter-spacing-tokens.test.ts` holds every letter-spacing under `resources/` and the design system to a token, five literals kept by name and reason (three wordmarks, the sign-in title, the two-step key) on a list that only shrinks.
 
-- **`nit` · Three truncated values offer no way to read the whole text where they are shown.**
+- ✅ **CLOSED BY `M182` (2026-10-21) — ****`nit` · Three truncated values offer no way to read the whole text where they are shown.**
   `resources/js/Pages/webhooks/Index.vue:224-236` (`.webhooks__url`), `resources/js/Pages/integrations/Index.vue:456-468`
   (`.connection__channel`) and `resources/js/Pages/integrations/RuleShow.vue:432-442` (`.detail__result`) clip with an ellipsis and
   carry no `title`. The remedy is a `title` with the full value — allowed because the same text is on the row's detail page, so no
-  tooltip component is owed. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
+  tooltip component is owed. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Taken by UI6 (`M182`), 2026-10-21 (`D138`), with the eight more clipped values (`D159`).** ✅ **CLOSED BY `M182` (2026-10-21):** each of the three binds `title` to the text it renders, and so do eight more (`D159`): the leaderboard name, the builder's form title, the canvas's section and question labels, a scope's name, a media file's name, the Airtable link and a library item. ⚠️ "The same text is on the row's detail page" was false for the reply excerpt — `RuleShow` IS the detail page; the title still exposes nothing new, since the text is in the page. `resources/js/__tests__/truncation-title.test.ts` reads every component for an ellipsis rule and requires a title on each element carrying it (two fixed-word strings kept by name); mount proofs in `resources/js/Pages/webhooks/index.test.ts` (new) and `resources/js/Pages/integrations/index.test.ts` hold the bound value to the whole text.
 
-- **`nit` · The root lockfile records the design system's `vue` range as `^3.5.39` while its `package.json` says `^3.5.43`, so the node container's `npm install` rewrites `package-lock.json` and dirties the working tree.**
+- ✅ **CLOSED BY `M182` (2026-10-21) — ****`nit` · The root lockfile records the design system's `vue` range as `^3.5.39` while its `package.json` says `^3.5.43`, so the node container's `npm install` rewrites `package-lock.json` and dirties the working tree.**
   Found by `M171`: after the stack started, `git status` showed `package-lock.json` changed by one line — the `packages/design-system`
   entry's `"vue": "^3.5.39"` became `"^3.5.43"`. `M137` raised the design system's range (`packages/design-system/package.json:37`) and
   the root lock was never regenerated. Harmless to the build (CI runs `npm install`, not `npm ci`), but a session that stages
   everything ships an unrelated lockfile line, and one that does not keeps reverting it. The remedy is the one-line lock update in a
-  PR of its own. **Live.** Filed by `M171`. **Tier: during-testing.**
+  PR of its own. **Live.** Filed by `M171`. **Tier: during-testing.** ✅ **CLOSED BY `M182` (2026-10-21):** with `R-e5716b29` (the same line, filed first by `M156`): the lock regeneration `M182` owed for two `npm audit` advisories carries the entry as `^3.5.43`, and npm now leaves the lock byte-identical. Not in a PR of its own, as this row asked — the advisories made the lock change unavoidable in this one.
 
 - ✅ **CLOSED BY `M172` (2026-10-15) — ****`major` · A builder tab left open across a publish refuses every edit with "The key has already been taken", then "That item belongs to a published version" once the key is changed, and a reload loses the unsaved edits.**
   The testers' report (2026-10-14, relayed 2026-10-15): *"The key has already been taken. ************ has a change that was not saved.
@@ -15005,3 +15005,21 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Each passes alone, and CI's alphabetical order runs Admin before Settings, so no run has seen it; a reordered or parallel run would.
   The remedy: find what the settings test leaves set (a tenant context or a cached tenant) and clear it after each case, or make the
   console's audit write refuse a stale context. **Latent.** Filed by `M181`. **Tier: before-launch.**
+
+- **`nit` · At a phone width, a keyboard move of a scope already at the top level, back to the top level, never announces an outcome.**
+  Measured by `M182` with `tests/e2e/scopes-axe.spec.ts` ("keyboard move announces grab, target and outcome") on the dev stack: once
+  the seeded Movable District is a top-level row, the 375px project's run grabs it, drops it on the top level, confirms Move scope, and
+  the live region still reads "Grabbed Movable District…" ten seconds later — neither "Moved" nor "That move was refused", so
+  `settleIfPending()` in `resources/js/components/scopes/useScopeTreeMove.ts` never ran. The 834px and 1440px runs pass from the same
+  state, and so does the same case on UI5's tree (measured: the pre-`M182` `resources/js/Pages/scopes/Index.vue` fails identically), so
+  it is not `M182`'s dialog change. CI passes because its fresh database starts the node two levels down. The remedy: find what the
+  phone layout changes between the confirm and the refreshed rows (a visit that never fires, or rows that arrive unchanged and are not
+  watched), then announce the unchanged case too. **Latent.** Filed by `M182`. **Tier: during-testing.**
+
+- **`nit` · The builder canvas's question labels start at different points, because the type label before each one is wider than its 84px column for the longer types.**
+  Seen by `M182`'s real-browser look at 1920px: `.canvas__field-type` in `resources/js/components/builder/BuilderCanvas.vue` is
+  `min-width: 84px` and `flex-shrink: 0`, so "SHORT TEXT", "DATE" and "YES / NO" leave their labels at one x while "WHOLE NUMBER",
+  "SINGLE CHOICE" and "MULTIPLE CHOICE" push theirs 20–35px further right, and the column of labels reads ragged. Already so before
+  `M182`; its tracking token widened the longest by about 4px. The remedy: a type column wide enough for the longest label in the
+  catalogue (measured, in `ch` or `em` so it follows the type scale), or the type moved after the label as a badge.
+  **Live.** Filed by `M182`. **Tier: during-testing.**

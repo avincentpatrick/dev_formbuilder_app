@@ -544,8 +544,8 @@ function formatDay(iso: string | null): string {
 </template>
 
 <style scoped>
-/* `--mds-color-status-danger-fg`, never `--mds-color-danger-text` — the latter resolves to danger-300 in
-   dark and fails contrast on bg-surface. /admin/* is outside the axe sweep, so nothing would catch it. */
+/* `--mds-color-status-danger-fg`, the on-surface pair — since M182 `--mds-color-danger-text` is the same
+   step in both themes (`D158`). This page is outside the axe sweep, so a source pin is its only check. */
 
 /* M174: the container the cards' split reads — this page's own, since its root is the console layout's column. */
 .admin-td {

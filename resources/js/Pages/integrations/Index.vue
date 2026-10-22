@@ -262,7 +262,7 @@ function providerNotice(providerKey: string): string | null {
                     row-key="id"
                 >
                     <template #cell-destination_label="{ row }">
-                        <span class="connection__channel">{{ destinationLabel(row as RuleRow) }}</span>
+                        <span class="connection__channel" :title="destinationLabel(row as RuleRow)">{{ destinationLabel(row as RuleRow) }}</span>
                     </template>
                     <template #cell-event_types="{ row }">
                         {{ (row as RuleRow).event_types.length }}

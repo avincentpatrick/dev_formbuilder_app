@@ -143,7 +143,7 @@ function openEndpoint(id: string): void {
 
         <MdsDataTable :columns="columns" :rows="data" :loading="busy" caption="Webhook endpoints" row-key="id">
             <template #cell-url="{ row }">
-                <span class="webhooks__url">{{ (row as EndpointRow).url }}</span>
+                <span class="webhooks__url" :title="(row as EndpointRow).url">{{ (row as EndpointRow).url }}</span>
             </template>
             <template #cell-status="{ row }">
                 <MdsBadge v-bind="statusVariant((row as EndpointRow).status)" dot />

@@ -213,6 +213,8 @@ for (const theme of themes) {
         const district = page.getByLabel('District visited');
         await expect(district.locator('option:not([disabled])')).toHaveText(['Malate', 'Sampaloc', 'Tondo']);
         await district.selectOption('Sampaloc');
+        // M184 (`R-3e7c81bb`): a Dropdown whose choices came from a list file at publish — plain choices in the schema.
+        await expect(page.getByLabel('Facility visited').locator('option:not([disabled])')).toHaveText(['Malate BHS', 'Poblacion BHS', 'San Jose RHU']);
         await assertClean(page, 'Field Visit Referral (linked choices)');
     });
 }

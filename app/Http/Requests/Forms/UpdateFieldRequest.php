@@ -200,6 +200,7 @@ final class UpdateFieldRequest extends FormRequest
             'config.options_source' => 'choices source',
             'config.options_source.form_id' => 'source form',
             'config.options_source.field_key' => 'source question',
+            'config.options_list' => 'choice list',
             'config.levels' => 'levels',
             'config.levels.*.key' => 'level key',
             'config.levels.*.label' => 'level label',
@@ -364,6 +365,9 @@ final class UpdateFieldRequest extends FormRequest
                 'config.options_source' => ['sometimes', 'nullable', 'array:form_id,field_key'],
                 'config.options_source.form_id' => ['nullable', 'uuid'],
                 'config.options_source.field_key' => ['nullable', 'string', 'max:255'],
+                // M184 (`R-3e7c81bb`): choices taken from a list file of this form, by the list's name — empty while the author
+                // is still choosing; whether the list exists is publish's, as a cascade level's list is.
+                'config.options_list' => ['sometimes', 'nullable', 'string', 'max:64', 'regex:/^[a-z0-9_-]*$/'],
                 // M177 (`R-71509975`): the key of the Please specify question "Other, please specify" made.
                 'config.other_specify_key' => ['sometimes', 'nullable', 'string', 'max:150'],
             ];

@@ -275,8 +275,9 @@ final class FieldTypeConversion
     {
         $config = array_replace($targetDefault, $source);
 
+        // M184: a list file feeds the same types a link does, so both follow a conversion among them and neither onto a Likert scale.
         if (! in_array($to, LinkedChoiceService::LINKABLE_TYPES, true)) {
-            unset($config['options_source']);
+            unset($config['options_source'], $config['options_list']);
         }
 
         // M177 (`R-71509975`): a Likert scale has no "Other, please specify" — the link is dropped, and the plan says so.

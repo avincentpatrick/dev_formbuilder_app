@@ -678,7 +678,7 @@ watch(librarySaved, (value) => {
                     </template>
 
                     <template v-else-if="activeTab === 'options'">
-                        <LinkedChoicesEditor v-if="enums.linked_choice_types?.includes(field.field_type)" :config="field.config" :sources="props.store.linkableSources" @update:config="field.config = $event; props.store.touch(field.uid, 'field')" /><ChoicesEditor v-if="choiceSourceOf(field.config) === 'typed'" :options="choices" @update:options="setConfig('options', $event)" /><OtherSpecifyControl :store="props.store" />
+                        <LinkedChoicesEditor v-if="enums.linked_choice_types?.includes(field.field_type)" :config="field.config" :sources="props.store.linkableSources" :form-id="store.formId" :field-type="field.field_type" @update:config="field.config = $event; props.store.touch(field.uid, 'field')" /><ChoicesEditor v-if="choiceSourceOf(field.config) === 'typed'" :options="choices" @update:options="setConfig('options', $event)" /><OtherSpecifyControl :store="props.store" />
                         <MdsFormField
                             v-if="layoutOptions.length > 0"
                             label="Choice layout"

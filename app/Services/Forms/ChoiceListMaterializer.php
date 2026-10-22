@@ -19,8 +19,14 @@ use Illuminate\Support\Collection;
  * submission channel, `SchemaValueFormatter` for every export and connector, OCR's answer reader, the encode page.
  * Writing the list there makes all of them right with no change, and a published version is frozen, so an answer is
  * always checked against the list it was chosen from. The DRAFT keeps no options — the builder never carries a
- * 42,000-row list — and `SchemaTreeCloner` strips them again from the next draft ({@see self::withoutListOptions()}).
- * The public schema leaves them out too; the runtime fetches them beside it.
+ * 42,000-row list — and `SchemaTreeCloner` strips them again from the next draft ({@see self::forNextDraft()}).
+ * The public schema leaves a cascade's out too; the runtime fetches them beside it.
+ *
+ * ── A SINGLE CHOICE, MULTIPLE CHOICE OR DROPDOWN FROM A LIST FILE (M184, `R-3e7c81bb`) ──────────────────────────
+ * `config.options_list` names one list; publishing writes its rows as the question's options, exactly as for a cascade,
+ * so every reader above stays plain. Unlike a cascade's, those options STAY in the public schema: a browser running the
+ * app cached before the deploy merges only cascades' lists, and the offline list cache can be evicted apart from the
+ * schema — so the list is capped at {@see self::FLAT_LIST_MAX} rows instead (a longer one is a cascade's, or a later row's).
  *
  * ── THE MAPPING, KOBO'S `select_one_from_file` WITH A `choice_filter` ────────────────────────────────────────
  * Level `i` takes its choices from the list it names: each row's `name` is the value and `label` the label (Kobo's
@@ -36,6 +42,16 @@ use Illuminate\Support\Collection;
  */
 final class ChoiceListMaterializer
 {
+    /**
+     * M184 (`R-3e7c81bb`): the most rows a Single choice, Multiple choice or Dropdown takes from one list. Its options are
+     * written into the published version and the schema every browser downloads (not served beside it, as a cascade's
+     * are: an app cached before a deploy merges cascades only), so the list is bounded; a longer list is a cascade's.
+     */
+    public const int FLAT_LIST_MAX = 5_000;
+
+    /** The question types a list file may feed directly — the ones that may link to another form's answers too. */
+    private const FLAT_TYPES = [FieldType::SingleSelect, FieldType::MultiSelect, FieldType::Dropdown];
+
     /** Is every level of this cascade a list? Then its options come from the lists, and the draft holds none. */
     public static function isListBacked(mixed $config): bool
     {
@@ -68,6 +84,23 @@ final class ChoiceListMaterializer
         }
 
         return $config;
+    }
+
+    /**
+     * The config a draft cloned from a version carries — after a publish, or a restore ({@see SchemaTreeCloner}): every
+     * option a list wrote is taken out again, so the draft names its lists and holds none of their rows. A list-backed
+     * cascade's, as {@see withoutListOptions()} does, and since M184 a choice question bound to a list file.
+     *
+     * @param  array<string, mixed>  $config
+     * @return array<string, mixed>
+     */
+    public static function forNextDraft(array $config): array
+    {
+        if (is_string($config['options_list'] ?? null) && $config['options_list'] !== '') {
+            $config['options'] = [];
+        }
+
+        return self::withoutListOptions($config);
     }
 
     /**
@@ -159,6 +192,30 @@ final class ChoiceListMaterializer
             $field->forceFill(['config' => $config])->save();
         }
 
+        // M184 (`R-3e7c81bb`): a choice question bound to a list file — its options written the same way, over any typed
+        // ones a template, a library item or a restore carried beside the list's name.
+        $bound = FormField::query()
+            ->where('form_version_id', $draft->id)
+            ->whereIn('field_type', [FieldType::SingleSelect->value, FieldType::MultiSelect->value, FieldType::Dropdown->value, FieldType::LikertScale->value])
+            ->whereNotNull('config->options_list')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($bound as $field) {
+            $config = (array) $field->config;
+            $lists ??= FormVersionChoiceList::query()->where('form_version_id', $draft->id)->get()->keyBy('name');
+            $options = $this->flatOptionsFor($field, $config, $lists);
+
+            if ($options instanceof PublishValidationException) {
+                $violations[] = $options;
+
+                continue;
+            }
+
+            $config['options'] = $options;
+            $field->forceFill(['config' => $config])->save();
+        }
+
         if ($violations !== []) {
             throw count($violations) === 1 ? $violations[0] : PublishValidationException::several($violations);
         }
@@ -221,6 +278,49 @@ final class ChoiceListMaterializer
         }
 
         return $options;
+    }
+
+    /**
+     * A flat question's options from its list: each row's `name` the value, its `label` the label; any other column, a
+     * cascade's parent column among them, is ignored.
+     *
+     * @param  array<string, mixed>  $config
+     * @param  Collection<string, FormVersionChoiceList>  $lists
+     * @return list<array{value: string, label: string}>|PublishValidationException
+     */
+    private function flatOptionsFor(FormField $field, array $config, Collection $lists): array|PublishValidationException
+    {
+        $key = $field->key;
+        $name = is_string($config['options_list'] ?? null) ? $config['options_list'] : '';
+
+        if (! in_array($field->field_type, self::FLAT_TYPES, true)) {
+            return PublishValidationException::choiceOptionsInvalid($key, 'a Likert scale keeps its own points and cannot take them from a list file');
+        }
+        if (LinkedChoiceService::declaresLink($config)) {
+            return PublishValidationException::choiceOptionsInvalid($key, 'it takes its choices from a list file and from another form — choose one');
+        }
+        if ($name === '') {
+            return PublishValidationException::choiceOptionsInvalid($key, 'no list file is chosen for its choices');
+        }
+
+        $list = $lists->get($name);
+        if ($list === null) {
+            return PublishValidationException::choiceOptionsInvalid($key, "it takes its choices from “{$name}”, which this form does not hold — upload {$name}.csv or {$name}.xlsx");
+        }
+
+        $header = $list->header();
+        $nameAt = array_search('name', $header, true);
+        $labelAt = self::labelColumn($header);
+        if ($nameAt === false || $labelAt === null) {
+            return PublishValidationException::choiceOptionsInvalid($key, "“{$name}” has no name or label column");
+        }
+
+        $rows = $list->dataRows();
+        if (count($rows) > self::FLAT_LIST_MAX) {
+            return PublishValidationException::choiceOptionsInvalid($key, '“'.$name.'” holds '.number_format(count($rows)).' choices, and one question takes at most '.number_format(self::FLAT_LIST_MAX).' — use a cascading select for a longer list');
+        }
+
+        return array_map(static fn (array $row): array => ['value' => $row[$nameAt] ?? '', 'label' => $row[$labelAt] ?? ''], $rows);
     }
 
     /**

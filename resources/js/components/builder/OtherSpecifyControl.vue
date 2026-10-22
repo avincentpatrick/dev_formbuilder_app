@@ -15,6 +15,7 @@
 import { computed, ref, useId } from 'vue';
 import { MdsSwitch } from '@meridian/design-system';
 import DeleteFieldDialog from './DeleteFieldDialog.vue';
+import { choiceSourceOf } from './choice-source';
 import { otherSpecifyChild } from './other-specify';
 import { useAnsweredDelete } from './useAnsweredDelete';
 import type { BuilderStore } from './useBuilderStore';
@@ -30,7 +31,7 @@ const pending = confirmation.pending;
 const offered = computed(() => {
     const current = field.value;
 
-    return current !== null && (props.store.enums.other_specify_types ?? []).includes(current.field_type) && current.config.options_source == null;
+    return current !== null && (props.store.enums.other_specify_types ?? []).includes(current.field_type) && choiceSourceOf(current.config) === 'typed';
 });
 const child = computed(() => (field.value ? otherSpecifyChild(field.value, props.store.fields.value) : undefined));
 

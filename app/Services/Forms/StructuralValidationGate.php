@@ -425,8 +425,9 @@ final class StructuralValidationGate
     private function assertChoiceOptionsResolve(FormField $field): void
     {
         // M133 (`R-5da4a30f`): a question that takes its choices from another form has none typed here, by design —
-        // its link is {@see LinkedChoiceGate}'s to judge, and typed choices beside it are refused there.
-        if (LinkedChoiceService::declaresLink($field->config) && data_get($field->config, 'options', []) === []) {
+        // its link is {@see LinkedChoiceGate}'s to judge, and typed choices beside it are refused there. M184: nor does one
+        // bound to a list file whose choices are not written yet — publish writes them before this gate, and says why not.
+        if (! ChoiceSource::of($field->config)->isTyped() && data_get($field->config, 'options', []) === []) {
             return;
         }
 

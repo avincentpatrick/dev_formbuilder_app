@@ -18,6 +18,7 @@ use App\Exceptions\Forms\FormException;
 use App\Models\FormField;
 use App\Models\FormFieldValidation;
 use App\Services\Expressions\Coercion;
+use App\Services\Forms\ChoiceSource;
 use App\Services\Forms\FormBuilderService;
 use App\Services\Forms\LinkedChoiceService;
 use App\Services\Forms\StructuralValidationGate;
@@ -521,8 +522,9 @@ final class FieldTypeConversion
     private static function incomplete(FieldType $type, array $config): bool
     {
         return match (true) {
-            // M133: a question that takes its choices from another form has none typed here, and is finished.
-            ValueShape::for($type)->carriesOptionList() => self::emptyList($config['options'] ?? null) && ! LinkedChoiceService::declaresLink($config),
+            // M133: a question that takes its choices from another form has none typed here, and is finished; M184: so is one
+            // bound to a list file.
+            ValueShape::for($type)->carriesOptionList() => self::emptyList($config['options'] ?? null) && ChoiceSource::of($config)->isTyped(),
             $type === FieldType::CascadingSelect => self::emptyList($config['levels'] ?? null) || self::emptyList($config['options'] ?? null),
             // M183: the shared cells are needed only while a choice column draws from them — the publish gate's own question.
             $type === FieldType::Matrix => self::emptyList($config['rows'] ?? null) || self::emptyList($config['columns'] ?? null)

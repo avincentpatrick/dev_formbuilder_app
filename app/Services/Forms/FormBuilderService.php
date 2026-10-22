@@ -417,7 +417,7 @@ final class FormBuilderService
 
             /** @var array<string, mixed> $config */
             $config = (array) $field->config;
-            if (! OtherSpecify::offers($field->field_type) || LinkedChoiceService::declaresLink($config)) {
+            if (! OtherSpecify::offers($field->field_type) || ! ChoiceSource::of($config)->isTyped()) {
                 throw FormException::otherSpecifyNotOffered();
             }
             if ($this->otherSpecifyChild($draft, $config) !== null) {

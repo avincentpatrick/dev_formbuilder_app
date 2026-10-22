@@ -40,6 +40,7 @@ import FieldTypeControl from './FieldTypeControl.vue';
 import GeoEditor from './GeoEditor.vue';
 import LikertMatrixEditor from './LikertMatrixEditor.vue';
 import LinkedChoicesEditor from './LinkedChoicesEditor.vue';
+import { choiceSourceOf } from './choice-source';
 import OtherSpecifyControl from './OtherSpecifyControl.vue';
 import { applyShowMode, showModeFixed, showModeOf, type ShowMode } from './field-visibility';
 import MatrixEditor from './MatrixEditor.vue';
@@ -417,7 +418,7 @@ const defaultChoices = computed<EnumOption[] | null>(() => {
     if (current === null) return null;
     if (current.field_type === 'yes_no') return [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
     const options = current.config.options;
-    if (!['single_select', 'dropdown', 'likert_scale'].includes(current.field_type) || current.config.options_source != null || !Array.isArray(options) || options.length === 0) return null;
+    if (!['single_select', 'dropdown', 'likert_scale'].includes(current.field_type) || choiceSourceOf(current.config) !== 'typed' || !Array.isArray(options) || options.length === 0) return null;
 
     return (options as Array<{ value: string; label?: string }>).map((option) => ({ value: option.value, label: option.label || option.value }));
 });
@@ -677,7 +678,7 @@ watch(librarySaved, (value) => {
                     </template>
 
                     <template v-else-if="activeTab === 'options'">
-                        <LinkedChoicesEditor v-if="enums.linked_choice_types?.includes(field.field_type)" :config="field.config" :sources="props.store.linkableSources" @update:config="field.config = $event; props.store.touch(field.uid, 'field')" /><ChoicesEditor v-if="field.config.options_source == null" :options="choices" @update:options="setConfig('options', $event)" /><OtherSpecifyControl :store="props.store" />
+                        <LinkedChoicesEditor v-if="enums.linked_choice_types?.includes(field.field_type)" :config="field.config" :sources="props.store.linkableSources" @update:config="field.config = $event; props.store.touch(field.uid, 'field')" /><ChoicesEditor v-if="choiceSourceOf(field.config) === 'typed'" :options="choices" @update:options="setConfig('options', $event)" /><OtherSpecifyControl :store="props.store" />
                         <MdsFormField
                             v-if="layoutOptions.length > 0"
                             label="Choice layout"

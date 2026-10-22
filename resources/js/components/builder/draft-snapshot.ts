@@ -53,6 +53,7 @@
  * rendered. Nothing should ever hash the output of this module.
  */
 
+import { choiceSourceOf } from './choice-source';
 import { parseExpression } from './condition-model';
 import type { BuilderValidation, LocalField, LocalSection, Uid } from './types';
 
@@ -391,8 +392,8 @@ export function projectDraft(input: DraftProjectionInput): DraftProjection {
         const config: Record<string, unknown> = { ...f.config };
         // M133: a question that takes its choices from another form has none typed here by design — the live form
         // serves its list, and `previewLimitations()` says the preview does not. M141: nor does a cascade whose levels take
-        // their choices from CSV files — publishing builds its options from them.
-        if (Array.isArray(config.options) && config.options.length === 0 && config.options_source == null && !(f.field_type === 'cascading_select' && isListBacked(config))) {
+        // their choices from CSV files — publishing builds its options from them. M184: nor does a question bound to a list file.
+        if (Array.isArray(config.options) && config.options.length === 0 && choiceSourceOf(config) === 'typed' && !(f.field_type === 'cascading_select' && isListBacked(config))) {
             add(f.uid, key, 'empty_option_list', 'This question has no choices yet.');
         }
 

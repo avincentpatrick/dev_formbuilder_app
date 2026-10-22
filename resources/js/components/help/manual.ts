@@ -618,6 +618,7 @@ const OTHER_SPECIFY = 'resources/js/components/builder/OtherSpecifyControl.vue';
 const CASCADING = 'resources/js/components/builder/CascadingEditor.vue';
 const LIKERT_MATRIX = 'resources/js/components/builder/LikertMatrixEditor.vue';
 const MATRIX = 'resources/js/components/builder/MatrixEditor.vue';
+const GRID_LAYOUT = 'resources/js/components/builder/GridLayoutSelect.vue';
 const GEO = 'resources/js/components/builder/GeoEditor.vue';
 const MEDIA = 'resources/js/components/builder/MediaEditor.vue';
 const PREFILL = 'resources/js/components/builder/PrefillEditor.vue';
@@ -1019,7 +1020,7 @@ const reference: ChapterDraft[] = [
                 id: 'type-likert-scale',
                 title: 'Likert scale',
                 blocks: [
-                    p('A row of points, such as 1 “Strongly disagree” to 5 “Strongly agree”; the respondent picks one.'),
+                    p('A row of points, such as 1 “Strongly disagree” to 5 “Strongly agree”; the respondent picks one. The points sit on one line, each with its words underneath.'),
                     list(
                         ['It starts with no points. Add them on the ', ui('Options', CONFIG), ' tab with ', ui('Add option', CHOICES), ', lowest first.'],
                         ['Use numbers as each point’s ', ui('Value', CHOICES), ', so answers can be added up and checked with ', ui('Minimum value', RULE_TYPES), ' and ', ui('Maximum value', RULE_TYPES), '.'],
@@ -1030,10 +1031,11 @@ const reference: ChapterDraft[] = [
                 id: 'type-likert-matrix',
                 title: 'Likert matrix',
                 blocks: [
-                    p('Several statements, each rated on the same scale, in one table. On the ', ui('Grid', CONFIG), ' tab:'),
+                    p('Several statements, each rated on the same scale, in one table: the scale’s words across the top and one round button for each statement and point. On a phone each statement becomes a card with its scale on one line. On the ', ui('Grid', CONFIG), ' tab:'),
                     list(
                         [ui('Rows', LIKERT_MATRIX), ' — the statements to rate.'],
                         [ui('Scale points', LIKERT_MATRIX), ' — the rating scale shared by every row, from lowest to highest.'],
+                        [ui('Layout', GRID_LAYOUT), ' — ', ui('Table where it fits', GRID_LAYOUT), ', or ', ui('Cards everywhere', GRID_LAYOUT), '.'],
                     ),
                 ],
             },
@@ -1139,13 +1141,14 @@ const reference: ChapterDraft[] = [
                 id: 'type-matrix',
                 title: 'Matrix (grid)',
                 blocks: [
-                    p('A table of questions; each cell is a choice from one shared list. On the ', ui('Grid', CONFIG), ' tab:'),
+                    p('A table of questions: each row is asked in every column, and each column takes its own kind of answer. It is a table on a wide screen and a card per row on a phone. On the ', ui('Grid', CONFIG), ' tab:'),
                     list(
                         [ui('Rows', MATRIX), ' — each row is a question.'],
-                        [ui('Columns', MATRIX), ' — the table’s columns.'],
-                        [ui('Cell choices', MATRIX), ' — the choices offered in every cell.'],
+                        [ui('Columns', MATRIX), ' — each column is asked in every row. Under each one: its ', ui('Type', MATRIX), ' (one choice, several choices, short text, a whole or decimal number, or a date), ', ui('Required in every row', MATRIX), ', and for a choice column a list of its own.'],
+                        [ui('Cell choices', MATRIX), ' — the choices of every choice column with no list of its own.'],
+                        [ui('Layout', GRID_LAYOUT), ' — ', ui('Table where it fits', GRID_LAYOUT), ', or ', ui('Cards everywhere', GRID_LAYOUT), '.'],
                     ),
-                    tip('info', 'Grids cannot be used in conditions or formulas, or inside a repeatable section.'),
+                    tip('info', 'Grids cannot be used in conditions or formulas, or inside a repeatable section. A spreadsheet gives every cell its own column, beside the grid’s one-line summary.'),
                 ],
             },
         ],

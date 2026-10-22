@@ -541,9 +541,16 @@ class E2eSeeder extends Seeder
                             ['value' => 'consult', 'label' => 'Consultation'],
                             ['value' => 'lab', 'label' => 'Lab work'],
                         ],
+                        // M183 (`R-5033e87e`): two typed columns beside the two untyped ones, so the public-runtime scan meets a
+                        // number box and a column of tick boxes with its own choices in the table and in the cards.
                         'columns' => [
                             ['value' => 'morning', 'label' => 'Morning'],
                             ['value' => 'afternoon', 'label' => 'Afternoon'],
+                            ['value' => 'doctors', 'label' => 'Doctors on duty', 'type' => 'integer'],
+                            ['value' => 'payment', 'label' => 'Payment taken', 'type' => 'multi_select', 'options' => [
+                                ['value' => 'cash', 'label' => 'Cash'],
+                                ['value' => 'card', 'label' => 'Card'],
+                            ]],
                         ],
                         'cells' => [
                             ['value' => 'available', 'label' => 'Available'],
@@ -794,7 +801,9 @@ class E2eSeeder extends Seeder
                     'label' => 'Coverage matrix',
                     'config' => [
                         'rows' => [['value' => 'a', 'label' => 'Row A'], ['value' => 'b', 'label' => 'Row B']],
-                        'columns' => [['value' => 'q1', 'label' => 'Column 1'], ['value' => 'q2', 'label' => 'Column 2']],
+                        // M183: the second column takes several choices of its own, so the Grid tab's scan meets a column's
+                        // Type, Required and own choices; the first still draws on the Cell choices.
+                        'columns' => [['value' => 'q1', 'label' => 'Column 1'], ['value' => 'q2', 'label' => 'Column 2', 'type' => 'multi_select', 'required' => true, 'options' => [['value' => 'x', 'label' => 'X'], ['value' => 'y', 'label' => 'Y']]]],
                         'cells' => [['value' => 'yes', 'label' => 'Yes'], ['value' => 'no', 'label' => 'No']],
                     ],
                 ]);

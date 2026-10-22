@@ -261,8 +261,21 @@ export interface RenderCascade {
  */
 export interface RenderMatrix {
     rows: RenderOption[];
-    columns: RenderOption[];
+    columns: RenderMatrixColumn[];
     cells: RenderOption[];
+    /** M183 (`R-1c1d7266`): `stacked` draws cards at every width; `table` (the default) a table wherever one fits. */
+    layout: 'table' | 'stacked';
+}
+
+/**
+ * A grid column (M183, `R-5033e87e`). A `matrix` column carries its answer rule resolved: its `type` (a single
+ * choice when the author set none), its `options` (its own, else the shared `cells`; empty for a column that takes
+ * no choices) and `required`. A `likert_matrix` column is a scale point and carries none of the three.
+ */
+export interface RenderMatrixColumn extends RenderOption {
+    type?: string;
+    options?: RenderOption[];
+    required?: boolean;
 }
 
 /**

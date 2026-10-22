@@ -761,14 +761,19 @@ export class SemanticValidator {
     }
 
     /**
-     * Matrix (`{row:{col:cell}}`): each declared row×column cell may carry a value drawn from the shared cell
-     * choice pool. Returns the pruned `{row:{col:cell}}` (rows with no surviving cell dropped).
-     * `cellPath = "<rowKey>.<colKey>"`.
+     * Matrix (`{row:{col:cell}}`): each declared row×column cell may carry a value its column accepts. Returns the
+     * pruned `{row:{col:cell}}` (rows with no surviving cell dropped). `cellPath = "<rowKey>.<colKey>"`.
+     *
+     * M183 (`R-5033e87e`; mirror of PHP `SemanticValidator::processMatrix`): a column may carry its own type, choices
+     * and required flag (`grid.column_specs`). A choice cell (no type, or a single choice) is a string from its
+     * column's own list, else from `cells`; a multiple-choice cell is a list, each element from that list; a
+     * whole-number cell refuses a fraction; a text, decimal or date cell keeps its value as sent.
      */
     private processMatrix(field: SchemaField, raw: unknown, required: boolean, requiredMessage: string, errors: SemanticError[]): Record<string, Record<string, EngineValue>> {
         const rowKeys = this.compositeValues(field, 'rows');
         const colKeys = this.compositeValues(field, 'columns');
-        const cellSet = new Set(this.compositeValues(field, 'cells'));
+        const cells = this.compositeValues(field, 'cells');
+        const specs = this.columnSpecs(field);
         const rawMap = this.asObjectMap(raw);
 
         const pruned: Record<string, Record<string, EngineValue>> = {};
@@ -776,20 +781,46 @@ export class SemanticValidator {
             const rowMap = this.asObjectMap(rawMap[rowKey]);
             const prunedRow: Record<string, EngineValue> = {};
             for (const colKey of colKeys) {
+                const spec = specs.get(colKey) ?? { type: null, options: [], required: false };
+                const path = `${rowKey}.${colKey}`;
                 const has = Object.prototype.hasOwnProperty.call(rowMap, colKey);
                 const cell = (has ? rowMap[colKey] : ABSENT) as MaybeAbsent;
                 if (!has || isEmpty(cell)) {
-                    if (required) {
-                        errors.push({ fieldKey: field.key, rule: 'field_required', message: requiredMessage, sectionKey: null, instanceIndex: null, cellPath: `${rowKey}.${colKey}` });
+                    if (required || spec.required) {
+                        errors.push({ fieldKey: field.key, rule: 'field_required', message: requiredMessage, sectionKey: null, instanceIndex: null, cellPath: path });
                     }
 
                     continue;
                 }
 
-                const value = toStr(cell);
-                prunedRow[colKey] = value;
-                if (cellSet.size > 0 && !cellSet.has(value)) {
-                    errors.push({ fieldKey: field.key, rule: 'choice_not_in_options', message: 'The selected option is not available.', sectionKey: null, instanceIndex: null, cellPath: `${rowKey}.${colKey}` });
+                const choiceSet = new Set(spec.options.length > 0 ? spec.options : cells);
+
+                if (spec.type === 'multi_select') {
+                    prunedRow[colKey] = cell as EngineValue;
+                    for (const element of Array.isArray(cell) ? cell : [cell]) {
+                        if (choiceSet.size > 0 && !choiceSet.has(toStr(element as MaybeAbsent))) {
+                            errors.push({ fieldKey: field.key, rule: 'choice_not_in_options', message: 'A selected option is not available.', sectionKey: null, instanceIndex: null, cellPath: path });
+
+                            break; // one membership error per cell, as a multiple-choice question gives one per field
+                        }
+                    }
+
+                    continue;
+                }
+
+                if (spec.type === null || spec.type === 'single_select') {
+                    const value = toStr(cell);
+                    prunedRow[colKey] = value;
+                    if (choiceSet.size > 0 && !choiceSet.has(value)) {
+                        errors.push({ fieldKey: field.key, rule: 'choice_not_in_options', message: 'The selected option is not available.', sectionKey: null, instanceIndex: null, cellPath: path });
+                    }
+
+                    continue;
+                }
+
+                prunedRow[colKey] = cell as EngineValue;
+                if (spec.type === 'integer' && isNumericLike(cell) && !Number.isInteger(toNumber(cell))) {
+                    errors.push({ fieldKey: field.key, rule: 'not_a_whole_number', message: 'Enter a whole number.', sectionKey: null, instanceIndex: null, cellPath: path });
                 }
             }
 
@@ -818,6 +849,33 @@ export class SemanticValidator {
         }
 
         return out;
+    }
+
+    /**
+     * A matrix's per-column answer rules (M183, `R-5033e87e`), keyed by column value — the mirror of PHP
+     * `SemanticValidator::columnSpecs`: `type` (null = a single choice), the column's own choice values (empty = the
+     * grid's `cells`), and whether its cell is required in every row.
+     */
+    private columnSpecs(field: SchemaField): Map<string, { type: string | null; options: string[]; required: boolean }> {
+        const specs = new Map<string, { type: string | null; options: string[]; required: boolean }>();
+        for (const [value, spec] of Object.entries(field.grid?.column_specs ?? {})) {
+            if (value === '' || specs.has(value)) {
+                continue;
+            }
+            const options: string[] = [];
+            for (const option of spec?.options ?? []) {
+                if (option !== '' && !options.includes(option)) {
+                    options.push(option);
+                }
+            }
+            specs.set(value, {
+                type: typeof spec?.type === 'string' && spec.type !== '' ? spec.type : null,
+                options,
+                required: spec?.required === true,
+            });
+        }
+
+        return specs;
     }
 
     /** Coerce a raw answer to an object map, mirror-safe: a non-object / list / null becomes `{}` (empty). */

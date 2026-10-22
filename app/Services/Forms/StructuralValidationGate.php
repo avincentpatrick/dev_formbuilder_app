@@ -14,6 +14,7 @@ use App\Models\FormFieldValidation;
 use App\Models\FormVersion;
 use App\Rules\ContentBlocks;
 use App\Services\Validation\SemanticValidator;
+use App\Support\Forms\MatrixColumns;
 use Illuminate\Support\Collection;
 
 /**
@@ -526,15 +527,36 @@ final class StructuralValidationGate
 
     /**
      * A composite grid (Increment G4b) must be publishably answerable: `rows` + `columns` non-empty with
-     * distinct, present values, and — for `matrix`, whose cells are single-selects — a non-empty `cells`
-     * choice pool. (`likert_matrix` reuses `columns` as the score scale and has no `cells`.)
+     * distinct, present values. (`likert_matrix` reuses `columns` as the score scale and has no `cells`.)
+     *
+     * M183 (`R-5033e87e`, `D129`): a `matrix` column may carry its own type and choices ({@see MatrixColumns}). Every
+     * column's type must be one a grid holds; a choice column's own choices, when it has any, resolve like `cells`;
+     * and the shared `cells` are required only while some choice column draws from them — so a grid of numbers, dates
+     * and choice columns with lists of their own publishes with none. `FieldTypeConversion::incomplete()` asks the
+     * same question through the same helper.
      */
     private function assertMatrixConfigResolves(FormField $field): void
     {
         $this->assertOptionListResolves($field, 'rows', 'rows');
         $this->assertOptionListResolves($field, 'columns', 'columns');
 
-        if ($field->field_type === FieldType::Matrix) {
+        if ($field->field_type !== FieldType::Matrix) {
+            return;
+        }
+
+        /** @var array<string, mixed> $config */
+        $config = (array) $field->config;
+        foreach (MatrixColumns::columns($config) as $index => $column) {
+            $label = 'column '.($index + 1);
+            if (($unknown = MatrixColumns::unknownType($column)) !== null) {
+                throw PublishValidationException::matrixConfigInvalid($field->key, "{$label} has a type a grid cannot hold ({$unknown})");
+            }
+            if (MatrixColumns::isChoice(MatrixColumns::type($column)) && (array) ($column['options'] ?? []) !== []) {
+                $this->assertOptionListResolves($field, "columns.{$index}.options", "{$label} choices");
+            }
+        }
+
+        if (MatrixColumns::needsSharedCells($config)) {
             $this->assertOptionListResolves($field, 'cells', 'cells');
         }
     }

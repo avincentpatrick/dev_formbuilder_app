@@ -317,6 +317,8 @@ const cascadeOptions = computed<CascadeOption[]>(() => (field.value?.config.opti
 const gridRows = computed<Choice[]>(() => (field.value?.config.rows as Choice[] | undefined) ?? []);
 const gridColumns = computed<Choice[]>(() => (field.value?.config.columns as Choice[] | undefined) ?? []);
 const gridCells = computed<Choice[]>(() => (field.value?.config.cells as Choice[] | undefined) ?? []);
+// M183 (`R-1c1d7266`): a grid's layout — `stacked` for cards everywhere, nothing for a table where it fits.
+const gridLayout = computed<string | null>(() => (field.value?.config.layout as string | undefined) ?? null);
 // A geospatial field (Increment G5b2b) carries capture + default-map-view options (all optional).
 const geoCaptureAltitude = computed<boolean>(() => (field.value?.config.capture_altitude as boolean | undefined) ?? false);
 const geoAccuracyThreshold = computed<number | null>(() => (field.value?.config.accuracy_threshold as number | undefined) ?? null);
@@ -707,9 +709,11 @@ watch(librarySaved, (value) => {
                             :rows="gridRows"
                             :columns="gridColumns"
                             :cells="gridCells"
+                            :layout="gridLayout"
                             @update:rows="setConfig('rows', $event)"
                             @update:columns="setConfig('columns', $event)"
                             @update:cells="setConfig('cells', $event)"
+                            @update:layout="setConfig('layout', $event)"
                         />
                     </template>
 
@@ -717,8 +721,10 @@ watch(librarySaved, (value) => {
                         <LikertMatrixEditor
                             :rows="gridRows"
                             :columns="gridColumns"
+                            :layout="gridLayout"
                             @update:rows="setConfig('rows', $event)"
                             @update:columns="setConfig('columns', $event)"
+                            @update:layout="setConfig('layout', $event)"
                         />
                     </template>
 

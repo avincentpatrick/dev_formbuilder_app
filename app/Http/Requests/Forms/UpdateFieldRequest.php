@@ -15,6 +15,7 @@ use App\Models\FormField;
 use App\Rules\ContentBlocks;
 use App\Services\Expressions\DateMath;
 use App\Services\Expressions\Rounding;
+use App\Support\Forms\MatrixColumns;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -28,7 +29,8 @@ use Illuminate\Validation\Rule;
  *
  * Per-type `config` shape (Increment G4a/G4b/G5b2b): the choice-editor types (`config.options` = `[{value,label}]`),
  * `cascading_select` (`config.levels`/`config.options` with `level`/`parent`), the object-valued grids
- * `matrix` (`config.rows`/`columns`/`cells`) + `likert_matrix` (`config.rows`/`columns`), and the geospatial
+ * `matrix` (`config.rows`/`columns`/`cells`, each column's own `type`/`options`/`required` since M183) + `likert_matrix`
+ * (`config.rows`/`columns`), both with `config.layout`, and the geospatial
  * types (`config.capture_altitude`/`accuracy_threshold`/`default_center {lat,lon}`/`default_zoom`) get
  * type/shape rules here — but only the SHAPE, kept lenient (every value nullable) so a mid-edit blur that
  * transiently clears a value does not 422 the optimistic PATCH. Completeness, distinctness, and cascading /
@@ -215,6 +217,14 @@ final class UpdateFieldRequest extends FormRequest
             'config.columns.*.label' => 'column label',
             'config.columns.*.label_translations' => 'column label translations',
             'config.columns.*.label_translations.*' => 'column label translation',
+            'config.columns.*.type' => 'column type',
+            'config.columns.*.required' => 'column required',
+            'config.columns.*.options' => 'column choices',
+            'config.columns.*.options.*.value' => 'column choice value',
+            'config.columns.*.options.*.label' => 'column choice label',
+            'config.columns.*.options.*.label_translations' => 'column choice label translations',
+            'config.columns.*.options.*.label_translations.*' => 'column choice label translation',
+            'config.layout' => 'layout',
             'config.cells' => 'cells',
             'config.cells.*.value' => 'cell value',
             'config.cells.*.label' => 'cell label',
@@ -299,11 +309,21 @@ final class UpdateFieldRequest extends FormRequest
                 'config.columns.*.label' => ['nullable', 'string', 'max:500'],
                 'config.columns.*.label_translations' => ['sometimes', 'array'],
                 'config.columns.*.label_translations.*' => ['nullable', 'string', 'max:500'],
+                // M183 (`R-5033e87e`, `D129`): a column's own type, choices and required flag (`MatrixColumns`).
+                'config.columns.*.type' => ['nullable', 'string', Rule::in(array_map(static fn (FieldType $type): string => $type->value, MatrixColumns::TYPES))],
+                'config.columns.*.required' => ['sometimes', 'boolean:strict'],
+                'config.columns.*.options' => ['sometimes', 'array'],
+                'config.columns.*.options.*.value' => ['nullable', 'string', 'max:255'],
+                'config.columns.*.options.*.label' => ['nullable', 'string', 'max:500'],
+                'config.columns.*.options.*.label_translations' => ['sometimes', 'array'],
+                'config.columns.*.options.*.label_translations.*' => ['nullable', 'string', 'max:500'],
                 'config.cells' => ['sometimes', 'array'],
                 'config.cells.*.value' => ['nullable', 'string', 'max:255'],
                 'config.cells.*.label' => ['nullable', 'string', 'max:500'],
                 'config.cells.*.label_translations' => ['sometimes', 'array'],
                 'config.cells.*.label_translations.*' => ['nullable', 'string', 'max:500'],
+                // M183 (`R-1c1d7266`): cards at every width instead of a table where one fits; absent = the table.
+                'config.layout' => ['nullable', Rule::in(['table', 'stacked'])],
             ];
         }
 
@@ -319,6 +339,7 @@ final class UpdateFieldRequest extends FormRequest
                 'config.columns.*.label' => ['nullable', 'string', 'max:500'],
                 'config.columns.*.label_translations' => ['sometimes', 'array'],
                 'config.columns.*.label_translations.*' => ['nullable', 'string', 'max:500'],
+                'config.layout' => ['nullable', Rule::in(['table', 'stacked'])],
             ];
         }
 

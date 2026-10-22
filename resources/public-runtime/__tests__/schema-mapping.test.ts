@@ -145,6 +145,55 @@ describe('buildRenderModel', () => {
     });
 });
 
+// M183 (`R-5033e87e`, `R-1c1d7266`): a matrix column's own type, choices and required flag, and a grid's layout,
+// survive both projections — the engine's (it validates the typed cells) and the render model's (it draws them).
+describe('typed grid columns', () => {
+    const typedGrid = () =>
+        schemaResponse({
+            fields: [
+                field({
+                    key: 'g',
+                    field_type: 'matrix',
+                    config: {
+                        rows: [{ value: 'a', label: 'Clinic A' }],
+                        columns: [
+                            { value: 'staff', label: 'Staff', type: 'integer', required: true },
+                            { value: 'svc', label: 'Services', type: 'multi_select', options: [{ value: 'lab', label: 'Lab', label_translations: { fil: 'Laboratoryo' } }] },
+                            { value: 'rate', label: 'Rating' },
+                        ],
+                        cells: [{ value: 'good', label: 'Good' }],
+                        layout: 'stacked',
+                    },
+                }),
+                field({ key: 'sat', field_type: 'likert_matrix', config: { rows: [{ value: 'r', label: 'R' }], columns: [{ value: '1', label: 'Low' }] } }),
+            ],
+        });
+
+    it('hands the engine each typed column’s rule, keyed by its value', () => {
+        const grids = Object.fromEntries(buildEngineSchema(typedGrid()).fields.map((f) => [f.key, f.grid]));
+
+        expect(grids.g?.column_specs).toEqual({
+            staff: { type: 'integer', options: [], required: true },
+            svc: { type: 'multi_select', options: ['lab'], required: false },
+        });
+        // A grid with no typed column is exactly the pre-M183 projection.
+        expect(grids.sat?.column_specs).toBeUndefined();
+    });
+
+    it('draws each matrix column with its type, its choices (its own, else the shared cells) and its required flag', () => {
+        const byKey = Object.fromEntries(buildRenderModel(typedGrid()).fields.map((f) => [f.key, f]));
+
+        expect(byKey.g.matrix?.layout).toBe('stacked');
+        expect(byKey.g.matrix?.columns).toEqual([
+            { value: 'staff', label: 'Staff', labelTranslations: null, type: 'integer', options: [], required: true },
+            { value: 'svc', label: 'Services', labelTranslations: null, type: 'multi_select', options: [{ value: 'lab', label: 'Lab', labelTranslations: { fil: 'Laboratoryo' } }], required: false },
+            { value: 'rate', label: 'Rating', labelTranslations: null, type: 'single_select', options: [{ value: 'good', label: 'Good', labelTranslations: null }], required: false },
+        ]);
+        expect(byKey.sat.matrix?.layout).toBe('table');
+        expect(byKey.sat.matrix?.columns).toEqual([{ value: '1', label: 'Low', labelTranslations: null }]);
+    });
+});
+
 describe('translation resolver', () => {
     it('prefers the locale translation and falls back to the base (never blank)', () => {
         expect(resolveText('Detail', { es: 'Detalle' }, 'es')).toBe('Detalle');

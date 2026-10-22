@@ -874,42 +874,77 @@ final class SemanticValidator
     }
 
     /**
-     * Matrix (`{row:{col:cell}}`): each declared row×column cell may carry a value drawn from the shared cell
-     * choice pool. Returns the pruned `{row:{col:cell}}` (rows with no surviving cell dropped).
-     * `cellPath = "<rowKey>.<colKey>"`.
+     * Matrix (`{row:{col:cell}}`): each declared row×column cell may carry a value its column accepts. Returns the
+     * pruned `{row:{col:cell}}` (rows with no surviving cell dropped). `cellPath = "<rowKey>.<colKey>"`.
+     *
+     * M183 (`R-5033e87e`, `D129`): a column may carry its own `type`, `options` and `required` ({@see columnSpecs()}).
+     * A choice cell (no type, or a single choice) is a string drawn from its column's own list, else from the shared
+     * `cells`; a multiple-choice cell is a list, each element from that list; a whole-number cell refuses a fraction,
+     * as a whole-number question does; a text, decimal or date cell keeps its value as sent (its shape is Stage 1's).
+     * A column with no spec is exactly a pre-M183 column, so every earlier vector holds byte for byte.
      *
      * @param  list<SemanticError>  $errors
-     * @return array<string, array<string, string>>
+     * @return array<string, array<string, mixed>>
      */
     private function processMatrix(FormField $field, mixed $raw, bool $required, string $requiredMessage, array &$errors): array
     {
         $rowKeys = $this->compositeValues($field, 'rows');
         $colKeys = $this->compositeValues($field, 'columns');
-        $cellSet = array_flip($this->compositeValues($field, 'cells'));
+        $cells = $this->compositeValues($field, 'cells');
+        $specs = $this->columnSpecs($field);
         $rawMap = is_array($raw) && ! array_is_list($raw) ? $raw : [];
 
-        /** @var array<string, array<string, string>> $pruned */
+        /** @var array<string, array<string, mixed>> $pruned */
         $pruned = [];
         foreach ($rowKeys as $rowKey) {
             $rowRaw = $rawMap[$rowKey] ?? null;
             $rowMap = is_array($rowRaw) && ! array_is_list($rowRaw) ? $rowRaw : [];
 
-            /** @var array<string, string> $prunedRow */
+            /** @var array<string, mixed> $prunedRow */
             $prunedRow = [];
             foreach ($colKeys as $colKey) {
+                $spec = $specs[$colKey] ?? ['type' => null, 'options' => [], 'required' => false];
+                $path = "{$rowKey}.{$colKey}";
                 $cell = $rowMap[$colKey] ?? null;
                 if (! array_key_exists($colKey, $rowMap) || Coercion::isEmpty($cell)) {
-                    if ($required) {
-                        $errors[] = new SemanticError($field->key, 'field_required', $requiredMessage, null, null, "{$rowKey}.{$colKey}");
+                    if ($required || $spec['required']) {
+                        $errors[] = new SemanticError($field->key, 'field_required', $requiredMessage, null, null, $path);
                     }
 
                     continue;
                 }
 
-                $value = Coercion::toStr($cell);
-                $prunedRow[$colKey] = $value;
-                if ($cellSet !== [] && ! isset($cellSet[$value])) {
-                    $errors[] = new SemanticError($field->key, 'choice_not_in_options', 'The selected option is not available.', null, null, "{$rowKey}.{$colKey}");
+                $choiceSet = array_flip($spec['options'] !== [] ? $spec['options'] : $cells);
+
+                if ($spec['type'] === FieldType::MultiSelect->value) {
+                    $prunedRow[$colKey] = $cell;
+                    foreach (is_array($cell) ? $cell : [$cell] as $element) {
+                        if ($choiceSet !== [] && ! isset($choiceSet[Coercion::toStr($element)])) {
+                            $errors[] = new SemanticError($field->key, 'choice_not_in_options', 'A selected option is not available.', null, null, $path);
+
+                            break; // one membership error per cell, as a multiple-choice question gives one per field
+                        }
+                    }
+
+                    continue;
+                }
+
+                if ($spec['type'] === null || $spec['type'] === FieldType::SingleSelect->value) {
+                    $value = Coercion::toStr($cell);
+                    $prunedRow[$colKey] = $value;
+                    if ($choiceSet !== [] && ! isset($choiceSet[$value])) {
+                        $errors[] = new SemanticError($field->key, 'choice_not_in_options', 'The selected option is not available.', null, null, $path);
+                    }
+
+                    continue;
+                }
+
+                $prunedRow[$colKey] = $cell;
+                if ($spec['type'] === FieldType::Integer->value && Coercion::isNumericLike($cell)) {
+                    $number = Coercion::toNumber($cell);
+                    if (floor($number) !== $number) {
+                        $errors[] = new SemanticError($field->key, 'not_a_whole_number', self::WHOLE_NUMBER_MESSAGE, null, null, $path);
+                    }
                 }
             }
 
@@ -938,6 +973,44 @@ final class SemanticValidator
         }
 
         return array_values(array_unique($values));
+    }
+
+    /**
+     * A matrix's per-column answer rules (M183, `R-5033e87e`), keyed by column value: `type` (null = a single
+     * choice), the column's own choice values (empty = the grid's `cells`), and whether its cell is required in
+     * every row. Mirror of the TypeScript engine's `grid.column_specs`.
+     *
+     * @return array<string, array{type: ?string, options: list<string>, required: bool}>
+     */
+    private function columnSpecs(FormField $field): array
+    {
+        $specs = [];
+        foreach ((array) data_get($field->config, 'columns', []) as $column) {
+            if (! is_array($column)) {
+                continue;
+            }
+            $value = Coercion::toStr($column['value'] ?? '');
+            if ($value === '' || isset($specs[$value])) {
+                continue;
+            }
+
+            $options = [];
+            foreach ((array) ($column['options'] ?? []) as $option) {
+                $optionValue = is_array($option) ? Coercion::toStr($option['value'] ?? '') : Coercion::toStr($option);
+                if ($optionValue !== '') {
+                    $options[] = $optionValue;
+                }
+            }
+
+            $type = $column['type'] ?? null;
+            $specs[$value] = [
+                'type' => is_string($type) && $type !== '' ? $type : null,
+                'options' => array_values(array_unique($options)),
+                'required' => ($column['required'] ?? false) === true,
+            ];
+        }
+
+        return $specs;
     }
 
     /**

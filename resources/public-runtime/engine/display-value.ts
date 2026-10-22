@@ -323,7 +323,12 @@ function formatGrid(answer: unknown): string {
             continue;
         }
 
-        const pairs = sortedKeys(cells).map((colKey) => `${colKey}=${scalar(cells[colKey])}`);
+        // M183 (`R-5033e87e`): a multiple-choice column stores a list; its choices join with a slash (mirror of PHP).
+        const pairs = sortedKeys(cells).map((colKey) => {
+            const cell = cells[colKey];
+
+            return `${colKey}=${Array.isArray(cell) ? cell.map((v) => scalar(v)).join('/') : scalar(cell)}`;
+        });
 
         if (pairs.length > 0) {
             rows.push(`${rowKey}: ${pairs.join(', ')}`);

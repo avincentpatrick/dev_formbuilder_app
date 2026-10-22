@@ -306,7 +306,7 @@ final class XlsformImportParser
         $named = $origin !== '' ? "“{$origin}”" : 'a grid';
 
         if (str_starts_with($marker, XlsformTypeMap::MARKER_MATRIX)) {
-            $warnings[] = "The matrix {$named} is not importable; its cells were imported as separate single-select questions.";
+            $warnings[] = "The matrix {$named} is not importable; its cells were imported as separate questions, each of its column's type.";
         } elseif (str_starts_with($marker, XlsformTypeMap::MARKER_LIKERT_MATRIX)) {
             $warnings[] = "The Likert matrix {$named} is not importable; its rows were imported as separate single-select questions.";
         } elseif ($marker === XlsformTypeMap::MARKER_DURATION) {

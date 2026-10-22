@@ -23,6 +23,19 @@ export interface GridConfig {
     rows: string[];
     columns: string[];
     cells?: string[];
+    /** M183 (`R-5033e87e`): a matrix column's own type, choices and required flag, keyed by column value. */
+    column_specs?: Record<string, GridColumnSpec> | null;
+}
+
+/**
+ * A matrix column's answer rule (M183, `R-5033e87e`; mirror of PHP `SemanticValidator::columnSpecs`). No `type` is a
+ * single choice; a choice column with no `options` of its own draws from the grid's `cells`; `required` demands the
+ * column's cell in every row. A column with no spec at all is exactly a pre-M183 column.
+ */
+export interface GridColumnSpec {
+    type?: string | null;
+    options?: string[] | null;
+    required?: boolean | null;
 }
 
 /** A likert_matrix answer `{row: score}` (Increment G4b). */

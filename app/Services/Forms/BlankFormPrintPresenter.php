@@ -15,6 +15,7 @@ use App\Services\Submissions\SubmissionPdfPresenter;
 use App\Services\Templates\TemplateParser;
 use App\Support\Forms\FieldVisibility;
 use App\Support\Forms\LocaleVariant;
+use App\Support\Forms\MatrixColumns;
 use App\Support\Forms\StepProjection;
 use LogicException;
 
@@ -403,7 +404,7 @@ final class BlankFormPrintPresenter
                 'options' => $area === PrintAnswerArea::Choices ? $this->choiceOptions($type, $config, $locale) : [],
                 'grid' => $area === PrintAnswerArea::Grid ? [
                     'rows' => $this->optionList($config, 'rows', $locale),
-                    'columns' => $this->optionList($config, 'columns', $locale),
+                    'columns' => $this->gridColumns($type, $config, $locale),
                 ] : null,
             ];
         }
@@ -580,6 +581,39 @@ final class BlankFormPrintPresenter
     private function optionList(array $config, string $key, ?string $locale): array
     {
         return $this->formatter->options(['options' => $config[$key] ?? []], $locale);
+    }
+
+    /**
+     * A printed grid's columns and what each cell of the column holds (M183, `R-51e044a6`): a Likert matrix's cell is
+     * one box to tick (`tick`); a matrix cell is a box per choice beside its words (`choices` — the column's own, else
+     * the shared `cells`, which until M183 reached the paper nowhere) or a writing box (`write`) for a number, a text or
+     * a date. Grids make a version unreadable by the scanner ({@see CapabilityFlags}), so no reader depends on this
+     * geometry and {@see self::LAYOUT} stays.
+     *
+     * @param  array<string, mixed>  $config
+     * @return list<array{value: string, label: string, kind: string, options: list<array{value: string, label: string}>}>
+     */
+    private function gridColumns(FieldType $type, array $config, ?string $locale): array
+    {
+        $columns = [];
+        foreach (MatrixColumns::columns($config) as $object) {
+            $column = $this->formatter->options(['options' => [$object]], $locale)[0] ?? null;
+            if ($column === null) {
+                continue;
+            }
+            $kind = match (true) {
+                $type === FieldType::LikertMatrix => 'tick',
+                MatrixColumns::isChoice(MatrixColumns::type($object)) => 'choices',
+                default => 'write',
+            };
+            $columns[] = [
+                ...$column,
+                'kind' => $kind,
+                'options' => $kind === 'choices' ? $this->formatter->options(['options' => MatrixColumns::choices($object, $config)], $locale) : [],
+            ];
+        }
+
+        return $columns;
     }
 
     /**

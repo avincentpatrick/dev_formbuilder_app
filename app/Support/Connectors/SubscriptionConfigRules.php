@@ -137,7 +137,9 @@ final class SubscriptionConfigRules
             'config.mapping.fingerprint' => ['nullable', 'string', 'max:64'],
             'config.mapping.columns' => ['nullable', 'array', 'min:1'],
             'config.mapping.columns.*.header' => ['present', 'string', 'max:255'],
-            'config.mapping.columns.*.field_key' => ['nullable', 'string', 'max:100'],
+            // The answer bound to this column: a question's key, a `__` metadata key, or a grid cell's `<key>.<row>.<column>`
+            // (a Likert row's `<key>.<row>`). Up to 662 characters, the longest a grid cell's key can be.
+            'config.mapping.columns.*.field_key' => ['nullable', 'string', 'max:662'],
         ];
     }
 

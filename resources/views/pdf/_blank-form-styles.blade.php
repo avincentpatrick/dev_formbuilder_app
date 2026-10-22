@@ -175,6 +175,11 @@ body { font-family: sans-serif; font-size: 10pt; line-height: 1.4; color: #00000
 .grid__box {
     display: inline-block; width: 12pt; height: 12pt; border: 0.75pt solid #333333;
 }
+/* M183: a typed matrix cell. Its choices wrap inside the cell, each box with its words (the .choice rule above,
+   tightened to the grid's type size); a number, text or date cell is one writing box the cell's width. */
+.grid__cell .choice { margin: 0 6pt 2pt 0; font-size: 8.5pt; }
+.grid__cell .choice__box { width: 11pt; height: 11pt; margin-right: 3pt; }
+.grid__line { border: 0.75pt solid #333333; height: 18pt; }
 
 /* -- Page break ------------------------------------------------------------------------------- */
 /* An authored `page_break` field. The one structural field type that means MORE on paper than on a

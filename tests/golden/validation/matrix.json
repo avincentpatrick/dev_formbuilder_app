@@ -92,5 +92,71 @@
       "errors": [],
       "effective_answers": { "svc": { "a": { "q1": "ok" } } }
     }
+  },
+  {
+    "name": "matrix typed columns keep their typed values",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "svc", "field_type": "matrix", "grid": { "rows": ["a"], "columns": ["n", "w", "t", "d", "m"], "cells": ["ok"], "column_specs": { "n": { "type": "integer" }, "w": { "type": "decimal" }, "t": { "type": "short_text" }, "d": { "type": "date" }, "m": { "type": "multi_select", "options": ["x", "y", "z"] } } } } ] },
+    "answers": { "svc": { "a": { "n": 4, "w": 2.5, "t": "hello", "d": "2026-10-22", "m": ["x", "z"] } } },
+    "expected": {
+      "relevance": { "fields": { "svc": true } },
+      "errors": [],
+      "effective_answers": { "svc": { "a": { "n": 4, "w": 2.5, "t": "hello", "d": "2026-10-22", "m": ["x", "z"] } } }
+    }
+  },
+  {
+    "name": "matrix multi column refuses a choice outside its own list",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "svc", "field_type": "matrix", "grid": { "rows": ["a"], "columns": ["m"], "cells": ["ok"], "column_specs": { "m": { "type": "multi_select", "options": ["x", "y"] } } } } ] },
+    "answers": { "svc": { "a": { "m": ["x", "ok"] } } },
+    "expected": {
+      "relevance": { "fields": { "svc": true } },
+      "errors": [ { "field": "svc.a.m", "rule": "choice_not_in_options" } ],
+      "effective_answers": { "svc": { "a": { "m": ["x", "ok"] } } }
+    }
+  },
+  {
+    "name": "matrix column own choices replace the shared cell choices",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "svc", "field_type": "matrix", "grid": { "rows": ["a"], "columns": ["c1", "c2"], "cells": ["poor", "ok"], "column_specs": { "c1": { "type": "single_select", "options": ["yes", "no"] } } } } ] },
+    "answers": { "svc": { "a": { "c1": "yes", "c2": "yes" } } },
+    "expected": {
+      "relevance": { "fields": { "svc": true } },
+      "errors": [ { "field": "svc.a.c2", "rule": "choice_not_in_options" } ],
+      "effective_answers": { "svc": { "a": { "c1": "yes", "c2": "yes" } } }
+    }
+  },
+  {
+    "name": "matrix whole-number column refuses a fraction",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "svc", "field_type": "matrix", "grid": { "rows": ["a"], "columns": ["n"], "column_specs": { "n": { "type": "integer" } } } } ] },
+    "answers": { "svc": { "a": { "n": 2.5 } } },
+    "expected": {
+      "relevance": { "fields": { "svc": true } },
+      "errors": [ { "field": "svc.a.n", "rule": "not_a_whole_number" } ],
+      "effective_answers": { "svc": { "a": { "n": 2.5 } } }
+    }
+  },
+  {
+    "name": "matrix required column demands its cell in every row",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "svc", "field_type": "matrix", "grid": { "rows": ["a", "b"], "columns": ["q1", "q2"], "cells": ["ok"], "column_specs": { "q1": { "required": true } } } } ] },
+    "answers": { "svc": { "a": { "q1": "ok" } } },
+    "expected": {
+      "relevance": { "fields": { "svc": true } },
+      "errors": [ { "field": "svc.b.q1", "rule": "field_required" } ],
+      "effective_answers": { "svc": { "a": { "q1": "ok" } } }
+    }
+  },
+  {
+    "name": "matrix multi column with nothing ticked is unanswered",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "svc", "field_type": "matrix", "is_required": "required", "grid": { "rows": ["a"], "columns": ["m"], "column_specs": { "m": { "type": "multi_select", "options": ["x"] } } } } ] },
+    "answers": { "svc": { "a": { "m": [] } } },
+    "expected": {
+      "relevance": { "fields": { "svc": true } },
+      "errors": [ { "field": "svc.a.m", "rule": "field_required" } ],
+      "effective_answers": {}
+    }
   }
 ]

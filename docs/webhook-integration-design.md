@@ -190,7 +190,7 @@ keeps their contract wherever a receiver could tell the difference:
   attempt. Configured only by `webhooks.manage`, on a plan that includes `webhooks`.
 - **A different body.** The envelope names are §3's (`event_id`, `event_type: submission.created`, `occurred_at`,
   `api_version`), plus `automation`, `form`, `submission` (id, reference, status, source, submitted_at) and `answers`,
-  keyed by question key and formatted as the export and the Sheets connector format them. Unlike §3's payload, the
+  keyed by question key and formatted as the export and the Sheets connector format them (since `M183` a grid also by cell, `<key>.<row>.<column>`, beside its summary). Unlike §3's payload, the
   answers ARE included — that is what `D83` decided — and they are rebuilt at send time, never stored.
 - **Its own ledger.** `form_automation_runs`, not `webhook_deliveries` — one row per automation per event, no payload, at
   most five attempts on §2's shared retry ladder. There is no manual redeliver in v1 (filed on the remainder row).

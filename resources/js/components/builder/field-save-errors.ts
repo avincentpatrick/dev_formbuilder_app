@@ -56,6 +56,8 @@ const NAMES: Record<string, string> = {
     // M129: a note's content blocks, named by the tab that edits them — the refusal is one sentence for the whole
     // list (`ContentBlocks` answers "block 3 …"), so the pane's alert says it once, above every tab.
     'config.content': 'Content',
+    // M183 (`R-1c1d7266`): a grid's layout, as the Grid tab names it.
+    'config.layout': 'Layout',
     is_required: 'Requiredness',
     relevant_expression: 'Show this question when',
     is_pii: 'Personal data',
@@ -145,7 +147,7 @@ export function tabForSavePath(path: string): string | null {
     if (path.startsWith('validations')) return 'validation';
     if (path.startsWith('config.options') || path === 'config.other_specify_key') return 'options';
     if (path.startsWith('config.levels')) return 'cascading';
-    if (/^config\.(rows|columns|cells)/.test(path)) return 'grid';
+    if (/^config\.(rows|columns|cells|layout)/.test(path)) return 'grid';
     if (path.startsWith('config.content')) return 'content';
     if (path.startsWith('config.accepted_types')) return 'media';
 

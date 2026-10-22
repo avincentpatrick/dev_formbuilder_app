@@ -11,6 +11,7 @@ use App\Models\FormField;
 use App\Models\FormSection;
 use App\Services\Expressions\Coercion;
 use App\Services\Validation\SemanticValidator;
+use App\Support\Forms\MatrixColumns;
 use Illuminate\Support\Collection;
 
 /**
@@ -540,10 +541,13 @@ final class StructuralAnswerNormalizer
      * only: the value must be an object (not a list/scalar → `expected_object`); every row key must be a
      * declared `config.rows` value (`unknown_row`); each row's value must itself be an object; every column
      * key must be a declared `config.columns` value (`unknown_column`). Each surviving leaf cell is coerced
-     * to a canonical string; empty cells and empty rows are dropped; an all-empty grid normalises to
-     * not-stored. Cell-value membership (`cell ∈ config.cells`) is the relevance-aware Stage-3 check.
+     * by its column's type (M183, `R-5033e87e`, {@see MatrixColumns}) exactly as a question of that type is: a
+     * choice, text or date cell to a canonical string (a list refused, `expected_scalar`), a number cell kept as sent
+     * once it reads as a number (`not_a_number` otherwise), a multiple-choice cell to a list of strings. Empty cells
+     * and empty rows are dropped; an all-empty grid normalises to not-stored. Cell-value membership is the
+     * relevance-aware Stage-3 check.
      *
-     * @return array{0: bool, 1: array<string, array<string, string>>|null, 2: array{field: string, rule: string, message: string}|null}
+     * @return array{0: bool, 1: array<string, array<string, mixed>>|null, 2: array{field: string, rule: string, message: string}|null}
      */
     private function coerceMatrix(FormField $field, mixed $value): array
     {
@@ -553,8 +557,12 @@ final class StructuralAnswerNormalizer
 
         $rows = $this->configValueSet($field, 'rows');
         $columns = $this->configValueSet($field, 'columns');
+        $types = [];
+        foreach (MatrixColumns::columns((array) $field->config) as $column) {
+            $types[Coercion::toStr($column['value'] ?? '')] ??= MatrixColumns::type($column);
+        }
 
-        /** @var array<string, array<string, string>> $normalized */
+        /** @var array<string, array<string, mixed>> $normalized */
         $normalized = [];
         foreach ($value as $rawRowKey => $rowValue) {
             $rowKey = (string) $rawRowKey;
@@ -568,18 +576,37 @@ final class StructuralAnswerNormalizer
                 return [false, null, $this->mismatch("{$field->key}.{$rowKey}", 'expected_object', "Row {$rowKey} must be an object of column answers.")];
             }
 
-            /** @var array<string, string> $normalizedRow */
+            /** @var array<string, mixed> $normalizedRow */
             $normalizedRow = [];
             foreach ($rowValue as $rawColKey => $cell) {
                 $colKey = (string) $rawColKey;
+                $path = "{$field->key}.{$rowKey}.{$colKey}";
                 if (! isset($columns[$colKey])) {
-                    return [false, null, $this->mismatch("{$field->key}.{$rowKey}.{$colKey}", 'unknown_column', "Unknown column: {$colKey}.")];
+                    return [false, null, $this->mismatch($path, 'unknown_column', "Unknown column: {$colKey}.")];
                 }
                 if (Coercion::isEmpty($cell)) {
                     continue;
                 }
+
+                $type = $types[$colKey] ?? FieldType::SingleSelect;
+                if ($type === FieldType::MultiSelect) {
+                    $list = array_values(array_filter($this->toStringList($cell), static fn (string $v): bool => $v !== ''));
+                    if ($list !== []) {
+                        $normalizedRow[$colKey] = $list;
+                    }
+
+                    continue;
+                }
                 if (is_array($cell)) {
-                    return [false, null, $this->mismatch("{$field->key}.{$rowKey}.{$colKey}", 'expected_scalar', 'A grid cell must be a single value.')];
+                    return [false, null, $this->mismatch($path, 'expected_scalar', 'A grid cell must be a single value.')];
+                }
+                if ($type === FieldType::Integer || $type === FieldType::Decimal) {
+                    if (! Coercion::isNumericLike($cell)) {
+                        return [false, null, $this->mismatch($path, 'not_a_number', 'This cell must be a number.')];
+                    }
+                    $normalizedRow[$colKey] = $cell;
+
+                    continue;
                 }
                 $normalizedRow[$colKey] = Coercion::toStr($cell);
             }

@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { describeSavePath, INLINE_FIELD_KEYS, sortFieldSaveErrors } from './field-save-errors';
+import { describeSavePath, INLINE_FIELD_KEYS, sortFieldSaveErrors, tabForSavePath } from './field-save-errors';
 
 describe('sortFieldSaveErrors', () => {
     it('puts a key the panel shows a control for on that control, first message only', () => {
@@ -100,5 +100,15 @@ describe('a rule is named by its row on screen (M176, R-5554c526)', () => {
         expect(sortFieldSaveErrors({ 'validations.0': ['Empty. Choose what it checks, or remove it.'] }, [1]).listed).toEqual([
             { key: 'validations.0', text: 'Rule 2: Empty. Choose what it checks, or remove it.' },
         ]);
+    });
+});
+
+// M183 (`R-5033e87e`, `R-1c1d7266`): a refused grid setting is named the way the Grid tab names it, and opens that tab.
+describe('a grid setting (M183)', () => {
+    it('names the layout and a column’s new settings, and sends each to the Grid tab', () => {
+        expect(describeSavePath('config.layout')).toBe('Layout');
+        expect(describeSavePath('config.columns.1.type')).toBe('Column 2');
+        expect(tabForSavePath('config.layout')).toBe('grid');
+        expect(tabForSavePath('config.columns.1.options.0.value')).toBe('grid');
     });
 });

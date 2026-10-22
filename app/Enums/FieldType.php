@@ -11,8 +11,8 @@ use App\Rules\PickableFieldType;
  * forward from legacy's 8-category `input_types` lookup, expressed as code with no lookup table).
  * Backs `form_fields.field_type` and `field_library.field_type`.
  *
- * `matrix` is a generic grid (each cell independently typed) and is deliberately distinct from
- * `likert_matrix` (a score-only Likert grid). Advanced types (geo*, *_capture, cascading_select,
+ * `matrix` is a generic grid whose columns each take a type and choices of their own (M183, `MatrixColumns`) and is
+ * deliberately distinct from `likert_matrix` (a score-only Likert grid). Advanced types (geo*, *_capture, cascading_select,
  * *matrix) are surfaced in the Phase-1 builder with a baseline config editor; their rich editors and
  * runtime follow the form engine (ADR-0004).
  */

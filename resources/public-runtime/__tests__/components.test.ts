@@ -350,11 +350,12 @@ describe('RuntimeSession (component wiring)', () => {
         const client = fakeClient();
         const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client } });
 
-        // 2 rows × 3 columns = 6 radios, grouped by a per-row name.
+        // 2 rows × 3 columns = 6 radios, grouped by a per-row name — this copy's own (M183: never the question's key).
         expect(wrapper.findAll('input[type="radio"]')).toHaveLength(6);
+        const rows = wrapper.findAll('tbody tr');
 
-        await wrapper.find('input[name="lm-sat-clean"][value="3"]').setValue();
-        await wrapper.find('input[name="lm-sat-staff"][value="2"]').setValue();
+        await rows[0].find('input[value="3"]').setValue();
+        await rows[1].find('input[value="2"]').setValue();
         await wrapper.find('form').trigger('submit');
         await settle();
 

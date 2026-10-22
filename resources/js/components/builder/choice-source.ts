@@ -12,6 +12,7 @@ export type ChoiceSourceKind = 'typed' | 'list' | 'form';
 
 export function choiceSourceOf(config: Record<string, unknown>): ChoiceSourceKind {
     if (config.options_source != null) return 'form';
+    if (config.options_list != null) return 'list';
 
     return 'typed';
 }

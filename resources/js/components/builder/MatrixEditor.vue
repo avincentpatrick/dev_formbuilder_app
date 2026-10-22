@@ -21,12 +21,11 @@ interface Option {
     label: string;
 }
 
-/** A matrix column as stored: its value and label, its own type, choices and required flag, and any other key it had. */
+/** A matrix column as stored: its value and label, and its own type, choices and required flag (any other key rides along in the spread). */
 interface Column extends Option {
     type?: string;
     options?: Option[];
     required?: boolean;
-    [key: string]: unknown;
 }
 
 const COLUMN_TYPES = [

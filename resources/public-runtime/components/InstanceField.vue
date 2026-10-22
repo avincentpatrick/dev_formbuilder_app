@@ -99,7 +99,7 @@ function onUpdate(next: AnswerValue): void {
         props.sectionKey,
         props.index,
         props.field.key,
-        next as Exclude<AnswerValue, Record<string, string> | Record<string, Record<string, string>> | GeoEnvelope | MediaAttachmentRef[]>,
+        next as Exclude<AnswerValue, Record<string, string> | Record<string, Record<string, string | number | string[]>> | GeoEnvelope | MediaAttachmentRef[]>,
     );
 }
 

@@ -156,7 +156,7 @@ function selectOptions(column: MatrixColumn): MatrixOption[] {
 
         <div class="mds-grid__frame">
             <div class="mds-grid__scroll">
-                <table class="mds-grid__table" :style="{ '--mds-grid-columns': String(Math.max(columns.length, 1)) }">
+                <table class="mds-grid__table" :style="{ '--matrix-grid-columns': String(Math.max(columns.length, 1)) }">
                     <thead class="mds-grid__head">
                         <tr>
                             <td class="mds-grid__corner"></td>
@@ -254,7 +254,7 @@ function selectOptions(column: MatrixColumn): MatrixOption[] {
 <style scoped>
 .mds-grid {
     /* The radio's size, which the joined line is drawn through the middle of. */
-    --mds-grid-radio: 1.25rem;
+    --matrix-grid-radio: 1.25rem;
     display: flex;
     flex-direction: column;
     gap: var(--mds-space-3);
@@ -363,7 +363,7 @@ function selectOptions(column: MatrixColumn): MatrixOption[] {
    under its radio. The line is decoration: each radio is its own control, with its own ring. */
 .mds-grid--likert .mds-grid__row {
     display: grid;
-    grid-template-columns: repeat(var(--mds-grid-columns), minmax(0, 1fr));
+    grid-template-columns: repeat(var(--matrix-grid-columns), minmax(0, 1fr));
     gap: var(--mds-space-2) 0;
 }
 
@@ -380,7 +380,7 @@ function selectOptions(column: MatrixColumn): MatrixOption[] {
 .mds-grid--likert .mds-grid__cell::before {
     content: '';
     position: absolute;
-    top: calc(var(--mds-grid-radio) / 2 - 1.5px);
+    top: calc(var(--matrix-grid-radio) / 2 - 1.5px);
     inset-inline: 0;
     height: 3px;
     background-color: var(--mds-color-border-strong);
@@ -406,8 +406,8 @@ function selectOptions(column: MatrixColumn): MatrixOption[] {
 .mds-grid__radio {
     position: relative;
     z-index: 1;
-    width: var(--mds-grid-radio);
-    height: var(--mds-grid-radio);
+    width: var(--matrix-grid-radio);
+    height: var(--matrix-grid-radio);
     margin: 0;
     accent-color: currentColor;
 }

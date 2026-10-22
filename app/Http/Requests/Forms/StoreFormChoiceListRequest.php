@@ -9,19 +9,22 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
 
 /**
- * One choice list for a form, as a CSV file in Kobo's format (M141, `R-f69aab42`, `D95`). Authorization is the route's
- * `can:update,form`.
+ * One choice list for a form, as a CSV file in Kobo's format (M141, `R-f69aab42`, `D95`) or, since M184 (`R-3e7c81bb`),
+ * an Excel workbook laid out the same way. Authorization is the route's `can:update,form`.
  *
  * ⚠️ BOTH `text/csv` AND `text/plain` ARE ACCEPTED, AND THAT IS MEASURED. `mimetypes:` asks `finfo` about the bytes, and
- * `finfo` reports a comma file as `text/csv` but a semicolon, tab, ragged or header-only file as `text/plain`. The real
- * check is the parse ({@see ChoiceListCsvParser}), which refuses anything that is not a list, by row; the extension
- * rule keeps a stray text file from being read as one.
+ * `finfo` reports a comma file as `text/csv` but a semicolon, tab, ragged or header-only file as `text/plain`. A workbook
+ * is a zip, which `finfo` names either way — the spreadsheet type or `application/zip` — so both are accepted, as the
+ * XLSForm import's rule does. The real check is the parse ({@see ChoiceListCsvParser}), which tells the two apart by their
+ * bytes and refuses anything that is not a list, by row; the extension rule keeps a stray file from being read as one.
  *
  * The accessor is `uploadedList()`, never `file()`: `Request` already has that method.
  */
 final class StoreFormChoiceListRequest extends FormRequest
 {
     public const int MAX_KB = 10 * 1024;
+
+    private const string XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
     public function authorize(): bool
     {
@@ -34,7 +37,7 @@ final class StoreFormChoiceListRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'file' => ['required', 'file', 'extensions:csv', 'mimetypes:text/csv,text/plain,application/csv', 'max:'.self::MAX_KB],
+            'file' => ['required', 'file', 'extensions:csv,xlsx', 'mimetypes:text/csv,text/plain,application/csv,'.self::XLSX_TYPE.',application/zip', 'max:'.self::MAX_KB],
         ];
     }
 
@@ -44,9 +47,9 @@ final class StoreFormChoiceListRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'file.required' => 'Choose a CSV file to upload.',
-            'file.extensions' => 'A choice list must be a .csv file.',
-            'file.mimetypes' => 'A choice list must be a .csv file.',
+            'file.required' => 'Choose a CSV or Excel file to upload.',
+            'file.extensions' => 'A choice list must be a .csv or .xlsx file.',
+            'file.mimetypes' => 'A choice list must be a .csv or .xlsx file.',
             'file.max' => 'A choice list must be 10 MB or smaller.',
         ];
     }

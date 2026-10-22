@@ -46,7 +46,7 @@ describe('a level takes its choices from a CSV list', () => {
             { key: 'province', label: 'Province', list: 'provinces' },
         ]);
 
-        expect(wrapper.text()).toContain('Every level takes its choices from a CSV file.');
+        expect(wrapper.text()).toContain('Every level takes its choices from a CSV or Excel file.');
         expect(wrapper.text()).toContain('Region: regions — 17 choices');
         expect(wrapper.text()).toContain('Province: provinces — 82 choices');
         expect(wrapper.find('[aria-label="Option 1 value"]').exists()).toBe(false);
@@ -54,7 +54,7 @@ describe('a level takes its choices from a CSV list', () => {
 
     it('says why a level will not publish: a list not uploaded, or no column named after the level above', async () => {
         const missing = await mountEditor([{ key: 'region', label: 'Region', list: 'regions_2020' }]);
-        expect(missing.text()).toContain('regions_2020.csv is not uploaded to this form.');
+        expect(missing.text()).toContain('regions_2020 is not uploaded to this form.');
 
         const noColumn = await mountEditor([
             { key: 'reg', label: 'Region', list: 'regions' },
@@ -69,6 +69,16 @@ describe('a level takes its choices from a CSV list', () => {
             { key: 'province', label: 'Province' },
         ]);
 
-        expect(wrapper.text()).toContain('Every level must take its choices from a CSV file, or none may.');
+        expect(wrapper.text()).toContain('Every level must take its choices from a CSV or Excel file, or none may.');
+    });
+
+    it('takes a CSV or Excel file, and says beside it how to keep a code like 01 (M184, R-1059e9bd)', async () => {
+        const wrapper = await mountEditor([{ key: 'region', label: 'Region' }]);
+        const input = wrapper.find('input[type="file"]');
+        const described = (input.attributes('aria-describedby') ?? '').split(' ').map((id) => wrapper.find(`#${id}`).text()).join(' ');
+
+        expect(input.attributes('accept')).toContain('.xlsx');
+        expect(input.attributes('accept')).toContain('.csv');
+        expect(described).toContain('Excel turns a code like 01 into 1: format the code columns as Text before you type them, or use letters.');
     });
 });

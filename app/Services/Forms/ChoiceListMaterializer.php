@@ -29,9 +29,10 @@ use Illuminate\Support\Collection;
  * is null, which is what the runtime shows at the first level.
  *
  * Refused here, by name: a level naming a list the form does not hold, a list missing its parent column, and a
- * cascade that names lists on some levels only. An unknown parent value is refused by the gate that runs next
- * (`StructuralValidationGate::assertCascadingResolves()`), which checks every option's parent; a repeated value
- * cannot occur, because the parser refuses a repeated name in a file.
+ * cascade that names lists on some levels only. Since M184 (`R-1059e9bd`) a row whose parent the list above does not
+ * hold is refused here too, naming the file and the row and the likeliest cause — Excel turning a code like 01 into 1 —
+ * where the gate that runs next (`StructuralValidationGate::assertCascadingResolves()`) could name only the option; it
+ * still checks every typed cascade. A repeated value cannot occur, because the parser refuses a repeated name in a file.
  */
 final class ChoiceListMaterializer
 {
@@ -171,6 +172,7 @@ final class ChoiceListMaterializer
     private function optionsFor(string $fieldKey, array $levels, Collection $lists): array|PublishValidationException
     {
         $options = [];
+        $known = []; // each level's values, so a row's parent is checked here, where its file can be named
 
         foreach ($levels as $index => $level) {
             $key = (string) ($level['key'] ?? '');
@@ -178,13 +180,14 @@ final class ChoiceListMaterializer
             $list = $lists->get($name);
 
             if ($list === null) {
-                return PublishValidationException::cascadingConfigInvalid($fieldKey, "level “{$key}” takes its choices from “{$name}”, which this form does not hold — upload {$name}.csv");
+                return PublishValidationException::cascadingConfigInvalid($fieldKey, "level “{$key}” takes its choices from “{$name}”, which this form does not hold — upload {$name}.csv or {$name}.xlsx");
             }
 
             $header = $list->header();
             $nameAt = array_search('name', $header, true);
             $labelAt = self::labelColumn($header);
             $parentAt = null;
+            $parentColumn = '';
 
             if ($index > 0) {
                 $parentColumn = mb_strtolower((string) ($levels[$index - 1]['key'] ?? ''));
@@ -200,11 +203,17 @@ final class ChoiceListMaterializer
             }
 
             foreach ($list->dataRows() as $row) {
+                $value = $row[$nameAt] ?? '';
                 $parent = $parentAt === null ? null : ($row[$parentAt] ?? '');
 
+                if ($parent !== null && ! isset($known[$index - 1][$parent])) {
+                    return PublishValidationException::cascadingConfigInvalid($fieldKey, self::parentProblem($list, $value, $parent, $parentColumn));
+                }
+
+                $known[$index][$value] = true;
                 $options[] = [
                     'level' => $key,
-                    'value' => $row[$nameAt] ?? '',
+                    'value' => $value,
                     'label' => $row[$labelAt] ?? '',
                     'parent' => $parent === '' ? null : $parent,
                 ];
@@ -212,6 +221,20 @@ final class ChoiceListMaterializer
         }
 
         return $options;
+    }
+
+    /**
+     * M184 (`R-1059e9bd`): a row whose parent the list above does not hold, with its file and its name — and the likeliest
+     * cause, because Excel reads a code such as `01` as the number 1 and saves it so, after which the child's parent column
+     * names no row. (A typo reads the same way; the sentence says "may".)
+     */
+    private static function parentProblem(FormVersionChoiceList $list, string $value, string $parent, string $column): string
+    {
+        $what = $parent === ''
+            ? "leaves its “{$column}” column empty"
+            : "names “{$parent}” as its {$column}, which the list above does not hold";
+
+        return "“{$value}” in {$list->file_name} {$what} — if the file was saved in Excel, a code like 01 may have become 1: keep codes as text, or use letters";
     }
 
     /** @param  list<string>  $header */

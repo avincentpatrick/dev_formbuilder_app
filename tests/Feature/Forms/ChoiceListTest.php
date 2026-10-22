@@ -20,6 +20,8 @@ use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
+use OpenSpout\Common\Entity\Row;
+use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
@@ -72,13 +74,47 @@ function choiceListParse(string $content): array
 
 function choiceListParseError(string $content): string
 {
+    $path = (string) tempnam(sys_get_temp_dir(), 'm141');
+    file_put_contents($path, $content);
+
+    return choiceListPathError($path);
+}
+
+function choiceListPathError(string $path): string
+{
     try {
-        choiceListParse($content);
+        app(ChoiceListCsvParser::class)->parse($path);
     } catch (ValidationException $e) {
         return (string) ($e->errors()['file'][0] ?? '');
     }
 
     return 'no error';
+}
+
+/**
+ * An Excel workbook written by OpenSpout, each sheet a list of rows, each cell typed as given (an int or a float is a
+ * NUMBER cell, a string a TEXT cell) — the distinction Excel's "01" turns on.
+ *
+ * @param  list<list<list<scalar|null>>>  $sheets
+ */
+function choiceListWorkbook(array $sheets): string
+{
+    $path = (string) tempnam(sys_get_temp_dir(), 'm184').'.xlsx';
+    $writer = new XlsxWriter;
+    $writer->openToFile($path);
+
+    foreach ($sheets as $index => $rows) {
+        if ($index > 0) {
+            $writer->addNewSheetAndMakeItCurrent();
+        }
+        foreach ($rows as $cells) {
+            $writer->addRow(Row::fromValues($cells));
+        }
+    }
+
+    $writer->close();
+
+    return $path;
 }
 
 /** The three files of a small geography, and a cascade on the draft that names them. */
@@ -151,6 +187,56 @@ it('refuses a file without name and label columns, a row without a name, and an 
         ->and(choiceListParseError(''))->toBe('The file is empty.');
 });
 
+// ── Excel workbooks (M184, `R-3e7c81bb`) ──────────────────────────────────────────────────────────────────
+
+it('reads the first sheet of a workbook: a number as the digits typed, a text code as written', function (): void {
+    $parsed = app(ChoiceListCsvParser::class)->parse(choiceListWorkbook([
+        [['name', 'label', 'region'], ['0128', 'Ilocos Norte', 1], [129, 'Ilocos Sur', 1.0], [12.5, 'Half', '01']],
+        [['name', 'label'], ['x', 'The second sheet, never read']],
+    ]));
+
+    // ⚠️ The number 1 is "1" — its leading zero, if the sheet showed one, was never stored. Only the text cell keeps "01".
+    expect($parsed)->toBe([
+        'columns' => ['name', 'label', 'region'],
+        'rows' => [['0128', 'Ilocos Norte', '1'], ['129', 'Ilocos Sur', '1'], ['12.5', 'Half', '01']],
+    ]);
+});
+
+it('counts a workbook\'s rows as Excel shows them, blank rows included', function (): void {
+    expect(choiceListPathError(choiceListWorkbook([[['name', 'label'], ['01', 'One'], [], ['', 'No code']]])))
+        ->toBe('Row 4 has no name.');
+});
+
+it('refuses a zip that is not a workbook, saying what to save the file as', function (): void {
+    $path = (string) tempnam(sys_get_temp_dir(), 'm184').'.zip';
+    $zip = new ZipArchive;
+    $zip->open($path, ZipArchive::CREATE);
+    $zip->addFromString('content.xml', '<office:document/>');
+    $zip->close();
+
+    expect(choiceListPathError($path))->toBe('The file could not be read. Save it as a CSV file or an Excel workbook (.xlsx), and try again.');
+});
+
+it('refuses a list longer than the cap while reading it', function (): void {
+    $rows = array_map(static fn (int $i): string => "c{$i},Choice {$i}", range(1, ChoiceListCsvParser::MAX_ROWS + 1));
+
+    expect(choiceListParseError("name,label\n".implode("\n", $rows)."\n"))->toBe('The file has more than 60,000 rows.');
+});
+
+it('uploads a workbook through the route, and refuses an old .xls or an .ods by name', function (): void {
+    $workbook = choiceListWorkbook([[['name', 'label'], ['01', 'Ilocos Region']]]);
+
+    $this->actingAs($this->admin)->post("http://acme.meridian.test/forms/{$this->form->id}/choice-lists", [
+        'file' => new UploadedFile($workbook, 'regions.xlsx', null, null, true),
+    ])->assertCreated()->assertJsonPath('data.name', 'regions')->assertJsonPath('data.row_count', 1);
+
+    foreach (['regions.xls', 'regions.ods'] as $name) {
+        $this->actingAs($this->admin)->postJson("http://acme.meridian.test/forms/{$this->form->id}/choice-lists", [
+            'file' => new UploadedFile($workbook, $name, null, null, true),
+        ])->assertUnprocessable()->assertJsonValidationErrors(['file' => 'A choice list must be a .csv or .xlsx file.']);
+    }
+});
+
 // ── The draft's lists ─────────────────────────────────────────────────────────────────────────────────────
 
 it('names a list after its file, and replaces a list whose file is uploaded again', function (): void {
@@ -182,7 +268,7 @@ it('uploads, lists and removes through the routes, for whoever may edit the form
 it('refuses a file that is not a .csv, and a list it cannot read, with the reason', function (): void {
     $this->actingAs($this->admin)->postJson("http://acme.meridian.test/forms/{$this->form->id}/choice-lists", [
         'file' => UploadedFile::fake()->createWithContent('regions.txt', "name,label\n01,One\n"),
-    ])->assertUnprocessable()->assertJsonValidationErrors(['file' => 'A choice list must be a .csv file.']);
+    ])->assertUnprocessable()->assertJsonValidationErrors(['file' => 'A choice list must be a .csv or .xlsx file.']);
 
     $this->actingAs($this->admin)->postJson("http://acme.meridian.test/forms/{$this->form->id}/choice-lists", [
         'file' => UploadedFile::fake()->createWithContent('regions.csv', "name,label\n,One\n"),
@@ -246,11 +332,16 @@ it('refuses to publish when a list lacks the column named after the level above'
     expect(choiceListPublishError($this))->toContain('“cities” has no column named “province”, the level above “city”');
 });
 
-it('refuses to publish a row whose parent is not in the list above, through the cascade gate', function (): void {
+it('refuses to publish a row whose parent is not in the list above, naming the file and the likeliest cause (R-1059e9bd)', function (): void {
     choiceListGeography($this);
-    app(FormChoiceListService::class)->upload($this->form->refresh(), choiceListFile('cities.csv', "name,label,province\n012801,Adams,0199\n"));
+    app(FormChoiceListService::class)->upload($this->form->refresh(), choiceListFile('cities.csv', "name,label,province\n012801,Adams,128\n"));
 
-    expect(choiceListPublishError($this))->toContain('option “012801” has no valid parent');
+    expect(choiceListPublishError($this))->toContain(
+        '“012801” in cities.csv names “128” as its province, which the list above does not hold — if the file was saved in Excel, a code like 01 may have become 1: keep codes as text, or use letters'
+    );
+
+    app(FormChoiceListService::class)->upload($this->form->refresh(), choiceListFile('cities.csv', "name,label,province\n012801,Adams,\n"));
+    expect(choiceListPublishError($this))->toContain('“012801” in cities.csv leaves its “province” column empty');
 });
 
 it('refuses a cascade that takes some levels from lists and not others', function (): void {

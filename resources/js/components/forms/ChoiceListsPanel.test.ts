@@ -59,6 +59,17 @@ describe('the Choice lists section', () => {
         expect(wrapper.text()).toContain('No choice lists yet.');
     });
 
+    it('takes a CSV or Excel file, and says in its help how to keep a code like 01 (M184, R-1059e9bd)', async () => {
+        vi.stubGlobal('fetch', vi.fn(() => respond({ data: [] })));
+        const wrapper = mount(ChoiceListsPanel, { props: { open: true, formId: 'form-1' } });
+        await flushPromises();
+        const input = wrapper.find('input[type="file"]');
+        const describedBy = (input.attributes('aria-describedby') ?? '').split(' ');
+
+        expect(input.attributes('accept')).toContain('.xlsx');
+        expect(describedBy.map((id) => wrapper.find(`#${id}`).text()).join(' ')).toContain('Excel turns a code like 01 into 1');
+    });
+
     it('shows the server’s own reason when a file is refused', async () => {
         vi.stubGlobal('fetch', vi.fn()
             .mockImplementationOnce(() => respond({ data: [] }))

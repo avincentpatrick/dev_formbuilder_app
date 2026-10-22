@@ -1003,10 +1003,10 @@ const reference: ChapterDraft[] = [
                     p('A chain of lists, each narrowed by the one before — Region, then Province, then City. Set it up on the ', ui('Levels', CONFIG), ' tab:'),
                     steps(
                         ['Click ', ui('Add level', CASCADING), ' once per list, from the broadest to the most specific.'],
-                        ['For each level, either type its choices in the tab (', ui('Typed in below', CASCADING), ') or upload them in ', ui('Choices from a CSV file', CASCADING), '.'],
+                        ['For each level, either type its choices in the tab (', ui('Typed in below', CASCADING), ') or upload them in ', ui('Choices from a CSV or Excel file', CASCADING), '.'],
                         ['Typed choices: under each choice, pick its level and, below the top level, the choice above it (', ui('No parent (top level)', CASCADING), ' for the first level).'],
                     ),
-                    tip('info', 'Use CSV files for long lists such as every barangay. Either every level comes from a file, or none does.'),
+                    tip('info', 'Use CSV or Excel files for long lists such as every barangay. Either every level comes from a file, or none does. Excel turns a code like 01 into 1, so format the code columns as Text before you type them, or use letters.'),
                 ],
             },
         ],

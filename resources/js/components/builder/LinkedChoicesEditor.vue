@@ -122,7 +122,7 @@ const listNote = computed<{ tone: 'warning' | 'text'; text: string } | null>(() 
     if (list.row_count > FLAT_LIST_MAX) {
         return { tone: 'warning', text: `This list has ${size} choices, and one question takes at most 5,000. Use a cascading select for a longer list.` };
     }
-    if (list.row_count > FLAT_LIST_MAX && (props.fieldType === 'single_select' || props.fieldType === 'multi_select')) {
+    if (list.row_count > LONG_LIST && (props.fieldType === 'single_select' || props.fieldType === 'multi_select')) {
         return { tone: 'text', text: `This list has ${size} choices. A Dropdown is easier to use, and the paper form prints every choice.` };
     }
 

@@ -608,7 +608,7 @@ export class SemanticValidator {
 
             case 'multi_select': {
                 const allowed = field.options ?? [];
-                if (allowed.length === 0 || !Array.isArray(answer)) {
+                if (!Array.isArray(answer)) {
                     return;
                 }
                 for (const element of answer) {

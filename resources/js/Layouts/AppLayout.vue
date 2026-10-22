@@ -6,12 +6,14 @@
  * layout instance persists.
  */
 import { computed, ref, watch } from 'vue';
-import { usePage } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import { MdsToastHost } from '@meridian/design-system';
 import CommandPalette from '@/components/shell/CommandPalette.vue';
 import TopNav from '@/components/shell/TopNav.vue';
 import Sidebar from '@/components/shell/Sidebar.vue';
 import ImpersonationBanner from '@/components/shell/ImpersonationBanner.vue';
+import WhatsNewModal from '@/components/whats-new/WhatsNewModal.vue';
+import { versionLabel } from '@/components/whats-new/version-label';
 import { useToast } from '@/composables/useToast';
 
 const drawerOpen = ref(false);
@@ -31,6 +33,9 @@ const { toasts, push, dismiss } = useToast();
 // for inputs and prose — never to a centred column with empty space either side.
 const FLUID_PAGES = new Set<string>(['forms/Builder']);
 const fluid = computed(() => FLUID_PAGES.has(page.component));
+
+// M181 (`R-c7247dbf`, `D124`) — the release, under every page but the builder's (see the footer below).
+const version = computed(() => versionLabel(page.props.app?.version));
 
 // Server flash → toast bridge: any controller that redirects with ->with('toast', {...}) surfaces it
 // here once. Fires on the visit that carries the flash (immediate covers a redirect-then-render).
@@ -80,9 +85,23 @@ watch(() => page.url, () => {
                 <div class="app-shell__inner" :class="{ 'app-shell__inner--fluid': fluid }">
                     <slot />
                 </div>
+                <!-- M181 (`D124`): the product and its version under every page, with the way to What's new and Help.
+                     Inside the scroll region, after the page, so it sits at the foot of a short page and after a long
+                     one. Not on a fluid page: the builder owns the whole region and its scroll, and its version is in
+                     the sidebar's foot. Inside <main>, so it is no `contentinfo` landmark of its own. -->
+                <footer v-if="!fluid" class="app-shell__footer">
+                    <span>Meridian {{ version }}</span>
+                    <span aria-hidden="true">·</span>
+                    <Link href="/whats-new" class="app-shell__footer-link">What's new</Link>
+                    <span aria-hidden="true">·</span>
+                    <Link href="/help" class="app-shell__footer-link">Help</Link>
+                </footer>
             </main>
         </div>
         <MdsToastHost :toasts="toasts" @dismiss="dismiss" />
+        <!-- M181 (`D125`, `D126`): the What's new prompt — here for the reason the palette below is, the one persistent
+             instance, so it opens once on the first page loaded while there is something new, and never per page. -->
+        <WhatsNewModal />
         <!--
             Mounted HERE, beside the toast host, because this is the SINGLE persistent AppLayout instance:
             the palette's open state is module-scoped, so mounting it per-page would bind the ⌘K chord once
@@ -140,6 +159,38 @@ watch(() => page.url, () => {
     padding: var(--mds-space-8);
 }
 
+/* M181: a column, so the page takes the region's height at least and the footer sits at the foot of a short page.
+   Never on a fluid page: the builder's `height: 100%` layout is left exactly as it was. */
+.app-shell__content:not(.app-shell__content--fluid) {
+    display: flex;
+    flex-direction: column;
+}
+
+.app-shell__inner:not(.app-shell__inner--fluid) {
+    flex: 1 0 auto;
+}
+
+/* M181 (`D124`) — the slim footer under every page: the version, What's new and Help, on the page's own padding. */
+.app-shell__footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mds-space-2);
+    padding: 0 var(--mds-space-8) var(--mds-space-6);
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+    color: var(--mds-color-text-secondary);
+}
+
+.app-shell__footer-link {
+    color: var(--mds-color-action-primary-fg);
+}
+
+.app-shell__footer-link:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 2px;
+}
+
 /* Edge-to-edge, full-height — the builder owns its own layout and scroll. */
 .app-shell__inner--fluid {
     max-width: none;
@@ -152,11 +203,17 @@ watch(() => page.url, () => {
     .app-shell__inner:not(.app-shell__inner--fluid) {
         padding: var(--mds-space-4);
     }
+    .app-shell__footer {
+        padding-inline: var(--mds-space-4);
+    }
 }
 
 /* One more step of side padding on a wide screen, so a page's content never meets the edge of the glass. */
 @media (min-width: 1920px) {
     .app-shell__inner:not(.app-shell__inner--fluid) {
+        padding-inline: var(--mds-space-12);
+    }
+    .app-shell__footer {
         padding-inline: var(--mds-space-12);
     }
 }

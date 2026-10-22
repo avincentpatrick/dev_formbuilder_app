@@ -24,10 +24,19 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D156`, the last one filed, was asked and answered on 2026-10-20 while `M180` (R4) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D157`, the last one filed, was asked and answered on 2026-10-20 while `M181` (UI5) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D157 — Nobody has seen a What's new yet, and at merge point 4 three releases go live together (UI5, UI6, then T2 + Likert). The first time someone sees the prompt, what should it list? **A — every release since the person's account was created; a brand-new user still sees only the newest one.**
+
+**Asked and answered 2026-10-20 (user decision, in chat), while `M181` (UI5) was planned; recorded in its claim.** `D126` recorded "a brand-new user sees only the latest entry", and the plan of record (`~/.claude/plans/hi-let-s-conduct-a-mutable-goose.md` §C) applied it to every user whose `users.whats_new_seen_version` is NULL — which on the day the prompt ships is every tester, so they would have seen only T2's notes and missed UI5's and UI6's.
+
+- **A — all since they joined (recommended, chosen).** A person who has never seen a release gets every release whose `released_at` is on or after their `users.created_at`, and at least the newest.
+- **B — only the newest,** as first planned; the older notes stay on the What's new page.
+
+**What the answer files, in the same push:** no new row — it refines `R-c7247dbf`'s remedy, taken by `M181`.
+
 ### D156 — A calculation's Type will include Text, but the formulas cannot join answers, so a Text calculation could only choose between fixed words with `if()`. Add a way to join answers? **A — yes: `concat()` in both formula engines and a "Join answers" preset with an optional separator (a full name from a first and a last name).**
 
 **Asked and answered 2026-10-20 (user decision, in chat), while `M180` (R4) was planned; recorded in its claim.** Found by R4's planning pass: `R-f77aa45d` gives a calculation a Text type, and the function list (`app/Services/Expressions/FunctionRegistry.php`) has nothing that builds text from answers.
@@ -2926,7 +2935,7 @@ exercise. `preload` must not be sent at all while the name is a staging host, an
   and the strings `Strict-Transport-Security` and `HSTS` appear **nowhere in the tracked tree**.
 - ⚠️ **Port 80 has no listener.** A connection from outside times out after 21 seconds. So there is no plaintext
   downgrade path on this box for HSTS to protect against, except an active attacker who opens one. **That narrows
-  the benefit; it does not narrow the cost**, which is unchanged. ⛔ **CORRECTED BY `M102` (2026-09-19), WHICH READ THE BOX INSTEAD OF PROBING IT FROM OUTSIDE: THE FIRST SENTENCE OF THIS BULLET IS FALSE.** `httpd.conf` carries an uncommented `Listen 80`, and `httpd -S` maps a live `*:80` vhost for `staging.pitahc.gov.ph` to `confxtra\httpd-vhosts.conf` at `:47`, serving a `Redirect permanent` to the `https://` origin. **There IS a listener and there IS a plaintext request**; the 21-second timeout measured the agency firewall, not the server. So an internal tester who types the bare hostname makes exactly the cleartext round-trip HSTS exists to remove, and the benefit is wider than this bullet says — narrower than a public host, but not nil. ⚠️ **This corrects an input, not the recommendation: `A` still stands**, and if anything it stands more firmly, because there is now a real downgrade path for a short `max-age` to close.
+  the benefit; it does not narrow the cost**, which is unchanged. ⛔ **CORRECTED BY `M102` (2026-09-19), WHICH READ THE BOX INSTEAD OF PROBING IT FROM OUTSIDE: THE FIRST SENTENCE OF THIS BULLET IS FALSE.** `httpd.conf` carries an uncommented `Listen 80`, and `httpd -S` maps a live `*:80` vhost for `staging.pitahc.gov.ph` to `conf\extra\httpd-vhosts.conf` at `:47`, serving a `Redirect permanent` to the `https://` origin. **There IS a listener and there IS a plaintext request**; the 21-second timeout measured the agency firewall, not the server. So an internal tester who types the bare hostname makes exactly the cleartext round-trip HSTS exists to remove, and the benefit is wider than this bullet says — narrower than a public host, but not nil. ⚠️ **This corrects an input, not the recommendation: `A` still stands**, and if anything it stands more firmly, because there is now a real downgrade path for a short `max-age` to close.
 - ✅ **HSTS is HOST-scoped, and this is what separates it from the sibling row.** One response carrying it covers
   the whole origin, so the application is an adequate home for it — the exact opposite of `X-Robots-Tag`, which is
   response-scoped and had to stay in the vhost because Apache serves `/robots.txt` without invoking PHP at all.

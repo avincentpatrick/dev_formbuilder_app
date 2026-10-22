@@ -794,3 +794,62 @@ describe('Sidebar — collapsing to the rail on a wide screen (M128, R-33c7fd56)
         expect(toggle.element.closest('.sidebar__group')).toBeNull();
     });
 });
+
+/**
+ * M181 (`R-c7247dbf`, `D124`) — the sidebar's foot: the version and the way to What's new, on every page, the builder
+ * included (which has no footer). It sits OUTSIDE the nav's lists and never takes `.sidebar__item`, so the nav's item
+ * census, its `role="list"` rule and the drawer's first focus (`.sidebar__item`) are untouched.
+ */
+describe("Sidebar — the version and What's new at its foot (M181)", () => {
+    function footed(version = '0.9.0'): VueWrapper {
+        mocks.pageProps.props = {
+            auth: { user: { name: 'Demo Owner' }, can: allAbilities() },
+            entitlements: { features: {} },
+            app: { version },
+        };
+        return mount(Sidebar, { props: { drawerOpen: false } });
+    }
+
+    it("links to What's new and names the version", () => {
+        const link = footed().get('.sidebar__foot a');
+
+        expect(link.attributes('href')).toBe('/whats-new');
+        expect(link.text().replace(/\s+/g, ' ')).toBe("v0.9.0 · What's new");
+    });
+
+    it('sits after every group and inside no list, as no nav item', () => {
+        const wrapper = footed();
+        const foot = wrapper.get('nav > .sidebar__foot');
+
+        expect(foot.element.previousElementSibling?.classList.contains('sidebar__group')).toBe(true);
+        expect(foot.element.closest('ul')).toBeNull();
+        expect(foot.find('.sidebar__item').exists()).toBe(false);
+    });
+
+    it('gives the words to the tooltip in a collapsed rail, where only the glyph shows', async () => {
+        // Wider than 1024px and collapsed on this device, as the collapse suite's own tooltip case; the bubble exists only
+        // while it is open, so the link is focused rather than the tooltip's props read.
+        Object.defineProperty(window, 'matchMedia', {
+            writable: true,
+            configurable: true,
+            value: () => ({ matches: false, addEventListener: () => undefined, removeEventListener: () => undefined }),
+        });
+        window.localStorage.setItem('meridian:sidebar-collapsed', '1');
+        mocks.pageProps.props = {
+            auth: { user: { name: 'Demo Owner' }, can: allAbilities() },
+            entitlements: { features: {} },
+            app: { version: '0.9.0' },
+        };
+        const wrapper = mount(Sidebar, { props: { drawerOpen: false }, attachTo: document.body });
+        await flushPromises();
+
+        await wrapper.get('a.sidebar__foot-link').trigger('focusin');
+        await flushPromises();
+
+        expect(document.querySelector('[role="tooltip"]')?.textContent?.trim()).toBe("What's new · v0.9.0");
+        wrapper.unmount();
+        document.body.innerHTML = '';
+        window.localStorage.clear();
+    });
+});
+

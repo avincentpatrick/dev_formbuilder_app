@@ -10,11 +10,14 @@ import { computed, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { MdsIcon, MdsToastHost, type IconName } from '@meridian/design-system';
 import { useToast } from '@/composables/useToast';
+import { versionLabel } from '@/components/whats-new/version-label';
 
 defineProps<{ title: string; icon?: IconName }>();
 
 const page = usePage();
 const email = computed(() => page.props.auth.user?.email ?? '');
+// M181 (`R-c7247dbf`, `D124`): the release the console is running, beside the operator.
+const version = computed(() => versionLabel(page.props.app?.version));
 
 const { toasts, push, dismiss } = useToast();
 watch(
@@ -67,6 +70,7 @@ function logout(): void {
                 </Link>
             </nav>
             <div class="admin__right">
+                <span class="admin__version">{{ version }}</span>
                 <span class="admin__email">{{ email }}</span>
                 <button type="button" class="admin__logout" @click="logout">Log out</button>
             </div>
@@ -269,7 +273,8 @@ function logout(): void {
         flex-wrap: wrap;
         row-gap: var(--mds-space-2);
     }
-    .admin__email {
+    .admin__email,
+    .admin__version {
         display: none;
     }
     .admin__inner {
@@ -282,5 +287,14 @@ function logout(): void {
     .admin__inner {
         padding-inline: var(--mds-space-12);
     }
+}
+
+/* M181 (`D124`): the release, quiet beside the operator's address; hidden with it at 900px and below (the bar's
+   overflow budget above), where the About panel still carries it. */
+.admin__version {
+    font-size: var(--mds-type-caption-font-size);
+    line-height: var(--mds-type-caption-line-height);
+    color: var(--mds-color-text-secondary);
+    white-space: nowrap;
 }
 </style>

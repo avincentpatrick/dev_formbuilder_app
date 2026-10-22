@@ -227,6 +227,11 @@ the parent commit and accidentally gives the right answer.
 
 ## Closing out
 
+⛔ **A change a person can see ships its version and its notes in the same pull request.** Bump `VERSION` — a fix the
+last number, a new feature the middle one — and put the release's entry at the top of `database/data/releases.json`, in
+the plain words a tester reads in What's new. `ReleaseNotesFileTest` refuses notes whose newest entry disagrees with
+`VERSION`; every deploy copies them into the `releases` table.
+
 1. Close the row in `docs/feature-backlog.md`, and **file anything you decided not to fix, the moment
    you decide it.**
 2. Release your claim in `docs/claims/lane-a.md`, recording how the prediction fared — including the

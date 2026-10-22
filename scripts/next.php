@@ -192,6 +192,10 @@ function render_line(string $lane, array $state): string
         tracker_headroom_warning(),
         'RECENT LESSONS, read from the newest releases in '.$config['claim'].' rather than retyped: '
             .implode(' ', recent_lessons($config['claim'])),
+        // M181 (`R-c7247dbf`, `D124`): the release rule, named in every hand-off so the next increment cannot miss it.
+        'Before the PR: a change a person can see bumps VERSION (a fix the last number, a new feature the middle one) and'
+            .' adds its notes at the top of database/data/releases.json in the same pull request - ReleaseNotesFileTest'
+            .' refuses one without the other, and every deploy copies the notes into the releases table.',
         sprintf('On finish: close the row, release the claim, regenerate the baselines from your own merge run,'
             .' prepend the status bullet, php scripts/pipeline.php (the bullet moves nothing it cites only if you'
             .' regenerate), php scripts/next.php --lane=%s --write, push them together, then a 3-5 bullet status'

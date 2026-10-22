@@ -130,6 +130,11 @@ export const icons = {
     // and the manual's own pages put callouts on screen beside the header icon. The hook and dot are drawn
     // as `info`'s stem and dot are, so the two read as one family without being the same mark.
     help: 'M12 3a9 9 0 1 0 0 18a9 9 0 0 0 0-18 M9.5 9.5a2.5 2.5 0 1 1 3.6 2.24c-.66.33-1.1 1-1.1 1.76v.5 M12 17v.5',
+
+    // ── What's new (M181) ─────────────────────────────────────────────────────────────────────────────────────────
+    // The release notes' destination in the sidebar's rail: a four-point spark with a small one beside it — "new",
+    // which no glyph above says (`bell` is notifications, `info` the callout's note mark, `award` achievements).
+    sparkle: 'M10 3l1.6 4.4L16 9l-4.4 1.6L10 15l-1.6-4.4L4 9l4.4-1.6z M18 14l.8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8z',
 } as const;
 
 export type IconName = keyof typeof icons;

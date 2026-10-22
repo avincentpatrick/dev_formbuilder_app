@@ -1543,6 +1543,30 @@ The platform support tokens (M175, `R-78f43f26`, `D139`, `D141`): the credential
 
 ---
 
+## 40. `releases`
+
+The release history (M181, `R-c7247dbf`, `D124`, `D125` C): one row per version of the product and what changed in it. The user (2026-10-15): *"so every release, we know what changed, what version it is"*. The notes are written with each change in the repository file `database/data/releases.json`, whose newest entry matches the committed `VERSION` file (`ReleaseNotesFileTest`), and every deploy copies them here.
+
+**Writers:** `releases:sync` (`App\Console\Commands\SyncReleasesCommand`), run by `deploy.ps1` inside its window after `migrate --force` and the row count — it adds a new release, takes a corrected note, and never deletes. **Readers:** `App\Support\Platform\WhatsNew` — the What's new prompt on the first page after sign-in and the `/whats-new` page.
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `uuid` | No | application-generated (HasUuidv7) | No | Primary key. |
+| `version` | `varchar(32)` | No | — | No | Three numbers (`0.9.0`), unique, held to that shape by `releases_version_check` — so ordering by `version_compare()` is always defined. A fix a person can see bumps the last number, a new feature the middle one; launch is `1.0.0` (`D124`). |
+| `title` | `varchar(255)` | No | — | No | The release's headline, shown above its items. |
+| `items` | `jsonb` | No | — | No | What changed, in order: a list of `{kind, text, href?}` — `kind` one of `new`, `improved`, `fixed`; `text` plain words (never rendered as HTML); `href` an optional page of the site. Checked whole by `App\Support\Platform\ReleaseNotes` before any row is written. |
+| `released_at` | `timestamptz` | No | — | No | When the release went live on this server: stamped by the sync that first copied it, never rewritten. The file carries no date for that reason. A person who has never seen a release is shown every release since they joined (`D157`). |
+| `created_at` / `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
+
+**Indexes**: `UNIQUE (version)`.
+
+> **Design Notes**
+> - **No `tenant_id`, no RLS.** A release is the platform's and the same for every workspace, like `plans` and `platform_api_tokens`; there is nothing to isolate.
+> - **Never deleted.** A release dropped from the file stays: the table is the history, and the deploy's row count refuses a shrink.
+> - **What a person has seen** is `users.whats_new_seen_version` (`docs/multi-tenancy-rbac-design.md` §6): the newest version they closed the prompt on, which only moves forward.
+
+---
+
 ## Foreign Key Relationship Summary
 
 ```

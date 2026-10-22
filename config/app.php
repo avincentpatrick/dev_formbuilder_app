@@ -29,7 +29,7 @@ return [
     |
     */
 
-    'version' => env('APP_VERSION', 'dev'),
+    'version' => env('APP_VERSION'), // M181: unset → BuildInfo reads the committed VERSION file (never a `dev` default here)
 
     'commit' => env('APP_COMMIT'),
 

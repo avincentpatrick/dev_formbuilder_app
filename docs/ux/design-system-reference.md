@@ -604,7 +604,7 @@ Per the PRD's Feature #6 acceptance criteria, quoted verbatim: **"One shared app
 
 Concretely, this document specifies exactly two shells, both built from the tokens in Section 2, and no third variant is permitted without an exception (§1.3):
 
-- **Authenticated App Shell** — wraps the builder, dashboard, submissions inbox, and settings (and every future authenticated screen): a top nav (tenant/account switcher, search, notifications, avatar menu), a collapsible sidebar nav (primary navigation — Forms, Submissions, Dashboard, Settings), and a content region that fills the width beside the sidebar with no max-width (M173, `D120` — the page lays its own width out), padding (`--mds-space-8` on desktop, `--mds-space-12` horizontal from a 1920px viewport, `--mds-space-4` on mobile), and page-header pattern (title + primary action + optional breadcrumbs). Every authenticated page renders inside this shell; no authenticated page renders its own top-level layout.
+- **Authenticated App Shell** — wraps the builder, dashboard, submissions inbox, and settings (and every future authenticated screen): a top nav (tenant/account switcher, search, notifications, avatar menu), a collapsible sidebar nav (primary navigation — Forms, Submissions, Dashboard, Settings), and a content region that fills the width beside the sidebar with no max-width (M173, `D120` — the page lays its own width out), padding (`--mds-space-8` on desktop, `--mds-space-12` horizontal from a 1920px viewport, `--mds-space-4` on mobile), and page-header pattern (title + primary action + optional breadcrumbs). Under every page but the builder's (which owns the whole region and its scroll), a slim footer: the product and its version, What's new and Help (M181, `D124`); the sidebar's foot carries the version and What's new on every page, the builder's included, as the `sparkle` glyph alone in the rail. Every authenticated page renders inside this shell; no authenticated page renders its own top-level layout.
 - **Public/Guest Runtime Shell** — wraps every guest-facing form (`/f/{slug}`) and the offline PWA runtime: a minimal header (tenant/form branding only — no admin nav, no account menu, since guests have no account per PRD §2.4), a centered single-column content region sized for form-filling (narrower max-width than the admin shell, optimized for readability of one question/section at a time), and a persistent progress indicator (§3.9) where the form is multi-step. It consumes the **same semantic color/spacing/type/radius tokens** as the authenticated shell (hence "token-consistent") but is a structurally distinct component, because a guest has fundamentally different needs (no navigation chrome to get lost in, fastest possible time-to-first-field, embeddable in an iframe on a third-party domain per PRD Feature #3).
 
 > ⚠️ **The pre-auth pages are a third, documented variant of this rule** (`AuthLayout`, exceptions-log #1),
@@ -1688,6 +1688,10 @@ The rationale is also captured in `exceptions-log.md` #2.
   which shares the circle but is `MdsCallout`'s "note" mark: a sidebar item wearing it would read as a notice,
   and the manual puts callouts on screen beside its header icon. The hook and dot are drawn the way `info`'s
   stem and dot are, so the two read as one family without being the same mark at 16px.
+- **Glyph added in M181** (What's new, `/whats-new`, `R-c7247dbf`): **`sparkle`** — a four-point spark with a
+  small one beside it, under the same *Registry growth* rule. No glyph said "new": `bell` is notifications,
+  `info` the callout's note mark, `award` achievements. It marks the sidebar foot's link to the release notes,
+  where the rail shows it alone, and the What's new page's header.
 
 **Components added in C2** (implementing existing sections, with stories + this doc updated per §7.3):
 `MdsCard` (§3.5), `MdsEmptyState` (§3.10), `MdsSpinner` (§3.9 indeterminate; determinate bar still

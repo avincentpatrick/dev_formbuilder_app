@@ -8,6 +8,8 @@ use App\Services\Entitlements\EntitlementService;
 use App\Services\Feedback\FeedbackPresenter;
 use App\Support\Audit\ImpersonationContext;
 use App\Support\Authorization\ShellAbilities;
+use App\Support\Platform\BuildInfo;
+use App\Support\Platform\WhatsNew;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -52,6 +54,12 @@ class HandleInertiaRequests extends Middleware
 
         return [
             ...parent::share($request),
+            // M181 (`R-c7247dbf`, `D124`) — the release a person is looking at, on EVERY page (the sidebar foot, the
+            // footer under each page, the sign-in card, the console bar, the landing page). The committed VERSION
+            // file under the APP_VERSION override; never the bundle's `__APP_VERSION__` sha (see BuildInfo).
+            'app' => [
+                'version' => app(BuildInfo::class)->version(),
+            ],
             'auth' => [
                 'user' => $user ? [
                     'id' => $user->id,
@@ -109,6 +117,10 @@ class HandleInertiaRequests extends Middleware
             'feedback' => fn (): ?array => ($open = app(FeedbackPresenter::class)->testingRoundOpen()) === null
                 ? null
                 : ['testing_round_open' => $open],
+            // M181 (`R-c7247dbf`, `D125` C, `D157`) — the releases this person has not seen, newest first, or null; the
+            // app shell's What's new prompt opens on the first page loaded while it is set — for someone signing in, the
+            // page they land on. Lazy, and null off-tenant, in a support session and once everything is seen (WhatsNew).
+            'whatsNew' => fn (): ?array => app(WhatsNew::class)->pending($user),
             // One-shot flash → toast bridge (design-system §3.7). Controllers signal an outcome with
             // ->with('toast', ['type' => 'success'|'error'|'info', 'message' => '…']); the app shell's
             // ToastHost raises it once, then the session flash is gone.

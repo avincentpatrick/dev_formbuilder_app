@@ -85,6 +85,11 @@ const STATUS: Record<string, StatusDescriptor> = {
     bug: { variant: 'danger', label: 'Bug' },
     suggestion: { variant: 'info', label: 'Suggestion' },
     question: { variant: 'neutral', label: 'Question' },
+    // What an item of a What's new release says (M181, `R-c7247dbf`): new / improved / fixed. `new` is already the
+    // feedback status above — info, "New" — and means the same here, so it is shared rather than redefined. An
+    // improvement is success, a thing made better; a fix neutral, a settled repair, as `wont_fix` is settled.
+    improved: { variant: 'success', label: 'Improved' },
+    fixed: { variant: 'neutral', label: 'Fixed' },
 };
 
 /** Resolve a status string to its badge {variant,label}. Unknown values fall back to a neutral pill

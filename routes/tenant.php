@@ -67,6 +67,7 @@ use App\Http\Controllers\Tenant\SubmissionReviewController;
 use App\Http\Controllers\Tenant\TenantSettingsController;
 use App\Http\Controllers\Tenant\TwoFactorRequiredController;
 use App\Http\Controllers\Tenant\WebhookController;
+use App\Http\Controllers\Tenant\WhatsNewController;
 use App\Http\Middleware\AppSecurityHeaders;
 use App\Http\Middleware\EnforceImpersonationTimeout;
 use App\Http\Middleware\EnforceTenantMaintenance;
@@ -273,6 +274,10 @@ Route::middleware([
 
     // The user manual (M162, `D114`) — every signed-in member, no gate and no props; see HelpController.
     Route::get('/help', HelpController::class)->name('help');
+    // What's new (M181, `R-c7247dbf`) — every signed-in member, no gate; the prompt's any-close posts `seen`, HERE, where
+    // the request's own user GUC is set (`users` is FORCE RLS). See WhatsNewController.
+    Route::get('/whats-new', [WhatsNewController::class, 'index'])->name('whats-new');
+    Route::post('/whats-new/seen', [WhatsNewController::class, 'seen'])->name('whats-new.seen');
 
     // Settings — the current appearance reaches the page via the shared `ui.theme` prop (no controller
     // needed for the read). The appearance write persists the four personalization axes to

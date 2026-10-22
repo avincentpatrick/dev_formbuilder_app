@@ -36,7 +36,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@inertiajs/vue3', async () => {
     const { reactive } = await import('vue');
     mocks.live = reactive(mocks.page);
-    return { usePage: () => mocks.live };
+    return {
+        usePage: () => mocks.live,
+        // M181 — the footer's two links. Without it the factory mock hands the shell an undefined `Link`, which Vue
+        // reports only as "Invalid vnode type".
+        Link: { name: 'Link', props: ['href'], template: '<a :href="href"><slot /></a>' },
+    };
 });
 
 const AppLayout = (await import('./AppLayout.vue')).default;
@@ -47,6 +52,7 @@ const stubs = {
     ImpersonationBanner: true,
     CommandPalette: true,
     MdsToastHost: true,
+    WhatsNewModal: true,
 };
 
 function render(component: string): VueWrapper {
@@ -165,5 +171,50 @@ describe('AppLayout — the mobile drawer', () => {
 
         expect(wrapper.findComponent({ name: 'Sidebar' }).props('drawerOpen')).toBe(false);
         wrapper.unmount();
+    });
+});
+
+/**
+ * M181 (`R-c7247dbf`, `D124`) — the version under every page, and the What's new prompt beside the toast host. The
+ * user (2026-10-14): *"lets put the current version in the app, footer and login so users are aware"*. The builder owns
+ * its whole region and its own scroll, so it gets no footer; the sidebar foot carries the version there.
+ */
+describe("AppLayout — the footer and the What's new prompt (M181)", () => {
+    function shellAt(component: string, version = '0.9.0'): VueWrapper {
+        mocks.page.component = component;
+        mocks.page.url = '/dashboard';
+        mocks.page.props = { app: { version } };
+        return mount(AppLayout, { global: { stubs } });
+    }
+
+    it("puts the product, its version, What's new and Help under every page", () => {
+        const footer = shellAt('Dashboard').get('.app-shell__content > footer.app-shell__footer');
+
+        // Its parts, in order: the gap spaces them on screen, so the markup carries no space between them.
+        expect(footer.findAll(':scope > *').map((part) => part.text())).toEqual(['Meridian v0.9.0', '·', "What's new", '·', 'Help']);
+        expect(footer.findAll('a').map((a) => [a.text(), a.attributes('href')])).toEqual([
+            ["What's new", '/whats-new'],
+            ['Help', '/help'],
+        ]);
+    });
+
+    it('sits after the page, inside the scroll region, not inside the page column', () => {
+        const wrapper = shellAt('forms/Index');
+
+        expect(wrapper.find('.app-shell__inner footer').exists()).toBe(false);
+        expect(wrapper.find('.app-shell__content > .app-shell__inner + footer').exists()).toBe(true);
+    });
+
+    it('gives the builder no footer', () => {
+        expect(shellAt('forms/Builder').find('footer').exists()).toBe(false);
+    });
+
+    it('says a development build is one', () => {
+        expect(shellAt('Dashboard', 'dev').get('footer').text()).toContain('Meridian development build');
+    });
+
+    it("mounts the What's new prompt once, beside the toast host, on every page — the builder included", () => {
+        expect(shellAt('Dashboard').findAllComponents({ name: 'WhatsNewModal' })).toHaveLength(1);
+        expect(shellAt('forms/Builder').findAllComponents({ name: 'WhatsNewModal' })).toHaveLength(1);
     });
 });

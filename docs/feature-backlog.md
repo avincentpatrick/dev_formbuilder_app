@@ -157,7 +157,7 @@ No AI appears anywhere in the committed docs; the versioned draft/publish model 
 | Item | Priority | Phase | Note |
 |---|---|---|---|
 | Customer support surface — help center/KB + in-app contact (ticket/chat) with a reply path | should | 1 | Feature #11 feedback is one-way fire-and-forget; a B2B SaaS charging money needs a way to get an answer. A minimal support email is a viable MVP floor |
-| In-app product announcements / changelog ("What's new") feeding the notification center | nice | 3 | The bell/center exist as shells; a changelog feed is how you tell tenants a waited-for feature landed | ⏸️ **Queued (`M171`, 2026-10-15):** the prompt and the page are the ledger row *the product shows no user-facing version and has no "What's new"*; the feed into the notification centre is the `nit` row filed beside it. |
+| In-app product announcements / changelog ("What's new") feeding the notification center | nice | 3 | The bell/center exist as shells; a changelog feed is how you tell tenants a waited-for feature landed | ✅ **Built (`M181`, 2026-10-20):** the prompt and the page — the ledger row *the product shows no user-facing version and has no "What's new"*, closed by `M181`; the feed into the notification centre is still the `nit` row filed beside it. |
 
 ---
 
@@ -2262,7 +2262,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `PROGRESS_ARCHIVE.md` keeps what was believed at the time.
   ⚠️⚠️ **AND THIS INCREMENT REPRODUCED THE VERY DEFECT CLASS IT CLOSES — FOUR TIMES, IN ITS OWN PROSE.**
   A +59-line §D32 and a +10-line middleware docblock invalidated M7's own `0016:238`, its `0019:37` /
-  `ACCESS-MATRIX.md:411` evidence list, **and two LIVE rows in this file that M7 never read** — one of
+  `ACCESS-MATRIX.md:412` evidence list, **and two LIVE rows in this file that M7 never read** — one of
   them `EnforceTenantTwoFactor.php:33-52`, the sole evidence for the *enrolment-nudge* argument §D32
   leans on twice. M7 had explicitly checked which citations its insertion would move and answered
   *"nothing else moves"* — true of the citations that already existed, and silent about the ones the same
@@ -7559,7 +7559,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   SCHEMA.** `docs/multi-tenancy-rbac-design.md:56` gives the forward reference to `GET /api/v1/roles` as
   the reason roles use UUIDv7 rather than Spatie's bigint PKs, echoed at `app/Models/Role.php:13` and in
   the comment opening at `config/permission.php:20`. ⚠️ **The one near-miss is a circular pointer, not a
-  deferral**: `docs/multi-tenancy-rbac-design.md:744` defers the request/response *shapes* to Doc #14, and
+  deferral**: `docs/multi-tenancy-rbac-design.md:745` defers the request/response *shapes* to Doc #14, and
   `docs/api-specification.md:13` points straight back at §7.1 as the authoritative inventory. Neither
   defers the build. This repository builds `/api/v1` twins deliberately — `routes/tenant.php:787` says
   so — so the web surface does not discharge it. **Live.** Filed by `M80`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.** ⛔ **THIS IS THE ROW THAT MADE THE ANSWER `C` RATHER THAN `A`.** `D38`'s premise sentence *"nothing shipped depends on them"* is false here: the documented `GET /api/v1/roles` is the stated reason roles use UUIDv7 primary keys rather than Spatie's bigints, cited at `docs/multi-tenancy-rbac-design.md:56`, `app/Models/Role.php:13` and `config/permission.php:20-21`. **That schema shipped**, so a plain trim orphans the rationale for a decision already paid for.
@@ -14134,7 +14134,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The user's comment (2026-10-14): *"some pages only occupies the middle part of the page specially when screen is wide. can we make
   every page occupy the whole width? no content on the middle only"*. `resources/js/Layouts/AppLayout.vue` caps
   `.app-shell__inner` at 1200px, `:192` at 1600px for the `WIDE_PAGES` set (`:48-59`), `:197` none for the builder;
-  `resources/js/Layouts/AdminLayout.vue:199` caps `.admin__inner` at 1100px. `resources/js/Layouts/AppLayout.test.ts:68-90` pins the
+  `resources/js/Layouts/AdminLayout.vue:199` caps `.admin__inner` at 1100px. `resources/js/Layouts/AppLayout.test.ts:74-96` pins the
   set, `tests/e2e/list-layout.spec.ts` asserts `/settings` is exactly 1200px at a 1600px window,
   `packages/design-system/src/stories/ListPage.stories.ts:37` and `packages/design-system/src/stories/CardGrid.stories.ts:98`
   hard-code 1600px, and `docs/ux/design-system-reference.md:588` ("a consistent max-width") and `:1541` ("a padded,
@@ -14242,7 +14242,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   red; `type` dropped from the payload → Pest red; the CHECK dropped → the drift test red. **Live.** Filed by `M171`.
   **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Taken by F (`M175`), 2026-10-16: `D138` puts the feedback mechanism first and makes `D128`'s UI4 the increment F, with `R-9bfd832e`, `R-78f43f26` and `R-f3fb2522`.** ✅ **CLOSED BY `M175` (2026-10-16):** the capture acquires the stream inside the click, closes the panel, waits for `MdsModal`'s new `after-leave` (at most 400ms), draws one of two fresh frames, and reopens the panel by setting `open` — never through `openPanel()` — so the remarks, the kind and the picture are where the reporter left them; a decline never moves it (ADR-0015 §D11). A report must name its kind (`FeedbackType` bug, suggestion, question, nullable with `feedback_reports_type_check`; every live row NULL) and records `page_url` (an `http`/`https` address only — both lists link it) and `page_title`; `browser_info` gains the Inertia page and the bundle sha, and the server stamps its own version and commit over anything sent. Both lists show the kind as a badge (one map in `status-variant.ts`) with a filter and the title as a link, and the keyword box matches the title and the address. Red first: 12 Vitest cases and 10 Pest (the kind, the page fields, a `javascript:` address, the keyword, the console, the column census, two drift tests); `tests/e2e/feedback-capture.spec.ts` (a stubbed stream, `drawImage` wrapped) green at three viewports and red at all three against the no-step-aside bundle. Mutants caught: the close dropped, reopening through `openPanel()`, the emit deleted (Vitest); the kind not required, the address rule loosened, the version stamp dropped, the CHECK dropped (Pest).
 
-- **`minor` · The product shows no user-facing version and has no "What's new": Settings → About reads "dev" on the testing server, and a user learns of a change only by noticing it.**
+- ✅ **CLOSED BY `M181` (2026-10-20) — ****`minor` · The product shows no user-facing version and has no "What's new": Settings → About reads "dev" on the testing server, and a user learns of a change only by noticing it.**
   The user's request (2026-10-14): *"lets also have a what's new prompt to users for new login so users are aware for every changes.
   versioning must also be included. lets put the current version in the app, footer and login so users are aware."* `config/app.php:32`
   reads `APP_VERSION` with the default `dev` and `app/Support/Platform/BuildInfo.php:28-33` passes it through; `.env.example:22` leaves it
@@ -14259,7 +14259,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   never a delete), and the page and the prompt reading the table; a `/whats-new` page and a modal opened on the first page after sign-in for a user whose `users.whats_new_seen_version` (new,
   nullable, no backfill, withheld from tenant extracts like `welcomed_at`) is older, marked seen by any close through
   `POST /whats-new/seen`; one close-out sentence in `CLAUDE.md` and the RBAC §6 users row. **Live.** Filed by `M171`.
-  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
+  **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Taken by UI5 (`M181`), 2026-10-20 (`D138`).** ✅ **CLOSED BY `M181` (2026-10-20):** a committed `VERSION` file (0.9.0) is what every page shows — `BuildInfo` reads it under the `APP_VERSION` override (whose config default is now null, not `dev`) and shares it as `app.version`; the version sits in a footer under every page but the builder's, in the sidebar's foot (a `sparkle` glyph alone in the rail), on the sign-in card, in the console bar and on the landing page. The notes live in `database/data/releases.json` (checked whole by `ReleaseNotes`; `ReleaseNotesFileTest` holds the newest entry equal to `VERSION`) and `deploy.ps1` copies them into the central `releases` table with `releases:sync` after the row count — adds and corrects, never deletes, `released_at` stamped by the first copy. `/whats-new` lists every release for every member; the prompt opens on the first page loaded while the shared `whatsNew` prop is set (never off-tenant or in a support session), lists every release newer than `users.whats_new_seen_version` — or, for a person who has never seen one, every release since they joined, at least the newest (`D157` A) — and any close posts the newest version shown, which only moves forward. `E2eSeeder` syncs and stamps every seeded identity but one unseen member, so the prompt never stands between a spec and its first click. The release rule is in `CLAUDE.md` (Closing out), Standing Rule 11 and the hand-off. ⚠️ A changed `deploy.ps1` runs one deploy late: the first copy on staging is the deploy after this one. Not built: What's new as a search destination (filed beside this row). Relayed `UI4` (the same comment, Ongoing — "Planned for batch 4") is resolved by its reference once this is live on staging.
 
 - **`nit` · What's new entries do not reach the notification centre.**
   The gap-table row at `docs/feature-backlog.md:160` asks for a changelog "feeding the notification center"; the versioning row above
@@ -14284,7 +14284,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (`resources/js/Pages/members/Index.vue:497`). The remedy is the same rule. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).**
 
 - **`nit` · Three uppercase micro-labels hard-code their tracking where `--mds-tracking-wide` exists.**
-  `resources/js/Pages/help/Index.vue:223` (0.04em), `resources/js/components/shell/Sidebar.vue:338` (0.06em) and
+  `resources/js/Pages/help/Index.vue:223` (0.04em), `resources/js/components/shell/Sidebar.vue:366` (0.06em) and
   `resources/js/Layouts/AdminLayout.vue:130` (0.04em); `packages/design-system/src/components/FilterBar/FilterBar.vue:58-61` records the
   token as the one letting for the product's micro-labels (the console workspace page's and the landing page's literals are taken by
   their own rows). The remedy is the token. **Live.** Filed by `M171`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: the user's order of 2026-10-15 — the two blockers first, then this UI programme, then the testers' first-round items (`D128`).** **Narrowed 2026-10-15 by `M173`:** `M173` edits `resources/js/Layouts/AdminLayout.vue` for the shell row and takes its literal there, as the UI programme's plan intended; this row's remainder is `help/Index.vue` and `Sidebar.vue`.
@@ -14990,3 +14990,18 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `resources/js/components/builder/CalculationEditor.vue`). The remedy: put the switch inside the Default value field, under its visible
   label, so it reads as part of that box. **Live.** It needs a look at the Advanced tab of any question that takes a default.
   Filed by `M180`. **Tier: during-testing.**
+
+- **`nit` · What's new cannot be found through global search, because search may offer only what the sidebar's item list offers.**
+  Found by `M181` while building `R-c7247dbf`. `/whats-new` is reached from the footer under every page and from the sidebar's foot, but
+  `app/Support/Search/DestinationCatalog.php` must carry exactly the sidebar's items (`tests/Unit/Navigation/ShellAbilityParityTest.php`
+  refuses a destination search offers and the sidebar does not), and the foot is deliberately not a nav item — so typing "what's new",
+  "release" or "version" into search finds nothing. The remedy: let the catalog carry a destination outside the item list, the parity
+  test naming the foot as its one exception, or make What's new a nav item. **Live.** Filed by `M181`. **Tier: during-testing.**
+
+- **`nit` · `TenantAppSettingsTest` leaves a tenant behind that turns two of `PlatformSettingsConsoleTest`'s cases red when it runs first.**
+  Measured by `M181` on the trunk at `43e96656`: `tests/Feature/Settings/TenantAppSettingsTest.php` run before
+  `tests/Feature/Admin/PlatformSettingsConsoleTest.php` in one Pest process fails the console's stale-token refusal and its save with
+  `SQLSTATE[23503]` on `audits_tenant_id_foreign` — the audit row carries a tenant id from the first file's rolled-back transaction.
+  Each passes alone, and CI's alphabetical order runs Admin before Settings, so no run has seen it; a reordered or parallel run would.
+  The remedy: find what the settings test leaves set (a tenant context or a cached tenant) and clear it after each case, or make the
+  console's audit write refuse a stale context. **Latent.** Filed by `M181`. **Tier: before-launch.**

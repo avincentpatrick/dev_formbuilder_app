@@ -9,6 +9,7 @@ use App\Models\Form;
 use App\Models\Notification;
 use App\Models\NotificationPreference;
 use App\Models\PointAward;
+use App\Models\Release;
 use App\Models\SavedReportView;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
@@ -16,6 +17,7 @@ use App\Models\SubmissionAnswerIndex;
 use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
+use App\Support\Platform\ReleaseNotes;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\E2eSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -340,4 +342,26 @@ it('verifies every seeded identity except the invitation placeholder', function 
     // a joined membership in a second workspace would move the page just as surely — and this case would
     // stay green while the axe scan quietly stopped scanning a password form.
     expect($pendingVerifiedAt)->toBeNull();
+});
+
+it("copies the release notes in and seeds one verified member for the What's new prompt's spec (M181)", function (): void {
+    (new E2eSeeder)->run();
+
+    $tenant = Tenant::query()->where('slug', 'acme')->firstOrFail();
+
+    // CI never deploys, so the seeder is what fills `releases`: the committed notes (the sync's own idempotence is
+    // `SyncReleasesCommandTest`'s; a second run here cannot see its first run's users under row security).
+    expect(Release::query()->pluck('version')->all())->toBe(array_column((new ReleaseNotes)->load(), 'version'));
+
+    // The member the prompt is left for: active (so the dashboard is theirs to land on) and verified (or the sign-in
+    // lands on /email/verify instead). Read under a plain tenant context, as the case above explains — the privileged
+    // stamps themselves are a separate session that cannot see this test's transaction, so the browser proves them.
+    $newcomer = DB::transaction(function () use ($tenant): ?User {
+        TenantContext::applyLocal($tenant->id, null);
+
+        return User::query()->where('email', 'whatsnew@meridian.test')->first();
+    });
+
+    expect($newcomer)->not->toBeNull()
+        ->and($newcomer?->email_verified_at)->not->toBeNull();
 });

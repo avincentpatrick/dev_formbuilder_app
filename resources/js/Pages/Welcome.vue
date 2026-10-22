@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { MdsButton, MdsIcon } from '@meridian/design-system';
-import { Head } from '@inertiajs/vue3';
+import { Head, usePage } from '@inertiajs/vue3';
+import { versionLabel } from '@/components/whats-new/version-label';
 
 /**
  * The platform's front door, on the central host only (Increment I6).
@@ -27,6 +29,10 @@ defineProps<{
     /** The central host, so the footer can name the shape of a workspace URL rather than guess at it. */
     centralHost: string;
 }>();
+
+// M181 (`R-c7247dbf`, `D124`): the release, in the footer — text only: What's new is on a workspace host, behind sign-in.
+const page = usePage();
+const version = computed(() => versionLabel(page.props.app?.version));
 
 const capabilities = [
     {
@@ -96,6 +102,7 @@ const capabilities = [
                     Already a member of a workspace? Go straight to it at
                     <code class="landing__code">your-workspace.{{ centralHost }}</code>
                 </p>
+                <p class="landing__version">Meridian {{ version }}</p>
             </footer>
         </div>
     </main>
@@ -219,5 +226,12 @@ const capabilities = [
     .landing {
         padding: var(--mds-space-16) var(--mds-space-6);
     }
+}
+
+.landing__version {
+    margin: var(--mds-space-2) 0 0;
+    color: var(--mds-color-text-secondary);
+    font-size: var(--mds-type-caption-font-size);
+    line-height: var(--mds-type-caption-line-height);
 }
 </style>

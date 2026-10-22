@@ -92,6 +92,8 @@ it('never allows a path the running site loads', function (): void {
         'storage/', 'packages/', 'vendor/', 'artisan', 'composer.json', 'composer.lock',
         'package.json', 'package-lock.json', 'vite.config.ts', 'deploy.ps1', '.env.example',
         'openapi.json', 'phpunit.xml',
+        // M181: the release a person sees is read from this file at runtime (BuildInfo).
+        'VERSION',
     ];
 
     foreach ($siteLoads as $path) {

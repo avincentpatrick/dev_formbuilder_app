@@ -20,7 +20,7 @@ use Illuminate\Support\Collection;
  * the same namespace needs none.
  *
  * What it refuses, each with its own code:
- *   - a link on a question that is not a single choice or dropdown (`linked_choices_wrong_type`);
+ *   - a link on a question that is not a single choice, multiple choice (M184) or dropdown (`linked_choices_wrong_type`);
  *   - a link naming no form or no question (`linked_choices_incomplete`);
  *   - typed choices beside a link (`linked_choices_with_typed_options`) — both engines check an answer against the
  *     snapshot's typed list whenever it is non-empty, so a mix would refuse every linked answer;

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * Where a single-choice or dropdown question's choices come from (M133, `R-5da4a30f` — Connect project v1): typed
- * here, or another form's answers to one of its questions.
+ * Where a single-choice, multiple-choice (M184) or dropdown question's choices come from (M133, `R-5da4a30f` — Connect
+ * project v1): typed here, or another form's answers to one of its questions.
  *
  * The link is one config key, `options_source = {form_id, field_key}`. The forms offered are the ones that share
  * their answers (their Data sharing settings) and whose responses this author can read — the server sends them as

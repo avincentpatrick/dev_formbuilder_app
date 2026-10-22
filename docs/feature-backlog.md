@@ -11912,7 +11912,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · The builder and PHP disagree about whether a duration field takes an ordered comparison, and the
   disagreement is now pinned rather than resolved.** Found by `M113` (2026-09-26) while building the client
-  field-type mirror census. `ConfigPanel.vue:195`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
+  field-type mirror census. `ConfigPanel.vue:354`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
   'likert_scale']` — four members. `ValueShape::allowsOperator()` (`ValueShape.php:218-242`) permits
   `gt`/`lt`/`gte`/`lte` for `Number`, `Duration` and `Scale`, which is **five** types: the same four plus
   `duration`. ⛔ **`R-09f73330` SAYS THIS SET "MIRRORS NOTHING", AND THAT STOPPED BEING TRUE IN THE INCREMENT
@@ -14655,7 +14655,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M176` (2026-10-18) — ****`minor` · A refused question save shows its first error twice — as the lead line and again as the first bullet — and numbers its rules by their place in the request, not on screen.**
   The testers' comment (2026-10-11, comment 2): *"Instructions repeat"* — *"A validation rule must be either a structured rule or an
-  expression — not both, not neither."* above *"Rule 1: A validation rule must be …"*. `resources/js/components/builder/ConfigPanel.vue:529`
+  expression — not both, not neither."* above *"Rule 1: A validation rule must be …"*. `resources/js/components/builder/ConfigPanel.vue:530`
   prints the reply's `message`, which Laravel fills with the first error, and `:489` lists every error including that one;
   `resources/js/components/builder/field-save-errors.ts:86` names `validations.N` by its position in the request after unfinished
   rows are withheld, so "Rule 1" can point at the wrong row. The message itself (`app/Http/Requests/Forms/UpdateFieldRequest.php:391`)
@@ -15069,3 +15069,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `resources/public-runtime/lib/choice-lists.ts`'s `mergeChoiceLists()` taught flat lists), once the runtimes cached on devices merge
   flat lists. **Not live** on the trunk until `M184` merges at merge point 5 — the cap arrives with it.
   Filed by `M184`. **Tier: during-testing.**
+
+- **`minor` · An answer written on paper for a question that takes its choices from another form never reaches the review: the scan reads it, then lists it as "no longer offered".**
+  `app/Services/Ocr/OcrAnswerCarry.php` (`valueFits()`) checked a read answer against the question's own options, and a question
+  linked to another form holds none in its snapshot (`M133`), so every such answer — read correctly as writing by
+  `app/Services/Ocr/OcrAnswerReader.php` — was dropped as `option_missing` ("The choice read from the paper is no longer offered.")
+  on the staff review and on the guest's paper review alike, and the reviewer picked it again from the list beside the page. Found by
+  `M184` while letting a Multiple choice link (its claim's premise; proved red by a mutation). The remedy: both review screens pass
+  the list they draw (`LinkedChoiceService::valuesFor()`), and a written answer carries when it is one of those choices,
+  matched regardless of case and spacing. **Live.** Filed by `M184`. **Tier: early-testing.** ✅ **CLOSED BY `M184` (2026-10-23):**
+  `OcrAnswerCarry::carry()` takes the live choices by key; `OcrScanReviewPresenter` and `GuestPaperReview` pass
+  `LinkedChoiceService::valuesFor()`; an answer that is none of them, or one with no list passed, is still listed for the reviewer.

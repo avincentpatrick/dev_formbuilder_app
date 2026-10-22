@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\DB;
  * A choice question that takes its choices from another form's answers (M133, `R-5da4a30f` — Connect project v1).
  *
  * ── THE LINK IS ONE CONFIG KEY, AND THE LIST IS NEVER STORED ──────────────────────────────────────
- * A `single_select` or `dropdown` links with `config.options_source = {form_id, field_key}`. Being config, the link
+ * A `single_select`, `multi_select` (M184) or `dropdown` links with `config.options_source = {form_id, field_key}`. Being config, the link
  * is part of the version snapshot: frozen per version, cloned by `SchemaTreeCloner`, covered by the checksum —
  * changing WHICH form a question reads needs a publish, which is right. The LIST is not: it is read live from the
  * source's responses and served beside the schema (`D60` = A), so a busy source form never moves a checksum every
@@ -35,8 +35,14 @@ use Illuminate\Support\Facades\DB;
  */
 final class LinkedChoiceService
 {
-    /** The two question types a link may feed. Multi-select and Likert are the remainder row's. */
-    public const LINKABLE_TYPES = [FieldType::SingleSelect, FieldType::Dropdown];
+    /** The question types a link may feed — Multiple choice since M184 (`R-f655f9b1`). A Likert scale keeps its fixed points. */
+    public const LINKABLE_TYPES = [FieldType::SingleSelect, FieldType::MultiSelect, FieldType::Dropdown];
+
+    /**
+     * The SOURCE questions whose stored values are mapped to their labels: the choice types {@see ShareableQuestions}
+     * shares. Not {@see LINKABLE_TYPES} — that list is what a link may FEED, and a Multiple choice feeds but is not shared.
+     */
+    private const SOURCE_CHOICE_TYPES = [FieldType::SingleSelect, FieldType::Dropdown];
 
     /** The most choices one list carries (v1). More is the remainder row's; the builder says so. */
     public const MAX_CHOICES = 1000;
@@ -212,6 +218,21 @@ final class LinkedChoiceService
     }
 
     /**
+     * Every linked question's choices for one published version, as their values — what a scan's written answer is
+     * checked against before it reaches a review screen, because those screens draw the same live list
+     * (`App\Services\Ocr\OcrAnswerCarry`, M184).
+     *
+     * @return array<string, list<string>>
+     */
+    public function valuesFor(Form $destination, FormVersion $version): array
+    {
+        return array_map(
+            static fn (array $list): array => array_column($list['options'], 'value'),
+            $this->listsFor($destination, $version),
+        );
+    }
+
+    /**
      * @param  array{form_id: string, field_key: string}  $link
      * @return array{stamp: string, available: bool, truncated: bool, options: list<array{value: string, label: string}>}
      */
@@ -283,7 +304,7 @@ final class LinkedChoiceService
     private function labelsFor(Form $source, string $key): array
     {
         $field = ShareableQuestions::find($this->publishedSnapshot($source), $key);
-        if ($field === null || ! in_array(FieldType::tryFrom((string) ($field['field_type'] ?? '')), self::LINKABLE_TYPES, true)) {
+        if ($field === null || ! in_array(FieldType::tryFrom((string) ($field['field_type'] ?? '')), self::SOURCE_CHOICE_TYPES, true)) {
             return [];
         }
 

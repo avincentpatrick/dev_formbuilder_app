@@ -122,7 +122,7 @@ final class PublishValidationException extends RuntimeException
     public static function linkedChoicesInvalid(string $fieldKey, string $code): self
     {
         $message = match ($code) {
-            'linked_choices_wrong_type' => "“{$fieldKey}” cannot take its choices from another form: only a single-choice or dropdown question can.",
+            'linked_choices_wrong_type' => "“{$fieldKey}” cannot take its choices from another form: only a single-choice, multiple-choice or dropdown question can.",
             'linked_choices_incomplete' => "Choose the form and the question that “{$fieldKey}” takes its choices from.",
             'linked_choices_with_typed_options' => "“{$fieldKey}” takes its choices from another form, so it cannot also have choices typed here.",
             'linked_choices_self' => "“{$fieldKey}” cannot take its choices from this same form.",

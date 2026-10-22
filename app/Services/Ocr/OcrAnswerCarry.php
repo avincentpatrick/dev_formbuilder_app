@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Ocr;
 
 use App\Enums\FieldType;
+use App\Services\Forms\LinkedChoiceService;
 
 /**
  * Turns what a scan read into the answers a reviewer starts from (M129 — single-form OCR groundwork 2).
@@ -35,6 +36,12 @@ use App\Enums\FieldType;
  * ⚠️ NUMBERS ARRIVE AS TEXT. The reader returns `'41'` for an integer, and the shared number control displays
  * only a value whose type is number, so a carried number is converted here — or the box would look empty
  * while the answer map held a value.
+ *
+ * ── A LINKED QUESTION'S CHOICES ARE LIVE (M184) ────────────────────────────────────────────────────
+ * A question that takes its choices from another form holds none in its snapshot; the review screens draw the list
+ * served today ({@see LinkedChoiceService::valuesFor()}), and the caller passes it in. A written answer carries when it
+ * is one of those choices, matched without regard to case or spacing and saved as the choice is spelled. Before this,
+ * every such answer was checked against the empty snapshot list and listed as "no longer offered".
  */
 final class OcrAnswerCarry
 {
@@ -54,13 +61,14 @@ final class OcrAnswerCarry
      * @param  array<string, mixed>  $extraction  the scan's `extraction` column
      * @param  array<string, mixed>  $paper  the schema snapshot of the version the paper was printed from
      * @param  array<string, mixed>  $current  the schema snapshot of the current published version
+     * @param  array<string, list<string>>  $linked  the live choices of the current version's linked questions, by key
      * @return array{
      *     answers: array<string, mixed>,
      *     fields: array<string, array{state: string, tier: string|null, confidence: int|null, text: string|null, page: int|null, carried: bool, reason: string|null, ticks: bool, inked: bool, repaired: bool}>,
      *     dropped: list<array{key: string, label: string, text: string|null, reason: string, message: string}>
      * }
      */
-    public function carry(array $extraction, array $paper, array $current): array
+    public function carry(array $extraction, array $paper, array $current, array $linked = []): array
     {
         /** @var array<string, mixed> $read */
         $read = is_array($extraction['fields'] ?? null) ? $extraction['fields'] : [];
@@ -97,7 +105,12 @@ final class OcrAnswerCarry
                 continue;
             }
 
-            $reason = $this->refusal($entry, $type, $field, $repeatable);
+            $offered = $this->linkedChoices($field, $linked);
+            if ($offered !== null) {
+                $entry['value'] = $this->asLinkedChoice($entry['value'], $offered);
+            }
+
+            $reason = $this->refusal($entry, $type, $field, $repeatable, $offered);
             if ($reason === null) {
                 $answers[$key] = $this->coerce($entry['value'], $type);
                 $fields[$key] = $this->meta($entry, true, null);
@@ -129,8 +142,9 @@ final class OcrAnswerCarry
      * @param  array<string, mixed>  $entry
      * @param  array<string, mixed>  $field
      * @param  array<string, true>  $repeatable
+     * @param  list<string>|null  $linked  a linked question's live choices; null for any other question
      */
-    private function refusal(array $entry, FieldType $type, array $field, array $repeatable): ?string
+    private function refusal(array $entry, FieldType $type, array $field, array $repeatable, ?array $linked): ?string
     {
         $sectionKey = $field['section_key'] ?? null;
 
@@ -138,28 +152,29 @@ final class OcrAnswerCarry
             is_string($sectionKey) && isset($repeatable[$sectionKey]) => 'repeat',
             $type === FieldType::Duration => 'not_answerable',
             ($entry['type'] ?? null) !== $type->value => 'type_changed',
-            ! $this->valueFits($entry['value'] ?? null, $type, $field) => 'option_missing',
+            ! $this->valueFits($entry['value'] ?? null, $type, $field, $linked) => 'option_missing',
             default => null,
         };
     }
 
     /**
-     * Whether a value is one the current question's own options can hold. Free-text, number, date and
-     * yes/no answers have no options to fall out of.
+     * Whether a value is one the current question's own options can hold — or, for a linked question, one of the
+     * choices it is served today. Free-text, number, date and yes/no answers have no options to fall out of.
      *
      * @param  array<string, mixed>  $field
+     * @param  list<string>|null  $linked
      */
-    private function valueFits(mixed $value, FieldType $type, array $field): bool
+    private function valueFits(mixed $value, FieldType $type, array $field, ?array $linked): bool
     {
         /** @var array<string, mixed> $config */
         $config = is_array($field['config'] ?? null) ? $field['config'] : [];
 
         if (in_array($type, self::SINGLE_CHOICE, true)) {
-            return is_string($value) && in_array($value, $this->optionValues($config), true);
+            return is_string($value) && in_array($value, $linked ?? $this->optionValues($config), true);
         }
 
         if ($type === FieldType::MultiSelect) {
-            $offered = $this->optionValues($config);
+            $offered = $linked ?? $this->optionValues($config);
 
             return is_array($value) && array_diff(array_map('strval', $value), $offered) === [];
         }
@@ -169,6 +184,47 @@ final class OcrAnswerCarry
         }
 
         return true;
+    }
+
+    /**
+     * A linked question's live choices, or null when the question is not linked. A linked question whose list was not
+     * passed in has none to offer, so nothing written for it carries — the reviewer sees the text listed instead.
+     *
+     * @param  array<string, mixed>  $field
+     * @param  array<string, list<string>>  $linked
+     * @return list<string>|null
+     */
+    private function linkedChoices(array $field, array $linked): ?array
+    {
+        $config = is_array($field['config'] ?? null) ? $field['config'] : null;
+        if (! LinkedChoiceService::declaresLink($config)) {
+            return null;
+        }
+
+        return $linked[(string) ($field['key'] ?? '')] ?? [];
+    }
+
+    /**
+     * What was written, spelled as the live choice it matches regardless of case and spacing; anything that matches
+     * none is left as written, for {@see valueFits()} to refuse.
+     *
+     * @param  list<string>  $offered
+     */
+    private function asLinkedChoice(mixed $value, array $offered): mixed
+    {
+        $byShape = [];
+        foreach ($offered as $choice) {
+            $byShape[$this->shape($choice)] ??= $choice;
+        }
+
+        $one = fn (mixed $written): mixed => is_string($written) ? ($byShape[$this->shape($written)] ?? $written) : $written;
+
+        return is_array($value) ? array_map($one, $value) : $one($value);
+    }
+
+    private function shape(string $text): string
+    {
+        return mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', $text)));
     }
 
     /**

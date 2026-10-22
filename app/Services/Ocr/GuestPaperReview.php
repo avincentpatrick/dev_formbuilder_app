@@ -10,8 +10,10 @@ use App\Exceptions\Guest\ExpiredShareTokenException;
 use App\Exceptions\Guest\InvalidShareTokenException;
 use App\Exceptions\Ocr\OcrException;
 use App\Models\Attachment;
+use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\OcrScan;
+use App\Services\Forms\LinkedChoiceService;
 use App\Support\Guest\GuestShareToken;
 use App\Support\Guest\GuestShareTokenService;
 
@@ -40,6 +42,7 @@ final class GuestPaperReview
     public function __construct(
         private readonly GuestShareTokenService $tokens,
         private readonly OcrAnswerCarry $carry,
+        private readonly LinkedChoiceService $linked,
     ) {}
 
     /**
@@ -99,7 +102,9 @@ final class GuestPaperReview
             ? $target
             : (FormVersion::query()->where('form_id', $share->formId)->whereKey($scan->form_version_id)->first() ?? $target);
 
-        $carried = $this->carry->carry((array) $scan->extraction, (array) $paper->schema_snapshot, (array) $target->schema_snapshot);
+        // M184: a linked question's written answer is checked against the list the guest's page draws.
+        $linked = $target->form instanceof Form ? $this->linked->valuesFor($target->form, $target) : [];
+        $carried = $this->carry->carry((array) $scan->extraction, (array) $paper->schema_snapshot, (array) $target->schema_snapshot, $linked);
 
         return [
             'status' => 'read',

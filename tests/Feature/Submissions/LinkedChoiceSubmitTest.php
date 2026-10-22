@@ -111,6 +111,30 @@ it('accepts a stale answer on the offline sync replay, per item', function (): v
     expect(linkedSubmitStored($this->tenant, $this->destination))->toBe(['facility' => 'Old Bayan Clinic']);
 });
 
+it('accepts a linked Multiple choice\'s list, stale items included, and shows a keyer its live list (M184)', function (): void {
+    enterTenant($this->tenant->id, $this->owner->id);
+    $form = app(FormService::class)->create($this->tenant, $this->owner, 'Outreach');
+    addFormField($form->draftVersion, $this->owner, 'facilities', FieldType::MultiSelect, 1, ['config' => [
+        'options' => [], 'options_source' => ['form_id' => $this->source->id, 'field_key' => 'facility_name'],
+    ]]);
+    app(PublishService::class)->publish($form->refresh(), $this->owner);
+    $form->refresh()->update(['public_slug' => 'outreach', 'allow_guest_submissions' => true]);
+    $form = $form->refresh();
+
+    $this->postJson('http://acme.meridian.test/api/v1/public/f/'.shareTokenFor($form).'/submissions', [
+        'answers' => ['facilities' => ['San Jose RHU', 'Old Bayan Clinic']],
+    ])->assertCreated();
+    expect(linkedSubmitStored($this->tenant, $form))->toBe(['facilities' => ['San Jose RHU', 'Old Bayan Clinic']]);
+
+    enterTenant($this->tenant->id, $this->owner->id);
+    $this->withoutVite()->actingAs($this->owner)
+        ->get("http://acme.meridian.test/forms/{$form->id}/submissions/create")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('blocks.0.fields.0.key', 'facilities')
+            ->where('blocks.0.fields.0.options', [['value' => 'San Jose RHU', 'label' => 'San Jose RHU']]));
+});
+
 it('shows a keyer the live list on the encode page', function (): void {
     $this->withoutVite()->actingAs($this->owner)
         ->get("http://acme.meridian.test/forms/{$this->destination->id}/submissions/create")

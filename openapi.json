@@ -7572,7 +7572,8 @@
                                                         "string",
                                                         "null"
                                                     ],
-                                                    "maxLength": 100
+                                                    "description": "The answer bound to this column: a question's key, a `__` metadata key, or a grid cell's `<key>.<row>.<column>`\n(a Likert row's `<key>.<row>`). Up to 662 characters, the longest a grid cell's key can be.",
+                                                    "maxLength": 662
                                                 }
                                             },
                                             "required": [
@@ -8211,7 +8212,8 @@
                                                         "string",
                                                         "null"
                                                     ],
-                                                    "maxLength": 100
+                                                    "description": "The answer bound to this column: a question's key, a `__` metadata key, or a grid cell's `<key>.<row>.<column>`\n(a Likert row's `<key>.<row>`). Up to 662 characters, the longest a grid cell's key can be.",
+                                                    "maxLength": 662
                                                 }
                                             },
                                             "required": [

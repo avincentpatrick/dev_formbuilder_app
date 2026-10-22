@@ -181,8 +181,19 @@
                                 @foreach ($field['grid']['rows'] as $row)
                                     <tr>
                                         <td class="grid__row">{{ $row['label'] }}</td>
+                                        {{-- M183 (R-51e044a6): each cell by its column - a Likert cell is one box to tick; a
+                                             matrix cell is a box per choice beside its words (the column's own, else the
+                                             shared cell choices, which before M183 reached the paper nowhere), or a box to
+                                             write a number, a text or a date in. Grids are never scanned, so no reader
+                                             depends on where these sit. --}}
                                         @foreach ($field['grid']['columns'] as $column)
-                                            <td class="grid__cell"><span class="grid__box"></span></td>
+                                            @if ($column['kind'] === 'choices')
+                                                <td class="grid__cell">@foreach ($column['options'] as $option)<span class="choice"><span class="choice__box"></span>{{ $option['label'] }}</span>@endforeach</td>
+                                            @elseif ($column['kind'] === 'write')
+                                                <td class="grid__cell"><div class="grid__line"></div></td>
+                                            @else
+                                                <td class="grid__cell"><span class="grid__box"></span></td>
+                                            @endif
                                         @endforeach
                                     </tr>
                                 @endforeach

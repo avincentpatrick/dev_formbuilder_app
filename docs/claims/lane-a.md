@@ -16,7 +16,98 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M181` (UI5), `M182` (UI6) and `M183` (T2 + Likert) are merged and live on staging, released together at merge point 4 (`D137`; below). The next claim is T3 — options from anywhere (`D138`), held green for merge point 5 with T4. Merge only at a planned merge point.
+## Status: ACTIVE CLAIM — `M184`, T3 of the testers' items: options from anywhere (`R-f655f9b1`, `R-3e7c81bb`, `R-596d6afd`, `R-d8c2ce84`, with `R-1059e9bd`) (m184-t3-options-from-anywhere)
+
+Taken 2026-10-23. Branch `m184-t3-options-from-anywhere`, cut from origin/main at `a7705dc6`, PR into main. ⛔ **NOT MERGED THIS
+SESSION:** it is held green for merge point 5 with T4 (`D137`, `D138`: … merge point 4 → T3 → T4 → merge point 5). The plan of
+record is `~/.claude/plans/i-have-intial-comments-quirky-pascal.md` §B3; the build plan is
+`~/.claude/plans/read-claude-md-then-php-parsed-rabin.md`.
+Rows: `R-f655f9b1` — *"Only a Single choice or Dropdown can take its choices from another form's answers; a Multiple choice cannot"*;
+`R-3e7c81bb` — *"A list file can feed a cascade's levels but not a plain choice question, and only CSV is accepted"*; `R-596d6afd` —
+*"A text box cannot offer suggestions from a list file or another form's answers"*; `R-d8c2ce84` — *"The builder preview shows
+neither a list-backed cascade's choices nor a list taken from another form"*; and `R-1059e9bd` (the codes-as-text sentence), which
+`R-3e7c81bb` takes. Relayed `R1-3b` (all four) and `R1-1b` (multi-select and the preview; its grid rows are T4's).
+
+**The owed check is done: the user checked merge point 4 on staging on 2026-10-23 — "All good"** (UI4 What's new and the version in
+the footer, sidebar foot and sign-in card; UI5 the dark error red, dialogs, labels, titles on cut-off values; R1-7a typed grid
+columns, the table, a spreadsheet column per cell; U9 the Likert line; `/whats-new` lists 0.10.0, 0.9.1 and 0.9.0) — never re-ask.
+The session-start pull read 0 reports, 0 reopened and 0 new comments (relayed 31: 19 Resolved · 6 Ongoing · 6 Confirmed working), so
+nothing was triaged. **Asked and answered in planning (the user, 2026-10-23, in chat):** **`D160` A** — a question whose choices come
+from a list file prints like typed choices, every choice a tick box; the builder warns on a long list; a `during-testing` row is filed
+for a write-in box on long lists; recorded on this branch's first commit. **The 0.11.0 notes' wording was approved verbatim** (five
+items, in the build plan).
+
+### Evidence verified
+Read on `a7705dc6` by three read-only passes, a design pass and my own reads.
+- `LinkedChoiceService.php:39` (`LINKABLE_TYPES` = single, dropdown) — held. `UpdateFieldRequest.php:337-349` — **moved** to `:356-370`
+  (the `choices` arm, `:364` `config.options_source`), and it already covers `multi_select` (`FieldType.php:159`), so the row's "accepts
+  the source for those two only" is **false for the request**: a linked Multiple choice saves and is refused only at publish
+  (`linked_choices_wrong_type`). `ConfigPanel.vue:552-568` — **moved** to `:680`.
+- `ChoiceListMaterializer.php:136-146` — held in kind (cascades only, `:127-129`, writes `config.options` at `:157-158`).
+  `ChoiceListCsvParser.php:33` (CSV only, `MAX_ROWS`) — held. `CascadingEditor.vue:58-102` and `ChoiceListsPanel.vue:80` — held in
+  kind (the upload control `:188-205` and `:100-108`, `accept=".csv,text/csv"`).
+- `FieldInput.vue:221-274` — **moved** to `:245-297` (short text a plain `MdsTextInput` at `:413-422`); `EncodeFormPresenter.php:629-655`
+  — **moved** to `:671-704`.
+- `BuilderPresenter.php:106-108` — **moved** to `:107-109`; `routes/tenant.php:1118-1127` — **moved** to `:1141-1150`;
+  `linked-choices.ts:89-112` — held. `preview-model.ts:269-274` carries the two "appear on the live form" sentences — held.
+- `StructuralValidationGate.php:508` ("has no valid parent", `R-1059e9bd`) — held.
+
+### Premise verified
+- **A draft's `schema_snapshot` is `[]`** (`FormService.php:96`, `PublishService.php:183`), so `LinkedChoiceService::listsFor()` and
+  `ChoiceListMaterializer::listsForBrowser()`, which read the snapshot, return nothing for a draft: the preview route reads the draft's
+  `FormField` rows and `FormVersionChoiceList` rows instead.
+- **Flat list options stay in the snapshot and the guest schema** — not stripped and served beside it as cascades are. The service
+  worker serves `/build/` stale-while-revalidate, so the first load after a deploy runs the previous bundle, whose `mergeChoiceLists`
+  merges cascades only: a stripped flat question would show no choices. The list cache (`guest-choice-lists`, 10 entries,
+  `purgeOnQuotaError`) can also be evicted apart from the schema. A 5,000-row cap per flat list bounds the schema; larger is filed.
+- **OpenSpout v4.32 is the only spreadsheet reader** (no PhpSpreadsheet); it returns a numeric cell as a number and ignores number
+  formats, so `01` typed as a number arrives as `1` — only a text cell keeps `01`. That is `R-1059e9bd`'s cause, now on the upload path.
+- **A linked question prints a write-in box** (empty options), and the scan reads writing only for single/dropdown
+  (`OcrAnswerReader.php:621`); **`OcrAnswerCarry::valueFits()` (`:152`) rejects every value when the options are empty**, so a linked
+  question's written answer is probably dropped at review — to be proved red first.
+- `MultiSelect` is not a shareable source (`ShareableQuestions.php:31-39`) — a target only here; filed. `FormBuilderController` is 272
+  lines against the controller gate's 250 code lines, so the preview endpoint gets its own controller. The builder (`can:update`) and
+  the read-only version view (`can:view`) need two routes. Three adapters build an `EncodeField` and a parity test holds them together.
+  `E2eSeeder` seeds no choice list. One session only; lane B retired; no other claim, held block or forward queue in either file.
+
+### Remedy verdict
+**Works, reshaped in four places:** (1) list-bound flat options are written into the snapshot at publish and stay in the schema the
+browser gets (see premise), with `ChoiceListMaterializer::forNextDraft()` stripping them from the next draft; (2) the materializer, not
+the gate, checks a list-backed cascade's parents and carries the codes-as-text hint, naming the file and the row; (3) a list and a link
+on one question are refused inside the materializer before it writes, and typed options beside a list are overwritten (templates and
+restores carry them); (4) the preview's lists go into `projectDraft()` so the shape the runtime is keyed on moves. Kept as prescribed:
+one "Choices come from" chooser (the shipped label, not "Options come from"), `multi_select` in `LINKABLE_TYPES`, `.xlsx` (first sheet)
+beside CSV, `config.suggestions_source` with a datalist and free text always accepted, a tenant route returning the first 200 rows of
+each list with its total.
+
+Files: `app/Services/Forms/` (`LinkedChoiceService.php`, `LinkedChoiceGate.php`, `ChoiceListMaterializer.php`, `ChoiceListCsvParser.php`,
+`FormChoiceListService.php`, `SchemaTreeCloner.php`, `StructuralValidationGate.php`, `FormBuilderService.php`, new `ChoiceSource.php`,
+new `ChoicePreviewPresenter.php`), `app/Support/Forms/FieldTypeConversion.php`, `app/Exceptions/Forms/PublishValidationException.php`,
+new `app/Support/Spreadsheet/CellText.php`,
+`app/Services/Xlsform/XlsformWorkbookReader.php`, `app/Services/Ocr/OcrAnswerReader.php`, `app/Services/Ocr/OcrAnswerCarry.php`,
+`app/Services/Submissions/EncodeFormPresenter.php`, `app/Services/Forms/FormSettingsPresenter.php`, `app/Http/Requests/Forms/`
+(`UpdateFieldRequest.php`, `StoreFormChoiceListRequest.php`), new `app/Http/Controllers/Tenant/FormChoicesPreviewController.php`,
+`routes/tenant.php`, `database/seeders/E2eSeeder.php`; `resources/js/components/builder/` (`LinkedChoicesEditor.vue` → new
+`OptionSourceEditor.vue`, `ConfigPanel.vue`, `CascadingEditor.vue`, new `ChoiceListUpload.vue`, `OtherSpecifyControl.vue`,
+`draft-snapshot.ts`, `preview-model.ts`, `PreviewPane.vue`, `field-conversion.ts`, new `choice-source.ts`, new `preview-choices.ts`),
+`resources/js/components/forms/ChoiceListsPanel.vue`, `resources/js/components/forms/choice-lists.ts`, `resources/js/Pages/forms/VersionView.vue`,
+`resources/js/components/submissions/FieldInput.vue`, `resources/js/components/builder/types.ts`, `resources/js/components/help/manual.ts`,
+`resources/public-runtime/lib/` (`linked-choices.ts`, `choice-lists.ts`, `schema-mapping.ts`, `types.ts`), `resources/public-runtime/components/`
+(`FieldControl.vue`, `InstanceField.vue`), `resources/public-runtime/engine/semantic-validator.ts` (only if a golden vector needs it),
+`packages/design-system/src/components/TextInput/TextInput.vue`,
+`VERSION`, `database/data/releases.json`; the tests beside each — Pest under `tests/Feature/Forms`, `tests/Feature/Guest`,
+`tests/Feature/Submissions`, `tests/Feature/Ocr`, `tests/Unit`, the golden vectors `tests/golden/validation/`, the Vitest files beside
+the components.
+Shared artefacts taken: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/data-dictionary.md`,
+`tests/e2e/builder-axe.spec.ts`, `tests/e2e/builder-preview-authoring.spec.ts`, `tests/e2e/public-runtime-axe.spec.ts` and the specs
+the diff reaches, `PROGRESS.md` (own block).
+Paired files taken: the `EncodeField` adapters (`EncodeFormPresenter::field()` ↔ `FieldControl.vue` ↔ `InstanceField.vue`); the two
+`SemanticValidator` engines through the golden vectors.
+Namespaces spent: `D160`. Nothing from the migration or ADR namespace.
+Prediction: red first to the golden manifest's count pin and `FieldSaveAttributeNamesTest` (new config paths need attribute names);
+the linked-question carry test red on the trunk as the premise expects; `manual.test.ts` red once the editor is renamed until the
+`LINKED` constant follows. **Most likely wrong:** the `.xlsx` upload's MIME sniffing — fileinfo on Windows and on Linux CI disagree
+about an xlsx (zip vs spreadsheetml), so the request rule may pass here and fail in CI or the reverse.
 
 ## RELEASED — `M183`, T2 + Likert: typed grid columns, grids drawn as tables, a spreadsheet column per cell, and Kobo's Likert (`R-5033e87e`, `R-1c1d7266`, `R-f03cf999`, `R-51e044a6`) (merged as PR #376, `dba337b7`, last at merge point 4, rebased onto the trunk after `M182`; 6/6 green with real step counts on its rebased run at `f5dae98b` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11)
 

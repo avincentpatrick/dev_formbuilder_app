@@ -159,6 +159,17 @@ describe('LinkedChoicesEditor — a list file', () => {
         expect((await note('clinics')).text()).toBe('clinics is not uploaded to this form.');
     });
 
+    it('shows the chosen list in the picker before the lists arrive, and says nothing is missing until they have', async () => {
+        // Measured in e2e: a select drawn with a value none of its options carries shows blank, and the value is not applied
+        // again when the options land later.
+        vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
+        const wrapper = mount(LinkedChoicesEditor, { props: { config: { options: [], options_list: 'facilities' }, sources: SOURCES, formId: 'form-1', fieldType: 'dropdown' } });
+        await flushPromises();
+
+        expect((wrapper.find('select').element as HTMLSelectElement).value).toBe('facilities');
+        expect(wrapper.find('[data-linked-choices-list-note]').exists()).toBe(false);
+    });
+
     it('takes a file uploaded here as the question\'s list when none is chosen yet', async () => {
         const wrapper = await mountListed({ options: [], options_list: '' });
         const added = { name: 'clinics', file_name: 'clinics.xlsx', row_count: 3, columns: ['name', 'label'] };

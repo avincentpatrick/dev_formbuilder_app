@@ -88,14 +88,22 @@ const modeName = useId();
 
 // ── A list file (M184) ─────────────────────────────────────────────────────────────────────
 const lists = ref<ChoiceListRow[]>([]);
+const listsLoaded = ref(false);
 const listName = computed(() => (typeof props.config.options_list === 'string' ? props.config.options_list : ''));
 const chosenList = computed(() => lists.value.find((list) => list.name === listName.value) ?? null);
-const listOptions = computed(() => lists.value.map((list) => ({ value: list.name, label: `${list.name} — ${describeChoiceList(list)}` })));
+// ⚠️ THE CHOSEN NAME IS ALWAYS AN OPTION, even before the lists arrive. A `<select>` drawn with a value none of its options
+// carries shows blank, and when the options land later the unchanged value is not applied again — measured in e2e.
+const listOptions = computed(() => {
+    const options = lists.value.map((list) => ({ value: list.name, label: `${list.name} — ${describeChoiceList(list)}` }));
+
+    return listName.value !== '' && chosenList.value === null ? [{ value: listName.value, label: listName.value }, ...options] : options;
+});
 
 async function loadLists(): Promise<void> {
     if (!props.formId) return;
     try {
         lists.value = await listChoiceLists(props.formId);
+        listsLoaded.value = true;
     } catch {
         // The picker shows what the question already names; the upload says why a file was refused.
     }
@@ -117,7 +125,7 @@ function onListUploaded(added: ChoiceListRow): void {
 const listNote = computed<{ tone: 'warning' | 'text'; text: string } | null>(() => {
     if (listName.value === '') return null;
     const list = chosenList.value;
-    if (list === null) return { tone: 'warning', text: `${listName.value} is not uploaded to this form.` };
+    if (list === null) return listsLoaded.value ? { tone: 'warning', text: `${listName.value} is not uploaded to this form.` } : null;
     const size = list.row_count.toLocaleString('en');
     if (list.row_count > FLAT_LIST_MAX) {
         return { tone: 'warning', text: `This list has ${size} choices, and one question takes at most 5,000. Use a cascading select for a longer list.` };

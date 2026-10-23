@@ -55,13 +55,20 @@ function onMode(value: string): void {
 
 // ── A list file ─────────────────────────────────────────────────────────────────────────────
 const lists = ref<ChoiceListRow[]>([]);
+const listsLoaded = ref(false);
 const listName = computed(() => (typeof source.value?.name === 'string' ? source.value.name : ''));
-const listOptions = computed(() => lists.value.map((list) => ({ value: list.name, label: `${list.name} — ${describeChoiceList(list)}` })));
+// The chosen name is always an option, even before the lists arrive — `LinkedChoicesEditor` says why.
+const listOptions = computed(() => {
+    const options = lists.value.map((list) => ({ value: list.name, label: `${list.name} — ${describeChoiceList(list)}` }));
+
+    return listName.value !== '' && !lists.value.some((list) => list.name === listName.value) ? [{ value: listName.value, label: listName.value }, ...options] : options;
+});
 
 async function loadLists(): Promise<void> {
     if (!props.formId) return;
     try {
         lists.value = await listChoiceLists(props.formId);
+        listsLoaded.value = true;
     } catch {
         // The picker shows what the question already names; the upload says why a file was refused.
     }
@@ -81,7 +88,7 @@ function onListUploaded(added: ChoiceListRow): void {
 const listNote = computed<string | null>(() => {
     if (listName.value === '') return null;
     const list = lists.value.find((candidate) => candidate.name === listName.value);
-    if (list === undefined) return `${listName.value} is not uploaded to this form.`;
+    if (list === undefined) return listsLoaded.value ? `${listName.value} is not uploaded to this form.` : null;
     if (list.row_count > FLAT_LIST_MAX) {
         return `This list has ${list.row_count.toLocaleString('en')} rows, and one question suggests at most 5,000.`;
     }

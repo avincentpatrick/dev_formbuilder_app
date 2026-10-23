@@ -305,7 +305,9 @@ final class FieldTypeConversion
         $config = array_replace($targetDefault, $source);
 
         if ($to === FieldType::LikertMatrix) {
-            unset($config['cells']);
+            // M185 (`R-bb79aec0`): where the shared cells came from goes with them; the rows' source stays — a Likert
+            // matrix's statements may come from a list or a form too.
+            unset($config['cells'], $config['cells_list'], $config['cells_source']);
             // M183 (`R-5033e87e`): a Likert matrix's columns ARE its scale, so a column's own type, choices and
             // required flag have nothing to mean there.
             $config['columns'] = MatrixColumns::asScale($config);
@@ -532,11 +534,25 @@ final class FieldTypeConversion
             ValueShape::for($type)->carriesOptionList() => self::emptyList($config['options'] ?? null) && ChoiceSource::of($config)->isTyped(),
             $type === FieldType::CascadingSelect => self::emptyList($config['levels'] ?? null) || self::emptyList($config['options'] ?? null),
             // M183: the shared cells are needed only while a choice column draws from them — the publish gate's own question.
-            $type === FieldType::Matrix => self::emptyList($config['rows'] ?? null) || self::emptyList($config['columns'] ?? null)
-                || (MatrixColumns::needsSharedCells($config) && self::emptyList($config['cells'] ?? null)),
-            $type === FieldType::LikertMatrix => self::emptyList($config['rows'] ?? null) || self::emptyList($config['columns'] ?? null),
+            // M185: rows or cells taken from a list or a form are copied in at publish, so an empty one with a source is finished.
+            $type === FieldType::Matrix => self::gridListMissing($config, 'rows') || self::emptyList($config['columns'] ?? null)
+                || (MatrixColumns::needsSharedCells($config) && self::gridListMissing($config, 'cells')),
+            $type === FieldType::LikertMatrix => self::gridListMissing($config, 'rows') || self::emptyList($config['columns'] ?? null),
             default => false,
         };
+    }
+
+    /**
+     * A grid's rows or cells are missing only while empty AND typed here — `<items>_list` or `<items>_source` present and not
+     * null declares a source, picked or still being picked, as `ChoiceSource` reads a choice question's.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    private static function gridListMissing(array $config, string $items): bool
+    {
+        return self::emptyList($config[$items] ?? null)
+            && ($config["{$items}_list"] ?? null) === null
+            && ($config["{$items}_source"] ?? null) === null;
     }
 
     /** Whether a default written for $from reads as the same answer in $to. */

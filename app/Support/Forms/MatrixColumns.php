@@ -66,7 +66,8 @@ final class MatrixColumns
 
     /**
      * The column's choices as stored option objects: its own when it has any, else the grid's shared `cells`. Empty
-     * for a column that takes no choices.
+     * for a column that takes no choices — and for one whose own choices come from a list or a form and are not copied
+     * in yet (M185): a draft's sourced column never shows the shared cells as if they were its own.
      *
      * @param  array<string, mixed>  $column
      * @param  array<string, mixed>  $config  the whole grid config (for `cells`)
@@ -80,18 +81,19 @@ final class MatrixColumns
 
         $own = self::optionObjects($column['options'] ?? null);
 
-        return $own !== [] ? $own : self::optionObjects($config['cells'] ?? null);
+        return $own !== [] || self::sourcesOwn($column) ? $own : self::optionObjects($config['cells'] ?? null);
     }
 
     /**
-     * Whether some choice column draws from the shared `cells` — the only case in which a matrix needs them.
+     * Whether some choice column draws from the shared `cells` — the only case in which a matrix needs them. A column
+     * whose choices come from a list or a form (M185) has its own.
      *
      * @param  array<string, mixed>  $config
      */
     public static function needsSharedCells(array $config): bool
     {
         foreach (self::columns($config) as $column) {
-            if (self::isChoice(self::type($column)) && self::optionObjects($column['options'] ?? null) === []) {
+            if (self::isChoice(self::type($column)) && self::optionObjects($column['options'] ?? null) === [] && ! self::sourcesOwn($column)) {
                 return true;
             }
         }
@@ -100,8 +102,19 @@ final class MatrixColumns
     }
 
     /**
+     * Whether a column declares where its own choices come from — `options_list` or `options_source` present and not null,
+     * picked or still being picked, as `App\Services\Forms\ChoiceSource` reads a choice question's.
+     *
+     * @param  array<string, mixed>  $column
+     */
+    public static function sourcesOwn(array $column): bool
+    {
+        return ($column['options_list'] ?? null) !== null || ($column['options_source'] ?? null) !== null;
+    }
+
+    /**
      * The column list a Likert matrix keeps when a matrix becomes one: its scale is the columns themselves, so a
-     * column's own type, choices and required flag have nothing to mean there.
+     * column's own type, choices, their source (M185) and required flag have nothing to mean there.
      *
      * @param  array<string, mixed>  $config
      * @return list<array<string, mixed>>
@@ -109,7 +122,7 @@ final class MatrixColumns
     public static function asScale(array $config): array
     {
         return array_map(
-            static fn (array $column): array => array_diff_key($column, ['type' => true, 'options' => true, 'required' => true]),
+            static fn (array $column): array => array_diff_key($column, ['type' => true, 'options' => true, 'options_list' => true, 'options_source' => true, 'required' => true]),
             self::columns($config),
         );
     }

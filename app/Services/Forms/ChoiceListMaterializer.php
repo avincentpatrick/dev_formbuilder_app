@@ -89,7 +89,8 @@ final class ChoiceListMaterializer
     /**
      * The config a draft cloned from a version carries — after a publish, or a restore ({@see SchemaTreeCloner}): every
      * option a list wrote is taken out again, so the draft names its lists and holds none of their rows. A list-backed
-     * cascade's, as {@see withoutListOptions()} does, and since M184 a choice question bound to a list file.
+     * cascade's, as {@see withoutListOptions()} does, since M184 a choice question bound to a list file, and since M185 a
+     * grid's rows, cells and columns' choices copied in from a list or a form ({@see GridSources::withoutCopies()}).
      *
      * @param  array<string, mixed>  $config
      * @return array<string, mixed>
@@ -104,7 +105,8 @@ final class ChoiceListMaterializer
             unset($config['suggestions']);
         }
 
-        return self::withoutListOptions($config);
+        // M185 (`D161`): a grid's rows, cells and columns' choices copied in from a list or a form — the copy goes, the source stays.
+        return self::withoutListOptions(GridSources::withoutCopies($config));
     }
 
     /**

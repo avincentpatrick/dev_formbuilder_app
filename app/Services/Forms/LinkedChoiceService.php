@@ -278,6 +278,18 @@ final class LinkedChoiceService
     }
 
     /**
+     * One link's list as it reads right now — what a grid copies in when it is published (M185, `D161`): the same list, the
+     * same consent and the same cap a linked question is served live. Unavailable when either key refuses.
+     *
+     * @param  array{form_id: string, field_key: string}  $link
+     * @return array{stamp: string, available: bool, truncated: bool, options: list<array{value: string, label: string}>}
+     */
+    public function currentList(Form $destination, array $link): array
+    {
+        return $this->listFor($destination, $link);
+    }
+
+    /**
      * @param  array{form_id: string, field_key: string}  $link
      * @return array{stamp: string, available: bool, truncated: bool, options: list<array{value: string, label: string}>}
      */

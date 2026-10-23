@@ -149,6 +149,23 @@ final class GridSources
     }
 
     /**
+     * What a grid slot is called in a sentence: "rows", "cell choices", "choices of column “Services”".
+     *
+     * @param  array<string, mixed>  $config
+     * @param  array{part: string, at: int|string|null, items: string, list: string, source: string, max: int}  $slot
+     */
+    public static function name(array $config, array $slot): string
+    {
+        if ($slot['part'] !== 'column') {
+            return $slot['part'] === 'rows' ? 'rows' : 'cell choices';
+        }
+
+        $label = trim((string) ($config['columns'][$slot['at']]['label'] ?? ''));
+
+        return 'choices of column “'.($label !== '' ? $label : 'column '.((int) $slot['at'] + 1)).'”';
+    }
+
+    /**
      * @param  array<string, mixed>  $config
      * @param  array{part: string, at: int|string|null, items: string, list: string, source: string, max: int}  $slot
      * @return array<string, mixed>

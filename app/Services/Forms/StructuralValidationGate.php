@@ -538,7 +538,11 @@ final class StructuralValidationGate
      */
     private function assertMatrixConfigResolves(FormField $field): void
     {
-        $this->assertOptionListResolves($field, 'rows', 'rows');
+        // M185 (`D161`): rows or cells from a list or a form were copied in before this gate runs; still empty, the link is
+        // unfinished or refused, which `LinkedChoiceGate` names — so "no rows" is not said beside it.
+        if (! self::sourcedAndEmpty((array) $field->config, 'rows')) {
+            $this->assertOptionListResolves($field, 'rows', 'rows');
+        }
         $this->assertOptionListResolves($field, 'columns', 'columns');
 
         if ($field->field_type !== FieldType::Matrix) {
@@ -557,9 +561,21 @@ final class StructuralValidationGate
             }
         }
 
-        if (MatrixColumns::needsSharedCells($config)) {
+        if (MatrixColumns::needsSharedCells($config) && ! self::sourcedAndEmpty($config, 'cells')) {
             $this->assertOptionListResolves($field, 'cells', 'cells');
         }
+    }
+
+    /**
+     * M185: a grid's rows or cells that are empty AND come from a list or a form — `<items>_list` or `<items>_source` present
+     * and not null, as `ChoiceSource` reads a choice question's.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    private static function sourcedAndEmpty(array $config, string $items): bool
+    {
+        return (array) ($config[$items] ?? []) === []
+            && (($config["{$items}_list"] ?? null) !== null || ($config["{$items}_source"] ?? null) !== null);
     }
 
     /**

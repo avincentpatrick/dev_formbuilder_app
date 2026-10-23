@@ -7,7 +7,6 @@ use App\Enums\SubmissionStatus;
 use App\Models\Form;
 use App\Models\Tenant;
 use App\Models\User;
-use App\Services\Forms\ChoicePreviewPresenter;
 use App\Services\Forms\FormChoiceListService;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
@@ -103,7 +102,8 @@ it('shows the first 200 of a long list, and keeps a cascade\'s second level unde
     $data = $this->actingAs($this->admin)->getJson("http://acme.meridian.test/forms/{$this->form->id}/choices")->assertOk()->json('data');
     $levelOne = array_values(array_filter($data['cascades']['address']['options'], static fn (array $o): bool => $o[0] === 1));
 
-    expect($data['flat']['region_only']['options'])->toHaveCount(ChoicePreviewPresenter::SHOWN)
+    // The literal, not the constant: the cap is what the release notes promise, so a changed constant must turn this red.
+    expect($data['flat']['region_only']['options'])->toHaveCount(200)
         ->and($data['flat']['region_only']['total'])->toBe(250)
         ->and($data['cascades']['address']['total'])->toBe(252)
         ->and(array_column($levelOne, 1))->toBe(['t1']);

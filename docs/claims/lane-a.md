@@ -38,6 +38,44 @@ this branch's first commit. **The 0.12.0 notes' wording was approved verbatim** 
 Rows taken, in build order, each its own commits (`D75`): **`R-bb79aec0`** (sources, `D161`), **`R-7418e6bd`** (the Preview), **`R-0a7275ce`**
 (the table, `D129`); then Help and the release (0.12.0).
 
+**BUILT — PR #378, CI 6/6 green with real step counts (run 39989688969 at `afa472a4`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 ·
+Pest 11 · axe 11) — AND NOT MERGED.** ⛔ **Held for merge point 5 (`D137`, `D138`)**, after #377 (T3) is merged and live. ⚠️ **This branch
+merged the trunk TWICE** — the claim-merge `e3497c9d` and `35657567` (the claim extensions): at merge point 5 rebase T4's own commits with
+`git rebase --onto origin/main e3497c9d` and `git rebase --skip` any `claim(M185)` commit the second merge replays (it is on main already —
+merge point 4's recorded trap). After its deploy `/whats-new` lists 0.12.0 first; relayed `R1-7b` and `R1-1b` are resolved once it is live,
+and announced by name with the clicks. Dev data: *Barangay Facility Check (T4 demo)* in `demo` (a grid whose rows come from a list file, a
+household table), built through the services and published; `acme`'s *Household Table* comes from `E2eSeeder` (re-run after the VERSION bump).
+
+**Measured against the prediction:**
+- **"Red first: the save cases with `FieldSaveAttributeNamesTest`; then `DraftProjectionMirrorDriftTest` (10 → 11), the CHECK/enum catalog
+  tests and `TenantExtractColumnDriftTest`" — not observed.** Each attribute name, the mirror floor and the census line went in the same edit
+  as what they pin, so none went red; the save and clone cases were proved by mutants instead. The catalog tests were moot: no PHP enum was
+  created (`Rule::in` and the CHECK carry the two values), so no catalog row.
+- **"Most likely wrong: `builder-axe` once the seeded grid's Preview gains buttons" — wrong in the safe direction:** green locally at three
+  viewports and in CI.
+- **"Runner-up: the citation-liveness ceiling after the `MatrixGrid.vue` rewrite" — right in kind, wrong in file.** `MatrixGrid.vue`'s cited
+  lines held; `ConfigPanel.vue` moved (C5's −3 lines, then the import's +1: 19 citations shifted by a script that checks each old line's text
+  equals the new one's), and `EncodeFormPresenter.php` and `SchemaBlueprintMaterializer.php` cost one repoint each. The ledger ended at 15 of 16.
+- **Mutants: 21 caught.** One **SURVIVED first** — the store's "a Preview edit is saved now" passed with the flush deleted, because the test
+  awaited `whenIdle()`, which waits out the 600 ms debounce; caught once the test froze the clock.
+- **What no prediction named:** a Preview focus race at DESKTOP width only (e2e: a row added and named inside the 300 ms rebuild debounce got
+  its keyboard back, then lost it to the late rebuild — a Vitest case red before the fix, green after); the component-import lint reading an
+  import only at line start (the same-line import kept for line-neutrality was invisible to it); the printed table dropped by
+  `tidyPageBreaks()` (a block with no field rows); the public-runtime `section()` fixture not passing a new key; `E2eSeederIdempotencyTest`'s
+  published-form pin (CI's Pest job: 12, not 11); container PHPStan's 25 `property.notFound` phantoms against the host's 0; the guest bundle
+  already importing pure builder modules (`submissions/note-content.ts`), so the boundary test pins builder COMPONENTS only; the first
+  extension's reason false (Git Bash ate a grep's backslashes), corrected in the second. `GridCellControl.vue` was not extracted — each table
+  cell reuses its surface's own field slot (`RepeatTableFrame.vue` in place of the claimed `RepeatTable.vue`). Filed: `R-ebe4f09c` (an XLSForm
+  name with a space) and `R-b6c3556e` (the response page still shows a table section entry by entry), both during-testing; and a
+  TRUNK test defect filed and closed — `SubmissionAnswerEditTest`'s replay-clock case wrote a UTC date where `today()` reads the form's zone
+  (`D153`), so it failed every night from 16:00 UTC: CI's Pest job went red on a docs-only push at 16:14 UTC, this host reproduced it at
+  16:45, and the green run above ran after 16:00. ⚠️ **#377 carries the unfixed test:** at merge point 5, merge it before 16:00 UTC
+  (midnight in Manila) or its post-merge run on main goes red and does not deploy.
+- **Local e2e:** `repeat-table` and `builder-preview-authoring` 20 of 21 on the first run (the desktop focus case), all after the fix; the
+  specs the diff reaches (`builder-preview-authoring`, `builder-axe`, `public-runtime-axe`, `responsive-axe`, `list-layout`) 442 passed and 6
+  failed — all six `responsive-axe`'s "Sheets rule detail — drift", a seeded blocked delivery the dev worker had consumed; CI's E2E (a fresh
+  database) passed it.
+
 ### Evidence verified
 Read on `c55908a8` (T3's tree) by three read-only passes, a design pass and my own reads.
 - `R-bb79aec0`: `MatrixEditor.vue:42-49` — held in kind (props `:41`, emits `:42-47`; four lists now with the layout, and T2's per-column

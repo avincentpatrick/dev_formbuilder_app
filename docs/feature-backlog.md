@@ -15097,3 +15097,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   XLSForm reader refuses. Found by `M185` while planning the grid's list and form rows. The remedy: the export derives a name-safe
   token per row and column (the XLSForm name rule, a suffix on a clash) and keeps the value in the cell's label and a `#meridian`
   column, so a round trip still maps answers. **Live.** Filed by `M185`. **Tier: during-testing.**
+
+- **`nit` · A repeatable section laid out as a table is shown as one block per entry on a response's page and in the inbox's detail; only the PDF draws the table.**
+  `M185` draws a section set to *A table, a row per entry* as a table on the guest form, the builder's Preview, the encode page, the
+  response PDF and the printed form (`app/Support/Forms/RepeatTable.php`), but the screen that shows a stored response
+  (`app/Services/Submissions/SubmissionInboxPresenter.php`, the repeat branch that mirrors the PDF's old one) still lists each entry
+  as its own block of question and answer, so a reviewer reads a ten-person roster as ten blocks where the respondent filled one
+  table. Found by `M185`, which kept to the surfaces its row named. The remedy: the presenter emits the PDF's table block shape for a
+  section `RepeatTable::draws()` accepts, and the response page draws it with the design system's table. **Live.** Filed by `M185`.
+  **Tier: during-testing.**

@@ -31,8 +31,6 @@ import { computed, inject, useId } from 'vue';
 
 import type { AnswerValue, EncodeField, MatrixColumn, MatrixOption, RequiredMarker } from './FieldInput.vue';
 import { GridAuthoringKey, type GridEdit } from './grid-authoring';
-import InlineLabelEdit from '@/components/builder/InlineLabelEdit.vue';
-void InlineLabelEdit;
 
 const props = defineProps<{
     field: EncodeField;

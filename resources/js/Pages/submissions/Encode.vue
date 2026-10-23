@@ -533,7 +533,7 @@ function instanceLegend(block: Block, index: number): string {
  * cell — the guest form's own rule (`repeat-table.ts`). The cells are this page's fields, as the cards' are.
  */
 function asTable(step: RuntimeStep): boolean {
-    return drawsAsTable(blockFor(step)?.repeat_layout, rowsOf(step).map((field) => ({ field_type: field.field_type })));
+    return blockFor(step)?.repeat_layout === 'table';
 }
 
 function tableColumns(step: RuntimeStep): RepeatTableColumn[] {

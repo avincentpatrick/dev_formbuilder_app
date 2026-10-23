@@ -34,7 +34,6 @@ export function withChoiceConfig(config: Record<string, unknown>, slot: GridSlot
     ];
     for (const [from, to] of renames) {
         if (from in view) next[to] = view[from];
-        else delete next[to];
     }
 
     return next;

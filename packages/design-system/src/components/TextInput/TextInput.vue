@@ -44,7 +44,7 @@ withDefaults(
             | 'search';
         name?: string;
         autocomplete?: string;
-        /** The id of a `<datalist>` whose options the browser offers as the person types (M184) — suggestions only. */
+        /** The id of a datalist element whose options the browser offers as the person types (M184) — suggestions only. */
         list?: string;
         placeholder?: string;
         describedby?: string;

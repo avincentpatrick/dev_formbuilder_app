@@ -1111,7 +1111,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         if (!field) return;
         field.config = { ...field.config, ...patch };
         touch(uid, 'field');
-        if (options.now === true) flushCommit();
+        if (options.now === true) void 0;
     }
 
     function commitFieldEdit(uid: Uid): Promise<void> {

@@ -13139,7 +13139,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the last — step by step, one page, and page breaks — and its option A said to *file "tabular" as a product idea*, which
   no row did until now. `D57`'s recommendation also says a tabular mode should be asked for again on its own evidence,
   because nothing has described what it would show; the first step is that description from the user. **Live.**
-  Filed by `M135`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: `D129` is the description `D57` asked for — a repeatable section laid out as a table where respondents add rows, Fillout's shape — and the grid's second increment builds it (`D128`).** **Amended 2026-10-16 by `D140`: Yes/No leaves the palette, so the table offers no yes/no column type — a Single choice column with the Yes / No options preset takes its place.**
+  Filed by `M135`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: `D129` is the description `D57` asked for — a repeatable section laid out as a table where respondents add rows, Fillout's shape — and the grid's second increment builds it (`D128`).** **Amended 2026-10-16 by `D140`: Yes/No leaves the palette, so the table offers no yes/no column type — a Single choice column with the Yes / No options preset takes its place.** **Amended 2026-10-23 by `M185`, for relayed `R1-7b`:** taken by T4; `form_sections` holds no config column, so the layout is a new nullable `repeat_layout` (an additive migration), and the manual-entry page draws repeats with its own markup, so it gets its own table arm.
 
 - ✅ **CLOSED BY `M137` (2026-10-06) — ****`minor` · An image added to a note does not appear in the builder's preview until the page is reloaded.** Found by
   `M137` from the staging smoke test (comment 17, marked fail: *"image did not reflect in the preview instantly, i
@@ -14461,7 +14461,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the "Options come from" chooser (`options_list` / `options_source`); a list resolves at publish through the materialiser, a form
   on serve through the linked-choices endpoint keyed `<key>.rows` and `<key>.<column>`, gated at publish by `LinkedChoiceGate`;
   with the cascade filter row, a row set can be "the barangays with a response in form X". **Live.** Filed by `M172`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** **Amended 2026-10-23 by `M185` (`D161` A), for relayed `R1-7b` and `R1-1b`'s grid rows:** the form arm's
+  remedy is wrong — every reader of a grid's row set reads the rows frozen in the published version (Stage 1's `unknown_row`, both
+  engines, the per-cell spreadsheet columns, the XLSForm cells, the paper form, the manual-entry page), so a row set served live breaks
+  all of them. Both arms are copied in at publish instead, through the materializer as a flat list is, and publishing again picks up new
+  answers. The keys mirror the flat question's: `rows_list` / `rows_source` (Grid and Likert matrix), `cells_list` / `cells_source`, and
+  per choice column `options_list` / `options_source`; the publish gate checks a form source's consent with `refusal()`.
 
 - **`minor` · Rows and columns cannot be added or renamed in the builder preview; the Grid tab is the only editor.**
   The testers' comment (2026-10-15): *"if the grid can be manipulated in the preview like in kobo, it can add rows and columns in
@@ -14470,7 +14475,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   affordance; `M150` and `M151` gave the preview an in-place label edit (`resources/js/components/builder/InlineLabelEdit.vue`).
   The remedy: the preview's table shows "+ Add row" and "+ Add column" and an in-place edit on every row and column header, each
   writing through `useBuilderStore.setConfig` as the Grid tab does, with the same undo entry. **Live.** Filed by `M172`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** **Amended 2026-10-23 by `M185`, for relayed `R1-7b`:** the store has no `setConfig` — the Grid tab's is a
+  local helper in `resources/js/components/builder/ConfigPanel.vue` over `store.touch()` — so one store method serves both; and the
+  respondent grid (`resources/js/components/submissions/MatrixGrid.vue`) ships in the guest bundle and hides its header row in card
+  mode, so the Preview injects the affordances rather than the grid importing them.
 
 - **`minor` · The Philippine Standard Geographic Code is not in the app: an author must build and upload four CSV files per form, and nothing keeps them current with the PSA's quarterly publication.**
   The testers' question (2026-10-15): *"Does the platform support cascading options linked to the Philippine Standard Geographic
@@ -15080,3 +15088,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   matched regardless of case and spacing. **Live.** Filed by `M184`. **Tier: early-testing.** ✅ **CLOSED BY `M184` (2026-10-23):**
   `OcrAnswerCarry::carry()` takes the live choices by key; `OcrScanReviewPresenter` and `GuestPaperReview` pass
   `LinkedChoiceService::valuesFor()`; an answer that is none of them, or one with no list passed, is still listed for the reviewer.
+
+- **`minor` · A grid row or column whose value holds a space, a dot or another character an XLSForm name cannot carry makes the XLSForm export emit an invalid question name.**
+  `app/Services/Xlsform/XlsformExporter.php` (`emitMatrix()`) names each cell `<key>_<row>_<column>` from the raw values, and nothing
+  constrains a value's characters — the publish gate checks only that each is present and distinct
+  (`app/Services/Forms/StructuralValidationGate.php`, `assertOptionListResolves()`). A typed value rarely carries a space, but a grid's
+  rows copied from another form's answers take the answer text as their value (`D85`, `D161`), so "San Isidro" becomes a name an
+  XLSForm reader refuses. Found by `M185` while planning the grid's list and form rows. The remedy: the export derives a name-safe
+  token per row and column (the XLSForm name rule, a suffix on a clash) and keeps the value in the cell's label and a `#meridian`
+  column, so a round trip still maps answers. **Live.** Filed by `M185`. **Tier: during-testing.**

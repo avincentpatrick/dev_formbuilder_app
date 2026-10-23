@@ -106,6 +106,7 @@ Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/cla
 Paired files taken: `app/Support/Forms/RepeatTable.php` ↔ `resources/js/components/submissions/repeat-table.ts` (one fixture);
 `draft-snapshot.ts` `RawSection` ↔ `resources/public-runtime/lib/types.ts` (`DraftProjectionMirrorDriftTest`).
 Namespaces spent: `D161`; migration prefix `2026_08_17_000145`; no ADR.
+**Extended before opening (2026-10-23):** `app/Services/Forms/GridSources.php` instead of `app/Support/Forms/GridSources.php` — it reads`ChoiceSource` and the materializer's caps, both in `app/Services/Forms`, and nothing in `app/Support/Forms` imports `app/Services`.
 E2E specs the diff reaches, run locally: `builder-preview-authoring`, `builder-axe`, `public-runtime-axe`, `responsive-axe`, `list-layout`,
 the new `repeat-table`; CI runs every spec.
 Prediction: red first commit by commit — the request and save cases with `FieldSaveAttributeNamesTest`; the publish, clone and preview

@@ -9,7 +9,6 @@ use Illuminate\Validation\ValidationException;
 use OpenSpout\Common\Exception\OpenSpoutException;
 use OpenSpout\Reader\CSV\Options as CsvOptions;
 use OpenSpout\Reader\CSV\Reader as CsvReader;
-use OpenSpout\Reader\ReaderInterface;
 use OpenSpout\Reader\XLSX\Options as XlsxOptions;
 use OpenSpout\Reader\XLSX\Reader as XlsxReader;
 
@@ -201,7 +200,7 @@ final class ChoiceListCsvParser
      *
      * @return list<list<string>>
      */
-    private function rows(ReaderInterface $reader, string $path): array
+    private function rows(CsvReader|XlsxReader $reader, string $path): array
     {
         $table = [];
         $filled = 0;

@@ -178,6 +178,12 @@ function makeStore(
         // M178: the panel lists questions in canvas order, as the real store gives them (ungrouped first, by sequence).
         flattenedFields: () => [...(selected.fields ?? [])].sort((a, b) => a.sequence - b.sequence),
         touch: selected.touch ?? (() => undefined),
+        // M185: the store's one config write — assign, then touch — as the real `setFieldConfig` does.
+        setFieldConfig: (uid: string, patch: Record<string, unknown>) => {
+            const target = [selected.field, ...(selected.fields ?? [])].find((f) => f?.uid === uid);
+            if (target) target.config = { ...target.config, ...patch };
+            (selected.touch ?? (() => undefined))(uid, 'field');
+        },
         moveFieldToSection: () => undefined,
         saveFieldToLibrary: () => Promise.resolve(),
     } as unknown as BuilderStore;

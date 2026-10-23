@@ -1100,6 +1100,20 @@ export function useBuilderStore(props: BuilderPageProps) {
         flushCommit();
     }
 
+    /**
+     * Config keys of one question set as ONE edit (M185, `R-7418e6bd`) — the settings pane's grid lists and the Preview's
+     * grid editing write through here, so both make the same PATCH and the same "Edit <label>" undo entry. The pane's edits
+     * ride the debounce (a burst of keystrokes is one entry); the Preview's are each a finished edit and are saved `now`,
+     * as {@link renameField} saves an in-place label.
+     */
+    function setFieldConfig(uid: Uid, patch: Record<string, unknown>, options: { now?: boolean } = {}): void {
+        const field = findField(uid);
+        if (!field) return;
+        field.config = { ...field.config, ...patch };
+        touch(uid, 'field');
+        if (options.now === true) flushCommit();
+    }
+
     function commitFieldEdit(uid: Uid): Promise<void> {
         return enqueue(async () => {
             const field = findField(uid);
@@ -1726,6 +1740,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         commitReorder,
         touch,
         renameField,
+        setFieldConfig,
         select,
         undo,
         redo,

@@ -441,14 +441,11 @@ function setField<K extends keyof LocalField>(key: K, value: LocalField[K]): voi
 function patchConfig(patch: Record<string, unknown>): void {
     const target = field.value;
     if (!target) return;
-    target.config = { ...target.config, ...patch };
-    props.store.touch(target.uid, 'field');
+    // M185 (`R-7418e6bd`): the store's one config write, which the Preview's grid editing shares — debounced here.
+    props.store.setFieldConfig(target.uid, patch);
 }
 function setConfig(key: string, value: unknown): void {
-    const target = field.value;
-    if (!target) return;
-    target.config = { ...target.config, [key]: value };
-    props.store.touch(target.uid, 'field');
+    patchConfig({ [key]: value });
 }
 /**
  * An emptied list REMOVES the key rather than saving `[]`: a note with no `content` is today's one-line note, and

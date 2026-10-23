@@ -481,7 +481,7 @@ export function projectDraft(input: DraftProjectionInput): DraftProjection {
     };
 
     const projected = input.choices ? applyPreviewChoices(schema, input.choices) : schema;
-    const shape = shapeOf(projected.version.schema);
+    const shape = shapeOf(schemaSnapshot);
     projected.version.checksum = shape;
 
     return {

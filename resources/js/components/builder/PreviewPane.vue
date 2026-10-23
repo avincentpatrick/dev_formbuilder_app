@@ -169,7 +169,7 @@ provide(GridAuthoringKey, gridAuthoring);
 const editingKey = ref<string | null>(null);
 // And none lands under a moving question either: it would destroy the row under the pointer, or the grip with focus.
 // M185: nor under a grid header being renamed — the rebuild an added row asks for waits until its name is typed.
-const held = computed(() => editingKey.value !== null || reorder.isReordering.value);
+const held = computed(() => editingKey.value !== null || gridAuthoring.editing.value !== null || reorder.isReordering.value);
 let heldRebuild = false;
 
 function clearPending(): void {

@@ -28,6 +28,49 @@ Rows: `R-f655f9b1` — *"Only a Single choice or Dropdown can take its choices f
 neither a list-backed cascade's choices nor a list taken from another form"*; and `R-1059e9bd` (the codes-as-text sentence), which
 `R-3e7c81bb` takes. Relayed `R1-3b` (all four) and `R1-1b` (multi-select and the preview; its grid rows are T4's).
 
+**BUILT — PR #377, CI 6/6 green with real step counts (run 39888779783 at `c55908a8`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 ·
+Pest 11 · axe 11) — AND NOT MERGED.** ⛔ **Held for merge point 5 (`D137`, `D138`)** with T4, which stacks on this branch (it mounts the
+list picker per grid column). This branch is NOT re-merged with the trunk's claim commits; the rebase at merge point 5 carries them.
+After its deploy, `/whats-new` should list 0.11.0 first. Relayed `R1-3b` is resolved once it is live; `R1-1b` after T4's grid rows.
+
+**Measured against the prediction:**
+- **"Red first to the golden manifest's count pin and `FieldSaveAttributeNamesTest`" — not observed.** I wrote each new config path's
+  attribute name and the manifest's count in the same edit as the rule and the vector, so neither ever went red; the golden vector itself
+  was proved by mutants in both engines.
+- **"The linked-question carry test red on the trunk" — right.** `OcrAnswerCarry` dropped every linked written answer as "no longer
+  offered"; filed and closed in C2 (both review screens now pass the live list), its mutant caught.
+- **"`manual.test.ts` red once the editor is renamed" — moot:** the editor was NOT renamed to `OptionSourceEditor.vue` (the row cites
+  `LinkedChoicesEditor.vue` by path and the ledger sat one under its ceiling); it was widened in place.
+- **"Most likely wrong: `.xlsx` MIME sniffing" — wrong, in the safe direction.** The Linux container accepted the workbook through the
+  request rule (spreadsheetml or zip) on the first run, and CI's Pest agreed.
+- **Mutants: 20, every one caught — one only after its test was fixed.** The preview cap (`SHOWN = 201`) SURVIVED a test that counted
+  against the constant itself; the test now pins the literal 200. Through `scripts/mutate.php`: `ChoiceSource` blind to lists, Multiple
+  choice not linkable, the PHP engine's empty-options guard, the carry ignoring the live list, a written multi read as one string, the
+  codes-as-text hint, a workbook read as CSV, the next draft keeping rows, the flat cap, a flat list never written, `InstanceField`
+  without suggestions, the gate ignoring suggestion links, the preview cap, a cascade's orphans kept. Committed then reverted:
+  `choiceSourceOf`, the TS engine's guard, the D160 long-list note, the datalist cap, the shape taken before the lists, the picker race.
+- **What no prediction named:** (1) ⛔ **the claim's file list was a floor and I did not extend it before opening** —
+  `AttachmentController.php` (the preview routes went beside the choice-list routes there, so `routes/tenant.php` imports nothing new;
+  the claimed `FormChoicesPreviewController` was never made), `OcrScanReviewPresenter.php` and `GuestPaperReview.php` (the carry fix),
+  new `SuggestionsEditor.vue` and `forms/ChoiceListUpload.vue`, and the shared `docs/architecture/technical-architecture.md` (the
+  corpus count, 202) — recorded here instead of a prior pushed extension, which is the protocol slip; (2) every line added to a
+  line-cited file rots ledger citations — nine at once in C5, repointed at their true targets by a scratchpad script (cited text at the
+  parent → its new line), the ledger held at 15 of 16 throughout; (3) I repeated M182's trap: a row closes only with the CLOSED prefix on
+  its TITLE line (`state.php`'s open count caught it: 416 → 410); (4) **e2e found a real bug** — the list picker drawn blank when its
+  lists arrived after it (a select's unchanged value is not re-applied when its options land), 3 of 4 viewports; fixed, with a Vitest
+  case and a caught mutant; (5) ⛔ **CI's design-system axe job was red on the first run**: Storybook's docgen appends the prop
+  descriptions to the SFC as one line, and the parser read the `<datalist>` in `TextInput`'s new prop description as an unclosed tag —
+  reworded; 6/6 on the second run; (6) PHPStan's one real error was OpenSpout's generic `ReaderInterface` (invariant generics — the two
+  concrete readers typed instead); the other 47 are the container's bind-mount `property.notFound` artefact; (7) full Pest in the
+  container exhausts PHP's 128 MB in its result cache — rerun with no limit; (8) the dev database's "Field Visit Referral" predates the
+  seeder's new list-fed question, so it was added through the app's own services (its version 3 published) — never wiped.
+- **Local gates on the final tree:** Vitest 265 of 265 files, 4,185 tests; `vue-tsc` clean; Pint bare (1,840 files); Pest, whole suite,
+  6,064 passed — the one red the known `SuiteCollectionFloorTest` artefact; preflight with gates and Pint clean (citation ledger 15 of 16).
+  E2E at one worker, built bundle: `builder-axe` (choices from another form and from a list file, the preview cases),
+  `public-runtime-axe` (linked choices with the list-fed Dropdown), `builder-preview-authoring`, `public-runtime-offline` (linked) — 39 of
+  42, the three reds the picker race; the "choices from" set then 12 of 12 at three viewports. **No e2e covers** the guest datalist or the
+  builder preview drawing a list (Vitest covers both), and no separate real-browser look was taken.
+
 **The owed check is done: the user checked merge point 4 on staging on 2026-10-23 — "All good"** (UI4 What's new and the version in
 the footer, sidebar foot and sign-in card; UI5 the dark error red, dialogs, labels, titles on cut-off values; R1-7a typed grid
 columns, the table, a spreadsheet column per cell; U9 the Likert line; `/whats-new` lists 0.10.0, 0.9.1 and 0.9.0) — never re-ask.

@@ -332,7 +332,7 @@ const shownSuggestions = computed<string[]>(() => {
     const all = hasSuggestions.value ? (props.field.suggestions ?? []) : [];
     const typed = stringValue.value.trim().toLowerCase();
 
-    return (typed === '' ? all : all.filter((suggestion) => suggestion.toLowerCase().includes(typed)));
+    return (typed === '' ? all : all.filter((suggestion) => suggestion.toLowerCase().includes(typed))).slice(0, SUGGESTIONS_SHOWN);
 });
 
 function toggleOption(value: string, checked: boolean): void {

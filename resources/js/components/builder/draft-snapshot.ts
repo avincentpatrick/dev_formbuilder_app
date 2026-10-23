@@ -351,6 +351,7 @@ export function projectDraft(input: DraftProjectionInput): DraftProjection {
             is_repeatable: s.is_repeatable,
             min_instances: s.min_instances,
             max_instances: s.max_instances,
+            repeat_layout: s.repeat_layout === 'table' ? 'table' : null,
             relevant_expression: parsedOrNull(s.relevant_expression, () =>
                 add(s.uid, key, 'unparsable_expression', 'This section’s condition is not finished yet, so it is being ignored in the preview.'),
             ),

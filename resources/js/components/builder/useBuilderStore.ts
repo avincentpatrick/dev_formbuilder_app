@@ -1856,6 +1856,7 @@ function sectionPayload(section: LocalSection): Record<string, unknown> {
         is_repeatable: section.is_repeatable,
         min_instances: section.min_instances,
         max_instances: section.max_instances,
+        repeat_layout: section.repeat_layout ?? null,
         relevant_expression: section.relevant_expression,
         version: section.version,
     };

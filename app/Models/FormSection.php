@@ -54,6 +54,8 @@ class FormSection extends Model implements TenantScoped
         'is_repeatable',
         'min_instances',
         'max_instances',
+        // M185 (`R-0a7275ce`): `table` draws a repeatable section as a table; null is the cards.
+        'repeat_layout',
         'relevant_expression',
     ];
 

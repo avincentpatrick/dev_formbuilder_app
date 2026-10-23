@@ -132,6 +132,8 @@ final class SchemaBlueprintMaterializer
             'is_repeatable' => (bool) ($section['is_repeatable'] ?? false),
             'min_instances' => $section['min_instances'] ?? null,
             'max_instances' => $section['max_instances'] ?? null,
+            // M185: a template or a library section keeps its table layout; absent is the cards.
+            'repeat_layout' => ($section['repeat_layout'] ?? null) === 'table' ? 'table' : null,
             'relevant_expression' => $section['relevant_expression'] ?? null,
         ];
     }

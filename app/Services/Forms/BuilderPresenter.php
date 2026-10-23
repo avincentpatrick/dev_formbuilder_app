@@ -209,6 +209,8 @@ final class BuilderPresenter
             'is_repeatable' => $section->is_repeatable,
             'min_instances' => $section->min_instances,
             'max_instances' => $section->max_instances,
+            // M185 (`R-0a7275ce`): `table` or null (cards).
+            'repeat_layout' => $section->repeat_layout,
             'relevant_expression' => $section->relevant_expression,
             'sequence' => $section->sequence,
             'version' => FormBuilderService::rowVersion($section),

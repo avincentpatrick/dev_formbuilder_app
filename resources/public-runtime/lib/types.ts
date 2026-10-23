@@ -81,6 +81,11 @@ export interface RawSection {
     /** Repeat-group instance bounds (Increment G1/G2). Null = unbounded on that side. */
     min_instances: number | null;
     max_instances: number | null;
+    /**
+     * M185 (`R-0a7275ce`): `table` lays a repeatable section out as a table. Absent — every snapshot published before it, and
+     * every section drawn as cards since — is the cards.
+     */
+    repeat_layout?: 'table' | 'cards' | null;
     relevant_expression: string | null;
 }
 
@@ -350,6 +355,8 @@ export interface RenderSection {
     /** Repeat-group instance bounds (Increment G2). Null = unbounded on that side. */
     minInstances: number | null;
     maxInstances: number | null;
+    /** M185: the section is drawn as a table when it holds only questions a table can hold (`repeat-table.ts`). */
+    repeatLayout: 'table' | 'cards';
     relevantExpression: string | null;
 }
 

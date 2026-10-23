@@ -9,7 +9,7 @@
  */
 import { fieldRendersNothing } from '../../../public-runtime/engine/field-roles';
 
-export const REPEAT_TABLE_TYPES = new Set<string>(['short_text', 'email', 'phone', 'url', 'integer', 'decimal', 'date', 'single_select', 'dropdown', 'multi_select']);
+export const REPEAT_TABLE_TYPES = new Set<string>(['long_text', 'short_text', 'email', 'phone', 'url', 'integer', 'decimal', 'date', 'single_select', 'dropdown', 'multi_select']);
 
 /** A member as either shape carries it: a snapshot field (`field_type`, `config.visibility`) or a rendered one. */
 export interface RepeatMember {

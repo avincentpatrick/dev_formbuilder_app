@@ -19,11 +19,18 @@
  * the cards are `aria-hidden` copies of the column's header. Radios stay native, as they always were in this file:
  * the joined line needs the bare control. A wide grid scrolls inside its own box, never the page. Each copy of the
  * grid names its radio groups for itself (`useId`, the `R-de624bb1` rule), never after the question's key.
+ *
+ * M185 (`R-7418e6bd`): in the builder's Preview — and only there, because only the Preview provides it — a rename button
+ * beside every row and column header and "+ Add row" / "+ Add column" under the grid ({@link GridAuthoringKey}). The
+ * header WORDS carry the ids the controls are named by, in a span of their own, so a button beside them never joins a
+ * control's name; and in the cards the header row, otherwise hidden, is drawn as a strip of the columns' names so each
+ * can be renamed there. A grid whose rows come from a list or a form says so instead of offering to add or rename them.
  */
-import { MdsCheckbox, MdsNumberInput, MdsSelect, MdsTextInput } from '@meridian/design-system';
-import { computed, useId } from 'vue';
+import { MdsButton, MdsCheckbox, MdsIconButton, MdsNumberInput, MdsSelect, MdsTextInput } from '@meridian/design-system';
+import { computed, inject, useId } from 'vue';
 
 import type { AnswerValue, EncodeField, MatrixColumn, MatrixOption, RequiredMarker } from './FieldInput.vue';
+import { GridAuthoringKey, type GridEdit } from './grid-authoring';
 
 const props = defineProps<{
     field: EncodeField;
@@ -42,6 +49,22 @@ const rows = computed(() => props.field.matrix?.rows ?? []);
 const columns = computed<MatrixColumn[]>(() => props.field.matrix?.columns ?? []);
 const cells = computed(() => props.field.matrix?.cells ?? []);
 const stacked = computed<boolean>(() => props.field.matrix?.layout === 'stacked');
+
+// ── The builder Preview's editing (M185), when it provides one; no other surface does ──────────────────────────────────
+const authoring = inject(GridAuthoringKey, null);
+const rowsFrom = computed<string | null>(() => (authoring ? authoring.rowsFrom(props.field.key) : null));
+const rowsEditable = computed<boolean>(() => authoring !== null && rowsFrom.value === null);
+const columnNoun = computed<string>(() => (props.kind === 'likert-matrix' ? 'scale point' : 'column'));
+
+function edit(part: GridEdit['part'], value: string): GridEdit {
+    return { key: props.field.key, part, value };
+}
+
+function isEditing(part: GridEdit['part'], value: string): boolean {
+    const open = authoring?.editing.value ?? null;
+
+    return open !== null && open.key === props.field.key && open.part === part && open.value === value;
+}
 
 // ── Ids: one set per rendered copy ─────────────────────────────────────────────────────────────────────────────
 const uid = useId();
@@ -143,7 +166,7 @@ function selectOptions(column: MatrixColumn): MatrixOption[] {
 <template>
     <fieldset
         class="mds-grid"
-        :class="{ 'mds-grid--stacked': stacked, 'mds-grid--likert': kind === 'likert-matrix' }"
+        :class="{ 'mds-grid--stacked': stacked, 'mds-grid--likert': kind === 'likert-matrix', 'mds-grid--authoring': authoring !== null }"
         :aria-describedby="describedby"
         data-matrix-grid
     >
@@ -160,12 +183,48 @@ function selectOptions(column: MatrixColumn): MatrixOption[] {
                     <thead class="mds-grid__head">
                         <tr>
                             <td class="mds-grid__corner"></td>
-                            <th v-for="(col, j) in columns" :id="colId(j)" :key="col.value" scope="col" class="mds-grid__col">{{ col.label }}</th>
+                            <th v-for="(col, j) in columns" :key="col.value" scope="col" class="mds-grid__col">
+                                <component
+                                    :is="authoring.editor"
+                                    v-if="authoring && isEditing('columns', col.value)"
+                                    :value="col.label"
+                                    :label="`Name of the ${columnNoun}`"
+                                    @commit="(value: string, via: 'key' | 'blur') => authoring?.commit(edit('columns', col.value), value, via)"
+                                    @cancel="authoring?.cancel()"
+                                />
+                                <span :id="colId(j)" class="mds-grid__words" :class="{ 'mds-grid__words--editing': isEditing('columns', col.value) }">{{ col.label }}</span>
+                                <MdsIconButton
+                                    v-if="authoring && !isEditing('columns', col.value)"
+                                    icon="edit"
+                                    size="sm"
+                                    :label="`Rename ${columnNoun} ${col.label}`"
+                                    :data-grid-rename-column="col.value"
+                                    @click="authoring?.open(edit('columns', col.value))"
+                                />
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-for="(row, i) in rows" :key="row.value" class="mds-grid__row">
-                            <th :id="rowId(i)" scope="row" class="mds-grid__row-label">{{ row.label }}</th>
+                            <th scope="row" class="mds-grid__row-label">
+                                <component
+                                    :is="authoring.editor"
+                                    v-if="authoring && rowsEditable && isEditing('rows', row.value)"
+                                    :value="row.label"
+                                    label="Name of the row"
+                                    @commit="(value: string, via: 'key' | 'blur') => authoring?.commit(edit('rows', row.value), value, via)"
+                                    @cancel="authoring?.cancel()"
+                                />
+                                <span :id="rowId(i)" class="mds-grid__words" :class="{ 'mds-grid__words--editing': rowsEditable && isEditing('rows', row.value) }">{{ row.label }}</span>
+                                <MdsIconButton
+                                    v-if="rowsEditable && !isEditing('rows', row.value)"
+                                    icon="edit"
+                                    size="sm"
+                                    :label="`Rename row ${row.label}`"
+                                    :data-grid-rename-row="row.value"
+                                    @click="authoring?.open(edit('rows', row.value))"
+                                />
+                            </th>
                             <td v-for="(col, j) in columns" :key="col.value" class="mds-grid__cell">
                                 <!-- likert_matrix: one radio per point; the row's points are one native group. -->
                                 <label v-if="kind === 'likert-matrix'" class="mds-grid__point">
@@ -235,6 +294,16 @@ function selectOptions(column: MatrixColumn): MatrixOption[] {
                     </tbody>
                 </table>
             </div>
+        </div>
+
+        <div v-if="authoring" class="mds-grid__authoring" data-grid-authoring>
+            <MdsButton v-if="rowsEditable" variant="tertiary" size="sm" icon-left="plus" data-grid-add-row @click="authoring.add(field.key, 'rows')">
+                Add row
+            </MdsButton>
+            <p v-else class="mds-grid__help" data-grid-rows-from>{{ rowsFrom }}</p>
+            <MdsButton variant="tertiary" size="sm" icon-left="plus" data-grid-add-column @click="authoring.add(field.key, 'columns')">
+                Add {{ columnNoun }}
+            </MdsButton>
         </div>
 
         <div :id="errorId" class="mds-grid__error" aria-live="polite">
@@ -495,6 +564,79 @@ function selectOptions(column: MatrixColumn): MatrixOption[] {
 
     .mds-grid--likert:not(.mds-grid--stacked) .mds-grid__cell::before {
         display: none;
+    }
+}
+
+/* ── The builder Preview's editing (M185, `R-7418e6bd`) — only where the Preview provides it ─────────────────────────── */
+/* A header being renamed keeps its words in the DOM, out of sight, so every control is still named by them. */
+.mds-grid__words--editing {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.mds-grid--authoring .mds-grid__words {
+    margin-inline-end: var(--mds-space-1);
+}
+
+/* The cards hide the header row; for the author it is drawn as a strip of the columns' names, each with its rename. */
+.mds-grid--authoring .mds-grid__head {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+}
+
+.mds-grid--authoring .mds-grid__head > tr {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mds-space-2);
+}
+
+.mds-grid--authoring .mds-grid__corner {
+    display: none;
+}
+
+.mds-grid--authoring .mds-grid__col {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--mds-space-1) var(--mds-space-2);
+    border: 1px dashed var(--mds-color-border-strong);
+    border-radius: var(--mds-radius-sm);
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-caption-font-size);
+    line-height: var(--mds-type-caption-line-height);
+    font-weight: var(--mds-font-weight-semibold);
+    color: var(--mds-color-text-secondary);
+    overflow-wrap: anywhere;
+}
+
+.mds-grid__authoring {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mds-space-2);
+}
+
+@container mds-grid (min-width: 30em) {
+    .mds-grid--authoring:not(.mds-grid--stacked) .mds-grid__head > tr {
+        display: table-row;
+    }
+
+    .mds-grid--authoring:not(.mds-grid--stacked) .mds-grid__corner {
+        display: table-cell;
+    }
+
+    .mds-grid--authoring:not(.mds-grid--stacked) .mds-grid__col {
+        display: table-cell;
+        border: 0;
+        border-bottom: 1px solid var(--mds-color-border-default);
+        border-radius: 0;
     }
 }
 

@@ -27,6 +27,9 @@
  */
 import { computed, h, nextTick, onBeforeUnmount, provide, ref, watch, type FunctionalComponent } from 'vue';
 import { ContentImageRetryKey } from '../submissions/note-content';
+import { GridAuthoringKey } from '../submissions/grid-authoring';
+import InlineLabelEdit from './InlineLabelEdit.vue';
+import { createPreviewGridAuthoring } from './preview-grid-authoring';
 import PreviewRuntime from './PreviewRuntime.vue';
 import { PRESET_PREVIEW_ATTR, presetScopeCss } from './preset-scope';
 import {
@@ -142,6 +145,21 @@ const reorder = usePreviewReorder({
     onDragStart: () => runtimeHost.value?.commitEdit(),
 });
 
+// M185 (`R-7418e6bd`): a grid's rows and columns added and renamed where the Preview draws it — saved now through the store's
+// one config write, as the Grid tab's are. The open header lives here (the grid remounts as rows change); see `held`.
+const gridAuthoring = createPreviewGridAuthoring({
+    store: props.store,
+    fieldByKey: (key) => {
+        const uid = model.value.projection.uidByKey[key];
+
+        return uid === undefined ? null : (props.store.fields.value.find((field) => field.uid === uid) ?? null);
+    },
+    isReordering: () => reorder.isReordering.value,
+    root: () => root.value,
+    editor: InlineLabelEdit,
+});
+provide(GridAuthoringKey, gridAuthoring);
+
 /**
  * M151 (`R-74c3cf35`): the question whose label is being edited in place, held HERE because `PreviewRuntime` remounts.
  *
@@ -150,7 +168,8 @@ const reorder = usePreviewReorder({
  */
 const editingKey = ref<string | null>(null);
 // And none lands under a moving question either: it would destroy the row under the pointer, or the grip with focus.
-const held = computed(() => editingKey.value !== null || reorder.isReordering.value);
+// M185: nor under a grid header being renamed — the rebuild an added row asks for waits until its name is typed.
+const held = computed(() => editingKey.value !== null || gridAuthoring.editing.value !== null || reorder.isReordering.value);
 let heldRebuild = false;
 
 function clearPending(): void {

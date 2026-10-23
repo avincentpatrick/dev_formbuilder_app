@@ -79,6 +79,7 @@ const relevance = ref<Record<string, boolean>>({ q1: true, q2: true, cap: true }
 const stepCount = ref(2);
 
 import PreviewPane from './PreviewPane.vue';
+import { GridAuthoringKey, type GridAuthoring } from '../submissions/grid-authoring';
 import { PALETTE } from './builder-store-fixtures';
 import { PREVIEW_REBUILD_DEBOUNCE_MS } from './preview-model';
 import type { BuilderStore } from './useBuilderStore';
@@ -945,6 +946,40 @@ describe('PreviewPane — a grid’s lists from elsewhere (M185, R-bb79aec0)', (
         double.fields.value = [{ ...grid, config: { ...grid.config, rows_list: 'zones', columns: [{ value: 'c', label: 'Stocked' }] } }];
         await flushPromises();
         expect(fetched).toHaveBeenCalledTimes(2);
+
+        wrapper.unmount();
+    });
+});
+
+describe('PreviewPane — a grid header renamed in place (M185, R-7418e6bd)', () => {
+    it('holds a rebuild that falls due while a grid header is open, then makes it when the header closes', async () => {
+        let provided: GridAuthoring | null = null;
+        const Grab = defineComponent({
+            setup() {
+                provided = inject(GridAuthoringKey, null);
+
+                return () => h('div');
+            },
+        });
+        const double = twoSections();
+        const wrapper = mount(PreviewPane, {
+            props: { store: double.store, form: formProp(), draft: { id: 'ver-1', version_number: 1 }, active: true },
+            global: { stubs: { FieldRow: Grab, RepeatGroup: true } },
+        });
+        await flushPromises();
+        expect(created).toHaveLength(1);
+        expect(provided).not.toBeNull();
+
+        provided!.open({ key: 'q1', part: 'rows', value: 'row_1' });
+        double.fields.value = double.fields.value.map((f) => (f.key === 'q2' ? { ...f, key: 'renamed' } : f));
+        await flushPromises();
+        vi.advanceTimersByTime(PREVIEW_REBUILD_DEBOUNCE_MS * 4);
+        await flushPromises();
+        expect(created).toHaveLength(1);
+
+        provided!.cancel();
+        await flushPromises();
+        expect(created).toHaveLength(2);
 
         wrapper.unmount();
     });

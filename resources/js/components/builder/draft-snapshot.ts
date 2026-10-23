@@ -526,7 +526,7 @@ export function shapeOf(snapshot: RawSchemaSnapshot): string {
         optionValuesOf(f.config),
         // M185 (`R-7418e6bd`): a grid's row, column and choice values feed the engine's own value lists, so a row added or a
         // column re-typed rebuilds it — else the engine would prune an answer in the new row. Labels never do.
-        null,
+        gridValuesOf(f.field_type, f.config),
         // M177 (`R-f44e9d00`): Show to respondents decides what renders, and an Always calculation shows its formula's
         // value — so both rebuild the runtime, as an option value does.
         f.config?.visibility ?? null,

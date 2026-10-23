@@ -264,6 +264,53 @@ describe('RuntimeSession (component wiring)', () => {
         wrapper.unmount();
     });
 
+    it('lays a repeat group out as a table (M185, R-0a7275ce): a column per question, a row per entry, the answers nested as the cards nest them', async () => {
+        const schema = schemaResponse({
+            sections: [section({ key: 'hh', label: 'Members', is_repeatable: true, min_instances: 0, max_instances: 3, repeat_layout: 'table' })],
+            fields: [
+                field({ key: 'member_name', label: 'Name', section_key: 'hh', section_sequence: 0 }),
+                field({ key: 'member_age', label: 'Age', field_type: 'integer', section_key: 'hh', section_sequence: 1 }),
+            ],
+        });
+        const client = fakeClient();
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client } });
+
+        await wrapper.findAll('button').find((b) => b.text().includes('Add Members'))!.trigger('click');
+        await settle();
+
+        const table = wrapper.get('[data-repeat-table]');
+        expect(table.findAll('thead th').map((th) => th.text())).toEqual(['Name (optional)', 'Age (optional)']);
+        expect(table.get('tbody th').text()).toBe('Members 1');
+        expect(table.find('[data-repeat-cell="member_age"] input').exists()).toBe(true);
+        expect(wrapper.find('fieldset.repeat-instance').exists()).toBe(false);
+
+        await table.get('[data-repeat-cell="member_name"] input').setValue('Bob');
+        await table.get('[data-repeat-cell="member_age"] input').setValue('40');
+        await wrapper.find('form').trigger('submit');
+        await settle();
+
+        expect(client.submit).toHaveBeenCalledWith(expect.objectContaining({ answers: { hh: [{ member_name: 'Bob', member_age: 40 }] } }));
+        wrapper.unmount();
+    });
+
+    it('keeps a table section as cards when one of its questions cannot be a table column (M185)', async () => {
+        const schema = schemaResponse({
+            sections: [section({ key: 'hh', label: 'Members', is_repeatable: true, min_instances: 0, max_instances: 3, repeat_layout: 'table' })],
+            fields: [
+                field({ key: 'member_name', label: 'Name', section_key: 'hh', section_sequence: 0 }),
+                field({ key: 'notes', label: 'Notes', field_type: 'long_text', section_key: 'hh', section_sequence: 1 }),
+            ],
+        });
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client: fakeClient() } });
+
+        await wrapper.findAll('button').find((b) => b.text().includes('Add Members'))!.trigger('click');
+        await settle();
+
+        expect(wrapper.find('[data-repeat-table]').exists()).toBe(false);
+        expect(wrapper.find('fieldset.repeat-instance').exists()).toBe(true);
+        wrapper.unmount();
+    });
+
     it('renders a likert_scale as a radio group and submits the chosen score (G4a)', async () => {
         const scaleConfig = {
             options: [

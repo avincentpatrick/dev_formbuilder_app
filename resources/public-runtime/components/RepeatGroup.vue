@@ -6,9 +6,15 @@
  * per-instance relevance/required/constraint and the min/max count check come from the engine through the
  * store — this component only manages the add/remove interaction, the min/max affordances, focus movement, and
  * the aria-live announcements (UX §10.1).
+ *
+ * M185 (`R-0a7275ce`, `D129`): a section set to a table, whose every question a cell can hold (`repeat-table.ts`), is drawn
+ * by the shared {@link RepeatTableFrame} — each cell the same `InstanceField`, each row's end the same Remove — so its
+ * answers, errors, conditions, add, remove, focus and announcements are exactly the cards'. Anything else stays cards.
  */
 import { computed, nextTick, ref } from 'vue';
 import { MdsButton } from '@meridian/design-system';
+import RepeatTableFrame from '@/components/submissions/RepeatTableFrame.vue';
+import { drawsAsTable } from '@/components/submissions/repeat-table';
 import InstanceField from './InstanceField.vue';
 import { useAnnouncer, useRuntime } from '../composables/context';
 import { fieldRendersNothing } from '../lib/schema-mapping';
@@ -57,6 +63,11 @@ const boundsHint = computed<string | null>(() => {
     return null;
 });
 
+// M185: drawn as a table only when the author chose one and every member fits a cell; the headers read the flat label.
+const asTable = computed(() => drawsAsTable(props.section.repeatLayout, members.value.map((f) => ({ field_type: f.fieldType, visibility: f.visibility }))));
+const columns = computed(() => members.value.map((f) => ({ key: f.key, label: runtime.labelFor(f), marker: runtime.requiredMarkerFor(f) })));
+const memberByKey = computed(() => new Map(members.value.map((f) => [f.key, f])));
+
 function instanceLegend(index: number): string {
     return `${label.value} ${index + 1}`;
 }
@@ -97,6 +108,25 @@ async function onRemove(index: number): Promise<void> {
         <p v-if="boundsHint" class="repeat-group__bounds">{{ boundsHint }}</p>
 
         <p v-if="count === 0" class="repeat-group__empty">Nothing added yet.</p>
+
+        <RepeatTableFrame v-else-if="asTable" :label="label" :columns="columns" :rows="uids">
+            <template #cell="{ index, column }">
+                <InstanceField :section-key="sectionKey" :index="index" :field="memberByKey.get(column.key)!" />
+            </template>
+            <template #actions="{ index }">
+                <MdsButton
+                    type="button"
+                    variant="tertiary"
+                    size="sm"
+                    icon-left="trash"
+                    data-instance-remove
+                    :aria-label="`Remove ${instanceLegend(index)}`"
+                    @click="onRemove(index)"
+                >
+                    Remove
+                </MdsButton>
+            </template>
+        </RepeatTableFrame>
 
         <ol v-else class="repeat-group__list">
             <li v-for="(uid, index) in uids" :key="uid">

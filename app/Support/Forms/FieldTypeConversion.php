@@ -228,9 +228,13 @@ final class FieldTypeConversion
     private static function inFamilyConfig(FieldType $from, FieldType $to, array $source, array $targetDefault): array
     {
         return match (self::family($from)) {
+            // M184 (`R-596d6afd`): suggestions are a Short text's alone, so they stay behind when it becomes another text type.
+            ConversionFamily::Text => $to === FieldType::ShortText
+                ? array_replace($targetDefault, $source)
+                : array_diff_key(array_replace($targetDefault, $source), ['suggestions_source' => true, 'suggestions' => true]),
             // The choice family shares one config arm (`UpdateFieldRequest`'s `choices`), so the options —
             // with every option's `label_translations` and any key no rule enumerates — carry verbatim.
-            ConversionFamily::Text, ConversionFamily::Number, ConversionFamily::Temporal,
+            ConversionFamily::Number, ConversionFamily::Temporal,
             ConversionFamily::Geo => array_replace($targetDefault, $source),
             ConversionFamily::Choice => self::choiceConfig($to, $source, $targetDefault),
             ConversionFamily::Attachment => self::mediaConfig($to, $source),

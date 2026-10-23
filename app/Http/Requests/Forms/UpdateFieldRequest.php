@@ -201,6 +201,12 @@ final class UpdateFieldRequest extends FormRequest
             'config.options_source.form_id' => 'source form',
             'config.options_source.field_key' => 'source question',
             'config.options_list' => 'choice list',
+            // M184 — where a Short text's suggestions come from.
+            'config.suggestions_source' => 'suggestions source',
+            'config.suggestions_source.kind' => 'where the suggestions come from',
+            'config.suggestions_source.name' => 'suggestions list',
+            'config.suggestions_source.form_id' => 'suggestions form',
+            'config.suggestions_source.field_key' => 'suggestions question',
             'config.levels' => 'levels',
             'config.levels.*.key' => 'level key',
             'config.levels.*.label' => 'level label',
@@ -370,6 +376,18 @@ final class UpdateFieldRequest extends FormRequest
                 'config.options_list' => ['sometimes', 'nullable', 'string', 'max:64', 'regex:/^[a-z0-9_-]*$/'],
                 // M177 (`R-71509975`): the key of the Please specify question "Other, please specify" made.
                 'config.other_specify_key' => ['sometimes', 'nullable', 'string', 'max:150'],
+            ];
+        }
+
+        // M184 (`R-596d6afd`): where a Short text's suggestions come from — a list file by its name, or another form's
+        // question. Shape only, as for a choice question's sources; whether either can serve is publish's.
+        if ($type === FieldType::ShortText) {
+            return [
+                'config.suggestions_source' => ['sometimes', 'nullable', 'array:kind,name,form_id,field_key'],
+                'config.suggestions_source.kind' => ['required_with:config.suggestions_source', Rule::in(['list', 'form'])],
+                'config.suggestions_source.name' => ['nullable', 'string', 'max:64', 'regex:/^[a-z0-9_-]*$/'],
+                'config.suggestions_source.form_id' => ['nullable', 'uuid'],
+                'config.suggestions_source.field_key' => ['nullable', 'string', 'max:255'],
             ];
         }
 

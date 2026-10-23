@@ -75,10 +75,18 @@ function isLinked(config: unknown): boolean {
     return link !== null && typeof link === 'object';
 }
 
-/** Whether a schema has any question that takes its choices from another form — the only case worth a request. */
+/** M184 (`R-596d6afd`): whether a Short text's suggestions come from another form. */
+function suggestsFromForm(config: unknown): boolean {
+    if (config === null || typeof config !== 'object') return false;
+    const source = (config as Record<string, unknown>).suggestions_source;
+
+    return source !== null && typeof source === 'object' && (source as Record<string, unknown>).kind === 'form';
+}
+
+/** Whether a schema has any question that takes its choices — or its suggestions — from another form: the only case worth a request. */
 export function hasLinkedChoices(schema: SchemaResponse): boolean {
     // Tolerant of a partial schema (a fixture, or a cached response from before a key existed): no fields, no request.
-    return (schema.version?.schema?.fields ?? []).some((field) => isLinked(field.config));
+    return (schema.version?.schema?.fields ?? []).some((field) => isLinked(field.config) || suggestsFromForm(field.config));
 }
 
 /**
@@ -92,6 +100,13 @@ export function mergeLinkedChoices(schema: SchemaResponse, lists: LinkedChoiceLi
     }
 
     const fields = schema.version.schema.fields.map((field) => {
+        // M184: a Short text's suggestions are its list's labels — and no note when there are none, since any answer goes.
+        if (suggestsFromForm(field.config)) {
+            const list = lists?.[field.key];
+            const suggestions = list !== undefined && list.available ? list.options.map((option) => option.label) : [];
+
+            return { ...field, config: { ...(field.config ?? {}), suggestions } };
+        }
         if (!isLinked(field.config)) {
             return field;
         }

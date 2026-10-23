@@ -92,6 +92,7 @@ const CONFIG_SENTENCES: Record<string, string> = {
     // M184: where a choice question's choices come from — another form's answers, or a list file.
     options_source: 'It no longer takes its choices from another form.',
     options_list: 'It no longer takes its choices from a list file.',
+    suggestions_source: 'It no longer suggests answers.',
     levels: 'Its levels are removed.',
     rows: 'Its rows are removed.',
     columns: 'Its columns are removed.',

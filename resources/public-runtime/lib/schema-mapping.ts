@@ -505,10 +505,21 @@ function toRenderField(field: RawField): RenderField {
         appearance: field.appearance ?? null,
         content: field.field_type === 'note' && Array.isArray(field.config?.content) ? (field.config.content as unknown[]) : null,
         calculation: calculationDisplayOf(field),
+        suggestions: suggestionsOf(field),
         visibility: visibilityOf(field),
         sequence: field.sequence,
         sectionSequence: field.section_sequence,
     };
+}
+
+/**
+ * M184 (`R-596d6afd`): a Short text's suggestions — a list file's labels the version was published with, or another
+ * form's answers `mergeLinkedChoices()` wrote in. Null for every other type; never checked against the answer.
+ */
+function suggestionsOf(field: RawField): string[] | null {
+    const raw = field.field_type === 'short_text' ? field.config?.suggestions : undefined;
+
+    return Array.isArray(raw) ? raw.filter((item): item is string => typeof item === 'string') : null;
 }
 
 /** M177 (`R-f44e9d00`): Show to respondents, as stored — anything but the two values reads as the type's own rule. */

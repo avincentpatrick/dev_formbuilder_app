@@ -44,6 +44,8 @@ withDefaults(
             | 'search';
         name?: string;
         autocomplete?: string;
+        /** The id of a `<datalist>` whose options the browser offers as the person types (M184) — suggestions only. */
+        list?: string;
         placeholder?: string;
         describedby?: string;
         invalid?: boolean;
@@ -69,6 +71,7 @@ defineExpose({ field });
         :name="name"
         :value="modelValue"
         :autocomplete="autocomplete"
+        :list="list"
         :placeholder="placeholder"
         :disabled="disabled"
         :aria-invalid="invalid || undefined"

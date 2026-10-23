@@ -52,6 +52,8 @@ const encodeField = computed<EncodeField>(() => ({
     // M130 — the author's choice layout and a note's content blocks, as FieldControl carries them.
     appearance: props.field.appearance,
     content: props.field.content,
+    // M184 (`R-596d6afd`) — a Short text inside a repeat offers its suggestions in every instance.
+    suggestions: props.field.suggestions,
     supported: props.field.supported,
 }));
 

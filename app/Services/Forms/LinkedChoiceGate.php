@@ -26,6 +26,10 @@ use Illuminate\Support\Collection;
  *     snapshot's typed list whenever it is non-empty, so a mix would refuse every linked answer;
  *   - and whatever {@see LinkedChoiceService::refusal()} finds: the form itself, a missing source, a question the
  *     source does not share, or an owner who cannot read the source's responses.
+ *
+ * M184 (`R-596d6afd`): a Short text whose SUGGESTIONS come from another form passes the same two keys, refused as
+ * `suggestions_invalid` in words about suggestions — the answer is free text either way, but a list that cannot serve
+ * should be said at publish, not found empty by a respondent.
  */
 final class LinkedChoiceGate
 {
@@ -42,6 +46,20 @@ final class LinkedChoiceGate
 
         foreach ($fields as $field) {
             $config = $field->config;
+            if (LinkedChoiceService::declaresSuggestionLink($config)) {
+                $link = LinkedChoiceService::suggestionLinkOf($config);
+                $destination ??= Form::query()->whereKey($version->form_id)->first();
+                $code = match (true) {
+                    $link === null => 'linked_choices_incomplete',
+                    $destination === null => 'linked_choices_source_missing',
+                    default => $this->links->refusal($destination, $link),
+                };
+                if ($code !== null) {
+                    $violations[] = PublishValidationException::suggestionsInvalid($field->key, $code);
+                }
+
+                continue;
+            }
             if (! LinkedChoiceService::declaresLink($config)) {
                 continue;
             }

@@ -11749,14 +11749,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   which must not become a seventh. The PHP `FieldType` enum is authoritative and the builder palette is fully
   server-driven — but the **renderers** carry six hand-written mirrors: `schema-mapping.ts:48-59` (`SUPPORTED`,
   whose own comment admits it mirrors `EncodeFormPresenter::SUPPORTED`), `:72` (`HAS_OPTIONS`), `:75`
-  (`TEXT_TYPES`), `FieldInput.vue` (`MEDIA_TYPES`) and `ConfigPanel.vue:193` (`NUMERIC_TYPES`). ✅ **Only
+  (`TEXT_TYPES`), `FieldInput.vue` (`MEDIA_TYPES`) and `ConfigPanel.vue:194` (`NUMERIC_TYPES`). ✅ **Only
   `field-roles.ts`'s `RENDERS_NOTHING` is pinned**, by `tests/Unit/Forms/PdfFieldRoleTest.php`, which regex-parses
   the TypeScript from PHP and asserts set equality — so the instrument already exists in this repository and needs
   copying, not inventing. ⚠️ **`EncodeFormPresenter`'s own docblock (`:64-72`) admits the duplication and records
   that collapsing it was deliberately declined** — which makes a parity test the right answer rather than a
   refactor: it converts five unguarded mirrors into guarded ones **without deleting any of them**. ⚠️ A gate
   written here is green on arrival and therefore proves nothing until a committed mutation — removing one type
-  from one mirror — turns it red. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AS A PROVEN STRICT SUBSET OF `R-09f73330`, NOT WORKED SEPARATELY.** ✅ Its citations hold, with two off-by-N: `HAS_OPTIONS` is declared at `schema-mapping.ts:73`, not `:72` (`:72` is the comment), and the `EncodeFormPresenter` docblock admission runs `:64-69`, not `:64-72`. ⛔ **ALL FIVE GAPS IT NAMES APPEAR IN `R-09f73330` VERBATIM, AT THE SAME FILE AND LINE** — `schema-mapping.ts:48`/`:73`/`:75`, `FieldInput.vue`'s `MEDIA_TYPES` and `ConfigPanel.vue:193` — and it names **no** declaration that row does not. (It also cites `field-roles.ts`'s `RENDERS_NOTHING`, but as already-gated *evidence*, not as a gap.) So the single gate written for `R-09f73330` necessarily closes this one too, and **working both would have collided on three production files** under `D13` clause 1. ⚠️ **Its *"six copies, five ungated"* is a FLOOR:** there are **ten** ungated declarations by declaration count, and an eleventh that was already gated. ⚠️ **And its supporting citation is mis-aimed, though its conclusion survives:** `EncodeFormPresenter`'s docblock at `:67-72` declines collapsing the *builder functions*, not the `SUPPORTED` constant — the admission that actually supports the row is on the TypeScript side, at `schema-mapping.ts:47`. ⚠️ **Its *"the instrument exists and needs copying"* is now UNDERSTATED:** the technique has been copied three further times since it was filed — `DraftProjectionMirrorDriftTest`, `DocumentedEnumMirrorDriftTest` (a table-driven generalisation over three grammars) and the `NotificationType`/`ShellAbility` parity tests.
+  from one mirror — turns it red. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AS A PROVEN STRICT SUBSET OF `R-09f73330`, NOT WORKED SEPARATELY.** ✅ Its citations hold, with two off-by-N: `HAS_OPTIONS` is declared at `schema-mapping.ts:73`, not `:72` (`:72` is the comment), and the `EncodeFormPresenter` docblock admission runs `:64-69`, not `:64-72`. ⛔ **ALL FIVE GAPS IT NAMES APPEAR IN `R-09f73330` VERBATIM, AT THE SAME FILE AND LINE** — `schema-mapping.ts:48`/`:73`/`:75`, `FieldInput.vue`'s `MEDIA_TYPES` and `ConfigPanel.vue:194` — and it names **no** declaration that row does not. (It also cites `field-roles.ts`'s `RENDERS_NOTHING`, but as already-gated *evidence*, not as a gap.) So the single gate written for `R-09f73330` necessarily closes this one too, and **working both would have collided on three production files** under `D13` clause 1. ⚠️ **Its *"six copies, five ungated"* is a FLOOR:** there are **ten** ungated declarations by declaration count, and an eleventh that was already gated. ⚠️ **And its supporting citation is mis-aimed, though its conclusion survives:** `EncodeFormPresenter`'s docblock at `:67-72` declines collapsing the *builder functions*, not the `SUPPORTED` constant — the admission that actually supports the row is on the TypeScript side, at `schema-mapping.ts:47`. ⚠️ **Its *"the instrument exists and needs copying"* is now UNDERSTATED:** the technique has been copied three further times since it was filed — `DraftProjectionMirrorDriftTest`, `DocumentedEnumMirrorDriftTest` (a table-driven generalisation over three grammars) and the `NotificationType`/`ShellAbility` parity tests.
 
 - **`minor` · Three more request paths prune an array key by the same mechanism `B0` just fixed, and one of
   them may be doing it on purpose.** Found by `M111` (2026-09-25) while sweeping for the CLASS behind
@@ -11817,7 +11817,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `HAS_OPTIONS`, `:75` `TEXT_TYPES`; `display-value.ts:48` `HAS_OPTIONS` (a second copy), `:51` `GEO_TYPES`,
   `:55` `MEDIA_TYPES`; `semantic-validator.ts:43` `MEDIA_FIELD_TYPES` (a third copy of the media set);
   `FieldInput.vue`'s `MEDIA_TYPES` (a fourth) and its inline text-type literal (a second `TEXT_TYPES`);
-  and `ConfigPanel.vue:193` `NUMERIC_TYPES`. ⛔ **`TEXT_TYPES` and `NUMERIC_TYPES` MIRROR NOTHING** — there is no
+  and `ConfigPanel.vue:194` `NUMERIC_TYPES`. ⛔ **`TEXT_TYPES` and `NUMERIC_TYPES` MIRROR NOTHING** — there is no
   PHP predicate or registry either one corresponds to, so they cannot drift from a source; they ARE a source, and
   an undeclared one. ✅ **The technique is proven and is now used twice:** `tests/Unit/Forms/PdfFieldRoleTest.php`
   parses `field-roles.ts` by regex with two anti-vacuity arms, and `M112` built
@@ -14438,7 +14438,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · A text box cannot offer suggestions from a list file or another form's answers.**
   The testers' comment (2026-10-15): *"sometimes even the textbox must have an option to populate options thru the connection to
-  responses from other forms"*. `resources/js/components/submissions/FieldInput.vue:221-274` renders a text question as a plain
+  responses from other forms"*. `resources/js/components/submissions/FieldInput.vue:224-277` renders a text question as a plain
   input, and `app/Http/Requests/Forms/UpdateFieldRequest.php:337-349` accepts no source on it. The remedy: `config.suggestions_source
   = {kind: list | form, …}` on Short text gives a type-ahead (a `<datalist>`-backed combobox) on the web form, the encode page
   (`app/Services/Submissions/EncodeFormPresenter.php:629-655` already serves linked lists there) and the preview, while free text
@@ -14475,7 +14475,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`minor` · The Philippine Standard Geographic Code is not in the app: an author must build and upload four CSV files per form, and nothing keeps them current with the PSA's quarterly publication.**
   The testers' question (2026-10-15): *"Does the platform support cascading options linked to the Philippine Standard Geographic
   code (PSGC)?"*. `M141` made a PSGC-sized cascade work from uploaded CSV files (measured at 43,739 options), but no PSGC data
-  exists in the repository, each form re-uploads its own lists (`app/Services/Forms/ChoiceListMaterializer.php:182` reads them by
+  exists in the repository, each form re-uploads its own lists (`app/Services/Forms/ChoiceListMaterializer.php:186` reads them by
   version), `docs/PRD.md:442` declined a national geography, and `docs/data-dictionary.md:375` says a reference-dataset table is
   "deliberately not introduced here". The Philippine Statistics Authority publishes the PSGC Publication Datafile each quarter
   (3Q 2026 released 2026-10-12; ten-digit codes kept as text; region, province or independent city, city or municipality,
@@ -14655,7 +14655,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M176` (2026-10-18) — ****`minor` · A refused question save shows its first error twice — as the lead line and again as the first bullet — and numbers its rules by their place in the request, not on screen.**
   The testers' comment (2026-10-11, comment 2): *"Instructions repeat"* — *"A validation rule must be either a structured rule or an
-  expression — not both, not neither."* above *"Rule 1: A validation rule must be …"*. `resources/js/components/builder/ConfigPanel.vue:530`
+  expression — not both, not neither."* above *"Rule 1: A validation rule must be …"*. `resources/js/components/builder/ConfigPanel.vue:531`
   prints the reply's `message`, which Laravel fills with the first error, and `:489` lists every error including that one;
   `resources/js/components/builder/field-save-errors.ts:86` names `validations.N` by its position in the request after unfinished
   rows are withheld, so "Rule 1" can point at the wrong row. The message itself (`app/Http/Requests/Forms/UpdateFieldRequest.php:391`)
@@ -14666,7 +14666,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M176` (2026-10-18) — ****`minor` · "Allow negative numbers" is a Basics checkbox that is really a hidden "Minimum value 0" rule, so removing that rule turns negatives back on.**
   The user (2026-10-16): *"when they removed the allow negative, the other settings will be saved, but when they removed the
   validation rules, the allow negative returned … include the allow negative in the rules since it is really a validation rule"*.
-  `resources/js/components/builder/field-conversion.ts:250` (`negativeFloor()`) derives the checkbox from whether a `min_value 0` row
+  `resources/js/components/builder/field-conversion.ts:251` (`negativeFloor()`) derives the checkbox from whether a `min_value 0` row
   exists and `:261` (`withNegativesAllowed()`) adds or removes that row; `resources/js/components/builder/FieldTypeControl.vue:316`
   binds the checkbox to it. Unticking adds a visible "Minimum value 0" rule; deleting that rule on the Validation tab ticks the box
   again; editing its value disables the box. The remedy: the Basics checkbox goes; the Validation tab's rule menu offers **No
@@ -14685,7 +14685,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M176` (2026-10-18) — ****`minor` · The "Change question type" dialog speaks in developer words and repeats the type as the question's name.**
   The testers' comment (2026-10-11, comment 1): *"Make the text/instructions more “smart highschooler” friendly"*, on a screenshot of
   this dialog. `resources/js/components/builder/ConvertFieldDialog.vue:39` says *"It keeps its key, so conditions, calculations and
-  text that mention it still point to it"*; `resources/js/components/builder/field-conversion.ts:203` and
+  text that mention it still point to it"*; `resources/js/components/builder/field-conversion.ts:204` and
   `app/Enums/ConversionWarning.php:50` carry the rest, with `app/Enums/ConversionDropReason.php` and `app/Enums/ConversionImpact.php`;
   a new question's label is its type's label (`app/Services/Forms/FormBuilderService.php:137`), so the dialog reads *"Current type of
   “Date & time”: Date & time"*. The remedy: `docs/ux/design-system-reference.md` gains a voice rule — write for a smart
@@ -14944,7 +14944,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M180` (2026-10-20) — ****`minor` · A condition or a rule can name a calculated question, but always reads it as blank.**
   Both engines work out calculations last and never feed them back into relevance or constraints
   (`app/Services/Validation/SemanticValidator.php:126`, `resources/public-runtime/engine/semantic-validator.ts:155`), yet the condition
-  editor offers every calculated question (`resources/js/components/builder/ConfigPanel.vue:368`) and the compared-question lists do too,
+  editor offers every calculated question (`resources/js/components/builder/ConfigPanel.vue:369`) and the compared-question lists do too,
   because a calculation's value shape is a number (`app/Enums/ValueShape.php:109`) — so "show when the total is over 10" never shows,
   and a rule against a total never checks. The remedy (`D149` A, taken by R4 with its dependency order): conditions and rules read a
   calculation's value, the calculations worked out before what reads them, cycles refused at publish. Until then R3's lists leave

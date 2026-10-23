@@ -92,6 +92,30 @@ final class LinkedChoiceService
     }
 
     /**
+     * M184 (`R-596d6afd`): whether a Short text's suggestions are declared to come from another form, picked or not —
+     * `config.suggestions_source = {kind: form, form_id, field_key}`.
+     *
+     * @param  array<string, mixed>|null  $config
+     */
+    public static function declaresSuggestionLink(?array $config): bool
+    {
+        $source = $config['suggestions_source'] ?? null;
+
+        return is_array($source) && ($source['kind'] ?? null) === 'form';
+    }
+
+    /**
+     * The link a Short text's suggestions take, or null when they come from no form or from a half-picked one.
+     *
+     * @param  array<string, mixed>|null  $config
+     * @return array{form_id: string, field_key: string}|null
+     */
+    public static function suggestionLinkOf(?array $config): ?array
+    {
+        return self::declaresSuggestionLink($config) ? self::linkOf(['options_source' => $config['suggestions_source'] ?? null]) : null;
+    }
+
+    /**
      * Why a link cannot serve right now, as a stable code, or null when both keys hold.
      *
      * @param  array{form_id: string, field_key: string}  $link
@@ -191,22 +215,43 @@ final class LinkedChoiceService
      * the snapshot holds no typed options, so both engines skip the membership check — which is what keeps an
      * offline response submittable after the source changes. `tests/golden/validation/membership.json` pins it.
      *
+     * M184 (`R-596d6afd`): a Short text whose suggestions come from another form is served the same list under its key —
+     * the runtime offers it as suggestions, and the answer stays free text.
+     *
      * @return array<string, array{stamp: string, available: bool, truncated: bool, options: list<array{value: string, label: string}>}>
      */
     public function listsFor(Form $destination, FormVersion $version): array
     {
         $snapshot = $version->schema_snapshot;
+
+        return $this->listsForFields($destination, (array) ($snapshot['fields'] ?? []));
+    }
+
+    /**
+     * {@see listsFor()} over any list of fields in the snapshot's shape (`key`, `field_type`, `config`) — a published
+     * version's, or a DRAFT's rows for the builder preview, whose snapshot is empty until it is published (M184).
+     *
+     * @param  iterable<mixed>  $fields
+     * @return array<string, array{stamp: string, available: bool, truncated: bool, options: list<array{value: string, label: string}>}>
+     */
+    public function listsForFields(Form $destination, iterable $fields): array
+    {
         $lists = [];
         $memo = [];
 
-        foreach ((array) ($snapshot['fields'] ?? []) as $field) {
+        foreach ($fields as $field) {
             if (! is_array($field) || ! is_string($field['key'] ?? null)) {
                 continue;
             }
 
             $type = FieldType::tryFrom((string) ($field['field_type'] ?? ''));
-            $link = self::linkOf(is_array($field['config'] ?? null) ? $field['config'] : null);
-            if ($type === null || $link === null || ! in_array($type, self::LINKABLE_TYPES, true)) {
+            $config = is_array($field['config'] ?? null) ? $field['config'] : null;
+            $link = match (true) {
+                $type === FieldType::ShortText => self::suggestionLinkOf($config),
+                in_array($type, self::LINKABLE_TYPES, true) => self::linkOf($config),
+                default => null,
+            };
+            if ($link === null) {
                 continue;
             }
 

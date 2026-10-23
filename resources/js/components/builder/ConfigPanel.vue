@@ -40,6 +40,7 @@ import FieldTypeControl from './FieldTypeControl.vue';
 import GeoEditor from './GeoEditor.vue';
 import LikertMatrixEditor from './LikertMatrixEditor.vue';
 import LinkedChoicesEditor from './LinkedChoicesEditor.vue';
+import SuggestionsEditor from './SuggestionsEditor.vue';
 import { choiceSourceOf } from './choice-source';
 import OtherSpecifyControl from './OtherSpecifyControl.vue';
 import { applyShowMode, showModeFixed, showModeOf, type ShowMode } from './field-visibility';
@@ -646,6 +647,7 @@ watch(librarySaved, (value) => {
                                 @update:model-value="setField('placeholder', $event || null)"
                             />
                         </MdsFormField>
+                        <SuggestionsEditor v-if="field.field_type === 'short_text'" :config="field.config" :sources="props.store.linkableSources" :form-id="store.formId" @update:config="field.config = $event; props.store.touch(field.uid, 'field')" />
                         <p v-if="neverShown && !isCalculated" class="config__note" data-never-required>
                             Respondents never see this question, so it is never required. Change that under Show to respondents on the
                             Advanced tab.

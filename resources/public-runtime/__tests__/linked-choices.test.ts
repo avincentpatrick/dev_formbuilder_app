@@ -125,3 +125,29 @@ describe('linked choices — fetchSchema', () => {
         }
     });
 });
+
+/**
+ * M184 (`R-596d6afd`) — a Short text whose suggestions come from another form asks for the same list, and takes it as its
+ * suggestions: the labels, no choices, and no note when the list cannot load, because any answer goes.
+ */
+describe('mergeLinkedChoices — a Short text that suggests from another form', () => {
+    const SUGGEST = { suggestions_source: { kind: 'form', form_id: 'src-1', field_key: 'facility_name' } };
+
+    function suggestingSchema() {
+        return schemaResponse({ versionId: 'ver-7', fields: [field({ key: 'facility', field_type: 'short_text', config: { ...SUGGEST }, hint: 'Type a facility.' })] });
+    }
+
+    it('is a reason to ask for the lists', () => {
+        expect(hasLinkedChoices(suggestingSchema())).toBe(true);
+    });
+
+    it('writes the labels as suggestions, never as choices, and adds no note when they cannot load', () => {
+        const merged = mergeLinkedChoices(suggestingSchema(), LISTS).version.schema.fields[0];
+        const failed = mergeLinkedChoices(suggestingSchema(), null).version.schema.fields[0];
+
+        expect(merged.config).toEqual({ ...SUGGEST, suggestions: ['Mabini RHU', 'San Jose RHU'] });
+        expect(merged.hint).toBe('Type a facility.');
+        expect(failed.config).toEqual({ ...SUGGEST, suggestions: [] });
+        expect(failed.hint).toBe('Type a facility.');
+    });
+});

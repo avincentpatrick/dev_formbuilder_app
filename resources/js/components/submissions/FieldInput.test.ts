@@ -251,3 +251,43 @@ describe('FieldInput — a Likert scale as the joined line (M183)', () => {
         expect(wrapper.emitted('update:modelValue')).toEqual([['green']]);
     });
 });
+
+/**
+ * M184 (`R-596d6afd`) — a Short text's suggestions, in a `<datalist>` the browser offers as the person types. At most a
+ * hundred, the ones containing what is typed; free text is never refused, because a datalist only suggests.
+ */
+describe('FieldInput — a Short text that suggests answers (M184)', () => {
+    function textField(suggestions: string[] | null): EncodeField {
+        return { key: 'facility', field_type: 'short_text', label: 'Facility', hint: null, placeholder: null, required: false, options: [], suggestions, supported: true };
+    }
+
+    it('ties the box to a list of its suggestions, and turns off the browser\'s own history beside them', () => {
+        const wrapper = mount(FieldInput, { props: { field: textField(['San Jose RHU', 'Poblacion BHS']), modelValue: '' } });
+        const input = wrapper.find('input');
+        const list = wrapper.find(`datalist#${input.attributes('list')}`);
+
+        expect(list.exists()).toBe(true);
+        expect(list.findAll('option').map((option) => option.attributes('value'))).toEqual(['San Jose RHU', 'Poblacion BHS']);
+        expect(input.attributes('autocomplete')).toBe('off');
+    });
+
+    it('offers at most a hundred, those containing what is typed in any case', () => {
+        const many = Array.from({ length: 300 }, (_, i) => `Barangay ${i + 1}`);
+
+        const empty = mount(FieldInput, { props: { field: textField(many), modelValue: '' } });
+        expect(empty.findAll('datalist option')).toHaveLength(100);
+
+        const typed = mount(FieldInput, { props: { field: textField([...many, 'San Jose RHU']), modelValue: 'san jose' } });
+        expect(typed.findAll('datalist option').map((option) => option.attributes('value'))).toEqual(['San Jose RHU']);
+    });
+
+    it('keeps whatever is typed, and draws no list for a box without suggestions', async () => {
+        const wrapper = mount(FieldInput, { props: { field: textField(['San Jose RHU']), modelValue: '' } });
+        await wrapper.find('input').setValue('A clinic nobody listed');
+        expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['A clinic nobody listed']);
+
+        const plain = mount(FieldInput, { props: { field: textField(null), modelValue: '' } });
+        expect(plain.find('datalist').exists()).toBe(false);
+        expect(plain.find('input').attributes('list')).toBeUndefined();
+    });
+});

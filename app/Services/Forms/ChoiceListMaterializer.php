@@ -99,6 +99,10 @@ final class ChoiceListMaterializer
         if (is_string($config['options_list'] ?? null) && $config['options_list'] !== '') {
             $config['options'] = [];
         }
+        // A Short text's suggestions (M184, `R-596d6afd`) are written at publish or served live, never kept in a draft.
+        if (is_array($config['suggestions_source'] ?? null)) {
+            unset($config['suggestions']);
+        }
 
         return self::withoutListOptions($config);
     }
@@ -216,6 +220,30 @@ final class ChoiceListMaterializer
             $field->forceFill(['config' => $config])->save();
         }
 
+        // M184 (`R-596d6afd`): a Short text whose suggestions come from a list file — its labels written the same way, as
+        // `config.suggestions`. Suggestions only: the answer stays free text, and no engine reads them.
+        $suggesting = FormField::query()
+            ->where('form_version_id', $draft->id)
+            ->where('field_type', FieldType::ShortText->value)
+            ->where('config->suggestions_source->kind', 'list')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($suggesting as $field) {
+            $config = (array) $field->config;
+            $lists ??= FormVersionChoiceList::query()->where('form_version_id', $draft->id)->get()->keyBy('name');
+            $suggestions = $this->suggestionsFor($field->key, $config, $lists);
+
+            if ($suggestions instanceof PublishValidationException) {
+                $violations[] = $suggestions;
+
+                continue;
+            }
+
+            $config['suggestions'] = $suggestions;
+            $field->forceFill(['config' => $config])->save();
+        }
+
         if ($violations !== []) {
             throw count($violations) === 1 ? $violations[0] : PublishValidationException::several($violations);
         }
@@ -321,6 +349,48 @@ final class ChoiceListMaterializer
         }
 
         return array_map(static fn (array $row): array => ['value' => $row[$nameAt] ?? '', 'label' => $row[$labelAt] ?? ''], $rows);
+    }
+
+    /**
+     * A Short text's suggestions from its list: each row's label, each once, in the file's order.
+     *
+     * @param  array<string, mixed>  $config
+     * @param  Collection<string, FormVersionChoiceList>  $lists
+     * @return list<string>|PublishValidationException
+     */
+    private function suggestionsFor(string $key, array $config, Collection $lists): array|PublishValidationException
+    {
+        $source = is_array($config['suggestions_source'] ?? null) ? $config['suggestions_source'] : [];
+        $name = is_string($source['name'] ?? null) ? $source['name'] : '';
+
+        if ($name === '') {
+            return PublishValidationException::suggestionsInvalid($key, 'no list file is chosen for its suggestions');
+        }
+
+        $list = $lists->get($name);
+        if ($list === null) {
+            return PublishValidationException::suggestionsInvalid($key, "it suggests answers from “{$name}”, which this form does not hold — upload {$name}.csv or {$name}.xlsx");
+        }
+
+        $labelAt = self::labelColumn($list->header());
+        if ($labelAt === null) {
+            return PublishValidationException::suggestionsInvalid($key, "“{$name}” has no label column");
+        }
+
+        $rows = $list->dataRows();
+        if (count($rows) > self::FLAT_LIST_MAX) {
+            return PublishValidationException::suggestionsInvalid($key, '“'.$name.'” holds '.number_format(count($rows)).' rows, and one question suggests at most '.number_format(self::FLAT_LIST_MAX));
+        }
+
+        $labels = [];
+        foreach ($rows as $row) {
+            $label = $row[$labelAt] ?? '';
+            if ($label !== '') {
+                $labels[$label] = true;
+            }
+        }
+
+        return array_map('strval', array_keys($labels));
     }
 
     /**

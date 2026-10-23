@@ -1,5 +1,27 @@
 [
     {
+        "version": "0.12.0",
+        "title": "Grids from lists, and sections as tables",
+        "items": [
+            {
+                "kind": "new",
+                "text": "A Grid's or Likert matrix's rows can come from a list file or another form's answers: Grid tab → Rows come from. A grid column's choices can too. They are copied in when you publish; publish again to pick up new answers."
+            },
+            {
+                "kind": "new",
+                "text": "Add and rename a grid's rows and columns right in the builder's Preview."
+            },
+            {
+                "kind": "new",
+                "text": "A repeatable section can be laid out as a table: each question is a column and each entry a row, with Add row and Remove row. Phones still show one card per entry. Section → Advanced → Layout → Table."
+            },
+            {
+                "kind": "improved",
+                "text": "The response PDF and the paper form draw a table section as a table."
+            }
+        ]
+    },
+    {
         "version": "0.11.0",
         "title": "Choices from lists and other forms",
         "items": [

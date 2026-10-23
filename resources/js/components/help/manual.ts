@@ -117,6 +117,9 @@ const CHOICES = 'resources/js/components/builder/ChoicesEditor.vue';
 const VALIDATION = 'resources/js/components/builder/ValidationEditor.vue';
 const CONDITIONS = 'resources/js/components/builder/ConditionRows.vue';
 const PREVIEW = 'resources/js/components/builder/PreviewPane.vue';
+// M185: a grid edited where the Preview draws it, and a repeatable section's layout.
+const MATRIX_GRID = 'resources/js/components/submissions/MatrixGrid.vue';
+const REPEAT_LAYOUT = 'resources/js/components/builder/RepeatLayoutSelect.vue';
 const LOGIC = 'resources/js/components/builder/LogicRail.vue';
 const SETTINGS = 'resources/js/components/forms/FormSettingsSections.vue';
 const DETAILS = 'resources/js/components/builder/GeneralPanel.vue';
@@ -435,6 +438,10 @@ const guide: ChapterDraft[] = [
                     p('You can still edit while you preview: double-click a question’s wording to change it, or drag a question by its handle to move it.'),
                     p('A section whose every question is hidden — a calculation, a hidden field, or a question set to Never — still shows here as a card that says respondents won’t see it. Click a question on the card to open its settings.'),
                     p('Choices from a list file or from another form’s answers show here too, and so do a Short text’s suggestions. A long list shows its first 200 choices, and the question says how many there are.'),
+                    p(
+                        'A grid can be built right here: ', ui('Add row', MATRIX_GRID), ' and Add column sit under it, and the pencil beside a row’s or a column’s name renames it. Each change is saved at once and can be undone. A grid whose rows come from a list file or another form says so, and its rows are changed on the ',
+                        ui('Grid', CONFIG), ' tab.',
+                    ),
                     tip(
                         'info',
                         'The box “', ui('What this preview does not do', PREVIEW),
@@ -832,7 +839,9 @@ const reference: ChapterDraft[] = [
                         [ui('Basics', CONFIG), ': ', ui('Section title', CONFIG), ' (the heading respondents see), ', ui('Section key', CONFIG), ' (its short name) and ', ui('Description', CONFIG), '.'],
                         [
                             ui('Advanced', CONFIG), ': ', ui('Repeatable group', CONFIG), ' lets respondents fill the section in more than once — one entry per household member, for example. ',
-                            ui('Min instances', CONFIG), ' and ', ui('Max instances', CONFIG), ' set how many entries are allowed.',
+                            ui('Min instances', CONFIG), ' and ', ui('Max instances', CONFIG), ' set how many entries are allowed. ',
+                            ui('Layout', REPEAT_LAYOUT), ' draws the entries as ', ui('A card per entry', REPEAT_LAYOUT), ', or as ', ui('A table, a row per entry', REPEAT_LAYOUT),
+                            ' — every question a column. A table holds text, numbers, dates and choices; a section with any other question stays as cards, and the setting names it. Phones show a card per entry either way, and the response PDF and the paper form draw the table too.',
                         ],
                         ['“', ui('Show this section only when…', CONFIG), '” — show or skip the whole section, like a question.'],
                     ),
@@ -1043,6 +1052,7 @@ const reference: ChapterDraft[] = [
                 blocks: [
                     p('Several statements, each rated on the same scale, in one table: the scale’s words across the top and one round button for each statement and point. On a phone each statement becomes a card with its scale on one line. On the ', ui('Grid', CONFIG), ' tab:'),
                     list(
+                        [ui('Rows come from', LINKED), ' — ', ui('Typed here', LINKED), ', ', ui('A list file', LINKED), ' or ', ui("Another form's answers", LINKED), '. Rows from a list or a form are copied in when you publish; publish again to pick up new answers.'],
                         [ui('Rows', LIKERT_MATRIX), ' — the statements to rate.'],
                         [ui('Scale points', LIKERT_MATRIX), ' — the rating scale shared by every row, from lowest to highest.'],
                         [ui('Layout', GRID_LAYOUT), ' — ', ui('Table where it fits', GRID_LAYOUT), ', or ', ui('Cards everywhere', GRID_LAYOUT), '.'],
@@ -1153,11 +1163,13 @@ const reference: ChapterDraft[] = [
                 blocks: [
                     p('A table of questions: each row is asked in every column, and each column takes its own kind of answer. It is a table on a wide screen and a card per row on a phone. On the ', ui('Grid', CONFIG), ' tab:'),
                     list(
+                        [ui('Rows come from', LINKED), ' — ', ui('Typed here', LINKED), ', ', ui('A list file', LINKED), ' (each row of the file a row of the grid, up to 200) or ', ui("Another form's answers", LINKED), '.'],
                         [ui('Rows', MATRIX), ' — each row is a question.'],
-                        [ui('Columns', MATRIX), ' — each column is asked in every row. Under each one: its ', ui('Type', MATRIX), ' (one choice, several choices, short text, a whole or decimal number, or a date), ', ui('Required in every row', MATRIX), ', and for a choice column a list of its own.'],
-                        [ui('Cell choices', MATRIX), ' — the choices of every choice column with no list of its own.'],
+                        [ui('Columns', MATRIX), ' — each column is asked in every row. Under each one: its ', ui('Type', MATRIX), ' (one choice, several choices, short text, a whole or decimal number, or a date), ', ui('Required in every row', MATRIX), ', and for a choice column where its choices come from — typed, a list file or another form’s answers.'],
+                        [ui('Cell choices come from', LINKED), ' and ', ui('Cell choices', MATRIX), ' — the choices of every choice column with no list of its own.'],
                         [ui('Layout', GRID_LAYOUT), ' — ', ui('Table where it fits', GRID_LAYOUT), ', or ', ui('Cards everywhere', GRID_LAYOUT), '.'],
                     ),
+                    tip('info', 'Rows and choices from a list file or another form are copied into the grid when you publish, so the paper form, the PDF and every export show them. Publish again to pick up new answers.'),
                     tip('info', 'Grids cannot be used in conditions or formulas, or inside a repeatable section. A spreadsheet gives every cell its own column, beside the grid’s one-line summary.'),
                 ],
             },

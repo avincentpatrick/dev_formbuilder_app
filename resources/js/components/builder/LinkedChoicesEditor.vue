@@ -96,7 +96,7 @@ const chosenList = computed(() => lists.value.find((list) => list.name === listN
 const listOptions = computed(() => {
     const options = lists.value.map((list) => ({ value: list.name, label: `${list.name} — ${describeChoiceList(list)}` }));
 
-    return options;
+    return listName.value !== '' && chosenList.value === null ? [{ value: listName.value, label: listName.value }, ...options] : options;
 });
 
 async function loadLists(): Promise<void> {

@@ -64,7 +64,7 @@ const boundsHint = computed<string | null>(() => {
 });
 
 // M185: drawn as a table only when the author chose one and every member fits a cell; the headers read the flat label.
-const asTable = computed(() => drawsAsTable(props.section.repeatLayout, members.value.map((f) => ({ field_type: f.fieldType, visibility: f.visibility }))));
+const asTable = computed(() => props.section.repeatLayout === 'table' && members.value.length > 0);
 const columns = computed(() => members.value.map((f) => ({ key: f.key, label: runtime.labelFor(f), marker: runtime.requiredMarkerFor(f) })));
 const memberByKey = computed(() => new Map(members.value.map((f) => [f.key, f])));
 

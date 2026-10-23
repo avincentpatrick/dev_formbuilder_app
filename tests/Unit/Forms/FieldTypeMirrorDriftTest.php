@@ -6,6 +6,7 @@ use App\Enums\ComparisonOperator;
 use App\Enums\FieldType;
 use App\Enums\ValueShape;
 use App\Services\Submissions\EncodeFormPresenter;
+use App\Support\Forms\RepeatTable;
 
 /*
 |--------------------------------------------------------------------------
@@ -61,6 +62,8 @@ function clientTypeMirrors(): array
         'semantic_validator.MEDIA_FIELD_TYPES' => ['path' => 'resources/public-runtime/engine/semantic-validator.ts', 'name' => 'MEDIA_FIELD_TYPES', 'grammar' => 'set'],
         'field_input.MEDIA_TYPES' => ['path' => 'resources/js/components/submissions/FieldInput.vue', 'name' => 'MEDIA_TYPES', 'grammar' => 'array'],
         'config_panel.NUMERIC_TYPES' => ['path' => 'resources/js/components/builder/ConfigPanel.vue', 'name' => 'NUMERIC_TYPES', 'grammar' => 'set'],
+        // M185 (`R-0a7275ce`): the types a repeatable section's table cell holds — `RepeatTable::TYPES`'s twin.
+        'repeat_table.REPEAT_TABLE_TYPES' => ['path' => 'resources/js/components/submissions/repeat-table.ts', 'name' => 'REPEAT_TABLE_TYPES', 'grammar' => 'set'],
         // The only unnamed one: an inline literal inside `FieldInput.vue`'s `control` computed, anchored on
         // the statement it governs because there is no identifier to anchor on.
         'field_input.inline_text' => ['path' => 'resources/js/components/submissions/FieldInput.vue', 'name' => '(inline text literal)', 'grammar' => 'inline_text'],
@@ -87,6 +90,7 @@ function clientTypeMirrorFloors(): array
         'semantic_validator.MEDIA_FIELD_TYPES' => 5,
         'field_input.MEDIA_TYPES' => 5,
         'config_panel.NUMERIC_TYPES' => 4,
+        'repeat_table.REPEAT_TABLE_TYPES' => 10,
         'field_input.inline_text' => 7,
     ];
 }
@@ -246,4 +250,9 @@ it('records NUMERIC_TYPES as a DIVERGENCE from ValueShape, not as a mirror of it
     // array_diff PRESERVES KEYS, so both sides are re-indexed before comparison.
     expect(array_values(array_diff($phpOrdered, $client)))->toBe(['duration'])
         ->and(array_values(array_diff($client, $phpOrdered)))->toBe([]);
+});
+
+it('keeps the repeat table cell types equal to RepeatTable::TYPES (M185)', function (): void {
+    expect(clientTypeMembers('repeat_table.REPEAT_TABLE_TYPES'))
+        ->toEqualCanonicalizing(array_map(static fn (FieldType $t): string => $t->value, RepeatTable::TYPES));
 });

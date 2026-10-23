@@ -38,7 +38,7 @@ import type { CalculationQuestion } from './calculation-presets';
 import ContentBlocksEditor from './ContentBlocksEditor.vue';
 import FieldTypeControl from './FieldTypeControl.vue';
 import GeoEditor from './GeoEditor.vue';
-import LikertMatrixEditor from './LikertMatrixEditor.vue';
+import LikertMatrixEditor from './LikertMatrixEditor.vue'; import RepeatLayoutSelect from './RepeatLayoutSelect.vue'; // M185: on one line, so no cited line below moves
 import LinkedChoicesEditor from './LinkedChoicesEditor.vue';
 import SuggestionsEditor from './SuggestionsEditor.vue';
 import { choiceSourceOf } from './choice-source';
@@ -976,7 +976,7 @@ watch(librarySaved, (value) => {
                                     @update:model-value="setSection('max_instances', $event)"
                                 />
                             </MdsFormField>
-                        </div>
+                        </div><RepeatLayoutSelect v-if="section.is_repeatable" :layout="section.repeat_layout" :members="props.store.fields.value.filter((f) => f.form_section_id === section?.id).sort((a, b) => a.sequence - b.sequence)" :palette="props.store.palette" @update:layout="setSection('repeat_layout', $event)" />
                         <ConditionEditor
                             :key="`section-${section.uid}`"
                             :expression="section.relevant_expression"

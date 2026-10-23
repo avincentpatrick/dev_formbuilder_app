@@ -15106,3 +15106,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   table. Found by `M185`, which kept to the surfaces its row named. The remedy: the presenter emits the PDF's table block shape for a
   section `RepeatTable::draws()` accepts, and the response page draws it with the design system's table. **Live.** Filed by `M185`.
   **Tier: during-testing.**
+
+- ✅ **CLOSED BY `M185` (2026-10-24) — ****`minor` · `SubmissionAnswerEditTest`'s replay-clock case fails whenever the suite runs between 16:00 and 24:00 UTC, so a correct pull request goes red at night.**
+  `tests/Feature/Submissions/SubmissionAnswerEditTest.php` (the "evaluates a today()-dependent relevance against the day the response
+  was filed" case) wrote the filing day as a UTC date into `today() = '…'`, but `today()` reads the FORM's zone since `D153` (`M180`), and a
+  new form is Asia/Manila — eight hours ahead — so from 16:00 UTC the expected day is already yesterday there and the gated answer is pruned.
+  Found by `M185` when CI's Pest job went red on a docs-only push at 16:14 UTC; reproduced on this host at 16:45 UTC (red), the test code
+  unchanged since the case passed in the morning. **Live.** Filed by `M185`. **Tier: early-testing.** ✅ **CLOSED BY `M185` (2026-10-24):**
+  the case reads the filing day in the form's own zone; red before at 16:45 UTC, green after. The service was right; only the test's clock was.

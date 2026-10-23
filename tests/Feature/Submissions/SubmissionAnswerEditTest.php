@@ -348,8 +348,11 @@ it('evaluates a today()-dependent relevance against the day the response was fil
     $form = app(FormService::class)->create($this->tenant, $this->owner, 'Dated');
     $version = $form->draftVersion;
     addFormField($version, $this->owner, 'full_name', FieldType::ShortText, 0);
+    // M185: the day as the FORM's clock reads it — `today()` is the form's zone since `D153` (Asia/Manila for a new form),
+    // so a UTC date failed this test whenever it ran between 16:00 and 24:00 UTC, when Manila is already on the next day.
+    $filedDay = $filedOn->copy()->setTimezone((string) $form->timezone)->toDateString();
     addFormField($version, $this->owner, 'same_day_note', FieldType::ShortText, 1, [
-        'relevant_expression' => "today() = '{$filedOn->toDateString()}'",
+        'relevant_expression' => "today() = '{$filedDay}'",
     ]);
     app(PublishService::class)->publish($form->refresh(), $this->owner);
 

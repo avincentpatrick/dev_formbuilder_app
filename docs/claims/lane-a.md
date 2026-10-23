@@ -16,7 +16,105 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M184`, T3 of the testers' items: options from anywhere (`R-f655f9b1`, `R-3e7c81bb`, `R-596d6afd`, `R-d8c2ce84`, with `R-1059e9bd`) (m184-t3-options-from-anywhere)
+## Status: ACTIVE CLAIM — `M185`, T4 of the testers' items: the grid, part 2 — rows and choices from a list or another form, rows and columns edited in the Preview, a repeatable section as a table (`R-bb79aec0`, `R-7418e6bd`, `R-0a7275ce`) (m185-t4-grid-part-2)
+
+Taken 2026-10-23. Branch `m185-t4-grid-part-2`, **stacked**: cut from `origin/m184-t3-options-from-anywhere` at `c55908a8` (T3, built and
+held), with `origin/main` merged on top to bring this claim — that merge is the claim-merge commit, and T4's own commits start after it.
+It stacks because it mounts T3's list chooser per grid column and bumps a `VERSION` that exists only on T3's branch (0.11.0). PR into
+main. ⛔ **NOT MERGED THIS SESSION:** held green for merge point 5 with T3 (`D137`, `D138`: … T3 → T4 → merge point 5) — the user's census
+before, #377 merged and live, this branch rebased onto the trunk by its own commits only and merged, then the census after. The plan of
+record is `~/.claude/plans/i-have-intial-comments-quirky-pascal.md` (§B7, §E row 9); the build plan is
+`~/.claude/plans/read-claude-md-then-php-swirling-taco.md`. `state.php` prints next free `M184` because it counts RELEASED headings and
+`M184` is HELD — this is `M185`.
+
+**No check is owed:** T3 is not live; merge point 4 was confirmed on 2026-10-23. The session-start pull read 0 reports, 0 reopened and 0
+new comments (relayed 31: 19 Resolved · 6 Ongoing · 6 Confirmed working), so nothing was triaged. **Asked and answered in planning (the
+user, 2026-10-23, in chat):** **`D161` A** — a grid's lists are copied in when you publish (rows of a Grid or Likert matrix, a choice
+column's and the shared cells' choices, from a list file or another form's answers); publish again to pick up new answers; recorded on
+this branch's first commit. **The 0.12.0 notes' wording was approved verbatim** (four items, in the build plan). Relayed **`R1-7b`**
+("Grid: rows and choices from a list or form, add rows/columns in the preview, a section as a table") is this increment's comment, with
+**`R1-1b`**'s grid rows; both are resolved only once live.
+
+Rows taken, in build order, each its own commits (`D75`): **`R-bb79aec0`** (sources, `D161`), **`R-7418e6bd`** (the Preview), **`R-0a7275ce`**
+(the table, `D129`); then Help and the release (0.12.0).
+
+### Evidence verified
+Read on `c55908a8` (T3's tree) by three read-only passes, a design pass and my own reads.
+- `R-bb79aec0`: `MatrixEditor.vue:42-49` — held in kind (props `:41`, emits `:42-47`; four lists now with the layout, and T2's per-column
+  options). `LinkedChoiceService.php:258-275` — **moved** (`listsForFields` `:237-263`, keyed by the field's key). `routes/api.php:591` —
+  held (the linked-choices route).
+- `R-7418e6bd`: `BuilderCanvas.vue:206` — held as a line, **false as a pointer**: it is the section header's label; a grid is an ordinary
+  field row (`:228-292`) that shows no rows or columns. `InlineLabelEdit.vue` — held (props `value`, `label`, `maxlength`; mounted on
+  question labels only, `PreviewRuntime.vue:431-438`).
+- `R-0a7275ce`: no code citation; `D57`/`D129` held.
+
+### Premise verified
+1. **There is no `useBuilderStore.setConfig`** (`R-7418e6bd`'s write path). `ConfigPanel.vue:447-452` is a local helper — assign
+   `target.config`, then `store.touch()`, whose 600 ms debounce makes one PATCH and one "Edit <label>" undo entry per burst
+   (`useBuilderStore.ts:1066-1137`). The Preview needs a store method both share.
+2. **`MatrixGrid.vue` ships in the guest bundle** (`FieldInput.vue` ← `public-runtime/components/FieldControl.vue`, `InstanceField.vue`)
+   **and hides its `<thead>` in card mode** — the narrow Preview's usual drawing — leaving only `aria-hidden` caption copies
+   (`:183`, `:188`); its controls are named by the header cells' ids (`:163`, `:168`, `:178`). A pencil inside a `<th>` would rename every
+   control, and one inside an `aria-hidden` copy fails axe. No guest-bundle size gate exists, so the builder-code boundary is a convention
+   until this increment pins it.
+3. **The Preview's engine goes stale on a new grid row:** `shapeOf` (`draft-snapshot.ts:506-546`) ignores grid rows and columns, so
+   `engineGridConfig` keeps the old value lists and `semantic-validator.ts:840-852` prunes a new row's answers until another edit.
+4. **A live row set breaks every reader of the row set** — Stage 1 refuses an answered row not in `config.rows` (`unknown_row`,
+   `StructuralAnswerNormalizer.php:569-571`), both engines loop over config rows, the per-cell export columns, XLSForm cells, the paper
+   form and the encode page all read frozen `config.rows`. Hence `D161`.
+5. **`LinkedChoiceGate::codeFor()` runs after `materialize()`** (`PublishService.php:130-131`) and refuses typed options beside a link
+   (`:88-91`), so a grid whose copied rows sit beside its source would be refused as `linked_choices_with_typed_options` — the grid arm must
+   use `refusal()` only.
+6. **`form_sections` has no config column** (`2026_07_06_000204_create_form_sections_table.php:20-35`), so the layout needs an additive
+   migration; `SchemaSnapshotSerializer::section()` hashes every key, so the new one is emitted only when set (no stored checksum is
+   compared with a re-derived one in `app/`; `TemplateRoundTripTest:82` re-derives one, so `SchemaBlueprintMaterializer` copies it).
+7. **The encode page has its own repeat markup** (`Encode.vue:1512-1575`), not `RepeatGroup.vue`; per-instance relevance already exists
+   (`useFormRuntime.ts:1123-1125`, `InstanceField.vue:115`); `FieldType::YesNo` still exists (`FieldType.php:43`), so the table's types are
+   an allow-list. Repeat forms are not OCR-compatible (`CapabilityFlags.php:127-136`), so the paper table touches no scan.
+
+### Remedy verdict
+- `R-bb79aec0`: **wrong in its form arm** — "a form on serve through the linked-choices endpoint keyed `<key>.rows`" breaks premise 4's
+  readers; `D161` copies both arms at publish instead, through the materializer, as T3 does for a flat list. The `{kind, …}` shape is
+  replaced by split keys mirroring T3's (`rows_list`/`rows_source`, `cells_list`/`cells_source`, `columns[i].options_list`/`options_source`)
+  so `LinkedChoicesEditor`, `ChoiceSource::of()` and `LinkedChoiceService::linkOf()` work through a key-rename view.
+- `R-7418e6bd`: works in intent; **its path is false** (premise 1) — a store `setFieldConfig(uid, patch, {now})` that the Grid tab calls
+  debounced and the Preview immediately; the affordances are injected by the Preview so no builder code reaches the guest bundle.
+- `R-0a7275ce`: works as designed, with the migration (premise 6) and a table arm on the guest form, the encode page, the response PDF and
+  the printed form.
+
+Files: `app/Support/Forms/GridSources.php` (new), `app/Support/Forms/MatrixColumns.php`, `app/Http/Requests/Forms/UpdateFieldRequest.php`,
+`app/Support/Forms/FieldTypeConversion.php`, `app/Services/Forms/ChoiceListMaterializer.php`, `app/Services/Forms/LinkedChoiceService.php`,
+`app/Services/Forms/LinkedChoiceGate.php`, `app/Exceptions/Forms/PublishValidationException.php`,
+`app/Services/Forms/StructuralValidationGate.php`, `app/Services/Forms/FormSettingsPresenter.php`,
+`app/Services/Forms/ChoicePreviewPresenter.php`, `database/migrations/2026_08_17_000145_add_repeat_layout_to_form_sections_table.php`
+(new), `app/Enums/RepeatLayout.php` (new), `app/Models/FormSection.php`, `app/Http/Requests/Forms/UpdateSectionRequest.php`,
+`app/Services/Forms/FormBuilderService.php`, `app/Services/Forms/BuilderPresenter.php`, `app/Services/Forms/SchemaSnapshotSerializer.php`,
+`app/Services/Forms/SchemaBlueprintMaterializer.php`, `app/Support/Forms/RepeatTable.php` (new),
+`app/Services/Submissions/EncodeFormPresenter.php`, `app/Services/Submissions/SubmissionPdfPresenter.php`,
+`app/Services/Forms/BlankFormPrintPresenter.php`, `resources/views/pdf/submission.blade.php`, `resources/views/pdf/blank-form.blade.php`,
+`database/seeders/E2eSeeder.php`; `resources/js/components/builder/LinkedChoicesEditor.vue`, `grid-sources.ts` (new), `grid-options.ts`
+(new), `MatrixEditor.vue`, `LikertMatrixEditor.vue`, `GridOptionList.vue`, `ConfigPanel.vue`, `useBuilderStore.ts`, `preview-choices.ts`,
+`PreviewPane.vue`, `draft-snapshot.ts`, `types.ts`, `conflict-diff.ts`, `field-conversion.ts` (all `resources/js/components/builder/`);
+`resources/js/components/submissions/MatrixGrid.vue`, `grid-authoring.ts` (new), `GridCellControl.vue` (new), `RepeatTable.vue` (new),
+`repeat-table.ts` (new); `resources/public-runtime/components/RepeatGroup.vue`, `resources/public-runtime/lib/types.ts`,
+`resources/public-runtime/lib/schema-mapping.ts`; `resources/js/Pages/submissions/Encode.vue`; `resources/js/components/help/manual.ts`;
+`VERSION`, `database/data/releases.json`; the tests each commit names (Pest under `tests/Feature/Forms`, `tests/Feature/Submissions`,
+`tests/Unit/Forms`; Vitest beside each file; `tests/fixtures/repeat-table.json` (new); e2e `tests/e2e/builder-preview-authoring.spec.ts`,
+`tests/e2e/repeat-table.spec.ts` (new)).
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md`, `docs/data-dictionary.md`,
+`PROGRESS.md` (own block, at close), the top-level e2e specs above.
+Paired files taken: `app/Support/Forms/RepeatTable.php` ↔ `resources/js/components/submissions/repeat-table.ts` (one fixture);
+`draft-snapshot.ts` `RawSection` ↔ `resources/public-runtime/lib/types.ts` (`DraftProjectionMirrorDriftTest`).
+Namespaces spent: `D161`; migration prefix `2026_08_17_000145`; no ADR.
+E2E specs the diff reaches, run locally: `builder-preview-authoring`, `builder-axe`, `public-runtime-axe`, `responsive-axe`, `list-layout`,
+the new `repeat-table`; CI runs every spec.
+Prediction: red first commit by commit — the request and save cases with `FieldSaveAttributeNamesTest`; the publish, clone and preview
+Pest cases; the editor, preview and grid Vitest cases; then in the table's attribute commit `DraftProjectionMirrorDriftTest` (10 → 11),
+`DocumentedCheckConstraintDriftTest`/`DocumentedEnumCatalogDriftTest` and `TenantExtractColumnDriftTest` until the dictionary moves. All
+green after. About twelve mutants, each turning only its named cases. **Most likely wrong:** `builder-axe` once the seeded grid's Preview
+gains buttons (the card-mode column strip). Runner-up: the citation-liveness ceiling after the `MatrixGrid.vue` header rewrite.
+
+## HELD — `M184`, T3 of the testers' items: options from anywhere (`R-f655f9b1`, `R-3e7c81bb`, `R-596d6afd`, `R-d8c2ce84`, with `R-1059e9bd`) (m184-t3-options-from-anywhere)
 
 Taken 2026-10-23. Branch `m184-t3-options-from-anywhere`, cut from origin/main at `a7705dc6`, PR into main. ⛔ **NOT MERGED THIS
 SESSION:** it is held green for merge point 5 with T4 (`D137`, `D138`: … merge point 4 → T3 → T4 → merge point 5). The plan of

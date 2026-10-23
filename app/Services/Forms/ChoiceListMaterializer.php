@@ -152,6 +152,52 @@ final class ChoiceListMaterializer
     }
 
     /**
+     * M184 (`R-d8c2ce84`): a DRAFT's list-bound questions as publishing would write them, for the builder's preview —
+     * which otherwise has nothing to show, the draft holding only the lists' names. A cascade comes in the guest
+     * payload's tuple shape ({@see listsForBrowser()}). A question whose list cannot be used is left out: the builder says
+     * why where the list is chosen, and publish refuses it in words.
+     *
+     * @return array{cascades: array<string, array{levels: list<string>, options: list<list<int|string|null>>}>, flat: array<string, list<array{value: string, label: string}>>, suggestions: array<string, list<string>>}
+     */
+    public function forDraft(FormVersion $draft): array
+    {
+        $built = ['cascades' => [], 'flat' => [], 'suggestions' => []];
+        $lists = FormVersionChoiceList::query()->where('form_version_id', $draft->id)->get()->keyBy('name');
+        if ($lists->isEmpty()) {
+            return $built;
+        }
+
+        foreach (FormField::query()->where('form_version_id', $draft->id)->orderBy('id')->get() as $field) {
+            $config = (array) $field->config;
+
+            if ($field->field_type === FieldType::CascadingSelect && self::isListBacked($config)) {
+                $levels = array_values(array_filter((array) $config['levels'], is_array(...)));
+                $options = $this->optionsFor($field->key, $levels, $lists);
+                if (is_array($options)) {
+                    $keys = array_map(static fn (array $level): string => (string) ($level['key'] ?? ''), $levels);
+                    $index = array_flip($keys);
+                    $built['cascades'][$field->key] = [
+                        'levels' => $keys,
+                        'options' => array_map(static fn (array $o): array => [$index[$o['level']] ?? 0, $o['value'], $o['label'], $o['parent']], $options),
+                    ];
+                }
+            } elseif (($config['options_list'] ?? null) !== null) {
+                $options = $this->flatOptionsFor($field, $config, $lists);
+                if (is_array($options)) {
+                    $built['flat'][$field->key] = $options;
+                }
+            } elseif ($field->field_type === FieldType::ShortText && (is_array($config['suggestions_source'] ?? null) && ($config['suggestions_source']['kind'] ?? null) === 'list')) {
+                $suggestions = $this->suggestionsFor($field->key, $config, $lists);
+                if (is_array($suggestions)) {
+                    $built['suggestions'][$field->key] = $suggestions;
+                }
+            }
+        }
+
+        return $built;
+    }
+
+    /**
      * Write each list-backed cascade's options into the draft being published. Its fields are already locked.
      *
      * @throws PublishValidationException naming every cascade whose lists cannot be read

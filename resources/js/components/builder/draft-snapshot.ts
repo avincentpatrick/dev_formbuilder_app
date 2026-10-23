@@ -55,6 +55,7 @@
 
 import { choiceSourceOf } from './choice-source';
 import { parseExpression } from './condition-model';
+import { applyPreviewChoices, type PreviewChoices } from './preview-choices';
 import type { BuilderValidation, LocalField, LocalSection, Uid } from './types';
 
 import type {
@@ -106,6 +107,11 @@ export interface DraftProjectionInput {
     version: { id: string; version_number: number };
     sections: LocalSection[];
     fields: LocalField[];
+    /**
+     * M184 (`R-d8c2ce84`): the choices the draft takes from elsewhere, as the server read them for the preview. Applied
+     * BEFORE the shape is taken, so their arrival moves the shape and the runtime is rebuilt with them.
+     */
+    choices?: PreviewChoices | null;
 }
 
 export interface DraftProjection {
@@ -474,11 +480,12 @@ export function projectDraft(input: DraftProjectionInput): DraftProjection {
         },
     };
 
-    const shape = shapeOf(schemaSnapshot);
-    schema.version.checksum = shape;
+    const projected = input.choices ? applyPreviewChoices(schema, input.choices) : schema;
+    const shape = shapeOf(projected.version.schema);
+    projected.version.checksum = shape;
 
     return {
-        schema,
+        schema: projected,
         issues,
         uidByKey,
         keyByUid,

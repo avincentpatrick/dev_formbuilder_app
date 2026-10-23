@@ -266,12 +266,9 @@ export function previewLimitations(): string[] {
         // shares with the real form is not one. `M120` had already taken its other clause, once
         // `single_page_mode` gained a writer.
         'In a repeatable section, changed wording shows after you next add, move or delete something.',
-        // M133 (`R-5da4a30f`): the list is read live from the other form's answers and served to the live form only;
-        // the preview has no respondent link to fetch it with. The remainder row owns showing it here.
-        'Choices taken from another form appear on the live form, not here.',
-        // M141 (`R-f69aab42`): a cascade's CSV lists become its choices when the form is published; the draft holds only
-        // the lists' names, so the preview has none to show.
-        'Choices from CSV files appear on the live form once it is published, not here.',
+        // M184 (`R-d8c2ce84`) DELETED two entries: "Choices taken from another form appear on the live form, not here" and
+        // "Choices from CSV files appear on the live form once it is published, not here". The preview now reads both
+        // (`preview-choices.ts`), and a long list's question says how much of it is shown.
         // M151 (`R-2baef8ea`): a repeat's members are drawn by the respondent's own `RepeatGroup`, and a question its
         // condition hides has an empty row — neither has a place on screen to drag from.
         'Questions inside a repeatable section, and questions their condition hides, are moved in Structure.',

@@ -76,8 +76,9 @@ export function hasChoiceLists(schema: SchemaResponse): boolean {
 /**
  * A copy of `schema` whose CSV-backed cascades carry their lists as ordinary options, and a note where a list is
  * missing. `lists` null means the request failed. Every other field, and the schema object itself, is untouched.
+ * `unavailable` lets the builder's preview (M184) say what a missing list means there; the guest page's is the default.
  */
-export function mergeChoiceLists(schema: SchemaResponse, lists: ChoiceLists | null): SchemaResponse {
+export function mergeChoiceLists(schema: SchemaResponse, lists: ChoiceLists | null, unavailable: string = CHOICE_LIST_UNAVAILABLE): SchemaResponse {
     if (!hasChoiceLists(schema)) {
         return schema;
     }
@@ -89,7 +90,7 @@ export function mergeChoiceLists(schema: SchemaResponse, lists: ChoiceLists | nu
 
         const list = lists?.[field.key];
         if (list === undefined) {
-            const hint = [field.hint, CHOICE_LIST_UNAVAILABLE].filter((part) => part !== null && part !== undefined && part !== '').join(' ');
+            const hint = [field.hint, unavailable].filter((part) => part !== null && part !== undefined && part !== '').join(' ');
 
             return { ...field, hint, config: { ...(field.config ?? {}), options: [] } };
         }

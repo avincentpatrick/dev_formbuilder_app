@@ -92,9 +92,14 @@ export function hasLinkedChoices(schema: SchemaResponse): boolean {
 /**
  * A copy of `schema` whose linked questions carry their lists as typed choices, and a note where a list is missing
  * or empty. `lists` null means the request failed. Every other field, and the schema object itself, is untouched —
- * the cached response is never mutated.
+ * the cached response is never mutated. `notes` lets the builder's preview (M184) say what a missing list means there;
+ * the guest page's own sentences are the default.
  */
-export function mergeLinkedChoices(schema: SchemaResponse, lists: LinkedChoiceLists | null): SchemaResponse {
+export function mergeLinkedChoices(
+    schema: SchemaResponse,
+    lists: LinkedChoiceLists | null,
+    notes: { unavailable: string; empty: string } = { unavailable: LINKED_CHOICES_UNAVAILABLE, empty: LINKED_CHOICES_EMPTY },
+): SchemaResponse {
     if (!hasLinkedChoices(schema)) {
         return schema;
     }
@@ -113,7 +118,7 @@ export function mergeLinkedChoices(schema: SchemaResponse, lists: LinkedChoiceLi
 
         const list = lists?.[field.key];
         const usable = list !== undefined && list.available;
-        const note = !usable ? LINKED_CHOICES_UNAVAILABLE : list.options.length === 0 ? LINKED_CHOICES_EMPTY : null;
+        const note = !usable ? notes.unavailable : list.options.length === 0 ? notes.empty : null;
         const hint = note === null ? field.hint : [field.hint, note].filter((part) => part !== null && part !== undefined && part !== '').join(' ');
 
         return {

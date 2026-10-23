@@ -302,3 +302,66 @@ test('Builder — questions dragged in the preview: reordered, into a new sectio
         await archive(page, formId);
     }
 });
+
+/*
+ * M185 (`R-7418e6bd`, relayed `R1-7b`) — the testers' "if the grid can be manipulated in the preview like in kobo, it can add
+ * rows and columns in the preview". On a fresh Grid: "+ Add column" and "+ Add row" in the Preview each save once and open
+ * the new header for its name, Enter saves the name once and puts the keyboard back on its rename, the Grid tab shows what
+ * the Preview made, and Undo takes the last name back.
+ */
+test('Builder — a grid’s rows and columns added and named in the preview, each saved once, and undone', async ({ page }, info) => {
+    test.setTimeout(180_000);
+    const formId = await createForm(page, `Preview grid ${info.project.name} ${Date.now()}`);
+    const patch = () => page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes(`/forms/${formId}/fields/`) && r.ok());
+
+    try {
+        await showBuilderPane(page, 'fields');
+        await page.locator('.palette').getByRole('button', { name: /^Matrix \(grid\)/ }).click();
+        await settled(page);
+        await openPreview(page);
+
+        const grid = page.locator('[data-preview-field] [data-matrix-grid]').first();
+        await expect(grid).toBeVisible({ timeout: 15_000 });
+
+        let saving = patch();
+        await grid.locator('[data-grid-add-column]').click();
+        await saving;
+        let name = grid.getByRole('textbox', { name: 'Name of the column' });
+        await expect(name).toBeFocused();
+        await name.fill('Stocked');
+        saving = patch();
+        await name.press('Enter');
+        await saving;
+        await expect(grid.locator('[data-grid-rename-column="col_1"]')).toBeFocused();
+
+        saving = patch();
+        await grid.locator('[data-grid-add-row]').click();
+        await saving;
+        name = grid.getByRole('textbox', { name: 'Name of the row' });
+        await expect(name).toBeFocused();
+        await name.fill('Ward 1');
+        saving = patch();
+        await name.press('Enter');
+        await saving;
+        await expect(grid.locator('[data-grid-rename-row="row_1"]')).toBeFocused();
+        await expect(grid).toContainText('Ward 1');
+        await expect(grid).toContainText('Stocked');
+        await assertClean(page, 'builder preview with a grid being edited');
+        await saved(page);
+
+        await showBuilderPane(page, 'canvas');
+        await page.locator('.builder__centre-tabs').getByText('Structure').click();
+        await page.locator('.canvas__field-main').first().click();
+        await configTab(page, 'Grid');
+        const rowLabel = page.locator('.config').getByRole('textbox', { name: 'Row 1 label' });
+        await expect(rowLabel).toHaveValue('Ward 1');
+        await expect(page.locator('.config').getByRole('textbox', { name: 'Column 1 label' })).toHaveValue('Stocked');
+
+        saving = patch();
+        await page.getByRole('button', { name: 'Undo' }).click();
+        await saving;
+        await expect(rowLabel).toHaveValue('Row 1');
+    } finally {
+        await archive(page, formId);
+    }
+});

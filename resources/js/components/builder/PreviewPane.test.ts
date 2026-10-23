@@ -983,4 +983,39 @@ describe('PreviewPane — a grid header renamed in place (M185, R-7418e6bd)', ()
 
         wrapper.unmount();
     });
+
+    it('makes a rebuild still waiting on its debounce when a grid header closes, so the keyboard lands on the grid that stays', async () => {
+        // Measured in e2e at desktop width: a row added and named inside the 300 ms debounce got its focus back, and the
+        // rebuild that fell due a moment later remounted the grid under it — the rename button lost the keyboard.
+        let provided: GridAuthoring | null = null;
+        const Grab = defineComponent({
+            setup() {
+                provided = inject(GridAuthoringKey, null);
+
+                return () => h('div');
+            },
+        });
+        const double = twoSections();
+        const wrapper = mount(PreviewPane, {
+            props: { store: double.store, form: formProp(), draft: { id: 'ver-1', version_number: 1 }, active: true },
+            global: { stubs: { FieldRow: Grab, RepeatGroup: true } },
+        });
+        await flushPromises();
+        expect(created).toHaveLength(1);
+
+        provided!.open({ key: 'q1', part: 'rows', value: 'row_1' });
+        double.fields.value = double.fields.value.map((f) => (f.key === 'q2' ? { ...f, key: 'renamed' } : f));
+        await flushPromises();
+        vi.advanceTimersByTime(PREVIEW_REBUILD_DEBOUNCE_MS / 3);
+        provided!.cancel();
+        await flushPromises();
+
+        expect(created).toHaveLength(2);
+
+        vi.advanceTimersByTime(PREVIEW_REBUILD_DEBOUNCE_MS * 4);
+        await flushPromises();
+        expect(created).toHaveLength(2);
+
+        wrapper.unmount();
+    });
 });

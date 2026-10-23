@@ -203,8 +203,10 @@ function settle(): void {
     rebuild();
 }
 
+// M185: and one still waiting on its debounce lands now too — a grid row added and named inside the 300 ms would otherwise
+// get its keyboard back, then lose it to the rebuild a moment later (measured in e2e at desktop width).
 watch(held, (isHeld) => {
-    if (!isHeld && heldRebuild && props.active) {
+    if (!isHeld && (heldRebuild || timer !== null) && props.active) {
         rebuild();
     }
 });

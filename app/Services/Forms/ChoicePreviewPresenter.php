@@ -22,6 +22,9 @@ use App\Models\FormVersion;
  * still opens onto its provinces — and carries its full size, so the preview can say "the first 200 of 42,010".
  *
  * Shaped like the guest endpoints' payloads, so the runtime's own merge functions take them unchanged.
+ *
+ * M185 (`R-bb79aec0`, `D161`): a draft's grids too — their rows, cells and choice columns copied from a list or a form, as
+ * publishing will copy them ({@see ChoiceListMaterializer::gridsForDraft()}). A published version's are in its snapshot.
  */
 final class ChoicePreviewPresenter
 {
@@ -41,7 +44,7 @@ final class ChoicePreviewPresenter
             ->all();
         $built = $this->lists->forDraft($draft);
 
-        return $this->payload($this->links->listsForFields($form, $fields), $built['cascades'], $built['flat'], $built['suggestions']);
+        return $this->payload($this->links->listsForFields($form, $fields), $built['cascades'], $built['flat'], $built['suggestions'], $this->lists->gridsForDraft($draft));
     }
 
     /**
@@ -52,7 +55,7 @@ final class ChoicePreviewPresenter
      */
     public function forVersion(Form $form, FormVersion $version): array
     {
-        return $this->payload($this->links->listsFor($form, $version), ChoiceListMaterializer::listsForBrowser($version), [], []);
+        return $this->payload($this->links->listsFor($form, $version), ChoiceListMaterializer::listsForBrowser($version), [], [], []);
     }
 
     /**
@@ -60,16 +63,25 @@ final class ChoicePreviewPresenter
      * @param  array<string, array{levels: list<string>, options: list<list<int|string|null>>}>  $cascades
      * @param  array<string, list<array{value: string, label: string}>>  $flat
      * @param  array<string, list<string>>  $suggestions
+     * @param  array<string, array{rows?: list<array{value: string, label: string}>, cells?: list<array{value: string, label: string}>, columns?: array<string, list<array{value: string, label: string}>>}>  $grids
      * @return array<string, mixed>
      */
-    private function payload(array $linked, array $cascades, array $flat, array $suggestions): array
+    private function payload(array $linked, array $cascades, array $flat, array $suggestions, array $grids): array
     {
+        $cut = static fn (array $options): array => ['options' => array_slice($options, 0, self::SHOWN), 'total' => count($options)];
+
         return [
             // A link's list is already capped at LinkedChoiceService::MAX_CHOICES, and says when it was cut.
             'linked' => (object) $linked,
             'cascades' => (object) array_map(self::cutCascade(...), $cascades),
             'flat' => (object) array_map(static fn (array $options): array => ['options' => array_slice($options, 0, self::SHOWN), 'total' => count($options)], $flat),
             'suggestions' => (object) array_map(static fn (array $items): array => ['suggestions' => array_slice($items, 0, self::SHOWN), 'total' => count($items)], $suggestions),
+            // M185: a grid's copied lists, each cut as a flat list is; a column's keyed by the column's value.
+            'grids' => (object) array_map(static fn (array $grid): array => array_filter([
+                'rows' => isset($grid['rows']) ? $cut($grid['rows']) : null,
+                'cells' => isset($grid['cells']) ? $cut($grid['cells']) : null,
+                'columns' => isset($grid['columns']) ? (object) array_map($cut, $grid['columns']) : null,
+            ], static fn (mixed $part): bool => $part !== null), $grids),
         ];
     }
 

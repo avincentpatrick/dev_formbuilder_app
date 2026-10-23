@@ -524,6 +524,9 @@ export function shapeOf(snapshot: RawSchemaSnapshot): string {
         f.default_value,
         f.default_value_is_expression ?? false,
         optionValuesOf(f.config),
+        // M185 (`R-7418e6bd`): a grid's row, column and choice values feed the engine's own value lists, so a row added or a
+        // column re-typed rebuilds it — else the engine would prune an answer in the new row. Labels never do.
+        gridValuesOf(f.field_type, f.config),
         // M177 (`R-f44e9d00`): Show to respondents decides what renders, and an Always calculation shows its formula's
         // value — so both rebuild the runtime, as an option value does.
         f.config?.visibility ?? null,
@@ -533,6 +536,19 @@ export function shapeOf(snapshot: RawSchemaSnapshot): string {
     ]);
 
     return JSON.stringify({ sections, fields });
+}
+
+/** A grid's VALUES only — its rows', its columns' (with each column's type and own choices) and its cells'; null off a grid. */
+function gridValuesOf(type: string, config: Record<string, unknown> | null): unknown {
+    if (config === null || (type !== 'matrix' && type !== 'likert_matrix')) return null;
+
+    const values = (list: unknown): unknown[] =>
+        Array.isArray(list) ? list.map((o) => (o !== null && typeof o === 'object' && 'value' in o ? (o as { value: unknown }).value : null)) : [];
+    const columns = Array.isArray(config.columns)
+        ? config.columns.map((c) => (c !== null && typeof c === 'object' ? [(c as { value?: unknown }).value ?? null, (c as { type?: unknown }).type ?? null, values((c as { options?: unknown }).options)] : null))
+        : [];
+
+    return [values(config.rows), columns, values(config.cells)];
 }
 
 /** Option VALUES only — a relabelled option must not rebuild the runtime. */

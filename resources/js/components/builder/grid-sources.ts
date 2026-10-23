@@ -40,6 +40,22 @@ export function withChoiceConfig(config: Record<string, unknown>, slot: GridSlot
     return next;
 }
 
+/**
+ * Where every list of a grid comes from — its rows', its cells' and each column's sources, in order — or null when all are
+ * typed here. The Preview reads the lists again whenever this changes.
+ */
+export function gridSourcesOf(config: Record<string, unknown>): unknown[] | null {
+    const columns = Array.isArray(config.columns) ? config.columns : [];
+    const own = columns.flatMap((column) => {
+        const c = column !== null && typeof column === 'object' ? (column as Record<string, unknown>) : {};
+
+        return [c.options_list ?? null, c.options_source ?? null];
+    });
+    const parts = [config.rows_list ?? null, config.rows_source ?? null, config.cells_list ?? null, config.cells_source ?? null, ...own];
+
+    return parts.some((part) => part !== null) ? parts : null;
+}
+
 /** Whether the slot's items come from a list file or another form rather than being typed here. */
 export function slotIsSourced(config: Record<string, unknown>, slot: GridSlot): boolean {
     return choiceSourceOf(asChoiceConfig(config, slot)) !== 'typed';

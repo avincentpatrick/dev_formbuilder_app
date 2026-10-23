@@ -209,6 +209,55 @@ final class ChoiceListMaterializer
     }
 
     /**
+     * M185 (`R-bb79aec0`, `D161`): a DRAFT's sourced grids as publishing would copy them in, for the builder's preview — each
+     * grid's rows, cells and choice columns (by the column's value) that can be built today. A slot that cannot is left out;
+     * the chooser says why, and publish refuses it in words.
+     *
+     * @return array<string, array{rows?: list<array{value: string, label: string}>, cells?: list<array{value: string, label: string}>, columns?: array<string, list<array{value: string, label: string}>>}>
+     */
+    public function gridsForDraft(FormVersion $draft): array
+    {
+        $grids = [];
+        $lists = null;
+        $destination = null;
+
+        $fields = FormField::query()
+            ->where('form_version_id', $draft->id)
+            ->whereIn('field_type', [FieldType::Matrix->value, FieldType::LikertMatrix->value])
+            ->orderBy('id')
+            ->get();
+
+        foreach ($fields as $field) {
+            $config = (array) $field->config;
+            if (! GridSources::declaresAny($field->field_type, $config)) {
+                continue;
+            }
+
+            $lists ??= FormVersionChoiceList::query()->where('form_version_id', $draft->id)->get()->keyBy('name');
+            $destination ??= Form::query()->whereKey($draft->form_id)->first();
+            $built = [];
+
+            foreach (GridSources::slots($field->field_type, $config) as $slot) {
+                $items = $this->slotItems($field->key, $config, $slot, $lists, $destination);
+                if (! is_array($items)) {
+                    continue;
+                }
+                if ($slot['part'] === 'column') {
+                    $built['columns'][(string) ($config['columns'][$slot['at']]['value'] ?? '')] = $items;
+                } else {
+                    $built[$slot['part']] = $items;
+                }
+            }
+
+            if ($built !== []) {
+                $grids[$field->key] = $built;
+            }
+        }
+
+        return $grids;
+    }
+
+    /**
      * Write each list-backed cascade's options into the draft being published. Its fields are already locked.
      *
      * @throws PublishValidationException naming every cascade whose lists cannot be read

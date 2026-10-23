@@ -917,3 +917,35 @@ describe('a label edited in place in Preview (M151, R-74c3cf35)', () => {
         expect(editButton(wrapper).exists()).toBe(false);
     });
 });
+
+describe('PreviewPane — a grid’s lists from elsewhere (M185, R-bb79aec0)', () => {
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it('reads the choices again when a grid’s source changes, and not when only a row is renamed', async () => {
+        const fetched = vi.fn(() => Promise.resolve(new Response(JSON.stringify({ data: null }), { status: 200 })));
+        vi.stubGlobal('fetch', fetched);
+        const grid = field('check', {
+            form_section_id: 'sec-s1',
+            field_type: 'matrix',
+            config: { rows: [], rows_list: 'wards', columns: [{ value: 'c', label: 'C' }], cells: [{ value: 'y', label: 'Yes' }] },
+        });
+        const double = makeStore([grid], [section('s1')]);
+        const wrapper = mountPane(double);
+        await flushPromises();
+
+        expect(fetched).toHaveBeenCalledTimes(1);
+        expect(String((fetched.mock.calls[0] as unknown[])[0])).toBe('/forms/form-1/choices');
+
+        double.fields.value = [{ ...grid, config: { ...grid.config, rows_list: 'zones' } }];
+        await flushPromises();
+        expect(fetched).toHaveBeenCalledTimes(2);
+
+        double.fields.value = [{ ...grid, config: { ...grid.config, rows_list: 'zones', columns: [{ value: 'c', label: 'Stocked' }] } }];
+        await flushPromises();
+        expect(fetched).toHaveBeenCalledTimes(2);
+
+        wrapper.unmount();
+    });
+});

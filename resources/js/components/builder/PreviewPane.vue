@@ -43,6 +43,7 @@ import type { BuilderPageProps } from './types';
 import { useFlipReorder } from './useFlipReorder';
 import { usePreviewReorder } from './usePreviewReorder';
 import { fetchPreviewChoices, previewChoicesUrl, type PreviewChoices } from './preview-choices';
+import { gridSourcesOf } from './grid-sources';
 import { isListBacked } from '../../../public-runtime/lib/choice-lists';
 import { isoClock } from '../../../public-runtime/lib/schema-mapping';
 import type { AnswerMap, SchemaResponse } from '../../../public-runtime/lib/types';
@@ -66,8 +67,8 @@ const previewChoices = ref<PreviewChoices | null>(null);
 const boundSources = computed(() =>
     JSON.stringify(
         props.store.fields.value
-            .filter((f) => f.config.options_source != null || f.config.options_list != null || f.config.suggestions_source != null || (f.field_type === 'cascading_select' && isListBacked(f.config)))
-            .map((f) => [f.key, f.field_type, f.config.options_source ?? null, f.config.options_list ?? null, f.config.suggestions_source ?? null, f.config.levels ?? null]),
+            .filter((f) => f.config.options_source != null || f.config.options_list != null || f.config.suggestions_source != null || (f.field_type === 'cascading_select' && isListBacked(f.config)) || gridSourcesOf(f.config) !== null)
+            .map((f) => [f.key, f.field_type, f.config.options_source ?? null, f.config.options_list ?? null, f.config.suggestions_source ?? null, f.config.levels ?? null, gridSourcesOf(f.config)]),
     ),
 );
 let choicesRead = 0;

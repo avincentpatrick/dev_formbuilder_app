@@ -56,6 +56,55 @@ describe('applyPreviewChoices', () => {
     });
 });
 
+describe('applyPreviewChoices — a grid’s copied lists (M185, R-bb79aec0, D161)', () => {
+    function gridSchema() {
+        return schemaResponse({
+            versionId: 'draft-1',
+            fields: [
+                field({
+                    key: 'check',
+                    field_type: 'matrix',
+                    config: {
+                        rows: [],
+                        rows_list: 'wards',
+                        columns: [
+                            { value: 'svc', label: 'Services', type: 'multi_select', options_source: { form_id: 'src', field_key: 'service' } },
+                            { value: 'grade', label: 'Grade', options: [{ value: 'a', label: 'Good' }] },
+                        ],
+                        cells: [],
+                    },
+                }),
+            ],
+        });
+    }
+
+    it('writes the rows, the cells and a column’s choices over the grid’s own keys, the other columns untouched', () => {
+        const [grid] = applyPreviewChoices(gridSchema(), {
+            ...NONE,
+            grids: {
+                check: {
+                    rows: { options: [{ value: 'w1', label: 'Ward 1' }], total: 1 },
+                    cells: { options: [{ value: 'y', label: 'Yes' }], total: 1 },
+                    columns: { svc: { options: [{ value: 'Lab', label: 'Lab' }], total: 1 } },
+                },
+            },
+        }).version.schema.fields;
+
+        expect(grid.config?.rows).toEqual([{ value: 'w1', label: 'Ward 1' }]);
+        expect(grid.config?.cells).toEqual([{ value: 'y', label: 'Yes' }]);
+        expect((grid.config?.columns as Record<string, unknown>[])[0].options).toEqual([{ value: 'Lab', label: 'Lab' }]);
+        expect((grid.config?.columns as Record<string, unknown>[])[1]).toEqual({ value: 'grade', label: 'Grade', options: [{ value: 'a', label: 'Good' }] });
+        expect(grid.hint ?? null).toBeNull();
+    });
+
+    it('says how much of a column’s long list is shown, and leaves a payload with no grids alone', () => {
+        const cut = applyPreviewChoices(gridSchema(), { ...NONE, grids: { check: { columns: { svc: { options: [{ value: 'a', label: 'A' }], total: 1000 } } } } });
+
+        expect(cut.version.schema.fields[0].hint).toBe('Showing the first 1 of 1,000 choices here; the form shows them all.');
+        expect(applyPreviewChoices(gridSchema(), NONE).version.schema.fields[0].config?.rows).toEqual([]);
+    });
+});
+
 describe('previewChoicesUrl', () => {
     it('reads the draft\'s choices, or a published version\'s', () => {
         expect(previewChoicesUrl('form 1')).toBe('/forms/form%201/choices');

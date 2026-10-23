@@ -551,6 +551,23 @@ group('9. rule rows — screened through the engine’s own lowering (M145, R-55
     });
 });
 
+group('a grid’s rows and columns rebuild the preview’s engine (M185, R-7418e6bd)', () => {
+    const grid = (rows: { value: string; label: string }[], columns: Record<string, unknown>[] = [{ value: 'c', label: 'C' }]) =>
+        projectDraft(input([field({ uid: 'u1', field_type: 'matrix', config: { rows, columns, cells: [{ value: 'y', label: 'Yes' }] } })])).shape;
+
+    it('moves when a row or a column is added, or a column re-typed — the engine prunes answers to its own value lists', () => {
+        const one = grid([{ value: 'row_1', label: 'Row 1' }]);
+
+        expect(grid([{ value: 'row_1', label: 'Row 1' }, { value: 'row_2', label: 'Row 2' }])).not.toBe(one);
+        expect(grid([{ value: 'row_1', label: 'Row 1' }], [{ value: 'c', label: 'C' }, { value: 'd', label: 'D' }])).not.toBe(one);
+        expect(grid([{ value: 'row_1', label: 'Row 1' }], [{ value: 'c', label: 'C', type: 'integer' }])).not.toBe(one);
+    });
+
+    it('stays when a row or a column is only renamed', () => {
+        expect(grid([{ value: 'row_1', label: 'Ward 1' }], [{ value: 'c', label: 'Stocked' }])).toBe(grid([{ value: 'row_1', label: 'Row 1' }]));
+    });
+});
+
 group('a formula default reaches the preview (M180, R-20784770)', () => {
     it('projects the default\'s formula flag, and a change to it alone moves the shape', () => {
         const fixed = projectDraft(input([field({ uid: 'u1', default_value: 'today()' })]));

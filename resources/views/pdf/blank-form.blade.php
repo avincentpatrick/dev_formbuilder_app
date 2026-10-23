@@ -107,6 +107,32 @@
                 <p class="block__desc">{{ $block['description'] }}</p>
             @endif
 
+            {{-- M185 (`R-0a7275ce`): a repeatable section laid out as a table - a column per question, a numbered blank row
+                 per entry, each cell a line to write on or the question's tick boxes, as a grid's cells are. --}}
+            @if (($block['table'] ?? null) !== null)
+                <table class="grid">
+                    <tr>
+                        <th class="grid__row"></th>
+                        @foreach ($block['table']['columns'] as $column)
+                            <th>{{ $column['label'] }}@if ($column['required'])<span class="q__req"> *</span>@endif
+                                @if ($column['conditional'])<span class="q__flag">(if applicable)</span>@endif</th>
+                        @endforeach
+                    </tr>
+                    @for ($row = 1; $row <= $block['table']['rows']; $row++)
+                        <tr>
+                            <td class="grid__row">{{ $block['label'] }} {{ $row }}</td>
+                            @foreach ($block['table']['columns'] as $column)
+                                @if ($column['kind'] === 'choices')
+                                    <td class="grid__cell">@foreach ($column['options'] as $option)<span class="choice"><span class="choice__box"></span>{{ $option['label'] }}</span>@endforeach</td>
+                                @else
+                                    <td class="grid__cell"><div class="grid__line"></div></td>
+                                @endif
+                            @endforeach
+                        </tr>
+                    @endfor
+                </table>
+            @endif
+
             @foreach ($block['fields'] as $field)
                 @if ($field['area'] === 'page_break')
                     {{-- An authored page break. Emitted as an empty block box rather than wrapped in

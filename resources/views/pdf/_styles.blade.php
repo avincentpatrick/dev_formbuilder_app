@@ -66,6 +66,12 @@ body { font-family: sans-serif; font-size: 10pt; line-height: 1.45; color: #1a1a
     background-color: {{ $brand['tint'] }}; color: #121A2A;
 }
 .notice { margin: 2pt 0; color: #6a6a6a; font-style: italic; }
+/* M185: a repeatable section laid out as a table. dompdf repeats a thead on each page it breaks across. */
+.rt { width: 100%; border-collapse: collapse; margin-bottom: 3pt; table-layout: fixed; }
+.rt thead { display: table-header-group; }
+.rt__corner, .rt__col, .rt__row, .rt__cell { padding: 2.5pt 4pt; border-bottom: 0.5pt solid #c8c8c8; vertical-align: top; text-align: left; word-wrap: break-word; }
+.rt__col { color: #3a3a3a; font-weight: bold; }
+.rt__row { color: #3a3a3a; font-weight: normal; }
 
 .foot {
     margin-top: 16pt; padding-top: 6pt; border-top: 0.5pt solid #c8c8c8;

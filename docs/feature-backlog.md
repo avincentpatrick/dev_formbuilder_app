@@ -14441,7 +14441,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   responses from other forms"*. `resources/js/components/submissions/FieldInput.vue:224-277` renders a text question as a plain
   input, and `app/Http/Requests/Forms/UpdateFieldRequest.php:337-349` accepts no source on it. The remedy: `config.suggestions_source
   = {kind: list | form, …}` on Short text gives a type-ahead (a `<datalist>`-backed combobox) on the web form, the encode page
-  (`app/Services/Submissions/EncodeFormPresenter.php:629-655` already serves linked lists there) and the preview, while free text
+  (`app/Services/Submissions/EncodeFormPresenter.php:633-659` already serves linked lists there) and the preview, while free text
   stays accepted and the server never checks it; the chooser reads "Suggestions come from" on a text question. **Live.** Filed by `M172`.
   **Tier: early-testing.** **Taken by T3 (`M184`), 2026-10-23 (`D138`), for relayed `R1-3b`.** ✅ **CLOSED BY `M184` (2026-10-23):** Basics → **Suggestions come from** — No suggestions · A list file · Another form's answers (`config.suggestions_source`). A list's labels are written into `config.suggestions` at publish; another form's answers are served live like a linked choice question's. The web form, the manual-entry page and the preview tie the box to a `<datalist>` of at most 100 suggestions containing what is typed; any text is still an answer, on every channel. On the branch, held green for merge point 5 with T4 (`D137`, `D138`); relayed `R1-3b` is resolved once it is live.
 

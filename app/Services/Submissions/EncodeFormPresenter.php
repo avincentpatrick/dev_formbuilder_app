@@ -181,6 +181,7 @@ final class EncodeFormPresenter
                 'repeatable' => false,
                 'min_instances' => null,
                 'max_instances' => null,
+                'repeat_layout' => null,
                 'fields' => $ungrouped->map(fn (FormField $f): array => $this->field($form, $f, $sources, $answers))->values()->all(),
             ];
         }
@@ -201,6 +202,9 @@ final class EncodeFormPresenter
                 'repeatable' => $section->is_repeatable,
                 'min_instances' => $section->is_repeatable ? $section->min_instances : null,
                 'max_instances' => $section->is_repeatable ? $section->max_instances : null,
+                // M185 (`R-0a7275ce`): `table` when the author laid the section out as one; whether every question fits a
+                // cell is the page's to decide (`repeat-table.ts`), as the guest form decides it.
+                'repeat_layout' => $section->is_repeatable && $section->repeat_layout === 'table' ? 'table' : null,
                 'fields' => $sectionFields
                     ->map(fn (FormField $f): array => $this->field($form, $f, $sources, $answers))
                     ->values()->all(),

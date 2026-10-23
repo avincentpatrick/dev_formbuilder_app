@@ -240,6 +240,27 @@ it('projects a repeatable section with no instances as a visible step', function
         ->and($payload['steps'][0]['field_keys'])->toBe(['member_name']);
 });
 
+it('says which repeatable section the author laid out as a table, and keeps it across a publish (M185, R-0a7275ce)', function (): void {
+    $tenant = payloadTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+
+    $form = app(FormService::class)->create($tenant, $owner, 'Roster');
+    $draft = $form->draftVersion;
+    $hh = FormSection::create(['form_version_id' => $draft->id, 'key' => 'hh', 'label' => 'Members', 'sequence' => 1, 'is_repeatable' => true, 'repeat_layout' => 'table']);
+    // A section set to a table and then made not repeatable is no table: the layout means nothing outside a repeat.
+    $flat = FormSection::create(['form_version_id' => $draft->id, 'key' => 'about', 'label' => 'About', 'sequence' => 2, 'repeat_layout' => 'table']);
+    addFormField($draft, $owner, 'member_name', FieldType::ShortText, 1, ['form_section_id' => $hh->id]);
+    addFormField($draft, $owner, 'site', FieldType::ShortText, 2, ['form_section_id' => $flat->id]);
+    app(PublishService::class)->publish($form->refresh(), $owner);
+
+    $blocks = collect(encodePayloadFor($form->refresh())['blocks'])->keyBy('key');
+
+    expect($blocks['hh']['repeat_layout'])->toBe('table')
+        ->and($blocks['about']['repeat_layout'])->toBeNull()
+        ->and(FormSection::query()->where('form_version_id', $form->refresh()->draft_version_id)->where('key', 'hh')->value('repeat_layout'))->toBe('table');
+});
+
 it('emits the synthetic lead step for section-less fields, first', function (): void {
     $tenant = payloadTenant();
     $owner = User::factory()->create();

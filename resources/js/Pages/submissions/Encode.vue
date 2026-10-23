@@ -36,6 +36,8 @@ import { MdsAlert, MdsBreadcrumb, MdsButton, MdsCard, type BreadcrumbItem } from
 import PageHeader from '@/components/shell/PageHeader.vue';
 import { createServerAutosave } from '@/composables/useServerAutosave';
 import FieldInput, { type AnswerValue, type EncodeField } from '@/components/submissions/FieldInput.vue';
+import RepeatTableFrame, { type RepeatTableColumn } from '@/components/submissions/RepeatTableFrame.vue';
+import { drawsAsTable } from '@/components/submissions/repeat-table';
 import ScanPages from '@/components/ocr/ScanPages.vue';
 import { scanNote, type ScanNote, type ScanPage, type ScanReview } from '@/components/ocr/scan-review';
 import {
@@ -53,6 +55,8 @@ interface Block {
     repeatable: boolean;
     min_instances: number | null;
     max_instances: number | null;
+    /** M185 (`R-0a7275ce`): `table` when the author laid the section out as one. */
+    repeat_layout?: 'table' | null;
     fields: EncodeField[];
 }
 
@@ -522,6 +526,22 @@ function boundsHint(block: Block): string | null {
 
 function instanceLegend(block: Block, index: number): string {
     return `${block.label ?? 'Entry'} ${index + 1}`;
+}
+
+/**
+ * M185 (`R-0a7275ce`, `D129`): a repeatable section the author laid out as a table, drawn as one when every question fits a
+ * cell — the guest form's own rule (`repeat-table.ts`). The cells are this page's fields, as the cards' are.
+ */
+function asTable(step: RuntimeStep): boolean {
+    return drawsAsTable(blockFor(step)?.repeat_layout, rowsOf(step).map((field) => ({ field_type: field.field_type })));
+}
+
+function tableColumns(step: RuntimeStep): RepeatTableColumn[] {
+    return rowsOf(step).map((field) => ({ key: field.key, label: field.label, marker: field.required ? 'required' : 'none' }));
+}
+
+function memberOf(step: RuntimeStep, key: string): EncodeField {
+    return rowsOf(step).find((field) => field.key === key)!;
 }
 
 // ── Navigation ───────────────────────────────────────────────────────────────────────────────────────────
@@ -1515,6 +1535,40 @@ function onConflictKeydown(event: KeyboardEvent): void {
                                     <p v-if="runtime.instanceCount(step.sectionKey) === 0" class="encode__empty">
                                         Nothing added yet.
                                     </p>
+
+                                    <RepeatTableFrame
+                                        v-else-if="asTable(step)"
+                                        :label="blockFor(step)?.label ?? 'Entry'"
+                                        :columns="tableColumns(step)"
+                                        :rows="runtime.instanceUidsFor(step.sectionKey)"
+                                    >
+                                        <template #cell="{ index, column }">
+                                            <div
+                                                v-if="runtime.instanceFieldRelevant(step.sectionKey!, index, column.key)"
+                                                :id="anchorFor(runtime.instanceAddress(step.sectionKey!, index, column.key))"
+                                            >
+                                                <FieldInput
+                                                    :field="memberOf(step, column.key)"
+                                                    :model-value="instanceValue(step.sectionKey!, index, column.key)"
+                                                    :error="instanceError(step.sectionKey!, index, column.key)"
+                                                    :read-only="isEditing"
+                                                    @update:model-value="setInstanceValue(step.sectionKey!, index, column.key, $event)"
+                                                />
+                                            </div>
+                                        </template>
+                                        <template #actions="{ index }">
+                                            <MdsButton
+                                                type="button"
+                                                variant="tertiary"
+                                                size="sm"
+                                                icon-left="trash"
+                                                :aria-label="`Remove ${instanceLegend(blockFor(step)!, index)}`"
+                                                @click="removeInstance(step.sectionKey!, index)"
+                                            >
+                                                Remove
+                                            </MdsButton>
+                                        </template>
+                                    </RepeatTableFrame>
 
                                     <ol v-else class="encode__instances">
                                         <li v-for="(uid, index) in runtime.instanceUidsFor(step.sectionKey)" :key="uid">

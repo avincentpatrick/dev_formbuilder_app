@@ -5,26 +5,59 @@
  * renders one radio group over the scale. The publish gate verifies rows + columns are each non-empty with
  * distinct values. Each list is a plain `{value,label}[]` edited via the shared {@link GridOptionList};
  * every change emits a fresh array (one debounced history entry). M183 (`R-1c1d7266`): a Layout too ({@link GridLayoutSelect}).
+ *
+ * M185 (`R-bb79aec0`, `D161`): the statements may come from a list file or another form's answers, as a Grid's rows may
+ * (`MatrixEditor.vue` says how); the scale stays typed here.
  */
+import { computed } from 'vue';
+
+import { asChoiceConfig, slotIsSourced, withChoiceConfig } from './grid-sources';
 import GridLayoutSelect from './GridLayoutSelect.vue';
 import GridOptionList from './GridOptionList.vue';
+import LinkedChoicesEditor from './LinkedChoicesEditor.vue';
+import type { LinkableSource } from './types';
 
 interface Option {
     value: string;
     label: string;
 }
 
-defineProps<{ rows: Option[]; columns: Option[]; layout?: string | null }>();
+const props = defineProps<{
+    rows: Option[];
+    columns: Option[];
+    layout?: string | null;
+    /** M185: the grid's whole config — where its rows come from. Without it, no source is offered. */
+    config?: Record<string, unknown> | null;
+    sources?: LinkableSource[];
+    formId?: string | null;
+}>();
 const emit = defineEmits<{
     'update:rows': [value: Option[]];
     'update:columns': [value: Option[]];
     'update:layout': [value: string | null];
+    'update:config': [value: Record<string, unknown>];
 }>();
+
+const rowsSourced = computed(() => (props.config ? slotIsSourced(props.config, 'rows') : false));
+
+function setRows(view: Record<string, unknown>): void {
+    if (props.config) emit('update:config', withChoiceConfig(props.config, 'rows', view));
+}
 </script>
 
 <template>
     <div class="likert-matrix-editor">
+        <LinkedChoicesEditor
+            v-if="config"
+            kind="rows"
+            :config="asChoiceConfig(config, 'rows')"
+            :sources="sources ?? []"
+            :form-id="formId"
+            data-grid-rows-source
+            @update:config="setRows"
+        />
         <GridOptionList
+            v-if="!rowsSourced"
             heading="Rows"
             singular="Row"
             prefix="row"

@@ -708,7 +708,7 @@ watch(librarySaved, (value) => {
                     </template>
 
                     <template v-else-if="activeTab === 'grid' && configEditor === 'matrix'">
-                        <MatrixEditor
+                        <MatrixEditor :config="field.config" :sources="props.store.linkableSources" :form-id="store.formId" @update:config="field.config = $event; props.store.touch(field.uid, 'field')"
                             :rows="gridRows"
                             :columns="gridColumns"
                             :cells="gridCells"
@@ -721,7 +721,7 @@ watch(librarySaved, (value) => {
                     </template>
 
                     <template v-else-if="activeTab === 'grid'">
-                        <LikertMatrixEditor
+                        <LikertMatrixEditor :config="field.config" :sources="props.store.linkableSources" :form-id="store.formId" @update:config="field.config = $event; props.store.touch(field.uid, 'field')"
                             :rows="gridRows"
                             :columns="gridColumns"
                             :layout="gridLayout"

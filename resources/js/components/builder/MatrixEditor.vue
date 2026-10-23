@@ -9,12 +9,22 @@
  * a Required flag (its cell in every row) and, as a choice column, a list of its own; a choice column with none draws
  * on the Cell choices, and the hint under them names the columns that do. A column keeps every key it already had; a
  * column whose new type takes no choices drops its own. Both grids also take a Layout ({@link GridLayoutSelect}).
+ *
+ * M185 (`R-bb79aec0`, `D161`): the Rows, the Cell choices and a choice column's own choices may come from a list file or
+ * another form's answers — the one chooser ({@link LinkedChoicesEditor}) mounted over each, the rows and cells through
+ * `grid-sources.ts`, a column directly (its keys already are a question's). A sourced list hides its typed editor. A source
+ * change emits the whole config (`update:config`), one assignment and one undo entry in the panel. Offered only when the
+ * panel passes `config`; without it the editor is T2's.
  */
 import { MdsCheckbox, MdsFormField, MdsSelect } from '@meridian/design-system';
 import { computed } from 'vue';
 
+import { choiceSourceOf } from './choice-source';
+import { asChoiceConfig, slotIsSourced, withChoiceConfig } from './grid-sources';
 import GridLayoutSelect from './GridLayoutSelect.vue';
 import GridOptionList from './GridOptionList.vue';
+import LinkedChoicesEditor from './LinkedChoicesEditor.vue';
+import type { LinkableSource } from './types';
 
 interface Option {
     value: string;
@@ -38,13 +48,39 @@ const COLUMN_TYPES = [
 ];
 const CHOICE_TYPES = new Set(['single_select', 'multi_select']);
 
-const props = defineProps<{ rows: Option[]; columns: Column[]; cells: Option[]; layout?: string | null }>();
+const props = defineProps<{
+    rows: Option[];
+    columns: Column[];
+    cells: Option[];
+    layout?: string | null;
+    /** M185: the grid's whole config — where its lists come from. Without it, no source is offered. */
+    config?: Record<string, unknown> | null;
+    sources?: LinkableSource[];
+    formId?: string | null;
+}>();
 const emit = defineEmits<{
     'update:rows': [value: Option[]];
     'update:columns': [value: Column[]];
     'update:cells': [value: Option[]];
     'update:layout': [value: string | null];
+    'update:config': [value: Record<string, unknown>];
 }>();
+
+const rowsSourced = computed(() => (props.config ? slotIsSourced(props.config, 'rows') : false));
+const cellsSourced = computed(() => (props.config ? slotIsSourced(props.config, 'cells') : false));
+
+function columnSourced(column: Column): boolean {
+    return choiceSourceOf(column as unknown as Record<string, unknown>) !== 'typed';
+}
+
+function setSlot(slot: 'rows' | 'cells', view: Record<string, unknown>): void {
+    if (props.config) emit('update:config', withChoiceConfig(props.config, slot, view));
+}
+
+/** A column's chooser emits the whole column; it goes back in place, the other columns untouched. */
+function setColumnSource(index: number, column: Record<string, unknown>): void {
+    if (props.config) emit('update:config', { ...props.config, columns: props.columns.map((c, i) => (i === index ? (column as unknown as Column) : c)) });
+}
 
 /** A column's type as the grid reads it: none, or one a grid cannot hold, is a single choice. */
 function typeOf(column: Column): string {
@@ -92,15 +128,27 @@ function setOptions(index: number, options: Option[]): void {
     });
 }
 
-/** The choice columns with no list of their own — the ones the Cell choices serve. */
+/** The choice columns with no list of their own — the ones the Cell choices serve. A sourced column has its own (M185). */
 const cellChoiceUsers = computed(() =>
-    props.columns.filter((column) => takesChoices(column) && (column.options ?? []).length === 0).map((column) => column.label || column.value),
+    props.columns
+        .filter((column) => takesChoices(column) && (column.options ?? []).length === 0 && !columnSourced(column))
+        .map((column) => column.label || column.value),
 );
 </script>
 
 <template>
     <div class="matrix-editor">
+        <LinkedChoicesEditor
+            v-if="config"
+            kind="rows"
+            :config="asChoiceConfig(config, 'rows')"
+            :sources="sources ?? []"
+            :form-id="formId"
+            data-grid-rows-source
+            @update:config="setSlot('rows', $event)"
+        />
         <GridOptionList
+            v-if="!rowsSourced"
             heading="Rows"
             singular="Row"
             prefix="row"
@@ -137,7 +185,17 @@ const cellChoiceUsers = computed(() =>
                         @update:model-value="setRequired(index, $event)"
                     />
                     <div v-if="takesChoices(option)" :data-column-choices="index">
+                        <LinkedChoicesEditor
+                            v-if="config"
+                            kind="column-choices"
+                            :config="option as unknown as Record<string, unknown>"
+                            :sources="sources ?? []"
+                            :form-id="formId"
+                            :data-column-source="index"
+                            @update:config="setColumnSource(index, $event)"
+                        />
                         <GridOptionList
+                            v-if="!columnSourced(option)"
                             :heading="`Choices for ${option.label || option.value}`"
                             singular="Choice"
                             prefix="choice"
@@ -149,7 +207,17 @@ const cellChoiceUsers = computed(() =>
                 </div>
             </template>
         </GridOptionList>
+        <LinkedChoicesEditor
+            v-if="config"
+            kind="cell-choices"
+            :config="asChoiceConfig(config, 'cells')"
+            :sources="sources ?? []"
+            :form-id="formId"
+            data-grid-cells-source
+            @update:config="setSlot('cells', $event)"
+        />
         <GridOptionList
+            v-if="!cellsSourced"
             heading="Cell choices"
             singular="Choice"
             prefix="cell"

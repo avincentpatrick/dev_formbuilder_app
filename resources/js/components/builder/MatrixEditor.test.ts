@@ -90,3 +90,77 @@ describe('Grid layout (M183)', () => {
         expect(likert.emitted('update:layout')).toEqual([['stacked']]);
     });
 });
+
+describe('MatrixEditor — rows, cells and columns from a list or a form (M185, R-bb79aec0, D161)', () => {
+    const SOURCES = [{ id: 'src-1', title: 'Facility Register', questions: [{ key: 'facility_name', label: 'Facility name' }] }];
+
+    function sourced(config: Record<string, unknown>) {
+        return mount(MatrixEditor, {
+            props: {
+                rows: (config.rows as never) ?? [],
+                columns: (config.columns as never) ?? [],
+                cells: (config.cells as never) ?? [],
+                config,
+                sources: SOURCES,
+            },
+        });
+    }
+
+    function lastConfig(wrapper: ReturnType<typeof sourced>): Record<string, unknown> {
+        return (wrapper.emitted('update:config') ?? []).at(-1)?.[0] as Record<string, unknown>;
+    }
+
+    it('offers no source without the grid’s config, as T2 drew it', () => {
+        const wrapper = editor([{ value: 'c1', label: 'C1' }]);
+
+        expect(wrapper.find('[data-grid-rows-source]').exists()).toBe(false);
+        expect(wrapper.find('[data-column-source="0"]').exists()).toBe(false);
+    });
+
+    it('takes the rows from another form in one whole-config change, and hides the typed rows once it does', async () => {
+        const config = { rows: [], columns: [{ value: 'c', label: 'C' }], cells: [], layout: 'stacked' };
+        const wrapper = sourced(config);
+
+        expect(wrapper.text()).toContain('Each row is a question.');
+        await wrapper.get('[data-grid-rows-source]').find('input[type="radio"][value="form"]').setValue(true);
+        expect(lastConfig(wrapper)).toEqual({ ...config, rows_source: { form_id: null, field_key: null } });
+
+        await wrapper.setProps({ config: lastConfig(wrapper) });
+        expect(wrapper.text()).not.toContain('Each row is a question.');
+    });
+
+    it('gives a choice column its own source, the other columns untouched, and stops counting it among the cells’ users', async () => {
+        const columns = [{ value: 'svc', label: 'Services', type: 'multi_select' }, { value: 'grade', label: 'Grade' }];
+        const wrapper = sourced({ rows: [{ value: 'r', label: 'R' }], columns, cells: [] });
+
+        expect(wrapper.get('[data-cell-choices-users]').text()).toBe('Used by: Services, Grade.');
+        await wrapper.get('[data-column-source="0"]').find('input[type="radio"][value="form"]').setValue(true);
+        const next = lastConfig(wrapper);
+        expect(next.columns).toEqual([
+            { value: 'svc', label: 'Services', type: 'multi_select', options: [], options_source: { form_id: null, field_key: null } },
+            columns[1],
+        ]);
+
+        await wrapper.setProps({ config: next, columns: next.columns as never });
+        expect(wrapper.get('[data-cell-choices-users]').text()).toBe('Used by: Grade.');
+        expect(wrapper.get('[data-column-choices="0"]').text()).not.toContain('Choices for Services');
+    });
+
+    it('offers no source on a column that takes no choices', () => {
+        const wrapper = sourced({ rows: [], columns: [{ value: 'n', label: 'Count', type: 'integer' }], cells: [] });
+
+        expect(wrapper.find('[data-column-source="0"]').exists()).toBe(false);
+    });
+});
+
+describe('LikertMatrixEditor — statements from a list or a form (M185)', () => {
+    it('takes its rows from another form and keeps its scale typed', async () => {
+        const config = { rows: [], columns: [{ value: '1', label: 'Poor' }] };
+        const wrapper = mount(LikertMatrixEditor, { props: { rows: [], columns: config.columns, config, sources: [] } });
+
+        await wrapper.get('[data-grid-rows-source]').find('input[type="radio"][value="form"]').setValue(true);
+
+        expect((wrapper.emitted('update:config') ?? []).at(-1)?.[0]).toEqual({ ...config, rows_source: { form_id: null, field_key: null } });
+        expect(wrapper.text()).toContain('Scale points');
+    });
+});

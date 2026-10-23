@@ -38,7 +38,8 @@ import type { CalculationQuestion } from './calculation-presets';
 import ContentBlocksEditor from './ContentBlocksEditor.vue';
 import FieldTypeControl from './FieldTypeControl.vue';
 import GeoEditor from './GeoEditor.vue';
-import LikertMatrixEditor from './LikertMatrixEditor.vue'; import RepeatLayoutSelect from './RepeatLayoutSelect.vue'; // M185: on one line, so no cited line below moves
+import LikertMatrixEditor from './LikertMatrixEditor.vue';
+import RepeatLayoutSelect from './RepeatLayoutSelect.vue';
 import LinkedChoicesEditor from './LinkedChoicesEditor.vue';
 import SuggestionsEditor from './SuggestionsEditor.vue';
 import { choiceSourceOf } from './choice-source';

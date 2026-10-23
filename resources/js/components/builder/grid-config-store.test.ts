@@ -100,7 +100,13 @@ describe('setFieldConfig — one write for the Grid tab and the Preview (M185)',
         const store = useBuilderStore(pageProps());
         const field = store.fields.value[0];
 
+        // ⛔ THE CLOCK IS FROZEN: `whenIdle()` waits out the debounce, so only a stopped clock tells "saved now" from "saved
+        // once the 600 ms run out" — measured: a mutant that dropped the flush passed while this read `whenIdle()` first.
+        vi.useFakeTimers();
         store.setFieldConfig(field.uid, { rows: addGridEntry(ROWS, 'row', 'Row') }, { now: true });
+        await flushPromises();
+        expect(patches(mock)).toHaveLength(1);
+        vi.useRealTimers();
         await store.whenIdle();
         await flushPromises();
 

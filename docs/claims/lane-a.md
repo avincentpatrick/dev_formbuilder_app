@@ -16,7 +16,114 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M184` (T3) and `M185` (T4) are merged and live on staging, released together at merge point 5 (`D137`; below). The next claim is T5 — the PSGC cascade and the cross-form filter (`D138`), held green for merge point 6 with T6 and L. Merge only at a planned merge point.
+## Status: ACTIVE CLAIM — `M186`, T5 of the testers' items: Philippine places (PSGC) and the cross-form filter (`R-70c7673a`, `R-ed7f3127`, with `R-7a2f4a13`, `R-dbb2ff34`, and `R-bbf03029` only if the staging count is zero) (m186-t5-psgc-filter)
+
+Taken 2026-10-25. Branch `m186-t5-psgc-filter`, cut from origin/main at `38a105af`, PR into main. ⛔ **NOT MERGED THIS SESSION:** it is
+held green for merge point 6 with T6 and L (`D137`, `D138`: … merge point 5 → T5 → T6 → L → merge point 6). **T6 stacks on this
+branch** — it bumps a `VERSION` that is 0.13.0 only here. The plan of record is `~/.claude/plans/i-have-intial-comments-quirky-pascal.md`
+§B2; the build plan is `~/.claude/plans/read-claude-md-then-php-twinkling-stearns.md`.
+Rows: `R-70c7673a` — *"The Philippine Standard Geographic Code is not in the app: an author must build and upload four CSV files per
+form"*; `R-ed7f3127` — *"A cascade level or a choice list cannot be filtered by what another form has recorded"*; `R-7a2f4a13` —
+*"The staff encode page carries a CSV-backed cascade's whole list in its page props"* (retiered up by `M172` for this increment);
+`R-dbb2ff34` — *"The deployment guide still says the testing server runs PHP 8.4.25"*; `R-bbf03029` — *"A typed cascade publishes a
+first-level choice that carries a parent … and a value repeated within a level"*, taken only if no live staging form carries the shape
+(`M172`'s note on the row). And one row this claim files and closes: a template or library item made from a published version copies
+a list-backed cascade's whole option list into the new draft (with PSGC, 43,000 options in the builder's props). Relayed `R1-2`
+("Philippine places (PSGC) cascade, filtered by another form") is this increment's comment; it is resolved only once live.
+
+**The owed check is done: the user checked merge point 5 on staging on 2026-10-24 — "All good"** (`R1-3b` a Single choice from a list
+file and Short text suggestions in the Preview; `R1-1b` a Multiple choice from another form's answers in the Preview; `R1-7b` a Grid's
+rows from a list or form, Add row / Add column / rename in the Preview, a repeatable section as a table; `/whats-new` lists 0.12.0 then
+0.11.0) — never re-ask. The session-start pull read 0 reports, 0 reopened and 0 new comments (relayed 31: 22 Resolved · 3 Ongoing · 6
+Confirmed working), so nothing was triaged. **Asked and answered in planning (the user, 2026-10-24, in chat), recorded on this branch's
+first commit:** **`D162` A** — when a lower cascade level is filtered, the levels above shrink to the choices with an allowed choice
+below them; if nothing is left the question says so. **`D163` A** — a filter that cannot be checked (the source's sharing off, offline
+with nothing saved, more than 50,000 distinct answers) shows every choice with a short note; an answer is never refused. **The 0.13.0
+notes' wording was approved verbatim** (three items, in the build plan).
+
+### Evidence verified
+Read on `38a105af` by three read-only passes, a design pass and my own reads.
+- `R-70c7673a`: `ChoiceListMaterializer.php:186` — **moved**: `:186` is now `forDraft`'s loop, the by-name load is `:176` (and `:292`
+  at publish). `docs/PRD.md:442` — held ("never a hardcoded national geography table"). `docs/data-dictionary.md:375` — **moved** to
+  `:376`. `docs/adr/0002-multi-tenancy-shared-db-rls.md:73` — held. `TenantScopedTables.php:134` — held as a line, **false as a
+  pointer**: it is `form_templates` inside `NULLABLE_GLOBAL` (tables with a NULLABLE `tenant_id` and a widened policy), not a list for
+  tenant-free tables; a table with no `tenant_id` belongs on no list (the `releases` precedent, migration `2026_08_17_000143`).
+  `CascadingEditor.vue:58-102` — **moved**: that is script; the Levels UI is template `:132-177`.
+- `R-ed7f3127`: `ShareableQuestions.php:31-39` — held. `LinkedChoiceService.php:258-275` — **moved**: the flat list is `listFor()`
+  `:296-328` and `distinctAnswers()` `:336-353` (`:258-275` is the memo and `valuesFor()`). `PublicFormSchemaController.php:60-77` —
+  held. `FieldInput.vue:353-390` — **moved** to `:378-415` (script) and `:527-545` (template). `linked-choices.ts:89-112` — held in kind
+  (`hasLinkedChoices` `:87-90`, `mergeLinkedChoices` `:98-132`).
+- `R-7a2f4a13`: `EncodeFormPresenter::cascade()` — held (`:497-527` emits the full published `config.options`); the engine copy is
+  already stripped (`:245`).
+- `R-bbf03029`: `StructuralValidationGate::assertCascadingResolves()` — held (`:455-512`; no first-level parent check `:504-505`, no
+  within-level uniqueness).
+- `R-dbb2ff34`: `docs/deployment-infrastructure.md:425` — held ("PHP 8.4.25 x64 NTS"). Its "PostgreSQL 15" is right (`D43` B; dev and
+  CI run 17).
+
+### Premise verified
+- **psa.gov.ph refuses scripts** (403 and a bot check on every PSA URL tried), so the PSA workbook is downloaded in a browser by the
+  user; 3Q 2026 (Ref. 2026-331, 2026-10-12) is known only from search extracts — 18 regions, 82 provinces, 149 cities, 1,493
+  municipalities, 42,010 barangays — and is **measured from the file's own summary sheet**, never asserted.
+- **OpenSpout v4.32 is the only spreadsheet reader**; `ChoiceListCsvParser` reads the first sheet only and a numeric cell loses its
+  leading zero (`CellText`). The PSA workbook has several sheets, so `psgc:build` reads the `PSGC` sheet by name and left-pads codes.
+- **`config.levels.*.list` cannot hold `psgc:region`** (`UpdateFieldRequest.php:309`, `^[a-z0-9_-]+$`); only that rule widens.
+  `isListBacked` reads any non-empty name, so the strip and the serve-beside path are reused.
+- **The guest engine is built from the MERGED options** (`schema-mapping.ts:603`, pinned "ONE list for controls and engine"), so a
+  filter written into `config.options` would make the guest page refuse a resumed answer: the filter is display-only, a new
+  snake_case `choice_filter` member (`EncodeFieldAdapterParityTest`'s regexes are `[a-z_]+`).
+- **Widening `ShareableQuestions::TYPES` to cascades would silently share every cascade on forms set to "all"**, and feed EMPTY lists
+  (`distinctAnswers` keeps string/number only) to options, suggestions, grid copies and OCR carry — `LinkedChoiceGate` checks only
+  the target's type. So cascades get their own purpose and are shared only when ticked.
+- **`can:view,form` refuses a Reviewer holding an editor grant**, who can open manual entry (`SubmissionPolicy` create, resume); the
+  lists route takes a new `SubmissionPolicy::readEncodeLists`. Resume and edit pin a possibly superseded version, so only a draft 404s.
+- **Auto-filling a single-choice level from a watcher would create an empty draft row on the encode page and race a guest draft's
+  restore** (`Encode.vue:598-601`, `useAutosave.ts`), so implied levels are written only inside the person's own pick.
+- **Templates and library items copy config as-is** (`SchemaBlueprintMaterializer.php:152`, `TemplateService.php:90`): the API
+  save-as-template from a published version and an archived form's fall-back carry the full option list into a draft — the row filed
+  here.
+- `deploy.ps1` runs `releases:sync` AFTER the row-count compare, so `SyncReleasesCommand`'s docblock and dictionary §40 ("the deploy's
+  row count would refuse a shrink") are wrong; `psgc:sync` runs BEFORE the compare. One session only; lane B retired; no other claim,
+  held block or forward queue in either file.
+
+### Remedy verdict
+**`R-70c7673a` works, reshaped:** the four tiers carry a city-tier **self-entry** for a city outside any province (same code, same name),
+shown once in every display (a raw-code collapse in both formatters, a golden vector); a level with one choice is implied, never the
+last level; `psgc:sync` upserts by (level, code), never deletes, and a recoded place keeps its old publication. **`R-ed7f3127` works,
+reshaped:** sets ride the linked-choices response as a list (`sets: [{field_key, level, …}]` — level keys have no format rule), carry
+raw values plus a choice source's labels, cap at 50,000 (`D163`), and the narrowing is client-side (`D162`). **`R-7a2f4a13` works** with
+a tenant route by version and the new ability. **`R-dbb2ff34` works** (one sentence). **`R-bbf03029`**: decided by the staging count.
+
+Files: new `database/migrations/2026_08_17_000146_create_psgc_places_table.php`, new `app/Models/PsgcPlace.php`, new
+`app/Console/Commands/BuildPsgcCommand.php`, new `app/Console/Commands/SyncPsgcCommand.php`, new `app/Services/Psgc/` (the workbook
+reader and the data file), new `database/data/psgc/places.csv` and `manifest.json`, `deploy.ps1`, `database/seeders/E2eSeeder.php`,
+`app/Console/Commands/SyncReleasesCommand.php` (docblock); `app/Services/Forms/` (`ChoiceListMaterializer.php`, new `PsgcLists.php`,
+`ChoicePreviewPresenter.php`, `LinkedChoiceService.php`, `LinkedChoiceGate.php`, `StructuralValidationGate.php`,
+`SchemaBlueprintMaterializer.php`, `TemplateService.php`, `BuilderPresenter.php`, `FormSettingsPresenter.php`),
+`app/Support/Forms/ShareableQuestions.php`, `app/Http/Requests/Forms/` (`UpdateFieldRequest.php`, `UpdateDataSharingRequest.php`),
+`app/Exceptions/Forms/PublishValidationException.php`, `app/Policies/SubmissionPolicy.php`, new
+`app/Http/Controllers/Tenant/VersionChoiceListsController.php`, `routes/tenant.php`,
+`app/Http/Controllers/Public/PublicFormSchemaController.php`, `app/Services/Submissions/` (`EncodeFormPresenter.php`,
+`SchemaValueFormatter.php`), the About card's presenter; `resources/js/components/builder/` (`CascadingEditor.vue`,
+`LinkedChoicesEditor.vue`, new `ChoiceFilterEditor.vue`, `ConfigPanel.vue`, `SuggestionsEditor.vue`, `MatrixEditor.vue`,
+`LikertMatrixEditor.vue`, `types.ts`, `preview-choices.ts`), `resources/js/components/forms/DataSharingPanel.vue`,
+`resources/js/components/submissions/FieldInput.vue`, `resources/js/Pages/submissions/Encode.vue`,
+`resources/js/components/settings/AboutCard.vue`, `resources/js/components/help/manual.ts`, `resources/public-runtime/lib/`
+(`linked-choices.ts`, `schema-mapping.ts`, `types.ts`), `resources/public-runtime/components/` (`FieldControl.vue`, `InstanceField.vue`),
+`resources/public-runtime/engine/display-value.ts`, `tests/golden/templates/formatting.json`, `openapi.json`, `VERSION`,
+`database/data/releases.json`; the tests beside each — Pest under `tests/Feature/` (`Psgc`, `Deploy`, `Forms`, `Guest`, `Submissions`,
+`Templates`), `tests/Unit`, the Vitest files beside the components, new `tests/e2e/psgc-cascade.spec.ts`.
+Shared artefacts taken: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/data-dictionary.md`,
+`docs/PRD.md`, `docs/TESTING-GUIDE.md`, `docs/deployment-infrastructure.md`, `openapi.json`, `tests/e2e/public-runtime-axe.spec.ts`,
+`tests/e2e/builder-axe.spec.ts`, `tests/e2e/form-settings-axe.spec.ts` and the specs the diff reaches, `PROGRESS.md` (own block).
+Paired files taken: the `EncodeField` adapters (`EncodeFormPresenter::field()` ↔ `FieldControl.vue` ↔ `InstanceField.vue`); the two
+display formatters (`SchemaValueFormatter.php` ↔ `display-value.ts`) through the golden template vectors; `deploy.ps1` ↔ its pinning
+tests.
+Namespaces spent: migration prefix `2026_08_17_000146`; `D162`, `D163`. Nothing from the ADR namespace.
+Prediction: red first to `FieldSaveAttributeNamesTest` (the new filter and flag paths), `EncodeFieldAdapterParityTest` (the new member
+before all three adapters carry it), `DocumentedDefaultDriftTest` (the new dictionary section) and the Contract job's `openapi.json`
+diff (the `sets` member) until it is regenerated in the container; `manual.test.ts` red once a quoted Levels label moves. **Most likely
+wrong:** the PSA workbook itself — its header text, the summary sheet's layout and how NCR's districts and the special geographic area
+are coded come from third-party descriptions, so `psgc:build`'s first run against the real file is where this plan meets the world.
 
 ## RELEASED — `M185`, T4 of the testers' items: the grid, part 2 — rows and choices from a list or another form, rows and columns edited in the Preview, a repeatable section as a table (`R-bb79aec0`, `R-7418e6bd`, `R-0a7275ce`) (merged as PR #378, `eba3e3a4`, last at merge point 5, rebased onto the trunk after `M184`; 6/6 green with real step counts on its rebased run at `293e0381` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `eba3e3a4` the same)
 

@@ -151,6 +151,20 @@ group('the eight draft-only states', () => {
         expect(partial.issues.map((i) => i.code)).toContain('empty_option_list');
     });
 
+    it('4d. does not call a list-bound question empty, and takes the preview\'s lists before the shape, so their arrival rebuilds (M184)', () => {
+        const bound = [field({ uid: 'u1', key: 'facility', field_type: 'dropdown', config: { options: [], options_list: 'facilities' } })];
+        const before = projectDraft(input(bound));
+        const after = projectDraft({
+            ...input(bound),
+            choices: { linked: {}, cascades: {}, suggestions: {}, flat: { facility: { options: [{ value: 'RHU1', label: 'San Jose RHU' }], total: 1 } } },
+        });
+
+        expect(before.issues.map((i) => i.code)).not.toContain('empty_option_list');
+        expect(after.schema.version.schema.fields[0].config?.options).toEqual([{ value: 'RHU1', label: 'San Jose RHU' }]);
+        expect(after.shape).not.toBe(before.shape);
+        expect(after.schema.version.checksum).toBe(after.shape);
+    });
+
     it('5. NEVER hands an unparsable expression to the engine', () => {
         // ⛔ THE LOAD-BEARING CASE. A throw from the engine's parser latches engineFailed for the whole
         // session, so a half-typed condition — the normal state of a field being edited — must be

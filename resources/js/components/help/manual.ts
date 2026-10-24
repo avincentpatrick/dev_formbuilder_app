@@ -434,6 +434,7 @@ const guide: ChapterDraft[] = [
                     ),
                     p('You can still edit while you preview: double-click a question’s wording to change it, or drag a question by its handle to move it.'),
                     p('A section whose every question is hidden — a calculation, a hidden field, or a question set to Never — still shows here as a card that says respondents won’t see it. Click a question on the card to open its settings.'),
+                    p('Choices from a list file or from another form’s answers show here too, and so do a Short text’s suggestions. A long list shows its first 200 choices, and the question says how many there are.'),
                     tip(
                         'info',
                         'The box “', ui('What this preview does not do', PREVIEW),
@@ -614,6 +615,7 @@ const CONDITION_EDITOR = 'resources/js/components/builder/ConditionEditor.vue';
 const APPEARANCE = 'app/Enums/FieldAppearance.php';
 const INDEXED = 'app/Enums/IndexedDataType.php';
 const LINKED = 'resources/js/components/builder/LinkedChoicesEditor.vue';
+const SUGGESTIONS = 'resources/js/components/builder/SuggestionsEditor.vue';
 const OTHER_SPECIFY = 'resources/js/components/builder/OtherSpecifyControl.vue';
 const CASCADING = 'resources/js/components/builder/CascadingEditor.vue';
 const LIKERT_MATRIX = 'resources/js/components/builder/LikertMatrixEditor.vue';
@@ -856,6 +858,10 @@ const reference: ChapterDraft[] = [
                         ['Tabs: ', ui('Basics', CONFIG), ', ', ui('Validation', CONFIG), ', ', ui('Advanced', CONFIG), '.'],
                         ['Useful rules: ', ui('Minimum length', RULE_TYPES), ', ', ui('Maximum length', RULE_TYPES), ', ', ui('Must match a pattern', RULE_TYPES), '.'],
                     ),
+                    p(
+                        'A Short text can suggest answers as people type: on ', ui('Basics', CONFIG), ', under ', ui('Suggestions come from', SUGGESTIONS), ', pick ',
+                        ui('A list file', SUGGESTIONS), ' or ', ui("Another form's answers", SUGGESTIONS), '. People can still type any answer; the suggestions only help them type it the same way.',
+                    ),
                 ],
             },
             {
@@ -966,6 +972,10 @@ const reference: ChapterDraft[] = [
                         'Its choices can also come from another form: under ', ui('Choices come from', LINKED), ', pick ', ui("Another form's answers", LINKED),
                         ', then the form and the question. That form’s owner has to share its answers first, in its ', ui('Data sharing', SETTINGS), ' settings. The default is ', ui('Typed here', LINKED), '.',
                     ),
+                    p(
+                        'Or from a list file: pick ', ui('A list file', LINKED), ', then a list this form holds, or ', ui('Upload a CSV or Excel file', LINKED),
+                        ' there. The file needs a “name” column (the code saved) and a “label” column (what respondents read); an Excel file’s first sheet is read. Publishing turns the list into the choices, up to 5,000. A long list is easier as a Dropdown, and the paper form prints every choice.',
+                    ),
                 ],
             },
             {
@@ -974,7 +984,7 @@ const reference: ChapterDraft[] = [
                 blocks: [
                     p(
                         'Tick boxes; the respondent ticks every choice that applies. Its ', ui('Options', CONFIG), ' tab works like ', link('Single choice', '#type-single-choice'),
-                        ', including ', ui('Choice layout', CONFIG), ', but its choices are always typed here. In a condition, check it with ', ui('includes', CONDITION_ROW), ' or ', ui('does not include', CONDITION_ROW), '.',
+                        ', including ', ui('Choice layout', CONFIG), ' and where its choices come from: typed here, a list file, or another form’s answers. In a condition, check it with ', ui('includes', CONDITION_ROW), ' or ', ui('does not include', CONDITION_ROW), '.',
                     ),
                 ],
             },
@@ -984,7 +994,7 @@ const reference: ChapterDraft[] = [
                 blocks: [
                     p(
                         'A list that opens when tapped; the respondent picks one. Better than ', ui('Single choice', FIELD_TYPES), ' for long lists. Its ', ui('Options', CONFIG),
-                        ' tab works like Single choice’s, without a layout, and its choices can also come from another form.',
+                        ' tab works like Single choice’s, without a layout, and its choices can also come from a list file or another form.',
                     ),
                 ],
             },
@@ -1003,10 +1013,10 @@ const reference: ChapterDraft[] = [
                     p('A chain of lists, each narrowed by the one before — Region, then Province, then City. Set it up on the ', ui('Levels', CONFIG), ' tab:'),
                     steps(
                         ['Click ', ui('Add level', CASCADING), ' once per list, from the broadest to the most specific.'],
-                        ['For each level, either type its choices in the tab (', ui('Typed in below', CASCADING), ') or upload them in ', ui('Choices from a CSV file', CASCADING), '.'],
+                        ['For each level, either type its choices in the tab (', ui('Typed in below', CASCADING), ') or upload them in ', ui('Choices from a CSV or Excel file', CASCADING), '.'],
                         ['Typed choices: under each choice, pick its level and, below the top level, the choice above it (', ui('No parent (top level)', CASCADING), ' for the first level).'],
                     ),
-                    tip('info', 'Use CSV files for long lists such as every barangay. Either every level comes from a file, or none does.'),
+                    tip('info', 'Use CSV or Excel files for long lists such as every barangay. Either every level comes from a file, or none does. Excel turns a code like 01 into 1, so format the code columns as Text before you type them, or use letters.'),
                 ],
             },
         ],

@@ -9,6 +9,7 @@ use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\OcrScan;
 use App\Services\Forms\BlankFormPrintPresenter;
+use App\Services\Forms\LinkedChoiceService;
 use App\Services\Submissions\EncodeFormPresenter;
 
 /**
@@ -31,6 +32,7 @@ final class OcrScanReviewPresenter
     public function __construct(
         private readonly EncodeFormPresenter $encode,
         private readonly OcrAnswerCarry $carry,
+        private readonly LinkedChoiceService $linked,
     ) {}
 
     /** @return array<string, mixed> */
@@ -39,7 +41,8 @@ final class OcrScanReviewPresenter
         /** @var array<string, mixed> $extraction */
         $extraction = $scan->extraction ?? [];
         $paper = $this->paperVersion($form, $scan) ?? $current;
-        $carried = $this->carry->carry($extraction, (array) $paper->schema_snapshot, (array) $current->schema_snapshot);
+        // M184: a linked question's written answer is checked against the list this screen draws, not its empty snapshot.
+        $carried = $this->carry->carry($extraction, (array) $paper->schema_snapshot, (array) $current->schema_snapshot, $this->linked->valuesFor($form, $current));
 
         return [
             ...$this->encode->present($form, $current),

@@ -10,11 +10,14 @@
  *
  * Built in the shared shell (the default `AppLayout`) from the design system's components, like every page.
  */
-import { computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import { MdsAlert, MdsBreadcrumb, type BreadcrumbItem } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
 import PreviewRuntime from '@/components/builder/PreviewRuntime.vue';
+import { applyPreviewChoices, fetchPreviewChoices, previewChoicesUrl, type PreviewChoices } from '@/components/builder/preview-choices';
+import { hasChoiceLists } from '../../../public-runtime/lib/choice-lists';
+import { hasLinkedChoices } from '../../../public-runtime/lib/linked-choices';
 import { buildRenderModel } from '../../../public-runtime/lib/schema-mapping';
 import type { SchemaResponse } from '../../../public-runtime/lib/types';
 
@@ -25,7 +28,16 @@ const props = defineProps<{
     crumbs: BreadcrumbItem[];
 }>();
 
-const model = computed(() => buildRenderModel(props.schema));
+// M184 (`R-d8c2ce84`): a cascade's list files and another form's answers are served beside the snapshot, as on the live
+// form; read once, and the runtime is drawn again with them (its key moves when they land).
+const choices = ref<PreviewChoices | null>(null);
+onMounted(async () => {
+    if (hasLinkedChoices(props.schema) || hasChoiceLists(props.schema)) {
+        choices.value = await fetchPreviewChoices(previewChoicesUrl(props.schema.form.id, props.version.id));
+    }
+});
+const schema = computed(() => (choices.value === null ? props.schema : applyPreviewChoices(props.schema, choices.value)));
+const model = computed(() => buildRenderModel(schema.value));
 
 const published = computed(() =>
     props.version.published_at === null
@@ -52,6 +64,7 @@ const published = computed(() =>
 
         <section class="version-view__form" aria-label="The form as this version asked it">
             <PreviewRuntime
+                :key="choices === null ? 'snapshot' : 'with-choices'"
                 :snapshot="schema"
                 :model="model"
                 :issues-by-key="{}"

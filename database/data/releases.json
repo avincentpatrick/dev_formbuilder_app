@@ -1,5 +1,31 @@
 [
     {
+        "version": "0.11.0",
+        "title": "Choices from lists and other forms",
+        "items": [
+            {
+                "kind": "new",
+                "text": "Multiple choice questions can take their choices from another form's answers, as Single choice and Dropdown already could."
+            },
+            {
+                "kind": "new",
+                "text": "Upload a list as a CSV or Excel file and use it for a Single choice, Multiple choice or Dropdown question: Options → Choices come from → A list file."
+            },
+            {
+                "kind": "new",
+                "text": "Short text questions can suggest answers as people type, from a list file or another form's answers. Any other answer is still accepted."
+            },
+            {
+                "kind": "improved",
+                "text": "The builder's Preview shows choices from a list file or another form. A long list shows its first 200."
+            },
+            {
+                "kind": "improved",
+                "text": "Excel turns a code like 01 into 1. The upload now says how to keep codes as text."
+            }
+        ]
+    },
+    {
         "version": "0.10.0",
         "title": "Grids that work like tables",
         "items": [

@@ -122,7 +122,7 @@ final class PublishValidationException extends RuntimeException
     public static function linkedChoicesInvalid(string $fieldKey, string $code): self
     {
         $message = match ($code) {
-            'linked_choices_wrong_type' => "“{$fieldKey}” cannot take its choices from another form: only a single-choice or dropdown question can.",
+            'linked_choices_wrong_type' => "“{$fieldKey}” cannot take its choices from another form: only a single-choice, multiple-choice or dropdown question can.",
             'linked_choices_incomplete' => "Choose the form and the question that “{$fieldKey}” takes its choices from.",
             'linked_choices_with_typed_options' => "“{$fieldKey}” takes its choices from another form, so it cannot also have choices typed here.",
             'linked_choices_self' => "“{$fieldKey}” cannot take its choices from this same form.",
@@ -133,6 +133,25 @@ final class PublishValidationException extends RuntimeException
         };
 
         return self::one($fieldKey, $code, $message);
+    }
+
+    /**
+     * A Short text whose suggestions (M184, `R-596d6afd`) cannot be served: from a list file the form does not hold or
+     * cannot use, or from another form whose link cannot serve. The link's refusals are {@see linkedChoicesInvalid()}'s,
+     * worded for suggestions; the code stays `suggestions_invalid` so a suggestion never reads as a broken choice list.
+     */
+    public static function suggestionsInvalid(string $fieldKey, string $reason): self
+    {
+        $detail = match ($reason) {
+            'linked_choices_incomplete' => 'choose the form and the question it suggests answers from',
+            'linked_choices_self' => 'it cannot suggest answers from this same form',
+            'linked_choices_source_missing' => 'the form it suggests answers from no longer exists',
+            'linked_choices_not_shared' => "the form it suggests answers from does not share that question; its owner can share it in the form's Data sharing settings",
+            'linked_choices_owner_cannot_read' => "this form's owner cannot see the responses of the form it suggests answers from",
+            default => $reason,
+        };
+
+        return self::one($fieldKey, 'suggestions_invalid', "The suggestions on “{$fieldKey}” cannot be offered ({$detail}).");
     }
 
     /** A cascading-select field (Increment G4a) whose level/option hierarchy does not resolve. */

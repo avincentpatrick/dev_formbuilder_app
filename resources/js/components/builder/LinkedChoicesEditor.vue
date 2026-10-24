@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * Where a single-choice or dropdown question's choices come from (M133, `R-5da4a30f` — Connect project v1): typed
- * here, or another form's answers to one of its questions.
+ * Where a single-choice, multiple-choice (M184) or dropdown question's choices come from (M133, `R-5da4a30f` — Connect
+ * project v1): typed here, or another form's answers to one of its questions.
  *
  * The link is one config key, `options_source = {form_id, field_key}`. The forms offered are the ones that share
  * their answers (their Data sharing settings) and whose responses this author can read — the server sends them as
@@ -17,20 +17,46 @@
  * (`types.ts`, `ConditionCatalogue`). `ConfigPanel` writes what it emits in one assignment and one touch, which is
  * what makes "remove the typed choices and link" a single undo entry.
  *
- * ⚠️ A RADIO PAIR, NOT A SEGMENTED CONTROL. The Options tab already sits under the builder's one tablist, and a
- * two-way choice with a sentence of consequence under it reads better as a group with a legend.
+ * ⚠️ RADIOS, NOT A SEGMENTED CONTROL. The Options tab already sits under the builder's one tablist, and a choice with
+ * a sentence of consequence under it reads better as a group with a legend.
+ *
+ * ── A LIST FILE (M184, `R-3e7c81bb`) ─────────────────────────────────────────────────────────────────────────────
+ * The third place: one of this form's list files (`options_list`, the list's name — never its rows, as a cascade level
+ * names its list), written into the question's choices when the form is published. Offered when the panel passes the
+ * form's id, which is where the lists are read and uploaded. One question takes one source: choosing any clears the
+ * others' keys, in the same change. Past 30 choices a Single or Multiple choice says what `D160` chose — the paper prints
+ * every choice — and points at a Dropdown; past 5,000 it says publish will refuse.
  */
-import { computed, ref, useId } from 'vue';
+import { computed, onMounted, ref, useId, watch } from 'vue';
 import { MdsButton, MdsFormField, MdsRadio, MdsSelect } from '@meridian/design-system';
+import ChoiceListUpload from '@/components/forms/ChoiceListUpload.vue';
+import { describeChoiceList, listChoiceLists, type ChoiceListRow } from '@/components/forms/choice-lists';
+import { choiceSourceOf } from './choice-source';
 import type { LinkableSource, OptionsSource } from './types';
 
+/** `D160`: past this many choices a Single or Multiple choice is better as a Dropdown, and the paper prints them all. */
+const LONG_LIST = 30;
+/** `ChoiceListMaterializer::FLAT_LIST_MAX` — the most rows one question takes from a list. */
+const FLAT_LIST_MAX = 5000;
+
 const props = defineProps<{
-    /** The question's whole config: its `options_source` link, if any, and its typed `options`. */
+    /** The question's whole config: its `options_source` link or `options_list` name, if any, and its typed `options`. */
     config: Record<string, unknown>;
     sources: LinkableSource[];
+    /** The form whose list files the question may take its choices from; without it, no list file is offered. */
+    formId?: string | null;
+    fieldType?: string;
 }>();
 
 const emit = defineEmits<{ 'update:config': [value: Record<string, unknown>] }>();
+
+/** The config without one key — a source the question no longer takes its choices from. */
+function without(config: Record<string, unknown>, key: string): Record<string, unknown> {
+    const next = { ...config };
+    delete next[key];
+
+    return next;
+}
 
 /** The question's link, or null when its choices are typed here (a missing or null key alike). */
 const source = computed<OptionsSource | null>(() => {
@@ -46,12 +72,70 @@ const typedCount = computed(() => (Array.isArray(props.config.options) ? props.c
 
 /** One new config: the link set (and typed choices cleared, never kept beside it), or the link removed. */
 function emitSource(next: OptionsSource | null): void {
-    emit('update:config', next === null ? { ...props.config, options_source: null } : { ...props.config, options: [], options_source: next });
+    const base = without(props.config, 'options_list');
+    emit('update:config', next === null ? { ...base, options_source: null } : { ...base, options: [], options_source: next });
 }
 
-const mode = computed<'here' | 'form'>(() => (source.value === null ? 'here' : 'form'));
-const confirming = ref(false);
+/** One new config: the question takes its choices from this list file ('' while the author is choosing one). */
+function emitList(name: string): void {
+    emit('update:config', { ...without(props.config, 'options_source'), options: [], options_list: name });
+}
+
+type Mode = 'here' | 'list' | 'form';
+const mode = computed<Mode>(() => ({ typed: 'here', list: 'list', form: 'form' } as const)[choiceSourceOf(props.config)]);
+const confirming = ref<'list' | 'form' | null>(null);
 const modeName = useId();
+
+// ── A list file (M184) ─────────────────────────────────────────────────────────────────────
+const lists = ref<ChoiceListRow[]>([]);
+const listsLoaded = ref(false);
+const listName = computed(() => (typeof props.config.options_list === 'string' ? props.config.options_list : ''));
+const chosenList = computed(() => lists.value.find((list) => list.name === listName.value) ?? null);
+// ⚠️ THE CHOSEN NAME IS ALWAYS AN OPTION, even before the lists arrive. A `<select>` drawn with a value none of its options
+// carries shows blank, and when the options land later the unchanged value is not applied again — measured in e2e.
+const listOptions = computed(() => {
+    const options = lists.value.map((list) => ({ value: list.name, label: `${list.name} — ${describeChoiceList(list)}` }));
+
+    return listName.value !== '' && chosenList.value === null ? [{ value: listName.value, label: listName.value }, ...options] : options;
+});
+
+async function loadLists(): Promise<void> {
+    if (!props.formId) return;
+    try {
+        lists.value = await listChoiceLists(props.formId);
+        listsLoaded.value = true;
+    } catch {
+        // The picker shows what the question already names; the upload says why a file was refused.
+    }
+}
+// Read only once the question takes its choices from a list — not for every choice question the author opens.
+onMounted(() => {
+    if (mode.value === 'list') void loadLists();
+});
+watch(mode, (next) => {
+    if (next === 'list') void loadLists();
+});
+
+function onListUploaded(added: ChoiceListRow): void {
+    lists.value = [...lists.value.filter((list) => list.name !== added.name), added].sort((a, b) => a.name.localeCompare(b.name));
+    if (listName.value === '') emitList(added.name);
+}
+
+/** Why the chosen list will not publish, or what it means on paper — or null. */
+const listNote = computed<{ tone: 'warning' | 'text'; text: string } | null>(() => {
+    if (listName.value === '') return null;
+    const list = chosenList.value;
+    if (list === null) return listsLoaded.value ? { tone: 'warning', text: `${listName.value} is not uploaded to this form.` } : null;
+    const size = list.row_count.toLocaleString('en');
+    if (list.row_count > FLAT_LIST_MAX) {
+        return { tone: 'warning', text: `This list has ${size} choices, and one question takes at most 5,000. Use a cascading select for a longer list.` };
+    }
+    if (list.row_count > LONG_LIST && (props.fieldType === 'single_select' || props.fieldType === 'multi_select')) {
+        return { tone: 'text', text: `This list has ${size} choices. A Dropdown is easier to use, and the paper form prints every choice.` };
+    }
+
+    return null;
+});
 
 const chosenSource = computed<LinkableSource | null>(() => props.sources.find((s) => s.id === source.value?.form_id) ?? null);
 
@@ -61,25 +145,31 @@ const questionOptions = computed(() => (chosenSource.value?.questions ?? []).map
 /** A link this author can no longer pick from: the source stopped sharing, or they cannot read it. */
 const unavailable = computed(() => source.value?.form_id != null && chosenSource.value === null);
 
-function startLink(): void {
-    confirming.value = false;
-    emitSource({ form_id: null, field_key: null });
+function start(next: 'list' | 'form'): void {
+    confirming.value = null;
+    if (next === 'form') emitSource({ form_id: null, field_key: null });
+    else emitList('');
+}
+
+function confirmStart(): void {
+    if (confirming.value !== null) start(confirming.value);
 }
 
 function onMode(value: string): void {
     if (value === 'here') {
-        confirming.value = false;
-        if (source.value !== null) emitSource(null);
+        confirming.value = null;
+        if (mode.value !== 'here') emitSource(null);
 
         return;
     }
-    if (source.value !== null) return;
-    if (typedCount.value > 0) {
-        confirming.value = true;
+    const next = value === 'list' ? 'list' : 'form';
+    if (mode.value === next) return;
+    if (mode.value === 'here' && typedCount.value > 0) {
+        confirming.value = next;
 
         return;
     }
-    startLink();
+    start(next);
 }
 
 function onSource(formId: string): void {
@@ -99,14 +189,22 @@ function onQuestion(key: string): void {
         <legend class="linked-choices__legend">Choices come from</legend>
         <div class="linked-choices__modes">
             <MdsRadio
-                :model-value="confirming ? 'form' : mode"
+                :model-value="confirming ?? mode"
                 value="here"
                 label="Typed here"
                 :name="modeName"
                 @update:model-value="onMode"
             />
             <MdsRadio
-                :model-value="confirming ? 'form' : mode"
+                v-if="formId"
+                :model-value="confirming ?? mode"
+                value="list"
+                label="A list file"
+                :name="modeName"
+                @update:model-value="onMode"
+            />
+            <MdsRadio
+                :model-value="confirming ?? mode"
                 value="form"
                 label="Another form's answers"
                 :name="modeName"
@@ -120,10 +218,33 @@ function onQuestion(key: string): void {
                 takes its choices from one place.
             </p>
             <div class="linked-choices__actions">
-                <MdsButton variant="tertiary" size="sm" @click="confirming = false">Keep typed choices</MdsButton>
-                <MdsButton variant="primary" size="sm" @click="startLink">Remove and continue</MdsButton>
+                <MdsButton variant="tertiary" size="sm" @click="confirming = null">Keep typed choices</MdsButton>
+                <MdsButton variant="primary" size="sm" @click="confirmStart">Remove and continue</MdsButton>
             </div>
         </div>
+
+        <template v-if="mode === 'list' && formId">
+            <MdsFormField v-slot="{ id, describedby, invalid }" label="List file" help="Respondents choose from the list's rows: “name” is what is saved, “label” what they see.">
+                <MdsSelect
+                    :id="id"
+                    :describedby="describedby"
+                    :invalid="invalid"
+                    :model-value="listName"
+                    :options="listOptions"
+                    placeholder="Choose a list file"
+                    @update:model-value="emitList($event)"
+                />
+            </MdsFormField>
+            <p v-if="listNote" :class="listNote.tone === 'warning' ? 'linked-choices__warning' : 'linked-choices__text'" data-linked-choices-list-note>
+                {{ listNote.text }}
+            </p>
+            <ChoiceListUpload
+                :form-id="formId"
+                label="Upload a CSV or Excel file"
+                help="Columns “name” (a code used once in the file) and “label”. An Excel file’s first sheet is read. The file’s name is the list’s name; uploading it again replaces the list. Up to 5,000 choices for one question."
+                @uploaded="onListUploaded"
+            />
+        </template>
 
         <template v-if="mode === 'form'">
             <p v-if="sources.length === 0 && !unavailable" class="linked-choices__text" data-linked-choices-empty>

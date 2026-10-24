@@ -664,3 +664,36 @@ it('reads what was written for a question that takes its choices from another fo
     // Its row is a `choices` area with no options, and the paper gave it a write-in box: nothing there was ticked (R-d2467239).
     expect($fields['facility'])->toMatchArray(['state' => 'read', 'value' => 'SAN JOSE RHU', 'ticks' => false]);
 });
+
+it('reads what was written for a multiple choice that takes its choices from another form, as a list (M184)', function (): void {
+    (new RolePermissionSeeder)->run();
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    enterTenant($this->tenant->id, $this->user->id);
+    makeActiveMember($this->user, 'admin');
+
+    $source = app(FormService::class)->create($this->tenant, $this->user, 'Facility Register');
+    addFormField($source->draftVersion, $this->user, 'facility_name', FieldType::ShortText, 1);
+    app(PublishService::class)->publish($source->refresh(), $this->user);
+    app(FormService::class)->setDataSharing($source->refresh(), true, null, $this->user);
+
+    $form = app(FormService::class)->create($this->tenant, $this->user, 'Referral');
+    addFormField($form->draftVersion, $this->user, 'patient_name', FieldType::ShortText, 1, ['label' => 'Patient name']);
+    addFormField($form->draftVersion, $this->user, 'facilities', FieldType::MultiSelect, 2, ['label' => 'Facilities', 'config' => [
+        'options' => [], 'options_source' => ['form_id' => $source->id, 'field_key' => 'facility_name'],
+    ]]);
+    $version = app(PublishService::class)->publish($form->refresh(), $this->user);
+    $printed = app(BlankFormPrintPresenter::class)->present($form->refresh(), $version);
+    foreach ($printed['blocks'] as $b => $block) {
+        foreach ($block['fields'] as $i => $row) {
+            if ($row['key'] === 'facilities') {
+                expect($row['options'])->toBe([]);
+                $printed['blocks'][$b]['fields'][$i] = [...$row, 'area' => 'ruled'];
+            }
+        }
+    }
+
+    $fields = ocrMatchFields($this->matcher, $form->refresh(), $version, $printed, ['patient_name' => 'ANA REYES', 'facilities' => 'SAN JOSE RHU, POBLACION BHS']);
+
+    // One choice per comma: a multiple choice's answer is a list, never one string.
+    expect($fields['facilities'])->toMatchArray(['state' => 'read', 'value' => ['SAN JOSE RHU', 'POBLACION BHS'], 'ticks' => false]);
+});

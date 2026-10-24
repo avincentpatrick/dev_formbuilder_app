@@ -50,6 +50,8 @@ const encodeField = computed<EncodeField>(() => ({
     content: props.field.content,
     // M180 (`R-f77aa45d`) — a calculation set to Always shows its value by its Type.
     calculation: props.field.calculation,
+    // M184 (`R-596d6afd`) — a Short text's suggestions, offered as the person types.
+    suggestions: props.field.suggestions,
     supported: props.field.supported,
 }));
 

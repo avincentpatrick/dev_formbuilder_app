@@ -154,5 +154,32 @@
               "facility": "Mabini RHU"
           }
       }
+  },
+  {
+      "name": "multi_select with no typed options (a question that takes its choices from another form, M184) accepts any list",
+      "grammar_version": "2.0",
+      "schema": {
+          "fields": [
+              {
+                  "key": "facilities",
+                  "field_type": "multi_select",
+                  "options": []
+              }
+          ]
+      },
+      "answers": {
+          "facilities": ["San Jose RHU", "Mabini RHU"]
+      },
+      "expected": {
+          "relevance": {
+              "fields": {
+                  "facilities": true
+              }
+          },
+          "errors": [],
+          "effective_answers": {
+              "facilities": ["San Jose RHU", "Mabini RHU"]
+          }
+      }
   }
 ]

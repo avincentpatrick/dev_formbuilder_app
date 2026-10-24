@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Xlsform;
 
 use App\Services\Xlsform\Dto\RawWorkbook;
-use DateTimeInterface;
+use App\Support\Spreadsheet\CellText;
 use OpenSpout\Reader\XLSX\Reader as XlsxReader;
 
 /**
@@ -113,17 +113,6 @@ final class XlsformWorkbookReader
     /** Coerce a spreadsheet cell value to a string (form definitions are text; numbers/dates are rare but tolerated). */
     private function stringify(mixed $value): string
     {
-        if ($value === null || is_bool($value)) {
-            return '';
-        }
-        if ($value instanceof DateTimeInterface) {
-            return $value->format('c');
-        }
-        if (is_int($value) || is_float($value)) {
-            // Emit an integer-valued float without the ".0" tail (repeat_count = 5, not "5.0").
-            return $value == (int) $value ? (string) (int) $value : (string) $value;
-        }
-
-        return is_scalar($value) ? (string) $value : '';
+        return CellText::of($value);
     }
 }

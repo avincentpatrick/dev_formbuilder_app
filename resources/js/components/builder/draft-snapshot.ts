@@ -53,7 +53,9 @@
  * rendered. Nothing should ever hash the output of this module.
  */
 
+import { choiceSourceOf } from './choice-source';
 import { parseExpression } from './condition-model';
+import { applyPreviewChoices, type PreviewChoices } from './preview-choices';
 import type { BuilderValidation, LocalField, LocalSection, Uid } from './types';
 
 import type {
@@ -105,6 +107,11 @@ export interface DraftProjectionInput {
     version: { id: string; version_number: number };
     sections: LocalSection[];
     fields: LocalField[];
+    /**
+     * M184 (`R-d8c2ce84`): the choices the draft takes from elsewhere, as the server read them for the preview. Applied
+     * BEFORE the shape is taken, so their arrival moves the shape and the runtime is rebuilt with them.
+     */
+    choices?: PreviewChoices | null;
 }
 
 export interface DraftProjection {
@@ -391,8 +398,8 @@ export function projectDraft(input: DraftProjectionInput): DraftProjection {
         const config: Record<string, unknown> = { ...f.config };
         // M133: a question that takes its choices from another form has none typed here by design — the live form
         // serves its list, and `previewLimitations()` says the preview does not. M141: nor does a cascade whose levels take
-        // their choices from CSV files — publishing builds its options from them.
-        if (Array.isArray(config.options) && config.options.length === 0 && config.options_source == null && !(f.field_type === 'cascading_select' && isListBacked(config))) {
+        // their choices from CSV files — publishing builds its options from them. M184: nor does a question bound to a list file.
+        if (Array.isArray(config.options) && config.options.length === 0 && choiceSourceOf(config) === 'typed' && !(f.field_type === 'cascading_select' && isListBacked(config))) {
             add(f.uid, key, 'empty_option_list', 'This question has no choices yet.');
         }
 
@@ -473,11 +480,12 @@ export function projectDraft(input: DraftProjectionInput): DraftProjection {
         },
     };
 
-    const shape = shapeOf(schemaSnapshot);
-    schema.version.checksum = shape;
+    const projected = input.choices ? applyPreviewChoices(schema, input.choices) : schema;
+    const shape = shapeOf(projected.version.schema);
+    projected.version.checksum = shape;
 
     return {
-        schema,
+        schema: projected,
         issues,
         uidByKey,
         keyByUid,

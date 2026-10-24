@@ -503,7 +503,9 @@ final class OcrAnswerReader
             return $this->blank();
         }
 
-        $text = implode(' ', array_map(static fn (OcrLine $l): string => OcrText::withoutBorderArtefacts($l->text()), $answer));
+        // M184: a linked multiple choice keeps its lines apart, because each line written is one choice.
+        $glue = $type === FieldType::MultiSelect ? ', ' : ' ';
+        $text = implode($glue, array_map(static fn (OcrLine $l): string => OcrText::withoutBorderArtefacts($l->text()), $answer));
 
         return $this->parsed($type, [], $text, null, $this->confidenceOf($symbols));
     }
@@ -617,8 +619,9 @@ final class OcrAnswerReader
         // M133 (`R-5da4a30f`): a single choice or dropdown that takes its choices from another form prints no boxes — its
         // list is live, so the blank sheet gives it a write-in box — and what was written IS the answer (`D85`: the text
         // shown). Read as writing, so the reviewer sees it found rather than unreadable; publish refuses any other
-        // choice question with no choices, so an empty list here can only mean a linked one.
-        if ($options === [] && ($type === FieldType::SingleSelect || $type === FieldType::Dropdown)) {
+        // choice question with no choices, so an empty list here can only mean a linked one. M184 (`R-f655f9b1`): a
+        // multiple choice links the same way, and its writing is a list — one choice per line or comma.
+        if ($options === [] && in_array($type, [FieldType::SingleSelect, FieldType::Dropdown, FieldType::MultiSelect], true)) {
             return $this->ruled($type, $this->answerLines($lines, $static, []));
         }
 
@@ -837,6 +840,7 @@ final class OcrAnswerReader
             FieldType::Duration => $this->duration($parts, $text, $confidence),
             FieldType::CascadingSelect => $this->cascade($parts, $config, $text, $confidence),
             FieldType::YesNo => $this->yesNo($text, $confidence),
+            FieldType::MultiSelect => $this->writtenChoices($text, $confidence),
             FieldType::Email => $this->found(strtolower(str_replace(' ', '', $text)), $text, $confidence),
             FieldType::Url => $this->found(strtoupper($text) === $text ? strtolower(str_replace(' ', '', $text)) : str_replace(' ', '', $text), $text, $confidence),
             default => $this->found($text, $text, $confidence),
@@ -1211,6 +1215,25 @@ final class OcrAnswerReader
             FieldType::YesNo => Coercion::yesNoAnswer($nearest),
             default => $nearest,
         }, $text, $confidence);
+    }
+
+    /**
+     * M184 (`R-f655f9b1`): a linked multiple choice's write-in box, as the list its answer is — split on the commas and
+     * semicolons written and on the line breaks {@see ruled()} kept as commas, each piece trimmed, each kept once.
+     *
+     * @return array{state: string, value: mixed, text: string|null, confidence: int|null}
+     */
+    private function writtenChoices(string $text, int $confidence): array
+    {
+        $choices = [];
+        foreach (preg_split('/[,;]/u', $text) ?: [] as $piece) {
+            $piece = trim($piece);
+            if ($piece !== '' && ! in_array($piece, $choices, true)) {
+                $choices[] = $piece;
+            }
+        }
+
+        return $choices === [] ? $this->unreadable($text, $confidence) : $this->found($choices, $text, $confidence);
     }
 
     /** @return array{state: string, value: mixed, text: string|null, confidence: int|null} */

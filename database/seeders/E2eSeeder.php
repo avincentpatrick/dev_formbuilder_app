@@ -56,6 +56,7 @@ use App\Models\WebhookEndpoint;
 use App\Services\Attachments\AttachmentStorageService;
 use App\Services\Authorization\ResourceGrantService;
 use App\Services\Forms\FormBuilderService;
+use App\Services\Forms\FormChoiceListService;
 use App\Services\Forms\FormReferenceFileService;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
@@ -2198,6 +2199,17 @@ class E2eSeeder extends Seeder
             'key' => 'district',
             'label' => 'District visited',
             'config' => ['options' => [], 'options_source' => ['form_id' => $uptake->id, 'field_key' => 'district']],
+        ]);
+        // M184 (`R-3e7c81bb`): a Dropdown whose choices come from a list file, written in at publish. Optional, so the offline
+        // spec's one-answer submit still goes through; `builder-axe` opens its List file arm, the guest scans draw it.
+        $path = (string) tempnam(sys_get_temp_dir(), 'e2e-list');
+        file_put_contents($path, "name,label\nBHS-MAL,Malate BHS\nBHS-POB,Poblacion BHS\nRHU-SJ,San Jose RHU\n");
+        app(FormChoiceListService::class)->upload($referral->refresh(), new UploadedFile($path, 'facilities.csv', null, null, true));
+        @unlink($path);
+        $builder->addField($referral, $owner, FieldType::Dropdown, $section->id)->update([
+            'key' => 'facility',
+            'label' => 'Facility visited',
+            'config' => ['options' => [], 'options_list' => 'facilities'],
         ]);
         app(PublishService::class)->publish($referral->refresh(), $owner);
 

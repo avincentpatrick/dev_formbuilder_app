@@ -29,7 +29,7 @@ uses(RefreshDatabase::class);
 |--------------------------------------------------------------------------
 | M133 — a choice question that takes its choices from another form: authoring and the publish gate.
 |--------------------------------------------------------------------------
-| The link is `config.options_source = {form_id, field_key}` on a `single_select` or `dropdown`. Publish refuses every
+| The link is `config.options_source = {form_id, field_key}` on a `single_select`, `multi_select` (M184) or `dropdown`. Publish refuses every
 | link that cannot serve, each with its own code, and exempts a well-linked question from "no options defined".
 | Key 2 is the destination's OWNER, never the person publishing.
 |
@@ -101,6 +101,19 @@ it('publishes a question that takes its choices from a shared question, with no 
         ->and($snapshotField['config']['options'])->toBe([]);
 });
 
+it('publishes a Multiple choice that takes its choices from a shared question (M184, R-f655f9b1)', function (): void {
+    $destination = linkGateDestination($this->tenant, $this->admin, linkGateTo($this->source), FieldType::MultiSelect);
+
+    expect(linkGateCodes($destination))->toBe([]);
+
+    $version = app(PublishService::class)->publish($destination, $this->admin);
+    $snapshotField = collect($version->schema_snapshot['fields'])->firstWhere('key', 'facility');
+
+    expect($snapshotField['field_type'])->toBe('multi_select')
+        ->and($snapshotField['config']['options_source'])->toEqual(['field_key' => 'facility_name', 'form_id' => $this->source->id])
+        ->and($snapshotField['config']['options'])->toBe([]);
+});
+
 it('still refuses an ordinary choice question with no choices at all', function (): void {
     $destination = linkGateDestination($this->tenant, $this->admin, ['options' => []]);
 
@@ -114,7 +127,7 @@ it('refuses every link that cannot serve, each with its own code', function (Clo
     expect(fn () => app(PublishService::class)->publish($destination, $this->admin))
         ->toThrow(PublishValidationException::class);
 })->with([
-    'a multi-select' => [fn (Form $s) => linkGateTo($s), 'linked_choices_wrong_type', 'multi_select'],
+    'a Likert scale' => [fn (Form $s) => linkGateTo($s), 'linked_choices_wrong_type', 'likert_scale'],
     'no form picked' => [fn (Form $s) => ['options' => [], 'options_source' => ['form_id' => null, 'field_key' => null]], 'linked_choices_incomplete', 'dropdown'],
     'no question picked' => [fn (Form $s) => ['options' => [], 'options_source' => ['form_id' => $s->id, 'field_key' => null]], 'linked_choices_incomplete', 'single_select'],
     'typed choices beside it' => [fn (Form $s) => [...linkGateTo($s), 'options' => [['value' => 'a', 'label' => 'A']]], 'linked_choices_with_typed_options', 'dropdown'],
@@ -195,16 +208,21 @@ it('saves a link through the builder, and refuses a link carrying any other key'
     $patch(['form_id' => 'not-a-uuid', 'field_key' => 'facility_name'])->assertUnprocessable();
 });
 
-it('keeps a link across single choice and dropdown, and drops it onto a multi-select', function (): void {
+it('keeps a link across single choice, multiple choice and dropdown, and drops it onto a Likert scale', function (): void {
     $destination = linkGateDestination($this->tenant, $this->admin, linkGateTo($this->source));
     $field = FormField::query()->where('form_version_id', $destination->draft_version_id)->firstOrFail();
+    $link = ['form_id' => $this->source->id, 'field_key' => 'facility_name'];
 
     $toSingle = FieldTypeConversion::plan($field, [], FieldType::SingleSelect, [], false);
-    expect($toSingle->config['options_source'] ?? null)->toBe(['form_id' => $this->source->id, 'field_key' => 'facility_name']);
+    expect($toSingle->config['options_source'] ?? null)->toBe($link);
 
+    // M184 (`R-f655f9b1`): a Multiple choice links too.
     $toMulti = FieldTypeConversion::plan($field, [], FieldType::MultiSelect, [], false);
-    expect(array_key_exists('options_source', $toMulti->config))->toBeFalse()
-        ->and($toMulti->configDropped)->toContain('options_source');
+    expect($toMulti->config['options_source'] ?? null)->toBe($link);
+
+    $toLikert = FieldTypeConversion::plan($field, [], FieldType::LikertScale, [], false);
+    expect(array_key_exists('options_source', $toLikert->config))->toBeFalse()
+        ->and($toLikert->configDropped)->toContain('options_source');
 });
 
 it('offers the builder the sharing forms this author can read, with the questions they share', function (): void {

@@ -33,10 +33,13 @@ function ocrCarryRead(string $type, mixed $value, string $tier = 'auto', ?string
     return ['type' => $type, 'state' => 'read', 'value' => $value, 'text' => $text ?? (is_scalar($value) ? (string) $value : 'x'), 'confidence' => 95, 'tier' => $tier, 'page' => 1, 'anchored_by' => 'key'];
 }
 
-/** @param  array<string, array<string, mixed>>  $read */
-function ocrCarry(array $read, array $paper, ?array $current = null): array
+/**
+ * @param  array<string, array<string, mixed>>  $read
+ * @param  array<string, list<string>>  $linked
+ */
+function ocrCarry(array $read, array $paper, ?array $current = null, array $linked = []): array
 {
-    return (new OcrAnswerCarry)->carry(['fields' => $read], $paper, $current ?? $paper);
+    return (new OcrAnswerCarry)->carry(['fields' => $read], $paper, $current ?? $paper, $linked);
 }
 
 const OCR_CARRY_CHOICES = ['options' => [['value' => 'a', 'label' => 'A'], ['value' => 'b', 'label' => 'B']]];
@@ -58,6 +61,38 @@ it('carries what was read on the same printing, numbers as numbers', function ()
     expect($result['answers'])->toBe([
         'name' => 'Ana', 'age' => 41, 'weight' => 61.5, 'pick' => 'b', 'many' => ['a', 'b'], 'ok' => true, 'when' => '2026-10-01',
     ])->and($result['dropped'])->toBe([]);
+});
+
+it('carries a linked question\'s writing when it is one of the choices served today, spelled as the choice (M184)', function (): void {
+    $link = ['options' => [], 'options_source' => ['form_id' => 'f', 'field_key' => 'facility_name']];
+    $snapshot = ocrCarrySnapshot([ocrCarryField('facility', 'dropdown', $link), ocrCarryField('services', 'multi_select', $link)]);
+    $live = ['Barangay Health Station 1', 'Rural Health Unit'];
+
+    $result = ocrCarry([
+        'facility' => ocrCarryRead('dropdown', 'rural  health unit'),
+        'services' => ocrCarryRead('multi_select', ['Rural Health Unit', 'BARANGAY HEALTH STATION 1']),
+    ], $snapshot, null, ['facility' => $live, 'services' => $live]);
+
+    expect($result['answers'])->toBe([
+        'facility' => 'Rural Health Unit',
+        'services' => ['Rural Health Unit', 'Barangay Health Station 1'],
+    ])->and($result['dropped'])->toBe([]);
+});
+
+it('lists a linked question\'s writing that is none of the choices served today, and any when no list was passed', function (): void {
+    $link = ['options' => [], 'options_source' => ['form_id' => 'f', 'field_key' => 'facility_name']];
+    $snapshot = ocrCarrySnapshot([ocrCarryField('facility', 'single_select', $link), ocrCarryField('services', 'multi_select', $link)]);
+    $read = [
+        'facility' => ocrCarryRead('single_select', 'Hospital'),
+        'services' => ocrCarryRead('multi_select', ['Rural Health Unit', 'Hospital']),
+    ];
+
+    $offList = ocrCarry($read, $snapshot, null, ['facility' => ['Rural Health Unit'], 'services' => ['Rural Health Unit']]);
+    $noList = ocrCarry($read, $snapshot);
+
+    expect($offList['answers'])->toBe([])
+        ->and(array_column($offList['dropped'], 'reason'))->toBe(['option_missing', 'option_missing'])
+        ->and($noList['answers'])->toBe([]);
 });
 
 it('fills in an answer read below the review threshold and keeps its manual tier for the note (D108)', function (): void {

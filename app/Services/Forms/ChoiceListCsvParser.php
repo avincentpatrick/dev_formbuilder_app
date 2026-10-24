@@ -4,12 +4,18 @@ declare(strict_types=1);
 
 namespace App\Services\Forms;
 
+use App\Support\Spreadsheet\CellText;
 use Illuminate\Validation\ValidationException;
+use OpenSpout\Common\Exception\OpenSpoutException;
 use OpenSpout\Reader\CSV\Options as CsvOptions;
 use OpenSpout\Reader\CSV\Reader as CsvReader;
+use OpenSpout\Reader\XLSX\Options as XlsxOptions;
+use OpenSpout\Reader\XLSX\Reader as XlsxReader;
 
 /**
- * Reads one choice list from a CSV file in Kobo's own format (M141, `R-f69aab42`, `D95`).
+ * Reads one choice list from a CSV file in Kobo's own format (M141, `R-f69aab42`, `D95`) — or, since M184 (`R-3e7c81bb`),
+ * from the first sheet of an Excel workbook (`.xlsx`) laid out the same way. The name stays: the format is Kobo's CSV
+ * format, whichever file carries it.
  *
  * The file has a `name` column — a code, unique in the file — and a `label` column (Kobo's `label::English (en)`
  * counts when there is no plain `label`). A file for a level below the first adds a column named after the level
@@ -21,6 +27,10 @@ use OpenSpout\Reader\CSV\Reader as CsvReader;
  *  - **A byte-order mark** leads a "CSV UTF-8" file; it is dropped so the first header is `name`, not `\u{FEFF}name`.
  *  - **The delimiter** is a comma, a semicolon in regions that use a decimal comma, or a tab; the header line decides.
  *  - **Rows may be ragged**; a short row is padded and an over-long one cut to the header.
+ *  - **A workbook is a zip**, so it is told from a CSV by its first four bytes, never by its name. Only its first sheet is
+ *    read, with blank rows kept so "Row N" is the row Excel shows. ⚠️ A code Excel stored as a NUMBER has already lost
+ *    its leading zero ({@see CellText}); only a cell stored as text keeps `01` — the upload says so (`R-1059e9bd`).
+ *  - **The row and column caps are enforced while reading**, not after: a 10 MB workbook unpacks to far more than 10 MB.
  *
  * ⛔ A NAME MUST BE UNIQUE IN ITS FILE, AND THAT IS NOT TIDINESS. Both validation engines key a cascade level's
  * options by value, so a repeated value silently takes the later row's parent — and barangay NAMES repeat across
@@ -38,6 +48,9 @@ final class ChoiceListCsvParser
 
     private const int MAX_LABEL = 500;
 
+    /** The local-file header every zip — so every `.xlsx` — starts with. */
+    private const string ZIP_SIGNATURE = "PK\x03\x04";
+
     /**
      * @return array{columns: list<string>, rows: list<list<string>>}
      *
@@ -51,15 +64,7 @@ final class ChoiceListCsvParser
             throw self::invalid('The file is empty.');
         }
 
-        if (str_starts_with($bytes, "\u{FEFF}")) {
-            $bytes = substr($bytes, 3);
-        }
-
-        if (! mb_check_encoding($bytes, 'UTF-8')) {
-            $bytes = (string) mb_convert_encoding($bytes, 'UTF-8', 'Windows-1252');
-        }
-
-        $table = $this->read($bytes);
+        $table = str_starts_with($bytes, self::ZIP_SIGNATURE) ? $this->readWorkbook($path) : $this->readCsv($bytes);
         $header = array_map(static fn (string $cell): string => mb_strtolower(trim($cell)), array_shift($table) ?? []);
 
         while ($header !== [] && end($header) === '') {
@@ -126,7 +131,7 @@ final class ChoiceListCsvParser
             $rows[] = $cells;
 
             if (count($rows) > self::MAX_ROWS) {
-                throw self::invalid('The file has more than '.number_format(self::MAX_ROWS).' rows.');
+                throw self::tooManyRows();
             }
         }
 
@@ -138,12 +143,33 @@ final class ChoiceListCsvParser
     }
 
     /**
+     * Every row of the first sheet as strings, blank rows kept.
+     *
+     * @return list<list<string>>
+     */
+    private function readWorkbook(string $path): array
+    {
+        $options = new XlsxOptions;
+        $options->SHOULD_PRESERVE_EMPTY_ROWS = true;
+
+        return $this->rows(new XlsxReader($options), $path);
+    }
+
+    /**
      * Every row as strings, read by OpenSpout from a temporary copy of the normalised bytes.
      *
      * @return list<list<string>>
      */
-    private function read(string $bytes): array
+    private function readCsv(string $bytes): array
     {
+        if (str_starts_with($bytes, "\u{FEFF}")) {
+            $bytes = substr($bytes, 3);
+        }
+
+        if (! mb_check_encoding($bytes, 'UTF-8')) {
+            $bytes = (string) mb_convert_encoding($bytes, 'UTF-8', 'Windows-1252');
+        }
+
         $firstLine = strtok($bytes, "\n");
         $firstLine = $firstLine === false ? '' : $firstLine;
         $counts = [',' => substr_count($firstLine, ','), ';' => substr_count($firstLine, ';'), "\t" => substr_count($firstLine, "\t")];
@@ -160,24 +186,52 @@ final class ChoiceListCsvParser
         }
 
         file_put_contents($path, $bytes);
-        $reader = new CsvReader($options);
+
+        try {
+            return $this->rows(new CsvReader($options), $path);
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    /**
+     * The first sheet's rows, each cut to one column past the cap — enough for the header check to refuse a wide file —
+     * and refused as soon as more rows hold anything than the cap allows.
+     *
+     * @return list<list<string>>
+     */
+    private function rows(CsvReader|XlsxReader $reader, string $path): array
+    {
         $table = [];
+        $filled = 0;
 
         try {
             $reader->open($path);
 
             foreach ($reader->getSheetIterator() as $sheet) {
                 foreach ($sheet->getRowIterator() as $row) {
-                    $table[] = array_map(static fn (mixed $cell): string => is_scalar($cell) ? (string) $cell : '', $row->toArray());
+                    $cells = array_map(CellText::of(...), array_slice($row->toArray(), 0, self::MAX_COLUMNS + 1));
+
+                    if (implode('', $cells) !== '' && ++$filled > self::MAX_ROWS + 1) {
+                        throw self::tooManyRows(); // the header is the one more
+                    }
+
+                    $table[] = $cells;
                 }
                 break;
             }
+        } catch (OpenSpoutException) {
+            throw self::invalid('The file could not be read. Save it as a CSV file or an Excel workbook (.xlsx), and try again.');
         } finally {
             $reader->close();
-            @unlink($path);
         }
 
         return $table;
+    }
+
+    private static function tooManyRows(): ValidationException
+    {
+        return self::invalid('The file has more than '.number_format(self::MAX_ROWS).' rows.');
     }
 
     private static function invalid(string $message): ValidationException

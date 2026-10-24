@@ -16,6 +16,15 @@ export interface ChoiceListRow {
 
 const FALLBACK = 'That did not work. Check your connection and try again.';
 
+/** M184 (`R-3e7c81bb`): a list is a CSV file or an Excel workbook (its first sheet). */
+export const CHOICE_LIST_ACCEPT = '.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+/**
+ * M184 (`R-1059e9bd`): said beside every upload, because Excel reads a code such as 01 as the number 1 and saves it so,
+ * after which a child list's parent column names no row — and nothing on the screen said why.
+ */
+export const CODES_AS_TEXT = 'Excel turns a code like 01 into 1: format the code columns as Text before you type them, or use letters.';
+
 function base(formId: string): string {
     return `/forms/${encodeURIComponent(formId)}/choice-lists`;
 }
@@ -26,7 +35,7 @@ export async function listChoiceLists(formId: string): Promise<ChoiceListRow[]> 
     return Array.isArray(json?.data) ? (json.data as ChoiceListRow[]) : [];
 }
 
-/** Add a list from a CSV file, or replace the list of the same name. */
+/** Add a list from a CSV file or a workbook, or replace the list of the same name. */
 export async function uploadChoiceList(formId: string, file: File): Promise<ChoiceListRow> {
     const body = new FormData();
     body.append('file', file);

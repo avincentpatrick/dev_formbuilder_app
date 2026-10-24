@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Tenant;
 
+use App\Enums\FormVersionStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Attachments\StoreAttachmentRequest;
 use App\Http\Requests\Forms\StoreFormChoiceListRequest;
@@ -15,6 +16,7 @@ use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\User;
 use App\Services\Attachments\AttachmentStorageService;
+use App\Services\Forms\ChoicePreviewPresenter;
 use App\Services\Forms\FormChoiceListService;
 use App\Services\Forms\FormReferenceFileService;
 use Illuminate\Http\JsonResponse;
@@ -135,6 +137,26 @@ final class AttachmentController extends Controller
         $service->remove($form, $list);
 
         return response()->noContent();
+    }
+
+    /**
+     * M184 (`R-d8c2ce84`): the choices the builder's Preview shows of the draft — another form's answers, its list
+     * files' rows, a Short text's suggestions — each list cut to what a preview needs ({@see ChoicePreviewPresenter}).
+     * Beside the choice-list routes, whose files they are read from; a read that writes nothing.
+     */
+    public function previewChoices(Form $form, ChoicePreviewPresenter $presenter): JsonResponse
+    {
+        $draft = $form->draft_version_id === null ? null : FormVersion::query()->whereKey($form->draft_version_id)->first();
+
+        return response()->json(['data' => $draft === null ? null : $presenter->forDraft($form, $draft)]);
+    }
+
+    /** The same for a published version opened read-only from the hub — never a draft, whose snapshot is empty. */
+    public function previewVersionChoices(Form $form, FormVersion $version, ChoicePreviewPresenter $presenter): JsonResponse
+    {
+        abort_if($version->status === FormVersionStatus::Draft, 404);
+
+        return response()->json(['data' => $presenter->forVersion($form, $version)]);
     }
 
     public function show(Attachment $attachment): StreamedResponse

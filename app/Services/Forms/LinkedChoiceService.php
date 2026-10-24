@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\DB;
  * A choice question that takes its choices from another form's answers (M133, `R-5da4a30f` — Connect project v1).
  *
  * ── THE LINK IS ONE CONFIG KEY, AND THE LIST IS NEVER STORED ──────────────────────────────────────
- * A `single_select` or `dropdown` links with `config.options_source = {form_id, field_key}`. Being config, the link
+ * A `single_select`, `multi_select` (M184) or `dropdown` links with `config.options_source = {form_id, field_key}`. Being config, the link
  * is part of the version snapshot: frozen per version, cloned by `SchemaTreeCloner`, covered by the checksum —
  * changing WHICH form a question reads needs a publish, which is right. The LIST is not: it is read live from the
  * source's responses and served beside the schema (`D60` = A), so a busy source form never moves a checksum every
@@ -35,8 +35,14 @@ use Illuminate\Support\Facades\DB;
  */
 final class LinkedChoiceService
 {
-    /** The two question types a link may feed. Multi-select and Likert are the remainder row's. */
-    public const LINKABLE_TYPES = [FieldType::SingleSelect, FieldType::Dropdown];
+    /** The question types a link may feed — Multiple choice since M184 (`R-f655f9b1`). A Likert scale keeps its fixed points. */
+    public const LINKABLE_TYPES = [FieldType::SingleSelect, FieldType::MultiSelect, FieldType::Dropdown];
+
+    /**
+     * The SOURCE questions whose stored values are mapped to their labels: the choice types {@see ShareableQuestions}
+     * shares. Not {@see LINKABLE_TYPES} — that list is what a link may FEED, and a Multiple choice feeds but is not shared.
+     */
+    private const SOURCE_CHOICE_TYPES = [FieldType::SingleSelect, FieldType::Dropdown];
 
     /** The most choices one list carries (v1). More is the remainder row's; the builder says so. */
     public const MAX_CHOICES = 1000;
@@ -83,6 +89,30 @@ final class LinkedChoiceService
     public static function declaresLink(?array $config): bool
     {
         return is_array($config) && array_key_exists('options_source', $config) && $config['options_source'] !== null;
+    }
+
+    /**
+     * M184 (`R-596d6afd`): whether a Short text's suggestions are declared to come from another form, picked or not —
+     * `config.suggestions_source = {kind: form, form_id, field_key}`.
+     *
+     * @param  array<string, mixed>|null  $config
+     */
+    public static function declaresSuggestionLink(?array $config): bool
+    {
+        $source = $config['suggestions_source'] ?? null;
+
+        return is_array($source) && ($source['kind'] ?? null) === 'form';
+    }
+
+    /**
+     * The link a Short text's suggestions take, or null when they come from no form or from a half-picked one.
+     *
+     * @param  array<string, mixed>|null  $config
+     * @return array{form_id: string, field_key: string}|null
+     */
+    public static function suggestionLinkOf(?array $config): ?array
+    {
+        return self::declaresSuggestionLink($config) ? self::linkOf(['options_source' => $config['suggestions_source'] ?? null]) : null;
     }
 
     /**
@@ -185,22 +215,43 @@ final class LinkedChoiceService
      * the snapshot holds no typed options, so both engines skip the membership check — which is what keeps an
      * offline response submittable after the source changes. `tests/golden/validation/membership.json` pins it.
      *
+     * M184 (`R-596d6afd`): a Short text whose suggestions come from another form is served the same list under its key —
+     * the runtime offers it as suggestions, and the answer stays free text.
+     *
      * @return array<string, array{stamp: string, available: bool, truncated: bool, options: list<array{value: string, label: string}>}>
      */
     public function listsFor(Form $destination, FormVersion $version): array
     {
         $snapshot = $version->schema_snapshot;
+
+        return $this->listsForFields($destination, (array) ($snapshot['fields'] ?? []));
+    }
+
+    /**
+     * {@see listsFor()} over any list of fields in the snapshot's shape (`key`, `field_type`, `config`) — a published
+     * version's, or a DRAFT's rows for the builder preview, whose snapshot is empty until it is published (M184).
+     *
+     * @param  iterable<mixed>  $fields
+     * @return array<string, array{stamp: string, available: bool, truncated: bool, options: list<array{value: string, label: string}>}>
+     */
+    public function listsForFields(Form $destination, iterable $fields): array
+    {
         $lists = [];
         $memo = [];
 
-        foreach ((array) ($snapshot['fields'] ?? []) as $field) {
+        foreach ($fields as $field) {
             if (! is_array($field) || ! is_string($field['key'] ?? null)) {
                 continue;
             }
 
             $type = FieldType::tryFrom((string) ($field['field_type'] ?? ''));
-            $link = self::linkOf(is_array($field['config'] ?? null) ? $field['config'] : null);
-            if ($type === null || $link === null || ! in_array($type, self::LINKABLE_TYPES, true)) {
+            $config = is_array($field['config'] ?? null) ? $field['config'] : null;
+            $link = match (true) {
+                $type === FieldType::ShortText => self::suggestionLinkOf($config),
+                in_array($type, self::LINKABLE_TYPES, true) => self::linkOf($config),
+                default => null,
+            };
+            if ($link === null) {
                 continue;
             }
 
@@ -209,6 +260,21 @@ final class LinkedChoiceService
         }
 
         return $lists;
+    }
+
+    /**
+     * Every linked question's choices for one published version, as their values — what a scan's written answer is
+     * checked against before it reaches a review screen, because those screens draw the same live list
+     * (`App\Services\Ocr\OcrAnswerCarry`, M184).
+     *
+     * @return array<string, list<string>>
+     */
+    public function valuesFor(Form $destination, FormVersion $version): array
+    {
+        return array_map(
+            static fn (array $list): array => array_column($list['options'], 'value'),
+            $this->listsFor($destination, $version),
+        );
     }
 
     /**
@@ -283,7 +349,7 @@ final class LinkedChoiceService
     private function labelsFor(Form $source, string $key): array
     {
         $field = ShareableQuestions::find($this->publishedSnapshot($source), $key);
-        if ($field === null || ! in_array(FieldType::tryFrom((string) ($field['field_type'] ?? '')), self::LINKABLE_TYPES, true)) {
+        if ($field === null || ! in_array(FieldType::tryFrom((string) ($field['field_type'] ?? '')), self::SOURCE_CHOICE_TYPES, true)) {
             return [];
         }
 

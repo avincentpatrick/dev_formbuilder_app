@@ -18,6 +18,7 @@ use App\Exceptions\Forms\FormException;
 use App\Models\FormField;
 use App\Models\FormFieldValidation;
 use App\Services\Expressions\Coercion;
+use App\Services\Forms\ChoiceSource;
 use App\Services\Forms\FormBuilderService;
 use App\Services\Forms\LinkedChoiceService;
 use App\Services\Forms\StructuralValidationGate;
@@ -227,9 +228,13 @@ final class FieldTypeConversion
     private static function inFamilyConfig(FieldType $from, FieldType $to, array $source, array $targetDefault): array
     {
         return match (self::family($from)) {
+            // M184 (`R-596d6afd`): suggestions are a Short text's alone, so they stay behind when it becomes another text type.
+            ConversionFamily::Text => $to === FieldType::ShortText
+                ? array_replace($targetDefault, $source)
+                : array_diff_key(array_replace($targetDefault, $source), ['suggestions_source' => true, 'suggestions' => true]),
             // The choice family shares one config arm (`UpdateFieldRequest`'s `choices`), so the options —
             // with every option's `label_translations` and any key no rule enumerates — carry verbatim.
-            ConversionFamily::Text, ConversionFamily::Number, ConversionFamily::Temporal,
+            ConversionFamily::Number, ConversionFamily::Temporal,
             ConversionFamily::Geo => array_replace($targetDefault, $source),
             ConversionFamily::Choice => self::choiceConfig($to, $source, $targetDefault),
             ConversionFamily::Attachment => self::mediaConfig($to, $source),
@@ -274,8 +279,9 @@ final class FieldTypeConversion
     {
         $config = array_replace($targetDefault, $source);
 
+        // M184: a list file feeds the same types a link does, so both follow a conversion among them and neither onto a Likert scale.
         if (! in_array($to, LinkedChoiceService::LINKABLE_TYPES, true)) {
-            unset($config['options_source']);
+            unset($config['options_source'], $config['options_list']);
         }
 
         // M177 (`R-71509975`): a Likert scale has no "Other, please specify" — the link is dropped, and the plan says so.
@@ -521,8 +527,9 @@ final class FieldTypeConversion
     private static function incomplete(FieldType $type, array $config): bool
     {
         return match (true) {
-            // M133: a question that takes its choices from another form has none typed here, and is finished.
-            ValueShape::for($type)->carriesOptionList() => self::emptyList($config['options'] ?? null) && ! LinkedChoiceService::declaresLink($config),
+            // M133: a question that takes its choices from another form has none typed here, and is finished; M184: so is one
+            // bound to a list file.
+            ValueShape::for($type)->carriesOptionList() => self::emptyList($config['options'] ?? null) && ChoiceSource::of($config)->isTyped(),
             $type === FieldType::CascadingSelect => self::emptyList($config['levels'] ?? null) || self::emptyList($config['options'] ?? null),
             // M183: the shared cells are needed only while a choice column draws from them — the publish gate's own question.
             $type === FieldType::Matrix => self::emptyList($config['rows'] ?? null) || self::emptyList($config['columns'] ?? null)

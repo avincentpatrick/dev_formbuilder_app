@@ -331,6 +331,8 @@ export interface RenderField {
     content: unknown[] | null;
     /** M180 (`R-f77aa45d`): a calculation's display settings — its Type, decimal places and unit; null otherwise. */
     calculation: Record<string, unknown> | null;
+    /** M184 (`R-596d6afd`): a Short text's suggestions, offered as the person types; null for every other type. */
+    suggestions: string[] | null;
     /** M177 (`R-f44e9d00`): Show to respondents — `hidden` (Never) or `shown` (Always); null keeps the type's own rule. */
     visibility: 'hidden' | 'shown' | null;
     sequence: number;

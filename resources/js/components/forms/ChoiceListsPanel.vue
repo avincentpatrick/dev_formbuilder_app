@@ -1,16 +1,18 @@
 <script setup lang="ts">
 /**
- * The Choice lists section of a form's settings (M141, `R-f69aab42`, `D92` = A, `D95`): the CSV files the form's
- * cascading questions take their choices from, one per level, in Kobo's format. A cascade level names its list in the
- * builder's Levels tab, where a file can be uploaded too; this section shows every list the draft holds, its size and
- * columns, and removes one. Publishing freezes the lists with the version.
+ * The Choice lists section of a form's settings (M141, `R-f69aab42`, `D92` = A, `D95`): the CSV files — or, since M184,
+ * Excel workbooks — the form's choice questions take their choices from, in Kobo's format. A cascade level names its list
+ * in the builder's Levels tab, and a Single choice, Multiple choice or Dropdown on its Options tab, where a file can be
+ * uploaded too; this section shows every list the draft holds, its size and columns, and removes one. Publishing freezes
+ * the lists with the version.
  *
- * Read when the settings open, not passed in: the lists live on the draft and change from two places (here and the
- * Levels tab), so the server is the one copy.
+ * Read when the settings open, not passed in: the lists live on the draft and change from three places (here, the
+ * Levels tab and the Options tab), so the server is the one copy.
  */
 import { ref, watch } from 'vue';
-import { MdsFormField, MdsIconButton } from '@meridian/design-system';
-import { describeChoiceList, listChoiceLists, removeChoiceList, uploadChoiceList, type ChoiceListRow } from '@/components/forms/choice-lists';
+import { MdsIconButton } from '@meridian/design-system';
+import ChoiceListUpload from '@/components/forms/ChoiceListUpload.vue';
+import { describeChoiceList, listChoiceLists, removeChoiceList, type ChoiceListRow } from '@/components/forms/choice-lists';
 
 const props = defineProps<{
     /** Whether the settings are open — the modal's state, or always true on the hub page. */
@@ -20,8 +22,6 @@ const props = defineProps<{
 
 const lists = ref<ChoiceListRow[]>([]);
 const loadError = ref<string | null>(null);
-const uploading = ref(false);
-const uploadError = ref<string | null>(null);
 const status = ref<string | null>(null);
 const actionError = ref<string | null>(null);
 
@@ -42,24 +42,9 @@ watch(
     { immediate: true },
 );
 
-async function onFileChosen(event: Event): Promise<void> {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = '';
-    if (file === undefined || uploading.value) return;
-
-    uploading.value = true;
-    uploadError.value = null;
+function onUploaded(added: ChoiceListRow): void {
     status.value = null;
-    try {
-        const added = await uploadChoiceList(props.formId, file);
-        lists.value = [...lists.value.filter((list) => list.name !== added.name), added].sort((a, b) => a.name.localeCompare(b.name));
-        status.value = `Uploaded ${added.name}: ${describeChoiceList(added)}.`;
-    } catch (thrown) {
-        uploadError.value = thrown instanceof Error ? thrown.message : 'The file was not accepted.';
-    } finally {
-        uploading.value = false;
-    }
+    lists.value = [...lists.value.filter((list) => list.name !== added.name), added].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 async function remove(list: ChoiceListRow): Promise<void> {
@@ -77,8 +62,9 @@ async function remove(list: ChoiceListRow): Promise<void> {
 <template>
     <div class="choice-lists">
         <p class="choice-lists__intro">
-            Long lists, such as region, province, city or municipality, and barangay, can come from CSV files instead of
-            being typed. Upload one file per level, then choose it on each level of a cascading question.
+            Long lists, such as region, province, city or municipality, and barangay, can come from CSV or Excel files
+            instead of being typed. Upload one file per level and choose it on each level of a cascading question, or
+            choose a file on the Options tab of a single choice, multiple choice or dropdown question.
         </p>
 
         <p v-if="loadError" class="choice-lists__error" role="alert">{{ loadError }}</p>
@@ -95,24 +81,13 @@ async function remove(list: ChoiceListRow): Promise<void> {
 
         <p v-if="actionError" class="choice-lists__error" role="alert">{{ actionError }}</p>
 
-        <MdsFormField
-            v-slot="{ id, describedby, invalid }"
-            label="Upload a CSV file"
-            help="Columns “name” (a code used once in the file) and “label”; below the first level, add a column named after the level above. The file’s name is the list’s name, and uploading it again replaces the list. Up to 10 MB."
-            :error="uploadError ?? undefined"
-        >
-            <input
-                :id="id"
-                class="choice-lists__file"
-                type="file"
-                accept=".csv,text/csv"
-                :disabled="uploading"
-                :aria-describedby="describedby"
-                :aria-invalid="invalid || undefined"
-                @change="onFileChosen"
-            />
-        </MdsFormField>
-        <p class="choice-lists__status" role="status">{{ uploading ? 'Reading the file…' : (status ?? '') }}</p>
+        <ChoiceListUpload
+            :form-id="formId"
+            label="Upload a CSV or Excel file"
+            help="Columns “name” (a code used once in the file) and “label”; below the first level of a cascade, add a column named after the level above. An Excel file’s first sheet is read. The file’s name is the list’s name, and uploading it again replaces the list. Up to 10 MB."
+            @uploaded="onUploaded"
+        />
+        <p class="choice-lists__status" role="status">{{ status ?? '' }}</p>
     </div>
 </template>
 
@@ -174,9 +149,5 @@ async function remove(list: ChoiceListRow): Promise<void> {
     margin: 0;
     color: var(--mds-color-status-danger-fg);
     font-size: var(--mds-type-body-sm-font-size);
-}
-
-.choice-lists__file {
-    max-width: 100%;
 }
 </style>

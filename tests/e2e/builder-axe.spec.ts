@@ -272,6 +272,24 @@ for (const theme of themes) {
         await scan(page, 'options tab, choices from another form');
     });
 
+    // M184 (`R-3e7c81bb`) — the Options tab of a question that takes its choices from a list file. "Field Visit Referral"
+    // (E2eSeeder) binds its Facility question to `facilities.csv`, so the tab opens on the list mode with the list picked
+    // and the upload beside it, and no typed list. Opened and scanned only; nothing is changed.
+    test(`Builder — choices from a list file (${theme})`, async ({ page }) => {
+        await openBuilder(page, 'Field Visit Referral');
+        await showBuilderPane(page, 'canvas');
+        await page.locator('.canvas__field-main', { hasText: 'Facility visited' }).click();
+        await showBuilderPane(page, 'settings');
+        await page.getByRole('tab', { name: 'Options' }).click();
+
+        const linked = page.locator('[data-linked-choices]');
+        await expect(linked.getByRole('radio', { name: 'A list file' })).toBeChecked({ timeout: 10_000 });
+        await expect(linked.getByLabel('List file', { exact: true })).toHaveValue('facilities');
+        await expect(linked.locator('[data-choice-list-upload] input[type="file"]')).toHaveAttribute('accept', /\.xlsx/);
+        await forceTheme(page, theme);
+        await scan(page, 'options tab, choices from a list file');
+    });
+
     test(`Builder — empty canvas (${theme})`, async ({ page }) => {
         await openBuilder(page, 'Blank Intake Form');
         await expect(page.getByText('An empty form')).toBeVisible({ timeout: 10_000 });

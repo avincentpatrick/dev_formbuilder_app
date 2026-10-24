@@ -17,7 +17,8 @@
  */
 import { computed, onMounted, ref } from 'vue';
 import { MdsButton, MdsFormField, MdsIconButton, MdsSelect, MdsTextInput } from '@meridian/design-system';
-import { describeChoiceList, listChoiceLists, uploadChoiceList, type ChoiceListRow } from '@/components/forms/choice-lists';
+import ChoiceListUpload from '@/components/forms/ChoiceListUpload.vue';
+import { describeChoiceList, listChoiceLists, type ChoiceListRow } from '@/components/forms/choice-lists';
 
 interface CascadeLevel {
     key: string;
@@ -39,11 +40,8 @@ const emit = defineEmits<{
 
 const levelSelectOptions = computed(() => props.levels.map((l) => ({ value: l.key, label: l.label || l.key })));
 
-// ── CSV choice lists (M141) ─────────────────────────────────────────────────
+// ── CSV choice lists (M141; Excel workbooks too since M184) ─────────────────
 const lists = ref<ChoiceListRow[]>([]);
-const uploading = ref(false);
-const uploadError = ref<string | null>(null);
-const uploadStatus = ref<string | null>(null);
 
 async function loadLists(): Promise<void> {
     if (!props.formId) return;
@@ -73,7 +71,7 @@ function listProblem(index: number): string | null {
     const level = props.levels[index];
     if (!level || !namesAList(level) || !props.formId) return null;
     const list = lists.value.find((candidate) => candidate.name === level.list);
-    if (!list) return `${level.list}.csv is not uploaded to this form.`;
+    if (!list) return `${level.list} is not uploaded to this form.`;
     const above = props.levels[index - 1];
     if (above && !list.columns.includes(above.key.toLowerCase())) {
         return `${list.name} has no “${above.key}” column. Name the level above after the file’s column, or add the column.`;
@@ -81,24 +79,8 @@ function listProblem(index: number): string | null {
     return null;
 }
 
-async function onListChosen(event: Event): Promise<void> {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = '';
-    if (file === undefined || uploading.value || !props.formId) return;
-
-    uploading.value = true;
-    uploadError.value = null;
-    uploadStatus.value = null;
-    try {
-        const added = await uploadChoiceList(props.formId, file);
-        lists.value = [...lists.value.filter((list) => list.name !== added.name), added].sort((a, b) => a.name.localeCompare(b.name));
-        uploadStatus.value = `Uploaded ${added.name}: ${describeChoiceList(added)}.`;
-    } catch (thrown) {
-        uploadError.value = thrown instanceof Error ? thrown.message : 'The file was not accepted.';
-    } finally {
-        uploading.value = false;
-    }
+function onListUploaded(added: ChoiceListRow): void {
+    lists.value = [...lists.value.filter((list) => list.name !== added.name), added].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function levelIndexOf(levelKey: string): number {
@@ -185,32 +167,20 @@ function removeOption(index: number): void {
             <div>
                 <MdsButton variant="tertiary" size="sm" icon-left="plus" @click="addLevel">Add level</MdsButton>
             </div>
-            <MdsFormField
+            <ChoiceListUpload
                 v-if="formId"
-                v-slot="{ id, describedby, invalid }"
-                label="Choices from a CSV file"
+                :form-id="formId"
+                label="Choices from a CSV or Excel file"
                 help="One file per level: “name” and “label” columns, and below the first level a column named after the level above. The file’s name is the list’s name; uploading it again replaces the list."
-                :error="uploadError ?? undefined"
-            >
-                <input
-                    :id="id"
-                    class="cascading__file"
-                    type="file"
-                    accept=".csv,text/csv"
-                    :disabled="uploading"
-                    :aria-describedby="describedby"
-                    :aria-invalid="invalid || undefined"
-                    @change="onListChosen"
-                />
-            </MdsFormField>
-            <p v-if="formId" class="cascading__hint" role="status">{{ uploading ? 'Reading the file…' : (uploadStatus ?? '') }}</p>
+                @uploaded="onListUploaded"
+            />
         </section>
 
         <section v-if="allFromLists" class="cascading__section">
             <h3 class="cascading__heading">Options</h3>
             <p class="cascading__hint">
-                Every level takes its choices from a CSV file. The live form loads them, and publishing checks that every
-                choice’s parent is in the file above.
+                Every level takes its choices from a CSV or Excel file. The live form loads them, and publishing checks that
+                every choice’s parent is in the file above.
             </p>
             <ul class="cascading__list-sizes">
                 <li v-for="level in levels" :key="level.key">
@@ -222,7 +192,7 @@ function removeOption(index: number): void {
         <section v-else class="cascading__section">
             <h3 class="cascading__heading">Options</h3>
             <p v-if="someFromLists" class="cascading__problem">
-                Every level must take its choices from a CSV file, or none may.
+                Every level must take its choices from a CSV or Excel file, or none may.
             </p>
             <p class="cascading__hint">Tag each option with its level and (below the top level) its parent option.</p>
             <div class="cascading__options">
@@ -325,10 +295,6 @@ function removeOption(index: number): void {
     margin: 0;
     color: var(--mds-color-status-danger-fg);
     font-size: var(--mds-type-body-sm-font-size);
-}
-
-.cascading__file {
-    max-width: 100%;
 }
 
 .cascading__list-sizes {

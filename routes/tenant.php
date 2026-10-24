@@ -1148,6 +1148,15 @@ Route::middleware([
         ->middleware('can:update,form')
         ->where('list', '[a-z0-9_-]{1,64}')
         ->name('forms.choice-lists.destroy');
+    // M184, `R-d8c2ce84`: the choices the builder's Preview shows — of the draft for whoever may edit the form, and of a
+    // published version for whoever may view it (the version view's gate). Reads that write nothing.
+    Route::get('/forms/{form}/choices', [AttachmentController::class, 'previewChoices'])
+        ->middleware('can:update,form')
+        ->name('forms.choices.preview');
+    Route::get('/forms/{form}/versions/{version}/choices', [AttachmentController::class, 'previewVersionChoices'])
+        ->scopeBindings()
+        ->middleware('can:view,form')
+        ->name('forms.versions.choices');
     // M132, `R-b7bc5149`: a form's automations — "when a response is submitted, send an email or the answers to a web
     // address" (`D82`, `D83`), run on the queue only (`D62`). On the already-imported FormController, for the `use`-line
     // reason above. A change is `can:manage,automation` too: a web-address automation is `webhooks.manage`'s alone. The

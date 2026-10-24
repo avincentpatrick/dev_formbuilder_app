@@ -155,6 +155,9 @@ export interface EncodeField {
     // M180 (`R-f77aa45d`) — a calculation's display settings (`calculated_type`, `decimal_places`, `duration_unit`), read by
     // `displayValue()` so its value shows by its Type; null for every other type, and for an untyped calculation.
     calculation?: Record<string, unknown> | null;
+    // M184 (`R-596d6afd`) — a Short text's suggestions (a list file's labels, or another form's answers), offered as the
+    // person types; null for every other type. Free text stays accepted, and the server never checks it against them.
+    suggestions?: string[] | null;
     supported: boolean;
 }
 
@@ -320,6 +323,18 @@ const stringValue = computed<string>(() => (typeof props.modelValue === 'string'
 const numberValue = computed<number | null>(() => (typeof props.modelValue === 'number' ? props.modelValue : null));
 const listValue = computed<string[]>(() => (Array.isArray(props.modelValue) ? (props.modelValue as string[]) : []));
 
+// M184 (`R-596d6afd`) — a Short text's suggestions, in a `<datalist>` the browser offers as the person types: at most this
+// many, the ones containing what is typed (any case), so a list of thousands never puts thousands of options in the page.
+// Free text stays accepted — a datalist suggests and never restricts.
+const SUGGESTIONS_SHOWN = 100;
+const hasSuggestions = computed(() => props.field.field_type === 'short_text' && (props.field.suggestions?.length ?? 0) > 0);
+const shownSuggestions = computed<string[]>(() => {
+    const all = hasSuggestions.value ? (props.field.suggestions ?? []) : [];
+    const typed = stringValue.value.trim().toLowerCase();
+
+    return (typed === '' ? all : all.filter((suggestion) => suggestion.toLowerCase().includes(typed))).slice(0, SUGGESTIONS_SHOWN);
+});
+
 function toggleOption(value: string, checked: boolean): void {
     const current = listValue.value;
     emit('update:modelValue', checked ? [...current, value] : current.filter((v) => v !== value));
@@ -410,16 +425,22 @@ function setCascadeLevel(index: number, value: string): void {
         :error="error"
         v-slot="{ id, describedby, invalid }"
     >
-        <MdsTextInput
-            v-if="control === 'text'"
-            :id="id"
-            :type="textType"
-            :model-value="stringValue"
-            :placeholder="field.placeholder ?? undefined"
-            :describedby="describedby"
-            :invalid="invalid"
-            @update:model-value="emit('update:modelValue', $event)"
-        />
+        <template v-if="control === 'text'">
+            <MdsTextInput
+                :id="id"
+                :type="textType"
+                :model-value="stringValue"
+                :placeholder="field.placeholder ?? undefined"
+                :describedby="describedby"
+                :invalid="invalid"
+                :list="hasSuggestions ? `${id}-suggestions` : undefined"
+                :autocomplete="hasSuggestions ? 'off' : undefined"
+                @update:model-value="emit('update:modelValue', $event)"
+            />
+            <datalist v-if="hasSuggestions" :id="`${id}-suggestions`" data-suggestions>
+                <option v-for="suggestion in shownSuggestions" :key="suggestion" :value="suggestion" />
+            </datalist>
+        </template>
         <MdsTextarea
             v-else-if="control === 'textarea'"
             :id="id"

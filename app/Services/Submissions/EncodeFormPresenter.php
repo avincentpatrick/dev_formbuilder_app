@@ -100,6 +100,9 @@ final class EncodeFormPresenter
      */
     private const OMITTED = [FieldType::PageBreak, FieldType::Calculated];
 
+    /** @var array<string, array<string, array{stamp: string, available: bool, truncated: bool, options: list<array{value: string, label: string}>}>> each version's linked lists, read once (M184) */
+    private array $linkedLists = [];
+
     public function __construct(
         private readonly SchemaValueFormatter $formatter,
         private readonly TemplateRenderer $templates,
@@ -468,6 +471,8 @@ final class EncodeFormPresenter
             'content' => $type === FieldType::Note && is_array($field->config['content'] ?? null) ? $field->config['content'] : null,
             // M180 (`R-f77aa45d`) — a calculation's display settings, so its value shows by its Type, as on the guest form.
             'calculation' => $this->calculationDisplay($field),
+            // M184 (`R-596d6afd`) — a Short text's suggestions, offered as the keyer types; null for every other type.
+            'suggestions' => $this->suggestions($field),
             // `note` is display-only (handled by the page), never an input; a repeatable section's fields are
             // supported and render inside the add/remove-instance loop (Increment G2). A hidden field is
             // keyable ONLY when it is externally sourced — a `fixed` or source-less one has no answer this
@@ -693,13 +698,50 @@ final class EncodeFormPresenter
      */
     private function linkedOptions(FormField $field): array
     {
+        return $this->linkedLists($field)[$field->key]['options'] ?? [];
+    }
+
+    /**
+     * M184 (`R-596d6afd`): a Short text's suggestions — a list file's labels, written into the version at publish, or
+     * another form's answers as they read now (the same list a linked choice question is served). Null for every other
+     * type, as the guest adapters send it. The answer stays free text: the server never checks it against these.
+     *
+     * @return list<string>|null
+     */
+    private function suggestions(FormField $field): ?array
+    {
+        if ($field->field_type !== FieldType::ShortText) {
+            return null;
+        }
+
+        $config = (array) $field->config;
+        if (LinkedChoiceService::declaresSuggestionLink($config)) {
+            return array_column($this->linkedLists($field)[$field->key]['options'] ?? [], 'label');
+        }
+
+        $written = $config['suggestions'] ?? null;
+
+        return is_array($written) ? array_values(array_filter($written, is_string(...))) : null;
+    }
+
+    /**
+     * Every linked list of the field's version, read once per version for the whole page — a form with ten linked
+     * questions used to read every list ten times (M184).
+     *
+     * @return array<string, array{stamp: string, available: bool, truncated: bool, options: list<array{value: string, label: string}>}>
+     */
+    private function linkedLists(FormField $field): array
+    {
+        $versionId = (string) $field->form_version_id;
+        if (array_key_exists($versionId, $this->linkedLists)) {
+            return $this->linkedLists[$versionId];
+        }
+
         $version = FormVersion::query()->whereKey($field->form_version_id)->first();
         $form = $version === null ? null : Form::query()->whereKey($version->form_id)->first();
 
-        if ($version === null || $form === null) {
-            return [];
-        }
-
-        return app(LinkedChoiceService::class)->listsFor($form, $version)[$field->key]['options'] ?? [];
+        return $this->linkedLists[$versionId] = $version === null || $form === null
+            ? []
+            : app(LinkedChoiceService::class)->listsFor($form, $version);
     }
 }

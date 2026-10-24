@@ -33,8 +33,9 @@ final class SchemaTreeCloner
             $new = $field->replicate();
             $new->form_version_id = $target->id;
             // M141 — a cascade whose levels name CSV choice lists carries the lists' options only while PUBLISHED
-            // (`ChoiceListMaterializer`); the draft takes the lists themselves, below, and no options.
-            $new->config = ChoiceListMaterializer::withoutListOptions((array) $field->config);
+            // (`ChoiceListMaterializer`); the draft takes the lists themselves, below, and no options. M184: so does a
+            // choice question bound to a list file.
+            $new->config = ChoiceListMaterializer::forNextDraft((array) $field->config);
             $new->form_section_id = $field->form_section_id !== null
                 ? ($sectionIdMap[$field->form_section_id] ?? null)
                 : null;

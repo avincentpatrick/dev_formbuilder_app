@@ -42,6 +42,8 @@ import type { BuilderStore } from './useBuilderStore';
 import type { BuilderPageProps } from './types';
 import { useFlipReorder } from './useFlipReorder';
 import { usePreviewReorder } from './usePreviewReorder';
+import { fetchPreviewChoices, previewChoicesUrl, type PreviewChoices } from './preview-choices';
+import { isListBacked } from '../../../public-runtime/lib/choice-lists';
 import { isoClock } from '../../../public-runtime/lib/schema-mapping';
 import type { AnswerMap, SchemaResponse } from '../../../public-runtime/lib/types';
 
@@ -57,6 +59,26 @@ const props = defineProps<{
 // asks again on the content editor's own schedule (`ContentBlocksEditor.vue`, 3 s, ten tries) instead of keeping
 // the first failure until a reload. Only this surface opts in; see `ContentImageRetry`.
 provide(ContentImageRetryKey, { delayMs: 3000, maxAttempts: 10 });
+
+// M184 (`R-d8c2ce84`): the choices the draft takes from elsewhere — another form's answers, list files, suggestions — read
+// from the server while Preview is open, again whenever a question's source changes. Only the latest read lands.
+const previewChoices = ref<PreviewChoices | null>(null);
+const boundSources = computed(() =>
+    JSON.stringify(
+        props.store.fields.value
+            .filter((f) => f.config.options_source != null || f.config.options_list != null || f.config.suggestions_source != null || (f.field_type === 'cascading_select' && isListBacked(f.config)))
+            .map((f) => [f.key, f.field_type, f.config.options_source ?? null, f.config.options_list ?? null, f.config.suggestions_source ?? null, f.config.levels ?? null]),
+    ),
+);
+let choicesRead = 0;
+async function readChoices(): Promise<void> {
+    const read = ++choicesRead;
+    const choices = boundSources.value === '[]' ? null : await fetchPreviewChoices(previewChoicesUrl(props.form.id));
+    if (read === choicesRead) previewChoices.value = choices;
+}
+watch([() => props.active, boundSources], ([active]) => {
+    if (active) void readChoices();
+}, { immediate: true });
 
 const model = computed(() =>
     buildPreviewModel({
@@ -75,6 +97,7 @@ const model = computed(() =>
         version: props.draft ?? { id: 'preview', version_number: 0 },
         sections: props.store.sections.value,
         fields: props.store.fields.value,
+        choices: previewChoices.value,
     }),
 );
 

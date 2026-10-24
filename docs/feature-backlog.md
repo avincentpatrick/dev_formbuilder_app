@@ -11680,7 +11680,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   which trims that row to a v1 for the Oct 12 testing: a linked form feeds a `single_select`/`dropdown`'s options.
   Left here: pulldata-style lookups and calculations over linked data, and whatever of `D60`'s separate freshness
   channel (answered A — beside the schema checksum) v1 does not need.
-  **Live.** Filed by `M127`. **Tier: during-testing.** **Also left by `M133`'s v1:** the linked list in the builder preview (it says the choices show on the live form), `select_one_from_file` in the XLSForm export, the sync manifest's empty `choice_lists`, linked choices for multi-select and Likert questions, a source question inside a repeat group, more than 1,000 choices, and a server-side cache of the list. **Split 2026-10-15 by `M172` (`D128`):** the multi-select half and the builder-preview half are their own `early-testing` rows now (R-f655f9b1, R-d8c2ce84, the options-from-anywhere increment); the grid's rows from another form and the cascade filter are R-bb79aec0 and R-ed7f3127. Left here, unchanged in tier: lookups and calculations over linked data, a source inside a repeat, more than 1,000 choices, a server-side cache, `select_one_from_file` in the XLSForm export and the sync manifest's `choice_lists`.
+  **Live.** Filed by `M127`. **Tier: during-testing.** **Also left by `M133`'s v1:** the linked list in the builder preview (it says the choices show on the live form), `select_one_from_file` in the XLSForm export, the sync manifest's empty `choice_lists`, linked choices for multi-select and Likert questions, a source question inside a repeat group, more than 1,000 choices, and a server-side cache of the list. **Split 2026-10-15 by `M172` (`D128`):** the multi-select half and the builder-preview half are their own `early-testing` rows now (R-f655f9b1, R-d8c2ce84, the options-from-anywhere increment); the grid's rows from another form and the cascade filter are R-bb79aec0 and R-ed7f3127. Left here, unchanged in tier: lookups and calculations over linked data, a source inside a repeat, more than 1,000 choices, a server-side cache, `select_one_from_file` in the XLSForm export and the sync manifest's `choice_lists`. **Amended 2026-10-23 by `M184`:** the two halves split out are closed on its branch (multi-select links, the preview's lists), and it adds what the row did not name — a flat question's choices and a Short text's suggestions from a list file, served in the schema rather than beside it; this row's remainder is unchanged.
 
 - ✅ **CLOSED BY `M132` (2026-10-05) — ****`minor` · An author cannot attach a reference file to a form, and the attachment model has no form-level kind
   to hang one on.** Filed 2026-09-25 by `M110` from the report *"there is also a attachments in kobotoolbox that
@@ -11749,14 +11749,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   which must not become a seventh. The PHP `FieldType` enum is authoritative and the builder palette is fully
   server-driven — but the **renderers** carry six hand-written mirrors: `schema-mapping.ts:48-59` (`SUPPORTED`,
   whose own comment admits it mirrors `EncodeFormPresenter::SUPPORTED`), `:72` (`HAS_OPTIONS`), `:75`
-  (`TEXT_TYPES`), `FieldInput.vue` (`MEDIA_TYPES`) and `ConfigPanel.vue:193` (`NUMERIC_TYPES`). ✅ **Only
+  (`TEXT_TYPES`), `FieldInput.vue` (`MEDIA_TYPES`) and `ConfigPanel.vue:194` (`NUMERIC_TYPES`). ✅ **Only
   `field-roles.ts`'s `RENDERS_NOTHING` is pinned**, by `tests/Unit/Forms/PdfFieldRoleTest.php`, which regex-parses
   the TypeScript from PHP and asserts set equality — so the instrument already exists in this repository and needs
   copying, not inventing. ⚠️ **`EncodeFormPresenter`'s own docblock (`:64-72`) admits the duplication and records
   that collapsing it was deliberately declined** — which makes a parity test the right answer rather than a
   refactor: it converts five unguarded mirrors into guarded ones **without deleting any of them**. ⚠️ A gate
   written here is green on arrival and therefore proves nothing until a committed mutation — removing one type
-  from one mirror — turns it red. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AS A PROVEN STRICT SUBSET OF `R-09f73330`, NOT WORKED SEPARATELY.** ✅ Its citations hold, with two off-by-N: `HAS_OPTIONS` is declared at `schema-mapping.ts:73`, not `:72` (`:72` is the comment), and the `EncodeFormPresenter` docblock admission runs `:64-69`, not `:64-72`. ⛔ **ALL FIVE GAPS IT NAMES APPEAR IN `R-09f73330` VERBATIM, AT THE SAME FILE AND LINE** — `schema-mapping.ts:48`/`:73`/`:75`, `FieldInput.vue`'s `MEDIA_TYPES` and `ConfigPanel.vue:193` — and it names **no** declaration that row does not. (It also cites `field-roles.ts`'s `RENDERS_NOTHING`, but as already-gated *evidence*, not as a gap.) So the single gate written for `R-09f73330` necessarily closes this one too, and **working both would have collided on three production files** under `D13` clause 1. ⚠️ **Its *"six copies, five ungated"* is a FLOOR:** there are **ten** ungated declarations by declaration count, and an eleventh that was already gated. ⚠️ **And its supporting citation is mis-aimed, though its conclusion survives:** `EncodeFormPresenter`'s docblock at `:67-72` declines collapsing the *builder functions*, not the `SUPPORTED` constant — the admission that actually supports the row is on the TypeScript side, at `schema-mapping.ts:47`. ⚠️ **Its *"the instrument exists and needs copying"* is now UNDERSTATED:** the technique has been copied three further times since it was filed — `DraftProjectionMirrorDriftTest`, `DocumentedEnumMirrorDriftTest` (a table-driven generalisation over three grammars) and the `NotificationType`/`ShellAbility` parity tests.
+  from one mirror — turns it red. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AS A PROVEN STRICT SUBSET OF `R-09f73330`, NOT WORKED SEPARATELY.** ✅ Its citations hold, with two off-by-N: `HAS_OPTIONS` is declared at `schema-mapping.ts:73`, not `:72` (`:72` is the comment), and the `EncodeFormPresenter` docblock admission runs `:64-69`, not `:64-72`. ⛔ **ALL FIVE GAPS IT NAMES APPEAR IN `R-09f73330` VERBATIM, AT THE SAME FILE AND LINE** — `schema-mapping.ts:48`/`:73`/`:75`, `FieldInput.vue`'s `MEDIA_TYPES` and `ConfigPanel.vue:194` — and it names **no** declaration that row does not. (It also cites `field-roles.ts`'s `RENDERS_NOTHING`, but as already-gated *evidence*, not as a gap.) So the single gate written for `R-09f73330` necessarily closes this one too, and **working both would have collided on three production files** under `D13` clause 1. ⚠️ **Its *"six copies, five ungated"* is a FLOOR:** there are **ten** ungated declarations by declaration count, and an eleventh that was already gated. ⚠️ **And its supporting citation is mis-aimed, though its conclusion survives:** `EncodeFormPresenter`'s docblock at `:67-72` declines collapsing the *builder functions*, not the `SUPPORTED` constant — the admission that actually supports the row is on the TypeScript side, at `schema-mapping.ts:47`. ⚠️ **Its *"the instrument exists and needs copying"* is now UNDERSTATED:** the technique has been copied three further times since it was filed — `DraftProjectionMirrorDriftTest`, `DocumentedEnumMirrorDriftTest` (a table-driven generalisation over three grammars) and the `NotificationType`/`ShellAbility` parity tests.
 
 - **`minor` · Three more request paths prune an array key by the same mechanism `B0` just fixed, and one of
   them may be doing it on purpose.** Found by `M111` (2026-09-25) while sweeping for the CLASS behind
@@ -11817,7 +11817,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `HAS_OPTIONS`, `:75` `TEXT_TYPES`; `display-value.ts:48` `HAS_OPTIONS` (a second copy), `:51` `GEO_TYPES`,
   `:55` `MEDIA_TYPES`; `semantic-validator.ts:43` `MEDIA_FIELD_TYPES` (a third copy of the media set);
   `FieldInput.vue`'s `MEDIA_TYPES` (a fourth) and its inline text-type literal (a second `TEXT_TYPES`);
-  and `ConfigPanel.vue:193` `NUMERIC_TYPES`. ⛔ **`TEXT_TYPES` and `NUMERIC_TYPES` MIRROR NOTHING** — there is no
+  and `ConfigPanel.vue:194` `NUMERIC_TYPES`. ⛔ **`TEXT_TYPES` and `NUMERIC_TYPES` MIRROR NOTHING** — there is no
   PHP predicate or registry either one corresponds to, so they cannot drift from a source; they ARE a source, and
   an undeclared one. ✅ **The technique is proven and is now used twice:** `tests/Unit/Forms/PdfFieldRoleTest.php`
   parses `field-roles.ts` by regex with two anti-vacuity arms, and `M112` built
@@ -11912,7 +11912,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · The builder and PHP disagree about whether a duration field takes an ordered comparison, and the
   disagreement is now pinned rather than resolved.** Found by `M113` (2026-09-26) while building the client
-  field-type mirror census. `ConfigPanel.vue:195`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
+  field-type mirror census. `ConfigPanel.vue:354`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
   'likert_scale']` — four members. `ValueShape::allowsOperator()` (`ValueShape.php:218-242`) permits
   `gt`/`lt`/`gte`/`lte` for `Number`, `Duration` and `Scale`, which is **five** types: the same four plus
   `duration`. ⛔ **`R-09f73330` SAYS THIS SET "MIRRORS NOTHING", AND THAT STOPPED BEING TRUE IN THE INCREMENT
@@ -13595,12 +13595,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the page's first comment sends the next reader looking for controls that no longer exist. **Not live** — a stale
   comment, not a defect in the product. Filed by `M148`. **Tier: during-testing.**
 
-- **`nit` · A CSV choice list whose codes start with zero breaks if the file is re-saved in Excel, and nothing says
+- ✅ **CLOSED BY `M184` (2026-10-23) — ****`nit` · A CSV choice list whose codes start with zero breaks if the file is re-saved in Excel, and nothing says
   why.** Found by `M148` while writing the sample files the user asked for (Round 2, `r2-c11`: *"give me sample csv for
   me to check specially for multi levels"*). Excel reads `01` as the number 1 and saves it so, a child file's parent
   column then names no row, and publish refuses with "option “X” has no valid parent" — true, but silent on the cause.
   The remedy is one sentence beside the upload in `CascadingEditor.vue` and in Settings → Choice lists (keep codes as
-  text, or use letters), and the same hint on that refusal. **Live.** Filed by `M148`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: taken by the options-from-anywhere increment, which rewrites the same upload control and accepts Excel (`D128`).**
+  text, or use letters), and the same hint on that refusal. **Live.** Filed by `M148`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: taken by the options-from-anywhere increment, which rewrites the same upload control and accepts Excel (`D128`).** ✅ **CLOSED BY `M184` (2026-10-23):** every list upload — Settings → Choice lists, a cascade's Levels tab, a question's Options and a Short text's suggestions — says in its help "Excel turns a code like 01 into 1: format the code columns as Text before you type them, or use letters."; and publish now checks a list-fed cascade's parents itself, naming the file and the row and adding the likeliest cause, where the gate could name only the option. On the branch, held green for merge point 5 with T4 (`D137`, `D138`); relayed `R1-3b` is resolved once it is live.
 
 - ✅ **CLOSED BY `M149` (2026-10-08) — ****`major` · A phone photo stored on its side is read without being turned upright, so every question on it is "not
   found".** Found by `M149` in the OCR bake-off's first round (15 hand-filled layout-4 forms, both pages photographed with a
@@ -14415,7 +14415,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the PDF and the printed form draw typed cells (a write-in box for text and number cells, tick boxes for choices). Closes
   `R-c64d0afd`'s second question; its first, a signed link in a cell, stays there. **Live.** Filed by `M172`. **Tier: early-testing.** **Taken by T2 (`M183`), 2026-10-22 (`D138`); the XLSForm names are `{key}_{row}_{col}`, not the ones written here.** ✅ **CLOSED BY `M183` (2026-10-22):** `SubmissionRowProjector` makes a column per cell right after the kept summary — `<key>.<row>.<column>` for a matrix, read as a question of its column's type (choices by their labels), `<key>.<row>` for a Likert matrix, read as a Likert scale — so the export, Google Sheets, Airtable, the column catalog and the automation webhook all carry them; a dropped row keeps its columns for the responses that answered it, a retired grid's cells are headed as removed, and the first of two colliding keys wins. The XLSForm export writes each cell as a question of its column's type with the column's own list; the printed form shows each cell's choices as boxes and a writing box for a number, a text or a date. ⚠️ The XLSForm names were always `{key}_{row}_{col}`, never the `{row_key}_{column_key}` written above (the spec said so too, and is corrected); a mapping's `field_key` was capped at 100, below the longest cell key (now 662); and until now `config.cells` reached the paper nowhere — a printed matrix was empty boxes with its choices on no page. Released last at merge point 4 as PR #376 (`dba337b7`), live on staging since 2026-10-22; relayed `R1-7a` resolved at `dba337b7`.
 
-- **`minor` · Only a Single choice or Dropdown can take its choices from another form's answers; a Multiple choice cannot.**
+- ✅ **CLOSED BY `M184` (2026-10-23) — ****`minor` · Only a Single choice or Dropdown can take its choices from another form's answers; a Multiple choice cannot.**
   `app/Services/Forms/LinkedChoiceService.php:39` limits a link to single choice and dropdown, and
   `app/Http/Requests/Forms/UpdateFieldRequest.php:337-349` accepts `config.options_source` for those two only; the Options tab
   offers the link through `resources/js/components/builder/LinkedChoicesEditor.vue` (`ConfigPanel.vue:552-568`). The testers'
@@ -14423,9 +14423,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   populate options thru the connection to responses from other forms"*. Split out of `R-5fdbc47c`, which named multi-select as
   the remainder's. The remedy: `multi_select` joins `LINKABLE_TYPES`, the request accepts the source for it, and the link is
   offered through the one "Options come from" chooser (Typed here · A list file · Another form's answers) that replaces the
-  editor for every choice question. **Live.** Filed by `M172`. **Tier: early-testing.**
+  editor for every choice question. **Live.** Filed by `M172`. **Tier: early-testing.** **Taken by T3 (`M184`), 2026-10-23 (`D138`), for relayed `R1-1b` and `R1-3b`; the request already accepts the source for a Multiple choice (`UpdateFieldRequest`'s `choices` arm covers it), which is refused only at publish — and the chooser keeps its shipped label, "Choices come from".** ✅ **CLOSED BY `M184` (2026-10-23):** `multi_select` joins `LinkedChoiceService::LINKABLE_TYPES`, so the Options tab offers "Another form's answers" on a Multiple choice, the guest and encode pages serve its live list, and any list answer is accepted (a golden vector pins both engines); a linked Multiple choice on paper is a write-in box read back as a list, one choice per line or comma. Found and closed beside it: a linked question's written answer used to be dropped at review as "no longer offered" (its own row, below). On the branch, held green for merge point 5 with T4 (`D137`, `D138`); relayed `R1-3b` is resolved once it is live. Relayed `R1-1b` waits for T4's grid rows.
 
-- **`minor` · A list file can feed a cascade's levels but not a plain choice question, and only CSV is accepted, so a list in Excel must be converted first.**
+- ✅ **CLOSED BY `M184` (2026-10-23) — ****`minor` · A list file can feed a cascade's levels but not a plain choice question, and only CSV is accepted, so a list in Excel must be converted first.**
   `app/Services/Forms/ChoiceListMaterializer.php:136-146` materialises a version's choice lists for `cascading_select` levels only
   (every level or none); `app/Services/Forms/ChoiceListCsvParser.php:33` reads CSV alone; the upload sits in the Levels tab
   (`resources/js/components/builder/CascadingEditor.vue:58-102`) and Settings → Choice lists
@@ -14434,24 +14434,24 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   list (`name,label` columns, the parent column optional), materialised at publish exactly as a cascade's so every server-side
   reader stays plain; the upload accepts Excel (`.xlsx`, first sheet) through the spreadsheet reader the XLSForm importer already
   uses (`app/Services/Xlsform/XlsformImporter.php`), reading codes as text; the chooser's "A list file" arm offers the version's
-  lists. Takes `R-1059e9bd` (its sentence lands beside the same upload control). **Live.** Filed by `M172`. **Tier: early-testing.**
+  lists. Takes `R-1059e9bd` (its sentence lands beside the same upload control). **Live.** Filed by `M172`. **Tier: early-testing.** **Taken by T3 (`M184`), 2026-10-23 (`D138`), for relayed `R1-3b`; the options stay in the schema the browser gets (a cached app after a deploy merges cascades only), capped at 5,000 rows, and a list-fed question prints like typed choices (`D160`).** ✅ **CLOSED BY `M184` (2026-10-23):** Options → Choices come from → **A list file** binds a Single choice, Multiple choice or Dropdown to one of the draft's lists (`config.options_list`); publishing writes its rows as the question's options (`ChoiceListMaterializer`), refused in words when no list is chosen, the form holds none of that name, a link stands beside it, it is a Likert scale, or it holds more than 5,000 rows (filed: serving longer flat lists beside the schema). A list file may be an Excel workbook (`.xlsx`, its first sheet, codes as the digits typed — a number cell has already lost its leading zero, which the upload now says). The upload control is one shared component, `ChoiceListUpload.vue`. On the branch, held green for merge point 5 with T4 (`D137`, `D138`); relayed `R1-3b` is resolved once it is live.
 
-- **`minor` · A text box cannot offer suggestions from a list file or another form's answers.**
+- ✅ **CLOSED BY `M184` (2026-10-23) — ****`minor` · A text box cannot offer suggestions from a list file or another form's answers.**
   The testers' comment (2026-10-15): *"sometimes even the textbox must have an option to populate options thru the connection to
-  responses from other forms"*. `resources/js/components/submissions/FieldInput.vue:221-274` renders a text question as a plain
+  responses from other forms"*. `resources/js/components/submissions/FieldInput.vue:224-277` renders a text question as a plain
   input, and `app/Http/Requests/Forms/UpdateFieldRequest.php:337-349` accepts no source on it. The remedy: `config.suggestions_source
   = {kind: list | form, …}` on Short text gives a type-ahead (a `<datalist>`-backed combobox) on the web form, the encode page
   (`app/Services/Submissions/EncodeFormPresenter.php:629-655` already serves linked lists there) and the preview, while free text
   stays accepted and the server never checks it; the chooser reads "Suggestions come from" on a text question. **Live.** Filed by `M172`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** **Taken by T3 (`M184`), 2026-10-23 (`D138`), for relayed `R1-3b`.** ✅ **CLOSED BY `M184` (2026-10-23):** Basics → **Suggestions come from** — No suggestions · A list file · Another form's answers (`config.suggestions_source`). A list's labels are written into `config.suggestions` at publish; another form's answers are served live like a linked choice question's. The web form, the manual-entry page and the preview tie the box to a `<datalist>` of at most 100 suggestions containing what is typed; any text is still an answer, on every channel. On the branch, held green for merge point 5 with T4 (`D137`, `D138`); relayed `R1-3b` is resolved once it is live.
 
-- **`minor` · The builder preview shows neither a list-backed cascade's choices nor a list taken from another form; it says the choices show on the live form.**
+- ✅ **CLOSED BY `M184` (2026-10-23) — ****`minor` · The builder preview shows neither a list-backed cascade's choices nor a list taken from another form; it says the choices show on the live form.**
   Left by `M133`'s v1 and `M141` and recorded on `R-5fdbc47c`: the preview runtime (`resources/js/components/builder/PreviewRuntime.vue`)
   is built from the draft's props, which carry `linkable_sources` (`app/Services/Forms/BuilderPresenter.php:106-108`) but never a
   list's rows or a link's answers, so an author checks a PSGC cascade or a linked list only on the published form. The remedy: a
   tenant route beside the choice-list routes (`routes/tenant.php:1118-1127`) returns the draft's linked lists and the first 200 rows
   of each list-bound question with "showing 200 of N", and the preview merges them the way the guest runtime does
-  (`resources/public-runtime/lib/linked-choices.ts:89-112`). **Live.** Filed by `M172`. **Tier: early-testing.** **Amended 2026-10-15 by `M172`:** an old version opened read-only from the hub (`resources/js/Pages/forms/VersionView.vue`) draws `schemaWithoutListOptions()` through the same preview, so a list-backed cascade shows no choices there either; the same route closes both.
+  (`resources/public-runtime/lib/linked-choices.ts:89-112`). **Live.** Filed by `M172`. **Tier: early-testing.** **Amended 2026-10-15 by `M172`:** an old version opened read-only from the hub (`resources/js/Pages/forms/VersionView.vue`) draws `schemaWithoutListOptions()` through the same preview, so a list-backed cascade shows no choices there either; the same route closes both. **Taken by T3 (`M184`), 2026-10-23 (`D138`), for relayed `R1-1b` and `R1-3b`; two routes, not one — the builder needs edit access and the version view only view access.** ✅ **CLOSED BY `M184` (2026-10-23):** `GET /forms/{form}/choices` (the draft) and `/forms/{form}/versions/{version}/choices` (a published version) serve another form's answers, a cascade's lists, a question's list file and a Short text's suggestions, built from the draft as publishing would build them (`ChoicePreviewPresenter`), each cut to its first 200 — per level for a cascade, keeping children of the choices kept above — with its size; the preview and the read-only version view write them in with the runtime's own merges, a long list's question saying "Showing the first 200 of N choices here; the form shows them all." The two "appear on the live form, not here" limitations are gone. On the branch, held green for merge point 5 with T4 (`D137`, `D138`); relayed `R1-3b` is resolved once it is live.
 
 - **`minor` · A grid's rows, columns and choices must be typed by hand: none can come from a list file or another form's answers, so a grid of barangays or facilities is retyped on every form.**
   The testers' comment (2026-10-15): *"rows can be determined thru the list from the shared responses from other form or uploaded
@@ -14475,7 +14475,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`minor` · The Philippine Standard Geographic Code is not in the app: an author must build and upload four CSV files per form, and nothing keeps them current with the PSA's quarterly publication.**
   The testers' question (2026-10-15): *"Does the platform support cascading options linked to the Philippine Standard Geographic
   code (PSGC)?"*. `M141` made a PSGC-sized cascade work from uploaded CSV files (measured at 43,739 options), but no PSGC data
-  exists in the repository, each form re-uploads its own lists (`app/Services/Forms/ChoiceListMaterializer.php:148` reads them by
+  exists in the repository, each form re-uploads its own lists (`app/Services/Forms/ChoiceListMaterializer.php:186` reads them by
   version), `docs/PRD.md:442` declined a national geography, and `docs/data-dictionary.md:375` says a reference-dataset table is
   "deliberately not introduced here". The Philippine Statistics Authority publishes the PSGC Publication Datafile each quarter
   (3Q 2026 released 2026-10-12; ten-digit codes kept as text; region, province or independent city, city or municipality,
@@ -14655,7 +14655,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M176` (2026-10-18) — ****`minor` · A refused question save shows its first error twice — as the lead line and again as the first bullet — and numbers its rules by their place in the request, not on screen.**
   The testers' comment (2026-10-11, comment 2): *"Instructions repeat"* — *"A validation rule must be either a structured rule or an
-  expression — not both, not neither."* above *"Rule 1: A validation rule must be …"*. `resources/js/components/builder/ConfigPanel.vue:529`
+  expression — not both, not neither."* above *"Rule 1: A validation rule must be …"*. `resources/js/components/builder/ConfigPanel.vue:531`
   prints the reply's `message`, which Laravel fills with the first error, and `:489` lists every error including that one;
   `resources/js/components/builder/field-save-errors.ts:86` names `validations.N` by its position in the request after unfinished
   rows are withheld, so "Rule 1" can point at the wrong row. The message itself (`app/Http/Requests/Forms/UpdateFieldRequest.php:391`)
@@ -14666,7 +14666,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M176` (2026-10-18) — ****`minor` · "Allow negative numbers" is a Basics checkbox that is really a hidden "Minimum value 0" rule, so removing that rule turns negatives back on.**
   The user (2026-10-16): *"when they removed the allow negative, the other settings will be saved, but when they removed the
   validation rules, the allow negative returned … include the allow negative in the rules since it is really a validation rule"*.
-  `resources/js/components/builder/field-conversion.ts:250` (`negativeFloor()`) derives the checkbox from whether a `min_value 0` row
+  `resources/js/components/builder/field-conversion.ts:251` (`negativeFloor()`) derives the checkbox from whether a `min_value 0` row
   exists and `:261` (`withNegativesAllowed()`) adds or removes that row; `resources/js/components/builder/FieldTypeControl.vue:316`
   binds the checkbox to it. Unticking adds a visible "Minimum value 0" rule; deleting that rule on the Validation tab ticks the box
   again; editing its value disables the box. The remedy: the Basics checkbox goes; the Validation tab's rule menu offers **No
@@ -14685,7 +14685,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M176` (2026-10-18) — ****`minor` · The "Change question type" dialog speaks in developer words and repeats the type as the question's name.**
   The testers' comment (2026-10-11, comment 1): *"Make the text/instructions more “smart highschooler” friendly"*, on a screenshot of
   this dialog. `resources/js/components/builder/ConvertFieldDialog.vue:39` says *"It keeps its key, so conditions, calculations and
-  text that mention it still point to it"*; `resources/js/components/builder/field-conversion.ts:203` and
+  text that mention it still point to it"*; `resources/js/components/builder/field-conversion.ts:204` and
   `app/Enums/ConversionWarning.php:50` carry the rest, with `app/Enums/ConversionDropReason.php` and `app/Enums/ConversionImpact.php`;
   a new question's label is its type's label (`app/Services/Forms/FormBuilderService.php:137`), so the dialog reads *"Current type of
   “Date & time”: Date & time"*. The remedy: `docs/ux/design-system-reference.md` gains a voice rule — write for a smart
@@ -14944,7 +14944,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M180` (2026-10-20) — ****`minor` · A condition or a rule can name a calculated question, but always reads it as blank.**
   Both engines work out calculations last and never feed them back into relevance or constraints
   (`app/Services/Validation/SemanticValidator.php:126`, `resources/public-runtime/engine/semantic-validator.ts:155`), yet the condition
-  editor offers every calculated question (`resources/js/components/builder/ConfigPanel.vue:368`) and the compared-question lists do too,
+  editor offers every calculated question (`resources/js/components/builder/ConfigPanel.vue:369`) and the compared-question lists do too,
   because a calculation's value shape is a number (`app/Enums/ValueShape.php:109`) — so "show when the total is over 10" never shows,
   and a rule against a total never checks. The remedy (`D149` A, taken by R4 with its dependency order): conditions and rules read a
   calculation's value, the calculations worked out before what reads them, cycles refused at publish. Until then R3's lists leave
@@ -15043,3 +15043,40 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and the response PDF draw a grid answer as a table — rows down, columns across, each cell's answer by its label (a Likert matrix
   marks the chosen point) — from the version's own config.
   **Live.** Filed by `M183`. **Tier: during-testing.**
+
+- **`minor` · A choice question with a long list prints every choice as a tick box on the paper form, so a list of hundreds runs to pages.**
+  `app/Services/Forms/BlankFormPrintPresenter.php` (`choiceOptions()`) prints every option of a Single choice, Multiple choice or
+  Dropdown as a tick box, however many there are. A typed list does it today; a question whose choices come from a list file (`M184`)
+  carries its whole list in the published version and prints the same way — `D160` A kept it so, for the scan reads ticks as today, and
+  the builder warns above 30 choices. A question linked to another form already prints a write-in box, its list being live. The remedy
+  (`D160`'s B): past a threshold, a write-in box, and the scan matches the writing to the nearest choice with a "may be wrong" note
+  (`app/Services/Ocr/OcrAnswerReader.php`'s `nearestOption()`, as a cascade's written levels are matched).
+  **Live.** Filed by `M184` (`D160`). **Tier: during-testing.**
+
+- **`minor` · A Multiple choice question cannot be the source of another form's choices.**
+  `app/Support/Forms/ShareableQuestions.php:31-39` shares short text, numbers, calculations, hidden values, Single choice and
+  Dropdown — not Multiple choice — and `LinkedChoiceService`'s `distinctAnswers()` keeps only string and number answers
+  (`jsonb_typeof`), so a list answer would be dropped even if it were shared. `M184` lets a Multiple choice *take* its choices from
+  another form; a "services offered" checklist in one form still cannot feed another. The remedy: share a Multiple choice, and build
+  the distinct set from each answer's elements (`jsonb_array_elements_text`), with labels from the source's options.
+  **Live.** Filed by `M184`. **Tier: during-testing.**
+
+- **`minor` · A list file of more than 5,000 rows cannot feed a plain choice question or a text box's suggestions.**
+  `M184` writes a list-bound question's choices into the published version, so every reader stays plain and an app cached before a
+  deploy still shows them, and caps such a list at 5,000 rows to bound the form a browser downloads; a longer list is refused at
+  publish and pointed at a cascade. KoboToolbox's `select_one_from_file` reads a list of any size. The remedy: serve a long flat list
+  beside the schema as a cascade's is (`ChoiceListMaterializer::listsForBrowser()`, the choice-lists endpoint,
+  `resources/public-runtime/lib/choice-lists.ts`'s `mergeChoiceLists()` taught flat lists), once the runtimes cached on devices merge
+  flat lists. **Not live** on the trunk until `M184` merges at merge point 5 — the cap arrives with it.
+  Filed by `M184`. **Tier: during-testing.**
+
+- ✅ **CLOSED BY `M184` (2026-10-23) — ****`minor` · An answer written on paper for a question that takes its choices from another form never reaches the review: the scan reads it, then lists it as "no longer offered".**
+  `app/Services/Ocr/OcrAnswerCarry.php` (`valueFits()`) checked a read answer against the question's own options, and a question
+  linked to another form holds none in its snapshot (`M133`), so every such answer — read correctly as writing by
+  `app/Services/Ocr/OcrAnswerReader.php` — was dropped as `option_missing` ("The choice read from the paper is no longer offered.")
+  on the staff review and on the guest's paper review alike, and the reviewer picked it again from the list beside the page. Found by
+  `M184` while letting a Multiple choice link (its claim's premise; proved red by a mutation). The remedy: both review screens pass
+  the list they draw (`LinkedChoiceService::valuesFor()`), and a written answer carries when it is one of those choices,
+  matched regardless of case and spacing. **Live.** Filed by `M184`. **Tier: early-testing.** ✅ **CLOSED BY `M184` (2026-10-23):**
+  `OcrAnswerCarry::carry()` takes the live choices by key; `OcrScanReviewPresenter` and `GuestPaperReview` pass
+  `LinkedChoiceService::valuesFor()`; an answer that is none of them, or one with no list passed, is still listed for the reviewer.

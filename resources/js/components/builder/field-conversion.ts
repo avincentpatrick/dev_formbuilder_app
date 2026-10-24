@@ -89,6 +89,10 @@ export function needsReview(plan: ConversionPlan): boolean {
 // M176 (`R-36e6f557`): in the DSR §1.5 voice — say what the author loses, in everyday words.
 const CONFIG_SENTENCES: Record<string, string> = {
     options: 'Its choices are removed.',
+    // M184: where a choice question's choices come from — another form's answers, or a list file.
+    options_source: 'It no longer takes its choices from another form.',
+    options_list: 'It no longer takes its choices from a list file.',
+    suggestions_source: 'It no longer suggests answers.',
     levels: 'Its levels are removed.',
     rows: 'Its rows are removed.',
     columns: 'Its columns are removed.',

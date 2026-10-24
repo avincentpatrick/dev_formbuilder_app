@@ -16,7 +16,28 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M185`, T4 of the testers' items: the grid, part 2 — rows and choices from a list or another form, rows and columns edited in the Preview, a repeatable section as a table (`R-bb79aec0`, `R-7418e6bd`, `R-0a7275ce`) (m185-t4-grid-part-2)
+## Status: NO ACTIVE CLAIM — `M184` (T3) and `M185` (T4) are merged and live on staging, released together at merge point 5 (`D137`; below). The next claim is T5 — the PSGC cascade and the cross-form filter (`D138`), held green for merge point 6 with T6 and L. Merge only at a planned merge point.
+
+## RELEASED — `M185`, T4 of the testers' items: the grid, part 2 — rows and choices from a list or another form, rows and columns edited in the Preview, a repeatable section as a table (`R-bb79aec0`, `R-7418e6bd`, `R-0a7275ce`) (merged as PR #378, `eba3e3a4`, last at merge point 5, rebased onto the trunk after `M184`; 6/6 green with real step counts on its rebased run at `293e0381` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `eba3e3a4` the same)
+
+**RELEASED LAST AT MERGE POINT 5 (`D137`, `D138`), 2026-10-24, by the merge-point-5 session** (plan
+`~/.claude/plans/read-claude-md-then-php-breezy-lampson.md`). The session-start pull read 0 reports, 0 reopened and 0 new comments.
+**The user's census before (07:21:30 UTC): tenants 1 · users 6 · forms 11 · form_versions 27 · submissions 22 · attachments 62 ·
+feedback_reports 31 · notifications 68** (notifications 4 above merge point 4's). `M184` merged first (`916f9e21`, its block below), its
+trunk run done at 07:52 UTC — well before 16:00 UTC, when the replay-clock case this branch fixed would have turned its trunk run red.
+Built green on 2026-10-23/24 (run 39989688969 at `afa472a4`); after `M184` merged, rebased onto the trunk by its own commits
+(`git rebase --onto origin/main e3497c9d`): the replay list held 42, two of them main's claim commits brought in by this branch's second
+merge of the trunk (`35657567`) — `a9160283` conflicted on `docs/claims/lane-a.md` and was skipped, `b401d2f8` dropped as already
+upstream — leaving 40. The tree byte-identical to the one CI passed apart from `docs/claims/lane-a.md` (`git diff afa472a4 293e0381`);
+re-run 6/6 at `293e0381` (run 40073895286, the same step counts); squash-merged as `eba3e3a4` with an explicit body once `M184`'s deploy
+had finished and `/up` answered 200; the trunk's CI 6/6 (run 40076243100 — the run `docs/gate-baselines.md` is now measured from); the
+deploy (run 40078373206, 4 minutes) backed up to `deploy-20261024-083506.dump` (466,056 B), counted 68 tables and 10,038 rows, ran
+`2026_08_17_000145` (36 ms), found every table at least as full after, and copied the notes: `releases: 1 added, 0 updated, 4 unchanged;
+5 in the table, none removed (newest 0.12.0)`; `/up` 200, the sign-in page's shared version `0.12.0`. **The user's census after (09:52:01 UTC) matched the one before table for table, but
+notifications 71 — 3 above, one for each relayed report resolved in between (each resolve notifies its reporter).** Relayed `R1-7b` (the
+testers' round-1 grid comment) and `R1-1b` (its Multiple choice and preview half live with `M184`, its grid rows here) resolved at
+`eba3e3a4` — the stock note only (relayed: 22 Resolved · 3 Ongoing · 6 Confirmed working). Owed at the next session's start: the user's
+check of `R1-3b`, `R1-1b` and `R1-7b` on staging. The build's record follows.
 
 Taken 2026-10-23. Branch `m185-t4-grid-part-2`, **stacked**: cut from `origin/m184-t3-options-from-anywhere` at `c55908a8` (T3, built and
 held), with `origin/main` merged on top to bring this claim — that merge is the claim-merge commit, and T4's own commits start after it.
@@ -38,12 +59,9 @@ this branch's first commit. **The 0.12.0 notes' wording was approved verbatim** 
 Rows taken, in build order, each its own commits (`D75`): **`R-bb79aec0`** (sources, `D161`), **`R-7418e6bd`** (the Preview), **`R-0a7275ce`**
 (the table, `D129`); then Help and the release (0.12.0).
 
-**BUILT — PR #378, CI 6/6 green with real step counts (run 39989688969 at `afa472a4`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 ·
-Pest 11 · axe 11) — AND NOT MERGED.** ⛔ **Held for merge point 5 (`D137`, `D138`)**, after #377 (T3) is merged and live. ⚠️ **This branch
-merged the trunk TWICE** — the claim-merge `e3497c9d` and `35657567` (the claim extensions): at merge point 5 rebase T4's own commits with
-`git rebase --onto origin/main e3497c9d` and `git rebase --skip` any `claim(M185)` commit the second merge replays (it is on main already —
-merge point 4's recorded trap). After its deploy `/whats-new` lists 0.12.0 first; relayed `R1-7b` and `R1-1b` are resolved once it is live,
-and announced by name with the clicks. Dev data: *Barangay Facility Check (T4 demo)* in `demo` (a grid whose rows come from a list file, a
+Built: PR #378, CI 6/6 green with real step counts (run 39989688969 at `afa472a4`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 ·
+Pest 11 · axe 11). The branch merged the trunk twice (the claim-merge `e3497c9d` and `35657567`, the claim extensions); the rebase at
+merge point 5 replayed T4's own commits past the first and skipped what the second brought in (above). Dev data: *Barangay Facility Check (T4 demo)* in `demo` (a grid whose rows come from a list file, a
 household table), built through the services and published; `acme`'s *Household Table* comes from `E2eSeeder` (re-run after the VERSION bump).
 
 **Measured against the prediction:**
@@ -154,7 +172,18 @@ Pest cases; the editor, preview and grid Vitest cases; then in the table's attri
 green after. About twelve mutants, each turning only its named cases. **Most likely wrong:** `builder-axe` once the seeded grid's Preview
 gains buttons (the card-mode column strip). Runner-up: the citation-liveness ceiling after the `MatrixGrid.vue` header rewrite.
 
-## HELD — `M184`, T3 of the testers' items: options from anywhere (`R-f655f9b1`, `R-3e7c81bb`, `R-596d6afd`, `R-d8c2ce84`, with `R-1059e9bd`) (m184-t3-options-from-anywhere)
+## RELEASED — `M184`, T3 of the testers' items: options from anywhere (`R-f655f9b1`, `R-3e7c81bb`, `R-596d6afd`, `R-d8c2ce84`, with `R-1059e9bd`) (merged as PR #377, `916f9e21`, first at merge point 5, 6/6 green with real step counts on its run at `c55908a8` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `916f9e21` the same)
+
+**RELEASED FIRST AT MERGE POINT 5 (`D137`, `D138`), 2026-10-24, by the merge-point-5 session.** Built green on 2026-10-23 (run
+39888779783 at `c55908a8`, re-read at the merge: the six jobs and their step counts). After the user's census (07:21:30 UTC, in `M185`'s
+block above): squash-merged as `916f9e21` with an explicit body at 07:22 UTC, with no rebase (no stacked base; the trunk had moved only
+by claim commits, and `git merge-tree` found it clean); the trunk's CI 6/6 (run 40073860848, done 07:52 UTC — before 16:00 UTC, when
+`SubmissionAnswerEditTest`'s replay-clock case, which this branch still carried, turns red until `M185` lands); the deploy (run
+40075832065, 6 minutes) backed up to `deploy-20261024-075722.dump` (464,824 B), counted 68 tables and 10,028 rows, found nothing to
+migrate and every table at least as full after, and copied the notes: `releases: 1 added, 0 updated, 3 unchanged; 4 in the table, none
+removed (newest 0.11.0)`; `/up` 200, the sign-in page's shared version `0.11.0`. Relayed `R1-3b` (the testers' round-1 comment: choices
+from other forms' responses or uploaded references for every question with options, and the text box) resolved at `916f9e21`, the
+stock note only. The build's record follows.
 
 Taken 2026-10-23. Branch `m184-t3-options-from-anywhere`, cut from origin/main at `a7705dc6`, PR into main. ⛔ **NOT MERGED THIS
 SESSION:** it is held green for merge point 5 with T4 (`D137`, `D138`: … merge point 4 → T3 → T4 → merge point 5). The plan of
@@ -166,10 +195,9 @@ Rows: `R-f655f9b1` — *"Only a Single choice or Dropdown can take its choices f
 neither a list-backed cascade's choices nor a list taken from another form"*; and `R-1059e9bd` (the codes-as-text sentence), which
 `R-3e7c81bb` takes. Relayed `R1-3b` (all four) and `R1-1b` (multi-select and the preview; its grid rows are T4's).
 
-**BUILT — PR #377, CI 6/6 green with real step counts (run 39888779783 at `c55908a8`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 ·
-Pest 11 · axe 11) — AND NOT MERGED.** ⛔ **Held for merge point 5 (`D137`, `D138`)** with T4, which stacks on this branch (it mounts the
-list picker per grid column). This branch is NOT re-merged with the trunk's claim commits; the rebase at merge point 5 carries them.
-After its deploy, `/whats-new` should list 0.11.0 first. Relayed `R1-3b` is resolved once it is live; `R1-1b` after T4's grid rows.
+Built: PR #377, CI 6/6 green with real step counts (run 39888779783 at `c55908a8`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 ·
+Pest 11 · axe 11). T4 stacked on this branch (it mounts the list picker per grid column); the branch was not re-merged with the trunk's
+claim commits, and merged at merge point 5 without a rebase.
 
 **Measured against the prediction:**
 - **"Red first to the golden manifest's count pin and `FieldSaveAttributeNamesTest`" — not observed.** I wrote each new config path's

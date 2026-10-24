@@ -24,10 +24,20 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D160`, the last filed, was asked and answered on 2026-10-23 while `M184` (T3) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D161`, the last filed, was asked and answered on 2026-10-23 while `M185` (T4) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D161 — A grid's rows, and a choice column's choices, can now come from a list file or another form's answers. When should the grid pick up that form's new answers? **A — when you publish: the rows and choices are copied into the form at publish; publish again to pick up new answers.**
+
+**Asked and answered 2026-10-23 (user decision, in chat), while `M185` (T4) was planned; recorded in its claim.** Every reader of a grid's row set reads the rows frozen in the published version: Stage 1 refuses an answered row that is not in `config.rows` (`unknown_row`), both engines loop over the config rows, and the spreadsheet's per-cell columns, the XLSForm cells, the paper form and the manual-entry page all draw `config.rows`. A list file is copied at publish in any case, as T3 does for a flat question (`ChoiceListMaterializer`).
+
+- **A — when you publish (recommended, chosen).** The materializer writes the rows of a Grid or Likert matrix, and a Grid column's or the shared cells' choices, into the version before the gates run; the next draft keeps only the source. Every surface works as for typed rows. **The consequence, accepted with it:** copied rows outlive a source form's withdrawn sharing until the next publish (the publish gate checks consent then), whereas T3's live lists stop at once.
+- **B — live, like a Dropdown's choices.** New answers appear without publishing; the answer checks, exports, paper form and manual entry must all learn a row set that is not stored in the form — about twice the increment, and the paper form could print only blank row names.
+- **C — mixed.** A column's choices live, the rows at publish; a live column's cells print as write-in boxes.
+
+**What the answer files, in the same push:** nothing new — `R-bb79aec0`'s remedy is amended to A at the row.
+
 ### D160 — A question can now take its choices from an uploaded list file, and a list file can easily hold hundreds of rows. On the paper form, a question whose choices are typed in prints every choice as a tick box, however many there are. How should a list-fed question print? **A — like typed choices: every choice a tick box, so the scan reads the ticks as today; the builder warns when a list is long; a write-in box for long lists is filed for later.**
 
 **Asked and answered 2026-10-23 (user decision, in chat), while `M184` (T3) was planned; recorded in its claim.** T3 writes a list-bound question's choices into the published version (`ChoiceListMaterializer`), so every reader — the paper form's `BlankFormPrintPresenter::choiceOptions()` among them — sees plain options. A question linked to another form already prints a write-in box, because its list is live and its stored options are empty.

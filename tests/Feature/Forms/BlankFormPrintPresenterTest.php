@@ -714,3 +714,60 @@ it('prints a reference to another answer as a blank line to write in, on a label
         ->and($fields['age']['hint'])->toBe('Ask ________ directly')
         ->and($fields['cost']['label'])->toBe('Write it as ${price}');
 });
+
+/*
+| M185 (`R-0a7275ce`, `D129`) — a repeatable section laid out as a table prints as one table: a column per question with its
+| tick boxes when it is a choice, and at least five numbered blank rows, more when `min_instances` asks, never past
+| `max_instances` or twenty. A section with a question no cell holds prints its copies as before.
+*/
+
+/** @return array<string, mixed> the printed table of a "members" section with $section's bounds */
+function printTableOf(object $test, array $section, array $more = []): ?array
+{
+    [$form, $version] = printFixture([
+        'sections' => [['key' => 'members', 'label' => 'Member', 'sequence' => 1, 'is_repeatable' => true, 'repeat_layout' => 'table', ...$section]],
+        'fields' => [
+            printField('member_name', 'short_text', ['section_key' => 'members', 'section_sequence' => 0, 'label' => 'Name']),
+            printField('member_sex', 'single_select', ['section_key' => 'members', 'section_sequence' => 1, 'label' => 'Sex', 'config' => ['options' => [['value' => 'f', 'label' => 'Female'], ['value' => 'm', 'label' => 'Male']]]]),
+            ...$more,
+        ],
+    ]);
+    $blocks = $test->present->present($form, $version)['blocks'];
+
+    return collect($blocks)->firstWhere('label', 'Member')['table'] ?? null;
+}
+
+it('prints a table section as one table, a column per question and a choice as its tick boxes', function (): void {
+    $table = printTableOf($this, ['min_instances' => 2]);
+
+    expect(array_column($table['columns'], 'label'))->toBe(['Name', 'Sex'])
+        ->and(array_column($table['columns'], 'kind'))->toBe(['write', 'choices'])
+        ->and(array_column($table['columns'][1]['options'], 'label'))->toBe(['Female', 'Male'])
+        ->and($table['rows'])->toBe(5);
+});
+
+it('prints at least five blank rows, more when the minimum asks, never past the maximum or twenty', function (array $bounds, int $rows): void {
+    expect(printTableOf($this, $bounds)['rows'])->toBe($rows);
+})->with([
+    'a minimum of 2' => [['min_instances' => 2], 5],
+    'a minimum of 8' => [['min_instances' => 8], 8],
+    'a maximum of 3' => [['min_instances' => 1, 'max_instances' => 3], 3],
+    'a minimum of 40' => [['min_instances' => 40], 20],
+]);
+
+it('prints a table section\'s copies as before when one of its questions cannot be a column', function (): void {
+    $table = printTableOf($this, ['min_instances' => 2], [printField('member_notes', 'long_text', ['section_key' => 'members', 'section_sequence' => 2])]);
+
+    expect($table)->toBeNull();
+});
+
+it('renders the printed table', function (): void {
+    [$form, $version] = printFixture([
+        'sections' => [['key' => 'members', 'label' => 'Member', 'sequence' => 1, 'is_repeatable' => true, 'repeat_layout' => 'table', 'min_instances' => 1]],
+        'fields' => [printField('member_name', 'short_text', ['section_key' => 'members', 'section_sequence' => 0, 'label' => 'Name'])],
+    ]);
+
+    $html = view('pdf.blank-form', ['model' => $this->present->present($form, $version)])->render();
+
+    expect($html)->toContain('Member 5')->and($html)->not->toContain('Member 6');
+});

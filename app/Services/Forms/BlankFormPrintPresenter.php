@@ -16,6 +16,7 @@ use App\Services\Templates\TemplateParser;
 use App\Support\Forms\FieldVisibility;
 use App\Support\Forms\LocaleVariant;
 use App\Support\Forms\MatrixColumns;
+use App\Support\Forms\RepeatTable;
 use App\Support\Forms\StepProjection;
 use LogicException;
 
@@ -75,6 +76,15 @@ final class BlankFormPrintPresenter
      * a second copy of the sheet. Recorded as a documented cap rather than left to the author.
      */
     private const MAX_REPEAT_INSTANCES = 5;
+
+    /**
+     * M185 (`R-0a7275ce`): a repeatable section laid out as a table prints this many blank rows at least — a row is a line,
+     * not a page, so a roster gets room for a household — and at most {@see TABLE_ROWS_MAX}, never past `max_instances`.
+     */
+    private const TABLE_ROWS = 5;
+
+    /** The most blank rows one printed table holds; the enumerator's recourse is a second sheet, as for the cards. */
+    private const TABLE_ROWS_MAX = 20;
 
     /**
      * The revision of the printed LAYOUT, printed beside the version stamp and read back by the matcher
@@ -219,6 +229,23 @@ final class BlankFormPrintPresenter
             $description = $this->paperText(LocaleVariant::resolve($section['description_translations'] ?? null, $this->stringOrNull($section['description'] ?? null), $locale));
 
             $repeatable = $this->isRepeatable($section);
+
+            // M185 (`R-0a7275ce`, `D129`): laid out as a table on the form, it prints as one — a column per question, a
+            // numbered row per entry — by the form's own rule (`RepeatTable`). Repeat forms are never scanned
+            // (`CapabilityFlags`), so no reader depends on where its boxes sit and {@see self::LAYOUT} stays.
+            if ($repeatable && RepeatTable::draws($section, $bySection[$key] ?? [])) {
+                $blocks[] = [
+                    'label' => $label,
+                    'description' => $description === '' ? null : $description,
+                    'instance' => null,
+                    'conditional' => $this->stringOrNull($section['relevant_expression'] ?? null) !== null,
+                    'fields' => [],
+                    'table' => $this->tableOf($section, $rows),
+                ];
+
+                continue;
+            }
+
             $instances = $this->repeatInstances($section);
             [$leadingBreaks, $rows] = $this->splitLeadingBreaks($rows);
 
@@ -316,6 +343,14 @@ final class BlankFormPrintPresenter
         $questionPrinted = false;
         $pending = null;
         foreach ($blocks as $b => $block) {
+            // M185: a printed table is questions too — a break before it is kept, as before a question.
+            if (($block['table'] ?? null) !== null) {
+                if ($pending !== null) {
+                    $kept[$pending] = true;
+                    $pending = null;
+                }
+                $questionPrinted = true;
+            }
             /** @var list<array<string, mixed>> $fields */
             $fields = $block['fields'];
             foreach ($fields as $r => $row) {
@@ -344,7 +379,7 @@ final class BlankFormPrintPresenter
                 }
             }
 
-            if ($rows !== []) {
+            if ($rows !== [] || ($block['table'] ?? null) !== null) {
                 $block['fields'] = $rows;
                 $tidy[] = $block;
             }
@@ -614,6 +649,36 @@ final class BlankFormPrintPresenter
         }
 
         return $columns;
+    }
+
+    /**
+     * M185: a printed table — each question a column (its words, its required and "if applicable" marks, and its tick
+     * boxes when it is a choice), and how many numbered blank rows.
+     *
+     * @param  array<string, mixed>  $section
+     * @param  list<array<string, mixed>>  $rows  the section's printed field rows
+     * @return array{columns: list<array<string, mixed>>, rows: int}
+     */
+    private function tableOf(array $section, array $rows): array
+    {
+        $columns = [];
+        foreach ($rows as $row) {
+            if (($row['area'] ?? null) === PrintAnswerArea::PageBreak->value) {
+                continue;
+            }
+            $columns[] = [
+                'label' => $row['label'],
+                'required' => $row['required'],
+                'conditional' => $row['conditional'],
+                'kind' => $row['options'] !== [] ? 'choices' : 'write',
+                'options' => $row['options'],
+            ];
+        }
+
+        $min = is_numeric($section['min_instances'] ?? null) ? (int) $section['min_instances'] : 0;
+        $max = is_numeric($section['max_instances'] ?? null) ? (int) $section['max_instances'] : self::TABLE_ROWS_MAX;
+
+        return ['columns' => $columns, 'rows' => max(1, min(max($min, self::TABLE_ROWS), $max, self::TABLE_ROWS_MAX))];
     }
 
     /**

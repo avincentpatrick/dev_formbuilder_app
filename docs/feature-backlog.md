@@ -672,7 +672,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   👤 **What is left is a decision, and it is filed rather than guessed**, because the component-level fix
   touches 13 call sites and the only instrument that can settle it is an e2e run in the container. ⚠️ **A
   fourth option nobody had raised**: `Settings/Index.vue` already solves this at the HOST, with a comment
-  saying so, and three call sites are guarded by it today. Corrected by `M87`. ✅ **CLOSED BY `M109` (2026-09-25), BESIDE `R-6c429d4e` UNDER RECORDED `D13` EXCEPTION #2** — `flex-wrap: wrap` on the hosted control, declared at each of the four stretch-clamped hosts, which is `D28`'s chosen option 3 with the illustration its own row corrects. Every CSS claim above verified against the source. ⚠️ **Two citations had drifted and are repaired here:** the Requiredness control is at `ConfigPanel.vue:326-334` (cited `307-312`) and `.config` at `:599-606` (cited `546-553`). ⛔ **THE 30px IS UN-STRUCK, AND IT IS EXACTLY 30.** This row struck the figure as unprovenanced and `D28:1603` agreed — *"no test, fixture or snapshot records it"*. The new element-level assertion on `.config` measured the spill at **30px** on the first run that could see it, which is the first provenance the number has ever had. ⛔ **AND THE ASSERTION IS LIVE AT ONE PROJECT OF THREE — MEASURED, NOT ASSUMED.** With the `.config__group` rule deliberately disarmed and the build regenerated, the case is **CAUGHT at `mobile` (30px)** and **SURVIVES at `desktop` and `tablet`**, where the pane is wide enough that the control fits. A green run on the two wide projects proves nothing about this defect, which is exactly the property `assertNoHorizontalOverflow` lacks here: `.config` is `overflow-y: auto`, so `overflow-x` computes to `auto`, and the document-level gate files the spill as `absorbed` — `axe.ts:183-191` already named this control as that case. ⚠️ **The first version of the assertion was vacuous and its own guard caught it:** the builder is compact at `extra_large` even on the desktop project, so after `forcePersonalization` the config pane was no longer on screen, where `.config` is still in the DOM and `scrollWidth - clientWidth` reads 0. The guard is now `toBeVisible`, not `toHaveCount(1)`. ➕ **Filed rather than fixed:** three of the four host rules — `.mds-field`, `.sheets-fields`, `.encode-field` — ship with no assertion of their own.
+  saying so, and three call sites are guarded by it today. Corrected by `M87`. ✅ **CLOSED BY `M109` (2026-09-25), BESIDE `R-6c429d4e` UNDER RECORDED `D13` EXCEPTION #2** — `flex-wrap: wrap` on the hosted control, declared at each of the four stretch-clamped hosts, which is `D28`'s chosen option 3 with the illustration its own row corrects. Every CSS claim above verified against the source. ⚠️ **Two citations had drifted and are repaired here:** the Requiredness control is at `ConfigPanel.vue:327-335` (cited `307-312`) and `.config` at `:599-606` (cited `546-553`). ⛔ **THE 30px IS UN-STRUCK, AND IT IS EXACTLY 30.** This row struck the figure as unprovenanced and `D28:1603` agreed — *"no test, fixture or snapshot records it"*. The new element-level assertion on `.config` measured the spill at **30px** on the first run that could see it, which is the first provenance the number has ever had. ⛔ **AND THE ASSERTION IS LIVE AT ONE PROJECT OF THREE — MEASURED, NOT ASSUMED.** With the `.config__group` rule deliberately disarmed and the build regenerated, the case is **CAUGHT at `mobile` (30px)** and **SURVIVES at `desktop` and `tablet`**, where the pane is wide enough that the control fits. A green run on the two wide projects proves nothing about this defect, which is exactly the property `assertNoHorizontalOverflow` lacks here: `.config` is `overflow-y: auto`, so `overflow-x` computes to `auto`, and the document-level gate files the spill as `absorbed` — `axe.ts:183-191` already named this control as that case. ⚠️ **The first version of the assertion was vacuous and its own guard caught it:** the builder is compact at `extra_large` even on the desktop project, so after `forcePersonalization` the config pane was no longer on screen, where `.config` is still in the DOM and `scrollWidth - clientWidth` reads 0. The guard is now `toBeVisible`, not `toHaveCount(1)`. ➕ **Filed rather than fixed:** three of the four host rules — `.mds-field`, `.sheets-fields`, `.encode-field` — ship with no assertion of their own.
 
 ### Connectors & webhooks
 
@@ -11338,7 +11338,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   should open writes the wrong thing.~~** Filed 2026-09-25 by `M110`, from the report *"can we make that a radio
   button and then show the condition settings when the user selected the conditional instead of going to the
   validation tab and creating rules"*. Requiredness is an `MdsSegmentedControl` in the **Basics** tab
-  (`ConfigPanel.vue:326-334`); the condition editor is in **Advanced** (`:468-474`), with no path between them.
+  (`ConfigPanel.vue:327-335`); the condition editor is in **Advanced** (`:468-474`), with no path between them.
   ⛔ **BUT THE LITERAL READING OF THE REQUEST BUILDS THE WRONG FEATURE.** The Advanced editor writes
   `relevant_expression`, which **hides** a field; `RequiredMode::Conditional` **requires** it. Confirmed at
   `SemanticValidator::requiredState()` (`:1403-1420`): `Conditional` is honoured only where a `required_*` unit
@@ -11488,7 +11488,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   in this repository could see it** — `.builder__pane { overflow: hidden }` CLIPS the spill instead of
   scrolling it, so `assertNoHorizontalOverflow`'s `.app-shell__content` read is flat over it, axe has no rule,
   and `personalization-axe` had element-level reads for the pane switcher (`M19`) and the config pane (`M109`)
-  but never for this control. Fixed with the host-level `flex-wrap` `ConfigPanel.vue:1075` already applies to
+  but never for this control. Fixed with the host-level `flex-wrap` `ConfigPanel.vue:1076` already applies to
   the Requiredness control — `D28`'s measured affordance. ⛔ **THE ROW'S OWN EVIDENCE: ONE CITATION FALSE, FOUR
   ROTTED, AND ONE CLAIM FALSE.** `ConfirmationModal.vue:11` names a file `M117` renamed and a sentence it
   deleted (the in-tree statement moved to `draft-snapshot.ts:7`); `Builder.vue:537-543` and `:462-471` are both
@@ -11547,7 +11547,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M130` (2026-10-04) — `minor` · The "Appearance hint" field is a free-text box in the builder that changes nothing about how any
   form renders.** Filed 2026-09-25 by `M110`, answering the report *"can you also clarify to me what the
-  appearance hint do?"* — measured answer: at render time, nothing. `ConfigPanel.vue:475-481` writes
+  appearance hint do?"* — measured answer: at render time, nothing. `ConfigPanel.vue:476-482` writes
   `form_fields.appearance` as unguided free text with no help and no vocabulary; `public-runtime/lib/types.ts:67`
   declares it on the render model and `toRenderField()` (in `schema-mapping.ts`) never reads it, so it
   reaches neither `FieldRow.vue` nor `FieldControl.vue` nor the encode channel. An author who types `vertical` or
@@ -11558,7 +11558,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the synthetic one the exporter wrote. ✅ **The user has chosen to wire it up** as a typed, per-field layout
   vocabulary the renderers honour. ⚠️ **The test that matters is the round trip** — an imported `minimal` must
   survive an edit and re-export, because the type map disambiguates on exactly those strings. **Live.**
-  Filed by `M110`. **Tier: early-testing.** ⚠️ **VERIFIED BY `M130` (2026-10-04), TAKEN.** The input moved to `ConfigPanel.vue:585-591`, on the Advanced tab. An imported `minimal` survives an edit through the TYPE, not through this column: `select_one` with `minimal` imports as a Dropdown with the column left null, and the export forces it back, because a forced appearance REPLACES the stored one (`XlsformExporter::appearance()`). A stored value arrives only on `select_multiple` or as a multi-token string, and no test edited one and exported it again. The vocabulary is the two ODK names that round-trip verbatim on the two list types, `columns-pack` and `columns`, and never `minimal`, which would re-import a single choice as a Dropdown. The save request also accepts the field's stored value unchanged, so an imported string survives its first edit. A single choice now shows round buttons by default (`D77`). ✅ **CLOSED BY `M130` (2026-10-04) — A TYPED CHOICE LAYOUT, CHOSEN WHERE THE CHOICES ARE.** `FieldAppearance` (`columns-pack` "Side by side", `columns` "In columns") for single and multiple choice, offered per type on the palette and picked on the Options tab ("Choice layout"); `UpdateFieldRequest` accepts null, an allowed value for the stored type, or the field's stored value unchanged, so an imported string survives its first edit; any other type shows a stored value read-only with Remove. XLSForm round-trips every type and value (`XlsformAppearanceRoundTripTest`).
+  Filed by `M110`. **Tier: early-testing.** ⚠️ **VERIFIED BY `M130` (2026-10-04), TAKEN.** The input moved to `ConfigPanel.vue:583-589`, on the Advanced tab. An imported `minimal` survives an edit through the TYPE, not through this column: `select_one` with `minimal` imports as a Dropdown with the column left null, and the export forces it back, because a forced appearance REPLACES the stored one (`XlsformExporter::appearance()`). A stored value arrives only on `select_multiple` or as a multi-token string, and no test edited one and exported it again. The vocabulary is the two ODK names that round-trip verbatim on the two list types, `columns-pack` and `columns`, and never `minimal`, which would re-import a single choice as a Dropdown. The save request also accepts the field's stored value unchanged, so an imported string survives its first edit. A single choice now shows round buttons by default (`D77`). ✅ **CLOSED BY `M130` (2026-10-04) — A TYPED CHOICE LAYOUT, CHOSEN WHERE THE CHOICES ARE.** `FieldAppearance` (`columns-pack` "Side by side", `columns` "In columns") for single and multiple choice, offered per type on the palette and picked on the Options tab ("Choice layout"); `UpdateFieldRequest` accepts null, an allowed value for the stored type, or the field's stored value unchanged, so an imported string survives its first edit; any other type shows a stored value read-only with Remove. XLSForm round-trips every type and value (`XlsformAppearanceRoundTripTest`).
 
 - ✅ **CLOSED BY `M130` (2026-10-04) — `minor` · No renderer honours a per-field layout hint, so a typed appearance vocabulary would have an author
   surface and no effect.** Filed 2026-09-25 by `M110` as the second half of the appearance work, split because it
@@ -11738,7 +11738,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `StructuredRuleEvaluator::conditionGroupHolds()` evaluates them — but `FormBuilderService::replaceValidations()`
   (`:570-589`) never writes either column, `BuilderPresenter::field()` (`:168-178`) never emits them, and
   `BuilderValidation` (`types.ts:15-23`) has no such field. ⚠️ **The only writers are the XLSForm importer and
-  `SchemaBlueprintMaterializer.php:185-203`**, so a compound rule can arrive in a form by import or from a
+  `SchemaBlueprintMaterializer.php:187-205`**, so a compound rule can arrive in a form by import or from a
   template and then be invisible and uneditable in the builder that owns the form — which is worse than not
   supporting it, because an author cannot see why their field behaves as it does. ⚠️ `SchemaSnapshotSerializer`
   already remaps the group ordinal and has a test; extend it to a builder-authored group rather than writing a
@@ -11749,14 +11749,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   which must not become a seventh. The PHP `FieldType` enum is authoritative and the builder palette is fully
   server-driven — but the **renderers** carry six hand-written mirrors: `schema-mapping.ts:48-59` (`SUPPORTED`,
   whose own comment admits it mirrors `EncodeFormPresenter::SUPPORTED`), `:72` (`HAS_OPTIONS`), `:75`
-  (`TEXT_TYPES`), `FieldInput.vue` (`MEDIA_TYPES`) and `ConfigPanel.vue:194` (`NUMERIC_TYPES`). ✅ **Only
+  (`TEXT_TYPES`), `FieldInput.vue` (`MEDIA_TYPES`) and `ConfigPanel.vue:195` (`NUMERIC_TYPES`). ✅ **Only
   `field-roles.ts`'s `RENDERS_NOTHING` is pinned**, by `tests/Unit/Forms/PdfFieldRoleTest.php`, which regex-parses
   the TypeScript from PHP and asserts set equality — so the instrument already exists in this repository and needs
   copying, not inventing. ⚠️ **`EncodeFormPresenter`'s own docblock (`:64-72`) admits the duplication and records
   that collapsing it was deliberately declined** — which makes a parity test the right answer rather than a
   refactor: it converts five unguarded mirrors into guarded ones **without deleting any of them**. ⚠️ A gate
   written here is green on arrival and therefore proves nothing until a committed mutation — removing one type
-  from one mirror — turns it red. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AS A PROVEN STRICT SUBSET OF `R-09f73330`, NOT WORKED SEPARATELY.** ✅ Its citations hold, with two off-by-N: `HAS_OPTIONS` is declared at `schema-mapping.ts:73`, not `:72` (`:72` is the comment), and the `EncodeFormPresenter` docblock admission runs `:64-69`, not `:64-72`. ⛔ **ALL FIVE GAPS IT NAMES APPEAR IN `R-09f73330` VERBATIM, AT THE SAME FILE AND LINE** — `schema-mapping.ts:48`/`:73`/`:75`, `FieldInput.vue`'s `MEDIA_TYPES` and `ConfigPanel.vue:194` — and it names **no** declaration that row does not. (It also cites `field-roles.ts`'s `RENDERS_NOTHING`, but as already-gated *evidence*, not as a gap.) So the single gate written for `R-09f73330` necessarily closes this one too, and **working both would have collided on three production files** under `D13` clause 1. ⚠️ **Its *"six copies, five ungated"* is a FLOOR:** there are **ten** ungated declarations by declaration count, and an eleventh that was already gated. ⚠️ **And its supporting citation is mis-aimed, though its conclusion survives:** `EncodeFormPresenter`'s docblock at `:67-72` declines collapsing the *builder functions*, not the `SUPPORTED` constant — the admission that actually supports the row is on the TypeScript side, at `schema-mapping.ts:47`. ⚠️ **Its *"the instrument exists and needs copying"* is now UNDERSTATED:** the technique has been copied three further times since it was filed — `DraftProjectionMirrorDriftTest`, `DocumentedEnumMirrorDriftTest` (a table-driven generalisation over three grammars) and the `NotificationType`/`ShellAbility` parity tests.
+  from one mirror — turns it red. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AS A PROVEN STRICT SUBSET OF `R-09f73330`, NOT WORKED SEPARATELY.** ✅ Its citations hold, with two off-by-N: `HAS_OPTIONS` is declared at `schema-mapping.ts:73`, not `:72` (`:72` is the comment), and the `EncodeFormPresenter` docblock admission runs `:64-69`, not `:64-72`. ⛔ **ALL FIVE GAPS IT NAMES APPEAR IN `R-09f73330` VERBATIM, AT THE SAME FILE AND LINE** — `schema-mapping.ts:48`/`:73`/`:75`, `FieldInput.vue`'s `MEDIA_TYPES` and `ConfigPanel.vue:195` — and it names **no** declaration that row does not. (It also cites `field-roles.ts`'s `RENDERS_NOTHING`, but as already-gated *evidence*, not as a gap.) So the single gate written for `R-09f73330` necessarily closes this one too, and **working both would have collided on three production files** under `D13` clause 1. ⚠️ **Its *"six copies, five ungated"* is a FLOOR:** there are **ten** ungated declarations by declaration count, and an eleventh that was already gated. ⚠️ **And its supporting citation is mis-aimed, though its conclusion survives:** `EncodeFormPresenter`'s docblock at `:67-72` declines collapsing the *builder functions*, not the `SUPPORTED` constant — the admission that actually supports the row is on the TypeScript side, at `schema-mapping.ts:47`. ⚠️ **Its *"the instrument exists and needs copying"* is now UNDERSTATED:** the technique has been copied three further times since it was filed — `DraftProjectionMirrorDriftTest`, `DocumentedEnumMirrorDriftTest` (a table-driven generalisation over three grammars) and the `NotificationType`/`ShellAbility` parity tests.
 
 - **`minor` · Three more request paths prune an array key by the same mechanism `B0` just fixed, and one of
   them may be doing it on purpose.** Found by `M111` (2026-09-25) while sweeping for the CLASS behind
@@ -11817,7 +11817,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `HAS_OPTIONS`, `:75` `TEXT_TYPES`; `display-value.ts:48` `HAS_OPTIONS` (a second copy), `:51` `GEO_TYPES`,
   `:55` `MEDIA_TYPES`; `semantic-validator.ts:43` `MEDIA_FIELD_TYPES` (a third copy of the media set);
   `FieldInput.vue`'s `MEDIA_TYPES` (a fourth) and its inline text-type literal (a second `TEXT_TYPES`);
-  and `ConfigPanel.vue:194` `NUMERIC_TYPES`. ⛔ **`TEXT_TYPES` and `NUMERIC_TYPES` MIRROR NOTHING** — there is no
+  and `ConfigPanel.vue:195` `NUMERIC_TYPES`. ⛔ **`TEXT_TYPES` and `NUMERIC_TYPES` MIRROR NOTHING** — there is no
   PHP predicate or registry either one corresponds to, so they cannot drift from a source; they ARE a source, and
   an undeclared one. ✅ **The technique is proven and is now used twice:** `tests/Unit/Forms/PdfFieldRoleTest.php`
   parses `field-roles.ts` by regex with two anti-vacuity arms, and `M112` built
@@ -11912,7 +11912,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · The builder and PHP disagree about whether a duration field takes an ordered comparison, and the
   disagreement is now pinned rather than resolved.** Found by `M113` (2026-09-26) while building the client
-  field-type mirror census. `ConfigPanel.vue:354`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
+  field-type mirror census. `ConfigPanel.vue:355`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
   'likert_scale']` — four members. `ValueShape::allowsOperator()` (`ValueShape.php:218-242`) permits
   `gt`/`lt`/`gte`/`lte` for `Number`, `Duration` and `Scale`, which is **five** types: the same four plus
   `duration`. ⛔ **`R-09f73330` SAYS THIS SET "MIRRORS NOTHING", AND THAT STOPPED BEING TRUE IN THE INCREMENT
@@ -13133,13 +13133,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `php artisan db:seed --class=PlatformTemplateSeeder --force`, then the same for `PlatformFieldLibrarySeeder`; both
   refresh content idempotently and keep `usage_count`. **Live.** Filed by `M134`. **Tier: early-testing.** ✅ **CLOSED BY `M135` (2026-10-05) — BOTH CATALOG SEEDERS RE-RUN ON THE TESTING SERVER.** First measured on this PC (both seeders twice: 9 of 9 after the first run, nothing changed by the second), then on the box in one supervised block: a `pg_dump` of both tables (`C:\meridian\backups\m135-catalog-before-reseed.dump`, 15,696 bytes), a read-only census reading **9** platform email and phone questions (seven across five templates, and the library's "Email address" and "Phone number") with **0** carrying the format check, both seeders `DONE`, and the census again: **9 of 9**, totals unchanged (10 templates, 6 library items) and `usage_count` sums kept (2 and 3).
 
-- **`minor` · A form's sections cannot be laid out as a table, the third presentation the user's comment 16 asked for.**
+- ✅ **CLOSED BY `M185` (2026-10-23) — ****`minor` · A form's sections cannot be laid out as a table, the third presentation the user's comment 16 asked for.**
   Found by `M135` while mapping the 19 builder comments for the staging smoke test. Comment 16 asked whether a form is
   *"a pager but sectioned, … a tabular layout or a per page setup"*; `D57` (answered A now, C next) shipped the first and
   the last — step by step, one page, and page breaks — and its option A said to *file "tabular" as a product idea*, which
   no row did until now. `D57`'s recommendation also says a tabular mode should be asked for again on its own evidence,
   because nothing has described what it would show; the first step is that description from the user. **Live.**
-  Filed by `M135`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: `D129` is the description `D57` asked for — a repeatable section laid out as a table where respondents add rows, Fillout's shape — and the grid's second increment builds it (`D128`).** **Amended 2026-10-16 by `D140`: Yes/No leaves the palette, so the table offers no yes/no column type — a Single choice column with the Yes / No options preset takes its place.**
+  Filed by `M135`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: `D129` is the description `D57` asked for — a repeatable section laid out as a table where respondents add rows, Fillout's shape — and the grid's second increment builds it (`D128`).** **Amended 2026-10-16 by `D140`: Yes/No leaves the palette, so the table offers no yes/no column type — a Single choice column with the Yes / No options preset takes its place.** **Amended 2026-10-23 by `M185`, for relayed `R1-7b`:** taken by T4; `form_sections` holds no config column, so the layout is a new nullable `repeat_layout` (an additive migration), and the manual-entry page draws repeats with its own markup, so it gets its own table arm. ✅ **CLOSED BY `M185` (2026-10-23):** a repeatable section's Advanced tab has **Layout** — *A card per entry* or *A table, a row per entry* — stored in `form_sections.repeat_layout` (an additive migration, cards stored as null). It is drawn as a table — every question a column, every entry a row with its Remove, a card per entry below 30em of its own — on the guest form, in the Preview and on the encode page (`resources/js/components/submissions/RepeatTableFrame.vue`, each cell the surface's own field slot), in the response PDF and on the printed form (five to twenty numbered blank rows), whenever every question fits a cell (`App\Support\Forms\RepeatTable` and its twin `repeat-table.ts`, one fixture); the setting names the question that keeps a section as cards. On the branch, held green for merge point 5 with T3 (`D137`, `D138`); relayed `R1-7b` is resolved once it is live.
 
 - ✅ **CLOSED BY `M137` (2026-10-06) — ****`minor` · An image added to a note does not appear in the builder's preview until the page is reloaded.** Found by
   `M137` from the staging smoke test (comment 17, marked fail: *"image did not reflect in the preview instantly, i
@@ -14272,7 +14272,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `resources/js/components/builder/LogicRail.vue:228`, `resources/js/components/shell/FeedbackButton.vue:453`) and the uses remain:
   `resources/js/Pages/forms/Builder.vue:863`, `resources/js/components/webhooks/WebhookFormModal.vue:197`,
   `resources/js/components/scopes/GrantModal.vue:256`, `resources/js/components/scopes/DeleteNodeModal.vue:120`,
-  `resources/js/components/builder/ConfigPanel.vue:837`, `resources/js/components/submissions/MediaInput.vue:420`, `:557`, `:583`,
+  `resources/js/components/builder/ConfigPanel.vue:838`, `resources/js/components/submissions/MediaInput.vue:420`, `:557`, `:583`,
   `:589`, `resources/js/components/submissions/MatrixGrid.vue:290`, `resources/js/components/submissions/GeoInput.vue:637`, `:742`,
   `resources/js/components/submissions/FieldInput.vue:703`, `resources/js/components/integrations/RuleFormModal.vue:448`,
   `resources/js/components/builder/PreviewRuntime.vue:669` (the OCR pages' and the encode page's uses are taken by their own rows).
@@ -14333,7 +14333,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   undo (`resources/js/components/builder/useBuilderStore.ts:287-305`) or the journal's put-back (`:986-1010`) re-sends a key freed
   and retaken meanwhile. The server's own keys never clash (`app/Services/Forms/FormBuilderService.php:903-928`, `uniqueKey()` and
   `copyKey()`); the client never creates one. The refusal is shown under Field key on the Advanced tab only
-  (`resources/js/components/builder/ConfigPanel.vue:644-651`), while selecting a question always opens Basics (`:168-173`); the
+  (`resources/js/components/builder/ConfigPanel.vue:645-652`), while selecting a question always opens Basics (`:168-173`); the
   alert names every other refused question as "has a change that was not saved. Select it to see why" (`:80`) with no reason and
   no badge on the tab; a validation refusal is not counted as unsaved, so there is no Retry (`useBuilderStore.ts:948-956`).
   `docs/form-versioning-schema-migration.md:129` says a key is never renamed, and nothing enforces it. `D132` (the user,
@@ -14418,7 +14418,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M184` (2026-10-23) — ****`minor` · Only a Single choice or Dropdown can take its choices from another form's answers; a Multiple choice cannot.**
   `app/Services/Forms/LinkedChoiceService.php:39` limits a link to single choice and dropdown, and
   `app/Http/Requests/Forms/UpdateFieldRequest.php:337-349` accepts `config.options_source` for those two only; the Options tab
-  offers the link through `resources/js/components/builder/LinkedChoicesEditor.vue` (`ConfigPanel.vue:552-568`). The testers'
+  offers the link through `resources/js/components/builder/LinkedChoicesEditor.vue` (`ConfigPanel.vue:550-566`). The testers'
   comment (2026-10-15): *"All input forms that has options like radio button, checkboxes, select options … must have an option to
   populate options thru the connection to responses from other forms"*. Split out of `R-5fdbc47c`, which named multi-select as
   the remainder's. The remedy: `multi_select` joins `LINKABLE_TYPES`, the request accepts the source for it, and the link is
@@ -14441,7 +14441,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   responses from other forms"*. `resources/js/components/submissions/FieldInput.vue:224-277` renders a text question as a plain
   input, and `app/Http/Requests/Forms/UpdateFieldRequest.php:337-349` accepts no source on it. The remedy: `config.suggestions_source
   = {kind: list | form, …}` on Short text gives a type-ahead (a `<datalist>`-backed combobox) on the web form, the encode page
-  (`app/Services/Submissions/EncodeFormPresenter.php:629-655` already serves linked lists there) and the preview, while free text
+  (`app/Services/Submissions/EncodeFormPresenter.php:633-659` already serves linked lists there) and the preview, while free text
   stays accepted and the server never checks it; the chooser reads "Suggestions come from" on a text question. **Live.** Filed by `M172`.
   **Tier: early-testing.** **Taken by T3 (`M184`), 2026-10-23 (`D138`), for relayed `R1-3b`.** ✅ **CLOSED BY `M184` (2026-10-23):** Basics → **Suggestions come from** — No suggestions · A list file · Another form's answers (`config.suggestions_source`). A list's labels are written into `config.suggestions` at publish; another form's answers are served live like a linked choice question's. The web form, the manual-entry page and the preview tie the box to a `<datalist>` of at most 100 suggestions containing what is typed; any text is still an answer, on every channel. On the branch, held green for merge point 5 with T4 (`D137`, `D138`); relayed `R1-3b` is resolved once it is live.
 
@@ -14453,7 +14453,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   of each list-bound question with "showing 200 of N", and the preview merges them the way the guest runtime does
   (`resources/public-runtime/lib/linked-choices.ts:89-112`). **Live.** Filed by `M172`. **Tier: early-testing.** **Amended 2026-10-15 by `M172`:** an old version opened read-only from the hub (`resources/js/Pages/forms/VersionView.vue`) draws `schemaWithoutListOptions()` through the same preview, so a list-backed cascade shows no choices there either; the same route closes both. **Taken by T3 (`M184`), 2026-10-23 (`D138`), for relayed `R1-1b` and `R1-3b`; two routes, not one — the builder needs edit access and the version view only view access.** ✅ **CLOSED BY `M184` (2026-10-23):** `GET /forms/{form}/choices` (the draft) and `/forms/{form}/versions/{version}/choices` (a published version) serve another form's answers, a cascade's lists, a question's list file and a Short text's suggestions, built from the draft as publishing would build them (`ChoicePreviewPresenter`), each cut to its first 200 — per level for a cascade, keeping children of the choices kept above — with its size; the preview and the read-only version view write them in with the runtime's own merges, a long list's question saying "Showing the first 200 of N choices here; the form shows them all." The two "appear on the live form, not here" limitations are gone. On the branch, held green for merge point 5 with T4 (`D137`, `D138`); relayed `R1-3b` is resolved once it is live.
 
-- **`minor` · A grid's rows, columns and choices must be typed by hand: none can come from a list file or another form's answers, so a grid of barangays or facilities is retyped on every form.**
+- ✅ **CLOSED BY `M185` (2026-10-23) — ****`minor` · A grid's rows, columns and choices must be typed by hand: none can come from a list file or another form's answers, so a grid of barangays or facilities is retyped on every form.**
   The testers' comment (2026-10-15): *"rows can be determined thru the list from the shared responses from other form or uploaded
   reference"*, and every column's options likewise. `resources/js/components/builder/MatrixEditor.vue:42-49` takes three typed
   lists; `app/Services/Forms/LinkedChoiceService.php:258-275` builds a linked list for one question key only, served by
@@ -14461,16 +14461,24 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the "Options come from" chooser (`options_list` / `options_source`); a list resolves at publish through the materialiser, a form
   on serve through the linked-choices endpoint keyed `<key>.rows` and `<key>.<column>`, gated at publish by `LinkedChoiceGate`;
   with the cascade filter row, a row set can be "the barangays with a response in form X". **Live.** Filed by `M172`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** **Amended 2026-10-23 by `M185` (`D161` A), for relayed `R1-7b` and `R1-1b`'s grid rows:** the form arm's
+  remedy is wrong — every reader of a grid's row set reads the rows frozen in the published version (Stage 1's `unknown_row`, both
+  engines, the per-cell spreadsheet columns, the XLSForm cells, the paper form, the manual-entry page), so a row set served live breaks
+  all of them. Both arms are copied in at publish instead, through the materializer as a flat list is, and publishing again picks up new
+  answers. The keys mirror the flat question's: `rows_list` / `rows_source` (Grid and Likert matrix), `cells_list` / `cells_source`, and
+  per choice column `options_list` / `options_source`; the publish gate checks a form source's consent with `refusal()`. ✅ **CLOSED BY `M185` (2026-10-23):** the Grid tab's *Rows come from*, *Cell choices come from* and each choice column's *Choices come from* — Typed here · A list file · Another form's answers — copied into the version at publish by `ChoiceListMaterializer` (`app/Services/Forms/GridSources.php`), the next draft keeping only the source; at most 200 rows, a column's choices up to 5,000 from a list or the first 1,000 from a form; a form link refused once, by `LinkedChoiceGate` (`grid_source_invalid`); the Preview shows the copies; the source form's Data sharing counts the grid among its users. On the branch, held green for merge point 5 with T3 (`D137`, `D138`); relayed `R1-7b` and `R1-1b` are resolved once it is live.
 
-- **`minor` · Rows and columns cannot be added or renamed in the builder preview; the Grid tab is the only editor.**
+- ✅ **CLOSED BY `M185` (2026-10-23) — ****`minor` · Rows and columns cannot be added or renamed in the builder preview; the Grid tab is the only editor.**
   The testers' comment (2026-10-15): *"if the grid can be manipulated in the preview like in kobo, it can add rows and columns in
   the preview for easier visualization"*. The Structure canvas shows a grid's label and type only
   (`resources/js/components/builder/BuilderCanvas.vue:206`); the preview renders the respondent control with no author
   affordance; `M150` and `M151` gave the preview an in-place label edit (`resources/js/components/builder/InlineLabelEdit.vue`).
   The remedy: the preview's table shows "+ Add row" and "+ Add column" and an in-place edit on every row and column header, each
   writing through `useBuilderStore.setConfig` as the Grid tab does, with the same undo entry. **Live.** Filed by `M172`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** **Amended 2026-10-23 by `M185`, for relayed `R1-7b`:** the store has no `setConfig` — the Grid tab's is a
+  local helper in `resources/js/components/builder/ConfigPanel.vue` over `store.touch()` — so one store method serves both; and the
+  respondent grid (`resources/js/components/submissions/MatrixGrid.vue`) ships in the guest bundle and hides its header row in card
+  mode, so the Preview injects the affordances rather than the grid importing them. ✅ **CLOSED BY `M185` (2026-10-23):** in the Preview a grid has a rename beside every row and column header — in the cards its columns become a strip of names — and *Add row* / *Add column* (a Likert matrix's scale point) under it; each is saved at once through the store's new `setFieldConfig` (one PATCH, one undo entry), which the Grid tab's lists now write through too. The editing is provided by the Preview (`resources/js/components/submissions/grid-authoring.ts`), so the guest form and the encode page draw the grid they drew, and `resources/js/__tests__/guest-bundle-boundary.test.ts` pins that no builder component reaches the guest bundle. A grid whose rows come from a list or a form says so. On the branch, held green for merge point 5 with T3 (`D137`, `D138`); relayed `R1-7b` is resolved once it is live.
 
 - **`minor` · The Philippine Standard Geographic Code is not in the app: an author must build and upload four CSV files per form, and nothing keeps them current with the PSA's quarterly publication.**
   The testers' question (2026-10-15): *"Does the platform support cascading options linked to the Philippine Standard Geographic
@@ -14505,7 +14513,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`nit` · The palette's "Adv" tooltip promises an advanced editor "coming with the form engine", and the settings panel carries a baseline note no type can reach any more.**
   `resources/js/components/builder/FieldPalette.vue:102` titles every advanced type "baseline settings (advanced editor coming
-  with the form engine)" beside the badge at `:106`; `resources/js/components/builder/ConfigPanel.vue:485-488` shows "Baseline
+  with the form engine)" beside the badge at `:106`; `resources/js/components/builder/ConfigPanel.vue:486-489` shows "Baseline
   settings for this advanced field type" only when an advanced type has no editor, and every one has had its editor since the
   form engine landed; `app/Enums/FieldType.php:122-124` says the same. The testers asked whether the Adv types are ready
   (2026-10-15); they are, and the tooltip says otherwise. The remedy: the tooltip says what the Help page says
@@ -14655,7 +14663,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M176` (2026-10-18) — ****`minor` · A refused question save shows its first error twice — as the lead line and again as the first bullet — and numbers its rules by their place in the request, not on screen.**
   The testers' comment (2026-10-11, comment 2): *"Instructions repeat"* — *"A validation rule must be either a structured rule or an
-  expression — not both, not neither."* above *"Rule 1: A validation rule must be …"*. `resources/js/components/builder/ConfigPanel.vue:531`
+  expression — not both, not neither."* above *"Rule 1: A validation rule must be …"*. `resources/js/components/builder/ConfigPanel.vue:532`
   prints the reply's `message`, which Laravel fills with the first error, and `:489` lists every error including that one;
   `resources/js/components/builder/field-save-errors.ts:86` names `validations.N` by its position in the request after unfinished
   rows are withheld, so "Rule 1" can point at the wrong row. The message itself (`app/Http/Requests/Forms/UpdateFieldRequest.php:391`)
@@ -14759,7 +14767,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M177` (2026-10-19) — ****`minor` · The builder's help text and messages use words a first-time author does not know.**
   The testers' comment (2026-10-11, comment 1) asks for wording a smart high-schooler understands, and its screenshot is one dialog
-  of many: `resources/js/components/builder/ConfigPanel.vue:566` (*"Evaluated on the server. Use ${field} references …"*) and `:722`
+  of many: `resources/js/components/builder/ConfigPanel.vue:567` (*"Evaluated on the server. Use ${field} references …"*) and `:722`
   (*"Referenced in expressions and exports"*), the help texts of the builder's other editors, the store's messages and the preview's
   list of limits all speak of keys, expressions and references. The remedy: the voice rule that the type-dialog row writes into
   `docs/ux/design-system-reference.md`, applied to every builder help text and message; `manual.ts` follows.
@@ -14791,7 +14799,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The user (2026-10-16): *"lets make the calculate referenced … create a calculated field using the form's own questions by clicking
   or selecting, not by purely typing. not all users are technical. but make sure that formula can still be typed … put presets"*,
   with Fillout's calculation screens (number, text and duration; a duration from a Start and an End in years, months, weeks, days,
-  hours or minutes). `resources/js/components/builder/ConfigPanel.vue:620` is a two-row text box whose help says *"Evaluated on the
+  hours or minutes). `resources/js/components/builder/ConfigPanel.vue:621` is a two-row text box whose help says *"Evaluated on the
   server"* though both engines compute it; `config.calculated_formula` is the only setting; `tests/golden/validation/calculated.json`
   pins that a calculation cannot read another. The remedy: a Type (**Number · Text · Date · Duration**, decimal places for Number)
   and two modes — **Build it** (presets: Sum, Difference, Average, Count answered, Age from a birth date, Duration between two dates
@@ -14810,7 +14818,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M177` (2026-10-19) — ****`nit` · The builder's draft check looks for a calculation's formula under the wrong key, so every calculated question would read "no formula yet".**
   `resources/js/components/builder/draft-snapshot.ts:402` reads `config.formula`, but the formula lives in
-  `config.calculated_formula` (`resources/js/components/builder/ConfigPanel.vue:277`); `resources/js/components/builder/draft-snapshot.test.ts`
+  `config.calculated_formula` (`resources/js/components/builder/ConfigPanel.vue:278`); `resources/js/components/builder/draft-snapshot.test.ts`
   pins the wrong key. Nothing shows it today only because the preview never draws a calculated question; it will once a calculation
   can be shown. The remedy: read `calculated_formula`, and the test with it. **Latent.** It surfaces once a calculated question can be
   shown. Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M177` (2026-10-19):** taken by `M177` because `R-f44e9d00` made it live — `draft-snapshot.ts` reads `calculated_formula`, and the preview rebuilds on visibility and the formula. Red first: 2. Mutant caught. Live on staging since merge point 2 (PR #370, `a5b718bb`).
@@ -14934,7 +14942,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `________` for the person filling it to write in; an escaped `$${` stays literal. **Live.** Filed by `M178`. **Tier: early-testing.** ✅ **CLOSED BY `M178` (2026-10-19):** `BlankFormPrintPresenter::paperText()` prints each reference in a field's label and hint and a section's title and description as `________`, through the render path's own lenient template parser (so `$${` stays literal and a malformed hole prints nothing, as on screen), before the view escapes the text. Red first: 1 Pest case. Built and held for merge point 3 (`D137`); live since it, 2026-10-20.
 
 - ✅ **CLOSED BY `M180` (2026-10-20) — ****`minor` · A question's Default value is saved but never filled in for a respondent, though the Help page says it is.**
-  The Advanced tab's **Default value** (`resources/js/components/builder/ConfigPanel.vue:839`) saves `default_value`, but nothing reads it
+  The Advanced tab's **Default value** (`resources/js/components/builder/ConfigPanel.vue:840`) saves `default_value`, but nothing reads it
   when a form opens — `resources/public-runtime/lib/prefill.ts` seeds only a hidden question's fixed value — and it reaches only the
   XLSForm export (`app/Services/Xlsform/XlsformExporter.php:283`). `resources/js/components/help/manual.ts:815` says *"an answer filled
   in before the respondent starts, which they can change"*. The remedy (`D148` A, taken by R4): the default fills the answer when the
@@ -14944,7 +14952,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M180` (2026-10-20) — ****`minor` · A condition or a rule can name a calculated question, but always reads it as blank.**
   Both engines work out calculations last and never feed them back into relevance or constraints
   (`app/Services/Validation/SemanticValidator.php:126`, `resources/public-runtime/engine/semantic-validator.ts:155`), yet the condition
-  editor offers every calculated question (`resources/js/components/builder/ConfigPanel.vue:369`) and the compared-question lists do too,
+  editor offers every calculated question (`resources/js/components/builder/ConfigPanel.vue:370`) and the compared-question lists do too,
   because a calculation's value shape is a number (`app/Enums/ValueShape.php:109`) — so "show when the total is over 10" never shows,
   and a rule against a total never checks. The remedy (`D149` A, taken by R4 with its dependency order): conditions and rules read a
   calculation's value, the calculations worked out before what reads them, cycles refused at publish. Until then R3's lists leave
@@ -15080,3 +15088,29 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   matched regardless of case and spacing. **Live.** Filed by `M184`. **Tier: early-testing.** ✅ **CLOSED BY `M184` (2026-10-23):**
   `OcrAnswerCarry::carry()` takes the live choices by key; `OcrScanReviewPresenter` and `GuestPaperReview` pass
   `LinkedChoiceService::valuesFor()`; an answer that is none of them, or one with no list passed, is still listed for the reviewer.
+
+- **`minor` · A grid row or column whose value holds a space, a dot or another character an XLSForm name cannot carry makes the XLSForm export emit an invalid question name.**
+  `app/Services/Xlsform/XlsformExporter.php` (`emitMatrix()`) names each cell `<key>_<row>_<column>` from the raw values, and nothing
+  constrains a value's characters — the publish gate checks only that each is present and distinct
+  (`app/Services/Forms/StructuralValidationGate.php`, `assertOptionListResolves()`). A typed value rarely carries a space, but a grid's
+  rows copied from another form's answers take the answer text as their value (`D85`, `D161`), so "San Isidro" becomes a name an
+  XLSForm reader refuses. Found by `M185` while planning the grid's list and form rows. The remedy: the export derives a name-safe
+  token per row and column (the XLSForm name rule, a suffix on a clash) and keeps the value in the cell's label and a `#meridian`
+  column, so a round trip still maps answers. **Live.** Filed by `M185`. **Tier: during-testing.**
+
+- **`nit` · A repeatable section laid out as a table is shown as one block per entry on a response's page and in the inbox's detail; only the PDF draws the table.**
+  `M185` draws a section set to *A table, a row per entry* as a table on the guest form, the builder's Preview, the encode page, the
+  response PDF and the printed form (`app/Support/Forms/RepeatTable.php`), but the screen that shows a stored response
+  (`app/Services/Submissions/SubmissionInboxPresenter.php`, the repeat branch that mirrors the PDF's old one) still lists each entry
+  as its own block of question and answer, so a reviewer reads a ten-person roster as ten blocks where the respondent filled one
+  table. Found by `M185`, which kept to the surfaces its row named. The remedy: the presenter emits the PDF's table block shape for a
+  section `RepeatTable::draws()` accepts, and the response page draws it with the design system's table. **Live.** Filed by `M185`.
+  **Tier: during-testing.**
+
+- ✅ **CLOSED BY `M185` (2026-10-24) — ****`minor` · `SubmissionAnswerEditTest`'s replay-clock case fails whenever the suite runs between 16:00 and 24:00 UTC, so a correct pull request goes red at night.**
+  `tests/Feature/Submissions/SubmissionAnswerEditTest.php` (the "evaluates a today()-dependent relevance against the day the response
+  was filed" case) wrote the filing day as a UTC date into `today() = '…'`, but `today()` reads the FORM's zone since `D153` (`M180`), and a
+  new form is Asia/Manila — eight hours ahead — so from 16:00 UTC the expected day is already yesterday there and the gated answer is pruned.
+  Found by `M185` when CI's Pest job went red on a docs-only push at 16:14 UTC; reproduced on this host at 16:45 UTC (red), the test code
+  unchanged since the case passed in the morning. **Live.** Filed by `M185`. **Tier: early-testing.** ✅ **CLOSED BY `M185` (2026-10-24):**
+  the case reads the filing day in the form's own zone; red before at 16:45 UTC, green after. The service was right; only the test's clock was.

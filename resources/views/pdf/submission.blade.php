@@ -79,6 +79,30 @@
                 <p class="notice">{{ $block['notice'] }}</p>
             @endif
 
+            {{-- M185 (`R-0a7275ce`): a repeatable section laid out as a table on the form; its header row repeats on every page. --}}
+            @if (($block['table'] ?? null) !== null)
+                <table class="rt">
+                    <thead>
+                        <tr>
+                            <th class="rt__corner"></th>
+                            @foreach ($block['table']['columns'] as $column)
+                                <th class="rt__col">{{ $column }}</th>
+                            @endforeach
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($block['table']['rows'] as $row)
+                            <tr>
+                                <th class="rt__row">{{ $row['label'] }}</th>
+                                @foreach ($row['cells'] as $cell)
+                                    <td class="rt__cell">{{ $cell }}</td>
+                                @endforeach
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
+
             @foreach ($block['fields'] as $field)
                 @if ($field['role'] === 'prose')
                     {{-- A note: text the respondent read, with no answer slot. --}}

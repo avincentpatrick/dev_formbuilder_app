@@ -11,6 +11,8 @@
  */
 import { MdsButton, MdsIconButton, MdsTextInput } from '@meridian/design-system';
 
+import { addGridEntry, patchGridEntry, removeGridEntry } from './grid-options';
+
 const props = defineProps<{
     heading: string;
     singular: string;
@@ -21,20 +23,15 @@ const props = defineProps<{
 const emit = defineEmits<{ 'update:options': [value: T[]] }>();
 defineSlots<{ details?: (props: { option: T; index: number }) => unknown }>();
 
+// M185 (`R-7418e6bd`): the add / rename / remove rules live in `grid-options.ts`, which the Preview's grid editing shares.
 function updateOption(index: number, patch: Partial<Pick<T, 'value' | 'label'>>): void {
-    emit(
-        'update:options',
-        props.options.map((option, i) => (i === index ? { ...option, ...patch } : option)),
-    );
+    emit('update:options', patchGridEntry(props.options, index, patch));
 }
 function addOption(): void {
-    const existing = new Set(props.options.map((option) => option.value));
-    let n = props.options.length + 1;
-    while (existing.has(`${props.prefix}_${n}`)) n++;
-    emit('update:options', [...props.options, { value: `${props.prefix}_${n}`, label: `${props.singular} ${n}` } as T]);
+    emit('update:options', addGridEntry(props.options, props.prefix, props.singular));
 }
 function removeOption(index: number): void {
-    emit('update:options', props.options.filter((_, i) => i !== index));
+    emit('update:options', removeGridEntry(props.options, index));
 }
 </script>
 

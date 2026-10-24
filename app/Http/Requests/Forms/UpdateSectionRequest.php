@@ -6,6 +6,7 @@ namespace App\Http\Requests\Forms;
 
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * A section content edit from the config panel (Increment D4a). Validates shape only — `key` format (a key another
@@ -28,6 +29,9 @@ final class UpdateSectionRequest extends FormRequest
             'is_repeatable' => ['boolean'],
             'min_instances' => ['nullable', 'integer', 'min:0', 'max:10000'],
             'max_instances' => ['nullable', 'integer', 'min:0', 'max:10000'],
+            // M185 (`R-0a7275ce`, `D129`): a repeatable section as cards (null) or a table; whether its questions can be columns
+            // is not refused here — a section that cannot be a table is drawn as cards, and the builder says why.
+            'repeat_layout' => ['nullable', 'string', Rule::in(['cards', 'table'])],
             'relevant_expression' => ['nullable', 'string', 'max:2000'],
             'version' => ['nullable', 'string'],
         ];

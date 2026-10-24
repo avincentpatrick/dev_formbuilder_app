@@ -62,6 +62,7 @@ const SECTION_SETTINGS: Record<string, string> = {
     is_repeatable: 'Repeatable group',
     min_instances: 'Min instances',
     max_instances: 'Max instances',
+    repeat_layout: 'Layout',
     key: 'Section key',
 };
 

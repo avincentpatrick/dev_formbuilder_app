@@ -154,6 +154,25 @@ final class PublishValidationException extends RuntimeException
         return self::one($fieldKey, 'suggestions_invalid', "The suggestions on “{$fieldKey}” cannot be offered ({$detail}).");
     }
 
+    /**
+     * M185 (`R-bb79aec0`, `D161`): a grid's rows, cells or a column's choices that come from a list file or another form,
+     * and cannot be copied in. `$what` names the part ("rows", "cell choices", "choices of column “Services”"); `$reason`
+     * is a link's refusal code (`LinkedChoiceService::refusal()`) or a sentence of its own.
+     */
+    public static function gridSourceInvalid(string $fieldKey, string $what, string $reason): self
+    {
+        $detail = match ($reason) {
+            'linked_choices_incomplete' => "choose the form and the question the {$what} come from",
+            'linked_choices_self' => "the {$what} cannot come from this same form",
+            'linked_choices_source_missing' => "the form the {$what} come from no longer exists",
+            'linked_choices_not_shared' => "the form the {$what} come from does not share that question; its owner can share it in the form's Data sharing settings",
+            'linked_choices_owner_cannot_read' => "this form's owner cannot see the responses of the form the {$what} come from",
+            default => $reason,
+        };
+
+        return self::one($fieldKey, 'grid_source_invalid', "The {$what} of the grid “{$fieldKey}” cannot be filled in ({$detail}).");
+    }
+
     /** A cascading-select field (Increment G4a) whose level/option hierarchy does not resolve. */
     public static function cascadingConfigInvalid(string $fieldKey, string $detail): self
     {

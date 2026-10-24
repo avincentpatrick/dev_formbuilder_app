@@ -39,6 +39,7 @@ import ContentBlocksEditor from './ContentBlocksEditor.vue';
 import FieldTypeControl from './FieldTypeControl.vue';
 import GeoEditor from './GeoEditor.vue';
 import LikertMatrixEditor from './LikertMatrixEditor.vue';
+import RepeatLayoutSelect from './RepeatLayoutSelect.vue';
 import LinkedChoicesEditor from './LinkedChoicesEditor.vue';
 import SuggestionsEditor from './SuggestionsEditor.vue';
 import { choiceSourceOf } from './choice-source';
@@ -441,14 +442,11 @@ function setField<K extends keyof LocalField>(key: K, value: LocalField[K]): voi
 function patchConfig(patch: Record<string, unknown>): void {
     const target = field.value;
     if (!target) return;
-    target.config = { ...target.config, ...patch };
-    props.store.touch(target.uid, 'field');
+    // M185 (`R-7418e6bd`): the store's one config write, which the Preview's grid editing shares — debounced here.
+    props.store.setFieldConfig(target.uid, patch);
 }
 function setConfig(key: string, value: unknown): void {
-    const target = field.value;
-    if (!target) return;
-    target.config = { ...target.config, [key]: value };
-    props.store.touch(target.uid, 'field');
+    patchConfig({ [key]: value });
 }
 /**
  * An emptied list REMOVES the key rather than saving `[]`: a note with no `content` is today's one-line note, and
@@ -708,7 +706,7 @@ watch(librarySaved, (value) => {
                     </template>
 
                     <template v-else-if="activeTab === 'grid' && configEditor === 'matrix'">
-                        <MatrixEditor
+                        <MatrixEditor :config="field.config" :sources="props.store.linkableSources" :form-id="store.formId" @update:config="field.config = $event; props.store.touch(field.uid, 'field')"
                             :rows="gridRows"
                             :columns="gridColumns"
                             :cells="gridCells"
@@ -721,7 +719,7 @@ watch(librarySaved, (value) => {
                     </template>
 
                     <template v-else-if="activeTab === 'grid'">
-                        <LikertMatrixEditor
+                        <LikertMatrixEditor :config="field.config" :sources="props.store.linkableSources" :form-id="store.formId" @update:config="field.config = $event; props.store.touch(field.uid, 'field')"
                             :rows="gridRows"
                             :columns="gridColumns"
                             :layout="gridLayout"
@@ -979,7 +977,7 @@ watch(librarySaved, (value) => {
                                     @update:model-value="setSection('max_instances', $event)"
                                 />
                             </MdsFormField>
-                        </div>
+                        </div><RepeatLayoutSelect v-if="section.is_repeatable" :layout="section.repeat_layout" :members="props.store.fields.value.filter((f) => f.form_section_id === section?.id).sort((a, b) => a.sequence - b.sequence)" :palette="props.store.palette" @update:layout="setSection('repeat_layout', $event)" />
                         <ConditionEditor
                             :key="`section-${section.uid}`"
                             :expression="section.relevant_expression"

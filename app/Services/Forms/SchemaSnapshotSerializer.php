@@ -123,6 +123,10 @@ final class SchemaSnapshotSerializer
      */
     private function section(FormSection $s): array
     {
+        // M185 (`R-0a7275ce`): a section laid out as a table says so; one drawn as cards carries no key at all, so every
+        // version and template published before the table existed — and every one since without it — hashes as it did.
+        $layout = $s->repeat_layout === 'table' ? ['repeat_layout' => 'table'] : [];
+
         return [
             'key' => $s->key,
             'label' => $s->label,
@@ -135,6 +139,7 @@ final class SchemaSnapshotSerializer
             'is_repeatable' => $s->is_repeatable,
             'min_instances' => $s->min_instances,
             'max_instances' => $s->max_instances,
+            ...$layout,
             'relevant_expression' => $s->relevant_expression,
         ];
     }

@@ -26,6 +26,11 @@
  * form's id, which is where the lists are read and uploaded. One question takes one source: choosing any clears the
  * others' keys, in the same change. Past 30 choices a Single or Multiple choice says what `D160` chose — the paper prints
  * every choice — and points at a Dropdown; past 5,000 it says publish will refuse.
+ *
+ * ── A GRID'S ROWS, CELLS AND COLUMNS (M185, `R-bb79aec0`, `D161`) ──────────────────────────────────────────────────────
+ * The grid editors mount this same chooser over one slot at a time, through `grid-sources.ts`, which renames the slot's keys
+ * to these three — so what it emits is unchanged. `kind` changes the words only: what the list becomes (rows or choices),
+ * its cap, and that a grid's lists are COPIED IN WHEN THE FORM IS PUBLISHED, from a form's answers as well as a file.
  */
 import { computed, onMounted, ref, useId, watch } from 'vue';
 import { MdsButton, MdsFormField, MdsRadio, MdsSelect } from '@meridian/design-system';
@@ -38,6 +43,8 @@ import type { LinkableSource, OptionsSource } from './types';
 const LONG_LIST = 30;
 /** `ChoiceListMaterializer::FLAT_LIST_MAX` — the most rows one question takes from a list. */
 const FLAT_LIST_MAX = 5000;
+/** `GridSources::ROWS_MAX` — the most rows a grid takes from a list or a form. */
+const GRID_ROWS_MAX = 200;
 
 const props = defineProps<{
     /** The question's whole config: its `options_source` link or `options_list` name, if any, and its typed `options`. */
@@ -46,7 +53,40 @@ const props = defineProps<{
     /** The form whose list files the question may take its choices from; without it, no list file is offered. */
     formId?: string | null;
     fieldType?: string;
+    /**
+     * M185: what the list becomes — a choice question's choices (the default, served live from a form), or a grid's rows,
+     * its shared cell choices or one column's choices, all copied in at publish.
+     */
+    kind?: 'choices' | 'rows' | 'cell-choices' | 'column-choices';
 }>();
+
+/** The words that change with what the list becomes; a grid's lists are copied in at publish, from a file or a form. */
+const words = computed(() => {
+    const rows = props.kind === 'rows';
+    const grid = props.kind !== undefined && props.kind !== 'choices';
+    const noun = rows ? 'rows' : 'choices';
+    const copied = 'They are copied in when you publish; publish again to pick up new answers.';
+
+    return {
+        legend: rows ? 'Rows come from' : props.kind === 'cell-choices' ? 'Cell choices come from' : 'Choices come from',
+        noun,
+        one: rows ? 'row' : 'choice',
+        owner: grid ? 'A grid' : 'A question',
+        listHelp: rows
+            ? 'Each row of the list becomes a row of the grid: “name” is what is saved, “label” what respondents see.'
+            : 'Respondents choose from the list\'s rows: “name” is what is saved, “label” what they see.',
+        uploadCap: rows ? 'Up to 200 rows for one grid.' : 'Up to 5,000 choices for one question.',
+        formHelp: rows
+            ? `The grid's rows are the answers given to this question, up to 200. ${copied}`
+            : grid
+              ? `Respondents choose from the answers given to this question, up to 1,000. ${copied}`
+              : 'Respondents choose from the answers given to this question, up to 1,000, as they read today.',
+        listCopied: grid ? copied : null,
+        unavailable: grid
+            ? `The form these ${noun} come from no longer shares them with you. Choose another, or type the ${noun} here.`
+            : 'The form this question takes its choices from no longer shares them with you. Choose another, or type the choices here.',
+    };
+});
 
 const emit = defineEmits<{ 'update:config': [value: Record<string, unknown>] }>();
 
@@ -127,6 +167,9 @@ const listNote = computed<{ tone: 'warning' | 'text'; text: string } | null>(() 
     const list = chosenList.value;
     if (list === null) return listsLoaded.value ? { tone: 'warning', text: `${listName.value} is not uploaded to this form.` } : null;
     const size = list.row_count.toLocaleString('en');
+    if (props.kind === 'rows' && list.row_count > GRID_ROWS_MAX) {
+        return { tone: 'warning', text: `This list has ${size} rows, and a grid takes at most 200.` };
+    }
     if (list.row_count > FLAT_LIST_MAX) {
         return { tone: 'warning', text: `This list has ${size} choices, and one question takes at most 5,000. Use a cascading select for a longer list.` };
     }
@@ -186,7 +229,7 @@ function onQuestion(key: string): void {
 
 <template>
     <fieldset class="linked-choices" data-linked-choices>
-        <legend class="linked-choices__legend">Choices come from</legend>
+        <legend class="linked-choices__legend">{{ words.legend }}</legend>
         <div class="linked-choices__modes">
             <MdsRadio
                 :model-value="confirming ?? mode"
@@ -212,19 +255,19 @@ function onQuestion(key: string): void {
             />
         </div>
 
-        <div v-if="confirming" class="linked-choices__confirm" role="group" aria-label="Remove typed choices" data-linked-choices-confirm>
+        <div v-if="confirming" class="linked-choices__confirm" role="group" :aria-label="`Remove typed ${words.noun}`" data-linked-choices-confirm>
             <p class="linked-choices__text">
-                The {{ typedCount }} {{ typedCount === 1 ? 'choice' : 'choices' }} typed here will be removed. A question
-                takes its choices from one place.
+                The {{ typedCount }} {{ typedCount === 1 ? words.one : words.noun }} typed here will be removed. {{ words.owner }}
+                takes its {{ words.noun }} from one place.
             </p>
             <div class="linked-choices__actions">
-                <MdsButton variant="tertiary" size="sm" @click="confirming = null">Keep typed choices</MdsButton>
+                <MdsButton variant="tertiary" size="sm" @click="confirming = null">Keep typed {{ words.noun }}</MdsButton>
                 <MdsButton variant="primary" size="sm" @click="confirmStart">Remove and continue</MdsButton>
             </div>
         </div>
 
         <template v-if="mode === 'list' && formId">
-            <MdsFormField v-slot="{ id, describedby, invalid }" label="List file" help="Respondents choose from the list's rows: “name” is what is saved, “label” what they see.">
+            <MdsFormField v-slot="{ id, describedby, invalid }" label="List file" :help="words.listCopied ? `${words.listHelp} ${words.listCopied}` : words.listHelp">
                 <MdsSelect
                     :id="id"
                     :describedby="describedby"
@@ -241,7 +284,7 @@ function onQuestion(key: string): void {
             <ChoiceListUpload
                 :form-id="formId"
                 label="Upload a CSV or Excel file"
-                help="Columns “name” (a code used once in the file) and “label”. An Excel file’s first sheet is read. The file’s name is the list’s name; uploading it again replaces the list. Up to 5,000 choices for one question."
+                :help="`Columns “name” (a code used once in the file) and “label”. An Excel file’s first sheet is read. The file’s name is the list’s name; uploading it again replaces the list. ${words.uploadCap}`"
                 @uploaded="onListUploaded"
             />
         </template>
@@ -250,10 +293,7 @@ function onQuestion(key: string): void {
             <p v-if="sources.length === 0 && !unavailable" class="linked-choices__text" data-linked-choices-empty>
                 No form shares its answers with you yet. A form's owner can share them in its Data sharing settings.
             </p>
-            <p v-if="unavailable" class="linked-choices__warning" data-linked-choices-unavailable>
-                The form this question takes its choices from no longer shares them with you. Choose another, or type
-                the choices here.
-            </p>
+            <p v-if="unavailable" class="linked-choices__warning" data-linked-choices-unavailable>{{ words.unavailable }}</p>
             <template v-if="sources.length > 0">
                 <MdsFormField v-slot="{ id, describedby, invalid }" label="Form">
                     <MdsSelect
@@ -270,7 +310,7 @@ function onQuestion(key: string): void {
                     v-if="chosenSource"
                     v-slot="{ id, describedby, invalid }"
                     label="Question"
-                    help="Respondents choose from the answers given to this question, up to 1,000, as they read today."
+                    :help="words.formHelp"
                 >
                     <MdsSelect
                         :id="id"

@@ -113,6 +113,7 @@ interface PayloadOptions {
         repeatable?: boolean;
         min_instances?: number | null;
         max_instances?: number | null;
+        repeat_layout?: 'table' | null;
         fields: Array<Record<string, unknown>>;
     }>;
     singlePage?: boolean;
@@ -158,6 +159,7 @@ function payload(o: PayloadOptions): Record<string, unknown> {
             repeatable: b.repeatable ?? false,
             min_instances: b.min_instances ?? null,
             max_instances: b.max_instances ?? null,
+            repeat_layout: b.repeat_layout ?? null,
             fields: b.fields,
         })),
         // The server's first-paint projection. The store recomputes immediately, so these tests assert what
@@ -685,6 +687,50 @@ describe('encode page — repeat groups', () => {
 
         // `max_instances` still bites — it is the abuse guard, and H21a deliberately left it un-narrowed.
         expect(wrapper.text()).toContain('Maximum of 2 reached.');
+    });
+
+    function tablePayload(memberType: string) {
+        return payload({
+            singlePage: true,
+            sections: [section({ key: 'hh', label: 'Members', sequence: 1, is_repeatable: true, min_instances: 2, max_instances: 4 })],
+            fields: [
+                field({ key: 'member_name', section_key: 'hh', label: 'Name', sequence: 1 }),
+                field({ key: 'member_more', section_key: 'hh', label: 'More', sequence: 2, field_type: memberType }),
+            ],
+            blocks: [
+                {
+                    key: 'hh',
+                    label: 'Members',
+                    repeatable: true,
+                    min_instances: 2,
+                    max_instances: 4,
+                    repeat_layout: 'table',
+                    fields: [blockField({ key: 'member_name', label: 'Name' }), blockField({ key: 'member_more', label: 'More', field_type: memberType })],
+                },
+            ],
+        });
+    }
+
+    it('lays a section out as a table (M185, R-0a7275ce): the seeded rows as rows, a column per question, each cell this page’s field', async () => {
+        const wrapper = mountEncode(tablePayload('integer'));
+        await nextTick();
+
+        const table = wrapper.get('[data-repeat-table]');
+        expect(table.findAll('tbody tr').map((tr) => tr.get('th').text())).toEqual(['Members 1', 'Members 2']);
+        expect(table.findAll('thead th')).toHaveLength(2);
+        expect(table.findAll('[data-repeat-cell="member_more"] input')).toHaveLength(2);
+
+        await table.findAll('tbody tr')[1].findAll('button').find((b) => b.text() === 'Remove')!.trigger('click');
+        await nextTick();
+        expect(wrapper.get('[data-repeat-table]').findAll('tbody tr')).toHaveLength(1);
+    });
+
+    it('keeps cards when a question cannot be a table column (M185)', async () => {
+        const wrapper = mountEncode(tablePayload('long_text'));
+        await nextTick();
+
+        expect(wrapper.find('[data-repeat-table]').exists()).toBe(false);
+        expect(wrapper.text()).toContain('Members 1');
     });
 });
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Forms;
 
+use App\Enums\FieldType;
 use App\Exceptions\Forms\PublishValidationException;
 use App\Models\Form;
 use App\Models\FormField;
@@ -30,6 +31,9 @@ use Illuminate\Support\Collection;
  * M184 (`R-596d6afd`): a Short text whose SUGGESTIONS come from another form passes the same two keys, refused as
  * `suggestions_invalid` in words about suggestions — the answer is free text either way, but a list that cannot serve
  * should be said at publish, not found empty by a respondent.
+ *
+ * M185 (`R-bb79aec0`, `D161`): a grid's rows, cells or a column's choices from another form pass the same two keys,
+ * refused as `grid_source_invalid`, naming the part.
  */
 final class LinkedChoiceGate
 {
@@ -46,6 +50,30 @@ final class LinkedChoiceGate
 
         foreach ($fields as $field) {
             $config = $field->config;
+            // M185 (`R-bb79aec0`, `D161`): a grid's rows, cells or a column's choices from another form. The materializer has
+            // already copied a servable list in, so only completeness and consent are judged here — never "typed choices beside
+            // a link" ({@see codeFor()}): the copy is exactly what sits beside it.
+            if ($field->field_type === FieldType::Matrix || $field->field_type === FieldType::LikertMatrix) {
+                $grid = (array) $config;
+                foreach (GridSources::slots($field->field_type, $grid) as $slot) {
+                    $view = GridSources::view($grid, $slot);
+                    if (! LinkedChoiceService::declaresLink($view)) {
+                        continue;
+                    }
+                    $link = LinkedChoiceService::linkOf($view);
+                    $destination ??= Form::query()->whereKey($version->form_id)->first();
+                    $code = match (true) {
+                        $link === null => 'linked_choices_incomplete',
+                        $destination === null => 'linked_choices_source_missing',
+                        default => $this->links->refusal($destination, $link),
+                    };
+                    if ($code !== null) {
+                        $violations[] = PublishValidationException::gridSourceInvalid($field->key, GridSources::name($grid, $slot), $code);
+                    }
+                }
+
+                continue;
+            }
             if (LinkedChoiceService::declaresSuggestionLink($config)) {
                 $link = LinkedChoiceService::suggestionLinkOf($config);
                 $destination ??= Form::query()->whereKey($version->form_id)->first();

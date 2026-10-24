@@ -66,6 +66,8 @@ export interface ServerSection {
     is_repeatable: boolean;
     min_instances: number | null;
     max_instances: number | null;
+    /** M185 (`R-0a7275ce`): `table` draws a repeatable section as a table; null (or absent, in an older fixture) is the cards. */
+    repeat_layout?: 'table' | 'cards' | null;
     relevant_expression: string | null;
     sequence: number;
     version: string | null;

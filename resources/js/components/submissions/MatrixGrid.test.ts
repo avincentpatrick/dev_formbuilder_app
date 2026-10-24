@@ -5,10 +5,11 @@
  * and the switch the CSS keys on. The table-or-cards look itself is the e2e spec's and the real-browser look's.
  */
 import { mount } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
-import { defineComponent, h } from 'vue';
+import { describe, expect, it, vi } from 'vitest';
+import { defineComponent, h, ref } from 'vue';
 
 import type { AnswerValue, EncodeField } from './FieldInput.vue';
+import { GridAuthoringKey, type GridAuthoring, type GridEdit } from './grid-authoring';
 import MatrixGrid from './MatrixGrid.vue';
 
 function typedGrid(overrides: Partial<EncodeField> = {}, layout: 'table' | 'stacked' = 'table'): EncodeField {
@@ -185,6 +186,99 @@ describe('MatrixGrid — a Likert matrix, KoboToolbox’s way (M183, R-f03cf999)
         await wrapper.findAll('tbody tr')[0].findAll('input[type="radio"]')[2].setValue(true);
 
         expect(lastValue(wrapper)).toEqual({ staff: '2', clean: '3' });
+        wrapper.unmount();
+    });
+});
+
+describe('MatrixGrid — the builder Preview’s editing (M185, R-7418e6bd)', () => {
+    /** A stand-in for `InlineLabelEdit`: the provided editor, drawn where the header's words were. */
+    const Editor = defineComponent({
+        props: { value: { type: String, required: true }, label: { type: String, required: true } },
+        emits: ['commit', 'cancel'],
+        setup: (props) => () => h('input', { 'data-test-editor': props.label, value: props.value }),
+    });
+
+    function authoring(overrides: Partial<GridAuthoring> = {}): GridAuthoring {
+        return {
+            editing: ref<GridEdit | null>(null),
+            rowsFrom: () => null,
+            add: vi.fn(),
+            open: vi.fn(),
+            commit: vi.fn(),
+            cancel: vi.fn(),
+            editor: Editor,
+            ...overrides,
+        };
+    }
+
+    function authored(field: EncodeField, provided: GridAuthoring) {
+        return mount(MatrixGrid, {
+            props: { field, kind: field.field_type === 'likert_matrix' ? 'likert-matrix' : 'matrix', modelValue: null },
+            global: { provide: { [GridAuthoringKey as symbol]: provided } },
+            attachTo: document.body,
+        });
+    }
+
+    it('offers nothing where nothing is provided — the guest form and the encode page', () => {
+        const wrapper = grid(typedGrid());
+
+        expect(wrapper.find('[data-grid-authoring]').exists()).toBe(false);
+        expect(wrapper.find('[data-grid-rename-row]').exists()).toBe(false);
+        expect(wrapper.find('[data-grid-rename-column]').exists()).toBe(false);
+        expect(wrapper.find('.mds-grid--authoring').exists()).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('puts a rename beside every row and column header, and never in a control’s name', () => {
+        const wrapper = authored(typedGrid(), authoring());
+
+        expect(wrapper.findAll('[data-grid-rename-row]').map((b) => b.attributes('aria-label'))).toEqual(['Rename row Clinic A', 'Rename row Clinic B']);
+        expect(wrapper.findAll('[data-grid-rename-column]')).toHaveLength(5);
+        expect(wrapper.find('.mds-grid--authoring').exists()).toBe(true);
+        const second = wrapper.findAll('tbody tr')[1];
+        expect(nameOf(second.find('input[type="number"]').element)).toBe('Clinic B Staff on duty');
+        wrapper.unmount();
+    });
+
+    it('asks the provider to add a row or a column, and to open a header’s rename', async () => {
+        const provided = authoring();
+        const wrapper = authored(typedGrid(), provided);
+
+        await wrapper.get('[data-grid-add-row]').trigger('click');
+        await wrapper.get('[data-grid-add-column]').trigger('click');
+        await wrapper.get('[data-grid-rename-column="svc"]').trigger('click');
+
+        expect(provided.add).toHaveBeenNthCalledWith(1, 'clinics', 'rows');
+        expect(provided.add).toHaveBeenNthCalledWith(2, 'clinics', 'columns');
+        expect(provided.open).toHaveBeenCalledWith({ key: 'clinics', part: 'columns', value: 'svc' });
+        wrapper.unmount();
+    });
+
+    it('draws the provided editor in the open header, keeping the words that name the controls', () => {
+        const provided = authoring({ editing: ref<GridEdit | null>({ key: 'clinics', part: 'rows', value: 'b' }) });
+        const wrapper = authored(typedGrid(), provided);
+
+        expect(wrapper.get('[data-test-editor="Name of the row"]').element.getAttribute('value')).toBe('Clinic B');
+        expect(wrapper.find('[data-grid-rename-row="b"]').exists()).toBe(false);
+        expect(nameOf(wrapper.findAll('tbody tr')[1].find('input[type="number"]').element)).toBe('Clinic B Staff on duty');
+        wrapper.unmount();
+    });
+
+    it('says where the rows come from instead of offering to add or rename them', () => {
+        const wrapper = authored(typedGrid(), authoring({ rowsFrom: () => 'The rows come from a list file. Change them on the Grid tab.' }));
+
+        expect(wrapper.find('[data-grid-add-row]').exists()).toBe(false);
+        expect(wrapper.find('[data-grid-rename-row]').exists()).toBe(false);
+        expect(wrapper.get('[data-grid-rows-from]').text()).toBe('The rows come from a list file. Change them on the Grid tab.');
+        expect(wrapper.find('[data-grid-add-column]').exists()).toBe(true);
+        wrapper.unmount();
+    });
+
+    it('calls a Likert matrix’s columns its scale points', () => {
+        const wrapper = authored(likertGrid(), authoring());
+
+        expect(wrapper.get('[data-grid-add-column]').text()).toBe('Add scale point');
+        expect(wrapper.get('[data-grid-rename-column="1"]').attributes('aria-label')).toBe('Rename scale point Poor');
         wrapper.unmount();
     });
 });

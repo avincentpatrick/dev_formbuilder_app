@@ -223,7 +223,11 @@ final class FormSettingsPresenter
                 ->select('form_version_id')
                 ->where('config->options_source->form_id', $form->id)
                 // M184 (`R-596d6afd`): a Short text that suggests answers from this form uses it too.
-                ->orWhere('config->suggestions_source->form_id', $form->id))
+                ->orWhere('config->suggestions_source->form_id', $form->id)
+                // M185 (`D161`): so does a grid whose rows, cells or a column's choices are copied from it at publish.
+                ->orWhere('config->rows_source->form_id', $form->id)
+                ->orWhere('config->cells_source->form_id', $form->id)
+                ->orWhereJsonContains('config->columns', [['options_source' => ['form_id' => (string) $form->id]]]))
             ->orderBy('title');
 
         $readable = array_values((clone $linking)->readableBy($viewer)->get(['id', 'title'])

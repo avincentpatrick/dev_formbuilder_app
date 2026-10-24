@@ -183,3 +183,40 @@ describe('LinkedChoicesEditor — a list file', () => {
         expect(emitted(wrapper).at(-1)).toEqual({ options: [], options_list: 'clinics' });
     });
 });
+
+describe('LinkedChoicesEditor — a grid’s rows, cells and columns (M185, R-bb79aec0, D161)', () => {
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it('speaks of rows for a grid’s rows, and says a grid’s lists are copied in when the form is published', () => {
+        const wrapper = mount(LinkedChoicesEditor, { props: { config: { options: [], options_source: { form_id: 'src-1', field_key: null } }, sources: SOURCES, kind: 'rows' } });
+
+        expect(wrapper.find('legend').text()).toBe('Rows come from');
+        expect(wrapper.text()).toContain("The grid's rows are the answers given to this question, up to 200. They are copied in when you publish; publish again to pick up new answers.");
+    });
+
+    it('asks before removing typed rows, in words about rows', async () => {
+        const wrapper = mount(LinkedChoicesEditor, { props: { config: { options: [{ value: 'a', label: 'A' }] }, sources: SOURCES, kind: 'rows' } });
+
+        await wrapper.find('input[type="radio"][value="form"]').setValue(true);
+
+        expect(wrapper.find('[data-linked-choices-confirm]').text()).toContain('The 1 row typed here will be removed. A grid takes its rows from one place.');
+    });
+
+    it('warns past 200 rows from a list, and never with the paper note a Single choice gets', async () => {
+        const wards = { name: 'wards', file_name: 'wards.csv', row_count: 201, columns: ['name', 'label'] };
+        vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify({ data: [wards] }), { status: 200 }))));
+        const wrapper = mount(LinkedChoicesEditor, { props: { config: { options: [], options_list: 'wards' }, sources: SOURCES, formId: 'form-1', fieldType: 'matrix', kind: 'rows' } });
+        await flushPromises();
+
+        expect(wrapper.find('[data-linked-choices-list-note]').text()).toBe('This list has 201 rows, and a grid takes at most 200.');
+    });
+
+    it('keeps a question’s own words when no kind is given', () => {
+        const wrapper = mount(LinkedChoicesEditor, { props: { config: { options: [], options_source: { form_id: 'src-1', field_key: null } }, sources: SOURCES } });
+
+        expect(wrapper.find('legend').text()).toBe('Choices come from');
+        expect(wrapper.text()).toContain('up to 1,000, as they read today.');
+    });
+});

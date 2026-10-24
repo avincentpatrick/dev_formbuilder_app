@@ -1,0 +1,76 @@
+{
+    "about": "M185 (R-0a7275ce, D129): can a repeatable section be drawn as a table? Read by tests/Unit/Forms/RepeatTableTest.php (App\\Support\\Forms\\RepeatTable) and resources/js/components/submissions/repeat-table.test.ts, so the two halves cannot disagree. `columns` is the keys of the members drawn as columns; `blocker` the key of the first that keeps the section as cards, or null.",
+    "cases": [
+        {
+            "name": "every kind a cell holds",
+            "members": [
+                { "key": "name", "field_type": "short_text" },
+                { "key": "email", "field_type": "email" },
+                { "key": "phone", "field_type": "phone" },
+                { "key": "site", "field_type": "url" },
+                { "key": "age", "field_type": "integer" },
+                { "key": "weight", "field_type": "decimal" },
+                { "key": "born", "field_type": "date" },
+                { "key": "sex", "field_type": "single_select" },
+                { "key": "barangay", "field_type": "dropdown" },
+                { "key": "symptoms", "field_type": "multi_select" }
+            ],
+            "columns": ["name", "email", "phone", "site", "age", "weight", "born", "sex", "barangay", "symptoms"],
+            "blocker": null
+        },
+        {
+            "name": "a long text keeps the cards",
+            "members": [
+                { "key": "name", "field_type": "short_text" },
+                { "key": "notes", "field_type": "long_text" },
+                { "key": "visited", "field_type": "time" }
+            ],
+            "columns": ["name", "notes", "visited"],
+            "blocker": "notes"
+        },
+        {
+            "name": "a Yes / No kept from before D140 keeps the cards",
+            "members": [
+                { "key": "name", "field_type": "short_text" },
+                { "key": "vaccinated", "field_type": "yes_no" }
+            ],
+            "columns": ["name", "vaccinated"],
+            "blocker": "vaccinated"
+        },
+        {
+            "name": "a note keeps the cards",
+            "members": [
+                { "key": "intro", "field_type": "note" },
+                { "key": "name", "field_type": "short_text" }
+            ],
+            "columns": ["intro", "name"],
+            "blocker": "intro"
+        },
+        {
+            "name": "what renders nothing is no column: a page break, a calculation left Never, a question set to Never",
+            "members": [
+                { "key": "name", "field_type": "short_text" },
+                { "key": "brk", "field_type": "page_break" },
+                { "key": "total", "field_type": "calculated" },
+                { "key": "secret", "field_type": "long_text", "config": { "visibility": "hidden" } }
+            ],
+            "columns": ["name"],
+            "blocker": null
+        },
+        {
+            "name": "a calculation set to Always is seen, and keeps the cards",
+            "members": [
+                { "key": "name", "field_type": "short_text" },
+                { "key": "bmi", "field_type": "calculated", "config": { "visibility": "shown" } }
+            ],
+            "columns": ["name", "bmi"],
+            "blocker": "bmi"
+        },
+        {
+            "name": "no members",
+            "members": [],
+            "columns": [],
+            "blocker": null
+        }
+    ]
+}

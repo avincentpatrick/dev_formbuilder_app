@@ -231,6 +231,19 @@ final class UpdateFieldRequest extends FormRequest
             'config.columns.*.options.*.label' => 'column choice label',
             'config.columns.*.options.*.label_translations' => 'column choice label translations',
             'config.columns.*.options.*.label_translations.*' => 'column choice label translation',
+            // M185 — where a grid's rows, its shared cells and a column's choices come from.
+            'config.rows_list' => 'rows list',
+            'config.rows_source' => 'rows source',
+            'config.rows_source.form_id' => 'rows form',
+            'config.rows_source.field_key' => 'rows question',
+            'config.cells_list' => 'cell choices list',
+            'config.cells_source' => 'cell choices source',
+            'config.cells_source.form_id' => 'cell choices form',
+            'config.cells_source.field_key' => 'cell choices question',
+            'config.columns.*.options_list' => 'column choices list',
+            'config.columns.*.options_source' => 'column choices source',
+            'config.columns.*.options_source.form_id' => 'column choices form',
+            'config.columns.*.options_source.field_key' => 'column choices question',
             'config.layout' => 'layout',
             'config.cells' => 'cells',
             'config.cells.*.value' => 'cell value',
@@ -331,6 +344,11 @@ final class UpdateFieldRequest extends FormRequest
                 'config.cells.*.label_translations.*' => ['nullable', 'string', 'max:500'],
                 // M183 (`R-1c1d7266`): cards at every width instead of a table where one fits; absent = the table.
                 'config.layout' => ['nullable', Rule::in(['table', 'stacked'])],
+                // M185 (`R-bb79aec0`, `D161`): the rows, the shared cells and a column's choices from a list file or another
+                // form — shape only, as for a choice question's; whether each can serve is publish's (`GridSources`).
+                ...self::gridSourceRules('config.rows'),
+                ...self::gridSourceRules('config.cells'),
+                ...self::gridSourceRules('config.columns.*.options'),
             ];
         }
 
@@ -347,6 +365,8 @@ final class UpdateFieldRequest extends FormRequest
                 'config.columns.*.label_translations' => ['sometimes', 'array'],
                 'config.columns.*.label_translations.*' => ['nullable', 'string', 'max:500'],
                 'config.layout' => ['nullable', Rule::in(['table', 'stacked'])],
+                // M185: a Likert matrix's statements may come from a list or a form; its scale stays typed.
+                ...self::gridSourceRules('config.rows'),
             ];
         }
 
@@ -398,6 +418,22 @@ final class UpdateFieldRequest extends FormRequest
         }
 
         return [];
+    }
+
+    /**
+     * M185 (`R-bb79aec0`): a grid slot's `<items>_list` and `<items>_source`, the same shapes a choice question's
+     * `options_list` and `options_source` take — `config.columns.*.options` makes `config.columns.*.options_list`.
+     *
+     * @return array<string, list<string>>
+     */
+    private static function gridSourceRules(string $items): array
+    {
+        return [
+            "{$items}_list" => ['sometimes', 'nullable', 'string', 'max:64', 'regex:/^[a-z0-9_-]*$/'],
+            "{$items}_source" => ['sometimes', 'nullable', 'array:form_id,field_key'],
+            "{$items}_source.form_id" => ['nullable', 'uuid'],
+            "{$items}_source.field_key" => ['nullable', 'string', 'max:255'],
+        ];
     }
 
     /**

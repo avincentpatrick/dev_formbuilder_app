@@ -79,6 +79,7 @@ const relevance = ref<Record<string, boolean>>({ q1: true, q2: true, cap: true }
 const stepCount = ref(2);
 
 import PreviewPane from './PreviewPane.vue';
+import { GridAuthoringKey, type GridAuthoring } from '../submissions/grid-authoring';
 import { PALETTE } from './builder-store-fixtures';
 import { PREVIEW_REBUILD_DEBOUNCE_MS } from './preview-model';
 import type { BuilderStore } from './useBuilderStore';
@@ -915,5 +916,106 @@ describe('a label edited in place in Preview (M151, R-74c3cf35)', () => {
 
         expect(wrapper.find('[data-preview-field="q1"]').exists()).toBe(true);
         expect(editButton(wrapper).exists()).toBe(false);
+    });
+});
+
+describe('PreviewPane — a grid’s lists from elsewhere (M185, R-bb79aec0)', () => {
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it('reads the choices again when a grid’s source changes, and not when only a row is renamed', async () => {
+        const fetched = vi.fn(() => Promise.resolve(new Response(JSON.stringify({ data: null }), { status: 200 })));
+        vi.stubGlobal('fetch', fetched);
+        const grid = field('check', {
+            form_section_id: 'sec-s1',
+            field_type: 'matrix',
+            config: { rows: [], rows_list: 'wards', columns: [{ value: 'c', label: 'C' }], cells: [{ value: 'y', label: 'Yes' }] },
+        });
+        const double = makeStore([grid], [section('s1')]);
+        const wrapper = mountPane(double);
+        await flushPromises();
+
+        expect(fetched).toHaveBeenCalledTimes(1);
+        expect(String((fetched.mock.calls[0] as unknown[])[0])).toBe('/forms/form-1/choices');
+
+        double.fields.value = [{ ...grid, config: { ...grid.config, rows_list: 'zones' } }];
+        await flushPromises();
+        expect(fetched).toHaveBeenCalledTimes(2);
+
+        double.fields.value = [{ ...grid, config: { ...grid.config, rows_list: 'zones', columns: [{ value: 'c', label: 'Stocked' }] } }];
+        await flushPromises();
+        expect(fetched).toHaveBeenCalledTimes(2);
+
+        wrapper.unmount();
+    });
+});
+
+describe('PreviewPane — a grid header renamed in place (M185, R-7418e6bd)', () => {
+    it('holds a rebuild that falls due while a grid header is open, then makes it when the header closes', async () => {
+        let provided: GridAuthoring | null = null;
+        const Grab = defineComponent({
+            setup() {
+                provided = inject(GridAuthoringKey, null);
+
+                return () => h('div');
+            },
+        });
+        const double = twoSections();
+        const wrapper = mount(PreviewPane, {
+            props: { store: double.store, form: formProp(), draft: { id: 'ver-1', version_number: 1 }, active: true },
+            global: { stubs: { FieldRow: Grab, RepeatGroup: true } },
+        });
+        await flushPromises();
+        expect(created).toHaveLength(1);
+        expect(provided).not.toBeNull();
+
+        provided!.open({ key: 'q1', part: 'rows', value: 'row_1' });
+        double.fields.value = double.fields.value.map((f) => (f.key === 'q2' ? { ...f, key: 'renamed' } : f));
+        await flushPromises();
+        vi.advanceTimersByTime(PREVIEW_REBUILD_DEBOUNCE_MS * 4);
+        await flushPromises();
+        expect(created).toHaveLength(1);
+
+        provided!.cancel();
+        await flushPromises();
+        expect(created).toHaveLength(2);
+
+        wrapper.unmount();
+    });
+
+    it('makes a rebuild still waiting on its debounce when a grid header closes, so the keyboard lands on the grid that stays', async () => {
+        // Measured in e2e at desktop width: a row added and named inside the 300 ms debounce got its focus back, and the
+        // rebuild that fell due a moment later remounted the grid under it — the rename button lost the keyboard.
+        let provided: GridAuthoring | null = null;
+        const Grab = defineComponent({
+            setup() {
+                provided = inject(GridAuthoringKey, null);
+
+                return () => h('div');
+            },
+        });
+        const double = twoSections();
+        const wrapper = mount(PreviewPane, {
+            props: { store: double.store, form: formProp(), draft: { id: 'ver-1', version_number: 1 }, active: true },
+            global: { stubs: { FieldRow: Grab, RepeatGroup: true } },
+        });
+        await flushPromises();
+        expect(created).toHaveLength(1);
+
+        provided!.open({ key: 'q1', part: 'rows', value: 'row_1' });
+        double.fields.value = double.fields.value.map((f) => (f.key === 'q2' ? { ...f, key: 'renamed' } : f));
+        await flushPromises();
+        vi.advanceTimersByTime(PREVIEW_REBUILD_DEBOUNCE_MS / 3);
+        provided!.cancel();
+        await flushPromises();
+
+        expect(created).toHaveLength(2);
+
+        vi.advanceTimersByTime(PREVIEW_REBUILD_DEBOUNCE_MS * 4);
+        await flushPromises();
+        expect(created).toHaveLength(2);
+
+        wrapper.unmount();
     });
 });

@@ -240,6 +240,8 @@ it('keeps every setting of a section, and sends it back on the builder page', fu
         'is_repeatable' => true,
         'min_instances' => 1,
         'max_instances' => 12,
+        // M185 (`R-0a7275ce`): laid out as a table.
+        'repeat_layout' => 'table',
         'relevant_expression' => null,
         'version' => $section['version'],
     ];

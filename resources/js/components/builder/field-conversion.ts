@@ -97,6 +97,9 @@ const CONFIG_SENTENCES: Record<string, string> = {
     rows: 'Its rows are removed.',
     columns: 'Its columns are removed.',
     cells: 'Its cell choices are removed.',
+    // M185: where a grid's shared cell choices came from.
+    cells_list: 'Its cell choices no longer come from a list file.',
+    cells_source: 'Its cell choices no longer come from another form.',
     accepted_types: 'Its accepted file types are reset.',
     capture_source: 'Its choice of camera or upload is removed.',
     max_file_size_bytes: 'Its file size limit is removed.',

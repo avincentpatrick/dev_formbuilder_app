@@ -18,6 +18,7 @@ use App\Services\Validation\SemanticResult;
 use App\Services\Validation\SemanticValidator;
 use App\Support\Forms\FieldVisibility;
 use App\Support\Forms\LocaleVariant;
+use App\Support\Forms\RepeatTable;
 use App\Support\Submissions\SubmissionReference;
 use Illuminate\Support\Collection;
 
@@ -224,6 +225,15 @@ final class SubmissionPdfPresenter
                 continue;
             }
 
+            // M185 (`R-0a7275ce`, `D129`): laid out as a table on the form, it is one here — a column per question, a row per
+            // entry — by the same rule the form decided it with (`RepeatTable`, the twin of `repeat-table.ts`).
+            $members = $sectionFields->map(static fn (FormField $f): array => ['key' => $f->key, 'field_type' => $f->field_type->value, 'config' => $f->config])->all();
+            if (RepeatTable::draws(['is_repeatable' => true, 'repeat_layout' => $section->repeat_layout], $members)) {
+                $blocks[] = $this->tableBlock($section, $sectionFields, $instances, $answers, $sources, $locale, $relevance);
+
+                continue;
+            }
+
             foreach ($instances as $index => $instance) {
                 // The instance SHADOWS the flat document — the exact context SemanticValidator
                 // builds for a repeat instance, so a member's label resolves against its own
@@ -247,6 +257,46 @@ final class SubmissionPdfPresenter
         }
 
         return $blocks;
+    }
+
+    /**
+     * M185 (`R-0a7275ce`): a repeatable section laid out as a table — the column headers are the questions as the form's
+     * headers read them (the flat document), each row an entry numbered as the form numbered it, each cell its answer read
+     * against its own entry. A cell its condition hid is left empty, where an unanswered one reads as an em-dash: the first
+     * was never asked, the second was asked and left blank.
+     *
+     * @param  Collection<int, FormField>  $fields
+     * @param  list<array<string, mixed>>  $instances
+     * @param  array<string, mixed>  $answers
+     * @param  array<string, array{type: FieldType, config: array<string, mixed>}>  $sources
+     * @return array<string, mixed>
+     */
+    private function tableBlock(FormSection $section, Collection $fields, array $instances, array $answers, array $sources, ?string $locale, SemanticResult $relevance): array
+    {
+        $columns = array_values($fields->map(
+            fn (FormField $f): string => $this->templates->render(LocaleVariant::resolve($f->label_translations, $f->label, $locale, $f->key), $sources, $answers, $locale),
+        )->all());
+
+        $rows = [];
+        foreach ($instances as $index => $instance) {
+            $scoped = array_merge($answers, $instance);
+            $mask = $relevance->repeatFieldRelevance[$section->key][$index] ?? [];
+            $cells = [];
+            foreach ($fields as $field) {
+                $cells[] = ($mask[$field->key] ?? true) !== true
+                    ? ''
+                    : $this->blankable($this->formatter->displayValue($field->field_type, $scoped[$field->key] ?? null, $field->config ?? [], $locale));
+            }
+            $rows[] = ['label' => $this->sectionLabel($section, $sources, $scoped, $locale).' '.($index + 1), 'cells' => $cells];
+        }
+
+        return [
+            'id' => $section->id,
+            'label' => $this->sectionLabel($section, $sources, $answers, $locale),
+            'fields' => [],
+            'notice' => null,
+            'table' => ['columns' => $columns, 'rows' => $rows],
+        ];
     }
 
     /**

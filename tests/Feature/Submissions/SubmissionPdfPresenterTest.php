@@ -13,6 +13,7 @@ use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
 use App\Services\Submissions\SubmissionInboxPresenter;
 use App\Services\Submissions\SubmissionPdfPresenter;
+use App\Services\Submissions\SubmissionPdfRenderer;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -459,4 +460,58 @@ it('carries a calculated value into the PDF through the label the respondent rea
 
     expect($labels)->not->toHaveKey('doubled')
         ->and($labels['confirm'])->toBe('Confirm your score of 42');
+});
+
+/*
+| M185 (`R-0a7275ce`, `D129`) — a repeatable section laid out as a table on the form is one in the PDF: a column per question
+| as the form's headers read it, a row per entry numbered as the form numbered it, a hidden cell empty and an unanswered one
+| an em-dash. A section with a question no cell holds keeps today's block per entry.
+*/
+
+/** A "Members" section of $types (key => type), laid out as a table; the second member shown only to adults. */
+function pdfTableForm(Tenant $tenant, User $owner, array $types): Form
+{
+    $form = app(FormService::class)->create($tenant, $owner, 'Household');
+    $version = $form->draftVersion;
+    $section = FormSection::create([
+        'form_version_id' => $version->id, 'key' => 'members', 'label' => 'Members', 'sequence' => 1,
+        'is_repeatable' => true, 'min_instances' => 0, 'max_instances' => 5, 'repeat_layout' => 'table',
+    ]);
+    $sequence = 1;
+    foreach ($types as $key => $type) {
+        $extra = ['form_section_id' => $section->id, 'label' => ucfirst($key)];
+        if ($sequence === 2) {
+            $extra['relevant_expression'] = '${age} >= 18';
+        }
+        addFormField($version, $owner, $key, $type, $sequence++, $extra);
+    }
+    app(PublishService::class)->publish($form->refresh(), $owner);
+
+    return $form->refresh();
+}
+
+it('draws a table section as one table, a hidden cell empty and an unanswered one an em-dash', function (): void {
+    $form = pdfTableForm($this->tenant, $this->owner, ['age' => FieldType::Integer, 'job' => FieldType::ShortText, 'nickname' => FieldType::ShortText]);
+    $submission = seedPdfSubmission($form, $this->owner, ['members' => [['age' => 40, 'job' => 'Nurse'], ['age' => 9, 'nickname' => 'Bea']]]);
+
+    $blocks = array_values(array_filter(app(SubmissionPdfPresenter::class)->present($submission)['blocks'], fn (array $b): bool => $b['label'] === 'Members'));
+
+    expect($blocks)->toHaveCount(1)
+        ->and($blocks[0]['table']['columns'])->toBe(['Age', 'Job', 'Nickname'])
+        ->and($blocks[0]['table']['rows'])->toBe([
+            ['label' => 'Members 1', 'cells' => ['40', 'Nurse', SubmissionPdfPresenter::BLANK]],
+            ['label' => 'Members 2', 'cells' => ['9', '', 'Bea']],
+        ]);
+
+    $html = app(SubmissionPdfRenderer::class)->html($submission);
+    expect($html)->toContain('class="rt"')->and($html)->toContain('Members 2');
+});
+
+it('keeps a block per entry when a question of the table section cannot be a column', function (): void {
+    $form = pdfTableForm($this->tenant, $this->owner, ['age' => FieldType::Integer, 'notes' => FieldType::LongText]);
+    $submission = seedPdfSubmission($form, $this->owner, ['members' => [['age' => 40], ['age' => 30]]]);
+
+    $labels = array_map(fn (array $b) => $b['label'], app(SubmissionPdfPresenter::class)->present($submission)['blocks']);
+
+    expect($labels)->toContain('Members 1', 'Members 2')->and($labels)->not->toContain('Members');
 });

@@ -540,6 +540,7 @@ function toRenderSection(section: RawSection): RenderSection {
         isRepeatable: section.is_repeatable,
         minInstances: section.min_instances ?? null,
         maxInstances: section.max_instances ?? null,
+        repeatLayout: section.repeat_layout === 'table' ? 'table' : 'cards',
         relevantExpression: section.relevant_expression,
     };
 }

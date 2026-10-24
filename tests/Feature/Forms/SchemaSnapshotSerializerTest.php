@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 use App\Enums\FieldType;
+use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\SchemaSnapshotSerializer;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -179,4 +181,37 @@ it('diverges by key ORDER and nothing else, which is what bounds the defect', fu
         .'the known limitation; anything else means the column has lost information and the numeric '
         .'caveat in SchemaSnapshotSerializer has stopped being hypothetical.'
     );
+});
+
+/*
+| M185 (`R-0a7275ce`, `D129`): a repeatable section laid out as a table says so in the snapshot; one drawn as cards carries no
+| key at all, so every version published before the table — and every one since without it — hashes exactly as it did.
+*/
+it('writes a section\'s table layout into the snapshot only when it is a table, so a cards section hashes as before', function (): void {
+    $version = makeDraftVersion(makeForm($this->user));
+    $section = FormSection::query()->create([
+        'tenant_id' => $this->tenant->id, 'form_version_id' => $version->id, 'key' => 'roster', 'label' => 'Roster',
+        'sequence' => 0, 'is_repeatable' => true, 'min_instances' => 1, 'max_instances' => 5,
+    ]);
+    $cards = $this->serializer->snapshot($version->refresh());
+    $before = $this->serializer->checksumOf($cards);
+
+    $section->forceFill(['repeat_layout' => 'table'])->save();
+    $table = $this->serializer->snapshot($version->refresh());
+
+    expect($cards['sections'][0])->not->toHaveKey('repeat_layout')
+        ->and($table['sections'][0]['repeat_layout'])->toBe('table')
+        ->and($this->serializer->checksumOf($table))->not->toBe($before);
+
+    $section->forceFill(['repeat_layout' => 'cards'])->save();
+    expect($this->serializer->checksumOf($this->serializer->snapshot($version->refresh())))->toBe($before);
+});
+
+it('refuses a layout the database does not know', function (): void {
+    $version = makeDraftVersion(makeForm($this->user));
+
+    expect(fn () => FormSection::query()->create([
+        'tenant_id' => $this->tenant->id, 'form_version_id' => $version->id, 'key' => 'roster', 'label' => 'Roster',
+        'sequence' => 0, 'is_repeatable' => true, 'repeat_layout' => 'carousel',
+    ]))->toThrow(QueryException::class);
 });

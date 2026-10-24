@@ -506,6 +506,21 @@ it('drops the cells on the way from matrix to likert matrix', function (): void 
         ->and($plan->configDropped)->toBe(['cells']);
 });
 
+it('drops where the cells came from on the way to a likert matrix, and keeps where the rows come from', function (): void {
+    $field = makeSchemaField(['field_type' => FieldType::Matrix, 'config' => [
+        'rows' => [], 'rows_list' => 'wards',
+        'columns' => [['value' => 'c', 'options_source' => ['form_id' => 'f', 'field_key' => 'k']]],
+        'cells' => [], 'cells_source' => ['form_id' => 'f', 'field_key' => 'k'],
+    ]]);
+    $plan = fieldConversionPlan($field, [], FieldType::LikertMatrix);
+
+    expect($plan->config)->not->toHaveKeys(['cells', 'cells_source'])
+        ->and($plan->config['rows_list'])->toBe('wards')
+        ->and($plan->config['columns'])->toBe([['value' => 'c']])
+        ->and($plan->configDropped)->toBe(['cells_source', 'columns'])
+        ->and(fieldConversionWarningCodes($plan))->not->toContain(ConversionWarning::NeedsSetup->value);
+});
+
 it('warns that a likert matrix arriving at matrix needs its cells', function (): void {
     $field = makeSchemaField(['field_type' => FieldType::LikertMatrix, 'config' => ['rows' => [['value' => 'r']], 'columns' => [['value' => 'c']]]]);
     $plan = fieldConversionPlan($field, [], FieldType::Matrix);

@@ -448,6 +448,33 @@ class E2eSeeder extends Seeder
                 ]);
             }
 
+            // M185 (`R-0a7275ce`, `D129`) — a guest form whose repeatable section is laid out as a TABLE: a column per
+            // question, a row per entry. Reached at /f/household-table; `repeat-table.spec.ts` checks it as a table where
+            // the section has room and as a card per entry on a phone. Members optional, so an empty load is axe-clean.
+            if (Form::query()->where('title', 'Household Table')->doesntExist()) {
+                $household = app(FormService::class)->create(
+                    $tenant, $owner, 'Household Table', 'A household roster laid out as a table (M185 demo).'
+                );
+                $hb = app(FormBuilderService::class);
+                $people = $hb->addSection($household);
+                $people->update(['label' => 'Household members', 'is_repeatable' => true, 'min_instances' => 0, 'max_instances' => 6, 'repeat_layout' => 'table']);
+                $hb->addField($household, $owner, FieldType::ShortText, $people->id)->update(['label' => 'Member name']);
+                $hb->addField($household, $owner, FieldType::Integer, $people->id)->update(['label' => 'Age']);
+                $hb->addField($household, $owner, FieldType::Dropdown, $people->id)->update([
+                    'label' => 'Sex',
+                    'config' => ['options' => [['value' => 'female', 'label' => 'Female'], ['value' => 'male', 'label' => 'Male']]],
+                ]);
+                $hb->addField($household, $owner, FieldType::Date, $people->id)->update(['label' => 'Date of birth']);
+                app(PublishService::class)->publish($household->refresh(), $owner);
+
+                $household->update([
+                    'public_slug' => 'household-table',
+                    'allow_guest_submissions' => true,
+                    'supported_locales' => ['en'],
+                    'single_page_mode' => true,
+                ]);
+            }
+
             // M131 (`R-6017d6d8`) — a guest form wearing a PRESET THEME, so the public-runtime axe scan measures a
             // generated ramp on a real page in light and dark: the E2E workspace is deliberately unbranded, so until
             // this form no scan had ever met one. Graphite, because it moves all three documented additions at once

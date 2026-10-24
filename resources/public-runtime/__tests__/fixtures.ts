@@ -34,6 +34,8 @@ export function section(partial: Partial<RawSection> & { key: string }): RawSect
         is_repeatable: partial.is_repeatable ?? false,
         min_instances: partial.min_instances ?? null,
         max_instances: partial.max_instances ?? null,
+        // M185: only when a case sets it, as a snapshot carries it only for a table.
+        ...(partial.repeat_layout !== undefined ? { repeat_layout: partial.repeat_layout } : {}),
         relevant_expression: partial.relevant_expression ?? null,
     };
 }

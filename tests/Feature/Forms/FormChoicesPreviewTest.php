@@ -109,6 +109,33 @@ it('shows the first 200 of a long list, and keeps a cascade\'s second level unde
         ->and(array_column($levelOne, 1))->toBe(['t1']);
 });
 
+it('serves a draft grid\'s rows, cells and column choices as publishing will copy them in, a long column cut to 200 (M185)', function (): void {
+    $grades = array_map(static fn (int $i): string => "g{$i},Grade {$i}", range(1, 250));
+    choicePreviewList($this->form, 'wards.csv', "name,label\nw1,Ward 1\nw2,Ward 2\n");
+    choicePreviewList($this->form, 'grades.csv', "name,label\n".implode("\n", $grades)."\n");
+    choicePreviewField($this, 'check', FieldType::Matrix, [
+        'rows' => [],
+        'rows_list' => 'wards',
+        'columns' => [
+            ['value' => 'from', 'label' => 'Referred from', 'options_source' => ['form_id' => $this->source->id, 'field_key' => 'facility_name']],
+            ['value' => 'grade', 'label' => 'Grade', 'options_list' => 'grades'],
+            ['value' => 'staff', 'label' => 'Staff', 'type' => 'integer'],
+        ],
+        'cells' => [],
+        'cells_list' => 'missing',
+    ], 1);
+    choicePreviewField($this, 'typed', FieldType::Matrix, ['rows' => [['value' => 'r', 'label' => 'R']], 'columns' => [['value' => 'c', 'label' => 'C']], 'cells' => []], 2);
+
+    $data = $this->actingAs($this->admin)->getJson("http://acme.meridian.test/forms/{$this->form->id}/choices")->assertOk()->json('data');
+
+    expect($data['grids']['check']['rows'])->toBe(['options' => [['value' => 'w1', 'label' => 'Ward 1'], ['value' => 'w2', 'label' => 'Ward 2']], 'total' => 2])
+        ->and($data['grids']['check']['columns']['from'])->toBe(['options' => [['value' => 'San Jose RHU', 'label' => 'San Jose RHU']], 'total' => 1])
+        ->and($data['grids']['check']['columns']['grade']['options'])->toHaveCount(200)
+        ->and($data['grids']['check']['columns']['grade']['total'])->toBe(250)
+        ->and($data['grids']['check'])->not->toHaveKey('cells')
+        ->and($data['grids'])->not->toHaveKey('typed');
+});
+
 it('serves a published version\'s cascade lists and links, for its read-only view', function (): void {
     choicePreviewList($this->form, 'regions.csv', "name,label\n01,Ilocos Region\n");
     choicePreviewField($this, 'address', FieldType::CascadingSelect, ['options' => [], 'levels' => [['key' => 'region', 'label' => 'Region', 'list' => 'regions']]], 1);

@@ -6,6 +6,7 @@ namespace App\Services\Forms;
 
 use App\Enums\FieldType;
 use App\Exceptions\Forms\PublishValidationException;
+use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormVersion;
 use App\Models\FormVersionChoiceList;
@@ -27,6 +28,11 @@ use Illuminate\Support\Collection;
  * so every reader above stays plain. Unlike a cascade's, those options STAY in the public schema: a browser running the
  * app cached before the deploy merges only cascades' lists, and the offline list cache can be evicted apart from the
  * schema — so the list is capped at {@see self::FLAT_LIST_MAX} rows instead (a longer one is a cascade's, or a later row's).
+ *
+ * ── A GRID'S ROWS, CELLS AND COLUMNS' CHOICES (M185, `R-bb79aec0`, `D161`) ────────────────────────────────────
+ * From a list file OR another form's answers, both copied in here ({@see GridSources}): every reader of a grid reads its
+ * rows frozen, so a live row set would break them all. Publishing again picks up new answers; a link that is unfinished or
+ * refused is left empty for `LinkedChoiceGate` to name.
  *
  * ── THE MAPPING, KOBO'S `select_one_from_file` WITH A `choice_filter` ────────────────────────────────────────
  * Level `i` takes its choices from the list it names: each row's `name` is the value and `label` the label (Kobo's
@@ -51,6 +57,9 @@ final class ChoiceListMaterializer
 
     /** The question types a list file may feed directly — the ones that may link to another form's answers too. */
     private const FLAT_TYPES = [FieldType::SingleSelect, FieldType::MultiSelect, FieldType::Dropdown];
+
+    /** M185 (`D161`): a grid copies another form's answers in at publish, read through the same consent a live list is. */
+    public function __construct(private readonly LinkedChoiceService $links) {}
 
     /** Is every level of this cascade a list? Then its options come from the lists, and the draft holds none. */
     public static function isListBacked(mixed $config): bool
@@ -89,7 +98,8 @@ final class ChoiceListMaterializer
     /**
      * The config a draft cloned from a version carries — after a publish, or a restore ({@see SchemaTreeCloner}): every
      * option a list wrote is taken out again, so the draft names its lists and holds none of their rows. A list-backed
-     * cascade's, as {@see withoutListOptions()} does, and since M184 a choice question bound to a list file.
+     * cascade's, as {@see withoutListOptions()} does, since M184 a choice question bound to a list file, and since M185 a
+     * grid's rows, cells and columns' choices copied in from a list or a form ({@see GridSources::withoutCopies()}).
      *
      * @param  array<string, mixed>  $config
      * @return array<string, mixed>
@@ -104,7 +114,8 @@ final class ChoiceListMaterializer
             unset($config['suggestions']);
         }
 
-        return self::withoutListOptions($config);
+        // M185 (`D161`): a grid's rows, cells and columns' choices copied in from a list or a form — the copy goes, the source stays.
+        return self::withoutListOptions(GridSources::withoutCopies($config));
     }
 
     /**
@@ -195,6 +206,55 @@ final class ChoiceListMaterializer
         }
 
         return $built;
+    }
+
+    /**
+     * M185 (`R-bb79aec0`, `D161`): a DRAFT's sourced grids as publishing would copy them in, for the builder's preview — each
+     * grid's rows, cells and choice columns (by the column's value) that can be built today. A slot that cannot is left out;
+     * the chooser says why, and publish refuses it in words.
+     *
+     * @return array<string, array{rows?: list<array{value: string, label: string}>, cells?: list<array{value: string, label: string}>, columns?: array<string, list<array{value: string, label: string}>>}>
+     */
+    public function gridsForDraft(FormVersion $draft): array
+    {
+        $grids = [];
+        $lists = null;
+        $destination = null;
+
+        $fields = FormField::query()
+            ->where('form_version_id', $draft->id)
+            ->whereIn('field_type', [FieldType::Matrix->value, FieldType::LikertMatrix->value])
+            ->orderBy('id')
+            ->get();
+
+        foreach ($fields as $field) {
+            $config = (array) $field->config;
+            if (! GridSources::declaresAny($field->field_type, $config)) {
+                continue;
+            }
+
+            $lists ??= FormVersionChoiceList::query()->where('form_version_id', $draft->id)->get()->keyBy('name');
+            $destination ??= Form::query()->whereKey($draft->form_id)->first();
+            $built = [];
+
+            foreach (GridSources::slots($field->field_type, $config) as $slot) {
+                $items = $this->slotItems($field->key, $config, $slot, $lists, $destination);
+                if (! is_array($items)) {
+                    continue;
+                }
+                if ($slot['part'] === 'column') {
+                    $built['columns'][(string) ($config['columns'][$slot['at']]['value'] ?? '')] = $items;
+                } else {
+                    $built[$slot['part']] = $items;
+                }
+            }
+
+            if ($built !== []) {
+                $grids[$field->key] = $built;
+            }
+        }
+
+        return $grids;
     }
 
     /**
@@ -290,6 +350,44 @@ final class ChoiceListMaterializer
             $field->forceFill(['config' => $config])->save();
         }
 
+        // M185 (`R-bb79aec0`, `D161`): a grid's rows, its shared cells and a choice column's choices from a list file or another
+        // form — copied in, so every reader of the published grid reads plain rows and choices, frozen with the version. A link
+        // that is unfinished or refused is left for `LinkedChoiceGate` to name, so one fault is said once.
+        $grids = FormField::query()
+            ->where('form_version_id', $draft->id)
+            ->whereIn('field_type', [FieldType::Matrix->value, FieldType::LikertMatrix->value])
+            ->orderBy('id')
+            ->get();
+        $destination = null;
+
+        foreach ($grids as $field) {
+            $config = (array) $field->config;
+            if (! GridSources::declaresAny($field->field_type, $config)) {
+                continue;
+            }
+
+            $lists ??= FormVersionChoiceList::query()->where('form_version_id', $draft->id)->get()->keyBy('name');
+            $destination ??= Form::query()->whereKey($draft->form_id)->first();
+            $faults = [];
+
+            foreach (GridSources::slots($field->field_type, $config) as $slot) {
+                $items = $this->slotItems($field->key, $config, $slot, $lists, $destination);
+                if ($items instanceof PublishValidationException) {
+                    $faults[] = $items;
+                } elseif (is_array($items)) {
+                    $config = GridSources::withItems($config, $slot, $items);
+                }
+            }
+
+            if ($faults !== []) {
+                array_push($violations, ...$faults);
+
+                continue;
+            }
+
+            $field->forceFill(['config' => $config])->save();
+        }
+
         if ($violations !== []) {
             throw count($violations) === 1 ? $violations[0] : PublishValidationException::several($violations);
         }
@@ -382,19 +480,100 @@ final class ChoiceListMaterializer
             return PublishValidationException::choiceOptionsInvalid($key, "it takes its choices from “{$name}”, which this form does not hold — upload {$name}.csv or {$name}.xlsx");
         }
 
+        $pairs = self::pairsOf($list);
+        if ($pairs === null) {
+            return PublishValidationException::choiceOptionsInvalid($key, "“{$name}” has no name or label column");
+        }
+
+        if (count($pairs) > self::FLAT_LIST_MAX) {
+            return PublishValidationException::choiceOptionsInvalid($key, '“'.$name.'” holds '.number_format(count($pairs)).' choices, and one question takes at most '.number_format(self::FLAT_LIST_MAX).' — use a cascading select for a longer list');
+        }
+
+        return $pairs;
+    }
+
+    /**
+     * M185 (`R-bb79aec0`, `D161`): one grid slot's items as publishing copies them in — a list file's rows, or another
+     * form's answers (`D85`: an answer's text is its value) — or null when the slot is typed here, or takes another form's
+     * answers through a link that is unfinished or refused, which `LinkedChoiceGate` names.
+     *
+     * @param  array<string, mixed>  $config
+     * @param  array{part: string, at: int|string|null, items: string, list: string, source: string, max: int}  $slot
+     * @param  Collection<string, FormVersionChoiceList>  $lists
+     * @return list<array{value: string, label: string}>|PublishValidationException|null
+     */
+    private function slotItems(string $key, array $config, array $slot, Collection $lists, ?Form $destination): array|PublishValidationException|null
+    {
+        $view = GridSources::view($config, $slot);
+        $source = ChoiceSource::of($view);
+        if ($source->isTyped()) {
+            return null;
+        }
+
+        $what = GridSources::name($config, $slot);
+        $unit = $slot['part'] === 'rows' ? 'rows' : 'choices';
+
+        if ($source === ChoiceSource::Form) {
+            if (($view['options_list'] ?? null) !== null) {
+                return PublishValidationException::gridSourceInvalid($key, $what, 'they come from a list file and from another form — choose one');
+            }
+            $link = LinkedChoiceService::linkOf($view);
+            $list = $link === null || $destination === null ? null : $this->links->currentList($destination, $link);
+            if ($list === null || ! $list['available']) {
+                return null;
+            }
+            if ($list['options'] === []) {
+                return PublishValidationException::gridSourceInvalid($key, $what, 'the question they come from has no answers yet');
+            }
+            // Rows past their cap are refused — a grid of a thousand rows is answered by nobody; a column's choices keep the
+            // first 1,000, as the same list does live on a Dropdown.
+            if ($slot['part'] === 'rows' && ($list['truncated'] || count($list['options']) > $slot['max'])) {
+                $count = $list['truncated'] ? 'more than '.number_format(LinkedChoiceService::MAX_CHOICES) : number_format(count($list['options']));
+
+                return PublishValidationException::gridSourceInvalid($key, $what, "the question they come from has {$count} different answers, and a grid takes at most ".number_format($slot['max']).' rows');
+            }
+
+            return $list['options'];
+        }
+
+        $name = is_string($view['options_list'] ?? null) ? $view['options_list'] : '';
+        if ($name === '') {
+            return PublishValidationException::gridSourceInvalid($key, $what, 'no list file is chosen for them');
+        }
+        $file = $lists->get($name);
+        if ($file === null) {
+            return PublishValidationException::gridSourceInvalid($key, $what, "they come from “{$name}”, which this form does not hold — upload {$name}.csv or {$name}.xlsx");
+        }
+        $pairs = self::pairsOf($file);
+        if ($pairs === null) {
+            return PublishValidationException::gridSourceInvalid($key, $what, "“{$name}” has no name or label column");
+        }
+        if ($pairs === []) {
+            return PublishValidationException::gridSourceInvalid($key, $what, "“{$name}” holds no rows");
+        }
+        if (count($pairs) > $slot['max']) {
+            return PublishValidationException::gridSourceInvalid($key, $what, '“'.$name.'” holds '.number_format(count($pairs)).' rows, and a grid takes at most '.number_format($slot['max'])." {$unit} from one list");
+        }
+
+        return $pairs;
+    }
+
+    /**
+     * A list's rows as choices — each row's `name` the value, its `label` the label; any other column, a cascade's parent
+     * column among them, is ignored — or null when the list has no name or no label column.
+     *
+     * @return list<array{value: string, label: string}>|null
+     */
+    private static function pairsOf(FormVersionChoiceList $list): ?array
+    {
         $header = $list->header();
         $nameAt = array_search('name', $header, true);
         $labelAt = self::labelColumn($header);
         if ($nameAt === false || $labelAt === null) {
-            return PublishValidationException::choiceOptionsInvalid($key, "“{$name}” has no name or label column");
+            return null;
         }
 
-        $rows = $list->dataRows();
-        if (count($rows) > self::FLAT_LIST_MAX) {
-            return PublishValidationException::choiceOptionsInvalid($key, '“'.$name.'” holds '.number_format(count($rows)).' choices, and one question takes at most '.number_format(self::FLAT_LIST_MAX).' — use a cascading select for a longer list');
-        }
-
-        return array_map(static fn (array $row): array => ['value' => $row[$nameAt] ?? '', 'label' => $row[$labelAt] ?? ''], $rows);
+        return array_map(static fn (array $row): array => ['value' => $row[$nameAt] ?? '', 'label' => $row[$labelAt] ?? ''], $list->dataRows());
     }
 
     /**

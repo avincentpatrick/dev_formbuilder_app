@@ -16,7 +16,111 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M186`, T5 of the testers' items: Philippine places (PSGC) and the cross-form filter (`R-70c7673a`, `R-ed7f3127`, with `R-7a2f4a13`, `R-dbb2ff34`, and `R-bbf03029` only if the staging count is zero) (m186-t5-psgc-filter)
+## Status: ACTIVE CLAIM — `M187`, T6 of the testers' items: a Signature anyone can sign, what "Adv" means, and what each question type can do (`R-af2d278b`, `R-96127b20`, `R-3e6358ed`, with `R-c64d0afd`) (m187-t6-signature-readiness)
+
+Taken 2026-10-25. Branch `m187-t6-signature-readiness`, **stacked on `m186-t5-psgc-filter` at `be6166d1`** (it bumps a `VERSION` that is
+0.13.0 only there), with `origin/main` merged in once (the claim-merge, whose sha merge point 6 rebases `--onto`). PR into main.
+⛔ **NOT MERGED THIS SESSION:** held green for merge point 6 with T5 and L (`D137`, `D138`: … T5 → T6 → L → merge point 6). **L stacks
+on this branch.** The plan of record is `~/.claude/plans/i-have-intial-comments-quirky-pascal.md` §B6, narrowed by `D140`; the build
+plan is `~/.claude/plans/read-claude-md-then-php-humming-marshmallow.md`.
+Rows: `R-af2d278b` — *"A duration or signature question can be published and never answered: neither the guest form nor manual entry
+has a control for it"* (narrowed by `D140` to **Signature only**: Duration left the palette at `M177` and a duration is worked out by a
+calculation, so it is not built); `R-96127b20` — *"The palette's 'Adv' tooltip promises an advanced editor 'coming with the form
+engine', and the settings panel carries a baseline note no type can reach any more"*; `R-3e6358ed` — *"Nothing tells an author what
+each question type can do on each surface, and the testers asked whether the advanced types are ready to use"*; `R-c64d0afd` — *"What
+a media cell should SAY beyond a filename …"*, question (1), the signed link (question (2) closed by `M183`). Relayed `R1-6` ("Are the
+'Adv' question types ready?") is this increment's comment; it is resolved only once live.
+
+The session-start pull read 0 reports, 0 reopened and 0 new comments (relayed 31: 22 Resolved · 3 Ongoing · 6 Confirmed working), so
+nothing was triaged. The PSA workbook is still not in Downloads, so T5's `R-70c7673a` stays open (owed before merge point 6, not
+before T6). **Asked and answered in planning (the user, 2026-10-25, in chat), recorded on this branch's first commit:** **`D164` A** —
+a form with a Signature question stays unscannable (any photo, file or signature makes the version not `ocr_compatible`), and the app
+says so plainly; a row is filed for saving the signed box from a scan. **`D165` A** — a photo, file or signature cell in a spreadsheet
+export (CSV, XLSX, Google Sheets, Airtable) shows its name and a link that opens it after sign-in; no key travels in the file. **The
+0.14.0 notes' wording was approved verbatim** (four items, in the build plan).
+
+### Evidence verified
+Read on `be6166d1` (T5's tip, this branch's base) by two read-only passes and my own reads.
+- `R-af2d278b`: `EncodeFormPresenter::SUPPORTED` — held (`:81`, the deferral note `:93`); the guest runtime's `SUPPORTED` in
+  `schema-mapping.ts` — held (`:51`, note `:61`), **and the row understates itself**: `isMediaFieldType()` (`:461`) is a second
+  exclusion, so `buildMedia()` sends signature no media config, `FieldControl.vue` gives it no upload URL, and the TS validator skips
+  the count bounds PHP enforces. `FieldTypeMirrorDriftTest` — held (it pins both `SUPPORTED` sets by reflection; the floor is 25).
+  Both channels' "Not available for manual entry yet (Phase 2)." — held (`FieldInput.vue:801`). "`CapabilityFlags` counts `duration` as
+  extractable" — held (`OcrFieldEligibility.php:68`) and moot for Signature (`:94`, Excluded).
+- `R-96127b20`: `FieldPalette.vue:102`/`:106` — **moved** to `:92`/`:96`. `ConfigPanel.vue:486-489` — **moved and reworded**: `:607-609`
+  now reads "This type has only its basic settings here for now. Its own settings come in a later update.", still shown only to an
+  advanced type with no `configEditor()`, which no type is. `FieldType.php:122-124` — **moved** to `:122-123`, and the class docblock
+  `:16-17` says the same. `manual.ts:650` — **moved**: the two Adv sentences are `:305` and `:675`.
+- `R-3e6358ed`: `FieldType.php:123-131` — **moved** (`isAdvanced()` `:125`); `schema-mapping.ts:50-62` — **moved** to `:51-63`;
+  `manual.ts:300` — **moved** to `:305`. Grids excluded from conditions, piping, OCR and analytics — held.
+- `R-c64d0afd` (1): `AttachmentPolicy` — held (`SignatureCapture` `:95`); the "metered-export audit row" — held in kind
+  (`SubmissionExporter`).
+
+### Premise verified
+- **Signature is plumbed everywhere but the control:** `ValueShape::Attachment`, `AnswerEnvelope::Media`,
+  `AttachmentKind::SignatureCapture`, `AttachmentPolicy`, `StructuralAnswerNormalizer::coerceMedia`, both `SemanticValidator`s,
+  `PrintAnswerArea::SignatureLine` (the paper's line to sign on, pinned), `XlsformTypeMap` (`image` + `signature`), and
+  `config/attachments.php` accepts `image/png` for it. Nothing in `package.json` draws; no bundle-size gate exists
+  (`guest-bundle-boundary.test.ts` bans builder imports only).
+- **`ext-gd` is present** in the app container (`docker/Dockerfile`), in all four CI jobs (`ci.yml`), and on the staging queue worker
+  that runs `GeneratePdfJob`. The "absent" claims in `SubmissionPdfRenderer`, `BlankFormPrintRenderer` and `BlankFormPrintPresenter`
+  are stale — corrected in place.
+- **A response PDF is made on request** (`SubmissionPdfRequestService` dispatches `GeneratePdfJob`), while the scan job is dispatched
+  at upload, so a signature is almost always servable (Phase 1: `pending → skipped`) before any PDF; no race to engineer around.
+- **The builder Preview provides no upload URL** (`UploadUrlKey` is provided by the guest `App.vue` only), so the pad draws locally
+  there and never uploads.
+- **No Signature or Duration question exists on dev** (`form_fields.field_type`, 0 and 0; no published version holds one) **or in any
+  seeder.** On deploy an already-published Signature becomes answerable with no republish, because `SUPPORTED` is client code.
+- **The scan refusal names no signature:** `OcrException::formNotEligible()` says "a grid, a location, a file or a repeating group" —
+  `D164`'s "say so plainly" is that sentence.
+- **A queued job cannot use `route()`** for a tenant link; `App\Support\Tenancy\TenantUrl::to()` is the one composer and already lists
+  `/attachments/…` as its use (H17). `builder-store-fixtures.ts` marks `calculated` and `hidden` advanced; PHP says neither — corrected.
+- One session only; lane B retired; no other claim, forward queue or held block but `M186` in either file.
+
+### Remedy verdict
+**`R-af2d278b` works, widened:** a control in both channels at once, as the row says, plus the second exclusion (`isMediaFieldType`)
+and a server override so an author's old accepted-types list cannot refuse the pad's PNG. **Measured before any test:** dompdf under
+`SubmissionPdfRenderer::dompdfOptions()` (remote off, chroot `resources/views/pdf`) embeds a `data:` URI RGBA PNG as an image XObject
+(1,416-byte PNG → 3,483-byte PDF), so the PDF embeds the stored bytes with no file and no remote fetch. **`R-96127b20` works** as
+prescribed. **`R-3e6358ed` works, reshaped:** "pinned by the mirror drift test and `manual.test.ts`" cannot pin a hand-written table,
+so the cells are DERIVED in PHP from the rules that decide them (`FieldReadiness`), committed as JSON for Help, and a Pest test holds
+the JSON equal to the derivation. **`R-c64d0afd` (1) works** by `D165` A through `TenantUrl::to()` and the existing
+`AttachmentController::show` + `AttachmentPolicy`: no new route, no key, no expiry.
+
+Files: new `resources/js/components/submissions/SignaturePad.vue`, new `resources/js/components/submissions/media-upload.ts`,
+`resources/js/components/submissions/MediaInput.vue`, `resources/js/components/submissions/FieldInput.vue`,
+`resources/public-runtime/lib/schema-mapping.ts`, `resources/public-runtime/components/FieldControl.vue`,
+`app/Services/Submissions/EncodeFormPresenter.php`, `app/Services/Attachments/AttachmentStorageService.php`,
+`resources/js/components/builder/MediaEditor.vue`, `app/Services/Submissions/SubmissionInboxPresenter.php`,
+`resources/js/Pages/submissions/Show.vue`, `app/Services/Submissions/SubmissionPdfPresenter.php`,
+`app/Services/Submissions/SubmissionPdfRenderer.php`, `resources/views/pdf/submission.blade.php`, `resources/views/pdf/_styles.blade.php`,
+`app/Services/Forms/BlankFormPrintRenderer.php` and `BlankFormPrintPresenter.php` (docblocks), `app/Exceptions/Ocr/OcrException.php`;
+`resources/js/components/builder/FieldPalette.vue`, `resources/js/components/builder/ConfigPanel.vue`,
+`resources/js/components/builder/builder-store-fixtures.ts`, `app/Enums/FieldType.php` (docblocks); new
+`app/Support/Forms/FieldReadiness.php`, new `app/Console/Commands/HelpReadinessCommand.php`, new
+`resources/js/components/help/field-readiness.json`, `resources/js/components/help/manual.ts`,
+`resources/js/components/help/ManualBlock.vue`, `resources/js/Pages/help/Index.vue`; `app/Services/Submissions/SubmissionRowProjector.php`;
+`VERSION`, `database/data/releases.json`; the tests beside each — `tests/Unit/Forms/FieldTypeMirrorDriftTest.php`, new
+`tests/Unit/Forms/FieldReadinessTableTest.php`, `tests/Feature/Submissions/` (`G6FieldTypesTest.php`, `SubmissionPdfRendererTest.php`,
+`SubmissionPdfPresenterTest.php`, `SubmissionExportTest.php`), `tests/golden/validation/media.json`,
+`resources/public-runtime/__tests__/schema-mapping.test.ts`, `MediaInput.test.ts`, new `SignaturePad.test.ts`,
+`builder-voice.test.ts`, `manual.test.ts`, `resources/js/Pages/help/index.test.ts`, the Vitest files beside the components, new
+`tests/e2e/signature.spec.ts`.
+Shared artefacts taken: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/data-dictionary.md` (the media
+cell's export text, if it states one), `docs/ocr-pipeline-design.md` (if it quotes the refusal), `tests/e2e/public-runtime-axe.spec.ts`,
+`tests/e2e/builder-axe.spec.ts` and the specs the diff reaches, `PROGRESS.md` (own block).
+Paired files taken: `EncodeFormPresenter::SUPPORTED` ↔ `schema-mapping.ts` `SUPPORTED` (`FieldTypeMirrorDriftTest`); the `EncodeField`
+adapters (`EncodeFormPresenter::field()` ↔ `FieldControl.vue` ↔ `InstanceField.vue`); the two semantic validators through
+`tests/golden/validation/media.json`.
+Namespaces spent: `D164`, `D165`. No migration prefix, nothing from the ADR namespace.
+Prediction: red first to `FieldTypeMirrorDriftTest` (the floor and the equality, until both `SUPPORTED` sets move),
+`schema-mapping.test.ts` (`sig.supported`), `G6FieldTypesTest` (its supported-set check) and `FieldReadinessTableTest` (no JSON yet);
+`manual.test.ts` stays green through the Signature rewrite because the "Not available …" note survives for Duration; PHPStan clean on
+`FieldReadiness`. **Most likely wrong:** the readiness table at 375 px — 31 types by eleven surfaces inside the manual's column must
+scroll inside its own wrapper, keep axe clean, and leave the help page with no horizontal scroll; the design system's `DataTable` may
+not fit a static table at all.
+
+## HELD — `M186`, T5 of the testers' items: Philippine places (PSGC) and the cross-form filter (`R-70c7673a`, `R-ed7f3127`, with `R-7a2f4a13`, `R-dbb2ff34`, and `R-bbf03029` only if the staging count is zero) (m186-t5-psgc-filter)
 
 Taken 2026-10-25. Branch `m186-t5-psgc-filter`, cut from origin/main at `38a105af`, PR into main. ⛔ **NOT MERGED THIS SESSION:** it is
 held green for merge point 6 with T6 and L (`D137`, `D138`: … merge point 5 → T5 → T6 → L → merge point 6). **T6 stacks on this

@@ -302,7 +302,7 @@ const guide: ChapterDraft[] = [
                         [ui('Note / label', FIELD_TYPES), ' — text, a heading or an image for the respondent to read. It asks nothing.'],
                         [ui('Page break', FIELD_TYPES), ' — starts a new page when the form is shown one step at a time.'],
                     ),
-                    p('A type marked “Adv” is an advanced one. You can try it, but its settings are more technical.'),
+                    p('A type marked “Adv” is an advanced one: it works like any other, and its settings are more technical.'),
                 ],
             },
             {
@@ -673,7 +673,7 @@ const reference: ChapterDraft[] = [
                         [ui('Add a field', PALETTE), ' — the heading of the list of question types.'],
                         ['A group heading. Questions of the same kind sit together: ', ui('Text', CATEGORIES), ', ', ui('Number', CATEGORIES), ', ', ui('Date & time', CATEGORIES), ', ', ui('Choice', CATEGORIES), ', ', ui('Rating', CATEGORIES), ', ', ui('Location', CATEGORIES), ', ', ui('Media', CATEGORIES), ' and ', ui('Layout', CATEGORIES), '.'],
                         ['A question type. Click it to add that kind of question to your form. Each type is explained in this reference, from ', link('Text questions', '#types-text'), ' onwards.'],
-                        [ui('Adv', PALETTE), ' — an advanced type. It works like any other, but its settings are more technical.'],
+                        [ui('Adv', PALETTE), ' — an advanced type: it works like any other, and its settings are more technical.'],
                     ),
                 ],
             },

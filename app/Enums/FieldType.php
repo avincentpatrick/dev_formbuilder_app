@@ -12,9 +12,8 @@ use App\Rules\PickableFieldType;
  * Backs `form_fields.field_type` and `field_library.field_type`.
  *
  * `matrix` is a generic grid whose columns each take a type and choices of their own (M183, `MatrixColumns`) and is
- * deliberately distinct from `likert_matrix` (a score-only Likert grid). Advanced types (geo*, *_capture, cascading_select,
- * *matrix) are surfaced in the Phase-1 builder with a baseline config editor; their rich editors and
- * runtime follow the form engine (ADR-0004).
+ * deliberately distinct from `likert_matrix` (a score-only Likert grid). Advanced types (geo*, *_capture, signature,
+ * cascading_select, *matrix) carry the builder's "Adv" badge: each has its own settings tab, more technical than most.
  */
 enum FieldType: string
 {
@@ -119,8 +118,9 @@ enum FieldType: string
     }
 
     /**
-     * Advanced types get only a baseline config editor in the Phase-1 builder — their rich editors and
-     * runtime follow the form engine (ADR-0004). The builder surfaces them fully but flags the gap.
+     * The types the palette badges "Adv": each works like any other, and its own settings tab ({@see self::configEditor()})
+     * is more technical than most. Until M187 (`R-96127b20`) this said they had only a baseline editor pending the form
+     * engine — true in Phase 1, false since every one of them gained its editor.
      */
     public function isAdvanced(): bool
     {

@@ -28,6 +28,8 @@ const BANNED = [
     /\bstructural change\b/i,
     /^Blank\b/,
     /\bsoft reminder\b/i,
+    // M187 (`R-96127b20`): the palette promised an editor "coming with the form engine" long after it came.
+    /\bform engine\b/i,
     /\bset by the server\b/i,
 ];
 
@@ -42,6 +44,11 @@ function helpTexts(): { where: string; text: string }[] {
         }
         for (const match of source.matchAll(/<p[^>]*class="(?:config__note|cond__help)"[^>]*>([\s\S]*?)<\/p>/g)) {
             found.push({ where: `${file} (note)`, text: match[1].replace(/\s+/g, ' ').trim() });
+        }
+        // M187 (`R-96127b20`): a bound title is help text too — the palette's "Adv" tooltip promised a "baseline" editor
+        // "coming with the form engine" long after every advanced type had its own settings.
+        for (const match of source.matchAll(/:title="([^"]+)"/g)) {
+            found.push({ where: `${file} (title)`, text: match[1] });
         }
     }
 

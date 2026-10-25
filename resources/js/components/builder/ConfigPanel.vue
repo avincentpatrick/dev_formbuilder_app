@@ -127,7 +127,6 @@ const librarySaved = props.store.librarySaved;
 const { feature } = useEntitlements();
 
 const optionTypes = new Set<string>();
-const advancedTypes = new Set<string>();
 const configEditorByType = new Map<string, string | null>();
 // M115 — `ValueShape::for()`'s answer per field type, arriving on the palette entry beside the three facts
 // already harvested here. It decides what the Validation tab may offer and whether that tab exists at all.
@@ -137,7 +136,6 @@ const layoutsByType = new Map<string, EnumOption[]>();
 props.store.palette.forEach((group) =>
     group.types.forEach((type) => {
         if (type.has_options) optionTypes.add(type.value);
-        if (type.advanced) advancedTypes.add(type.value);
         configEditorByType.set(type.value, type.config_editor);
         shapeByType.set(type.value, type.value_shape);
         layoutsByType.set(type.value, type.appearances ?? []);
@@ -300,7 +298,6 @@ const layoutSelectOptions = computed<EnumOption[]>(() => [
     ...layoutOptions.value,
     ...(keptAppearance.value !== null ? [{ value: keptAppearance.value, label: `Kept from an earlier setting or an import: ${keptAppearance.value}` }] : []),
 ]);
-const advanced = computed(() => (field.value ? advancedTypes.has(field.value.field_type) : false));
 const isCalculated = computed(() => field.value?.field_type === 'calculated');
 // M180 (`R-f77aa45d`) — the questions a calculation's presets may read: every other question, in canvas order.
 const calculationQuestions = computed<CalculationQuestion[]>(() => {
@@ -604,10 +601,6 @@ watch(librarySaved, (value) => {
             >
                 <!-- ── Field editor ─────────────────────────────────────────── -->
                 <template v-if="field">
-                    <p v-if="advanced && configEditor === null" class="config__note">
-                        This type has only its basic settings here for now. Its own settings come in a later update.
-                    </p>
-
                     <template v-if="activeTab === 'basics'">
                         <FieldTypeControl :store="store" />
                         <MdsFormField label="Label" :help="field.field_type === 'note' ? NOTE_LABEL_HELP : undefined" :error="fieldSaveErrors.inline.label" v-slot="{ id, describedby, invalid }">

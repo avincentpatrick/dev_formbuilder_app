@@ -14533,13 +14533,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   level by the same level of another places question; a list by a one-answer question). The builder's **Show only**
   (`ChoiceFilterEditor.vue`) under each level and under a list's source. Relayed `R1-2` is resolved once live.
 
-- **`nit` · The palette's "Adv" tooltip promises an advanced editor "coming with the form engine", and the settings panel carries a baseline note no type can reach any more.**
+- ✅ **CLOSED BY `M187` (2026-10-25) — ****`nit` · The palette's "Adv" tooltip promises an advanced editor "coming with the form engine", and the settings panel carries a baseline note no type can reach any more.**
   `resources/js/components/builder/FieldPalette.vue:102` titles every advanced type "baseline settings (advanced editor coming
   with the form engine)" beside the badge at `:106`; `resources/js/components/builder/ConfigPanel.vue:486-489` shows "Baseline
   settings for this advanced field type" only when an advanced type has no editor, and every one has had its editor since the
   form engine landed; `app/Enums/FieldType.php:122-124` says the same. The testers asked whether the Adv types are ready
   (2026-10-15); they are, and the tooltip says otherwise. The remedy: the tooltip says what the Help page says
-  (`resources/js/components/help/manual.ts:650`), the note and the docblock go. **Live.** Filed by `M172`. **Tier: early-testing.**
+  (`resources/js/components/help/manual.ts:650`), the note and the docblock go. **Live.** Filed by `M172`. **Tier: early-testing.** ✅ **CLOSED BY `M187` (2026-10-25):** the citations had moved (the title to `FieldPalette.vue:92`, the note to `ConfigPanel.vue:607-609`, reworded to "only its basic settings here for now"). The tooltip now reads "<type> — an advanced type: it works like any other, and its settings are more technical", as Help says; the never-shown note went with its now-unread `advanced` flag; `FieldType.php`'s two docblocks and `FieldPalette.vue`'s say what Adv means now; the store fixtures' `calculated` and `hidden` no longer claim to be advanced (PHP says neither). `builder-voice.test.ts` now reads every bound `:title` in the builder and bans "form engine" — red first on the old tooltip, and the mutant restoring it is caught. **Latent** until `M187` merges.
 
 - **`minor` · Nothing tells an author what each question type can do on each surface, and the testers asked whether the advanced types are ready to use.**
   The testers' question (2026-10-15): *"are the adv questions ready to use?"*. The answer lives only in code: the eleven badged

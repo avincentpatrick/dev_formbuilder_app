@@ -2,8 +2,9 @@
 /**
  * The builder's left pane: the field types as add-buttons — one per variant group (M125) — grouped by category
  * (data straight from the FieldType enum via BuilderPresenter, so the palette never re-lists them).
- * Advanced types (geo / media capture / cascading / matrix) are shown fully but flagged — their rich
- * config editors follow the form engine (ADR-0004). Adding places the field in the current section.
+ * Advanced types (geo / media capture / cascading / grids) carry an "Adv" badge: each works like any other type and has its
+ * own settings, which are more technical (M187, `R-96127b20` — the badge used to promise an editor still to come).
+ * Adding places the field in the current section.
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { MdsIcon } from '@meridian/design-system';
@@ -89,7 +90,7 @@ watch(() => props.palette, () => queueMicrotask(measure), { deep: false });
                         type="button"
                         class="palette__item"
                         :disabled="disabled"
-                        :title="type.advanced ? `${type.label} — baseline settings (advanced editor coming with the form engine)` : type.label"
+                        :title="type.advanced ? `${type.label} — an advanced type: it works like any other, and its settings are more technical` : type.label"
                         @click="emit('add', type.value)"
                     >
                         <span class="palette__item-label">{{ type.label }}</span>

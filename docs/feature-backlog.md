@@ -6618,7 +6618,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   cost hiding in it** — a mapped column that changes identity is a broken sync, not a re-render, and that is
   why it is a row rather than a refinement. ⚠️ **Also unresolved and cheaper:** the grid arms render row and
   column VALUES, not their author-defined LABELS, because resolving those needs the field's `config` threaded
-  into `displayValue()`. **Live.** Filed by `M74`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: `D130` answers question (2) — one column per cell beside today's summary — and the grid's first increment takes it; question (1), the signed link, stays open here (`D128`).** **Question (2) closed by T2 (`M183`), 2026-10-22, with `R-51e044a6`: a spreadsheet column per cell beside the summary. This row stays open for (1).**
+  into `displayValue()`. **Live.** Filed by `M74`. **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: `D130` answers question (2) — one column per cell beside today's summary — and the grid's first increment takes it; question (1), the signed link, stays open here (`D128`).** **Question (2) closed by T2 (`M183`), 2026-10-22, with `R-51e044a6`: a spreadsheet column per cell beside the summary. This row stays open for (1).** **`D165` A (2026-10-25) answers (1): a photo, file or signature cell shows its name and a link that opens it after sign-in — composed by `TenantUrl::to()`, opened through `AttachmentController::show` and `AttachmentPolicy`, so no key, no expiry and no new route; `M187` builds it.**
 
 - ✅ **CLOSED BY `M75` (2026-09-06) — `minor` · ~~`gate-baselines.php` writes the file BEFORE it judges
   whether every metric was found, so a NOT FOUND row ships and is reported afterwards.~~** ✅ **The mechanism
@@ -15179,3 +15179,34 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the ADR does not. Found by `M186` while planning a platform-wide table. The remedy: either a gate that lists every table without
   `tenant_id` and requires each to be named on an exemption list, or the ADR's sentence corrected to what CI checks. **Live.**
   Filed by `M186`. **Tier: during-testing.**
+
+- **`minor` · A scanned paper form cannot carry its signature, so a form with a Signature question cannot be scanned at all.**
+  `app/Enums/OcrFieldEligibility.php` excludes every media type, signature included, and `app/Services/Forms/CapabilityFlags.php`
+  marks the whole version not `ocr_compatible` when any excluded field is present, so the scan refuses the form
+  (`app/Exceptions/Ocr/OcrException.php`, `formNotEligible()`). Signature is the one media type whose answer IS on the paper: the
+  printed form draws a line to sign on (`app/Enums/PrintAnswerArea.php`, `SignatureLine`). `D164` (2026-10-25) keeps the refusal for
+  now and has it name a signature. The remedy: crop the signed box from the scanned page — the layout already knows where it printed —
+  and save it as the signature's attachment, then let a form with a Signature be scanned. **Live.** Filed by `M187`.
+  **Tier: during-testing.**
+
+- **`minor` · A Signature can only be drawn; a person who cannot draw with a pointer — a keyboard or screen-reader user — cannot sign.**
+  `M187`'s pad (`resources/js/components/submissions/SignaturePad.vue`) takes a finger, a pen or the mouse. WCAG 2.1.1 exempts input that
+  depends on the path of the user's movement, which a drawn signature is, so the pad meets the success criterion, but it leaves those
+  respondents with no way to answer a required Signature. The remedy: a "Type your name instead" choice that draws the typed name onto
+  the pad in a handwriting-style face and saves it the same way, with the response recording that it was typed. Decided not to build in
+  `M187`. **Latent** until `M187` merges. Filed by `M187`. **Tier: during-testing.**
+
+- **`nit` · A photo, video or file answer on the response page is its file name; only a signature is shown as a picture.**
+  `M187` draws a signature on the response page (`resources/js/Pages/submissions/Show.vue`) from the attachment route, inline for a
+  raster image; every other media answer stays the text `SchemaValueFormatter::formatMedia()` writes (its name, else its type, else
+  "Attached file"). A reviewer opens a photo through the response's attachment list instead. The remedy: the same picture for an
+  image capture, a still for a video, and a link for any other file. Decided not to widen `M187`. **Live.** Filed by `M187`.
+  **Tier: during-testing.**
+
+- **`nit` · An upload that never reaches a response is kept forever.**
+  A file is stored when it is picked (`app/Services/Attachments/AttachmentStorageService.php`, `store()`), before the response is sent, and
+  `SubmissionFinalizer` re-points only the attachments a submitted answer names. A photo replaced before sending, a signature drawn
+  again (`M187` uploads the latest drawing), and a draft abandoned before its first save each leave a file and a row no response
+  points at; nothing in `app/Jobs/Maintenance/` sweeps them. The remedy: a scheduled sweep that deletes unreferenced attachments older
+  than the longest draft lifetime. It deletes rows, so it waits until staging data may be removed. **Live.** Filed by `M187`.
+  **Tier: before-launch.**

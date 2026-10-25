@@ -24,7 +24,7 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D166`, the last filed, was asked and answered on 2026-10-26 while `M186` (T5)'s data commit was planned, and recorded in its claim (`D164`/`D165` are `M187`'s, on its held branch). A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D166`, the last filed, was asked and answered on 2026-10-26 while `M186` (T5)'s data commit was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
@@ -36,6 +36,25 @@ _None open._ `D166`, the last filed, was asked and answered on 2026-10-26 while 
 - **B — as the PSA writes it (chosen).** A blank level at the province group is a province-level place, named as the PSA names it; a blank level anywhere else is refused by name (`PsgcTiers`).
 
 **What the answer files, in the same push:** nothing new — `R-70c7673a`'s data commit carries it.
+
+### D165 — A photo, file or signature reaches a spreadsheet export, Google Sheets and Airtable as its file name only (`R-c64d0afd`, question (1), which `M74` left open). What should that cell show? **A — its name and a link that opens the file in the app; whoever clicks it signs in, so no key travels in the spreadsheet.**
+
+**Asked and answered 2026-10-25 (user decision, in chat), while `M187` (T6) was planned; recorded in its claim.** A Signature becomes answerable in T6, so every signed response adds one such cell. The row's three concerns were a URL policy, an expiry, and whether an XLSX may carry a credentialed link off the platform; option A answers all three by carrying no credential at all.
+
+- **A — the name and a sign-in link (recommended, chosen).** `TenantUrl::to()` composes the link on the workspace's app host (a queued export has no request, so `route()` would emit the central host), and opening it runs the existing `AttachmentController::show` and `AttachmentPolicy`: sign-in, `submissions.view`, and the wait until the file is checked. No new route, no expiry, no key.
+- **B — a link that opens without signing in, for 7 days.** Easier to pass around; the file leaves the app's sign-in, and a signed URL needs a policy, an expiry and an audit trail.
+- **C — the file name only.** Today's cell; the question is closed as answered.
+
+**What the answer files, in the same push:** nothing new — `R-c64d0afd`'s question (1) carries it, and `M187` builds it.
+
+### D164 — A Signature can now be answered (`R-af2d278b`), and the paper form prints a line to sign on, but any photo, file or signature question makes the whole form unreadable by the scan (`CapabilityFlags`, `OcrFieldEligibility::Excluded`). Should a form with a Signature stay unscannable? **A — yes, kept; the app says so plainly, and saving the signed box from a scan is filed for later.**
+
+**Asked and answered 2026-10-25 (user decision, in chat), while `M187` (T6) was planned; recorded in its claim.** Signature is the only media type with a paper artefact (`PrintAnswerArea::SignatureLine`), and `OcrFieldEligibility`'s docblock already notes that nothing reads it. The refusal a reviewer sees (`OcrException::formNotEligible()`) lists a grid, a location, a file and a repeating group, and names no signature.
+
+- **A — keep it (recommended, chosen).** The refusal and the readiness table name a signature; a form with one is keyed in, as a form with a photo is today.
+- **B — let the scan skip the signature.** The form stays scannable; a scanned response carries no signature picture (the scan itself is the record), and a required Signature is not asked of a scanned response.
+
+**What the answer files, in the same push:** a `during-testing` row — a scanned form cannot carry its signature; save the signed box from the scan as the answer, so a form with a Signature can be scanned.
 
 ### D163 — A question's choices can now be narrowed by what another form has recorded. Sometimes that form cannot be checked: its sharing was turned off, the phone is offline with nothing saved, or it has more than 50,000 different answers. What should the question show then? **A — every choice, with a short note that the list could not be narrowed.**
 

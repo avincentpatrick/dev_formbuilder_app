@@ -451,6 +451,12 @@ final class StructuralValidationGate
      * A `cascading_select` (Increment G4a) hierarchy must resolve: at least one level and one option, every
      * option pinned to a declared level, every declared level populated, and every non-root option's
      * `parent` pointing at a value that exists at the immediately-shallower level (no dangling parent).
+     *
+     * M186 (`R-bbf03029`): and two shapes no respondent can be offered — a first-level option that names a parent (the
+     * runtime shows the first level's choices only where the parent is empty, so it is never shown), and a value twice
+     * at one level (both engines key a level's choices by value, so the later parent silently wins). Left open by M141
+     * because tightening would refuse a live form's republish; counted on the testing server first — no form, in any
+     * version, carries either. A value at TWO levels stays legal: the Philippine places' city under no province is one.
      */
     private function assertCascadingResolves(FormField $field): void
     {
@@ -486,6 +492,9 @@ final class StructuralValidationGate
             }
             $index = $levelIndex[$levelKey];
             $parent = array_key_exists('parent', $option) && $option['parent'] !== null ? (string) $option['parent'] : null;
+            if (isset($valuesByLevelIndex[$index][$value])) {
+                throw PublishValidationException::cascadingConfigInvalid($field->key, "option “{$value}” appears twice at level “{$levelKey}”");
+            }
             $valuesByLevelIndex[$index][$value] = true;
             $options[] = ['level' => $index, 'value' => $value, 'parent' => $parent];
         }
@@ -502,7 +511,12 @@ final class StructuralValidationGate
 
         foreach ($options as $option) {
             if ($option['level'] === 0) {
-                continue; // root options need no parent
+                // Root options take no parent; one that names one is never shown to anybody.
+                if ($option['parent'] !== null && $option['parent'] !== '') {
+                    throw PublishValidationException::cascadingConfigInvalid($field->key, "option “{$option['value']}” is at the first level, so it takes no parent — no respondent would ever be shown it");
+                }
+
+                continue;
             }
             $parent = $option['parent'];
             if ($parent === null || ! isset($valuesByLevelIndex[$option['level'] - 1][$parent])) {

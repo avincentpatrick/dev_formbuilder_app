@@ -8,6 +8,7 @@ use App\Enums\ScanStatus;
 use App\Enums\SubmissionSource;
 use App\Exceptions\Attachments\AttachmentException;
 use App\Exceptions\Forms\PublishValidationException;
+use App\Exceptions\Ocr\OcrException;
 use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Jobs\ScanAttachmentJob;
 use App\Models\Form;
@@ -18,10 +19,14 @@ use App\Models\SubmissionAnswer;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Attachments\AttachmentStorageService;
+use App\Services\Forms\CapabilityFlags;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
 use App\Services\Submissions\EncodeFormPresenter;
+use App\Services\Submissions\SubmissionInboxPresenter;
 use App\Services\Submissions\SubmissionPayload;
+use App\Services\Submissions\SubmissionPdfPresenter;
+use App\Services\Submissions\SubmissionPdfRenderer;
 use App\Services\Submissions\SubmissionPipeline;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -302,4 +307,173 @@ it('presents media as supported with a normalized media config + upload url (G6)
             'captureSource' => 'camera',
         ])
         ->and($field['upload']['url'])->toContain('/attachments');
+});
+
+/*
+|--------------------------------------------------------------------------
+| M187 (`R-af2d278b`) — a Signature anyone can sign.
+|--------------------------------------------------------------------------
+|
+| The type was plumbed end to end by G6 (value shape, staging, policy, both validators) except for the control, and
+| both channels kept it out of their supported sets, so it rendered "Not available for manual entry yet". The pad
+| draws a PNG and uploads it through the same staging endpoint a photo uses.
+*/
+
+function g6SignatureVersion(Tenant $tenant, User $user, array $config = [], RequiredMode $required = RequiredMode::Optional): FormVersion
+{
+    return g6Publish($tenant, $user, function (FormVersion $draft, User $u) use ($config, $required): void {
+        addFormField($draft, $u, 'signed', FieldType::Signature, 0, ['is_required' => $required, 'config' => $config]);
+    });
+}
+
+it('presents a signature as supported, with a media config and the upload url (M187)', function (): void {
+    $version = g6SignatureVersion($this->tenant, $this->user);
+
+    /** @var Form $form */
+    $form = Form::query()->findOrFail($version->form_id);
+    $presented = app(EncodeFormPresenter::class)->present($form, $version);
+    $field = collect($presented['blocks'])->flatMap(fn (array $b): array => $b['fields'])->firstWhere('key', 'signed');
+
+    expect($field['supported'])->toBeTrue()
+        ->and($field['media'])->toBeArray()
+        ->and($field['upload']['url'])->toContain('/attachments');
+});
+
+it('stores the pad\'s PNG even when the question carries an old list of file types that leaves PNG out (M187)', function (): void {
+    // Before M187 a signature took the photo's settings tab, so an author could have narrowed its file types. The pad
+    // only ever sends a PNG, and a list that refuses it would leave the question impossible to answer.
+    $version = g6SignatureVersion($this->tenant, $this->user, ['accepted_types' => ['image/jpeg']]);
+
+    $attachment = $this->storage->store(g6FakeImage('signature.png'), $version, 'signed', $this->user->id);
+
+    expect($attachment->mime_type)->toBe('image/png');
+});
+
+it('still refuses a signature that is not an image (M187)', function (): void {
+    $version = g6SignatureVersion($this->tenant, $this->user);
+
+    expect(fn () => $this->storage->store(UploadedFile::fake()->createWithContent('signature.pdf', '%PDF-1.4 fake'), $version, 'signed', $this->user->id))
+        ->toThrow(AttachmentException::class);
+});
+
+it('submits a required signature answered with its staged drawing (M187)', function (): void {
+    $version = g6SignatureVersion($this->tenant, $this->user, required: RequiredMode::Required);
+    $attachment = $this->storage->store(g6FakeImage('signature.png'), $version, 'signed', $this->user->id);
+
+    $result = $this->pipeline->submit(new SubmissionPayload(
+        version: $version,
+        answers: ['signed' => [['id' => $attachment->id, 'mime' => 'image/png']]],
+        source: SubmissionSource::Manual,
+        respondentUserId: $this->user->id,
+    ));
+
+    $attachment->refresh();
+    expect($attachment->attachable_type)->toBe('submission')
+        ->and($attachment->attachable_id)->toBe($result->submission->id);
+});
+
+/**
+ * What the pad uploads: a 900 × 300 RGBA PNG on white (browsers export a canvas as RGBA even when it is opaque).
+ *
+ * ⚠️ NOT `g6FakeImage()`: that 1 × 1 PNG is grey-with-alpha (colour type 4), which dompdf silently drops — measured, the
+ * document carried no image at all — so a PDF assertion against it would test a file the pad never makes.
+ */
+function g6PadPng(): UploadedFile
+{
+    $image = imagecreatetruecolor(900, 300);
+    imagesavealpha($image, true);
+    imagefill($image, 0, 0, (int) imagecolorallocatealpha($image, 255, 255, 255, 0));
+    imageline($image, 40, 220, 860, 80, (int) imagecolorallocate($image, 17, 17, 17));
+    ob_start();
+    imagepng($image);
+
+    return UploadedFile::fake()->createWithContent('signature.png', (string) ob_get_clean());
+}
+
+/** A submitted response whose Signature holds one staged drawing, with that attachment's scan status set. */
+function g6SignedSubmission(Tenant $tenant, User $user, AttachmentStorageService $storage, SubmissionPipeline $pipeline, ScanStatus $scan): array
+{
+    $version = g6SignatureVersion($tenant, $user);
+    $attachment = $storage->store(g6PadPng(), $version, 'signed', $user->id);
+    $result = $pipeline->submit(new SubmissionPayload(
+        version: $version,
+        answers: ['signed' => [['id' => $attachment->id, 'mime' => 'image/png']]],
+        source: SubmissionSource::Manual,
+        respondentUserId: $user->id,
+    ));
+    $attachment->forceFill(['virus_scan_status' => $scan])->save();
+
+    return [$result->submission->refresh(), $attachment];
+}
+
+/** @return array<string, array<string, mixed>> the response page's answer rows, by question key */
+function g6DetailRows(User $user, Submission $submission): array
+{
+    return collect(app(SubmissionInboxPresenter::class)->detail($user, $submission)['blocks'])
+        ->flatMap(fn (array $b): array => $b['fields'])
+        ->keyBy('key')
+        ->all();
+}
+
+it('shows a signature on the response page as its picture once the file may be served (M187)', function (): void {
+    [$submission, $attachment] = g6SignedSubmission($this->tenant, $this->user, $this->storage, $this->pipeline, ScanStatus::Skipped);
+
+    $row = g6DetailRows($this->user, $submission)['signed'];
+
+    expect($row['image'])->toBe(['url' => route('attachments.show', ['attachment' => $attachment->id]), 'alt' => 'Signature']);
+});
+
+it('keeps a signature as text until its scan lets it be served, and for a file the scan refused (M187)', function (): void {
+    [$pending] = g6SignedSubmission($this->tenant, $this->user, $this->storage, $this->pipeline, ScanStatus::Pending);
+    expect(g6DetailRows($this->user, $pending)['signed']['image'])->toBeNull();
+
+    [$infected] = g6SignedSubmission($this->tenant, $this->user, $this->storage, $this->pipeline, ScanStatus::Infected);
+    expect(g6DetailRows($this->user, $infected)['signed']['image'])->toBeNull();
+});
+
+/** @return array<string, array<string, mixed>> the PDF's answer rows, by question key */
+function g6PdfRows(Submission $submission): array
+{
+    return collect(app(SubmissionPdfPresenter::class)->present($submission)['blocks'])
+        ->flatMap(fn (array $b): array => $b['fields'])
+        ->keyBy('key')
+        ->all();
+}
+
+it('embeds a servable signature in the response PDF as a data URI of its own file (M187)', function (): void {
+    [$submission, $attachment] = g6SignedSubmission($this->tenant, $this->user, $this->storage, $this->pipeline, ScanStatus::Skipped);
+    $bytes = Storage::disk($attachment->disk)->get($attachment->path);
+
+    expect(g6PdfRows($submission)['signed']['image'])->toBe('data:image/png;base64,'.base64_encode((string) $bytes));
+
+    // And dompdf draws it: an image XObject in the document, which no answer of text produces.
+    expect(app(SubmissionPdfRenderer::class)->render($submission))->toMatch('~/Subtype\s*/Image~');
+});
+
+it('keeps the PDF row as text for a signature not yet servable, or refused by the scan (M187)', function (): void {
+    [$pending] = g6SignedSubmission($this->tenant, $this->user, $this->storage, $this->pipeline, ScanStatus::Pending);
+    [$infected] = g6SignedSubmission($this->tenant, $this->user, $this->storage, $this->pipeline, ScanStatus::Infected);
+
+    expect(g6PdfRows($pending)['signed']['image'])->toBeNull()
+        ->and(g6PdfRows($infected)['signed']['image'])->toBeNull()
+        ->and(app(SubmissionPdfRenderer::class)->render($pending))->not->toMatch('~/Subtype\s*/Image~');
+});
+
+it('never embeds a signature too large on a side to be the pad\'s, read from the header alone (M187)', function (): void {
+    [$submission, $attachment] = g6SignedSubmission($this->tenant, $this->user, $this->storage, $this->pipeline, ScanStatus::Skipped);
+
+    // A small file whose header claims a 5000 × 10 canvas: the dimension cap refuses it before any decoder sees it.
+    $wide = imagecreatetruecolor(5000, 10);
+    ob_start();
+    imagepng($wide);
+    Storage::disk($attachment->disk)->put($attachment->path, (string) ob_get_clean());
+
+    expect(g6PdfRows($submission)['signed']['image'])->toBeNull();
+});
+
+it('keeps a form with a Signature unscannable, and the refusal names the signature (M187, D164)', function (): void {
+    $version = g6SignatureVersion($this->tenant, $this->user);
+
+    expect(CapabilityFlags::isOcrCompatible($version))->toBeFalse()
+        ->and(OcrException::formNotEligible()->getMessage())->toContain('a signature');
 });

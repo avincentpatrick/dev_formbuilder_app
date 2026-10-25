@@ -37,15 +37,16 @@ use Illuminate\Support\Carbon;
  *     recovers from malformed markup predictably rather than by guessing.
  *
  * ── What this class deliberately does NOT do ────────────────────────────────────────────────────
- * No images, no signatures, no logos. `ext-gd` is absent from the app container, so raster
- * embedding is unreachable regardless of configuration, and data-URI inlining of a respondent's
- * uploaded media is its own increment with its own threat model (an attacker-supplied image
- * decoder input is a different risk from an attacker-supplied string).
+ * No logos and no respondent photos; one image only — a SIGNATURE (M187, `R-af2d278b`), inlined as a `data:` URI
+ * of the response's own file, behind the decoder guards and the threat model written at
+ * {@see SubmissionPdfPresenter} `signatureImage()` (an attacker-supplied image is decoder input, a different risk
+ * from an attacker-supplied string). Nothing here is fetched, so the no-external-reference contract below holds.
  *
  * H23a4 REAFFIRMED that with a decision rather than inheriting it: tenant branding reaches this document
- * as COLOUR ONLY. The tenant's logo would have needed `ext-gd` (dompdf's PNG and WebP paths both throw
- * without it, and it is missing from all four CI jobs as well as the app image), so a logo would have
- * rendered on a developer's machine and thrown in CI. See {@see self::html()}.
+ * as COLOUR ONLY. ⚠️ Its reason at the time — `ext-gd` missing from the app image and all four CI jobs, so a
+ * PNG would render locally and throw in CI — is no longer true (M187 measured gd in `docker/Dockerfile`, in every
+ * `ci.yml` job, and on the testing server's queue worker, which renders this document); the colour-only decision
+ * stands on its own. See {@see self::html()}.
  */
 final class SubmissionPdfRenderer
 {
@@ -88,10 +89,9 @@ final class SubmissionPdfRenderer
      *
      * **COLOUR ONLY — no logo, and that is a decision, not an omission.** This class's own contract is that
      * the document has no external references of any kind (`isRemoteEnabled = false`, chroot pinned to the
-     * view directory, no `url()`/`@font-face`/`<img>` anywhere). Embedding a raster would additionally need
-     * `ext-gd`, which is absent from the app container AND from all four CI jobs, so a PNG logo would
-     * render locally and throw in CI. The tenant's colour on the header rule, the headings and the panel
-     * tint is real branding that costs none of that.
+     * view directory, no `url()`/`@font-face` anywhere, and no `<img>` but a signature's own `data:` URI since
+     * M187). A logo would be a second raster in every document of every tenant for no answer's sake. The tenant's
+     * colour on the header rule, the headings and the panel tint is real branding that costs none of that.
      *
      * @param  array<string, string>|null  $brand
      */

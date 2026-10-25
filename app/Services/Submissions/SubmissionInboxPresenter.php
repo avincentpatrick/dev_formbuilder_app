@@ -24,6 +24,7 @@ use App\Support\Search\ListEmptyReason;
 use App\Support\Search\SearchTerms;
 use App\Support\Submissions\SubmissionReference;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 /**
  * Read model for the submissions inbox (Increment F7). The list mirrors {@see FormPresenter}
@@ -458,7 +459,7 @@ final class SubmissionInboxPresenter
      * @param  array<string, mixed>  $answers  already scoped to one repeat instance where applicable
      * @param  array<string, array{type: FieldType, config: array<string, mixed>}>  $sources
      * @param  array<string, int>  $retired
-     * @return list<array{key: string, label: string, value: string, removed_in: int|null}>
+     * @return list<array{key: string, label: string, value: string, removed_in: int|null, image: array{url: string, alt: string}|null}>
      */
     private function fieldRows(Collection $fields, array $answers, array $sources, ?string $locale, array $retired = []): array
     {
@@ -467,7 +468,34 @@ final class SubmissionInboxPresenter
             'label' => $this->templates->render($f->label, $sources, $answers, $locale),
             'value' => $this->formatter->displayValue($f->field_type, $answers[$f->key] ?? null, $f->config ?? [], $locale),
             'removed_in' => $retired[$f->key] ?? null,
+            'image' => $f->field_type === FieldType::Signature ? $this->signatureImage($answers[$f->key] ?? null) : null,
         ])->all());
+    }
+
+    /**
+     * M187 (`R-af2d278b`): a signature is shown as the picture that was drawn, through the attachment route (which serves
+     * a raster image inline, behind `AttachmentPolicy`). Only once its scan lets it be served: until then — and for a
+     * file the scan refused — the row keeps the text every other surface writes.
+     *
+     * @return array{url: string, alt: string}|null
+     */
+    private function signatureImage(mixed $value): ?array
+    {
+        $ref = is_array($value) ? ($value[0] ?? null) : null;
+        $id = is_array($ref) && is_string($ref['id'] ?? null) ? $ref['id'] : null;
+
+        // A `local:` reference is a guest's offline placeholder that never reached the server; it names no row.
+        if ($id === null || ! Str::isUuid($id)) {
+            return null;
+        }
+
+        $attachment = Attachment::query()->whereKey($id)->first();
+
+        if ($attachment === null || ! $attachment->virus_scan_status->servable()) {
+            return null;
+        }
+
+        return ['url' => route('attachments.show', ['attachment' => $attachment->id]), 'alt' => 'Signature'];
     }
 
     /**

@@ -633,6 +633,7 @@ const MATRIX = 'resources/js/components/builder/MatrixEditor.vue';
 const GRID_LAYOUT = 'resources/js/components/builder/GridLayoutSelect.vue';
 const GEO = 'resources/js/components/builder/GeoEditor.vue';
 const MEDIA = 'resources/js/components/builder/MediaEditor.vue';
+const SIGNATURE_PAD = 'resources/js/components/submissions/SignaturePad.vue';
 const PREFILL = 'resources/js/components/builder/PrefillEditor.vue';
 const CONTENT = 'resources/js/components/builder/ContentBlocksEditor.vue';
 const FIELD_INPUT = 'resources/js/components/submissions/FieldInput.vue';
@@ -747,7 +748,7 @@ const reference: ChapterDraft[] = [
                         [ui('Levels', CONFIG), ' — ', ui('Cascading select', FIELD_TYPES), ': its levels and their choices.'],
                         [ui('Grid', CONFIG), ' — ', ui('Matrix (grid)', FIELD_TYPES), ' and ', ui('Likert matrix', FIELD_TYPES), ': rows and columns.'],
                         [ui('Map', CONFIG), ' — ', ui('GPS point', FIELD_TYPES), ', ', ui('GPS line', FIELD_TYPES), ' and ', ui('GPS area', FIELD_TYPES), ': how a location is captured.'],
-                        [ui('Media', CONFIG), ' — ', ui('File upload', FIELD_TYPES), ', ', ui('Photo', FIELD_TYPES), ', ', ui('Audio', FIELD_TYPES), ', ', ui('Video', FIELD_TYPES), ' and ', ui('Signature', FIELD_TYPES), ': what may be uploaded.'],
+                        [ui('Media', CONFIG), ' — ', ui('File upload', FIELD_TYPES), ', ', ui('Photo', FIELD_TYPES), ', ', ui('Audio', FIELD_TYPES), ' and ', ui('Video', FIELD_TYPES), ': what may be uploaded; ', ui('Signature', FIELD_TYPES), ': how it is signed.'],
                         [ui('Prefill', CONFIG), ' — ', ui('Hidden field', FIELD_TYPES), ': where its value comes from.'],
                         [ui('Content', CONFIG), ' — ', ui('Note / label', FIELD_TYPES), ': what it shows.'],
                         [ui('Validation', CONFIG), ' — every question that takes an answer. See ', link('Validation', '#validation-tab'), '.'],
@@ -1131,7 +1132,10 @@ const reference: ChapterDraft[] = [
                 id: 'type-signature',
                 title: 'Signature',
                 blocks: [
-                    tip('warning', 'Respondents cannot sign yet: the form shows “', NOT_YET, '” Leave it out of forms for testing for now.'),
+                    p('Respondents sign with a finger, a pen or the mouse, on the web form and in manual entry. When they lift the pen for a moment the signature is saved; ', ui('Clear', SIGNATURE_PAD), ' starts again.'),
+                    p('The response shows the signature as it was drawn, and so does its PDF. In a spreadsheet export the cell gives the file’s name and a link to open it; you sign in to open it. The paper form prints a line to sign on.'),
+                    p('The ', ui('Media', CONFIG), ' tab says ', ui('How it is signed', MEDIA), ': a signature has no file settings.'),
+                    tip('info', 'A form with a Signature cannot be scanned: its paper copies are keyed in. A Signature cannot sit inside a repeatable section. In Preview you can draw, but the signature is not saved.'),
                 ],
             },
         ],

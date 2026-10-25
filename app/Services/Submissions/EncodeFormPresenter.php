@@ -89,9 +89,10 @@ final class EncodeFormPresenter
         FieldType::Matrix, FieldType::LikertMatrix,
         // Increment G5b2: geospatial capture (coordinate/vertex control + progressive-enhancement Leaflet map).
         FieldType::Geopoint, FieldType::Geotrace, FieldType::Geoshape,
-        // Increment G6: media capture (upload-on-selection + progressive-enhancement getUserMedia). `signature`
-        // (a canvas-draw control) is deferred, so it stays unsupported for now.
+        // Increment G6: media capture (upload-on-selection + progressive-enhancement getUserMedia).
         FieldType::FileUpload, FieldType::ImageCapture, FieldType::AudioCapture, FieldType::VideoCapture,
+        // M187 (`R-af2d278b`): a signature, drawn on a pad and uploaded as a PNG through the same staging endpoint.
+        FieldType::Signature,
     ];
 
     /**

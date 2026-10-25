@@ -23,7 +23,8 @@ import PageHeader from '@/components/shell/PageHeader.vue';
 import ScanPages from '@/components/ocr/ScanPages.vue';
 import type { ScanPage } from '@/components/ocr/scan-review';
 
-type FieldRow = { key: string; label: string; value: string; removed_in?: number | null };
+// M187 (`R-af2d278b`): `image` is a signature's picture, sent only once its file may be served.
+type FieldRow = { key: string; label: string; value: string; removed_in?: number | null; image?: { url: string; alt: string } | null };
 /**
  * `id` is a stable unique key for the block, not a section id — a repeatable section emits one block per
  * stored instance (Increment H6b) carrying `"{sectionId}#{n}"`, so `fields` can legitimately be empty for
@@ -361,7 +362,8 @@ function formatDate(iso: string | null): string {
                                     <!-- M172 (`R-a44638b6`, `D133`): an answer to a question the current version no longer asks, kept and marked. -->
                                     <MdsBadge v-if="field.removed_in" variant="neutral" :label="`Removed from the form in version ${field.removed_in}`" data-removed-in />
                                 </dt>
-                                <dd>{{ field.value || '—' }}</dd>
+                                <dd v-if="field.image"><img :src="field.image.url" :alt="field.image.alt" class="detail__signature" /></dd>
+                                <dd v-else>{{ field.value || '—' }}</dd>
                             </div>
                         </dl>
                     </MdsCard>
@@ -562,6 +564,16 @@ function formatDate(iso: string | null): string {
     margin: 0;
     color: var(--mds-color-text-body);
     overflow-wrap: anywhere;
+}
+
+/* M187: the drawn signature, on the white it was saved on — framed so it reads as a picture, never wider than its column. */
+.detail__signature {
+    display: block;
+    width: 100%;
+    max-width: 18rem;
+    height: auto;
+    border: 1px solid var(--mds-color-border-default);
+    border-radius: var(--mds-radius-sm);
 }
 
 .detail__form {

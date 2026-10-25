@@ -38,6 +38,9 @@ const GeoInput = defineAsyncComponent(() => import('./GeoInput.vue'));
 // Media capture (Increment G6) is lazy-loaded so its upload/preview logic only ships in a media-bearing form.
 const MediaInput = defineAsyncComponent(() => import('./MediaInput.vue'));
 
+// M187 (`R-af2d278b`): the signature pad, lazy for the same reason — only a form with a Signature question loads it.
+const SignaturePad = defineAsyncComponent(() => import('./SignaturePad.vue'));
+
 export interface CascadeLevel {
     key: string;
     label: string;
@@ -231,9 +234,8 @@ const yesNoOptions = [
 ];
 
 /**
- * The five media field types, matching PHP's `FieldType::isMedia()`. `signature` is included even though it
- * has no encode CONTROL: the read-only summary below is about displaying what a submission already holds,
- * and a signature captured on the public runtime is exactly such a value.
+ * The five media field types, matching PHP's `FieldType::isMedia()`. The read-only summary below displays what a
+ * submission already holds, whichever control captured it (a signature has its own pad since M187).
  */
 const MEDIA_TYPES = ['file_upload', 'image_capture', 'audio_capture', 'video_capture', 'signature'];
 
@@ -270,6 +272,7 @@ const control = computed<
     | 'likert-matrix'
     | 'geo'
     | 'media'
+    | 'signature'
     | 'media-readonly'
     | 'note'
     | 'prefilled'
@@ -279,9 +282,8 @@ const control = computed<
     const t = props.field.field_type;
     if (t === 'note') return 'note';
     // Increment I9c — the edit surface shows what was captured and offers no way to change it. Ordered
-    // BEFORE the `supported` check for the same reason the `hidden` branch is: `signature` is deliberately
-    // `supported: false` on this channel, and falling through would tell an editor a file they can plainly
-    // see is "not available for manual entry yet".
+    // BEFORE the `supported` check, so a read-only file question can never fall through to the notice that
+    // says it is "not available for manual entry yet".
     if (props.readOnly === true && MEDIA_TYPES.includes(t)) return 'media-readonly';
     // Increment H7 — a hidden field. Externally sourced ⇒ a real text input (this channel has no URL, so a
     // keyer is the only possible source). Otherwise a read-only row: the server writes the authored literal
@@ -307,6 +309,7 @@ const control = computed<
     if (t === 'matrix') return 'matrix';
     if (t === 'geopoint' || t === 'geotrace' || t === 'geoshape') return 'geo';
     if (t === 'file_upload' || t === 'image_capture' || t === 'audio_capture' || t === 'video_capture') return 'media';
+    if (t === 'signature') return 'signature';
     return 'unsupported';
 });
 
@@ -736,6 +739,16 @@ function setCascadeLevel(index: number, value: string): void {
     <!-- Media capture (Increment G6): file / image / audio / video (upload-on-selection + preview) -->
     <MediaInput
         v-else-if="control === 'media'"
+        :field="field"
+        :model-value="props.modelValue"
+        :error="error"
+        :required-marker="marker"
+        @update:model-value="emit('update:modelValue', $event)"
+    />
+
+    <!-- Signature (M187, `R-af2d278b`): drawn on a pad, saved as a PNG through the same upload a photo uses -->
+    <SignaturePad
+        v-else-if="control === 'signature'"
         :field="field"
         :model-value="props.modelValue"
         :error="error"

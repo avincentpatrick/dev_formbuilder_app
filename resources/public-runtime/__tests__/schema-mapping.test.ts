@@ -65,7 +65,8 @@ describe('buildRenderModel', () => {
                         ],
                     },
                 }),
-                field({ key: 'sig', field_type: 'signature' }),
+                // M187: Duration, retired by `D140`, is the type no channel answers (Signature has its pad now).
+                field({ key: 'took', field_type: 'duration' }),
             ],
         });
         const model = buildRenderModel(schema);
@@ -74,7 +75,15 @@ describe('buildRenderModel', () => {
             { value: 'f', label: 'Female', labelTranslations: { es: 'Femenino' } },
             { value: 'm', label: 'm', labelTranslations: null },
         ]);
-        expect(model.fields.find((f) => f.key === 'sig')!.supported).toBe(false);
+        expect(model.fields.find((f) => f.key === 'took')!.supported).toBe(false);
+    });
+
+    it('marks a signature supported, with a media config the pad uploads through (M187)', () => {
+        const schema = schemaResponse({ fields: [field({ key: 'sig', field_type: 'signature', config: { max_count: 1 } })] });
+        const sig = buildRenderModel(schema).fields.find((f) => f.key === 'sig')!;
+
+        expect(sig.supported).toBe(true);
+        expect(sig.media).toEqual({ acceptedTypes: [], maxFileSizeBytes: null, maxCount: 1, minCount: null, captureSource: null });
     });
 
     it('marks geo types supported and normalizes their config snake_case → camelCase (G5b2)', () => {

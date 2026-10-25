@@ -6,8 +6,8 @@
  * as booleans — an offline response reopened for conflict review, whose outbox row now carries `true`/`false`. Each
  * showed a saved Yes as nothing selected. The control still EMITS the strings, so nothing downstream changes.
  */
-import { mount } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { flushPromises, mount } from '@vue/test-utils';
+import { describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 import FieldInput, { type AnswerValue, type EncodeField } from './FieldInput.vue';
 
@@ -289,5 +289,45 @@ describe('FieldInput — a Short text that suggests answers (M184)', () => {
         const plain = mount(FieldInput, { props: { field: textField(null), modelValue: '' } });
         expect(plain.find('datalist').exists()).toBe(false);
         expect(plain.find('input').attributes('list')).toBeUndefined();
+    });
+});
+
+describe('FieldInput — a Signature is signed on a pad (M187, R-af2d278b)', () => {
+    function typed(field_type: string, supported: boolean): EncodeField {
+        return {
+            key: 'q',
+            field_type,
+            label: 'Signature of the respondent',
+            hint: null,
+            placeholder: null,
+            required: false,
+            options: [],
+            supported,
+            media: { acceptedTypes: [], maxFileSizeBytes: null, maxCount: 1, minCount: null, captureSource: null },
+            upload: { url: '/forms/f1/attachments' },
+        };
+    }
+
+    it('draws the pad for a Signature, where both channels used to say it could not be answered', async () => {
+        const wrapper = mount(FieldInput, { props: { field: typed('signature', true), modelValue: null } });
+        // The pad is lazy (only a form with a Signature loads it): wait for its chunk, then for the render.
+        await vi.dynamicImportSettled();
+        await flushPromises();
+
+        expect(wrapper.find('canvas.signature__pad').exists()).toBe(true);
+        expect(wrapper.text()).not.toContain('Not available for manual entry yet');
+    });
+
+    it('keeps the notice for a Duration, which D140 retired and no channel answers', () => {
+        const wrapper = mount(FieldInput, { props: { field: typed('duration', false), modelValue: null } });
+
+        expect(wrapper.text()).toContain('Not available for manual entry yet');
+    });
+
+    it('lists a signature as a file on a read-only correction, as before', () => {
+        const wrapper = mount(FieldInput, { props: { field: typed('signature', true), modelValue: [{ id: 'a1', name: 'signature.png' }], readOnly: true } });
+
+        expect(wrapper.find('canvas').exists()).toBe(false);
+        expect(wrapper.text()).toContain('signature.png');
     });
 });

@@ -10,6 +10,9 @@
  * `buildMedia()` (TS runtime) + `mediaCountBounds` (both engines). The lenient PATCH validation lives in
  * `UpdateFieldRequest::configRules()`; only `min_count ≤ max_count` is enforced at publish (every value is
  * optional — a media field is fully usable with no author config).
+ *
+ * M187 (`R-af2d278b`): a Signature has none of these. Its pad always saves one PNG, and the server takes a signature's
+ * file types from its own default whatever the question says, so the tab says how people sign instead.
  */
 import { computed } from 'vue';
 import { MdsCheckbox, MdsFormField, MdsNumberInput, MdsTextInput } from '@meridian/design-system';
@@ -31,6 +34,8 @@ const emit = defineEmits<{
 }>();
 
 const BYTES_PER_MB = 1_048_576;
+
+const isSignature = computed<boolean>(() => props.fieldType === 'signature');
 
 // Camera/mic capture only makes sense for the capture types — a plain file upload has no device to prefer.
 const isCaptureType = computed(
@@ -58,7 +63,16 @@ function setMaxFileSize(mb: number | null): void {
 </script>
 
 <template>
-    <div class="media-editor">
+    <div v-if="isSignature" class="media-editor">
+        <section class="media-editor__group">
+            <h3 class="media-editor__heading">How it is signed</h3>
+            <p class="media-editor__note">
+                People sign with a finger, a pen or the mouse, on the web form and in manual entry. The signature is saved as a
+                picture, shown on the response and in its PDF. The paper form prints a line to sign on.
+            </p>
+        </section>
+    </div>
+    <div v-else class="media-editor">
         <section class="media-editor__group">
             <h3 class="media-editor__heading">What can be uploaded</h3>
             <MdsFormField
@@ -151,6 +165,12 @@ function setMaxFileSize(mb: number | null): void {
     font-size: var(--mds-type-label-font-size);
     font-weight: var(--mds-font-weight-semibold);
     color: var(--mds-color-text-body);
+}
+
+.media-editor__note {
+    margin: 0;
+    font-size: var(--mds-type-body-sm-font-size);
+    color: var(--mds-color-text-secondary);
 }
 
 .media-editor__counts {

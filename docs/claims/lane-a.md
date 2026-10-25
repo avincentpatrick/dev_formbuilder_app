@@ -122,7 +122,10 @@ already-imported controller, because a new `use` line there shifts every line a 
 preview's two, and the controller gate passes. **And again, opened before this push (recorded):**
 `resources/js/components/builder/PreviewPane.vue` (the Preview refetches its choices when a filter changes — its key named only
 the sources), `resources/js/components/forms/types.ts` (a shared question says it narrows only — `narrows_only`),
-`resources/public-runtime/lib/api-client.ts` (the guest's linked-choices read returns the sets beside the lists).
+`resources/public-runtime/lib/api-client.ts` (the guest's linked-choices read returns the sets beside the lists). **And, written
+before this push (recorded):** new `tests/fixtures/psgc/` (`places.csv`, `manifest.json` — the E2E environment's 19 places,
+written from `Tests\Support\PsgcFixture`, because the real quarter is not committed this session: the user could not download
+the PSA workbook), and `tests/Feature/Seeders/E2eSeederIdempotencyTest.php` (its published-form pin, 12 → 13 with Barangay Visit).
 Shared artefacts taken: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/data-dictionary.md`,
 `docs/PRD.md`, `docs/TESTING-GUIDE.md`, `docs/deployment-infrastructure.md`, `openapi.json`, `tests/e2e/public-runtime-axe.spec.ts`,
 `tests/e2e/builder-axe.spec.ts`, `tests/e2e/form-settings-axe.spec.ts` and the specs the diff reaches, `PROGRESS.md` (own block).

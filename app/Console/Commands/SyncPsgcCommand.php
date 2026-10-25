@@ -35,9 +35,19 @@ final class SyncPsgcCommand extends Command
     public function handle(): int
     {
         $file = $this->option('file');
+        $named = is_string($file) && $file !== '';
+        $data = new PsgcDataFile($named ? $file : null);
+
+        // Until the first quarter is committed there is nothing to copy, and that is not a failure: the deploy runs this
+        // on every push, and the builder says the places are not on this server yet. A file NAMED with --file must exist.
+        if (! $named && ! is_file($data->manifestPath())) {
+            $this->info('psgc: no Philippine places are committed yet (database/data/psgc/manifest.json); nothing was copied.');
+
+            return self::SUCCESS;
+        }
 
         try {
-            $data = (new PsgcDataFile(is_string($file) && $file !== '' ? $file : null))->load();
+            $data = $data->load();
         } catch (InvalidArgumentException $e) {
             $this->error($e->getMessage());
             $this->error('Nothing was copied.');

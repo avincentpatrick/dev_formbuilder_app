@@ -1,0 +1,20 @@
+level,code,name,parent_code
+region,0100000000,"Region I (Ilocos Region)",
+region,1300000000,"National Capital Region (NCR)",
+region,1900000000,"Bangsamoro Autonomous Region in Muslim Mindanao (BARMM)",
+province,0102800000,"Ilocos Norte",0100000000
+province,1380600000,"City of Manila",1300000000
+province,1381701000,Pateros,1300000000
+province,1999900000,"Special Geographic Area",1900000000
+city,0102801000,Adams,0102800000
+city,0102805000,"City of Batac",0102800000
+city,1380600000,"City of Manila",1380600000
+city,1381701000,Pateros,1381701000
+city,1999908000,Tugunan,1999900000
+barangay,0102801001,Adams,0102801000
+barangay,0102805001,Aglipay,0102805000
+barangay,1380601001,"Barangay 1",1380600000
+barangay,1380601002,"Barangay 2",1380600000
+barangay,1380601010,"Barangay 10",1380600000
+barangay,1381701001,Aguho,1381701000
+barangay,1999908001,Balong,1999908000

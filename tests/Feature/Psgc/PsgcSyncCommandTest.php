@@ -105,6 +105,27 @@ it('refuses a manifest whose counts the file does not hold', function (): void {
         ->assertExitCode(1);
 });
 
+it('copies nothing, and succeeds, while no places are committed — but fails on a file it was told to read', function (): void {
+    $committed = database_path('data/psgc/manifest.json');
+    if (is_file($committed)) {
+        $this->markTestSkipped('The Philippine places are committed; the committed-data test reads them.');
+    }
+
+    // Every deploy runs this; before the first quarter is committed it must not take the site down.
+    $this->artisan('psgc:sync')->expectsOutputToContain('no Philippine places are committed yet')->assertExitCode(0);
+    $this->artisan('psgc:sync', ['--file' => PsgcFixture::directory().'/manifest.json'])->assertExitCode(1);
+
+    expect(PsgcPlace::query()->count())->toBe(0);
+});
+
+it('keeps the E2E environment’s places fixture the one PsgcFixture builds', function (): void {
+    // `E2eSeeder` syncs `tests/fixtures/psgc/`; regenerate it from `Tests\Support\PsgcFixture` when that changes.
+    $committed = (new PsgcDataFile(base_path('tests/fixtures/psgc/manifest.json')))->load();
+
+    expect($committed['rows'])->toBe(PsgcTiers::build(PsgcFixture::places()))
+        ->and($committed['manifest']['publication'])->toBe('2026Q3');
+});
+
 it('holds the table to its levels, codes and quarters in the database too', function (): void {
     // Each in its own savepoint: a refused insert aborts the transaction around it, and the next would fail for that.
     $insert = static fn (array $row): bool => DB::transaction(static fn (): bool => DB::table('psgc_places')->insert([

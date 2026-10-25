@@ -24,10 +24,28 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D166`, the last filed, was asked and answered on 2026-10-26 while `M186` (T5)'s data commit was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D168`, the last filed, was asked and answered on 2026-10-26 while `M188` (L) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D168 — A question's history also lists a change of its type and a move to another place. Should Put back reverse those too? **A — no: they are listed, each with what to do instead; a setting changed while the question was another type cannot be put back until the type matches.**
+
+**Asked and answered 2026-10-26 (user decision, in chat), while `M188` (L) was planned; recorded in its claim.** A type change goes only through the type dialog, which may drop settings and rules (`/convert`), and a move only through the reorder (`/reorder`) — neither is a field save.
+
+- **A — listed, not put back (recommended, chosen).** "Type: Short text → Number" and "Moved to …" appear in the history; the type is changed again under Basics, the question is dragged back.
+- **B — put back too.** Put back converts the type back through the type dialog and moves the question to its old place — more to build and to test, for two actions the builder already has.
+
+**What the answer files, in the same push:** nothing new — `R-3894369d`'s remedy carries it.
+
+### D167 — When an author presses Put back on one entry in a question's history, what goes back? **A — the whole change: every setting that one change touched returns to how it was before it; typing a label in bursts counts as one change.**
+
+**Asked and answered 2026-10-26 (user decision, in chat), while `M188` (L) was planned; recorded in its claim.** Some settings are saved together and only make sense together — "Show to respondents" with its condition, "Indexed for reporting" with its type, a default with whether it is a formula.
+
+- **A — the whole change (recommended, chosen).** One Put back per entry restores every setting it changed; one person's saves to the same settings under two minutes apart are one entry.
+- **B — one setting at a time.** A Put back per line of a change, with the paired settings still going back together.
+
+**What the answer files, in the same push:** nothing new — `R-3894369d`'s remedy carries it.
+
 ### D166 — The PSA's own workbook lists the City of Isabela (Basilan) under a placeholder row, "City of Isabela (Not a Province)", with no level. How should it appear when someone picks Region IX, then Province? **B — as the PSA writes it: "City of Isabela (Not a Province)" at the province level, then "City of Isabela".**
 
 **Asked and answered 2026-10-26 (user decision, in chat), while `M186` (T5)'s data commit was planned; recorded in its claim.** Measured on the PSA's 2Q and 3Q 2026 files: two rows have a blank level, both coded at the province group — `0990100000` City of Isabela (Not a Province), the special province code the City of Isabela sits under, and `1999900000` Special Geographic Area.

@@ -16,6 +16,7 @@ use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\User;
 use App\Services\Attachments\AttachmentStorageService;
+use App\Services\Forms\ChoiceListMaterializer;
 use App\Services\Forms\ChoicePreviewPresenter;
 use App\Services\Forms\FormChoiceListService;
 use App\Services\Forms\FormReferenceFileService;
@@ -157,6 +158,22 @@ final class AttachmentController extends Controller
         abort_if($version->status === FormVersionStatus::Draft, 404);
 
         return response()->json(['data' => $presenter->forVersion($form, $version)]);
+    }
+
+    /**
+     * M186 (`R-7a2f4a13`): a version's list-backed cascades for manual entry, which fetches them beside the page as the
+     * guest page does rather than carrying a 42,000-row list in its props on every load. The public endpoint's shape
+     * ({@see ChoiceListMaterializer::listsForBrowser()}), whole — not the preview's 200. A published version never
+     * changes, so a day's private cache is safe; a draft has no lists yet. A superseded version is served: resume and
+     * edit render the version the response was given on.
+     */
+    public function encodeChoiceLists(Form $form, FormVersion $version): JsonResponse
+    {
+        abort_if($version->status === FormVersionStatus::Draft, 404);
+
+        return response()
+            ->json(['data' => ['version_id' => $version->id, 'lists' => (object) ChoiceListMaterializer::listsForBrowser($version)]])
+            ->header('Cache-Control', 'private, max-age=86400');
     }
 
     public function show(Attachment $attachment): StreamedResponse

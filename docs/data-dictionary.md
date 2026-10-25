@@ -1512,7 +1512,7 @@ The choice lists a form version takes from uploaded CSV files (M141, `R-f69aab42
 > **Design Notes**
 > - **RLS**: `draft_child`, as `form_version_reference_files`: anyone in the tenant reads; a write is accepted only while the version is a draft. Listed in `TenantScopedTables::STRICT`; nothing is withheld from the tenant extract.
 > - **A name is unique in its file, and that is not tidiness**: both validation engines key a level's options by value, and barangay NAMES repeat across cities, so `name` must be a code and a repeat is refused at upload, naming both rows.
-> - **Beside the schema, for a browser.** The public schema leaves a CSV-backed cascade's options out (`FormVersion::schemaWithoutListOptions()`); the runtime reads `GET /api/v1/public/choice-lists/{token}/{version}` (each choice a tuple `[level index, value, label, parent]`), and the service worker keeps it by version in `guest-choice-lists`. The staff encode page still renders the list from its props (`R-7a2f4a13`).
+> - **Beside the schema, for a browser.** The public schema leaves a CSV-backed cascade's options out (`FormVersion::schemaWithoutListOptions()`); the runtime reads `GET /api/v1/public/choice-lists/{token}/{version}` (each choice a tuple `[level index, value, label, parent]`), and the service worker keeps it by version in `guest-choice-lists`. Since M186 (`R-7a2f4a13`) the staff encode page does the same: its props carry the cascade's levels and no choices, and it fetches `GET /forms/{form}/versions/{version}/choice-lists` (the same shape, whole, cached privately for a day) — for whoever can open the page (`SubmissionPolicy::readEncodeLists`).
 > - **At most twenty lists per version**, 60,000 rows and 30 columns each, 10 MB a file.
 
 ---

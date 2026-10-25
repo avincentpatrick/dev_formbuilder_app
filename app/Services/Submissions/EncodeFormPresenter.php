@@ -13,6 +13,7 @@ use App\Models\FormField;
 use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Models\Submission;
+use App\Services\Forms\ChoiceListMaterializer;
 use App\Services\Forms\LinkedChoiceService;
 use App\Services\Forms\StepGraphInspector;
 use App\Services\Templates\TemplateRenderer;
@@ -241,7 +242,8 @@ final class EncodeFormPresenter
                 // must be read together.
                 'checksum' => $version->checksum,
                 // M141 — without a CSV-backed cascade's list: the engine copy needs no options (the server checks the
-                // answer), and the render copy in `blocks` already carries them (`R-7a2f4a13` is that copy's weight).
+                // answer). Since M186 (`R-7a2f4a13`) the render copy in `blocks` carries none either: the page fetches
+                // them by version from `choice_lists_url`.
                 'schema' => $version->schemaWithoutListOptions(),
                 'now' => $now,
             ],
@@ -294,6 +296,10 @@ final class EncodeFormPresenter
             // silent write down the draft channel — which has no audit row, no policy check for `update`, and
             // would overwrite the respondent's answers with no ledger entry that it happened.
             'draft_url' => $editing === null ? route('forms.submissions.draft', $form) : null,
+            // M186 (`R-7a2f4a13`): where the page fetches this version's list-backed cascades, or null when it has none.
+            'choice_lists_url' => $allFields->contains(static fn (FormField $f): bool => $f->field_type === FieldType::CascadingSelect && ChoiceListMaterializer::isListBacked($f->config))
+                ? route('forms.versions.choice-lists', [$form, $version])
+                : null,
         ];
     }
 
@@ -511,8 +517,11 @@ final class EncodeFormPresenter
             $levels[] = ['key' => $key, 'label' => (string) ($level['label'] ?? $key)];
         }
 
+        // M186 (`R-7a2f4a13`): a list-backed cascade's choices are fetched beside the page, by version (`choice_lists_url`),
+        // not carried in it — a barangay list is 42,000 rows, several MB, on every load of this page.
+        $listed = ChoiceListMaterializer::isListBacked($field->config);
         $options = [];
-        foreach ((array) data_get($field->config, 'options', []) as $option) {
+        foreach ($listed ? [] : (array) data_get($field->config, 'options', []) as $option) {
             if (! is_array($option) || ! isset($option['value'], $option['level'])) {
                 continue;
             }

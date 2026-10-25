@@ -13269,12 +13269,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   no `Prunable` touches users. A sweep of accounts never confirmed after a set number of days, holding no membership
   and no submission, would free the address. **Live.** Filed by `M140`. **Tier: before-launch.**
 
-- **`minor` · The staff encode page carries a CSV-backed cascade's whole list in its page props.** Filed by `M141`, which
+- ✅ **CLOSED BY `M186` (2026-10-25) — ****`minor` · The staff encode page carries a CSV-backed cascade's whole list in its page props.** Filed by `M141`, which
   turns a version's CSV choice lists into ordinary `config.options` at publish so every server-side reader stays
   correct. `EncodeFormPresenter` renders a cascade from the published field's options (`cascade()`), so a 42,000-row
   barangay list rides in the Inertia props on every encode load (a few MB). `M141` strips the engine's copy of the
   schema and leaves the render copy, which the page needs. The fix is the guest runtime's: fetch the lists beside the
-  page, by version. **Live.** **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: taken by the Philippine-places increment (`D131`), whose built-in list would otherwise put a few MB of props on every manual-entry page (`D128`).**
+  page, by version. **Live.** **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: taken by the Philippine-places increment (`D131`), whose built-in list would otherwise put a few MB of props on every manual-entry page (`D128`).** ✅ **CLOSED BY `M186` (2026-10-25):** `EncodeFormPresenter::cascade()` sends a list-backed cascade's levels and no choices, and the page fetches them once from `GET /forms/{form}/versions/{version}/choice-lists` (`AttachmentController::encodeChoiceLists()`, the guest endpoint's tuple shape, whole, `private, max-age=86400`; a superseded version served, a draft 404) and merges them into its render copy — "Loading the choice lists…" until then, a warning and Try again if they cannot be read. The gate is `SubmissionPolicy::readEncodeLists` — the union of the page's create, resume and edit doors — because `can:view,form` would refuse a Reviewer holding an editor grant who can encode (`tests/Feature/Submissions/EncodeChoiceListsTest.php`).
 
 - **`minor` · A typed cascade publishes a first-level choice that carries a parent, which no respondent is ever shown,
   and a value repeated within a level, whose later parent silently wins.** Found by `M141`.

@@ -1449,3 +1449,106 @@ describe('a question’s default value on the encode page (M180, R-20784770)', (
         expect(values(mountEncode(town({ editing, update_url: '/submissions/sub-1/answers', draft_url: null })))).not.toContain('Pasig');
     });
 });
+
+describe('a list-backed cascade on the encode page (M186, R-7a2f4a13)', () => {
+    const LISTS_URL = '/forms/form-1/versions/ver-1/choice-lists';
+
+    function placePage(): Record<string, unknown> {
+        const place = {
+            ...blockField({ key: 'place', field_type: 'cascading_select', label: 'Place' }),
+            // What the presenter sends now: the levels, and no choices.
+            cascade: { levels: [{ key: 'region', label: 'Region' }, { key: 'province', label: 'Province' }], options: [], skip_single: false },
+        };
+
+        return {
+            ...payload({
+                fields: [field({ key: 'place', field_type: 'cascading_select', config: { levels: [{ key: 'region', list: 'psgc:region' }, { key: 'province', list: 'psgc:province' }], options: [] } })],
+                blocks: [{ key: null, label: null, fields: [place] }],
+            }),
+            choice_lists_url: LISTS_URL,
+        };
+    }
+
+    const LISTS = {
+        data: {
+            version_id: 'ver-1',
+            lists: {
+                place: {
+                    levels: ['region', 'province'],
+                    options: [
+                        [0, '1300000000', 'NCR', null],
+                        [1, '1380600000', 'City of Manila', '1300000000'],
+                    ],
+                },
+            },
+        },
+    };
+
+    const settle = async (): Promise<void> => {
+        for (let i = 0; i < 5; i++) await nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+
+    const optionValues = (wrapper: VueWrapper, index: number): string[] =>
+        wrapper
+            .findAll('select')
+            [index].findAll('option')
+            .map((o) => (o.element as HTMLOptionElement).value)
+            .filter((v) => v !== '');
+
+    it('says it is loading, fetches the version’s lists once, and offers their choices', async () => {
+        let release: (value: unknown) => void = () => undefined;
+        const fetchSpy = vi.fn((url: string) =>
+            url === LISTS_URL
+                ? new Promise((resolve) => {
+                      release = resolve;
+                  })
+                : Promise.resolve({ ok: true, status: 204, json: () => Promise.resolve({}) }),
+        );
+        vi.stubGlobal('fetch', fetchSpy);
+        const wrapper = mountEncode(placePage());
+
+        expect(wrapper.text()).toContain('Loading the choice lists…');
+        expect(optionValues(wrapper, 0)).toEqual([]);
+
+        release({ ok: true, status: 200, json: () => Promise.resolve(LISTS) });
+        await settle();
+
+        expect(fetchSpy.mock.calls.filter(([url]) => url === LISTS_URL)).toHaveLength(1);
+        expect(wrapper.text()).not.toContain('Loading the choice lists…');
+        expect(optionValues(wrapper, 0)).toEqual(['1300000000']);
+
+        await wrapper.findAll('select')[0].setValue('1300000000');
+        await settle();
+        expect(optionValues(wrapper, 1)).toEqual(['1380600000']);
+    });
+
+    it('says when the lists could not be loaded, and tries again on request', async () => {
+        const fetchSpy = vi.fn((url: string) =>
+            Promise.resolve(url === LISTS_URL ? { ok: false, status: 500, json: () => Promise.resolve({}) } : { ok: true, status: 204, json: () => Promise.resolve({}) }),
+        );
+        vi.stubGlobal('fetch', fetchSpy);
+        const wrapper = mountEncode(placePage());
+        await settle();
+
+        expect(wrapper.text()).toContain('The choice lists could not be loaded');
+
+        fetchSpy.mockImplementation((url: string) =>
+            Promise.resolve(url === LISTS_URL ? { ok: true, status: 200, json: () => Promise.resolve(LISTS) } : { ok: true, status: 204, json: () => Promise.resolve({}) }),
+        );
+        await wrapper.findAll('button').find((b) => b.text() === 'Try again')!.trigger('click');
+        await settle();
+
+        expect(wrapper.text()).not.toContain('The choice lists could not be loaded');
+        expect(optionValues(wrapper, 0)).toEqual(['1300000000']);
+    });
+
+    it('fetches nothing for a version with no list-backed cascade', async () => {
+        const fetchSpy = vi.fn(() => Promise.resolve({ ok: true, status: 204, json: () => Promise.resolve({}) }));
+        vi.stubGlobal('fetch', fetchSpy);
+        mountEncode({ ...placePage(), choice_lists_url: null });
+        await settle();
+
+        expect(fetchSpy.mock.calls.filter(([url]) => url === LISTS_URL)).toHaveLength(0);
+    });
+});

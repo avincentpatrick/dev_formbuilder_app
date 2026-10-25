@@ -35,6 +35,7 @@ import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { MdsAlert, MdsBreadcrumb, MdsButton, MdsCard, type BreadcrumbItem } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
 import { createServerAutosave } from '@/composables/useServerAutosave';
+import { sendSettingsRequest } from '@/components/forms/reference-files';
 import FieldInput, { type AnswerValue, type EncodeField } from '@/components/submissions/FieldInput.vue';
 import RepeatTableFrame, { type RepeatTableColumn } from '@/components/submissions/RepeatTableFrame.vue';
 import { drawsAsTable } from '@/components/submissions/repeat-table';
@@ -171,6 +172,12 @@ const props = defineProps<{
      * response keeps its paper beside the form. Empty for a typed response, and absent in the other three modes.
      */
     scan_pages?: ScanPage[];
+    /**
+     * M186 (`R-7a2f4a13`) — where this version's list-backed cascades are fetched from, or null when it has none. Their
+     * choices are not in `blocks` (a barangay list is 42,000 rows on every load); they are fetched once, beside the page,
+     * and merged in. Optional: every existing encode test omits it, and absent means none.
+     */
+    choice_lists_url?: string | null;
 }>();
 
 /**
@@ -195,6 +202,49 @@ const isScanning = computed(() => props.scan != null);
  */
 const paperPages = computed<ScanPage[]>(() => (isScanning.value ? props.scan!.pages : isEditing.value ? props.scan_pages ?? [] : []));
 const hasPaper = computed(() => isScanning.value || paperPages.value.length > 0);
+
+// ── M186 (`R-7a2f4a13`): a list-backed cascade's choices, fetched beside the page ─────────────────────────────────
+// The guest page's shape (`ChoiceListMaterializer::listsForBrowser()`), each choice a tuple to halve a 42,000-row
+// list's bytes. Until they arrive the cascade's selects are empty and the page says why; if they cannot be read, it
+// says that and offers to try again. Only the RENDER copy is touched — the engine copy never held them, and the server
+// checks every answer against the version's own list.
+type FetchedLists = Record<string, { levels: string[]; options: [number, string, string, string | null][] }>;
+const fetchedLists = ref<FetchedLists>({});
+const listsState = ref<'none' | 'loading' | 'ready' | 'failed'>(props.choice_lists_url ? 'loading' : 'none');
+
+async function loadChoiceLists(): Promise<void> {
+    const url = props.choice_lists_url;
+    if (!url) return;
+    listsState.value = 'loading';
+    try {
+        const json = (await sendSettingsRequest(url, { method: 'GET' }, 'The choice lists could not be read.')) as { data?: { lists?: FetchedLists } } | null;
+        fetchedLists.value = json?.data?.lists ?? {};
+        listsState.value = 'ready';
+    } catch {
+        listsState.value = 'failed';
+    }
+}
+
+/** A field with its fetched cascade choices written in, or the field itself. */
+function withFetchedList(field: EncodeField): EncodeField {
+    const list = fetchedLists.value[field.key];
+    if (!list || !field.cascade) return field;
+
+    return {
+        ...field,
+        cascade: {
+            ...field.cascade,
+            options: list.options.map(([level, value, label, parent]) => ({ value, label, level: list.levels[level] ?? '', parent })),
+        },
+    };
+}
+
+onMounted(loadChoiceLists);
+
+/** `blocks` with the fetched lists merged in — what every row below renders from. */
+const renderBlocks = computed<Block[]>(() =>
+    listsState.value === 'ready' ? props.blocks.map((block) => ({ ...block, fields: block.fields.map(withFetchedList) })) : props.blocks,
+);
 
 
 const page = usePage();
@@ -326,7 +376,7 @@ const stepList = computed<Array<{ key: string; label: string; current: boolean }
 
 const blockByStepKey = computed<Record<string, Block>>(() => {
     const map: Record<string, Block> = {};
-    for (const block of props.blocks) {
+    for (const block of renderBlocks.value) {
         map[block.key ?? LEAD_STEP_KEY] = block;
     }
     return map;
@@ -368,7 +418,7 @@ function rowsOf(step: RuntimeStep): EncodeField[] {
 const referenceRows = computed<EncodeField[]>(() => {
     const shown = new Set(visibleSteps.value.map((step) => step.key));
     const rows: EncodeField[] = [];
-    for (const block of props.blocks) {
+    for (const block of renderBlocks.value) {
         if (shown.has(block.key ?? LEAD_STEP_KEY)) {
             continue;
         }
@@ -927,7 +977,7 @@ const scanHiddenAnswers = computed<string[]>(() => {
         return [];
     }
     const labels: string[] = [];
-    for (const block of props.blocks) {
+    for (const block of renderBlocks.value) {
         for (const field of block.fields) {
             if (field.key in scan.answers && runtime.fieldRelevance.value[field.key] === false) {
                 labels.push(field.label);
@@ -1340,6 +1390,19 @@ function onConflictKeydown(event: KeyboardEvent): void {
                 <!-- M129 — a save refused for a reason no single answer carries. Inserted after a POST returns, so
                      assertive — the conflict alert's argument below. -->
                 <MdsAlert v-if="scanError !== null" tone="danger" assertive title="This response was not saved" :message="scanError" />
+
+                <!-- M186 (`R-7a2f4a13`): a cascade's long list, fetched beside the page rather than carried in it. -->
+                <p v-if="listsState === 'loading'" class="encode__lists" role="status">Loading the choice lists…</p>
+                <div v-else-if="listsState === 'failed'" class="encode__lists">
+                    <MdsAlert
+                        tone="warning"
+                        title="The choice lists could not be loaded"
+                        message="Some questions have no choices until they are. Check the connection and try again."
+                    />
+                    <div>
+                        <MdsButton size="sm" variant="secondary" @click="loadChoiceLists">Try again</MdsButton>
+                    </div>
+                </div>
 
                 <!-- The one autosave failure a keyer must act on rather than wait out (a submitted-elsewhere draft or
                      an expired session). `role="alert"` because unlike the indicator above, continuing to type after
@@ -1862,6 +1925,16 @@ function onConflictKeydown(event: KeyboardEvent): void {
 }
 
 /* Engine-degrade notice (H21c) — the same border-accent treatment as the schedule banner. */
+/* M186 — the cascade lists' loading line, or their failure and its retry. */
+.encode__lists {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-2);
+    margin: 0 0 var(--mds-space-6);
+    color: var(--mds-color-text-secondary);
+    font-size: var(--mds-type-body-sm-font-size);
+}
+
 .encode__degraded {
     display: flex;
     flex-direction: column;

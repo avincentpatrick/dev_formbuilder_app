@@ -1157,6 +1157,12 @@ Route::middleware([
         ->scopeBindings()
         ->middleware('can:view,form')
         ->name('forms.versions.choices');
+    // M186, `R-7a2f4a13`: a version's whole cascade lists for manual entry, fetched beside the page by whoever can open it
+    // (`SubmissionPolicy::readEncodeLists`) — never in its props.
+    Route::get('/forms/{form}/versions/{version}/choice-lists', [AttachmentController::class, 'encodeChoiceLists'])
+        ->scopeBindings()
+        ->middleware('can:readEncodeLists,'.Submission::class.',form')
+        ->name('forms.versions.choice-lists');
     // M132, `R-b7bc5149`: a form's automations — "when a response is submitted, send an email or the answers to a web
     // address" (`D82`, `D83`), run on the queue only (`D62`). On the already-imported FormController, for the `use`-line
     // reason above. A change is `can:manage,automation` too: a web-address automation is `webhooks.manage`'s alone. The

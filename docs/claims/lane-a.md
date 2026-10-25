@@ -116,7 +116,10 @@ reader and the data file), new `database/data/psgc/places.csv` and `manifest.jso
 store hands the Levels tab the PSGC summary, as it hands `linkableSources` — the panel takes no page props), new
 `tests/Support/PsgcFixture.php` (the PSA-shaped fixture three test files share; Pest loads every file into one process, so a
 helper in one file is not safe in another), `tests/golden/templates/manifest.json` (the template vectors' count pin, which two new
-cascade vectors move).
+cascade vectors move). **Extended again, opened before this push (recorded):** `app/Http/Controllers/Tenant/AttachmentController.php`
+in place of the claimed new `VersionChoiceListsController.php`, which is not created — `routes/tenant.php` puts a new route on an
+already-imported controller, because a new `use` line there shifts every line a document cites; the handler sits beside the
+preview's two, and the controller gate passes.
 Shared artefacts taken: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/data-dictionary.md`,
 `docs/PRD.md`, `docs/TESTING-GUIDE.md`, `docs/deployment-infrastructure.md`, `openapi.json`, `tests/e2e/public-runtime-axe.spec.ts`,
 `tests/e2e/builder-axe.spec.ts`, `tests/e2e/form-settings-axe.spec.ts` and the specs the diff reaches, `PROGRESS.md` (own block).

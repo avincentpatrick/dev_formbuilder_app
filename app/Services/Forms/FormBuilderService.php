@@ -112,16 +112,22 @@ final class FormBuilderService
         });
     }
 
-    public function deleteSection(Form $form, FormSection $section): void
+    public function deleteSection(Form $form, FormSection $section, User $user): void
     {
-        DB::transaction(function () use ($form, $section): void {
-            $this->lockDraft($form);
+        DB::transaction(function () use ($form, $section, $user): void {
+            $draft = $this->lockDraft($form);
             // M90: the RE-READING guard, not the route-bound one. Holding the `forms` lock does not bound
             // this staleness — `lockDraft()` re-reads and returns a FRESH draft, so the lock says nothing
             // about the `$form` this guard compares. See the note on assertStillDraftChild().
             $this->assertStillDraftChild($form, $section);
+            // M188 (`R-3894369d`): the section's questions are moved to the top level, so each one's history says so —
+            // the database moves them (below), so nothing else would.
+            $recorder = app(FieldRevisionRecorder::class);
+            $before = $recorder->positions($draft);
+            $labels = $recorder->sectionLabels($draft);
             // The FK is ON DELETE SET NULL — the section's fields become ungrouped, not deleted.
             $section->delete();
+            $recorder->recordMoves($form, $draft, $user, $before, $recorder->positions($draft), $labels);
         });
     }
 
@@ -286,6 +292,11 @@ final class FormBuilderService
                 throw FormException::childRemovedDuringEdit();
             }
 
+            // M188 (`R-3894369d`): the question as it stands, re-read under the lock — never the route-bound copy, which
+            // can be a request old — so its history records what THIS save changed. A plain SELECT, so no lock is added.
+            $recorder = app(FieldRevisionRecorder::class);
+            $before = $recorder->snapshot(FormField::query()->whereKey($field->getKey())->firstOrFail());
+
             $field->fill([
                 'key' => $this->freeKey(FormField::query(), $field, (string) $data['key']),
                 'label' => $data['label'],
@@ -307,7 +318,13 @@ final class FormBuilderService
 
             $this->replaceValidations($field, $data['validations'] ?? [], $siblingIdByKey);
 
-            return $field->refresh();
+            $field->refresh();
+            // Last, after every lock this save takes: the revision's only foreign keys are to `tenants` and `users`, which
+            // no builder path locks, so the M91/M92 order is unchanged. `put_back_of` names the entry a Put back restores.
+            $putBackOf = $data['put_back_of'] ?? null;
+            $recorder->recordEdit($form, $field, $user, $before, $recorder->snapshot($field), is_string($putBackOf) ? $putBackOf : null);
+
+            return $field;
         });
     }
 
@@ -372,7 +389,9 @@ final class FormBuilderService
             // QueryException catch in updateField()); this does not relabel it, it makes it unreachable.
             $this->assertStillDraftChild($form, $field);
 
-            $copy = $field->replicate(['created_by', 'updated_by']);
+            // M188 (`R-3894369d`): a copy is a new question, so it leaves the lineage behind and the database gives it its
+            // own — otherwise the two would share one history.
+            $copy = $field->replicate(['created_by', 'updated_by', 'lineage_id']);
             // M177 (`R-71509975`): the copy keeps its choices, the Other one too, but not the link — two questions would
             // otherwise claim one Please specify, and turning either off would delete the other's.
             $copyConfig = (array) $copy->config;
@@ -443,9 +462,13 @@ final class FormBuilderService
             $options = array_values((array) ($config['options'] ?? []));
             $config['options'] = OtherSpecify::withOther($options);
             $config[OtherSpecify::CONFIG_KEY] = $child->key;
+            $recorder = app(FieldRevisionRecorder::class);
+            $before = $recorder->snapshot($field);
             $field->forceFill(['config' => $config, 'updated_by' => $user->id])->save();
+            // M188 (`R-3894369d`): the switch is listed in the choice question's history; it is put back by the switch.
+            $recorder->recordEdit($form, $field->refresh(), $user, $before, $recorder->snapshot($field));
 
-            return ['parent' => $field->refresh(), 'child' => $child->refresh()];
+            return ['parent' => $field, 'child' => $child->refresh()];
         });
     }
 
@@ -474,9 +497,12 @@ final class FormBuilderService
             $options = array_values((array) ($config['options'] ?? []));
             $config['options'] = OtherSpecify::withoutOther($options);
             unset($config[OtherSpecify::CONFIG_KEY]);
+            $recorder = app(FieldRevisionRecorder::class);
+            $before = $recorder->snapshot($field);
             $field->forceFill(['config' => $config, 'updated_by' => $user->id])->save();
+            $recorder->recordEdit($form, $field->refresh(), $user, $before, $recorder->snapshot($field));
 
-            return $field->refresh();
+            return $field;
         });
     }
 
@@ -598,6 +624,10 @@ final class FormBuilderService
                 throw new BuilderConflictException($locked);
             }
 
+            // M188 (`R-3894369d`, `D168`): listed in the question's history, never put back.
+            $recorder = app(FieldRevisionRecorder::class);
+            $before = $recorder->snapshot($locked);
+
             // field_type is always dirty here, so this always issues the UPDATE.
             $locked->fill([...$plan->fieldAttributes(), 'updated_by' => $user->id])->save();
 
@@ -619,7 +649,10 @@ final class FormBuilderService
                 ]);
             }
 
-            return $locked->refresh();
+            $locked->refresh();
+            $recorder->recordTypeChange($form, $locked, $user, $before, $recorder->snapshot($locked));
+
+            return $locked;
         });
     }
 
@@ -710,13 +743,18 @@ final class FormBuilderService
     // ── Reorder (structural; serialized by the form-row lock; `toBase()` so it does NOT bump updated_at) ──
 
     /**
+     * M188 (`R-3894369d`): each question this moves — to another section, or to another place among its section's — gets a
+     * `moved` entry in its history; the rows a move merely renumbers do not.
+     *
      * @param  list<array{id: string, sequence: int}>  $sections
      * @param  list<array{id: string, form_section_id: ?string, sequence: int, section_sequence: ?int}>  $fields
      */
-    public function reorder(Form $form, array $sections, array $fields): void
+    public function reorder(Form $form, User $user, array $sections, array $fields): void
     {
-        DB::transaction(function () use ($form, $sections, $fields): void {
+        DB::transaction(function () use ($form, $user, $sections, $fields): void {
             $draft = $this->lockDraft($form);
+            $recorder = app(FieldRevisionRecorder::class);
+            $before = $recorder->positions($draft);
 
             // M172 (`R-81756e95`): an id from a version a publish has moved past matched nothing below and answered a
             // silent 200, so the order the author saw was never saved. It is refused like every other builder write
@@ -747,6 +785,8 @@ final class FormBuilderService
                     'section_sequence' => $row['section_sequence'],
                 ]);
             }
+
+            $recorder->recordMoves($form, $draft, $user, $before, $recorder->positions($draft), $recorder->sectionLabels($draft));
         });
     }
 

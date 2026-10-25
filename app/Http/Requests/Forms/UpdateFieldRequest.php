@@ -75,6 +75,8 @@ final class UpdateFieldRequest extends FormRequest
             'is_queryable' => ['boolean'],
             'indexed_data_type' => ['nullable', Rule::enum(IndexedDataType::class)],
             'version' => ['nullable', 'string'],
+            // M188 (`R-3894369d`, `D167`): the history entry a Put back restores; recorded on the new entry, never trusted further.
+            'put_back_of' => ['sometimes', 'nullable', 'uuid'],
             'validations' => ['present', 'array'],
             'validations.*.rule_type' => ['nullable', Rule::enum(ValidationRuleType::class)],
             'validations.*.operator' => ['nullable', Rule::enum(ComparisonOperator::class)],
@@ -161,6 +163,7 @@ final class UpdateFieldRequest extends FormRequest
             'is_queryable' => 'queryable flag',
             'indexed_data_type' => 'indexed type',
             'version' => 'version',
+            'put_back_of' => 'change being put back',
             'validations' => 'rules',
             'validations.*.rule_type' => 'rule type',
             'validations.*.operator' => 'rule operator',

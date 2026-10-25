@@ -40,6 +40,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property bool $is_queryable
  * @property bool $is_pii
  * @property bool $is_sensitive
+ * @property string $lineage_id the question's identity across versions and renames (M188, `R-3894369d`): the database's
+ *                              `gen_random_uuid()` on insert, carried by `replicate()`, never mass-assigned
  */
 class FormField extends Model implements TenantScoped
 {

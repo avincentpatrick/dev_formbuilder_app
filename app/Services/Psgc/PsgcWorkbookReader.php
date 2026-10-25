@@ -109,7 +109,7 @@ final class PsgcWorkbookReader
 
         foreach ($rows as $row) {
             $line++;
-            $cells = array_map(CellText::of(...), $row->toArray());
+            $cells = array_values(array_map(CellText::of(...), $row->toArray())); // by position: the header row's index is a column
 
             if ($columns === null) {
                 $columns = $this->header($cells);

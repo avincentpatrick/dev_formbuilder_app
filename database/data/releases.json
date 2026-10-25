@@ -1,5 +1,27 @@
 [
     {
+        "version": "0.14.0",
+        "title": "Signatures, and what each question type can do",
+        "items": [
+            {
+                "kind": "new",
+                "text": "A Signature question can now be answered: people sign with a finger, a pen or the mouse, on the web form and in manual entry. The signature shows on the response page and in the response PDF."
+            },
+            {
+                "kind": "new",
+                "text": "Help → Builder reference → What each type can do: a table of every question type and where it works — the builder, the web form, manual entry, paper and scan, the PDF, spreadsheets, Google Sheets and Airtable, analytics and conditions."
+            },
+            {
+                "kind": "improved",
+                "text": "The “Adv” mark in the question list now says what it means: the type works like any other, and its settings are more technical."
+            },
+            {
+                "kind": "improved",
+                "text": "A photo, file or signature in a spreadsheet export now has a link to open it; you sign in to open it."
+            }
+        ]
+    },
+    {
         "version": "0.13.0",
         "title": "Philippine places, and choices narrowed by another form",
         "items": [

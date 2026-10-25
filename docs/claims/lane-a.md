@@ -326,6 +326,41 @@ skips by name. Relayed `R1-2` is resolved only once the places are live. Dev dat
 - **Mutants: 8 caught, 0 survived** — the build's totals refusal, the sync's hash check, `choice_filter_not_comparable`, the
   self-entry collapse, `readEncodeLists`, the template strip, the cascade-repeat refusal, "a cascade is shared only when ticked".
 
+**RESUMED 2026-10-26 for the data commit (`R-70c7673a`), on `m186-t5-psgc-filter`, still held for merge point 6.** The plan is
+`~/.claude/plans/read-claude-md-then-php-magical-map.md` Parts 1–3. **The workbook is in hand:** the user downloaded
+*PSGC-3Q-2026-Publication-Datafile.xlsx* in a browser (3,248,857 B, sha256 `8aad47f8…31dc9a59`) after the Internet Archive's Save
+Page Now failed on every psa.gov.ph address (520, "Job failed" — the Cloudflare challenge). The session-start pull read 0 reports,
+0 reopened, 0 new comments (relayed 31: 22 Resolved · 3 Ongoing · 6 Confirmed working). **Asked and answered in planning (the user,
+2026-10-26):** **`D166` B** — the City of Isabela appears as the PSA writes it: "City of Isabela (Not a Province)" at the province
+level, then "City of Isabela" (recorded on this branch with the tiers fix; `D166` because T6's branch holds `D164`/`D165`).
+- **Evidence (re-verified):** the row's citations are unchanged since `be6166d1`; `psgc:build`, `PsgcWorkbookReader` and
+  `PsgcTiers` are as built.
+- **Premise (re-verified, measured on the real files):** read in memory, the archived 2Q 2026 file (sha256 `31892bc2…94bca5d`)
+  and the user's 3Q file both hold Reg 18 · Prov 82 · City 149 · Mun 1,493 · SubMun 14 · Bgy 42,010, and two rows with a **blank
+  level**: `1999900000` Special Geographic Area and `0990100000` City of Isabela (Not a Province). There is no `Dist` and no `SGU`.
+  The National Summary is a **table** (`CODE · REGION · PROV. · CITIES · MUN. · BGY.`, a `PHILIPPINES` totals row, one coded row
+  per region), not "Regions 18" lines. **3Q differs from 2Q in layout only:** the places table starts in column B; a footnote row
+  `a/ As noted by the PSA Board, Lucena City is treated as an HUC …` sits in the code column; and Lucena's name carries the marker
+  (`0431200000` "City of Lucenaa/"). The only real change is PSA's announced one: `1001322005` Lambangan → **Lambagan**. The Ñ in
+  Las Piñas and Parañaque survives. With the blank rows at the province tier, the parent rules fault on 0 of 43,768 places.
+- **Remedy verdict — the build as committed would REFUSE the real file, four ways:** the summary reader takes "Region I (Ilocos
+  Region)"'s first number, 4, as the region total (and `--expect` cannot override a total read from the sheet); a blank level is
+  unknown; the footnote row is not a code; and Lucena's name would be stored as "City of Lucenaa/". **Works, with four fixes:**
+  read the summary as the PSA's table; put a blank level at the province group on the province tier (`D166` B), refusing any
+  other blank level by name; skip a footnote row and report it; strip a name's trailing marker only when a footnote row declares
+  it, and report it. The fixture is reshaped to the measured file.
+
+Files: `app/Services/Psgc/PsgcWorkbookReader.php`, `app/Services/Psgc/PsgcTiers.php`, `app/Console/Commands/BuildPsgcCommand.php`
+(it prints what it skipped and stripped), `tests/Support/PsgcFixture.php`, `tests/Feature/Psgc/PsgcBuildCommandTest.php`,
+`tests/fixtures/psgc/` (only if the reshaped fixture moves its bytes), new `database/data/psgc/places.csv` and `manifest.json`,
+`docs/deployment-infrastructure.md` §3.2, `docs/data-dictionary.md` §41 (if it describes the workbook), `docs/feature-backlog.md`,
+`docs/claims/decisions.md`, `docs/pipeline.md`. `PsgcWorkbookReader.php`, `PsgcTiers.php`, `BuildPsgcCommand.php`, the fixture,
+the build test and `PsgcCommittedDataTest.php` were opened read-only in planning (recorded). Namespaces spent: `D166`. No migration.
+Prediction: red first to the build test's new real-layout cases (the summary misread, the blank level, the footnote row, the
+marker); `PsgcCommittedDataTest` stops skipping once the data is committed and passes; the E2E fixture's bytes do not move (its
+19 places are written by `PsgcTiers`, not from the workbook). **Most likely wrong:** the committed CSV's size and the deploy's
+`psgc:sync` time on 43,788 rows — measured locally before the push.
+
 ## RELEASED — `M185`, T4 of the testers' items: the grid, part 2 — rows and choices from a list or another form, rows and columns edited in the Preview, a repeatable section as a table (`R-bb79aec0`, `R-7418e6bd`, `R-0a7275ce`) (merged as PR #378, `eba3e3a4`, last at merge point 5, rebased onto the trunk after `M184`; 6/6 green with real step counts on its rebased run at `293e0381` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `eba3e3a4` the same)
 
 **RELEASED LAST AT MERGE POINT 5 (`D137`, `D138`), 2026-10-24, by the merge-point-5 session** (plan

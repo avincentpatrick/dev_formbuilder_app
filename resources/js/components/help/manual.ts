@@ -607,6 +607,7 @@ const guide: ChapterDraft[] = [
                 title: 'Download the responses',
                 blocks: [
                     p('On the ', ui('Responses', TABS), ' tab, click ', ui('Export CSV', INBOX), ' or ', ui('Export XLSX', INBOX), ' (for Excel). Each response is one row and each question one column.'),
+                    p('A photo, file, recording or signature shows its name and a link to open it. Whoever opens the link signs in first, so the file is never open to someone who could not see the response.'),
                     tip('info', 'Reviewing and approving responses, scanning paper forms, inviting members and automatic emails are covered by your workspace’s own guidance, not by this manual.'),
                 ],
             },

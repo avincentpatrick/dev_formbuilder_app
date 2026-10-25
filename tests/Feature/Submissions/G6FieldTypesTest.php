@@ -28,7 +28,9 @@ use App\Services\Submissions\SubmissionPayload;
 use App\Services\Submissions\SubmissionPdfPresenter;
 use App\Services\Submissions\SubmissionPdfRenderer;
 use App\Services\Submissions\SubmissionPipeline;
+use App\Services\Submissions\SubmissionRowProjector;
 use App\Support\Tenancy\TenantContext;
+use App\Support\Tenancy\TenantUrl;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
@@ -397,7 +399,8 @@ function g6SignedSubmission(Tenant $tenant, User $user, AttachmentStorageService
     $attachment = $storage->store(g6PadPng(), $version, 'signed', $user->id);
     $result = $pipeline->submit(new SubmissionPayload(
         version: $version,
-        answers: ['signed' => [['id' => $attachment->id, 'mime' => 'image/png']]],
+        // The reference the upload returns (`Attachment::toAnswerRef()`), which carries the file's name.
+        answers: ['signed' => [$attachment->toAnswerRef()]],
         source: SubmissionSource::Manual,
         respondentUserId: $user->id,
     ));
@@ -476,4 +479,50 @@ it('keeps a form with a Signature unscannable, and the refusal names the signatu
 
     expect(CapabilityFlags::isOcrCompatible($version))->toBeFalse()
         ->and(OcrException::formNotEligible()->getMessage())->toContain('a signature');
+});
+
+/** One submission's export cells — what CSV, XLSX, Google Sheets and Airtable all write — by question key. */
+function g6ExportCells(Submission $submission): array
+{
+    $projector = app(SubmissionRowProjector::class);
+    [, $fieldMeta] = $projector->resolveColumns(collect([FormVersion::query()->findOrFail($submission->form_version_id)]), 'en');
+
+    return $projector->answerValues($submission, $fieldMeta, 'en');
+}
+
+it('exports a signature as its name and a link that opens it after sign-in (M187, D165)', function (): void {
+    [$submission, $attachment] = g6SignedSubmission($this->tenant, $this->user, $this->storage, $this->pipeline, ScanStatus::Skipped);
+
+    // `TenantUrl::to()`, never `route()`: a queued export has no request, so `route()` would name the central host.
+    $link = TenantUrl::to($this->tenant, 'attachments/'.$attachment->id);
+
+    expect(g6ExportCells($submission)['signed'])->toBe('signature.png — '.$link)
+        ->and($link)->toStartWith('http')
+        ->and($link)->toContain('alpha')
+        ->and($link)->not->toContain('signature'); // no key, no name, no expiry: the id and the workspace's host
+});
+
+it('exports every photo of an answer with its own link, joined as before (M187, D165)', function (): void {
+    $version = g6PhotoVersion($this->tenant, $this->user, ['max_count' => 3]);
+    $first = $this->storage->store(g6FakeImage('front.png'), $version, 'photos', $this->user->id);
+    $second = $this->storage->store(g6FakeImage('back.png'), $version, 'photos', $this->user->id);
+    $result = $this->pipeline->submit(new SubmissionPayload(
+        version: $version,
+        answers: ['photos' => [['id' => $first->id, 'name' => 'front.png'], ['id' => $second->id, 'name' => 'back.png']]],
+        source: SubmissionSource::Manual,
+        respondentUserId: $this->user->id,
+    ));
+
+    expect(g6ExportCells($result->submission->refresh())['photos'])->toBe(
+        'front.png — '.TenantUrl::to($this->tenant, 'attachments/'.$first->id)
+        .'; back.png — '.TenantUrl::to($this->tenant, 'attachments/'.$second->id),
+    );
+});
+
+it('exports a file that never reached the server by its name alone (M187)', function (): void {
+    $version = g6SignatureVersion($this->tenant, $this->user);
+    $submission = new Submission(['form_version_id' => $version->id, 'tenant_id' => $this->tenant->id]);
+    $submission->setRelation('answers', new SubmissionAnswer(['answers' => ['signed' => [['id' => 'local:42', 'name' => 'signature.png']]]]));
+
+    expect(g6ExportCells($submission)['signed'])->toBe('signature.png');
 });

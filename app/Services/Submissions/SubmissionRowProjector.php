@@ -8,12 +8,15 @@ use App\Enums\FieldType;
 use App\Enums\SubmissionSource;
 use App\Models\FormVersion;
 use App\Models\Submission;
+use App\Models\Tenant;
 use App\Services\Templates\TemplateRenderer;
 use App\Services\Templates\TemplateSources;
 use App\Support\Forms\MatrixColumns;
 use App\Support\Mapping\ColumnMapping;
 use App\Support\Submissions\SubmissionReference;
+use App\Support\Tenancy\TenantUrl;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 /**
  * Turns a {@see Submission} into named, display-ready values — the column resolution and cell formatting that
@@ -63,6 +66,9 @@ final class SubmissionRowProjector
     public const META_SUBMITTED_AT = '__submitted_at';
 
     public const META_LOCALE = '__locale';
+
+    /** @var array<string, Tenant|null> each workspace a media link was built for, read once (M187) */
+    private array $tenants = [];
 
     public function __construct(
         private readonly SchemaValueFormatter $formatter,
@@ -239,12 +245,55 @@ final class SubmissionRowProjector
                 continue;
             }
 
+            // M187 (`R-c64d0afd`, `D165` A): a file's name, then a link that opens it after sign-in. A media question
+            // cannot sit in a repeatable section, so only the top-level arm needs it.
+            if ($meta['type']->isMedia() && $meta['repeat'] === null) {
+                $values[$key] = $this->mediaCell($submission, $answers[$key] ?? null);
+
+                continue;
+            }
+
             $values[$key] = $meta['repeat'] === null
                 ? $this->formatter->displayValue($meta['type'], $answers[$key] ?? null, $meta['config'], $locale)
                 : $this->repeatCell($meta['type'], $meta['config'], $this->instancesOf($answers, $meta['repeat']), $key, $locale);
         }
 
         return $values;
+    }
+
+    /**
+     * M187 (`R-c64d0afd` question (1), `D165` A): a photo, file, recording or signature as its name and a link that opens
+     * it — "front.png — https://acme.example/attachments/{id}; back.png — …". The link carries no key and no expiry:
+     * whoever clicks it signs in, and `AttachmentController::show` with `AttachmentPolicy` decides, exactly as for a
+     * member opening the response. `TenantUrl::to()` rather than `route()`, because an export and a Sheets or Airtable
+     * sync run queued, with no request to take a host from — `route()` would name the central domain. The column keeps
+     * its key, so no mapped sync changes identity; rows synced before keep their old text. A file that never reached
+     * the server (a guest's offline `local:` placeholder) has no row to open and keeps its name alone.
+     */
+    private function mediaCell(Submission $submission, mixed $answer): string
+    {
+        $tenant = $this->tenantOf($submission);
+        $cells = [];
+
+        foreach ($this->formatter->mediaFiles($answer) as $file) {
+            $cells[] = $tenant !== null && $file['id'] !== null && Str::isUuid($file['id'])
+                ? $file['name'].' — '.TenantUrl::to($tenant, 'attachments/'.$file['id'])
+                : $file['name'];
+        }
+
+        return implode('; ', $cells);
+    }
+
+    /** The submission's workspace, read once per projector: every row of one export shares it. */
+    private function tenantOf(Submission $submission): ?Tenant
+    {
+        $id = $submission->tenant_id;
+
+        if ($id === '') {
+            return null;
+        }
+
+        return $this->tenants[$id] ??= Tenant::query()->find($id);
     }
 
     /**

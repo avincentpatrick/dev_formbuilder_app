@@ -324,26 +324,42 @@ final class SchemaValueFormatter
      */
     private function formatMedia(mixed $answer): string
     {
+        return implode('; ', array_column($this->mediaFiles($answer), 'name'));
+    }
+
+    /**
+     * A media answer's files, each with the name every surface shows for it (its name, else its type, else "Attached
+     * file"). Public for the export (M187, `D165`): it adds a link after each name, and reads the names from here so
+     * the two can never name a file differently.
+     *
+     * @return list<array{id: string|null, name: string}>
+     */
+    public function mediaFiles(mixed $answer): array
+    {
         if (! is_array($answer) || ! array_is_list($answer)) {
-            return '';
+            return [];
         }
 
-        $names = [];
+        $files = [];
 
         foreach ($answer as $ref) {
             if (! is_array($ref)) {
                 continue;
             }
 
+            $id = $ref['id'] ?? null;
             $name = $ref['name'] ?? null;
             $mime = $ref['mime'] ?? null;
 
-            $names[] = is_string($name) && $name !== ''
-                ? $name
-                : (is_string($mime) && $mime !== '' ? $mime : 'Attached file');
+            $files[] = [
+                'id' => is_string($id) && $id !== '' ? $id : null,
+                'name' => is_string($name) && $name !== ''
+                    ? $name
+                    : (is_string($mime) && $mime !== '' ? $mime : 'Attached file'),
+            ];
         }
 
-        return implode('; ', $names);
+        return $files;
     }
 
     /**

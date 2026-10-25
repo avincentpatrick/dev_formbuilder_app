@@ -34,6 +34,10 @@ use Illuminate\Support\Collection;
  *
  * M185 (`R-bb79aec0`, `D161`): a grid's rows, cells or a column's choices from another form pass the same two keys,
  * refused as `grid_source_invalid`, naming the part.
+ *
+ * M186 (`R-ed7f3127`): a filter — a cascade level's, or a list-fed choice question's — passes the same two keys for a
+ * filter's purpose (a cascade the source chose to share counts), and its values must be comparable with the choices it
+ * narrows ({@see LinkedChoiceService::filterProblem()}); refused as `choice_filter_invalid`, naming the level.
  */
 final class LinkedChoiceGate
 {
@@ -50,6 +54,14 @@ final class LinkedChoiceGate
 
         foreach ($fields as $field) {
             $config = $field->config;
+            // M186 (`R-ed7f3127`): a filter that narrows a cascade level, or a list-fed choice question's choices.
+            foreach (LinkedChoiceService::declaredFilters($field->field_type, $config) as $declared) {
+                $destination ??= Form::query()->whereKey($version->form_id)->first();
+                $problem = $this->filterProblem($field, (array) $config, $declared, $destination);
+                if ($problem !== null) {
+                    $violations[] = PublishValidationException::choiceFilterInvalid($field->key, $problem[0], $problem[1]);
+                }
+            }
             // M185 (`R-bb79aec0`, `D161`): a grid's rows, cells or a column's choices from another form. The materializer has
             // already copied a servable list in, so only completeness and consent are judged here — never "typed choices beside
             // a link" ({@see codeFor()}): the copy is exactly what sits beside it.
@@ -99,6 +111,34 @@ final class LinkedChoiceGate
         }
 
         return $violations;
+    }
+
+    /**
+     * What is wrong with one declared filter — `[what it narrows, why]` — or null.
+     *
+     * @param  array<string, mixed>  $config
+     * @param  array{level: int|null, filter: mixed}  $declared
+     * @return array{0: string, 1: string}|null
+     */
+    private function filterProblem(FormField $field, array $config, array $declared, ?Form $destination): ?array
+    {
+        $level = $declared['level'] === null ? null : (array_values((array) ($config['levels'] ?? []))[$declared['level']] ?? null);
+        $level = is_array($level) ? $level : null;
+        $what = $level === null ? 'choices' : 'level “'.((string) ($level['label'] ?? '') !== '' ? $level['label'] : ($level['key'] ?? '')).'”';
+
+        // A choice question narrows a list that comes from elsewhere — a list file or another form — never typed choices.
+        if ($level === null && (! in_array($field->field_type, LinkedChoiceService::LINKABLE_TYPES, true) || ChoiceSource::of($config)->isTyped())) {
+            return [$what, 'choice_filter_needs_a_source'];
+        }
+
+        $filter = LinkedChoiceService::filterOf($declared['filter']);
+        if ($filter === null) {
+            return [$what, 'linked_choices_incomplete'];
+        }
+
+        $code = $destination === null ? 'linked_choices_source_missing' : $this->links->filterProblem($destination, $filter, $level);
+
+        return $code === null ? null : [$what, $code];
     }
 
     /** @param array<string, mixed>|null $config */

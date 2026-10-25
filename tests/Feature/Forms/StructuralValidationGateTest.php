@@ -1076,3 +1076,51 @@ it('still lets a condition test a multi-select for an answer, or for a choice it
 
     expect(relatedKindRefusal($this->gate, $version)['codes'])->not->toContain('rule_operator_not_allowed_for_related_shape');
 });
+
+// ── M186 (`R-bbf03029`): two cascade shapes no respondent can be offered ─────────────────────────────────
+
+/** A two-level cascade with these options, on a fresh draft. */
+function gateCascadeVersion(User $user, array $options): FormVersion
+{
+    $version = makeDraftVersion(makeForm($user));
+    addFormField($version, $user, 'place', FieldType::CascadingSelect, 0, ['config' => [
+        'levels' => [['key' => 'region', 'label' => 'Region'], ['key' => 'city', 'label' => 'City']],
+        'options' => $options,
+    ]]);
+
+    return $version->refresh();
+}
+
+it('refuses a first-level option that names a parent, which no respondent is ever shown', function (): void {
+    $version = gateCascadeVersion($this->user, [
+        ['value' => 'ncr', 'label' => 'NCR', 'level' => 'region', 'parent' => null],
+        ['value' => 'r1', 'label' => 'Region I', 'level' => 'region', 'parent' => 'ncr'],
+        ['value' => 'manila', 'label' => 'Manila', 'level' => 'city', 'parent' => 'ncr'],
+    ]);
+
+    expect(fn () => $this->gate->assertPublishable($version))
+        ->toThrow(PublishValidationException::class, 'option “r1” is at the first level, so it takes no parent');
+});
+
+it('refuses a value twice at one level, whose later parent would silently win', function (): void {
+    $version = gateCascadeVersion($this->user, [
+        ['value' => 'ncr', 'label' => 'NCR', 'level' => 'region', 'parent' => null],
+        ['value' => 'r1', 'label' => 'Region I', 'level' => 'region', 'parent' => null],
+        ['value' => 'san_juan', 'label' => 'San Juan', 'level' => 'city', 'parent' => 'ncr'],
+        ['value' => 'san_juan', 'label' => 'San Juan', 'level' => 'city', 'parent' => 'r1'],
+    ]);
+
+    expect(fn () => $this->gate->assertPublishable($version))
+        ->toThrow(PublishValidationException::class, 'option “san_juan” appears twice at level “city”');
+});
+
+it('still publishes one value at two levels — the Philippine places’ city under no province', function (): void {
+    $version = gateCascadeVersion($this->user, [
+        ['value' => '1380600000', 'label' => 'City of Manila', 'level' => 'region', 'parent' => ''],
+        ['value' => '1380600000', 'label' => 'City of Manila', 'level' => 'city', 'parent' => '1380600000'],
+    ]);
+
+    $this->gate->assertPublishable($version);
+
+    expect(true)->toBeTrue(); // reached here without throwing — and an empty parent at the first level is no parent
+});

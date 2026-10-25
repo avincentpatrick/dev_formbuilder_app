@@ -257,6 +257,8 @@ export interface RenderCascadeOption {
 export interface RenderCascade {
     levels: RenderCascadeLevel[];
     options: RenderCascadeOption[];
+    /** M186 (`R-70c7673a`): `config.skip_single_choice_levels` — a level with one choice is filled in for the person. */
+    skipSingle?: boolean;
 }
 
 /**
@@ -308,6 +310,14 @@ export interface RenderMedia {
     captureSource: string | null;
 }
 
+/** M186 (`R-ed7f3127`): one filter on a question's choices — `level` a cascade level's index, or null for its own list. */
+export interface RenderChoiceFilter {
+    level: number | null;
+    mode: 'present' | 'absent';
+    /** The other form's answers, or null when they could not be read — every choice is then shown (`D163`). */
+    values: string[] | null;
+}
+
 export interface RenderField {
     key: string;
     sectionKey: string | null;
@@ -338,6 +348,11 @@ export interface RenderField {
     calculation: Record<string, unknown> | null;
     /** M184 (`R-596d6afd`): a Short text's suggestions, offered as the person types; null for every other type. */
     suggestions: string[] | null;
+    /**
+     * M186 (`R-ed7f3127`): what narrows the choices shown by what another form recorded, or null. Optional, so a render
+     * field built by hand in a test needs none. Display only: no engine reads it.
+     */
+    choiceFilter?: RenderChoiceFilter[] | null;
     /** M177 (`R-f44e9d00`): Show to respondents — `hidden` (Never) or `shown` (Always); null keeps the type's own rule. */
     visibility: 'hidden' | 'shown' | null;
     sequence: number;

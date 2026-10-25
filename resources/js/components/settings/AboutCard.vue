@@ -19,7 +19,9 @@ import { computed } from 'vue';
 import { MdsCard, MdsIcon } from '@meridian/design-system';
 
 const props = defineProps<{
-    about: { version: string; commit: string | null; built_at: string | null; environment: string };
+    // M186 (`D131`): `places` credits the PSA for the built-in Philippine places while a quarter is loaded. Optional, because
+    // the console's About shows the build only.
+    about: { version: string; commit: string | null; built_at: string | null; environment: string; places?: string | null };
 }>();
 
 const builtAt = computed(() => {
@@ -60,6 +62,10 @@ const builtAt = computed(() => {
             <div class="about__row">
                 <dt class="about__term">Environment</dt>
                 <dd class="about__value">{{ about.environment }}</dd>
+            </div>
+            <div v-if="about.places" class="about__row">
+                <dt class="about__term">Philippine places</dt>
+                <dd class="about__value">{{ about.places }}</dd>
             </div>
         </dl>
 

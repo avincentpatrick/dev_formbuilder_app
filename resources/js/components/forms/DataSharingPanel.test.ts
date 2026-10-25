@@ -165,3 +165,25 @@ describe('DataSharingPanel', () => {
         expect(mountPanel().find('[data-sharing-used-by]').text()).toContain('No published form uses them yet.');
     });
 });
+
+describe('a cascade, shared to narrow another form’s choices (M186, R-ed7f3127)', () => {
+    const QUESTIONS = [
+        { key: 'facility', label: 'Facility', narrows_only: false },
+        { key: 'place', label: 'Place', narrows_only: true },
+    ];
+
+    it('is not among "every question", and the section says how to share it', () => {
+        const wrapper = mountPanel({ enabled: true, field_keys: null, questions: QUESTIONS });
+
+        expect(wrapper.find('.data-sharing__list').text()).toBe('Facility');
+        expect(wrapper.find('[data-sharing-cascades]').text()).toContain('shared only when you choose it');
+    });
+
+    it('is ticked by its own label, which says it only narrows', () => {
+        const wrapper = mountPanel({ enabled: true, field_keys: ['place'], questions: QUESTIONS });
+
+        // Both questions offered to tick — the note beside them must not stand in for the list.
+        expect(wrapper.find('.data-sharing__choices').text()).toContain('Facility');
+        expect(wrapper.text()).toContain("Place — narrows another form's choices only");
+    });
+});

@@ -25,11 +25,13 @@ import type {
     ValidationRow,
     ValidationRuleType,
 } from '../engine';
+import type { ChoiceFilterSet } from './linked-choices';
 import type {
     AnswerMap,
     RawField,
     RawSection,
     RenderCascade,
+    RenderChoiceFilter,
     RenderCascadeLevel,
     RenderCascadeOption,
     RenderField,
@@ -104,7 +106,11 @@ export function resolveOptional(
 export function resolveCascade(
     cascade: RenderCascade | null,
     locale: string,
-): { levels: { key: string; label: string }[]; options: { value: string; label: string; level: string; parent: string | null }[] } | null {
+): {
+    levels: { key: string; label: string }[];
+    options: { value: string; label: string; level: string; parent: string | null }[];
+    skip_single: boolean;
+} | null {
     if (cascade === null) {
         return null;
     }
@@ -117,6 +123,7 @@ export function resolveCascade(
             level: option.level,
             parent: option.parent,
         })),
+        skip_single: cascade.skipSingle === true,
     };
 }
 
@@ -251,7 +258,8 @@ function buildCascade(field: RawField): RenderCascade | null {
           })
         : [];
 
-    return { levels, options };
+    // M186 (`R-70c7673a`): a level with one choice under the one picked above is filled in for the person.
+    return { levels, options, skipSingle: field.config?.skip_single_choice_levels === true };
 }
 
 /** A grid column as the shared `FieldInput.vue` grid draws it (labels resolved; the three rules only on a `matrix`). */
@@ -506,6 +514,7 @@ function toRenderField(field: RawField): RenderField {
         content: field.field_type === 'note' && Array.isArray(field.config?.content) ? (field.config.content as unknown[]) : null,
         calculation: calculationDisplayOf(field),
         suggestions: suggestionsOf(field),
+        choiceFilter: choiceFilterOf(field),
         visibility: visibilityOf(field),
         sequence: field.sequence,
         sectionSequence: field.section_sequence,
@@ -520,6 +529,39 @@ function suggestionsOf(field: RawField): string[] | null {
     const raw = field.field_type === 'short_text' ? field.config?.suggestions : undefined;
 
     return Array.isArray(raw) ? raw.filter((item): item is string => typeof item === 'string') : null;
+}
+
+/**
+ * M186 (`R-ed7f3127`): what narrows a question's choices — or a cascade's levels' — by what another form recorded: each
+ * filter the config declares (`levels[i].filter`, `options_filter`), with the values `mergeLinkedChoices()` wrote in from
+ * the sets served beside the schema. `values` null when no set arrived, or it could not be read or is over its cap — the
+ * control then shows every choice and says so (`D163`). Null when nothing narrows. The ENGINE never reads this.
+ */
+function choiceFilterOf(field: RawField): RenderChoiceFilter[] | null {
+    const config = (field.config ?? {}) as Record<string, unknown>;
+    const declared: { level: number | null; mode: 'present' | 'absent' }[] = [];
+    const modeOf = (filter: unknown): 'present' | 'absent' | null => {
+        if (filter === null || typeof filter !== 'object') return null;
+        const { form_id: formId, field_key: fieldKey, mode } = filter as Record<string, unknown>;
+        return typeof formId === 'string' && formId !== '' && typeof fieldKey === 'string' && fieldKey !== '' && (mode === 'present' || mode === 'absent') ? mode : null;
+    };
+
+    if (field.field_type === 'cascading_select') {
+        (Array.isArray(config.levels) ? config.levels : []).forEach((level, index) => {
+            const mode = level !== null && typeof level === 'object' ? modeOf((level as Record<string, unknown>).filter) : null;
+            if (mode !== null) declared.push({ level: index, mode });
+        });
+    } else {
+        const mode = modeOf(config.options_filter);
+        if (mode !== null) declared.push({ level: null, mode });
+    }
+    if (declared.length === 0) return null;
+
+    const sets = Array.isArray(config.choice_filter_sets) ? (config.choice_filter_sets as ChoiceFilterSet[]) : [];
+    return declared.map(({ level, mode }) => {
+        const set = sets.find((candidate) => candidate.field_key === field.key && candidate.level === level);
+        return { level, mode, values: set !== undefined && set.available && !set.truncated ? [...set.values] : null };
+    });
 }
 
 /** M177 (`R-f44e9d00`): Show to respondents, as stored — anything but the two values reads as the type's own rule. */

@@ -131,7 +131,8 @@ export interface EncodeField {
     required: boolean;
     options: { value: string; label: string }[];
     // Cascading-select hierarchy (Increment G4a); labels already resolved to the active locale by the caller.
-    cascade?: { levels: CascadeLevel[]; options: CascadeOption[] } | null;
+    // M186 (`R-70c7673a`): `skip_single` — a level with one choice under the one picked above is filled in for the person.
+    cascade?: { levels: CascadeLevel[]; options: CascadeOption[]; skip_single?: boolean } | null;
     // Composite grid config (Increment G4b: matrix / likert_matrix); labels already resolved by the caller.
     matrix?: MatrixConfig | null;
     // Geo capture config (Increment G5b2: geopoint / geotrace / geoshape); null for every other type.
@@ -158,7 +159,17 @@ export interface EncodeField {
     // M184 (`R-596d6afd`) — a Short text's suggestions (a list file's labels, or another form's answers), offered as the
     // person types; null for every other type. Free text stays accepted, and the server never checks it against them.
     suggestions?: string[] | null;
+    // M186 (`R-ed7f3127`) — what narrows the choices by what another form recorded: one entry per filter, `level` the
+    // cascade level it narrows (null for a question's own list), `values` the other form's answers — null when they could
+    // not be read (`D163`: every choice is shown, and the question says so). Display only: no engine reads it.
+    choice_filter?: ChoiceFilter[] | null;
     supported: boolean;
+}
+
+export interface ChoiceFilter {
+    level: number | null;
+    mode: 'present' | 'absent';
+    values: string[] | null;
 }
 
 // The value shapes an answer slot can hold across the encode controls (list for multi-select, an object for
@@ -335,6 +346,51 @@ const shownSuggestions = computed<string[]>(() => {
     return (typed === '' ? all : all.filter((suggestion) => suggestion.toLowerCase().includes(typed))).slice(0, SUGGESTIONS_SHOWN);
 });
 
+// ── Choices narrowed by what another form recorded (M186, `R-ed7f3127`, `D162`, `D163`) ─────────────────────────
+// Only what is SHOWN narrows: the engine and the server read the full list, so an answer outside the set — a resumed
+// draft's, an offline device's — still saves, and is kept on screen here. A choice matches a set by its value or its
+// label (a list fed by another form saves the label it showed).
+const NOTE_UNAVAILABLE = 'These choices could not be narrowed just now, so every choice is shown.';
+const NOTE_NONE_LEFT = 'No choices are left to show.';
+
+interface NarrowingSet {
+    level: number | null;
+    mode: 'present' | 'absent';
+    values: Set<string> | null;
+}
+const narrowing = computed<NarrowingSet[]>(() =>
+    (props.field.choice_filter ?? []).map((filter) => ({
+        level: filter.level,
+        mode: filter.mode,
+        values: filter.values === null ? null : new Set(filter.values),
+    })),
+);
+/** Does this choice pass the filter? A filter that could not be read passes everything (`D163`). */
+function passesNarrowing(filter: NarrowingSet | undefined, option: { value: string; label: string }): boolean {
+    if (filter === undefined || filter.values === null) return true;
+    const has = filter.values.has(option.value) || filter.values.has(option.label);
+    return filter.mode === 'present' ? has : !has;
+}
+
+const flatNarrowing = computed<NarrowingSet | undefined>(() => narrowing.value.find((filter) => filter.level === null));
+/** A choice question's options as shown: the narrowed ones, and whatever the answer already holds. */
+const shownOptions = computed<{ value: string; label: string }[]>(() => {
+    const filter = flatNarrowing.value;
+    if (filter === undefined || filter.values === null) return props.field.options;
+    const held = new Set([stringValue.value, ...listValue.value]);
+    return props.field.options.filter((option) => passesNarrowing(filter, option) || held.has(option.value));
+});
+
+const narrowingNote = computed<string | null>(() => {
+    if (narrowing.value.some((filter) => filter.values === null)) return NOTE_UNAVAILABLE;
+    if (flatNarrowing.value !== undefined && props.field.options.length > 0 && shownOptions.value.length === 0) return NOTE_NONE_LEFT;
+    const firstLevel = cascadeViable.value[0];
+    if (firstLevel !== null && firstLevel !== undefined && firstLevel.size === 0 && (props.field.cascade?.options.length ?? 0) > 0) return NOTE_NONE_LEFT;
+    return null;
+});
+/** The hint as shown: the author's, then what narrowing has to say. */
+const shownHint = computed<string | null>(() => [props.field.hint, narrowingNote.value].filter((part): part is string => !!part).join(' ') || null);
+
 function toggleOption(value: string, checked: boolean): void {
     const current = listValue.value;
     emit('update:modelValue', checked ? [...current, value] : current.filter((v) => v !== value));
@@ -350,7 +406,7 @@ const groupName = useId();
 const hintId = useId();
 const errorId = useId();
 const groupDescribedby = computed<string | undefined>(() => {
-    const ids = [props.field.hint ? hintId : null, props.error ? errorId : null].filter((id): id is string => id !== null);
+    const ids = [shownHint.value ? hintId : null, props.error ? errorId : null].filter((id): id is string => id !== null);
     return ids.length > 0 ? ids.join(' ') : undefined;
 });
 
@@ -394,24 +450,110 @@ const cascadeIndex = computed<Map<string, { value: string; label: string }[]>>((
     return index;
 });
 
-function cascadeOptionsAt(index: number): { value: string; label: string }[] {
+// M186 (`D162`): a level a filter narrows shows the choices that pass it, and every level ABOVE shows only the choices
+// with at least one shown choice below — so nobody picks a city and finds no barangay. Worked out once, from the bottom
+// level up; `null` at a level means nothing narrows it. Each level by its own values: one code may sit at two levels.
+const cascadeViable = computed<(Set<string> | null)[]>(() => {
+    const levels = cascadeLevels.value;
+    const filters = levels.map((_, index) => narrowing.value.find((filter) => filter.level === index && filter.values !== null));
+    const viable: (Set<string> | null)[] = levels.map(() => null);
+    if (!filters.some((filter) => filter !== undefined)) return viable;
+
+    const options = (props.field.cascade?.options ?? []) as CascadeOption[];
+    let parentsBelow: Set<string> | null = null; // the values one level up that have a shown choice under them
+    for (let index = levels.length - 1; index >= 0; index--) {
+        const filter = filters[index];
+        if (filter === undefined && parentsBelow === null) continue;
+        const shown = new Set<string>();
+        const parents = new Set<string>();
+        for (const option of options) {
+            if (option.level !== levels[index].key) continue;
+            if (!passesNarrowing(filter, option) || (parentsBelow !== null && !parentsBelow.has(option.value))) continue;
+            shown.add(option.value);
+            parents.add(option.parent ?? '');
+        }
+        viable[index] = shown;
+        parentsBelow = parents;
+    }
+    return viable;
+});
+
+/** The choices at a level under one parent (`''` for the first level) — narrowed, keeping what the answer holds there. */
+function cascadeChoicesUnder(index: number, parent: string): { value: string; label: string }[] {
     const level = cascadeLevels.value[index];
-    if (!level) return [];
-    const parent = index === 0 ? '' : cascadeValue.value[index - 1] ?? '';
-    if (index > 0 && parent === '') return []; // no parent chosen yet
-    return cascadeIndex.value.get(`${level.key}\u0000${parent}`) ?? [];
+    if (!level || (index > 0 && parent === '')) return [];
+    const all = cascadeIndex.value.get(`${level.key}\u0000${parent}`) ?? [];
+    const viable = cascadeViable.value[index];
+    if (viable === null || viable === undefined) return all;
+    const held = cascadeValue.value[index];
+    return all.filter((choice) => viable.has(choice.value) || choice.value === held);
+}
+
+// M186 (`R-70c7673a`): with `skip_single_choice_levels`, a level whose choices under the one picked above are exactly one
+// is IMPLIED — a city outside any province is its own one choice at the city level. The chain below is the stored answer
+// extended by those levels, and every select reads it. ⛔ NO WATCHER WRITES THEM: an emit on render would start the
+// encode page's autosave (an empty draft row) and race a guest draft's restore. They are written only by
+// `setCascadeLevel()`, inside the person's own pick — and the LAST level is never implied, so a narrowed cascade always
+// leaves the person something to choose and a required question can be answered.
+const cascadeSkipsSingle = computed<boolean>(() => props.field.cascade?.skip_single === true);
+
+/** Extend `chain` with the implied levels that follow it, stopping before the last level. */
+function withImpliedLevels(chain: string[]): string[] {
+    const next = [...chain];
+    if (!cascadeSkipsSingle.value) return next;
+    for (let i = next.length; i < cascadeLevels.value.length - 1; i++) {
+        const choices = cascadeChoicesUnder(i, i === 0 ? '' : next[i - 1] ?? '');
+        if (choices.length !== 1) break;
+        next.push(choices[0].value);
+    }
+    return next;
+}
+
+const cascadeChain = computed<string[]>(() => {
+    const stored: string[] = [];
+    for (const value of cascadeValue.value) {
+        if (value === '' || value === undefined) break;
+        stored.push(value);
+    }
+    return withImpliedLevels(stored);
+});
+
+/**
+ * Is this level filled in for the person rather than chosen — one choice under the one picked above, and not the last
+ * level? Then it is shown as text, not a select, whether or not the answer holds it yet.
+ */
+function cascadeImplied(index: number): boolean {
+    if (!cascadeSkipsSingle.value || index >= cascadeLevels.value.length - 1) return false;
+    const value = cascadeChain.value[index];
+    const choices = cascadeChoicesUnder(index, index === 0 ? '' : cascadeChain.value[index - 1] ?? '');
+    return value !== undefined && choices.length === 1 && choices[0].value === value;
+}
+
+function cascadeImpliedLabel(index: number): string {
+    const value = cascadeChain.value[index] ?? '';
+    return cascadeChoicesUnder(index, index === 0 ? '' : cascadeChain.value[index - 1] ?? '').find((choice) => choice.value === value)?.label ?? value;
+}
+
+function cascadeOptionsAt(index: number): { value: string; label: string }[] {
+    return cascadeChoicesUnder(index, index === 0 ? '' : cascadeChain.value[index - 1] ?? '');
 }
 
 function cascadeDisabled(index: number): boolean {
     if (index === 0) return false;
-    const parent = cascadeValue.value[index - 1];
+    const parent = cascadeChain.value[index - 1];
     return parent === '' || parent === undefined;
 }
 
 function setCascadeLevel(index: number, value: string): void {
-    const next = cascadeValue.value.slice(0, index); // keep shallower levels, drop this + deeper
-    if (value !== '') next.push(value);
-    emit('update:modelValue', next);
+    // Shallower levels kept — any implied ones with them, now written — this and deeper dropped (their parent changed).
+    const next = cascadeChain.value.slice(0, index);
+    if (value === '') {
+        emit('update:modelValue', next);
+
+        return;
+    }
+    next.push(value);
+    emit('update:modelValue', withImpliedLevels(next));
 }
 </script>
 
@@ -421,7 +563,7 @@ function setCascadeLevel(index: number, value: string): void {
         v-if="['text', 'textarea', 'number', 'select'].includes(control)"
         :label="singleLabel"
         :required="showRequiredMarker"
-        :help="field.hint ?? undefined"
+        :help="shownHint ?? undefined"
         :error="error"
         v-slot="{ id, describedby, invalid }"
     >
@@ -464,7 +606,7 @@ function setCascadeLevel(index: number, value: string): void {
             v-else-if="control === 'select'"
             :id="id"
             :model-value="stringValue"
-            :options="field.options"
+            :options="shownOptions"
             placeholder="Select an option"
             :describedby="describedby"
             :invalid="invalid"
@@ -484,11 +626,11 @@ function setCascadeLevel(index: number, value: string): void {
             }}<span v-if="showRequiredMarker" class="encode-field__required"> (required)</span
             ><span v-else-if="showOptionalMarker" class="encode-field__required"> (optional)</span>
         </legend>
-        <p v-if="field.hint" :id="hintId" class="encode-field__help">{{ field.hint }}</p>
+        <p v-if="shownHint" :id="hintId" class="encode-field__help">{{ shownHint }}</p>
 
         <div v-if="control === 'checkboxes'" class="encode-field__checks" :class="layoutClass" data-choice-list>
             <MdsCheckbox
-                v-for="opt in field.options"
+                v-for="opt in shownOptions"
                 :key="opt.value"
                 :label="opt.label"
                 :model-value="listValue.includes(opt.value)"
@@ -501,7 +643,7 @@ function setCascadeLevel(index: number, value: string): void {
              arrow keys move within the question and nowhere else. -->
         <div v-else-if="control === 'radios'" class="encode-choices" :class="layoutClass" data-choice-list>
             <MdsRadio
-                v-for="opt in field.options"
+                v-for="opt in shownOptions"
                 :key="opt.value"
                 :name="groupName"
                 :value="opt.value"
@@ -532,7 +674,10 @@ function setCascadeLevel(index: number, value: string): void {
                 :label="level.label"
                 v-slot="{ id, describedby }"
             >
+                <!-- M186: a level with one choice under the one picked above, filled in for the person. -->
+                <p v-if="cascadeImplied(i)" :id="id" class="encode-cascade__implied" data-implied>{{ cascadeImpliedLabel(i) }}</p>
                 <MdsSelect
+                    v-else
                     :id="id"
                     :model-value="cascadeValue[i] ?? ''"
                     :options="cascadeOptionsAt(i)"
@@ -769,6 +914,19 @@ function setCascadeLevel(index: number, value: string): void {
     line-height: var(--mds-type-body-sm-line-height);
     color: var(--mds-color-text-secondary);
     font-style: italic;
+}
+
+/* M186 — a cascade level filled in for the person: read as the prefilled value below reads, in its sunken box. */
+.encode-cascade__implied {
+    margin: 0;
+    padding: var(--mds-space-2) var(--mds-space-3);
+    border: 1px solid var(--mds-color-border-default);
+    border-radius: var(--mds-radius-md);
+    background-color: var(--mds-color-bg-sunken);
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+    color: var(--mds-color-text-body);
 }
 
 /* Increment H7 — a server-set hidden field. Every token below is already used elsewhere in this file, so

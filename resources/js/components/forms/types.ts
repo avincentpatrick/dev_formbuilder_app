@@ -190,6 +190,8 @@ export interface AutomationsProps {
 export interface ShareableQuestion {
     key: string;
     label: string;
+    /** M186 (`R-ed7f3127`): a cascade — it can narrow another form's choices only, and is shared only when ticked. */
+    narrows_only?: boolean;
 }
 
 /**

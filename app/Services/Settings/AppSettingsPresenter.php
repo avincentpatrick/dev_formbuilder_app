@@ -9,6 +9,7 @@ use App\Http\Controllers\Tenant\PreferencesController;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Entitlements\EntitlementService;
+use App\Services\Forms\PsgcLists;
 use App\Support\Entitlements\ToggleableModules;
 use App\Support\Platform\BuildInfo;
 
@@ -29,6 +30,7 @@ final class AppSettingsPresenter
         private readonly TenantSettingRegistry $settings,
         private readonly EntitlementService $entitlements,
         private readonly BuildInfo $build,
+        private readonly PsgcLists $psgc,
     ) {}
 
     /**
@@ -37,7 +39,7 @@ final class AppSettingsPresenter
      *     access: array{invite_only: bool, require_two_factor: bool, signup_host: string, actor_enrolled: bool},
      *     maintenance: array{enabled: bool, message: ?string},
      *     modules: list<array{key: string, label: string, hint: string, plan_granted: bool, enabled: bool}>,
-     *     about: array{version: string, commit: ?string, built_at: ?string, environment: string}
+     *     about: array{version: string, commit: ?string, built_at: ?string, environment: string, places: ?string}
      * }
      */
     public function forSettings(Tenant $tenant, User $user): array
@@ -67,7 +69,8 @@ final class AppSettingsPresenter
             // Rendered for EVERY member, not just Owner/Admin: an About panel is a support aid ("which
             // version am I seeing?"), and gating it would mean the person reporting a bug is the one person
             // who cannot answer the first question they are asked.
-            'about' => $this->build->toArray(),
+            // M186 (`R-70c7673a`, `D131`): the PSA credited for the built-in Philippine places, while a quarter is loaded.
+            'about' => [...$this->build->toArray(), 'places' => $this->psgc->credit()],
         ];
     }
 

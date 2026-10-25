@@ -11547,7 +11547,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M130` (2026-10-04) — `minor` · The "Appearance hint" field is a free-text box in the builder that changes nothing about how any
   form renders.** Filed 2026-09-25 by `M110`, answering the report *"can you also clarify to me what the
-  appearance hint do?"* — measured answer: at render time, nothing. `ConfigPanel.vue:476-482` writes
+  appearance hint do?"* — measured answer: at render time, nothing. `ConfigPanel.vue:483-489` writes
   `form_fields.appearance` as unguided free text with no help and no vocabulary; `public-runtime/lib/types.ts:67`
   declares it on the render model and `toRenderField()` (in `schema-mapping.ts`) never reads it, so it
   reaches neither `FieldRow.vue` nor `FieldControl.vue` nor the encode channel. An author who types `vertical` or
@@ -11747,7 +11747,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M113` (2026-09-26) — `minor` · Five of the six client-side copies of the field-type catalogue have no parity test, and the one that
   does proves the technique works.** Filed 2026-09-25 by `M110` while designing the per-type validation model,
   which must not become a seventh. The PHP `FieldType` enum is authoritative and the builder palette is fully
-  server-driven — but the **renderers** carry six hand-written mirrors: `schema-mapping.ts:48-59` (`SUPPORTED`,
+  server-driven — but the **renderers** carry six hand-written mirrors: `schema-mapping.ts:50-61` (`SUPPORTED`,
   whose own comment admits it mirrors `EncodeFormPresenter::SUPPORTED`), `:72` (`HAS_OPTIONS`), `:75`
   (`TEXT_TYPES`), `FieldInput.vue` (`MEDIA_TYPES`) and `ConfigPanel.vue:195` (`NUMERIC_TYPES`). ✅ **Only
   `field-roles.ts`'s `RENDERS_NOTHING` is pinned**, by `tests/Unit/Forms/PdfFieldRoleTest.php`, which regex-parses
@@ -11756,7 +11756,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   that collapsing it was deliberately declined** — which makes a parity test the right answer rather than a
   refactor: it converts five unguarded mirrors into guarded ones **without deleting any of them**. ⚠️ A gate
   written here is green on arrival and therefore proves nothing until a committed mutation — removing one type
-  from one mirror — turns it red. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AS A PROVEN STRICT SUBSET OF `R-09f73330`, NOT WORKED SEPARATELY.** ✅ Its citations hold, with two off-by-N: `HAS_OPTIONS` is declared at `schema-mapping.ts:73`, not `:72` (`:72` is the comment), and the `EncodeFormPresenter` docblock admission runs `:64-69`, not `:64-72`. ⛔ **ALL FIVE GAPS IT NAMES APPEAR IN `R-09f73330` VERBATIM, AT THE SAME FILE AND LINE** — `schema-mapping.ts:48`/`:73`/`:75`, `FieldInput.vue`'s `MEDIA_TYPES` and `ConfigPanel.vue:195` — and it names **no** declaration that row does not. (It also cites `field-roles.ts`'s `RENDERS_NOTHING`, but as already-gated *evidence*, not as a gap.) So the single gate written for `R-09f73330` necessarily closes this one too, and **working both would have collided on three production files** under `D13` clause 1. ⚠️ **Its *"six copies, five ungated"* is a FLOOR:** there are **ten** ungated declarations by declaration count, and an eleventh that was already gated. ⚠️ **And its supporting citation is mis-aimed, though its conclusion survives:** `EncodeFormPresenter`'s docblock at `:67-72` declines collapsing the *builder functions*, not the `SUPPORTED` constant — the admission that actually supports the row is on the TypeScript side, at `schema-mapping.ts:47`. ⚠️ **Its *"the instrument exists and needs copying"* is now UNDERSTATED:** the technique has been copied three further times since it was filed — `DraftProjectionMirrorDriftTest`, `DocumentedEnumMirrorDriftTest` (a table-driven generalisation over three grammars) and the `NotificationType`/`ShellAbility` parity tests.
+  from one mirror — turns it red. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AS A PROVEN STRICT SUBSET OF `R-09f73330`, NOT WORKED SEPARATELY.** ✅ Its citations hold, with two off-by-N: `HAS_OPTIONS` is declared at `schema-mapping.ts:75`, not `:72` (`:72` is the comment), and the `EncodeFormPresenter` docblock admission runs `:64-69`, not `:64-72`. ⛔ **ALL FIVE GAPS IT NAMES APPEAR IN `R-09f73330` VERBATIM, AT THE SAME FILE AND LINE** — `schema-mapping.ts:50`/`:73`/`:75`, `FieldInput.vue`'s `MEDIA_TYPES` and `ConfigPanel.vue:195` — and it names **no** declaration that row does not. (It also cites `field-roles.ts`'s `RENDERS_NOTHING`, but as already-gated *evidence*, not as a gap.) So the single gate written for `R-09f73330` necessarily closes this one too, and **working both would have collided on three production files** under `D13` clause 1. ⚠️ **Its *"six copies, five ungated"* is a FLOOR:** there are **ten** ungated declarations by declaration count, and an eleventh that was already gated. ⚠️ **And its supporting citation is mis-aimed, though its conclusion survives:** `EncodeFormPresenter`'s docblock at `:67-72` declines collapsing the *builder functions*, not the `SUPPORTED` constant — the admission that actually supports the row is on the TypeScript side, at `schema-mapping.ts:49`. ⚠️ **Its *"the instrument exists and needs copying"* is now UNDERSTATED:** the technique has been copied three further times since it was filed — `DraftProjectionMirrorDriftTest`, `DocumentedEnumMirrorDriftTest` (a table-driven generalisation over three grammars) and the `NotificationType`/`ShellAbility` parity tests.
 
 - **`minor` · Three more request paths prune an array key by the same mechanism `B0` just fixed, and one of
   them may be doing it on purpose.** Found by `M111` (2026-09-25) while sweeping for the CLASS behind
@@ -11813,7 +11813,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M113` (2026-09-26) — `minor` · Ten client-side copies of the field-type catalogue have no parity test, and two of them mirror no
   PHP counterpart at all.** Found by `M112` (2026-09-26) while verifying `R-54a19217`; the row it was verified
-  for says "five", counted by file. By declaration there are ten: `schema-mapping.ts:48-61` `SUPPORTED`, `:73`
+  for says "five", counted by file. By declaration there are ten: `schema-mapping.ts:50-63` `SUPPORTED`, `:73`
   `HAS_OPTIONS`, `:75` `TEXT_TYPES`; `display-value.ts:48` `HAS_OPTIONS` (a second copy), `:51` `GEO_TYPES`,
   `:55` `MEDIA_TYPES`; `semantic-validator.ts:43` `MEDIA_FIELD_TYPES` (a third copy of the media set);
   `FieldInput.vue`'s `MEDIA_TYPES` (a fourth) and its inline text-type literal (a second `TEXT_TYPES`);
@@ -11912,7 +11912,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · The builder and PHP disagree about whether a duration field takes an ordered comparison, and the
   disagreement is now pinned rather than resolved.** Found by `M113` (2026-09-26) while building the client
-  field-type mirror census. `ConfigPanel.vue:355`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
+  field-type mirror census. `ConfigPanel.vue:362`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
   'likert_scale']` — four members. `ValueShape::allowsOperator()` (`ValueShape.php:218-242`) permits
   `gt`/`lt`/`gte`/`lte` for `Number`, `Duration` and `Scale`, which is **five** types: the same four plus
   `duration`. ⛔ **`R-09f73330` SAYS THIS SET "MIRRORS NOTHING", AND THAT STOPPED BEING TRUE IN THE INCREMENT
@@ -11932,7 +11932,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   field-type literal in `resources/` while building the census, rather than by trusting either filing row's
   count. Beyond the ten declarations `R-09f73330` names and the already-gated `RENDERS_NOTHING`, the same type
   strings appear as bare inline disjunctions at `schema-mapping.ts:91,94,115,118,377,400,424,553`,
-  `FieldInput.vue:239,240,247,248`, `semantic-validator.ts:468,474,480,659,806,834`, `MediaEditor.vue:37`,
+  `FieldInput.vue:250,240,247,248`, `semantic-validator.ts:468,474,480,659,806,834`, `MediaEditor.vue:37`,
   `GeoInput.vue:38-43` and `ConfigPanel.vue`'s `config_editor` comparisons (cited as `:113` until `M116`, where that was a bare `);` and went blank — number DROPPED, not repaired). ⛔ **Two of them are ADDITIONAL COPIES of sets the census
   already guards** — `schema-mapping.ts:424` is a fourth four-member media disjunction, and `:115` and `:400`
   are a second and third geo triple — so the census's own equality assertions can be green while a sibling
@@ -13269,21 +13269,21 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   no `Prunable` touches users. A sweep of accounts never confirmed after a set number of days, holding no membership
   and no submission, would free the address. **Live.** Filed by `M140`. **Tier: before-launch.**
 
-- **`minor` · The staff encode page carries a CSV-backed cascade's whole list in its page props.** Filed by `M141`, which
+- ✅ **CLOSED BY `M186` (2026-10-25) — ****`minor` · The staff encode page carries a CSV-backed cascade's whole list in its page props.** Filed by `M141`, which
   turns a version's CSV choice lists into ordinary `config.options` at publish so every server-side reader stays
   correct. `EncodeFormPresenter` renders a cascade from the published field's options (`cascade()`), so a 42,000-row
   barangay list rides in the Inertia props on every encode load (a few MB). `M141` strips the engine's copy of the
   schema and leaves the render copy, which the page needs. The fix is the guest runtime's: fetch the lists beside the
-  page, by version. **Live.** **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: taken by the Philippine-places increment (`D131`), whose built-in list would otherwise put a few MB of props on every manual-entry page (`D128`).**
+  page, by version. **Live.** **Tier: early-testing.** **Retiered up from `during-testing` 2026-10-15 by `M172`: taken by the Philippine-places increment (`D131`), whose built-in list would otherwise put a few MB of props on every manual-entry page (`D128`).** ✅ **CLOSED BY `M186` (2026-10-25):** `EncodeFormPresenter::cascade()` sends a list-backed cascade's levels and no choices, and the page fetches them once from `GET /forms/{form}/versions/{version}/choice-lists` (`AttachmentController::encodeChoiceLists()`, the guest endpoint's tuple shape, whole, `private, max-age=86400`; a superseded version served, a draft 404) and merges them into its render copy — "Loading the choice lists…" until then, a warning and Try again if they cannot be read. The gate is `SubmissionPolicy::readEncodeLists` — the union of the page's create, resume and edit doors — because `can:view,form` would refuse a Reviewer holding an editor grant who can encode (`tests/Feature/Submissions/EncodeChoiceListsTest.php`).
 
-- **`minor` · A typed cascade publishes a first-level choice that carries a parent, which no respondent is ever shown,
+- ✅ **CLOSED BY `M186` (2026-10-25) — ****`minor` · A typed cascade publishes a first-level choice that carries a parent, which no respondent is ever shown,
   and a value repeated within a level, whose later parent silently wins.** Found by `M141`.
   `StructuralValidationGate::assertCascadingResolves()` skips a first-level option's parent and never checks that a value
   is unique within its level. `FieldInput.vue` shows first-level choices only when their parent is empty, and both
   validation engines key a level's options by value. A CSV list cannot reach either: the parser refuses a repeated name,
   and the materializer writes a null parent. So `M141` left the gate alone, because tightening it would refuse a
   republish of any live form that already carries such an option. Count those forms before tightening.
-  **Live.** Filed by `M141`. **Tier: during-testing.** **Noted 2026-10-15 by `M172`:** the Philippine-places increment (`D131`, R-70c7673a) counts the live forms carrying the shape and takes this row only if the count is zero; otherwise it stays here.
+  **Live.** Filed by `M141`. **Tier: during-testing.** **Noted 2026-10-15 by `M172`:** the Philippine-places increment (`D131`, R-70c7673a) counts the live forms carrying the shape and takes this row only if the count is zero; otherwise it stays here. ✅ **CLOSED BY `M186` (2026-10-25):** counted on the testing server first (a read-only check the user ran on the box, 2026-10-24: every cascade question in every version, drafts included — 0 forms with a first-level choice that has a parent, 0 with a value twice at one level), so `StructuralValidationGate::assertCascadingResolves()` now refuses both, by name (*"option “X” is at the first level, so it takes no parent"*, *"option “X” appears twice at level “L”"*). One value at TWO levels stays legal — the Philippine places' city under no province is one (`tests/Feature/Forms/StructuralValidationGateTest.php`).
 
 - **`minor` · A form automation has no Slack, Delay or Branch action and no form-abandoned trigger — what is left of
   form automations after their condition (`M142`).** Split from `R-b65bafca` by `M142`, which built that row's Filter
@@ -14441,7 +14441,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   responses from other forms"*. `resources/js/components/submissions/FieldInput.vue:224-277` renders a text question as a plain
   input, and `app/Http/Requests/Forms/UpdateFieldRequest.php:337-349` accepts no source on it. The remedy: `config.suggestions_source
   = {kind: list | form, …}` on Short text gives a type-ahead (a `<datalist>`-backed combobox) on the web form, the encode page
-  (`app/Services/Submissions/EncodeFormPresenter.php:633-659` already serves linked lists there) and the preview, while free text
+  (`app/Services/Submissions/EncodeFormPresenter.php:650-676` already serves linked lists there) and the preview, while free text
   stays accepted and the server never checks it; the chooser reads "Suggestions come from" on a text question. **Live.** Filed by `M172`.
   **Tier: early-testing.** **Taken by T3 (`M184`), 2026-10-23 (`D138`), for relayed `R1-3b`.** ✅ **CLOSED BY `M184` (2026-10-23):** Basics → **Suggestions come from** — No suggestions · A list file · Another form's answers (`config.suggestions_source`). A list's labels are written into `config.suggestions` at publish; another form's answers are served live like a linked choice question's. The web form, the manual-entry page and the preview tie the box to a `<datalist>` of at most 100 suggestions containing what is typed; any text is still an answer, on every channel. Released at merge point 5 as PR #377 (`916f9e21`), live on staging since 2026-10-24; relayed `R1-3b` resolved at `916f9e21`.
 
@@ -14480,10 +14480,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   respondent grid (`resources/js/components/submissions/MatrixGrid.vue`) ships in the guest bundle and hides its header row in card
   mode, so the Preview injects the affordances rather than the grid importing them. ✅ **CLOSED BY `M185` (2026-10-23):** in the Preview a grid has a rename beside every row and column header — in the cards its columns become a strip of names — and *Add row* / *Add column* (a Likert matrix's scale point) under it; each is saved at once through the store's new `setFieldConfig` (one PATCH, one undo entry), which the Grid tab's lists now write through too. The editing is provided by the Preview (`resources/js/components/submissions/grid-authoring.ts`), so the guest form and the encode page draw the grid they drew, and `resources/js/__tests__/guest-bundle-boundary.test.ts` pins that no builder component reaches the guest bundle. A grid whose rows come from a list or a form says so. Released at merge point 5 as PR #378 (`eba3e3a4`), live on staging since 2026-10-24; relayed `R1-7b` resolved at `eba3e3a4`.
 
-- **`minor` · The Philippine Standard Geographic Code is not in the app: an author must build and upload four CSV files per form, and nothing keeps them current with the PSA's quarterly publication.**
+- ✅ **CLOSED BY `M186` (2026-10-26) — ****`minor` · The Philippine Standard Geographic Code is not in the app: an author must build and upload four CSV files per form, and nothing keeps them current with the PSA's quarterly publication.**
   The testers' question (2026-10-15): *"Does the platform support cascading options linked to the Philippine Standard Geographic
   code (PSGC)?"*. `M141` made a PSGC-sized cascade work from uploaded CSV files (measured at 43,739 options), but no PSGC data
-  exists in the repository, each form re-uploads its own lists (`app/Services/Forms/ChoiceListMaterializer.php:186` reads them by
+  exists in the repository, each form re-uploads its own lists (`app/Services/Forms/ChoiceListMaterializer.php:185` reads them by
   version), `docs/PRD.md:442` declined a national geography, and `docs/data-dictionary.md:375` says a reference-dataset table is
   "deliberately not introduced here". The Philippine Statistics Authority publishes the PSGC Publication Datafile each quarter
   (3Q 2026 released 2026-10-12; ten-digit codes kept as text; region, province or independent city, city or municipality,
@@ -14495,9 +14495,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   "Philippine places (PSGC)" preset in the Levels tab (`resources/js/components/builder/CascadingEditor.vue:58-102`) binding four
   levels to platform lists that the materialiser reads at publish, so a published version stays frozen as today and a later quarter
   changes the next publish only; a level with exactly one choice filled in and shown read-only; the dictionary sentence and the
-  PRD line amended; the operator step in `deploy.ps1`. **Live.** Filed by `M172`. **Tier: early-testing.**
+  PRD line amended; the operator step in `deploy.ps1`. **Live.** Filed by `M172`. **Tier: early-testing.** **Built by `M186`
+  (2026-10-25), on its branch — everything but the data:** `psgc_places` (migration `2026_08_17_000146`, dictionary §41),
+  `psgc:build` (the PSA workbook's PSGC sheet, refusing unless its counts equal the summary sheet — exit 1, or 2 when nothing can
+  be measured), `psgc:sync` in `deploy.ps1` before the row count, `PsgcLists` writing the newest quarter in at publish, the Levels
+  tab's **Philippine places (PSGC)** and **Fill in a level that has only one choice**, the self-entry said once in every display,
+  the PSA credited in Settings → About; the E2E environment loads a 19-place fixture (`tests/fixtures/psgc/`). ⛔ **STILL OWED,
+  and why this row stays open: the data itself.** The user downloads the PSA's *PSGC 3Q 2026 Publication Datafile* in a browser
+  (psa.gov.ph refuses scripts), then `php artisan psgc:build <xlsx> --publication=2026Q3 --released=2026-10-12` writes
+  `database/data/psgc/` and the commit closes this row (`docs/deployment-infrastructure.md` §3.2). Until then `psgc:sync` copies
+  nothing and says so, the builder's button says the places are not on this server yet, and `PsgcCommittedDataTest` skips by
+  name. The 3Q 2026 totals (18 · 82 · 149 · 1,493 · 42,010) are search extracts, to be measured from the file. ✅ **CLOSED BY `M186` (2026-10-26), on its branch:** the user downloaded the PSA's workbook in a browser (`PSGC-3Q-2026-Publication-Datafile.xlsx`, sha256 `8aad47f8…31dc9a59`; the Internet Archive's Save Page Now failed on every psa.gov.ph address), and `psgc:build` wrote `database/data/psgc/`: 18 regions, 118 province-level places, 1,642 cities and municipalities, 42,010 barangays, with each of the PSA's levels equal to its National Summary (18 · 82 · 149 · 1,493 · 42,010, now measured). The real file differed from the third-party descriptions in four ways, each fixed and pinned (`tests/Feature/Psgc/PsgcBuildCommandTest.php`): the summary is a table (the reader took Region I's 4 provinces as the number of regions); two places have no level (the special geographic area, and the City of Isabela's special province code — `D166` B, offered as the PSA writes it); a footnote row sits in the code column; and its mark was pasted onto “City of Lucena”. 3Q differs from 2Q only by the PSA's announced correction (`1001322005` Lambangan → Lambagan). The deploy's `psgc:sync` copies the places in (10 s on the dev database, measured). Relayed `R1-2` is resolved only once live (merge point 6).
 
-- **`minor` · A cascade level or a choice list cannot be filtered by what another form has recorded, so "only the barangays with a report in form X" cannot be built.**
+- ✅ **CLOSED BY `M186` (2026-10-25) — ****`minor` · A cascade level or a choice list cannot be filtered by what another form has recorded, so "only the barangays with a report in form X" cannot be built.**
   The testers' question (2026-10-15): *"can options in a target form dynamically filter based on whether a specific barangay has
   recorded value in a source form?"*. `app/Support/Forms/ShareableQuestions.php:31-39` never offers a `cascading_select` for
   sharing; a link feeds a flat list of answers for one key (`app/Services/Forms/LinkedChoiceService.php:258-275`, served by
@@ -14509,7 +14519,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (`resources/public-runtime/lib/linked-choices.ts:89-112`); the web form, manual entry and the preview filter the options
   client-side and the server never refuses an answer outside the set (`M133`'s offline rule); `LinkedChoiceGate` refuses at
   publish a filter whose source does not share the question or whose values are not comparable. **Live.** Filed by `M172`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** ✅ **CLOSED BY `M186` (2026-10-25):** built as prescribed, reshaped where the code required it. A
+  cascade level's `filter` and a list- or form-fed question's `options_filter` (`{form_id, field_key, mode}`, saved through
+  `UpdateFieldRequest`); `ShareableQuestions::FILTER_TYPES` and a purpose flag, so a cascade is shared to narrow only — never to
+  feed options, suggestions, a grid's copy or the scan's carry — and only when its owner ticks it (`null`'s "every question"
+  never covers one); the linked-choices response's `sets` are a LIST (`[{field_key, level, stamp, available, truncated,
+  values}]`, level keys having no format rule), the source's distinct finished answers at the comparable level (a cascade
+  source read per level) plus a choice source's labels, capped at 50,000 (`D163`: over it, or unreadable, nothing narrows and
+  the question says so); the guest merge writes them display-only (`config.choice_filter_sets`, read by the render model,
+  never the engine), and manual entry and the Preview get the same through `choice_filter` on all three adapters; `FieldInput`
+  narrows the levels above a filtered one (`D162`) and keeps whatever the answer already holds; `LinkedChoiceGate` refuses, as
+  `choice_filter_invalid`, an unshared or unfinished source, a typed list, and values that can never match (a Philippine places
+  level by the same level of another places question; a list by a one-answer question). The builder's **Show only**
+  (`ChoiceFilterEditor.vue`) under each level and under a list's source. Relayed `R1-2` is resolved once live.
 
 - **`nit` · The palette's "Adv" tooltip promises an advanced editor "coming with the form engine", and the settings panel carries a baseline note no type can reach any more.**
   `resources/js/components/builder/FieldPalette.vue:102` titles every advanced type "baseline settings (advanced editor coming
@@ -14522,7 +14544,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`minor` · Nothing tells an author what each question type can do on each surface, and the testers asked whether the advanced types are ready to use.**
   The testers' question (2026-10-15): *"are the adv questions ready to use?"*. The answer lives only in code: the eleven badged
   types (`app/Enums/FieldType.php:123-131`) render everywhere, while `duration` and `signature` are placed by the palette and
-  refused by both channels (`resources/public-runtime/lib/schema-mapping.ts:48-60`, pinned to the encode presenter by
+  refused by both channels (`resources/public-runtime/lib/schema-mapping.ts:50-62`, pinned to the encode presenter by
   `tests/Unit/Forms/FieldTypeMirrorDriftTest.php` — `R-af2d278b`), grids are excluded from conditions, piping, OCR and analytics,
   and the Help page says only that an Adv type's settings are more technical (`resources/js/components/help/manual.ts:300`). The
   remedy: a readiness table in Help → Builder reference, one row per type across the builder, the preview, the web form, manual
@@ -15115,10 +15137,45 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   unchanged since the case passed in the morning. **Live.** Filed by `M185`. **Tier: early-testing.** ✅ **CLOSED BY `M185` (2026-10-24):**
   the case reads the filing day in the form's own zone; red before at 16:45 UTC, green after. The service was right; only the test's clock was.
 
-- **`nit` · The deployment guide still says the testing server runs PHP 8.4.25; it has run 8.4.27 since 2026-10-22.**
+- ✅ **CLOSED BY `M186` (2026-10-25) — ****`nit` · The deployment guide still says the testing server runs PHP 8.4.25; it has run 8.4.27 since 2026-10-22.**
   `docs/deployment-infrastructure.md`'s testing-site layout paragraph names PHP 8.4.25, but the box was patched to 8.4.27 on 2026-10-22
   (php2shell, a critical php-cgi advisory) by swapping its PHP folder, every path unchanged. The correction was to ride the next pull
   request rather than go out alone (`D137`); `M185`'s close-out could not carry it, because a direct push to the trunk may hold only
   claim and close-out paths (`scripts/pre-push-guard.php`, its `PROTOCOL_PATHS`). The captured headers such as
   `tests/fixtures/staging-headers/measured/1.headers` keep 8.4.25 on purpose: they record what the box sent, not what it runs. The
   remedy: the one sentence, on the next pull request that touches `docs/`. **Live.** Filed by `M185`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M186` (2026-10-25):** the testing-site layout paragraph says PHP 8.4.27, and when and how it changed; the captured
+  headers keep 8.4.25, as the row says they should.
+
+- ✅ **CLOSED BY `M186` (2026-10-25) — ****`minor` · A template or library item made from a published version copies a list-backed cascade's whole option list into the new draft.**
+  `app/Services/Forms/SchemaBlueprintMaterializer.php` (`fieldAttributes()`) writes a blueprint field's `config` as it is, and
+  `app/Services/Forms/TemplateService.php` (`saveAsTemplate()`) stores a version's snapshot as the blueprint. A published version's
+  list-backed cascade holds every choice in `config.options` (`ChoiceListMaterializer::materialize()` writes them at publish), and only
+  `SchemaTreeCloner` strips them for the next draft (`ChoiceListMaterializer::forNextDraft()`). So a template saved from a published
+  version — the API's save-as-template takes any version, and an archived form with no draft falls back to its published one — and every
+  form made from it carries the whole list in its draft: the builder's page props, and every save of that question, hold it until the
+  first publish overwrites it. With the built-in Philippine places that is 43,000 choices. Found by `M186` while planning the built-in
+  list. The remedy: `forNextDraft()` applied to each field's config in both places — never in `SchemaSnapshotSerializer`, which also
+  builds the published snapshot and its checksum. **Live.** Filed by `M186`. **Tier: early-testing.** ✅ **CLOSED BY `M186`
+  (2026-10-25):** `SchemaBlueprintMaterializer::fieldAttributes()` and `TemplateService::saveAsTemplate()` both pass each field's
+  config through `forNextDraft()`; a template saved from a published version keeps the list's name and none of its choices, and a
+  form made from an older template that carries them gets a draft holding none, which publishes them again
+  (`tests/Feature/Templates/TemplateListOptionsTest.php`).
+
+- **`minor` · A choice list cannot be narrowed by the same form's own answers, so "one report per barangay" cannot be built.**
+  `M186` lets a cascade level, or a question whose choices come from a list file or another form, show only the choices another form
+  has (or has not) recorded (`R-ed7f3127`), and it keeps `M133`'s rule that a form cannot link to itself
+  (`LinkedChoiceService::refusal()`, `linked_choices_self`). Narrowing by the form's own responses — *only the barangays with no report
+  yet* — is the natural next ask, and the self rule refuses it. Found by `M186` while building the filter. The remedy: allow the form
+  itself as the filter's source (no sharing consent is needed for a form's own answers), with the set read from its finished responses
+  like any other, and say in the builder that a response being edited still shows its own choice. **Live.** Filed by `M186`.
+  **Tier: during-testing.**
+
+- **`nit` · ADR-0002 says CI enforces that every table not on its exemption list is tenant-scoped; CI checks only tables that carry `tenant_id`.**
+  `docs/adr/0002-multi-tenancy-shared-db-rls.md` (D1, the exemption list's last bullet) says *"Every table not on this exemption list is
+  assumed tenant-scoped by default, and CI enforces that assumption"*, but `tests/Feature/Tenancy/TenantTableClassificationDriftTest.php`
+  and `scripts/migration-lint.php` sweep only tables with a `tenant_id` column, so a table created without one — `releases`
+  (`M181`), `psgc_places` (`M186`) — passes every gate without being named anywhere. The `releases` migration says so in its docblock;
+  the ADR does not. Found by `M186` while planning a platform-wide table. The remedy: either a gate that lists every table without
+  `tenant_id` and requires each to be named on an exemption list, or the ADR's sentence corrected to what CI checks. **Live.**
+  Filed by `M186`. **Tier: during-testing.**

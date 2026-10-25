@@ -4454,7 +4454,7 @@
         "/public/linked-choices/{shareToken}/{version}": {
             "get": {
                 "operationId": "v1.public.linked-choices.show",
-                "description": "One list per question that takes its choices from another form, keyed by that question's key. A list the\nother form no longer shares comes back empty with `available: false`. `stamp` changes whenever the list\ndoes. `version` must be the share token's own form version; any other request answers the same 404.",
+                "description": "One list per question that takes its choices from another form, keyed by that question's key. A list the\nother form no longer shares comes back empty with `available: false`. `stamp` changes whenever the list\ndoes. `version` must be the share token's own form version; any other request answers the same 404.\n\n`sets` (M186): one entry per question \u2014 and per cascade level \u2014 whose choices are narrowed by what another form\nrecorded: the distinct answers that form holds (`values`), to show only those choices or only the others. `level`\nis the cascade level's index, or null for a question's own list. A set that cannot be read is `available: false`,\nand one over 50,000 answers is `truncated: true`; both carry no values, and the page then narrows nothing.",
                 "summary": "Fetch the choices this shared form takes from another form's answers",
                 "tags": [
                     "PublicFormSchema"
@@ -4531,11 +4531,52 @@
                                                             "options"
                                                         ]
                                                     }
+                                                },
+                                                "sets": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "field_key": {
+                                                                "type": "string"
+                                                            },
+                                                            "level": {
+                                                                "type": [
+                                                                    "integer",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "stamp": {
+                                                                "type": "string"
+                                                            },
+                                                            "available": {
+                                                                "type": "boolean"
+                                                            },
+                                                            "truncated": {
+                                                                "type": "boolean"
+                                                            },
+                                                            "values": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "type": "string"
+                                                                }
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "field_key",
+                                                            "level",
+                                                            "stamp",
+                                                            "available",
+                                                            "truncated",
+                                                            "values"
+                                                        ]
+                                                    }
                                                 }
                                             },
                                             "required": [
                                                 "version_id",
-                                                "lists"
+                                                "lists",
+                                                "sets"
                                             ]
                                         }
                                     },

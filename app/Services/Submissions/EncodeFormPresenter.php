@@ -13,6 +13,7 @@ use App\Models\FormField;
 use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Models\Submission;
+use App\Services\Forms\ChoiceListMaterializer;
 use App\Services\Forms\LinkedChoiceService;
 use App\Services\Forms\StepGraphInspector;
 use App\Services\Templates\TemplateRenderer;
@@ -102,6 +103,9 @@ final class EncodeFormPresenter
 
     /** @var array<string, array<string, array{stamp: string, available: bool, truncated: bool, options: list<array{value: string, label: string}>}>> each version's linked lists, read once (M184) */
     private array $linkedLists = [];
+
+    /** @var array<string, list<array{field_key: string, level: int|null, stamp: string, available: bool, truncated: bool, values: list<string>}>> each version's narrowing sets, read once (M186) */
+    private array $filterSets = [];
 
     public function __construct(
         private readonly SchemaValueFormatter $formatter,
@@ -241,7 +245,8 @@ final class EncodeFormPresenter
                 // must be read together.
                 'checksum' => $version->checksum,
                 // M141 — without a CSV-backed cascade's list: the engine copy needs no options (the server checks the
-                // answer), and the render copy in `blocks` already carries them (`R-7a2f4a13` is that copy's weight).
+                // answer). Since M186 (`R-7a2f4a13`) the render copy in `blocks` carries none either: the page fetches
+                // them by version from `choice_lists_url`.
                 'schema' => $version->schemaWithoutListOptions(),
                 'now' => $now,
             ],
@@ -294,6 +299,10 @@ final class EncodeFormPresenter
             // silent write down the draft channel — which has no audit row, no policy check for `update`, and
             // would overwrite the respondent's answers with no ledger entry that it happened.
             'draft_url' => $editing === null ? route('forms.submissions.draft', $form) : null,
+            // M186 (`R-7a2f4a13`): where the page fetches this version's list-backed cascades, or null when it has none.
+            'choice_lists_url' => $allFields->contains(static fn (FormField $f): bool => $f->field_type === FieldType::CascadingSelect && ChoiceListMaterializer::isListBacked($f->config))
+                ? route('forms.versions.choice-lists', [$form, $version])
+                : null,
         ];
     }
 
@@ -477,6 +486,9 @@ final class EncodeFormPresenter
             'calculation' => $this->calculationDisplay($field),
             // M184 (`R-596d6afd`) — a Short text's suggestions, offered as the keyer types; null for every other type.
             'suggestions' => $this->suggestions($field),
+            // M186 (`R-ed7f3127`) — what narrows this question's choices, or a cascade's levels', by what another form
+            // recorded; null when nothing does. Display only, as on the guest form: the server checks no answer against it.
+            'choice_filter' => $this->choiceFilter($field),
             // `note` is display-only (handled by the page), never an input; a repeatable section's fields are
             // supported and render inside the add/remove-instance loop (Increment G2). A hidden field is
             // keyable ONLY when it is externally sourced — a `fixed` or source-less one has no answer this
@@ -492,7 +504,9 @@ final class EncodeFormPresenter
      * the shared FieldInput cascading control consumes. Null for every non-cascading type. The encode channel is
      * single-locale, so labels are emitted as authored (no translation resolution — same as {@see options()}).
      *
-     * @return array{levels: list<array{key: string, label: string}>, options: list<array{value: string, label: string, level: string, parent: string|null}>}|null
+     * M186 (`R-70c7673a`): `skip_single` — a level with one choice under the one picked above is filled in for the person.
+     *
+     * @return array{levels: list<array{key: string, label: string}>, options: list<array{value: string, label: string, level: string, parent: string|null}>, skip_single: bool}|null
      */
     private function cascade(FormField $field): ?array
     {
@@ -509,8 +523,11 @@ final class EncodeFormPresenter
             $levels[] = ['key' => $key, 'label' => (string) ($level['label'] ?? $key)];
         }
 
+        // M186 (`R-7a2f4a13`): a list-backed cascade's choices are fetched beside the page, by version (`choice_lists_url`),
+        // not carried in it — a barangay list is 42,000 rows, several MB, on every load of this page.
+        $listed = ChoiceListMaterializer::isListBacked($field->config);
         $options = [];
-        foreach ((array) data_get($field->config, 'options', []) as $option) {
+        foreach ($listed ? [] : (array) data_get($field->config, 'options', []) as $option) {
             if (! is_array($option) || ! isset($option['value'], $option['level'])) {
                 continue;
             }
@@ -523,7 +540,7 @@ final class EncodeFormPresenter
             ];
         }
 
-        return ['levels' => $levels, 'options' => $options];
+        return ['levels' => $levels, 'options' => $options, 'skip_single' => data_get($field->config, 'skip_single_choice_levels') === true];
     }
 
     /**
@@ -726,6 +743,50 @@ final class EncodeFormPresenter
         $written = $config['suggestions'] ?? null;
 
         return is_array($written) ? array_values(array_filter($written, is_string(...))) : null;
+    }
+
+    /**
+     * M186 (`R-ed7f3127`): each filter a question declares, with the values its set holds now — `values` null when the
+     * set could not be read or is over its cap, so the shared FieldInput shows every choice and says why (`D163`). The
+     * guest adapters build the same member from the sets served beside the schema (`EncodeFieldAdapterParityTest`).
+     *
+     * @return list<array{level: int|null, mode: string, values: list<string>|null}>|null
+     */
+    private function choiceFilter(FormField $field): ?array
+    {
+        $declared = LinkedChoiceService::declaredFilters($field->field_type, (array) $field->config);
+        if ($declared === []) {
+            return null;
+        }
+
+        $versionId = (string) $field->form_version_id;
+        if (! array_key_exists($versionId, $this->filterSets)) {
+            $version = FormVersion::query()->whereKey($field->form_version_id)->first();
+            $form = $version === null ? null : Form::query()->whereKey($version->form_id)->first();
+            $this->filterSets[$versionId] = $version === null || $form === null ? [] : app(LinkedChoiceService::class)->setsFor($form, $version);
+        }
+
+        $filters = [];
+        foreach ($declared as $one) {
+            $filter = LinkedChoiceService::filterOf($one['filter']);
+            if ($filter === null) {
+                continue;
+            }
+            $set = null;
+            foreach ($this->filterSets[$versionId] as $candidate) {
+                if ($candidate['field_key'] === $field->key && $candidate['level'] === $one['level']) {
+                    $set = $candidate;
+                    break;
+                }
+            }
+            $filters[] = [
+                'level' => $one['level'],
+                'mode' => $filter['mode'],
+                'values' => $set !== null && $set['available'] && ! $set['truncated'] ? $set['values'] : null,
+            ];
+        }
+
+        return $filters === [] ? null : $filters;
     }
 
     /**

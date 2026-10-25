@@ -1704,6 +1704,8 @@ export function useBuilderStore(props: BuilderPageProps) {
         formId: props.form.id,
         // M133: the forms a choice question may take its choices from — the Options tab reads it, and takes no page props.
         linkableSources: props.linkable_sources ?? [],
+        // M186: the built-in Philippine places this server holds — the Levels tab's preset reads it.
+        psgc: props.psgc ?? null,
         library,
         librarySaved,
         // actions

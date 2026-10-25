@@ -87,7 +87,15 @@ final class TemplateService
         return DB::transaction(function () use ($version, $actor, $meta): FormTemplate {
             $this->useSnapshotIsolation();
 
+            // M186 (`R-d41a9632`): a published version's list-written choices are not kept in the blueprint — the API takes
+            // any version, and an archived form falls back to its published one — exactly as a draft keeps none
+            // (`ChoiceListMaterializer::forNextDraft()`). NOT in the serializer, which also builds the published snapshot
+            // and its checksum.
             $blueprint = $this->serializer->snapshot($version);
+            $blueprint['fields'] = array_map(
+                static fn (mixed $field): mixed => is_array($field) ? [...$field, 'config' => ChoiceListMaterializer::forNextDraft((array) ($field['config'] ?? []))] : $field,
+                (array) ($blueprint['fields'] ?? []),
+            );
 
             return FormTemplate::create([
                 'tenant_id' => TenantContext::currentTenantId(),

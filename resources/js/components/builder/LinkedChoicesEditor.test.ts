@@ -220,3 +220,28 @@ describe('LinkedChoicesEditor — a grid’s rows, cells and columns (M185, R-bb
         expect(wrapper.text()).toContain('up to 1,000, as they read today.');
     });
 });
+
+describe('Show only, on a question whose choices come from elsewhere (M186, R-ed7f3127)', () => {
+    const FILTER = { form_id: 'src-1', field_key: 'facility_name', mode: 'present' };
+
+    it('is offered for a list from another form when the panel passes the filter sources — never for typed choices or a grid', () => {
+        const linked = mount(LinkedChoicesEditor, { props: { config: { options: [], options_source: { form_id: 'src-1', field_key: 'facility_name' } }, sources: SOURCES, filterSources: SOURCES } });
+        expect(linked.find('[data-choice-filter]').exists()).toBe(true);
+
+        const typed = mount(LinkedChoicesEditor, { props: { config: { options: [{ value: 'a', label: 'A' }] }, sources: SOURCES, filterSources: SOURCES } });
+        expect(typed.find('[data-choice-filter]').exists()).toBe(false);
+
+        const grid = mount(LinkedChoicesEditor, { props: { config: { options: [], options_source: { form_id: 'src-1', field_key: null } }, sources: SOURCES, filterSources: SOURCES, kind: 'rows' } });
+        expect(grid.find('[data-choice-filter]').exists()).toBe(false);
+    });
+
+    it('drops the filter in the same change when the choices go back to being typed here', async () => {
+        const wrapper = mount(LinkedChoicesEditor, {
+            props: { config: { options: [], options_source: { form_id: 'src-1', field_key: 'facility_name' }, options_filter: FILTER }, sources: SOURCES, filterSources: SOURCES },
+        });
+
+        await wrapper.find('input[type="radio"][value="here"]').setValue();
+
+        expect(emitted(wrapper).at(-1)).not.toHaveProperty('options_filter');
+    });
+});

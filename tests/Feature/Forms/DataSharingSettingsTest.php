@@ -220,9 +220,10 @@ it('lists only the shareable questions of the published version, in the order th
     expect($section)->not->toBeNull()
         ->and($section['enabled'])->toBeFalse()
         ->and($section['published'])->toBeTrue()
+        // M186: `narrows_only` marks a cascade — this form has none.
         ->and($section['questions'])->toBe([
-            ['key' => 'facility_name', 'label' => 'Facility name'],
-            ['key' => 'district', 'label' => 'District'],
+            ['key' => 'facility_name', 'label' => 'Facility name', 'narrows_only' => false],
+            ['key' => 'district', 'label' => 'District', 'narrows_only' => false],
         ])
         ->and($section['used_by'])->toBe([])
         ->and($section['used_by_others'])->toBe(0);

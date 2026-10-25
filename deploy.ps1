@@ -35,7 +35,8 @@
        during the window (public\index.php echoes it without loading vendor\). Inside it:
        git reset --hard to the commit; move live vendor\ and public\build aside to .prev and
        the staged ones in; delete the bootstrap\cache files that describe the old vendor\ and
-       routes; package:discover; migrate --force; releases:sync, which copies the committed
+       routes; package:discover; migrate --force; psgc:sync, which copies the committed
+       Philippine places into psgc_places; releases:sync, which copies the committed
        What's new notes into the releases table; config:cache, route:cache, view:cache and
        event:cache; queue:restart last.
     6. artisan up, then record the commit in storage\framework\deployed-sha.
@@ -513,6 +514,18 @@ try {
     Invoke-Native php @('artisan', 'package:discover')
 
     Invoke-Native php @('artisan', 'migrate', '--force')
+
+    # M186 (R-70c7673a, D131): copy the committed Philippine places (database/data/psgc) into psgc_places, which a cascade
+    # bound to them reads when it is published. BEFORE the count, so the count below measures it as well as the
+    # migration: it adds and corrects, never deletes, and a shrink would leave the site down like any other. Inside the
+    # window, so a data file that fails its own checks leaves the site down too. A release older than the command (a
+    # -Ref rollback to it) cannot copy, and says so rather than failing.
+    if (Test-Path -LiteralPath (Join-Path $AppPath 'app\Console\Commands\SyncPsgcCommand.php')) {
+        Invoke-Native php @('artisan', 'psgc:sync')
+    }
+    else {
+        Write-Warning 'This release predates the built-in Philippine places (a -Ref rollback to it?), so none were copied.'
+    }
 
     # M176 (R-a11cc78a, D144): every table holds at least as many rows as before the migration — or this throws, the
     # window stays incomplete, and the site is LEFT DOWN on purpose: no tester writes on top of lost data before a restore

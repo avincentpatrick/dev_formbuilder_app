@@ -1,0 +1,25 @@
+{
+    "publication": "2026Q3",
+    "label": "3Q 2026",
+    "released_on": "2026-10-12",
+    "source": "tests/Support/PsgcFixture.php",
+    "credit": "Philippine Standard Geographic Code (PSGC), 3Q 2026. Philippine Statistics Authority.",
+    "file": "places.csv",
+    "sha256": "49c4887b3d4461482c13df7b27b746509a90d1732d76e7df9ffcbfe62cecdb50",
+    "counts": {
+        "region": 3,
+        "province": 4,
+        "city": 5,
+        "barangay": 7
+    },
+    "psa_counts": {
+        "(blank)": 1,
+        "Bgy": 7,
+        "City": 2,
+        "Dist": 1,
+        "Mun": 3,
+        "Prov": 1,
+        "Reg": 3,
+        "SubMun": 1
+    }
+}

@@ -233,7 +233,8 @@ it('offers the builder the sharing forms this author can read, with the question
     expect($sources)->toBe([[
         'id' => $this->source->id,
         'title' => 'Facility Register',
-        'questions' => [['key' => 'facility_name', 'label' => 'Facility name']],
+        // M186: each question says its type, so the editors that take choices can leave a cascade out.
+        'questions' => [['key' => 'facility_name', 'label' => 'Facility name', 'field_type' => 'short_text']],
     ]]);
 
     // An author who cannot read the source's responses is offered nothing from it, sharing or not.

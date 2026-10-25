@@ -16,8 +16,8 @@ use InvalidArgumentException;
  * `deploy.ps1` runs it inside the maintenance window, after `migrate --force` and the row count, so the table always
  * holds the release that is live. Idempotent: a release already in the table is left exactly as it is unless its notes
  * changed in the file, and the date it went live (`released_at`, stamped by the copy that first added it) is never
- * rewritten. ⛔ It NEVER deletes: a release dropped from the file stays — the table is the release history, and the
- * deploy's row count would refuse a shrink anyway.
+ * rewritten. ⛔ It NEVER deletes: a release dropped from the file stays — the table is the release history. (Not the row
+ * count's doing, as this once said: the count compares BEFORE this runs, on purpose, so it measures the migration alone.)
  *
  * The file is checked whole before anything is written (`ReleaseNotes::load()`), so a malformed file fails the step and
  * changes nothing.

@@ -44,7 +44,11 @@ final class ChoicePreviewPresenter
             ->all();
         $built = $this->lists->forDraft($draft);
 
-        return $this->payload($this->links->listsForFields($form, $fields), $built['cascades'], $built['flat'], $built['suggestions'], $this->lists->gridsForDraft($draft));
+        return [
+            ...$this->payload($this->links->listsForFields($form, $fields), $built['cascades'], $built['flat'], $built['suggestions'], $this->lists->gridsForDraft($draft)),
+            // M186 (`R-ed7f3127`): the sets that narrow its choices, as the guest page is served them beside the schema.
+            'sets' => $this->links->setsForFields($form, $fields),
+        ];
     }
 
     /**
@@ -55,7 +59,10 @@ final class ChoicePreviewPresenter
      */
     public function forVersion(Form $form, FormVersion $version): array
     {
-        return $this->payload($this->links->listsFor($form, $version), ChoiceListMaterializer::listsForBrowser($version), [], [], []);
+        return [
+            ...$this->payload($this->links->listsFor($form, $version), ChoiceListMaterializer::listsForBrowser($version), [], [], []),
+            'sets' => $this->links->setsFor($form, $version),
+        ];
     }
 
     /**

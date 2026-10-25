@@ -149,6 +149,13 @@ watch(
     },
 );
 
+// M186 (`R-ed7f3127`): a cascade — places, say — can narrow another form's choices but never become them, and it is shared
+// only when ticked: "Every question" was a consent given before cascades could be shared, so it never covers one.
+const everyQuestion = computed(() => props.sharing.questions.filter((q) => q.narrows_only !== true));
+const hasCascades = computed(() => props.sharing.questions.some((q) => q.narrows_only === true));
+const choiceLabel = (question: DataSharingProps['questions'][number]): string =>
+    question.narrows_only === true ? `${question.label} — narrows another form's choices only` : question.label;
+
 function toggleQuestion(key: string, on: boolean): void {
     chosen.value = on ? [...chosen.value.filter((k) => k !== key), key] : chosen.value.filter((k) => k !== key);
 }
@@ -208,7 +215,7 @@ function saveQuestions(): void {
                     <MdsRadio v-model="scope" value="chosen" label="Only the questions I choose" :name="scopeName" />
                 </div>
                 <ul v-if="scope === 'all'" class="data-sharing__list">
-                    <li v-for="question in sharing.questions" :key="question.key">{{ question.label }}</li>
+                    <li v-for="question in everyQuestion" :key="question.key">{{ question.label }}</li>
                 </ul>
                 <div v-else class="data-sharing__choices">
                     <template v-if="searchable">
@@ -221,13 +228,19 @@ function saveQuestions(): void {
                         v-for="question in shownQuestions"
                         :key="question.key"
                         :model-value="chosen.includes(question.key)"
-                        :label="question.label"
+                        :label="choiceLabel(question)"
                         @update:model-value="toggleQuestion(question.key, $event)"
                     />
                     <p v-if="shownQuestions.length === 0" class="data-sharing__help" data-sharing-no-match>
                         No question matches “{{ query.trim() }}”.
                     </p>
                 </div>
+                <!-- M186: AFTER the v-if/v-else pair above, never between them — a v-else binds to the element before it. -->
+                <p v-if="hasCascades" class="data-sharing__help" data-sharing-cascades>
+                    A cascading question, such as a place, is shared only when you choose it under “Only the questions I
+                    choose”. Another form can then show only the choices this form has answers for — never take them as
+                    its own.
+                </p>
                 <div class="data-sharing__actions">
                     <MdsButton
                         variant="secondary"

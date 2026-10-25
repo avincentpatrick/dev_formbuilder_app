@@ -232,9 +232,9 @@ it('gives another form\'s token only that form\'s lists, never this one\'s', fun
     enterTenant($this->tenant->id, $this->owner->id);
     $plain = guestForm($this->tenant, $this->owner, 'plain-intake');
 
-    // Its own version: no linked question, so no list — not the destination's.
+    // Its own version: no linked question, so no list — not the destination's. (No narrowing set either, since M186.)
     $this->getJson(linkedGuestUrl($plain))->assertOk()->assertExactJson([
-        'data' => ['version_id' => (string) $plain->current_published_version_id, 'lists' => []],
+        'data' => ['version_id' => (string) $plain->current_published_version_id, 'lists' => [], 'sets' => []],
     ]);
     // The destination's version under the plain form's token: refused.
     $this->getJson(linkedGuestUrl($this->destination, token: shareTokenFor($plain)))->assertNotFound();

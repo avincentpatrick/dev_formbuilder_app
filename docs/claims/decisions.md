@@ -24,10 +24,37 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D161`, the last filed, was asked and answered on 2026-10-23 while `M185` (T4) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D166`, the last filed, was asked and answered on 2026-10-26 while `M186` (T5)'s data commit was planned, and recorded in its claim (`D164`/`D165` are `M187`'s, on its held branch). A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D166 — The PSA's own workbook lists the City of Isabela (Basilan) under a placeholder row, "City of Isabela (Not a Province)", with no level. How should it appear when someone picks Region IX, then Province? **B — as the PSA writes it: "City of Isabela (Not a Province)" at the province level, then "City of Isabela".**
+
+**Asked and answered 2026-10-26 (user decision, in chat), while `M186` (T5)'s data commit was planned; recorded in its claim.** Measured on the PSA's 2Q and 3Q 2026 files: two rows have a blank level, both coded at the province group — `0990100000` City of Isabela (Not a Province), the special province code the City of Isabela sits under, and `1999900000` Special Geographic Area.
+
+- **A — like other cities (recommended, not chosen).** "City of Isabela" at the province level and again at the city level, the way City of Zamboanga beside it appears; the placeholder row is dropped.
+- **B — as the PSA writes it (chosen).** A blank level at the province group is a province-level place, named as the PSA names it; a blank level anywhere else is refused by name (`PsgcTiers`).
+
+**What the answer files, in the same push:** nothing new — `R-70c7673a`'s data commit carries it.
+
+### D163 — A question's choices can now be narrowed by what another form has recorded. Sometimes that form cannot be checked: its sharing was turned off, the phone is offline with nothing saved, or it has more than 50,000 different answers. What should the question show then? **A — every choice, with a short note that the list could not be narrowed.**
+
+**Asked and answered 2026-10-24 (user decision, in chat), while `M186` (T5) was planned; recorded in its claim.** A narrowing set is served beside the schema with the linked choices (`R-ed7f3127`), and `M133`'s offline rule stands: the server never refuses an answer outside a list.
+
+- **A — every choice, with a note (recommended, chosen).** The respondent can still answer; the note says the choices could not be narrowed just now. A set the server could not build (`available: false`) and a set over the cap (`truncated: true`) are treated alike.
+- **B — no choices, with a note.** Strict: nothing can be picked until the other form can be checked again, so a respondent can be stuck.
+
+**What the answer files, in the same push:** nothing new — `R-ed7f3127`'s remedy carries it.
+
+### D162 — A cascade's lower level (a barangay, say) can now show only the choices another form has recorded. Should the levels above it shrink to match? **A — yes: regions, provinces and cities with no allowed choice below them are hidden; when nothing is left, the question says so.**
+
+**Asked and answered 2026-10-24 (user decision, in chat), while `M186` (T5) was planned; recorded in its claim.** The cascade control indexes a level's choices by their parent (`FieldInput.vue`), so the levels above can be narrowed in the browser from the allowed set below without the server knowing.
+
+- **A — narrow the levels above (recommended, chosen).** Nobody picks a city and then finds its barangay list empty. A choice already in the answer stays visible, so a saved draft never loses its value.
+- **B — only the filtered level.** The levels above show everything; the filtered level can come up empty, with a note.
+
+**What the answer files, in the same push:** nothing new — `R-ed7f3127`'s remedy carries it.
+
 ### D161 — A grid's rows, and a choice column's choices, can now come from a list file or another form's answers. When should the grid pick up that form's new answers? **A — when you publish: the rows and choices are copied into the form at publish; publish again to pick up new answers.**
 
 **Asked and answered 2026-10-23 (user decision, in chat), while `M185` (T4) was planned; recorded in its claim.** Every reader of a grid's row set reads the rows frozen in the published version: Stage 1 refuses an answered row that is not in `config.rows` (`unknown_row`), both engines loop over the config rows, and the spreadsheet's per-cell columns, the XLSForm cells, the paper form and the manual-entry page all draw `config.rows`. A list file is copied at publish in any case, as T3 does for a flat question (`ChoiceListMaterializer`).

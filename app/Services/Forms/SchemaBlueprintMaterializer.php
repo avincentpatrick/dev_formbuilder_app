@@ -149,7 +149,11 @@ final class SchemaBlueprintMaterializer
             'form_section_id' => $sectionId,
             'key' => $field['key'],
             'field_type' => FieldType::from((string) $field['field_type']),
-            'config' => $field['config'] ?? [],
+            // M186 (`R-d41a9632`): a blueprint taken from a PUBLISHED version holds the choices its lists wrote there — with
+            // the Philippine places, 43,000 of them. A draft never holds those ({@see ChoiceListMaterializer::forNextDraft()}),
+            // so the new draft names its lists and its next publish writes them again. Templates already saved, platform
+            // templates and library items all come through here.
+            'config' => ChoiceListMaterializer::forNextDraft((array) ($field['config'] ?? [])),
             'label' => $field['label'] ?? '',
             'label_translations' => $field['label_translations'] ?? null,
             'hint' => $field['hint'] ?? null,

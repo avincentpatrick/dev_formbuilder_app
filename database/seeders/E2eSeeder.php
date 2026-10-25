@@ -41,6 +41,7 @@ use App\Models\FormVersionReferenceFile;
 use App\Models\Notification;
 use App\Models\OcrScan;
 use App\Models\Plan;
+use App\Models\PsgcPlace;
 use App\Models\Role;
 use App\Models\SavedReportView;
 use App\Models\ScopeNode;
@@ -230,6 +231,15 @@ class E2eSeeder extends Seeder
 
         // The global plan catalog (H5a) — the tenant_id-free `plans` table, on the default connection.
         $this->call(PlanSeeder::class);
+
+        // M186 (`R-70c7673a`) — the Philippine places, which a cascade on them reads when it is published: the deploy's own
+        // `psgc:sync`, over a SMALL fixture (`tests/fixtures/psgc/`, written from `Tests\Support\PsgcFixture`) rather than
+        // the committed quarter — every shape the build handles in 19 places, so a spec's clicks never depend on which
+        // quarter is committed, and the seed stays fast. Before any form below publishes. Into an EMPTY table only (CI's is):
+        // a development database that already holds places — a real quarter synced by hand — keeps them.
+        if (PsgcPlace::query()->doesntExist() && Artisan::call('psgc:sync', ['--file' => base_path('tests/fixtures/psgc/manifest.json')]) !== 0) {
+            throw new RuntimeException('psgc:sync failed while seeding: '.trim(Artisan::output()));
+        }
 
         // Tenant + subdomain (tenants/domains are RLS-exempt central tables).
         $tenant = Tenant::firstOrCreate(['slug' => 'acme'], ['name' => 'Acme Research']);
@@ -975,6 +985,7 @@ class E2eSeeder extends Seeder
             $this->seedAnalyticsFixture($owner, $tenant);
 
             $this->seedLinkedChoices($owner, $tenant); // M133 — after the fixture whose answers it shares
+            $this->seedPhilippinePlaces($owner, $tenant); // M186 — after the places themselves (the sync above)
 
             // A handful of submissions against Clinic Intake so the inbox (Increment F7) has rows in a spread
             // of review states (Badge variety) and the detail page has answers to render for the axe gate.
@@ -2242,6 +2253,45 @@ class E2eSeeder extends Seeder
 
         $referral->update([
             'public_slug' => 'visit-referral',
+            'allow_guest_submissions' => true,
+            'supported_locales' => ['en'],
+            'single_page_mode' => true,
+        ]);
+    }
+
+    /**
+     * M186 (`R-70c7673a`) — a guest form whose cascade takes the Philippine places: "Barangay Visit" at `/f/barangay-visit`,
+     * its four levels bound to `psgc:region` … `psgc:barangay` and filling in a level with one choice, published through
+     * the real path so the materializer writes the places in. `psgc-cascade.spec.ts` picks a city outside any province and
+     * sees its city level filled in. Converged: a second run changes nothing.
+     */
+    private function seedPhilippinePlaces(User $owner, Tenant $tenant): void
+    {
+        if (Form::query()->where('title', 'Barangay Visit')->exists()) {
+            return;
+        }
+
+        $form = app(FormService::class)->create($tenant, $owner, 'Barangay Visit', 'Where the visit was, from the built-in Philippine places (M186 demo).');
+        $builder = app(FormBuilderService::class);
+        $section = $builder->addSection($form);
+        $builder->addField($form, $owner, FieldType::CascadingSelect, $section->id)->update([
+            'key' => 'place',
+            'label' => 'Place visited',
+            'config' => [
+                'levels' => [
+                    ['key' => 'region', 'label' => 'Region', 'list' => 'psgc:region'],
+                    ['key' => 'province', 'label' => 'Province or district', 'list' => 'psgc:province'],
+                    ['key' => 'city', 'label' => 'City or municipality', 'list' => 'psgc:city'],
+                    ['key' => 'barangay', 'label' => 'Barangay', 'list' => 'psgc:barangay'],
+                ],
+                'options' => [],
+                'skip_single_choice_levels' => true,
+            ],
+        ]);
+        app(PublishService::class)->publish($form->refresh(), $owner);
+
+        $form->update([
+            'public_slug' => 'barangay-visit',
             'allow_guest_submissions' => true,
             'supported_locales' => ['en'],
             'single_page_mode' => true,

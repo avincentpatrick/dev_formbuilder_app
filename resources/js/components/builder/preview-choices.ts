@@ -12,7 +12,7 @@
  */
 import { sendSettingsRequest } from '@/components/forms/reference-files';
 import { mergeChoiceLists, type ChoiceList } from '../../../public-runtime/lib/choice-lists';
-import { LINKED_CHOICES_EMPTY, mergeLinkedChoices, type LinkedChoiceLists } from '../../../public-runtime/lib/linked-choices';
+import { LINKED_CHOICES_EMPTY, mergeLinkedChoices, type ChoiceFilterSet, type LinkedChoiceLists } from '../../../public-runtime/lib/linked-choices';
 import type { SchemaResponse } from '../../../public-runtime/lib/types';
 
 export interface PreviewChoices {
@@ -22,6 +22,8 @@ export interface PreviewChoices {
     suggestions: Record<string, { suggestions: string[]; total: number }>;
     /** M185: absent from a payload built before grids could take their lists from elsewhere. */
     grids?: Record<string, PreviewGrid>;
+    /** M186: the sets that narrow a question's choices — absent from a payload built before they existed. */
+    sets?: ChoiceFilterSet[];
 }
 
 interface PreviewList {
@@ -74,7 +76,9 @@ function withNote(hint: string | null | undefined, note: string | null): string 
 
 /** A copy of `schema` carrying the choices, each long list's question saying how much of it is shown. */
 export function applyPreviewChoices(schema: SchemaResponse, choices: PreviewChoices): SchemaResponse {
-    const linked = mergeLinkedChoices(schema, choices.linked, { unavailable: PREVIEW_LINKED_UNAVAILABLE, empty: LINKED_CHOICES_EMPTY });
+    // M186 (`R-ed7f3127`): the sets that narrow its choices, as the guest page merges them — the preview narrows the
+    // first 200 of each list it shows.
+    const linked = mergeLinkedChoices(schema, choices.linked, { unavailable: PREVIEW_LINKED_UNAVAILABLE, empty: LINKED_CHOICES_EMPTY }, choices.sets ?? null);
     const listed = mergeChoiceLists(linked, choices.cascades, PREVIEW_LIST_UNAVAILABLE);
 
     const fields = listed.version.schema.fields.map((field) => {

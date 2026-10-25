@@ -183,6 +183,24 @@ final class SubmissionPolicy
     }
 
     /**
+     * Fetch a form version's choice lists for manual entry (M186, `R-7a2f4a13`) — exactly whoever can open the encode page
+     * on this form through ANY of its doors: a new response ({@see create()}, without its published-version check — the
+     * route names the version), a draft resumed ({@see promote()}), a response corrected ({@see update()}); the OCR review
+     * is {@see create()}'s too. NOT `FormPolicy::view`: a Reviewer holding an editor grant can encode
+     * (`submissions.create`, no `forms.edit.own`) and would be refused the lists of the page they are on.
+     *
+     * The lists are the form's own published choices — what that page shows anyway — so this widens no read.
+     */
+    public function readEncodeLists(User $user, Form $form): bool
+    {
+        $editor = fn (): bool => $this->grants->holdsOnFormId($user, $form->id, ResourceCapacity::Editor);
+
+        return ($user->can('submissions.create') && ($user->can('forms.edit.any') || $editor()))
+            || $user->can('submissions.edit.any')
+            || ($user->can('submissions.edit.own') && $editor());
+    }
+
+    /**
      * Tenant-wide submission visibility. `dashboard.org.view` is the one permission that separates the
      * org-wide read roles (Owner/Admin/Viewer) from the collaborator-scoped ones (Form Editor/Reviewer,
      * who hold only `dashboard.form.view`) — multi-tenancy-rbac-design.md §5.

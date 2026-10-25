@@ -54,6 +54,8 @@ const encodeField = computed<EncodeField>(() => ({
     content: props.field.content,
     // M184 (`R-596d6afd`) — a Short text inside a repeat offers its suggestions in every instance.
     suggestions: props.field.suggestions,
+    // M186 (`R-ed7f3127`) — what narrows the choices shown, as the flat adapter carries it.
+    choice_filter: props.field.choiceFilter ?? null,
     supported: props.field.supported,
 }));
 

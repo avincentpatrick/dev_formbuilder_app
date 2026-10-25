@@ -41,6 +41,7 @@ final class BuilderPresenter
         private readonly FormSharePresenter $share,
         private readonly FormSettingsPresenter $settings,
         private readonly LinkedChoiceService $linkedChoices,
+        private readonly PsgcLists $psgc,
     ) {}
 
     /**
@@ -107,6 +108,9 @@ final class BuilderPresenter
             // M133 (`R-5da4a30f`) — the forms a choice question may take its choices from, each with the questions it
             // shares, as this author may read them. Optional on the client: a fixture without it offers none.
             'linkable_sources' => $this->linkedChoices->linkableSources($form, $viewer),
+            // M186 (`R-70c7673a`) — the built-in Philippine places this server holds (the quarter, each level's count), or
+            // null before a deploy has copied them in. Optional on the client: without it the Levels tab offers no preset.
+            'psgc' => $this->psgc->summary(),
         ];
     }
 

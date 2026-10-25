@@ -8,12 +8,26 @@
  * A picture is a plain `<img>` from `public/images/help/`, at its CSS size and never wider than the card, with its
  * description as `alt` and a visible caption. It is light-themed in both themes — a screenshot of a light screen —
  * so it carries its own border rather than relying on the card's background to frame it.
+ *
+ * A table (M187, `R-3e6358ed` — what each question type can do) is the shared `MdsDataTable`, so it scrolls inside its
+ * own frame with keyboard access when it is wider than the page, and turns into one card per row on a phone; the page
+ * itself never scrolls sideways. Each row's head is drawn by `ManualSpans`, so its labels are bold like every quote.
  */
-import { MdsCallout } from '@meridian/design-system';
+import { computed } from 'vue';
+import { MdsCallout, MdsDataTable, type DataTableColumn } from '@meridian/design-system';
 import ManualSpans from './ManualSpans.vue';
-import type { ManualBlock } from './manual';
+import type { ManualBlock, ManualSpan } from './manual';
 
-defineProps<{ block: ManualBlock }>();
+const props = defineProps<{ block: ManualBlock }>();
+
+type TableRow = Record<string, unknown> & { key: string; head: ManualSpan[] };
+
+const tableColumns = computed<DataTableColumn[]>(() =>
+    props.block.kind === 'table' ? props.block.columns.map((col) => ({ key: col.key, header: col.heading })) : [],
+);
+const tableRows = computed<TableRow[]>(() =>
+    props.block.kind === 'table' ? props.block.rows.map((row) => ({ ...row.cells, key: row.key, head: row.head })) : [],
+);
 </script>
 
 <template>
@@ -36,6 +50,11 @@ defineProps<{ block: ManualBlock }>();
         />
         <figcaption class="manual-block__caption">{{ block.caption }}</figcaption>
     </figure>
+    <div v-else-if="block.kind === 'table'" class="manual-block__table">
+        <MdsDataTable :columns="tableColumns" :rows="tableRows" row-key="key" :caption="block.caption">
+            <template #cell-type="{ row }"><ManualSpans :spans="row.head" /></template>
+        </MdsDataTable>
+    </div>
     <MdsCallout v-else :tone="block.tone"><ManualSpans :spans="block.spans" /></MdsCallout>
 </template>
 
@@ -75,6 +94,12 @@ defineProps<{ block: ManualBlock }>();
     height: auto;
     border: 1px solid var(--mds-color-border-default);
     border-radius: var(--mds-radius-md);
+}
+
+/* Never wider than the card: the table scrolls (or stacks into cards) inside it. */
+.manual-block__table {
+    min-width: 0;
+    max-width: 100%;
 }
 
 .manual-block__caption {

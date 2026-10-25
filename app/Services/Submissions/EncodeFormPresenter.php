@@ -102,6 +102,15 @@ final class EncodeFormPresenter
      */
     private const OMITTED = [FieldType::PageBreak, FieldType::Calculated];
 
+    /**
+     * Whether a type has an input on this page — and, by `FieldTypeMirrorDriftTest`'s pin, on the guest form too. Read by
+     * the readiness table in Help (`FieldReadiness`, M187) rather than copied into it.
+     */
+    public static function supports(FieldType $type): bool
+    {
+        return in_array($type, self::SUPPORTED, true);
+    }
+
     /** @var array<string, array<string, array{stamp: string, available: bool, truncated: bool, options: list<array{value: string, label: string}>}>> each version's linked lists, read once (M184) */
     private array $linkedLists = [];
 
@@ -496,7 +505,7 @@ final class EncodeFormPresenter
             // channel could legitimately contribute (Increment H7).
             'supported' => $type === FieldType::Hidden
                 ? $prefill === PrefillSource::Url
-                : in_array($type, self::SUPPORTED, true),
+                : self::supports($type),
         ];
     }
 

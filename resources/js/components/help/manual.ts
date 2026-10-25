@@ -15,6 +15,8 @@
  * page does not need one. No screenshots in v1 (`D114`); filed as `R-5cde8465`.
  */
 
+import readiness from './field-readiness.json';
+
 export type ManualSpan =
     | { kind: 'text'; text: string }
     /** An on-screen label, drawn bold, with the repository file that draws it (checked by `manual.test.ts`). */
@@ -32,7 +34,12 @@ export type ManualBlock =
      * `tests/e2e/capture/help-pictures.capture.ts`; `width` and `height` are its CSS size — half its pixels, because it is
      * captured at a device scale of 2 — and `manual.test.ts` checks both against the file.
      */
-    | { kind: 'figure'; src: string; alt: string; caption: string; width: number; height: number };
+    | { kind: 'figure'; src: string; alt: string; caption: string; width: number; height: number }
+    /**
+     * A table (M187, `R-3e6358ed`): one row per item, the row's head as spans (so its labels are checked like any other),
+     * and its cells as plain text keyed by column. Drawn by `MdsDataTable`, which turns each row into a card on a phone.
+     */
+    | { kind: 'table'; caption: string; columns: { key: string; heading: string }[]; rows: { key: string; head: ManualSpan[]; cells: Record<string, string> }[] };
 
 /** The page's two parts: the walk-through (`M162`) and the reference to every control (`M163`). */
 export type ManualPart = 'guide' | 'reference';
@@ -91,6 +98,24 @@ function tip(tone: 'info' | 'success' | 'warning', ...parts: Part[]): ManualBloc
 
 function figure(src: string, alt: string, caption: string, width: number, height: number): ManualBlock {
     return { kind: 'figure', src, alt, caption, width, height };
+}
+
+/**
+ * M187 (`R-3e6358ed`): what each question type can do on each surface, from `field-readiness.json` — written by
+ * `php artisan help:readiness` from the rules themselves and held equal to them by `FieldReadinessTableTest`, so this
+ * page never states a capability the code does not have. Each type is named as the palette names it, with its Adv mark.
+ */
+function readinessTable(): ManualBlock {
+    return {
+        kind: 'table',
+        caption: 'What each question type can do',
+        columns: [{ key: 'type', heading: 'Question type' }, ...readiness.columns],
+        rows: readiness.rows.map((row) => ({
+            key: row.type,
+            head: spans([ui(row.label, FIELD_TYPES), ...(row.advanced ? [' ', ui('Adv', PALETTE)] : []), ...(row.retired ? [' (retired)'] : [])]),
+            cells: row.cells,
+        })),
+    };
 }
 
 // The files that draw the labels below. Paths are repository-relative; `manual.test.ts` reads each one.
@@ -302,7 +327,7 @@ const guide: ChapterDraft[] = [
                         [ui('Note / label', FIELD_TYPES), ' — text, a heading or an image for the respondent to read. It asks nothing.'],
                         [ui('Page break', FIELD_TYPES), ' — starts a new page when the form is shown one step at a time.'],
                     ),
-                    p('A type marked “Adv” is an advanced one: it works like any other, and its settings are more technical.'),
+                    p('A type marked “Adv” is an advanced one: it works like any other, and its settings are more technical. ', link('What each type can do', '#types-readiness'), ' shows where every type works.'),
                 ],
             },
             {
@@ -673,7 +698,7 @@ const reference: ChapterDraft[] = [
                         [ui('Add a field', PALETTE), ' — the heading of the list of question types.'],
                         ['A group heading. Questions of the same kind sit together: ', ui('Text', CATEGORIES), ', ', ui('Number', CATEGORIES), ', ', ui('Date & time', CATEGORIES), ', ', ui('Choice', CATEGORIES), ', ', ui('Rating', CATEGORIES), ', ', ui('Location', CATEGORIES), ', ', ui('Media', CATEGORIES), ' and ', ui('Layout', CATEGORIES), '.'],
                         ['A question type. Click it to add that kind of question to your form. Each type is explained in this reference, from ', link('Text questions', '#types-text'), ' onwards.'],
-                        [ui('Adv', PALETTE), ' — an advanced type: it works like any other, and its settings are more technical.'],
+                        [ui('Adv', PALETTE), ' — an advanced type: it works like any other, and its settings are more technical. See ', link('What each type can do', '#types-readiness'), '.'],
                     ),
                 ],
             },
@@ -1202,6 +1227,29 @@ const reference: ChapterDraft[] = [
         ],
     },
     {
+        id: 'types-readiness',
+        title: 'What each type can do',
+        summary: 'Every question type, and where it works: the web form, manual entry, paper, the PDF, exports and more.',
+        sections: [
+            {
+                id: 'type-readiness',
+                title: 'Every type, on every surface',
+                blocks: [
+                    p('Every question type works on the web form and in manual entry unless the table says otherwise. A type marked ', ui('Adv', PALETTE), ' is an advanced one: it works like any other, and its settings are more technical.'),
+                    readinessTable(),
+                    list(
+                        ['Retired — you can no longer add one. Questions already on a form keep working.'],
+                        ['Form cannot be scanned — a form with this question cannot have its paper copies read automatically, so they are keyed in.'],
+                        ['Named, not written — the paper form prints the question so nobody misses it, with no space to write an answer.'],
+                        ['A dash — the question holds no answer, so there is nothing to show.'],
+                    ),
+                    p('The builder’s ', ui('Preview', BUILDER), ' draws each question as the web form does, except that photo, file and location questions are shown but not interactive, and a signature can be drawn but is not saved.'),
+                    tip('info', 'Duration is retired: work a duration out with a ', ui('Calculated', FIELD_TYPES), ' question instead — a start, an end and the units.'),
+                ],
+            },
+        ],
+    },
+    {
         id: 'publish-checks',
         title: 'Why Publish can say no',
         summary: 'The settings Publish checks, and how to fix each one.',
@@ -1275,6 +1323,7 @@ export function manualLinks(chapters: ManualChapter[] = manual): { href: string;
 
 function blockSpans(block: ManualBlock): ManualSpan[][] {
     if (block.kind === 'figure') return [];
+    if (block.kind === 'table') return block.rows.map((row) => row.head);
     return block.kind === 'steps' || block.kind === 'list' ? block.items : [block.spans];
 }
 

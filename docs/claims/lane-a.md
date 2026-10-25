@@ -82,6 +82,8 @@ new `FieldHistory.vue`, `useBuilderStore.ts`, `builderClient.ts`, `conflict-diff
 `BuilderLockOrderTest.php`) and the tenancy and dictionary drift tests a new table moves; Vitest beside the components (new
 `FieldHistory.test.ts`, a store test for Put back, `conflict-diff.test.ts`, `ConfigPanel.test.ts`, `manual.test.ts`); new
 `tests/e2e/builder-history.spec.ts`.
+**Extended 2026-10-26, opened before this push (recorded):** `tests/Feature/Forms/BuilderDraftGuardTest.php` — it calls
+`deleteSection()` directly, which now takes the acting user so a deleted section's questions record their move.
 Shared artefacts taken: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/data-dictionary.md` (§5, a new
 section, the enum catalog), `docs/audit-compliance-logging-spec.md`, `tests/e2e/builder-axe.spec.ts`, `tests/e2e/builder-content-axe.spec.ts`
 and the specs the diff reaches, `PROGRESS.md` (own block).

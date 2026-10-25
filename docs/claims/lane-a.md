@@ -130,6 +130,35 @@ Prediction: red first to `FieldTypeMirrorDriftTest` (the floor and the equality,
 scroll inside its own wrapper, keep axe clean, and leave the help page with no horizontal scroll; the design system's `DataTable` may
 not fit a static table at all.
 
+**BUILT — PR #380, CI 6/6 green with real step counts (run 40205584374 at `9abdd939`: Static analysis 32 · E2E 20 · Contract 16 ·
+Frontend 12 · Pest 11 · axe 11; the first run, 40202616380 at `4fa6ee04`, was red in Contract alone — below) — AND NOT MERGED.**
+⛔ **Held for merge point 6 (`D137`, `D138`)**, with T5 (#379) and L; **L stacks on this branch** (`VERSION` 0.14.0 is only here). This
+branch merged the trunk ONCE, at `4096ea8a` (the claim `be6d2727`): at merge point 6, after #379 merges, rebase T6's own commits with
+`git rebase --onto origin/main 4096ea8a` and `git rebase --skip` any `claim(M187)` commit it replays. Rows closed on the branch:
+`R-af2d278b` (Signature only, `D140`), `R-96127b20`, `R-3e6358ed`, `R-c64d0afd`. Filed: `D164`'s scan-crop row, a typed signature,
+media answers drawn as pictures (during-testing), the sweep of unreferenced uploads (before-launch). `D164` and `D165` are recorded in
+`docs/claims/decisions.md` on the branch. Relayed `R1-6` is resolved only once live.
+
+**The prediction, measured.** Red first exactly as named: `FieldTypeMirrorDriftTest` (the floor), `schema-mapping.test.ts`,
+`G6FieldTypesTest` (2 of its new cases — the other two passed on the existing plumbing, as the premise said), `FieldReadinessTableTest`;
+`manual.test.ts` stayed green through the Signature rewrite. **The named most-likely-wrong was wrong:** the readiness table at 375 px
+needed nothing — `MdsDataTable` turns each type into a card on a phone, `help-contents` passed at every width, and no design exception
+was written. PHPStan was not quite clean: host PHPStan caught a redundant `is_string()` on `tenant_id` (container PHPStan reported 51
+`property.notFound`, the recorded artefact). **What no prediction named:** (1) CI's Contract job went red — `FieldType`'s class
+docblock IS the OpenAPI enum's description, so rewording "Adv" moved one line of `openapi.json` (regenerated; the claim extended,
+`115fb85c`); (2) dompdf silently drops a grey-with-alpha PNG (the G6 1 × 1 fixture) while it embeds the pad's RGBA one — the PDF fixture
+is pad-shaped; (3) nine ledger citations into edited files moved (eight dead, `FieldInput.vue:250` silently wrong) — repointed by
+text; (4) Pint's `fully_qualified_strict_types` turned a docblock `{@see}` into a `use` line in a cited file — reworded instead;
+(5) eight files were opened before their claim extension was pushed — recorded at `115fb85c`, not hidden; (6) `git stash` with only
+untracked changes saved nothing and the following pop applied an OLD `j5-onboarding` entry onto `PROGRESS.md` and
+`PROGRESS_ARCHIVE.md` — restored from HEAD, the entry kept; (7) the first local E2E rerun failed in global setup on a surviving
+`public/hot`. **Mutants: 16 caught, 0 survived** (9 Pest through `scripts/mutate.php`: both `SUPPORTED`, the forced file types, the PDF
+embed, its pixel cap, its scan check, the response page's scan check, a readiness verdict, a rule changed without regenerating, the
+export link; 7 Vitest by a byte-restoring harness: the guest set, its media config, per-stroke saving, an older save winning, a tap
+counting, the palette title, a row dropped from Help's table). **Measured:** a saved signature is 12,613 bytes (900 × 300 PNG, scan
+skipped); E2E locally `signature` (new; 375 and 1440) and `media-input-hidden-text`, `help-contents`, `public-runtime-axe`,
+`builder-axe`, `encode-validation` — 165 passed, 3 skipped, 0 failed; the whole Vitest suite 279 files (all on disk), 4,309 tests.
+
 ## HELD — `M186`, T5 of the testers' items: Philippine places (PSGC) and the cross-form filter (`R-70c7673a`, `R-ed7f3127`, with `R-7a2f4a13`, `R-dbb2ff34`, and `R-bbf03029` only if the staging count is zero) (m186-t5-psgc-filter)
 
 Taken 2026-10-25. Branch `m186-t5-psgc-filter`, cut from origin/main at `38a105af`, PR into main. ⛔ **NOT MERGED THIS SESSION:** it is

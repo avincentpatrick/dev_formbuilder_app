@@ -16,7 +16,84 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M187`, T6 of the testers' items: a Signature anyone can sign, what "Adv" means, and what each question type can do (`R-af2d278b`, `R-96127b20`, `R-3e6358ed`, with `R-c64d0afd`) (m187-t6-signature-readiness)
+## Status: ACTIVE CLAIM — `M188`, L of the testers' round 2: a history of each question's changes, and Put back (`R-3894369d`) (m188-l-change-history)
+
+Taken 2026-10-26. Branch `m188-l-change-history`, **stacked on `m187-t6-signature-readiness` at `9abdd939`** (it bumps a `VERSION`
+that is 0.14.0 only there), with `origin/main` merged in once (the claim-merge, whose sha merge point 6 rebases `--onto`). PR into
+main. ⛔ **NOT MERGED THIS SESSION:** held green for merge point 6 with T5 and T6 (`D137`, `D138`: … T5 → T6 → L → merge point 6).
+The plan of record is `~/.claude/plans/here-are-added-comments-peppy-quill.md` §L; the build plan is
+`~/.claude/plans/read-claude-md-then-php-magical-map.md` Part 4.
+Row: `R-3894369d` — *"A question keeps no history of its changes, so an author cannot see which setting changed, from what, or put
+one change back."* Relayed `P5b` (the testers' comment 5 of 2026-10-11, the change log with revert) is this increment's comment; it
+is resolved only once live.
+
+The session-start pull read 0 reports, 0 reopened and 0 new comments (relayed 31: 22 Resolved · 3 Ongoing · 6 Confirmed working),
+so nothing was triaged. **Asked and answered in planning (the user, 2026-10-26, in chat), recorded on this branch's first commit:**
+**`D167` A** — Put back restores the whole change: every setting one change touched goes back together, and typing a label in
+bursts counts as one change. **`D168` A** — a change of question type and a move are listed, not put back, each with what to do
+instead; a setting changed under an older type cannot be put back until the type matches. **The 0.15.0 notes' wording was approved
+verbatim** (two items, in the build plan).
+
+### Evidence verified
+Read on `9abdd939` (T6's tip, this branch's base) by two read-only passes and my own reads.
+- `app/Services/Forms/FormBuilderService.php:301` ("a question records who last changed it") — **moved** to `:305` (`'updated_by' =>
+  $user->id`; `:301` is now `is_pii`).
+- `docs/audit-compliance-logging-spec.md`, "Deliberately NOT audited" — held (`:93`): draft-row edits are not audited; the publish is.
+- "Undo lives in memory and is lost on reload; the edit journal holds unsent edits only" — held (`useBuilderStore.ts` `pushHistory`;
+  `edit-journal.ts`, sessionStorage, a one-day TTL).
+
+### Premise verified
+- **The question key is not an identity.** The field PATCH renames it (`UpdateFieldRequest`, `FormBuilderService::freeKey`), and
+  `uniqueKey` hands a deleted question's `field_N` to the next new one. Restore and XLSForm import bring old keys back. Publish clones
+  every question with the same key and a NEW id (`SchemaTreeCloner`, `replicate()`). A history keyed by key alone would hand a deleted
+  question's history to the next `field_3`, so each question gets a lineage id that `replicate()` carries.
+- **The builder's lock order forbids a foreign key to `forms` or `form_versions`** from the revision insert. `writeField` and
+  `convertField` lock the question row and never `forms`; publish locks `forms` FOR UPDATE and then the questions; archive deletes the
+  draft version (`FormService::archive`, cascading to its questions). A KEY SHARE taken by the insert after the row lock reverses the
+  order (the M91/M92 deadlock class `BuilderLockOrderTest` pins).
+- **`reorder()` takes no `User`**, and one drag renumbers every row. **Two paths change a question without `writeField`**:
+  `add/removeOtherSpecify` (`forceFill`) and `deleteSection` (the FK's SET NULL). `ChoiceListMaterializer` writes config at publish,
+  which is not an author's edit.
+- **The client snapshots inside its queued task** (`commitFieldEdit`), so a Put back must wait for idle or run inside the queue to be
+  its own undo entry. A 409 or a refusal pushes no entry. The type goes only through `/convert`, a move only through `/reorder`, and
+  "Other, please specify" only through `/other-specify`. `conflict-diff.ts` already words a setting's difference, privately, and its
+  config names have drifted (`max_size_mb`/`max_files`/`min_files` against `max_file_size_bytes`/`max_count`/`min_count`).
+- Builder routes are not in `openapi.json` (Scramble documents `api/v1` only). There is no retention job; forms are soft-deleted only.
+  One session only; lane B retired; `M186` and `M187` are held in this file, and no other claim or forward queue exists.
+
+### Remedy verdict
+**Works, reshaped:** the row's "keyed by the question key" cannot be the identity (above), so the history is keyed by a new
+`form_fields.lineage_id` (`uuid NOT NULL DEFAULT gen_random_uuid()`: additive DDL fills every row with no UPDATE through the draft
+guard; `replicate()` carries it through publish; a duplicate, a library insert and an import get a new one). The `form_field_revisions`
+table is append-only, with no FK to `forms` or `form_versions`. It is written inside `writeField` (only the settings whose value changed,
+re-read under the lock), `convertField`, `reorder` (a moved question: its section changed, or it sits outside the longest common
+subsequence of its section's order), `deleteSection` and the other-specify switch. `GET …/fields/{field}/history` merges one person's
+saves to the same settings under two minutes apart. Put back is a PATCH with `put_back_of`, applied after idle as one undo entry.
+
+Files: new `database/migrations/2026_08_17_000147_add_lineage_id_to_form_fields_table.php`, new
+`database/migrations/2026_08_17_000148_create_form_field_revisions_table.php`, new `app/Models/FormFieldRevision.php`, new
+`app/Enums/FieldRevisionKind.php`, new `app/Services/Forms/FieldRevisionRecorder.php`, new `app/Services/Forms/FieldHistoryPresenter.php`,
+`app/Services/Forms/FormBuilderService.php`, `app/Http/Controllers/Tenant/FormBuilderController.php`,
+`app/Http/Requests/Forms/UpdateFieldRequest.php`, `routes/tenant.php`, `app/Models/FormField.php`,
+`app/Support/Tenancy/TenantScopedTables.php` (and the extract census beside it); `resources/js/components/builder/` (`ConfigPanel.vue`,
+new `FieldHistory.vue`, `useBuilderStore.ts`, `builderClient.ts`, `conflict-diff.ts`, `ConflictDialog.vue`, `types.ts`),
+`resources/js/components/help/manual.ts`; `VERSION`, `database/data/releases.json`; the tests beside each — Pest under
+`tests/Feature/Forms/` (new `FieldRevisionRecorderTest.php`, new `FieldHistoryEndpointTest.php`, new `FormFieldRevisionRlsTest.php`,
+`BuilderLockOrderTest.php`) and the tenancy and dictionary drift tests a new table moves; Vitest beside the components (new
+`FieldHistory.test.ts`, a store test for Put back, `conflict-diff.test.ts`, `ConfigPanel.test.ts`, `manual.test.ts`); new
+`tests/e2e/builder-history.spec.ts`.
+Shared artefacts taken: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/data-dictionary.md` (§5, a new
+section, the enum catalog), `docs/audit-compliance-logging-spec.md`, `tests/e2e/builder-axe.spec.ts`, `tests/e2e/builder-content-axe.spec.ts`
+and the specs the diff reaches, `PROGRESS.md` (own block).
+Paired files taken: none (the builder's PHP and TS halves share no mirror test here).
+Namespaces spent: migration prefixes `2026_08_17_000147` and `2026_08_17_000148`; `D167`, `D168`. Nothing from the ADR namespace.
+Prediction: red first to the new recorder test (no table yet), `TenantTableClassificationDriftTest` (an unlisted `tenant_id` table) and
+the extract census, `ConfigPanel.test.ts` (every pinned tab list gains History) and `manual.test.ts` (an unquoted tab label);
+`BuilderLockOrderTest` green throughout (no FK is taken). **Most likely wrong:** one undo entry for Put back under the late snapshot —
+a Put back pressed while an edit to the same question is still debouncing — and second, the volatile column default rewriting
+`form_fields` under FORCE RLS.
+
+## HELD — `M187`, T6 of the testers' items: a Signature anyone can sign, what "Adv" means, and what each question type can do (`R-af2d278b`, `R-96127b20`, `R-3e6358ed`, with `R-c64d0afd`) (m187-t6-signature-readiness)
 
 Taken 2026-10-25. Branch `m187-t6-signature-readiness`, **stacked on `m186-t5-psgc-filter` at `be6166d1`** (it bumps a `VERSION` that is
 0.13.0 only there), with `origin/main` merged in once (the claim-merge, whose sha merge point 6 rebases `--onto`). PR into main.

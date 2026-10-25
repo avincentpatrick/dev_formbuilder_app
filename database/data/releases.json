@@ -1,5 +1,23 @@
 [
     {
+        "version": "0.13.0",
+        "title": "Philippine places, and choices narrowed by another form",
+        "items": [
+            {
+                "kind": "new",
+                "text": "A Cascading select can use the Philippine Standard Geographic Code (PSGC) from the Philippine Statistics Authority: Levels tab → Philippine places (PSGC). It gives Region, Province or district, City or municipality, and Barangay, from the 3Q 2026 list. When a level has only one choice, such as a city outside any province, it fills itself in."
+            },
+            {
+                "kind": "new",
+                "text": "Show only the choices another form has answers for — for example, only the barangays with a report in another form — or only those with none yet. Set it with Show only, on a cascade level or on a question whose choices come from a list file or another form."
+            },
+            {
+                "kind": "improved",
+                "text": "Manual entry opens faster for forms with long choice lists: the lists now load beside the page."
+            }
+        ]
+    },
+    {
         "version": "0.12.0",
         "title": "Grids from lists, and sections as tables",
         "items": [

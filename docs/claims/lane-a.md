@@ -119,7 +119,10 @@ helper in one file is not safe in another), `tests/golden/templates/manifest.jso
 cascade vectors move). **Extended again, opened before this push (recorded):** `app/Http/Controllers/Tenant/AttachmentController.php`
 in place of the claimed new `VersionChoiceListsController.php`, which is not created — `routes/tenant.php` puts a new route on an
 already-imported controller, because a new `use` line there shifts every line a document cites; the handler sits beside the
-preview's two, and the controller gate passes.
+preview's two, and the controller gate passes. **And again, opened before this push (recorded):**
+`resources/js/components/builder/PreviewPane.vue` (the Preview refetches its choices when a filter changes — its key named only
+the sources), `resources/js/components/forms/types.ts` (a shared question says it narrows only — `narrows_only`),
+`resources/public-runtime/lib/api-client.ts` (the guest's linked-choices read returns the sets beside the lists).
 Shared artefacts taken: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/data-dictionary.md`,
 `docs/PRD.md`, `docs/TESTING-GUIDE.md`, `docs/deployment-infrastructure.md`, `openapi.json`, `tests/e2e/public-runtime-axe.spec.ts`,
 `tests/e2e/builder-axe.spec.ts`, `tests/e2e/form-settings-axe.spec.ts` and the specs the diff reaches, `PROGRESS.md` (own block).

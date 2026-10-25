@@ -41,6 +41,8 @@ uses(RefreshDatabase::class);
 */
 
 beforeEach(function (): void {
+    // The encode page renders the Blade shell, whose `@vite` needs a build manifest CI does not have (M129's trap).
+    $this->withoutVite();
     TenantContext::flush();
     app(PermissionRegistrar::class)->setPermissionsTeamId(null);
     (new RolePermissionSeeder)->run();

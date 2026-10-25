@@ -7561,7 +7561,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the comment opening at `config/permission.php:20`. ⚠️ **The one near-miss is a circular pointer, not a
   deferral**: `docs/multi-tenancy-rbac-design.md:745` defers the request/response *shapes* to Doc #14, and
   `docs/api-specification.md:13` points straight back at §7.1 as the authoritative inventory. Neither
-  defers the build. This repository builds `/api/v1` twins deliberately — `routes/tenant.php:787` says
+  defers the build. This repository builds `/api/v1` twins deliberately — `routes/tenant.php:789` says
   so — so the web surface does not discharge it. **Live.** Filed by `M80`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.** ⛔ **THIS IS THE ROW THAT MADE THE ANSWER `C` RATHER THAN `A`.** `D38`'s premise sentence *"nothing shipped depends on them"* is false here: the documented `GET /api/v1/roles` is the stated reason roles use UUIDv7 primary keys rather than Spatie's bigints, cited at `docs/multi-tenancy-rbac-design.md:56`, `app/Models/Role.php:13` and `config/permission.php:20-21`. **That schema shipped**, so a plain trim orphans the rationale for a decision already paid for.
 
 - **`minor` · §7.1's `Form draft` row pins four `/api/v1` builder endpoints registered nowhere, and the
@@ -11547,7 +11547,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M130` (2026-10-04) — `minor` · The "Appearance hint" field is a free-text box in the builder that changes nothing about how any
   form renders.** Filed 2026-09-25 by `M110`, answering the report *"can you also clarify to me what the
-  appearance hint do?"* — measured answer: at render time, nothing. `ConfigPanel.vue:483-489` writes
+  appearance hint do?"* — measured answer: at render time, nothing. `ConfigPanel.vue:493-499` writes
   `form_fields.appearance` as unguided free text with no help and no vocabulary; `public-runtime/lib/types.ts:67`
   declares it on the render model and `toRenderField()` (in `schema-mapping.ts`) never reads it, so it
   reaches neither `FieldRow.vue` nor `FieldControl.vue` nor the encode channel. An author who types `vertical` or
@@ -11912,7 +11912,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · The builder and PHP disagree about whether a duration field takes an ordered comparison, and the
   disagreement is now pinned rather than resolved.** Found by `M113` (2026-09-26) while building the client
-  field-type mirror census. `ConfigPanel.vue:362`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
+  field-type mirror census. `ConfigPanel.vue:372`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
   'likert_scale']` — four members. `ValueShape::allowsOperator()` (`ValueShape.php:218-242`) permits
   `gt`/`lt`/`gte`/`lte` for `Number`, `Duration` and `Scale`, which is **five** types: the same four plus
   `duration`. ⛔ **`R-09f73330` SAYS THIS SET "MIRRORS NOTHING", AND THAT STOPPED BEING TRUE IN THE INCREMENT
@@ -14330,7 +14330,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M172` (2026-10-15) — ****`minor` · A key clash is refused instead of avoided, the refusal shows only on a tab that selecting the question never opens, and an undo or a journal replay can bring a taken key back.**
   The clash the testers can still hit after the stale-tab row above is fixed: an author types a key another question holds, or an
-  undo (`resources/js/components/builder/useBuilderStore.ts:287-305`) or the journal's put-back (`:986-1010`) re-sends a key freed
+  undo (`resources/js/components/builder/useBuilderStore.ts:289-307`) or the journal's put-back (`:986-1010`) re-sends a key freed
   and retaken meanwhile. The server's own keys never clash (`app/Services/Forms/FormBuilderService.php:903-928`, `uniqueKey()` and
   `copyKey()`); the client never creates one. The refusal is shown under Field key on the Advanced tab only
   (`resources/js/components/builder/ConfigPanel.vue:645-652`), while selecting a question always opens Basics (`:168-173`); the
@@ -14789,7 +14789,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M177` (2026-10-19) — ****`minor` · The builder's help text and messages use words a first-time author does not know.**
   The testers' comment (2026-10-11, comment 1) asks for wording a smart high-schooler understands, and its screenshot is one dialog
-  of many: `resources/js/components/builder/ConfigPanel.vue:567` (*"Evaluated on the server. Use ${field} references …"*) and `:722`
+  of many: `resources/js/components/builder/ConfigPanel.vue:577` (*"Evaluated on the server. Use ${field} references …"*) and `:722`
   (*"Referenced in expressions and exports"*), the help texts of the builder's other editors, the store's messages and the preview's
   list of limits all speak of keys, expressions and references. The remedy: the voice rule that the type-dialog row writes into
   `docs/ux/design-system-reference.md`, applied to every builder help text and message; `manual.ts` follows.
@@ -14840,7 +14840,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M177` (2026-10-19) — ****`nit` · The builder's draft check looks for a calculation's formula under the wrong key, so every calculated question would read "no formula yet".**
   `resources/js/components/builder/draft-snapshot.ts:402` reads `config.formula`, but the formula lives in
-  `config.calculated_formula` (`resources/js/components/builder/ConfigPanel.vue:278`); `resources/js/components/builder/draft-snapshot.test.ts`
+  `config.calculated_formula` (`resources/js/components/builder/ConfigPanel.vue:288`); `resources/js/components/builder/draft-snapshot.test.ts`
   pins the wrong key. Nothing shows it today only because the preview never draws a calculated question; it will once a calculation
   can be shown. The remedy: read `calculated_formula`, and the test with it. **Latent.** It surfaces once a calculated question can be
   shown. Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M177` (2026-10-19):** taken by `M177` because `R-f44e9d00` made it live — `draft-snapshot.ts` reads `calculated_formula`, and the preview rebuilds on visibility and the formula. Red first: 2. Mutant caught. Live on staging since merge point 2 (PR #370, `a5b718bb`).
@@ -14856,7 +14856,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   scale takes the joined line at every width; the web form, manual entry and the preview share it; the PDF and print draw the grid
   with tick boxes; answers stay `{row: score}`. **Live.** Filed by `M174`. **Tier: early-testing.** **Taken by T2 (`M183`), 2026-10-22 (`D138`), with `R-1c1d7266`; the printed Likert matrix already is that grid, and a Likert scale's paper stays as it is (the scanner reads it).** ✅ **CLOSED BY `M183` (2026-10-22):** a Likert matrix is KoboToolbox's Rating grid — the scale's words across the top, the statements 35% of the width, one centred radio per cell, rows banded — and as cards each statement's scale is the joined line; a Likert scale is that line at every width (`resources/js/components/submissions/LikertLine.vue`), its radios now marked by the error as every other group's are; every rendered copy names its own radio groups, never after the question's key. ⚠️ The printed Likert matrix already was the grid with a box per cell, so nothing changed there; a Likert scale's paper is unchanged on purpose — the scanner reads it. Released last at merge point 4 as PR #376 (`dba337b7`), live on staging since 2026-10-22; relayed `U9` (the team's item of 2026-10-16: "the likert matrix doesnt look like likert matrix") resolved at `dba337b7`.
 
-- **`minor` · A question keeps no history of its changes, so an author cannot see which setting changed, from what, or put one change back.**
+- ✅ **CLOSED BY `M188` (2026-10-26) — ****`minor` · A question keeps no history of its changes, so an author cannot see which setting changed, from what, or put one change back.**
   The testers' comment (2026-10-11, comment 5): *"it is best to have a ledger/list/log of the nitty-gritty changes per field … An
   option to revert changes on each of the field modification … Revert changes should state what the previous state was before
   applying reversal (this can be another module)"*. Undo lives in memory and is lost on reload; the edit journal holds unsent edits
@@ -14865,7 +14865,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `form_field_revisions` table keyed by the question key (so it survives a publish), written wherever a question is saved,
   converted or moved — who, when, which setting, before and after; a History tab in the right panel lists them, and **Put back**
   shows the earlier value before applying it as an ordinary edit with one undo entry. **Live.** Filed by `M174`.
-  **Tier: during-testing.**
+  **Tier: during-testing.** ✅ **CLOSED BY `M188` (2026-10-26), on its branch (`D167` A, `D168` A):** a question's history is
+  `form_field_revisions` (dictionary §42), written by `App\Services\Forms\FieldRevisionRecorder` inside the builder's own saves — only the
+  settings a save changed, a type change, a move (the dragged question only, by longest common subsequence), a deleted section's
+  questions, the Other switch — and keyed by a new `form_fields.lineage_id`, because the key is renamed and reused and publish gives every
+  question a new id. The right panel's **History** tab (`resources/js/components/builder/FieldHistory.vue`) lists them in the conflict
+  dialog's words; one person's saves to the same settings under two minutes apart are one change; **Put back** shows each setting now
+  and after, then saves it as an ordinary edit with one undo entry (`putBack` in the store). A type change and a move are listed, not
+  put back. Draft edits stay out of the audit ledger. Relayed `P5b` is resolved only once live (merge point 6).
 
 - **`nit` · No seeded form open for manual entry shows two sections at once, so the manual-entry page's sections list is never drawn in a browser test.**
   Found by `M174`: the side panel lists a form's sections only while it sits beside the form and only when two or more are
@@ -15210,3 +15217,22 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   points at; nothing in `app/Jobs/Maintenance/` sweeps them. The remedy: a scheduled sweep that deletes unreferenced attachments older
   than the longest draft lifetime. It deletes rows, so it waits until staging data may be removed. **Live.** Filed by `M187`.
   **Tier: before-launch.**
+
+- **`minor` · A section keeps no history, so a change to its title, condition or repeat settings cannot be seen or put back.**
+  `M188` gave every question a history (`form_field_revisions`) and the right panel a History tab, but `FormBuilderService::updateSection()`
+  records nothing and a section's panel has only Basics and Advanced (`resources/js/components/builder/ConfigPanel.vue`, the `tabs`
+  computed). The testers' comment asked "per field", so it was decided not to widen `M188`. The remedy: the same recorder over a
+  section's settings, keyed by a section lineage, and the same tab. **Latent** until `M188` merges. Filed by `M188`.
+  **Tier: during-testing.**
+
+- **`nit` · Undo of a deleted question starts its history afresh, so the changes made before the delete no longer show.**
+  The builder undoes a delete by creating the question again (`resources/js/components/builder/useBuilderStore.ts`, the delete's undo),
+  so the server gives it a new `form_fields.lineage_id` and `FieldHistoryPresenter` reads only the new one. The remedy: the create the
+  undo sends names the deleted question's lineage, which the server honours only for a question of the same form with no live row.
+  **Latent** until `M188` merges. Filed by `M188`. **Tier: during-testing.**
+
+- **`nit` · A question's history does not say when the form was restored to an earlier version.**
+  `App\Services\Forms\RestoreService` replaces the draft with an earlier version's questions, which carry their lineage, so the History
+  tab goes on listing changes the restore undid without saying so; the restore itself is audited (`form.restored`). The remedy: the
+  restore writes one entry per question it changed, kind `restored`, naming the version. **Latent** until `M188` merges.
+  Filed by `M188`. **Tier: during-testing.**

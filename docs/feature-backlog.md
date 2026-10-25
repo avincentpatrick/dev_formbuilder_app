@@ -15127,13 +15127,15 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   unchanged since the case passed in the morning. **Live.** Filed by `M185`. **Tier: early-testing.** ✅ **CLOSED BY `M185` (2026-10-24):**
   the case reads the filing day in the form's own zone; red before at 16:45 UTC, green after. The service was right; only the test's clock was.
 
-- **`nit` · The deployment guide still says the testing server runs PHP 8.4.25; it has run 8.4.27 since 2026-10-22.**
+- ✅ **CLOSED BY `M186` (2026-10-25) — ****`nit` · The deployment guide still says the testing server runs PHP 8.4.25; it has run 8.4.27 since 2026-10-22.**
   `docs/deployment-infrastructure.md`'s testing-site layout paragraph names PHP 8.4.25, but the box was patched to 8.4.27 on 2026-10-22
   (php2shell, a critical php-cgi advisory) by swapping its PHP folder, every path unchanged. The correction was to ride the next pull
   request rather than go out alone (`D137`); `M185`'s close-out could not carry it, because a direct push to the trunk may hold only
   claim and close-out paths (`scripts/pre-push-guard.php`, its `PROTOCOL_PATHS`). The captured headers such as
   `tests/fixtures/staging-headers/measured/1.headers` keep 8.4.25 on purpose: they record what the box sent, not what it runs. The
   remedy: the one sentence, on the next pull request that touches `docs/`. **Live.** Filed by `M185`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M186` (2026-10-25):** the testing-site layout paragraph says PHP 8.4.27, and when and how it changed; the captured
+  headers keep 8.4.25, as the row says they should.
 
 - ✅ **CLOSED BY `M186` (2026-10-25) — ****`minor` · A template or library item made from a published version copies a list-backed cascade's whole option list into the new draft.**
   `app/Services/Forms/SchemaBlueprintMaterializer.php` (`fieldAttributes()`) writes a blueprint field's `config` as it is, and

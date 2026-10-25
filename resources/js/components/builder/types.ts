@@ -241,6 +241,15 @@ export interface OptionsSource {
     field_key: string | null;
 }
 
+/**
+ * The built-in Philippine places this server holds (M186, `R-70c7673a`, `PsgcLists::summary()`): the quarter as the PSA
+ * names it, and each of the four levels' count — the Levels tab's "Philippine places (PSGC)" says both.
+ */
+export interface PsgcSummary {
+    label: string;
+    counts: { region: number; province: number; city: number; barangay: number };
+}
+
 /** A form a choice question may take its choices from, with the questions it shares (M133, `linkable_sources`). */
 export interface LinkableSource {
     id: string;
@@ -332,6 +341,8 @@ export interface BuilderPageProps {
     data_sharing?: DataSharingProps | null;
     /** M133 — the forms a choice question may take its choices from. Optional, so a fixture without it offers none. */
     linkable_sources?: LinkableSource[];
+    /** M186 — the built-in Philippine places, or null before a deploy copied them in. Optional: a fixture offers no preset. */
+    psgc?: PsgcSummary | null;
     /**
      * The toolbar's path trail, resolved SERVER-SIDE by `CrumbTrail` (Increment J2d).
      *

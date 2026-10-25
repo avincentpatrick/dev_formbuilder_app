@@ -104,7 +104,11 @@ export function resolveOptional(
 export function resolveCascade(
     cascade: RenderCascade | null,
     locale: string,
-): { levels: { key: string; label: string }[]; options: { value: string; label: string; level: string; parent: string | null }[] } | null {
+): {
+    levels: { key: string; label: string }[];
+    options: { value: string; label: string; level: string; parent: string | null }[];
+    skip_single: boolean;
+} | null {
     if (cascade === null) {
         return null;
     }
@@ -117,6 +121,7 @@ export function resolveCascade(
             level: option.level,
             parent: option.parent,
         })),
+        skip_single: cascade.skipSingle === true,
     };
 }
 
@@ -251,7 +256,8 @@ function buildCascade(field: RawField): RenderCascade | null {
           })
         : [];
 
-    return { levels, options };
+    // M186 (`R-70c7673a`): a level with one choice under the one picked above is filled in for the person.
+    return { levels, options, skipSingle: field.config?.skip_single_choice_levels === true };
 }
 
 /** A grid column as the shared `FieldInput.vue` grid draws it (labels resolved; the three rules only on a `matrix`). */

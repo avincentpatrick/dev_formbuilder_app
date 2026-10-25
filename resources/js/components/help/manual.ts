@@ -1026,6 +1026,15 @@ const reference: ChapterDraft[] = [
                         ['Typed choices: under each choice, pick its level and, below the top level, the choice above it (', ui('No parent (top level)', CASCADING), ' for the first level).'],
                     ),
                     tip('info', 'Use CSV or Excel files for long lists such as every barangay. Either every level comes from a file, or none does. Excel turns a code like 01 into 1, so format the code columns as Text before you type them, or use letters.'),
+                    p(
+                        'For places in the Philippines there is nothing to upload: ',
+                        ui('Philippine places (PSGC)', CASCADING),
+                        ' sets four levels — Region, Province or district, City or municipality, Barangay — from the Philippine Statistics Authority’s list. Publishing writes the newest list on this server into the form, so a published form keeps its quarter; publish again to pick up a later one. Remove levels from the bottom to stop at the city or the province.',
+                    ),
+                    p(
+                        ui('Fill in a level that has only one choice', CASCADING),
+                        ' fills such a level in for the person — a city outside any province is its own only choice at the city level, so they pick the city once. The last level is always theirs to pick.',
+                    ),
                 ],
             },
         ],

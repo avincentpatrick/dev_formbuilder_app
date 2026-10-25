@@ -379,6 +379,64 @@ describe('RuntimeSession (component wiring)', () => {
         wrapper.unmount();
     });
 
+    it('fills in a level with one choice for the person, writes it with their pick, and never fills the last level (M186)', async () => {
+        // A city outside any province is its own one choice at the city level — the Philippine places' self-entry.
+        const cascadeConfig = {
+            levels: [
+                { key: 'region', label: 'Region' },
+                { key: 'province', label: 'Province or district' },
+                { key: 'city', label: 'City or municipality' },
+                { key: 'barangay', label: 'Barangay' },
+            ],
+            options: [
+                { value: '0100000000', label: 'Region I', level: 'region', parent: null },
+                { value: '1300000000', label: 'NCR', level: 'region', parent: null },
+                { value: '1380600000', label: 'City of Manila', level: 'province', parent: '1300000000' },
+                { value: '1381701000', label: 'Pateros', level: 'province', parent: '1300000000' },
+                { value: '1380600000', label: 'City of Manila', level: 'city', parent: '1380600000' },
+                { value: '1381701000', label: 'Pateros', level: 'city', parent: '1381701000' },
+                { value: '1380601001', label: 'Barangay 1', level: 'barangay', parent: '1380600000' },
+                { value: '1380601002', label: 'Barangay 2', level: 'barangay', parent: '1380600000' },
+                { value: '1381701001', label: 'Aguho', level: 'barangay', parent: '1381701000' },
+            ],
+            skip_single_choice_levels: true,
+        };
+        const schema = schemaResponse({
+            fields: [field({ key: 'place', label: 'Place', field_type: 'cascading_select', config: cascadeConfig })],
+        });
+        const client = fakeClient();
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client } });
+
+        // Two regions: nothing to fill in until the person picks.
+        expect(wrapper.find('[data-implied]').exists()).toBe(false);
+        expect(wrapper.findAll('select')).toHaveLength(4);
+
+        await wrapper.findAll('select')[0].setValue('1300000000');
+        await settle();
+        await wrapper.findAll('select')[1].setValue('1381701000');
+        await settle();
+
+        // The city level is filled in and shown as text; the barangay level, with one choice too, stays a select.
+        expect(wrapper.find('[data-implied]').text()).toBe('Pateros');
+        const selects = wrapper.findAll('select');
+        expect(selects).toHaveLength(3);
+        expect(
+            selects[2]
+                .findAll('option')
+                .map((o) => (o.element as HTMLOptionElement).value)
+                .filter((v) => v !== ''),
+        ).toEqual(['1381701001']);
+
+        await selects[2].setValue('1381701001');
+        await wrapper.find('form').trigger('submit');
+        await settle();
+
+        expect(client.submit).toHaveBeenCalledWith(
+            expect.objectContaining({ answers: { place: ['1300000000', '1381701000', '1381701000', '1381701001'] } }),
+        );
+        wrapper.unmount();
+    });
+
     it('renders a likert_matrix as one radio group per row and submits the object (G4b)', async () => {
         const config = {
             rows: [

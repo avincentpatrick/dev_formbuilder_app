@@ -492,7 +492,9 @@ final class EncodeFormPresenter
      * the shared FieldInput cascading control consumes. Null for every non-cascading type. The encode channel is
      * single-locale, so labels are emitted as authored (no translation resolution — same as {@see options()}).
      *
-     * @return array{levels: list<array{key: string, label: string}>, options: list<array{value: string, label: string, level: string, parent: string|null}>}|null
+     * M186 (`R-70c7673a`): `skip_single` — a level with one choice under the one picked above is filled in for the person.
+     *
+     * @return array{levels: list<array{key: string, label: string}>, options: list<array{value: string, label: string, level: string, parent: string|null}>, skip_single: bool}|null
      */
     private function cascade(FormField $field): ?array
     {
@@ -523,7 +525,7 @@ final class EncodeFormPresenter
             ];
         }
 
-        return ['levels' => $levels, 'options' => $options];
+        return ['levels' => $levels, 'options' => $options, 'skip_single' => data_get($field->config, 'skip_single_choice_levels') === true];
     }
 
     /**

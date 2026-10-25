@@ -34,6 +34,11 @@ use Illuminate\Support\Collection;
  * rows frozen, so a live row set would break them all. Publishing again picks up new answers; a link that is unfinished or
  * refused is left empty for `LinkedChoiceGate` to name.
  *
+ * ── A CASCADE ON THE BUILT-IN PHILIPPINE PLACES (M186, `R-70c7673a`, `D131`) ─────────────────────────────────────
+ * Levels named `psgc:region` … `psgc:barangay` take their rows from the platform's `psgc_places`, the newest quarter
+ * loaded ({@see PsgcLists}), instead of the version's own files; everything after — the options written here, the strip,
+ * the serve-beside — is the same, so a published form keeps its quarter.
+ *
  * ── THE MAPPING, KOBO'S `select_one_from_file` WITH A `choice_filter` ────────────────────────────────────────
  * Level `i` takes its choices from the list it names: each row's `name` is the value and `label` the label (Kobo's
  * `label::…` when there is no plain `label`). Below the first level, the parent is the row's value in the column
@@ -58,8 +63,11 @@ final class ChoiceListMaterializer
     /** The question types a list file may feed directly — the ones that may link to another form's answers too. */
     private const FLAT_TYPES = [FieldType::SingleSelect, FieldType::MultiSelect, FieldType::Dropdown];
 
-    /** M185 (`D161`): a grid copies another form's answers in at publish, read through the same consent a live list is. */
-    public function __construct(private readonly LinkedChoiceService $links) {}
+    /**
+     * M185 (`D161`): a grid copies another form's answers in at publish, read through the same consent a live list is.
+     * M186 (`R-70c7673a`): a cascade bound to the built-in Philippine places reads them from the platform's table.
+     */
+    public function __construct(private readonly LinkedChoiceService $links, private readonly PsgcLists $psgc) {}
 
     /** Is every level of this cascade a list? Then its options come from the lists, and the draft holds none. */
     public static function isListBacked(mixed $config): bool
@@ -173,17 +181,15 @@ final class ChoiceListMaterializer
     public function forDraft(FormVersion $draft): array
     {
         $built = ['cascades' => [], 'flat' => [], 'suggestions' => []];
+        // No early return on a draft without uploaded lists: a cascade on the built-in Philippine places needs none (M186).
         $lists = FormVersionChoiceList::query()->where('form_version_id', $draft->id)->get()->keyBy('name');
-        if ($lists->isEmpty()) {
-            return $built;
-        }
 
         foreach (FormField::query()->where('form_version_id', $draft->id)->orderBy('id')->get() as $field) {
             $config = (array) $field->config;
 
             if ($field->field_type === FieldType::CascadingSelect && self::isListBacked($config)) {
                 $levels = array_values(array_filter((array) $config['levels'], is_array(...)));
-                $options = $this->optionsFor($field->key, $levels, $lists);
+                $options = PsgcLists::declaresAny($levels) ? $this->psgc->options($field->key, $levels) : $this->optionsFor($field->key, $levels, $lists);
                 if (is_array($options)) {
                     $keys = array_map(static fn (array $level): string => (string) ($level['key'] ?? ''), $levels);
                     $index = array_flip($keys);
@@ -289,8 +295,12 @@ final class ChoiceListMaterializer
                 continue;
             }
 
-            $lists ??= FormVersionChoiceList::query()->where('form_version_id', $draft->id)->get()->keyBy('name');
-            $options = $this->optionsFor($field->key, $levels, $lists);
+            if (PsgcLists::declaresAny($levels)) {
+                $options = $this->psgc->options($field->key, $levels);
+            } else {
+                $lists ??= FormVersionChoiceList::query()->where('form_version_id', $draft->id)->get()->keyBy('name');
+                $options = $this->optionsFor($field->key, $levels, $lists);
+            }
 
             if ($options instanceof PublishValidationException) {
                 $violations[] = $options;

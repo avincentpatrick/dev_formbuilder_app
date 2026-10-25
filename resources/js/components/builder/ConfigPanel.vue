@@ -700,8 +700,11 @@ watch(librarySaved, (value) => {
                             :levels="cascadeLevels"
                             :options="cascadeOptions"
                             :form-id="store.formId"
+                            :psgc="props.store.psgc"
+                            :skip-single="field.config.skip_single_choice_levels === true"
                             @update:levels="setConfig('levels', $event)"
                             @update:options="setConfig('options', $event)"
+                            @patch="patchConfig($event)"
                         />
                     </template>
 

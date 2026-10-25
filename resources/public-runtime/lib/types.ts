@@ -257,6 +257,8 @@ export interface RenderCascadeOption {
 export interface RenderCascade {
     levels: RenderCascadeLevel[];
     options: RenderCascadeOption[];
+    /** M186 (`R-70c7673a`): `config.skip_single_choice_levels` — a level with one choice is filled in for the person. */
+    skipSingle?: boolean;
 }
 
 /**

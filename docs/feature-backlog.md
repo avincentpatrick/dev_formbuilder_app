@@ -15149,5 +15149,5 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and `scripts/migration-lint.php` sweep only tables with a `tenant_id` column, so a table created without one — `releases`
   (`M181`), `psgc_places` (`M186`) — passes every gate without being named anywhere. The `releases` migration says so in its docblock;
   the ADR does not. Found by `M186` while planning a platform-wide table. The remedy: either a gate that lists every table without
-  `tenant_id` and requires each to be named on an exemption list, or the ADR's sentence corrected to what CI checks. **Live.** Filed by
-  `M186`. **Tier: during-testing.**
+  `tenant_id` and requires each to be named on an exemption list, or the ADR's sentence corrected to what CI checks. **Live.**
+  Filed by `M186`. **Tier: during-testing.**

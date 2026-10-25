@@ -112,6 +112,11 @@ reader and the data file), new `database/data/psgc/places.csv` and `manifest.jso
 `resources/public-runtime/engine/display-value.ts`, `tests/golden/templates/formatting.json`, `openapi.json`, `VERSION`,
 `database/data/releases.json`; the tests beside each — Pest under `tests/Feature/` (`Psgc`, `Deploy`, `Forms`, `Guest`, `Submissions`,
 `Templates`), `tests/Unit`, the Vitest files beside the components, new `tests/e2e/psgc-cascade.spec.ts`.
+**Extended 2026-10-25, all three opened before this push (recorded):** `resources/js/components/builder/useBuilderStore.ts` (the
+store hands the Levels tab the PSGC summary, as it hands `linkableSources` — the panel takes no page props), new
+`tests/Support/PsgcFixture.php` (the PSA-shaped fixture three test files share; Pest loads every file into one process, so a
+helper in one file is not safe in another), `tests/golden/templates/manifest.json` (the template vectors' count pin, which two new
+cascade vectors move).
 Shared artefacts taken: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/data-dictionary.md`,
 `docs/PRD.md`, `docs/TESTING-GUIDE.md`, `docs/deployment-infrastructure.md`, `openapi.json`, `tests/e2e/public-runtime-axe.spec.ts`,
 `tests/e2e/builder-axe.spec.ts`, `tests/e2e/form-settings-axe.spec.ts` and the specs the diff reaches, `PROGRESS.md` (own block).

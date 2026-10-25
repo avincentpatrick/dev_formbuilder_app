@@ -131,7 +131,8 @@ export interface EncodeField {
     required: boolean;
     options: { value: string; label: string }[];
     // Cascading-select hierarchy (Increment G4a); labels already resolved to the active locale by the caller.
-    cascade?: { levels: CascadeLevel[]; options: CascadeOption[] } | null;
+    // M186 (`R-70c7673a`): `skip_single` — a level with one choice under the one picked above is filled in for the person.
+    cascade?: { levels: CascadeLevel[]; options: CascadeOption[]; skip_single?: boolean } | null;
     // Composite grid config (Increment G4b: matrix / likert_matrix); labels already resolved by the caller.
     matrix?: MatrixConfig | null;
     // Geo capture config (Increment G5b2: geopoint / geotrace / geoshape); null for every other type.
@@ -394,24 +395,78 @@ const cascadeIndex = computed<Map<string, { value: string; label: string }[]>>((
     return index;
 });
 
-function cascadeOptionsAt(index: number): { value: string; label: string }[] {
+/** The choices at a level under one parent (`''` for the first level). */
+function cascadeChoicesUnder(index: number, parent: string): { value: string; label: string }[] {
     const level = cascadeLevels.value[index];
-    if (!level) return [];
-    const parent = index === 0 ? '' : cascadeValue.value[index - 1] ?? '';
-    if (index > 0 && parent === '') return []; // no parent chosen yet
+    if (!level || (index > 0 && parent === '')) return [];
     return cascadeIndex.value.get(`${level.key}\u0000${parent}`) ?? [];
+}
+
+// M186 (`R-70c7673a`): with `skip_single_choice_levels`, a level whose choices under the one picked above are exactly one
+// is IMPLIED — a city outside any province is its own one choice at the city level. The chain below is the stored answer
+// extended by those levels, and every select reads it. ⛔ NO WATCHER WRITES THEM: an emit on render would start the
+// encode page's autosave (an empty draft row) and race a guest draft's restore. They are written only by
+// `setCascadeLevel()`, inside the person's own pick — and the LAST level is never implied, so a narrowed cascade always
+// leaves the person something to choose and a required question can be answered.
+const cascadeSkipsSingle = computed<boolean>(() => props.field.cascade?.skip_single === true);
+
+/** Extend `chain` with the implied levels that follow it, stopping before the last level. */
+function withImpliedLevels(chain: string[]): string[] {
+    const next = [...chain];
+    if (!cascadeSkipsSingle.value) return next;
+    for (let i = next.length; i < cascadeLevels.value.length - 1; i++) {
+        const choices = cascadeChoicesUnder(i, i === 0 ? '' : next[i - 1] ?? '');
+        if (choices.length !== 1) break;
+        next.push(choices[0].value);
+    }
+    return next;
+}
+
+const cascadeChain = computed<string[]>(() => {
+    const stored: string[] = [];
+    for (const value of cascadeValue.value) {
+        if (value === '' || value === undefined) break;
+        stored.push(value);
+    }
+    return withImpliedLevels(stored);
+});
+
+/**
+ * Is this level filled in for the person rather than chosen — one choice under the one picked above, and not the last
+ * level? Then it is shown as text, not a select, whether or not the answer holds it yet.
+ */
+function cascadeImplied(index: number): boolean {
+    if (!cascadeSkipsSingle.value || index >= cascadeLevels.value.length - 1) return false;
+    const value = cascadeChain.value[index];
+    const choices = cascadeChoicesUnder(index, index === 0 ? '' : cascadeChain.value[index - 1] ?? '');
+    return value !== undefined && choices.length === 1 && choices[0].value === value;
+}
+
+function cascadeImpliedLabel(index: number): string {
+    const value = cascadeChain.value[index] ?? '';
+    return cascadeChoicesUnder(index, index === 0 ? '' : cascadeChain.value[index - 1] ?? '').find((choice) => choice.value === value)?.label ?? value;
+}
+
+function cascadeOptionsAt(index: number): { value: string; label: string }[] {
+    return cascadeChoicesUnder(index, index === 0 ? '' : cascadeChain.value[index - 1] ?? '');
 }
 
 function cascadeDisabled(index: number): boolean {
     if (index === 0) return false;
-    const parent = cascadeValue.value[index - 1];
+    const parent = cascadeChain.value[index - 1];
     return parent === '' || parent === undefined;
 }
 
 function setCascadeLevel(index: number, value: string): void {
-    const next = cascadeValue.value.slice(0, index); // keep shallower levels, drop this + deeper
-    if (value !== '') next.push(value);
-    emit('update:modelValue', next);
+    // Shallower levels kept — any implied ones with them, now written — this and deeper dropped (their parent changed).
+    const next = cascadeChain.value.slice(0, index);
+    if (value === '') {
+        emit('update:modelValue', next);
+
+        return;
+    }
+    next.push(value);
+    emit('update:modelValue', withImpliedLevels(next));
 }
 </script>
 
@@ -532,7 +587,10 @@ function setCascadeLevel(index: number, value: string): void {
                 :label="level.label"
                 v-slot="{ id, describedby }"
             >
+                <!-- M186: a level with one choice under the one picked above, filled in for the person. -->
+                <p v-if="cascadeImplied(i)" :id="id" class="encode-cascade__implied" data-implied>{{ cascadeImpliedLabel(i) }}</p>
                 <MdsSelect
+                    v-else
                     :id="id"
                     :model-value="cascadeValue[i] ?? ''"
                     :options="cascadeOptionsAt(i)"
@@ -769,6 +827,19 @@ function setCascadeLevel(index: number, value: string): void {
     line-height: var(--mds-type-body-sm-line-height);
     color: var(--mds-color-text-secondary);
     font-style: italic;
+}
+
+/* M186 — a cascade level filled in for the person: read as the prefilled value below reads, in its sunken box. */
+.encode-cascade__implied {
+    margin: 0;
+    padding: var(--mds-space-2) var(--mds-space-3);
+    border: 1px solid var(--mds-color-border-default);
+    border-radius: var(--mds-radius-md);
+    background-color: var(--mds-color-bg-sunken);
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+    color: var(--mds-color-text-body);
 }
 
 /* Increment H7 — a server-set hidden field. Every token below is already used elsewhere in this file, so

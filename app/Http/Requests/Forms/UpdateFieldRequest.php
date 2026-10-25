@@ -213,6 +213,7 @@ final class UpdateFieldRequest extends FormRequest
             'config.levels.*.label_translations' => 'level label translations',
             'config.levels.*.label_translations.*' => 'level label translation',
             'config.levels.*.list' => 'level choice list',
+            'config.skip_single_choice_levels' => 'fill in a level with one choice',
             // The two grids.
             'config.rows' => 'rows',
             'config.rows.*.value' => 'row value',
@@ -305,8 +306,12 @@ final class UpdateFieldRequest extends FormRequest
                 'config.levels.*.label' => ['nullable', 'string', 'max:255'],
                 'config.levels.*.label_translations' => ['sometimes', 'array'],
                 'config.levels.*.label_translations.*' => ['nullable', 'string', 'max:500'],
-                // M141 (`D95`) — the CSV choice list a level takes its choices from, by name (`FormChoiceListService::nameFor()`).
-                'config.levels.*.list' => ['nullable', 'string', 'max:64', 'regex:/^[a-z0-9_-]+$/'],
+                // M141 (`D95`) — the CSV choice list a level takes its choices from, by name (`FormChoiceListService::nameFor()`);
+                // since M186 (`R-70c7673a`) or one of the four built-in Philippine places levels (`PsgcLists`). An upload's
+                // name never holds a colon, so the two cannot be confused.
+                'config.levels.*.list' => ['nullable', 'string', 'max:64', 'regex:/^(psgc:(region|province|city|barangay)|[a-z0-9_-]+)$/'],
+                // M186: a level with exactly one choice under the one picked above is filled in for the respondent.
+                'config.skip_single_choice_levels' => ['sometimes', 'boolean:strict'],
                 'config.options' => ['sometimes', 'array'],
                 'config.options.*.value' => ['nullable', 'string', 'max:255'],
                 'config.options.*.label' => ['nullable', 'string', 'max:500'],

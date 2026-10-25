@@ -125,6 +125,18 @@ final class SchemaValueFormatter
         // "NCR; Manila", not "ncr; manila" (Increment G4a).
         $labels = ($type->hasOptions() || $type === FieldType::CascadingSelect) ? $this->optionLabels($config, $locale) : [];
 
+        // M186 (`R-70c7673a`): a cascade answer holds a city outside any province twice — the same code at the province and the
+        // city level (`PsgcTiers`' self-entry) — so a value equal to the one before it is said once. By CODE, never by
+        // label: a municipality and a barangay may share a name. A cascade only; a list's repeated value stays (the
+        // multi-select vector pins no dedupe).
+        if ($type === FieldType::CascadingSelect && is_array($answer) && array_is_list($answer)) {
+            $answer = array_values(array_filter(
+                $answer,
+                fn (mixed $v, int $i): bool => $i === 0 || $this->scalarString($this->scalar($v)) !== $this->scalarString($this->scalar($answer[$i - 1])),
+                ARRAY_FILTER_USE_BOTH,
+            ));
+        }
+
         if (is_array($answer)) {
             $parts = array_map(
                 fn (mixed $v): string => $labels[$this->scalarString($this->scalar($v))] ?? $this->scalarString($this->scalar($v)),

@@ -342,7 +342,7 @@ may touch a hub. The close-out artefacts every increment touches by procedure ar
 | 288 | `R-6e8c06a5` | `form_field_validations.logic_operator` has no CHECK, and nothing in the database ties an operator to a group. | before-launch | `docs/feature-backlog.md:13024` | — | blocked | precondition: row is not-live | — |
 | 289 | `gdpr-legal-posture` | The GDPR, legal and pricing posture decisions | before-launch | `docs/data-privacy-gdpr-compliance.md:126` | 4 | held | user: the GDPR, legal and pricing calls are the user's own | S |
 | 290 | `payments-checkout` | Embedded payments and self-serve billing — Cashier, Stripe Checkout, Stripe Tax | before-launch | `docs/adr/0008-entitlement-and-metering.md:168` | 4 | held | user: needs a Stripe account; cut from Phase 3 by decision 2026-07-21 | XL |
-| 291 | `track-b-deployment` | Track B — stand up the ADR-0005 self-hosted production host | before-launch | `docs/deployment-infrastructure.md:684` | 4 | held | user: deferred until app development is done, and needs the host itself | XL |
+| 291 | `track-b-deployment` | Track B — stand up the ADR-0005 self-hosted production host | before-launch | `docs/deployment-infrastructure.md:692` | 4 | held | user: deferred until app development is done, and needs the host itself | XL |
 | 292 | `uploading-import` | All uploading and import features, including bulk Excel and CSV, and the ledger entries marked RE-HOMED TO uploading-import | before-launch | `PROGRESS.md:210` | — | held | user: held by the explicit-signal decision of 2026-08-09; re-enters only on their go-signal | XL |
 | 293 | `R-486c204b` | A claim file has no constrained form for a forward declaration, so the one stale declaration on the tree cannot be gated. | after-launch | `docs/feature-backlog.md:4240` | — | ready | — | — |
 | 294 | `R-eecdb678` | `scripts/mutate.php` cannot drive a positive control for anything that is not Pest in a container. | after-launch | `docs/feature-backlog.md:4367` | — | ready | — | — |
@@ -491,14 +491,14 @@ rather than dropped, so that this file and its sources cannot disagree about wha
 - `ocr-provider-bakeoff` — done (`docs/ocr-pipeline-design.md:362`)
 - `ocr-single-form` — done (`docs/ocr-pipeline-design.md:361`)
 - `ocr-testing-server-key` — done (`docs/ocr-pipeline-design.md:367`)
-- `ocr-staging-scan` — done (`docs/deployment-infrastructure.md:686`)
-- `staging-smoke-test` — done (`docs/deployment-infrastructure.md:685`)
+- `ocr-staging-scan` — done (`docs/deployment-infrastructure.md:694`)
+- `staging-smoke-test` — done (`docs/deployment-infrastructure.md:693`)
 - `ocr-ink-live` — done (`docs/ocr-pipeline-design.md:365`)
 - `ocr-ink-ticks` — done (`docs/ocr-pipeline-design.md:364`)
 
 ## What this file cannot see
 
-Scanned **1043 file(s)**, and `scripts/pipeline-lint.php` gates this file on every push. It
+Scanned **1050 file(s)**, and `scripts/pipeline-lint.php` gates this file on every push. It
 refuses a hand edit, a roadmap phase claiming work in flight without naming a live row, a
 second queue, a held row missing from either this line or the stop-list that guards unattended
 work, a documented column that exists, is used by nothing and is scheduled nowhere, a row or

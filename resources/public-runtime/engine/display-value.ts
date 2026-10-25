@@ -430,9 +430,14 @@ export function displayValue(
     const labels = HAS_OPTIONS.has(type) || type === 'cascading_select' ? optionLabels(config, locale) : NO_LABELS;
 
     if (list !== null) {
+        // M186 (`R-70c7673a`): a cascade answer holds a city outside any province twice — the same code at the province
+        // and the city level — so a value equal to the one before it is said once. By CODE, never by label; a cascade
+        // only. Mirror of SchemaValueFormatter's branch, pinned by `fmt_cascading_select_says_a_repeated_level_once`.
+        const shown = type === 'cascading_select' ? list.filter((v, i) => i === 0 || scalar(v) !== scalar(list[i - 1])) : list;
+
         // Separator `'; '`, submitted order preserved — no sort, no dedupe, no empty filtering — with a
         // per-element fallback to the raw value on a label miss.
-        return list.map((v) => {
+        return shown.map((v) => {
             const s = scalar(v);
 
             return labels.get(s) ?? s;

@@ -198,6 +198,14 @@ submission printed its form's title as an unlinked heading. This section is that
    back, publish, and open the public link. **Expect:** picking *Ilocos Region* offers only *Ilocos Norte*.
    The form's **Settings → Choice lists** shows both files and removes one. A file with the same code twice
    is refused, naming both rows.
+14. *(M186)* **The Philippine places.** Add a **Cascading select**, open its **Levels** tab and press
+   **Philippine places (PSGC)**. **Expect:** four levels — *Region*, *Province or district*, *City or
+   municipality*, *Barangay* — each saying how many places it holds and the quarter (*3Q 2026*); no upload;
+   **Fill in a level that has only one choice** ticked. Publish and open the public link. Pick *National
+   Capital Region (NCR)*, then *City of Manila*. **Expect:** the city level reads *City of Manila* as text,
+   already filled in, and the barangay list opens on Manila's barangays. Submit and open the response.
+   **Expect:** *City of Manila* is said once. **Settings → About** credits the Philippine Statistics
+   Authority. (Before a deploy has copied the places in, the button says they are not on this server yet.)
 
 ---
 

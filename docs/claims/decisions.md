@@ -24,10 +24,28 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D161`, the last filed, was asked and answered on 2026-10-23 while `M185` (T4) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D163`, the last filed, was asked and answered on 2026-10-24 while `M186` (T5) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D163 — A question's choices can now be narrowed by what another form has recorded. Sometimes that form cannot be checked: its sharing was turned off, the phone is offline with nothing saved, or it has more than 50,000 different answers. What should the question show then? **A — every choice, with a short note that the list could not be narrowed.**
+
+**Asked and answered 2026-10-24 (user decision, in chat), while `M186` (T5) was planned; recorded in its claim.** A narrowing set is served beside the schema with the linked choices (`R-ed7f3127`), and `M133`'s offline rule stands: the server never refuses an answer outside a list.
+
+- **A — every choice, with a note (recommended, chosen).** The respondent can still answer; the note says the choices could not be narrowed just now. A set the server could not build (`available: false`) and a set over the cap (`truncated: true`) are treated alike.
+- **B — no choices, with a note.** Strict: nothing can be picked until the other form can be checked again, so a respondent can be stuck.
+
+**What the answer files, in the same push:** nothing new — `R-ed7f3127`'s remedy carries it.
+
+### D162 — A cascade's lower level (a barangay, say) can now show only the choices another form has recorded. Should the levels above it shrink to match? **A — yes: regions, provinces and cities with no allowed choice below them are hidden; when nothing is left, the question says so.**
+
+**Asked and answered 2026-10-24 (user decision, in chat), while `M186` (T5) was planned; recorded in its claim.** The cascade control indexes a level's choices by their parent (`FieldInput.vue`), so the levels above can be narrowed in the browser from the allowed set below without the server knowing.
+
+- **A — narrow the levels above (recommended, chosen).** Nobody picks a city and then finds its barangay list empty. A choice already in the answer stays visible, so a saved draft never loses its value.
+- **B — only the filtered level.** The levels above show everything; the filtered level can come up empty, with a note.
+
+**What the answer files, in the same push:** nothing new — `R-ed7f3127`'s remedy carries it.
+
 ### D161 — A grid's rows, and a choice column's choices, can now come from a list file or another form's answers. When should the grid pick up that form's new answers? **A — when you publish: the rows and choices are copied into the form at publish; publish again to pick up new answers.**
 
 **Asked and answered 2026-10-23 (user decision, in chat), while `M185` (T4) was planned; recorded in its claim.** Every reader of a grid's row set reads the rows frozen in the published version: Stage 1 refuses an answered row that is not in `config.rows` (`unknown_row`), both engines loop over the config rows, and the spreadsheet's per-cell columns, the XLSForm cells, the paper form and the manual-entry page all draw `config.rows`. A list file is copied at publish in any case, as T3 does for a flat question (`ChoiceListMaterializer`).

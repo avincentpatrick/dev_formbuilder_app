@@ -15122,3 +15122,32 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   claim and close-out paths (`scripts/pre-push-guard.php`, its `PROTOCOL_PATHS`). The captured headers such as
   `tests/fixtures/staging-headers/measured/1.headers` keep 8.4.25 on purpose: they record what the box sent, not what it runs. The
   remedy: the one sentence, on the next pull request that touches `docs/`. **Live.** Filed by `M185`. **Tier: during-testing.**
+
+- **`minor` · A template or library item made from a published version copies a list-backed cascade's whole option list into the new draft.**
+  `app/Services/Forms/SchemaBlueprintMaterializer.php` (`fieldAttributes()`) writes a blueprint field's `config` as it is, and
+  `app/Services/Forms/TemplateService.php` (`saveAsTemplate()`) stores a version's snapshot as the blueprint. A published version's
+  list-backed cascade holds every choice in `config.options` (`ChoiceListMaterializer::materialize()` writes them at publish), and only
+  `SchemaTreeCloner` strips them for the next draft (`ChoiceListMaterializer::forNextDraft()`). So a template saved from a published
+  version — the API's save-as-template takes any version, and an archived form with no draft falls back to its published one — and every
+  form made from it carries the whole list in its draft: the builder's page props, and every save of that question, hold it until the
+  first publish overwrites it. With the built-in Philippine places that is 43,000 choices. Found by `M186` while planning the built-in
+  list. The remedy: `forNextDraft()` applied to each field's config in both places — never in `SchemaSnapshotSerializer`, which also
+  builds the published snapshot and its checksum. **Live.** Filed by `M186`. **Tier: early-testing.**
+
+- **`minor` · A choice list cannot be narrowed by the same form's own answers, so "one report per barangay" cannot be built.**
+  `M186` lets a cascade level, or a question whose choices come from a list file or another form, show only the choices another form
+  has (or has not) recorded (`R-ed7f3127`), and it keeps `M133`'s rule that a form cannot link to itself
+  (`LinkedChoiceService::refusal()`, `linked_choices_self`). Narrowing by the form's own responses — *only the barangays with no report
+  yet* — is the natural next ask, and the self rule refuses it. Found by `M186` while building the filter. The remedy: allow the form
+  itself as the filter's source (no sharing consent is needed for a form's own answers), with the set read from its finished responses
+  like any other, and say in the builder that a response being edited still shows its own choice. **Live.** Filed by `M186`.
+  **Tier: during-testing.**
+
+- **`nit` · ADR-0002 says CI enforces that every table not on its exemption list is tenant-scoped; CI checks only tables that carry `tenant_id`.**
+  `docs/adr/0002-multi-tenancy-shared-db-rls.md` (D1, the exemption list's last bullet) says *"Every table not on this exemption list is
+  assumed tenant-scoped by default, and CI enforces that assumption"*, but `tests/Feature/Tenancy/TenantTableClassificationDriftTest.php`
+  and `scripts/migration-lint.php` sweep only tables with a `tenant_id` column, so a table created without one — `releases`
+  (`M181`), `psgc_places` (`M186`) — passes every gate without being named anywhere. The `releases` migration says so in its docblock;
+  the ADR does not. Found by `M186` while planning a platform-wide table. The remedy: either a gate that lists every table without
+  `tenant_id` and requires each to be named on an exemption list, or the ADR's sentence corrected to what CI checks. **Live.** Filed by
+  `M186`. **Tier: during-testing.**

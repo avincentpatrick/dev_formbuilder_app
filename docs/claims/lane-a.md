@@ -95,6 +95,37 @@ the extract census, `ConfigPanel.test.ts` (every pinned tab list gains History) 
 a Put back pressed while an edit to the same question is still debouncing — and second, the volatile column default rewriting
 `form_fields` under FORCE RLS.
 
+**BUILT — PR #381, CI 6/6 green with real step counts (run 40223773098 at `48b783bc`: Static analysis 32 · E2E 20 · Contract 16 ·
+Frontend 12 · Pest 11 · axe 11) — AND NOT MERGED.** ⛔ **Held for merge point 6 (`D137`, `D138`)** after T5 (#379) and T6 (#380). This
+branch merged the trunk ONCE, at `d1db55fc`: at merge point 6, once #380 is merged, rebase L's own commits with `git rebase --onto
+origin/main d1db55fc` and `git rebase --skip` any `claim(M188)` commit it replays. ⚠️ **Expect a `docs/claims/decisions.md` conflict
+in T6's and L's rebases:** T5 records `D166`, T6 `D164`/`D165`, L `D167`/`D168`, each at the top of ANSWERED — resolve newest first.
+Its migrations `000147`/`000148` run at L's deploy. Relayed `P5b` is resolved only once live. Commits: `7c0a2384` (`D167`, `D168`),
+`19542fb3` (the server), `75be9052` (the History tab and Put back), `48b783bc` (0.15.0, the row closed, three rows filed).
+
+**How the prediction fared — measured, the wrong parts first.**
+- **"Red first to the recorder test, the classification drift test and the extract census" — never observed:** the table, its
+  registration and its census entry were written before their tests, so none of the three was seen red. **`ConfigPanel.test.ts` and
+  `manual.test.ts` red — right** (eight pinned tab lists and the tab-label rule). **`BuilderLockOrderTest` green throughout — right**;
+  its new case was red once, on my own needle (`'for'` matches inside `"forms"`).
+- **"Most likely wrong: one undo entry under the late snapshot" — right that it was the hazard, and it held:** Put back drains the queue
+  before it sets anything; the store test's pending-edit case and its mutant prove it. **The volatile default under FORCE RLS — wrong,
+  no issue:** 373 dev rows filled with distinct values in 0.3 s.
+- **What no prediction named, each measured:** (1) the dictionary said no table carries a database-side UUID default — amended to the
+  primary keys, with `lineage_id` the documented exception (it must fill raw inserts too); (2) jsonb reorders a revision's keys, so the
+  Pest pins compare with `toEqual`; (3) Vue's whitespace condense joined the History line's spans, so a screen reader heard
+  "Label:Short text→changed to…" — the spans now sit on one line with spaces (a test caught it); (4) a new question is saved twice
+  (the palette's name, then the server's), and the two merge as one change; (5) **two traps this repository's memory already held were
+  re-derived**: `php artisan test` forks past `-d memory_limit` (128 MB fatal, exit 255), and container Pest over a directory collects a
+  fraction of it (`tests/Feature/Forms` 195 of 1,130 tests) — run by explicit paths; (6) local E2E answers every request in 3–11 s, so
+  `builder-content-axe.spec.ts` failed locally on a 5.7 s question create — a path L does not touch — and passed in CI; (7) six
+  ledger citations moved by the insertions (22 dead against a ceiling of 16, 16 after re-pointing); (8) a backslash-escaped apostrophe
+  in a test title lost its backslash on the way in.
+- **E2E run locally (desktop):** `builder-history.spec.ts` passed; `builder-axe.spec.ts` 26 passed (it walks History);
+  `builder-content-axe.spec.ts` red on the timing above, green in CI.
+- **Mutants: 7 caught, 0 survived** — no history recorded, merging off, a duplicate keeping the lineage, a revision FK to `forms`, every
+  renumbered row recorded as moved, Put back offered across a type change, Put back not draining the pending edit.
+
 ## HELD — `M187`, T6 of the testers' items: a Signature anyone can sign, what "Adv" means, and what each question type can do (`R-af2d278b`, `R-96127b20`, `R-3e6358ed`, with `R-c64d0afd`) (m187-t6-signature-readiness)
 
 Taken 2026-10-25. Branch `m187-t6-signature-readiness`, **stacked on `m186-t5-psgc-filter` at `be6166d1`** (it bumps a `VERSION` that is

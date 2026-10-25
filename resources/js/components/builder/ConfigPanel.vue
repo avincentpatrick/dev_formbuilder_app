@@ -49,6 +49,8 @@ import MatrixEditor from './MatrixEditor.vue';
 import MediaEditor from './MediaEditor.vue';
 import PrefillEditor from './PrefillEditor.vue';
 import ValidationEditor from './ValidationEditor.vue';
+import FieldHistory from './FieldHistory.vue';
+import type { DiffWords } from './conflict-diff';
 import { referenceCandidates, type ReferenceSource } from './reference-candidates';
 import { TAKES_NO_DEFAULT } from '../../../public-runtime/lib/defaults';
 import type { ContentBlock } from './content-blocks';
@@ -114,6 +116,12 @@ const leadLine = computed<string | null>(() => {
     return saveError.value;
 });
 const enums = props.store.enums;
+// M188 — the words History shows a change in: the conflict dialog's (question keys as their labels, types by palette name).
+const historyWords = computed<DiffWords>(() => ({
+    enums,
+    labels: Object.fromEntries(props.store.fields.value.map((f) => [f.key, f.label])),
+    typeLabel: (value: string) => props.store.palette.flatMap((g) => g.types).find((t) => t.value === value)?.label ?? value,
+}));
 const saving = props.store.saving;
 // Transient "Saved to library" confirmation (Increment G9b), cleared after a beat.
 const librarySaved = props.store.librarySaved;
@@ -209,6 +217,8 @@ const tabs = computed<{ key: string; label: string; alert?: boolean }[]>(() => {
         // types where it can never do anything.
         if (valueShape.value !== SHAPE_NO_ANSWER) list.push({ key: 'validation', label: 'Validation' });
         list.push({ key: 'advanced', label: 'Advanced' });
+        // M188 (`R-3894369d`): every question keeps a history; a section does not (a row is filed for that).
+        list.push({ key: 'history', label: 'History' });
         // M172: a tab holding a refusal carries a dot (the design system's tab `alert`); the alert says it in words.
         return list.map((tab) => ({ ...tab, alert: errorTabs.value.has(tab.key) }));
     }
@@ -925,6 +935,10 @@ watch(librarySaved, (value) => {
                                 Saved “{{ librarySaved }}” to your library.
                             </p>
                         </div>
+                    </template>
+
+                    <template v-else-if="activeTab === 'history'">
+                        <FieldHistory :store="store" :field="field" :words="historyWords" />
                     </template>
                 </template>
 

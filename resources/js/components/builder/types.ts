@@ -58,6 +58,45 @@ export interface ServerField {
     validations: BuilderValidation[];
 }
 
+/**
+ * M188 (`R-3894369d`) — one setting of a history entry, in the names the server records: a column, `config.<key>`,
+ * `validations`, or `position` for a move. `too_large` when the value was too large to keep (it is then null).
+ */
+export interface FieldHistoryChange {
+    setting: string;
+    before: unknown;
+    after: unknown;
+    too_large?: boolean;
+}
+
+/** Why an entry cannot be put back (`D168`); null when it can. */
+export type FieldHistoryRefusal = 'type_changed' | 'moved' | 'other_type' | 'other_specify' | 'too_large';
+
+/** One change in a question's history, as `GET …/fields/{field}/history` lists it (newest first). */
+export interface FieldHistoryEntry {
+    id: string;
+    kind: 'edited' | 'put_back' | 'type_changed' | 'moved';
+    /** When the change was saved — its last save, for a burst read as one change. */
+    at: string;
+    /** When the burst began; the same as `at` for a single save. */
+    from: string;
+    /** Who made it; null once the account is gone. */
+    by: string | null;
+    field_key: string;
+    field_type: string;
+    changes: FieldHistoryChange[];
+    /** On a Put back, when the change it put back was made. */
+    put_back_of_at: string | null;
+    can_put_back: boolean;
+    reason: FieldHistoryRefusal | null;
+}
+
+export interface FieldHistoryPage {
+    data: FieldHistoryEntry[];
+    /** Pass as `before` for the next, older page; null when there is none. */
+    next: string | null;
+}
+
 export interface ServerSection {
     id: string;
     key: string;

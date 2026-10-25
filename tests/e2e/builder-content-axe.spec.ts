@@ -53,7 +53,7 @@ for (const theme of themes) {
             await showBuilderPane(page, 'fields');
             await page.getByRole('button', { name: 'Note / label', exact: true }).click();
             await showBuilderPane(page, 'settings');
-            await expect(page.getByRole('tab')).toHaveText(['Basics', 'Content', 'Advanced']);
+            await expect(page.getByRole('tab')).toHaveText(['Basics', 'Content', 'Advanced', 'History']); // M188: every question ends on History
             await page.getByRole('tab', { name: 'Content' }).click();
 
             const editor = page.locator('.cbe');

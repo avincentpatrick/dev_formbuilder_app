@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { conflictDifferences, type DiffWords } from './conflict-diff';
+import { conflictDifferences, settingWords, type DiffWords } from './conflict-diff';
 import type { LocalField, LocalSection, ServerField, ServerSection } from './types';
 
 /**
@@ -122,5 +122,23 @@ describe('conflictDifferences', () => {
             { setting: 'Section title', mine: 'Grown-ups', theirs: 'Adults only' },
             { setting: 'Repeatable group', mine: 'Yes', theirs: 'No' },
         ]);
+    });
+});
+
+/** M188 (`R-3894369d`) — the History tab words each recorded change through the same function the dialog now uses. */
+describe('settingWords', () => {
+    it('names a file question’s limits by the keys the Media tab writes — they were three keys no question has', () => {
+        expect(settingWords('config.max_file_size_bytes', 1048576, 2097152, WORDS).setting).toBe('File size limit');
+        expect(settingWords('config.max_count', 1, 3, WORDS).setting).toBe('Most files');
+        expect(settingWords('config.min_count', null, 1, WORDS)).toEqual({ setting: 'Fewest files', a: 'Empty', b: '1' });
+    });
+
+    it('words a move as a place, and the rules as rules', () => {
+        expect(settingWords('position', { section: null, position: 4 }, { section: 'Household', position: 1 }, WORDS)).toEqual({
+            setting: 'Place',
+            a: 'Not in a section, place 4',
+            b: '“Household”, place 1',
+        });
+        expect(settingWords('validations', [], [], WORDS)).toEqual({ setting: 'Rules', a: 'No rules', b: 'No rules' });
     });
 });

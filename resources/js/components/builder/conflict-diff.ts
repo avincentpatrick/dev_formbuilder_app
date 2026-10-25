@@ -8,6 +8,9 @@
  *
  * Pure, so it is tested without mounting the dialog. Values are compared the way the server stores them (jsonb hands a
  * config back in its own key order; an absent rule group reads as null) — the same rule `samePayload()` follows.
+ *
+ * M188 (`R-3894369d`): {@link settingWords} — one setting's two values in those words — is shared with the History tab,
+ * which words each change a question's history records (`before → after`) exactly as this dialog words a difference.
  */
 
 import { describe, type LabelLookup } from './condition-describer';
@@ -76,9 +79,19 @@ const CONFIG_NAMES: Record<string, string> = {
     calculated_formula: 'Calculation formula',
     content: 'Content',
     accepted_types: 'Accepted file types',
-    max_size_mb: 'File size limit',
-    max_files: 'Most files',
-    min_files: 'Fewest files',
+    // M188: these three were `max_size_mb` / `max_files` / `min_files`, keys no question has (MediaEditor's are these).
+    max_file_size_bytes: 'File size limit',
+    max_count: 'Most files',
+    min_count: 'Fewest files',
+    visibility: 'Show to respondents',
+    options_source: 'Choices come from',
+    options_list: 'Choices come from',
+    suggestions_source: 'Suggestions come from',
+    rows_source: 'Rows come from',
+    rows_list: 'Rows come from',
+    cells_source: 'Cell choices come from',
+    cells_list: 'Cell choices come from',
+    default_center: 'Map centre',
 };
 
 function optionLabel(options: readonly { value: string; label: string }[], value: unknown): string {
@@ -149,9 +162,63 @@ function storedRules(rules: unknown): unknown {
     }));
 }
 
-function fieldDifferences(mine: LocalField, theirs: ServerField, words: DiffWords): ConflictDifference[] {
+/** One setting's two values, in the panel's words. */
+export interface SettingWords {
+    setting: string;
+    a: string;
+    b: string;
+}
+
+/** A question's place, as History words a move: "Household, 2nd" or "Top of the form, 4th". */
+function placeWords(value: unknown): string {
+    if (value === null || typeof value !== 'object') return EMPTY;
+    const { section, position } = value as { section?: string | null; position?: number | null };
+    const where = section ? `“${section}”` : 'Not in a section';
+
+    return typeof position === 'number' ? `${where}, place ${position}` : where;
+}
+
+/**
+ * One setting's two values in the words the settings panel uses — a column by its name, a config key as `config.<key>`, the
+ * rules as `validations`, a move as `position`. The conflict dialog's rows (mine, theirs) and the History tab's lines
+ * (before, after) are both this.
+ */
+export function settingWords(setting: string, a: unknown, b: unknown, words: DiffWords): SettingWords {
     const labels = words.labels ?? {};
+
+    if (setting.startsWith('config.')) {
+        const key = setting.slice('config.'.length);
+
+        return { setting: CONFIG_NAMES[key] ?? describeSavePath(setting), a: plain(a), b: plain(b) };
+    }
+
+    switch (setting) {
+        case 'validations':
+            return { setting: 'Rules', a: rulesWords(a, words), b: rulesWords(b, words) };
+        case 'position':
+            return { setting: 'Place', a: placeWords(a), b: placeWords(b) };
+        case 'field_type':
+            return { setting: 'Question type', a: words.typeLabel?.(String(a)) ?? String(a), b: words.typeLabel?.(String(b)) ?? String(b) };
+        case 'is_required':
+            return { setting: 'Required', a: optionLabel(words.enums.required_modes, a), b: optionLabel(words.enums.required_modes, b) };
+        case 'relevant_expression':
+            return { setting: describeSavePath(setting), a: conditionWords(a, labels, 'Always'), b: conditionWords(b, labels, 'Always') };
+        case 'indexed_data_type':
+            return { setting: describeSavePath(setting), a: optionLabel(words.enums.indexed_data_types, a) || EMPTY, b: optionLabel(words.enums.indexed_data_types, b) || EMPTY };
+        case 'default_value_is_expression':
+            return { setting: 'Default is a formula', a: plain(a), b: plain(b) };
+        case 'is_queryable':
+            return { setting: 'Indexed for reporting', a: plain(a), b: plain(b) };
+        default:
+            return { setting: describeSavePath(setting), a: plain(a), b: plain(b) };
+    }
+}
+
+function fieldDifferences(mine: LocalField, theirs: ServerField, words: DiffWords): ConflictDifference[] {
     const out: ConflictDifference[] = [];
+    const push = (row: SettingWords): void => {
+        out.push({ setting: row.setting, mine: row.a, theirs: row.b });
+    };
 
     for (const setting of FIELD_SETTINGS) {
         if (setting === 'config') {
@@ -159,13 +226,13 @@ function fieldDifferences(mine: LocalField, theirs: ServerField, words: DiffWord
             const b = (theirs.config ?? {}) as Record<string, unknown>;
             for (const key of [...new Set([...Object.keys(a), ...Object.keys(b)])].sort()) {
                 if (same(a[key], b[key])) continue;
-                out.push({ setting: CONFIG_NAMES[key] ?? describeSavePath(`config.${key}`), mine: plain(a[key]), theirs: plain(b[key]) });
+                push(settingWords(`config.${key}`, a[key], b[key], words));
             }
             continue;
         }
         if (setting === 'validations') {
             if (!same(storedRules(mine.validations), storedRules(theirs.validations))) {
-                out.push({ setting: 'Rules', mine: rulesWords(mine.validations, words), theirs: rulesWords(theirs.validations, words) });
+                push(settingWords('validations', mine.validations, theirs.validations, words));
             }
             continue;
         }
@@ -176,28 +243,7 @@ function fieldDifferences(mine: LocalField, theirs: ServerField, words: DiffWord
         if (setting === 'indexed_data_type' && !mine.is_queryable && !theirs.is_queryable) continue;
         if (same(a, b)) continue;
 
-        switch (setting) {
-            case 'field_type':
-                out.push({ setting: 'Question type', mine: words.typeLabel?.(String(a)) ?? String(a), theirs: words.typeLabel?.(String(b)) ?? String(b) });
-                break;
-            case 'is_required':
-                out.push({ setting: 'Required', mine: optionLabel(words.enums.required_modes, a), theirs: optionLabel(words.enums.required_modes, b) });
-                break;
-            case 'relevant_expression':
-                out.push({ setting: describeSavePath(setting), mine: conditionWords(a, labels, 'Always'), theirs: conditionWords(b, labels, 'Always') });
-                break;
-            case 'indexed_data_type':
-                out.push({ setting: describeSavePath(setting), mine: optionLabel(words.enums.indexed_data_types, a) || EMPTY, theirs: optionLabel(words.enums.indexed_data_types, b) || EMPTY });
-                break;
-            case 'default_value_is_expression':
-                out.push({ setting: 'Default is a formula', mine: plain(a), theirs: plain(b) });
-                break;
-            case 'is_queryable':
-                out.push({ setting: 'Indexed for reporting', mine: plain(a), theirs: plain(b) });
-                break;
-            default:
-                out.push({ setting: describeSavePath(setting), mine: plain(a), theirs: plain(b) });
-        }
+        push(settingWords(setting, a, b, words));
     }
 
     return out;

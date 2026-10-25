@@ -1577,7 +1577,7 @@ The built-in Philippine places (M186, `R-70c7673a`, `D131`): the Philippine Stan
 | Column | Type | Nullable | Default | PII? | Description |
 |---|---|---|---|---|---|
 | `id` | `uuid` | No | application-generated (HasUuidv7) | No | Primary key. |
-| `level` | `varchar(16)` | No | — | No | `region`, `province`, `city` or `barangay` (`psgc_places_level_check`). `province` holds the PSA's provinces, the National Capital Region's districts that hold a city, the special geographic area, and every city or municipality under no province; `city` holds cities and municipalities. |
+| `level` | `varchar(16)` | No | — | No | `region`, `province`, `city` or `barangay` (`psgc_places_level_check`). `province` holds the PSA's provinces, the National Capital Region's districts that hold a city, the special geographic area, the City of Isabela's special province code (“City of Isabela (Not a Province)”, `D166`), and every city or municipality under no province; `city` holds cities and municipalities. |
 | `code` | `varchar(10)` | No | — | No | The PSA's ten-digit code, kept as TEXT so `01…` keeps its zero (`psgc_places_code_check`). Unique per level, not overall: a city under no province is a row at both the province and the city level with one code. |
 | `name` | `varchar(255)` | No | — | No | The PSA's name for the place, as published (`City of Manila`). |
 | `parent_code` | `varchar(10)` | Yes | NULL | No | The code of the place one level up — always present at that level in the same quarter; NULL for a region. A city under no province names itself (its province-level row). |
@@ -1589,7 +1589,7 @@ The built-in Philippine places (M186, `R-70c7673a`, `D131`): the Philippine Stan
 > **Design Notes**
 > - **No `tenant_id`, no RLS.** The country's places are the same for every workspace — a shared lookup under ADR-0002 D1, like `releases`; there is nothing to isolate.
 > - **No FK points here.** A cascade names the lists, never the rows: publishing writes the places into the version's `config.options` (`ChoiceListMaterializer`), so every reader of a published cascade — validation, exports, the paper form, OCR — reads plain options, and a later quarter changes the next publish only.
-> - **Built from the code, not from the sheet's order.** `psgc:build` finds each place's parent by zeroing its code (RR PPP MM BBB) from the lowest non-zero group up until a place exists; moves a sub-municipality's barangays to its city; gives a city under no province a row at both levels; leaves out a district no city is coded under; and refuses to write unless the workbook's count at each of the PSA's levels equals its summary sheet.
+> - **Built from the code, not from the sheet's order.** `psgc:build` finds each place's parent by zeroing its code (RR PPP MM BBB) from the lowest non-zero group up until a place exists; moves a sub-municipality's barangays to its city; gives a city under no province a row at both levels; leaves out a district no city is coded under; puts a place with no level coded at the province group — the special geographic area, and the City of Isabela's special province code — at the province level, named as the PSA names it (`D166`); skips a footnote under the places and takes its mark off the name it notes ("City of Lucenaa/" → "City of Lucena", 3Q 2026); and refuses to write unless the workbook's count at each of the PSA's levels equals its summary sheet, read as the table the PSA prints.
 
 ---
 

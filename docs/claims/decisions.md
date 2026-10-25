@@ -24,10 +24,19 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D163`, the last filed, was asked and answered on 2026-10-24 while `M186` (T5) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D166`, the last filed, was asked and answered on 2026-10-26 while `M186` (T5)'s data commit was planned, and recorded in its claim (`D164`/`D165` are `M187`'s, on its held branch). A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D166 — The PSA's own workbook lists the City of Isabela (Basilan) under a placeholder row, "City of Isabela (Not a Province)", with no level. How should it appear when someone picks Region IX, then Province? **B — as the PSA writes it: "City of Isabela (Not a Province)" at the province level, then "City of Isabela".**
+
+**Asked and answered 2026-10-26 (user decision, in chat), while `M186` (T5)'s data commit was planned; recorded in its claim.** Measured on the PSA's 2Q and 3Q 2026 files: two rows have a blank level, both coded at the province group — `0990100000` City of Isabela (Not a Province), the special province code the City of Isabela sits under, and `1999900000` Special Geographic Area.
+
+- **A — like other cities (recommended, not chosen).** "City of Isabela" at the province level and again at the city level, the way City of Zamboanga beside it appears; the placeholder row is dropped.
+- **B — as the PSA writes it (chosen).** A blank level at the province group is a province-level place, named as the PSA names it; a blank level anywhere else is refused by name (`PsgcTiers`).
+
+**What the answer files, in the same push:** nothing new — `R-70c7673a`'s data commit carries it.
+
 ### D163 — A question's choices can now be narrowed by what another form has recorded. Sometimes that form cannot be checked: its sharing was turned off, the phone is offline with nothing saved, or it has more than 50,000 different answers. What should the question show then? **A — every choice, with a short note that the list could not be narrowed.**
 
 **Asked and answered 2026-10-24 (user decision, in chat), while `M186` (T5) was planned; recorded in its claim.** A narrowing set is served beside the schema with the linked choices (`R-ed7f3127`), and `M133`'s offline rule stands: the server never refuses an answer outside a list.

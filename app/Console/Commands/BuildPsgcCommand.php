@@ -62,6 +62,13 @@ final class BuildPsgcCommand extends Command
 
         $counts = PsgcTiers::psaCounts($read['places']);
         $this->line('Sheets: '.implode(' · ', $read['sheets']));
+        // What the reader set aside, said out loud — a quarter's new footnote is read here before it is committed.
+        foreach ($read['notes'] as $note) {
+            $this->line('Not a place, skipped: '.$note);
+        }
+        foreach ($read['marks'] as $mark) {
+            $this->line("Footnote mark {$mark['mark']} taken off {$mark['code']}: “{$mark['to']}”");
+        }
         $this->line('Places by the PSA\'s levels: '.implode(', ', array_map(static fn (string $l, int $n): string => "{$l} ".number_format($n), array_keys($counts), $counts)));
 
         $faults = [];

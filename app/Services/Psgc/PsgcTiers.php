@@ -11,7 +11,12 @@ use InvalidArgumentException;
  *
  * ── THE PSA'S LEVELS, AND THE FOUR A RESPONDENT SEES ─────────────────────────────────────────────────────────
  * The PSA codes a place `Reg`, `Prov`, `Dist` (the National Capital Region's districts), `SGU` (the special geographic
- * area), `City`, `Mun`, `SubMun` (the City of Manila's sub-municipalities) or `Bgy`. A respondent picks four times:
+ * area), `City`, `Mun`, `SubMun` (the City of Manila's sub-municipalities) or `Bgy` — or leaves the level BLANK. Measured
+ * on its 2Q and 3Q 2026 files: no `Dist` and no `SGU` at all, and two blank rows, both coded at the province group (RR PPP
+ * 00 000) — `1999900000` Special Geographic Area and `0990100000` City of Isabela (Not a Province), the special province
+ * code the City of Isabela sits under. A blank level at the province group is a province-level place, offered as the PSA
+ * writes it (`D166` B, the user, 2026-10-26: "City of Isabela (Not a Province)", then "City of Isabela"); a blank level
+ * anywhere else is refused by name. A respondent picks four times:
  *
  *   region                  ← Reg
  *   province or district    ← Prov, Dist, SGU — and a city or municipality outside any of them (a highly urbanised or
@@ -47,6 +52,9 @@ final class PsgcTiers
     /** Where each code group ends: RR PPP MM BBB. */
     private const array GROUP_ENDS = [2, 5, 7, 10];
 
+    /** A code at the province group: RR PPP 00 000, PPP not 000. */
+    private const string PROVINCE_GROUP = '/^[0-9]{2}(?!000)[0-9]{3}0{5}$/';
+
     /** @var array<string, array{code: string, name: string, kind: string}> */
     private array $places = [];
 
@@ -56,7 +64,14 @@ final class PsgcTiers
     private function __construct(array $places)
     {
         foreach ($places as $place) {
-            $kind = self::KINDS[mb_strtolower(trim($place['level']))] ?? null;
+            $level = mb_strtolower(trim($place['level']));
+            if ($level === '') {
+                if (preg_match(self::PROVINCE_GROUP, $place['code']) !== 1) {
+                    throw new InvalidArgumentException("Place {$place['code']} ({$place['name']}) has no level, and its code is not a province's (RR PPP 00 000), so this build cannot place it.");
+                }
+                $level = 'prov';
+            }
+            $kind = self::KINDS[$level] ?? null;
             if ($kind === null) {
                 throw new InvalidArgumentException("Place {$place['code']} ({$place['name']}) has the level “{$place['level']}”, which this build does not know (it knows Reg, Prov, Dist, SGU, City, Mun, SubMun and Bgy).");
             }
@@ -84,13 +99,13 @@ final class PsgcTiers
      * How many places the PSA codes at each of its levels — what its summary sheet counts.
      *
      * @param  list<array{code: string, name: string, level: string}>  $places
-     * @return array<string, int> keyed by the PSA's level code as written, e.g. Reg, Bgy
+     * @return array<string, int> keyed by the PSA's level code as written, e.g. Reg, Bgy; a blank level as "(blank)"
      */
     public static function psaCounts(array $places): array
     {
         $counts = [];
         foreach ($places as $place) {
-            $level = trim($place['level']);
+            $level = trim($place['level']) !== '' ? trim($place['level']) : '(blank)';
             $counts[$level] = ($counts[$level] ?? 0) + 1;
         }
         ksort($counts);

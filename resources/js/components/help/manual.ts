@@ -981,7 +981,7 @@ const reference: ChapterDraft[] = [
                 id: 'type-duration',
                 title: 'Duration',
                 blocks: [
-                    tip('warning', 'This type is retired: you can no longer add one. Respondents cannot answer a Duration question — the form shows “', NOT_YET, '” Use a ', ui('Whole number', FIELD_TYPES), ' question, such as “minutes”, for now; a duration will be worked out by a calculation.'),
+                    tip('warning', 'This type is retired: you can no longer add one. Respondents cannot answer a Duration question — the form shows “', NOT_YET, '” To record one, use a ', ui('Calculated', FIELD_TYPES), ' question that works it out from a start and an end, or a ', ui('Whole number', FIELD_TYPES), ' question, such as “minutes”.'),
                 ],
             },
         ],

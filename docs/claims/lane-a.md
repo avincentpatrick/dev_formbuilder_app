@@ -440,6 +440,29 @@ marker); `PsgcCommittedDataTest` stops skipping once the data is committed and p
 19 places are written by `PsgcTiers`, not from the workbook). **Most likely wrong:** the committed CSV's size and the deploy's
 `psgc:sync` time on 43,788 rows — measured locally before the push.
 
+**DATA COMMITTED (2026-10-26) — PR #379 CI 6/6 green with real step counts (run 40215500064 at `498144bf`: Static analysis 32 ·
+E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11) — AND STILL NOT MERGED (merge point 6).** Two commits on the branch:
+`b72ce4f9` (the build reads the PSA's real workbook; `D166` B) and `498144bf` (`database/data/psgc/`: 18 region · 118 province · 1,642
+city · 42,010 barangay rows, `places.csv` sha256 `8e0a1c36…a8e987f5`, 1,815,659 B, LF; each PSA level equal to its National Summary;
+a rebuild byte-identical). **`R-70c7673a` CLOSED on the branch.** At merge point 6 T5's rebase is unchanged (`git rebase --onto origin/main
+7fc683fa`, skipping replayed `claim(M186)` commits); both new commits are T5's own. Dev: `psgc:sync` loaded the real places (43,769 added,
+1 updated, 18 unchanged) — all 19 fixture codes exist in the real file, so nothing was deleted.
+
+**How the prediction fared — the wrong parts first.**
+- **"The E2E fixture's bytes do not move" — half wrong:** `places.csv` is byte-identical (sha `49c4887b…`), but its `manifest.json` moved —
+  its PSA counts recorded `SGU` and now record `(blank)`, since the fixture's special geographic area has the real file's blank level.
+- **What planning measured on the archived 2Q file was right, and 3Q added two shapes it could not show:** the places table moved to
+  column B (harmless — columns are found by header), and a footnote row in the code column with its mark pasted onto Lucena's name.
+  Both were found by reading the user's 3Q file before the build, not by the build refusing it.
+- **Red first — right:** 11 of 13 build cases red against the real layout before the fix.
+- **"Most likely wrong: the CSV's size and the sync time" — wrong, both fine:** 1.8 MB; `psgc:sync` 10 s on dev (a no-op re-run 8 s);
+  `psgc:build` 90 s on the host.
+- **What no prediction named:** Save Page Now failed on every psa.gov.ph address (520), so the user's browser was the route after all —
+  they downloaded it in a minute when asked with the exact clicks; the build test's summary line pads to 15 columns; container PHPStan's
+  51 model-column phantoms (host 0, as recorded).
+- **Mutants: 4 caught, 0 survived** — the region row read as the region total, any blank level placed, the footnote mark never
+  declared, the footnote row read as a place.
+
 ## RELEASED — `M185`, T4 of the testers' items: the grid, part 2 — rows and choices from a list or another form, rows and columns edited in the Preview, a repeatable section as a table (`R-bb79aec0`, `R-7418e6bd`, `R-0a7275ce`) (merged as PR #378, `eba3e3a4`, last at merge point 5, rebased onto the trunk after `M184`; 6/6 green with real step counts on its rebased run at `293e0381` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `eba3e3a4` the same)
 
 **RELEASED LAST AT MERGE POINT 5 (`D137`, `D138`), 2026-10-24, by the merge-point-5 session** (plan

@@ -15123,7 +15123,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `tests/fixtures/staging-headers/measured/1.headers` keep 8.4.25 on purpose: they record what the box sent, not what it runs. The
   remedy: the one sentence, on the next pull request that touches `docs/`. **Live.** Filed by `M185`. **Tier: during-testing.**
 
-- **`minor` · A template or library item made from a published version copies a list-backed cascade's whole option list into the new draft.**
+- ✅ **CLOSED BY `M186` (2026-10-25) — ****`minor` · A template or library item made from a published version copies a list-backed cascade's whole option list into the new draft.**
   `app/Services/Forms/SchemaBlueprintMaterializer.php` (`fieldAttributes()`) writes a blueprint field's `config` as it is, and
   `app/Services/Forms/TemplateService.php` (`saveAsTemplate()`) stores a version's snapshot as the blueprint. A published version's
   list-backed cascade holds every choice in `config.options` (`ChoiceListMaterializer::materialize()` writes them at publish), and only
@@ -15132,7 +15132,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   form made from it carries the whole list in its draft: the builder's page props, and every save of that question, hold it until the
   first publish overwrites it. With the built-in Philippine places that is 43,000 choices. Found by `M186` while planning the built-in
   list. The remedy: `forNextDraft()` applied to each field's config in both places — never in `SchemaSnapshotSerializer`, which also
-  builds the published snapshot and its checksum. **Live.** Filed by `M186`. **Tier: early-testing.**
+  builds the published snapshot and its checksum. **Live.** Filed by `M186`. **Tier: early-testing.** ✅ **CLOSED BY `M186`
+  (2026-10-25):** `SchemaBlueprintMaterializer::fieldAttributes()` and `TemplateService::saveAsTemplate()` both pass each field's
+  config through `forNextDraft()`; a template saved from a published version keeps the list's name and none of its choices, and a
+  form made from an older template that carries them gets a draft holding none, which publishes them again
+  (`tests/Feature/Templates/TemplateListOptionsTest.php`).
 
 - **`minor` · A choice list cannot be narrowed by the same form's own answers, so "one report per barangay" cannot be built.**
   `M186` lets a cascade level, or a question whose choices come from a list file or another form, show only the choices another form

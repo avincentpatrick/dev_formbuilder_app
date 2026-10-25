@@ -25,12 +25,15 @@ import { computed, onMounted, ref } from 'vue';
 import { MdsButton, MdsCheckbox, MdsFormField, MdsIconButton, MdsSelect, MdsTextInput } from '@meridian/design-system';
 import ChoiceListUpload from '@/components/forms/ChoiceListUpload.vue';
 import { describeChoiceList, listChoiceLists, type ChoiceListRow } from '@/components/forms/choice-lists';
-import type { PsgcSummary } from './types';
+import ChoiceFilterEditor from './ChoiceFilterEditor.vue';
+import type { ChoiceFilterValue, LinkableSource, PsgcSummary } from './types';
 
 interface CascadeLevel {
     key: string;
     label: string;
     list?: string;
+    /** M186 (`R-ed7f3127`): what narrows this level's choices by what another form recorded. */
+    filter?: ChoiceFilterValue | null;
 }
 interface CascadeOption {
     value: string;
@@ -47,6 +50,8 @@ const props = defineProps<{
     psgc?: PsgcSummary | null;
     /** M186: `config.skip_single_choice_levels`. */
     skipSingle?: boolean;
+    /** M186 (`R-ed7f3127`): the forms whose shared answers may narrow a level — every level offers Show only when any fits. */
+    sources?: LinkableSource[];
 }>();
 const emit = defineEmits<{
     'update:levels': [value: CascadeLevel[]];
@@ -125,6 +130,28 @@ function listProblem(index: number): string | null {
         return `${list.name} has no “${above.key}” column. Name the level above after the file’s column, or add the column.`;
     }
     return null;
+}
+
+// ── Show only, per level (M186, `R-ed7f3127`) ───────────────────────────────────────────────
+// Offered on a level once a form shares something that could narrow it — or when it is already narrowed — so a builder
+// with nothing to narrow by shows nothing more.
+function narrowable(level: CascadeLevel): boolean {
+    if (level.filter != null) return true;
+    const psgc = typeof level.list === 'string' && level.list.startsWith(PSGC_PREFIX) ? level.list : null;
+    return (props.sources ?? []).some((source) =>
+        source.questions.some((question) =>
+            question.field_type === 'cascading_select'
+                ? (question.levels ?? []).some((other) => (psgc !== null ? other.list === psgc : other.key !== '' && other.key === level.key))
+                : psgc === null,
+        ),
+    );
+}
+function setLevelFilter(index: number, filter: ChoiceFilterValue | null): void {
+    emit('update:levels', props.levels.map((l, i) => {
+        if (i !== index) return l;
+        const { filter: _old, ...rest } = l;
+        return filter === null ? rest : { ...rest, filter };
+    }));
 }
 
 function onListUploaded(added: ChoiceListRow): void {
@@ -221,6 +248,14 @@ function removeOption(index: number): void {
                         @update:model-value="updateLevel(i, { list: $event || undefined })"
                     />
                     <p v-if="listProblem(i)" class="cascading__problem">{{ listProblem(i) }}</p>
+                    <ChoiceFilterEditor
+                        v-if="narrowable(level)"
+                        :filter="level.filter ?? null"
+                        :sources="sources ?? []"
+                        :target="{ kind: 'level', key: level.key, list: level.list }"
+                        :name="level.label || level.key"
+                        @update:filter="setLevelFilter(i, $event)"
+                    />
                 </div>
                 <p v-if="levels.length === 0" class="cascading__empty">No levels yet.</p>
             </div>

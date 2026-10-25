@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Forms;
 
+use App\Enums\FieldType;
 use App\Enums\FormStatus;
 use App\Enums\FormThemePreset;
 use App\Exceptions\Ocr\OcrException;
@@ -204,7 +205,7 @@ final class FormSettingsPresenter
      * one and that this viewer may open; `used_by_others` counts the rest, so a form is never named to someone who
      * cannot see it and the count still tells the author the switch is in use.
      *
-     * @return array{enabled: bool, field_keys: list<string>|null, published: bool, questions: list<array{key: string, label: string}>, used_by: list<array{id: string, title: string}>, used_by_others: int}|null
+     * @return array{enabled: bool, field_keys: list<string>|null, published: bool, questions: list<array{key: string, label: string, narrows_only: bool}>, used_by: list<array{id: string, title: string}>, used_by_others: int}|null
      */
     public function dataSharing(Form $form, ?User $viewer): ?array
     {
@@ -227,7 +228,10 @@ final class FormSettingsPresenter
                 // M185 (`D161`): so does a grid whose rows, cells or a column's choices are copied from it at publish.
                 ->orWhere('config->rows_source->form_id', $form->id)
                 ->orWhere('config->cells_source->form_id', $form->id)
-                ->orWhereJsonContains('config->columns', [['options_source' => ['form_id' => (string) $form->id]]]))
+                ->orWhereJsonContains('config->columns', [['options_source' => ['form_id' => (string) $form->id]]])
+                // M186 (`R-ed7f3127`): and a question, or a cascade's level, whose choices it narrows.
+                ->orWhere('config->options_filter->form_id', $form->id)
+                ->orWhereJsonContains('config->levels', [['filter' => ['form_id' => (string) $form->id]]]))
             ->orderBy('title');
 
         $readable = array_values((clone $linking)->readableBy($viewer)->get(['id', 'title'])
@@ -238,9 +242,11 @@ final class FormSettingsPresenter
             'enabled' => $form->data_sharing_enabled === true,
             'field_keys' => $form->dataSharingFieldKeys(),
             'published' => $snapshot !== null,
+            // M186 (`R-ed7f3127`): a cascade too, marked — it can only narrow another form's choices, and it is shared only
+            // when ticked, never by "every question".
             'questions' => array_map(
-                static fn (array $q): array => ['key' => $q['key'], 'label' => $q['label']],
-                ShareableQuestions::fromSnapshot($snapshot),
+                static fn (array $q): array => ['key' => $q['key'], 'label' => $q['label'], 'narrows_only' => $q['field_type'] === FieldType::CascadingSelect->value],
+                ShareableQuestions::fromSnapshot($snapshot, true),
             ),
             'used_by' => $readable,
             'used_by_others' => max(0, $linking->count() - count($readable)),

@@ -625,6 +625,9 @@ const LINKED = 'resources/js/components/builder/LinkedChoicesEditor.vue';
 const SUGGESTIONS = 'resources/js/components/builder/SuggestionsEditor.vue';
 const OTHER_SPECIFY = 'resources/js/components/builder/OtherSpecifyControl.vue';
 const CASCADING = 'resources/js/components/builder/CascadingEditor.vue';
+// M186 (`R-ed7f3127`): Show only, and where a source form ticks a cascade to share.
+const CHOICE_FILTER = 'resources/js/components/builder/ChoiceFilterEditor.vue';
+const DATA_SHARING = 'resources/js/components/forms/DataSharingPanel.vue';
 const LIKERT_MATRIX = 'resources/js/components/builder/LikertMatrixEditor.vue';
 const MATRIX = 'resources/js/components/builder/MatrixEditor.vue';
 const GRID_LAYOUT = 'resources/js/components/builder/GridLayoutSelect.vue';
@@ -985,6 +988,11 @@ const reference: ChapterDraft[] = [
                         'Or from a list file: pick ', ui('A list file', LINKED), ', then a list this form holds, or ', ui('Upload a CSV or Excel file', LINKED),
                         ' there. The file needs a “name” column (the code saved) and a “label” column (what respondents read); an Excel file’s first sheet is read. Publishing turns the list into the choices, up to 5,000. A long list is easier as a Dropdown, and the paper form prints every choice.',
                     ),
+                    p(
+                        'Choices from a list file or another form can be narrowed by what a third form has recorded: under ', ui('Show only', CHOICE_FILTER), ', pick ',
+                        ui('Only those another form has an answer for', CHOICE_FILTER), ' or ', ui('Only those another form has no answer for', CHOICE_FILTER),
+                        ', then the form and its question. Respondents see only those choices; an answer already given is never refused, and if that form cannot be checked every choice is shown with a note.',
+                    ),
                 ],
             },
             {
@@ -1034,6 +1042,11 @@ const reference: ChapterDraft[] = [
                     p(
                         ui('Fill in a level that has only one choice', CASCADING),
                         ' fills such a level in for the person — a city outside any province is its own only choice at the city level, so they pick the city once. The last level is always theirs to pick.',
+                    ),
+                    p(
+                        'A level can show only what another form has recorded — only the barangays with a report in form X, or only those with none yet: ',
+                        ui('Show only', CHOICE_FILTER), ' under the level. The levels above narrow to match, so nobody picks a city with no barangay left. The other form shares its cascading question for this in its Data sharing settings, under ',
+                        ui('Only the questions I choose', DATA_SHARING), ' — never through every question. A Philippine places level is narrowed by the same level of the other form’s Philippine places question.',
                     ),
                 ],
             },

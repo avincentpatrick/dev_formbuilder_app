@@ -173,6 +173,27 @@ final class PublishValidationException extends RuntimeException
         return self::one($fieldKey, 'grid_source_invalid', "The {$what} of the grid “{$fieldKey}” cannot be filled in ({$detail}).");
     }
 
+    /**
+     * M186 (`R-ed7f3127`): a filter that narrows a cascade level's or a list-fed question's choices by what another form
+     * recorded, and cannot. `$what` names the level ("level “Barangay”") or "choices"; `$reason` is a link's refusal
+     * code (`LinkedChoiceService::refusal()`), `choice_filter_not_comparable` or `choice_filter_needs_a_source`.
+     */
+    public static function choiceFilterInvalid(string $fieldKey, string $what, string $reason): self
+    {
+        $detail = match ($reason) {
+            'linked_choices_incomplete' => 'choose the form and the question that narrow them, and whether to show the choices it has answers for or those it has none for',
+            'linked_choices_self' => 'they cannot be narrowed by this same form',
+            'linked_choices_source_missing' => 'the form that narrows them no longer exists',
+            'linked_choices_not_shared' => "the form that narrows them does not share that question; its owner can tick it in the form's Data sharing settings",
+            'linked_choices_owner_cannot_read' => "this form's owner cannot see the responses of the form that narrows them",
+            'choice_filter_not_comparable' => 'that question’s answers can never match these choices — a Philippine places level is narrowed by the same level of another form’s Philippine places question, and a list by a question with one answer',
+            'choice_filter_needs_a_source' => 'only choices that come from a list file or another form can be narrowed',
+            default => $reason,
+        };
+
+        return self::one($fieldKey, 'choice_filter_invalid', "The {$what} of “{$fieldKey}” cannot be narrowed ({$detail}).");
+    }
+
     /** A cascading-select field (Increment G4a) whose level/option hierarchy does not resolve. */
     public static function cascadingConfigInvalid(string $fieldKey, string $detail): self
     {

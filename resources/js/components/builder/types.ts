@@ -250,11 +250,24 @@ export interface PsgcSummary {
     counts: { region: number; province: number; city: number; barangay: number };
 }
 
-/** A form a choice question may take its choices from, with the questions it shares (M133, `linkable_sources`). */
+/**
+ * A form a choice question may take its choices from, with the questions it shares (M133, `linkable_sources`). M186: each
+ * question says its type, and a cascade its levels — a cascade is offered only to narrow choices, never to feed them.
+ */
 export interface LinkableSource {
     id: string;
     title: string;
-    questions: { key: string; label: string }[];
+    questions: { key: string; label: string; field_type?: string; levels?: { key: string; list: string | null }[] }[];
+}
+
+/**
+ * M186 (`R-ed7f3127`): what narrows a cascade level's choices (`levels[i].filter`) or a list-fed question's
+ * (`options_filter`) — the other form, its question, and which choices to show. Either half may be unpicked yet.
+ */
+export interface ChoiceFilterValue {
+    form_id: string | null;
+    field_key: string | null;
+    mode: 'present' | 'absent';
 }
 
 // A sibling field a validation row may name (M115) — for the six rule types that compare against a second

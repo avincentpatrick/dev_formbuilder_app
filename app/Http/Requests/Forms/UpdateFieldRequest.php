@@ -15,6 +15,7 @@ use App\Models\FormField;
 use App\Rules\ContentBlocks;
 use App\Services\Expressions\DateMath;
 use App\Services\Expressions\Rounding;
+use App\Services\Forms\LinkedChoiceService;
 use App\Support\Forms\MatrixColumns;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -214,6 +215,15 @@ final class UpdateFieldRequest extends FormRequest
             'config.levels.*.label_translations.*' => 'level label translation',
             'config.levels.*.list' => 'level choice list',
             'config.skip_single_choice_levels' => 'fill in a level with one choice',
+            // M186 — what narrows a cascade level's, or a list-fed question's, choices.
+            'config.levels.*.filter' => 'level narrowed by',
+            'config.levels.*.filter.form_id' => 'level narrowing form',
+            'config.levels.*.filter.field_key' => 'level narrowing question',
+            'config.levels.*.filter.mode' => 'which level choices to show',
+            'config.options_filter' => 'choices narrowed by',
+            'config.options_filter.form_id' => 'narrowing form',
+            'config.options_filter.field_key' => 'narrowing question',
+            'config.options_filter.mode' => 'which choices to show',
             // The two grids.
             'config.rows' => 'rows',
             'config.rows.*.value' => 'row value',
@@ -312,6 +322,8 @@ final class UpdateFieldRequest extends FormRequest
                 'config.levels.*.list' => ['nullable', 'string', 'max:64', 'regex:/^(psgc:(region|province|city|barangay)|[a-z0-9_-]+)$/'],
                 // M186: a level with exactly one choice under the one picked above is filled in for the respondent.
                 'config.skip_single_choice_levels' => ['sometimes', 'boolean:strict'],
+                // M186 (`R-ed7f3127`): a level narrowed by what another form recorded — shape only; publish judges it.
+                ...self::filterRules('config.levels.*.filter'),
                 'config.options' => ['sometimes', 'array'],
                 'config.options.*.value' => ['nullable', 'string', 'max:255'],
                 'config.options.*.label' => ['nullable', 'string', 'max:500'],
@@ -399,6 +411,8 @@ final class UpdateFieldRequest extends FormRequest
                 // M184 (`R-3e7c81bb`): choices taken from a list file of this form, by the list's name — empty while the author
                 // is still choosing; whether the list exists is publish's, as a cascade level's list is.
                 'config.options_list' => ['sometimes', 'nullable', 'string', 'max:64', 'regex:/^[a-z0-9_-]*$/'],
+                // M186 (`R-ed7f3127`): a list-fed question's choices narrowed by what another form recorded — shape only.
+                ...self::filterRules('config.options_filter'),
                 // M177 (`R-71509975`): the key of the Please specify question "Other, please specify" made.
                 'config.other_specify_key' => ['sometimes', 'nullable', 'string', 'max:150'],
             ];
@@ -423,6 +437,22 @@ final class UpdateFieldRequest extends FormRequest
         }
 
         return [];
+    }
+
+    /**
+     * M186 (`R-ed7f3127`): a filter's shape — `{form_id, field_key, mode}`, each half nullable while the author is still
+     * choosing, and nothing else (`array:` refuses an extra key, as `options_source` does).
+     *
+     * @return array<string, list<mixed>>
+     */
+    private static function filterRules(string $path): array
+    {
+        return [
+            $path => ['sometimes', 'nullable', 'array:form_id,field_key,mode'],
+            "{$path}.form_id" => ['nullable', 'uuid'],
+            "{$path}.field_key" => ['nullable', 'string', 'max:255'],
+            "{$path}.mode" => ['nullable', Rule::in(LinkedChoiceService::FILTER_MODES)],
+        ];
     }
 
     /**

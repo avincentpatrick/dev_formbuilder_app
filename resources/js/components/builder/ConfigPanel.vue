@@ -315,6 +315,13 @@ const calculationQuestions = computed<CalculationQuestion[]>(() => {
 const choices = computed<Choice[]>(() => (field.value?.config.options as Choice[] | undefined) ?? []);
 // A cascading field keeps its LEVELS + parented OPTIONS under distinct config keys (Increment G4a).
 const cascadeLevels = computed<CascadeLevel[]>(() => (field.value?.config.levels as CascadeLevel[] | undefined) ?? []);
+// M186 (`R-ed7f3127`): the sources the editors that TAKE choices offer — a cascade a source ticked can only narrow them
+// (Show only), so it is left out here, and a form sharing nothing else with it.
+const choiceSources = computed(() =>
+    (props.store.linkableSources ?? [])
+        .map((source) => ({ ...source, questions: source.questions.filter((question) => question.field_type !== 'cascading_select') }))
+        .filter((source) => source.questions.length > 0),
+);
 const cascadeOptions = computed<CascadeOption[]>(() => (field.value?.config.options as CascadeOption[] | undefined) ?? []);
 // A composite grid (Increment G4b) keeps its ROWS/COLUMNS (+ matrix CELLS) under distinct config keys.
 const gridRows = computed<Choice[]>(() => (field.value?.config.rows as Choice[] | undefined) ?? []);
@@ -645,7 +652,7 @@ watch(librarySaved, (value) => {
                                 @update:model-value="setField('placeholder', $event || null)"
                             />
                         </MdsFormField>
-                        <SuggestionsEditor v-if="field.field_type === 'short_text'" :config="field.config" :sources="props.store.linkableSources" :form-id="store.formId" @update:config="field.config = $event; props.store.touch(field.uid, 'field')" />
+                        <SuggestionsEditor v-if="field.field_type === 'short_text'" :config="field.config" :sources="choiceSources" :form-id="store.formId" @update:config="field.config = $event; props.store.touch(field.uid, 'field')" />
                         <p v-if="neverShown && !isCalculated" class="config__note" data-never-required>
                             Respondents never see this question, so it is never required. Change that under Show to respondents on the
                             Advanced tab.
@@ -678,7 +685,7 @@ watch(librarySaved, (value) => {
                     </template>
 
                     <template v-else-if="activeTab === 'options'">
-                        <LinkedChoicesEditor v-if="enums.linked_choice_types?.includes(field.field_type)" :config="field.config" :sources="props.store.linkableSources" :form-id="store.formId" :field-type="field.field_type" @update:config="field.config = $event; props.store.touch(field.uid, 'field')" /><ChoicesEditor v-if="choiceSourceOf(field.config) === 'typed'" :options="choices" @update:options="setConfig('options', $event)" /><OtherSpecifyControl :store="props.store" />
+                        <LinkedChoicesEditor v-if="enums.linked_choice_types?.includes(field.field_type)" :config="field.config" :sources="choiceSources" :filter-sources="props.store.linkableSources" :form-id="store.formId" :field-type="field.field_type" @update:config="field.config = $event; props.store.touch(field.uid, 'field')" /><ChoicesEditor v-if="choiceSourceOf(field.config) === 'typed'" :options="choices" @update:options="setConfig('options', $event)" /><OtherSpecifyControl :store="props.store" />
                         <MdsFormField
                             v-if="layoutOptions.length > 0"
                             label="Choice layout"
@@ -702,6 +709,7 @@ watch(librarySaved, (value) => {
                             :form-id="store.formId"
                             :psgc="props.store.psgc"
                             :skip-single="field.config.skip_single_choice_levels === true"
+                            :sources="props.store.linkableSources"
                             @update:levels="setConfig('levels', $event)"
                             @update:options="setConfig('options', $event)"
                             @patch="patchConfig($event)"
@@ -709,7 +717,7 @@ watch(librarySaved, (value) => {
                     </template>
 
                     <template v-else-if="activeTab === 'grid' && configEditor === 'matrix'">
-                        <MatrixEditor :config="field.config" :sources="props.store.linkableSources" :form-id="store.formId" @update:config="field.config = $event; props.store.touch(field.uid, 'field')"
+                        <MatrixEditor :config="field.config" :sources="choiceSources" :form-id="store.formId" @update:config="field.config = $event; props.store.touch(field.uid, 'field')"
                             :rows="gridRows"
                             :columns="gridColumns"
                             :cells="gridCells"
@@ -722,7 +730,7 @@ watch(librarySaved, (value) => {
                     </template>
 
                     <template v-else-if="activeTab === 'grid'">
-                        <LikertMatrixEditor :config="field.config" :sources="props.store.linkableSources" :form-id="store.formId" @update:config="field.config = $event; props.store.touch(field.uid, 'field')"
+                        <LikertMatrixEditor :config="field.config" :sources="choiceSources" :form-id="store.formId" @update:config="field.config = $event; props.store.touch(field.uid, 'field')"
                             :rows="gridRows"
                             :columns="gridColumns"
                             :layout="gridLayout"

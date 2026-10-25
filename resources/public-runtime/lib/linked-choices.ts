@@ -37,6 +37,19 @@ export interface LinkedChoiceList {
 
 export type LinkedChoiceLists = Record<string, LinkedChoiceList>;
 
+/**
+ * M186 (`R-ed7f3127`): one set that narrows a question's choices — or a cascade level's — by what another form recorded,
+ * as the same endpoint sends it beside the lists. `level` is the cascade level's index, or null for a question's own list.
+ */
+export interface ChoiceFilterSet {
+    field_key: string;
+    level: number | null;
+    stamp: string;
+    available: boolean;
+    truncated: boolean;
+    values: string[];
+}
+
 /** Said under a linked question whose list could not be loaded. */
 export const LINKED_CHOICES_UNAVAILABLE =
     'These choices are not available right now. Open this form once while you are online to load them.';
@@ -83,10 +96,19 @@ function suggestsFromForm(config: unknown): boolean {
     return source !== null && typeof source === 'object' && (source as Record<string, unknown>).kind === 'form';
 }
 
-/** Whether a schema has any question that takes its choices — or its suggestions — from another form: the only case worth a request. */
+/** M186 (`R-ed7f3127`): whether a question's choices, or a cascade level's, are narrowed by another form — picked or not. */
+function declaresFilter(config: unknown): boolean {
+    if (config === null || typeof config !== 'object') return false;
+    const { options_filter: filter, levels } = config as Record<string, unknown>;
+    if (filter !== null && typeof filter === 'object') return true;
+
+    return Array.isArray(levels) && levels.some((level) => level !== null && typeof level === 'object' && typeof (level as Record<string, unknown>).filter === 'object' && (level as Record<string, unknown>).filter !== null);
+}
+
+/** Whether a schema has any question that takes its choices — or its suggestions — from another form, or is narrowed by one: the only case worth a request. */
 export function hasLinkedChoices(schema: SchemaResponse): boolean {
     // Tolerant of a partial schema (a fixture, or a cached response from before a key existed): no fields, no request.
-    return (schema.version?.schema?.fields ?? []).some((field) => isLinked(field.config) || suggestsFromForm(field.config));
+    return (schema.version?.schema?.fields ?? []).some((field) => isLinked(field.config) || suggestsFromForm(field.config) || declaresFilter(field.config));
 }
 
 /**
@@ -94,17 +116,23 @@ export function hasLinkedChoices(schema: SchemaResponse): boolean {
  * or empty. `lists` null means the request failed. Every other field, and the schema object itself, is untouched —
  * the cached response is never mutated. `notes` lets the builder's preview (M184) say what a missing list means there;
  * the guest page's own sentences are the default.
+ *
+ * M186 (`R-ed7f3127`): `sets` — the narrowing sets served beside the lists — are written into each question that declares
+ * a filter as `config.choice_filter_sets`, which only the RENDER side reads (`schema-mapping.ts`'s `choiceFilterOf()`): the
+ * engine is built from `options`, untouched here, so an answer outside a set is never refused. `sets` null means the
+ * request failed, and the question shows every choice with a note (`D163`).
  */
 export function mergeLinkedChoices(
     schema: SchemaResponse,
     lists: LinkedChoiceLists | null,
     notes: { unavailable: string; empty: string } = { unavailable: LINKED_CHOICES_UNAVAILABLE, empty: LINKED_CHOICES_EMPTY },
+    sets: ChoiceFilterSet[] | null = null,
 ): SchemaResponse {
     if (!hasLinkedChoices(schema)) {
         return schema;
     }
 
-    const fields = schema.version.schema.fields.map((field) => {
+    const withLists = (field: SchemaResponse['version']['schema']['fields'][number]): typeof field => {
         // M184: a Short text's suggestions are its list's labels — and no note when there are none, since any answer goes.
         if (suggestsFromForm(field.config)) {
             const list = lists?.[field.key];
@@ -126,6 +154,17 @@ export function mergeLinkedChoices(
             hint,
             config: { ...(field.config ?? {}), options: usable ? list.options.map((option) => ({ ...option })) : [] },
         };
+    };
+
+    const fields = schema.version.schema.fields.map((field) => {
+        const merged = withLists(field);
+        if (!declaresFilter(field.config)) {
+            return merged;
+        }
+
+        const own = sets === null ? null : sets.filter((set) => set.field_key === field.key).map((set) => ({ ...set, values: [...set.values] }));
+
+        return { ...merged, config: { ...(merged.config ?? {}), choice_filter_sets: own } };
     });
 
     return { ...schema, version: { ...schema.version, schema: { ...schema.version.schema, fields } } };

@@ -24,6 +24,13 @@ use App\Enums\FieldType;
  *
  * Pure: it reads only the snapshot array it is given, so the three callers cannot drift by reading different
  * rows.
+ *
+ * ── A CASCADE, SHARED TO NARROW ANOTHER FORM'S CHOICES — AND ONLY WHEN CHOSEN (M186, `R-ed7f3127`) ───────────────
+ * A cascade stores the PATH a person picked, one value per level, so it cannot feed a list of choices — but its values
+ * at one level ("the barangays with a report") can narrow another form's choices ({@see FILTER_TYPES}). Every reader
+ * asks for one purpose: the default is a list's (options, suggestions, a grid's copy, the scan's carry), which never
+ * sees a cascade; `$forFilters` is a filter's. And a cascade is shared only when the owner ticks it: `null` — "every
+ * shareable question" — was a consent given before cascades could be shared, so it is never read as covering one.
  */
 final class ShareableQuestions
 {
@@ -39,12 +46,19 @@ final class ShareableQuestions
     ];
 
     /**
-     * The shareable questions of a snapshot, in the order the form asks them.
+     * M186 (`R-ed7f3127`): what may narrow another form's choices — every list type, and a cascade by its levels.
+     *
+     * @var list<FieldType>
+     */
+    public const FILTER_TYPES = [...self::TYPES, FieldType::CascadingSelect];
+
+    /**
+     * The shareable questions of a snapshot, in the order the form asks them — a cascade too when `$forFilters`.
      *
      * @param  array<string, mixed>|null  $snapshot
      * @return list<array{key: string, label: string, field_type: string}>
      */
-    public static function fromSnapshot(?array $snapshot): array
+    public static function fromSnapshot(?array $snapshot, bool $forFilters = false): array
     {
         $repeatSections = self::repeatSectionKeys($snapshot);
         $fields = self::fields($snapshot);
@@ -53,7 +67,7 @@ final class ShareableQuestions
 
         $questions = [];
         foreach ($fields as $field) {
-            if (! self::isShareable($field, $repeatSections)) {
+            if (! self::isShareable($field, $repeatSections, $forFilters)) {
                 continue;
             }
 
@@ -71,13 +85,13 @@ final class ShareableQuestions
      * @param  array<string, mixed>|null  $snapshot
      * @return array<string, mixed>|null
      */
-    public static function find(?array $snapshot, string $key): ?array
+    public static function find(?array $snapshot, string $key, bool $forFilters = false): ?array
     {
         $repeatSections = self::repeatSectionKeys($snapshot);
 
         foreach (self::fields($snapshot) as $field) {
             if (($field['key'] ?? null) === $key) {
-                return self::isShareable($field, $repeatSections) ? $field : null;
+                return self::isShareable($field, $repeatSections, $forFilters) ? $field : null;
             }
         }
 
@@ -86,31 +100,38 @@ final class ShareableQuestions
 
     /**
      * The keys a source currently shares: every shareable question when `$chosen` is null (`D60`'s note — null
-     * means all), otherwise the chosen keys that are still shareable in this snapshot, in the form's order.
+     * means all), otherwise the chosen keys that are still shareable in this snapshot, in the form's order. For a
+     * filter (M186), a cascade's key only when it is among `$chosen` — never through null's "all".
      *
      * @param  array<string, mixed>|null  $snapshot
      * @param  list<string>|null  $chosen
      * @return list<string>
      */
-    public static function sharedKeys(?array $snapshot, ?array $chosen): array
+    public static function sharedKeys(?array $snapshot, ?array $chosen, bool $forFilters = false): array
     {
-        $keys = array_map(static fn (array $q): string => $q['key'], self::fromSnapshot($snapshot));
+        $keys = [];
+        foreach (self::fromSnapshot($snapshot, $forFilters) as $question) {
+            $cascade = $question['field_type'] === FieldType::CascadingSelect->value;
+            if ($chosen === null ? ! $cascade : in_array($question['key'], $chosen, true)) {
+                $keys[] = $question['key'];
+            }
+        }
 
-        return $chosen === null ? $keys : array_values(array_intersect($keys, $chosen));
+        return $keys;
     }
 
     /**
      * @param  array<string, mixed>  $field
      * @param  array<string, true>  $repeatSections
      */
-    private static function isShareable(array $field, array $repeatSections): bool
+    private static function isShareable(array $field, array $repeatSections, bool $forFilters = false): bool
     {
         if (! is_string($field['key'] ?? null) || $field['key'] === '') {
             return false;
         }
 
         $type = FieldType::tryFrom((string) ($field['field_type'] ?? ''));
-        if ($type === null || ! in_array($type, self::TYPES, true)) {
+        if ($type === null || ! in_array($type, $forFilters ? self::FILTER_TYPES : self::TYPES, true)) {
             return false;
         }
 

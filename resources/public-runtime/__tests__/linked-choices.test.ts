@@ -9,7 +9,7 @@ import {
     mergeLinkedChoices,
     type LinkedChoiceLists,
 } from '../lib/linked-choices';
-import { buildEngineSchema } from '../lib/schema-mapping';
+import { buildEngineSchema, buildRenderModel } from '../lib/schema-mapping';
 import { field, schemaResponse } from './fixtures';
 
 /**
@@ -149,5 +149,70 @@ describe('mergeLinkedChoices — a Short text that suggests from another form', 
         expect(merged.hint).toBe('Type a facility.');
         expect(failed.config).toEqual({ ...SUGGEST, suggestions: [] });
         expect(failed.hint).toBe('Type a facility.');
+    });
+});
+
+describe('narrowing sets — merged for the controls, never for the engine (M186, R-ed7f3127)', () => {
+    const FILTER = { form_id: 'src-1', field_key: 'place', mode: 'present' as const };
+
+    function narrowedSchema() {
+        return schemaResponse({
+            versionId: 'ver-7',
+            fields: [
+                field({
+                    key: 'place',
+                    field_type: 'cascading_select',
+                    config: {
+                        levels: [{ key: 'region' }, { key: 'barangay', filter: FILTER }],
+                        options: [
+                            { value: 'ncr', label: 'NCR', level: 'region', parent: null },
+                            { value: 'b1', label: 'Barangay 1', level: 'barangay', parent: 'ncr' },
+                            { value: 'b2', label: 'Barangay 2', level: 'barangay', parent: 'ncr' },
+                        ],
+                    },
+                }),
+            ],
+        });
+    }
+
+    const SETS = [{ field_key: 'place', level: 1, stamp: 's', available: true, truncated: false, values: ['b2'] }];
+
+    it('asks when a question is narrowed by another form, even with no linked list', () => {
+        expect(hasLinkedChoices(narrowedSchema())).toBe(true);
+    });
+
+    it('writes the set into the narrowed question for the render model, and the engine keeps every choice', () => {
+        const merged = mergeLinkedChoices(narrowedSchema(), {}, undefined, SETS);
+        const place = merged.version.schema.fields[0];
+
+        expect(place.config?.choice_filter_sets).toEqual(SETS);
+        expect(buildRenderModel(merged).fields.find((f) => f.key === 'place')?.choiceFilter).toEqual([{ level: 1, mode: 'present', values: ['b2'] }]);
+        // The engine is built from `options`: an answer outside the set is still a valid answer.
+        expect(buildEngineSchema(merged).fields.find((f) => f.key === 'place')?.cascade?.options.map((o) => o.value)).toEqual(['ncr', 'b1', 'b2']);
+    });
+
+    it('narrows nothing when the read failed, or the set could not be read or is over its cap (D163)', () => {
+        for (const sets of [null, [], [{ ...SETS[0], available: false, values: [] }], [{ ...SETS[0], truncated: true, values: [] }]]) {
+            const merged = mergeLinkedChoices(narrowedSchema(), null, undefined, sets);
+
+            expect(buildRenderModel(merged).fields.find((f) => f.key === 'place')?.choiceFilter).toEqual([{ level: 1, mode: 'present', values: null }]);
+        }
+    });
+
+    it('reads the sets off the same response as the lists, and keeps working on a response cached before they existed', async () => {
+        const schema = narrowedSchema();
+        const fetch = vi
+            .fn()
+            .mockResolvedValueOnce(res(200, { data: schema }))
+            .mockResolvedValueOnce(res(200, { data: { version_id: 'ver-7', lists: [], sets: SETS } }))
+            .mockResolvedValueOnce(res(200, { data: schema }))
+            .mockResolvedValueOnce(res(200, { data: { version_id: 'ver-7', lists: [] } }));
+        const client = createApiClient({ token: 'tok', slug: 's', fetch: fetch as unknown as typeof globalThis.fetch });
+
+        const fresh = await client.fetchSchema();
+        expect(fresh.version.schema.fields[0].config?.choice_filter_sets).toEqual(SETS);
+
+        const cached = await client.fetchSchema();
+        expect(cached.version.schema.fields[0].config?.choice_filter_sets).toBeNull();
     });
 });

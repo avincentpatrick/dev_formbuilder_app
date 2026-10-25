@@ -66,12 +66,15 @@ provide(ContentImageRetryKey, { delayMs: 3000, maxAttempts: 10 });
 
 // M184 (`R-d8c2ce84`): the choices the draft takes from elsewhere — another form's answers, list files, suggestions — read
 // from the server while Preview is open, again whenever a question's source changes. Only the latest read lands.
+// M186 (`R-ed7f3127`): and whenever what narrows them changes — a list's `options_filter`, a cascade level's `filter`.
 const previewChoices = ref<PreviewChoices | null>(null);
+const narrowsAnyLevel = (config: Record<string, unknown>): boolean =>
+    Array.isArray(config.levels) && config.levels.some((level) => level !== null && typeof level === 'object' && (level as Record<string, unknown>).filter != null);
 const boundSources = computed(() =>
     JSON.stringify(
         props.store.fields.value
-            .filter((f) => f.config.options_source != null || f.config.options_list != null || f.config.suggestions_source != null || (f.field_type === 'cascading_select' && isListBacked(f.config)) || gridSourcesOf(f.config) !== null)
-            .map((f) => [f.key, f.field_type, f.config.options_source ?? null, f.config.options_list ?? null, f.config.suggestions_source ?? null, f.config.levels ?? null, gridSourcesOf(f.config)]),
+            .filter((f) => f.config.options_source != null || f.config.options_list != null || f.config.suggestions_source != null || f.config.options_filter != null || (f.field_type === 'cascading_select' && (isListBacked(f.config) || narrowsAnyLevel(f.config))) || gridSourcesOf(f.config) !== null)
+            .map((f) => [f.key, f.field_type, f.config.options_source ?? null, f.config.options_list ?? null, f.config.suggestions_source ?? null, f.config.options_filter ?? null, f.config.levels ?? null, gridSourcesOf(f.config)]),
     ),
 );
 let choicesRead = 0;

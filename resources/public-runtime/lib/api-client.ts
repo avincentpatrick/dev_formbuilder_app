@@ -11,7 +11,7 @@
  */
 
 import { encodeSolution, solveChallenge, type Challenge } from './challenge';
-import { ApiError, normalizeError } from './error-normalizer'; import { hasLinkedChoices, linkedChoicesUrl, mergeLinkedChoices, type LinkedChoiceLists } from './linked-choices'; import { choiceListsUrl, hasChoiceLists, mergeChoiceLists, type ChoiceLists } from './choice-lists';
+import { ApiError, normalizeError } from './error-normalizer'; import { hasLinkedChoices, linkedChoicesUrl, mergeLinkedChoices, type ChoiceFilterSet, type LinkedChoiceLists } from './linked-choices'; import { choiceListsUrl, hasChoiceLists, mergeChoiceLists, type ChoiceLists } from './choice-lists';
 import type {
     AnswerMap,
     MintResponse,
@@ -203,15 +203,16 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
      * the respondent that question's choices, never the form. Read through the service worker, which keeps the last
      * list per version for offline use.
      */
-    async function fetchLinkedChoices(versionId: string): Promise<LinkedChoiceLists | null> {
+    async function fetchLinkedChoices(versionId: string): Promise<{ lists: LinkedChoiceLists | null; sets: ChoiceFilterSet[] | null }> {
         try {
             const response = await doFetch(linkedChoicesUrl(currentToken, versionId), { headers: { Accept: 'application/json' } });
-            if (!response.ok) return null;
-            const body = (await response.json()) as { data?: { lists?: LinkedChoiceLists } };
+            if (!response.ok) return { lists: null, sets: null };
+            // M186 (`R-ed7f3127`): the narrowing sets ride the same response; a list cached before they existed carries none.
+            const body = (await response.json()) as { data?: { lists?: LinkedChoiceLists; sets?: ChoiceFilterSet[] } };
 
-            return body.data?.lists ?? null;
+            return { lists: body.data?.lists ?? null, sets: Array.isArray(body.data?.sets) ? body.data.sets : null };
         } catch {
-            return null;
+            return { lists: null, sets: null };
         }
     }
 
@@ -253,7 +254,9 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
 
             // M133 (`R-5da4a30f`): a question that takes its choices from another form gets them here, from their own
             // read (`D60` = A), merged into a copy — so every path that sets a schema gets them, and none can forget.
-            const linked = hasLinkedChoices(body.data) ? mergeLinkedChoices(body.data, await fetchLinkedChoices(body.data.version.id)) : body.data;
+            // M186 (`R-ed7f3127`): the sets that narrow a question's choices come with them.
+            const fetched = hasLinkedChoices(body.data) ? await fetchLinkedChoices(body.data.version.id) : null;
+            const linked = fetched === null ? body.data : mergeLinkedChoices(body.data, fetched.lists, undefined, fetched.sets);
 
             // M141 (`R-f69aab42`, `D95`): a cascade whose levels take their choices from CSV files gets its list here, from its
             // own read beside the schema, frozen per version — merged into a copy the same way.

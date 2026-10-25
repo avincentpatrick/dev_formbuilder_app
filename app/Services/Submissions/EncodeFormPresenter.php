@@ -104,6 +104,9 @@ final class EncodeFormPresenter
     /** @var array<string, array<string, array{stamp: string, available: bool, truncated: bool, options: list<array{value: string, label: string}>}>> each version's linked lists, read once (M184) */
     private array $linkedLists = [];
 
+    /** @var array<string, list<array{field_key: string, level: int|null, stamp: string, available: bool, truncated: bool, values: list<string>}>> each version's narrowing sets, read once (M186) */
+    private array $filterSets = [];
+
     public function __construct(
         private readonly SchemaValueFormatter $formatter,
         private readonly TemplateRenderer $templates,
@@ -483,6 +486,9 @@ final class EncodeFormPresenter
             'calculation' => $this->calculationDisplay($field),
             // M184 (`R-596d6afd`) — a Short text's suggestions, offered as the keyer types; null for every other type.
             'suggestions' => $this->suggestions($field),
+            // M186 (`R-ed7f3127`) — what narrows this question's choices, or a cascade's levels', by what another form
+            // recorded; null when nothing does. Display only, as on the guest form: the server checks no answer against it.
+            'choice_filter' => $this->choiceFilter($field),
             // `note` is display-only (handled by the page), never an input; a repeatable section's fields are
             // supported and render inside the add/remove-instance loop (Increment G2). A hidden field is
             // keyable ONLY when it is externally sourced — a `fixed` or source-less one has no answer this
@@ -737,6 +743,50 @@ final class EncodeFormPresenter
         $written = $config['suggestions'] ?? null;
 
         return is_array($written) ? array_values(array_filter($written, is_string(...))) : null;
+    }
+
+    /**
+     * M186 (`R-ed7f3127`): each filter a question declares, with the values its set holds now — `values` null when the
+     * set could not be read or is over its cap, so the shared FieldInput shows every choice and says why (`D163`). The
+     * guest adapters build the same member from the sets served beside the schema (`EncodeFieldAdapterParityTest`).
+     *
+     * @return list<array{level: int|null, mode: string, values: list<string>|null}>|null
+     */
+    private function choiceFilter(FormField $field): ?array
+    {
+        $declared = LinkedChoiceService::declaredFilters($field->field_type, (array) $field->config);
+        if ($declared === []) {
+            return null;
+        }
+
+        $versionId = (string) $field->form_version_id;
+        if (! array_key_exists($versionId, $this->filterSets)) {
+            $version = FormVersion::query()->whereKey($field->form_version_id)->first();
+            $form = $version === null ? null : Form::query()->whereKey($version->form_id)->first();
+            $this->filterSets[$versionId] = $version === null || $form === null ? [] : app(LinkedChoiceService::class)->setsFor($form, $version);
+        }
+
+        $filters = [];
+        foreach ($declared as $one) {
+            $filter = LinkedChoiceService::filterOf($one['filter']);
+            if ($filter === null) {
+                continue;
+            }
+            $set = null;
+            foreach ($this->filterSets[$versionId] as $candidate) {
+                if ($candidate['field_key'] === $field->key && $candidate['level'] === $one['level']) {
+                    $set = $candidate;
+                    break;
+                }
+            }
+            $filters[] = [
+                'level' => $one['level'],
+                'mode' => $filter['mode'],
+                'values' => $set !== null && $set['available'] && ! $set['truncated'] ? $set['values'] : null,
+            ];
+        }
+
+        return $filters === [] ? null : $filters;
     }
 
     /**

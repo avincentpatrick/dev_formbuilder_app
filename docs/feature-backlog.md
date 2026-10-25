@@ -14497,7 +14497,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   changes the next publish only; a level with exactly one choice filled in and shown read-only; the dictionary sentence and the
   PRD line amended; the operator step in `deploy.ps1`. **Live.** Filed by `M172`. **Tier: early-testing.**
 
-- **`minor` · A cascade level or a choice list cannot be filtered by what another form has recorded, so "only the barangays with a report in form X" cannot be built.**
+- ✅ **CLOSED BY `M186` (2026-10-25) — ****`minor` · A cascade level or a choice list cannot be filtered by what another form has recorded, so "only the barangays with a report in form X" cannot be built.**
   The testers' question (2026-10-15): *"can options in a target form dynamically filter based on whether a specific barangay has
   recorded value in a source form?"*. `app/Support/Forms/ShareableQuestions.php:31-39` never offers a `cascading_select` for
   sharing; a link feeds a flat list of answers for one key (`app/Services/Forms/LinkedChoiceService.php:258-275`, served by
@@ -14509,7 +14509,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   (`resources/public-runtime/lib/linked-choices.ts:89-112`); the web form, manual entry and the preview filter the options
   client-side and the server never refuses an answer outside the set (`M133`'s offline rule); `LinkedChoiceGate` refuses at
   publish a filter whose source does not share the question or whose values are not comparable. **Live.** Filed by `M172`.
-  **Tier: early-testing.**
+  **Tier: early-testing.** ✅ **CLOSED BY `M186` (2026-10-25):** built as prescribed, reshaped where the code required it. A
+  cascade level's `filter` and a list- or form-fed question's `options_filter` (`{form_id, field_key, mode}`, saved through
+  `UpdateFieldRequest`); `ShareableQuestions::FILTER_TYPES` and a purpose flag, so a cascade is shared to narrow only — never to
+  feed options, suggestions, a grid's copy or the scan's carry — and only when its owner ticks it (`null`'s "every question"
+  never covers one); the linked-choices response's `sets` are a LIST (`[{field_key, level, stamp, available, truncated,
+  values}]`, level keys having no format rule), the source's distinct finished answers at the comparable level (a cascade
+  source read per level) plus a choice source's labels, capped at 50,000 (`D163`: over it, or unreadable, nothing narrows and
+  the question says so); the guest merge writes them display-only (`config.choice_filter_sets`, read by the render model,
+  never the engine), and manual entry and the Preview get the same through `choice_filter` on all three adapters; `FieldInput`
+  narrows the levels above a filtered one (`D162`) and keeps whatever the answer already holds; `LinkedChoiceGate` refuses, as
+  `choice_filter_invalid`, an unshared or unfinished source, a typed list, and values that can never match (a Philippine places
+  level by the same level of another places question; a list by a one-answer question). The builder's **Show only**
+  (`ChoiceFilterEditor.vue`) under each level and under a list's source. Relayed `R1-2` is resolved once live.
 
 - **`nit` · The palette's "Adv" tooltip promises an advanced editor "coming with the form engine", and the settings panel carries a baseline note no type can reach any more.**
   `resources/js/components/builder/FieldPalette.vue:102` titles every advanced type "baseline settings (advanced editor coming

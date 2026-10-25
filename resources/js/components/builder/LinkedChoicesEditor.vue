@@ -36,8 +36,9 @@ import { computed, onMounted, ref, useId, watch } from 'vue';
 import { MdsButton, MdsFormField, MdsRadio, MdsSelect } from '@meridian/design-system';
 import ChoiceListUpload from '@/components/forms/ChoiceListUpload.vue';
 import { describeChoiceList, listChoiceLists, type ChoiceListRow } from '@/components/forms/choice-lists';
+import ChoiceFilterEditor from './ChoiceFilterEditor.vue';
 import { choiceSourceOf } from './choice-source';
-import type { LinkableSource, OptionsSource } from './types';
+import type { ChoiceFilterValue, LinkableSource, OptionsSource } from './types';
 
 /** `D160`: past this many choices a Single or Multiple choice is better as a Dropdown, and the paper prints them all. */
 const LONG_LIST = 30;
@@ -58,6 +59,11 @@ const props = defineProps<{
      * its shared cell choices or one column's choices, all copied in at publish.
      */
     kind?: 'choices' | 'rows' | 'cell-choices' | 'column-choices';
+    /**
+     * M186 (`R-ed7f3127`): the forms that may narrow these choices — `sources` with the cascades a source ticked. Passed
+     * for a question's own choices only, never a grid's; a list from a file or a form then offers Show only.
+     */
+    filterSources?: LinkableSource[];
 }>();
 
 /** The words that change with what the list becomes; a grid's lists are copied in at publish, from a file or a form. */
@@ -113,7 +119,8 @@ const typedCount = computed(() => (Array.isArray(props.config.options) ? props.c
 /** One new config: the link set (and typed choices cleared, never kept beside it), or the link removed. */
 function emitSource(next: OptionsSource | null): void {
     const base = without(props.config, 'options_list');
-    emit('update:config', next === null ? { ...base, options_source: null } : { ...base, options: [], options_source: next });
+    // Typed choices are never narrowed (M186): going back to them drops the filter in the same change.
+    emit('update:config', next === null ? { ...without(base, 'options_filter'), options_source: null } : { ...base, options: [], options_source: next });
 }
 
 /** One new config: the question takes its choices from this list file ('' while the author is choosing one). */
@@ -225,6 +232,17 @@ function onSource(formId: string): void {
 function onQuestion(key: string): void {
     emitSource({ form_id: source.value?.form_id ?? null, field_key: key || null });
 }
+
+// ── Show only (M186) ───────────────────────────────────────────────────────────────────────────
+const narrowable = computed(() => props.filterSources !== undefined && (props.kind ?? 'choices') === 'choices' && mode.value !== 'here');
+const optionsFilter = computed<ChoiceFilterValue | null>(() => {
+    const filter = props.config.options_filter;
+
+    return filter !== null && typeof filter === 'object' ? (filter as ChoiceFilterValue) : null;
+});
+function emitFilter(next: ChoiceFilterValue | null): void {
+    emit('update:config', next === null ? without(props.config, 'options_filter') : { ...props.config, options_filter: next });
+}
 </script>
 
 <template>
@@ -324,6 +342,14 @@ function onQuestion(key: string): void {
                 </MdsFormField>
             </template>
         </template>
+
+        <ChoiceFilterEditor
+            v-if="narrowable"
+            :filter="optionsFilter"
+            :sources="filterSources ?? []"
+            :target="{ kind: 'list' }"
+            @update:filter="emitFilter"
+        />
     </fieldset>
 </template>
 

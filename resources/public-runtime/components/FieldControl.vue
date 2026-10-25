@@ -52,6 +52,8 @@ const encodeField = computed<EncodeField>(() => ({
     calculation: props.field.calculation,
     // M184 (`R-596d6afd`) — a Short text's suggestions, offered as the person types.
     suggestions: props.field.suggestions,
+    // M186 (`R-ed7f3127`) — what narrows the choices shown by what another form recorded.
+    choice_filter: props.field.choiceFilter ?? null,
     supported: props.field.supported,
 }));
 

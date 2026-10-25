@@ -73,9 +73,10 @@ final class UpdateDataSharingRequest extends FormRequest
                     return;
                 }
 
+                // M186 (`R-ed7f3127`): a cascade may be chosen too — to narrow another form's choices, never to feed them.
                 $shareable = array_map(
                     static fn (array $question): string => $question['key'],
-                    ShareableQuestions::fromSnapshot($this->publishedSnapshot()),
+                    ShareableQuestions::fromSnapshot($this->publishedSnapshot(), true),
                 );
 
                 if ($this->boolean('enabled') && $shareable === []) {

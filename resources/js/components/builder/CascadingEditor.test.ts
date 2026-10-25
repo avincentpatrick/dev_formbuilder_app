@@ -155,3 +155,38 @@ describe('the built-in Philippine places (M186, R-70c7673a)', () => {
         expect(wrapper.emitted('patch')?.at(-1)).toEqual([{ skip_single_choice_levels: true }]);
     });
 });
+
+describe('Show only, per level (M186, R-ed7f3127)', () => {
+    const SOURCES = [
+        {
+            id: 'report',
+            title: 'Barangay Report',
+            questions: [{ key: 'place', label: 'Place', field_type: 'cascading_select', levels: [{ key: 'region', list: 'psgc:region' }, { key: 'barangay', list: 'psgc:barangay' }] }],
+        },
+    ];
+
+    it('offers it on a level a shared question can narrow, and nowhere else', async () => {
+        const wrapper = await mountEditor(
+            [
+                { key: 'region', label: 'Region', list: 'psgc:region' },
+                { key: 'province', label: 'Province or district', list: 'psgc:province' },
+            ],
+            [],
+            { psgc: PSGC, sources: SOURCES },
+        );
+
+        expect(wrapper.findAll('[data-choice-filter]')).toHaveLength(1);
+        expect(wrapper.text()).toContain('Show only — Region');
+    });
+
+    it('writes the filter onto its level, and takes it off again', async () => {
+        const wrapper = await mountEditor([{ key: 'region', label: 'Region', list: 'psgc:region' }], [], { psgc: PSGC, sources: SOURCES });
+
+        await wrapper.find('[data-choice-filter] select').setValue('present');
+        expect(wrapper.emitted('update:levels')?.at(-1)).toEqual([[{ key: 'region', label: 'Region', list: 'psgc:region', filter: { form_id: 'report', field_key: 'place', mode: 'present' } }]]);
+
+        await wrapper.setProps({ levels: [{ key: 'region', label: 'Region', list: 'psgc:region', filter: { form_id: 'report', field_key: 'place', mode: 'present' } }] });
+        await wrapper.find('[data-choice-filter] select').setValue('');
+        expect(wrapper.emitted('update:levels')?.at(-1)).toEqual([[{ key: 'region', label: 'Region', list: 'psgc:region' }]]);
+    });
+});

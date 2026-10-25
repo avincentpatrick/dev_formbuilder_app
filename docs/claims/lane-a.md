@@ -106,7 +106,17 @@ Files: new `resources/js/components/submissions/SignaturePad.vue`, new `resource
 `resources/public-runtime/__tests__/schema-mapping.test.ts`, `MediaInput.test.ts`, new `SignaturePad.test.ts`,
 `builder-voice.test.ts`, `manual.test.ts`, `resources/js/Pages/help/index.test.ts`, the Vitest files beside the components, new
 `tests/e2e/signature.spec.ts`.
-Shared artefacts taken: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/data-dictionary.md` (the media
+**Extended 2026-10-25 — every one OPENED BEFORE THIS PUSH, which the protocol forbids, recorded rather than hidden:**
+`app/Services/Submissions/SchemaValueFormatter.php` (`mediaFiles()`, so the export's link and every other surface name a file
+alike), `resources/js/components/builder/preview-model.ts` (the Preview's limits list names the signature), new
+`resources/js/components/submissions/signature-canvas.ts` and its test (the pad's drawing, kept testable without a canvas),
+`tests/Feature/Attachments/AttachmentPolicyTest.php` (the signature's refuse/serve pair behind the export link),
+`tests/Feature/Submissions/SubmissionPdfBrandingTest.php` (its stale `ext-gd` comment), `tests/golden/validation/manifest.json`
+(the vectors' count pin), `openapi.json` (FieldType's description is its docblock, which `R-96127b20` reworded — one line,
+regenerated in the container after CI's Contract job went red on it), and the readiness pin at
+`tests/Feature/Help/FieldReadinessTableTest.php` in place of the claimed `tests/Unit/Forms/` (it needs the app; Feature binds it).
+`resources/js/Pages/help/Index.vue` and `resources/public-runtime/components/FieldControl.vue` were claimed and needed no edit.
+Shared artefacts taken: `openapi.json` (extended, above), `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/data-dictionary.md` (the media
 cell's export text, if it states one), `docs/ocr-pipeline-design.md` (if it quotes the refusal), `tests/e2e/public-runtime-axe.spec.ts`,
 `tests/e2e/builder-axe.spec.ts` and the specs the diff reaches, `PROGRESS.md` (own block).
 Paired files taken: `EncodeFormPresenter::SUPPORTED` ↔ `schema-mapping.ts` `SUPPORTED` (`FieldTypeMirrorDriftTest`); the `EncodeField`

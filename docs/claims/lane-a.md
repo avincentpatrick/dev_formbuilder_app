@@ -139,6 +139,50 @@ diff (the `sets` member) until it is regenerated in the container; `manual.test.
 wrong:** the PSA workbook itself — its header text, the summary sheet's layout and how NCR's districts and the special geographic area
 are coded come from third-party descriptions, so `psgc:build`'s first run against the real file is where this plan meets the world.
 
+**BUILT — PR #379, CI 6/6 green with real step counts (run 40173107160 at `be6166d1`: Static analysis 32 · E2E 20 · Contract 16 ·
+Frontend 12 · Pest 11 · axe 11; the first run, 40170649298 at `8acafa1e`, was red in Pest alone — below) — AND
+NOT MERGED.** ⛔ **Held for merge
+point 6 (`D137`, `D138`)**, with T6 and L; **T6 stacks on this branch** (its `VERSION` is 0.13.0 only here). This branch merged the trunk
+ONCE, at `8acafa1e` (the claim's four extensions `d1988263`, `3359d766`, `86cd0791`, `e9c279d3`, identical to the branch's own claim
+text): at merge point 6 rebase T5's own commits with `git rebase --onto origin/main 7fc683fa` and `git rebase --skip` any `claim(M186)`
+commit the merge replays. ⚠️ **A changed `deploy.ps1` runs one deploy late:** T5's own deploy runs no `psgc:sync`; the first is T6's
+deploy. ⛔ **OWED BEFORE MERGE POINT 6 — the Philippine places themselves (`R-70c7673a` stays OPEN):** the user could not download the
+PSA workbook this session (asked twice). With the *PSGC 3Q 2026 Publication Datafile* in hand, `php artisan psgc:build <xlsx>
+--publication=2026Q3 --released=2026-10-12` writes `database/data/psgc/`; its first run against the real file is the first time the
+PSA's header text, summary sheet and NCR/special-geographic-area coding are measured, and the build may need adjusting there. Until then
+`psgc:sync` copies nothing and says so, the Levels tab's button says the places are not on this server yet, and `PsgcCommittedDataTest`
+skips by name. Relayed `R1-2` is resolved only once the places are live. Dev data: `acme`'s *Barangay Visit* at `/f/barangay-visit`
+(`E2eSeeder`, over the 19-place fixture, re-run on the dev DB after migrating `000146`); no `demo` tenant demo — that waits for the data.
+
+**How the prediction fared — measured, the wrong parts first.**
+- **"Most likely wrong: the PSA workbook itself" — never reached.** The user could not download it this session (asked twice), so
+  `psgc:build` met only its fixture (`Tests\Support\PsgcFixture`, every shape once) and the real file's header text, summary-sheet
+  layout and NCR/SGA coding stay unmeasured. That reshaped the increment, which no prediction named: `psgc:sync` had to succeed on a
+  tree with no data (the deploy runs it on every push and would otherwise have left the site down), `PsgcCommittedDataTest` skips by
+  name, the E2E environment loads a committed 19-place fixture, and `R-70c7673a` stays OPEN with the data commit owed.
+- **`FieldSaveAttributeNamesTest` red first — wrong:** the attribute names went in with the rules, so it was never red.
+  **`EncodeFieldAdapterParityTest` red first — right:** red the moment the server built `choice_filter` and before the two Vue
+  adapters did. **`DocumentedDefaultDriftTest` — wrong, green first time.** **The Contract job's `openapi.json` diff — right in
+  kind, and harder than predicted:** Scramble mis-inferred the `sets` shape three times (a spread gave an empty key; a cached
+  local and by-reference parameters gave strings) and was right only once the literal was built from casts and a typed helper —
+  `@var` is ignored there. **`manual.test.ts` — wrong:** no quoted label moved.
+- **What no prediction named, each measured:** (1) PHP turns a numeric-string array key like `'1300000000'` into an INTEGER, so
+  iterating `PsgcTiers`' place map fed an `int` to a `string` parameter (a TypeError; fixed by iterating values); (2) a
+  `v-if`/`v-else` pair split by a new element — the Data sharing note — bound the `v-else` to the note and hid the ticked list
+  whenever a cascade was present (caught by its own new test); (3) `Get-Content -Raw` in Windows PowerShell reads a BOM-less UTF-8
+  file as ANSI, so writing it back mangled every non-ASCII character in a test file (restored from git); (4) container PHPStan
+  reports ~52 model-column "undefined property" errors, host PHPStan 0 — the memory's trap, re-measured; host PHPStan found the one
+  real error (`array_map` keeps keys); (5) eleven backlog citations moved by the insertions (citation liveness 24 rotten against a
+  ceiling of 16 until re-pointed; 15 after); (6) local E2E needs built assets with Vite stopped — the page asks
+  `localhost:5173`, which the e2e container cannot reach; (7) a test's tenant context is gone after an HTTP request, and a second
+  published form needs its own slug.
+- ⛔ **CI's first run (40170649298) was red in Pest alone — a trap this repo's memory already recorded (M129):** four new cases render
+  the encode page's Blade shell, whose `@vite` throws `ViteManifestNotFoundException` where there is no build manifest; locally
+  `public/hot` hides it. Fixed with `withoutVite()` (`be6166d1`), then measured green locally with `public/hot` and the manifest
+  moved aside — the red half was CI's, not reproduced here. The other five jobs were green with full step counts on that run.
+- **Mutants: 8 caught, 0 survived** — the build's totals refusal, the sync's hash check, `choice_filter_not_comparable`, the
+  self-entry collapse, `readEncodeLists`, the template strip, the cascade-repeat refusal, "a cascade is shared only when ticked".
+
 ## RELEASED — `M185`, T4 of the testers' items: the grid, part 2 — rows and choices from a list or another form, rows and columns edited in the Preview, a repeatable section as a table (`R-bb79aec0`, `R-7418e6bd`, `R-0a7275ce`) (merged as PR #378, `eba3e3a4`, last at merge point 5, rebased onto the trunk after `M184`; 6/6 green with real step counts on its rebased run at `293e0381` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `eba3e3a4` the same)
 
 **RELEASED LAST AT MERGE POINT 5 (`D137`, `D138`), 2026-10-24, by the merge-point-5 session** (plan

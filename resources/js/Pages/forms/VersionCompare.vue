@@ -120,7 +120,7 @@ function typeName(value: string): string {
             Every setting of every question and section. A question that takes its choices from a list file or the Philippine
             places is compared by the list it names, so a list refreshed between two publishes is not shown as a change. To see
             a version as it asked its questions, use View on the
-            <Link :href="hub_href">form's overview</Link>.
+            <Link :href="hub_href" class="version-compare__alert-link">form's overview</Link>.
         </MdsAlert>
 
         <MdsEmptyState
@@ -293,5 +293,12 @@ function typeName(value: string): string {
 .version-compare__table tbody th {
     font-weight: var(--mds-font-weight-medium);
     color: var(--mds-color-text-body);
+}
+
+/* M189: a link inside the info alert takes the alert's own foreground — `status-info-{bg,fg}` is a measured pair — and keeps its
+   underline, so colour is never its only signifier. Left alone it was the browser's default blue, 1.04:1 on the dark alert. */
+.version-compare__alert-link {
+    color: inherit;
+    text-decoration: underline;
 }
 </style>

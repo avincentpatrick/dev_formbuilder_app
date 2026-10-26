@@ -76,6 +76,7 @@ final class FormHubPresenter
         // M172 (`R-52f5ad93`, `D133`): what each published version changed, by the questions' own labels — from the rows
         // just loaded, so it costs no query of its own.
         $changes = $this->changes->for($versions);
+        $compare = $this->compareHrefs($form, $versions);
 
         $payload = [
             'form' => [
@@ -96,6 +97,7 @@ final class FormHubPresenter
                 'status' => $v->status->value,
                 'published_at' => $v->published_at?->toIso8601String(),
                 'changes' => $changes[(string) $v->id] ?? null,
+                'compare_href' => $compare[(string) $v->id] ?? null,
             ])->all(),
             'recent' => $this->recent($form, $user),
             'tabs' => FormTabSet::for($form, $user),
@@ -225,5 +227,30 @@ final class FormHubPresenter
         }
 
         return $versions->firstWhere('id', $versionId)?->version_number;
+    }
+
+    /**
+     * M189 (`D169`): where each row's Compare goes — a published version against the one published before it, and the draft
+     * against the live version ("Compare with live"). The first version and a draft with nothing live have nothing to compare.
+     *
+     * @param  Collection<int, FormVersion>  $versions
+     * @return array<string, string> version id => the Compare page for it
+     */
+    private function compareHrefs(Form $form, Collection $versions): array
+    {
+        $hrefs = [];
+        $previous = null;
+        foreach ($versions->filter(fn (FormVersion $v): bool => $v->published_at !== null)->sortBy('version_number') as $version) {
+            if ($previous !== null) {
+                $hrefs[(string) $version->id] = "/forms/{$form->id}/compare/{$previous->id}/{$version->id}";
+            }
+            $previous = $version;
+        }
+
+        if ($form->draft_version_id !== null && $form->current_published_version_id !== null) {
+            $hrefs[(string) $form->draft_version_id] = "/forms/{$form->id}/compare/{$form->current_published_version_id}/{$form->draft_version_id}";
+        }
+
+        return $hrefs;
     }
 }

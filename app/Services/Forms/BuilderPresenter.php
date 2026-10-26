@@ -284,9 +284,12 @@ final class BuilderPresenter
      * is not. The field's own shape rides on the palette entry ({@see palette()}), which is where the
      * panel already derives its per-type facts.
      *
+     * M189: public, because the Compare page ({@see VersionComparePresenter}) words a setting with the builder's own
+     * `settingWords()`, which reads these lists — a second copy of them for one page would be the drift this method ends.
+     *
      * @return array<string, list<array<string, mixed>>|list<string>>
      */
-    private function enums(): array
+    public function enums(): array
     {
         return [
             'required_modes' => [

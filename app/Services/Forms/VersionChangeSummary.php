@@ -17,6 +17,10 @@ use Illuminate\Support\Collection;
  * key, label, type and requiredness; comparing it with the previous published version's gives the same verdict in the
  * words an author used. The publisher's note — the text after the summary's blank line — is passed through as written.
  *
+ * M189: a question is "changed" when ANY of its settings differs — its choices, rules, hint, translations — by
+ * {@see VersionComparison::fingerprint()}, the Compare page's own reading. Until then only the label, type and Required were
+ * compared, so a question whose choices changed read as unchanged. Where it sits is not a setting: a move alone is not listed.
+ *
  * Reads the rows the caller already loaded: the hub loads every version whole, so this costs no query of its own.
  */
 final class VersionChangeSummary
@@ -47,7 +51,7 @@ final class VersionChangeSummary
                     'removed' => array_values(array_map(fn (array $q): string => $q['label'], array_diff_key($previous, $questions))),
                     'changed' => array_values(array_map(
                         fn (array $q): string => $q['label'],
-                        array_filter(array_intersect_key($questions, $previous), fn (array $q, string $key): bool => $q !== $previous[$key], ARRAY_FILTER_USE_BOTH),
+                        array_filter(array_intersect_key($questions, $previous), fn (array $q, string $key): bool => $q['fingerprint'] !== $previous[$key]['fingerprint'], ARRAY_FILTER_USE_BOTH),
                     )),
                     'note' => $this->note($version),
                 ];
@@ -59,7 +63,7 @@ final class VersionChangeSummary
     }
 
     /**
-     * @return array<string, array{label: string, type: string, required: string}> key ⇒ what an author would call a change
+     * @return array<string, array{label: string, fingerprint: string}> key ⇒ its label, and its settings as one comparable text
      */
     private function questions(FormVersion $version): array
     {
@@ -73,11 +77,7 @@ final class VersionChangeSummary
             }
 
             $label = is_string($field['label'] ?? null) && trim($field['label']) !== '' ? $field['label'] : $field['key'];
-            $questions[$field['key']] = [
-                'label' => $label,
-                'type' => is_scalar($field['field_type'] ?? null) ? (string) $field['field_type'] : '',
-                'required' => is_scalar($field['is_required'] ?? null) ? (string) $field['is_required'] : '',
-            ];
+            $questions[$field['key']] = ['label' => $label, 'fingerprint' => VersionComparison::fingerprint($field)];
         }
 
         return $questions;

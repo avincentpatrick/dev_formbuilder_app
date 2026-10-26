@@ -349,3 +349,41 @@ it('says what each published version changed, by the questions\' own labels (M17
             ->where('versions.2.changes.first', true)
             ->etc());
 });
+
+it('counts a question as changed when any of its settings changed, not only its label, type or Required (M189)', function (): void {
+    // Until M189 the column compared label, type and Required only, so a question whose hint changed read as unchanged.
+    enterTenant($this->tenant->id, $this->owner->id);
+    $draft = $this->form->refresh()->draftVersion;
+    FormField::query()->where('form_version_id', $draft->id)->where('key', 'color')->firstOrFail()->update(['hint' => 'Pick the nearest one']);
+    app(PublishService::class)->publish($this->form->refresh(), $this->owner);
+
+    $this->withoutVite()
+        ->actingAs($this->owner)
+        ->get(hubUrl($this->form))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('versions.1.version_number', 2)
+            ->where('versions.1.changes.changed', ['Color'])
+            ->where('versions.1.changes.added', [])
+            ->where('versions.1.changes.removed', [])
+            ->etc());
+});
+
+it('links each published version but the first to Compare, and the draft to Compare with live (M189, D169)', function (): void {
+    enterTenant($this->tenant->id, $this->owner->id);
+    app(PublishService::class)->publish($this->form->refresh(), $this->owner); // v2 published, v3 the draft
+    $form = $this->form->refresh();
+    $ids = $form->versions()->pluck('id', 'version_number');
+    $base = "/forms/{$form->id}/compare";
+
+    $this->withoutVite()
+        ->actingAs($this->owner)
+        ->get(hubUrl($form))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('versions.0.status', 'draft')
+            ->where('versions.0.compare_href', "{$base}/{$ids[2]}/{$ids[3]}")
+            ->where('versions.1.compare_href', "{$base}/{$ids[1]}/{$ids[2]}")
+            ->where('versions.2.compare_href', null)
+            ->etc());
+});

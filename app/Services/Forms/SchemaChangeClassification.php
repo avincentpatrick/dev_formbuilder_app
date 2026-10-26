@@ -7,7 +7,7 @@ namespace App\Services\Forms;
 /**
  * The result of diffing a draft against the currently-published version (form-versioning-schema-migration.md
  * §5), keyed by the stable `key`. Feeds the auto-generated `form_versions.change_summary`. Phase 1 computes
- * and stores this; the interactive warning/diff UI is deferred to Phase 2/3, so nothing here blocks a publish.
+ * and stores this; nothing here blocks a publish (`D169`). M189's Compare page shows the same changes by label.
  */
 final readonly class SchemaChangeClassification
 {

@@ -93,6 +93,12 @@ the new Vitest files; `FormHubPageTest`'s existing cases, `SchemaChangeClassifie
 be wrong:** that `forNextDraft()` alone makes a list-backed and a PSGC question read unchanged draft-vs-live — a grid's copied rows or a
 suggestions list may leave a residue it does not strip.
 
+**Extended 2026-10-26, mid-build, before the file was opened for editing:** `resources/js/Pages/forms/VersionView.vue` and its own
+scan in `tests/e2e/responsive-axe.spec.ts`. The Compare page's new dark-theme scan went red at all three widths on `color-contrast`:
+the link inside the info `MdsAlert` keeps the browser's default blue (`#0000ee` on `#09418b`, 1.04:1). `M172`'s View page puts its link
+in the same alert in the same way and has no axe scan, so the same defect has been live on staging since `M172`; no other page nests a
+link inside an `MdsAlert` (measured over every page that has both). Both links take the alert's own foreground, underlined.
+
 ## RELEASED — `M188`, L of the testers' round 2: a history of each question's changes, and Put back (`R-3894369d`) (merged as PR #381, `2dfb0baa`, last at merge point 6, rebased onto the trunk after `M187`; 6/6 green with real step counts on its rebased run at `ac2107c0` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `2dfb0baa` the same)
 
 **RELEASED LAST AT MERGE POINT 6 (`D137`, `D138`), 2026-10-26, by the merge-point-6 session** (plan

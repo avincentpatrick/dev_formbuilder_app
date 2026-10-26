@@ -29,9 +29,9 @@ use Illuminate\Support\Str;
  * directory, which is also why they inherit that test's scan for raw-output Blade directives.
  *
  * ── WHAT THIS DOCUMENT DELIBERATELY DOES NOT DO ─────────────────────────────────────────────────
- * No images, no barcode, no QR. `ext-gd` is absent from the app container AND from all four CI jobs
- * (the H23a4 finding), so a raster would render on a developer's machine and throw in the pipeline.
- * The version identity that a scanning stage needs therefore travels as PRINTED TEXT — the form
+ * No images, no barcode, no QR. The H23a4 reason — `ext-gd` absent from the app container and all four CI jobs,
+ * so a raster would render locally and throw in the pipeline — no longer holds (M187 measured gd in both), but a
+ * printed stamp needs no decoder at all and a scan reads text. The version identity that a scanning stage needs therefore travels as PRINTED TEXT — the form
  * title, `v{n}` and the first eight characters of the version checksum — repeated on every page by
  * a `position: fixed` block. That is also the only page-repeat mechanism available: dompdf's page
  * counters go through `page_text()`, which is its inline-PHP API, and `isPhpEnabled` is false.

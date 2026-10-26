@@ -1,0 +1,535 @@
+{
+    "generated_by": "php artisan help:readiness",
+    "columns": [
+        {
+            "key": "builder",
+            "heading": "Builder"
+        },
+        {
+            "key": "answering",
+            "heading": "Web form and manual entry"
+        },
+        {
+            "key": "paper",
+            "heading": "Paper form"
+        },
+        {
+            "key": "scan",
+            "heading": "Scan"
+        },
+        {
+            "key": "pdf",
+            "heading": "Response PDF"
+        },
+        {
+            "key": "spreadsheet",
+            "heading": "Spreadsheet, Sheets, Airtable"
+        },
+        {
+            "key": "analytics",
+            "heading": "Analytics"
+        },
+        {
+            "key": "conditions",
+            "heading": "Conditions"
+        }
+    ],
+    "rows": [
+        {
+            "type": "short_text",
+            "label": "Short text",
+            "advanced": false,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "A box",
+                "scan": "Read",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "Yes",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "long_text",
+            "label": "Long text",
+            "advanced": false,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "Lines",
+                "scan": "Read",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "Yes",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "email",
+            "label": "Email",
+            "advanced": false,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "A box",
+                "scan": "Read",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "Yes",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "phone",
+            "label": "Phone",
+            "advanced": false,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "A box",
+                "scan": "Read",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "Yes",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "url",
+            "label": "URL",
+            "advanced": false,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "A box",
+                "scan": "Read",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "Yes",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "integer",
+            "label": "Whole number",
+            "advanced": false,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "A box",
+                "scan": "Read",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "Yes",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "decimal",
+            "label": "Decimal number",
+            "advanced": false,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "A box",
+                "scan": "Read",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "Yes",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "calculated",
+            "label": "Calculated",
+            "advanced": false,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Worked out",
+                "paper": "Not printed",
+                "scan": "Form cannot be scanned",
+                "pdf": "No",
+                "spreadsheet": "A column",
+                "analytics": "Yes",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "date",
+            "label": "Date",
+            "advanced": false,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "Boxes",
+                "scan": "Read",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "Yes",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "time",
+            "label": "Time",
+            "advanced": false,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "Boxes",
+                "scan": "Read",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "Yes",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "datetime",
+            "label": "Date & time",
+            "advanced": false,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "Boxes",
+                "scan": "Read",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "Yes",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "duration",
+            "label": "Duration",
+            "advanced": false,
+            "retired": true,
+            "cells": {
+                "builder": "Retired",
+                "answering": "No",
+                "paper": "Boxes",
+                "scan": "Read",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "Yes",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "single_select",
+            "label": "Single choice",
+            "advanced": false,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "Boxes to mark",
+                "scan": "Read",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "Yes",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "multi_select",
+            "label": "Multiple choice",
+            "advanced": false,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "Boxes to mark",
+                "scan": "Read",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "No",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "dropdown",
+            "label": "Dropdown",
+            "advanced": false,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "Boxes to mark",
+                "scan": "Read",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "Yes",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "yes_no",
+            "label": "Yes / No",
+            "advanced": false,
+            "retired": true,
+            "cells": {
+                "builder": "Retired",
+                "answering": "Yes",
+                "paper": "Boxes to mark",
+                "scan": "Read",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "Yes",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "cascading_select",
+            "label": "Cascading select",
+            "advanced": true,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "Boxes",
+                "scan": "Read",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "No",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "likert_scale",
+            "label": "Likert scale",
+            "advanced": false,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "Boxes to mark",
+                "scan": "Read",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "Yes",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "likert_matrix",
+            "label": "Likert matrix",
+            "advanced": true,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "A table",
+                "scan": "Form cannot be scanned",
+                "pdf": "Yes",
+                "spreadsheet": "A column, and one per cell",
+                "analytics": "No",
+                "conditions": "No"
+            }
+        },
+        {
+            "type": "geopoint",
+            "label": "GPS point",
+            "advanced": true,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "Named, not written",
+                "scan": "Form cannot be scanned",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "No",
+                "conditions": "No"
+            }
+        },
+        {
+            "type": "geotrace",
+            "label": "GPS line",
+            "advanced": true,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "Named, not written",
+                "scan": "Form cannot be scanned",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "No",
+                "conditions": "No"
+            }
+        },
+        {
+            "type": "geoshape",
+            "label": "GPS area",
+            "advanced": true,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "Named, not written",
+                "scan": "Form cannot be scanned",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "No",
+                "conditions": "No"
+            }
+        },
+        {
+            "type": "file_upload",
+            "label": "File upload",
+            "advanced": true,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "Named, not written",
+                "scan": "Form cannot be scanned",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "No",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "image_capture",
+            "label": "Photo",
+            "advanced": true,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "Named, not written",
+                "scan": "Form cannot be scanned",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "No",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "audio_capture",
+            "label": "Audio",
+            "advanced": true,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "Named, not written",
+                "scan": "Form cannot be scanned",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "No",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "video_capture",
+            "label": "Video",
+            "advanced": true,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "Named, not written",
+                "scan": "Form cannot be scanned",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "No",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "signature",
+            "label": "Signature",
+            "advanced": true,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "A line to sign on",
+                "scan": "Form cannot be scanned",
+                "pdf": "Yes",
+                "spreadsheet": "A column",
+                "analytics": "No",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "note",
+            "label": "Note / label",
+            "advanced": false,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Shown as text",
+                "paper": "Printed text",
+                "scan": "Not read",
+                "pdf": "As text",
+                "spreadsheet": "—",
+                "analytics": "—",
+                "conditions": "—"
+            }
+        },
+        {
+            "type": "page_break",
+            "label": "Page break",
+            "advanced": false,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Starts a new page",
+                "paper": "A new page",
+                "scan": "Not read",
+                "pdf": "No",
+                "spreadsheet": "—",
+                "analytics": "—",
+                "conditions": "—"
+            }
+        },
+        {
+            "type": "hidden",
+            "label": "Hidden field",
+            "advanced": false,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Not shown",
+                "paper": "Not printed",
+                "scan": "Not read",
+                "pdf": "No",
+                "spreadsheet": "A column",
+                "analytics": "Yes",
+                "conditions": "Yes"
+            }
+        },
+        {
+            "type": "matrix",
+            "label": "Matrix (grid)",
+            "advanced": true,
+            "retired": false,
+            "cells": {
+                "builder": "Yes",
+                "answering": "Yes",
+                "paper": "A table",
+                "scan": "Form cannot be scanned",
+                "pdf": "Yes",
+                "spreadsheet": "A column, and one per cell",
+                "analytics": "No",
+                "conditions": "No"
+            }
+        }
+    ]
+}

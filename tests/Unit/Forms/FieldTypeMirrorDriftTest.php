@@ -82,7 +82,7 @@ function clientTypeMirrors(): array
 function clientTypeMirrorFloors(): array
 {
     return [
-        'schema_mapping.SUPPORTED' => 25,
+        'schema_mapping.SUPPORTED' => 26,
         'schema_mapping.HAS_OPTIONS' => 4,
         'display_value.HAS_OPTIONS' => 4,
         'display_value.GEO_TYPES' => 3,

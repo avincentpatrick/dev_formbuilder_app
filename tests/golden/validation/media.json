@@ -61,5 +61,26 @@
       "relevance": { "fields": { "photos": true } },
       "effective_answers": { "photos": [ { "id": "a", "mime": "application/pdf", "size": 2048 }, { "id": "b" } ] }
     }
+  },
+  {
+    "name": "media_signature_required_empty",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "signed", "field_type": "signature", "is_required": "required" } ] },
+    "answers": { "signed": [] },
+    "expected": {
+      "relevance": { "fields": { "signed": true } },
+      "errors": [ { "field": "signed", "rule": "field_required" } ],
+      "effective_answers": {}
+    }
+  },
+  {
+    "name": "media_signature_signed_ok",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "signed", "field_type": "signature", "is_required": "required", "media": { "max": 1 } } ] },
+    "answers": { "signed": [ { "id": "att-sig", "mime": "image/png", "width": 900, "height": 300 } ] },
+    "expected": {
+      "relevance": { "fields": { "signed": true } },
+      "effective_answers": { "signed": [ { "id": "att-sig", "mime": "image/png", "width": 900, "height": 300 } ] }
+    }
   }
 ]

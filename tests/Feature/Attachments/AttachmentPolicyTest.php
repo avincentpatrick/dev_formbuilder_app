@@ -110,7 +110,7 @@ function memberWithStoredObject(string $roleName, string $kind): array
  * The submission's respondent is deliberately NULL — otherwise `SubmissionPolicy`'s respondent arm could
  * satisfy a case meant to be decided by collaboration, and the test would pass for the wrong reason.
  *
- * @param  'submission_media'|'export_artifact'|'webhook_envelope'|'branding_logo'|'staged_field'|'form_content_image'|'form_reference_file'  $kind
+ * @param  'submission_media'|'signature'|'export_artifact'|'webhook_envelope'|'branding_logo'|'staged_field'|'form_content_image'|'form_reference_file'  $kind
  * @return array{0: User, 1: Attachment, 2: Form}
  */
 function callerWithScopedObject(string $roleName, bool $collaborates, string $kind = 'submission_media'): array
@@ -140,6 +140,11 @@ function callerWithScopedObject(string $roleName, bool $collaborates, string $ki
             'attachable_id' => $form->id,
             'kind' => AttachmentKind::FormReferenceFile,
             'mime_type' => 'application/pdf',
+        ]),
+        // M187 (`D165`): a drawn signature, which a spreadsheet's link now opens through this same route.
+        'signature' => Attachment::factory()->forSubmission($submission)->clean()->create([
+            'kind' => AttachmentKind::SignatureCapture,
+            'mime_type' => 'image/png',
         ]),
         default => Attachment::factory()->forSubmission($submission)->clean()->create(),
     };
@@ -211,6 +216,14 @@ it('still serves a feedback screenshot to an owner, so the refusal is the permis
 | M33 — the OWNER reaches the gate. This is the pair the row turns on.
 |--------------------------------------------------------------------------
 */
+
+it('opens a signature from a spreadsheet link only for someone who may read its response (M187, D165)', function (bool $collaborates, int $status): void {
+    // The export's link carries no key: whoever clicks it signs in, and this route's policy decides — so a link that
+    // travels in a spreadsheet opens nothing for a member who could not open the response itself.
+    [$caller, $attachment] = callerWithScopedObject('form_editor', $collaborates, 'signature');
+
+    $this->actingAs($caller)->get(attachmentUrl($attachment))->assertStatus($status);
+})->with(['not a collaborator' => [false, 403], 'a collaborator' => [true, 200]]);
 
 it('refuses submission media to a form_editor who does not collaborate on its form', function (string $role): void {
     // ⛔ THE M33 DEFECT, AND THIS ASSERTION IS THE ONE THAT FLIPPED. It read `assertOk()` under M29, with a

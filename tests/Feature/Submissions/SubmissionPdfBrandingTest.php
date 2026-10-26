@@ -125,9 +125,9 @@ it('adds no image, no remote reference and no logo to the document', function ()
     app(TenantBrandingService::class)->setBrandColor($this->tenant, '#C0392B');
 
     // Give the tenant a logo it could have used, so this asserts a DECISION rather than the absence of
-    // an opportunity. dompdf's PNG and WebP paths both throw without ext-gd, which is absent here and in
-    // every CI job; the whole no-external-references contract (`isRemoteEnabled = false`, chroot pinned
-    // to the view directory) rests on this staying true.
+    // an opportunity. ⚠️ ext-gd is no longer absent (M187 measured it in the app image and every CI job), so
+    // the logo's absence is the H23a4 decision alone. The only image a document may carry is a signature's own
+    // data: URI (M187), and this form has none — which is why `data:image` stays refused here.
     $logo = brandingLogoAttachment($this->tenant->id);
     $this->tenant->forceFill(['logo_attachment_id' => $logo->id])->save();
 

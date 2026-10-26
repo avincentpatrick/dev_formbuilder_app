@@ -15,6 +15,8 @@
  * page does not need one. No screenshots in v1 (`D114`); filed as `R-5cde8465`.
  */
 
+import readiness from './field-readiness.json';
+
 export type ManualSpan =
     | { kind: 'text'; text: string }
     /** An on-screen label, drawn bold, with the repository file that draws it (checked by `manual.test.ts`). */
@@ -32,7 +34,12 @@ export type ManualBlock =
      * `tests/e2e/capture/help-pictures.capture.ts`; `width` and `height` are its CSS size — half its pixels, because it is
      * captured at a device scale of 2 — and `manual.test.ts` checks both against the file.
      */
-    | { kind: 'figure'; src: string; alt: string; caption: string; width: number; height: number };
+    | { kind: 'figure'; src: string; alt: string; caption: string; width: number; height: number }
+    /**
+     * A table (M187, `R-3e6358ed`): one row per item, the row's head as spans (so its labels are checked like any other),
+     * and its cells as plain text keyed by column. Drawn by `MdsDataTable`, which turns each row into a card on a phone.
+     */
+    | { kind: 'table'; caption: string; columns: { key: string; heading: string }[]; rows: { key: string; head: ManualSpan[]; cells: Record<string, string> }[] };
 
 /** The page's two parts: the walk-through (`M162`) and the reference to every control (`M163`). */
 export type ManualPart = 'guide' | 'reference';
@@ -91,6 +98,24 @@ function tip(tone: 'info' | 'success' | 'warning', ...parts: Part[]): ManualBloc
 
 function figure(src: string, alt: string, caption: string, width: number, height: number): ManualBlock {
     return { kind: 'figure', src, alt, caption, width, height };
+}
+
+/**
+ * M187 (`R-3e6358ed`): what each question type can do on each surface, from `field-readiness.json` — written by
+ * `php artisan help:readiness` from the rules themselves and held equal to them by `FieldReadinessTableTest`, so this
+ * page never states a capability the code does not have. Each type is named as the palette names it, with its Adv mark.
+ */
+function readinessTable(): ManualBlock {
+    return {
+        kind: 'table',
+        caption: 'What each question type can do',
+        columns: [{ key: 'type', heading: 'Question type' }, ...readiness.columns],
+        rows: readiness.rows.map((row) => ({
+            key: row.type,
+            head: spans([ui(row.label, FIELD_TYPES), ...(row.advanced ? [' ', ui('Adv', PALETTE)] : []), ...(row.retired ? [' (retired)'] : [])]),
+            cells: row.cells,
+        })),
+    };
 }
 
 // The files that draw the labels below. Paths are repository-relative; `manual.test.ts` reads each one.
@@ -302,7 +327,7 @@ const guide: ChapterDraft[] = [
                         [ui('Note / label', FIELD_TYPES), ' — text, a heading or an image for the respondent to read. It asks nothing.'],
                         [ui('Page break', FIELD_TYPES), ' — starts a new page when the form is shown one step at a time.'],
                     ),
-                    p('A type marked “Adv” is an advanced one. You can try it, but its settings are more technical.'),
+                    p('A type marked “Adv” is an advanced one: it works like any other, and its settings are more technical. ', link('What each type can do', '#types-readiness'), ' shows where every type works.'),
                 ],
             },
             {
@@ -582,6 +607,7 @@ const guide: ChapterDraft[] = [
                 title: 'Download the responses',
                 blocks: [
                     p('On the ', ui('Responses', TABS), ' tab, click ', ui('Export CSV', INBOX), ' or ', ui('Export XLSX', INBOX), ' (for Excel). Each response is one row and each question one column.'),
+                    p('A photo, file, recording or signature shows its name and a link to open it. Whoever opens the link signs in first, so the file is never open to someone who could not see the response.'),
                     tip('info', 'Reviewing and approving responses, scanning paper forms, inviting members and automatic emails are covered by your workspace’s own guidance, not by this manual.'),
                 ],
             },
@@ -633,6 +659,7 @@ const MATRIX = 'resources/js/components/builder/MatrixEditor.vue';
 const GRID_LAYOUT = 'resources/js/components/builder/GridLayoutSelect.vue';
 const GEO = 'resources/js/components/builder/GeoEditor.vue';
 const MEDIA = 'resources/js/components/builder/MediaEditor.vue';
+const SIGNATURE_PAD = 'resources/js/components/submissions/SignaturePad.vue';
 const PREFILL = 'resources/js/components/builder/PrefillEditor.vue';
 const CONTENT = 'resources/js/components/builder/ContentBlocksEditor.vue';
 const FIELD_INPUT = 'resources/js/components/submissions/FieldInput.vue';
@@ -672,7 +699,7 @@ const reference: ChapterDraft[] = [
                         [ui('Add a field', PALETTE), ' — the heading of the list of question types.'],
                         ['A group heading. Questions of the same kind sit together: ', ui('Text', CATEGORIES), ', ', ui('Number', CATEGORIES), ', ', ui('Date & time', CATEGORIES), ', ', ui('Choice', CATEGORIES), ', ', ui('Rating', CATEGORIES), ', ', ui('Location', CATEGORIES), ', ', ui('Media', CATEGORIES), ' and ', ui('Layout', CATEGORIES), '.'],
                         ['A question type. Click it to add that kind of question to your form. Each type is explained in this reference, from ', link('Text questions', '#types-text'), ' onwards.'],
-                        [ui('Adv', PALETTE), ' — an advanced type. It works like any other, but its settings are more technical.'],
+                        [ui('Adv', PALETTE), ' — an advanced type: it works like any other, and its settings are more technical. See ', link('What each type can do', '#types-readiness'), '.'],
                     ),
                 ],
             },
@@ -747,7 +774,7 @@ const reference: ChapterDraft[] = [
                         [ui('Levels', CONFIG), ' — ', ui('Cascading select', FIELD_TYPES), ': its levels and their choices.'],
                         [ui('Grid', CONFIG), ' — ', ui('Matrix (grid)', FIELD_TYPES), ' and ', ui('Likert matrix', FIELD_TYPES), ': rows and columns.'],
                         [ui('Map', CONFIG), ' — ', ui('GPS point', FIELD_TYPES), ', ', ui('GPS line', FIELD_TYPES), ' and ', ui('GPS area', FIELD_TYPES), ': how a location is captured.'],
-                        [ui('Media', CONFIG), ' — ', ui('File upload', FIELD_TYPES), ', ', ui('Photo', FIELD_TYPES), ', ', ui('Audio', FIELD_TYPES), ', ', ui('Video', FIELD_TYPES), ' and ', ui('Signature', FIELD_TYPES), ': what may be uploaded.'],
+                        [ui('Media', CONFIG), ' — ', ui('File upload', FIELD_TYPES), ', ', ui('Photo', FIELD_TYPES), ', ', ui('Audio', FIELD_TYPES), ' and ', ui('Video', FIELD_TYPES), ': what may be uploaded; ', ui('Signature', FIELD_TYPES), ': how it is signed.'],
                         [ui('Prefill', CONFIG), ' — ', ui('Hidden field', FIELD_TYPES), ': where its value comes from.'],
                         [ui('Content', CONFIG), ' — ', ui('Note / label', FIELD_TYPES), ': what it shows.'],
                         [ui('Validation', CONFIG), ' — every question that takes an answer. See ', link('Validation', '#validation-tab'), '.'],
@@ -955,7 +982,7 @@ const reference: ChapterDraft[] = [
                 id: 'type-duration',
                 title: 'Duration',
                 blocks: [
-                    tip('warning', 'This type is retired: you can no longer add one. Respondents cannot answer a Duration question — the form shows “', NOT_YET, '” Use a ', ui('Whole number', FIELD_TYPES), ' question, such as “minutes”, for now; a duration will be worked out by a calculation.'),
+                    tip('warning', 'This type is retired: you can no longer add one. Respondents cannot answer a Duration question — the form shows “', NOT_YET, '” To record one, use a ', ui('Calculated', FIELD_TYPES), ' question that works it out from a start and an end, or a ', ui('Whole number', FIELD_TYPES), ' question, such as “minutes”.'),
                 ],
             },
         ],
@@ -1131,7 +1158,10 @@ const reference: ChapterDraft[] = [
                 id: 'type-signature',
                 title: 'Signature',
                 blocks: [
-                    tip('warning', 'Respondents cannot sign yet: the form shows “', NOT_YET, '” Leave it out of forms for testing for now.'),
+                    p('Respondents sign with a finger, a pen or the mouse, on the web form and in manual entry. When they lift the pen for a moment the signature is saved; ', ui('Clear', SIGNATURE_PAD), ' starts again.'),
+                    p('The response shows the signature as it was drawn, and so does its PDF. In a spreadsheet export the cell gives the file’s name and a link to open it; you sign in to open it. The paper form prints a line to sign on.'),
+                    p('The ', ui('Media', CONFIG), ' tab says ', ui('How it is signed', MEDIA), ': a signature has no file settings.'),
+                    tip('info', 'A form with a Signature cannot be scanned: its paper copies are keyed in. A Signature cannot sit inside a repeatable section. In Preview you can draw, but the signature is not saved.'),
                 ],
             },
         ],
@@ -1193,6 +1223,29 @@ const reference: ChapterDraft[] = [
                     ),
                     tip('info', 'Rows and choices from a list file or another form are copied into the grid when you publish, so the paper form, the PDF and every export show them. Publish again to pick up new answers.'),
                     tip('info', 'Grids cannot be used in conditions or formulas, or inside a repeatable section. A spreadsheet gives every cell its own column, beside the grid’s one-line summary.'),
+                ],
+            },
+        ],
+    },
+    {
+        id: 'types-readiness',
+        title: 'What each type can do',
+        summary: 'Every question type, and where it works: the web form, manual entry, paper, the PDF, exports and more.',
+        sections: [
+            {
+                id: 'type-readiness',
+                title: 'Every type, on every surface',
+                blocks: [
+                    p('Every question type works on the web form and in manual entry unless the table says otherwise. A type marked ', ui('Adv', PALETTE), ' is an advanced one: it works like any other, and its settings are more technical.'),
+                    readinessTable(),
+                    list(
+                        ['Retired — you can no longer add one. Questions already on a form keep working.'],
+                        ['Form cannot be scanned — a form with this question cannot have its paper copies read automatically, so they are keyed in.'],
+                        ['Named, not written — the paper form prints the question so nobody misses it, with no space to write an answer.'],
+                        ['A dash — the question holds no answer, so there is nothing to show.'],
+                    ),
+                    p('The builder’s ', ui('Preview', BUILDER), ' draws each question as the web form does, except that photo, file and location questions are shown but not interactive, and a signature can be drawn but is not saved.'),
+                    tip('info', 'Duration is retired: work a duration out with a ', ui('Calculated', FIELD_TYPES), ' question instead — a start, an end and the units.'),
                 ],
             },
         ],
@@ -1271,6 +1324,7 @@ export function manualLinks(chapters: ManualChapter[] = manual): { href: string;
 
 function blockSpans(block: ManualBlock): ManualSpan[][] {
     if (block.kind === 'figure') return [];
+    if (block.kind === 'table') return block.rows.map((row) => row.head);
     return block.kind === 'steps' || block.kind === 'list' ? block.items : [block.spans];
 }
 

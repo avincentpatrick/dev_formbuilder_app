@@ -111,7 +111,12 @@
                     <table class="qa">
                         <tr>
                             <td class="qa__q">{{ $field['label'] }}</td>
-                            <td class="qa__a">{{ $field['value'] }}</td>
+                            {{-- M187: a signature as it was drawn — a data: URI of the response's own file, escaped like every value. --}}
+                            @if (($field['image'] ?? null) !== null)
+                                <td class="qa__a"><img class="qa__sig" src="{{ $field['image'] }}" alt="Signature"></td>
+                            @else
+                                <td class="qa__a">{{ $field['value'] }}</td>
+                            @endif
                         </tr>
                     </table>
                 @endif

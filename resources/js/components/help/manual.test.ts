@@ -137,6 +137,33 @@ describe('the Builder reference covers the whole builder (M163, `R-ccc0be00`, `D
         expect([...new Set(types)].filter((type) => !named.has(type))).toEqual([]);
     });
 
+    it('shows what each question type can do, one row per type and a cell for every surface (M187, R-3e6358ed)', () => {
+        // The table is `field-readiness.json`, written from the rules by `php artisan help:readiness` and held equal to
+        // them by `FieldReadinessTableTest`; this holds the page's side — every type once, nothing dropped on the way in.
+        const tables = manual.flatMap((c) => c.sections.flatMap((s) => s.blocks)).filter((b) => b.kind === 'table');
+        expect(tables).toHaveLength(1);
+        const table = tables[0];
+        if (table.kind !== 'table') throw new Error('unreachable');
+
+        const enumSource = readFileSync(join(process.cwd(), 'app/Enums/FieldType.php'), 'utf8');
+        const cases = [...enumSource.matchAll(/^\s*case \w+ = '([a-z_]+)';/gm)].map((m) => m[1]);
+        expect(cases.length).toBeGreaterThanOrEqual(31);
+        expect(table.rows.map((row) => row.key)).toEqual(cases);
+
+        const surfaces = table.columns.map((c) => c.key).filter((key) => key !== 'type');
+        expect(surfaces).toEqual(['builder', 'answering', 'paper', 'scan', 'pdf', 'spreadsheet', 'analytics', 'conditions']);
+        for (const row of table.rows) {
+            expect(Object.keys(row.cells), row.key).toEqual(surfaces);
+            expect(Object.values(row.cells).every((cell) => cell.length > 0), row.key).toBe(true);
+        }
+
+        // The testers asked whether the Adv types are ready: each is answered on both channels, and says Adv.
+        const signature = table.rows.find((row) => row.key === 'signature')!;
+        expect(signature.cells.answering).toBe('Yes');
+        expect(signature.head.some((span) => span.kind === 'ui' && span.label === 'Adv')).toBe(true);
+        expect(table.rows.find((row) => row.key === 'duration')!.head.some((span) => span.kind === 'text' && span.text.includes('retired'))).toBe(true);
+    });
+
     it('names every tab the right panel can show', () => {
         const panel = readFileSync(join(process.cwd(), 'resources/js/components/builder/ConfigPanel.vue'), 'utf8');
         const tabs = [...panel.matchAll(/\{ key: '[a-z_]+', label: '([^']+)' \}/g)].map((m) => m[1]);

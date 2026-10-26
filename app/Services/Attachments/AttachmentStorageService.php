@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Attachments;
 
 use App\Enums\AttachmentKind;
+use App\Enums\FieldType;
 use App\Enums\ScanStatus;
 use App\Enums\UsageMetric;
 use App\Exceptions\Attachments\AttachmentException;
@@ -570,12 +571,16 @@ final class AttachmentStorageService
     /**
      * The field's own `accepted_types`, or the per-type default from config. An empty result = accept any.
      *
+     * M187 (`R-af2d278b`): a signature always takes the default. Its pad only ever sends a PNG, and before the pad
+     * existed a signature shared the photo's settings, so an author may have narrowed its list to types the pad
+     * never sends — which would leave the question impossible to answer.
+     *
      * @return list<string>
      */
     private function acceptedTypes(FormField $field): array
     {
         $configured = $field->config['accepted_types'] ?? null;
-        if (is_array($configured) && $configured !== []) {
+        if ($field->field_type !== FieldType::Signature && is_array($configured) && $configured !== []) {
             return array_values(array_filter($configured, 'is_string'));
         }
 

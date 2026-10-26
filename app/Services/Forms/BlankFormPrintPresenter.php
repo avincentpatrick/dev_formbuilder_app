@@ -171,9 +171,9 @@ final class BlankFormPrintPresenter
             'version_number' => $version->version_number,
             'published_at' => $version->published_at?->toFormattedDateString(),
             // The first 8 chars of the version checksum, printed as a text stamp so a scanned sheet
-            // can be tied back to the exact schema it was printed from. It is TEXT and not a barcode
-            // because `ext-gd` is absent from the app container and from every CI job, so any raster
-            // would render on a developer's machine and throw in the pipeline (the H23a4 finding).
+            // can be tied back to the exact schema it was printed from. It is TEXT and not a barcode: the
+            // H23a4 reason (no `ext-gd` in the app container or CI) is gone since gd was added, but text
+            // needs no decoder and a scan reads it like any other printed label.
             'schema_stamp' => $version->checksum === null ? null : substr($version->checksum, 0, 8),
             // Printed in the footer so whoever runs off a stack of these knows up front whether the
             // scans can be auto-extracted, rather than discovering it after collection. Re-derived

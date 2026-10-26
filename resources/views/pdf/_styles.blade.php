@@ -60,6 +60,8 @@ body { font-family: sans-serif; font-size: 10pt; line-height: 1.45; color: #1a1a
 .qa { width: 100%; border-collapse: collapse; margin-bottom: 3pt; }
 .qa__q { width: 46%; padding: 2.5pt 8pt 2.5pt 0; color: #3a3a3a; vertical-align: top; }
 .qa__a { width: 54%; padding: 2.5pt 0; vertical-align: top; }
+/* M187: a signature drawn 900 × 300 px, printed at 150 × 50 pt with a hairline frame like the paper form's box. */
+.qa__sig { width: 150pt; height: 50pt; border: 0.5pt solid #c8c8c8; }
 
 .prose {
     margin: 4pt 0 6pt 0; padding: 5pt 7pt; font-size: 9.5pt;

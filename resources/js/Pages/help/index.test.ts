@@ -120,6 +120,19 @@ describe('the Help page', () => {
         wrapper.unmount();
     });
 
+    it('draws what each type can do as a table, naming each type in bold (M187)', () => {
+        const wrapper = render();
+        const table = wrapper.find('section#types-readiness table');
+
+        expect(table.exists()).toBe(true);
+        expect(table.find('caption').text()).toBe('What each question type can do');
+        expect(table.findAll('thead th').map((th) => th.text())).toContain('Web form and manual entry');
+        const signatureRow = table.findAll('tbody tr').find((tr) => tr.find('td').text().startsWith('Signature'));
+        expect(signatureRow, 'a row for the Signature type').toBeDefined();
+        expect(signatureRow!.find('td strong.manual-ui').text()).toBe('Signature');
+        wrapper.unmount();
+    });
+
     it('shows each tip as a static note, never a live region', () => {
         const wrapper = render();
         const tips = manual.flatMap((c) => c.sections.flatMap((s) => s.blocks)).filter((b) => b.kind === 'tip');

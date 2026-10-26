@@ -258,7 +258,8 @@ export function previewShowsLabel(field: RenderField): boolean {
  */
 export function previewLimitations(): string[] {
     return [
-        'Photo, file and location questions are shown but not interactive.',
+        // M187 (`R-af2d278b`): the signature pad draws here, but the Preview has no upload endpoint, so nothing is saved.
+        'Photo, file and location questions are shown but not interactive; a signature can be drawn but is not saved.',
         'Only the default language is shown.',
         // `M124` DELETED the page-break entry (`R-8c517fb6`): a stepped preview now splits a section at each
         // page break exactly as the respondent's form does. It is deleted rather than narrowed to repeatable

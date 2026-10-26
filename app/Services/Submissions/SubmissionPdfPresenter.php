@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\Submissions;
 
+use App\Enums\AttachmentKind;
 use App\Enums\FieldType;
 use App\Enums\PdfFieldRole;
 use App\Enums\SubmissionSource;
+use App\Models\Attachment;
 use App\Models\FormField;
 use App\Models\FormSection;
 use App\Models\FormVersion;
@@ -21,6 +23,8 @@ use App\Support\Forms\LocaleVariant;
 use App\Support\Forms\RepeatTable;
 use App\Support\Submissions\SubmissionReference;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /**
  * The render model for one submission's PDF (Increment H17) — a pure array, no HTML, no Blade, no
@@ -83,6 +87,12 @@ final class SubmissionPdfPresenter
 
     /** What a repeatable section with no stored instances shows. `Show.vue:163`, moved server-side. */
     public const EMPTY_REPEAT = 'No entries.';
+
+    /** M187: the largest signature file embedded — the pad saves ~10 KB; a bigger one is not the pad's. */
+    private const SIGNATURE_MAX_BYTES = 512 * 1024;
+
+    /** M187: the longest side, in pixels, of a signature embedded — the pad saves 900 × 300. */
+    private const SIGNATURE_MAX_PIXELS = 2000;
 
     public function __construct(
         private readonly SchemaValueFormatter $formatter,
@@ -311,7 +321,7 @@ final class SubmissionPdfPresenter
      * @param  array<string, mixed>  $answers  already scoped to one repeat instance where applicable
      * @param  array<string, array{type: FieldType, config: array<string, mixed>}>  $sources
      * @param  array<string, bool>  $mask
-     * @return list<array{key: string, label: string, value: string, role: string}>
+     * @return list<array{key: string, label: string, value: string, role: string, image: string|null}>
      */
     private function fieldRows(Collection $fields, array $answers, array $sources, ?string $locale, array $mask): array
     {
@@ -334,10 +344,54 @@ final class SubmissionPdfPresenter
                     ? ''
                     : $this->blankable($this->formatter->displayValue($field->field_type, $answers[$field->key] ?? null, $field->config ?? [], $locale)),
                 'role' => $role->value,
+                'image' => $field->field_type === FieldType::Signature ? $this->signatureImage($answers[$field->key] ?? null) : null,
             ];
         }
 
         return $rows;
+    }
+
+    /**
+     * M187 (`R-af2d278b`): a signed response shows the signature as it was drawn, embedded in the document as a `data:`
+     * URI of the response's own stored file — no file path, no remote fetch, so the renderer's no-external-reference
+     * contract (`isRemoteEnabled = false`, chroot on the view directory) is untouched. Measured before this was written:
+     * dompdf under {@see SubmissionPdfRenderer::dompdfOptions()} embeds such a PNG as an image XObject.
+     *
+     * ── THE THREAT MODEL THE RENDERER'S DOCBLOCK ASKED FOR ──────────────────────────────────────────────
+     * The bytes are a respondent's, and an image is decoder input rather than a string, so each guard below narrows
+     * what reaches the decoder: only a signature's own attachment; only once its scan lets it be served (never an
+     * infected file); only a type sniffed from the bytes at upload as PNG or JPEG; at most {@see self::SIGNATURE_MAX_BYTES};
+     * and at most {@see self::SIGNATURE_MAX_PIXELS} on a side, read from the header by `getimagesize()` — which parses
+     * no pixel data — so a small file that decompresses into a huge canvas never reaches dompdf. dompdf decodes a PNG
+     * with `ext-gd`, so without gd the row keeps its text rather than throwing. Anything refused keeps the row's text.
+     */
+    private function signatureImage(mixed $value): ?string
+    {
+        $ref = is_array($value) ? ($value[0] ?? null) : null;
+        $id = is_array($ref) && is_string($ref['id'] ?? null) ? $ref['id'] : null;
+
+        if ($id === null || ! Str::isUuid($id) || ! extension_loaded('gd')) {
+            return null;
+        }
+
+        $attachment = Attachment::query()->whereKey($id)->first();
+
+        if ($attachment === null
+            || $attachment->kind !== AttachmentKind::SignatureCapture
+            || ! $attachment->virus_scan_status->servable()
+            || ! in_array($attachment->mime_type, ['image/png', 'image/jpeg'], true)
+            || ($attachment->size_bytes ?? 0) > self::SIGNATURE_MAX_BYTES) {
+            return null;
+        }
+
+        $bytes = Storage::disk($attachment->disk)->get($attachment->path);
+        $size = is_string($bytes) ? @getimagesizefromstring($bytes) : false;
+
+        if ($size === false || $size[0] < 1 || $size[1] < 1 || max($size[0], $size[1]) > self::SIGNATURE_MAX_PIXELS) {
+            return null;
+        }
+
+        return 'data:'.$attachment->mime_type.';base64,'.base64_encode((string) $bytes);
     }
 
     /**

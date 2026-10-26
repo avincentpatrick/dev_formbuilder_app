@@ -124,7 +124,7 @@ export const PALETTE: PaletteGroup[] = [
         types: [
             { value: 'integer', label: 'Whole number', advanced: false, has_options: false, config_editor: null, value_shape: 'number', operand_kind: 'number', variant: NUMBER_PRIMARY },
             { value: 'decimal', label: 'Decimal number', advanced: false, has_options: false, config_editor: null, value_shape: 'number', operand_kind: 'number', variant: NUMBER_OTHER },
-            { value: 'calculated', label: 'Calculated', advanced: true, has_options: false, config_editor: null, value_shape: 'number', operand_kind: 'computed' },
+            { value: 'calculated', label: 'Calculated', advanced: false, has_options: false, config_editor: null, value_shape: 'number', operand_kind: 'computed' },
         ],
     },
     {
@@ -133,7 +133,7 @@ export const PALETTE: PaletteGroup[] = [
         icon: 'layout',
         types: [
             { value: 'note', label: 'Note / label', advanced: false, has_options: false, config_editor: 'content', value_shape: 'no_answer', operand_kind: 'none' },
-            { value: 'hidden', label: 'Hidden field', advanced: true, has_options: false, config_editor: 'prefill', value_shape: 'text', operand_kind: 'value' },
+            { value: 'hidden', label: 'Hidden field', advanced: false, has_options: false, config_editor: 'prefill', value_shape: 'text', operand_kind: 'value' },
             { value: 'page_break', label: 'Page break', advanced: false, has_options: false, config_editor: null, value_shape: 'no_answer', operand_kind: 'none' },
         ],
     },

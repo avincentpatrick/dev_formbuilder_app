@@ -58,8 +58,10 @@ const SUPPORTED = new Set<string>([
     'matrix', 'likert_matrix',
     // Increment G5b2: geospatial capture.
     'geopoint', 'geotrace', 'geoshape',
-    // Increment G6: media capture (signature's canvas control is deferred, so it stays unsupported).
+    // Increment G6: media capture.
     'file_upload', 'image_capture', 'audio_capture', 'video_capture',
+    // M187 (`R-af2d278b`): a signature, drawn on a pad and uploaded as a PNG.
+    'signature',
 ]);
 
 /**
@@ -458,9 +460,15 @@ function buildGeo(field: RawField): RenderGeo | null {
     };
 }
 
-/** The four media types wired to a renderer (Increment G6) — signature's canvas control is deferred. */
+/** The five media types wired to a renderer (Increment G6; M187 adds the signature pad). */
 function isMediaFieldType(fieldType: string): boolean {
-    return fieldType === 'file_upload' || fieldType === 'image_capture' || fieldType === 'audio_capture' || fieldType === 'video_capture';
+    return (
+        fieldType === 'file_upload' ||
+        fieldType === 'image_capture' ||
+        fieldType === 'audio_capture' ||
+        fieldType === 'video_capture' ||
+        fieldType === 'signature'
+    );
 }
 
 /** The UI-facing media capture config (Increment G6), normalised snake_case config → camelCase RenderMedia. */

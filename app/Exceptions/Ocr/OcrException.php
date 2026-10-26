@@ -39,7 +39,8 @@ final class OcrException extends RuntimeException
         return new self(
             422,
             'ocr_form_not_eligible',
-            'Scans of this form cannot be read automatically, because it has questions paper cannot carry (a grid, a location, a file or a repeating group). Responses must be keyed in.',
+            // M187 (`D164`): a signature is printed on the paper but never read from a scan, so it is named here.
+            'Scans of this form cannot be read automatically, because it has questions a scan cannot read (a grid, a location, a file, a signature or a repeating group). Responses must be keyed in.',
         );
     }
 

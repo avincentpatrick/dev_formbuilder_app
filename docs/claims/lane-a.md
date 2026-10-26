@@ -16,7 +16,82 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M186` (T5), `M187` (T6) and `M188` (L) are merged and live on staging, released together at merge point 6 (`D137`; below). That completes the testers' round-2 programme (`D138`). The next claim is the head of `docs/pipeline.md`'s Next section. Merge only at a planned merge point.
+## Status: ACTIVE CLAIM — `M189`, compare two versions of a form (`version-diff-ui`) (m189-version-compare)
+
+Taken 2026-10-26. Branch `m189-version-compare`, cut from `origin/main` at `8500dfa1`, PR into main. ⛔ **NOT MERGED THIS SESSION:**
+held green for merge point 7, released together with the next increment from the line (`D170`, `D137`). The plan is
+`~/.claude/plans/read-claude-md-then-php-wise-lamport.md`.
+Row: `version-diff-ui` — *"PRD Feature #8 — the interactive field-by-field version-diff view"*, the head of the line's during-testing
+tier (the early-testing tier is empty). Its point of truth is the marker at the end of `docs/form-versioning-schema-migration.md`; the
+requirement is `docs/PRD.md`'s Phase 2/3 acceptance line, *"An interactive, field-by-field version-comparison view (draft vs.
+currently-published, or any two historical versions)"*.
+
+✅ **The user confirmed merge point 6 on staging at this session's start (2026-10-26, "All good"):** `R1-2` (the PSGC preset and Show
+only), `R1-6` (the Adv tooltip, Help's *What each type can do* table, the Signature question), `P5b` (History and Put back) and
+`/whats-new` listing 0.15.0 · 0.14.0 · 0.13.0 — never re-ask. The session-start pull read 0 reports, 0 reopened and 0 new comments
+(relayed 31: 25 Resolved · 6 Confirmed working), so nothing was triaged. **Asked and answered in planning (the user, 2026-10-26, in
+chat), recorded with this claim:** **`D169` A** — the comparison lives in the form's Versions panel (Compare on each published version
+but the first, Compare with live on the draft, any two picked on the page); Publish stays one click and the builder gains no button.
+**`D170` A** — held green for merge point 7 with the next increment. **The 0.16.0 notes' wording was approved verbatim** (three items,
+in the plan).
+
+### Evidence verified
+Read on `8500dfa1` by two read-only passes and my own reads.
+- The marker `id=version-diff-ui … state=ready size=L tier=during-testing` — held, the last line of
+  `docs/form-versioning-schema-migration.md`.
+- `docs/PRD.md`'s acceptance line ("Acceptance criteria (Phase 2/3)", citing "Doc #8 §5 and §11") — held (`:288`).
+- `docs/form-versioning-schema-migration.md` §5 ("stored for future use even before any visual diff UI exists"; the table's
+  *Breaking-but-permitted* row, "Phase 2/3 UI will surface a warning"; "No blocking or warning modal exists yet") and §11's first
+  bullet — held (`:125`, `:134`, `:137`, `:200`), with `:21` saying the same.
+- `docs/architecture/technical-architecture.md` §6.2 point 8 ("even before the interactive diff view exists", `:427`) and the
+  appendix's point 12 (`:548`) — held.
+
+### Premise verified
+- **M172 built the summary and a read-only View, not the diff.** `VersionChangeSummary` derives each version's added, removed and
+  changed questions from consecutive published snapshots, and counts a question as changed only when its label, type or Required
+  differs — so a question whose choices or rules changed is not listed. `FormVersionViewController` opens one version read-only. The
+  closed `M172` row says *"The interactive field-by-field diff stays `version-diff-ui`"*.
+- **`change_summary` holds keys only and a published row is frozen** (`PublishedVersionGuard`), so the comparison is computed from two
+  snapshots when read: a published version's stored `schema_snapshot`, the draft's from its rows (`SchemaSnapshotSerializer::snapshot()`,
+  which publish already calls on a draft).
+- **A key change is a fork** (§5's hard rule, `D132`), so questions are matched by key and a renamed key reads as removed + added.
+  `form_fields.lineage_id` exists only since `M188` and is not in the snapshot.
+- **A published snapshot holds rows the draft does not.** Publish copies list rows in (`ChoiceListMaterializer::materialize()` before the
+  snapshot) and the next draft drops them (`forNextDraft()`), so an unnormalised comparison would read every list-backed and PSGC
+  question as changed draft-vs-live.
+- **A second assignment sits next to the row:** `docs/piping-output-encoding-design.md` hands "`SchemaChangeClassifier` hole-diffing
+  (§6.1)" to "the diff-UI increment" — taken here, on the Compare page. Its A10 residue (a thank-you message piping from a deleted
+  question) cannot be reached by a version comparison (`confirmation_message` is a `forms` column) and is filed instead.
+- **Two scoped route parameters do not scope to the form:** Laravel resolves `{to}` through `$from->tos()`, so the route checks both
+  versions' `form_id` itself. The builder's action bar is pinned at six (`builder-layout.test.ts`), which `D169` respects.
+- One session only; lane B retired; no other claim or forward queue exists.
+
+### Remedy verdict
+**None prescribed** beyond the PRD's line. The design: a pure `VersionComparison` over two normalised snapshots (each field's config
+through `forNextDraft()`), reusing `FieldRevisionRecorder::changes()` per question, its longest-common-subsequence for moves, and one
+breaking rule extracted from `SchemaChangeClassifier` (whose `change_summary` text stays byte-identical); marks for answers that may not
+compare, who is asked, and piped answers; a page at `GET /forms/{form}/compare/{from}/{to}` worded by `settingWords()`; the hub's
+Compare and Compare with live; `VersionChangeSummary` on the same normalisation.
+
+Files: new `app/Services/Forms/VersionComparison.php`, new `app/Services/Forms/VersionComparePresenter.php`, new
+`app/Http/Controllers/Tenant/FormVersionCompareController.php`, `app/Services/Forms/SchemaChangeClassifier.php`,
+`app/Services/Forms/FieldRevisionRecorder.php`, `app/Services/Forms/VersionChangeSummary.php`, `app/Services/Forms/BuilderPresenter.php`,
+`routes/tenant.php`; new `resources/js/Pages/forms/VersionCompare.vue`, new `resources/js/Pages/forms/version-compare.ts`,
+`resources/js/Pages/forms/Show.vue`, `resources/js/components/builder/conflict-diff.ts`, `resources/js/components/help/manual.ts`;
+`VERSION`, `database/data/releases.json`; the tests beside each — new `tests/Feature/Forms/VersionComparisonTest.php`, new
+`tests/Feature/Forms/VersionCompareRouteTest.php`, `tests/Feature/Forms/FormHubPageTest.php`, new
+`resources/js/Pages/forms/version-compare.test.ts`, new `resources/js/Pages/forms/VersionCompare.test.ts`,
+`resources/js/Pages/forms/show.test.ts`, and `tests/e2e/responsive-axe.spec.ts`.
+Shared artefacts taken: `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`,
+`docs/form-versioning-schema-migration.md`, `docs/architecture/technical-architecture.md`, `docs/PRD.md`, `docs/data-dictionary.md`,
+`docs/piping-output-encoding-design.md`, `tests/e2e/responsive-axe.spec.ts`, `PROGRESS.md` (own block).
+Paired files taken: none.
+Namespaces spent: `D169`, `D170`. Nothing from the migration or ADR namespaces.
+Prediction: red first to the two new Pest files (no class, no route), the new hub case (a hint-only change is not "changed" today) and
+the new Vitest files; `FormHubPageTest`'s existing cases, `SchemaChangeClassifierTest` and `conflict-diff.test.ts` pass unedited.
+`manual.test.ts` goes red until each new Help label exists in its source. PHPStan moves (`app/` is touched). **The one I most expect to
+be wrong:** that `forNextDraft()` alone makes a list-backed and a PSGC question read unchanged draft-vs-live — a grid's copied rows or a
+suggestions list may leave a residue it does not strip.
 
 ## RELEASED — `M188`, L of the testers' round 2: a history of each question's changes, and Put back (`R-3894369d`) (merged as PR #381, `2dfb0baa`, last at merge point 6, rebased onto the trunk after `M187`; 6/6 green with real step counts on its rebased run at `ac2107c0` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `2dfb0baa` the same)
 

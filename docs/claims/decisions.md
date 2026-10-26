@@ -24,10 +24,30 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D168`, the last filed, was asked and answered on 2026-10-26 while `M188` (L) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D170`, the last filed, was asked and answered on 2026-10-26 while `M189` (`version-diff-ui`) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D170 — `M189` is the first increment after the round-2 programme, and no merge point is planned for the during-testing tier. When should it go live on staging? **A — held green and released at merge point 7, together with the next increment from the line.**
+
+**Asked and answered 2026-10-26 (user decision, in chat), while `M189` (`version-diff-ui`) was planned; recorded in its claim.** `D137` merges only at a planned merge point and never a lone small PR; `D138`'s order ended at merge point 6, so nothing named the next one.
+
+- **A — with the next increment (recommended, chosen).** One deploy under the testers instead of two; the user's census before and after, as at every merge point.
+- **B — alone, once green.** It is a whole feature rather than a small fix, but one more deploy under the testers.
+- **C — decide at its green.** Build and hold it, and ask again then.
+
+**What the answer files, in the same push:** nothing new — the next increment's claim names merge point 7 and stacks on or sits beside `M189`'s branch.
+
+### D169 — Where should an author compare two versions of a form (`version-diff-ui`)? **A — on the form's Versions panel: Compare on each published version but the first, Compare with live on the draft, any two picked on the page; Publish stays one click and the builder gains no button.**
+
+**Asked and answered 2026-10-26 (user decision, in chat), while `M189` was planned; recorded in its claim.** `docs/form-versioning-schema-migration.md` §5 promised that a "Phase 2/3 UI will surface a warning" for a breaking-but-permitted change, and the builder's action bar is pinned at six buttons so it fits a phone (`builder-layout.test.ts`).
+
+- **A — the Versions panel (recommended, chosen).** The warning is surfaced as a mark on the Compare page; publishing is unchanged.
+- **B — the panel, and a check at Publish.** Publish first shows what will change, marking what affects answers already collected, then asks to confirm — every publish becomes two clicks.
+- **C — the panel, and a builder button.** A seventh "Compare with live" button in the builder's bar, which the phone-width pin exists to stop.
+
+**What the answer files, in the same push:** nothing new — `version-diff-ui`'s marker carries it, and §5's "no warning modal" sentence becomes a recorded decision rather than a deferral.
+
 ### D168 — A question's history also lists a change of its type and a move to another place. Should Put back reverse those too? **A — no: they are listed, each with what to do instead; a setting changed while the question was another type cannot be put back until the type matches.**
 
 **Asked and answered 2026-10-26 (user decision, in chat), while `M188` (L) was planned; recorded in its claim.** A type change goes only through the type dialog, which may drop settings and rules (`/convert`), and a move only through the reorder (`/reorder`) — neither is a field save.

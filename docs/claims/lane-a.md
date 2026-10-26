@@ -99,6 +99,44 @@ the link inside the info `MdsAlert` keeps the browser's default blue (`#0000ee` 
 in the same alert in the same way and has no axe scan, so the same defect has been live on staging since `M172`; no other page nests a
 link inside an `MdsAlert` (measured over every page that has both). Both links take the alert's own foreground, underlined.
 
+**BUILT — PR #382, CI 6/6 green with real step counts (run 40352268887 at `5e7f77f8`: Static analysis 32 · E2E 20 · Contract 16 ·
+Frontend 12 · Pest 11 · axe 11) — AND NOT MERGED.** ⛔ **Held for merge point 7 (`D170`)**, released with the next increment from the
+line; the user's census before and after, as at every merge point. This branch merged the trunk ONCE, at `74503a6c` (to carry the
+claim extension): at merge point 7 rebase M189's own commits with `git rebase --onto origin/main 74503a6c` and `git rebase --skip` any
+`claim(M189)` commit it replays — or merge with no rebase if the trunk has moved only by claim commits (`M186`'s precedent). No
+migration. `docs/claims/decisions.md` (`D169`, `D170`) is already on the trunk. Commits: `206f02c7` (the build), `01868cec` (PHPStan),
+`5e7f77f8` (the alert link and View's scan).
+
+**How the prediction fared — measured, the wrong parts first.**
+- **"Red first to the new Vitest files" — never observed:** `version-compare.test.ts`, `VersionCompare.test.ts` and the new
+  `show.test.ts` case were written after the code and were green on their first run; three Vitest mutants prove them instead. **The
+  Pest files — right:** `VersionComparisonTest` 17 red (no class), `VersionCompareRouteTest` 5 red and 1 vacuously green (a missing
+  route is a 404 too — the no-form-check mutant proves that case), the two new hub cases red for the predicted reasons.
+- **"`manual.test.ts` red until each Help label exists" — wrong:** the page's labels were written before the Help text, so it was green.
+- **"`FormHubPageTest`'s cases, `SchemaChangeClassifierTest` and `conflict-diff.test.ts` pass unedited" — right**, and
+  `FieldRevisionRecorderTest` too, after `moved()` was extracted from `recordMoves()`.
+- **"PHPStan moves" — right:** two real errors in `VersionComparePresenter` (a list, an always-array check), found by the HOST run; the
+  container run printed its 51 known `property.notFound` phantoms.
+- **"Most likely wrong: `forNextDraft()` alone makes a list-backed and a PSGC question read unchanged draft-vs-live" — it held:** the
+  route test's list-file + PSGC case is green, and the raw-config mutant turns it red, so the normalisation is load-bearing. A grid's
+  copied rows were not put through the same test — `forNextDraft()` strips them by `GridSources::withoutCopies()`, unmeasured here.
+- **What no prediction named, each measured:** (1) **the dark-theme `color-contrast` of a link inside an info `MdsAlert`** — the
+  browser's default `#0000ee` on `#09418b`, 1.04:1 — on this page and, unscanned, on `M172`'s View page, live on staging since `M172`;
+  the claim was extended (`d84bf020`), View got its own scan, both were red at three widths and all 12 scans pass after; (2) the
+  route test's first draft deleted a question the fixture does not have (`age`); (3) a `place()` call spread its arguments into the
+  wrong parameters, caught on reading before the first run; (4) **two traps this repository's memory held were re-derived**: local E2E
+  needs built assets and no `public/hot` (global-setup timed out), and container PHPStan's phantoms; and one was NEW — `docker compose
+  stop node` left `public/hot` in place once, so it was removed by hand; (5) a `$(grep -rl …)` that matched an E2E spec handed it to
+  Pest, which ran past five minutes before it was stopped.
+- **Run locally:** Pest — all of `tests/Feature/Forms` (1,155 passed), `tests/Feature/Docs` (169 passed; `SuiteCollectionFloorTest`
+  red on the known bind-mount artefact), `tests/Feature/Releases` (24); Vitest — the whole suite, 283 files, 4,332 passed; E2E —
+  `responsive-axe.spec.ts` (Compare versions and Version view, light and dark at three widths; Form hub), `whats-new.spec.ts`,
+  `builder-history.spec.ts`.
+- **Mutants: 9 caught, 0 survived** — Pest (`scripts/mutate.php`): the raw config, no indexed-type arm (caught by the new indexing
+  case only — `SchemaChangeClassifierTest` stays green, as predicted), order by raw sequence, no form check, the hub's label-only
+  summary, no piping mark; Vitest (a byte-restoring harness with the same rules): every question visible, the To side worded with the
+  From side's labels, Compare without view.
+
 ## RELEASED — `M188`, L of the testers' round 2: a history of each question's changes, and Put back (`R-3894369d`) (merged as PR #381, `2dfb0baa`, last at merge point 6, rebased onto the trunk after `M187`; 6/6 green with real step counts on its rebased run at `ac2107c0` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `2dfb0baa` the same)
 
 **RELEASED LAST AT MERGE POINT 6 (`D137`, `D138`), 2026-10-26, by the merge-point-6 session** (plan

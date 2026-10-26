@@ -16,7 +16,31 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M188`, L of the testers' round 2: a history of each question's changes, and Put back (`R-3894369d`) (m188-l-change-history)
+## Status: NO ACTIVE CLAIM — `M186` (T5), `M187` (T6) and `M188` (L) are merged and live on staging, released together at merge point 6 (`D137`; below). That completes the testers' round-2 programme (`D138`). The next claim is the head of `docs/pipeline.md`'s Next section. Merge only at a planned merge point.
+
+## RELEASED — `M188`, L of the testers' round 2: a history of each question's changes, and Put back (`R-3894369d`) (merged as PR #381, `2dfb0baa`, last at merge point 6, rebased onto the trunk after `M187`; 6/6 green with real step counts on its rebased run at `ac2107c0` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `2dfb0baa` the same)
+
+**RELEASED LAST AT MERGE POINT 6 (`D137`, `D138`), 2026-10-26, by the merge-point-6 session** (plan
+`~/.claude/plans/read-claude-md-then-php-valiant-prism.md`). The session-start pull read 0 reports, 0 reopened and 0 new comments.
+**The user's census before (2026-10-25 23:32:48 UTC): tenants 1 · users 6 · forms 11 · form_versions 27 · submissions 22 · attachments 62
+· feedback_reports 31 · notifications 71** (exactly merge point 5's census after). `M186` merged first (`1f9beb6d`, with no rebase) and
+`M187` second (`4f321bd5`, rebased); their blocks are below. Built green on 2026-10-26 (run 40223773098 at `48b783bc`). Once `M187`
+squashed, rebased onto the trunk by its own 4 commits (`git rebase --onto origin/main d1db55fc`). Two conflicts, as predicted:
+`docs/claims/decisions.md` (`D168`, `D167` above T5's `D166`; the None-open line names `D168`) in the first commit's replay, and
+`docs/pipeline.md` (regenerated) in the fourth. No `claim(` commit replayed. Every other path is patch-identical to `48b783bc`
+(`range-diff`: commits 2 and 3 `=`, 4 identical outside the generated files, 1 touching `decisions.md` alone). Host gates green; the
+citation ledger reads 16 rotten, at its ceiling of 16 (T6 alone read 15). Re-run 6/6 at `ac2107c0` (run 40248755364). Squash-merged as
+`2dfb0baa` with an explicit body at 00:51 UTC, once `M187`'s deploy had finished and `/up` answered 200. The trunk's CI 6/6 (run
+40251377837 — the run `docs/gate-baselines.md` is now measured from). The deploy (run 40254356965, 2 minutes) backed up to
+`deploy-20261026-012930.dump` (1,155,457 B, larger since the places), counted 69 tables and 53,929 rows, ran `2026_08_17_000147` (73 ms)
+and `2026_08_17_000148` (96 ms), re-synced the places (`psgc: 0 added, 0 updated, 43,788 unchanged`), found every table at least as full
+after (70 tables), and copied the notes: `releases: 1 added, 0 updated, 7 unchanged; 8 in the table, none removed (newest 0.15.0)`. `/up`
+200, the sign-in page's shared version `0.15.0`. **The user's census after (2026-10-26 03:56:45 UTC) matched the one before table for
+table, but notifications 74 — 3 above, one for each relayed report resolved in between; the statuses line now reads `confirmed,
+resolved` (no relayed report is left Ongoing).** The user did not report `/whats-new` at the census. Relayed
+`P5b` (the testers' PDF comment 5: a log of each field's changes, with a revert that says what it was before) was resolved at `2dfb0baa`,
+the stock note only (relayed: 25 Resolved · 0 Ongoing · 6 Confirmed working). Owed at the next session's start: the user's check of
+`R1-2`, `R1-6` and `P5b` on staging. The build's record follows.
 
 Taken 2026-10-26. Branch `m188-l-change-history`, **stacked on `m187-t6-signature-readiness` at `9abdd939`** (it bumps a `VERSION`
 that is 0.14.0 only there), with `origin/main` merged in once (the claim-merge, whose sha merge point 6 rebases `--onto`). PR into
@@ -95,13 +119,11 @@ the extract census, `ConfigPanel.test.ts` (every pinned tab list gains History) 
 a Put back pressed while an edit to the same question is still debouncing — and second, the volatile column default rewriting
 `form_fields` under FORCE RLS.
 
-**BUILT — PR #381, CI 6/6 green with real step counts (run 40223773098 at `48b783bc`: Static analysis 32 · E2E 20 · Contract 16 ·
-Frontend 12 · Pest 11 · axe 11) — AND NOT MERGED.** ⛔ **Held for merge point 6 (`D137`, `D138`)** after T5 (#379) and T6 (#380). This
-branch merged the trunk ONCE, at `d1db55fc`: at merge point 6, once #380 is merged, rebase L's own commits with `git rebase --onto
-origin/main d1db55fc` and `git rebase --skip` any `claim(M188)` commit it replays. ⚠️ **Expect a `docs/claims/decisions.md` conflict
-in T6's and L's rebases:** T5 records `D166`, T6 `D164`/`D165`, L `D167`/`D168`, each at the top of ANSWERED — resolve newest first.
-Its migrations `000147`/`000148` run at L's deploy. Relayed `P5b` is resolved only once live. Commits: `7c0a2384` (`D167`, `D168`),
-`19542fb3` (the server), `75be9052` (the History tab and Put back), `48b783bc` (0.15.0, the row closed, three rows filed).
+Built: PR #381, CI 6/6 green with real step counts (run 40223773098 at `48b783bc`: Static analysis 32 · E2E 20 · Contract 16 ·
+Frontend 12 · Pest 11 · axe 11). The branch merged the trunk once, at `d1db55fc`; the rebase at merge point 6 replayed L's own commits
+past it, and the predicted `docs/claims/decisions.md` conflicts came in both T6's and L's rebases (above). Commits before the rebase:
+`7c0a2384` (`D167`, `D168`), `19542fb3` (the server), `75be9052` (the History tab and Put back), `48b783bc` (0.15.0, the row closed,
+three rows filed).
 
 **How the prediction fared — measured, the wrong parts first.**
 - **"Red first to the recorder test, the classification drift test and the extract census" — never observed:** the table, its
@@ -126,7 +148,22 @@ Its migrations `000147`/`000148` run at L's deploy. Relayed `P5b` is resolved on
 - **Mutants: 7 caught, 0 survived** — no history recorded, merging off, a duplicate keeping the lineage, a revision FK to `forms`, every
   renumbered row recorded as moved, Put back offered across a type change, Put back not draining the pending edit.
 
-## HELD — `M187`, T6 of the testers' items: a Signature anyone can sign, what "Adv" means, and what each question type can do (`R-af2d278b`, `R-96127b20`, `R-3e6358ed`, with `R-c64d0afd`) (m187-t6-signature-readiness)
+## RELEASED — `M187`, T6 of the testers' items: a Signature anyone can sign, what "Adv" means, and what each question type can do (`R-af2d278b`, `R-96127b20`, `R-3e6358ed`, with `R-c64d0afd`) (merged as PR #380, `4f321bd5`, second at merge point 6, rebased onto the trunk after `M186`; 6/6 green with real step counts on its rebased run at `161c297e` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `4f321bd5` the same)
+
+**RELEASED SECOND AT MERGE POINT 6 (`D137`, `D138`), 2026-10-26, by the merge-point-6 session.** Built green on 2026-10-25 (run
+40205584374 at `9abdd939`). Once `M186` squashed (`1f9beb6d`), rebased onto the trunk by its own 10 commits (`git rebase --onto
+origin/main 4096ea8a`). Two conflicts, as predicted: `docs/claims/decisions.md` (T5's `D166` against this branch's `D164`/`D165`; all three
+kept, newest first, the None-open line naming `D166`) in the first commit's replay, and `docs/pipeline.md` (regenerated by
+`scripts/pipeline.php`) in the first and ninth. `feature-backlog.md` auto-merged, and no `claim(` commit replayed. Every other path is
+patch-identical to `9abdd939`: same file list, and `range-diff` pairs commits 2–8 and 10 as `=`, with 1 and 9 identical outside the two
+generated files. Host gates green (`pipeline-lint`, the eight lint gates, Pint proved scanned). Re-run 6/6 at `161c297e` (run
+40245533176, the first PR run to carry T5's real places). Squash-merged as `4f321bd5` with an explicit body at 00:16 UTC, once `M186`'s
+deploy had finished and `/up` answered 200. The trunk's CI 6/6 (run 40248546143). The deploy (run 40250835334) backed up to
+`deploy-20261026-004837.dump` (470,309 B), counted 69 tables and 10,088 rows, found nothing to migrate, ran the first `psgc:sync` —
+`psgc: 43,788 added, 0 updated, 0 unchanged; 43,788 in the table, none removed (3Q 2026)` — found every table at least as full after, and
+copied the notes: `releases: 1 added, 0 updated, 6 unchanged; 7 in the table, none removed (newest 0.14.0)`. `/up` 200, the sign-in page's
+shared version `0.14.0`. Relayed `R1-6` (the testers' round-1 question "are the adv questions ready to use?") was resolved at `4f321bd5`,
+the stock note only. The build's record follows.
 
 Taken 2026-10-25. Branch `m187-t6-signature-readiness`, **stacked on `m186-t5-psgc-filter` at `be6166d1`** (it bumps a `VERSION` that is
 0.13.0 only there), with `origin/main` merged in once (the claim-merge, whose sha merge point 6 rebases `--onto`). PR into main.
@@ -240,14 +277,12 @@ Prediction: red first to `FieldTypeMirrorDriftTest` (the floor and the equality,
 scroll inside its own wrapper, keep axe clean, and leave the help page with no horizontal scroll; the design system's `DataTable` may
 not fit a static table at all.
 
-**BUILT — PR #380, CI 6/6 green with real step counts (run 40205584374 at `9abdd939`: Static analysis 32 · E2E 20 · Contract 16 ·
-Frontend 12 · Pest 11 · axe 11; the first run, 40202616380 at `4fa6ee04`, was red in Contract alone — below) — AND NOT MERGED.**
-⛔ **Held for merge point 6 (`D137`, `D138`)**, with T5 (#379) and L; **L stacks on this branch** (`VERSION` 0.14.0 is only here). This
-branch merged the trunk ONCE, at `4096ea8a` (the claim `be6d2727`): at merge point 6, after #379 merges, rebase T6's own commits with
-`git rebase --onto origin/main 4096ea8a` and `git rebase --skip` any `claim(M187)` commit it replays. Rows closed on the branch:
-`R-af2d278b` (Signature only, `D140`), `R-96127b20`, `R-3e6358ed`, `R-c64d0afd`. Filed: `D164`'s scan-crop row, a typed signature,
-media answers drawn as pictures (during-testing), the sweep of unreferenced uploads (before-launch). `D164` and `D165` are recorded in
-`docs/claims/decisions.md` on the branch. Relayed `R1-6` is resolved only once live.
+Built: PR #380, CI 6/6 green with real step counts (run 40205584374 at `9abdd939`: Static analysis 32 · E2E 20 · Contract 16 ·
+Frontend 12 · Pest 11 · axe 11; the first run, 40202616380 at `4fa6ee04`, was red in Contract alone — below). L stacked on this branch
+(`VERSION` 0.14.0 was only here). The branch merged the trunk once, at `4096ea8a` (the claim `be6d2727`); the rebase at merge point 6
+replayed T6's own commits past it (above). Rows closed on the branch: `R-af2d278b` (Signature only, `D140`), `R-96127b20`, `R-3e6358ed`,
+`R-c64d0afd`. Filed: `D164`'s scan-crop row, a typed signature, media answers drawn as pictures (during-testing), the sweep of
+unreferenced uploads (before-launch). `D164` and `D165` are recorded in `docs/claims/decisions.md`.
 
 **The prediction, measured.** Red first exactly as named: `FieldTypeMirrorDriftTest` (the floor), `schema-mapping.test.ts`,
 `G6FieldTypesTest` (2 of its new cases — the other two passed on the existing plumbing, as the premise said), `FieldReadinessTableTest`;
@@ -269,7 +304,18 @@ counting, the palette title, a row dropped from Help's table). **Measured:** a s
 skipped); E2E locally `signature` (new; 375 and 1440) and `media-input-hidden-text`, `help-contents`, `public-runtime-axe`,
 `builder-axe`, `encode-validation` — 165 passed, 3 skipped, 0 failed; the whole Vitest suite 279 files (all on disk), 4,309 tests.
 
-## HELD — `M186`, T5 of the testers' items: Philippine places (PSGC) and the cross-form filter (`R-70c7673a`, `R-ed7f3127`, with `R-7a2f4a13`, `R-dbb2ff34`, and `R-bbf03029` only if the staging count is zero) (m186-t5-psgc-filter)
+## RELEASED — `M186`, T5 of the testers' items: Philippine places (PSGC) and the cross-form filter (`R-70c7673a`, `R-ed7f3127`, with `R-7a2f4a13`, `R-dbb2ff34`, and `R-bbf03029` only if the staging count is zero) (merged as PR #379, `1f9beb6d`, first at merge point 6, 6/6 green with real step counts on its run at `498144bf` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `1f9beb6d` the same)
+
+**RELEASED FIRST AT MERGE POINT 6 (`D137`, `D138`), 2026-10-25/26, by the merge-point-6 session.** Built green on 2026-10-25/26 (run
+40215500064 at `498144bf`, re-read at the merge: the six jobs and their step counts). After the user's census (23:32:48 UTC, in `M188`'s
+block above): squash-merged as `1f9beb6d` with an explicit body at 23:33 UTC, with no rebase. The trunk had moved only by claim commits
+(`docs/claims/lane-a.md`) since the branch's merge-base `e9c279d3`, and `git merge-tree` found it clean, so the `--onto 7fc683fa` this
+block prescribed was not needed. The trunk's CI 6/6 (run 40245305976). The deploy (run 40247970517) backed up to
+`deploy-20261026-001428.dump` (470,182 B), counted 68 tables and 10,115 rows, ran `2026_08_17_000146` (74 ms), found every table at
+least as full after (69 tables), and copied the notes: `releases: 1 added, 0 updated, 5 unchanged; 6 in the table, none removed (newest
+0.13.0)`. As predicted, it ran no `psgc:sync` (the old `deploy.ps1`). `/up` 200, the sign-in page's shared version `0.13.0`. The places
+were copied by T6's deploy (`M187`'s block above). Relayed `R1-2` (the testers' round-1 question on a PSGC cascade filtered by another
+form) was resolved at `1f9beb6d` once they were live, the stock note only. The build's record follows.
 
 Taken 2026-10-25. Branch `m186-t5-psgc-filter`, cut from origin/main at `38a105af`, PR into main. ⛔ **NOT MERGED THIS SESSION:** it is
 held green for merge point 6 with T6 and L (`D137`, `D138`: … merge point 5 → T5 → T6 → L → merge point 6). **T6 stacks on this
@@ -392,19 +438,12 @@ diff (the `sets` member) until it is regenerated in the container; `manual.test.
 wrong:** the PSA workbook itself — its header text, the summary sheet's layout and how NCR's districts and the special geographic area
 are coded come from third-party descriptions, so `psgc:build`'s first run against the real file is where this plan meets the world.
 
-**BUILT — PR #379, CI 6/6 green with real step counts (run 40173107160 at `be6166d1`: Static analysis 32 · E2E 20 · Contract 16 ·
-Frontend 12 · Pest 11 · axe 11; the first run, 40170649298 at `8acafa1e`, was red in Pest alone — below) — AND
-NOT MERGED.** ⛔ **Held for merge
-point 6 (`D137`, `D138`)**, with T6 and L; **T6 stacks on this branch** (its `VERSION` is 0.13.0 only here). This branch merged the trunk
-ONCE, at `8acafa1e` (the claim's four extensions `d1988263`, `3359d766`, `86cd0791`, `e9c279d3`, identical to the branch's own claim
-text): at merge point 6 rebase T5's own commits with `git rebase --onto origin/main 7fc683fa` and `git rebase --skip` any `claim(M186)`
-commit the merge replays. ⚠️ **A changed `deploy.ps1` runs one deploy late:** T5's own deploy runs no `psgc:sync`; the first is T6's
-deploy. ⛔ **OWED BEFORE MERGE POINT 6 — the Philippine places themselves (`R-70c7673a` stays OPEN):** the user could not download the
-PSA workbook this session (asked twice). With the *PSGC 3Q 2026 Publication Datafile* in hand, `php artisan psgc:build <xlsx>
---publication=2026Q3 --released=2026-10-12` writes `database/data/psgc/`; its first run against the real file is the first time the
-PSA's header text, summary sheet and NCR/special-geographic-area coding are measured, and the build may need adjusting there. Until then
-`psgc:sync` copies nothing and says so, the Levels tab's button says the places are not on this server yet, and `PsgcCommittedDataTest`
-skips by name. Relayed `R1-2` is resolved only once the places are live. Dev data: `acme`'s *Barangay Visit* at `/f/barangay-visit`
+Built: PR #379, CI 6/6 green with real step counts (run 40173107160 at `be6166d1`: Static analysis 32 · E2E 20 · Contract 16 ·
+Frontend 12 · Pest 11 · axe 11; the first run, 40170649298 at `8acafa1e`, was red in Pest alone — below). T6 stacked on this branch
+(its `VERSION` is 0.13.0 only here). The branch merged the trunk once, at `8acafa1e` (the claim's four extensions); the rebase this
+paragraph prescribed for merge point 6 was not needed (above). A changed `deploy.ps1` runs one deploy late, as recorded: T5's own deploy
+ran no `psgc:sync`, and T6's was the first. The Philippine places themselves were owed when this was written (`R-70c7673a` open, the PSA
+workbook not yet downloaded); they were committed on 2026-10-26 (below). Dev data: `acme`'s *Barangay Visit* at `/f/barangay-visit`
 (`E2eSeeder`, over the 19-place fixture, re-run on the dev DB after migrating `000146`); no `demo` tenant demo — that waits for the data.
 
 **How the prediction fared — measured, the wrong parts first.**
@@ -471,12 +510,12 @@ marker); `PsgcCommittedDataTest` stops skipping once the data is committed and p
 19 places are written by `PsgcTiers`, not from the workbook). **Most likely wrong:** the committed CSV's size and the deploy's
 `psgc:sync` time on 43,788 rows — measured locally before the push.
 
-**DATA COMMITTED (2026-10-26) — PR #379 CI 6/6 green with real step counts (run 40215500064 at `498144bf`: Static analysis 32 ·
-E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11) — AND STILL NOT MERGED (merge point 6).** Two commits on the branch:
+Data committed (2026-10-26): PR #379 CI 6/6 green with real step counts (run 40215500064 at `498144bf`: Static analysis 32 ·
+E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11), held until merge point 6. Two commits on the branch:
 `b72ce4f9` (the build reads the PSA's real workbook; `D166` B) and `498144bf` (`database/data/psgc/`: 18 region · 118 province · 1,642
 city · 42,010 barangay rows, `places.csv` sha256 `8e0a1c36…a8e987f5`, 1,815,659 B, LF; each PSA level equal to its National Summary;
-a rebuild byte-identical). **`R-70c7673a` CLOSED on the branch.** At merge point 6 T5's rebase is unchanged (`git rebase --onto origin/main
-7fc683fa`, skipping replayed `claim(M186)` commits); both new commits are T5's own. Dev: `psgc:sync` loaded the real places (43,769 added,
+a rebuild byte-identical). **`R-70c7673a` CLOSED on the branch.** The rebase this paragraph once prescribed (`--onto 7fc683fa`) was not
+needed: at merge point 6 the trunk had moved only by claim commits, and the branch squashed cleanly (above). Dev: `psgc:sync` loaded the real places (43,769 added,
 1 updated, 18 unchanged) — all 19 fixture codes exist in the real file, so nothing was deleted.
 
 **How the prediction fared — the wrong parts first.**

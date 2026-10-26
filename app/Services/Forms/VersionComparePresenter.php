@@ -57,9 +57,7 @@ final class VersionComparePresenter
             return $this->serializer->snapshot($version);
         }
 
-        $snapshot = $version->schema_snapshot;
-
-        return is_array($snapshot) ? $snapshot : [];
+        return $version->schema_snapshot;
     }
 
     /** @return array{id: string, version_number: int, status: string, name: string, published_at: ?string} */
@@ -82,13 +80,12 @@ final class VersionComparePresenter
      */
     private function versions(Form $form): array
     {
-        return $form->versions()
+        return array_values($form->versions()
             ->orderByDesc('version_number')
             ->get(['id', 'form_id', 'version_number', 'status', 'published_at'])
             ->filter(fn (FormVersion $v): bool => $v->status !== FormVersionStatus::Draft || $v->id === $form->draft_version_id)
             ->map(fn (FormVersion $v): array => ['id' => (string) $v->id, 'name' => self::name($form, $v)])
-            ->values()
-            ->all();
+            ->all());
     }
 
     private static function name(Form $form, FormVersion $version): string

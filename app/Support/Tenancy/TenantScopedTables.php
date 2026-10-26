@@ -66,6 +66,9 @@ final class TenantScopedTables
         // (`TenantExtractColumns::WITHHELD`); a run holds no payload and no response body.
         'form_automation_runs',
         'form_automations',
+        // M188. A question's history: settings the authors typed, before and after, and who changed them. Nothing withheld
+        // (the settings are `form_fields`' own, extracted there too). Append-only, as `audits` is.
+        'form_field_revisions',
         'form_field_validations',
         'form_fields',
         // M131. Nothing withheld: a folder is a name the workspace typed, and who typed it.

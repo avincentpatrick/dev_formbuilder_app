@@ -1,5 +1,19 @@
 [
     {
+        "version": "0.15.0",
+        "title": "A history of each question’s changes",
+        "items": [
+            {
+                "kind": "new",
+                "text": "Every question now keeps a history: select it, then History in the right panel. It lists each change saved from this update on — who made it, when, which setting, and what it was before and after."
+            },
+            {
+                "kind": "new",
+                "text": "Put back returns a change to how it was. It first shows each setting now and after, then saves it like any edit, so Undo reverses it. A change of type or a move is listed but not put back — change the type or drag the question instead."
+            }
+        ]
+    },
+    {
         "version": "0.14.0",
         "title": "Signatures, and what each question type can do",
         "items": [

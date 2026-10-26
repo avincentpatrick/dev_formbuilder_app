@@ -429,3 +429,42 @@ it('locks exactly ONE row when the payload names no sibling, which is §3.4 left
         'a sibling resolution ran for a payload that names no sibling'
     );
 });
+
+it('writes the question’s history last, naming no row the publisher or the archive locks (M188)', function (): void {
+    // `R-3894369d`: the revision is inserted inside writeField(), after its locks. A foreign key from it to `forms` or
+    // `form_versions` would take FOR KEY SHARE on a row publish holds FOR UPDATE (and archive deletes) while this
+    // transaction holds the question's row — the opposite order, this file's whole subject. So it has none.
+    $form = builderLockOrderDraft($this->tenant, $this->user);
+    [$field, $payload] = builderLockOrderPayload($form);
+    $payload['label'] = 'A label the history records';
+
+    $log = builderLockOrderSqlDuring(function () use ($form, $field, $payload): void {
+        app(FormBuilderService::class)->updateField($form, $field, $this->user, $payload, null);
+    });
+
+    $lock = builderLockOrderFirstIndex($log, 'form_fields', 'for update');
+    $history = builderLockOrderFirstIndex($log, 'insert into "form_field_revisions"');
+    $lastChild = null;
+    foreach ($log as $i => $sql) {
+        if (str_contains($sql, '"form_field_validations"')) {
+            $lastChild = $i;
+        }
+    }
+
+    expect($lock)->not->toBeNull('no locking select on `form_fields` was issued');
+    expect($history)->not->toBeNull('the save recorded no history, so the ordering proves nothing');
+    expect($lastChild)->not->toBeNull('no statement touched form_field_validations');
+    expect($history)->toBeGreaterThan($lastChild, 'the history was written before the save had taken its rows');
+    // A plain read of the form row is fine (the draft guard reads it); a LOCK on it is the reversal.
+    expect(builderLockOrderFirstIndex($log, 'from "forms"', 'for update'))->toBeNull('the save locked the form row')
+        ->and(builderLockOrderFirstIndex($log, 'from "forms"', 'for share'))->toBeNull('the save share-locked the form row');
+
+    $parents = array_map(static fn (object $row): string => (string) $row->parent, DB::select(
+        "select ccu.table_name as parent from information_schema.table_constraints tc
+         join information_schema.constraint_column_usage ccu on ccu.constraint_name = tc.constraint_name
+         where tc.table_name = 'form_field_revisions' and tc.constraint_type = 'FOREIGN KEY'"
+    ));
+    expect($parents)->not->toBeEmpty()
+        ->and($parents)->not->toContain('forms')
+        ->and($parents)->not->toContain('form_versions');
+});

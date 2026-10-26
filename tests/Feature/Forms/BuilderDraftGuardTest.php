@@ -400,7 +400,7 @@ it('refuses a section DELETE whose form was published after the models were boun
 
     app(PublishService::class)->publish(Form::query()->whereKey($form->id)->firstOrFail(), $admin);
 
-    expect(fn () => app(FormBuilderService::class)->deleteSection($boundForm, $boundSection))
+    expect(fn () => app(FormBuilderService::class)->deleteSection($boundForm, $boundSection, $admin))
         ->toThrow(FormException::class);
 
     enterTenant($tenant->id, $admin->id);

@@ -17,6 +17,8 @@ import { otherSpecifyCondition } from './other-specify';
 import type {
     BuilderPageProps,
     CanvasGroup,
+    FieldHistoryChange,
+    FieldHistoryPage,
     LibraryItem,
     LocalField,
     LocalSection,
@@ -305,7 +307,11 @@ export function useBuilderStore(props: BuilderPageProps) {
         const earlier = noteSent(uid, sent);
         // M176 (`R-5554c526`): which editor row each sent rule is, so a refusal of `validations.N` names the row on screen.
         save.ruleRows[uid] = field.validations.flatMap((rule, row) => (isUnfinishedRule(rule) ? [] : [row]));
-        const result = await guard(() => client.patch<ServerField>(`${base}/fields/${field.id}`, sent), { uid });
+        // M188 (`R-3894369d`): a Put back's save names the history entry it restores — on the request only, never in `sent`,
+        // which every comparison below reads.
+        const putBackOf = putBacks.get(uid);
+        const body = putBackOf === undefined ? sent : { ...sent, put_back_of: putBackOf };
+        const result = await guard(() => client.patch<ServerField>(`${base}/fields/${field.id}`, body), { uid });
         if (!result) return false;
         // M170 — a 409 whose question already holds exactly this edit is not a conflict. It is how the put-back after a
         // refresh meets the save sent as the page went, when that save landed after the server rendered the reload: the
@@ -654,6 +660,49 @@ export function useBuilderStore(props: BuilderPageProps) {
         } catch {
             return null;
         }
+    }
+
+    // ── A question's history (M188, `R-3894369d`, `D167`, `D168`) ─────────────────────────
+    /** The history entry the next save of a question restores — sent once, with that save ({@link putBack}). */
+    const putBacks = new Map<Uid, string>();
+
+    /**
+     * One page of a question's history, newest first (`?before` for the next). A READ — no burst bookkeeping, so it never
+     * moves the save verdict — and null when it could not be read: the History tab says so.
+     */
+    async function historyFor(uid: Uid, before: string | null = null): Promise<FieldHistoryPage | null> {
+        const field = findField(uid);
+        if (!field) return null;
+        try {
+            const query = before === null ? '' : `?before=${encodeURIComponent(before)}`;
+            const result = await client.get<FieldHistoryPage>(`${base}/fields/${field.id}/history${query}`);
+
+            return result.conflict ? null : result.data;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Put an earlier change back (`D167`): every setting the entry changed returns to its value before it, saved as an
+     * ORDINARY edit — one PATCH and one "Edit …" undo entry, through the same commit the settings pane uses, so a 409 and a
+     * refusal behave as they do there. True once the server holds it.
+     *
+     * ⛔ THE COMMIT READS THE QUESTION INSIDE ITS QUEUED TASK (`commitFieldEdit`), so an edit still debouncing would be
+     * swept into this one's entry, and this one into nothing. `whenIdle()` flushes it and drains the queue FIRST — the
+     * pending edit is its own entry — and only then are the earlier values set.
+     */
+    async function putBack(uid: Uid, changes: readonly FieldHistoryChange[], entryId: string): Promise<boolean> {
+        await whenIdle();
+        const field = findField(uid);
+        if (!field || conflict.value) return false;
+        for (const change of changes) applyHistoryValue(field, change.setting, change.before);
+        putBacks.set(uid, entryId);
+        touch(uid, 'field');
+        await whenIdle();
+        putBacks.delete(uid);
+
+        return !conflict.value && save.fieldErrors[uid] === undefined;
     }
 
     // ── "Other, please specify" (M177, `R-71509975`) ────────────────────────────────
@@ -1712,6 +1761,8 @@ export function useBuilderStore(props: BuilderPageProps) {
         addField,
         deleteField,
         answersFor,
+        historyFor,
+        putBack,
         // "Other, please specify" (M177)
         addOtherSpecify,
         removeOtherSpecify,
@@ -1769,6 +1820,27 @@ function fieldSnapshot(field: LocalField): FieldSnapshot {
 }
 function applyFieldSnapshot(field: LocalField, snap: FieldSnapshot): void {
     Object.assign(field, clone(snap));
+}
+/**
+ * M188 — one setting of a history entry set on the question, in the names the server records: a column, a `config.<key>`
+ * (an empty value REMOVES the key, which `setFieldConfig` cannot), or `validations`.
+ */
+function applyHistoryValue(field: LocalField, setting: string, value: unknown): void {
+    if (setting.startsWith('config.')) {
+        const config = { ...field.config };
+        const key = setting.slice('config.'.length);
+        if (value === null || value === undefined) delete config[key];
+        else config[key] = clone(value);
+        field.config = config;
+
+        return;
+    }
+    if (setting === 'validations') {
+        field.validations = clone(Array.isArray(value) ? value : []) as LocalField['validations'];
+
+        return;
+    }
+    (field as unknown as Record<string, unknown>)[setting] = clone(value);
 }
 function sectionSnapshot(section: LocalSection): SectionSnapshot {
     const { uid: _uid, id: _id, version: _v, sequence: _s, ...rest } = section;

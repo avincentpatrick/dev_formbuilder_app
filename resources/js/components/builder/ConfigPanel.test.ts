@@ -200,10 +200,12 @@ afterEach(() => {
 describe('ConfigPanel — the tab set it hands the shared widget', () => {
     it('offers the field tabs, adding Options only for a type that has them', () => {
         const plain = mountPanel(makeStore({ field: field() }));
+        // M188 (`R-3894369d`): every question ends on History.
         expect(plain.findAll('[role="tab"]').map((tab) => tab.text())).toEqual([
             'Basics',
             'Validation',
             'Advanced',
+            'History',
         ]);
 
         const choosable = mountPanel(makeStore({ field: field({ field_type: 'single_select' }) }));
@@ -212,6 +214,7 @@ describe('ConfigPanel — the tab set it hands the shared widget', () => {
             'Options',
             'Validation',
             'Advanced',
+            'History',
         ]);
     });
 
@@ -222,7 +225,7 @@ describe('ConfigPanel — the tab set it hands the shared widget', () => {
         // M129: a note gained the Content tab, between Basics and Advanced, from `FieldType::configEditor()`.
         const note = mountPanel(makeStore({ field: field({ field_type: 'note' }) }));
 
-        expect(note.findAll('[role="tab"]').map((tab) => tab.text())).toEqual(['Basics', 'Content', 'Advanced']);
+        expect(note.findAll('[role="tab"]').map((tab) => tab.text())).toEqual(['Basics', 'Content', 'Advanced', 'History']);
     });
 
     it("mounts a note's content editor on the Content tab, and an emptied list removes the key rather than saving []", async () => {
@@ -370,7 +373,7 @@ describe('ConfigPanel — switching a tab swaps the body', () => {
         expect(wrapper.text()).toContain('Help text');
         expect(wrapper.text()).not.toContain('Field key');
 
-        const advanced = wrapper.findAll('[role="tab"]').at(-1);
+        const advanced = wrapper.findAll('[role="tab"]').at(-2); // M188: History follows it
         expect(advanced?.text()).toBe('Advanced');
         await advanced?.trigger('click');
 
@@ -390,6 +393,7 @@ describe('ConfigPanel — switching a tab swaps the body', () => {
         expect(wrapper.findAll('[role="tab"]').map((tab) => tab.attributes('aria-selected'))).toEqual([
             'false',
             'true',
+            'false',
             'false',
             'false',
         ]);
@@ -418,7 +422,7 @@ describe('ConfigPanel — the plan gate on Save-to-library (M90)', () => {
 
         // Basics · Validation · Advanced for a type with no options — asserted, not assumed, so a tab-set
         // change renames this test's target rather than silently pointing it at the wrong body.
-        expect(tabs.map((tab) => tab.text())).toEqual(['Basics', 'Validation', 'Advanced']);
+        expect(tabs.map((tab) => tab.text())).toEqual(['Basics', 'Validation', 'Advanced', 'History']);
         await tabs[2]?.trigger('click');
 
         return wrapper;
@@ -495,7 +499,7 @@ describe('ConfigPanel — the Conditional requiredness reveal (M116)', () => {
         const wrapper = mountPanel(makeStore({ field: field({ is_required: 'conditional' }) }));
 
         expect(wrapper.findAll('[role="tablist"]')).toHaveLength(1);
-        expect(wrapper.findAll('[role="tab"]').map((t) => t.text())).toEqual(['Basics', 'Validation', 'Advanced']);
+        expect(wrapper.findAll('[role="tab"]').map((t) => t.text())).toEqual(['Basics', 'Validation', 'Advanced', 'History']);
     });
 
     it('edits only the rules it owns and leaves every other rule byte-identical at its own index', () => {
@@ -863,7 +867,7 @@ describe('ConfigPanel — the "Insert a question" picker (M178, R-75719ac4)', ()
 
     it('puts the picker on a formula default only, offering the questions before this one and the dates (M180, D148)', async () => {
         const wrapper = mountPicker();
-        await wrapper.findAll('[role="tab"]').at(-1)?.trigger('click');
+        await wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Advanced')?.trigger('click');
 
         expect(wrapper.text()).toContain('Default value');
         // None on a fixed default: the condition editor opens on its rows (its "Edit as text" box carries the picker).

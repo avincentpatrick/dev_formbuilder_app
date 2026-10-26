@@ -20,6 +20,7 @@ use App\Models\FormField;
 use App\Models\FormSection;
 use App\Models\User;
 use App\Services\Forms\BuilderPresenter;
+use App\Services\Forms\FieldHistoryPresenter;
 use App\Services\Forms\FormBuilderService;
 use App\Services\Forms\StepGraphInspector;
 use App\Support\Forms\GraphNotice;
@@ -79,10 +80,10 @@ final class FormBuilderController extends Controller
         ));
     }
 
-    public function destroySection(Form $form, FormSection $section): JsonResponse
+    public function destroySection(Request $request, Form $form, FormSection $section): JsonResponse
     {
-        return $this->respond(function () use ($form, $section): array {
-            $this->builder->deleteSection($form, $section);
+        return $this->respond(function () use ($request, $form, $section): array {
+            $this->builder->deleteSection($form, $section, $this->actor($request));
 
             return ['deleted' => true];
         });
@@ -136,6 +137,19 @@ final class FormBuilderController extends Controller
         abort_unless($field->version()->where('form_id', $form->id)->exists(), 404);
 
         return response()->json(['responses' => $this->builder->answeredCount($form, $field)]);
+    }
+
+    /**
+     * M188 (`R-3894369d`, `D167`, `D168`) — a question's history for the right panel's History tab, newest first, 50 at a
+     * time (`?before=<entry id>` for the next 50). A READ, like {@see self::answeredCount()}: no `builder.draft` check and
+     * no `respond()` mapping, and a question of another form is not this form's to read.
+     */
+    public function history(Request $request, Form $form, FormField $field, FieldHistoryPresenter $history): JsonResponse
+    {
+        abort_unless($field->version()->where('form_id', $form->id)->exists(), 404);
+        $before = $request->query('before');
+
+        return response()->json($history->present($form, $field, is_string($before) ? $before : null));
     }
 
     public function duplicateField(Request $request, Form $form, FormField $field): JsonResponse
@@ -225,8 +239,8 @@ final class FormBuilderController extends Controller
             'fields.*.section_sequence' => ['nullable', 'integer'],
         ]);
 
-        return $this->respond(function () use ($form, $data): array {
-            $this->builder->reorder($form, $data['sections'], $data['fields']);
+        return $this->respond(function () use ($request, $form, $data): array {
+            $this->builder->reorder($form, $this->actor($request), $data['sections'], $data['fields']);
 
             return ['ok' => true];
         });

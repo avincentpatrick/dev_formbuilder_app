@@ -631,9 +631,11 @@ Route::middleware([
         ->middleware(['can:update,form', 'builder.draft'])->name('forms.fields.update');
     Route::delete('/forms/{form}/fields/{field}', [FormBuilderController::class, 'destroyField'])
         ->middleware(['can:update,form', 'builder.draft'])->name('forms.fields.destroy');
-    // M172 (`R-a44638b6`, `D133`): how many responses hold an answer to a question — the delete dialog's number. A read.
+    // M172 (`R-a44638b6`, `D133`): how many responses hold an answer to a question; M188 (`R-3894369d`): its history. Reads.
     Route::get('/forms/{form}/fields/{field}/answers', [FormBuilderController::class, 'answeredCount'])
         ->middleware('can:update,form')->name('forms.fields.answers');
+    Route::get('/forms/{form}/fields/{field}/history', [FormBuilderController::class, 'history'])
+        ->middleware('can:update,form')->name('forms.fields.history');
     Route::post('/forms/{form}/fields/{field}/duplicate', [FormBuilderController::class, 'duplicateField'])
         ->middleware(['can:update,form', 'builder.draft'])->name('forms.fields.duplicate');
     // Type conversion (Increment M122): its own controller and endpoint, never the autosave PATCH, whose

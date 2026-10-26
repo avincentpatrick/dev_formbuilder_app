@@ -133,6 +133,7 @@ const PALETTE = 'resources/js/components/builder/FieldPalette.vue';
 const SAVE_LABEL = 'resources/js/components/builder/save-label.ts';
 const CANVAS = 'resources/js/components/builder/BuilderCanvas.vue';
 const CONFIG = 'resources/js/components/builder/ConfigPanel.vue';
+const HISTORY = 'resources/js/components/builder/FieldHistory.vue';
 const CALCULATION_EDITOR = 'resources/js/components/builder/CalculationEditor.vue';
 const TYPE_CONTROL = 'resources/js/components/builder/FieldTypeControl.vue';
 const FIELD_TYPES = 'app/Enums/FieldType.php';
@@ -779,6 +780,7 @@ const reference: ChapterDraft[] = [
                         [ui('Content', CONFIG), ' — ', ui('Note / label', FIELD_TYPES), ': what it shows.'],
                         [ui('Validation', CONFIG), ' — every question that takes an answer. See ', link('Validation', '#validation-tab'), '.'],
                         [ui('Advanced', CONFIG), ' — every question. See ', link('Advanced', '#advanced-tab'), '.'],
+                        [ui('History', CONFIG), ' — every question: the changes saved to it, and a way to put one back. See ', link('History', '#history-tab'), '.'],
                     ),
                 ],
             },
@@ -857,6 +859,28 @@ const reference: ChapterDraft[] = [
                         [ui('Contains personal data (PII)', CONFIG), ' and ', ui('Sensitive', CONFIG), ' — mark answers that identify or could harm a person, so they are handled with care.'],
                         [ui('Indexed for reporting', CONFIG), ' — make the answer available to reports; then choose its ', ui('Indexed data type', CONFIG), ': ', ui('Text', INDEXED), ', ', ui('Number', INDEXED), ', ', ui('Boolean', INDEXED), ', ', ui('Date', INDEXED), ' or ', ui('Datetime', INDEXED), '.'],
                         [ui('Save to library', CONFIG), ' — keep a copy to reuse in other forms. See ', link('The question library', '#library'), '.'],
+                    ),
+                ],
+            },
+            {
+                id: 'history-tab',
+                title: 'History',
+                blocks: [
+                    p(
+                        'The ', ui('History', CONFIG), ' tab lists the changes saved to a question, newest first: who made each one, when, and every ',
+                        'setting it changed, from what to what. It keeps the question’s changes through every publish and every rename of its key. ',
+                        'Typing a label in bursts counts as one change. Changes saved before this tab existed are not listed.',
+                    ),
+                    steps(
+                        ['Select the question, then open its ', ui('History', CONFIG), ' tab.'],
+                        ['Find the change and press its ', ui('Put back', HISTORY), '.'],
+                        ['The dialog shows each setting as it is ', ui('Now', HISTORY), ' and ', ui('After putting back', HISTORY), '. Press ', ui('Put back', HISTORY), ' to save it, or ', ui('Cancel', HISTORY), '.'],
+                    ),
+                    tip(
+                        'info',
+                        'A Put back is saved like any edit, so ', ui('Undo', BUILDER), ' reverses it. A change of question type and a move are listed but ',
+                        'not put back: change the type again under ', ui('Basics', CONFIG), ', or drag the question back. Older changes are behind ',
+                        ui('Show older changes', HISTORY), '.',
                     ),
                 ],
             },

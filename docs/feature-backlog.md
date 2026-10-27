@@ -15432,8 +15432,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `tests/e2e/responsive-axe.spec.ts` and `tests/e2e/auth-axe.spec.ts` reach the dashboard, forms, responses, settings, builder and
   sign-in pages; no e2e spec visits `/settings/sso` (`Pages/Settings/Sso.vue`) or `Pages/ocr/ScanStatus.vue`. `R-26905216` covers
   the four console pages, not these. `docs/PRD.md` Feature #5 asks for every screen at each breakpoint, checked in CI. The remedy: both
-  pages in `responsive-axe.spec.ts`'s page list, at the three viewports. **Latent** — nothing is known broken on either. Filed by
-  `M191`. **Tier: after-launch.**
+  pages in `responsive-axe.spec.ts`'s page list, at the three viewports. **Latent** — nothing is known broken on either.
+  Filed by `M191`. **Tier: after-launch.**
 
 - **`nit` · Four page stylesheets switch layout at breakpoints the design system does not define, with no written rationale.**
   `docs/ux/design-system-reference.md` §2.7 defines three — ≤480px, ≤1024px, >1024px. `Pages/submissions/Encode.vue` and

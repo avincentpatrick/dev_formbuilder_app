@@ -31,6 +31,11 @@ Rows:
 - `R-283b9c0d` — *"Two PRD acceptance criteria are dispositioned in INDENTED CONTINUATION bullets the collector skips…"*, which says it
   rides with this row.
 - The stale sentence found in planning: `docs/TESTING-GUIDE.md` §18 says *"OCR upload, single form (Feature #1) | Not built"*.
+  ⚠️ **Extended 2026-10-27, pushed before the guide was opened:** that sentence is ALREADY QUEUED, as `R-248174d6` (*"`docs/TESTING-GUIDE.md`
+  still sends its reader to two buttons that have moved, and says single-form OCR is not built"*, `M162`, during-testing) — planning
+  missed it. The whole row is taken: §2's *Edit* and §3's *Schedule* steps, §18's OCR row, and a pointer to the in-app Help page. It is
+  the only row here that edits the guide, so `D13`'s file-overlap rule holds. §18 is invisible to `P2b` and `P2c` (a heading naming no
+  out-of-scope word, rows reading *"Not built."*) — filed as a row rather than widened here.
 
 The session-start pull read 0 reports, 0 reopened and 0 new comments (relayed 31: 25 Resolved · 6 Confirmed working), so nothing was
 triaged. The user confirmed merge point 7 on staging (Compare two versions works) in planning. One decision was asked and answered in

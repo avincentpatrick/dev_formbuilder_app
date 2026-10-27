@@ -579,9 +579,6 @@ function build_basename_index(): array
 
             $path = $dir === '.' ? $entry : $dir.'/'.$entry;
 
-            if (in_array($path, SKIP_PATHS, true)) {
-                continue;
-            }
 
             if (in_array($path, SKIP_DIRS, true) || in_array($entry, SKIP_DIRS, true)) {
                 continue;

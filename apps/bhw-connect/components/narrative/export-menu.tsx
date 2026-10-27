@@ -2,6 +2,7 @@
 
 import { logEvent } from "@/lib/usage/log-client";
 import type { DemographicDimension, GeoLevel, Indicator } from "@/lib/filters/schema";
+import { withBasePath } from "@/lib/base-path";
 
 const FORMATS = [
   { format: "csv", label: "CSV" },
@@ -36,7 +37,7 @@ export function ExportMenu({
         <span key={format}>
           {i > 0 && <span aria-hidden="true">·</span>}
           <a
-            href={`/api/export/${format}?${params.toString()}`}
+            href={withBasePath(`/api/export/${format}?${params.toString()}`)}
             onClick={() =>
               logEvent("export", { geoCode, meta: { format, indicator, dimension, geoLevel } })
             }

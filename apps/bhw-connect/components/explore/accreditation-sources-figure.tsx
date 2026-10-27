@@ -2,6 +2,7 @@ import { FigureCard } from "@/components/narrative/figure-card";
 import { GlossaryTerm } from "@/components/glossary/glossary-term";
 import { FigureBenchmark, type FigureBenchmarkProps } from "@/components/narrative/figure-benchmark";
 import { formatIndicatorValue } from "@/lib/analysis/map-indicators";
+import { withBasePath } from "@/lib/base-path";
 
 /**
  * Accreditation, triangulated across the two datasets (E2.1 / review R8.2).
@@ -57,7 +58,7 @@ export function AccreditationSourcesFigure({
           rate counts only <GlossaryTerm slug="accredited">accredited</GlossaryTerm> individually
           validated profiles. A gap between them reflects the two sources&apos; different coverage,
           not an error — see{" "}
-          <a href="/data-quality" className="underline hover:text-accent">
+          <a href={withBasePath("/data-quality")} className="underline hover:text-accent">
             data quality
           </a>
           .

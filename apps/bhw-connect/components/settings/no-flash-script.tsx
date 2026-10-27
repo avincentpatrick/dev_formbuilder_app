@@ -8,8 +8,11 @@ import { DEFAULT_SETTINGS, STORAGE_KEY } from "./settings-types";
  * "system") and stamps data-theme / data-palette / data-font-size onto the
  * root element, which globals.css keys all of its CSS variables off of.
  * Runs before React hydrates; the SettingsProvider keeps it in sync afterward.
+ *
+ * It carries the request's CSP nonce (proxy.ts, lib/csp.ts): the policy runs no inline script
+ * without one.
  */
-export function NoFlashScript() {
+export function NoFlashScript({ nonce }: { nonce?: string }) {
   const script = `(function(){try{
 var d=document.documentElement;
 var def=${JSON.stringify(DEFAULT_SETTINGS)};
@@ -21,5 +24,5 @@ d.dataset.palette=s.palette;
 d.dataset.fontSize=s.fontSize;
 }catch(e){}})();`;
 
-  return <script dangerouslySetInnerHTML={{ __html: script }} />;
+  return <script nonce={nonce} dangerouslySetInnerHTML={{ __html: script }} />;
 }

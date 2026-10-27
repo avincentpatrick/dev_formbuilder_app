@@ -19,6 +19,7 @@
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.7",
     "exceljs": "^4.4.0",
+    "geist": "1.7.2",
     "html2canvas-pro": "^1.6.7",
     "linkedom": "^0.18.13",
     "maplibre-gl": "^5.24.0",

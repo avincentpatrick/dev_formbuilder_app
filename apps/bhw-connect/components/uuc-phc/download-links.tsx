@@ -1,4 +1,5 @@
 import type { GeoLevel } from "@/lib/filters/schema";
+import { withBasePath } from "@/lib/base-path";
 
 /**
  * The section's downloads, in one place (plan U11).
@@ -32,19 +33,19 @@ export function DownloadLinks({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <a
-        href={`/api/export/uuc-phc?${scope}`}
+        href={withBasePath(`/api/export/uuc-phc?${scope}`)}
         className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium transition-colors hover:border-accent"
       >
         Summary (PNG)
       </a>
       <a
-        href={`/api/export/uuc-phc/data?${scope}&format=csv`}
+        href={withBasePath(`/api/export/uuc-phc/data?${scope}&format=csv`)}
         className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium transition-colors hover:border-accent"
       >
         Listed barangays (CSV)
       </a>
       <a
-        href={`/api/export/uuc-phc/data?${scope}&format=xlsx`}
+        href={withBasePath(`/api/export/uuc-phc/data?${scope}&format=xlsx`)}
         className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium transition-colors hover:border-accent"
       >
         Listed barangays (XLSX)

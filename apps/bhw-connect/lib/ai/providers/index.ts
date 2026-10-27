@@ -2,6 +2,7 @@ import "server-only";
 import { createGeminiProvider } from "./gemini";
 import { createOpenAICompatibleProvider } from "./openai-compatible";
 import type { AIProvider, ProviderId } from "./types";
+import { SITE_URL } from "@/lib/site-url";
 
 export * from "./types";
 
@@ -23,7 +24,7 @@ const REGISTRY: Record<ProviderId, AIProvider> = {
     apiKeyEnv: "OPENROUTER_API_KEY",
     // Required by OpenRouter for attribution on the free tier — see docs/DECISIONS.md 2.1.
     extraHeaders: {
-      "HTTP-Referer": "https://bhw-connect-jongsky25s-projects.vercel.app",
+      "HTTP-Referer": SITE_URL,
       "X-Title": "BHW Connect",
     },
   }),

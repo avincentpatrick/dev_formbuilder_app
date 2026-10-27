@@ -16,6 +16,7 @@ import { CorrectionForm } from "@/components/districts/correction-form";
 import { DistrictExportMenu } from "@/components/districts/district-export-menu";
 import { FigureCard } from "@/components/narrative/figure-card";
 import { BenchmarkBars } from "@/components/place/benchmark";
+import { withBasePath } from "@/lib/base-path";
 
 export const revalidate = 3_600; // matches /districts — a snapshot rebuilt by ingestion
 
@@ -105,7 +106,7 @@ export default async function DistrictDetailPage({
           Rolled up from the leaf grain (barangay), never from a member city/municipality&apos;s own
           row — the one arithmetic trap a multi-district city creates. A narrower figure set than a
           place page&apos;s (
-          <a href="/methodology" className="underline hover:text-accent">
+          <a href={withBasePath("/methodology")} className="underline hover:text-accent">
             see /methodology
           </a>
           ): districts carry accreditation, service years, and any-honorarium % only, for now.

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { withBasePath } from "@/lib/base-path";
 
 export const metadata = { title: "Roadmap" };
 
@@ -28,7 +29,7 @@ export default function RoadmapPage() {
           <li>
             Strictly data-grounded AI insights and an &quot;ask the data&quot; chat — every number is
             looked up live and checked before it&apos;s shown; see{" "}
-            <a href="/methodology#ai" className="underline hover:text-accent">
+            <a href={withBasePath("/methodology#ai")} className="underline hover:text-accent">
               how this works
             </a>
           </li>
@@ -66,7 +67,7 @@ export default function RoadmapPage() {
         <p>
           BHW Connect is built as shared infrastructure for more than one Philippine public-interest
           dataset. If there&apos;s a dataset you think belongs here next, tell us via{" "}
-          <a href="/feedback" className="underline hover:text-accent">
+          <a href={withBasePath("/feedback")} className="underline hover:text-accent">
             feedback
           </a>
           . We keep a running assessment of candidates — license, geographic join, how often it

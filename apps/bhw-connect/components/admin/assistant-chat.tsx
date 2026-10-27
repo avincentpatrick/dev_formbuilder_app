@@ -10,6 +10,7 @@ import { AssistantFigureView } from "./assistant-figure";
 import { RouteChips } from "./route-chips";
 import type { AssistantFigure } from "@/lib/ai/figure-from-payload";
 import type { AssistantRoute, PinnedRoute, RouteScope } from "@/lib/ai/route";
+import { withBasePath } from "@/lib/base-path";
 
 type Turn = { role: "user" | "assistant" | "system"; content: string };
 type ToolCall = { name: string; args: Record<string, unknown> };
@@ -122,7 +123,7 @@ export function AssistantChat() {
     if (!lastAnswer || !lastQuestion || reportState === "saving") return;
     setReportState("saving");
     try {
-      const res = await fetch("/api/ai/assistant/regression", {
+      const res = await fetch(withBasePath("/api/ai/assistant/regression"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -195,7 +196,7 @@ export function AssistantChat() {
     setStatus("sending");
 
     try {
-      const res = await fetch("/api/ai/assistant", {
+      const res = await fetch(withBasePath("/api/ai/assistant"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
+import { dataPlaneFetch } from "./data-plane";
 
 /**
  * Service-role Supabase client — bypasses RLS entirely. Reserved for the handful of tables that
@@ -30,5 +31,7 @@ export function createSupabaseServiceClient() {
 
   return createClient<Database>(url, serviceRoleKey, {
     auth: { persistSession: false },
+    // Supabase on a laptop and on Vercel; PostgREST on the testing box (lib/db/data-plane.ts).
+    global: { fetch: dataPlaneFetch() },
   });
 }

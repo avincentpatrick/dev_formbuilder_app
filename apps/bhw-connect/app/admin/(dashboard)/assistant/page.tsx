@@ -1,6 +1,7 @@
 import { AssistantChat } from "@/components/admin/assistant-chat";
 import { listRegisteredDatasets } from "@/lib/db/dataset-registry";
 import { listOpenRegressionCases } from "@/lib/db/regression-cases";
+import { withBasePath } from "@/lib/base-path";
 
 /**
  * The internal assistant (docs/AI_ASSISTANT_PLAN.md §8, Increment 1.4). Gated by the `(dashboard)`
@@ -71,7 +72,7 @@ export default async function AdminAssistantPage() {
                 page (2.4). Replaying them is a different job with its own page — it re-issues every
                 recorded tool call, which is not something to do on a chat page render. */}
             <li className="text-xs text-muted">
-              <a href="/admin/regressions" className="hover:underline">
+              <a href={withBasePath("/admin/regressions")} className="hover:underline">
                 Replay these against this build →
               </a>
             </li>

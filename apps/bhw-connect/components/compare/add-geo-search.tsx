@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useFilterState } from "@/lib/filters/use-filter-state";
+import { withBasePath } from "@/lib/base-path";
 
 type GeoHit = { kind: "geo"; geoCode: string; geoLevel: string; geoName: string; nTotal: number | null };
 /** D3.3 — a district hit from `/api/geo/search`, addable to the district-vs-district compare set
@@ -38,7 +39,7 @@ export function AddGeoSearch({ disabled }: { disabled?: boolean }) {
         return;
       }
       try {
-        const res = await fetch(`/api/geo/search?q=${encodeURIComponent(trimmed)}`);
+        const res = await fetch(withBasePath(`/api/geo/search?q=${encodeURIComponent(trimmed)}`));
         if (currentRequest !== requestId.current) return;
         const body = await res.json();
         setResults(body.results ?? []);

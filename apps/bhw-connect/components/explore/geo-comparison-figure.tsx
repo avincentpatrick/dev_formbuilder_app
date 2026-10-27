@@ -22,6 +22,7 @@ import {
   type GeoLevel,
   type MapIndicator,
 } from "@/lib/filters/schema";
+import { withBasePath } from "@/lib/base-path";
 
 const ChoroplethMap = dynamic(
   () => import("@/components/maps/choropleth-map").then((m) => m.ChoroplethMap),
@@ -224,7 +225,7 @@ export function GeoComparisonFigure({
           Desaturated, dashed areas have fewer than {MIN_LEADER_N} profiled BHWs, so their rate is
           unstable. Areas with no shaded boundary aren&apos;t missing data — see the ranked list
           below the map, and{" "}
-          <a href="/data-quality" className="underline hover:text-accent">
+          <a href={withBasePath("/data-quality")} className="underline hover:text-accent">
             data quality
           </a>{" "}
           for known boundary-source gaps.
@@ -289,7 +290,10 @@ export function GeoComparisonFigure({
             Showing <strong>adjusted</strong> accreditation rates: areas with few profiled BHWs are
             pulled toward their parent&apos;s rate so a handful of people can&apos;t swing the map.
             Raw rates return when you untick the box.{" "}
-            <a href="/methodology#adjusted-rates" className="underline hover:text-accent">
+            <a
+              href={withBasePath("/methodology#adjusted-rates")}
+              className="underline hover:text-accent"
+            >
               How this works
             </a>
             .

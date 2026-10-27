@@ -3,8 +3,11 @@ import { getAllGeosAtLevels } from "@/lib/db/geo";
 import { getProfilingStatusStaticParams } from "@/lib/db/profiling-status";
 import { getUucPhcStaticParams } from "@/lib/db/uuc-phc";
 import { getDistrictIndex } from "@/lib/db/districts";
+import { SITE_URL } from "@/lib/site-url";
 
-const BASE_URL = "https://bhw-connect-jongsky25s-projects.vercel.app";
+// Origin plus base path (`lib/site-url.ts`): a sitemap entry is an absolute URL, so it carries
+// the prefix itself.
+const BASE_URL = SITE_URL;
 
 const STATIC_PATHS = [
   "",

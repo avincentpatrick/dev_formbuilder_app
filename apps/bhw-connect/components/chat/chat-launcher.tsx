@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import type { DatasetScopeId } from "@/lib/ai/scope-id";
 import type { GeoLevel } from "@/lib/filters/schema";
 import { logEvent } from "@/lib/usage/log-client";
+import { withBasePath } from "@/lib/base-path";
 
 const SESSION_KEY = "bhw-connect-session-id";
 
@@ -97,7 +98,7 @@ export function ChatLauncher({
     logEvent("ai_chat_open_question", { geoCode, meta: { dataset } });
 
     try {
-      const res = await fetch("/api/ai/chat", {
+      const res = await fetch(withBasePath("/api/ai/chat"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -185,7 +186,7 @@ export function ChatLauncher({
             <p className="text-sm text-muted">
               {introLine} Answers are AI-generated and grounded only in this site&apos;s own data —
               see{" "}
-              <a href={methodologyHref} className="underline hover:text-accent">
+              <a href={withBasePath(methodologyHref)} className="underline hover:text-accent">
                 how this works
               </a>
               .

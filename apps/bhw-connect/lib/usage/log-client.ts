@@ -1,6 +1,7 @@
 "use client";
 
 import { getSessionId } from "@/lib/feedback/session";
+import { stripBasePath, withBasePath } from "@/lib/base-path";
 
 function doNotTrackEnabled(): boolean {
   if (typeof navigator === "undefined") return false;
@@ -24,11 +25,11 @@ export function logEvent(
     const body = JSON.stringify({
       sessionId: getSessionId(),
       eventType,
-      pagePath: options.pagePath ?? window.location.pathname,
+      pagePath: options.pagePath ?? stripBasePath(window.location.pathname),
       geoCode: options.geoCode,
       meta: options.meta,
     });
-    fetch("/api/log", {
+    fetch(withBasePath("/api/log"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body,

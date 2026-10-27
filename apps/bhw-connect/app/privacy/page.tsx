@@ -1,3 +1,5 @@
+import { withBasePath } from "@/lib/base-path";
+
 export const metadata = { title: "Privacy" };
 
 export default function PrivacyPage() {
@@ -30,7 +32,7 @@ export default function PrivacyPage() {
           The published dashboard never shows or exports individual-level BHW records — only
           aggregate counts and percentages, with small groups suppressed to prevent
           re-identification. See{" "}
-          <a href="/methodology" className="underline hover:text-accent">
+          <a href={withBasePath("/methodology")} className="underline hover:text-accent">
             methodology
           </a>{" "}
           for the exact rule.
@@ -46,7 +48,7 @@ export default function PrivacyPage() {
         <h2 className="text-lg font-semibold">Questions</h2>
         <p>
           Reach out via the{" "}
-          <a href="/feedback" className="underline hover:text-accent">
+          <a href={withBasePath("/feedback")} className="underline hover:text-accent">
             feedback
           </a>{" "}
           page with any privacy question or concern.

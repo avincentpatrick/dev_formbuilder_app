@@ -17,6 +17,7 @@ import {
 } from "@/lib/analysis/map-indicators";
 import { logEvent } from "@/lib/usage/log-client";
 import type { DistrictMapIndicator } from "@/lib/filters/schema";
+import { withBasePath } from "@/lib/base-path";
 
 const ChoroplethMap = dynamic(
   () => import("@/components/maps/choropleth-map").then((m) => m.ChoroplethMap),
@@ -116,7 +117,7 @@ export function DistrictMapFigure({
   const drill = useCallback((code: string) => {
     logEvent("map_drill", { meta: { childLevel: "district", districtCode: code } });
     setSelectedCode(null);
-    window.location.assign(`/districts/${code}`);
+    window.location.assign(withBasePath(`/districts/${code}`));
   }, []);
 
   const changeIndicator = useCallback(
@@ -183,7 +184,7 @@ export function DistrictMapFigure({
 
         <div className="relative">
           <ChoroplethMap
-            geojsonUrl="/geo/districts.json"
+            geojsonUrl={withBasePath("/geo/districts.json")}
             childLevel="district"
             data={resolved}
             bins={bins}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { logEvent } from "@/lib/usage/log-client";
 import { formatCount } from "@/lib/format";
+import { withBasePath } from "@/lib/base-path";
 
 type GeoParentChain = { region?: string; province?: string; citymun?: string };
 
@@ -182,7 +183,7 @@ export function GeoSearch({
 
         setStatus("loading");
         try {
-          const res = await fetch(`/api/geo/search?q=${encodeURIComponent(trimmed)}`);
+          const res = await fetch(withBasePath(`/api/geo/search?q=${encodeURIComponent(trimmed)}`));
           if (currentRequest !== requestId.current) return;
           const body = await res.json();
           const next: GeoSearchResult[] = body.results ?? [];

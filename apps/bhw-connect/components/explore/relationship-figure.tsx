@@ -14,6 +14,7 @@ import {
 import { describeCorrelation, MIN_CORRELATION_N } from "@/lib/analysis/correlation";
 import { logEvent } from "@/lib/usage/log-client";
 import { REL_EXTERNAL_INDICATORS, type RelAxisIndicator, type GeoLevel } from "@/lib/filters/schema";
+import { withBasePath } from "@/lib/base-path";
 
 /** One child geo with all axis values, for the scatter (E1.4 / E4.4). `povertyIncidence` is the
  * external PSA SAE variable, present only at city/municipality grain. */
@@ -176,7 +177,7 @@ export function RelationshipFigure({
           Hollow points have fewer than {MIN_LEADER_N} profiled BHWs and are excluded from the
           correlation. This is a place-level comparison (ecological), not a statement about
           individual BHWs — see{" "}
-          <a href="/methodology#relationships" className="underline hover:text-accent">
+          <a href={withBasePath("/methodology#relationships")} className="underline hover:text-accent">
             methodology
           </a>
           .
@@ -269,7 +270,7 @@ export function RelationshipFigure({
               const smallN = d.p.nTotal !== null && d.p.nTotal < MIN_LEADER_N;
               const label = `${d.p.geoName}: ${xMeta.label} ${xf(d.x)}, ${yMeta.label} ${yf(d.y)}${d.p.nTotal !== null ? ` (${d.p.nTotal.toLocaleString()} profiled)` : ""}. Open place page.`;
               return (
-                <a key={d.p.geoCode} href={`/place/${childLevel}/${d.p.geoCode}`} aria-label={label}>
+                <a key={d.p.geoCode} href={withBasePath(`/place/${childLevel}/${d.p.geoCode}`)} aria-label={label}>
                   <title>{label}</title>
                   <circle
                     cx={xScale(d.x)}

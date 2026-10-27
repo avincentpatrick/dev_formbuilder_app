@@ -3,6 +3,7 @@ import { getDistrictIndex } from "@/lib/db/districts";
 import { DistrictIndexTable } from "@/components/districts/district-index-table";
 import { MatchQualityBadge, MATCH_QUALITY_DESCRIPTION } from "@/components/districts/match-quality-badge";
 import type { DistrictMatchQuality } from "@/lib/db/districts";
+import { withBasePath } from "@/lib/base-path";
 
 export const metadata = { title: "Districts" };
 
@@ -90,11 +91,11 @@ export default async function DistrictsPage() {
 
           <p className="text-sm text-muted">
             Download the mapping itself:{" "}
-            <a href="/api/export/districts/csv" className="underline hover:text-accent">
+            <a href={withBasePath("/api/export/districts/csv")} className="underline hover:text-accent">
               CSV
             </a>{" "}
             ·{" "}
-            <a href="/api/export/districts/xlsx" className="underline hover:text-accent">
+            <a href={withBasePath("/api/export/districts/xlsx")} className="underline hover:text-accent">
               XLSX
             </a>{" "}
             — every live member LGU with its source page, revision, and match method.

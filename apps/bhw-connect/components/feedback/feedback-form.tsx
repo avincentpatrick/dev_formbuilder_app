@@ -4,6 +4,7 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { logEvent } from "@/lib/usage/log-client";
 import { getSessionId } from "@/lib/feedback/session";
+import { withBasePath } from "@/lib/base-path";
 
 export const CATEGORIES = [
   { value: "bug", label: "Something's broken" },
@@ -46,7 +47,7 @@ export function FeedbackForm({
     setStatus("submitting");
 
     try {
-      const res = await fetch("/api/feedback", {
+      const res = await fetch(withBasePath("/api/feedback"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

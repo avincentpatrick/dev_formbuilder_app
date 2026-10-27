@@ -90,6 +90,7 @@ import { DIMENSION_LABEL } from "@/components/explore/demographics-figure";
 import { PresentationProvider } from "@/components/present/presentation-context";
 import { PresentationSlide } from "@/components/present/presentation-slide";
 import { PresentButton } from "@/components/present/present-button";
+import { withBasePath } from "@/lib/base-path";
 
 const CHILD_LEVEL_LABEL: Record<GeoLevel, string> = {
   national: "Region",
@@ -403,11 +404,11 @@ export default async function ExplorePage({
   // at citymun the map is absent and only the ranked list renders.
   const mapGeojsonUrl =
     geo.geoLevel === "national"
-      ? "/geo/regions.json"
+      ? withBasePath("/geo/regions.json")
       : geo.geoLevel === "region"
-        ? `/geo/provinces/${geo.geoCode}.json`
+        ? withBasePath(`/geo/provinces/${geo.geoCode}.json`)
         : geo.geoLevel === "province"
-          ? `/geo/citymun/${geo.geoCode}.json`
+          ? withBasePath(`/geo/citymun/${geo.geoCode}.json`)
           : null;
   // Indicator switcher (E1.1). Topics come from the parent's training rows; an
   // active `training:` indicator whose topic isn't available here falls back to

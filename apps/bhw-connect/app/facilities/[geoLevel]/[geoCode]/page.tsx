@@ -29,6 +29,7 @@ import { AiInsight } from "@/components/narrative/ai-insight";
 import { PresentationProvider } from "@/components/present/presentation-context";
 import { PresentationSlide } from "@/components/present/presentation-slide";
 import { PresentButton } from "@/components/present/present-button";
+import { withBasePath } from "@/lib/base-path";
 
 // 1 hour. ISR: citymun render on demand; region/province are prerendered. Same reasoning as the
 // landing page — a shorter window bounds how long a transient empty read can stay cached.
@@ -199,7 +200,7 @@ export default async function FacilitiesAreaPage({ params }: { params: Promise<P
                         areaName={geo.geoName}
                         outlineUrl={
                           ancestors.province
-                            ? `/geo/citymun/${ancestors.province.geoCode}.json`
+                            ? withBasePath(`/geo/citymun/${ancestors.province.geoCode}.json`)
                             : null
                         }
                         outlineGeoCode={geo.geoCode}

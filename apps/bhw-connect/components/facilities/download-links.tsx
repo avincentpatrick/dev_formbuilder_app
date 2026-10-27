@@ -1,4 +1,5 @@
 import type { GeoLevel } from "@/lib/filters/schema";
+import { withBasePath } from "@/lib/base-path";
 
 /**
  * The section's one download: a PNG summary of this area's coverage, ownership split, and
@@ -15,7 +16,7 @@ export function DownloadLinks({ geoLevel, geoCode }: { geoLevel: GeoLevel; geoCo
   return (
     <div className="flex flex-wrap items-center gap-2">
       <a
-        href={`/api/export/facilities?${scope}`}
+        href={withBasePath(`/api/export/facilities?${scope}`)}
         className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium transition-colors hover:border-accent"
       >
         Summary (PNG)

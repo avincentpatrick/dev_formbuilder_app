@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { logEvent } from "@/lib/usage/log-client";
 import { getSessionId } from "@/lib/feedback/session";
+import { withBasePath } from "@/lib/base-path";
 
 const ACTIONS = [
   { value: "add", label: "A place is missing from this district" },
@@ -55,7 +56,7 @@ export function CorrectionForm({
     setStatus("submitting");
 
     try {
-      const res = await fetch("/api/districts/corrections", {
+      const res = await fetch(withBasePath("/api/districts/corrections"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -290,7 +291,7 @@ function GeoPicker({
         return;
       }
       try {
-        const res = await fetch(`/api/geo/search?q=${encodeURIComponent(trimmed)}`);
+        const res = await fetch(withBasePath(`/api/geo/search?q=${encodeURIComponent(trimmed)}`));
         if (currentRequest !== requestId.current) return;
         const body = await res.json();
         const all: GeoSearchResult[] = body.results ?? [];

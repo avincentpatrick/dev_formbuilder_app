@@ -17,6 +17,7 @@ import { BottleneckBars } from "@/components/profiling-status/bottleneck-bars";
 import { AreaRanking } from "@/components/profiling-status/area-ranking";
 import { CoverageFlags } from "@/components/profiling-status/coverage-flags";
 import { ChildBreakdown } from "@/components/profiling-status/child-breakdown";
+import { withBasePath } from "@/lib/base-path";
 
 // 1 hour, not 24. ISR: citymun render on-demand; region/province are SSG. As on the landing page,
 // a shorter window bounds how long a transient empty read (getProfilingStatus returns null on any
@@ -84,7 +85,7 @@ export default async function ProfilingStatusAreaPage({ params }: { params: Prom
     (a): a is NonNullable<typeof a> => a !== null && a.geoCode !== geo.geoCode,
   );
 
-  const downloadHref = `/api/export/profiling-status?geoLevel=${geo.geoLevel}&geoCode=${encodeURIComponent(geo.geoCode)}`;
+  const downloadHref = withBasePath(`/api/export/profiling-status?geoLevel=${geo.geoLevel}&geoCode=${encodeURIComponent(geo.geoCode)}`);
   const childHeading = CHILD_HEADING[geo.geoLevel];
 
   return (

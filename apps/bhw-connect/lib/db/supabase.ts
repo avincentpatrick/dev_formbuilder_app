@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
+import { dataPlaneFetch } from "./data-plane";
 
 /**
  * Server-only Supabase client for reading public `agg_*`/`dim_*` tables.
@@ -18,5 +19,7 @@ export function createSupabaseServerClient() {
 
   return createClient<Database>(url, anonKey, {
     auth: { persistSession: false },
+    // Supabase on a laptop and on Vercel; PostgREST on the testing box (lib/db/data-plane.ts).
+    global: { fetch: dataPlaneFetch() },
   });
 }

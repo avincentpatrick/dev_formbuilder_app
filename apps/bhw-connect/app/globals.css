@@ -265,8 +265,10 @@ html[data-presenting] [data-feedback-ui] {
   display: inline-block;
   aspect-ratio: 2048 / 672;
   background: var(--accent);
-  -webkit-mask: url(/img/equity-mark.png) center/contain no-repeat;
-  mask: url(/img/equity-mark.png) center/contain no-repeat;
+  /* Relative, so the bundler emits the file under /_next/static/media with the base path applied;
+     a root-relative url(/img/…) would 404 under /bhw-connect. */
+  -webkit-mask: url("../public/img/equity-mark.png") center/contain no-repeat;
+  mask: url("../public/img/equity-mark.png") center/contain no-repeat;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
   vertical-align: middle;

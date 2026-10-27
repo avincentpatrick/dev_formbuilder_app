@@ -9,6 +9,7 @@ import { BottleneckBars } from "@/components/profiling-status/bottleneck-bars";
 import { AreaRanking } from "@/components/profiling-status/area-ranking";
 import { CoverageFlags } from "@/components/profiling-status/coverage-flags";
 import { ChildBreakdown } from "@/components/profiling-status/child-breakdown";
+import { withBasePath } from "@/lib/base-path";
 
 // 1 hour, not 24. This page is statically prerendered, so whatever it renders is cached for the
 // whole window — including the "data is not available" empty state, which `getProfilingStatus`
@@ -41,7 +42,7 @@ export default async function ProfilingStatusLanding() {
   }
 
   const regionCount = children.length;
-  const downloadHref = "/api/export/profiling-status?geoLevel=national&geoCode=PH";
+  const downloadHref = withBasePath("/api/export/profiling-status?geoLevel=national&geoCode=PH");
 
   return (
     <div className="flex flex-col gap-8">

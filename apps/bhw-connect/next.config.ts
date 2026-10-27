@@ -1,6 +1,22 @@
 import type { NextConfig } from "next";
+import { normaliseBasePath } from "./lib/base-path";
 
 const nextConfig: NextConfig = {
+  // The prefix the app is served under: empty on a laptop and on Vercel, `/bhw-connect` on the
+  // testing box and in CI (Meridian's ADR-0024). Next prefixes its links, redirects and assets with
+  // it; everything it does not prefix goes through `withBasePath()` (lib/base-path.ts).
+  basePath: normaliseBasePath(process.env.NEXT_PUBLIC_BASE_PATH),
+
+  // A self-contained server (`.next/standalone/server.js`) that the box runs from a release
+  // directory, never from the git checkout (ops/deploy-bhw.ps1).
+  output: "standalone",
+
+  // This app sits inside a repository with a second lockfile at its root (Meridian's). Without
+  // these, Next infers the repository root as the workspace — measured: it does, and warns — and
+  // the standalone output nests under it. Both are pinned to this directory.
+  outputFileTracingRoot: __dirname,
+  turbopack: { root: __dirname },
+
   // @resvg/resvg-js ships a native .node binding (PNG export rendering,
   // increment 1.8) that Turbopack can't bundle into an ESM chunk — keep it
   // as a real runtime require() instead.

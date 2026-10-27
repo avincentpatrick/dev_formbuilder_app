@@ -12,6 +12,7 @@ import {
   elementAtPoint,
   type ElementContext,
 } from "@/lib/feedback/capture";
+import { withBasePath } from "@/lib/base-path";
 
 type Mode = "idle" | "picking" | "commenting" | "sending" | "done" | "error";
 
@@ -108,7 +109,7 @@ export function SpotFeedback() {
 
     try {
       const screenshot = (await screenshotRef.current) ?? undefined;
-      const res = await fetch("/api/feedback", {
+      const res = await fetch(withBasePath("/api/feedback"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

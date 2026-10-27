@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getActiveDataset } from "@/lib/db/dataset";
 import { getChangelogEntries } from "@/lib/db/changelog";
 import { GlossaryTerm } from "@/components/glossary/glossary-term";
+import { withBasePath } from "@/lib/base-path";
 
 export const metadata = { title: "Methodology" };
 
@@ -110,7 +111,7 @@ export default async function MethodologyPage() {
           barangay: 10). Maps are shown down to the city/municipality level; barangay-level figures
           are available via search and place pages, with barangay map polygons planned for a future
           release. Where a place has no matching boundary polygon (see{" "}
-          <a href="/data-quality" className="underline hover:text-accent">
+          <a href={withBasePath("/data-quality")} className="underline hover:text-accent">
             data quality
           </a>
           ), it&apos;s shown in the ranked list next to the map rather than omitted.

@@ -2,6 +2,7 @@
 
 import { logEvent } from "@/lib/usage/log-client";
 import type { DistrictExportIndicator } from "@/lib/exports/figure-data";
+import { withBasePath } from "@/lib/base-path";
 
 const FORMATS = [
   { format: "csv", label: "CSV" },
@@ -31,7 +32,7 @@ export function DistrictExportMenu({
         <span key={format}>
           {i > 0 && <span aria-hidden="true">·</span>}
           <a
-            href={`/api/export/${format}?${params.toString()}`}
+            href={withBasePath(`/api/export/${format}?${params.toString()}`)}
             onClick={() => logEvent("export", { meta: { format, indicator, districtCode } })}
             className="px-1 underline-offset-2 hover:text-accent hover:underline"
           >

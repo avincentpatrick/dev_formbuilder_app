@@ -80,6 +80,35 @@ it('covers every path a close-out push touches, or the arm cannot do its job', f
     }
 });
 
+it('lets another application under apps/ ship without a Meridian window, because Meridian loads nothing from it', function (): void {
+    // M192 (ADR-0024): BHW Connect lives under apps/bhw-connect/ and deploys itself. Its pushes must not
+    // take the testing site down, so `apps/` is site-safe — and that is only true while nothing the
+    // site loads reaches into apps/. Both halves are asserted, from the files that would say otherwise.
+    expect(deployAllowlist('SiteSafePrefixes'))->toContain('apps/');
+
+    $composer = json_decode((string) file_get_contents(base_path('composer.json')), true);
+    $autoload = array_merge(
+        array_values((array) ($composer['autoload']['psr-4'] ?? [])),
+        (array) ($composer['autoload']['files'] ?? []),
+        (array) ($composer['autoload']['classmap'] ?? []),
+    );
+
+    foreach ($autoload as $root) {
+        expect(Str::startsWith((string) $root, 'apps/'))->toBeFalse(
+            "composer.json autoloads `{$root}`, under apps/: deploy.ps1 would skip the window for code the site loads."
+        );
+    }
+
+    preg_match('/input:\s*\[([^\]]*)\]/u', (string) file_get_contents(base_path('vite.config.ts')), $input);
+
+    expect($input)->toHaveCount(2, 'vite.config.ts no longer declares its inputs as one array literal.');
+    expect($input[1])->not->toContain('apps/', 'A Vite input under apps/ would ship in a build deploy.ps1 skips.');
+
+    $package = json_decode((string) file_get_contents(base_path('package.json')), true);
+
+    expect($package)->not->toHaveKey('workspaces', 'npm workspaces would hoist apps/ into the root install the site builds from.');
+});
+
 it('never allows a path the running site loads', function (): void {
     $allowed = array_merge(deployAllowlist('SiteSafePrefixes'), deployAllowlist('SiteSafeFiles'));
 

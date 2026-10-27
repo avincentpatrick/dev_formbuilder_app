@@ -16,7 +16,29 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M190`, every deferral section and deferral sentence gets a recorded disposition (`deferral-site-disposition`) (m190-deferral-dispositions)
+## Status: NO ACTIVE CLAIM — `M189` (Compare two versions) and `M190` (deferral dispositions) are merged and live on staging, released together at merge point 7 (`D170`; below). The next claim is the head of `docs/pipeline.md`'s during-testing tier.
+
+## RELEASED — `M190`, every deferral section and deferral sentence gets a recorded disposition (`deferral-site-disposition`) (merged as PR #383, `f980cbba`, last at merge point 7, rebased onto the trunk after `M189`; 6/6 green with real step counts on its rebased run at `a6638c28` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `f980cbba` the same)
+
+**RELEASED LAST AT MERGE POINT 7 (`D170`), 2026-10-27, by the merge-point-7 session** (plan
+`~/.claude/plans/read-claude-md-then-php-declarative-rossum.md`). `M189` merged first (`b2252d80`, with no rebase; its block and the
+census before are below). Once `M189` had deployed, rebased onto the trunk with `git rebase origin/main` (the base `619549ef` is a trunk
+claim commit, so only this branch's two commits replayed). The four predicted conflicts, all prose: form-versioning §11's first bullet
+and piping §8.1's hole-diffing bullet took `M189`'s text with this branch's disposition (`Built — M189`; the piping one naming
+`R-b0f90c12` and `R-49337f53`), `docs/feature-backlog.md`'s end kept both appended blocks, and `docs/pipeline.md` was regenerated at each
+replayed commit. `range-diff`: the second commit identical, the first differing only in those files. `pipeline-lint` then named the third
+`Queued — version-diff-ui` site, workflow §10, as predicted — **but its premise had moved:** `M189`'s Compare page marks a relevance
+change ("Changes who is asked") while `SchemaChangeClassifier::breakingCodeOf()` still has no relevance arm, so the disposition says both
+halves rather than a bare `Built — M189` (`a6638c28`). Host gates green (Pint proved by its probe, the eight lint gates, `tracker-lint`,
+`state --check`); container `tests/Feature/Docs` 184 passed, `SuiteCollectionFloorTest` red on the known bind-mount artefact (519 of 598
+files). Re-run 6/6 at `a6638c28` (run 40445931939). Squash-merged as `f980cbba` with an explicit body at 04:22 UTC, once `M189`'s deploy
+had finished and `/up` answered 200. The trunk's CI 6/6 (run 40449344963 — the run `docs/gate-baselines.md` is now measured from).
+The deploy (run 40451991779, 2 minutes) backed up to `deploy-20261027-045224.dump` (1,170,756 B), counted 70 tables and 54,040 rows,
+had nothing to migrate, re-synced the places (43,788 unchanged), found every table at least as full after (70 tables), and left the notes
+as they were (`releases: 0 added, 0 updated, 9 unchanged; 9 in the table, none removed (newest 0.16.0)`). `/up` 200, version `0.16.0`.
+**The user's census after (2026-10-27 05:08:05 UTC) matched the one before table for table: tenants 1 · users 6 · forms 11 ·
+form_versions 27 · submissions 22 · attachments 62 · feedback_reports 31 · notifications 74; statuses `confirmed, resolved`** (no
+relayed report was resolved in between). The build's record follows.
 
 Taken 2026-10-27. Branch `m190-deferral-dispositions`, cut from `origin/main` at `dc649b43`, PR into main. ⛔ **NOT MERGED THIS SESSION:**
 held green for **merge point 7 together with `M189`** (`D170`, `D137`). The plan is
@@ -76,15 +98,10 @@ the `P2c` pin moves 8 → 7. The fixture's baseline goes red the moment the corp
 carries those ids. PHPStan cannot move (a docblock). **Most likely wrong:** the item walk's boundaries — a continuation line, an
 indented amendment or a marker comment read as part of the wrong item — on a shape the audits did not list.
 
-**BUILT — PR #383, CI 6/6 green with real step counts (run 40431625030 at `c5b3f300`: Static analysis 32 · E2E 20 · Contract 16 ·
-Frontend 12 · Pest 11 · axe 11) — AND NOT MERGED.** ⛔ **Held for merge point 7 (`D170`), merged AFTER #382 (`M189`)**; the user's
-census before and after, as at every merge point. The branch is cut from `dc649b43` and has never merged the trunk. **At merge point 7,
-once #382 is in:** rebase this branch onto the trunk. Expect conflicts at form-versioning §11's first bullet and piping §8.1's
-hole-diffing bullet — take #382's text and keep this branch's disposition — and at the end of `docs/feature-backlog.md`, where both
-appended rows (keep both). Then `pipeline-lint` names the three `Queued — version-diff-ui` sites (form-versioning §11, piping §8.1,
-workflow §10's relevance-diff bullet), because that marker will have left the line: change each to `Built — M189`, the piping one naming
-`R-b0f90c12` (`M189`'s thank-you-message row) and `R-49337f53` too. Regenerate the line. No migration. Commits: `acdd8585` (the build),
-`c5b3f300` (a last-match control; the marker done, the line regenerated).
+Built: PR #383, CI 6/6 green with real step counts (run 40431625030 at `c5b3f300`: Static analysis 32 · E2E 20 · Contract 16 ·
+Frontend 12 · Pest 11 · axe 11). The branch was cut from `dc649b43` and never merged the trunk; the rebase at merge point 7 and its
+predicted conflicts are above. No migration. Commits before the rebase: `acdd8585` (the build), `c5b3f300` (a last-match control; the
+marker done, the line regenerated); after it, `a5acabb6`, `9645dcf9` and `a6638c28` (the relevance-diff disposition).
 
 **How the prediction fared — measured, the wrong parts first.**
 - **"Most likely wrong: the item walk's boundaries" — wrong, in the good direction.** Its first run collected exactly the audits' items
@@ -120,7 +137,18 @@ workflow §10's relevance-diff bullet), because that marker will have left the l
   committed, on `M82`'s stated grounds:** no arm of this gate reads a diff; each run proved its write (the sha256 moved) and its
   restore (byte-compared, `git status` clean).
 
-## HELD — `M189`, compare two versions of a form (`version-diff-ui`) (m189-version-compare)
+## RELEASED — `M189`, compare two versions of a form (`version-diff-ui`) (merged as PR #382, `b2252d80`, first at merge point 7, with no rebase; 6/6 green with real step counts on its run at `5e7f77f8` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `b2252d80` the same)
+
+**RELEASED FIRST AT MERGE POINT 7 (`D170`), 2026-10-27, by the merge-point-7 session** (plan
+`~/.claude/plans/read-claude-md-then-php-declarative-rossum.md`). The session-start pull read 0 reports, 0 reopened and 0 new comments.
+**The user's census before (2026-10-27 03:33:12 UTC): tenants 1 · users 6 · forms 11 · form_versions 27 · submissions 22 · attachments 62
+· feedback_reports 31 · notifications 74** (exactly merge point 6's census after). No rebase: the trunk had moved past `74503a6c` only by
+claim commits (`dc649b43`, `619549ef`, `131c837b`, `docs/claims/lane-a.md` alone), and `git merge-tree` into `131c837b` was clean.
+Squash-merged as `b2252d80` with an explicit body at 03:34 UTC. The trunk's CI 6/6 (run 40444876339, 36 minutes). The deploy (run
+40448225775, 2 minutes) backed up to `deploy-20261027-041138.dump` (1,167,136 B), counted 70 tables and 53,998 rows, had nothing to
+migrate, re-synced the places (`psgc: 0 added, 0 updated, 43,788 unchanged`), found every table at least as full after (70 tables), and
+copied the notes: `releases: 1 added, 0 updated, 8 unchanged; 9 in the table, none removed (newest 0.16.0)`. `/up` 200, the sign-in
+page's shared version `0.16.0`. `M190` merged second (above). No relayed report closes with it. The build's record follows.
 
 Taken 2026-10-26. Branch `m189-version-compare`, cut from `origin/main` at `8500dfa1`, PR into main. ⛔ **NOT MERGED THIS SESSION:**
 held green for merge point 7, released together with the next increment from the line (`D170`, `D137`). The plan is
@@ -203,13 +231,10 @@ the link inside the info `MdsAlert` keeps the browser's default blue (`#0000ee` 
 in the same alert in the same way and has no axe scan, so the same defect has been live on staging since `M172`; no other page nests a
 link inside an `MdsAlert` (measured over every page that has both). Both links take the alert's own foreground, underlined.
 
-**BUILT — PR #382, CI 6/6 green with real step counts (run 40352268887 at `5e7f77f8`: Static analysis 32 · E2E 20 · Contract 16 ·
-Frontend 12 · Pest 11 · axe 11) — AND NOT MERGED.** ⛔ **Held for merge point 7 (`D170`)**, released with the next increment from the
-line; the user's census before and after, as at every merge point. This branch merged the trunk ONCE, at `74503a6c` (to carry the
-claim extension): at merge point 7 rebase M189's own commits with `git rebase --onto origin/main 74503a6c` and `git rebase --skip` any
-`claim(M189)` commit it replays — or merge with no rebase if the trunk has moved only by claim commits (`M186`'s precedent). No
-migration. `docs/claims/decisions.md` (`D169`, `D170`) is already on the trunk. Commits: `206f02c7` (the build), `01868cec` (PHPStan),
-`5e7f77f8` (the alert link and View's scan).
+Built: PR #382, CI 6/6 green with real step counts (run 40352268887 at `5e7f77f8`: Static analysis 32 · E2E 20 · Contract 16 ·
+Frontend 12 · Pest 11 · axe 11). The branch merged the trunk once, at `74503a6c`; at merge point 7 the trunk had moved past it only by
+claim commits, so it merged with no rebase (above). No migration. Commits: `206f02c7` (the build), `01868cec` (PHPStan), `5e7f77f8` (the
+alert link and View's scan).
 
 **How the prediction fared — measured, the wrong parts first.**
 - **"Red first to the new Vitest files" — never observed:** `version-compare.test.ts`, `VersionCompare.test.ts` and the new

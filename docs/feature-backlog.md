@@ -15257,7 +15257,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   copied in from a list never read as a change between a draft and its live version — and therefore neither does a new upload of the
   same list, or a newer quarter of the places, between two published versions. The page says so in its note. The remedy: compare the
   copied rows' count and checksum between two published versions only, and show "The list's rows changed (N → M)".
-  **Latent** until `M189` merges. Filed by `M189`. **Tier: during-testing.**
+  **Live** on the trunk since `M189` merged at merge point 7 (`b2252d80`, 2026-10-27). Filed by `M189`. **Tier: during-testing.**
 
 - **`minor` · A workspace cannot be deleted: `tenants:extract` reads a departing customer's data out and nothing removes it.**
   `docs/architecture/technical-architecture.md` §9's R12 names the purge as the write half of offboarding, and the only tenant
@@ -15358,7 +15358,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`nit` · The Compare page marks changed piping only in a question's base label, hint and placeholder, so a section's text or a translated label that now pipes a different answer shows changed without the mark.**
   `M189`'s `VersionComparison` reads `${…}` holes from the base label, hint and placeholder only, and gives sections no piping mark,
   though translations and section titles and descriptions carry templates too (`docs/piping-output-encoding-design.md` §6). The
-  remedy: read holes from every template-bearing text §6 names. **Latent** until `M189` merges. Filed by `M190`.
+  remedy: read holes from every template-bearing text §6 names. **Live** since `M189` merged (`b2252d80`). Filed by `M190`.
   **Tier: during-testing.**
 
 - **`nit` · The spreadsheet export takes an empty translated label as its column heading, where every screen falls back to the base label.**
@@ -15395,3 +15395,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the deploy ships, not the token's scope. The remedy: `permissions: contents: read` at the top of each file, widened per job only where
   one needs more. **Latent** — it depends on the repository's default token setting, which the tree cannot show. Filed by `M190`.
   **Tier: before-launch.**
+
+- **`minor` · `PROGRESS.md` has under one close-out of byte headroom, so the next close-out's status bullet can redden the trunk.**
+  Measured at merge point 7's close-out (2026-10-27): 126,093 bytes against `tracker-lint` R1's ceiling of 130,000 once `M189`'s and
+  `M190`'s bullets were prepended, and `preflight` warns below 4,000 because a status bullet has cost two to three KB. `## Current Status`
+  has held every bullet since the last surgery. The remedy, before the next close-out pushes: move the oldest status bullets into
+  `PROGRESS_ARCHIVE.md` by pre-measured line index, proved with `scripts/tracker-surgery.php` while uncommitted, the surgery marker at a
+  line's start in the squash body. **Live.** Filed by `M190` (its close-out). **Tier: during-testing.**

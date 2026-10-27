@@ -73,3 +73,11 @@ ingestion/data/dim_geo.csv
 .vscode/
 .idea/
 ingestion/data/agg_population_citymun.csv
+
+# source data — out of git since the app came into Meridian's public repository; where it lives is
+# in ingestion/data/README.md
+/ingestion/data/*
+!/ingestion/data/README.md
+
+# local storage for feedback screenshots in development (lib/db/admin.ts, from P3)
+/.local-storage/

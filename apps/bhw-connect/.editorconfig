@@ -1,0 +1,18 @@
+# BHW Connect's own editor settings. `root = true` stops the lookup here, so the 4-space indent in
+# the repository's root .editorconfig (Meridian's) never reaches this app's Prettier, which reads
+# .editorconfig for any option .prettierrc.json leaves unset.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_size = 2
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.py]
+indent_size = 4

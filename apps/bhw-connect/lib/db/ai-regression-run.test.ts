@@ -17,6 +17,11 @@ import { describe, expect, it } from "vitest";
  * per day, with scheduling precision to the hour. A second daily job therefore fits, and a job that
  * would run twice in a day does not — it fails at deploy time, which is the worst place to find out.
  * These turn "once per day" from something a reader has to remember into something CI checks.
+ *
+ * The schedules moved from `vercel.json` to `ops/cron-schedule.json` when the app came into
+ * Meridian's repository: the box's Task Scheduler runs them now (`ops/register-cron-tasks.ps1`).
+ * Both rules still hold there — the two jobs share the AI providers' free-tier request caps, so
+ * they still run once a day each and two hours apart.
  */
 
 const MIGRATION = fileURLToPath(
@@ -24,8 +29,8 @@ const MIGRATION = fileURLToPath(
 );
 const sql = readFileSync(MIGRATION, "utf8");
 
-const VERCEL = fileURLToPath(new URL("../../vercel.json", import.meta.url));
-const vercel = JSON.parse(readFileSync(VERCEL, "utf8")) as {
+const SCHEDULE = fileURLToPath(new URL("../../ops/cron-schedule.json", import.meta.url));
+const vercel = JSON.parse(readFileSync(SCHEDULE, "utf8")) as {
   crons: { path: string; schedule: string }[];
 };
 
@@ -128,7 +133,7 @@ describe("the ai_regression_run migration", () => {
   });
 });
 
-describe("the cron schedules in vercel.json", () => {
+describe("the cron schedules in ops/cron-schedule.json", () => {
   it("registers the regression replay alongside the precompute job", () => {
     expect(vercel.crons.map((cron) => cron.path)).toEqual([
       "/api/cron/precompute",

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -40,7 +40,13 @@ type Record_ = {
   proposal: { nodes: Node[]; edges: Edge[] };
 };
 
-const records: Record_[] = readFileSync(TRANSCRIPT, "utf8")
+// The transcript lives under `ingestion/data/`, which stays out of git since the app came into
+// Meridian's public repository (the folder holds the source data). These cases run wherever the
+// folder is present — the ingestion machine — and are skipped, not failed, where it is not; the
+// prompt's cases below read `extract_kb.py`, which is committed, and always run.
+const TRANSCRIPT_PRESENT = existsSync(TRANSCRIPT);
+
+const records: Record_[] = (TRANSCRIPT_PRESENT ? readFileSync(TRANSCRIPT, "utf8") : "")
   .split("\n")
   .filter((line) => line.trim())
   .map((line) => JSON.parse(line) as Record_);
@@ -104,7 +110,7 @@ function namesSameThing(a: string, b: string): boolean {
   return initialisms(a).has(y) || initialisms(b).has(x);
 }
 
-describe("kb extraction transcript", () => {
+describe.skipIf(!TRANSCRIPT_PRESENT)("kb extraction transcript", () => {
   it("records who proposed each slide, under which prompt, against which chunk", () => {
     expect(records.length).toBeGreaterThan(0);
     for (const record of records) {

@@ -1,0 +1,1118 @@
+import Link from "next/link";
+import { loadFilterState } from "@/lib/filters/codec";
+import {
+  DEFAULT_BREAKDOWNS,
+  DEFAULT_MAP_INDICATOR,
+  NATIONAL_GEO_CODE,
+  mapIndicatorTopicSlug,
+  type GeoLevel,
+  type MapBaseIndicator,
+  type MapIndicator,
+} from "@/lib/filters/schema";
+import { getChildGeos, getGeoAncestors, resolveGeoOrNational } from "@/lib/db/geo";
+import {
+  getBhwCounts,
+  getCertification,
+  getChildIndicators,
+  getChildTrainingCoverage,
+  getDemographics,
+  getHonorarium,
+  getTrainingCoverage,
+  type CertificationRow,
+  type ChildIndicatorRow,
+  type HonorariumRow,
+} from "@/lib/db/indicators";
+import { getDataCompleteness, type CompletenessRow } from "@/lib/db/data-quality";
+import {
+  getCohorts,
+  getWorkload,
+  getHonorariumInequality,
+  getHonorariumSufficiency,
+  getIncomeClassEquity,
+} from "@/lib/db/derived-figures";
+import {
+  MAP_BASE_INDICATOR_META,
+  formatIndicatorValue,
+  metaForIndicator,
+} from "@/lib/analysis/map-indicators";
+import { computeDataQualityGrade } from "@/lib/analysis/data-quality-grade";
+import type { ChildIndicator } from "@/components/explore/geo-comparison-figure";
+import { coverageForDisplay } from "@/lib/db/stepzero";
+import { getPeerRank, getPeerRanks } from "@/lib/db/peer-ranks";
+import { getInsights } from "@/lib/db/insights";
+import { getUucPhcCounts } from "@/lib/db/uuc-phc";
+import { getNhfrCounts } from "@/lib/db/nhfr";
+import { getAllDistrictBhwFigures } from "@/lib/db/districts";
+import {
+  getBenchmarkContext,
+  benchmarkRowsFor,
+  rowsFromAncestorValues,
+} from "@/lib/db/benchmark-context";
+import { PEER_LEVEL_PLURAL, peerParentName, toFigurePeer } from "@/lib/analysis/peer-labels";
+import { DOH_INDICATIVE_NOTE } from "@/lib/analysis/thresholds";
+import { GeoCascade } from "@/components/filters/geo-cascade";
+import { BreakdownPicker } from "@/components/filters/breakdown-picker";
+import { GeoSearch } from "@/components/home/geo-search";
+import { ActiveFilterChips, type BreadcrumbStep } from "@/components/filters/active-filter-chips";
+import { GlossaryTerm } from "@/components/glossary/glossary-term";
+import { DenominatorExplainer } from "@/components/home/denominator-explainer";
+import { BenchmarkBars } from "@/components/place/benchmark";
+import { FigureTabs } from "@/components/ui/figure-tabs";
+import { DemographicsFigure } from "@/components/explore/demographics-figure";
+import { DistrictMapFigure } from "@/components/explore/district-map-figure";
+import { MapLayerToggle } from "@/components/explore/map-layer-toggle";
+import { AccreditationSourcesFigure } from "@/components/explore/accreditation-sources-figure";
+import { CertificationFigure } from "@/components/explore/certification-figure";
+import { TrainingFigure } from "@/components/explore/training-figure";
+import { HonorariumFigure } from "@/components/explore/honorarium-figure";
+import { HonorariumAmountFigure } from "@/components/explore/honorarium-amount-figure";
+import { HonorariumDistributionFigure } from "@/components/explore/honorarium-distribution-figure";
+import { CompletenessFigure } from "@/components/place/completeness-figure";
+import { DataQualityBadge } from "@/components/explore/data-quality-badge";
+import { PeerRankChip } from "@/components/explore/peer-rank-chip";
+import { UucPhcContextChip } from "@/components/uuc-phc/context-chip";
+import { NhfrContextChip } from "@/components/facilities/context-chip";
+import { GeoComparisonFigure } from "@/components/explore/geo-comparison-figure";
+import { DistributionFigure } from "@/components/explore/distribution-figure";
+import {
+  RelationshipFigure,
+  type RelationshipPoint,
+} from "@/components/explore/relationship-figure";
+import { getChildPoverty } from "@/lib/db/poverty";
+import { CohortsFigure } from "@/components/explore/cohorts-figure";
+import { WorkloadFigure } from "@/components/explore/workload-figure";
+import { HonorariumInequalityFigure } from "@/components/explore/honorarium-inequality-figure";
+import { HonorariumSufficiencyFigure } from "@/components/explore/honorarium-sufficiency-figure";
+import { IncomeClassFigure } from "@/components/explore/income-class-figure";
+import { InsightsGrid } from "@/components/insights/insights-grid";
+import { ChatLauncher } from "@/components/chat/chat-launcher";
+import { DIMENSION_LABEL } from "@/components/explore/demographics-figure";
+import { PresentationProvider } from "@/components/present/presentation-context";
+import { PresentationSlide } from "@/components/present/presentation-slide";
+import { PresentButton } from "@/components/present/present-button";
+
+const CHILD_LEVEL_LABEL: Record<GeoLevel, string> = {
+  national: "Region",
+  region: "Province",
+  province: "City/Municipality",
+  citymun: "Barangay",
+  barangay: "Barangay",
+};
+
+const CHILD_LEVEL_LABEL_PLURAL: Record<GeoLevel, string> = {
+  national: "Regions",
+  region: "Provinces",
+  province: "Cities/Municipalities",
+  citymun: "Barangays",
+  barangay: "Barangays",
+};
+
+export const metadata = { title: "Explore" };
+
+function captionFor(nProfiles: number | null, geoName: string) {
+  return `N = ${nProfiles !== null ? nProfiles.toLocaleString() : "—"} validated profiles · ${geoName} · 2025 snapshot`;
+}
+
+/** The 4 indicators `agg_peer_ranks` covers that also have a standalone figure
+ * card here (Increment 4) — batched into one `getPeerRanks` call instead of
+ * one round trip per figure. */
+const FIGURE_PEER_INDICATORS = [
+  "pct_accredited",
+  "avg_active_years",
+  "any_honorarium_pct",
+  "households_per_bhw",
+] as const;
+
+/** R3: at barangay, a figure that renders the barangay's own data (not an
+ * ancestor fallback) still has no peer row — `agg_peer_ranks` stops at
+ * citymun — so the absence needs an explanation rather than silence. */
+const BARANGAY_PEER_NOTE = "Peer ranking is available down to city/municipality level.";
+
+/** R3: a figure built only down to citymun shows its citymun ancestor's data
+ * at a barangay page — this note says so explicitly, alongside the figure's
+ * own "(shown for X)" title suffix. */
+function fallbackNote(fallbackCitymunName: string | null): string | undefined {
+  return fallbackCitymunName
+    ? `Shown for ${fallbackCitymunName}; barangay-level data is not built for this figure.`
+    : undefined;
+}
+
+const tesdaCertifiedPct = (rows: CertificationRow[]): number | null =>
+  rows.find((r) => r.certType === "tesda_certified")?.pct ?? null;
+
+const barangayAvgMonthlyAmount = (rows: HonorariumRow[]): number | null =>
+  rows.find((r) => r.payerLevel === "barangay")?.avgMonthlyAmount ?? null;
+
+const barangayMedianAmount = (rows: HonorariumRow[]): number | null =>
+  rows.find((r) => r.payerLevel === "barangay")?.medianAmount ?? null;
+
+/** Adequacy n for the honorarium amount/distribution figures: the largest
+ * recipient count across paying levels (contract table: "max nReceiving"). */
+function maxNReceiving(rows: HonorariumRow[]): number | null {
+  const values = rows.map((r) => r.nReceiving).filter((v): v is number => v !== null);
+  return values.length > 0 ? Math.max(...values) : null;
+}
+
+/** Pick a child's value for one base map indicator (E1.1). */
+function mapBaseValue(row: ChildIndicatorRow, indicator: MapBaseIndicator): number | null {
+  switch (indicator) {
+    case "pct_accredited":
+      return row.pctAccredited;
+    case "any_honorarium_pct":
+      return row.anyHonorariumPct;
+    case "households_per_bhw":
+      return row.householdsPerBhw;
+    case "avg_active_years":
+      return row.avgActiveYears;
+    case "coverage_pct":
+      return row.coveragePct;
+    case "bhw_per_1000":
+      return row.bhwPer1000;
+  }
+}
+
+export default async function ExplorePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const rawParams = await searchParams;
+  const filters = loadFilterState(rawParams);
+  const geo = await resolveGeoOrNational(filters.geoCode, filters.geoLevel);
+  const breakdowns = filters.breakdowns ?? DEFAULT_BREAKDOWNS;
+
+  // Only `ancestors` gates the second batch below (province/citymun/barangay
+  // option lists need its resolved codes) — awaiting it alone first, then
+  // running every independent query concurrently, cuts one full sequential
+  // round-trip out of the page's server-rendering waterfall versus awaiting
+  // all of batch one (including the slower demographics/training queries)
+  // before batch two's three queries could even start. `getGeoAncestors` is
+  // `cache()`d, so `getBenchmarkContext` below reuses this exact result rather
+  // than re-querying.
+  const ancestors = await getGeoAncestors(geo.geoCode, geo.geoLevel);
+
+  // E3 derived figures (cohorts, workload, honorarium inequality) are built down
+  // to citymun only; a barangay falls back to its citymun ancestor, labeled —
+  // mirroring the training/completeness fallback.
+  const figureFallback = geo.geoLevel === "barangay" ? ancestors.citymun : null;
+  const figureCode = figureFallback ? figureFallback.geoCode : geo.geoCode;
+  const figureLevel: GeoLevel = figureFallback ? "citymun" : geo.geoLevel;
+  const figureFallbackName = figureFallback ? figureFallback.geoName : null;
+
+  // Ancestor-presence gating for Increment 4's benchmark rows — a pure function
+  // of geoLevel, so it's known before `benchmarkCtx` resolves (which computes
+  // the identical rule internally) and every ancestor fetch below can join the
+  // same Promise.all rather than waiting on a second round trip.
+  const wantRegionRow = geo.geoLevel !== "national" && geo.geoLevel !== "region";
+  const wantNationalRow = geo.geoLevel !== "national";
+  const regionCode = ancestors.region?.geoCode ?? null;
+
+  const [
+    regions,
+    benchmarkCtx,
+    demographicsByDimension,
+    training,
+    honorarium,
+    certification,
+    completeness,
+    citymunCompleteness,
+    provinces,
+    citymuns,
+    barangays,
+    insights,
+    cohorts,
+    workload,
+    honorariumInequality,
+    honorariumSufficiency,
+    incomeClassEquity,
+    peerRanks,
+    figureCounts,
+    workloadFallbackPeer,
+    honorariumRegion,
+    honorariumNational,
+    honorariumInequalityRegion,
+    honorariumInequalityNational,
+    workloadRegion,
+    workloadNational,
+    honorariumSufficiencyRegion,
+    honorariumSufficiencyNational,
+    certificationRegion,
+    certificationNational,
+    uucPhcCounts,
+    nhfrCounts,
+    districtMapFigures,
+  ] = await Promise.all([
+    getChildGeos(NATIONAL_GEO_CODE, "national"),
+    // Benchmark context (E1.2): this place vs. its region and the nation, so
+    // every figure answers "versus what?". Consolidates what used to be four
+    // separate conditional national/region overview+counts fetches here.
+    getBenchmarkContext(geo.geoCode, geo.geoLevel, geo.geoName),
+    Promise.all(
+      breakdowns.map(async (dimension) => ({
+        dimension,
+        rows: await getDemographics(geo.geoCode, geo.geoLevel, [dimension]),
+      })),
+    ),
+    getTrainingCoverage(geo.geoCode, geo.geoLevel),
+    getHonorarium(geo.geoCode, geo.geoLevel),
+    getCertification(geo.geoCode, geo.geoLevel),
+    getDataCompleteness(geo.geoCode, geo.geoLevel),
+    // Completeness is citymun-grain; a barangay has no rows, so fetch its
+    // citymun's for the data-quality grade (E2.5), mirroring CompletenessFigure.
+    geo.geoLevel === "barangay" && ancestors.citymun
+      ? getDataCompleteness(ancestors.citymun.geoCode, "citymun")
+      : Promise.resolve([] as CompletenessRow[]),
+    ancestors.region ? getChildGeos(ancestors.region.geoCode, "region") : Promise.resolve([]),
+    ancestors.province ? getChildGeos(ancestors.province.geoCode, "province") : Promise.resolve([]),
+    ancestors.citymun ? getChildGeos(ancestors.citymun.geoCode, "citymun") : Promise.resolve([]),
+    getInsights(geo.geoLevel, geo.geoCode, geo.geoName),
+    getCohorts(figureCode, figureLevel),
+    getWorkload(figureCode, figureLevel),
+    getHonorariumInequality(figureCode, figureLevel),
+    getHonorariumSufficiency(figureCode, figureLevel),
+    geo.geoLevel === "national" ? getIncomeClassEquity() : Promise.resolve([]),
+    // Peer standing (E2.3/E1.5) for the 4 `agg_peer_ranks`-covered indicators
+    // that also have a standalone figure card here, batched into one query.
+    getPeerRanks(geo.geoCode, geo.geoLevel, FIGURE_PEER_INDICATORS),
+    // Cohorts/Training/Completeness have no scalar headline value of their own
+    // to benchmark, but still need an adequacy n scoped to whichever geo their
+    // rows actually describe (the citymun fallback at barangay, same as
+    // `figureCode`/`figureLevel` above) — `getBhwCounts` is `cache()`d, so this
+    // is free when there's no fallback (figureCode === geo.geoCode).
+    getBhwCounts(figureCode, figureLevel),
+    // Workload is peer-covered (households_per_bhw) but, at barangay, describes
+    // its citymun ancestor (Risk R3) — the citymun itself is genuinely ranked,
+    // so its real rank is shown (never the barangay's, which doesn't exist).
+    figureFallback
+      ? getPeerRank(figureCode, figureLevel, "households_per_bhw")
+      : Promise.resolve(null),
+    // Ancestor fetches for the figures whose vertical rows don't live on
+    // `BenchmarkContext` (Increment 4's contract table) — honorarium
+    // amount/distribution, inequality, sufficiency, workload, and
+    // certification each read a different `lib/db` query fn at the same
+    // region/national geos used everywhere else on this page.
+    wantRegionRow && regionCode ? getHonorarium(regionCode, "region") : Promise.resolve([]),
+    wantNationalRow ? getHonorarium(NATIONAL_GEO_CODE, "national") : Promise.resolve([]),
+    wantRegionRow && regionCode
+      ? getHonorariumInequality(regionCode, "region")
+      : Promise.resolve(null),
+    wantNationalRow
+      ? getHonorariumInequality(NATIONAL_GEO_CODE, "national")
+      : Promise.resolve(null),
+    wantRegionRow && regionCode ? getWorkload(regionCode, "region") : Promise.resolve(null),
+    wantNationalRow ? getWorkload(NATIONAL_GEO_CODE, "national") : Promise.resolve(null),
+    wantRegionRow && regionCode
+      ? getHonorariumSufficiency(regionCode, "region")
+      : Promise.resolve(null),
+    wantNationalRow
+      ? getHonorariumSufficiency(NATIONAL_GEO_CODE, "national")
+      : Promise.resolve(null),
+    wantRegionRow && regionCode ? getCertification(regionCode, "region") : Promise.resolve([]),
+    wantNationalRow ? getCertification(NATIONAL_GEO_CODE, "national") : Promise.resolve([]),
+    // Cross-dataset context (U12a): how much of this area is on the 2025 UUC for PHC list. One
+    // extra row from an aggregate that already exists, in the same round trip as the rest — it
+    // returns null at barangay grain, where `agg_uuc_phc_counts` has no rows.
+    getUucPhcCounts(geo.geoCode, geo.geoLevel),
+    // Cross-dataset context (N4): the health infrastructure the DOH registry records here. Same
+    // shape and same cost as the line above, and null at barangay grain for the same reason.
+    getNhfrCounts(geo.geoCode, geo.geoLevel),
+    // D3.3 map layer — districts partition the whole country the way regions do, so the layer
+    // toggle only makes sense at the national view; every other level fetches nothing.
+    geo.geoLevel === "national" ? getAllDistrictBhwFigures() : Promise.resolve([]),
+  ]);
+
+  const overview = benchmarkCtx.self.overview;
+  const counts = benchmarkCtx.self.counts;
+  const showBenchmarks = benchmarkCtx.showBenchmarks;
+  const workloadPeerRank = figureFallback
+    ? workloadFallbackPeer
+    : (peerRanks.get("households_per_bhw") ?? null);
+
+  const breadcrumbSteps: BreadcrumbStep[] = [
+    { label: "Philippines", geoLevel: "national", geoCode: NATIONAL_GEO_CODE },
+    ...(ancestors.region
+      ? [
+          {
+            label: ancestors.region.geoName,
+            geoLevel: "region" as const,
+            geoCode: ancestors.region.geoCode,
+          },
+        ]
+      : []),
+    ...(ancestors.province
+      ? [
+          {
+            label: ancestors.province.geoName,
+            geoLevel: "province" as const,
+            geoCode: ancestors.province.geoCode,
+          },
+        ]
+      : []),
+    ...(ancestors.citymun
+      ? [
+          {
+            label: ancestors.citymun.geoName,
+            geoLevel: "citymun" as const,
+            geoCode: ancestors.citymun.geoCode,
+          },
+        ]
+      : []),
+    ...(geo.geoLevel === "barangay"
+      ? [{ label: geo.geoName, geoLevel: "barangay" as const, geoCode: geo.geoCode }]
+      : []),
+  ];
+
+  const caption = captionFor(overview.validatedProfiles ?? null, geo.geoName);
+  const coverage = coverageForDisplay(overview);
+
+  // Read-time data-quality grade (E2.5). At barangay (no completeness rows) it
+  // describes the citymun it falls back to, labeled as such.
+  const gradeRows = geo.geoLevel === "barangay" ? citymunCompleteness : completeness;
+  const dataQualityGrade = computeDataQualityGrade(gradeRows);
+  const gradeFallbackName =
+    geo.geoLevel === "barangay" && citymunCompleteness.length > 0
+      ? (ancestors.citymun?.geoName ?? null)
+      : null;
+
+  // The children the comparison figure ranks. This goes one level deeper than the
+  // *map* (E1.6): national→region, region→province, province→citymun, and
+  // citymun→barangay. Only the first three have boundary files; at citymun the
+  // figure renders list-only (no choropleth) with the map-absence stub above it.
+  const compareChildLevel: GeoLevel | null =
+    geo.geoLevel === "national"
+      ? "region"
+      : geo.geoLevel === "region"
+        ? "province"
+        : geo.geoLevel === "province"
+          ? "citymun"
+          : geo.geoLevel === "citymun"
+            ? "barangay"
+            : null;
+  const mapChildren =
+    geo.geoLevel === "national"
+      ? regions
+      : geo.geoLevel === "region"
+        ? provinces
+        : geo.geoLevel === "province"
+          ? citymuns
+          : geo.geoLevel === "citymun"
+            ? barangays
+            : [];
+  // Boundary files exist only down to citymun polygons (province view); barangay
+  // choropleths are deferred to Phase 2's PMTiles work (BUILD_PLAN §2/§4.3), so
+  // at citymun the map is absent and only the ranked list renders.
+  const mapGeojsonUrl =
+    geo.geoLevel === "national"
+      ? "/geo/regions.json"
+      : geo.geoLevel === "region"
+        ? `/geo/provinces/${geo.geoCode}.json`
+        : geo.geoLevel === "province"
+          ? `/geo/citymun/${geo.geoCode}.json`
+          : null;
+  // Indicator switcher (E1.1). Topics come from the parent's training rows; an
+  // active `training:` indicator whose topic isn't available here falls back to
+  // the default accreditation view so a stale permalink never shows all-grey.
+  // `agg_training` has no barangay rows, so the switcher's training option is
+  // suppressed when the children are barangays (citymun view) — otherwise it
+  // would offer a topic every child renders as no-data.
+  const trainingTopics =
+    compareChildLevel === "barangay"
+      ? []
+      : training
+          .filter((r) => r.topicSlug)
+          .map((r) => ({ slug: r.topicSlug, label: r.topicLabel ?? r.topicSlug }))
+          .sort((a, b) => a.label.localeCompare(b.label));
+
+  const requestedSlug = mapIndicatorTopicSlug(filters.mapIndicator);
+  const activeMapIndicator: MapIndicator =
+    requestedSlug !== null && !trainingTopics.some((t) => t.slug === requestedSlug)
+      ? DEFAULT_MAP_INDICATOR
+      : filters.mapIndicator;
+  const activeSlug = mapIndicatorTopicSlug(activeMapIndicator);
+  const activeTopicLabel = activeSlug
+    ? (trainingTopics.find((t) => t.slug === activeSlug)?.label ?? activeSlug)
+    : null;
+  const mapMeta = metaForIndicator(activeMapIndicator, activeTopicLabel);
+
+  let mapItems: ChildIndicator[] = [];
+  // Empirical-Bayes adjusted values per child for the accreditation map (E3.6),
+  // populated only when accreditation is active and the children are at
+  // citymun/barangay grain (the levels adjusted). Undefined hides the toggle.
+  let adjustedMapItems: ChildIndicator[] | undefined;
+  // Full base-indicator rows per child, shared by the map (mapItems) and the
+  // relationships scatter (E1.4, which needs every base value, not just the
+  // active one) — one query, two figures.
+  let childIndicators: ChildIndicatorRow[] = [];
+  // Relationships scatter points (E1.4) = child base indicators + the external PSA SAE poverty
+  // variable (E4.4), which carries data only where children are cities/municipalities.
+  let relationshipPoints: RelationshipPoint[] = [];
+  if (compareChildLevel) {
+    const childCodes = mapChildren.map((c) => c.geoCode);
+    const [childRows, trainingCoverage, povertyByCode] = await Promise.all([
+      getChildIndicators(childCodes),
+      activeSlug ? getChildTrainingCoverage(childCodes, activeSlug) : Promise.resolve(null),
+      compareChildLevel === "citymun"
+        ? getChildPoverty(childCodes)
+        : Promise.resolve(new Map<string, { incidence: number }>()),
+    ]);
+    childIndicators = childRows;
+    relationshipPoints = childRows.map((c) => ({
+      ...c,
+      povertyIncidence: povertyByCode.get(c.geoCode)?.incidence ?? null,
+    }));
+    mapItems = childIndicators.map((c) => {
+      if (trainingCoverage) {
+        const t = trainingCoverage.get(c.geoCode);
+        return {
+          geoCode: c.geoCode,
+          geoName: c.geoName,
+          value: t?.coveragePct ?? null,
+          nTotal: t?.nTotal ?? c.nTotal,
+        };
+      }
+      return {
+        geoCode: c.geoCode,
+        geoName: c.geoName,
+        value: mapBaseValue(c, activeMapIndicator as MapBaseIndicator),
+        nTotal: c.nTotal,
+      };
+    });
+
+    if (
+      activeMapIndicator === "pct_accredited" &&
+      (compareChildLevel === "citymun" || compareChildLevel === "barangay") &&
+      childIndicators.some((c) => c.adjustedPctAccredited !== null)
+    ) {
+      adjustedMapItems = childIndicators.map((c) => ({
+        geoCode: c.geoCode,
+        geoName: c.geoName,
+        value: c.adjustedPctAccredited,
+        nTotal: c.nTotal,
+      }));
+    }
+  }
+
+  // The parent geo's own value for the active indicator — the distribution
+  // figure's marker (E1.3), sourced identically to the summary strip so the two
+  // never disagree.
+  let parentValue: number | null = null;
+  if (activeSlug) {
+    parentValue = training.find((r) => r.topicSlug === activeSlug)?.coveragePct ?? null;
+  } else {
+    switch (activeMapIndicator as MapBaseIndicator) {
+      case "pct_accredited":
+        parentValue = counts?.pctAccredited ?? null;
+        break;
+      case "any_honorarium_pct":
+        parentValue = counts?.anyHonorariumPct ?? null;
+        break;
+      case "households_per_bhw":
+        parentValue = overview.householdsPerBhw;
+        break;
+      case "avg_active_years":
+        parentValue = counts?.avgActiveYears ?? null;
+        break;
+      case "coverage_pct":
+        parentValue = coverage;
+        break;
+      case "bhw_per_1000":
+        parentValue = overview.bhwPer1000;
+        break;
+    }
+  }
+
+  // Peer standing of the current geo among its same-level siblings for the active
+  // base indicator (E2.3). Only region/province/citymun are ranked (E1.2:
+  // `PEER_LEVEL_PLURAL`/`peerParentName` now live in `lib/analysis/peer-labels`,
+  // a client-safe module future pages can share instead of re-deriving these);
+  // training indicators and national/barangay have no row.
+  const activeBaseIndicator: MapBaseIndicator | null = activeSlug
+    ? null
+    : (activeMapIndicator as MapBaseIndicator);
+  const peerRank =
+    activeBaseIndicator && PEER_LEVEL_PLURAL[geo.geoLevel]
+      ? await getPeerRank(geo.geoCode, geo.geoLevel, activeBaseIndicator)
+      : null;
+
+  // Title-slide facts for presentation mode: where we are, which filters are
+  // active, and the page's caption line — all serializable (server → client).
+  const deckMeta = {
+    pageLabel: "Explore",
+    areaName: geo.geoName,
+    filterChips: [
+      ...breadcrumbSteps.slice(1).map((s) => s.label),
+      ...(filters.breakdowns ?? []).map((d) => DIMENSION_LABEL[d]),
+    ],
+    captionLine: caption,
+  };
+
+  return (
+    <PresentationProvider meta={deckMeta}>
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6 lg:flex-row">
+        <h1 className="sr-only">Explore BHW figures for {geo.geoName}</h1>
+        <aside className="flex flex-col gap-6 lg:w-64 lg:shrink-0">
+          {/* Jump straight to any place without walking the cascade (E1.6). In
+            explore mode the search stays on /explore with the geo applied as
+            filters, rather than leaving for the place page. */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-muted" htmlFor="geo-search-input">
+              Jump to a place
+            </label>
+            <GeoSearch variant="compact" mode="explore" />
+          </div>
+          <GeoCascade
+            regions={regions}
+            provinces={provinces}
+            citymuns={citymuns}
+            barangays={barangays}
+            selected={{
+              regionCode: ancestors.region?.geoCode ?? null,
+              provinceCode: ancestors.province?.geoCode ?? null,
+              citymunCode: ancestors.citymun?.geoCode ?? null,
+              barangayCode: geo.geoLevel === "barangay" ? geo.geoCode : null,
+            }}
+          />
+          <BreakdownPicker />
+        </aside>
+
+        <div className="flex flex-1 flex-col gap-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <ActiveFilterChips steps={breadcrumbSteps} />
+            <PresentButton />
+          </div>
+
+          {/* Summary strip (E1.2) + benchmark context (E1.5), consolidated into
+            one block so a headline figure is never shown twice. The count/
+            context metrics (which have no vs-region/vs-nation comparison) sit on
+            the top line; the three comparative metrics (% accredited, avg years,
+            households per BHW) render once below — with benchmark bars when this
+            isn't the national view, and as plain values at national (nothing
+            above it to compare against). */}
+          <PresentationSlide id="at-a-glance" title={`${geo.geoName} at a glance`}>
+            <section
+              aria-labelledby="area-summary-heading"
+              className="rounded-lg border border-border bg-surface px-4 py-3"
+            >
+              <h2
+                id="area-summary-heading"
+                className="text-xs font-semibold uppercase tracking-wide text-muted"
+              >
+                {geo.geoName} at a glance
+              </h2>
+              <div className="mt-2 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
+                <span>
+                  <span className="font-semibold">
+                    {overview.totalBhw?.toLocaleString() ?? "—"}
+                  </span>{" "}
+                  <span className="text-muted">total BHWs</span>
+                </span>
+                <span>
+                  <span className="font-semibold">
+                    {overview.validatedProfiles?.toLocaleString() ?? "—"}
+                  </span>{" "}
+                  <span className="text-muted">
+                    <GlossaryTerm slug="validated_profile">validated profiles</GlossaryTerm>
+                    {coverage !== null ? ` (${coverage}% of registered)` : ""}
+                  </span>
+                </span>
+                {overview.bhwPer1000 !== null && (
+                  <span>
+                    <span className="font-semibold">
+                      {formatIndicatorValue(overview.bhwPer1000, "")}
+                    </span>{" "}
+                    <span className="text-muted">
+                      <GlossaryTerm slug="bhw_per_1000">BHWs per 1,000 residents</GlossaryTerm>
+                    </span>
+                  </span>
+                )}
+                {!overview.hasStepzero && (
+                  <span className="text-xs text-muted">
+                    Quick-count total not available for this area.
+                  </span>
+                )}
+              </div>
+
+              {/* The three comparative headline metrics — shown once here. With
+                vs-region/vs-nation bars below the national level; plain values at
+                national. This replaces the former standalone benchmark block. */}
+              <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
+                <div>
+                  <p className="mb-1 text-xs font-medium">
+                    <GlossaryTerm slug="accredited">% accredited</GlossaryTerm>
+                  </p>
+                  {showBenchmarks ? (
+                    <BenchmarkBars
+                      rows={benchmarkRowsFor(benchmarkCtx, (s) => s.counts?.pctAccredited ?? null)}
+                      format="percent"
+                    />
+                  ) : (
+                    <p className="text-sm font-semibold">
+                      {counts?.pctAccredited != null
+                        ? formatIndicatorValue(counts.pctAccredited, "%")
+                        : "—"}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium">Avg years of service</p>
+                  {showBenchmarks ? (
+                    <BenchmarkBars
+                      rows={benchmarkRowsFor(benchmarkCtx, (s) => s.counts?.avgActiveYears ?? null)}
+                      format="count"
+                      unitSuffix="yrs"
+                    />
+                  ) : (
+                    <p className="text-sm font-semibold">
+                      {counts?.avgActiveYears != null
+                        ? formatIndicatorValue(counts.avgActiveYears, "")
+                        : "—"}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium">
+                    <GlossaryTerm slug="households_per_bhw">Households per BHW</GlossaryTerm>
+                  </p>
+                  {showBenchmarks ? (
+                    <BenchmarkBars
+                      rows={benchmarkRowsFor(benchmarkCtx, (s) => s.overview.householdsPerBhw)}
+                      format="count"
+                      unitSuffix="hh/BHW"
+                    />
+                  ) : (
+                    <p className="text-sm font-semibold">
+                      {overview.householdsPerBhw != null
+                        ? overview.householdsPerBhw.toLocaleString()
+                        : "—"}
+                    </p>
+                  )}
+                  <p className="mt-2 text-xs text-muted">{DOH_INDICATIVE_NOTE}</p>
+                </div>
+              </div>
+
+              {overview.hasStepzero && (
+                <details className="mt-3 text-xs">
+                  <summary className="cursor-pointer text-muted hover:text-accent">
+                    How are these BHWs counted?
+                  </summary>
+                  <div className="mt-2">
+                    <DenominatorExplainer
+                      totalBhw={overview.totalBhw}
+                      registeredUniverse={overview.registeredUniverse}
+                      validatedProfiles={overview.validatedProfiles}
+                      coveragePct={coverage}
+                    />
+                  </div>
+                </details>
+              )}
+            </section>
+          </PresentationSlide>
+
+          {/* Cross-dataset context (U12a) — this area on the 2025 UUC for PHC list. Sits under
+            the at-a-glance strip, where a reader has just read this area's BHW figures, and
+            deliberately outside every `PresentationSlide`: the deck's caption states a BHW N, and
+            a count of barangays projected under it would be a figure that caption's denominator
+            cannot carry. */}
+          <UucPhcContextChip counts={uucPhcCounts} />
+
+          {/* Cross-dataset context (N4) — the health facilities registered here, beside the
+            workforce figures above. Outside every `PresentationSlide` for the same reason as the
+            chip above. */}
+          <NhfrContextChip counts={nhfrCounts} />
+
+          {/* Data-quality grade (E2.5) — one honest letter for how complete the
+            profiles behind these figures are, linking the full breakdown. */}
+          <DataQualityBadge grade={dataQualityGrade} fallbackCitymunName={gradeFallbackName} />
+
+          {/* Map-absence stub (E1.6) — at citymun/barangay there's no choropleth
+            (barangay boundaries are on the roadmap). At citymun the ranked list
+            still renders below; barangay is a leaf with no children to rank. */}
+          {mapGeojsonUrl === null && (
+            <div className="rounded-lg border border-dashed border-border bg-surface/60 px-4 py-3 text-sm">
+              <p className="font-medium">
+                Maps below the city/municipality level are on the roadmap.
+              </p>
+              <p className="mt-1 text-muted">
+                {compareChildLevel
+                  ? `Barangay choropleths aren't available yet, so the ranked list below covers every barangay in ${geo.geoName}.`
+                  : `Barangay-level maps aren't available yet — the figures below describe ${geo.geoName}.`}{" "}
+                <Link href="/roadmap" className="underline hover:text-accent">
+                  See the roadmap
+                </Link>
+                .
+              </p>
+            </div>
+          )}
+
+          {/* D3.3 map layer — districts partition the whole country the way regions do, so the
+            toggle only shows at the national view; switching it never changes geoLevel/geoCode,
+            just which choropleth renders below. */}
+          {geo.geoLevel === "national" && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium text-muted">Map layer</span>
+              <MapLayerToggle active={filters.mapLayer} />
+            </div>
+          )}
+
+          {/* Comparison figure (E1.2 hero) — the indicator switcher is the page's
+            centerpiece. Full choropleth at national/region/province; list-only
+            (no boundary file) at citymun, under the stub above. */}
+          {compareChildLevel && geo.geoLevel === "national" && filters.mapLayer === "district" ? (
+            <PresentationSlide id="geo-comparison" title="Map: legislative districts">
+              <DistrictMapFigure
+                items={districtMapFigures}
+                caption={caption}
+                activeIndicator={filters.districtMapIndicator}
+              />
+            </PresentationSlide>
+          ) : (
+            compareChildLevel && (
+              <PresentationSlide id="geo-comparison" title={`Map: ${mapMeta.label}`}>
+                <GeoComparisonFigure
+                  key={geo.geoCode}
+                  geojsonUrl={mapGeojsonUrl}
+                  childLevel={compareChildLevel}
+                  childLevelLabel={CHILD_LEVEL_LABEL[geo.geoLevel]}
+                  items={mapItems}
+                  adjustedItems={adjustedMapItems}
+                  caption={caption}
+                  activeIndicator={activeMapIndicator}
+                  meta={mapMeta}
+                  trainingTopics={trainingTopics}
+                />
+                {/* Peer-standing chip (E2.3): how this geo ranks among its siblings
+                  on the active indicator — moved inside this slide (E1.5/E4.2) so
+                  it presents alongside the map instead of floating outside any
+                  slide's coverage. */}
+                <PeerRankChip
+                  rank={peerRank}
+                  geoName={geo.geoName}
+                  parentName={peerParentName(geo.geoLevel, ancestors)}
+                  siblingPlural={PEER_LEVEL_PLURAL[geo.geoLevel] ?? ""}
+                  indicatorLabel={mapMeta.label}
+                />
+              </PresentationSlide>
+            )
+          )}
+
+          {/* Distribution view (E1.3) — spread of the active indicator across
+            children, reusing the map's data. */}
+          {compareChildLevel && mapItems.length > 0 && (
+            <PresentationSlide id="distribution" title={`Distribution: ${mapMeta.label}`}>
+              <DistributionFigure
+                key={`${geo.geoCode}-${activeMapIndicator}`}
+                items={mapItems}
+                parentValue={parentValue}
+                parentName={geo.geoName}
+                childLevelLabel={CHILD_LEVEL_LABEL[geo.geoLevel]}
+                childLevelLabelPlural={CHILD_LEVEL_LABEL_PLURAL[geo.geoLevel]}
+                meta={mapMeta}
+                caption={caption}
+              />
+            </PresentationSlide>
+          )}
+
+          {/* Relationships view (E1.4) — scatter of children on two chosen
+            indicators + Spearman-in-words, reusing the same child rows. */}
+          {compareChildLevel && childIndicators.length > 0 && (
+            <PresentationSlide id="relationships" title="Relationships between indicators">
+              <RelationshipFigure
+                key={geo.geoCode}
+                points={relationshipPoints}
+                childLevel={compareChildLevel}
+                childLevelLabelPlural={CHILD_LEVEL_LABEL_PLURAL[geo.geoLevel]}
+                caption={caption}
+              />
+            </PresentationSlide>
+          )}
+
+          {/* Per-theme figure groups (E1.5 parity): certification, demographics,
+            training, and completeness — each now responding to the geo filter,
+            with exports, matching what the place page shows for one geo. */}
+          <div className="grid grid-cols-1 gap-4">
+            <PresentationSlide id="accreditation-sources" title="Accreditation sources">
+              <AccreditationSourcesFigure
+                lguReported={overview.pctRegisteredAccredited}
+                verified={counts?.pctAccredited ?? null}
+                verifiedCi={counts ? { low: counts.ciLow, high: counts.ciHigh } : null}
+                caption={caption}
+                benchmark={{
+                  rows: showBenchmarks
+                    ? benchmarkRowsFor(benchmarkCtx, (s) => s.counts?.pctAccredited ?? null)
+                    : undefined,
+                  format: "percent",
+                  peer: toFigurePeer(
+                    peerRanks.get("pct_accredited"),
+                    peerParentName(geo.geoLevel, ancestors),
+                    PEER_LEVEL_PLURAL[geo.geoLevel] ?? "",
+                    MAP_BASE_INDICATOR_META.pct_accredited.label,
+                  ),
+                  n: counts?.nTotal ?? null,
+                  note: geo.geoLevel === "barangay" ? BARANGAY_PEER_NOTE : undefined,
+                }}
+              />
+            </PresentationSlide>
+
+            <PresentationSlide id="certification" title="Certification">
+              <CertificationFigure
+                rows={certification}
+                caption={caption}
+                geoCode={geo.geoCode}
+                geoLevel={geo.geoLevel}
+                benchmark={{
+                  rows: showBenchmarks
+                    ? rowsFromAncestorValues(
+                        benchmarkCtx,
+                        tesdaCertifiedPct(certification),
+                        tesdaCertifiedPct(certificationRegion),
+                        tesdaCertifiedPct(certificationNational),
+                      )
+                    : undefined,
+                  format: "percent",
+                  n: counts?.nTotal ?? null,
+                }}
+              />
+            </PresentationSlide>
+
+            {demographicsByDimension.map(({ dimension, rows }) => (
+              <PresentationSlide
+                key={dimension}
+                id={`demographics-${dimension}`}
+                title={`Demographics: ${DIMENSION_LABEL[dimension]}`}
+              >
+                <DemographicsFigure
+                  dimension={dimension}
+                  rows={rows}
+                  caption={caption}
+                  geoCode={geo.geoCode}
+                  geoLevel={geo.geoLevel}
+                  benchmark={{ n: counts?.nTotal ?? null }}
+                />
+              </PresentationSlide>
+            ))}
+
+            <PresentationSlide id="training" title="Training coverage">
+              <TrainingFigure
+                rows={training}
+                caption={caption}
+                geoLevel={geo.geoLevel}
+                citymunAncestor={ancestors.citymun}
+                benchmark={{ n: figureCounts?.nTotal ?? null }}
+                geoCode={geo.geoCode}
+              />
+            </PresentationSlide>
+
+            <PresentationSlide id="completeness" title="Data completeness">
+              <CompletenessFigure
+                rows={completeness}
+                caption={caption}
+                geoLevel={geo.geoLevel}
+                citymunAncestor={ancestors.citymun}
+                benchmark={{ n: counts?.nTotal ?? null }}
+              />
+            </PresentationSlide>
+
+            {/* Workload distribution (E3.4) — how many households each BHW covers. */}
+            <PresentationSlide id="workload" title="Workload">
+              <WorkloadFigure
+                row={workload}
+                caption={caption}
+                geoLevel={geo.geoLevel}
+                fallbackCitymunName={figureFallbackName}
+                benchmark={{
+                  rows: showBenchmarks
+                    ? rowsFromAncestorValues(
+                        benchmarkCtx,
+                        workload?.median ?? null,
+                        workloadRegion?.median ?? null,
+                        workloadNational?.median ?? null,
+                        figureFallbackName ?? "This place",
+                      )
+                    : undefined,
+                  peer: toFigurePeer(
+                    workloadPeerRank,
+                    peerParentName(figureLevel, ancestors),
+                    PEER_LEVEL_PLURAL[figureLevel] ?? "",
+                    MAP_BASE_INDICATOR_META.households_per_bhw.label,
+                  ),
+                  n: workload?.nBhw ?? null,
+                  nLabel: "BHWs reporting a household count",
+                  note: [fallbackNote(figureFallbackName), DOH_INDICATIVE_NOTE]
+                    .filter((s): s is string => Boolean(s))
+                    .join(" "),
+                }}
+              />
+            </PresentationSlide>
+          </div>
+
+          {/* Joining waves (E3.2) — when today's BHWs reached each milestone. */}
+          <PresentationSlide id="cohorts" title="Joining waves">
+            <CohortsFigure
+              rows={cohorts}
+              caption={caption}
+              geoLevel={geo.geoLevel}
+              fallbackCitymunName={figureFallbackName}
+              benchmark={{ n: figureCounts?.nTotal ?? null, note: fallbackNote(figureFallbackName) }}
+            />
+          </PresentationSlide>
+
+          {/* Income-class equity (E3.7) — national scope only. */}
+          {geo.geoLevel === "national" && incomeClassEquity.length > 0 && (
+            <PresentationSlide id="income-class" title="Income-class equity">
+              <IncomeClassFigure
+                rows={incomeClassEquity}
+                caption={caption}
+                benchmark={{ n: overview.validatedProfiles ?? null }}
+              />
+            </PresentationSlide>
+          )}
+
+          {/* One honorarium story told three ways — tabbed, exactly as Home does
+            it, but scoped to the selected geo (E1.5). */}
+          <PresentationSlide id="honorarium" title="Honorarium">
+            <FigureTabs
+              heading="Honorarium"
+              tabs={[
+                {
+                  id: "sufficiency",
+                  label: "Is it enough?",
+                  content: (
+                    <HonorariumSufficiencyFigure
+                      data={honorariumSufficiency}
+                      caption={caption}
+                      geoCode={geo.geoCode}
+                      geoLevel={geo.geoLevel}
+                      fallbackCitymunName={figureFallbackName}
+                      benchmark={{
+                        rows: showBenchmarks
+                          ? rowsFromAncestorValues(
+                              benchmarkCtx,
+                              honorariumSufficiency?.pctBelowSufficiency ?? null,
+                              honorariumSufficiencyRegion?.pctBelowSufficiency ?? null,
+                              honorariumSufficiencyNational?.pctBelowSufficiency ?? null,
+                              figureFallbackName ?? "This place",
+                            )
+                          : undefined,
+                        format: "percent",
+                        n: honorariumSufficiency?.nTotal ?? null,
+                        note: fallbackNote(figureFallbackName),
+                      }}
+                    />
+                  ),
+                },
+                {
+                  id: "who",
+                  label: "Who receives",
+                  content: (
+                    <HonorariumFigure
+                      rows={honorarium}
+                      caption={caption}
+                      geoCode={geo.geoCode}
+                      geoLevel={geo.geoLevel}
+                      benchmark={{
+                        rows: showBenchmarks
+                          ? benchmarkRowsFor(benchmarkCtx, (s) => s.counts?.anyHonorariumPct ?? null)
+                          : undefined,
+                        format: "percent",
+                        peer: toFigurePeer(
+                          peerRanks.get("any_honorarium_pct"),
+                          peerParentName(geo.geoLevel, ancestors),
+                          PEER_LEVEL_PLURAL[geo.geoLevel] ?? "",
+                          MAP_BASE_INDICATOR_META.any_honorarium_pct.label,
+                        ),
+                        n: counts?.nTotal ?? null,
+                        note: geo.geoLevel === "barangay" ? BARANGAY_PEER_NOTE : undefined,
+                      }}
+                    />
+                  ),
+                },
+                {
+                  id: "amount",
+                  label: "How much",
+                  content: (
+                    <HonorariumAmountFigure
+                      rows={honorarium}
+                      caption={caption}
+                      geoCode={geo.geoCode}
+                      geoLevel={geo.geoLevel}
+                      benchmark={{
+                        rows: showBenchmarks
+                          ? rowsFromAncestorValues(
+                              benchmarkCtx,
+                              barangayAvgMonthlyAmount(honorarium),
+                              barangayAvgMonthlyAmount(honorariumRegion),
+                              barangayAvgMonthlyAmount(honorariumNational),
+                            )
+                          : undefined,
+                        format: "peso",
+                        n: maxNReceiving(honorarium),
+                        nLabel: "recipients",
+                      }}
+                    />
+                  ),
+                },
+                {
+                  id: "distribution",
+                  label: "Distribution",
+                  content: (
+                    <HonorariumDistributionFigure
+                      rows={honorarium}
+                      caption={caption}
+                      geoCode={geo.geoCode}
+                      geoLevel={geo.geoLevel}
+                      benchmark={{
+                        rows: showBenchmarks
+                          ? rowsFromAncestorValues(
+                              benchmarkCtx,
+                              barangayMedianAmount(honorarium),
+                              barangayMedianAmount(honorariumRegion),
+                              barangayMedianAmount(honorariumNational),
+                            )
+                          : undefined,
+                        format: "peso",
+                        n: maxNReceiving(honorarium),
+                        nLabel: "recipients",
+                      }}
+                    />
+                  ),
+                },
+                {
+                  id: "inequality",
+                  label: "Inequality",
+                  content: (
+                    <HonorariumInequalityFigure
+                      row={honorariumInequality}
+                      caption={caption}
+                      geoLevel={geo.geoLevel}
+                      fallbackCitymunName={figureFallbackName}
+                      benchmark={{
+                        rows: showBenchmarks
+                          ? rowsFromAncestorValues(
+                              benchmarkCtx,
+                              honorariumInequality?.gini ?? null,
+                              honorariumInequalityRegion?.gini ?? null,
+                              honorariumInequalityNational?.gini ?? null,
+                              figureFallbackName ?? "This place",
+                            )
+                          : undefined,
+                        n: honorariumInequality?.nReceiving ?? null,
+                        nLabel: "receiving BHWs",
+                        note: fallbackNote(figureFallbackName),
+                      }}
+                    />
+                  ),
+                },
+              ]}
+            />
+          </PresentationSlide>
+
+          <PresentationSlide id="insights" title="Insights">
+            <InsightsGrid insights={insights} geoLevel={geo.geoLevel} geoName={geo.geoName} />
+          </PresentationSlide>
+        </div>
+
+        <ChatLauncher geoCode={geo.geoCode} geoLevel={geo.geoLevel} geoName={geo.geoName} />
+      </div>
+    </PresentationProvider>
+  );
+}

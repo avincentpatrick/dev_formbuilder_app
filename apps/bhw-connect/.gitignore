@@ -1,0 +1,75 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# python (ingestion)
+__pycache__/
+*.pyc
+.venv/
+ingestion/_qa_report.json
+ingestion/_sql_batches/
+ingestion/_qa_report_stepzero.json
+ingestion/_sql_batches_stepzero/
+ingestion/_qa_report_patch_psgc_gap.json
+ingestion/_sql_patch_psgc_gap/
+ingestion/_qa_report_psgc_crosswalk.json
+ingestion/_sql_psgc_crosswalk/
+ingestion/_qa_report_population.json
+ingestion/_sql_batches_population/
+ingestion/_qa_report_poverty.json
+ingestion/_sql_batches_poverty/
+ingestion/dim_geo.json
+ingestion/data/dim_geo_nir.csv
+ingestion/_qa_report_legislative_districts.json
+ingestion/_sql_districts/
+# A local export of our own dim_geo, produced for --dim-geo-csv. Derived from the database, not a
+# source snapshot, so it is rebuilt rather than committed (same posture as dim_geo_nir.csv above).
+ingestion/data/dim_geo.csv
+
+# editor
+.vscode/
+.idea/
+ingestion/data/agg_population_citymun.csv

@@ -1,0 +1,313 @@
+@import "tailwindcss";
+
+:root {
+  /* Neutral background/foreground */
+  --background: #ffffff;
+  --foreground: #1a1d1e;
+  --surface: #f6f7f8;
+  --border: #dde1e3;
+  --muted: #57616a;
+
+  /* Single accent (WCAG AA on white at normal text weight) */
+  --accent: #0a6e6e;
+  --accent-foreground: #ffffff;
+  --accent-subtle: #e3f1f1;
+
+  /* Colorblind-safe sequential ramp (light -> dark teal), for choropleths/bars.
+     Verified for deuteranopia/protanopia/tritanopia distinguishability. */
+  --seq-1: #e3f1f1;
+  --seq-2: #b3d9d8;
+  --seq-3: #7fc0be;
+  --seq-4: #4aa39f;
+  --seq-5: #237f7c;
+  --seq-6: #0a6e6e;
+  --seq-7: #054a49;
+
+  /* Status colors */
+  --danger: #b3261e;
+  --warning: #8a5a00;
+
+  /* Type scale (major third, 1.25). Bumped one notch from a 1rem to a 1.0625rem
+     base for readability (user feedback: text too small) — the whole scale is
+     shifted up proportionally so the 1.25 ratio and vertical rhythm are kept.
+     The per-user "Font size" accessibility setting (data-font-size, below) still
+     composes on top of this. */
+  --font-size-xs: 0.8125rem;
+  --font-size-sm: 0.9375rem;
+  --font-size-base: 1.0625rem;
+  --font-size-lg: 1.33rem;
+  --font-size-xl: 1.66rem;
+  --font-size-2xl: 2.07rem;
+  --font-size-3xl: 2.59rem;
+  --font-size-4xl: 3.11rem;
+
+  /* Spacing scale (4px base) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-subtle: var(--accent-subtle);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-seq-1: var(--seq-1);
+  --color-seq-2: var(--seq-2);
+  --color-seq-3: var(--seq-3);
+  --color-seq-4: var(--seq-4);
+  --color-seq-5: var(--seq-5);
+  --color-seq-6: var(--seq-6);
+  --color-seq-7: var(--seq-7);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* Register the type scale as Tailwind's font-size theme namespace, so
+     text-xs..text-3xl utilities resolve to the app's own scale instead of
+     Tailwind's built-in defaults. */
+  --text-xs: var(--font-size-xs);
+  --text-sm: var(--font-size-sm);
+  --text-base: var(--font-size-base);
+  --text-lg: var(--font-size-lg);
+  --text-xl: var(--font-size-xl);
+  --text-2xl: var(--font-size-2xl);
+  --text-3xl: var(--font-size-3xl);
+  /* Register text-4xl too so the KPI stat numbers (which use text-4xl) track the
+     app scale instead of falling back to Tailwind's built-in 2.25rem. */
+  --text-4xl: var(--font-size-4xl);
+}
+
+/* ---------------------------------------------------------------------------
+   Theme mode.
+
+   The theme is driven by the `data-theme` attribute on <html>, which the
+   no-flash inline script sets to "light" or "dark" before first paint
+   (resolving "system" against the OS preference). The @media fallback covers
+   the no-JS case, scoped so it never overrides an explicit choice.
+   --------------------------------------------------------------------------- */
+:root[data-theme="dark"] {
+  --background: #0f1314;
+  --foreground: #edf1f1;
+  --surface: #181d1e;
+  --border: #2d3436;
+  --muted: #9aa5ac;
+  --accent: #4aa39f;
+  --accent-foreground: #06201f;
+  --accent-subtle: #14302f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    --background: #0f1314;
+    --foreground: #edf1f1;
+    --surface: #181d1e;
+    --border: #2d3436;
+    --muted: #9aa5ac;
+    --accent: #4aa39f;
+    --accent-foreground: #06201f;
+    --accent-subtle: #14302f;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Accent color palettes.
+
+   Selected via `data-palette` on <html>. Each palette overrides the accent
+   trio (with a dark-mode variant) and the colorblind-safe sequential ramp used
+   by charts. The default (teal) is defined in :root above, so no palette rule
+   is needed for it.
+   --------------------------------------------------------------------------- */
+:root[data-palette="blue"] {
+  --accent: #1d4ed8;
+  --accent-foreground: #ffffff;
+  --accent-subtle: #e6edfd;
+  --seq-1: #e6edfd;
+  --seq-2: #c3d3f9;
+  --seq-3: #9bb4f2;
+  --seq-4: #6d8fe8;
+  --seq-5: #4169d8;
+  --seq-6: #2b4cb8;
+  --seq-7: #1a2f7a;
+}
+:root[data-theme="dark"][data-palette="blue"] {
+  --accent: #7aa2f7;
+  --accent-foreground: #0b1220;
+  --accent-subtle: #16233d;
+}
+
+:root[data-palette="violet"] {
+  --accent: #6d28d9;
+  --accent-foreground: #ffffff;
+  --accent-subtle: #efe9fd;
+  --seq-1: #efe9fd;
+  --seq-2: #dcccfb;
+  --seq-3: #c0a6f6;
+  --seq-4: #a079ec;
+  --seq-5: #7e4fdb;
+  --seq-6: #5f2fb8;
+  --seq-7: #3f1d7a;
+}
+:root[data-theme="dark"][data-palette="violet"] {
+  --accent: #b794f6;
+  --accent-foreground: #1a1030;
+  --accent-subtle: #2a1e46;
+}
+
+:root[data-palette="rose"] {
+  --accent: #be123c;
+  --accent-foreground: #ffffff;
+  --accent-subtle: #fde7ec;
+  --seq-1: #fde7ec;
+  --seq-2: #f9c3d1;
+  --seq-3: #f293ac;
+  --seq-4: #e85f83;
+  --seq-5: #d5325c;
+  --seq-6: #b01d43;
+  --seq-7: #7a1330;
+}
+:root[data-theme="dark"][data-palette="rose"] {
+  --accent: #f2789f;
+  --accent-foreground: #2a0d18;
+  --accent-subtle: #3d1420;
+}
+
+:root[data-palette="amber"] {
+  --accent: #9a6700;
+  --accent-foreground: #ffffff;
+  --accent-subtle: #fbf0d9;
+  --seq-1: #fbf0d9;
+  --seq-2: #f5dca6;
+  --seq-3: #eec36a;
+  --seq-4: #e0a83a;
+  --seq-5: #c98a12;
+  --seq-6: #9a6700;
+  --seq-7: #6b4700;
+}
+:root[data-theme="dark"][data-palette="amber"] {
+  --accent: #e0b34d;
+  --accent-foreground: #251a00;
+  --accent-subtle: #332812;
+}
+
+/* ---------------------------------------------------------------------------
+   Font size.
+
+   Scales the root font-size, which cascades to the rem-based type scale and
+   spacing. Selected via `data-font-size` on <html>; "base" is the 100% default.
+   --------------------------------------------------------------------------- */
+:root[data-font-size="sm"] {
+  font-size: 93.75%; /* ~15px */
+}
+:root[data-font-size="lg"] {
+  font-size: 112.5%; /* ~18px */
+}
+:root[data-font-size="xl"] {
+  font-size: 125%; /* ~20px */
+}
+
+/* ---------------------------------------------------------------------------
+   Presentation mode.
+
+   `presentation:` utilities apply inside the currently promoted slide
+   (components/present/presentation-slide.tsx sets `data-slide-active` on the
+   wrapper), letting figures opt into bigger sizing on their slide, e.g. the
+   choropleth's `presentation:h-[60vh]`. The entry animation lives on the
+   attribute selector so it re-triggers on every slide change with zero JS.
+   --------------------------------------------------------------------------- */
+@custom-variant presentation ([data-slide-active] &);
+
+@keyframes present-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+[data-slide-active] {
+  animation: present-slide-in 250ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slide-active] {
+    animation: none;
+  }
+}
+
+/* The floating feedback widget sits above the deck's backdrop (z-62/63) —
+   hide it while presenting (the provider sets data-presenting on <html>). */
+html[data-presenting] [data-feedback-ui] {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Equity in Health logo mark.
+
+   Ported from the CSS-IS platform: a single-colour silhouette of the "equity
+   in health" wordmark, painted live in the current accent via a CSS mask — so
+   it recolours with the palette picker and adapts to light/dark automatically.
+   print-color-adjust keeps it visible on printed/exported sheets. */
+.equity-mark {
+  display: inline-block;
+  aspect-ratio: 2048 / 672;
+  background: var(--accent);
+  -webkit-mask: url(/img/equity-mark.png) center/contain no-repeat;
+  mask: url(/img/equity-mark.png) center/contain no-repeat;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  vertical-align: middle;
+}
+.equity-mark.sm {
+  height: 20px;
+}
+.equity-mark.md {
+  height: 40px;
+}
+.equity-mark.lg {
+  height: 54px;
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Visible focus ring for keyboard navigation everywhere (a11y). */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 50;
+  padding: var(--space-2) var(--space-4);
+  background: var(--accent);
+  color: var(--accent-foreground);
+  border-radius: 0 0 0.375rem 0;
+}
+
+.skip-link:focus {
+  left: 0;
+}

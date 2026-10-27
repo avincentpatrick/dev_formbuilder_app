@@ -65,6 +65,16 @@ const HUB_THRESHOLD = 3;
 /** Directories that are not this repository's own source. */
 const SKIP_DIRS = ['.git', 'vendor', 'node_modules', 'storage', 'public/build', '.idea', 'coverage'];
 
+/**
+ * Paths from the repository root whose contents are ANOTHER APPLICATION, never this one's source
+ * (M192, ADR-0024): `apps/` holds BHW Connect, with its own documents, tests and untracked build
+ * output (`.next/`), which put second copies of Meridian's basenames in the index and drifted
+ * `docs/pipeline.md` (measured: `pipeline-lint` P1 went red the moment the import landed). Matched by
+ * PATH only — `SKIP_DIRS` also matches a bare name at any depth, and a folder called `apps` anywhere
+ * else is Meridian's own.
+ */
+const SKIP_PATHS = ['apps'];
+
 /** Every flag this script accepts. Read by getopt AND by the argv fence below. */
 const FLAGS = ['dry-run', 'check', 'json', 'help'];
 
@@ -568,6 +578,10 @@ function build_basename_index(): array
             }
 
             $path = $dir === '.' ? $entry : $dir.'/'.$entry;
+
+            if (in_array($path, SKIP_PATHS, true)) {
+                continue;
+            }
 
             if (in_array($path, SKIP_DIRS, true) || in_array($entry, SKIP_DIRS, true)) {
                 continue;

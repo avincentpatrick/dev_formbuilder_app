@@ -16,7 +16,67 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M189`, compare two versions of a form (`version-diff-ui`) (m189-version-compare)
+## Status: ACTIVE CLAIM — `M190`, every deferral section and deferral sentence gets a recorded disposition (`deferral-site-disposition`) (m190-deferral-dispositions)
+
+Taken 2026-10-27. Branch `m190-deferral-dispositions`, cut from `origin/main` at `dc649b43`, PR into main. ⛔ **NOT MERGED THIS SESSION:**
+held green for **merge point 7 together with `M189`** (`D170`, `D137`). The plan is
+`~/.claude/plans/read-claude-md-then-php-vivid-papert.md`.
+Row: `deferral-site-disposition` — *"Give every documented deferral section and deferral sentence a recorded disposition"*, the head of
+the line's during-testing tier after `version-diff-ui` (held as `M189`). `D24` (option 1) scheduled it first, before
+`prd-feature-disposition`. **Numbered `M190`, past the held `M189`:** `state.php` reads "next free M189" because a held increment is not a
+RELEASED heading — the `M188` precedent, numbered past the held `M186` and `M187`.
+
+The session-start pull read 0 reports, 0 reopened and 0 new comments (relayed 31: 25 Resolved · 6 Confirmed working), so nothing was
+triaged. No decision was filed or asked in planning: the design is the gate's, and every verdict below falls under a rule already
+written (`CLAUDE.md`'s *no unqueued obligation*, the backlog header's *an untagged table row is a product idea, not planned*).
+
+### Evidence verified
+Read on `dc649b43` with `php scripts/pipeline-lint.php --verbose` and three read-only audits of every site against the code.
+- The marker `id=deferral-site-disposition … state=ready size=L tier=during-testing` — held, in `PROGRESS.md` above the status block.
+- `P2b` — held: **23** sections, digest `d5dc9f0538d3c191`, the same 23 the plan lists. `P2c` — held: **8** sentences, digest
+  `01597bbb027f0f74`. `P2e` — 89, untouched by this increment.
+- `D24`'s measured residue ("23 sections … 8 deferral sentences") — held. Its *"eight sentences are already known to be half stale"* is
+  **wrong**: one of eight is stale (`docs/PRD.md`'s Feature #4 trend bullet, built by `H24a`); the other seven are true.
+
+### Premise verified
+- **The rules pin and never discharge.** `pin()` takes a site list, a floor, a count and a digest — no disposition. Held.
+- **The only disposition device in the corpus is the PRD's end-of-line italic parenthetical**, read by `carries_a_disposition()` with
+  `M84`'s last-match + suffix rule. Held — so the same device, at the item's own line, is the discharge, and no second list is built.
+- **Markers cannot attribute** — every marker sits at end of file by convention (`M82`). Held.
+- **`docs/feature-backlog.md` and `docs/claims/` are outside the coverage corpus** (`php scripts/pipeline.php --corpus`, 57 markdown
+  files) — so the rows this increment files cannot themselves become sites.
+- **`M189` edits lines inside two of these sections** — form-versioning §11 and piping §8.1's hole-diffing bullet — on its held branch.
+  A known rebase conflict at merge point 7, and the dispositions that depend on `M189` read `Queued — version-diff-ui` here; the join
+  this increment builds forces each to `Built — M189` once that marker leaves the line.
+- **Carved out:** the three deferral sentences in PHP docblocks are the separate after-launch row (*"…read the MARKDOWN half of the
+  corpus only…"*) and stay out; `PROGRESS.md`'s dated bullets are history, not forward claims.
+
+### Remedy verdict
+None prescribed beyond the title and `D24`. The design, measured in planning: an item is a top-level list item's first paragraph, a
+table body row, or — in a section with neither — its first paragraph; its disposition is an italic parenthetical that is the last thing
+in it, from a closed vocabulary of three — **`Built — <who>`**, **`Queued — <ids in backticks>`**, **`Not planned — <ground>`**. `P2b`
+and `P2c` fail on any item or site without one, and on a `Queued` id that is not a row in the line. Every edit to a document is
+appended to an existing line, so no `path:N` citation into it moves.
+
+Files: `scripts/pipeline-lint.php`, `tests/Feature/Docs/PipelineLintControlsTest.php`, `docs/feature-backlog.md`, `docs/PRD.md`,
+`docs/adr/0002-multi-tenancy-shared-db-rls.md`, `docs/adr/0016-saml-sso.md`, `docs/adr/0021-respondent-scoped-device-outbox.md`,
+`docs/api-specification.md`, `docs/architecture/technical-architecture.md`, `docs/audit-compliance-logging-spec.md`,
+`docs/competitive-feature-parity-matrix.md`, `docs/data-privacy-gdpr-compliance.md`, `docs/deployment-infrastructure.md`,
+`docs/form-versioning-schema-migration.md`, `docs/multi-tenancy-rbac-design.md`, `docs/non-functional-requirements.md`,
+`docs/observability-incident-response.md`, `docs/ocr-pipeline-design.md`, `docs/offline-first-sync-design.md`,
+`docs/onboarding-template-content-plan.md`, `docs/piping-output-encoding-design.md`, `docs/pricing-feature-gating-matrix.md`,
+`docs/security-threat-model.md`, `docs/testing-strategy.md`, `docs/ux/design-system-reference.md`,
+`docs/webhook-integration-design.md`, `docs/workflow-branching-design.md`, `docs/xlsform-interop-spec.md`,
+`app/Exceptions/Templates/TemplateSyntaxException.php` (docblock only), `PROGRESS.md`, `docs/pipeline.md`.
+Shared artefacts taken: every `docs/` file above, `PROGRESS.md` (own block and the marker).
+Paired files taken: none.
+Namespaces spent: nothing from either namespace.
+Prediction: `pipeline-lint` goes red on the first run of the new rule with ~113 undispositioned items, then green as each is written;
+the `P2c` pin moves 8 → 7. The fixture's baseline goes red the moment the corpus cites a real row id, until `pipelineLintDocument()`
+carries those ids. PHPStan cannot move (a docblock). **Most likely wrong:** the item walk's boundaries — a continuation line, an
+indented amendment or a marker comment read as part of the wrong item — on a shape the audits did not list.
+
+## HELD — `M189`, compare two versions of a form (`version-diff-ui`) (m189-version-compare)
 
 Taken 2026-10-26. Branch `m189-version-compare`, cut from `origin/main` at `8500dfa1`, PR into main. ⛔ **NOT MERGED THIS SESSION:**
 held green for merge point 7, released together with the next increment from the line (`D170`, `D137`). The plan is

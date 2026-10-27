@@ -1,5 +1,12 @@
 # BHW Connect Dashboard
 
+> **This app now lives in Meridian's repository**, at `apps/bhw-connect/`, and is served at
+> `https://staging.pitahc.gov.ph/bhw-connect` from Meridian's testing server. Read
+> [`docs/working-agreement.md`](../../docs/working-agreement.md) (at the repository root) and this
+> app's [`CLAUDE.md`](CLAUDE.md) first. Its history before the move is in the archived repository
+> <https://github.com/jongsky25/BHW-Connect-Dashboard>, imported here at commit `e4237373`. Its source
+> data (`ingestion/data/`) is no longer in git: see [`ingestion/data/README.md`](ingestion/data/README.md).
+
 A public, open-access dashboard for the Philippine Barangay Health Worker (BHW) dataset — built for both lay and technical audiences, with WHO WPSAR-style figures, cascading geographic filters (national → region → province → city/municipality → barangay), interactive maps, purpose-built downloads (CSV/XLSX/PNG/PPTX), and (Phase 2) strictly data-grounded AI insights and chat.
 
 **Status:** implementation in progress — Phase 0 (foundation).

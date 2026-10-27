@@ -249,19 +249,28 @@ function fieldDifferences(mine: LocalField, theirs: ServerField, words: DiffWord
     return out;
 }
 
-function sectionDifferences(mine: LocalSection, theirs: ServerSection, words: DiffWords): ConflictDifference[] {
+/**
+ * One section setting's two values in the panel's words. M189 (`version-diff-ui`): shared with the Compare page, which words
+ * a section's changes between two versions exactly as this dialog words them.
+ */
+export function sectionSettingWords(setting: string, a: unknown, b: unknown, words: DiffWords): SettingWords {
     const labels = words.labels ?? {};
+    const name = SECTION_SETTINGS[setting] ?? describeSavePath(setting);
+
+    return setting === 'relevant_expression'
+        ? { setting: name, a: conditionWords(a, labels, 'Always'), b: conditionWords(b, labels, 'Always') }
+        : { setting: name, a: plain(a), b: plain(b) };
+}
+
+function sectionDifferences(mine: LocalSection, theirs: ServerSection, words: DiffWords): ConflictDifference[] {
     const out: ConflictDifference[] = [];
 
-    for (const [setting, name] of Object.entries(SECTION_SETTINGS)) {
+    for (const setting of Object.keys(SECTION_SETTINGS)) {
         const a = (mine as unknown as Record<string, unknown>)[setting];
         const b = (theirs as unknown as Record<string, unknown>)[setting];
         if (same(a, b)) continue;
-        out.push(
-            setting === 'relevant_expression'
-                ? { setting: name, mine: conditionWords(a, labels, 'Always'), theirs: conditionWords(b, labels, 'Always') }
-                : { setting: name, mine: plain(a), theirs: plain(b) },
-        );
+        const row = sectionSettingWords(setting, a, b, words);
+        out.push({ setting: row.setting, mine: row.a, theirs: row.b });
     }
 
     return out;

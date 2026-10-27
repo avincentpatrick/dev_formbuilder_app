@@ -424,7 +424,7 @@ stateDiagram-v2
 5. **Cross-version analytics align on a stable `form_fields.key`** (a slug preserved across versions for the same logical question), never by rewriting historical submissions to a new schema — a field can be renamed, restyled, or re-validated in a new version while its `key` keeps old and new submissions comparable in aggregate reporting.
 6. **Rollback is forward-only.** "Rolling back" to an earlier version's shape is performed by publishing that old snapshot forward as a *new* `version_number` — old version numbers are never resurrected or reused, which keeps every submission's `form_version_id` reference permanently meaningful.
 7. **Forms are soft-deleted only**; hard deletion is blocked while any submission references any of the form's versions, preserving referential and audit integrity.
-8. > **Elaborated in `docs/form-versioning-schema-migration.md` §5**: still a Phase 2/3 UX enhancement, not a Phase 1 requirement — but Phase 1 already computes and stores the underlying field/section-level change classification (non-breaking / breaking-but-permitted / fork) on every publish, auto-populating `change_summary` with a plain-text summary even before the interactive diff view exists.
+8. > **Elaborated in `docs/form-versioning-schema-migration.md` §5**: still a Phase 2/3 UX enhancement, not a Phase 1 requirement — but Phase 1 already computes and stores the underlying field/section-level change classification (non-breaking / breaking-but-permitted / fork) on every publish, auto-populating `change_summary` with a plain-text summary even before the interactive diff view exists. **The view was built by `M189` (`D169`, 2026-10-26): the Compare page, from the form hub's Versions panel.**
 
 ---
 
@@ -545,6 +545,6 @@ The plan is the source of truth for product/architecture direction; the followin
 9. **Guest share-tokens are signed, scoped to exactly one `form_version_id`**, with tenant/form/version embedded and verified per request; expiry and a single-use flag are configurable per tenant rather than globally fixed (§7.2).
 10. **Offline sync surfaces a "needs attention" banner after 5 silent Background-Sync retry cycles**, rather than retrying invisibly forever or failing loudly on the first attempt (§4.2).
 11. **Client-generated submission identifiers use a time-sortable format (UUIDv7/ULID)** rather than random UUIDv4, to minimize collision risk across many offline devices and support chronological conflict review (§4.2).
-12. **A version-diff (draft vs. published) builder view** is flagged as a natural low-cost UX addition consistent with the plan's "intuitive by default" principle, but is not treated as load-bearing architecture (§6.2).
+12. **A version-diff (draft vs. published) builder view** is flagged as a natural low-cost UX addition consistent with the plan's "intuitive by default" principle, but is not treated as load-bearing architecture (§6.2). **Built by `M189` as the hub's Compare page rather than a builder view (`D169`: the builder's action bar is held at six buttons for phone width, and Publish stays one click).**
 
 All twelve are candidates for promotion to formal ADRs as implementation begins; none contradicts or extends the plan's product direction — each fills in a level of detail the plan intentionally left to implementation-time judgment.

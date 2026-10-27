@@ -127,6 +127,8 @@ const TEMPLATES = 'resources/js/Pages/forms/Templates.vue';
 const FACETS = 'app/Support/Forms/FormListFacets.php';
 const ROW_ACTIONS = 'resources/js/components/forms/FormRowActions.vue';
 const HUB = 'resources/js/Pages/forms/Show.vue';
+const COMPARE = 'resources/js/Pages/forms/VersionCompare.vue';
+const COMPARE_WORDS = 'resources/js/Pages/forms/version-compare.ts';
 const TABS = 'app/Support/Forms/FormTabSet.php';
 const BUILDER = 'resources/js/Pages/forms/Builder.vue';
 const PALETTE = 'resources/js/components/builder/FieldPalette.vue';
@@ -537,10 +539,17 @@ const guide: ChapterDraft[] = [
                 blocks: [
                     p('Every publish is kept. On the form’s own page, the ', ui('Versions', HUB), ' panel lists them (in the forms list it is ', ui('Version history', ROW_ACTIONS), '):'),
                     list(
-                        [ui('What changed', HUB), ' — the questions that version added, removed or changed, with the note written when it was published.'],
+                        [ui('What changed', HUB), ' — the questions that version added, removed or changed (any of their settings), with the note written when it was published.'],
+                        [ui('Compare', HUB), ' — every setting that version changed since the one before it, question by question, before and after. On the draft it is ', ui('Compare with live', HUB), ': what publishing will change.'],
                         [ui('View', HUB), ' — open that version read-only, exactly as it asked its questions. You can try them; nothing is saved.'],
                         [ui('Print blank', HUB), ' — a paper copy of that version to print and fill in by hand.'],
                         [ui('Restore', HUB), ' — copy an older version back into your draft (confirm with ', ui('Restore into draft', HUB), '). It changes nothing live until you publish again.'],
+                    ),
+                    p(
+                        'On the Compare page, pick any two versions under ', ui('Compare', COMPARE), ' and ', ui('With', COMPARE),
+                        ', or ', ui('Swap', COMPARE), ' them. A change that makes answers hard to compare across versions — a new question type, a question made required, a removed question — is marked ',
+                        ui('Answers may not compare across versions', COMPARE_WORDS), '; so is a change to who is asked, or to the answers a question’s text shows. ',
+                        ui('Only marked changes', COMPARE), ' keeps just those, and ', ui('Show unchanged questions', COMPARE), ' adds the rest.',
                     ),
                     p(
                         'To start a new form from this one, click ', ui('Save as template', BUILDER),

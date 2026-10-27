@@ -303,6 +303,44 @@ for (const theme of themes) {
     });
 }
 
+// M172's View page, `/forms/{form}/versions/{version}/view`, reached by the hub's View on the live version (the uuid-route
+// house rule). Unscanned until M189, whose Compare scan found the info alert's link at the browser's default blue in the dark
+// theme — and this page carries its link in the same alert.
+for (const theme of themes) {
+    test(`Version view (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/forms', { waitUntil: 'networkidle' });
+        await formEntry(page, 'Community Health Survey')
+            .getByRole('link', { name: 'Community Health Survey' })
+            .click();
+        await page.waitForURL(/\/forms\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+        await page.locator('[data-version-view]').first().click();
+        await page.waitForURL(/\/forms\/[0-9a-f-]{36}\/versions\/[0-9a-f-]{36}\/view$/, { timeout: 30_000 });
+        await page.locator('[data-version-view-note]').waitFor({ state: 'visible', timeout: 10_000 });
+        await forceTheme(page, theme);
+        await assertClean(page, 'Version view');
+    });
+}
+
+// M189 (`version-diff-ui`, `D169`) — the Compare page, `/forms/{form}/compare/{from}/{to}`, reached by the hub's Compare with
+// live on the draft row (the uuid-route house rule). "Community Health Survey" has a live version and a draft the seeder
+// left unchanged, so the comparison is empty until Show unchanged questions is ticked: ticked, every question's card is
+// drawn, which is the composition worth scanning — and at 375px the one where a long label could push the page sideways.
+for (const theme of themes) {
+    test(`Compare versions (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/forms', { waitUntil: 'networkidle' });
+        await formEntry(page, 'Community Health Survey')
+            .getByRole('link', { name: 'Community Health Survey' })
+            .click();
+        await page.waitForURL(/\/forms\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+        await page.getByRole('button', { name: 'Compare with live' }).click();
+        await page.waitForURL(/\/forms\/[0-9a-f-]{36}\/compare\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+        await page.getByText('Show unchanged questions').click();
+        await page.locator('[data-compare-question]').first().waitFor({ state: 'visible', timeout: 10_000 });
+        await forceTheme(page, theme);
+        await assertClean(page, 'Compare versions');
+    });
+}
+
 // One form's responses (J2c) — `/forms/{form}/submissions`, the hub's Responses tab.
 //
 // ⚠️ SCANNED SEPARATELY FROM `/submissions` EVEN THOUGH IT IS THE SAME COMPONENT, and that is the point of

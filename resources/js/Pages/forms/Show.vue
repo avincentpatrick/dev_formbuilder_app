@@ -59,6 +59,8 @@ type VersionRow = {
     published_at: string | null;
     /** M172 (`R-52f5ad93`): what a published version changed, by label; null for the draft. */
     changes: VersionChanges | null;
+    /** M189 (`D169`): the Compare page against the version before (the draft: against the live one); null for the first. */
+    compare_href: string | null;
 };
 
 type VersionChanges = {
@@ -268,6 +270,11 @@ function changeLines(changes: VersionChanges | null): string[] {
 /** M172 — an old version opened read-only through the builder's preview (`FormVersionViewController`). */
 function viewVersion(version: VersionRow): void {
     router.visit(`/forms/${props.form.id}/versions/${version.id}/view`);
+}
+
+/** M189 (`version-diff-ui`, `D169`) — what a version changed, setting by setting (`FormVersionCompareController`). */
+function compareVersion(version: VersionRow): void {
+    if (version.compare_href) router.visit(version.compare_href);
 }
 
 // ── Actions ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -507,6 +514,19 @@ function isPrintable(version: VersionRow): boolean {
                                 @click="viewVersion(row)"
                             >
                                 View
+                            </MdsButton>
+                            <!-- M189 (`D169`): View's gate. A published version is compared with the one before it, the
+                                 draft with the live version; the first version and a never-published draft have nothing to
+                                 compare, and the presenter sends them no link. -->
+                            <MdsButton
+                                v-if="can.template && row.compare_href"
+                                variant="tertiary"
+                                size="sm"
+                                icon-left="list"
+                                data-version-compare
+                                @click="compareVersion(row)"
+                            >
+                                {{ row.status === 'draft' ? 'Compare with live' : 'Compare' }}
                             </MdsButton>
                             <MdsButton
                                 v-if="can.template && isPrintable(row)"

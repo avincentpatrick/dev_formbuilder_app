@@ -101,30 +101,14 @@ final class FieldRevisionRecorder
      */
     public function recordMoves(Form $form, FormVersion $draft, User $user, array $before, array $after, array $sectionLabels): void
     {
-        $moved = [];
-        foreach ($after as $id => $now) {
-            if (isset($before[$id]) && $before[$id]['section_id'] !== $now['section_id']) {
-                $moved[$id] = true;
-            }
-        }
-
-        $orderBefore = self::orderBySection($before);
-        $orderAfter = self::orderBySection($after);
-        foreach ($orderAfter as $section => $ids) {
-            $stayed = array_values(array_filter($ids, static fn (string $id): bool => ! isset($moved[$id]) && isset($before[$id])));
-            $was = array_values(array_filter($orderBefore[$section] ?? [], static fn (string $id): bool => in_array($id, $stayed, true)));
-            $kept = array_flip(self::longestCommonSubsequence($was, $stayed));
-            foreach ($stayed as $id) {
-                if (! isset($kept[$id])) {
-                    $moved[$id] = true;
-                }
-            }
-        }
+        $moved = self::moved($before, $after);
 
         if ($moved === []) {
             return;
         }
 
+        $orderBefore = self::orderBySection($before);
+        $orderAfter = self::orderBySection($after);
         $fields = FormField::query()->where('form_version_id', $draft->id)->whereIn('id', array_keys($moved))->get();
         foreach ($fields as $field) {
             $id = (string) $field->id;
@@ -137,15 +121,48 @@ final class FieldRevisionRecorder
     }
 
     /**
+     * The questions that MOVED between two {@see self::positions()} readings: one whose section changed, or one outside the
+     * longest common subsequence of its section's order before and after. Shared with M189's version comparison
+     * ({@see VersionComparison}), which reads two versions' positions keyed by question key rather than by id.
+     *
+     * @param  array<string, array{section_id: ?string, sequence: int}>  $before
+     * @param  array<string, array{section_id: ?string, sequence: int}>  $after
+     * @return array<string, true>
+     */
+    public static function moved(array $before, array $after): array
+    {
+        $moved = [];
+        foreach ($after as $id => $now) {
+            if (isset($before[$id]) && $before[$id]['section_id'] !== $now['section_id']) {
+                $moved[(string) $id] = true;
+            }
+        }
+
+        $orderBefore = self::orderBySection($before);
+        foreach (self::orderBySection($after) as $section => $ids) {
+            $stayed = array_values(array_filter($ids, static fn (string $id): bool => ! isset($moved[$id]) && isset($before[$id])));
+            $was = array_values(array_filter($orderBefore[$section] ?? [], static fn (string $id): bool => in_array($id, $stayed, true)));
+            $kept = array_flip(self::longestCommonSubsequence($was, $stayed));
+            foreach ($stayed as $id) {
+                if (! isset($kept[$id])) {
+                    $moved[$id] = true;
+                }
+            }
+        }
+
+        return $moved;
+    }
+
+    /**
      * Where one question sits, as its history records a move: its section's label (null at the top level) and its place
      * among that section's questions, from 1.
      *
-     * @param  array<string, list<string>>  $order
+     * @param  array<string, list<string>>  $order  {@see self::orderBySection()}
      * @param  array<string, array{section_id: ?string, sequence: int}>  $positions
      * @param  array<string, string>  $sectionLabels
      * @return array{section: ?string, position: ?int}
      */
-    private static function place(array $order, array $positions, string $id, array $sectionLabels): array
+    public static function place(array $order, array $positions, string $id, array $sectionLabels): array
     {
         $section = $positions[$id]['section_id'];
         $index = array_search($id, $order[(string) $section] ?? [], true);
@@ -248,7 +265,7 @@ final class FieldRevisionRecorder
      * @param  array<string, array{section_id: ?string, sequence: int}>  $positions
      * @return array<string, list<string>> section id ('' for the top level) => question ids in order
      */
-    private static function orderBySection(array $positions): array
+    public static function orderBySection(array $positions): array
     {
         uasort($positions, static fn (array $a, array $b): int => $a['sequence'] <=> $b['sequence']);
         $order = [];
@@ -292,7 +309,7 @@ final class FieldRevisionRecorder
     }
 
     /** One comparable text for a value: arrays with their keys sorted, so key order is never a change. */
-    private static function canonical(mixed $value): string
+    public static function canonical(mixed $value): string
     {
         $sort = static function (mixed $v) use (&$sort): mixed {
             if (! is_array($v)) {

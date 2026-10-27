@@ -283,6 +283,31 @@ describe('form hub — the version panel', () => {
 
         wrapper.unmount();
     });
+
+    it('offers Compare where the server sent a link — Compare with live on the draft — and nothing without view (M189, D169)', async () => {
+        const versions = [
+            { id: 'v-3', version_number: 3, status: 'draft', published_at: null, changes: null, compare_href: `/forms/${FORM_ID}/compare/v-2/v-3` },
+            {
+                id: 'v-2', version_number: 2, status: 'published', published_at: '2026-07-01T00:00:00+00:00',
+                changes: { first: false, added: [], removed: [], changed: ['Color'], note: null }, compare_href: `/forms/${FORM_ID}/compare/v-1/v-2`,
+            },
+            {
+                id: 'v-1', version_number: 1, status: 'superseded', published_at: '2026-06-01T00:00:00+00:00',
+                changes: { first: true, added: [], removed: [], changed: [], note: null }, compare_href: null,
+            },
+        ];
+        const wrapper = render({ versions: versions as never });
+
+        const compares = wrapper.findAll('[data-version-compare]');
+        expect(compares.map((button) => button.text()), 'none on the first version').toEqual(['Compare with live', 'Compare']);
+        await compares[1].trigger('click');
+        expect(mocks.visit).toHaveBeenLastCalledWith(`/forms/${FORM_ID}/compare/v-1/v-2`);
+        wrapper.unmount();
+
+        const reader = render({ versions: versions as never, can: { edit: false, publish: false, encode: false, template: false } });
+        expect(reader.findAll('[data-version-compare]')).toHaveLength(0);
+        reader.unmount();
+    });
 });
 
 describe('form hub — links, and the two places one would be a lie', () => {

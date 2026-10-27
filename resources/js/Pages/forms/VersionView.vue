@@ -59,7 +59,7 @@ const published = computed(() =>
         <MdsAlert tone="info" :title="`Version ${version.version_number}${published} — read-only`" data-version-view-note>
             This is the form as this version asked it. You can try the questions, but nothing you enter is saved, and
             nothing here changes the form. To edit, open the Builder; to go back, return to the
-            <Link :href="hub_href">form's overview</Link>.
+            <Link :href="hub_href" class="version-view__alert-link">form's overview</Link>.
         </MdsAlert>
 
         <section class="version-view__form" aria-label="The form as this version asked it">
@@ -89,5 +89,12 @@ const published = computed(() =>
     border-radius: var(--mds-radius-md);
     background-color: var(--mds-color-bg-surface);
     min-width: 0;
+}
+
+/* M189: a link inside the info alert takes the alert's own foreground — `status-info-{bg,fg}` is a measured pair — and keeps its
+   underline, so colour is never its only signifier. Left alone it was the browser's default blue, 1.04:1 on the dark alert. */
+.version-view__alert-link {
+    color: inherit;
+    text-decoration: underline;
 }
 </style>

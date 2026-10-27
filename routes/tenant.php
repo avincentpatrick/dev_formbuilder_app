@@ -38,6 +38,7 @@ use App\Http\Controllers\Tenant\FormShareController;
 use App\Http\Controllers\Tenant\FormShareQrController;
 use App\Http\Controllers\Tenant\FormTemplateController;
 use App\Http\Controllers\Tenant\FormThemeController;
+use App\Http\Controllers\Tenant\FormVersionCompareController;
 use App\Http\Controllers\Tenant\FormVersionViewController;
 use App\Http\Controllers\Tenant\FormXlsformController;
 use App\Http\Controllers\Tenant\GoogleCompleteController;
@@ -609,6 +610,13 @@ Route::middleware([
     Route::get('/forms/{form}/versions/{version}/view', FormVersionViewController::class)
         ->scopeBindings()
         ->middleware('can:view,form')->name('forms.versions.view');
+
+    // M189 (`version-diff-ui`, `D169`): two versions compared — View's gate. NOT `scopeBindings`: with two version
+    // parameters it scopes `{to}` to `{from}`; the controller checks both against the form. `whereUuid` keeps a malformed
+    // id a 404 rather than a Postgres 22P02.
+    Route::get('/forms/{form}/compare/{from}/{to}', FormVersionCompareController::class)
+        ->whereUuid(['from', 'to'])
+        ->middleware('can:view,form')->name('forms.versions.compare');
 
     // Interactive builder (Increment D4a) — the three-pane workspace + its fine-grained mutation surface.
     // `show` renders the page; the rest are JSON edits the builder's CSRF fetch sidecar calls directly

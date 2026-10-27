@@ -285,7 +285,7 @@ Acceptance criteria (Phase 2):
 - Calculated fields are supported without `eval()`, mirroring the legacy system's confirmed-good pattern for this specific capability.
 
 Acceptance criteria (Phase 2/3):
-- An interactive, field-by-field version-comparison view (draft vs. currently-published, or any two historical versions) — Doc #8 §5 and §11.
+- An interactive, field-by-field version-comparison view (draft vs. currently-published, or any two historical versions) — Doc #8 §5 and §11. ✅ **Built by `M189` (2026-10-26, `D169`):** the Compare page, opened from the form hub's Versions panel.
 
 ### Feature #9 — User style/theme preferences
 **Phase: 1 (theme mode) → Phase 2 (accent color, text size, accessibility fonts)**

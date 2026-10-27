@@ -14372,7 +14372,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   by key) reaches no page; an old version is reachable only as the Print blank PDF (`routes/tenant.php:580`), the XLSForm download
   (`:554`) or `GET /api/v1/forms/{form}/versions/{version}`. The remedy: the panel lists each version's summary (added, removed and
   changed questions by label) and a View that opens the old version read-only through the preview runtime from `schema_snapshot`
-  (a tenant route beside the Print blank one). The interactive field-by-field diff stays `version-diff-ui`
+  (a tenant route beside the Print blank one). The interactive field-by-field diff stays `version-diff-ui` (built by `M189`)
   (`docs/form-versioning-schema-migration.md:209`). **Live.** Filed by `M172`. **Tier: early-testing.** ✅ **CLOSED BY `M172` (2026-10-15):** the hub's Versions panel has a "What changed" column — added, removed and changed questions by their own labels with the publisher's note, derived when read from the snapshots the hub already loads (`app/Services/Forms/VersionChangeSummary.php`; `change_summary` holds keys only and a published row is frozen) — and View beside Print blank: `GET /forms/{form}/versions/{version}/view` (`FormVersionViewController`, Print blank's shape and gate, a draft 404s) draws the version through the builder's preview with `readOnly`, no author control offered, nothing saved. Help says so. Red first: two Pest cases, two Vitest cases; mutation caught: the view route serving a draft.
 
 - ✅ **CLOSED BY `M183` (2026-10-22) — ****`minor` · A grid's cells are all single choices from one shared list: no column can have its own type or its own choices, so a table of names, numbers, dates and ticks cannot be built.**
@@ -15236,3 +15236,25 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   tab goes on listing changes the restore undid without saying so; the restore itself is audited (`form.restored`). The remedy: the
   restore writes one entry per question it changed, kind `restored`, naming the version. **Live** on the trunk since `M188` merged at merge point 6 (`2dfb0baa`, 2026-10-26).
   Filed by `M188`. **Tier: during-testing.**
+
+- **`minor` · A narrowed constraint is breaking-but-permitted in the versioning design, and nothing detects it.**
+  `docs/form-versioning-schema-migration.md` §5's table lists "narrowing a constraint" (a lower maximum length, a smaller range) among
+  the changes that make answers hard to compare across versions, but `SchemaChangeClassifier::breakingCodeOf()` knows only a new type,
+  a question made required and indexing changed. So the publish summary records nothing and `M189`'s Compare page shows the rule
+  change without the "Answers may not compare across versions" mark. Decided not to widen `M189`: each rule type narrows in its own
+  direction. The remedy: a per-rule-type comparison of the old and new limit in the shared rule, so publish and Compare agree.
+  **Live.** Filed by `M189`. **Tier: during-testing.**
+
+- **`nit` · Deleting a question a thank-you message pipes from says nothing until Publish refuses.**
+  `docs/piping-output-encoding-design.md` A10 left this residue to "`SchemaChangeClassifier` hole-diffing"; `M189` built the
+  hole-diffing on the Compare page, which cannot reach it: `forms.confirmation_message` is a form's column, not a version's, so no
+  comparison of two versions sees it. The message is checked when saved (`FormConfirmationMessageController`) and at publish
+  (`TemplateValidationGate::confirmationMessageViolations()`), never when a question is deleted. The remedy: the question's delete dialog
+  names the thank-you message when the message pipes that question in. **Live.** Filed by `M189`. **Tier: during-testing.**
+
+- **`nit` · The Compare page does not show a list file or the Philippine places refreshed between two publishes.**
+  `M189` compares each question's config as the next draft holds it (`ChoiceListMaterializer::forNextDraft()`), so the rows publish
+  copied in from a list never read as a change between a draft and its live version — and therefore neither does a new upload of the
+  same list, or a newer quarter of the places, between two published versions. The page says so in its note. The remedy: compare the
+  copied rows' count and checksum between two published versions only, and show "The list's rows changed (N → M)".
+  **Latent** until `M189` merges. Filed by `M189`. **Tier: during-testing.**

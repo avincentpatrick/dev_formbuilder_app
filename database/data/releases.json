@@ -1,5 +1,23 @@
 [
     {
+        "version": "0.16.0",
+        "title": "Compare two versions of a form",
+        "items": [
+            {
+                "kind": "new",
+                "text": "Compare any two versions of a form. On the form’s page, Versions → Compare shows what a version changed since the one before it, and Compare with live on the draft shows what publishing will change. You can pick any two versions at the top of the page."
+            },
+            {
+                "kind": "new",
+                "text": "Each question that changed lists every setting before and after, and added, removed and moved questions are listed too. A change that makes answers hard to compare across versions is marked: a new question type, a question made required, or a removed question. So is a change to who is asked, or to which answers a question’s text shows."
+            },
+            {
+                "kind": "improved",
+                "text": "The Versions panel’s “What changed” now lists a question as changed when any of its settings changed, such as its choices or rules, not only its label, type or Required."
+            }
+        ]
+    },
+    {
         "version": "0.15.0",
         "title": "A history of each question’s changes",
         "items": [

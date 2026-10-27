@@ -282,7 +282,7 @@ The immutable snapshot per publish — the single structural fix for legacy's co
 | `title` | `varchar(255)` | No | — | No | This version's own title at the moment of its creation/publish (so a respondent's historical submission can show "what this form was called when I filled it," even after later renames). |
 | `description` | `text` | Yes | `NULL` | No | — |
 | `schema_snapshot` | `jsonb` | No | — | No | Denormalized, read-optimized cache of this version's own sections/fields/validations (see Design Notes) — the shape consumed by the public runtime and the offline PWA client. |
-| `change_summary` | `text` | Yes | `NULL` | No | Optional publisher-entered changelog note for this publish. |
+| `change_summary` | `text` | Yes | `NULL` | No | The changelog written at publish: the generated summary by key (`SchemaChangeClassification::changeSummary()`, `docs/form-versioning-schema-migration.md` §5), then, after a blank line, the publisher's own note when one was given. Frozen with the version; the hub and the Compare page (`M189`) read what changed from the snapshots instead, in the questions' own labels. |
 | `checksum` | `varchar(64)` | Yes | `NULL` | No | SHA-256 of the canonical serialization **as hashed at publish** — a version identity, **not** re-derivable from the stored `schema_snapshot`, because `jsonb` re-orders object keys by length then bytes where the serializer sorts bytewise (M92). Consumers compare stamps; the offline client and export tooling use it to detect drift/cache-bust without re-downloading the full snapshot. |
 | `published_at` | `timestamptz` | Yes | `NULL` | No | Set once, when this version transitions `draft` → `published`. |
 | `published_by` | `uuid` | Yes | `NULL` | No | FK to `users.id` (external). |

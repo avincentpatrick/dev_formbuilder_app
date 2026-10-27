@@ -364,7 +364,7 @@ if (($liveHead -eq $sha) -and (-not [IO.File]::Exists($DownFile)) -and ($deploye
 #     ⚠️ `__APP_VERSION__` stays at the last BUILT commit after a skip: vite.config.ts stamps it from
 #     the stage's HEAD, and `submissions.app_version` records it. That is the one thing a skip leaves
 #     stale, and it is preferred to taking the site down to restamp a string.
-$SiteSafePrefixes = @('docs/', 'tests/', 'scripts/', '.github/')
+$SiteSafePrefixes = @('docs/', 'tests/', 'scripts/', '.github/', 'apps/')
 $SiteSafeFiles = @('PROGRESS.md', 'PROGRESS_ARCHIVE.md', 'CLAUDE.md', 'README.md')
 
 if (($deployedSha -match '^([0-9a-f]{40}|[0-9a-f]{64})$') -and

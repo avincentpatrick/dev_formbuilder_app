@@ -1179,6 +1179,17 @@ it('P2b — a disposition QUOTED mid-item does not discharge it, which is M84\'s
     });
 });
 
+it('P2b — the LAST parenthetical is the answer, so an earlier one cannot vouch for a refused word', function (): void {
+    // The suffix rule above cannot see this shape: the line DOES end in a parenthetical. Read from the
+    // first `*(` instead of the last, the item opens "Built — M1)* and …" and passes as Built.
+    [$doc] = pipelineLintDeferralList('- A newly deferred thing, like *(Built — M1)* and *(Deferred — to later)*');
+
+    pipelineLintPerturb('docs/testing-strategy.md', $doc, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('ends in *(Deferred — to later)*, which opens with none of');
+    });
+});
+
 it('P2b — a hard-wrapped item is read to the END of its paragraph, so a disposition there counts', function (): void {
     [$doc] = pipelineLintDeferralList(
         "- A newly deferred thing whose sentence\n  wraps onto a second line. *(Not planned — a non-goal of this fixture)*"

@@ -76,6 +76,50 @@ the `P2c` pin moves 8 → 7. The fixture's baseline goes red the moment the corp
 carries those ids. PHPStan cannot move (a docblock). **Most likely wrong:** the item walk's boundaries — a continuation line, an
 indented amendment or a marker comment read as part of the wrong item — on a shape the audits did not list.
 
+**BUILT — PR #383, CI 6/6 green with real step counts (run 40431625030 at `c5b3f300`: Static analysis 32 · E2E 20 · Contract 16 ·
+Frontend 12 · Pest 11 · axe 11) — AND NOT MERGED.** ⛔ **Held for merge point 7 (`D170`), merged AFTER #382 (`M189`)**; the user's
+census before and after, as at every merge point. The branch is cut from `dc649b43` and has never merged the trunk. **At merge point 7,
+once #382 is in:** rebase this branch onto the trunk. Expect conflicts at form-versioning §11's first bullet and piping §8.1's
+hole-diffing bullet — take #382's text and keep this branch's disposition — and at the end of `docs/feature-backlog.md`, where both
+appended rows (keep both). Then `pipeline-lint` names the three `Queued — version-diff-ui` sites (form-versioning §11, piping §8.1,
+workflow §10's relevance-diff bullet), because that marker will have left the line: change each to `Built — M189`, the piping one naming
+`R-b0f90c12` (`M189`'s thank-you-message row) and `R-49337f53` too. Regenerate the line. No migration. Commits: `acdd8585` (the build),
+`c5b3f300` (a last-match control; the marker done, the line regenerated).
+
+**How the prediction fared — measured, the wrong parts first.**
+- **"Most likely wrong: the item walk's boundaries" — wrong, in the good direction.** Its first run collected exactly the audits' items
+  — 114 (planned at ~113): ADR-0002's intro paragraph is not an item, piping §8 stops at its own §8.1 site, the indented amendments and
+  the marker comments are not items, and the four wrapped items land on their paragraph's last line.
+- **"The fixture's baseline goes red until it carries the cited ids" — right, and planned for; but the first full run failed one case
+  for a reason no prediction named:** P7a's control addresses the decision row by POSITION (`$rows[111]` is D2), and the cited-id rows
+  inserted ahead of it moved it. They are appended last.
+- **"Red with ~113 items and 8 sentences, then green" — right:** 114 and 8; the `P2c` pin moved 8 → 7 (digest `6dfe8780e5b59052`).
+  `P2e` stays 89, digest unchanged. **"PHPStan cannot move" — right** (a docblock).
+- **What no prediction named, each measured:** (1) the rule-group count — the controls count groups by the FIRST TOKEN of each `[ok]`
+  line, so the new checks report under the existing names `P2b sections` and `P2c deferrals` (a new name would have split a group and
+  reddened that control); it stays 15. (2) The quoted-mid-item control is caught by the SUFFIX rule, not by last-match, so nothing
+  isolated last-match until a case was added whose line does end in a parenthetical — the first-match mutant proves it. (3) `D24`'s
+  "half stale" was one sentence of eight. (4) The audit found stale prose beyond the sites, corrected in place and line-neutral: the
+  PRD's payments phase, two "open questions" since answered (I11a, `D44`), the builder preview (`M118`), `TemplateSyntaxException`'s
+  callers (docblock and piping §8.1: two, both catching), OCR's "no GD" twice (`M160`), the golden-runner count (six), a § reference;
+  `R-4c3a27a5`'s premise (GD) is noted at the row as fired.
+- **Filed: 23 rows.** during-testing — `R-d7e27962` (a form prints only in its default language), `R-c260bb0b` (an XLSForm rename leaves
+  `${old}` references dangling), `R-49337f53` (Compare's piping mark misses section text and translations, latent until `M189` merges),
+  `R-5413902d` (the OCR key has no budget alert); before-launch — `R-c8c19908`, `R-7ed05f6d`, `R-a34bdb93`, `R-6bf1ffc3`, `R-3495d9cd`,
+  `R-8038db5c`, `R-ea8f81c0`, `R-3506c98c`, `R-d9168a73`, `R-9d113919`; after-launch — `R-dc9be6cd`, `R-fdd40169`, `R-88aad7f4`,
+  `R-e5951e29`, `R-968816fe`, `R-8a31fb4f`, `R-b9b74c3c`, `R-7a57ff85`, `R-22358a38`.
+- **Run locally:** Pest — `PipelineLintControlsTest` 74 passed; `tests/Feature/Docs` with `QueuedMailContractTest` and
+  `DocumentedDefaultDriftTest` 257 passed, `SuiteCollectionFloorTest` red on the known bind-mount artefact (517 of 596 files collected).
+  Host — Pint, `pipeline-lint`, `tracker-lint`, citation liveness (16/16), `controller-gate`, `preflight --with-gates --with-pint`.
+  Vitest and E2E: no spec reaches this diff; CI ran both.
+- **Mutants: 6 caught, 0 survived** (`scripts/mutate.php`). The off-the-line arm dropped → the LEFT-the-line control, and P3's
+  left-the-line case through the shared `line_ids()`; any opening word accepted → the `Deferred` control and the last-parenthetical
+  one; first-match → the last-parenthetical control, and P2e's prose-parenthetical case through the shared parser; a `>` line read as
+  continuation → the amendment control alone. Two CO-FIRE, recorded as such: continuation dropped (71 red) and the item floor raised
+  (73 red) reach every case, because the live corpus's own wrapped items and the floor sit under the fixture's baseline. **Not
+  committed, on `M82`'s stated grounds:** no arm of this gate reads a diff; each run proved its write (the sha256 moved) and its
+  restore (byte-compared, `git status` clean).
+
 ## HELD — `M189`, compare two versions of a form (`version-diff-ui`) (m189-version-compare)
 
 Taken 2026-10-26. Branch `m189-version-compare`, cut from `origin/main` at `8500dfa1`, PR into main. ⛔ **NOT MERGED THIS SESSION:**

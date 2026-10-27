@@ -681,10 +681,10 @@ under-disclose at the same time.
 ---
 
 ## 9. Out of Scope / Deferred
-- Metrics, dashboards, alerting, on-call → Doc #23 (this doc's §5.5 incident skeleton points there).
-- Automated zero-downtime release-swap on Windows → future enhancement (§3.1).
-- A second node / managed failover for higher availability → revisit before paid-customer SLAs (ADR-0005).
-- Plan-tier-specific infrastructure quotas → Doc #24.
+- Metrics, dashboards, alerting, on-call → Doc #23 (this doc's §5.5 incident skeleton points there). *(Queued — `R-7ed05f6d`)*
+- Automated zero-downtime release-swap on Windows → future enhancement (§3.1). *(Not planned — owed only on ADR-0005's revisit trigger, deploy downtime becoming a recurring cost)*
+- A second node / managed failover for higher availability → revisit before paid-customer SLAs (ADR-0005). *(Queued — `R-a34bdb93`)*
+- Plan-tier-specific infrastructure quotas → Doc #24. *(Built — the quotas in docs/pricing-feature-gating-matrix.md §2 (QuotaGuard))*
 
 <!-- The pipeline markers below are DELIBERATELY at end-of-file. A marker inserted mid-document
      shifts every line beneath it, and this repository cites documents as `path:N` — 25 such

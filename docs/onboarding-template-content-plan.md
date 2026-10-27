@@ -79,6 +79,6 @@ English-only at launch, matching `docs/non-functional-requirements.md` §6's sta
 
 ## 6. Out of Scope / Deferred
 
-- User-submitted/community template contributions — no existing doc requests this, and it would need its own moderation/review workflow not currently justified by a stated need.
-- A scripted, multi-step product tour beyond the single template-vs-blank choice point (§2) — deliberately not built, consistent with this project's "intuitive by default" principle valuing low-friction first use over a guided walkthrough.
-- Template categories/gallery filtering UI beyond the existing card-grid pattern — an implementation detail for whichever team builds the gallery screen, not an architectural decision.
+- User-submitted/community template contributions — no existing doc requests this, and it would need its own moderation/review workflow not currently justified by a stated need. *(Not planned — no stated need)*
+- A scripted, multi-step product tour beyond the single template-vs-blank choice point (§2) — deliberately not built, consistent with this project's "intuitive by default" principle valuing low-friction first use over a guided walkthrough. *(Not planned — a deliberate choice (§2))*
+- Template categories/gallery filtering UI beyond the existing card-grid pattern — an implementation detail for whichever team builds the gallery screen, not an architectural decision. *(Built — G9a's card grid with category badges)*

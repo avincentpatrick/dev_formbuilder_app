@@ -141,12 +141,12 @@ Load testing (§2) runs on a separate, less-frequent cadence (e.g., nightly or p
 
 ## 7. Out of Scope / Deferred
 
-- Specific numeric load-testing pass/fail thresholds beyond referencing the NFR doc's existing targets (§2) — this document validates against those, it does not set new ones.
-- Deploy pipeline mechanics (environments, secrets, the actual CD stage's steps) → Doc #22.
-- Ongoing production performance monitoring/alerting (as opposed to pre-merge/pre-release testing) → Doc #23.
-- Property-based testing adoption — not currently planned; a plausible future enhancement once the core suites above are mature, not a Phase 0 requirement.
+- Specific numeric load-testing pass/fail thresholds beyond referencing the NFR doc's existing targets (§2) — this document validates against those, it does not set new ones. *(Not planned — this document sets no new targets; measuring the existing ones is a row filed by M190)*
+- Deploy pipeline mechanics (environments, secrets, the actual CD stage's steps) → Doc #22. *(Built — deploy.yml and deploy.ps1 (docs/deployment-infrastructure.md))*
+- Ongoing production performance monitoring/alerting (as opposed to pre-merge/pre-release testing) → Doc #23. *(Queued — `R-7ed05f6d`)*
+- Property-based testing adoption — not currently planned; a plausible future enhancement once the core suites above are mature, not a Phase 0 requirement. *(Not planned — not currently planned)*
 - ~~Mutation testing~~ — **this line was stale and is corrected here (H21c).** No mutation-testing *tool* is adopted and none is planned; what IS now standing practice, unprompted by any framework, is a **hand-run mutation pass over the code an increment just wrote**, one edit at a time, recording which tests each reddens. H21a, H21b and H21c each ran one, and each found something a green suite had not: H21a that dropping the post-loop mask tightening was green for two compounding reasons (the assertion was an `if/else` invariant satisfied by both behaviours, and the settle bound means the field COUNT decides which phase of an oscillation the loop halts on); H21b that §4.2's forward walk was pinned by **nothing at all**, which corrected the design document rather than a test; H21c that passing the OMITTED-filtered field list to `StepProjection` reddens **nothing**, because two lists answering different questions happen to stand in a subset relation nothing enforces.
-  **The standing lesson all three share: a mutation that reddens nothing is the loudest result you can get.** It does not mean the code is redundant — it means no test reaches that path, and the right response is to find out empirically *why* before trusting either the test or the mutation.
+  **The standing lesson all three share: a mutation that reddens nothing is the loudest result you can get.** It does not mean the code is redundant — it means no test reaches that path, and the right response is to find out empirically *why* before trusting either the test or the mutation. *(Not planned — no mutation-testing tool; the hand-run pass has been scripted since M36 as scripts/mutate.php)*
 
 ---
 

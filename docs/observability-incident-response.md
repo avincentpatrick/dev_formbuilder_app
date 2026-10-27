@@ -85,6 +85,6 @@ Elaborates `docs/deployment-infrastructure.md` §5.4's skeleton into the full pr
 
 ## 8. Out of Scope / Deferred
 
-- Specific APM/logging/tracing vendor selection (Datadog, New Relic, Sentry, self-hosted Grafana/Loki/Tempo, etc.) — an implementation detail left to whichever team sets up the observability stack, not an architectural decision this document needs to pin.
-- Formal multi-tier on-call/escalation policy — deferred until team size or enterprise SLA commitments (Phase 4) justify it (§6).
-- Per-plan-tier SLA commitments (does a higher tier get a contractual uptime guarantee) → Doc #24.
+- Specific APM/logging/tracing vendor selection (Datadog, New Relic, Sentry, self-hosted Grafana/Loki/Tempo, etc.) — an implementation detail left to whichever team sets up the observability stack, not an architectural decision this document needs to pin. *(Queued — `R-7ed05f6d`, which chooses the vendor first)*
+- Formal multi-tier on-call/escalation policy — deferred until team size or enterprise SLA commitments (Phase 4) justify it (§6). *(Not planned — until team size or an enterprise SLA justifies it)*
+- Per-plan-tier SLA commitments (does a higher tier get a contractual uptime guarantee) → Doc #24. *(Built — decided in docs/pricing-feature-gating-matrix.md, with nothing to build in code)*

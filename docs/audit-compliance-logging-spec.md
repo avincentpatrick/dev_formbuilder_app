@@ -157,6 +157,6 @@ Audit rows are append-only and never deleted (`docs/data-dictionary.md` §13: "n
 
 ## 5. Out of Scope / Deferred
 
-- The Audit Log screen's UI/filtering/search design → Doc #19 (UI/UX Design System Reference) and `docs/PRD.md` Feature #12 already cover the user-facing shape; this document is schema/redaction-scope only.
-- Whether super-admin actions taken *against* a tenant appear in that tenant's own Audit Log — an explicit open question already flagged in `docs/multi-tenancy-rbac-design.md` §9, not resolved here.
-- Long-term audit-log archival/cold-storage strategy if the table grows very large over years of operation → Doc #22 (Deployment & Infrastructure Doc).
+- The Audit Log screen's UI/filtering/search design → Doc #19 (UI/UX Design System Reference) and `docs/PRD.md` Feature #12 already cover the user-facing shape; this document is schema/redaction-scope only. *(Built — the Audit Log page (AuditLogController))*
+- Whether super-admin actions taken *against* a tenant appear in that tenant's own Audit Log — the open question `docs/multi-tenancy-rbac-design.md` §9 flagged, since decided there (they surface) and built by I11a: an action taken while acting as a member lands in the tenant's log, shown as "Platform operator" (`AuditLogPresenter`). *(Built — I11a)*
+- Long-term audit-log archival/cold-storage strategy if the table grows very large over years of operation → Doc #22 (Deployment & Infrastructure Doc). *(Queued — `R-8a31fb4f`)*

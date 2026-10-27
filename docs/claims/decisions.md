@@ -18,16 +18,147 @@ two server-paginated tables (2026-08-18) · fail **open** on an unseeded plan ca
 password policy min-12 + HIBP + classes (2026-08-09) · Google-only social login (2026-08-09) ·
 gamification last (2026-08-09) · the held list stays held until the user signals, and they said
 *"not yet, ask again later"* on 2026-08-18 · **a flaky e2e result fails CI** (2026-08-26, D2 below) · **the M-series ends at zero open
-`major` rows plus three consecutive increments filing none** (2026-08-28, D5 below) · **the batch series ends and the tiered pipeline succeeds it** (2026-09-14, D12 below) · **the testing server is invitation-only** (2026-09-14, D31 below) · **the guest per-address limits are raised on the testing server only** (2026-09-14, D32 below) · **the Windows Server 2016 testing site runs PostgreSQL 15** (2026-09-14, D43 below) · **the testing site is one workspace at the root of `staging.pitahc.gov.ph`, served by Apache** (2026-09-15, D46 below) · **automatic deploys to the testing server are on** (2026-09-17, D47 below) · **the repository stays public with fake data only through testing, and goes private before any real data** (2026-09-17, D48 below) · **inbound TCP 443 is open and `mod_md` renews the testing site's certificate over `tls-alpn-01`, with a scheduled task to activate it** (2026-09-18, D49 below) · **the API documentation marks its six unbuilt promises as not built, in place, rather than deleting them** (2026-09-20, D38 below) · **operators create every workspace, and `tenants:create` stays the only path** (2026-09-20, D44 below) · **the central-host sign-in loop is retiered `before-launch`** (2026-09-20, D51 below) · **the central-host welcome-email copy stays `early-testing`** (2026-09-20, D52 below) · **the deploy that deletes the previous build's chunks is retiered `early-testing`** (2026-09-20, D53 below) · **the offline panel's quota line says what it counts — *"across all sessions on this device"*** (2026-09-20, D26 below) · **the resume shell is cached under a token-free key, closing the enumeration primitive** (2026-09-20, D20 below) · **`MdsSegmentedControl` is left alone and its four stretch-clamped hosts guard themselves** (2026-09-20, D28 below) · **a workspace admin may invite any address** (2026-09-20, D33 below) · **a new account confirms its email address before that address counts as its own** (2026-09-20, D34 below) · **single-page mode becomes an author setting, defaulting to step by step** (2026-09-20, D35 below) · **corrections save on the button, and the documents say they are not resumable** (2026-09-20, D36 below) · **a lost second factor is cleared by an audited admin reset** (2026-09-20, D37 below) · **the testing site sends `Strict-Transport-Security: max-age=300` from the vhost** (2026-09-20, D54 below) · **a form presents its sections in the two modes the boolean already expresses, and "per page" becomes real by honouring `page_break` next** (2026-09-26, D57 below) · **one `ComparisonOperator` enum in PHP carries both a rule-row label and a sentence label** (2026-09-26, D59 below) · **form settings are reachable from both a hub tab and a builder modal, mounting the same components** (2026-09-26, D63 below) · **a field converts only within its own value shape, plus `note` and `hidden`** (2026-09-26, D64 below) · **a filed decision is put to the user only when the tier being worked holds a row blocked on it** (2026-09-26, D66 below) · **a guest whose device cannot run the form's rules is warned and can still submit** (2026-10-01, D67 below) · **the collapsed sidebar is remembered per browser** (2026-10-01, D68 below) · **a note carrying content blocks hides its label from respondents** (2026-10-01, D69 below) · **page breaks paginate automatically in every stepped form, and staff manual entry stays one step per section for now** (2026-10-02, the D57 amendment) · **open rows are batched three or four to an increment by file overlap, and the one-hub cap reads the files a remedy edits** (2026-09-02 and 2026-09-26, D13 and D15 below) · **`main` is branch-protected with the owner as the bypass actor** (2026-08-31, D7 below) · **the named client is redacted from the working tree and history is not rewritten** (2026-08-31, D6 below) · **the Oct 12 testing comes first: the 19 builder comments and single-form OCR, in one lane** (2026-10-03, D72 below).
+`major` rows plus three consecutive increments filing none** (2026-08-28, D5 below) · **the batch series ends and the tiered pipeline succeeds it** (2026-09-14, D12 below) · **the testing server is invitation-only** (2026-09-14, D31 below) · **the guest per-address limits are raised on the testing server only** (2026-09-14, D32 below) · **the Windows Server 2016 testing site runs PostgreSQL 15** (2026-09-14, D43 below) · **the testing site is one workspace at the root of `staging.pitahc.gov.ph`, served by Apache** (2026-09-15, D46 below) · **automatic deploys to the testing server are on** (2026-09-17, D47 below) · **the repository stays public with fake data only through testing, and goes private before any real data** (2026-09-17, D48 below) · **inbound TCP 443 is open and `mod_md` renews the testing site's certificate over `tls-alpn-01`, with a scheduled task to activate it** (2026-09-18, D49 below) · **the API documentation marks its six unbuilt promises as not built, in place, rather than deleting them** (2026-09-20, D38 below) · **operators create every workspace, and `tenants:create` stays the only path** (2026-09-20, D44 below) · **the central-host sign-in loop is retiered `before-launch`** (2026-09-20, D51 below) · **the central-host welcome-email copy stays `early-testing`** (2026-09-20, D52 below) · **the deploy that deletes the previous build's chunks is retiered `early-testing`** (2026-09-20, D53 below) · **the offline panel's quota line says what it counts — *"across all sessions on this device"*** (2026-09-20, D26 below) · **the resume shell is cached under a token-free key, closing the enumeration primitive** (2026-09-20, D20 below) · **`MdsSegmentedControl` is left alone and its four stretch-clamped hosts guard themselves** (2026-09-20, D28 below) · **a workspace admin may invite any address** (2026-09-20, D33 below) · **a new account confirms its email address before that address counts as its own** (2026-09-20, D34 below) · **single-page mode becomes an author setting, defaulting to step by step** (2026-09-20, D35 below) · **corrections save on the button, and the documents say they are not resumable** (2026-09-20, D36 below) · **a lost second factor is cleared by an audited admin reset** (2026-09-20, D37 below) · **the testing site sends `Strict-Transport-Security: max-age=300` from the vhost** (2026-09-20, D54 below) · **a form presents its sections in the two modes the boolean already expresses, and "per page" becomes real by honouring `page_break` next** (2026-09-26, D57 below) · **one `ComparisonOperator` enum in PHP carries both a rule-row label and a sentence label** (2026-09-26, D59 below) · **form settings are reachable from both a hub tab and a builder modal, mounting the same components** (2026-09-26, D63 below) · **a field converts only within its own value shape, plus `note` and `hidden`** (2026-09-26, D64 below) · **a filed decision is put to the user only when the tier being worked holds a row blocked on it** (2026-09-26, D66 below) · **a guest whose device cannot run the form's rules is warned and can still submit** (2026-10-01, D67 below) · **the collapsed sidebar is remembered per browser** (2026-10-01, D68 below) · **a note carrying content blocks hides its label from respondents** (2026-10-01, D69 below) · **page breaks paginate automatically in every stepped form, and staff manual entry stays one step per section for now** (2026-10-02, the D57 amendment) · **open rows are batched three or four to an increment by file overlap, and the one-hub cap reads the files a remedy edits** (2026-09-02 and 2026-09-26, D13 and D15 below) · **`main` is branch-protected with the owner as the bypass actor** (2026-08-31, D7 below) · **the named client is redacted from the working tree and history is not rewritten** (2026-08-31, D6 below) · **the Oct 12 testing comes first: the 19 builder comments and single-form OCR, in one lane** (2026-10-03, D72 below) · **BHW Connect lives in this repository under `apps/bhw-connect/`, at `/bhw-connect` on the testing box, with its own database on the box's PostgreSQL 15; its developer merges BHW-only changes on green** (2026-10-27, D172–D184 below).
 
 ---
 
 ## OPEN
 
-_None open._ `D170`, the last filed, was asked and answered on 2026-10-26 while `M189` (`version-diff-ui`) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D184`, the last filed, was asked and answered on 2026-10-27 while `M192` (the BHW Connect merge, phase P0) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D184 — Once BHW Connect runs on the testing box, what happens to its Vercel deployment? **A — paused, then deleted; `/bhw-connect` becomes the only address.**
+
+**Asked and answered 2026-10-27 (user decision, in chat), while `M192` was planned; recorded in its claim.** BHW is hosted on Vercel today, built from jongsky25's own repository.
+
+- **A — pause, then delete (recommended, chosen).** The old Vercel address stops working, and one address remains.
+- **B — keep it building pull-request previews of `apps/bhw-connect`.** Each preview needs a database of its own, which is not free.
+
+**What the answer files, in the same push:** the pause in `bhw-p1-box`, once `/bhw-connect` answers from the box (jongsky25's clicks, since the project is theirs). The deletion goes with the Supabase project's (`D183`).
+
+### D183 — Once BHW's data is on the box, what happens to the Supabase project? **A — paused for 30 days as the rollback, then deleted.**
+
+**Asked and answered 2026-10-27 (user decision, in chat), while `M192` was planned; recorded in its claim.** The project sits in jongsky25's organisation on the Pro plan.
+
+- **A — pause 30 days, then delete (recommended, chosen).** A frozen rollback for a month, then no further cost.
+- **B — keep it in sync.** Two live copies that must be kept equal.
+- **C — delete at once.** No rollback copy.
+
+**What the answer files, in the same push:** the pause and the dated deletion in `bhw-p2-db`, as jongsky25's clicks.
+
+### D182 — What environment is committed for running BHW against a real database away from the box? And how does jongsky25, who works only from Claude on a phone, test and ship? **A — `apps/bhw-connect/docker-compose.yml` (Postgres 15 + PostgREST, the box's shape). Staging is BHW's preview.**
+
+**Asked and answered 2026-10-27 (user decision, in chat), while `M192` was planned; recorded in its claim.** The user asked how jongsky25 tests. The flow was explained and confirmed:
+1. Their Claude session runs BHW's lint, types, unit tests and build. None of these needs a database once the build is offline-tolerant.
+2. The pull request's `bhw-connect` job repeats them, plus a build under `/bhw-connect`.
+3. They merge on green (`D176`), and from `bhw-p1-box` on the box redeploys only BHW.
+4. They check it on staging.
+5. A bad release is rolled back by `deploy-bhw.ps1 -Rollback` (the user, seconds) or by a revert pull request (jongsky25, one CI run).
+
+- **A — Docker: Postgres 15 + PostgREST (recommended, chosen).** It is identical to the box and rehearses the move. Its seed holds the lookup tables and **synthetic** sample rows, never real `fact_bhw_raw` records, which are personal data in a public repository.
+- **B — Supabase's local stack.** Heavier, and nothing is set up for it today; it stays their option.
+
+**What the answer files, in the same push:** the compose file and `db/make-seed.mjs` in `M192`; `bhw-preview-slot` (a preview of a pull request on the box, before-launch) and `bhw-ci-fast-path` (Meridian's jobs skip on a BHW-only pull request, the secret scan kept, during-testing) as markers in ADR-0024.
+
+### D181 — The box's database listens on localhost only, and jongsky25 works from a phone. How does a new data load reach staging? **A — the file is prepared in their Claude session, sent privately (never through git, since it carries personal records), and loaded on the box by the user with one pasted block.**
+
+**Asked and answered 2026-10-27 (user decision, in chat), while `M192` was planned; recorded in its claim.** BHW's Python ingestion loads parquet into Postgres and builds aggregates; the box has no SSH server and no Python. The plan's tunnel option was dropped from the asking, because a phone session cannot hold a tunnel.
+
+- **A — file sent privately, the user loads it (recommended, chosen).** Nothing personal enters git. One guarded block on the box per load.
+- **B — an admin upload page in BHW now.** jongsky25 would never need the user, but it is a feature to build first.
+- **C — Python on the box.** A new runtime on the server, and the files still have to reach it.
+
+**What the answer files, in the same push:** the load block in the runbook's §8.4 at `bhw-p2-db`; `bhw-data-upload-page` (before-launch, blocked on `bhw-p2-db`) as a marker in ADR-0024.
+
+### D180 — BHW's AI search needs pgvector, which the box's PostgreSQL 15 lacks and EDB ships no Windows build of. How does it get there? **A — built once off the box against the EDB PostgreSQL 15 headers, then three files copied in.**
+
+**Asked and answered 2026-10-27 (user decision, in chat), while `M192` was planned; recorded in its claim.** It is one column, `doc_chunk_embedding.embedding`, holding 212 rows and no index.
+
+- **A — build off the box (recommended, chosen).** Any Windows machine with the free VS Build Tools; no compiler ever lands on the server.
+- **B — build on the box.** It leaves a toolchain on a production-like server.
+- **C — change the column to `real[]` and rewrite one function.** It touches jongsky25's schema; their call.
+
+**What the answer files, in the same push:** the build and the copy in `bhw-p2-db`, rehearsed on the dev machine first.
+
+### D179 — Where does Meridian show the link to BHW Connect? **A — an item in the top menu for signed-in users, plus a footer link; BHW's header links back to Meridian.**
+
+**Asked and answered 2026-10-27 (user decision, in chat), while `M192` was planned; recorded in its claim.**
+
+- **A — top menu + footer (recommended, chosen).**
+- **B — a dashboard tile only.**
+- **C — the landing page's footer only.**
+
+**What the answer files, in the same push:** the links in `bhw-p3-identity`, which is a Meridian-visible change and so bumps `VERSION` and carries a release note.
+
+### D178 — Once Supabase Auth is gone, how do BHW's admins sign in? **A — with Meridian's session, through one small `GET /api/v1/auth/whoami`; BHW's own `admin_users` still decides who is a BHW admin.**
+
+**Asked and answered 2026-10-27 (user decision, in chat), while `M192` was planned; recorded in its claim.** BHW uses Supabase Auth at four call sites, and has one admin.
+
+- **A — Meridian's login (recommended, chosen).** One login for the site. Nothing about BHW enters Meridian's permission tables.
+- **B — a separate BHW login.** Two logins on one site.
+- **C — a Meridian permission.** Meridian would own who administers BHW.
+
+**What the answer files, in the same push:** `bhw-p3-identity`, including the password re-check on Meridian's API-key mint that `D172` relies on.
+
+### D177 — What review does a pull request need, now that two developers share the trunk? **A — none on your own side; a change that touches the other owner's paths, or the shared ones, needs the other owner's `boundary-approved` label, and the `boundary` CI step enforces it.**
+
+**Asked and answered 2026-10-27 (user decision, in chat), while `M192` was planned; recorded in its claim.** GitHub's "require review from code owners" would deadlock two single-owner sides, because an author can never approve their own pull request.
+
+- **A — only cross-side changes (recommended, chosen).** The label counts only when it was applied by an owner of the touched paths who is not the author, read live from the label's events. Ownership is read from `.github/CODEOWNERS` at the BASE commit, so a pull request cannot rewrite the map that judges it.
+- **B — always one approval from the other developer.** GitHub-native, but every pull request waits.
+- **C — never.** Trust only.
+
+**What the answer files, in the same push:** `.github/CODEOWNERS` and `scripts/boundary-check.php` with its controls in `M192`; the user creates the label.
+
+### D176 — May a pull request that changes only BHW merge outside Meridian's merge points? **A — yes, any time on green.**
+
+**Asked and answered 2026-10-27 (user decision, in chat), while `M192` was planned; recorded in its claim.** `D137` merges Meridian only at planned merge points, because every green run on `main` deploys under the testers.
+
+- **A — any time on green (recommended, chosen).** With `apps/` site-safe in `deploy.ps1`, a BHW-only push opens no Meridian window and cannot move the testers' census, provided the previous deploy finished cleanly; after a failed deploy, any push takes the full path. Every other pull request keeps `D137`.
+- **B — everything waits for a merge point.** The user controls every deploy, and jongsky25 waits on them.
+
+**What the answer files, in the same push:** the carve-out in `CLAUDE.md`'s trunk bullet and in `docs/working-agreement.md`, in `M192`.
+
+### D175 — How does BHW's code enter this repository? **B — today's code only: one import commit naming the source sha; its history stays readable in the archived repository.**
+
+**Asked and answered 2026-10-27 (user decision, in chat), while `M192` was planned; recorded in its claim.** It was asked twice. The first asking offered a `git filter-repo` rewrite (data dropped, the key replaced, every path moved, blame kept) against a squash. The user could not follow the rewrite and asked for a strategy, which became `D174`. The second asking put it in plain words, and the recommendation moved to B: for a developer working from a phone, blame inside this repository is worth less than an import with nothing old in it.
+
+- **A — every past change, cleaned.** All 213 commits, rewritten once; more steps and a tool install.
+- **B — today's code only (recommended at the second asking, chosen).** Nothing from BHW's history (the inlined anon key, the unredacted NHFR workbook) can enter this public repository. `ingestion/data/`, `.github/` and `vercel.json` are left out.
+
+**What the answer files, in the same push:** the import commit in `M192`, gitleaks-clean before its first push.
+
+### D174 — How do two developers work on one server without colliding, when jongsky25 develops BHW only from Claude on a phone and the user drives the box? **A — one repository, one server.**
+
+**Asked and answered 2026-10-27 (user decision, in chat), while `M192` was planned; recorded in its claim.** The user's answer to the history question set the goal: all of BHW's source in this repository; jongsky25 able to keep developing it and to update staging themselves; one server; clean deploys.
+
+- **A — one repository (recommended, chosen).** BHW lives only under `apps/bhw-connect/`. jongsky25 becomes a collaborator here and points Claude mobile at this repository. Their pull requests touch only their folder and merge on green (`D176`); the box redeploys only BHW. Their old repository is archived read-only.
+- **B — two repositories, one server.** A second runner on the box for their repository, which only they, as its admin, can register. A read-only mirror would live here, and there would be two CI setups.
+- Rejected outright: a two-way sync between two repositories, which is where every conflict would live.
+
+**What the answer files, in the same push:** `.github/CODEOWNERS`, `docs/working-agreement.md`, `apps/bhw-connect/CLAUDE.md`, and a scope line at the top of `CLAUDE.md` (which jongsky25's sessions here load), all in `M192`.
+
+### D173 — Where does BHW's database live after the move off Supabase? **A — a second database, `bhw_connect`, on the box's PostgreSQL 15.**
+
+**Asked and answered 2026-10-27 (user decision, in chat), while `M192` was planned; recorded in its claim.** It is 651 MB. Nothing in its schema needs version 17, and the plain-SQL restore path into 15 is the plan's.
+
+- **A — a second database on the box's PG15 (recommended, chosen).** Its own roles and its own nightly dump; one instance to back up and patch; free. The runbook's "dedicated instance, shared with no other site" sentence is amended by ADR-0024.
+- **B — a second PostgreSQL 17 instance on the box.** A second service, port, data directory, backup and upgrade path.
+- **C — stay on Supabase.** Paid, and in a foreign cloud.
+
+**What the answer files, in the same push:** `bhw-p2-db`.
+
+### D172 — Where does BHW Connect live on the testing site, and is sharing Meridian's origin accepted? **A — `/bhw-connect` on `staging.pitahc.gov.ph`, built and run on the same box; the one-origin trade accepted, with its mitigations.**
+
+**Asked and answered 2026-10-27 (user decision, in chat), while `M192` was planned; recorded in its claim.** Under a path, BHW's pages run on Meridian's origin. The session cookie reaches them, and `XSRF-TOKEN` is readable by script, so a script-injection bug in BHW could act as whoever is signed in to Meridian. The user's condition, met by the design: *"as long as the source code are also in the same server"*.
+
+- **A — `/bhw-connect` (recommended, chosen).** One address, with a strict CSP on every BHW response and Meridian's API-key mint behind a password re-check.
+- **B — `/bhw`.** The same trade; BHW already has a `/bhw` page, so it would read `/bhw/bhw`.
+- **C — a subdomain.** An isolated origin, at the price of DICT DNS work and a second `mod_md` certificate.
+
+**What the answer files, in the same push:** the prefix-aware code and the CSP in `M192`; the Apache `ProxyPass` in `bhw-p1-box`; the password re-check in `bhw-p3-identity`.
+
 ### D171 — `M191` (`prd-feature-disposition`) changes only documents and a checking script, so a tester sees nothing new, but merging it still redeploys staging. When should it go live? **A — held green and released at merge point 8, together with the next increment from the line.**
 
 **Asked and answered 2026-10-27 (user decision, in chat), while `M191` was planned; recorded in its claim.** `D137` merges only at a planned merge point and never a lone small PR, and merge point 7 (`D170`) has been released, so nothing named the next one.

@@ -16,7 +16,100 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M191`, the tracker surgery, then every PRD feature and acceptance criterion gets a recorded disposition (`R-4868cdbc`, `prd-feature-disposition`, with `R-283b9c0d`) (m191-prd-dispositions)
+## Status: ACTIVE CLAIM — `M192`, the BHW Connect merge, phase P0: BHW's code imported under `apps/bhw-connect/`, made prefix-aware, with its CI job, its box scripts written (not run), and the governance both developers work under (`bhw-p0-import`) (m192-bhw-import)
+
+Taken 2026-10-27. Branch `m192-bhw-import`, cut from `origin/main` at `bff6e11d`, PR into main. ⛔ **NOT MERGED THIS SESSION:** held
+green until the user names the merge point it rides. It opens one Meridian window, because `deploy.ps1` changes. ⛔ **No work on the
+staging box in this phase.** The plan of record is `~/.claude/plans/there-is-another-app-whimsical-cascade.md` (§5 P0); the build plan
+is `~/.claude/plans/pasted-content-id-3256-start-the-dynamic-ember.md`.
+Row: `bhw-p0-import` — *"Bring BHW Connect into the repository under `apps/bhw-connect/`, prefix-aware, with its own CI job and the
+governance between the two developers"*. It is new: a pipeline marker filed by this increment at its point of truth, the end of
+`docs/adr/0024-second-application-under-one-host.md`, with the later phases' markers beside it (`bhw-p1-box` … `bhw-p4-loop`,
+`bhw-ci-fast-path`, `bhw-preview-slot`, `bhw-data-upload-page`).
+
+The session-start pull read 0 reports, 0 reopened and 0 new comments (relayed 31: 25 Resolved · 6 Confirmed working), so nothing was
+triaged. It ran with an explicit `--since`, so no state file was written. Thirteen decisions were asked and answered in planning —
+`D172` to `D184`: the twelve the plan names, and `D174`, which the user's answer on the history import raised. All are recorded in this
+push and none stays open.
+
+### Evidence verified
+The plan's measurements were taken 2026-10-27 and re-read in planning, from `origin/main` at `bff6e11d` and BHW's `main` at `e4237373`.
+- `deploy.ps1` — held: step 2b's `$SiteSafePrefixes = @('docs/', 'tests/', 'scripts/', '.github/')` is a single-line literal at column
+  0. `DeploySkipAllowlistTest`'s reader regex requires that shape, and its `$siteLoads` list has no `apps/` entry.
+- `.github/workflows/ci.yml` — held: six jobs, the six required contexts of `D7`. Gitleaks v8.21.2 scans the full history
+  (`fetch-depth: 0`). There is no changed-paths step anywhere, and `.github/` holds no `CODEOWNERS`.
+- BHW — held:
+  - Next 16.2.10, no `basePath`, no `output`. `proxy.ts` (Next 16's middleware) matches `/admin/:path*` only.
+  - The two data clients pass no `global.fetch`. Geist comes from `next/font/google`.
+  - The inlined anon JWT is in `.github/workflows/ci.yml` and nowhere the survey found outside `.github/`.
+  - `ingestion/data/` is 414 blobs and 56,036,402 bytes. There is no `CLAUDE.md`.
+- Root-relative URLs Next will not prefix — moved past the plan's counts:
+  - 9 client fetches, not 10
+  - about 25 raw anchors, not 13
+  - also `window.location.assign`, the `/geo/*.json` map URLs, a CSS `url(/img/…)`, the usage logger's `window.location.pathname`,
+    and a fourth hard-coded hostname in `lib/ai/providers/index.ts`
+
+### Premise verified
+- **The plan's census "Meridian's lint gates read only `app/`, `database/`, `routes/`, `resources/js`, `tests/`, `docs/`" is FALSE
+  in two places:**
+  - `scripts/backlog-triage.php` walks every file from `.` (untracked `.next/` included), feeds `pipeline.php`, and so turns
+    `pipeline-lint` red.
+  - `scripts/citation-liveness-lint.php` indexes `git ls-files` repo-wide, so BHW's basenames would make Meridian's bare citations
+    ambiguous.
+  - Both get an `apps/` exclusion with a control. The root `.editorconfig` (`root = true`, indent 4) would also reach BHW's Prettier.
+    All the others are rooted elsewhere, measured by name.
+- **The other developer works only from Claude mobile** (cloud sessions, `claude/*` branches, PRs). Their sessions in this repository
+  load the root `CLAUDE.md`, so it gains a scope line and `apps/bhw-connect/CLAUDE.md` is added.
+- **Both repositories are already public, so the import exposes nothing new. No `.claude/` settings are committed here**, so nothing
+  fires in their sessions.
+- **Our user can push to BHW's repository but is not its admin**, so archiving it and pausing Supabase and Vercel are jongsky25's
+  clicks.
+- **`deploy.yml` is NOT wired to `deploy-bhw.ps1` here.** It would make the box run a new script on merge, and this phase does no box
+  work. The wiring is part of `bhw-p1-box`.
+- **`next build` needs data and network:** seven `generateStaticParams`, the sitemap, six `opengraph-image` routes, the AI narratives
+  on prerendered pages, and Google Fonts. It is measured before the CI data strategy is chosen.
+- **A strict CSP needs a per-request nonce in the App Router, which makes pages dynamic.** It is measured, and the route-table delta
+  recorded.
+- **"6/6" is written in `CLAUDE.md` twice and in `scripts/next.php`.** It becomes "every required check green", true before and after
+  the seventh check.
+- **The required-check order matters:** `#384` merges before `bhw-connect` becomes a required context, or it blocks.
+
+### Remedy verdict
+- The plan's P0 works as prescribed, with five measured changes:
+  1. The import is a snapshot (`D175` B), not a `filter-repo` rewrite.
+  2. Two Meridian scripts gain an `apps/` exclusion.
+  3. `deploy.yml` stays unwired.
+  4. The boundary check reads `CODEOWNERS` from the BASE commit. On this PR the base has none, so it is not enforced, and a PR can
+     never rewrite the map that judges it. It is proved by controls and a mutation now, and live after the merge.
+  5. The migration lint lints only versions above a floor recorded at the import (the 111 imported files do not match the 170
+     applied).
+- No `apps/**` entry is added to `paths-ignore`: BHW changes must run CI.
+
+Files: everything under `apps/bhw-connect/` (imported, then edited: `next.config.ts`, `proxy.ts`, `lib/base-path.ts`,
+`lib/db/data-plane.ts`, the two data clients, the files the URL census names, `app/layout.tsx`, `app/sitemap.ts`, `app/robots.ts`,
+`app/globals.css`, `package.json`, the new `db/` and `ops/` scripts, `docker-compose.yml`, `.env.example`, `.editorconfig`, `CLAUDE.md`,
+`README.md`, `ingestion/data/README.md`), plus:
+- deploy: `deploy.ps1`, `tests/Feature/Deploy/DeploySkipAllowlistTest.php`
+- CI: `.github/workflows/ci.yml`, `.github/CODEOWNERS`
+- scripts: `scripts/boundary-check.php` (new, with its controls), `scripts/backlog-triage.php`, `scripts/citation-liveness-lint.php`,
+  each with its control, and `scripts/next.php`
+- `vite.config.ts`, `CLAUDE.md`
+- docs: `docs/working-agreement.md` (new), `docs/adr/0024-second-application-under-one-host.md` (new),
+  `docs/deployment-infrastructure.md`, `docs/pipeline.md`, `docs/claims/decisions.md`
+Shared artefacts taken: every `docs/` file above, `CLAUDE.md`, and `PROGRESS.md` (own block, at close-out).
+Paired files taken: none.
+Namespaces spent: ADR `0024`; decisions `D172`–`D184`. No migration prefix.
+Prediction:
+- The snapshot is gitleaks-clean on the first run, because the one key lives only in the dropped `.github/`.
+- BHW's own lint, typecheck and Vitest are green on the host before any edit.
+- A build with no data source fails in `generateStaticParams` and the sitemap first.
+- The nonce CSP turns every prerendered page dynamic.
+- Two Meridian gates need the exclusion, and every other one is already blind.
+- The new CI job takes 6–10 minutes when BHW changed.
+- **Most likely wrong:** the build's offline tolerance. The OG images and the AI narratives on prerendered pages may need more than
+  `generateStaticParams` returning `[]`.
+
+## HELD — `M191`, the tracker surgery, then every PRD feature and acceptance criterion gets a recorded disposition (`R-4868cdbc`, `prd-feature-disposition`, with `R-283b9c0d`) (m191-prd-dispositions)
 
 Taken 2026-10-27. Branch `m191-prd-dispositions`, cut from `origin/main` at `6c8258f2`, PR into main. ⛔ **NOT MERGED THIS SESSION:**
 held green for **merge point 8, together with the next increment from the line** (`D171`, `D137`). The plan is

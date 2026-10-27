@@ -28,6 +28,15 @@ _None open._ `D170`, the last filed, was asked and answered on 2026-10-26 while 
 
 
 ## ANSWERED
+### D171 — `M191` (`prd-feature-disposition`) changes only documents and a checking script, so a tester sees nothing new, but merging it still redeploys staging. When should it go live? **A — held green and released at merge point 8, together with the next increment from the line.**
+
+**Asked and answered 2026-10-27 (user decision, in chat), while `M191` was planned; recorded in its claim.** `D137` merges only at a planned merge point and never a lone small PR, and merge point 7 (`D170`) has been released, so nothing named the next one.
+
+- **A — with the next increment (recommended, chosen).** One deploy under the testers instead of two; the user's census before and after, as at every merge point.
+- **B — alone, once green.** Nothing a tester sees changes, but it is one more deploy under the testers.
+
+**What the answer files, in the same push:** nothing new — the next increment's claim names merge point 8 and stacks on or sits beside `M191`'s branch. The tracker surgery that `M191` also carries is not held: it touches only `paths-ignore` files and goes straight to the trunk.
+
 ### D170 — `M189` is the first increment after the round-2 programme, and no merge point is planned for the during-testing tier. When should it go live on staging? **A — held green and released at merge point 7, together with the next increment from the line.**
 
 **Asked and answered 2026-10-26 (user decision, in chat), while `M189` (`version-diff-ui`) was planned; recorded in its claim.** `D137` merges only at a planned merge point and never a lone small PR; `D138`'s order ended at merge point 6, so nothing named the next one.

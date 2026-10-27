@@ -16,7 +16,70 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M189` (Compare two versions) and `M190` (deferral dispositions) are merged and live on staging, released together at merge point 7 (`D170`; below). The next claim is the head of `docs/pipeline.md`'s during-testing tier.
+## Status: ACTIVE CLAIM — `M191`, the tracker surgery, then every PRD feature and acceptance criterion gets a recorded disposition (`R-4868cdbc`, `prd-feature-disposition`, with `R-283b9c0d`) (m191-prd-dispositions)
+
+Taken 2026-10-27. Branch `m191-prd-dispositions`, cut from `origin/main` at `6c8258f2`, PR into main. ⛔ **NOT MERGED THIS SESSION:**
+held green for **merge point 8, together with the next increment from the line** (`D171`, `D137`). The plan is
+`~/.claude/plans/read-claude-md-then-php-eager-matsumoto.md`.
+Rows:
+- `R-4868cdbc` — *"`PROGRESS.md` has under one close-out of byte headroom, so the next close-out's status bullet can redden the trunk"*.
+  The user ordered it first. ⛔ **It goes STRAIGHT TO MAIN, ahead of the branch** (the `M143` route): the move touches only
+  `PROGRESS.md` and `PROGRESS_ARCHIVE.md`, both in `paths-ignore`, so the push produces no run and deploys nothing. The guard is
+  `pipeline.php --check` current plus a diff naming only those paths; if either fails, it rides in this PR's squash instead (the `M179` route).
+- `prd-feature-disposition` — *"Record what became of each documented product feature and acceptance criterion"*, the head of the
+  line's during-testing tier (XL, `D24` option 1).
+- `R-283b9c0d` — *"Two PRD acceptance criteria are dispositioned in INDENTED CONTINUATION bullets the collector skips…"*, which says it
+  rides with this row.
+- The stale sentence found in planning: `docs/TESTING-GUIDE.md` §18 says *"OCR upload, single form (Feature #1) | Not built"*.
+
+The session-start pull read 0 reports, 0 reopened and 0 new comments (relayed 31: 25 Resolved · 6 Confirmed working), so nothing was
+triaged. The user confirmed merge point 7 on staging (Compare two versions works) in planning. One decision was asked and answered in
+planning — `D171`, the merge point — and is recorded in this push.
+
+### Evidence verified
+Read on `6c8258f2`.
+- `R-4868cdbc` — held: `preflight` measures 126,093 bytes against R1's 130,000 (3,907 of headroom) and warns. `## Current Status` holds 22
+  bullets, `M190` down to `M170`, with `M169` out of order between `M172` and `M171`.
+- The marker `id=prd-feature-disposition … state=ready size=XL tier=during-testing` — held, at `docs/PRD.md`'s end of file.
+- `P2a` — held: **14** headings, digest `04021df8ddc03536`. `P2e` — held: **93** criteria, **89** undispositioned, digest
+  `55529a3ee0686949`, the vocabulary `Shipped`, `Partially shipped`, `Built`, `Deferred`, `ADR-`.
+- `R-283b9c0d` — held: Feature #10's first and third criteria are answered in two-space-indented continuation bullets that open
+  *"As built (I5)."*, which `p2e_acceptance_residue()` skips.
+
+### Premise verified
+- **`P2e` speaks a different vocabulary from `P2b`/`P2c`.** It has no `Queued` and no `Not planned`, and it joins no id against the line,
+  so a criterion queued on a row that later closes stays green forever. One grammar across the three rules is the remedy, not a fourth.
+- **`P2a` has nowhere to record a verdict.** It counts headings. The `**Phase:**` line under each heading is the feature's own line,
+  and an end-of-line parenthetical there moves nothing (the identity is the number).
+- **The controls anchor on a criterion that is undispositioned today** (`docs/PRD.md`'s Feature #1 first bullet, and Feature #3's
+  bot-challenge bullet's prefix) and on hard-coded residue counts, so they must be rewritten, not patched.
+- **The PRD is cited by line from other documents** (ADR-0011 and five others) **and carries end-of-file markers**, so every edit is
+  appended to an existing line or corrected in place; no line is inserted.
+- **`docs/TESTING-GUIDE.md` is not rendered in the app** (only two docblocks name it), so correcting it is not a change a tester sees, and
+  §18 is a table that `P2b`'s corpus may not reach — measured during the build, filed if it does not.
+- **The pipeline markers sit above `## Current Status`**, so moving status bullets moves no line the generated line cites:
+  `pipeline.php --check` reads current on `6c8258f2`.
+
+### Remedy verdict
+- `R-4868cdbc` — works as prescribed: move the oldest 15 bullets (`M184` down to `M170`, about 20.5 KB) by pre-measured line index into
+  the archive above the `M168` bullet, proved by `scripts/tracker-surgery.php` while uncommitted, marker at the start of the body.
+- `prd-feature-disposition` — none prescribed beyond the title. The design: `P2e` takes M190's three words with the line join and fails
+  per criterion (the residue constant and its digest go; the corpus count stays); `P2a` requires each feature's `**Phase:**` line to end in
+  one of the same three words, and that word to equal its criteria's rollup — Queued if any is owed, else Not planned if any was declined,
+  else Built. Each verdict is measured against the code, never read from a docblock or a phase label.
+- `R-283b9c0d` — the prescribed remedy (accept the indented continuation) is **unnecessary under the design**: each parent criterion
+  gets its own end-of-line disposition, and a criterion without one fails rather than counts. Closed as superseded, with that reason.
+
+Files: `PROGRESS.md`, `PROGRESS_ARCHIVE.md` (the surgery, straight to main), `scripts/pipeline-lint.php`,
+`tests/Feature/Docs/PipelineLintControlsTest.php`, `docs/PRD.md`, `docs/TESTING-GUIDE.md`, `docs/feature-backlog.md`,
+`docs/pipeline.md`, `docs/claims/decisions.md` (`D171`).
+Shared artefacts taken: every `docs/` file above, `PROGRESS.md` (own block, and the status bullets the surgery moves).
+Paired files taken: none.
+Namespaces spent: nothing from either namespace.
+Prediction: the surgery passes all four proofs on the first run and leaves about 24 KB of headroom; no CI run follows its push. The new
+`P2e`/`P2a` rules are red on arrival on about 89 criteria and 14 features, then green as each verdict is written; 10 to 20 rows are filed,
+mostly before-launch and after-launch. PHPStan cannot move (`scripts/` and docs only). **Most likely wrong:** the rollup on a feature that
+spans two phases (Feature #4, "Phase 1 (basic) → Phase 3"), where a Built basic half and a Queued advanced half must read Queued.
 
 ## RELEASED — `M190`, every deferral section and deferral sentence gets a recorded disposition (`deferral-site-disposition`) (merged as PR #383, `f980cbba`, last at merge point 7, rebased onto the trunk after `M189`; 6/6 green with real step counts on its rebased run at `a6638c28` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `f980cbba` the same)
 

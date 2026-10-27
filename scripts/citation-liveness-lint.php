@@ -348,7 +348,9 @@ function git_index(string $root): ?array
 
         $paths[$line] = true;
 
-        $byBasename[basename($line)][] = $line;
+        if (! str_starts_with($line, GUEST_APP_PREFIX)) {
+            $byBasename[basename($line)][] = $line;
+        }
     }
 
     return ['paths' => $paths, 'byBasename' => $byBasename];

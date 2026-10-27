@@ -24,10 +24,10 @@ use RuntimeException;
  * makes that non-matching obvious instead of hiding it behind a familiar parent.
  *
  * No render callback is registered for this class, deliberately. {@see TemplateParser::parse()} — the only
- * method that throws — has exactly one production caller, the publish gate, whose catch is total; every
- * render path uses {@see TemplateParser::parseLenient()}, which cannot throw (§3.4's never-fail render
- * contract). The exception is therefore structurally unable to reach HTTP, and a callback would be dead
- * code. The first increment that calls `parse()` outside a gate owes one.
+ * method that throws — has two production callers, the publish gate's `holeKeys()` walk and `ValidTemplate`,
+ * each catch total; every render path uses {@see TemplateParser::parseLenient()}, which cannot throw (§3.4's
+ * never-fail render contract). The exception is therefore structurally unable to reach HTTP, and a callback
+ * would be dead code. The first caller whose catch is not total owes one.
  */
 final class TemplateSyntaxException extends RuntimeException
 {

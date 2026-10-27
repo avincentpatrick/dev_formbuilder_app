@@ -156,6 +156,13 @@ const MIN_APP_FILES = 600;
  * ⚠️ A GATE WHOSE EXPECTATION AN INCREMENT INVALIDATES MUST BE UPDATED BY THAT INCREMENT, or main
  * merges red. Disposition a site and you lower the constant in the same commit; that is the point.
  *
+ * ✅ M190: P2b AND P2c NOW DISCHARGE, AND NOT BY A MARKER. Everything above stays true of markers and
+ * of P2a and P2e. What M82 could not find was a discharge that needs no attribution, and the corpus
+ * already had one: the PRD's end-of-line italic parenthetical, which records an outcome AT THE LINE IT
+ * IS ABOUT. So every item of a P2b section and every P2c sentence now ends in one of three words —
+ * Built, Queued (naming a row the line holds), Not planned — and a site carrying none is a failure,
+ * not a constant to move. The pins stay: they still catch a site set that changed underneath.
+ *
  * ⛔ EACH CORPUS PINS A DIGEST AS WELL AS A COUNT, AND THE DIGEST IS THE HALF THAT EARNS ITS KEEP. A
  * count alone is blind to a SWAP — remove one site, add another — which is exactly the shape
  * tracker-surgery.php exists for: a deleted block is simply a smaller file, and this repository has
@@ -221,9 +228,35 @@ const DEFERRAL_VOCABULARY = [
 
 const MIN_DEFERRAL_SITES = 4;
 
-const EXPECTED_DEFERRAL_SITES = 8;
+// 8 -> 7 by M190: `docs/PRD.md`'s Feature #4 trend bullet called the trends unfinished after H24a built them.
+const EXPECTED_DEFERRAL_SITES = 7;
 
-const DIGEST_DEFERRAL_SITES = '01597bbb027f0f74';
+const DIGEST_DEFERRAL_SITES = '6dfe8780e5b59052';
+
+/**
+ * P2b and P2c — what a deferral site may say became of it (M190).
+ *
+ * ⛔ A CLOSED VOCABULARY OF THREE, AND `Deferred` IS DELIBERATELY NOT IN IT. P2e accepts "Deferred"
+ * because a PRD criterion deferred to a phase is an answer about a promise. Here "deferred" is the
+ * QUESTION — every one of these sites already says something is deferred — and accepting the word
+ * would let a site answer itself. Each word must name what it rests on after its dash:
+ *
+ *   Built — <who>          the deferred thing exists now; the document had gone stale
+ *   Queued — <ids>         a row in the line carries it; every id in backticks, every one checked
+ *   Not planned — <ground> a non-goal the document ratifies, or owed only on a trigger not yet fired
+ *
+ * ⛔ A QUEUED ID IS JOINED AGAINST THE LINE, which is what keeps a site honest after its row closes:
+ * the close-out that takes the row off the line turns this gate red at the site, naming it, until the
+ * site says Built. That is P3's own live-and-known join, pointed at prose.
+ */
+const DEFERRAL_DISPOSITIONS = ['Built', 'Queued', 'Not planned'];
+
+/**
+ * Measured at 114 items over the 23 sections when M190 wrote it. The floor sits well below so ordinary
+ * editing does not trip it, and well above zero so an item walk that has gone blind refuses rather
+ * than reporting a short list as work dispositioned.
+ */
+const MIN_DISPOSITION_ITEMS = 80;
 
 /**
  * P2e — the PRD's acceptance criteria, and the residue that carries no disposition.
@@ -391,8 +424,8 @@ p2d_artefact_drift($rows);
 $coverage = coverage_corpus($document);
 
 p2a_prd_features($coverage);
-p2b_disposition_sections($coverage);
-p2c_deferral_sites($coverage);
+p2b_disposition_sections($coverage, line_ids($rows, $offLine));
+p2c_deferral_sites($coverage, line_ids($rows, $offLine));
 p2e_acceptance_residue($coverage);
 
 // ── P6. The generated file may not arm the next run. ────────────────────────────────────────────
@@ -456,6 +489,32 @@ function p1_drift(): void
 }
 
 /**
+ * The ids a citation may name: LIVE (a row in the line) and KNOWN (live, or a row that has left it).
+ *
+ * One definition for every rule that joins prose to the line — P3's roadmap cells and, since M190, the
+ * Queued dispositions of P2b and P2c. Telling the two apart is what lets a failure say "it finished,
+ * write that down" rather than "no such row", which are different repairs.
+ *
+ * @return array{live: array<string, true>, known: array<string, true>}
+ */
+function line_ids(array $rows, array $offLine): array
+{
+    $live = [];
+
+    foreach ($rows as $row) {
+        $live[$row['id']] = true;
+    }
+
+    $known = $live;
+
+    foreach ($offLine as $row) {
+        $known[$row['id']] = true;
+    }
+
+    return ['live' => $live, 'known' => $known];
+}
+
+/**
  * P3 — the roadmap speaks a closed vocabulary, and a row claiming work is in flight cites a row that
  * is actually in the line.
  *
@@ -477,17 +536,7 @@ function p3_roadmap(array $rows, array $offLine): void
         ));
     }
 
-    $liveIds = [];
-
-    foreach ($rows as $row) {
-        $liveIds[$row['id']] = true;
-    }
-
-    $knownIds = $liveIds;
-
-    foreach ($offLine as $row) {
-        $knownIds[$row['id']] = true;
-    }
+    ['live' => $liveIds, 'known' => $knownIds] = line_ids($rows, $offLine);
 
     foreach ($cells as $cell) {
         $spoken = [];
@@ -1011,25 +1060,46 @@ function p2a_prd_features(array $corpus): void
  * none; either way the statement is an obligation site and a new one may not appear unnoticed. The
  * identity is the heading with its SECTION NUMBER STRIPPED — inserting a section above renumbers
  * every heading below it, and that is a renumbering rather than a new obligation.
+ *
+ * ✅ AND SINCE M190 EVERY ITEM IN EVERY SUCH SECTION SAYS WHAT BECAME OF IT. See deferral_items() for
+ * what an item is and DEFERRAL_DISPOSITIONS for what it may say.
+ *
+ * @param  array{live: array<string, true>, known: array<string, true>}  $ids
  */
-function p2b_disposition_sections(array $corpus): void
+function p2b_disposition_sections(array $corpus, array $ids): void
 {
     $sites = [];
+    $items = [];
 
     foreach ($corpus as $file) {
         foreach ($file['lines'] as $i => $line) {
-            if (preg_match('/^#{1,6} (.*)$/', rtrim($line, "\r"), $m) !== 1) {
+            if (preg_match('/^(#{1,6}) (.*)$/', rtrim($line, "\r"), $m) !== 1) {
                 continue;
             }
 
-            if (! declares_a_disposition($m[1])) {
+            if (! declares_a_disposition($m[2])) {
                 continue;
             }
 
             $sites[] = [
-                'identity' => $file['path'].'#'.normalise_heading($m[1]),
+                'identity' => $file['path'].'#'.normalise_heading($m[2]),
                 'where' => $file['path'].':'.($i + 1),
             ];
+
+            $found = deferral_items($file['lines'], $i, strlen($m[1]));
+
+            if ($found === []) {
+                fail('P2b sections', sprintf(
+                    '%s:%d declares a disposition and holds no item that could carry one. Give it a list, '
+                    .'or a paragraph ending in Built, Queued or Not planned.',
+                    $file['path'],
+                    $i + 1
+                ));
+            }
+
+            foreach ($found as $item) {
+                $items[] = ['where' => $file['path'].':'.$item['line'], 'text' => $item['text']];
+            }
         }
     }
 
@@ -1041,6 +1111,212 @@ function p2b_disposition_sections(array $corpus): void
         EXPECTED_DISPOSITION_SECTIONS,
         DIGEST_DISPOSITION_SECTIONS
     );
+
+    if (count($items) < MIN_DISPOSITION_ITEMS) {
+        cannot_measure(sprintf(
+            'P2b reached %d item(s) in its sections, under the floor of %d. An item walk that has gone '
+            .'blind returns a SHORT LIST, and a short list here reads as every deferral answered.',
+            count($items),
+            MIN_DISPOSITION_ITEMS
+        ));
+    }
+
+    $clean = true;
+
+    foreach ($items as $item) {
+        $error = deferral_disposition_error(last_disposition(without_table_edge($item['text'])), $ids);
+
+        if ($error !== null) {
+            $clean = false;
+            fail('P2b sections', sprintf('the item at %s %s', $item['where'], $error));
+        }
+    }
+
+    if ($clean) {
+        pass('P2b sections', sprintf(
+            '%d item(s) across %d section(s), each saying Built, Queued or Not planned',
+            count($items),
+            count($sites)
+        ));
+    }
+}
+
+/**
+ * The items of the deferral section whose heading is at $heading (0-based), at heading level $level.
+ *
+ * AN ITEM IS WHERE A DISPOSITION CAN STAND AT THE END OF THE THING IT IS ABOUT:
+ *   - a top-level list item, read as its FIRST PARAGRAPH — the bullet line and the lines that continue
+ *     it, up to a blank line, a heading, the next item, a `>` line, a `<!--` line, a table or a fence;
+ *   - a table body row;
+ *   - in a section with neither, the section's first paragraph.
+ *
+ * ⛔ THE FIRST PARAGRAPH AND NOT THE WHOLE ITEM, AND THAT WAS DECIDED BY TWO SHAPES THIS CORPUS HOLDS.
+ * ADR-0002 hangs an indented `>` amendment under each bullet, and a later author appends prose to an
+ * item after a blank line. Read as part of the item, both would move its disposition into a quotation
+ * or a paragraph nobody reads as the item's own. The bullet's paragraph is the statement; what follows
+ * is commentary on it.
+ *
+ * ⚠️ A NESTED HEADING ENDS THE SECTION ONLY WHEN IT IS A SITE ITSELF, OR NO DEEPER THAN THIS ONE. A
+ * deeper heading that declares nothing is a subdivision, and its items are this section's items —
+ * otherwise a section could shed every obligation by putting a subheading over them.
+ *
+ * @param  list<string>  $lines
+ * @return list<array{line: int, text: string}>
+ */
+function deferral_items(array $lines, int $heading, int $level): array
+{
+    $items = [];
+    $open = null;
+    $prose = null;
+    $proseClosed = false;
+    $inFence = false;
+    $inComment = false;
+
+    $close = static function () use (&$items, &$open): void {
+        if ($open !== null) {
+            $items[] = $open;
+            $open = null;
+        }
+    };
+
+    for ($i = $heading + 1, $n = count($lines); $i < $n; $i++) {
+        $text = rtrim($lines[$i], "\r");
+
+        if (preg_match('/^\s*(```|~~~)/', $text) === 1) {
+            $close();
+            $inFence = ! $inFence;
+
+            continue;
+        }
+
+        if ($inFence) {
+            continue;
+        }
+
+        // An HTML comment — a pipeline marker, a note to the next author — is never an item, however
+        // many lines it runs to.
+        if ($inComment || preg_match('/^\s*<!--/', $text) === 1) {
+            $close();
+            $proseClosed = $prose !== null;
+            $inComment = ! str_contains($text, '-->');
+
+            continue;
+        }
+
+        if (preg_match('/^(#{1,6}) (.*)$/', $text, $m) === 1) {
+            if (strlen($m[1]) <= $level || declares_a_disposition($m[2])) {
+                break;
+            }
+
+            $close();
+            $proseClosed = $prose !== null;
+
+            continue;
+        }
+
+        if (preg_match('/^([-*+]|\d+[.)]) /', $text) === 1) {
+            $close();
+            $open = ['line' => $i + 1, 'text' => $text];
+
+            continue;
+        }
+
+        if (str_starts_with($text, '|')) {
+            $close();
+            $proseClosed = $prose !== null;
+            $next = rtrim($lines[$i + 1] ?? '', "\r");
+
+            // A separator row, or a header row (the line under it is the separator), is not an item.
+            if (is_table_separator($text) || is_table_separator($next)) {
+                continue;
+            }
+
+            $items[] = ['line' => $i + 1, 'text' => $text];
+
+            continue;
+        }
+
+        if (trim($text) === '' || preg_match('/^\s*>/', $text) === 1) {
+            $close();
+            $proseClosed = $prose !== null;
+
+            continue;
+        }
+
+        if ($open !== null) {
+            $open['text'] .= ' '.trim($text);
+        } elseif (! $proseClosed) {
+            $prose = $prose === null
+                ? ['line' => $i + 1, 'text' => $text]
+                : ['line' => $prose['line'], 'text' => $prose['text'].' '.trim($text)];
+        }
+    }
+
+    $close();
+
+    if ($items === [] && $prose !== null) {
+        return [$prose];
+    }
+
+    return $items;
+}
+
+function is_table_separator(string $line): bool
+{
+    return preg_match('/^\|[\s|:-]+\|?\s*$/', $line) === 1 && str_contains($line, '-');
+}
+
+/** A table row's closing pipe is markup, not text: the disposition is the last thing in its last cell. */
+function without_table_edge(string $text): string
+{
+    $trimmed = rtrim($text);
+
+    return str_starts_with(ltrim($trimmed), '|') && str_ends_with($trimmed, '|')
+        ? rtrim(substr($trimmed, 0, -1))
+        : $trimmed;
+}
+
+/**
+ * What is wrong with a deferral site's disposition, or null when it is sound.
+ *
+ * @param  array{live: array<string, true>, known: array<string, true>}  $ids
+ */
+function deferral_disposition_error(?string $inner, array $ids): ?string
+{
+    if ($inner === null) {
+        return 'ends in no disposition. End it with *(Built — <who>)*, *(Queued — `<row id>`)* or '
+            .'*(Not planned — <ground>)*: the item is a deferral, and nothing records what became of it.';
+    }
+
+    if (preg_match('/^('.implode('|', DEFERRAL_DISPOSITIONS).') — (\S.*)$/u', $inner, $m) !== 1) {
+        return sprintf(
+            'ends in *(%s)*, which opens with none of %s followed by " — " and what it rests on.',
+            $inner,
+            implode(', ', DEFERRAL_DISPOSITIONS)
+        );
+    }
+
+    if ($m[1] !== 'Queued') {
+        return null;
+    }
+
+    if (preg_match_all('/`([^`]+)`/', $m[2], $cited) === 0) {
+        return 'says Queued and names no row id in backticks, so nothing can check the row exists.';
+    }
+
+    foreach ($cited[1] as $id) {
+        if (isset($ids['live'][$id])) {
+            continue;
+        }
+
+        return isset($ids['known'][$id])
+            ? sprintf('is Queued on `%s`, which has LEFT the line. Write what became of it — *(Built — Mnn)* '
+                .'if it landed — because a site cannot be queued on finished work.', $id)
+            : sprintf('is Queued on `%s`, which is not a row in the line — closed or mistyped. A closed row '
+                .'means the site is Built or Not planned now; say which.', $id);
+    }
+
+    return null;
 }
 
 /**
@@ -1075,10 +1351,16 @@ function normalise_heading(string $heading): string
  * See DEFERRAL_VOCABULARY above for what this arm is worth, which is much less than the design
  * assumed and is written down rather than implied. The identity is the file and the PHRASE, not the
  * sentence: rewording a paragraph is not a new obligation, and moving it to another document is.
+ *
+ * ✅ SINCE M190 EACH SUCH LINE ALSO ENDS IN WHAT BECAME OF IT — the LINE, not the paragraph, because
+ * the line is the site this rule names and a stale sentence is corrected where it stands.
+ *
+ * @param  array{live: array<string, true>, known: array<string, true>}  $ids
  */
-function p2c_deferral_sites(array $corpus): void
+function p2c_deferral_sites(array $corpus, array $ids): void
 {
     $sites = [];
+    $clean = true;
 
     foreach ($corpus as $file) {
         foreach ($file['lines'] as $i => $line) {
@@ -1094,6 +1376,13 @@ function p2c_deferral_sites(array $corpus): void
                     'where' => $file['path'].':'.($i + 1),
                 ];
 
+                $error = deferral_disposition_error(last_disposition(without_table_edge(rtrim($line, "\r"))), $ids);
+
+                if ($error !== null) {
+                    $clean = false;
+                    fail('P2c deferrals', sprintf('the sentence at %s:%d %s', $file['path'], $i + 1, $error));
+                }
+
                 break;
             }
         }
@@ -1107,6 +1396,10 @@ function p2c_deferral_sites(array $corpus): void
         EXPECTED_DEFERRAL_SITES,
         DIGEST_DEFERRAL_SITES
     );
+
+    if ($clean) {
+        pass('P2c deferrals', sprintf('%d sentence(s), each saying Built, Queued or Not planned', count($sites)));
+    }
 }
 
 /**
@@ -1244,19 +1537,11 @@ function p2e_acceptance_residue(array $corpus): void
  */
 function carries_a_disposition(string $bullet): bool
 {
-    $trimmed = rtrim($bullet);
+    $inner = last_disposition($bullet);
 
-    if (! str_ends_with($trimmed, ')*')) {
+    if ($inner === null) {
         return false;
     }
-
-    $opens = strrpos($trimmed, '*(');
-
-    if ($opens === false) {
-        return false;
-    }
-
-    $inner = substr($trimmed, $opens + 2);
 
     foreach (DISPOSITION_VOCABULARY as $word) {
         if (stripos($inner, $word) === 0) {
@@ -1265,6 +1550,29 @@ function carries_a_disposition(string $bullet): bool
     }
 
     return false;
+}
+
+/**
+ * The body of the italic parenthetical that ENDS this text, or null when the text ends in none.
+ *
+ * Shared by P2e and, since M190, by P2b and P2c, so the suffix rule above — the last thing on the
+ * line, found by the last opening rather than the first — is one definition and not three.
+ */
+function last_disposition(string $text): ?string
+{
+    $trimmed = rtrim($text);
+
+    if (! str_ends_with($trimmed, ')*')) {
+        return null;
+    }
+
+    $opens = strrpos($trimmed, '*(');
+
+    if ($opens === false) {
+        return null;
+    }
+
+    return substr($trimmed, $opens + 2, -2);
 }
 
 /**

@@ -120,7 +120,7 @@ pressing anything is the dominant kiosk path rather than an edge case.
 
 The right long-term answer for genuinely operator-run hardware, and it already exists as a backlog
 row (*"Kiosk mode — lock to one form, auto-reset, clear PII on timeout"*). It needs an operator
-concept the guest runtime does not have, and it would leave the defect live until it was built.
+concept the guest runtime does not have, and it would leave the defect live until it was built. *(Queued — `R-968816fe`)*
 
 ### D. Reference-only rows with no Discard (rejected — it does not contain the disclosure)
 

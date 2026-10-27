@@ -742,14 +742,14 @@ ADR-0002 §D3 documents *why* each layer is enforced (a descriptive table). This
 
 ## 11. Out of Scope / Deferred
 
-- Detailed OpenAPI request/response shapes for `/api/v1/users`, `/api/v1/roles` → Doc #14 (API Specification).
-- ~~SSO/SAML → Phase 4 (architecture plan §3).~~ **BUILT (P1a–P1c, ADR-0016)** — a per-tenant SAML 2.0 Service Provider, SP-initiated only, Enterprise-gated. §7.1 above already describes JIT provisioning as one of the four doors, so this line was contradicting its own document. Its threat surface is `docs/security-threat-model.md` §8.
-- Dedicated-database tenancy → ADR-0002's own explicitly deferred future ADR.
-- GDPR subject-access/erasure mechanics for `users`/`tenant_users` rows → Doc #12 (Data Privacy & GDPR/Compliance Doc).
-- Full audit-event redaction rule detail → Doc #13 (Audit & Compliance Logging Spec) — this doc only specifies that role/permission changes emit `audits.event = 'permission_changed'` (already in the Data Dictionary's `AuditEvent` enum).
-- Plan-tier seat/role quotas (e.g., "Starter plan caps at 5 Form Editors") → Doc #24 (Pricing & Feature-Gating Matrix).
-- Tenant-creation/onboarding UX (how the very first Owner and tenant row come to exist) → Doc #25 (Onboarding & Template Content Plan). ⚠️ **As built (`M95`), the operator path is `tenants:create`:** it writes the tenant with `owner_user_id`, its domain label, the Owner membership and role, and a default subscription in one transaction. Self-serve sign-up creates an account and no workspace; whether it should create one is an open question in `docs/claims/decisions.md`.
-- Privilege-escalation threat scenarios (this doc defines the mechanism precisely enough for that analysis to build on; it does not itself attempt an adversarial review) → Doc #11 (Security & Threat Model Doc).
+- Detailed OpenAPI request/response shapes for `/api/v1/users`, `/api/v1/roles` → Doc #14 (API Specification). *(Queued — `R-47552102`)*
+- ~~SSO/SAML → Phase 4 (architecture plan §3).~~ **BUILT (P1a–P1c, ADR-0016)** — a per-tenant SAML 2.0 Service Provider, SP-initiated only, Enterprise-gated. §7.1 above already describes JIT provisioning as one of the four doors, so this line was contradicting its own document. Its threat surface is `docs/security-threat-model.md` §8. *(Built — P1a–P1c)*
+- Dedicated-database tenancy → ADR-0002's own explicitly deferred future ADR, written since as `docs/adr/0017-tenant-isolation-tiering.md`, whose §D2 rejects database-per-tenant for this schema. *(Not planned — ADR-0017 §D2 rejects database-per-tenant for this schema)*
+- GDPR subject-access/erasure mechanics for `users`/`tenant_users` rows → Doc #12 (Data Privacy & GDPR/Compliance Doc). *(Queued — `gdpr-subject-export`, `R-6bf1ffc3`)*
+- Full audit-event redaction rule detail → Doc #13 (Audit & Compliance Logging Spec) — this doc only specifies that role/permission changes emit `audits.event = 'permission_changed'` (already in the Data Dictionary's `AuditEvent` enum). *(Built — AuditRedactor; role changes emit permission_changed)*
+- Plan-tier seat/role quotas (e.g., "Starter plan caps at 5 Form Editors") → Doc #24 (Pricing & Feature-Gating Matrix). *(Not planned — no per-role cap, by docs/pricing-feature-gating-matrix.md; the total-seat cap is built (H5b))*
+- Tenant-creation/onboarding UX (how the very first Owner and tenant row come to exist) → Doc #25 (Onboarding & Template Content Plan). ⚠️ **As built (`M95`), the operator path is `tenants:create`:** it writes the tenant with `owner_user_id`, its domain label, the Owner membership and role, and a default subscription in one transaction. Self-serve sign-up creates an account and no workspace; whether it should create one was `D44` in `docs/claims/decisions.md`, answered A on 2026-09-20 — operators create every workspace, and `tenants:create` stays the only path. *(Built — M95's tenants:create, which D44 keeps the only path)*
+- Privilege-escalation threat scenarios (this doc defines the mechanism precisely enough for that analysis to build on; it does not itself attempt an adversarial review) → Doc #11 (Security & Threat Model Doc). *(Built — docs/security-threat-model.md §3 and §8)*
 
 ---
 

@@ -197,11 +197,11 @@ Because submissions pin to a specific, immutable `form_version_id`, an offline c
 
 ## 11. Out of Scope / Deferred
 
-- ~~The interactive, field-by-field **visual version-diff/comparison UI**~~ — **built by `M189` (`D169`, 2026-10-26)**: the Compare page, opened from the hub's Versions panel (Compare on a published version, Compare with live on the draft), consuming §5's classification through the shared rule. Kept in this list so the deferral's disposition is on record.
-- XLSForm import's precise effect on draft/version creation (does an import always create a new form, or can it target an existing form's draft?) → Doc #16 (XLSForm Interop Spec).
-- Full real-time, character-level collaborative co-editing → explicitly not planned (§8).
-- Form-template instantiation mechanics (cloning a `form_templates` blueprint into a brand-new form + initial draft) → already specified in `docs/data-dictionary.md` §12, not re-derived here.
-- OCR-linelist's interaction with versioning (an OCR-linelist batch always submits against whatever version is currently published, by definition, same as any other channel) → Doc #17 (OCR Pipeline Design Doc) for the OCR-specific mechanics.
+- ~~The interactive, field-by-field **visual version-diff/comparison UI**~~ — **built by `M189` (`D169`, 2026-10-26)**: the Compare page, opened from the hub's Versions panel (Compare on a published version, Compare with live on the draft), consuming §5's classification through the shared rule. Kept in this list so the deferral's disposition is on record. *(Built — M189)*
+- XLSForm import's precise effect on draft/version creation (does an import always create a new form, or can it target an existing form's draft?) → Doc #16 (XLSForm Interop Spec). *(Built — G7b: an import fills an existing form's draft and never creates a form)*
+- Full real-time, character-level collaborative co-editing → explicitly not planned (§8). *(Not planned — a non-goal (§8))*
+- Form-template instantiation mechanics (cloning a `form_templates` blueprint into a brand-new form + initial draft) → already specified in `docs/data-dictionary.md` §12, not re-derived here. *(Built — G9a (TemplateService))*
+- OCR-linelist's interaction with versioning (an OCR-linelist batch always submits against whatever version is currently published, by definition, same as any other channel) → Doc #17 (OCR Pipeline Design Doc) for the OCR-specific mechanics. *(Queued — `ocr-linelist`; single-form OCR already submits against the published version)*
 
 <!-- The pipeline markers below are DELIBERATELY at end-of-file. A marker inserted mid-document
      shifts every line beneath it, and this repository cites documents as `path:N` — 25 such

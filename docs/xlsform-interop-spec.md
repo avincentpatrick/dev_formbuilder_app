@@ -122,9 +122,9 @@ This reuses the exact same "draft-repopulation convenience, not a special-cased 
 
 ## 7. Out of Scope / Deferred
 
-- Bulk/multi-form migration tooling (§5) — a Phase 3 candidate, not committed.
-- A live, ongoing sync between an external Kobo/ODK deployment and this product (this spec covers one-shot import/export, not continuous synchronization) — no existing doc requests this, and it would be a materially larger, separately-scoped feature.
-- The XLSForm `settings` sheet's less common columns (e.g., `style`, `public_key` for encrypted forms) — deferred until a specific customer need surfaces one.
+- Bulk/multi-form migration tooling (§5) — a Phase 3 candidate, not committed. *(Not planned — only if migration volume ever justifies it (§5))*
+- A live, ongoing sync between an external Kobo/ODK deployment and this product (this spec covers one-shot import/export, not continuous synchronization) — no existing doc requests this, and it would be a materially larger, separately-scoped feature. *(Not planned — one-shot import and export only)*
+- The XLSForm `settings` sheet's less common columns (e.g., `style`, `public_key` for encrypted forms) — deferred until a specific customer need surfaces one. *(Not planned — until a customer needs one)*
 
 ---
 

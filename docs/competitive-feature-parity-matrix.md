@@ -109,9 +109,9 @@ These four features were added at the user's explicit request after the original
 
 A living competitive matrix is dishonest if it only ever shows gaps to close. Some capabilities exist in Kobo or Fillout that this product deliberately does not plan to match, and saying so explicitly prevents a future reader from mistaking silence for an oversight:
 
-- **Kobo's raw XForm-level API surface and self-hosting model** — Kobo/ODK Central is often self-hosted by NGOs directly; this product is SaaS-only by design (architecture plan §1, hosting recommendation). Matching Kobo's self-hosting story is out of scope permanently, not deferred.
-- **Fillout's very broad, generic-business-form integration catalog** (50+ integrations) — the architecture plan explicitly commits to "a short native list...phased in — not 50 at once" (§2.5); chasing Fillout's integration breadth for its own sake is not a goal, only integrations with demonstrated tenant demand are.
-- **ODK's raw, spreadsheet-first XLSForm-only authoring workflow as the primary builder UX** — XLSForm import/export is a first-class *interoperability* feature (Doc #16), but the primary authoring experience is always this product's own structured builder, never "author a spreadsheet first."
+- **Kobo's raw XForm-level API surface and self-hosting model** — Kobo/ODK Central is often self-hosted by NGOs directly; this product is SaaS-only by design (architecture plan §1, hosting recommendation). Matching Kobo's self-hosting story is out of scope permanently, not deferred. *(Not planned — out of scope permanently: SaaS only)*
+- **Fillout's very broad, generic-business-form integration catalog** (50+ integrations) — the architecture plan explicitly commits to "a short native list...phased in — not 50 at once" (§2.5); chasing Fillout's integration breadth for its own sake is not a goal, only integrations with demonstrated tenant demand are. *(Not planned — a non-goal by the architecture plan)*
+- **ODK's raw, spreadsheet-first XLSForm-only authoring workflow as the primary builder UX** — XLSForm import/export is a first-class *interoperability* feature (Doc #16), but the primary authoring experience is always this product's own structured builder, never "author a spreadsheet first." *(Not planned — a non-goal; XLSForm import and export are built (G7) for interoperability)*
 
 ## 7. Where This Product Already Exceeds Both
 

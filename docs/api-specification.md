@@ -325,8 +325,8 @@ A separate surface from `/api/v1`, with one client: `scripts/feedback-pull.php`,
 
 ## 4. Out of Scope / Deferred
 
-- ~~The full, generated `openapi.yaml`~~ — **delivered in Phase 0 Increment E** as `openapi.json` at the repo root (Scramble-generated, Redocly-validated, drift-checked in CI). See §0.
-- Webhook event payload schemas (the `data` shape per `event_type`) → Doc #15.
-- XLSForm import/export request/response detail beyond the endpoint's existence (already in `docs/architecture/technical-architecture.md` §7.1) → Doc #16.
-- OCR intake endpoint payload/polling detail → Doc #17.
-- Sync manifest/batch-replay endpoint detail → Doc #18.
+- ~~The full, generated `openapi.yaml`~~ — **delivered in Phase 0 Increment E** as `openapi.json` at the repo root (Scramble-generated, Redocly-validated, drift-checked in CI). See §0. *(Built — Phase 0 Increment E)*
+- Webhook event payload schemas (the `data` shape per `event_type`) → Doc #15. *(Built — the §3 catalog in docs/webhook-integration-design.md, whose two missing events are a row there)*
+- XLSForm import/export request/response detail beyond the endpoint's existence (already in `docs/architecture/technical-architecture.md` §7.1) → Doc #16. *(Built — G7, in docs/xlsform-interop-spec.md)*
+- OCR intake endpoint payload/polling detail → Doc #17. *(Queued — `R-d9eec5d8`, `ocr-linelist`; the single-form session routes are in docs/ocr-pipeline-design.md)*
+- Sync manifest/batch-replay endpoint detail → Doc #18. *(Built — docs/offline-first-sync-design.md §2)*

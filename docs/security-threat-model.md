@@ -303,7 +303,7 @@ None of these are load-bearing blockers for Phase 0 scaffolding to begin — the
 
 ## 10. Out of Scope / Deferred
 
-- Full penetration-testing scope/cadence, dependency/supply-chain scanning policy, and secrets-management specifics → Doc #22 (Deployment & Infrastructure Doc).
-- GDPR-specific data-handling threats (subject access, erasure abuse, consent bypass) → Doc #12 (Data Privacy & GDPR/Compliance Doc) — this document's scope is security, not privacy-compliance, though the two obviously overlap at the edges (e.g., an information-disclosure threat is also a GDPR concern; each doc cites the other rather than duplicating).
-- Detailed audit-event redaction rules → Doc #13 (Audit & Compliance Logging Spec).
-- CI/CD pipeline security (build-artifact integrity, secrets in CI) → Doc #22.
+- Full penetration-testing scope/cadence, dependency/supply-chain scanning policy, and secrets-management specifics → Doc #22 (Deployment & Infrastructure Doc). *(Queued — `R-ea8f81c0`, the penetration test; dependency and secrets scanning run in CI)*
+- GDPR-specific data-handling threats (subject access, erasure abuse, consent bypass) → Doc #12 (Data Privacy & GDPR/Compliance Doc) — this document's scope is security, not privacy-compliance, though the two obviously overlap at the edges (e.g., an information-disclosure threat is also a GDPR concern; each doc cites the other rather than duplicating). *(Queued — `R-3506c98c`)*
+- Detailed audit-event redaction rules → Doc #13 (Audit & Compliance Logging Spec). *(Built — AuditRedactor (docs/audit-compliance-logging-spec.md §2))*
+- CI/CD pipeline security (build-artifact integrity, secrets in CI) → Doc #22. *(Queued — `R-bfe2a451`, `R-9d113919`; secret scanning runs in CI)*

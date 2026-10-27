@@ -188,6 +188,45 @@ function pipelineLintCopyCoverageCorpus(): void
     }
 }
 
+/**
+ * Every row id the live corpus cites in a `Queued` disposition (M190).
+ *
+ * ⛔ THE STUB LINE MUST HOLD THEM, OR EVERY CASE BELOW STARTS RED. Since M190 the gate joins each
+ * backticked id in a P2b or P2c `*(Queued — …)*` against the generator's rows, and the copied corpus
+ * names real ones (`R-…`, `ocr-linelist`) that the synthetic line does not carry.
+ *
+ * ⚠️ THIS IS A SECOND READING OF THE DISPOSITION SHAPE, AND THE BASELINE ASSERTION IS WHAT KEEPS IT
+ * HONEST. If it misses an id the gate reads, the base fixture goes red and every case says "the
+ * baseline was not green" — loud, never a silently weaker control. It reads the REAL documents, once:
+ * a case that perturbs a copy to cite an unknown id must find that id absent from the line.
+ *
+ * @return list<string>
+ */
+function pipelineLintQueuedIds(): array
+{
+    static $ids = null;
+
+    if ($ids !== null) {
+        return $ids;
+    }
+
+    $found = [];
+
+    foreach (pipelineLintCoverageCorpus() as $path) {
+        preg_match_all('/\*\(Queued — ([^\n]*?)\)\*/u', (string) file_get_contents(base_path($path)), $dispositions);
+
+        foreach ($dispositions[1] as $body) {
+            preg_match_all('/`([^`]+)`/', $body, $cited);
+
+            foreach ($cited[1] as $id) {
+                $found[$id] = true;
+            }
+        }
+    }
+
+    return $ids = array_keys($found);
+}
+
 /** A documented column name, stable across the schema, the corpus and the dictionary. */
 function pipelineLintColumn(int $table, int $index): string
 {
@@ -295,6 +334,21 @@ function pipelineLintDocument(array $overrides = []): string
             'phase' => 'n/a',
             'size' => '',
             'tier' => $tier,
+        ];
+    }
+
+    // M190: one row per id the live corpus's Queued dispositions cite, which P2b and P2c join against.
+    // APPENDED LAST, because cases above address rows by position (`$rows[111]` is D2).
+    foreach (pipelineLintQueuedIds() as $id) {
+        $rows[] = [
+            'id' => $id,
+            'class' => 'defect',
+            'state' => 'ready',
+            'blocker' => '',
+            'headline' => 'A row a deferral site is queued on',
+            'phase' => 'n/a',
+            'size' => '',
+            'tier' => 'after-launch',
         ];
     }
 
@@ -1007,6 +1061,8 @@ it('P2b — reddens when a document grows a new Out of Scope section', function 
     pipelineLintPerturb('docs/TESTING-GUIDE.md', $guide, function (int $status, string $output): void {
         expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
         expect($output)->toContain('holds 24 section(s) declaring a disposition');
+        // M190: and the new section's one item says nothing of what became of it.
+        expect($output)->toContain('ends in no disposition');
     });
 });
 
@@ -1040,7 +1096,9 @@ it('P2c — reddens when a document gains a sentence saying something is not bui
 
     pipelineLintPerturb('docs/TESTING-GUIDE.md', $guide, function (int $status, string $output): void {
         expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
-        expect($output)->toContain('holds 9 deferral sentence(s)');
+        // 7 since M190, which corrected the one stale sentence of the eight; the added one makes 8.
+        expect($output)->toContain('holds 8 deferral sentence(s)');
+        expect($output)->toContain('ends in no disposition');
     });
 });
 
@@ -1064,6 +1122,185 @@ it('P2c — does NOT fire on "is not built ON", which is a sentence about compos
 
     pipelineLintPerturb('docs/TESTING-GUIDE.md', $guide, function (int $status, string $output): void {
         expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// M190 — every deferral site says what became of it: Built, Queued (on a row the line holds), or Not
+// planned. Each case below edits a copy of `docs/testing-strategy.md` §7, a real deferral list, by
+// inserting lines after one of its items; the section count never moves, so a red here is the item
+// rule's and not the pin's.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * `docs/testing-strategy.md` with $insert placed after its §7 property-based-testing item.
+ *
+ * @return array{0: string, 1: int} the document, and the 1-based line the insertion starts on
+ */
+function pipelineLintDeferralList(string $insert): array
+{
+    $lines = explode("\n", pipelineLintDoc('docs/testing-strategy.md'));
+
+    foreach ($lines as $i => $line) {
+        if (str_starts_with($line, '- Property-based testing adoption')) {
+            array_splice($lines, $i + 1, 0, explode("\n", $insert));
+
+            return [implode("\n", $lines), $i + 2];
+        }
+    }
+
+    throw new RuntimeException('docs/testing-strategy.md §7 no longer holds its property-based-testing item.');
+}
+
+it('P2b — reddens on a new item in an existing deferral section that says nothing of what became of it', function (): void {
+    [$doc, $line] = pipelineLintDeferralList('- A newly deferred thing.');
+
+    pipelineLintPerturb('docs/testing-strategy.md', $doc, function (int $status, string $output) use ($line): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain("the item at docs/testing-strategy.md:{$line} ends in no disposition");
+        expect($output)->not->toContain('section(s) declaring a disposition and the pinned expectation');
+    });
+});
+
+it('P2b — does NOT fire when the new item ends in a disposition', function (): void {
+    [$doc] = pipelineLintDeferralList('- A newly deferred thing. *(Not planned — a non-goal of this fixture)*');
+
+    pipelineLintPerturb('docs/testing-strategy.md', $doc, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
+    });
+});
+
+it('P2b — a disposition QUOTED mid-item does not discharge it, which is M84\'s trap a sixth time', function (): void {
+    [$doc, $line] = pipelineLintDeferralList('- A newly deferred thing, unlike its neighbour *(Built — M1)* which shipped.');
+
+    pipelineLintPerturb('docs/testing-strategy.md', $doc, function (int $status, string $output) use ($line): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain("the item at docs/testing-strategy.md:{$line} ends in no disposition");
+    });
+});
+
+it('P2b — a hard-wrapped item is read to the END of its paragraph, so a disposition there counts', function (): void {
+    [$doc] = pipelineLintDeferralList(
+        "- A newly deferred thing whose sentence\n  wraps onto a second line. *(Not planned — a non-goal of this fixture)*"
+    );
+
+    pipelineLintPerturb('docs/testing-strategy.md', $doc, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
+    });
+});
+
+it('P2b — and a disposition on a wrapped item\'s FIRST line is not its last thing, so it does not count', function (): void {
+    [$doc, $line] = pipelineLintDeferralList(
+        "- A newly deferred thing whose sentence *(Not planned — a non-goal of this fixture)*\n  wraps onto a second line."
+    );
+
+    pipelineLintPerturb('docs/testing-strategy.md', $doc, function (int $status, string $output) use ($line): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain("the item at docs/testing-strategy.md:{$line} ends in no disposition");
+    });
+});
+
+it('P2b — refuses "Deferred" as an answer, because every one of these sites already says it', function (): void {
+    [$doc] = pipelineLintDeferralList('- A newly deferred thing. *(Deferred — to a later increment)*');
+
+    pipelineLintPerturb('docs/testing-strategy.md', $doc, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('opens with none of Built, Queued, Not planned');
+    });
+});
+
+it('P2b — a section with no list is read as its first paragraph, and that paragraph must answer', function (): void {
+    // ADR-0021's option C is the corpus's one prose-only deferral section.
+    $path = 'docs/adr/0021-respondent-scoped-device-outbox.md';
+    $doc = pipelineLintDoc($path);
+    $heading = '### C. A device-owner gate / kiosk unlock (deferred — it is a different feature)';
+
+    expect($doc)->toContain($heading);
+
+    [$before, $after] = explode($heading, $doc, 2);
+    $stripped = $before.$heading.(string) preg_replace('/ \*\([^\n]*\)\*(?=\n)/', '', $after, 1);
+    $line = substr_count($before, "\n") + 3;
+
+    pipelineLintPerturb($path, $stripped, function (int $status, string $output) use ($path, $line): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain("the item at {$path}:{$line} ends in no disposition");
+    });
+});
+
+it('P2b — an amendment quoted under an item and an HTML comment are commentary, not items', function (): void {
+    // ADR-0002 hangs an indented `>` amendment under each bullet; three deferral sections carry
+    // pipeline markers in comments, and a note to the next author can run to several lines.
+    [$doc] = pipelineLintDeferralList(
+        "  > An amendment under the item above, carrying no disposition of its own.\n"
+        ."<!-- a note to the next author -->\n"
+        ."<!-- a note that\n   runs to a second line -->"
+    );
+
+    pipelineLintPerturb('docs/testing-strategy.md', $doc, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
+    });
+});
+
+it('P2b — a table body row in a deferral section is an item, and its header row is not', function (): void {
+    [$doc, $line] = pipelineLintDeferralList(
+        "\n| Deferred thing | Why |\n|---|---|\n| A deferred table row | no reason given |\n"
+    );
+
+    pipelineLintPerturb('docs/testing-strategy.md', $doc, function (int $status, string $output) use ($line): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('the item at docs/testing-strategy.md:'.($line + 3).' ends in no disposition');
+        expect($output)->not->toContain('the item at docs/testing-strategy.md:'.($line + 1).' ');
+    });
+});
+
+it('P2b — Queued on an id the line does not hold reddens, naming it', function (): void {
+    [$doc] = pipelineLintDeferralList('- A newly deferred thing. *(Queued — `R-00000000`)*');
+
+    pipelineLintPerturb('docs/testing-strategy.md', $doc, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('is Queued on `R-00000000`, which is not a row in the line — closed or mistyped');
+    });
+});
+
+it('P2b — Queued on a row that has LEFT the line reddens with the repair, not "no such row"', function (): void {
+    // `finished-row` is the stub's one off-the-line row. Telling it apart is the whole of line_ids()'s
+    // second half: a finished row means the site is Built now, a missing one means a typo.
+    [$doc] = pipelineLintDeferralList('- A newly deferred thing. *(Queued — `finished-row`)*');
+
+    pipelineLintPerturb('docs/testing-strategy.md', $doc, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('is Queued on `finished-row`, which has LEFT the line');
+    });
+});
+
+it('P2b — Queued with no id in backticks reddens, because nothing could check it', function (): void {
+    [$doc] = pipelineLintDeferralList('- A newly deferred thing. *(Queued — in the next increment)*');
+
+    pipelineLintPerturb('docs/testing-strategy.md', $doc, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('says Queued and names no row id in backticks');
+    });
+});
+
+it('P2c — a new deferral sentence that answers still moves the pin, so the set cannot grow unseen', function (): void {
+    $guide = pipelineLintDoc('docs/TESTING-GUIDE.md')
+        ."\nThe export runner is still unbuilt. *(Not planned — a non-goal of this fixture)*\n";
+
+    pipelineLintPerturb('docs/TESTING-GUIDE.md', $guide, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('holds 8 deferral sentence(s)');
+        expect($output)->not->toContain('ends in no disposition');
+    });
+});
+
+it('P2c — a sentence in a table row answers in its last cell, before the closing pipe', function (): void {
+    $guide = pipelineLintDoc('docs/TESTING-GUIDE.md')
+        ."\n| Runner | State |\n|---|---|\n| export | The export runner is still unbuilt. *(Not planned — a non-goal of this fixture)* |\n";
+
+    pipelineLintPerturb('docs/TESTING-GUIDE.md', $guide, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('holds 8 deferral sentence(s)');
+        expect($output)->not->toContain('ends in no disposition');
     });
 });
 

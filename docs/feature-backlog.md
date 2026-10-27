@@ -13336,7 +13336,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `FormShareQrController` already does) but unreadable server-side, and `resources/views/pdf/blank-form.blade.php`
   carries a "no images" contract for the same reason. The identity travels as text — `Layout 2` and the stamp — which
   the matcher reads. Revisit when images are pre-processed server-side (ADR-0014 names GD's arrival as a revisit
-  trigger) or the provider decodes codes. **Latent.** Filed by `M143`. **Tier: after-launch.**
+  trigger) or the provider decodes codes. ⚠️ **The first trigger has fired:** `M160` put GD in the app image for the ink reader (`docker/Dockerfile`), so the premise above is no longer true and the registration-mark half is open work (noted by `M190`, whose audit of `docs/ocr-pipeline-design.md`'s out-of-scope list found it). **Latent.** Filed by `M143`. **Tier: after-launch.**
 
 - **`nit` · A short written answer that is a substring of any printed text in its region is dropped as printed text, so
   "FORM" written in a box above a footer that says "Scans of this form…" reads as blank.** Found by `M143` while
@@ -15258,3 +15258,140 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   same list, or a newer quarter of the places, between two published versions. The page says so in its note. The remedy: compare the
   copied rows' count and checksum between two published versions only, and show "The list's rows changed (N → M)".
   **Latent** until `M189` merges. Filed by `M189`. **Tier: during-testing.**
+
+- **`minor` · A workspace cannot be deleted: `tenants:extract` reads a departing customer's data out and nothing removes it.**
+  `docs/architecture/technical-architecture.md` §9's R12 names the purge as the write half of offboarding, and the only tenant
+  commands are `tenants:create` and `tenants:extract`; no route or command deletes a tenant's rows. So a customer who leaves can only
+  be erased by hand, table by table, under row-level security. The remedy: R12's DELETE-half design, then a purge command paired with
+  the extract. ⚠️ `retention-sweep-job` is one of R12's revisit triggers, so whoever builds the sweep owes this design first.
+  **Latent** until a workspace leaves. Filed by `M190`. **Tier: before-launch.**
+
+- **`nit` · `MdsProgress` has no step-count variant, so the public runtime and the encode page each draw their own "Step X of N".**
+  `docs/ux/design-system-reference.md` §3.9 and §3.13 ask for the variant, and `packages/design-system/src/components/Progress/Progress.vue`
+  has no step prop — so `resources/public-runtime/components/ProgressIndicator.vue` and `resources/js/Pages/submissions/Encode.vue`
+  each hand-roll one, and §3.9's visited-set rule lives only in the runtime. The remedy: a step variant on `MdsProgress` that both adopt.
+  **Live.** Filed by `M190`. **Tier: after-launch.**
+
+- **`minor` · `form.archived` and `subscription.updated` are in the webhook catalog, and a tenant cannot subscribe to either.**
+  `docs/webhook-integration-design.md` §3 lists both and neither is a case of `App\Enums\DomainEventType`. The design's reason — no
+  emission site — no longer holds: `FormService::archive()` archives a form, and `SuperAdminService::assignPlan()` already writes a
+  `subscription.updated` audit entry. The remedy: the two cases, emitted from those two methods, with the catalog's payloads.
+  **Live.** Filed by `M190`. **Tier: after-launch.**
+
+- **`minor` · The Google Sheets and Airtable connectors append one row per new response, with no scheduled sync and no backfill.**
+  `docs/webhook-integration-design.md` §4 specifies both and marks them forward-spec; delivery runs per event only. So a sheet connected
+  to a form that already has responses never receives them, and a response edited after delivery is never updated there. The remedy: a
+  backfill run when a rule is created, then a scheduled re-sync. **Live.** Filed by `M190`. **Tier: after-launch.**
+
+- **`minor` · Builder presence — seeing who else has a form's builder open — does not exist, so two editors learn of each other only from a 409.**
+  `docs/PRD.md` §7 calls it planned and `docs/form-versioning-schema-migration.md` §8 puts it on Reverb, which is not installed (there is
+  no `routes/channels.php`). The optimistic-concurrency token catches the collision only after the second save. The remedy: a presence
+  channel per form draft and the editors' avatars in the builder header. **Live.** Filed by `M190`. **Tier: after-launch.**
+
+- **`minor` · A shared device has no operator lock — no pinning it to one form, no operator-set reset — so kiosk use rests on the visit window alone.**
+  `docs/adr/0021-respondent-scoped-device-outbox.md` option C calls a device-owner gate the right long-term answer for operator-run
+  hardware and says a backlog row exists; that row is an untagged idea in this file's wish-list table, which the line does not read.
+  Today a shared tablet relies on the ten-minute visit window and the "Submit another response" hand-off. The remedy: an operator
+  unlock that pins a form and sets the reset window. **Latent** until a tenant runs a form on shared hardware. Filed by `M190`.
+  **Tier: after-launch.**
+
+- **`minor` · The `audits` table is append-only and never pruned, and the archival plan for it is written nowhere.**
+  `docs/audit-compliance-logging-spec.md` §5 hands long-term archival to the deployment document, which never mentions it. So the table
+  grows without bound and nobody owns its retention period. The remedy: a stated retention period, then an archive to cold storage that
+  keeps the rows readable for an audit request. **Latent** until the table's size matters. Filed by `M190`. **Tier: after-launch.**
+
+- **`minor` · Nothing measures or alerts on the server: no metrics, no alerts, no on-call, only `/up`.**
+  `docs/observability-incident-response.md` §3–§6 designs the metrics, the alerts and the on-call rota, and the deployment, privacy,
+  requirements and testing documents all hand this work to it; in code there is Laravel's `/up` and nothing else — no metrics store, no
+  uptime check, no vendor chosen. So an outage, a stuck queue or a breach is noticed only when someone looks, which on the testing
+  server means when a tester reports it. The remedy: choose the vendor, then the §3 metrics and the §5 alerts. **Live.**
+  Filed by `M190`. **Tier: before-launch.**
+
+- **`minor` · Whether production needs a second node or managed failover is undecided, and ADR-0005 makes deciding it a precondition of any SLA.**
+  `docs/adr/0005-hosting-self-hosted-windows-server.md` says a second node "should be evaluated before committing SLAs", and
+  `docs/deployment-infrastructure.md` §9 lists it out of scope with no owner. The remedy: measure the single box's recovery time against
+  the per-plan commitments in `docs/pricing-feature-gating-matrix.md`, and put the choice to the user before any SLA is offered.
+  **Latent** until an SLA is offered. Filed by `M190`. **Tier: before-launch.**
+
+- **`minor` · No path anonymizes a member's `users` row, so an erasure request for a staff account has nothing to run.**
+  `docs/data-privacy-gdpr-compliance.md` §3 specifies anonymizing the account; `gdpr-erasure-execution` covers respondents'
+  submissions (`submissions.pii_erased_at`) only, and nothing in `app/` deletes or anonymizes a user. The remedy: an anonymization that
+  keeps the row, because audit entries point at it, and blanks the name, the email and the credentials. **Latent** until a member asks.
+  Filed by `M190`. **Tier: before-launch.**
+
+- **`minor` · No document walks OWASP ASVS Level 1 control by control, so nobody can say which controls the app meets.**
+  `docs/non-functional-requirements.md` hands "the ASVS checklist" to the threat model, which maps threats per surface instead. The
+  remedy: an ASVS Level 1 table — each control, how it is met, the test that pins it — with every gap filed as a row.
+  **Latent** until launch. Filed by `M190`. **Tier: before-launch.**
+
+- **`minor` · A blank form prints only in its default language, so a form translated into Tagalog cannot be printed in Tagalog.**
+  `BlankFormPrintPresenter::present()` takes `forms.default_locale`, and its docblock calls a print-in-another-language choice "a real
+  gap" recorded in `docs/ocr-pipeline-design.md`, whose out-of-scope list carries it with no row. Translated forms ship today, so a
+  tester with one can reach this. The remedy: a language choice beside the print button, defaulting to the form's default, passed to the
+  presenter. **Live.** Filed by `M190`. **Tier: during-testing.**
+
+- **`minor` · No audit row records which values a reviewer changed after an OCR read.**
+  `docs/ocr-pipeline-design.md` lists a field-level OCR audit trail out of scope with no ground and no row. An `ocr_scans` row keeps the
+  reading (`extraction`) beside who confirmed it, so a disputed scanned answer can be traced only by comparing the stored reading with
+  the response by hand. The remedy: the confirmation writes one audit entry listing each answer whose confirmed value differs from the
+  reading. **Live.** Filed by `M190`. **Tier: after-launch.**
+
+- **`minor` · A photo, file or signature question can be named in a condition or formula though piping refuses it, and nobody has decided which rule is right.**
+  `App\Services\Forms\ExpressionValidationGate` refuses only composite and geo operands, while the template gate refuses media holes too
+  (`docs/piping-output-encoding-design.md` §8). Refusing media operands would also refuse ODK's `${photo} != ''` "was it captured"
+  idiom, so the remedy is a decision first: allow it in both with a stated meaning (captured or not), or refuse it in both.
+  **Latent** until an author writes one. Filed by `M190`. **Tier: after-launch.**
+
+- **`minor` · An XLSForm question renamed on import keeps every `${old}` reference pointing at the old name, so the form will not publish until each is fixed by hand.**
+  `XlsformImportParser::sanitizeKeys()` lowercases and slugs each `name` (`Age` becomes `age`) and warns, and nothing rewrites the
+  `${…}` references in `relevant`, `constraint`, `calculation`, labels or hints, so each one dangles. `R-ade0b598` is the builder-side
+  sibling (a key edited in the builder) and does not reach import. The remedy: carry the rename map into the parse and rewrite every
+  reference before the draft is written, warning once per renamed key. **Live.** Filed by `M190`. **Tier: during-testing.**
+
+- **`minor` · No page sets a `script-src` or `default-src` content-security policy, so one escaping slip would run script with nothing behind it.**
+  `App\Http\Middleware\AppSecurityHeaders` and `PublicRuntimeSecurityHeaders` set `frame-ancestors` and the other app headers;
+  `docs/piping-output-encoding-design.md` §8 calls the hardening deferred, and `PublicRuntimeSecurityHeadersTest` pins `default-src`,
+  `script-src`, `connect-src` and `font-src` absent so the change must enumerate them together. `R-25dc7ded` asks whether the headers
+  are present at all, not this policy. The remedy: a nonce-based `script-src` with `default-src 'self'`, each directive measured
+  against the pages first. **Latent** until an escaping slip exists. Filed by `M190`. **Tier: before-launch.**
+
+- **`nit` · The Compare page marks changed piping only in a question's base label, hint and placeholder, so a section's text or a translated label that now pipes a different answer shows changed without the mark.**
+  `M189`'s `VersionComparison` reads `${…}` holes from the base label, hint and placeholder only, and gives sections no piping mark,
+  though translations and section titles and descriptions carry templates too (`docs/piping-output-encoding-design.md` §6). The
+  remedy: read holes from every template-bearing text §6 names. **Latent** until `M189` merges. Filed by `M190`.
+  **Tier: during-testing.**
+
+- **`nit` · The spreadsheet export takes an empty translated label as its column heading, where every screen falls back to the base label.**
+  `SubmissionRowProjector::header()` resolves `$translations[$locale] ?? $field['label']`, which accepts an empty string, while the other
+  label resolutions go through `App\Support\Forms\LocaleVariant` and fall back. `docs/piping-output-encoding-design.md` §8.1 records the
+  divergence under an older class name. **Latent** until something writes an empty translation — the XLSForm import drops empty ones
+  and the builder writes none. Filed by `M190`. **Tier: after-launch.**
+
+- **`minor` · No penetration test is scoped or scheduled, so the app would launch tested by nobody outside the team.**
+  `docs/security-threat-model.md` lists it out of scope, `docs/deployment-infrastructure.md` says nothing, and the only other mention
+  is this file's wish-list table, which the line does not read. The remedy: scope a test of the tenant boundary, the guest runtime and
+  the support API, and book it before launch. **Latent** until launch. Filed by `M190`. **Tier: before-launch.**
+
+- **`minor` · Neither privacy document says how a data-subject request proves who is asking, so the export and erasure rows have no rule against handing one person's data to another.**
+  `docs/security-threat-model.md` hands GDPR-specific threats to `docs/data-privacy-gdpr-compliance.md`, which has no threat analysis,
+  and a guest's request would match on `guest_contact_email` — something anyone can type. The remedy: a stated proof (a link sent to
+  the address on file; the tenant's own sign-in for staff), written into both documents before `gdpr-subject-export` or
+  `gdpr-erasure-execution` is built. **Latent** until either is built. Filed by `M190`. **Tier: before-launch.**
+
+- **`minor` · No load test exists, so the response-time targets have never been measured.**
+  `docs/testing-strategy.md` defers the thresholds to `docs/non-functional-requirements.md` and names load testing as a layer, and there
+  is no k6, Artillery or similar anywhere in the tree. The remedy: one scripted run of the public submit, the builder save and the
+  inbox at the stated concurrency, against a copy of the testing server, before launch. **Latent** until launch. Filed by `M190`.
+  **Tier: before-launch.**
+
+- **`minor` · The OCR key's Google Cloud project has billing on and no budget alert.**
+  `docs/deployment-infrastructure.md:62` records the alert as owed since `M135` (2026-10-05), and nothing queued it. A runaway scan loop
+  or a leaked key would bill with nobody told. The remedy is the user's, in the Google Cloud console, step by step in chat: a monthly
+  budget on the project with alerts at 50% and 90%. **Live.** Filed by `M190`. **Tier: during-testing.**
+
+- **`minor` · Neither CI workflow sets a `permissions:` block, so every job's `GITHUB_TOKEN` carries whatever the repository default grants.**
+  `.github/workflows/ci.yml` and `.github/workflows/deploy.yml` declare no permissions at workflow or job level. If the repository
+  default is read-write, a compromised action or dependency step could push to `main`, which deploys. `R-bfe2a451` covers which commit
+  the deploy ships, not the token's scope. The remedy: `permissions: contents: read` at the top of each file, widened per job only where
+  one needs more. **Latent** — it depends on the repository's default token setting, which the tree cannot show. Filed by `M190`.
+  **Tier: before-launch.**

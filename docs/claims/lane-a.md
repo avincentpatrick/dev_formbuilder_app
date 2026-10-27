@@ -86,6 +86,42 @@ Prediction: the surgery passes all four proofs on the first run and leaves about
 mostly before-launch and after-launch. PHPStan cannot move (`scripts/` and docs only). **Most likely wrong:** the rollup on a feature that
 spans two phases (Feature #4, "Phase 1 (basic) → Phase 3"), where a Built basic half and a Queued advanced half must read Queued.
 
+**BUILT — PR #384, CI 6/6 green with real step counts (run 40465860839 at `1f8ae2a9`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11) — AND NOT MERGED.**
+⛔ **Held for merge point 8 (`D171`)**, together with the next increment from the line; the user's census before and after, as at every
+merge point. The branch is cut from `cdd7b5bb` (the claim extension) and has never merged the trunk. No migration, no `VERSION` bump, no
+release note. Commits: `799cd002` (the gate, red on arrival), `ab77d61e` (the verdicts, the rows, the controls), `1f8ae2a9` (a filer
+clause on one line). **The surgery is not on this branch:** `R-4868cdbc`'s move is on the trunk as `770b1b4a`, its hand-off regenerated
+as `322081f1`.
+
+**How the prediction fared — measured, the wrong parts first.**
+- **"Most likely wrong: the rollup on Feature #4" — wrong, because the trap never arose.** H24a and H24b2 built the advanced half, so
+  every Feature #4 criterion is Built and the feature is too. The rollup's Queued-wins rule is exercised by Features 3, 5, 6 and 8
+  instead, and by its own control.
+- **"Red on about 89 criteria and 14 features" — the count was 108, and the miss is the prediction's:** 14 features, all 93 criteria (the
+  four old endings — `Shipped:`, `Built in`, `ADR-` — no longer qualify under the three words) and the placeholder digest.
+- **"10 to 20 rows, mostly before-launch and after-launch" — 8: two during-testing, six after-launch, none before-launch.**
+- **What no prediction named, each measured:** (1) a `Queued` ending may backtick only row ids — the join reads every backticked token,
+  so six endings citing `G8`, `B1`, `M180` and similar went red until unquoted. (2) `BacklogProvenanceTest` reads `Filed by \`Mnnn\`.` on
+  ONE line; a wrapped clause failed it (the `M166` trap, recorded in memory and still missed). (3) **The premise missed a row:**
+  `TESTING-GUIDE.md` §18's OCR sentence was already `R-248174d6` (`M162`), found only when the triage census was read — the claim was
+  extended, by a pushed commit, before the guide was opened. (4) **The surgery's label was wrong in the claim:** lines 224–238 are `M183`
+  down to `M170`; `M184` is line 223 and stayed. The re-measure by index, not the claim's words, decided the cut. (5) **The pre-push hook
+  refuses two commits sent straight to `main`;** the surgery and its hand-off were pushed one commit at a time by sha — the `M143` shape —
+  and the claim extension cherry-picked onto the trunk's tip so the gate commit beneath it never reached `main`.
+- **Right:** the surgery passed all four proofs on its first run and left 24,895 bytes of headroom; no CI run followed any of the four
+  direct pushes; PHPStan cannot move (`scripts/`, `tests/` and docs only); the rule-group count stays 15 by keeping each rule's first token.
+- **Filed: 8 rows.** during-testing — `R-94f984d6` (a guest with no saved draft refused after a republish), `R-9b654c0e` (per-form access
+  only through the API); after-launch — `R-6d87798a`, `R-a1890e23`, `R-80c463fe`, `R-4ddd9532`, `R-b05055dc`, `R-8cb6c049`.
+  **Closed:** `R-248174d6`, `R-283b9c0d` (superseded), `R-4868cdbc`.
+- **Run locally:** Pest — `PipelineLintControlsTest` 81 passed (342 assertions); `tests/Feature/Docs` 190 passed and 2 failed —
+  `BacklogProvenanceTest` (the wrapped filer clause; 6/6 when re-run alone after the fix) and `SuiteCollectionFloorTest`, red on the
+  known bind-mount artefact. The folder was not re-run whole after the fix; CI is the authority for it. Host — Pint (bare), `pipeline-lint`, `tracker-lint`, citation
+  liveness (16/16), `preflight --with-gates --with-pint`. Vitest and E2E: no spec reaches this diff; CI ran both.
+- **Mutants: 5 caught, 0 survived** (`scripts/mutate.php`): `Deferred` re-admitted (3 red, P2e's own refusal among them), the Queued join
+  dropped (4), the rollup check dropped (2, both P2a rollup cases), Built ahead of Queued in the rollup (CO-FIRES: the live PRD's Queued
+  features turn the fixture's baseline red, so nearly every coverage case fails), P2e's per-criterion failure muted (6). **Not committed,
+  on `M82`'s grounds:** no arm of this gate reads a diff; each run proved its write and its byte-compared restore.
+
 ## RELEASED — `M190`, every deferral section and deferral sentence gets a recorded disposition (`deferral-site-disposition`) (merged as PR #383, `f980cbba`, last at merge point 7, rebased onto the trunk after `M189`; 6/6 green with real step counts on its rebased run at `a6638c28` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `f980cbba` the same)
 
 **RELEASED LAST AT MERGE POINT 7 (`D170`), 2026-10-27, by the merge-point-7 session** (plan

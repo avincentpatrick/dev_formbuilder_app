@@ -63,7 +63,7 @@ $author = strtolower((string) $options['author']);
 $base = (string) $options['base'];
 $head = (string) $options['head'];
 
-$codeowners = git_show($head, '.github/CODEOWNERS');
+$codeowners = git_show($base, '.github/CODEOWNERS');
 
 if ($codeowners === null) {
     fwrite(STDOUT, "boundary: the base commit has no .github/CODEOWNERS, so the boundary is not enforced on this pull request.\n");

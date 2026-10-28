@@ -20,7 +20,7 @@
        this version finds no deployed-sha and deploys in full.
     2b. NOTHING THE SITE RUNS CHANGED: when what is live is exactly what is recorded as deployed,
        the site is up, the live build is present, and every path changed since is one the site
-       does not load (docs/, tests/, scripts/, .github/ and four top-level markdown files), then
+       does not load (docs/, tests/, scripts/, .github/, apps/ and four top-level markdown files), then
        fast-forward the checkout, record the commit and open NO window. Deny by default: one
        unrecognised path deploys in full. This is what keeps a documentation close-out from taking
        the site down to ship a markdown file.
@@ -350,6 +350,13 @@ if (($liveHead -eq $sha) -and (-not [IO.File]::Exists($DownFile)) -and ($deploye
 #     because nothing the site serves loads either: every mention of `scripts/` under `app/`,
 #     `database/` and `resources/views/` is a comment about a lint gate.
 #
+#     ⛔ `apps/` IS ANOTHER APPLICATION, NOT A PATH THIS SITE LOADS (M192, ADR-0024). BHW Connect lives
+#     under apps/bhw-connect/, runs from its own releases directory (never from this checkout) and is
+#     deployed by its own script, apps/bhw-connect/ops/deploy-bhw.ps1. Nothing Meridian loads lives
+#     there: no autoload root, no Vite input, no view. So a BHW-only push fast-forwards the checkout
+#     and opens no Meridian window - but only through this arm's guards: after a failed or interrupted
+#     deploy, a BHW-only push takes the full path like any other push.
+#
 #     ⚠️ `--no-renames`, AND `diff-tree` RATHER THAN `diff`. Porcelain `git diff --name-only` prints
 #     only a rename's NEW path, so moving `app/Foo.php` to `docs/Foo.php` would read as
 #     documentation-only (measured on this repository). `--no-commit-id` keeps the sha line out.
@@ -357,7 +364,7 @@ if (($liveHead -eq $sha) -and (-not [IO.File]::Exists($DownFile)) -and ($deploye
 #     ⚠️ `__APP_VERSION__` stays at the last BUILT commit after a skip: vite.config.ts stamps it from
 #     the stage's HEAD, and `submissions.app_version` records it. That is the one thing a skip leaves
 #     stale, and it is preferred to taking the site down to restamp a string.
-$SiteSafePrefixes = @('docs/', 'tests/', 'scripts/', '.github/')
+$SiteSafePrefixes = @('docs/', 'tests/', 'scripts/', '.github/', 'apps/')
 $SiteSafeFiles = @('PROGRESS.md', 'PROGRESS_ARCHIVE.md', 'CLAUDE.md', 'README.md')
 
 if (($deployedSha -match '^([0-9a-f]{40}|[0-9a-f]{64})$') -and

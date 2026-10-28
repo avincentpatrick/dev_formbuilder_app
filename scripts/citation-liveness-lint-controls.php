@@ -147,6 +147,24 @@ $cases = [
         'exit' => 1,
         'expect' => 'is BLANK',
     ],
+    [
+        // M192. With a guest copy of Target.vue under apps/ in the fixture, C2 and C3 are this rule's
+        // discriminators: let apps/ back into the basename map and both partial paths go ambiguous.
+        'id' => 'C7',
+        'what' => 'a FULL path into apps/ (another application) still resolves and is still checked',
+        'file' => 'docs/guest-full.md',
+        'body' => "# Guest\n\nThe guest copy is `apps/guest/src/deep/nested/Target.vue:5`.\n",
+        'exit' => 1,
+        'expect' => 'is BLANK',
+    ],
+    [
+        'id' => 'C8',
+        'what' => 'a BARE name that apps/ also carries still resolves to the file in this repository',
+        'file' => 'docs/guest-bare.md',
+        'body' => "# Bare\n\nThe shell is `Guest.vue:5`.\n",
+        'exit' => 1,
+        'expect' => 'is BLANK',
+    ],
 ];
 
 $failed = [];
@@ -214,7 +232,7 @@ if ($failed !== []) {
 
 fwrite(STDOUT, sprintf(
     'citation-liveness-lint-controls: passed (%d cases; the partial-path arm both ways, the ambiguity '
-    ."rule, the untracked case and the literal arm's regression control)\n",
+    ."rule, the untracked case, the literal arm's regression control and another application under apps/)\n",
     count($cases)
 ));
 exit(0);
@@ -239,6 +257,12 @@ function build_fixture(string $fixture, string $gateBytes): void
     // The AMBIGUITY control's two halves: one partial suffix, two tracked paths.
     file_put_contents($fixture.'/src/a/other/Twin.vue', $body);
     file_put_contents($fixture.'/src/b/other/Twin.vue', $body);
+
+    // M192 — another application under apps/: a copy of Target.vue (C2, C3, C7) and of Guest.vue (C8).
+    mkdir($fixture.'/apps/guest/src/deep/nested', 0o777, true);
+    file_put_contents($fixture.'/apps/guest/src/deep/nested/Target.vue', $body);
+    file_put_contents($fixture.'/src/Guest.vue', $body);
+    file_put_contents($fixture.'/apps/guest/src/Guest.vue', $body);
 
     for ($i = 1; $i <= FIXTURE_DOCUMENTS; $i++) {
         $lines = ['# Document '.$i, ''];

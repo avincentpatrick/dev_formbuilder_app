@@ -1,0 +1,21 @@
+# Who owns what in this repository (M192, ADR-0024, decision D177).
+#
+# The LAST matching line wins, as GitHub reads it. This file is read twice: by GitHub, to request a
+# review from the owners, and by CI's boundary step (scripts/boundary-check.php), which reads it from
+# the BASE commit and refuses a pull request that changes another owner's paths without that owner's
+# `boundary-approved` label. "Require review from code owners" is deliberately OFF on `main`: with one
+# owner per side, an author could never approve their own pull request.
+#
+# The working agreement both developers follow is docs/working-agreement.md.
+
+# Meridian: everything not given away below.
+*                          @avincentpatrick
+
+# BHW Connect: the whole application.
+/apps/bhw-connect/         @jongsky25
+
+# Shared: a change here can take the other application down, so it needs the other owner's label.
+/apps/bhw-connect/ops/     @jongsky25 @avincentpatrick
+/.github/                  @avincentpatrick @jongsky25
+/deploy.ps1                @avincentpatrick @jongsky25
+/docs/working-agreement.md @avincentpatrick @jongsky25

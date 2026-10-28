@@ -1,0 +1,510 @@
+import "server-only";
+import { cache } from "react";
+import { createSupabaseServerClient } from "./supabase";
+import { getActiveDatasetId } from "./dataset";
+import { getChildGeos, getGeoByCode } from "./geo";
+import { NATIONAL_GEO_CODE } from "@/lib/filters/schema";
+
+/**
+ * The `/districts` (D2.1) match-quality badge. Only two of the plan's three named states
+ * (`all_exact`, `has_overrides`) read directly off `match_method`; `has_unresolved` is set only
+ * where a gap is unambiguously this district's own (a lone district missing a member of its own
+ * province/HUC) — see the `district_index` DB function for why a shared province/city gap can't be
+ * attributed to one sibling district. `resolved` covers everything else: rows placed by a rule
+ * (whole-province expansion, an independent city, a PSGC code, a barangay roster) rather than a
+ * plain name match, with no override and no known gap. `no_members` is a district with zero live
+ * rows — not seen as of D1.6a, named rather than silently read as clean if it ever occurs.
+ */
+export type DistrictMatchQuality =
+  | "all_exact"
+  | "has_overrides"
+  | "has_unresolved"
+  | "resolved"
+  | "no_members";
+
+export type DistrictIndexRow = {
+  districtCode: string;
+  districtName: string;
+  ordinal: number | null;
+  isLone: boolean;
+  regionCode: string | null;
+  regionName: string | null;
+  memberCount: number;
+  bhwTotal: number;
+  population: number | null;
+  matchQuality: DistrictMatchQuality;
+};
+
+/**
+ * The full `/districts` index (D2.1): all public districts, each with its member LGU count, BHW
+ * total (summed from `agg_bhw_counts` over the district's own live members), PSA population, and
+ * match-quality badge — computed in one round trip by the `district_index` DB function rather than
+ * joining `geo_district_map` (3,513 rows) against `agg_bhw_counts` (~41k rows) here.
+ *
+ * Region names come from `dim_geo` rather than `dim_legislative_district.region_code` alone — that
+ * column is a bare code (e.g. `'03'`), a convenience for filtering, not a display name.
+ */
+export const getDistrictIndex = cache(async (): Promise<DistrictIndexRow[]> => {
+  const datasetId = await getActiveDatasetId();
+  if (datasetId === null) return [];
+
+  const supabase = createSupabaseServerClient();
+  const [{ data, error }, regions] = await Promise.all([
+    supabase.rpc("district_index", { p_dataset_id: datasetId }),
+    getChildGeos(NATIONAL_GEO_CODE, "national"),
+  ]);
+
+  if (error || !data) return [];
+
+  const regionNameByCode = new Map(regions.map((r) => [r.geoCode, r.geoName]));
+
+  return data.map((row) => ({
+    districtCode: row.district_code,
+    districtName: row.district_name,
+    ordinal: row.ordinal,
+    isLone: row.is_lone,
+    regionCode: row.region_code,
+    regionName: row.region_code ? (regionNameByCode.get(row.region_code) ?? null) : null,
+    memberCount: row.member_count,
+    bhwTotal: row.bhw_total,
+    population: row.population,
+    matchQuality: row.match_quality as DistrictMatchQuality,
+  }));
+});
+
+/**
+ * D2.2 — one membership row's per-row receipt: the place it names, the source page and revision it
+ * came from, how it was matched, and (where a human has reviewed it) any override reason. Live and
+ * superseded rows share this shape; `getDistrictDetail` below sorts them into the two.
+ */
+export type DistrictMemberReceipt = {
+  id: number;
+  geoCode: string;
+  geoName: string;
+  geoLevel: "citymun" | "barangay";
+  matchMethod: string;
+  sourceKind: string;
+  sourceRef: string;
+  retrievedAt: string;
+  status: string;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+  reviewNote: string | null;
+  supersededBy: number | null;
+};
+
+export type DistrictGapMember = {
+  geoCode: string;
+  geoName: string;
+  geoLevel: "citymun" | "barangay";
+};
+
+export type DistrictRepresentative = {
+  fullName: string;
+  party: string | null;
+  asOf: string;
+  sourceKind: string;
+  sourceRef: string;
+};
+
+export type DistrictDetail = {
+  districtCode: string;
+  districtName: string;
+  congressNo: number;
+  ordinal: number | null;
+  isLone: boolean;
+  regionCode: string | null;
+  regionName: string | null;
+  psaPopulation: number | null;
+  representative: DistrictRepresentative | null;
+  /** Live membership rows — the receipt table's main content. */
+  members: DistrictMemberReceipt[];
+  /** Rows a correction has superseded — published rather than dropped, so the history is the
+   *  audit trail the plan promises (docs/LEGISLATIVE_DISTRICTS_PLAN.md §3). Empty until D2.3 ships
+   *  its first accepted correction. */
+  correctionHistory: DistrictMemberReceipt[];
+  /** This district's own attributable gap only — see `district_gap_members`'s migration comment for
+   *  why every other kind of gap can't be pinned on one district from this data. */
+  gapMembers: DistrictGapMember[];
+};
+
+function toMemberReceipt(
+  row: {
+    id: number;
+    geo_code: string;
+    // The DB check constraint on geo_district_map limits this to citymun/barangay; the generated
+    // column type is the shared 5-value geo_level_enum, wider than what this table can hold.
+    geo_level: "national" | "region" | "province" | "citymun" | "barangay";
+    match_method: string;
+    source_kind: string;
+    source_ref: string;
+    retrieved_at: string;
+    status: string;
+    reviewed_at: string | null;
+    reviewed_by: string | null;
+    review_note: string | null;
+    superseded_by: number | null;
+  },
+  geoNameByCode: Map<string, string>,
+): DistrictMemberReceipt {
+  return {
+    id: row.id,
+    geoCode: row.geo_code,
+    geoName: geoNameByCode.get(row.geo_code) ?? row.geo_code,
+    geoLevel: row.geo_level as "citymun" | "barangay",
+    matchMethod: row.match_method,
+    sourceKind: row.source_kind,
+    sourceRef: row.source_ref,
+    retrievedAt: row.retrieved_at,
+    status: row.status,
+    reviewedAt: row.reviewed_at,
+    reviewedBy: row.reviewed_by,
+    reviewNote: row.review_note,
+    supersededBy: row.superseded_by,
+  };
+}
+
+/**
+ * The `/districts/[districtCode]` per-row receipt (D2.2): one district's full membership — live
+ * rows and superseded history alike — each carrying its source page, revision id, match_method,
+ * and any override reason, plus the district's own attributable gap (`district_gap_members`) and
+ * its sitting representative. Returns null for an unknown or rejected district_code, which the page
+ * reads as 404.
+ */
+export const getDistrictDetail = cache(async (districtCode: string): Promise<DistrictDetail | null> => {
+  const supabase = createSupabaseServerClient();
+
+  const [{ data: district }, { data: memberRows }, { data: repRows }, { data: gapRows }] =
+    await Promise.all([
+      supabase
+        .from("dim_legislative_district")
+        .select(
+          "district_code, district_name, congress_no, ordinal, is_lone, region_code, psa_population",
+        )
+        .eq("district_code", districtCode)
+        .maybeSingle(),
+      supabase
+        .from("geo_district_map")
+        .select(
+          "id, geo_code, geo_level, match_method, source_kind, source_ref, retrieved_at, status, reviewed_at, reviewed_by, review_note, superseded_by",
+        )
+        .eq("district_code", districtCode),
+      supabase
+        .from("district_representative")
+        .select("full_name, party, as_of, source_kind, source_ref")
+        .eq("district_code", districtCode)
+        .is("superseded_by", null)
+        .order("as_of", { ascending: false })
+        .limit(1),
+      supabase.rpc("district_gap_members", { p_district_code: districtCode }),
+    ]);
+
+  if (!district) return null;
+
+  const members = memberRows ?? [];
+  const geoCodes = Array.from(new Set(members.map((m) => m.geo_code)));
+  const geoNameByCode = new Map<string, string>();
+  if (geoCodes.length > 0) {
+    const { data: geoRows } = await supabase
+      .from("dim_geo")
+      .select("geo_code, geo_name")
+      .in("geo_code", geoCodes);
+    for (const row of geoRows ?? []) geoNameByCode.set(row.geo_code, row.geo_name);
+  }
+
+  const receipts = members
+    .map((row) => toMemberReceipt(row, geoNameByCode))
+    .sort((a, b) => a.geoName.localeCompare(b.geoName));
+
+  const rep = repRows?.[0];
+  const region = district.region_code ? await getGeoByCode(district.region_code) : null;
+
+  return {
+    districtCode: district.district_code,
+    districtName: district.district_name,
+    congressNo: district.congress_no,
+    ordinal: district.ordinal,
+    isLone: district.is_lone,
+    regionCode: district.region_code,
+    regionName: region?.geoName ?? null,
+    psaPopulation: district.psa_population,
+    representative: rep
+      ? {
+          fullName: rep.full_name,
+          party: rep.party,
+          asOf: rep.as_of,
+          sourceKind: rep.source_kind,
+          sourceRef: rep.source_ref,
+        }
+      : null,
+    members: receipts.filter((m) => m.supersededBy === null),
+    correctionHistory: receipts.filter((m) => m.supersededBy !== null),
+    gapMembers: (gapRows ?? []).map((row) => ({
+      geoCode: row.geo_code,
+      geoName: row.geo_name,
+      geoLevel: row.geo_level as "citymun" | "barangay",
+    })),
+  };
+});
+
+/**
+ * D3.3 — the figure set `agg_bhw_by_district` (D3.1) actually supports: n_total/n_accredited,
+ * pct_accredited, avg_active_years, any_honorarium_pct. Deliberately narrower than the full
+ * `/place` figure set (demographics, training, honorarium amount/distribution, completeness,
+ * households-per-BHW, insights, ...) — those all read a per-`geo_level` aggregate keyed on
+ * `dim_geo`, and D3.1 built the first dataset's district rollup only ("once the first one is
+ * proven"). Recorded as a scope decision in docs/DECISIONS.md rather than silently shipped as if
+ * it were the full parity the plan text names.
+ */
+export type DistrictBhwFigures = {
+  districtCode: string;
+  nTotal: number;
+  nAccredited: number;
+  pctAccredited: number | null;
+  avgActiveYears: number | null;
+  anyHonorariumPct: number | null;
+};
+
+/**
+ * One district's BHW figures (D3.3), from `agg_bhw_by_district` for the active dataset. Null for a
+ * district with no matching BHWs — `agg_bhw_by_district` only carries a row per district that has
+ * at least one (same convention as `agg_bhw_counts`), so this is a real "no data" rather than an
+ * error.
+ */
+export const getDistrictBhwFigures = cache(
+  async (districtCode: string): Promise<DistrictBhwFigures | null> => {
+    const datasetId = await getActiveDatasetId();
+    if (datasetId === null) return null;
+
+    const supabase = createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("agg_bhw_by_district")
+      .select("n_total, n_accredited, pct_accredited, avg_active_years, any_honorarium_pct")
+      .eq("dataset_id", datasetId)
+      .eq("district_code", districtCode)
+      .maybeSingle();
+
+    if (error || !data) return null;
+
+    return {
+      districtCode,
+      nTotal: data.n_total,
+      nAccredited: data.n_accredited,
+      pctAccredited: data.pct_accredited,
+      avgActiveYears: data.avg_active_years,
+      anyHonorariumPct: data.any_honorarium_pct,
+    };
+  },
+);
+
+/**
+ * Every district's BHW figures (D3.3), for the /explore map layer's choropleth over
+ * `public/geo/districts.json` — one round trip rather than 189+ single-district calls. Same
+ * source and figure set as `getDistrictBhwFigures`, joined with `dim_legislative_district` for the
+ * display name the map's tooltip/ranked list need.
+ */
+export const getAllDistrictBhwFigures = cache(
+  async (): Promise<(DistrictBhwFigures & { districtName: string })[]> => {
+    const datasetId = await getActiveDatasetId();
+    if (datasetId === null) return [];
+
+    const supabase = createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("agg_bhw_by_district")
+      .select(
+        "district_code, n_total, n_accredited, pct_accredited, avg_active_years, any_honorarium_pct, dim_legislative_district(district_name)",
+      )
+      .eq("dataset_id", datasetId);
+
+    if (error || !data) return [];
+
+    return data.map((row) => ({
+      districtCode: row.district_code,
+      districtName:
+        (row.dim_legislative_district as unknown as { district_name: string } | null)
+          ?.district_name ?? row.district_code,
+      nTotal: row.n_total,
+      nAccredited: row.n_accredited,
+      pctAccredited: row.pct_accredited,
+      avgActiveYears: row.avg_active_years,
+      anyHonorariumPct: row.any_honorarium_pct,
+    }));
+  },
+);
+
+/**
+ * D3.3 — "/api/geo/search: districts become searchable by name and by member LGU, so 'Palo'
+ * surfaces 'Leyte's 1st'." Backed by the `search_district` DB function (own name +
+ * `geo_district_map` member names, pg_trgm word-similarity, same style as `search_geo`).
+ * `bhwTotal` is cross-referenced from `getDistrictIndex`'s cached result rather than joined in SQL,
+ * so this function stays a plain search (no dataset id) like `search_geo` itself.
+ */
+export type DistrictSearchResult = {
+  districtCode: string;
+  districtName: string;
+  /** The member LGU name that matched, when the hit came from membership rather than the
+   *  district's own name — e.g. "Palo" under "Leyte's 1st". Null when the district name itself
+   *  was the best match. */
+  matchedMemberName: string | null;
+  bhwTotal: number | null;
+};
+
+export async function searchDistricts(query: string, limit = 8): Promise<DistrictSearchResult[]> {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+
+  const supabase = createSupabaseServerClient();
+  const [{ data, error }, index] = await Promise.all([
+    supabase.rpc("search_district", { search_query: trimmed, result_limit: limit }),
+    getDistrictIndex(),
+  ]);
+  if (error || !data) return [];
+
+  const bhwTotalByCode = new Map(index.map((d) => [d.districtCode, d.bhwTotal]));
+
+  return data.map((row) => ({
+    districtCode: row.district_code,
+    districtName: row.district_name,
+    matchedMemberName: row.matched_member_name,
+    bhwTotal: bhwTotalByCode.get(row.district_code) ?? null,
+  }));
+}
+
+/**
+ * D3.3 owner decision 3: "Publishing the mapping as a download — yes, after D2 ships." One row per
+ * live membership, the same rows `/districts/[districtCode]` renders as a receipt table, joined
+ * with the district's own name/Congress and the member's display name — everything a CSV/XLSX of
+ * "the mapping itself" needs. Superseded rows are excluded, matching every other public surface
+ * that reads live membership only (correction history is its own ledger, not part of the mapping).
+ */
+export type DistrictMappingRow = {
+  districtCode: string;
+  districtName: string;
+  congressNo: number;
+  regionName: string | null;
+  memberGeoCode: string;
+  memberGeoName: string;
+  memberGeoLevel: "citymun" | "barangay";
+  matchMethod: string;
+  sourceKind: string;
+  sourceRef: string;
+  retrievedAt: string;
+};
+
+/** Supabase/PostgREST's hard per-request row cap (BUILD_PLAN.md pitfall P9 — see
+ * `getAllGeosAtLevels` in `lib/db/geo.ts`, the precedent this follows). `geo_district_map` alone
+ * is ~3,500 rows, well past it, so both the member read and the `dim_geo` name lookup below page
+ * or chunk past it rather than silently truncating the mapping export. */
+const MAPPING_PAGE_SIZE = 1000;
+
+/** Every live `geo_district_map` member row, paginated past the 1,000-row cap. */
+async function getAllLiveDistrictMembers(): Promise<
+  {
+    district_code: string;
+    geo_code: string;
+    geo_level: "citymun" | "barangay";
+    match_method: string;
+    source_kind: string;
+    source_ref: string;
+    retrieved_at: string;
+  }[]
+> {
+  const supabase = createSupabaseServerClient();
+  const results: Awaited<ReturnType<typeof getAllLiveDistrictMembers>> = [];
+
+  for (let offset = 0; ; offset += MAPPING_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("geo_district_map")
+      .select("district_code, geo_code, geo_level, match_method, source_kind, source_ref, retrieved_at")
+      .is("superseded_by", null)
+      .neq("status", "rejected")
+      .order("id", { ascending: true })
+      .range(offset, offset + MAPPING_PAGE_SIZE - 1);
+
+    if (error || !data) break;
+    results.push(
+      ...(data as unknown as Awaited<ReturnType<typeof getAllLiveDistrictMembers>>),
+    );
+    if (data.length < MAPPING_PAGE_SIZE) break;
+  }
+
+  return results;
+}
+
+export const getDistrictMappingExport = cache(async (): Promise<DistrictMappingRow[]> => {
+  const supabase = createSupabaseServerClient();
+  const [{ data: districts }, members, regions] = await Promise.all([
+    supabase
+      .from("dim_legislative_district")
+      .select("district_code, district_name, congress_no, region_code")
+      .neq("status", "rejected"),
+    getAllLiveDistrictMembers(),
+    getChildGeos(NATIONAL_GEO_CODE, "national"),
+  ]);
+
+  if (!districts) return [];
+
+  const regionNameByCode = new Map(regions.map((r) => [r.geoCode, r.geoName]));
+  const districtByCode = new Map(districts.map((d) => [d.district_code, d]));
+
+  // Chunked (not one `.in()` call): the member set is ~3,500 distinct codes, and a result set
+  // that large would hit the same 1,000-row cap regardless of how big the IN-list is — each chunk
+  // here stays comfortably under it.
+  const geoCodes = Array.from(new Set(members.map((m) => m.geo_code)));
+  const geoNameByCode = new Map<string, string>();
+  const CHUNK_SIZE = 500;
+  for (let i = 0; i < geoCodes.length; i += CHUNK_SIZE) {
+    const chunk = geoCodes.slice(i, i + CHUNK_SIZE);
+    const { data: geoRows } = await supabase
+      .from("dim_geo")
+      .select("geo_code, geo_name")
+      .in("geo_code", chunk);
+    for (const row of geoRows ?? []) geoNameByCode.set(row.geo_code, row.geo_name);
+  }
+
+  return members
+    .map((m) => {
+      const district = districtByCode.get(m.district_code);
+      if (!district) return null;
+      return {
+        districtCode: district.district_code,
+        districtName: district.district_name,
+        congressNo: district.congress_no,
+        regionName: district.region_code
+          ? (regionNameByCode.get(district.region_code) ?? null)
+          : null,
+        memberGeoCode: m.geo_code,
+        memberGeoName: geoNameByCode.get(m.geo_code) ?? m.geo_code,
+        memberGeoLevel: m.geo_level as "citymun" | "barangay",
+        matchMethod: m.match_method,
+        sourceKind: m.source_kind,
+        sourceRef: m.source_ref,
+        retrievedAt: m.retrieved_at,
+      };
+    })
+    .filter((r): r is DistrictMappingRow => r !== null)
+    .sort((a, b) => a.districtName.localeCompare(b.districtName) || a.memberGeoName.localeCompare(b.memberGeoName));
+});
+
+export type DistrictDatasetGaps = {
+  uncoveredCitymunCount: number;
+  unplacedBarangayCount: number;
+};
+
+/**
+ * The two dataset-wide gap counts docs/LEGISLATIVE_DISTRICTS.md reports (23 uncovered LGUs, 41
+ * unplaced barangays as of the last build) — recomputed live by `district_dataset_gaps()` rather
+ * than copied from that doc, so this number can't go stale the way a hardcoded one would. Shown on
+ * every district page alongside that district's own attributable gap, same posture /data-quality
+ * takes: published, not hidden.
+ */
+export const getDistrictDatasetGaps = cache(async (): Promise<DistrictDatasetGaps | null> => {
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("district_dataset_gaps");
+  if (error || !data || data.length === 0) return null;
+
+  return {
+    uncoveredCitymunCount: data[0].uncovered_citymun_count,
+    unplacedBarangayCount: data[0].unplaced_barangay_count,
+  };
+});

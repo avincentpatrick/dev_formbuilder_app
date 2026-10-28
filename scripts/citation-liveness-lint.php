@@ -163,6 +163,9 @@ const TIER2_FILES = ['docs/feature-backlog.md'];
 // (`ValidationEditor.vue:93`) on its prop declaration. Three in rows `M176` closes now name the file at `cef2a9b0`.
 const LEDGER_ROT_CEILING = 16;
 
+/** Another application's tree (M192): resolvable by full path, never by bare or partial name. See git_index(). */
+const GUEST_APP_PREFIX = 'apps/';
+
 /** R3 floors. Three, because there are three independent ways for this gate to pass while blind. */
 const MIN_EXPECTED_DOCUMENTS = 40;
 const MIN_EXPECTED_CITATIONS = 140;
@@ -314,6 +317,13 @@ exit(0);
 /**
  * Every tracked path, plus a basename map for bare-name citations.
  *
+ * ⛔ THE BASENAME MAP LEAVES OUT ANOTHER APPLICATION (M192, ADR-0024). `apps/` holds BHW Connect, whose
+ * files are not this repository's subject: a second `index.ts`, `db.ts` or `schema.ts` there would make
+ * a Meridian document's bare or partial citation ambiguous, and an ambiguous citation is quietly never
+ * line-checked again. So `apps/` paths are kept in `paths` — a document citing one by its FULL path
+ * still resolves and is still checked — and kept out of `byBasename`, which both the bare-name and
+ * the partial-path arms read.
+ *
  * @return array{paths: array<string, true>, byBasename: array<string, list<string>>}|null
  */
 function git_index(string $root): ?array
@@ -337,7 +347,10 @@ function git_index(string $root): ?array
         }
 
         $paths[$line] = true;
-        $byBasename[basename($line)][] = $line;
+
+        if (! str_starts_with($line, GUEST_APP_PREFIX)) {
+            $byBasename[basename($line)][] = $line;
+        }
     }
 
     return ['paths' => $paths, 'byBasename' => $byBasename];

@@ -6,7 +6,7 @@
 the walkthrough the product owner drives the whole application from: it visits every surface that is built,
 in the order a real user would meet them, against the fixture `Database\Seeders\DemoSeeder` creates. It is
 also a deliberate record of what is **not** built — §18 lists that, so a missing feature reads as a known
-gap rather than a bug you found.
+gap rather than a bug you found. The steps a tester follows are on the in-app **Help** page (**Help** in the sidebar).
 
 **How to read:** Each chapter is a numbered list of steps. Every step names the **URL**, the **account** to
 be signed in as, the **action**, and the **expected result** — so when reality disagrees with the page, the
@@ -117,9 +117,9 @@ a pending row to show. That is intended.
 
 1. `/forms` · owner. **Expect:** six forms. *Patient Intake*, *Community Health Survey 2026*, *Field Site
    Assessment*, *Referral Router* and *Staff Feedback 2025* are published; *Quarterly Report (draft)* is not.
-2. Open **Quarterly Report (draft)** → **Edit**. This opens the builder on an unpublished form.
-   *(Since J2b the row **title** goes to the form's hub instead — §2.1 — and **Edit** is how you reach the
-   builder directly. The title used to link to the builder, and only for a role that could edit it.)*
+2. On **Quarterly Report (draft)**, press **Open builder** in its row's actions. This opens the builder on an unpublished form.
+   *(Since J2b the row **title** goes to the form's hub instead — §2.1 — where **Edit form** also opens the
+   builder. The title used to link to the builder, and only for a role that could edit it.)*
 3. Add a section, then add fields to it. **Expect:** the field-type picker offers around thirty types grouped
    by kind; each added field appears on the canvas and is selected, with its settings in the right-hand panel.
 4. Rename a field's label and change its key. **Expect:** the change is saved without a page reload (watch for
@@ -218,7 +218,7 @@ submission printed its form's title as an unlinked heading. This section is that
 3. Open **Patient Intake** → **Share**. **Expect:** a public link (`/f/patient-intake`), a QR code, and a
    toggle for guest submissions.
 4. Download or scan the QR code. **Expect:** it resolves to the same public link.
-5. Open **Community Health Survey 2026** → **Schedule**. **Expect:** an open window (it opened 30 days ago and
+5. Open **Community Health Survey 2026** → the **Settings** tab → **Schedule** (or **Form settings** → **Schedule** in the builder). **Expect:** an open window (it opened 30 days ago and
    closes in 30 days) and a response cap of 200.
 6. Set a form's window to close in the past, then visit its public link. **Expect:** the form refuses new
    responses and says so. **Staff Feedback 2025** is already in that state — see §4 step 5.
@@ -744,8 +744,8 @@ expected and is not a defect.
 
 | Area | Status |
 |---|---|
-| **OCR upload, single form (Feature #1)** | Not built. Blocked on filled paper-form samples and ground-truth data that only you can supply. |
-| **OCR upload, linelist/batch (Feature #2)** | Not built, same blocker. |
+| ~~**OCR upload, single form (Feature #1)**~~ | ✅ Built (`M128`–`M135`) — turn on **Accept scans of paper copies** under a form's **Settings** → **Scanning**, then **Scan paper forms** on its Responses page. |
+| **OCR upload, linelist/batch (Feature #2)** | Not built. Blocked on two or three scanned linelist sheets and their blank templates, which only you can supply (`ocr-linelist`). |
 | **Payments and self-serve billing** | Cut to Phase 4 by decision. Plans are assigned by the super-admin console instead. |
 | **Real-time notification push** | The bell polls on an interval rather than pushing over a socket. Deliberate; the socket layer is deployment-track work. |
 | **Cross-tenant audit search from the console** | **Not built, deliberately** — not deferred. `/admin/audit-log` shows platform-wide actions only. A super-admin action against a workspace is recorded in *that workspace's* log, where the people it affected can read it; letting the console read every tenant's history was a one-line change and was rejected. |

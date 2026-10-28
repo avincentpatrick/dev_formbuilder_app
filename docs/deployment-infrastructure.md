@@ -21,7 +21,7 @@ Per **ADR-0005**, production runs on the owner's **Windows Server 2016**: a **we
 |---|---|---|
 | **Local development** | Individual dev machines | Docker Compose (Laravel, Postgres, Redis, Mailpit) — the committed parity source. Native PHP + Postgres on Windows/Laragon is an accepted alternative for developers who don't run Docker. |
 | **CI** | Automated tests (`docs/testing-strategy.md`) | GitHub-hosted **Linux** runners with PostgreSQL 17 + PostGIS 3.5 and Redis service containers. (Note the Linux-CI vs Windows-prod parity gap, ADR-0005, and a version gap too: the testing site runs PostgreSQL 15, §8 step 2.) |
-| **Staging** — **built, and it is the testing site** | Pre-production validation and tester access | **`staging.pitahc.gov.ph` on the owner's Windows Server 2016, built 2026-09-17 under `D46`** — one workspace at the root, served by **Apache** (not a second nginx server block), its own **PostgreSQL 15** instance, worker service `meridian-test-worker` and scheduler task, app at `C:\meridian\test-app`. Isolated synthetic/seeded data, never real respondent PII (`docs/data-privacy-gdpr-compliance.md`). §8.3 is its runbook; §8 step 2 says why a separate database on a shared instance is not enough. |
+| **Staging** — **built, and it is the testing site** | Pre-production validation and tester access | **`staging.pitahc.gov.ph` on the owner's Windows Server 2016, built 2026-09-17 under `D46`** — one workspace at the root, served by **Apache** (not a second nginx server block), its own **PostgreSQL 15** instance, worker service `meridian-test-worker` and scheduler task, app at `C:\meridian\test-app`. Isolated synthetic/seeded data, never real respondent PII (`docs/data-privacy-gdpr-compliance.md`). §8.3 is its runbook; §8 step 2 says why a separate database on a shared instance is not enough. A second application, BHW Connect, is served at `/bhw-connect` from the same box, with its own service and database (ADR-0024, §8.4). |
 | **Production** | Live tenant traffic | **Self-hosted Windows Server 2016**, per ADR-0005. |
 
 **Promotion path**: `main` is the deployable branch. A green CI run on `main` triggers the deploy workflow (self-hosted runner) → production. If a staging site is configured, validate there first and promote to production as a deliberate act, given the blast radius against live tenant data.
@@ -145,7 +145,7 @@ The concrete pieces to stand one site up (companion to `deploy.ps1`). Each step 
 
 1. **PHP 8.4** x64, the Non Thread Safe build (it ships `php-cgi.exe`) — install the VC++ 2015–2022 runtime first. In `php.ini` enable `pdo_pgsql`, `zip`, `mbstring`, `openssl`, `fileinfo`, `curl` and `intl`, plus `zend_extension=opcache`, then confirm with `php -m` that `dom`, `xmlreader`, `libxml`, `iconv`, `ctype`, `filter` and `tokenizer` are listed as well. **Not `redis`** — cache, queue and sessions all use the `database` driver and no code calls Redis — ⛔ **And never `gd` in `php.ini`:** with `opcache.enable=1` it took the testing site down on 2026-10-12 the moment php-cgi restarted — every page a PHP fatal in Carbon (*CarbonPeriod::getIterator(): Generator must be compatible with DatePeriod::getIterator()*), cured by restoring the file. Only the OCR worker uses `gd` (the ink in a printed box, `D113`, `M160`), so it gets it on its own command line (step 6), and the reading job raises its own `memory_limit` to 512M while it measures; without `gd` the job reads on and missed ticks stay blank for the reviewer. Production values: `display_errors=Off`, `opcache.enable=1`, `upload_max_filesize=25M` and `post_max_size=30M`; the stock 2M/8M rejects every attachment over 2 MB, while `config/attachments.php` allows 25 MB. Leave `memory_limit` at its 128M default unless you also change step 6's `--memory`. ⚠️ Windows PHP has no `pcntl`; step 6 says why that matters.
 2. **PostgreSQL 15 for Windows (EDB), as a dedicated instance for this site**, plus **PostGIS 3.5** from Stack Builder (Spatial Extensions), or the newest 3.x Stack Builder offers for 15. Dev and CI run PostgreSQL 17 with PostGIS 3.5; the testing site runs 15 because EDB tests its 17 installer only on Windows Server 2019 and 2022, and its 15 installer on 2016 (the user's choice, recorded in `docs/claims/decisions.md`).
-   - **Dedicated** means its own Windows service, port and data directory, shared with no other site. The role names `meridian_auth` and `meridian_superadmin` are cluster-wide and hard-coded in their migrations, so on a shared instance the first site to migrate would fix their passwords for every database — and §8.2's privileged login is the instance's superuser, which reaches every database on it. A later production site gets its own instance.
+   - **Dedicated** means its own Windows service, port and data directory, shared with no other site. The role names `meridian_auth` and `meridian_superadmin` are cluster-wide and hard-coded in their migrations, so on a shared instance the first site to migrate would fix their passwords for every database — and §8.2's privileged login is the instance's superuser, which reaches every database on it. A later production site gets its own instance. ⚠️ **Amended by ADR-0024 (`D173`):** on the testing site this instance also holds `bhw_connect`, BHW Connect's database, whose roles collide with none of Meridian's; §8.4 says how the two are kept apart (CONNECT revoked from PUBLIC on both, separate roles and dumps). It is another application on the same box, not a second Meridian site, so the reasons above do not reach it.
    - Bind it to this box only: `listen_addresses = 'localhost'` in `postgresql.conf`, only `127.0.0.1/32` and `::1/128` in `pg_hba.conf`, and no firewall rule for its port.
    - A migration runs `CREATE EXTENSION IF NOT EXISTS postgis` over the privileged connection, and it fails without the PostGIS binaries.
    - As the installer superuser: `CREATE ROLE meridian_app LOGIN PASSWORD '<new password>' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;` then `CREATE DATABASE meridian OWNER meridian_app;`, then `ALTER DATABASE meridian SET timezone TO 'UTC';`. ⛔ **`meridian_app` must own the database.** From PostgreSQL 15 a non-owner has no `CREATE` on schema `public`, so the first `CREATE TABLE` would fail, and FORCE row-level security relies on the app role owning every table (ADR-0013's trigger function needs the same privilege).
@@ -631,6 +631,84 @@ from outside on 2026-09-19 was the **agency firewall**, not an absent listener.
   **semicolon**-delimited, so `max-age=300; includeSubDomains` was reported as *missing* `max-age=300`
   while carrying it. `M106` replaced the map's values with a `separator` / `require` / `forbid` policy.
   **Read this before pricing any future header as one line.**
+
+### 8.4 A second application under the same host — BHW Connect (ADR-0024)
+
+⚠️ **AS DESIGNED, NOT YET MEASURED.** Written by `M192` (the import, phase P0), which changed nothing on
+the box. Each part below is built, measured and rewritten from what was measured by the phase named in
+brackets: `bhw-p1-box` (the app and Apache), `bhw-p2-db` (the database), `bhw-p3-identity` (sign-in).
+The decisions are `D172`–`D185` in `docs/claims/decisions.md`; the working agreement between the two
+developers is `docs/working-agreement.md`.
+
+**What it is.** BHW Connect — a second developer's Next.js 16 application — lives in this repository at
+`apps/bhw-connect/` and is served at **`https://staging.pitahc.gov.ph/bhw-connect`** (`D172`). Meridian
+stays at the root and is unchanged by it. The trade that one address carries — BHW's pages share
+Meridian's origin, so Meridian's session cookie reaches them — is ADR-0024's, with its mitigations: a
+strict Content-Security-Policy on every BHW page (`apps/bhw-connect/lib/csp.ts`) and Meridian's API-key
+mint behind a password re-check (`bhw-p3-identity`).
+
+**Where it lives on the box — all outside the git checkout** `C:\meridian\test-app`, which every Meridian
+deploy resets:
+
+| Path | What |
+|---|---|
+| `C:\meridian\bhw\.env` | BHW's configuration and secrets, written by the operator, never in git or chat. The build and `ops\start.ps1` both read it. |
+| `C:\meridian\bhw\releases\<sha>\` | One standalone build each (`server.js`, `.next\static`, `public\`); the newest three kept. |
+| `C:\meridian\bhw\current` | A directory junction to the live release — the swap and the rollback. |
+| `C:\meridian\bhw\deployed-sha`, `previous-release` | BHW's own deploy record, separate from Meridian's `storage\framework\deployed-sha`. |
+| `C:\meridian\bhw\logs\`, `storage\`, `data\`, `postgrest\` | Service and task logs; feedback screenshots (`bhw-p3-identity`); source data (`D181`); the PostgREST binary and config (`bhw-p2-db`). |
+| `C:\meridian\backups\bhw\` | `bhw_connect`'s dumps. ⛔ ACL'd to the operator account only: `fact_bhw_raw` holds personal records. |
+
+**Services** (NSSM, both loopback-only, both granted to the runner's account for stop/start the way the
+worker is):
+
+- `bhw-connect` — `powershell -File C:\meridian\test-app\apps\bhw-connect\ops\start.ps1`: loads `.env`,
+  serves `current\server.js` on `127.0.0.1:3100`. Node 24 (the version the builds already use). [`bhw-p1-box`]
+- `bhw-postgrest` — the official PostgREST v16.4 Windows binary on `127.0.0.1:3001`, logging in as
+  `authenticator` to `bhw_connect`. Until it exists BHW reads Supabase. [`bhw-p2-db`]
+
+**Apache** — three lines in `meridian.conf`'s `*:443` vhost, **before** the PHP handler; back up the file
+and run `httpd -t` before any restart, then re-check `/up` and `/login` at once (§8.3's outage rule):
+
+```
+ProxyPreserveHost On
+ProxyPass        /bhw-connect http://127.0.0.1:3100/bhw-connect retry=0 timeout=120
+ProxyPassReverse /bhw-connect http://127.0.0.1:3100/bhw-connect
+```
+
+`mod_proxy_http` must be loaded (`httpd -M | findstr proxy_http`). `ProxyPass` resolves before
+`.htaccess`, so `artisan down` never covers `/bhw-connect`, and a stopped BHW answers 503 from Apache
+while Meridian is untouched. The vhost's `X-Robots-Tag` and HSTS headers cover it too. ⛔ A bad line
+stops Apache and takes **both** applications down — the reason `httpd -t` comes first. [`bhw-p1-box`]
+
+**The database** (`D173`) — a second database `bhw_connect` on **this** PostgreSQL 15 instance (§8 step
+2's "dedicated" sentence is amended accordingly), with its own roles — `bhw_app` (owner), `anon`,
+`authenticated`, `service_role` (BYPASSRLS), `authenticator` — none of which collide with Meridian's,
+created by `apps/bhw-connect/db/bootstrap-roles.sql`. `ALTER DATABASE bhw_connect SET timezone = 'UTC'`.
+⛔ **`REVOKE CONNECT ON DATABASE … FROM PUBLIC` on BOTH databases, then `GRANT CONNECT` to each one's own
+roles:** PostgreSQL grants every login CONNECT to every database by default, so without it BHW's
+`authenticator` could open a connection to `meridian`. pgvector is built off the box against the EDB
+PostgreSQL 15 headers and three files copied in (`D180`). Migrations: `apps/bhw-connect/db/migrate.mjs`,
+additive only. Data loads: a file sent privately and loaded by the operator with `psql \copy` (`D181`).
+Meridian's `deploy:backup`, `deploy:census` and nightly task are scoped to `meridian` and never see it. [`bhw-p2-db`]
+
+**Deploying it.** `apps/bhw-connect/ops/deploy-bhw.ps1`, run by the same Deploy job right after
+`deploy.ps1` (wired in `bhw-p1-box`): its own deployed sha, a diff over `apps/bhw-connect` only, a build
+aside into `releases\<sha>`, migrations with a census before and after (refusing on a lost row), a
+junction swap with a 60-second health check and an automatic swap back. `deploy.ps1` treats `apps/` as
+site-safe, so **a BHW-only push opens no Meridian window** — unless the previous Meridian deploy did not
+finish cleanly, in which case any push takes the full path. **Rollback:** `ops\deploy-bhw.ps1
+-AppPath C:\meridian\test-app -Rollback` — seconds, no git, no build.
+
+**Scheduled tasks** (`apps/bhw-connect/ops/register-cron-tasks.ps1`, from the versioned
+`ops/cron-schedule.json`): `bhw-connect-precompute` and `bhw-connect-regression-replay`, daily, each a
+local call to `/bhw-connect/api/cron/…` with the bearer read from `.env` when it runs; and
+`bhw-connect-db-backup` at 01:45 (`ops/nightly-dump.ps1`: `pg_dump` custom format, keep 14). A restore
+drill into `bhw_connect_restoretest` is part of `bhw-p2-db`.
+
+**What can take which down.** BHW cannot take Meridian down through a deploy: it runs outside the
+checkout, from its own database, behind its own service. Only a bad Apache line can, which `httpd -t`
+prevents. Meridian cannot take BHW down through a deploy either; a PostgreSQL restart affects both.
 
 ---
 

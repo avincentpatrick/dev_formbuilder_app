@@ -1,0 +1,15 @@
+{
+  "_comment": "The two scheduled jobs, in UTC cron syntax. Moved here from vercel.json when the app came into Meridian's repository: ops/register-cron-tasks.ps1 registers them as Windows Task Scheduler tasks on the box, and lib/db/ai-regression-run.test.ts holds them to once a day, two hours apart.",
+  "crons": [
+    {
+      "name": "bhw-connect-precompute",
+      "path": "/api/cron/precompute",
+      "schedule": "0 20 * * *"
+    },
+    {
+      "name": "bhw-connect-regression-replay",
+      "path": "/api/cron/regression-replay",
+      "schedule": "0 22 * * *"
+    }
+  ]
+}

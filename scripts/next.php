@@ -170,7 +170,7 @@ function render_line(string $lane, array $state): string
         //    D143 / R-2d921bbe (M178): no backup block — every deploy backs up and counts its tables (run 39190622862).
         sprintf('main IS THE TRUNK: branch from origin/main, PR into main. MERGE ONLY AT A PLANNED MERGE POINT, never a'
             .' lone small PR: between merge points a PR waits green; at a merge point, after the user has taken the staging'
-            .' data census, merge the batch in order, each on 6/6 green with each job\'s step count read individually and'
+            .' data census, merge the batch in order, each on every required check green with each job\'s step count read individually and'
             .' each only once the previous deploy has finished and /up answers, then the user takes the census again. No'
             .' backup is run by hand: every deploy backs up and counts every table around its migration - read both from'
             .' its log. Migrations are additive only - never remove staging data. Your claim goes in %s and is PUSHED before you open the first file.', $config['claim']),

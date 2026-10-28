@@ -44,6 +44,16 @@ declare(strict_types=1);
 
 const GATE = 'scripts/backlog-triage.php';
 
+/**
+ * The fewest cases this harness may run and still say `passed` (M195, `R-4130e1fa`).
+ *
+ * ⛔ A CASE COUNT IS ONLY WORTH RECORDING IF SOMETHING REFUSES A SUSPICIOUSLY SMALL ONE. Since M195
+ * `docs/gate-baselines.md` records this harness's count, and without a floor a case deleted or lost to
+ * a broken edit still ends in `passed` — ten becoming two moves a number nobody is made to read. The
+ * floor sits AT the count and ratchets up with it; it is never lowered to make a run green.
+ */
+const MIN_CASES = 10;
+
 $root = str_replace('\\', '/', dirname(__DIR__));
 $gateBytes = @file_get_contents($root.'/'.GATE);
 
@@ -204,6 +214,11 @@ if ($failures !== []) {
     ));
 
     exit(1);
+}
+
+// A harness that ran fewer cases than it owns has not measured the arms it lost, which is never a pass.
+if ($ran < MIN_CASES) {
+    cannot_measure(sprintf('ran %d case(s), under the floor of %d. A case that stops running is a lost control, not a passing one.', $ran, MIN_CASES));
 }
 
 fwrite(STDOUT, sprintf("backlog-triage-controls: passed (%d cases, all landing where they should).\n", $ran));

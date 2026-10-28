@@ -57,6 +57,9 @@ const GATE_BASELINES_SCENARIOS = [
     // above shares `ci-log.txt`, which satisfies every declared pattern, so until this one the
     // `$missing > 0` branch could not be reached by any control at all.
     'missing-metric',
+    // M195 — a seventh job printing the same summaries FIRST, which is what the BHW Connect job does in a
+    // real run. The first scenario whose log has more jobs than the generator reads.
+    'two-jobs-one-summary',
 ];
 
 /**
@@ -64,9 +67,9 @@ const GATE_BASELINES_SCENARIOS = [
  * LOWERED TO MAKE A RUN GREEN — the list stood at twelve when M75 wrote the sentence above, thirteen at
  * citation-liveness-lint and fourteen at test-pointer-lint, and two comments in this file were still
  * saying twelve when M91 corrected them. A floor is the one form of that number that cannot go stale in
- * the dangerous direction.
+ * the dangerous direction. Twenty-two at M195, which recorded the eight counted pass lines nothing did.
  */
-const GATE_BASELINES_GATE_FLOOR = 14;
+const GATE_BASELINES_GATE_FLOOR = 22;
 function gateBaselinesFixtureDir(): string
 {
     return base_path('tests/fixtures/gate-baselines');
@@ -147,7 +150,7 @@ it('has every fixture the controls name, and the directory holds nothing else', 
         count(GATE_BASELINES_SCENARIOS).'. A fixture nothing asserts is a shape nobody has decided about.'
     );
 
-    foreach (['gh.php', 'git.php', 'ci-log.txt', 'ci-log-missing-metric.txt'] as $support) {
+    foreach (['gh.php', 'git.php', 'ci-log.txt', 'ci-log-missing-metric.txt', 'ci-log-two-jobs-one-summary.txt'] as $support) {
         expect(is_file(gateBaselinesFixtureDir().'/'.$support))->toBeTrue('missing stub: '.$support);
     }
 });
@@ -242,7 +245,7 @@ it('gives every declared gate a line in every ci-log fixture, because the list a
         expect(GATE_BASELINES_SCENARIOS)->toContain($named);
     }
 
-    foreach (['recent-push', 'missing-metric'] as $scenario) {
+    foreach (['recent-push', 'missing-metric', 'two-jobs-one-summary'] as $scenario) {
         [, $document] = gateBaselinesRunStreams($scenario);
 
         $unscraped = gateBaselinesNotFound($document);
@@ -285,6 +288,52 @@ it('accepts a current push run on main, and scrapes every metric from its log', 
     expect($output)->not->toContain('**NOT FOUND**');
 });
 
+/**
+ * Every figure a `--dry-run` document reports — its table rows and the E2E extras line — without the
+ * provenance line, which names the run and so differs between any two scenarios.
+ *
+ * @return list<string>
+ */
+function gateBaselinesFigures(string $document): array
+{
+    preg_match_all('/^(?:\| .*|\*\*E2E extras:\*\*.*)$/m', $document, $matches);
+
+    return $matches[0];
+}
+
+it('reads each metric from its own job, so a seventh job printing the same summaries first changes no row', function (): void {
+    // ⛔ M195 (`R-b31f421e`). Merge point 8's regeneration read Vitest as BHW Connect's 85 files where
+    //    Meridian has 283: every pattern ran over the whole log, and BHW's job prints the same summary
+    //    earlier. This scenario is that run in miniature — ci-log.txt with a BHW block placed first,
+    //    printing a Vitest summary, a skip count and the word flaky.
+    // ⚠️ THE COMPARISON IS VALUE-FREE ON PURPOSE. No figure is asserted anywhere in this file; what is
+    //    asserted is that the seventh job changes NOTHING — every row and the extras line are recent-push's.
+    [$status, $stdout, $stderr] = gateBaselinesRunStreams('two-jobs-one-summary');
+    [, $baseline] = gateBaselinesRunStreams('recent-push');
+
+    expect($status)->toBe(0, $stdout.$stderr);
+
+    // ⛔ THE NON-VACUITY HALF. If the decoy ever stopped preceding Meridian's block, a whole-log scrape
+    //    would read the right figure too, and the equality below would prove nothing.
+    $log = (string) file_get_contents(gateBaselinesFixtureDir().'/ci-log-two-jobs-one-summary.txt');
+    $decoy = strpos($log, 'BHW Connect (lint, types, tests, build)'.chr(9));
+    $own = strpos($log, 'Frontend build & type-check'.chr(9));
+
+    expect($decoy)->toBeInt('the fixture no longer carries the seventh job');
+    expect($own)->toBeInt('the fixture no longer carries the Frontend job');
+    expect($decoy)->toBeLessThan($own);
+
+    $figures = gateBaselinesFigures($stdout);
+
+    // A document that lost its table would make two empty lists equal.
+    expect(count($figures))->toBeGreaterThan(GATE_BASELINES_GATE_FLOOR);
+    expect($figures)->toBe(
+        gateBaselinesFigures($baseline),
+        'a seventh job printing the same summaries changed what the generator reports — a metric is being '
+        .'read from another job\'s lines'
+    );
+});
+
 it('accepts the nightly schedule run, which is hours old and zero commits behind', function (): void {
     [$status, $output] = gateBaselinesRun('nightly-schedule');
 
@@ -305,7 +354,9 @@ it('names the unscraped metric on stdout and the count on STDERR, and says nothi
 
     expect($status)->toBe(1, $stdout.$stderr);
     expect($stdout)->toContain('**NOT FOUND**');
-    expect($stdout)->toContain('citation-liveness-lint');
+    // The row itself, not the bare name: since M195 `citation-liveness-lint-controls` is a value row that
+    // carries the same substring, so the name alone would be found whichever gate went unscraped.
+    expect($stdout)->toContain('| citation-liveness-lint | **NOT FOUND**');
 
     // ⛔ THE STREAM IS THE ASSERTION, NOT SCENERY. --dry-run's whole output IS the document, so a
     //    diagnostic on stdout would corrupt anything piping it. Only the split helper can see this.

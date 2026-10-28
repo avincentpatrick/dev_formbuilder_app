@@ -16,7 +16,77 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M195`, the gate baselines read each metric from its own job's lines, and every counted gate is recorded (`R-b31f421e`, `R-4130e1fa`) (m195-gate-baselines-per-job)
+## Status: ACTIVE CLAIM — `M196`, a builder edit must carry its `version` token, and the token is checked under the row lock (`R-036f3226`, `D189` A) (m196-builder-token-under-lock)
+
+Taken 2026-10-29. Branch `m196-builder-token-under-lock`, cut from `origin/main` at `5ffc1239`, PR into main. ⛔ **NOT MERGED THIS SESSION:**
+held green. Its merge point, and its place in it, are the user's to name, asked by name before this session ends. Numbered past the held
+`M194` and `M195`.
+
+Row — the head of the line's during-testing tier, on its own because its remedy edits two hub files (`FormBuilderService.php`,
+`UpdateFieldRequest.php`) and `D13` allows one hub row per batch:
+- `R-036f3226` — *"The optimistic-concurrency token §8 substituted for the draft lock is CLIENT-OPTIONAL, and a shipped test pins it
+  that way"*.
+
+`D189` A, asked after a read-only verification: require the token, and close the race it leaves open even when sent. The session-start
+pull read 0 reports, 0 reopened and 0 new comments, so nothing was triaged.
+
+### Evidence verified
+Every citation holds.
+- `UpdateFieldRequest` and `UpdateSectionRequest` each validate `version` as `['nullable', 'string']`.
+- `FormBuilderService::assertNoDrift()` returns without a check when the token is null.
+- `BuilderRoutesTest` *"accepts an edit that carries no concurrency token (overwrite)"* sends `'version' => null` and asserts 200.
+- `docs/form-versioning-schema-migration.md` §3.4 declines the `forms` lock for field-level edits, and §8 makes `updated_at` the token.
+
+### Premise verified
+- **The client contract does not move, so this is a fix, not a decision about the client.**
+  - The shipped builder's field and section payloads always carry `version`, and no client path sets it to null.
+  - The three end-to-end specs that PATCH a field directly (`calculations-and-defaults`, `media-input-hidden-text`, `signature`)
+    each send `version: field.version`.
+  - Of the 20 feature-test files that PATCH a field or section, only the pinning test sends none.
+- **The controller is the only caller** of `updateField()` and `updateSection()` in `app/`, `routes/` and `database/`. The builder
+  routes are not in `openapi.json`, so the contract file does not move.
+- **What the row missed: the token does not close last-write-wins even when sent.**
+  - `assertNoDrift()` runs before the transaction, against the copy route binding loaded.
+  - `writeField()` locks the field row but never re-checks the token under that lock, and `updateSection()` takes no row lock at all.
+  - So two concurrent saves carrying the same valid token both pass. `convertField()` already does it right: lock, then check.
+- **Two weaknesses of the token itself are out of this row's reach.** They are filed as one row, because one remedy (a revision counter)
+  cures both:
+  - It has one-second precision (`timestamp(0)`, recorded at `rowVersion()` since H25), so two edits in the same second share a token.
+  - A rules-only save by the field's last editor leaves the field row clean, so `updated_at` and the token do not move.
+
+### Remedy verdict
+- **Required token — works.** The 422 lands on no shipped client path, as measured above.
+- **The check under the lock — works by precedent.** It follows `convertField()`'s lock-then-check order, re-reading the row under the
+  lock `writeField()` already takes, and taking the one section row's lock in `updateSection()`. That is the row the UPDATE locks anyway,
+  so no new acquisition order is introduced.
+  - To be measured as a defect first: a test that hands the service a route-bound copy older than the row goes red against the current
+    code, then green.
+
+Files:
+- `app/Http/Requests/Forms/UpdateFieldRequest.php`, `app/Http/Requests/Forms/UpdateSectionRequest.php`
+- `app/Services/Forms/FormBuilderService.php`, `app/Http/Controllers/Tenant/FormBuilderController.php`
+- `tests/Feature/Forms/BuilderRoutesTest.php`
+- `docs/form-versioning-schema-migration.md` (§8)
+- `docs/feature-backlog.md` (the closure, the answers to `D190` and `D191` at their rows, and the rows owed), `docs/pipeline.md`
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/form-versioning-schema-migration.md`.
+Paired files taken: none.
+Namespaces spent: nothing new. `D189` was answered with `M195`'s built claim.
+Rows owed on this branch:
+- the token's precision and the rules-only save (one row);
+- `D191`'s design codes and `@see` (`before-launch`);
+- the rule that regenerates `docs/pipeline.md` in a claim push, while that path is outside `paths-ignore`, which made `69d7e56f`
+  deploy.
+
+Prediction:
+- The stale-copy cases go red on the current code and green after the fix, and the pinning test flips to 422.
+- `tests/Feature/Forms` stays green.
+- PHPStan stays at no errors, since the diff touches `app/`. Pint is green, bare.
+- CI is 7/7.
+- **Most likely wrong:** a feature test outside `tests/Feature/Forms` that PATCHes with no token, and a section test that relied on
+  the missing lock.
+
+## HELD — `M195`, the gate baselines read each metric from its own job's lines, and every counted gate is recorded (`R-b31f421e`, `R-4130e1fa`) (m195-gate-baselines-per-job)
 
 **BUILT — PR #388, CI 7/7 green with real step counts, NOT MERGED.** Run 40721232507 at `6810b8bb`: Static analysis 33 · BHW Connect 19 ·
 E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11.

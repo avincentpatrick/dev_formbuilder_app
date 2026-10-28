@@ -16,7 +16,89 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M192`, the BHW Connect merge, phase P0: BHW's code imported under `apps/bhw-connect/`, made prefix-aware, with its CI job, its box scripts written (not run), and the governance both developers work under (`bhw-p0-import`) (m192-bhw-import)
+## Status: ACTIVE CLAIM — `M193`, the six `D38` rows: documented `/api/v1` surface marked not built, in place (`R-9e3e417e`, `R-1b966250`, `R-47552102`, `R-fcfc1f52`, `R-4328a4d9`, `R-f1312153`) (m193-d38-not-built)
+
+Taken 2026-10-28. Branch `m193-d38-not-built`, cut from `origin/main` at `87ab7956`, PR into main. ⛔ **NOT MERGED THIS SESSION:** held
+green for **merge point 8, third, after `#384` and `#385`** (`D186`, `D171`, `D137`). The plan is
+`~/.claude/plans/read-claude-md-then-run-fluffy-pizza.md`. Numbered past the held `M191` and `M192` (the `M188`/`M190` precedent).
+Rows — the head of the line's during-testing tier after the held `prd-feature-disposition`, and its five siblings under `D38` = C:
+- `R-9e3e417e` — *"§7.1's `Form draft` row pins four `/api/v1` builder endpoints registered nowhere, and the `validations`
+  sub-resource exists on neither surface"*, with the adjacent Forms row's `POST` / `PATCH` / `DELETE`.
+- `R-1b966250` — *"The documented async export API … has zero routes and no `exports` job row"*.
+- `R-47552102` — *"The documented `Users & roles` API resource group … has zero routes, and a shipped schema decision was already
+  made on its account"*.
+- `R-fcfc1f52` — *"`docs/api-specification.md` … states in the present tense that every unsafe request is deduplicated"* (`Idempotency-Key`).
+- `R-4328a4d9` — *"The API rate-limit table promises 300 requests/minute per authenticated user and no such limiter is defined"*.
+- `R-f1312153` — *"1 concurrent sync export per form, additional requests 429 — no concurrency guard exists on any export path"*.
+
+⛔ **Six rows across two hub files breaks both clauses of `D13` item 1 — exception #6, allowed by the user in chat** and recorded at
+`D13` in `docs/claims/decisions.md`. The session-start pull read 0 reports, 0 reopened and 0 new comments (relayed 31: 25 Resolved ·
+6 Confirmed working), so nothing was triaged. `D186` (the order at merge point 8) was asked and answered in planning.
+
+### Evidence verified
+Measured in planning on `origin/main` at `87ab7956` by a read-only fan-out, one reader per document.
+- **The claims hold in all six rows; most line citations have drifted**, each still landing on a live line, so the citation gate
+  cannot see it:
+  - `routes/api.php` is one lower everywhere since `M130`'s `use` line (the forms family is `:169`–`:201`, the exports `:188`/`:403`).
+    It carries 75 routes, not 68; `openapi.json` 58 paths, not 51 — none an export, user, role, draft, section, field or validation path.
+  - `R-9e3e417e`: the builder block is `routes/tenant.php:621-680`, and it is no longer "all on `FormBuilderController`" (the conversion
+    and other-specify controllers sit in it). `FormBuilderService` writes validations at `:276`, `:319` and `:993`; `:240`, `:316-318`
+    and `:572` are now other lines.
+  - `R-1b966250`: `data-dictionary.md:59` is now the `FieldRevisionKind` row; `GeneratePdfJob`'s "no notification bell" is stale (the
+    bell exists), and the row leans only on "no broadcast", which holds.
+  - `R-47552102`: the member routes are `routes/tenant.php:429-454`; the "/api/v1 twins" sentences moved.
+  - `R-fcfc1f52`: `AppServiceProvider`'s §2.5 comment is near `:389` and the `api` limiter near `:392`; 31 middleware, not 29.
+  - `R-4328a4d9`: 28 limiter registrations (17 + 10 + 1), and the signed-in group now carries 7 numeric throttles and 3 named ones,
+    not three.
+  - `R-f1312153`: `routes/api.php` `:188`, `:403`, `:153`; 35 `lockForUpdate()` calls, not about twenty.
+- Each closing note records its row's drift; the closed rows' prose is not rewritten.
+
+### Premise verified
+- **Holds for all six: nothing in any of the six groups exists on `/api/v1`, and `openapi.json` agrees.** No `Idempotency-Key` read
+  exists anywhere; no limiter is 300 and the `web` group appends no throttle; no export path carries a `Cache::lock`, a unique job,
+  `WithoutOverlapping` or a 429.
+- **Three things the rows say are false as worded, and the annotations must not repeat them:**
+  - Per-route, per-user limiters DO exist (6–120 a minute), so "no per-user limiter" is false.
+  - `/api/v1` DOES carry two exports (XLSForm and the analytics report): "no export endpoint" holds only as "no submission export".
+  - Web twins exist for forms (create, edit, archive), sections, fields and members; the draft has no PATCH twin.
+- **Second copies the rows never named, each left stale by an annotation of the row alone — taken here:**
+  - `FormApiController`'s class docblock says the writes "extend this same pattern in Phase 1".
+  - `config/permission.php` says roles "are" addressable via `GET /api/v1/roles`.
+  - `technical-architecture.md` §7.3 describes the async export and the sync mode's cap in the present tense, and its two diagram
+    labels and its infrastructure table give Redis an "idempotency dedupe" no code performs.
+  - `docs/api-specification.md` sends higher volumes to the async export path, and says every rate-limited response carries the
+    `X-RateLimit-*` headers, which the guest per-form limiter and the monthly quota do not (`M123` folded that into `R-f1312153`).
+- ⛔ **`docs/multi-tenancy-rbac-design.md` ends a line in `*(Queued — `R-47552102`)*`** (`M190`). Closing that row turns `P2b` red
+  unless the ending is rewritten. It is the only `Queued` site for any of the six, on the trunk and on `#384`'s branch.
+- **§7.1 carries five more unbuilt groups that no row tracks** (`PATCH /tenant`, manual/API submissions and their CRUD, attachments,
+  OCR, subscription). Marked six and left five, the table would read as audited. Taken here as the census half: every §7.1 row is
+  checked against the routes and `openapi.json` and marked. **Not taken:** the two webhook rows, queued as `R-c8c8da76` and
+  `R-1d43bef5` with a different fix (their paths exist under other names), and the spec's guest per-IP line, queued as `R-63b85640`
+  and `R-307a9789`.
+- `#384` (`M191`) changes neither document and none of these lines; `#385` (`M192`) neither. Their `P2a`/`P2e` read only `docs/PRD.md`.
+
+### Remedy verdict
+- **`D38` = C works for all six, as prescribed.** Both documents are citation tier 1 with zero tolerance; an annotation inside an
+  existing line moves nothing and renumbers no section. No test reads either document's text. `P2b` never reaches §7.1, nor the spec
+  outside its §4.
+- **The wording is the trap:** `P2c` fires on `is not built`, `has not been built`, `still unbuilt` and `remains unbuilt`. Every
+  annotation reads **not built (`D38`)**, says what is true beside it, points at code by symbol rather than by line, and keeps a table
+  row on one line with no bare `|`.
+
+Files: `docs/architecture/technical-architecture.md`, `docs/api-specification.md`, `docs/multi-tenancy-rbac-design.md`,
+`app/Http/Controllers/Api/V1/FormApiController.php`, `config/permission.php`, `openapi.json` (only if the docblock moves it),
+`docs/feature-backlog.md`, `docs/pipeline.md`.
+Shared artefacts taken: every `docs/` file above, `openapi.json` if it moves, and `PROGRESS.md` (own block, at close-out).
+Paired files taken: none.
+Namespaces spent: decision `D186` (answered in planning). No ADR, no migration prefix.
+Prediction:
+- The lint gates stay green: no `P2c` phrase is used, no line moves, and the one `Queued` site is rewritten.
+- `pipeline.php --check` is green after the regeneration, with the six ids gone from the line.
+- Every edited document keeps its line count.
+- **Most likely wrong:** `openapi.json` stays byte-identical after the `FormApiController` docblock edit — Scramble may emit that
+  class docblock, the way `R-e568ddd2` records for the FormRequest classes.
+
+## HELD — `M192`, the BHW Connect merge, phase P0: BHW's code imported under `apps/bhw-connect/`, made prefix-aware, with its CI job, its box scripts written (not run), and the governance both developers work under (`bhw-p0-import`) (m192-bhw-import)
 
 Taken 2026-10-27. Branch `m192-bhw-import`, cut from `origin/main` at `bff6e11d`, PR into main. ⛔ **NOT MERGED THIS SESSION:** held
 green until the user names the merge point it rides. It opens one Meridian window, because `deploy.ps1` changes. ⛔ **No work on the
@@ -115,6 +197,7 @@ Prediction:
 `BHW Connect (lint, types, tests, build)` to `main`'s required checks (earlier, it blocks `#384`). No `VERSION` bump, no
 release note: nothing a tester sees changes. The branch is cut from `bff6e11d` and holds `f73d6524` (this claim) and
 the trunk is unchanged since. `D185` was asked and answered during the build and is recorded in this push.
+✅ **Merge point named 2026-10-28 (`D186`): second at merge point 8, after `#384` and before `M193`.**
 
 **How the prediction fared — measured, the wrong parts first.**
 - **"BHW's own lint, typecheck and Vitest are green on the host before any edit" — wrong on Vitest.** Two files failed,

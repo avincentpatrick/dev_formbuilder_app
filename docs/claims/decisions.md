@@ -24,10 +24,30 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D184`, the last filed, was asked and answered on 2026-10-27 while `M192` (the BHW Connect merge, phase P0) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D185`, the last filed, was asked and answered on 2026-10-28 while `M192` (the BHW Connect merge, phase P0) was built, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D185 — BHW's production dependencies carry 2 critical and 8 high advisories, so Meridian's audit rule would turn the new BHW check red. What does P0 do? **A — the BHW audit warns in P0; a row lists every advisory and blocks P1, so BHW is never served from this origin until they are cleared with the map and export screens checked in a browser.**
+
+**Asked and answered 2026-10-28 (user decision, in chat), while `M192` was being built; recorded in its claim.** Measured on the import's lockfile through `scripts/npm-audit-judge.php`:
+- `next` is critical: a middleware/proxy bypass under Turbopack, the layer the new CSP runs in. The fix is the 16.4 line, whose fixing release was five days old.
+- `maplibre-gl` is critical: an XSS in its sanitiser, fixed only in a major (5 → 6).
+- `pptxgenjs` and `image-size` are high, with no clean fix.
+- `postcss` and `sharp` are high, fixed through `next`.
+- `brace-expansion`, `nanoid`, `source-map-js` and `zod` are high, with in-range lockfile fixes.
+
+Nothing serves BHW from Meridian's origin until `bhw-p1-box`.
+
+- **A — warn now, block P1 (recommended, chosen).** No blind major upgrade of another developer's map library today.
+- **B — upgrade what is safe now.** `next` and the four in-range fixes, checked by build and tests; the check stays red on the rest until decided.
+- **C — upgrade everything now.** Including `maplibre-gl` 5 → 6, with maps unseen until staging.
+
+**What the answer files, in the same push:**
+- The BHW job's audit step warns on a block and still fails on any other error.
+- `bhw-dependency-advisories` (during-testing) is filed in ADR-0024, and `bhw-p1-box` is blocked on it.
+- When that row closes, the step's warning arm is deleted.
+
 ### D184 — Once BHW Connect runs on the testing box, what happens to its Vercel deployment? **A — paused, then deleted; `/bhw-connect` becomes the only address.**
 
 **Asked and answered 2026-10-27 (user decision, in chat), while `M192` was planned; recorded in its claim.** BHW is hosted on Vercel today, built from jongsky25's own repository.

@@ -98,7 +98,7 @@ Files: everything under `apps/bhw-connect/` (imported, then edited: `next.config
   `docs/deployment-infrastructure.md`, `docs/pipeline.md`, `docs/claims/decisions.md`
 Shared artefacts taken: every `docs/` file above, `CLAUDE.md`, and `PROGRESS.md` (own block, at close-out).
 Paired files taken: none.
-Namespaces spent: ADR `0024`; decisions `D172`–`D184`. No migration prefix.
+Namespaces spent: ADR `0024`; decisions `D172`–`D185` (`D185` asked and answered during the build). No migration prefix.
 Prediction:
 - The snapshot is gitleaks-clean on the first run, because the one key lives only in the dropped `.github/`.
 - BHW's own lint, typecheck and Vitest are green on the host before any edit.
@@ -108,6 +108,73 @@ Prediction:
 - The new CI job takes 6–10 minutes when BHW changed.
 - **Most likely wrong:** the build's offline tolerance. The OG images and the AI narratives on prerendered pages may need more than
   `generateStaticParams` returning `[]`.
+
+**BUILT — PR #385, CI 7/7 green with real step counts (run 40608342904 at `641cda58`: Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11) — AND NOT MERGED.**
+⛔ **Held until the user names the merge point it rides.** It opens one Meridian window (`deploy.ps1`, `composer.json`,
+`vite.config.ts`). **Order at that merge point:** `#384` (`M191`) first, then this; once live, the user adds
+`BHW Connect (lint, types, tests, build)` to `main`'s required checks (earlier, it blocks `#384`). No `VERSION` bump, no
+release note: nothing a tester sees changes. The branch is cut from `bff6e11d` and holds `f73d6524` (this claim) and
+the trunk is unchanged since. `D185` was asked and answered during the build and is recorded in this push.
+
+**How the prediction fared — measured, the wrong parts first.**
+- **"BHW's own lint, typecheck and Vitest are green on the host before any edit" — wrong on Vitest.** Two files failed,
+  and both were caused by the import's own drops, not by BHW: one test read `vercel.json`, the other a transcript under
+  `ingestion/data/`. The cron schedule moved to `ops/cron-schedule.json`, which the test now reads, and the transcript
+  cases are skipped where the folder is empty. Lint and typecheck were green. `format:check` flagged 446 files: 182 are
+  BHW's own, the same count on a pristine copy outside the repository (BHW's CI never ran it), and 264 came from
+  Meridian's root `.editorconfig`, which BHW's own `root = true` file removed.
+- **"A build with no data source fails in `generateStaticParams` and the sitemap first" — wrong.** Those swallow their
+  errors. The build failed on `/bhw`, 60 s three times, because supabase-js 2.110 retries a failed GET for seven seconds.
+  The failure was the same against a refused port, a `.invalid` host and an instant 503. An instant 501 built in 20 s
+  with no page changed: `BHW_DATA_SOURCE=none` in the data plane.
+- **"The new CI job takes 6–10 minutes when BHW changed" — wrong, and faster:** 1 min 39 s, the database cases and the
+  build included.
+- **"Most likely wrong: offline tolerance needs more than `generateStaticParams` returning `[]`" — wrong the other way.**
+  It needed no page change at all.
+- **Right:**
+  - The snapshot was gitleaks-clean on the first run, and so was the branch's full history (1,324 commits).
+  - The nonce CSP turned every prerendered page dynamic: 28 static became 6, the six being OG images, robots and the
+    sitemap. With real data, all 1,004 generated pages render on request.
+  - Two Meridian gates needed the exclusion. `backlog-triage` was live: `pipeline-lint` P1 went red on arrival. The
+    citation index was latent: the counts did not move.
+- **What no prediction named, each measured:**
+  1. Git Bash rewrote `NEXT_PUBLIC_BASE_PATH=/bhw-connect` into a Windows path, a host artefact.
+  2. Under a base path, the CSP matcher missed the bare home page, which was served with no policy. A runtime probe of
+     an assembled release caught it.
+  3. My own comment claimed Next prefixes `metadataBase`. It does not; `og:image` lacked `/bhw-connect`.
+  4. npm 11 rewrote the npm-10 lockfile, so installs went through `npx npm@10`.
+  5. The proxy `config` must be a literal.
+  6. BHW's production dependencies carry 2 critical and 8 high advisories (`D185`).
+  7. PostgreSQL grants CONNECT to PUBLIC, so the runbook revokes it on both databases.
+  8. A browser's `Purpose: prefetch` must not skip the CSP.
+  9. The tool layer's backslash collapse struck three times.
+- **Mutants: 5 caught, 0 survived.** Each was committed, turned red, then was reverted:
+
+  | Mutant | Caught by |
+  |---|---|
+  | `D1`: `apps/` removed from `$SiteSafePrefixes` | `DeploySkipAllowlistTest`; `scripts/mutate.php` also reported CAUGHT |
+  | `C9`: `backlog-triage` walks `apps/` again | controls C9; the live pipeline drifted |
+  | `C7-C8`: the citation basename map takes `apps/` back | controls C2, C3 and C8; C7 stays green |
+  | `B9`: the boundary reads `CODEOWNERS` from the head | controls B9 |
+  | `J1`: a TypeScript error under `apps/bhw-connect/lib/` | CI's `bhw-connect` job, red at Type-check (run 40608039685) |
+
+- **Filed: ten markers in ADR-0024, plus `D185`.**
+  - `bhw-p0-import`: done.
+  - `bhw-dependency-advisories`, `bhw-p1-box`, `bhw-p2-db`, `bhw-p3-identity`, `bhw-p4-loop` and `bhw-ci-fast-path`:
+    during-testing.
+  - `bhw-preview-slot`, `bhw-data-upload-page` and `bhw-e2e-in-ci`: before-launch.
+- **Owed after the merge, at the merge point's close-out:**
+  - Observe the bhw-connect job's "unchanged → success" branch on a Meridian-only PR.
+  - Observe the boundary turn red on a real cross-side PR without the label.
+  - Regenerate `docs/gate-baselines.md` from the post-merge run.
+- **Run locally:**
+  - Host: `preflight --with-gates --with-pint` OK, Pint 1,882 files, the four controls harnesses green.
+  - BHW: lint, typecheck, Vitest (84 files, 1,228 passed, 11 skipped; the `db/` cases also against the local stack),
+    both builds.
+  - An assembled standalone release served every page under the prefix with the policy and the nonce, and a PNG export
+    through the win32 resvg binding.
+  - Container, `tests/Feature/Docs` and `tests/Feature/Deploy`: 222 passed, 1 failed. The failure is
+    `SuiteCollectionFloorTest`, the known bind-mount artefact; its 79 missing files are all under `tests/Feature/Forms`.
 
 ## HELD — `M191`, the tracker surgery, then every PRD feature and acceptance criterion gets a recorded disposition (`R-4868cdbc`, `prd-feature-disposition`, with `R-283b9c0d`) (m191-prd-dispositions)
 

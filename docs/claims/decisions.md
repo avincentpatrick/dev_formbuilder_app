@@ -24,10 +24,48 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D188`, the last filed, was asked and answered on 2026-10-28 while `M195` was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D191`, the last filed, was asked and answered on 2026-10-29 with `D189` and `D190`, after the read-only verification of the line's next four rows, and recorded with `M195`'s built claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D191 — `openapi.json` publishes our internal notes. What is kept out of it, and how? **A — the clear maintainer marks now, with a check that refuses them; the design codes in a later row.** **Tier: during-testing.**
+
+**Asked and answered 2026-10-29 (user decision, in chat), after `M195`'s read-only verification of `R-e568ddd2`; recorded with `M195`'s built claim.** The verification found the row's leak is wider than it says.
+- 15 of the 17 `Api/V1` request classes have their docblock published verbatim.
+- The worst maintainer text now comes from enums, controller methods and inline comments: `SyncResultStatus` carries *"⛔ … (M69)"*, `AnalyticsAxis` names `scripts/controller-gate.php`, and `StoreDomainRequest` names `CustomDomainApiTest`.
+- About seventy design codes (H-, ADR-, D-, "Increment") and 33 `@see` lines sit beside them.
+
+The options:
+- **A — clear marks, with a check (recommended, chosen).** Remove ⛔/⚠️, M-numbers, test-class names and script paths from the sources Scramble reads, and widen the one-off assertion `OpenApiContractTest` already makes into a denylist over the whole committed `openapi.json`. The design codes and `@see` go in a later row.
+- **B — everything, now.** A plus every design code and `@see`, about thirty source files in one increment.
+- **C — the worst only, no check.** Hand-fix a few lines; nothing stops new ones.
+
+**What the answer files:** `R-e568ddd2`'s remedy becomes A, taken as its own increment, because it edits `openapi.json`, a hub. The later row (design codes and `@see`, tier `before-launch`, since integrators are not on the testing server) is filed on the next increment's branch. `docs/feature-backlog.md` is a deploying path on the trunk, so it is not edited in a claim push.
+
+### D190 — Eleven form-settings saves in `FormService` write their audit history from a copy nobody re-read. What should they do? **A — take the form lock first, as `setDataSharing` does.** **Tier: during-testing.**
+
+**Asked and answered 2026-10-29 (user decision, in chat), after `M195`'s read-only verification of `R-5041cc72`; recorded with `M195`'s built claim.** The row's *"only `archive()` takes one"* is now false: `setDataSharing` also locks, and builds its audit from the locked copy. The lock-free writers have grown from seven to eleven (`assignFolder`, `setTheme`, `setSinglePageMode` and `setOcrScanning` are newer), and ten of them build `$old` from the caller's copy. There is a concrete race: the schedule sweeper flips `schedule_state` under the lock, and `setSchedule` can then audit the pre-sweep value.
+
+The options:
+- **A — lock like data sharing (recommended, chosen).** The history is exact, and a settings save may wait a moment behind a publish, restore, import or sweep.
+- **B — re-read without a lock.** A smaller window that never waits, but two settings saves can still race.
+- **C — leave it as is**, with the hazard written down.
+
+**What the answer files:** `R-5041cc72`'s remedy becomes A, and §3.4 of `docs/form-versioning-schema-migration.md` gains the settings setters in its list of lock-takers. It is taken as its own increment, because `FormService.php` is a hub.
+
+### D189 — A builder edit's `version` token is optional, and even when sent it does not stop two saves at the same moment from both winning. What should happen? **A — require it, and re-check it under the row lock.** **Tier: during-testing.**
+
+**Asked and answered 2026-10-29 (user decision, in chat), after `M195`'s read-only verification of `R-036f3226`; recorded with `M195`'s built claim.** The verification found two things:
+- **The client contract does not move.** The shipped builder sends the token on every field and section write, and no client code sets it to null. A token-less PATCH is reachable only from outside the builder.
+- **The token does not close last-write-wins even when it is sent.** `assertNoDrift()` runs before the transaction, against the copy route binding loaded. `writeField` locks the row but never re-checks, and `updateSection` takes no row lock. So two concurrent PATCHes carrying the same valid token both pass. `convertField` does it right: lock, then check.
+
+The options:
+- **A — require it and close the race (recommended, chosen).** `version` becomes required on both update requests, `BuilderRoutesTest`'s *"accepts an edit that carries no concurrency token"* flips to a refusal, and the drift check moves under a row lock in both update paths, as `convertField` does.
+- **B — the same, with an explicit "overwrite anyway" flag** a caller may send.
+- **C — leave it optional**, and document last-save-wins.
+
+**What the answer files:** `R-036f3226`'s remedy becomes A, widened to the race, and it is the head of the line, so it is the next increment. The token's one-second precision, and a validation-only edit that does not bump `updated_at`, are measured there and fixed or filed.
+
 ### D188 — `M195` (the gate-baselines scraper) is held for the merge point `#387` (`M194`) rides. In what order do the two go live? **A — `M195` first, then `#387`.**
 
 **Asked and answered 2026-10-28 (user decision, in chat), while `M195` was planned; recorded in its claim.** The session prompt held `M195` green "for the merge point #387 rides", and that merge point is still the user's to name (`#387` waits on jongsky25's `boundary-approved` label and on his Supabase keys for the browser check). Only the order inside it was asked.

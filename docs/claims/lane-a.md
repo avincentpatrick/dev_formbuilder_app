@@ -18,6 +18,32 @@ Standing Rule 7(b-bis).
 
 ## Status: ACTIVE CLAIM — `M195`, the gate baselines read each metric from its own job's lines, and every counted gate is recorded (`R-b31f421e`, `R-4130e1fa`) (m195-gate-baselines-per-job)
 
+**BUILT — PR #388, CI 7/7 green with real step counts, NOT MERGED.** Run 40721232507 at `6810b8bb`: Static analysis 33 · BHW Connect 19 ·
+E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11.
+- BHW Connect ran 9 of its 19 steps. The boundary passed and the job printed *"apps/bhw-connect is unchanged in this pull request: every
+  later step is skipped, and the job reports success."*
+- **Held first at the merge point `#387` rides** (`D188`).
+- The branch carries both rows' closures, two filed rows (`R-b3223cf8`, `R-c4ac829b`) and the regenerated line.
+
+**How the prediction fared.**
+- **Held:**
+  - The dry run against run 40696757541 moved exactly the two lines, and all eight new rows read a value.
+  - `GateBaselinesTest` passed 13 cases.
+  - `scripts/mutate.php` CAUGHT both scope mutants, each red in the new case alone.
+  - The committed floor mutant exited 2 with *"ran 9 case(s), under the floor of 10"*.
+  - Pint, the host lints and `preflight --with-gates --with-pint` were green.
+- **Wrong:** "the six other controls harnesses" were five. The mail-attribute linter is a lint and already floors both its counts;
+  corrected above.
+- **Not named:** the container's run of `tests/Feature/Docs` failed `SuiteCollectionFloorTest`, because the bind mount truncates
+  collection (519 of 598 files seen). CI is green on it, and that test names CI as the authority.
+- ⛔ **Also not named, and it was a deploy.** This claim's own push, `69d7e56f`, carried `docs/pipeline.md`, which is outside
+  `ci.yml`'s `paths-ignore`.
+  - It ran CI on main (40718180626, green) and a deploy (40723013140) at 16:08 UTC, outside a merge point.
+  - The deploy's own filter found *"only paths the site does not run"* and took no maintenance window.
+  - `M194`'s claim push, `f134e970`, had done the same an hour earlier.
+  - So this commit carries only paths-ignored files. Answering `D189`–`D191` changes no row in the line, the next regeneration rides
+    `M196`'s branch, and the conflict between the two rules is filed there as a row.
+
 Taken 2026-10-28. Branch `m195-gate-baselines-per-job`, cut from `origin/main` at `f134e970`, PR into main. ⛔ **NOT MERGED THIS SESSION:** held
 green for **the merge point `#387` rides, first, with `#387` last** (`D188`, asked and answered in planning). Numbered past the held `M194`
 (the `M188`/`M190` precedent). The plan is `~/.claude/plans/read-claude-md-run-php-bubbly-meerkat.md`.
@@ -55,8 +81,9 @@ exception #7, allowed by the user in chat** and recorded at `D13` in `docs/claim
   - the controls of tracker-lint, citation liveness, the pre-push guard, the test-pointer lint, backlog-triage and the boundary check.
 
   The composer audit, the npm audit judge and gitleaks print verdicts, not counts, and stay out.
-- **None of the six other controls harnesses has a floor on its own case count.** Every "floor" in them is about the gate they test.
-  The row asks for the floor on `backlog-triage-controls.php` only; the other six are filed.
+- **None of the five other controls harnesses has a floor on its own case count.** Every "floor" in them is about the gate they test.
+  The mail-attribute linter already floors both its counts. The row asks for the floor on `backlog-triage-controls.php` only; the
+  other five are filed. *(Corrected from "six" at the build: the mail-attribute linter is a lint with floors, not a harness.)*
 - **BHW's figures stay out of the baselines.** That job reports on jongsky25's tree (the ADR named *second-application-under-one-host*),
   so no metric reads it, and the new fixture uses it only as a decoy.
 

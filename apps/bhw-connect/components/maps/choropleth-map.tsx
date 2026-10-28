@@ -132,7 +132,7 @@ export function ChoroplethMap({
     let map: import("maplibre-gl").Map | undefined;
 
     Promise.all([import("maplibre-gl"), fetch(geojsonUrl).then((r) => r.json())]).then(
-      ([{ default: maplibregl }, geojson]) => {
+      ([maplibregl, geojson]) => {
         if (cancelled || !containerRef.current) return;
 
         geojsonRef.current = geojson;

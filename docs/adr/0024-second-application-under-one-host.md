@@ -105,10 +105,10 @@ and still reports success. Ownership is `.github/CODEOWNERS` — Meridian everyt
 (`scripts/boundary-check.php`) refuses a pull request that changes another owner's paths without that
 owner's `boundary-approved` label, reading the map from the base commit so a pull request cannot rewrite
 the map that judges it. "Require review from code owners" stays off: with one owner per side an author
-could never approve their own pull request. BHW's dependency audit runs through Meridian's judge but
-**warns** until `bhw-dependency-advisories` clears the two critical and eight high advisories BHW carried
-at the import, and `bhw-p1-box` is blocked on that row (`D185`): BHW is not served from this origin until
-they are gone.
+could never approve their own pull request. BHW's dependency audit runs through Meridian's judge and,
+since `M194`, **blocks** on a high or critical production advisory; it warned only while the two critical
+and eight high BHW carried at the import were open (`D185`), and `bhw-dependency-advisories` cleared them
+(`D187`) before `bhw-p1-box` serves BHW from this origin.
 
 ### §D8 — Meridian's records stay Meridian's
 

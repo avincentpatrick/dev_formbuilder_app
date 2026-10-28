@@ -93,7 +93,7 @@ export function PointMap({
             .then((r) => r.json())
             .catch(() => null)
         : Promise.resolve(null),
-    ]).then(([{ default: maplibregl }, outline]) => {
+    ]).then(([maplibregl, outline]) => {
       if (cancelled || !containerRef.current) return;
 
       const outlineFeatures = (

@@ -1,0 +1,88 @@
+import Link from "next/link";
+import { withBasePath } from "@/lib/base-path";
+
+export const metadata = { title: "Roadmap" };
+
+export default function RoadmapPage() {
+  return (
+    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-10 sm:px-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Roadmap</h1>
+        <p className="mt-2 text-muted">What&apos;s live today, what&apos;s coming next, and how to suggest what we cover after that.</p>
+      </div>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-lg font-semibold">Live now</h2>
+        <ul className="list-inside list-disc">
+          <li>National, regional, provincial, city/municipality, and barangay figures on accreditation, demographics, training, and honorarium</li>
+          <li>Cascading explore dashboard with a live choropleth map (down to city/municipality level)</li>
+          <li>Shareable place profile pages for every region, province, city/municipality, and barangay</li>
+          <li>Compare mode for side-by-side places</li>
+          <li>CSV, XLSX, PNG, and PPTX exports for every figure</li>
+          <li>Full methodology, glossary, and data-quality pages</li>
+          <li>
+            A public index of the 250 legislative districts, sourced from public sources rather
+            than PSA/COMELEC and labeled by match quality, with a per-row source receipt on every
+            district page, a structured public correction form, and a public ledger of submitted
+            corrections
+          </li>
+          <li>
+            Strictly data-grounded AI insights and an &quot;ask the data&quot; chat — every number is
+            looked up live and checked before it&apos;s shown; see{" "}
+            <a href={withBasePath("/methodology#ai")} className="underline hover:text-accent">
+              how this works
+            </a>
+          </li>
+          <li>
+            A{" "}
+            <Link href="/facilities" className="underline hover:text-accent">
+              health facilities section
+            </Link>{" "}
+            built on the DOH National Health Facility Registry — 44,799 facilities as of September
+            2026, and how many of each area&apos;s barangays have one at all
+          </li>
+          <li>An admin panel for feedback triage, usage dashboards, and content curation (staff-only)</li>
+          <li>
+            Workload context — &quot;Households per BHW&quot;, the ratio BHWs are actually
+            assigned by — using household figures from the StepZero quick-count, shown alongside
+            Total BHWs
+          </li>
+        </ul>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-lg font-semibold">Coming next</h2>
+        <ul className="list-inside list-disc">
+          <li>Barangay-level map polygons</li>
+          <li>
+            More datasets alongside the BHW census — see the scoping notes below for candidates
+            and how we assess them. Health facilities (NHFR) is the most recent to land; DOH FHSIS
+            service indicators are the next candidate, access and license permitting
+          </li>
+        </ul>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-lg font-semibold">Have a dataset to suggest?</h2>
+        <p>
+          BHW Connect is built as shared infrastructure for more than one Philippine public-interest
+          dataset. If there&apos;s a dataset you think belongs here next, tell us via{" "}
+          <a href={withBasePath("/feedback")} className="underline hover:text-accent">
+            feedback
+          </a>
+          . We keep a running assessment of candidates — license, geographic join, how often it
+          updates — in{" "}
+          <a
+            href="https://github.com/jongsky25/bhw-connect-dashboard/blob/main/docs/DATASET_SCOPING.md"
+            className="underline hover:text-accent"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            our dataset scoping notes
+          </a>
+          .
+        </p>
+      </section>
+    </div>
+  );
+}

@@ -153,6 +153,44 @@ check($failures, $ran, 'C8 a nested checkout does not make every basename ambigu
     },
     ['app/Services/WidgetRenderService.php'], []);
 
+/*
+ * C9 — ANOTHER APPLICATION UNDER apps/ IS NOT PART OF THIS REPOSITORY (M192). BHW Connect lives at
+ * `apps/bhw-connect/` with no `.git` of its own, so C8's guard does not see it; a second copy of a
+ * Meridian basename there would make C1's citation ambiguous. Untracked too, as `.next/` is.
+ */
+check($failures, $ran, 'C9 an application under apps/ does not make a basename ambiguous',
+    function () use ($fixture): array {
+        mkdir($fixture.'/apps/guest/app/Services', 0o777, true);
+        file_put_contents(
+            $fixture.'/apps/guest/app/Services/WidgetRenderService.php',
+            "<?php\n\nclass WidgetRenderService {}\n"
+        );
+
+        try {
+            return harvest($fixture, '`WidgetRenderService::draw()` drops a frame.');
+        } finally {
+            rrmdir($fixture.'/apps');
+        }
+    },
+    ['app/Services/WidgetRenderService.php'], []);
+
+/*
+ * C10 — ...BUT ONLY AT THE ROOT. A folder that merely happens to be called `apps` inside Meridian's
+ * own tree is still Meridian's source and still indexed: the skip is by path, never by name.
+ */
+check($failures, $ran, 'C10 a folder called apps elsewhere is still read',
+    function () use ($fixture): array {
+        mkdir($fixture.'/app/apps', 0o777, true);
+        file_put_contents($fixture.'/app/apps/NestedAppsService.php', "<?php\n\nclass NestedAppsService {}\n");
+
+        try {
+            return harvest($fixture, '`NestedAppsService::run()` stalls.');
+        } finally {
+            rrmdir($fixture.'/app/apps');
+        }
+    },
+    ['app/apps/NestedAppsService.php'], []);
+
 // ---------------------------------------------------------------------------------------------
 
 rrmdir($fixture);

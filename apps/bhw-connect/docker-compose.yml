@@ -1,0 +1,53 @@
+# BHW Connect's local database, in the testing box's shape: PostgreSQL 15 and PostgREST, with the
+# roles and schemas db/bootstrap-roles.sql creates there (Meridian's ADR-0024, decision D182).
+#
+#   docker compose up -d                 # from apps/bhw-connect
+#   BHW_DATABASE_URL=postgres://bhw_app:bhw-local@127.0.0.1:5442/bhw_connect node db/migrate.mjs
+#
+# Then point the app at it — NEXT_PUBLIC_SUPABASE_URL and SUPABASE_REST_URL as in .env.example's
+# local section, and keys minted from the JWT secret below with db/mint-jwt.mjs.
+#
+# Its own project name and ports, so it never meets Meridian's stack at the repository root
+# (5432, 8080 …). Every password here is a throw-away for this machine; the box's are set by hand.
+name: bhw-connect
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: bhw_connect
+      POSTGRES_PASSWORD: bhw-local
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "5442:5432"
+    volumes:
+      - bhw-db:/var/lib/postgresql/data
+      - ./db/bootstrap-roles.sql:/docker-entrypoint-initdb.d/10-bootstrap-roles.sql:ro
+      - ./db/local-dev.sql:/docker-entrypoint-initdb.d/20-local-dev.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d bhw_connect"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  rest:
+    # The same release the box runs (its Windows build), more than two weeks old when pinned.
+    image: postgrest/postgrest:v16.4
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:bhw-local@db:5432/bhw_connect
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_DB_EXTRA_SEARCH_PATH: public, extensions
+      PGRST_DB_MAX_ROWS: "1000"
+      PGRST_DB_POOL: "10"
+      PGRST_JWT_SECRET: bhw-local-jwt-secret-for-this-machine-only
+      PGRST_SERVER_PORT: "3001"
+    ports:
+      - "3001:3001"
+
+volumes:
+  bhw-db:

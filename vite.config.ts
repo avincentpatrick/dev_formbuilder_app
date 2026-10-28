@@ -81,7 +81,9 @@ export default defineConfig({
             host: 'localhost',
         },
         watch: {
-            ignored: ['**/storage/framework/views/**'],
+            // apps/ is another application (BHW Connect, ADR-0024) with its own node_modules and
+            // .next build output: nothing in it is an input to this build.
+            ignored: ['**/storage/framework/views/**', '**/apps/**'],
         },
     },
 });

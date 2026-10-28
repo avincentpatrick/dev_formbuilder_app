@@ -1,5 +1,9 @@
 # CLAUDE.md — the imperatives
 
+> **Working only under `apps/bhw-connect/`? This file is not for you.** It is Meridian's. BHW Connect's
+> rules are `apps/bhw-connect/CLAUDE.md`, and the page both developers agreed to is
+> `docs/working-agreement.md`.
+
 **This file is the imperative layer and nothing else.** Every *why* — the incident that produced a
 rule, what it cost, who decided it — lives in `PROGRESS.md` under `## Standing Rules`. Neither file
 restates the other; when they disagree, `PROGRESS.md` holds the reasoning and this file holds the
@@ -46,11 +50,16 @@ takes an id, the reference may stand in for it.
 - `main` is the trunk. `git fetch && git checkout -b <branch> origin/main` — **never** from local `HEAD`.
 - PR into `main`. ⛔ **Merge only at a planned merge point, never a lone small PR** — every green run on `main`
   deploys under the testers. Between merge points a PR waits green. At a merge point, **after the user has taken the
-  staging data census**, merge the batch in order, each PR on **6/6 green** with each job's step count parsed
-  individually, and each only once the previous deploy has finished and the site answers; **then the user takes the
+  staging data census**, merge the batch in order, each PR on **every required check green** with each job's step count
+  parsed individually, and each only once the previous deploy has finished and the site answers; **then the user takes the
   census again**. No backup is run by hand: every deploy backs the database up and counts every table's rows around
   its migration, refusing to migrate when the backup fails and staying down when a count drops — read both from its log.
 - ⛔ **Migrations are additive only:** no dropped table or column, no truncate, no row delete. Staging data is never removed.
+- ⛔ **`apps/` is another application's tree** — BHW Connect, its own developer's, per the ADR named
+  *second-application-under-one-host*. Never claim, lint, renumber or tidy inside it, and never let a Meridian gate
+  read it. A PR that changes only `apps/bhw-connect/` is its owner's to merge whenever it is green; every other PR,
+  ours included when it touches theirs, keeps the merge-point rule above. Ownership and the shared paths are
+  `.github/CODEOWNERS`; the rules between the two developers are `docs/working-agreement.md`.
 - One worktree per agent. Never two sessions in one checkout. Never `checkout` a branch another
   worktree holds.
 
@@ -160,6 +169,7 @@ file, never copy out of it. `state.php` reports how far behind the trunk that fi
 | Vitest | Cannot run on the host. Container, `--pool=forks`. |
 | Storybook axe | Cannot run in the musl node container — glibc Chromium fails `ENOENT` with the binary present. |
 | E2E | `docker compose run --rm e2e`. A full local run takes hours at one worker, so run the specs your diff reaches and **say which**. |
+| BHW Connect | **Host**, in `apps/bhw-connect`: `npm ci`, then `npm run lint`, `npm run typecheck`, `npx vitest run` (its own Vitest, unlike Meridian's). Its database cases need `docker compose up -d` there and `BHW_TEST_DATABASE_URL`. In CI, the `bhw-connect` job — which skips itself and still reports success on a PR that leaves the folder alone. |
 
 ## Prove a gate you just wrote
 
@@ -179,6 +189,9 @@ the parent commit and accidentally gives the right answer.
 - **`wc -l`, never `grep -c`** — `grep -c` exits non-zero on zero matches and reads as a failure.
 - **A pipe hides the exit status.** Capture it, or read `PIPESTATUS`.
 - **`/tmp` is shared between lanes and is invisible to Windows PHP** — use the session scratchpad.
+- **Git Bash rewrites a value that starts with `/` into a Windows path** before a native program sees it —
+  an argument, and an environment variable too (`/bhw-connect` arrived as `C:/Program Files/Git/bhw-connect`).
+  `MSYS_NO_PATHCONV=1` for arguments, `MSYS2_ENV_CONV_EXCL=<NAME>` for a variable.
 - **The tool layer collapses doubled backslashes**, so build an escape as a character code rather than
   writing one. A quoted heredoc is otherwise safe; verify the bytes afterwards.
 - **Never split lines on the regex newline class without the unicode modifier.** It matches a byte that
@@ -186,10 +199,10 @@ the parent commit and accidentally gives the right answer.
 
 ## Merging
 
-- **6/6 green, each job's step count read individually.** A job reporting no steps never acquired a
+- **Every required check green, each job's step count read individually.** A job reporting no steps never acquired a
   runner and proves nothing.
 - **A push filtered out by `paths-ignore` produces no run at all.** Read that as *correctly skipped* —
-  never as *pending*. Require a positive count of six completed checks, never merely "none incomplete".
+  never as *pending*. Require a positive count of completed checks equal to the required set, never merely "none incomplete".
 - ⛔ **A squash merge must land the surgery marker on a line of its own, and neither default does it.**
   An empty `--body` discards the commit bodies outright; GitHub's *default* body renders each commit
   subject as `* <subject>`, which demotes the marker off line start — the trunk then carries the text

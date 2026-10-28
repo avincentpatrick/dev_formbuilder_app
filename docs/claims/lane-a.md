@@ -16,7 +16,69 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — merge point 8 (`D186`; below) released three increments together, all merged and live on staging: `M191` (the PRD dispositions), `M192` (BHW Connect's import) and `M193` (the six `D38` rows). The next claim is `bhw-dependency-advisories` (`D187`), then `bhw-p1-box`.
+## Status: ACTIVE CLAIM — `M194`, BHW Connect's production advisories cleared, and its audit blocking again (`bhw-dependency-advisories`) (m194-bhw-advisories)
+
+Taken 2026-10-28. Branch `m194-bhw-advisories`, cut from `origin/main` at `3f41b551`, PR into main. Asked for by the user (`D187`:
+a Meridian session clears them first, then P1), because `bhw-p1-box` is blocked on this row by `D185`.
+Row: `bhw-dependency-advisories` — *"Clear BHW's production dependency advisories … with the map and export screens checked in a
+browser, then put the bhw-connect job's audit back under Meridian's blocking rule (D185)"*, a marker at the end of
+`docs/adr/0024-second-application-under-one-host.md`.
+⛔ **It is ours and touches jongsky25's tree and the shared `.github/`**, so it needs his `boundary-approved` label (`D177`), and it keeps
+Meridian's merge-point rule rather than "BHW-only merges on green" (`CLAUDE.md`, *The trunk*). The merge point is the user's to name.
+
+### Evidence verified
+Measured 2026-10-28 on a scratch copy of the import (`#385`'s tree, the trunk's since `7cc8506b`), with npm 10.9.9 on Node 24.11.0.
+- `npm audit --omit=dev` reported 13: 2 critical, 8 high and 3 moderate. That is `D185`'s 2 and 8, unchanged, with three moderates
+  that `D185` did not count, because only high and critical block.
+  - `next` is critical. It covers a proxy bypass under Turbopack, a Server Actions denial of service and an SSRF, all `<16.2.11`.
+    Fixed by `next@16.4.3`, which also fixes `postcss` and `sharp`.
+  - `maplibre-gl` is critical: a sanitiser XSS, `<=6.4.0`, fixed only in the major (`6.16.0`).
+  - `pptxgenjs` and `image-size` are high. `image-size` is fixed only in `>=2.0.3`. `pptxgenjs` (latest 4.0.1) declares `^1.2.1`, and
+    npm's suggested `pptxgenjs@4.0.0` still declares `^1.1.1`, so that is no fix.
+  - `brace-expansion`, `nanoid`, `source-map-js` and `zod` are high, each with a fix inside its current range.
+
+### Premise verified
+- **`pptxgenjs` never loads `image-size`.** Its distributed code calls `require('sizeof')`, another package, in its Node image-size
+  path. An `overrides` entry pinning `image-size` to `^2.0.4` therefore changes nothing at runtime.
+- **MapLibre 6 is ESM-only and has no default export.** Both map components destructure `{ default: maplibregl }` from a dynamic
+  import. That is two type errors, and their knock-on errors.
+  - The rest of the API BHW uses carries over: `Map`, `NavigationControl`, `LngLatBounds`, `on`, `getSource`, `setFeatureState`,
+    `queryRenderedFeatures` and `fitBounds`.
+  - BHW never calls `setData`, and the CSP's `worker-src 'self' blob:` already allows a module worker served from `'self'`.
+- **`eslint-config-next` 16.4.3 adds a rule** that warns on `window.location.assign()`. Its one hit is a deliberate defect fixture
+  (`lib/__fixtures__/base-path-census/`). It is a warning, so lint exits 0.
+- **A running server refuses `BHW_DATA_SOURCE=none`** (*"is for CI builds only"*). The map and export screens therefore cannot be
+  checked without a data source, and the only one is jongsky25's Supabase until `bhw-p2-db`. The keys stay in
+  `apps/bhw-connect/.env.local` (ignored by `.env*`), never in git or chat.
+
+### Remedy verdict
+- **Works, as measured on the scratch copy:**
+  - `next` and `eslint-config-next` pinned to `16.4.3`, the house's exact-pin style.
+  - `maplibre-gl ^6.16.0`, plus the `image-size` override.
+  - `npm update` of the four in-range packages.
+  - The two destructures become `[maplibregl, …]`.
+- **Results:** the audit reads 0 critical and 0 high (3 moderate); lint exits 0 with one warning; type-check passes; all 85 Vitest files
+  pass; the CI build under `/bhw-connect` with no data source passes.
+- **A headless probe** of the home page under `/bhw-connect` found no CSP refusals, and WebGL2 is available (MapLibre 6 requires it).
+- **Not yet measured:** the maps and exports with data. That waits on jongsky25's keys.
+- **The audit step:** its `code = 1` warning arm is deleted, so a high or critical advisory fails the job again. The "registry
+  unreachable" arm stays, Meridian's own rule.
+
+Files:
+- `apps/bhw-connect/package.json`, `apps/bhw-connect/package-lock.json`
+- `apps/bhw-connect/components/maps/choropleth-map.tsx`, `apps/bhw-connect/components/maps/point-map.tsx`
+- `.github/workflows/ci.yml` (the BHW audit step only)
+- `docs/adr/0024-second-application-under-one-host.md` (the marker), `docs/pipeline.md`
+
+Shared artefacts taken: `.github/workflows/ci.yml`, `docs/adr/0024-second-application-under-one-host.md`, and `PROGRESS.md` (own block, at
+close-out).
+Paired files taken: none.
+Namespaces spent: none. `D187` was answered and recorded in merge point 8's close-out.
+Prediction:
+- The audit step passes, and the rest of the BHW job is green as on the scratch copy.
+- **The boundary step is red until jongsky25 adds the label.** That is the observation `M192` still owes.
+- Meridian's six jobs are unmoved.
+- **Most likely wrong:** the maps with data. A module worker under the `/bhw-connect` prefix may not load in a real browser.
 
 ## RELEASED — `M193`, the six `D38` rows: documented `/api/v1` surface marked not built, in place (`R-9e3e417e`, `R-1b966250`, `R-47552102`, `R-fcfc1f52`, `R-4328a4d9`, `R-f1312153`) (merged as PR #386, `27440f21`, last at merge point 8, after merging the trunk into its branch at `78399fcf`; 7/7 green with real step counts on that run — Static analysis 33 · BHW Connect 19 (the unchanged branch) · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `27440f21` the same, with BHW Connect at 20)
 

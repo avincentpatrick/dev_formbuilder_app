@@ -98,6 +98,48 @@ Prediction:
 - **Most likely wrong:** `openapi.json` stays byte-identical after the `FormApiController` docblock edit — Scramble may emit that
   class docblock, the way `R-e568ddd2` records for the FormRequest classes.
 
+**BUILT — PR #386, CI 6/6 green with real step counts (run 40669550589 at `04992d4d`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11) — AND NOT MERGED.**
+⛔ **Held for merge point 8, third, after `#384` and `#385` (`D186`).** At that point it is rebased onto the trunk after `#385`:
+- Expect conflicts at the backlog's end and in `docs/pipeline.md`. Keep both, then regenerate the line **in a tree with `vendor/`
+  installed** (see below).
+- Re-run the lint gates, which by then carry `#384`'s `P2e` and `#385`'s citation-lint change.
+- Expect 7/7, with the BHW job's "unchanged → success" — the observation `#385`'s close-out owes.
+
+No `VERSION` bump, no release note, no migration: nothing a tester sees changes.
+
+**How the prediction fared — measured, the wrong part first.**
+- **"`pipeline.php --check` is green after the regeneration" — right in the end, but the first run was red, and the red was my
+  own doing.**
+  - Run 40664591441 at `4817fa32` failed `pipeline-lint` P1 drift.
+  - I had checked the line from a bare `git worktree` with no `vendor/`. That check called the correct line drifted. I blamed the
+    untracked `apps/` left by the `M192` checkout and regenerated from the worktree.
+  - Measured in a fresh `pull/386/merge` clone in the app container: current before `composer install`, drifted after.
+    - With `vendor/` hidden: drifted.
+    - With the cache files alone: no effect.
+  - About twenty backlog lines cite into `vendor/`, so the citation health the line sorts by moves with it (the mechanism is
+    inferred; the effect is measured).
+  - Reverted in `04992d4d` to the first generation, which equals CI's byte for byte past the provenance line. The `apps/`
+    residue never mattered.
+- **"The lint gates stay green" — right.** No `P2c` phrase was used, and the one `Queued` site was rewritten. The citation ledger
+  stayed at the trunk's 16 rotten.
+- **"Every edited document keeps its line count" — right.** Additions equal deletions in all five, so no section was renumbered.
+- **"Most likely wrong: `openapi.json` stays byte-identical" — right.** A fresh `scramble:export` is byte-identical: a
+  controller's class docblock is not emitted.
+- **What no prediction named:**
+  - Beside the dedupe labels, the Redis row's Reverb backplane is unbuilt too: there is no broadcasting config and no
+    dependency. It was marked in place.
+  - No store runs on Redis at all. Filed, below.
+- **Filed: two rows.**
+  - Redis is documented as the cache and rate-limit store while every store runs on the database (during-testing).
+  - Nothing compares §7.1's marks with `openapi.json` (before-launch).
+- **Run locally:**
+  - Host: Pint with its probe, the four lint gates, `pipeline.php --check` from the CI-equivalent clone, `state.php --check`, and
+    `preflight --with-gates --with-pint`.
+  - Container: `tests/Feature/Docs`, 184 passed and 1 failed. The failure is `SuiteCollectionFloorTest`, the bind-mount artefact
+    (79 files under `tests/Feature/Forms`).
+  - Not run locally: Vitest, E2E and Storybook axe, since no front-end file changed. CI ran all three green.
+  - No mutation: no gate was written.
+
 ## HELD — `M192`, the BHW Connect merge, phase P0: BHW's code imported under `apps/bhw-connect/`, made prefix-aware, with its CI job, its box scripts written (not run), and the governance both developers work under (`bhw-p0-import`) (m192-bhw-import)
 
 Taken 2026-10-27. Branch `m192-bhw-import`, cut from `origin/main` at `bff6e11d`, PR into main. ⛔ **NOT MERGED THIS SESSION:** held

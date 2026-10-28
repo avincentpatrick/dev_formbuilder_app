@@ -17,8 +17,8 @@ return [
          * `Spatie\Permission\Contracts\Permission` contract.
          */
 
-        // Meridian: UUIDv7-keyed subclass (roles/permissions are externally
-        // addressable via GET /api/v1/roles — no sequential-ID enumeration).
+        // Meridian: UUIDv7-keyed subclass (the documented GET /api/v1/roles, not built — D38 — would
+        // address roles/permissions externally, so no sequential-ID enumeration).
         'permission' => Permission::class,
 
         /*

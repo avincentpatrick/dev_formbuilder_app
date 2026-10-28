@@ -16,8 +16,8 @@ use Illuminate\Http\Request;
 
 /**
  * Read access to the durable form record over /api/v1 (Increment E). Authorization is the route's
- * `ability:read:forms` + FormPolicy `can:` gates; RLS scopes every query to the token's tenant. Writes
- * (create/update/delete) and the other §7.1 resources extend this same pattern in Phase 1.
+ * `ability:read:forms` + FormPolicy `can:` gates; RLS scopes every query to the token's tenant. Only
+ * the reads are built: §7.1 marks the writes not built (D38), and forms are written in the tenant-web app.
  */
 final class FormApiController extends Controller
 {

@@ -37,7 +37,7 @@ GET /api/v1/forms?limit=50&cursor=eyJpZCI6IjAxOTAi...
   }
 }
 ```
-`limit` defaults to 25, max 100 (higher volumes go through the async export path, §7.3). Offset-based pagination (`?page=2`) is **not** offered — cursor pagination is the only mode, avoiding two paginated-list code paths to maintain.
+`limit` defaults to 25, max 100 (higher volumes go through the async export path, §7.3 — **not built (`D38`)**: `/api/v1` carries no submission export). Offset-based pagination (`?page=2`) is **not** offered — cursor pagination is the only mode, avoiding two paginated-list code paths to maintain.
 
 ### 2.3 Error Format
 
@@ -60,7 +60,7 @@ A single, consistent error envelope across every endpoint (not yet specified any
 ### 2.4 Idempotency
 
 - **Submissions**: `client_submission_uuid` (already in `docs/data-dictionary.md` §7) is the domain-specific idempotency key for the offline-sync replay case (Doc #18 owns the full mechanism).
-- **Every other unsafe (`POST`/`PATCH`/`DELETE`) request** may optionally include an `Idempotency-Key` header (a client-generated UUID); the API deduplicates against a short-lived (24-hour) Redis-backed cache keyed on `(tenant_id, endpoint, Idempotency-Key)`, returning the original response for a repeated key rather than re-executing the action — a general-purpose mechanism beyond the submission-specific one, useful for any integration consumer that needs safe retries (e.g., a Zapier action retrying after a network timeout).
+- **Every other unsafe (`POST`/`PATCH`/`DELETE`) request** — **not built (`D38`)**: no route reads an `Idempotency-Key` header and `openapi.json` declares none, so a repeated request runs again; Increment E recorded it as deferred and nothing has built it since, and only the submission key above deduplicates. As designed: it may optionally include an `Idempotency-Key` header (a client-generated UUID); the API deduplicates against a short-lived (24-hour) Redis-backed cache keyed on `(tenant_id, endpoint, Idempotency-Key)`, returning the original response for a repeated key rather than re-executing the action — a general-purpose mechanism beyond the submission-specific one, useful for any integration consumer that needs safe retries (e.g., a Zapier action retrying after a network timeout).
 
 ### 2.5 Rate Limits
 
@@ -70,11 +70,11 @@ Concrete numbers, since `docs/architecture/technical-architecture.md` §7.2 stat
 |---|---|
 | Guest respondent (per share token) | 30 requests/minute |
 | Guest respondent (per IP, across all tokens) | 100 requests/minute |
-| Authenticated Admin/Builder session | 300 requests/minute per user |
+| Authenticated Admin/Builder session | 300 requests/minute per user — **not built (`D38`)**: no session-wide or per-user limiter exists and the `web` group carries no throttle; signed-in routes carry per-route limits only, from 6 to 120 a minute (search suggestions 120; uploads and automations 30; a feedback thread 30 per member; OCR scans and the SSO step-up 20; a test send 6) |
 | Integration/API-key consumer | 600 requests/minute per key (a plan-tier-adjustable ceiling — Doc #24 may raise this for higher tiers) |
-| Sync/live-connect export (§7.3) | 1 concurrent sync export per form at a time; additional requests return `429` until the in-flight one completes |
+| Sync/live-connect export (§7.3) | 1 concurrent sync export per form at a time; additional requests return `429` until the in-flight one completes — **not built (`D38`)**: `/api/v1` has no submission export, sync or async, and no export path carries a concurrency guard; the tenant-web CSV/XLSX download streams unguarded, and a PDF request queues a job each time |
 
-Every rate-limited response includes standard `X-RateLimit-Limit`/`X-RateLimit-Remaining`/`X-RateLimit-Reset` headers.
+Every rate-limited response includes standard `X-RateLimit-Limit`/`X-RateLimit-Remaining`/`X-RateLimit-Reset` headers — except the guest per-form limit and the monthly quota, which send only `Retry-After`.
 
 ### 2.6 Sanctum Ability Catalog
 

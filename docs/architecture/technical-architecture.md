@@ -140,7 +140,7 @@ graph TB
 
   subgraph "Data Stores"
     PG[("PostgreSQL<br/>+ Row-Level Security")]
-    REDIS[("Redis<br/>cache, queue broker,<br/>rate limits, idempotency dedupe")]
+    REDIS[("Redis<br/>cache, queue broker,<br/>rate limits, idempotency dedupe (not built, D38)")]
   end
 
   subgraph "External Services"
@@ -158,7 +158,7 @@ graph TB
   ADMINAPP -->|"Eloquent ORM<br/>(RLS session var set per request)"| PG
   RESTAPI -->|"Eloquent ORM<br/>(RLS session var set per request)"| PG
   ADMINAPP -->|"sessions, cache, rate limits"| REDIS
-  RESTAPI -->|"cache, rate limits,<br/>webhook idempotency dedupe"| REDIS
+  RESTAPI -->|"cache, rate limits,<br/>webhook idempotency dedupe (not built, D38)"| REDIS
   QUEUE -->|"dequeues jobs"| REDIS
   QUEUE -->|"persists job results"| PG
   SCHED -->|"dispatches scheduled jobs<br/>(retry sweeps, usage rollups, retention purges)"| REDIS
@@ -184,7 +184,7 @@ graph TB
 | Scheduler | Cron-driven periodic jobs: webhook retry sweep, usage-counter rollups, subscription reconciliation, data-retention purges | ~~**Not yet implemented — specified by ADR-0007.** `routes/console.php` is stock and there is no `withSchedule`;~~ ✅ **Built in H2 (corrected by `M94`):** `routes/console.php` declares seven `Schedule::job(...)` entries — failed-job pruning, the usage-counter rollup, the expired-draft reaper, the scheduled-form sweep, the webhook retry sweep, connector token refresh and custom-domain verification — and deliberately no `withSchedule`; `schedule:run` runs every minute, each scheduled task dispatching to the queue rather than running inline, so a slow task can't block the scheduler tick. Subscription reconciliation and data-retention purges are not among the seven; the purge is the ledger row on NFR §8's soft-delete grace period. |
 | Reverb | Realtime channel server for live dashboards, builder presence, and "your queued submissions can now sync" push triggers to the PWA | Treated as a UX enhancement, not a hard dependency — see Risk R10 in §9. |
 | PostgreSQL | System of record; RLS-enforced tenant isolation; JSONB for submission payloads **plus the typed `submission_answer_index` projection for queryable fields**; PostGIS for geo field types (Phase 2) | See §5 for RLS mechanics. **Corrected 2026-08-03 (ADR-0011):** this row previously read "JSONB+GIN". No GIN index exists on `submission_answers.answers` — the hybrid model's read path is carried by the typed projection and by whole-document reads. See ADR-0001's implementation-status note. |
-| Redis | Cache, rate limiting, webhook idempotency dedupe cache, Reverb pub/sub backplane | **No longer the queue broker as of ADR-0007 §D1** — the queue runs on Postgres via the `database` driver; Redis+Horizon is the documented upgrade path, not the current state. Single Redis instance is sufficient at MVP scale; can be split (cache vs. pub/sub) later without app changes since each use goes through its own Laravel config connection name. |
+| Redis | Cache, rate limiting, webhook idempotency dedupe cache, Reverb pub/sub backplane — the dedupe cache and the Reverb backplane **not built (`D38`)**: webhook deliveries are deduplicated by the `webhook_deliveries` unique key on endpoint and event, and nothing broadcasts | **No longer the queue broker as of ADR-0007 §D1** — the queue runs on Postgres via the `database` driver; Redis+Horizon is the documented upgrade path, not the current state. Single Redis instance is sufficient at MVP scale; can be split (cache vs. pub/sub) later without app changes since each use goes through its own Laravel config connection name. |
 | Object Storage (S3-compatible) | Attachments, async export files, OCR source images, XLSForm import/export files | Namespaced `tenants/{tenant_id}/...`; see §5. |
 
 ---
@@ -436,24 +436,24 @@ A versioned REST API (`/api/v1`) with an OpenAPI 3.1 contract is a first-class d
 
 | Resource group | Representative endpoints | Purpose | Typical caller(s) |
 |---|---|---|---|
-| Auth & API keys | `POST /api/v1/auth/tokens` | Issue Sanctum personal access tokens (scoped "API keys") | Tenant Admin (issues), Integration Consumer (uses) |
-| Tenant | `GET/PATCH /api/v1/tenant` | Current tenant profile, branding, locale/settings | Admin App |
-| Forms | `GET/POST /api/v1/forms`, `GET/PATCH/DELETE /api/v1/forms/{form}` | CRUD on the durable form record (metadata, guest-access config, capability flags) | Admin App, Integration Consumer |
-| Form versions | `GET /api/v1/forms/{form}/versions`, `POST /api/v1/forms/{form}/versions/{version}/publish` | List/inspect immutable versions; publish the current draft | Admin App |
-| Form draft | `GET/PATCH /api/v1/forms/{form}/draft`, `.../sections`, `.../fields`, `.../fields/{field}/validations` | Builder CRUD against the single mutable draft | Admin App |
-| XLSForm interop | `GET /api/v1/forms/{form}/versions/{version}/xlsform`, `POST /api/v1/forms/{form}/draft/xlsform-import` | Bidirectional XLSForm exchange (full mapping in the XLSForm Interop Spec) | Admin App, Integration Consumer |
+| Auth & API keys | `POST /api/v1/auth/tokens` — **implemented**, with `GET` to list and `DELETE /api/v1/auth/tokens/{id}` to revoke | Issue Sanctum personal access tokens (scoped "API keys") | Tenant Admin (issues), Integration Consumer (uses) |
+| Tenant | `GET/PATCH /api/v1/tenant` — `GET` **implemented**; `PATCH` **not built (`D38`)**: branding is edited in the tenant-web app's settings | Current tenant profile, branding, locale/settings | Admin App |
+| Forms | `GET/POST /api/v1/forms`, `GET/PATCH/DELETE /api/v1/forms/{form}` — the two `GET`s **implemented (Increment E)**; `POST`, `PATCH` and `DELETE` **not built (`D38`)**: the tenant-web app creates, edits and archives forms | CRUD on the durable form record (metadata, guest-access config, capability flags) | Admin App, Integration Consumer |
+| Form versions | `GET /api/v1/forms/{form}/versions`, `POST /api/v1/forms/{form}/versions/{version}/publish` — **implemented**, with `GET /api/v1/forms/{form}/versions/{version}` to inspect one | List/inspect immutable versions; publish the current draft | Admin App |
+| Form draft | `GET/PATCH /api/v1/forms/{form}/draft`, `.../sections`, `.../fields`, `.../fields/{field}/validations` — **not built (`D38`)**: sections and fields have tenant-web twins only, the draft is read through the builder page, and validations are saved inline with their field rather than as a resource | Builder CRUD against the single mutable draft | Admin App |
+| XLSForm interop | `GET /api/v1/forms/{form}/versions/{version}/xlsform`, `POST /api/v1/forms/{form}/draft/xlsform-import` — **implemented** | Bidirectional XLSForm exchange (full mapping in the XLSForm Interop Spec) | Admin App, Integration Consumer |
 | Public form schema | `GET /api/v1/public/f/{shareToken}` — **implemented (Increment F5)** | Fetch the pinned `form_version` schema for rendering | Public Runtime (guest) |
-| Submissions | `POST /api/v1/public/f/{shareToken}/submissions` (guest — **implemented F5**), `POST /api/v1/forms/{form}/submissions` (manual/API), `GET/PATCH/DELETE /api/v1/submissions/{submission}` | Create/list/review submissions through the unified pipeline (§4.1) | All caller types |
-| Sync | `GET /api/v1/sync/manifest`, `POST /api/v1/sync/submissions` (batch) | Offline-first manifest fetch + idempotent batch replay (§4.2) | Public Runtime (PWA) |
-| Attachments | `POST /api/v1/submissions/{submission}/attachments`, `GET /api/v1/attachments/{attachment}` (signed redirect) | Upload/retrieve polymorphic attachments | Public Runtime, Admin App |
-| Exports | `POST /api/v1/forms/{form}/exports`, `GET /api/v1/exports/{export}` | Async chunked export job lifecycle | Admin App, Integration Consumer |
-| OCR intake | `POST /api/v1/forms/{form}/ocr/single`, `POST /api/v1/forms/{form}/ocr/linelist`, `GET /api/v1/ocr/jobs/{job}` | Submit scans; poll extraction/review status | Admin App |
-| Field library & templates | `GET/POST /api/v1/field-library`, `GET/POST /api/v1/form-templates` | Reusable question/form blueprints | Admin App |
+| Submissions | `POST /api/v1/public/f/{shareToken}/submissions` (guest — **implemented F5**), `POST /api/v1/forms/{form}/submissions` (manual/API — **not built (`D38`)**: staff encode in the tenant-web app), `GET/PATCH/DELETE /api/v1/submissions/{submission}` (**not built (`D38`)**; only `POST /api/v1/submissions/{submission}/promote` exists) | Create/list/review submissions through the unified pipeline (§4.1) | All caller types |
+| Sync | `GET /api/v1/sync/manifest`, `POST /api/v1/sync/submissions` (batch) — **implemented** | Offline-first manifest fetch + idempotent batch replay (§4.2) | Public Runtime (PWA) |
+| Attachments | `POST /api/v1/submissions/{submission}/attachments`, `GET /api/v1/attachments/{attachment}` (signed redirect) — **not built (`D38`)**: a guest uploads through `POST /api/v1/public/f/{shareToken}/attachments`, and staff upload and read files in the tenant-web app | Upload/retrieve polymorphic attachments | Public Runtime, Admin App |
+| Exports | `POST /api/v1/forms/{form}/exports`, `GET /api/v1/exports/{export}` — **not built (`D38`)**: there is no `exports` job row; the `exports` queue and `export_artifact` storage ship, used only by the single-submission PDF, and the tenant-web app streams a form's CSV/XLSX download | Async chunked export job lifecycle | Admin App, Integration Consumer |
+| OCR intake | `POST /api/v1/forms/{form}/ocr/single`, `POST /api/v1/forms/{form}/ocr/linelist`, `GET /api/v1/ocr/jobs/{job}` — **not built (`D38`)**: single-form scans are uploaded and reviewed in the tenant-web app, and the linelist channel is queued as `ocr-linelist` | Submit scans; poll extraction/review status | Admin App |
+| Field library & templates | `GET/POST /api/v1/field-library`, `GET/POST /api/v1/form-templates` — **implemented** | Reusable question/form blueprints | Admin App |
 | Webhook endpoints | `GET/POST/PATCH/DELETE /api/v1/webhooks/endpoints` | Tenant-configured webhook subscriptions | Admin App, Integration Consumer |
 | Webhook deliveries | `GET /api/v1/webhooks/deliveries`, `POST /api/v1/webhooks/deliveries/{delivery}/redeliver` | Delivery observability + manual redelivery | Admin App |
-| Users & roles | `GET/POST /api/v1/users`, `/api/v1/roles` | Tenant membership + Spatie-permission role assignment | Admin App |
-| Subscription | `GET /api/v1/subscription` | Read current plan/quota (billing *actions* remain Cashier-driven Admin UI) | Admin App, Integration Consumer |
-| Audit log | `GET /api/v1/audits` | Query the audit trail for a given resource | Admin App |
+| Users & roles | `GET/POST /api/v1/users`, `/api/v1/roles` — **not built (`D38`)**: members are managed in the tenant-web app; kept because this forward reference is why roles use UUIDv7 keys (`docs/multi-tenancy-rbac-design.md` §4) | Tenant membership + Spatie-permission role assignment | Admin App |
+| Subscription | `GET /api/v1/subscription` — **not built (`D38`)**: no `/api/v1` route reads the plan | Read current plan/quota (billing *actions* remain Cashier-driven Admin UI) | Admin App, Integration Consumer |
+| Audit log | `GET /api/v1/audits` — **implemented** | Query the audit trail for a given resource | Admin App |
 
 ### 7.2 Authentication Per Caller Type
 
@@ -468,9 +468,9 @@ A versioned REST API (`/api/v1`) with an OpenAPI 3.1 contract is a first-class d
 
 ### 7.3 Export Modes
 
-- **Async / queued export** (the default for anything non-trivial): requests create an `exports` job row (`status = queued`); a Horizon worker streams/chunks the query (never loading the full submission set into memory — carrying forward legacy's confirmed-good memory-safe chunked-export pattern) into CSV/XLSX/PDF, writes the result to object storage under `tenants/{tenant}/exports/...`, and returns a signed, expiring download URL. Completion is signaled via email and a realtime (Reverb) push. This is always used for XLSX/PDF (heavier formats) and for any export beyond the cursor-pagination threshold below.
-- **Sync / live-connect export**: a direct, cursor-paginated JSON/CSV streaming response for small or real-time consumption — e.g., a live Sheets/Airtable connector or a Zapier polling trigger.
-  > **Decision (not pinned by the plan; the plan specifies "cursor-based pagination for exports beyond 1000 records" without a hard sync-mode ceiling):** the sync export path is capped at **5,000 rows or 30 seconds of processing, whichever comes first**; beyond that the API returns a structured `422` pointing the caller to the async export endpoint instead. This keeps the sync path bounded and predictable without a separate hard-coded row limit baked into client integrations.
+- **Async / queued export** (the default for anything non-trivial) — **not built (`D38`)**: there is no `exports` job row and nothing broadcasts; only the single-submission PDF runs on the `exports` queue, and its link is emailed when ready. As designed: requests create an `exports` job row (`status = queued`); a Horizon worker streams/chunks the query (never loading the full submission set into memory — carrying forward legacy's confirmed-good memory-safe chunked-export pattern) into CSV/XLSX/PDF, writes the result to object storage under `tenants/{tenant}/exports/...`, and returns a signed, expiring download URL. Completion is signaled via email and a realtime (Reverb) push. This is always used for XLSX/PDF (heavier formats) and for any export beyond the cursor-pagination threshold below.
+- **Sync / live-connect export** — **not built (`D38`)** on `/api/v1`, which carries no submission export; the tenant-web app streams a form's CSV/XLSX download. As designed: a direct, cursor-paginated JSON/CSV streaming response for small or real-time consumption — e.g., a live Sheets/Airtable connector or a Zapier polling trigger.
+  > **Decision (not pinned by the plan; the plan specifies "cursor-based pagination for exports beyond 1000 records" without a hard sync-mode ceiling):** the sync export path is capped at **5,000 rows or 30 seconds of processing, whichever comes first**; beyond that the API returns a structured `422` pointing the caller to the async export endpoint instead. This keeps the sync path bounded and predictable without a separate hard-coded row limit baked into client integrations. **Not built (`D38`)**, like the sync mode itself: no such cap or `422` exists.
 - **XLSForm export/import** is treated as a distinct, spec-driven interchange format (not a generic "export mode" alongside CSV/PDF) — `GET .../xlsform` and `POST .../xlsform-import`, fully documented in the XLSForm Interop Spec, and always operating against a specific `form_version` (export) or the current draft (import target).
 
 ### 7.4 Webhook Reliability Mechanisms
@@ -539,7 +539,7 @@ The plan is the source of truth for product/architecture direction; the followin
 3. **The RLS session variable is set via `SET LOCAL`** scoped to each request/job's transaction, so it cannot leak across pooled-connection reuse (§5).
 4. **The Expression Evaluator exists as two behaviorally-identical implementations** (TypeScript for live UX, PHP as sole submission-time authority), kept in sync via a shared golden-file test-vector suite — the only architecturally consistent reading of the plan's "expression engine is first-class" and "client-side is UX sugar only" principles taken together (§4.3).
 5. **A database-level guard is recommended, in addition to application-layer enforcement**, to make published-version immutability defense-in-depth rather than single-layer (§6.2). ~~Still open; owned by increment H25.~~ — **CLOSED 2026-08-05 by H25 → ADR-0013** (promoted to a formal ADR, exactly as this appendix's closing line anticipated). Built as `form_versions_published_immutable_trg`: `BEFORE UPDATE … FOR EACH ROW`, gated on the row not being a draft, deny-by-default over a whole-row `to_jsonb` diff, `published → superseded` the only legal transition. **UPDATE only** — the delete half is deliberately not built and is now risk **R12**.
-6. **The sync/live-connect export mode is capped at 5,000 rows or 30 seconds of processing**, whichever comes first, before requiring the async export path; the plan specifies cursor pagination "beyond 1000 records" but does not pin an exact sync-mode ceiling (§7.3).
+6. **The sync/live-connect export mode is capped at 5,000 rows or 30 seconds of processing**, whichever comes first, before requiring the async export path; the plan specifies cursor pagination "beyond 1000 records" but does not pin an exact sync-mode ceiling (§7.3). **Not built (`D38`)**, like the sync mode itself.
 7. **Webhook retry schedule** (1m → 5m → 30m → 2h → 6h → 12h → 24h → 48h → 72h, 10 attempts total, matching the Data Dictionary's `max_attempts` default) **and circuit-breaker threshold** (20 consecutive failures) are concrete starting defaults, explicitly flagged as pending finalization in the Webhook & Integration Design Doc (§7.4).
 8. **Webhook delivery timeout is set at 10 seconds** (connect + response) (§7.4).
 9. **Guest share-tokens are signed, scoped to exactly one `form_version_id`**, with tenant/form/version embedded and verified per request; expiry and a single-use flag are configurable per tenant rather than globally fixed (§7.2).

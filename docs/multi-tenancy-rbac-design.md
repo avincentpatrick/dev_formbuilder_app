@@ -742,7 +742,7 @@ ADR-0002 §D3 documents *why* each layer is enforced (a descriptive table). This
 
 ## 11. Out of Scope / Deferred
 
-- Detailed OpenAPI request/response shapes for `/api/v1/users`, `/api/v1/roles` → Doc #14 (API Specification). *(Queued — `R-47552102`)*
+- Detailed OpenAPI request/response shapes for `/api/v1/users`, `/api/v1/roles` → Doc #14 (API Specification). *(Not planned — owed only if `/api/v1/users` and `/api/v1/roles` are built; `docs/architecture/technical-architecture.md` §7.1 marks them not built, `D38`)*
 - ~~SSO/SAML → Phase 4 (architecture plan §3).~~ **BUILT (P1a–P1c, ADR-0016)** — a per-tenant SAML 2.0 Service Provider, SP-initiated only, Enterprise-gated. §7.1 above already describes JIT provisioning as one of the four doors, so this line was contradicting its own document. Its threat surface is `docs/security-threat-model.md` §8. *(Built — P1a–P1c)*
 - Dedicated-database tenancy → ADR-0002's own explicitly deferred future ADR, written since as `docs/adr/0017-tenant-isolation-tiering.md`, whose §D2 rejects database-per-tenant for this schema. *(Not planned — ADR-0017 §D2 rejects database-per-tenant for this schema)*
 - GDPR subject-access/erasure mechanics for `users`/`tenant_users` rows → Doc #12 (Data Privacy & GDPR/Compliance Doc). *(Queued — `gdpr-subject-export`, `R-6bf1ffc3`)*

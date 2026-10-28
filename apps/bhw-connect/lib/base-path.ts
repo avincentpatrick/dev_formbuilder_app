@@ -41,6 +41,3 @@ export function stripBasePath(pathname: string, basePath: string = BASE_PATH): s
   if (pathname === basePath) return "/";
   return pathname.startsWith(`${basePath}/`) ? pathname.slice(basePath.length) : pathname;
 }
-
-// mutation(M192 J1): deliberately wrong, to prove the bhw-connect job goes red.
-export const mutationJ1: number = "not a number";

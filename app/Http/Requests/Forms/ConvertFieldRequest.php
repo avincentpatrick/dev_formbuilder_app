@@ -18,8 +18,8 @@ use Illuminate\Validation\Rule;
  * new type's config against the old type's rules; and the PATCH is the autosave channel, where a dropped
  * keystroke must never change what a question is.
  *
- * ⚠️ THE TOKEN IS REQUIRED HERE, UNLIKE THE PATCH. {@see FormBuilderService::convertField()} refuses to land a
- * type change on a row the author did not see, so `version` is not optional. `fingerprint` is the plan the
+ * ⚠️ THE TOKEN IS REQUIRED HERE, AS IT IS ON THE PATCH SINCE M196 (`D189`). {@see FormBuilderService::convertField()}
+ * refuses to land a type change on a row the author did not see, so `version` is not optional. `fingerprint` is the plan the
  * author confirmed, as `GET …/conversions` returned it; it may be absent only for a plan that needs no
  * confirmation, and the engine — not this request — decides which plans those are.
  */

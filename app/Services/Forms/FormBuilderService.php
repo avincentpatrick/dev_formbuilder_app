@@ -37,8 +37,11 @@ use Ramsey\Uuid\Uuid;
  * has mapped it to 422 since it was written).
  *
  * Concurrency model (§8):
- *  - CONTENT edits (updateField/updateSection) are optimistic: the client echoes the `updated_at` token it
- *    last read; a drift throws {@see BuilderConflictException} (→ 409) carrying the fresh row.
+ *  - CONTENT edits (updateField/updateSection) are optimistic: the client MUST echo the `updated_at` token it
+ *    last read (required since M196, `D189`), and the token is compared with the row re-read UNDER ITS ROW LOCK,
+ *    never with the copy route binding loaded; a drift throws {@see BuilderConflictException} (→ 409) carrying
+ *    the fresh row. Until M196 the check ran before the transaction against the bound copy, so two saves that
+ *    both bound the row before either wrote both passed — the lost update the token exists to stop.
  *  - STRUCTURAL edits (add/delete/duplicate/reorder) are serialized by a `forms`-row FOR UPDATE lock and
  *    carry no token. Reorder writes through the BASE query builder (`toBase()`) so it does NOT bump
  *    `updated_at` — a positional change must not spuriously 409 the next content PATCH. Until M176 this sentence
@@ -88,13 +91,23 @@ final class FormBuilderService
     /**
      * @param  array<string, mixed>  $data
      */
-    public function updateSection(Form $form, FormSection $section, array $data, ?string $expectedVersion): FormSection
+    public function updateSection(Form $form, FormSection $section, array $data, string $expectedVersion): FormSection
     {
         $this->assertDraftChild($form, $section);
-        $this->assertNoDrift($section, $expectedVersion);
 
-        return DB::transaction(function () use ($form, $section, $data): FormSection {
+        return DB::transaction(function () use ($form, $section, $data, $expectedVersion): FormSection {
             $this->assertStillDraftChild($form, $section);
+
+            // M196 (`R-036f3226`, `D189`): the one section row, locked, then the token checked against it — convertField()'s
+            // order. It is the row the UPDATE below locks anyway, so no new acquisition order is introduced. A locking
+            // SELECT is filtered by the update policy rather than erroring, so a row no longer in the draft matches nothing.
+            $locked = FormSection::query()->whereKey($section->getKey())->lockForUpdate()->first();
+
+            if ($locked === null) {
+                throw FormException::childRemovedDuringEdit();
+            }
+
+            $this->assertNoDrift($locked, $expectedVersion);
 
             $section->fill([
                 'key' => $this->freeKey(FormSection::query(), $section, (string) $data['key']),
@@ -192,13 +205,12 @@ final class FormBuilderService
      *
      * @param  array<string, mixed>  $data
      */
-    public function updateField(Form $form, FormField $field, User $user, array $data, ?string $expectedVersion): FormField
+    public function updateField(Form $form, FormField $field, User $user, array $data, string $expectedVersion): FormField
     {
         $this->assertDraftChild($form, $field);
-        $this->assertNoDrift($field, $expectedVersion);
 
         try {
-            return $this->writeField($form, $field, $user, $data);
+            return $this->writeField($form, $field, $user, $data, $expectedVersion);
         } catch (QueryException $e) {
             // The CODE, never the driver's message text or the constraint name: the house rule stated in
             // SavedReportViewService::guardName() and SubmissionPipeline, and the reason is locale
@@ -222,9 +234,9 @@ final class FormBuilderService
     /**
      * @param  array<string, mixed>  $data
      */
-    private function writeField(Form $form, FormField $field, User $user, array $data): FormField
+    private function writeField(Form $form, FormField $field, User $user, array $data, string $expectedVersion): FormField
     {
-        return DB::transaction(function () use ($form, $field, $user, $data): FormField {
+        return DB::transaction(function () use ($form, $field, $user, $data, $expectedVersion): FormField {
             $this->assertStillDraftChild($form, $field);
 
             // ⛔ M91 — THE ACQUISITION ORDER, MADE UNCONDITIONAL. Without this the order of row touches
@@ -247,12 +259,14 @@ final class FormBuilderService
             // ⚠️ §8 IS THE OTHER SENTENCE A READER WILL REACH FOR, AND IT SURVIVES INTACT. It says
             // `form_sections`/`form_fields`/`form_field_validations` use *"optimistic concurrency, not
             // locking"*, with `updated_at` as the token and a 409 on drift. That mechanism ARBITRATES
-            // CONFLICTS and is untouched: assertNoDrift() still runs before this transaction opens and
-            // still answers 409. This lock arbitrates nothing and rejects nobody — it is transaction
-            // scoped, held for the width of one write, and exists only so two transactions agree on
-            // the ORDER they touch two tables in. A reader who reads it as a second concurrency
-            // mechanism has read it wrong, which is why the distinction is written here rather than
-            // left to be inferred.
+            // CONFLICTS; this lock does not. It is transaction scoped, held for the width of one write, and
+            // exists so two transactions agree on the ORDER they touch two tables in.
+            // ⛔ M196 (`R-036f3226`, `D189`) — BUT THE TOKEN IS NOW READ UNDER IT, AND THAT IS WHAT MAKES IT A TOKEN.
+            // Until M196 assertNoDrift() ran before this transaction opened, against the copy route binding
+            // loaded, so two saves that both bound the row before either wrote both passed and the second
+            // silently undid the first. The check below compares the token with the row as it stands once
+            // this transaction holds it — convertField()'s order. The lock is still not a second mechanism;
+            // it is the moment at which the one mechanism can no longer be raced.
             //
             // ⚠️ A LOCKING SELECT IS FILTERED BY THE UPDATE POLICY'S USING EXPRESSION RATHER THAN
             // ERRORING, so a row that has stopped being a draft child between the guard above and here
@@ -294,8 +308,12 @@ final class FormBuilderService
 
             // M188 (`R-3894369d`): the question as it stands, re-read under the lock — never the route-bound copy, which
             // can be a request old — so its history records what THIS save changed. A plain SELECT, so no lock is added.
+            // M196: the same re-read is what the token is checked against, so a 409 carries this row, not the copy.
+            $current = FormField::query()->whereKey($field->getKey())->firstOrFail();
+            $this->assertNoDrift($current, $expectedVersion);
+
             $recorder = app(FieldRevisionRecorder::class);
-            $before = $recorder->snapshot(FormField::query()->whereKey($field->getKey())->firstOrFail());
+            $before = $recorder->snapshot($current);
 
             $field->fill([
                 'key' => $this->freeKey(FormField::query(), $field, (string) $data['key']),
@@ -577,8 +595,9 @@ final class FormBuilderService
      * drops, an INSERT of only the new type's shipped checks. The id and the key never change, so every
      * reference to the field survives by construction — see {@see FieldTypeConversion}.
      *
-     * ⛔ THE TOKEN IS REQUIRED HERE, UNLIKE updateField(). A null token skips the drift check there; a type
-     * change is the one edit that must never land on a row the author did not see.
+     * ⛔ THE TOKEN IS REQUIRED HERE, AS IT IS ON updateField() AND updateSection() SINCE M196 (`D189`): a type
+     * change is the one edit that must never land on a row the author did not see. This method's lock-then-check
+     * order is the one those two adopted.
      *
      * ⛔ AND THE TOKEN IS NOT ENOUGH, WHICH IS WHY THE FINGERPRINT EXISTS. The token is `updated_at` at
      * second precision, and an edit to validation rows alone never bumps it — so the plan is RECOMPUTED
@@ -909,9 +928,14 @@ final class FormBuilderService
         }
     }
 
-    private function assertNoDrift(FormSection|FormField $row, ?string $expectedVersion): void
+    /**
+     * ⛔ CALL IT ONLY ON A ROW READ UNDER ITS LOCK (M196). Against a copy loaded before the transaction it compares the
+     * token with itself, and two saves that both bound the row pass together. There is no null arm any more: every
+     * caller's token is required, and a null that skipped the check was the overwrite `D189` ended.
+     */
+    private function assertNoDrift(FormSection|FormField $row, string $expectedVersion): void
     {
-        if ($expectedVersion !== null && self::rowVersion($row) !== $expectedVersion) {
+        if (self::rowVersion($row) !== $expectedVersion) {
             throw new BuilderConflictException($row);
         }
     }

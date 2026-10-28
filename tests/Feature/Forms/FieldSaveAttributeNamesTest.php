@@ -91,7 +91,7 @@ it('names the setting, not the request path, when a save is refused', function (
             'is_required' => 'optional',
             'config' => ['options' => [['value' => 'a', 'label' => str_repeat('a', 501)]]],
             'validations' => [],
-            'version' => null,
+            'version' => $added->json('version'),
         ])
         ->assertStatus(422);
 

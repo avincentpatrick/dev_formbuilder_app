@@ -24,10 +24,25 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D186`, the last filed, was asked and answered on 2026-10-28 while `M193` (the six `D38` rows) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D187`, the last filed, was asked and answered on 2026-10-28 when merge point 8 was called, and recorded in its close-out. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D187 — `D185` keeps BHW off the testing server until its production advisories are cleared, and the user wants jongsky25 to see BHW on staging. Who clears them before P1? **A — a Meridian session clears them first, then P1.**
+
+**Asked and answered 2026-10-28 (user decision, in chat), when merge point 8 was called; recorded in its close-out.** The user: *"lets finish the p1 so jong can already see the bhw connect in staging."* `D185` stands; this decides only who does the work and when.
+
+- **A — a Meridian session first (recommended, chosen).** After `#385` merged, the next increment does the following, then P1 runs at the box:
+  - takes `next` to 16.4, `maplibre-gl` to 6 and the in-range fixes, and makes a call on `pptxgenjs` and `image-size`;
+  - checks the map and export screens in a browser against jongsky25's Supabase;
+  - removes the BHW audit step's warning arm.
+
+  jongsky25 adds `boundary-approved` (the pull request is ours and touches his tree and `.github/`).
+- **B — jongsky25 first.** It is his first task in the onboarding guide. P1 waits on him.
+- **C — serve now, fix after.** It changes `D185`: BHW would be served beside Meridian's login with a proxy-bypass and an XSS advisory open.
+
+**What the answer files, in the same push:** nothing new. `bhw-dependency-advisories` is already queued in ADR-0024, `bhw-p1-box` is blocked on it, and the next claim takes it.
+
 ### D186 — `M192` (`#385`, the BHW Connect import) was held until the user named its merge point, and `M193` joins merge point 8 with `M191` (`#384`). In what order do the three go live? **A — `#384`, then `#385`, then `M193`.**
 
 **Asked and answered 2026-10-28 (user decision, in chat), while `M193` was planned; recorded in its claim.** `D171` puts `#384` at merge point 8 with the next increment from the line; `#385`'s claim said it was held until the user named its merge point, with `#384` first. The session prompt named one merge point for both, so the order was asked.

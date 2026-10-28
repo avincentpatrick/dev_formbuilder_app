@@ -15484,3 +15484,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the table to it. The remedy is a docs test that reads each §7.1 row's full `/api/v1` paths with their mark and checks them against
   `openapi.json`'s paths, reading a row that mixes marks (Tenant, Forms, Submissions) path by path. **Latent** — every mark is right
   today, and the first build that changes the API surface is what makes one wrong. Filed by `M193`. **Tier: before-launch.**
+
+- **`minor` · `scripts/gate-baselines.php` matches every metric against the whole run log, so the seventh job's Vitest summary is read as Meridian's: the run after merge point 8 regenerates Vitest as 85 files where Meridian has 283.**
+  Found at merge point 8's close-out (2026-10-28), regenerating from run 40696757541. Each metric names a `job`, but the job is only
+  the table's label: the pattern runs over the concatenated log of every job and takes the first match. `M192` added the
+  `BHW Connect (lint, types, tests, build)` job, whose Vitest prints the same `Test Files N passed (N)` line earlier in the log than
+  Meridian's `Frontend build & type-check`. A committed 85 would also turn `preflight`'s Vitest check red against the 283 files on
+  disk, so `docs/gate-baselines.md` was NOT regenerated and stays at run 40449344963. `M192`'s premise that every other Meridian gate
+  was already blind to `apps/` missed this one. The remedy: match each pattern only against the lines `gh run view --log` prefixes
+  with that job's name, with a fixture of two jobs printing the same summary. **Live.** Filed by `M193`. **Tier: during-testing.**

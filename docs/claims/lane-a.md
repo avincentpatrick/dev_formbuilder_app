@@ -16,7 +16,29 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M193`, the six `D38` rows: documented `/api/v1` surface marked not built, in place (`R-9e3e417e`, `R-1b966250`, `R-47552102`, `R-fcfc1f52`, `R-4328a4d9`, `R-f1312153`) (m193-d38-not-built)
+## Status: NO ACTIVE CLAIM — merge point 8 (`D186`; below) released three increments together, all merged and live on staging: `M191` (the PRD dispositions), `M192` (BHW Connect's import) and `M193` (the six `D38` rows). The next claim is `bhw-dependency-advisories` (`D187`), then `bhw-p1-box`.
+
+## RELEASED — `M193`, the six `D38` rows: documented `/api/v1` surface marked not built, in place (`R-9e3e417e`, `R-1b966250`, `R-47552102`, `R-fcfc1f52`, `R-4328a4d9`, `R-f1312153`) (merged as PR #386, `27440f21`, last at merge point 8, after merging the trunk into its branch at `78399fcf`; 7/7 green with real step counts on that run — Static analysis 33 · BHW Connect 19 (the unchanged branch) · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `27440f21` the same, with BHW Connect at 20)
+
+**RELEASED LAST AT MERGE POINT 8 (`D186`), 2026-10-28, by the session that built it.**
+- **The user's census:** before (12:05:48 UTC) = after (14:14:45 UTC), exactly: tenants 1 · users 6 · forms 11 · form versions 27 ·
+  submissions 22 · attachments 62 · feedback reports 31 · notifications 74; statuses confirmed, resolved.
+- **The branch merged the trunk once, after `#384` and `#385`, at `78399fcf`.** Two conflicts:
+  - At the backlog's end, the trunk's rows were kept whole and the two new rows appended, split by measured line index.
+  - The generated line was regenerated in a checkout with `vendor/`.
+- **That run carries `#385`'s owed observation:** *"apps/bhw-connect is unchanged in this pull request: every later step is skipped,
+  and the job reports success."*
+- **Deploy 40702645903 took a maintenance window**, because the pull request touched a PHP comment and a config comment.
+  - Backup `deploy-20261028-140951.dump`, 1,169,394 bytes.
+  - 70 tables and 54,043 rows counted. Nothing to migrate, and every table held at least as many rows after.
+  - `/up` and `/login` answered 200.
+- ⛔ **`docs/gate-baselines.md` was NOT regenerated at this close-out.**
+  - Run 40696757541 scrapes Vitest as 85 files, BHW's, where Meridian has 283.
+  - The cause: `scripts/gate-baselines.php` matches each metric against the whole run log, and the seventh job prints the same summary
+    line first. Filed as `R-b31f421e` (during-testing).
+  - The file stays at run 40449344963 until the scraper reads per job.
+
+**The claim as taken follows.**
 
 Taken 2026-10-28. Branch `m193-d38-not-built`, cut from `origin/main` at `87ab7956`, PR into main. ⛔ **NOT MERGED THIS SESSION:** held
 green for **merge point 8, third, after `#384` and `#385`** (`D186`, `D171`, `D137`). The plan is
@@ -140,7 +162,29 @@ No `VERSION` bump, no release note, no migration: nothing a tester sees changes.
   - Not run locally: Vitest, E2E and Storybook axe, since no front-end file changed. CI ran all three green.
   - No mutation: no gate was written.
 
-## HELD — `M192`, the BHW Connect merge, phase P0: BHW's code imported under `apps/bhw-connect/`, made prefix-aware, with its CI job, its box scripts written (not run), and the governance both developers work under (`bhw-p0-import`) (m192-bhw-import)
+## RELEASED — `M192`, the BHW Connect merge, phase P0: BHW's code imported under `apps/bhw-connect/`, made prefix-aware, with its CI job, its box scripts written (not run), and the governance both developers work under (`bhw-p0-import`) (merged as PR #385, `7cc8506b`, second at merge point 8, after merging the trunk into its branch at `77dbbe6b`; 7/7 green with real step counts on that run — Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `7cc8506b` the same)
+
+**RELEASED SECOND AT MERGE POINT 8 (`D186`, the merge point named 2026-10-28), 2026-10-28, by the `M193` session.**
+- **The branch merged the trunk after `#384` at `77dbbe6b`.** The one conflict was the generated line.
+- **Deploy 40695734307 took Meridian's full path,** because `deploy.ps1`, `composer.json` and `vite.config.ts` changed.
+  - Backup `deploy-20261028-132659.dump`, 1,170,038 bytes.
+  - 70 tables and 54,052 rows counted. Nothing to migrate, and every table held at least as many rows after.
+  - `/up` and `/login` answered 200.
+- **BHW is not served yet.** `deploy.yml` is wired to `ops/deploy-bhw.ps1` only in `bhw-p1-box`, which waits on
+  `bhw-dependency-advisories` (`D185`, `D187`).
+- **The owed items, as they stand:**
+  - ✅ The BHW job's "unchanged → success" branch, observed on `#386`'s run 40690735940.
+  - ⏳ The boundary turning red on a real cross-side pull request without the label. It is owed to `bhw-dependency-advisories`'
+    pull request, which is exactly that.
+  - ⛔ The gate baselines are not regenerated (`R-b31f421e`, in `M193`'s release). That is a gate this claim's premise called blind:
+    *"every other one is already blind"* was false for `scripts/gate-baselines.php`.
+- **The user's GitHub steps:**
+  - Done: the `boundary-approved` label exists, and jongsky25 is invited with write access (pending).
+  - Not yet saved when this was written: the ruleset's pull-request rule and the BHW required check. The ruleset was last updated
+    2026-08-31.
+- **jongsky25 has the onboarding guide** (`BHW-Connect-START-HERE.md`, sent privately, not in the repository).
+
+**The claim as taken follows.**
 
 Taken 2026-10-27. Branch `m192-bhw-import`, cut from `origin/main` at `bff6e11d`, PR into main. ⛔ **NOT MERGED THIS SESSION:** held
 green until the user names the merge point it rides. It opens one Meridian window, because `deploy.ps1` changes. ⛔ **No work on the
@@ -301,7 +345,15 @@ the trunk is unchanged since. `D185` was asked and answered during the build and
   - Container, `tests/Feature/Docs` and `tests/Feature/Deploy`: 222 passed, 1 failed. The failure is
     `SuiteCollectionFloorTest`, the known bind-mount artefact; its 79 missing files are all under `tests/Feature/Forms`.
 
-## HELD — `M191`, the tracker surgery, then every PRD feature and acceptance criterion gets a recorded disposition (`R-4868cdbc`, `prd-feature-disposition`, with `R-283b9c0d`) (m191-prd-dispositions)
+## RELEASED — `M191`, the tracker surgery, then every PRD feature and acceptance criterion gets a recorded disposition (`R-4868cdbc`, `prd-feature-disposition`, with `R-283b9c0d`) (merged as PR #384, `92a9a925`, first at merge point 8, with no rebase; 6/6 green with real step counts on its run at `1f8ae2a9` — Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `92a9a925` the same)
+
+**RELEASED FIRST AT MERGE POINT 8 (`D171`, `D186`), 2026-10-28, by the `M193` session.**
+- **No rebase.** The trunk had gained only claim commits, and the merged tree's line was checked current, with `pipeline-lint`
+  passing, in a CI-equivalent clone before the merge.
+- **Deploy 40689211330 took no window**, because only paths the site does not run changed.
+- **The thirteenth surgery** (`R-4868cdbc`, `770b1b4a`, on the trunk ahead of the branch) gets its archive note in this close-out.
+
+**The claim as taken follows.**
 
 Taken 2026-10-27. Branch `m191-prd-dispositions`, cut from `origin/main` at `6c8258f2`, PR into main. ⛔ **NOT MERGED THIS SESSION:**
 held green for **merge point 8, together with the next increment from the line** (`D171`, `D137`). The plan is

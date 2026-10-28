@@ -11206,7 +11206,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   regenerated deliberately. The remedy is to cite the line's rows by `R-` id, which is stable for the life of the row.
   **Live.** Filed by `M108`. **Tier: during-testing.**
 
-- **`minor` · `backlog-triage-controls` is registered in CI and absent from `docs/gate-baselines.md`, so its case
+- ✅ **CLOSED BY `M195` (2026-10-28) — ****`minor` · `backlog-triage-controls` is registered in CI and absent from `docs/gate-baselines.md`, so its case
   count is the one gate number nothing tracks.** Filed 2026-09-24 by `M108`, which registered the gate and found the
   gap while regenerating the baselines from its own post-merge run. `scripts/gate-baselines.php` carries a fixed
   roster of gate patterns, each a regex over that gate's own pass line; the new harness prints
@@ -11220,6 +11220,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   change pushed straight to the trunk without a claim naming a branch is what `scripts/pre-push-guard.php` exists to
   refuse. ⚠️ **It also wants a floor of its own in the same edit**, on the argument above: a case count is only worth
   recording if something refuses a suspiciously small one. **Live.** Filed by `M108`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M195` (2026-10-28), on its branch, under `D13` exception #7 (with `R-b31f421e`, allowed by the user in
+  chat).** `scripts/gate-baselines.php` records the harness's count, which is 10 cases now, not 8. Its floor is
+  `MIN_CASES` in `scripts/backlog-triage-controls.php`: a committed mutant that stops one case from running exits 2
+  with *"ran 9 case(s), under the floor of 10"*. ⚠️ **"The one gate number nothing tracks" was false.** The static job
+  printed eight counted pass lines that nothing recorded, and all eight are recorded now:
+  - the mail-attribute linter and tracker-lint;
+  - the controls of tracker-lint, citation liveness, the pre-push guard, the test-pointer lint, backlog-triage and the
+    boundary check.
+
+  The other five controls harnesses have no floor under their counts, and that is filed below, as is the declared roster
+  that let eight go unrecorded.
 
 - **`minor` · A tab open longer than the build-retention window still asks for a chunk that no longer exists.**
   Filed 2026-09-25 by `M109`, at the moment the window was chosen rather than after. `deploy.ps1` now carries the
@@ -15485,7 +15496,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `openapi.json`'s paths, reading a row that mixes marks (Tenant, Forms, Submissions) path by path. **Latent** — every mark is right
   today, and the first build that changes the API surface is what makes one wrong. Filed by `M193`. **Tier: before-launch.**
 
-- **`minor` · `scripts/gate-baselines.php` matches every metric against the whole run log, so the seventh job's Vitest summary is read as Meridian's: the run after merge point 8 regenerates Vitest as 85 files where Meridian has 283.**
+- ✅ **CLOSED BY `M195` (2026-10-28) — ****`minor` · `scripts/gate-baselines.php` matches every metric against the whole run log, so the seventh job's Vitest summary is read as Meridian's: the run after merge point 8 regenerates Vitest as 85 files where Meridian has 283.**
   Found at merge point 8's close-out (2026-10-28), regenerating from run 40696757541. Each metric names a `job`, but the job is only
   the table's label: the pattern runs over the concatenated log of every job and takes the first match. `M192` added the
   `BHW Connect (lint, types, tests, build)` job, whose Vitest prints the same `Test Files N passed (N)` line earlier in the log than
@@ -15493,3 +15504,36 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   disk, so `docs/gate-baselines.md` was NOT regenerated and stays at run 40449344963. `M192`'s premise that every other Meridian gate
   was already blind to `apps/` missed this one. The remedy: match each pattern only against the lines `gh run view --log` prefixes
   with that job's name, with a fixture of two jobs printing the same summary. **Live.** Filed by `M193`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M195` (2026-10-28), on its branch, under `D13` exception #7 (with `R-4130e1fa`, allowed by the user in chat).**
+  Each metric, and the E2E extras, now read only their own job's lines: the text gh prints before a line's first tab. Against run
+  40696757541, measured before any test was written, exactly two lines move: Vitest 85 → **283 files**, and the extras 11 →
+  **82 skipped**.
+  - ⚠️ **The extras were wrong before BHW arrived.** The committed file's `1 skipped` was Pest's line; E2E prints 82.
+  - Both ci-log fixtures took gh's real `job TAB step TAB timestamp text` shape, which they had never modelled.
+  - The new scenario `two-jobs-one-summary` puts a seventh job first, printing a Vitest summary, a skip count and the word *flaky*,
+    and its table must equal `recent-push`'s.
+  - Two committed-tree mutants, the metric scope and the extras scope each reverted to the whole log, were both CAUGHT by that case
+    alone.
+
+- **`minor` · Five controls harnesses print a case count with nothing under it, so a case that stops running still ends in `passed`.**
+  Found by `M195` (2026-10-28). That increment records each count in `docs/gate-baselines.md` and gives one harness,
+  `scripts/backlog-triage-controls.php`, a `MIN_CASES` floor, as `R-4130e1fa` asked. The other five have no floor on their own
+  counts: tracker-lint's controls, citation liveness's, the pre-push guard's, the test-pointer lint's `--selftest`, and the
+  boundary check's. Every "floor" in them is a floor on the fixtures or the scan of the gate they test. The mail-attribute
+  linter, also newly recorded, already floors both its counts (`MIN_EXPECTED_VIEWS`, `MIN_EXPECTED_ATTRIBUTE_ECHOES`).
+  - A recorded count only shows the drop at the next regeneration, after the merge that lost the case.
+  - The remedy is the same constant and the same `cannot_measure` exit in each harness, proved by a committed mutant that stops
+    one case.
+
+  **Latent** — every count is whole today. Filed by `M195`. **Tier: during-testing.**
+
+- **`minor` · `scripts/gate-baselines.php`'s gate roster is declared, not derived, so a counted gate added to `ci.yml` is recorded nowhere until someone adds it by hand — eight had been.**
+  Found by `M195` (2026-10-28), which recorded the static job's eight unrecorded pass lines by hand. `M90` already named the shape in
+  the roster's own comment (*"a gate added to ci.yml is INVISIBLE here until somebody adds a row"*), and nothing enforces it.
+  `GateBaselinesTest` pairs the roster with its fixtures, never with `ci.yml`.
+  - The remedy is a docs test that reads each `ci.yml` step that runs a repository gate and requires a roster entry or a stated
+    exemption for each. The verdict-only steps (the composer audit, the npm audit judge, gitleaks) and the BHW job are named as
+    exemptions.
+
+  **Latent** — every counted line is recorded today, and the next gate added to `ci.yml` is what makes it wrong. Filed by `M195`.
+  **Tier: during-testing.**

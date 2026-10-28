@@ -138,6 +138,10 @@ design — not a page inside Meridian's shell.
   page) until `bhw-e2e-in-ci`.
 - The boundary label is trust-based: a label applied before later commits still counts, and the working
   agreement asks the approver to re-apply it.
+- The boundary runs inside a `pull_request` job, which GitHub takes from the pull request's own copy of
+  `ci.yml` — so a collaborator could delete the step in the same pull request it would have refused. The
+  `.github/` change still shows in the diff, but no check flags it. GitHub cannot limit a collaborator to one
+  folder of a personal repository, so this guard is the whole fence; hardening it is `bhw-boundary-hardening`.
 
 **Rejected:** a subdomain; two repositories; a second PostgreSQL instance; staying on Supabase; direct
 Postgres queries; npm workspaces; moving Meridian to `apps/meridian/`; "require review from code owners";
@@ -156,4 +160,5 @@ Each phase is one increment, claimed when taken. The markers below are the queue
 <!-- pipeline: id=bhw-ci-fast-path title="Meridian's six CI jobs skip a pull request that changes only apps/bhw-connect, the secret scan kept — BHW's checks drop from about 30 minutes" phase=n/a state=blocked size=S blocker="M192 merged: the bhw-connect job must be on the trunk first" tier=during-testing -->
 <!-- pipeline: id=bhw-preview-slot title="A preview of a BHW pull request on the box before it merges (a second BHW service at /bhw-connect-preview), if staging-as-preview proves too coarse (D182)" phase=n/a state=blocked size=M blocker="bhw-p1-box" tier=before-launch -->
 <!-- pipeline: id=bhw-data-upload-page title="An admin-only BHW page that takes a data load file and loads it, so a load needs no operator (D181)" phase=n/a state=blocked size=L blocker="bhw-p2-db" tier=before-launch -->
+<!-- pipeline: id=bhw-boundary-hardening title="Run the boundary check from main's own copy of its workflow (a pull_request_target workflow reading the head's commits without running them, or a ruleset-required workflow), so a pull request cannot delete the check that judges it; measure first whether such a check can satisfy a required status" phase=n/a state=blocked size=S blocker="M192 merged: the boundary and CODEOWNERS must be on the trunk" tier=during-testing -->
 <!-- pipeline: id=bhw-e2e-in-ci title="BHW's Playwright specs in CI against the prefixed build, so a broken page is caught before it ships rather than on staging" phase=n/a state=blocked size=S blocker="bhw-p4-loop" tier=before-launch -->

@@ -1315,104 +1315,239 @@ it('P2c — a sentence in a table row answers in its last cell, before the closi
     });
 });
 
-it('P2e — reddens when a new acceptance criterion carries no disposition', function (): void {
-    $anchor = '- A user can upload a single-page image or PDF, associated with a specific form and its currently published version.';
-    $prd = str_replace(
-        $anchor,
-        $anchor."\n- A newly promised capability with nothing recording what became of it.",
-        pipelineLintDoc('docs/PRD.md')
-    );
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// P2a and P2e discharge (M191). Every criterion and every feature's Phase line now ENDS in its answer,
+// so a case cannot anchor on a criterion's prose prefix any more: replacing a prefix with "prefix +
+// new line" would hand the original criterion's disposition to the line inserted after it. Each case
+// below edits a WHOLE line, found by the shape the gate reads.
+//
+// ⚠️ THE HELPERS ARE A SECOND READING OF THAT SHAPE, AND THE BASELINE ASSERTION KEEPS THEM HONEST. If
+// one finds the wrong line, the perturbation reddens the wrong site and the case's own message
+// assertion fails — loud, never a silently weaker control.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
 
-    pipelineLintPerturb('docs/PRD.md', $prd, function (int $status, string $output): void {
-        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
-        expect($output)->toContain('states 94 acceptance criteria');
-    });
-});
+/** @return list<string> */
+function pipelineLintPrdLines(): array
+{
+    return explode("\n", pipelineLintDoc('docs/PRD.md'));
+}
 
-it('P2e — reddens when a criterion GAINS a disposition, because the constant moves with the work', function (): void {
-    // ⚠️ NOT A FALSE POSITIVE — IT IS THE MECHANISM. Dispositioning a bullet is progress, and the
-    // increment that makes it lowers the constant in the same commit. tracker-lint records the same
-    // discipline for its own residue: a gate whose expectation an increment invalidates must be
-    // updated BY that increment, or main merges red.
-    $anchor = '- A user can upload a single-page image or PDF, associated with a specific form and its currently published version.';
-    $prd = str_replace($anchor, $anchor.' *(Shipped: a fixture increment.)*', pipelineLintDoc('docs/PRD.md'));
-
-    pipelineLintPerturb('docs/PRD.md', $prd, function (int $status, string $output): void {
-        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
-        expect($output)->toContain('holds 88 undispositioned acceptance bullet(s)');
-    });
-});
-
-it('P2e — reddens when a DISPOSITIONED criterion is deleted, which the residue alone cannot see', function (): void {
-    // ⛔ WHY P2e PINS THE CORPUS AS WELL AS THE RESIDUE. Deleting a bullet that already carried its
-    // disposition leaves the residue at exactly 89 — a rule watching only the residue reports green
-    // while a stated product commitment has been removed from the document.
-    $lines = explode("\n", pipelineLintDoc('docs/PRD.md'));
+/** The index of the PRD's first acceptance criterion: a top-level bullet after `Acceptance criteria`, inside a feature. */
+function pipelineLintFirstCriterion(array $lines): int
+{
+    $feature = false;
+    $acceptance = false;
 
     foreach ($lines as $i => $line) {
-        if (str_starts_with($line, '- ') && str_contains($line, '*(')) {
-            unset($lines[$i]);
+        if (preg_match('/^#{1,6} (.*)$/', $line, $m) === 1) {
+            $feature = str_starts_with($m[1], 'Feature #');
+            $acceptance = false;
+
+            continue;
+        }
+
+        if ($feature && preg_match('/^Acceptance criteria/i', $line) === 1) {
+            $acceptance = true;
+
+            continue;
+        }
+
+        if ($feature && $acceptance && str_starts_with($line, '- ')) {
+            return $i;
+        }
+    }
+
+    throw new RuntimeException('the PRD holds no acceptance criterion');
+}
+
+/** The index of Feature #N's Phase line — the line directly under its heading. */
+function pipelineLintPhaseLine(array $lines, int $feature): int
+{
+    foreach ($lines as $i => $line) {
+        if (str_starts_with($line, "### Feature #{$feature} ")) {
+            expect($lines[$i + 1] ?? '')->toStartWith('**Phase');
+
+            return $i + 1;
+        }
+    }
+
+    throw new RuntimeException("the PRD holds no Feature #{$feature}");
+}
+
+/** The line without the italic parenthetical that ends it. */
+function pipelineLintWithoutDisposition(string $line): string
+{
+    $opens = strrpos($line, '*(');
+
+    expect($opens)->not->toBeFalse("this line ends in no disposition to remove:\n{$line}");
+
+    return rtrim(substr($line, 0, (int) $opens));
+}
+
+/** The word the line's closing disposition opens with. */
+function pipelineLintDispositionWord(string $line): string
+{
+    expect(preg_match('/\*\((Built|Queued|Not planned) — (?!.*\*\().*\)\*$/u', $line, $m))->toBe(1, $line);
+
+    return $m[1];
+}
+
+it('P2e — reddens when a new acceptance criterion carries no disposition', function (): void {
+    $lines = pipelineLintPrdLines();
+    $at = pipelineLintFirstCriterion($lines);
+    array_splice($lines, $at + 1, 0, ['- A newly promised capability with nothing recording what became of it.']);
+
+    pipelineLintPerturb('docs/PRD.md', implode("\n", $lines), function (int $status, string $output) use ($at): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('the criterion at docs/PRD.md:'.($at + 2).' ends in no disposition');
+        expect($output)->toContain('holds 94 acceptance criteria and the pinned expectation is 93');
+    });
+});
+
+it('P2e — reddens when a criterion LOSES its disposition, naming the criterion', function (): void {
+    $lines = pipelineLintPrdLines();
+    $at = pipelineLintFirstCriterion($lines);
+    $lines[$at] = pipelineLintWithoutDisposition($lines[$at]);
+
+    pipelineLintPerturb('docs/PRD.md', implode("\n", $lines), function (int $status, string $output) use ($at): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('the criterion at docs/PRD.md:'.($at + 1).' ends in no disposition');
+        expect($output)->not->toContain('pinned expectation is 93');
+    });
+});
+
+it('P2e — reddens when a DISPOSITIONED criterion is deleted, which no per-criterion check can see', function (): void {
+    // ⛔ WHY P2e STILL PINS THE CORPUS. A deleted criterion is one fewer line to check, so a rule that
+    // only reads the criteria that exist reports green while a stated product promise has gone.
+    $lines = pipelineLintPrdLines();
+    unset($lines[pipelineLintFirstCriterion($lines)]);
+
+    pipelineLintPerturb('docs/PRD.md', implode("\n", $lines), function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('holds 92 acceptance criteria and the pinned expectation is 93');
+        expect($output)->not->toContain('ends in no disposition');
+    });
+});
+
+it('P2e — refuses the retired "Deferred", which answers without naming the row that carries it', function (): void {
+    $lines = pipelineLintPrdLines();
+    $at = pipelineLintFirstCriterion($lines);
+    $lines[$at] = pipelineLintWithoutDisposition($lines[$at]).' *(Deferred — to a later phase)*';
+
+    pipelineLintPerturb('docs/PRD.md', implode("\n", $lines), function (int $status, string $output) use ($at): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('the criterion at docs/PRD.md:'.($at + 1).' ends in *(Deferred — to a later phase)*, which opens with none of Built, Queued, Not planned');
+    });
+});
+
+it('P2e — refuses the retired "Shipped:", the form the PRD used before M191', function (): void {
+    $lines = pipelineLintPrdLines();
+    $at = pipelineLintFirstCriterion($lines);
+    $lines[$at] = pipelineLintWithoutDisposition($lines[$at]).' *(Shipped: in an earlier increment.)*';
+
+    pipelineLintPerturb('docs/PRD.md', implode("\n", $lines), function (int $status, string $output) use ($at): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('the criterion at docs/PRD.md:'.($at + 1).' ends in *(Shipped: in an earlier increment.)*');
+    });
+});
+
+it('P2e — Queued on an id the line does not hold reddens, naming it', function (): void {
+    $lines = pipelineLintPrdLines();
+    $at = pipelineLintFirstCriterion($lines);
+    $lines[$at] = pipelineLintWithoutDisposition($lines[$at]).' *(Queued — `R-00000000`, a fixture)*';
+
+    pipelineLintPerturb('docs/PRD.md', implode("\n", $lines), function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('is Queued on `R-00000000`, which is not a row in the line');
+    });
+});
+
+it('P2e — a criterion that merely QUOTES a disposition mid-line does not discharge itself', function (): void {
+    // ⛔ M84's OVER-COLLECT DIRECTION, the worse one: under a first-match reader a criterion that only
+    // MENTIONS an answer would count as answered, and a live promise would stop being checked.
+    $lines = pipelineLintPrdLines();
+    $at = pipelineLintFirstCriterion($lines);
+    $lines[$at] = pipelineLintWithoutDisposition($lines[$at])
+        .' The sibling criterion reads *(Built — an earlier increment)* and this one has not been.';
+
+    pipelineLintPerturb('docs/PRD.md', implode("\n", $lines), function (int $status, string $output) use ($at): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('the criterion at docs/PRD.md:'.($at + 1).' ends in no disposition');
+    });
+});
+
+it('P2e — a criterion whose PROSE also carries an italic parenthetical is still read by its LAST one', function (): void {
+    // M84's UNDER-COLLECT direction. The bot-challenge criterion carries `(e.g., CAPTCHA)` in plain
+    // parentheses; italicising it puts a vocabulary-free parenthetical ahead of the real answer, which
+    // a first-match reader would take and refuse.
+    $prd = pipelineLintDoc('docs/PRD.md');
+
+    expect($prd)->toContain('(e.g., CAPTCHA)');
+
+    pipelineLintPerturb('docs/PRD.md', str_replace('(e.g., CAPTCHA)', '*(e.g., CAPTCHA)*', $prd), function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
+        expect($output)->toContain('93 criteria, each saying Built, Queued or Not planned');
+    });
+});
+
+it('P2a — reddens when a feature\'s Phase line loses its disposition', function (): void {
+    $lines = pipelineLintPrdLines();
+    $phase = pipelineLintPhaseLine($lines, 1);
+    $lines[$phase] = pipelineLintWithoutDisposition($lines[$phase]);
+
+    pipelineLintPerturb('docs/PRD.md', implode("\n", $lines), function (int $status, string $output) use ($phase): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('the Phase line of Feature #1 at docs/PRD.md:'.$phase.' ends in no disposition');
+    });
+});
+
+it('P2a — reddens when a feature has no Phase line directly under its heading', function (): void {
+    $lines = pipelineLintPrdLines();
+    $phase = pipelineLintPhaseLine($lines, 14);
+    $lines[$phase] = str_replace('**Phase', '**Stage', $lines[$phase]);
+
+    pipelineLintPerturb('docs/PRD.md', implode("\n", $lines), function (int $status, string $output) use ($phase): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('Feature #14 at docs/PRD.md:'.$phase.' has no **Phase:** line directly under its heading');
+    });
+});
+
+it('P2a — reddens when a Built feature says another word, because the criteria are the answer', function (): void {
+    // ⛔ THE FEATURE'S WORD IS A SECOND COPY OF ITS CRITERIA'S, so the copy is checked against them.
+    $lines = pipelineLintPrdLines();
+    $phase = pipelineLintPhaseLine($lines, 1);
+    $word = pipelineLintDispositionWord($lines[$phase]);
+    $other = $word === 'Built' ? 'Not planned' : 'Built';
+    $lines[$phase] = pipelineLintWithoutDisposition($lines[$phase]).' *('.$other.' — a fixture)*';
+
+    pipelineLintPerturb('docs/PRD.md', implode("\n", $lines), function (int $status, string $output) use ($word, $other): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('Feature #1 at docs/PRD.md:');
+        expect($output)->toContain("says {$other}, and its criteria roll up to {$word}");
+    });
+});
+
+it('P2a — a feature with any criterion still Queued is Queued, however much of it is Built', function (): void {
+    // The rollup's first rule, and the one a reader is most tempted to get wrong: a feature mostly
+    // shipped is still owed while a row carries any of it.
+    $lines = pipelineLintPrdLines();
+    $queued = null;
+
+    foreach ($lines as $i => $line) {
+        if (str_starts_with($line, '**Phase') && str_starts_with($lines[$i - 1] ?? '', '### Feature #') && pipelineLintDispositionWord($line) === 'Queued') {
+            $queued = $i;
 
             break;
         }
     }
 
+    expect($queued)->not->toBeNull('the PRD holds no Queued feature, so this case has nothing to perturb');
+
+    $lines[$queued] = pipelineLintWithoutDisposition($lines[$queued]).' *(Built — a fixture)*';
+
     pipelineLintPerturb('docs/PRD.md', implode("\n", $lines), function (int $status, string $output): void {
         expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
-        expect($output)->toContain('states 92 acceptance criteria');
-    });
-});
-
-/**
- * ⛔ THE TWO CASES BELOW ASSERT **CLEAN**, WHICH IS THE ONLY HONEST SHAPE HERE AND IS ALSO THE WEAKEST
- * ONE, SO SAY SO (M84). `carries_a_disposition()` used to read the FIRST italic parenthetical on a
- * bullet; it now requires the disposition to be the LAST thing on the line. Both predicates give the
- * same answer on every bullet in the live PRD — the residue is 89 and the digest unchanged either way
- * — so `php scripts/pipeline-lint.php` cannot tell them apart and proves nothing about this repair.
- *
- * These two perturbations are the shapes where they DIVERGE. Under the shipped predicate each stays
- * green; under the first-match predicate each reddens, in opposite directions. ⚠️ A green case proves
- * nothing on its own: the proof is the mutation that restores the old body and turns both red, and it
- * is recorded in the increment rather than left implicit.
- *
- * Both edit a line IN PLACE so the fixture's line count does not move, which is the shape the
- * `P2a — RETITLED` and `P2b — RENUMBERED` cases already establish.
- */
-it('P2e — a dispositioned criterion whose PROSE also carries an italic parenthetical still counts as dispositioned', function (): void {
-    // UNDER-COLLECT, the direction the row filed. This bullet already ends with a real disposition and
-    // already carries `(e.g., CAPTCHA)` earlier in its prose — in PLAIN parentheses, which the
-    // predicate cannot see. Italicising that aside creates the hazard the row described as if it were
-    // already present. First-match reads `e.g., CAPTCHA`, finds no vocabulary word, and counts a
-    // dispositioned criterion as residue: 89 becomes 90.
-    $anchor = '- Per-form, configurable rate limiting / bot-challenge (e.g., CAPTCHA) is available to curb spam submissions.';
-    $prd = pipelineLintDoc('docs/PRD.md');
-
-    expect($prd)->toContain($anchor);
-
-    $hazard = str_replace('(e.g., CAPTCHA)', '*(e.g., CAPTCHA)*', $anchor);
-
-    pipelineLintPerturb('docs/PRD.md', str_replace($anchor, $hazard, $prd), function (int $status, string $output): void {
-        expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
-        expect($output)->toContain('89 undispositioned acceptance bullet(s)');
-    });
-});
-
-it('P2e — a criterion that merely QUOTES a disposition mid-line does not discharge itself', function (): void {
-    // ⛔ OVER-COLLECT, AND THE ROW DID NOT CLAIM THIS DIRECTION AT ALL. It is the worse one: under
-    // first-match a bullet that only MENTIONS a disposition leaves the residue set, so a live product
-    // commitment stops being counted as outstanding. 89 becomes 88. This is the same
-    // mention-versus-declaration trap `P2b`'s narrating-heading carve-out and `P2c`'s strip_mentions()
-    // already carry; `P2e` was the arm still exposed to it.
-    $anchor = '- A user can upload a single-page image or PDF, associated with a specific form and its currently published version.';
-    $prd = pipelineLintDoc('docs/PRD.md');
-
-    expect($prd)->toContain($anchor);
-
-    $quoting = $anchor.' The sibling criterion reads *(Shipped: in an earlier increment.)* — this one has not been.';
-
-    pipelineLintPerturb('docs/PRD.md', str_replace($anchor, $quoting, $prd), function (int $status, string $output): void {
-        expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
-        expect($output)->toContain('89 undispositioned acceptance bullet(s)');
+        expect($output)->toContain('says Built, and its criteria roll up to Queued');
     });
 });
 

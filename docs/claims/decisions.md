@@ -24,10 +24,40 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D184`, the last filed, was asked and answered on 2026-10-27 while `M192` (the BHW Connect merge, phase P0) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D186`, the last filed, was asked and answered on 2026-10-28 while `M193` (the six `D38` rows) was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D186 — `M192` (`#385`, the BHW Connect import) was held until the user named its merge point, and `M193` joins merge point 8 with `M191` (`#384`). In what order do the three go live? **A — `#384`, then `#385`, then `M193`.**
+
+**Asked and answered 2026-10-28 (user decision, in chat), while `M193` was planned; recorded in its claim.** `D171` puts `#384` at merge point 8 with the next increment from the line; `#385`'s claim said it was held until the user named its merge point, with `#384` first. The session prompt named one merge point for both, so the order was asked.
+
+- **A — `#384` → `#385` → `M193` (recommended, chosen).** It keeps `#385`'s own order. `M193`, which changes only documents and two comments, goes last, so its rebased run is a Meridian-only pull request after the BHW job exists — the job's "unchanged → success" branch, which `#385`'s close-out owes, is observed there.
+- **B — `#384` → `M193` → `#385`.** The BHW deploy changes (`deploy.ps1`, `composer.json`, `vite.config.ts`) land last, so trouble in that deploy leaves the two documentation changes already live.
+- **C — `#384` and `M193` only.** `#385` waits for a later merge point.
+
+**What the answer files, in the same push:** nothing new. `M192` moves under HELD in `docs/claims/lane-a.md` as second at merge point 8, and `M193`'s claim names its place, third. As at every merge point: the user's census before and after, and each pull request only once the previous deploy has finished and `/up` answers.
+
+### D185 — BHW's production dependencies carry 2 critical and 8 high advisories, so Meridian's audit rule would turn the new BHW check red. What does P0 do? **A — the BHW audit warns in P0; a row lists every advisory and blocks P1, so BHW is never served from this origin until they are cleared with the map and export screens checked in a browser.**
+
+**Asked and answered 2026-10-28 (user decision, in chat), while `M192` was being built; recorded in its claim.** Measured on the import's lockfile through `scripts/npm-audit-judge.php`:
+- `next` is critical: a middleware/proxy bypass under Turbopack, the layer the new CSP runs in. The fix is the 16.4 line, whose fixing release was five days old.
+- `maplibre-gl` is critical: an XSS in its sanitiser, fixed only in a major (5 → 6).
+- `pptxgenjs` and `image-size` are high, with no clean fix.
+- `postcss` and `sharp` are high, fixed through `next`.
+- `brace-expansion`, `nanoid`, `source-map-js` and `zod` are high, with in-range lockfile fixes.
+
+Nothing serves BHW from Meridian's origin until `bhw-p1-box`.
+
+- **A — warn now, block P1 (recommended, chosen).** No blind major upgrade of another developer's map library today.
+- **B — upgrade what is safe now.** `next` and the four in-range fixes, checked by build and tests; the check stays red on the rest until decided.
+- **C — upgrade everything now.** Including `maplibre-gl` 5 → 6, with maps unseen until staging.
+
+**What the answer files, in the same push:**
+- The BHW job's audit step warns on a block and still fails on any other error.
+- `bhw-dependency-advisories` (during-testing) is filed in ADR-0024, and `bhw-p1-box` is blocked on it.
+- When that row closes, the step's warning arm is deleted.
+
 ### D184 — Once BHW Connect runs on the testing box, what happens to its Vercel deployment? **A — paused, then deleted; `/bhw-connect` becomes the only address.**
 
 **Asked and answered 2026-10-27 (user decision, in chat), while `M192` was planned; recorded in its claim.** BHW is hosted on Vercel today, built from jongsky25's own repository.
@@ -3753,6 +3783,14 @@ half that works.
 ##### There is no #6 — `M130` (2026-10-04) tripped the escalation, and `D75` is the answer
 
 The third Oct 12 batch broke the second clause again, and the first as well: two of its rows edit the same six files. As #5 said it should, `M130` filed a decision about the rule instead of a sixth exception. **`D75` (user decision, in chat): until the Oct 12 session, a plan slot is one increment, and each row lands as its own commits in a stated order.** The log resumes at #6 for any deviation after that.
+
+##### #6 — `M193` (2026-10-28) · six rows of one answer across two hub documents, allowed by the user in chat
+
+**What was not satisfied:** both clauses of item 1. `M193` takes the six rows `D38` answered — `R-9e3e417e`, `R-1b966250` and `R-47552102` edit the §7.1 table of `docs/architecture/technical-architecture.md`; `R-fcfc1f52`, `R-4328a4d9` and `R-f1312153` edit `docs/api-specification.md` — so three rows edit each file, and both files are in the derived hub set.
+
+**Why:** one subject with one answer. `D38` = C marks documented, unbuilt `/api/v1` surface as not built, in place, and the six rows are its whole list. `M108`, closing the row that said the six could neither be grouped nor safely split, recorded them as pre-cleared to batch together; that was an increment's word, not the user's, so the batch was put to the user by name. Every edit sits inside an existing line, so no line moves and no citation cascades, and the two files' rows do not interleave.
+
+**Disposition:** the user chose all six together, in chat on 2026-10-28, over the three §7.1 rows alone and over the head row with unrelated rows. Recorded in both places this log requires: inline at the closed rows and in `PROGRESS.md`'s release paragraph. Not a precedent, and the first of its reason, so the escalation rule above is not engaged.
 
 ---
 

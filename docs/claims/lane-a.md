@@ -16,7 +16,131 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M192`, the BHW Connect merge, phase P0: BHW's code imported under `apps/bhw-connect/`, made prefix-aware, with its CI job, its box scripts written (not run), and the governance both developers work under (`bhw-p0-import`) (m192-bhw-import)
+## Status: ACTIVE CLAIM — `M193`, the six `D38` rows: documented `/api/v1` surface marked not built, in place (`R-9e3e417e`, `R-1b966250`, `R-47552102`, `R-fcfc1f52`, `R-4328a4d9`, `R-f1312153`) (m193-d38-not-built)
+
+Taken 2026-10-28. Branch `m193-d38-not-built`, cut from `origin/main` at `87ab7956`, PR into main. ⛔ **NOT MERGED THIS SESSION:** held
+green for **merge point 8, third, after `#384` and `#385`** (`D186`, `D171`, `D137`). The plan is
+`~/.claude/plans/read-claude-md-then-run-fluffy-pizza.md`. Numbered past the held `M191` and `M192` (the `M188`/`M190` precedent).
+Rows — the head of the line's during-testing tier after the held `prd-feature-disposition`, and its five siblings under `D38` = C:
+- `R-9e3e417e` — *"§7.1's `Form draft` row pins four `/api/v1` builder endpoints registered nowhere, and the `validations`
+  sub-resource exists on neither surface"*, with the adjacent Forms row's `POST` / `PATCH` / `DELETE`.
+- `R-1b966250` — *"The documented async export API … has zero routes and no `exports` job row"*.
+- `R-47552102` — *"The documented `Users & roles` API resource group … has zero routes, and a shipped schema decision was already
+  made on its account"*.
+- `R-fcfc1f52` — *"`docs/api-specification.md` … states in the present tense that every unsafe request is deduplicated"* (`Idempotency-Key`).
+- `R-4328a4d9` — *"The API rate-limit table promises 300 requests/minute per authenticated user and no such limiter is defined"*.
+- `R-f1312153` — *"1 concurrent sync export per form, additional requests 429 — no concurrency guard exists on any export path"*.
+
+⛔ **Six rows across two hub files breaks both clauses of `D13` item 1 — exception #6, allowed by the user in chat** and recorded at
+`D13` in `docs/claims/decisions.md`. The session-start pull read 0 reports, 0 reopened and 0 new comments (relayed 31: 25 Resolved ·
+6 Confirmed working), so nothing was triaged. `D186` (the order at merge point 8) was asked and answered in planning.
+
+### Evidence verified
+Measured in planning on `origin/main` at `87ab7956` by a read-only fan-out, one reader per document.
+- **The claims hold in all six rows; most line citations have drifted**, each still landing on a live line, so the citation gate
+  cannot see it:
+  - `routes/api.php` is one lower everywhere since `M130`'s `use` line (the forms family is `:169`–`:201`, the exports `:188`/`:403`).
+    It carries 75 routes, not 68; `openapi.json` 58 paths, not 51 — none an export, user, role, draft, section, field or validation path.
+  - `R-9e3e417e`: the builder block is `routes/tenant.php:621-680`, and it is no longer "all on `FormBuilderController`" (the conversion
+    and other-specify controllers sit in it). `FormBuilderService` writes validations at `:276`, `:319` and `:993`; `:240`, `:316-318`
+    and `:572` are now other lines.
+  - `R-1b966250`: `data-dictionary.md:59` is now the `FieldRevisionKind` row; `GeneratePdfJob`'s "no notification bell" is stale (the
+    bell exists), and the row leans only on "no broadcast", which holds.
+  - `R-47552102`: the member routes are `routes/tenant.php:429-454`; the "/api/v1 twins" sentences moved.
+  - `R-fcfc1f52`: `AppServiceProvider`'s §2.5 comment is near `:389` and the `api` limiter near `:392`; 31 middleware, not 29.
+  - `R-4328a4d9`: 28 limiter registrations (17 + 10 + 1), and the signed-in group now carries 7 numeric throttles and 3 named ones,
+    not three.
+  - `R-f1312153`: `routes/api.php` `:188`, `:403`, `:153`; 35 `lockForUpdate()` calls, not about twenty.
+- Each closing note records its row's drift; the closed rows' prose is not rewritten.
+
+### Premise verified
+- **Holds for all six: nothing in any of the six groups exists on `/api/v1`, and `openapi.json` agrees.** No `Idempotency-Key` read
+  exists anywhere; no limiter is 300 and the `web` group appends no throttle; no export path carries a `Cache::lock`, a unique job,
+  `WithoutOverlapping` or a 429.
+- **Three things the rows say are false as worded, and the annotations must not repeat them:**
+  - Per-route, per-user limiters DO exist (6–120 a minute), so "no per-user limiter" is false.
+  - `/api/v1` DOES carry two exports (XLSForm and the analytics report): "no export endpoint" holds only as "no submission export".
+  - Web twins exist for forms (create, edit, archive), sections, fields and members; the draft has no PATCH twin.
+- **Second copies the rows never named, each left stale by an annotation of the row alone — taken here:**
+  - `FormApiController`'s class docblock says the writes "extend this same pattern in Phase 1".
+  - `config/permission.php` says roles "are" addressable via `GET /api/v1/roles`.
+  - `technical-architecture.md` §7.3 describes the async export and the sync mode's cap in the present tense, and its two diagram
+    labels and its infrastructure table give Redis an "idempotency dedupe" no code performs.
+  - `docs/api-specification.md` sends higher volumes to the async export path, and says every rate-limited response carries the
+    `X-RateLimit-*` headers, which the guest per-form limiter and the monthly quota do not (`M123` folded that into `R-f1312153`).
+- ⛔ **`docs/multi-tenancy-rbac-design.md` ends a line in `*(Queued — `R-47552102`)*`** (`M190`). Closing that row turns `P2b` red
+  unless the ending is rewritten. It is the only `Queued` site for any of the six, on the trunk and on `#384`'s branch.
+- **§7.1 carries five more unbuilt groups that no row tracks** (`PATCH /tenant`, manual/API submissions and their CRUD, attachments,
+  OCR, subscription). Marked six and left five, the table would read as audited. Taken here as the census half: every §7.1 row is
+  checked against the routes and `openapi.json` and marked. **Not taken:** the two webhook rows, queued as `R-c8c8da76` and
+  `R-1d43bef5` with a different fix (their paths exist under other names), and the spec's guest per-IP line, queued as `R-63b85640`
+  and `R-307a9789`.
+- `#384` (`M191`) changes neither document and none of these lines; `#385` (`M192`) neither. Their `P2a`/`P2e` read only `docs/PRD.md`.
+
+### Remedy verdict
+- **`D38` = C works for all six, as prescribed.** Both documents are citation tier 1 with zero tolerance; an annotation inside an
+  existing line moves nothing and renumbers no section. No test reads either document's text. `P2b` never reaches §7.1, nor the spec
+  outside its §4.
+- **The wording is the trap:** `P2c` fires on `is not built`, `has not been built`, `still unbuilt` and `remains unbuilt`. Every
+  annotation reads **not built (`D38`)**, says what is true beside it, points at code by symbol rather than by line, and keeps a table
+  row on one line with no bare `|`.
+
+Files: `docs/architecture/technical-architecture.md`, `docs/api-specification.md`, `docs/multi-tenancy-rbac-design.md`,
+`app/Http/Controllers/Api/V1/FormApiController.php`, `config/permission.php`, `openapi.json` (only if the docblock moves it),
+`docs/feature-backlog.md`, `docs/pipeline.md`.
+Shared artefacts taken: every `docs/` file above, `openapi.json` if it moves, and `PROGRESS.md` (own block, at close-out).
+Paired files taken: none.
+Namespaces spent: decision `D186` (answered in planning). No ADR, no migration prefix.
+Prediction:
+- The lint gates stay green: no `P2c` phrase is used, no line moves, and the one `Queued` site is rewritten.
+- `pipeline.php --check` is green after the regeneration, with the six ids gone from the line.
+- Every edited document keeps its line count.
+- **Most likely wrong:** `openapi.json` stays byte-identical after the `FormApiController` docblock edit — Scramble may emit that
+  class docblock, the way `R-e568ddd2` records for the FormRequest classes.
+
+**BUILT — PR #386, CI 6/6 green with real step counts (run 40669550589 at `04992d4d`: Static analysis 32 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11) — AND NOT MERGED.**
+⛔ **Held for merge point 8, third, after `#384` and `#385` (`D186`).** At that point it is rebased onto the trunk after `#385`:
+- Expect conflicts at the backlog's end and in `docs/pipeline.md`. Keep both, then regenerate the line **in a tree with `vendor/`
+  installed** (see below).
+- Re-run the lint gates, which by then carry `#384`'s `P2e` and `#385`'s citation-lint change.
+- Expect 7/7, with the BHW job's "unchanged → success" — the observation `#385`'s close-out owes.
+
+No `VERSION` bump, no release note, no migration: nothing a tester sees changes.
+
+**How the prediction fared — measured, the wrong part first.**
+- **"`pipeline.php --check` is green after the regeneration" — right in the end, but the first run was red, and the red was my
+  own doing.**
+  - Run 40664591441 at `4817fa32` failed `pipeline-lint` P1 drift.
+  - I had checked the line from a bare `git worktree` with no `vendor/`. That check called the correct line drifted. I blamed the
+    untracked `apps/` left by the `M192` checkout and regenerated from the worktree.
+  - Measured in a fresh `pull/386/merge` clone in the app container: current before `composer install`, drifted after.
+    - With `vendor/` hidden: drifted.
+    - With the cache files alone: no effect.
+  - About twenty backlog lines cite into `vendor/`, so the citation health the line sorts by moves with it (the mechanism is
+    inferred; the effect is measured).
+  - Reverted in `04992d4d` to the first generation, which equals CI's byte for byte past the provenance line. The `apps/`
+    residue never mattered.
+- **"The lint gates stay green" — right.** No `P2c` phrase was used, and the one `Queued` site was rewritten. The citation ledger
+  stayed at the trunk's 16 rotten.
+- **"Every edited document keeps its line count" — right.** Additions equal deletions in all five, so no section was renumbered.
+- **"Most likely wrong: `openapi.json` stays byte-identical" — right.** A fresh `scramble:export` is byte-identical: a
+  controller's class docblock is not emitted.
+- **What no prediction named:**
+  - Beside the dedupe labels, the Redis row's Reverb backplane is unbuilt too: there is no broadcasting config and no
+    dependency. It was marked in place.
+  - No store runs on Redis at all. Filed, below.
+- **Filed: two rows.**
+  - Redis is documented as the cache and rate-limit store while every store runs on the database (during-testing).
+  - Nothing compares §7.1's marks with `openapi.json` (before-launch).
+- **Run locally:**
+  - Host: Pint with its probe, the four lint gates, `pipeline.php --check` from the CI-equivalent clone, `state.php --check`, and
+    `preflight --with-gates --with-pint`.
+  - Container: `tests/Feature/Docs`, 184 passed and 1 failed. The failure is `SuiteCollectionFloorTest`, the bind-mount artefact
+    (79 files under `tests/Feature/Forms`).
+  - Not run locally: Vitest, E2E and Storybook axe, since no front-end file changed. CI ran all three green.
+  - No mutation: no gate was written.
+
+## HELD — `M192`, the BHW Connect merge, phase P0: BHW's code imported under `apps/bhw-connect/`, made prefix-aware, with its CI job, its box scripts written (not run), and the governance both developers work under (`bhw-p0-import`) (m192-bhw-import)
 
 Taken 2026-10-27. Branch `m192-bhw-import`, cut from `origin/main` at `bff6e11d`, PR into main. ⛔ **NOT MERGED THIS SESSION:** held
 green until the user names the merge point it rides. It opens one Meridian window, because `deploy.ps1` changes. ⛔ **No work on the
@@ -98,7 +222,7 @@ Files: everything under `apps/bhw-connect/` (imported, then edited: `next.config
   `docs/deployment-infrastructure.md`, `docs/pipeline.md`, `docs/claims/decisions.md`
 Shared artefacts taken: every `docs/` file above, `CLAUDE.md`, and `PROGRESS.md` (own block, at close-out).
 Paired files taken: none.
-Namespaces spent: ADR `0024`; decisions `D172`–`D184`. No migration prefix.
+Namespaces spent: ADR `0024`; decisions `D172`–`D185` (`D185` asked and answered during the build). No migration prefix.
 Prediction:
 - The snapshot is gitleaks-clean on the first run, because the one key lives only in the dropped `.github/`.
 - BHW's own lint, typecheck and Vitest are green on the host before any edit.
@@ -108,6 +232,74 @@ Prediction:
 - The new CI job takes 6–10 minutes when BHW changed.
 - **Most likely wrong:** the build's offline tolerance. The OG images and the AI narratives on prerendered pages may need more than
   `generateStaticParams` returning `[]`.
+
+**BUILT — PR #385, CI 7/7 green with real step counts (run 40608342904 at `641cda58`: Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11) — AND NOT MERGED.**
+⛔ **Held until the user names the merge point it rides.** It opens one Meridian window (`deploy.ps1`, `composer.json`,
+`vite.config.ts`). **Order at that merge point:** `#384` (`M191`) first, then this; once live, the user adds
+`BHW Connect (lint, types, tests, build)` to `main`'s required checks (earlier, it blocks `#384`). No `VERSION` bump, no
+release note: nothing a tester sees changes. The branch is cut from `bff6e11d` and holds `f73d6524` (this claim) and
+the trunk is unchanged since. `D185` was asked and answered during the build and is recorded in this push.
+✅ **Merge point named 2026-10-28 (`D186`): second at merge point 8, after `#384` and before `M193`.**
+
+**How the prediction fared — measured, the wrong parts first.**
+- **"BHW's own lint, typecheck and Vitest are green on the host before any edit" — wrong on Vitest.** Two files failed,
+  and both were caused by the import's own drops, not by BHW: one test read `vercel.json`, the other a transcript under
+  `ingestion/data/`. The cron schedule moved to `ops/cron-schedule.json`, which the test now reads, and the transcript
+  cases are skipped where the folder is empty. Lint and typecheck were green. `format:check` flagged 446 files: 182 are
+  BHW's own, the same count on a pristine copy outside the repository (BHW's CI never ran it), and 264 came from
+  Meridian's root `.editorconfig`, which BHW's own `root = true` file removed.
+- **"A build with no data source fails in `generateStaticParams` and the sitemap first" — wrong.** Those swallow their
+  errors. The build failed on `/bhw`, 60 s three times, because supabase-js 2.110 retries a failed GET for seven seconds.
+  The failure was the same against a refused port, a `.invalid` host and an instant 503. An instant 501 built in 20 s
+  with no page changed: `BHW_DATA_SOURCE=none` in the data plane.
+- **"The new CI job takes 6–10 minutes when BHW changed" — wrong, and faster:** 1 min 39 s, the database cases and the
+  build included.
+- **"Most likely wrong: offline tolerance needs more than `generateStaticParams` returning `[]`" — wrong the other way.**
+  It needed no page change at all.
+- **Right:**
+  - The snapshot was gitleaks-clean on the first run, and so was the branch's full history (1,324 commits).
+  - The nonce CSP turned every prerendered page dynamic: 28 static became 6, the six being OG images, robots and the
+    sitemap. With real data, all 1,004 generated pages render on request.
+  - Two Meridian gates needed the exclusion. `backlog-triage` was live: `pipeline-lint` P1 went red on arrival. The
+    citation index was latent: the counts did not move.
+- **What no prediction named, each measured:**
+  1. Git Bash rewrote `NEXT_PUBLIC_BASE_PATH=/bhw-connect` into a Windows path, a host artefact.
+  2. Under a base path, the CSP matcher missed the bare home page, which was served with no policy. A runtime probe of
+     an assembled release caught it.
+  3. My own comment claimed Next prefixes `metadataBase`. It does not; `og:image` lacked `/bhw-connect`.
+  4. npm 11 rewrote the npm-10 lockfile, so installs went through `npx npm@10`.
+  5. The proxy `config` must be a literal.
+  6. BHW's production dependencies carry 2 critical and 8 high advisories (`D185`).
+  7. PostgreSQL grants CONNECT to PUBLIC, so the runbook revokes it on both databases.
+  8. A browser's `Purpose: prefetch` must not skip the CSP.
+  9. The tool layer's backslash collapse struck three times.
+- **Mutants: 5 caught, 0 survived.** Each was committed, turned red, then was reverted:
+
+  | Mutant | Caught by |
+  |---|---|
+  | `D1`: `apps/` removed from `$SiteSafePrefixes` | `DeploySkipAllowlistTest`; `scripts/mutate.php` also reported CAUGHT |
+  | `C9`: `backlog-triage` walks `apps/` again | controls C9; the live pipeline drifted |
+  | `C7-C8`: the citation basename map takes `apps/` back | controls C2, C3 and C8; C7 stays green |
+  | `B9`: the boundary reads `CODEOWNERS` from the head | controls B9 |
+  | `J1`: a TypeScript error under `apps/bhw-connect/lib/` | CI's `bhw-connect` job, red at Type-check (run 40608039685) |
+
+- **Filed: ten markers in ADR-0024, plus `D185`.**
+  - `bhw-p0-import`: done.
+  - `bhw-dependency-advisories`, `bhw-p1-box`, `bhw-p2-db`, `bhw-p3-identity`, `bhw-p4-loop` and `bhw-ci-fast-path`:
+    during-testing.
+  - `bhw-preview-slot`, `bhw-data-upload-page` and `bhw-e2e-in-ci`: before-launch.
+- **Owed after the merge, at the merge point's close-out:**
+  - Observe the bhw-connect job's "unchanged → success" branch on a Meridian-only PR.
+  - Observe the boundary turn red on a real cross-side PR without the label.
+  - Regenerate `docs/gate-baselines.md` from the post-merge run.
+- **Run locally:**
+  - Host: `preflight --with-gates --with-pint` OK, Pint 1,882 files, the four controls harnesses green.
+  - BHW: lint, typecheck, Vitest (84 files, 1,228 passed, 11 skipped; the `db/` cases also against the local stack),
+    both builds.
+  - An assembled standalone release served every page under the prefix with the policy and the nonce, and a PNG export
+    through the win32 resvg binding.
+  - Container, `tests/Feature/Docs` and `tests/Feature/Deploy`: 222 passed, 1 failed. The failure is
+    `SuiteCollectionFloorTest`, the known bind-mount artefact; its 79 missing files are all under `tests/Feature/Forms`.
 
 ## HELD — `M191`, the tracker surgery, then every PRD feature and acceptance criterion gets a recorded disposition (`R-4868cdbc`, `prd-feature-disposition`, with `R-283b9c0d`) (m191-prd-dispositions)
 

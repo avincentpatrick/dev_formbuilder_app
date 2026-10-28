@@ -16,7 +16,91 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M194`, BHW Connect's production advisories cleared, and its audit blocking again (`bhw-dependency-advisories`) (m194-bhw-advisories)
+## Status: ACTIVE CLAIM — `M195`, the gate baselines read each metric from its own job's lines, and every counted gate is recorded (`R-b31f421e`, `R-4130e1fa`) (m195-gate-baselines-per-job)
+
+Taken 2026-10-28. Branch `m195-gate-baselines-per-job`, cut from `origin/main` at `f134e970`, PR into main. ⛔ **NOT MERGED THIS SESSION:** held
+green for **the merge point `#387` rides, first, with `#387` last** (`D188`, asked and answered in planning). Numbered past the held `M194`
+(the `M188`/`M190` precedent). The plan is `~/.claude/plans/read-claude-md-run-php-bubbly-meerkat.md`.
+Rows — the one the user asked for by id, and its one file-overlap sibling in the tier:
+- `R-b31f421e` — *"`scripts/gate-baselines.php` matches every metric against the whole run log, so the seventh job's Vitest summary is
+  read as Meridian's"*.
+- `R-4130e1fa` — *"`backlog-triage-controls` is registered in CI and absent from `docs/gate-baselines.md`, so its case count is the one
+  gate number nothing tracks"*.
+
+⛔ **Two rows editing one hub script (`scripts/gate-baselines.php`) and its paired fixtures breaks both clauses of `D13` item 1 —
+exception #7, allowed by the user in chat** and recorded at `D13` in `docs/claims/decisions.md`. The session-start pull read 0 reports,
+0 reopened and 0 new comments (relayed 31: 25 Resolved · 6 Confirmed working), so nothing was triaged.
+
+### Evidence verified
+**`R-b31f421e` — held, measured on the run the row names.**
+- `php scripts/gate-baselines.php --run=40696757541 --dry-run`, which writes nothing, reads `Vitest | 85 files`. That is BHW's figure;
+  the same log carries Meridian's `283 passed (283)` later.
+- The cause is as the row says: the scrape loop runs `preg_match` over `$plain`, the whole log, and a metric's `job` is only the
+  table's third column.
+
+**`R-4130e1fa` — held, with one figure moved.**
+- `ci.yml` runs `composer run backlog-triage-controls` in the static job, and `docs/gate-baselines.md` has no row for it.
+- Its pass line reads *"passed (10 cases, …)"* on run 40696757541, not the row's 8.
+
+### Premise verified
+- **The E2E extras line was wrong before BHW arrived, and the row does not know it.** `$skipped` and the flaky check read the whole log
+  as well. The committed file says `1 skipped`, which is Pest's line; E2E printed `82 skipped`. On run 40696757541 it reads `11 skipped`,
+  BHW's.
+- **gh's log shape is `<job> TAB <step> TAB <timestamp> <text>`**, read off that run. Both committed ci-log fixtures pad the job name
+  with spaces, a shape gh never prints, so both are converted.
+- **No other script scrapes a run log.** Only `scripts/gate-baselines.php` calls `gh run view`.
+- **`R-4130e1fa`'s "the one gate number nothing tracks" is false.** The static job prints eight counted pass lines the roster records
+  nowhere:
+  - the mail-attribute linter and tracker-lint;
+  - the controls of tracker-lint, citation liveness, the pre-push guard, the test-pointer lint, backlog-triage and the boundary check.
+
+  The composer audit, the npm audit judge and gitleaks print verdicts, not counts, and stay out.
+- **None of the six other controls harnesses has a floor on its own case count.** Every "floor" in them is about the gate they test.
+  The row asks for the floor on `backlog-triage-controls.php` only; the other six are filed.
+- **BHW's figures stay out of the baselines.** That job reports on jongsky25's tree (the ADR named *second-application-under-one-host*),
+  so no metric reads it, and the new fixture uses it only as a decoy.
+
+### Remedy verdict
+- **`R-b31f421e` — works as prescribed, measured on a scratch copy before any test was written.** Each metric, and the E2E extras, read
+  only the lines that carry their job's name before the first tab.
+  - Against run 40696757541 exactly two lines move: `Vitest` 85 → **283 files**, and the extras `11` → **82 skipped**.
+  - Every other row is byte-identical.
+- **`R-4130e1fa` — works, widened to the census above.** The row's pattern matches its pass line; the floor is proved at the build by a
+  mutant that drops one case.
+
+Files:
+- `scripts/gate-baselines.php`, `scripts/backlog-triage-controls.php`
+- `tests/Feature/Docs/GateBaselinesTest.php`
+- `tests/fixtures/gate-baselines/ci-log.txt`, `ci-log-missing-metric.txt`, plus the new `two-jobs-one-summary.json` and
+  `ci-log-two-jobs-one-summary.txt`
+- `docs/feature-backlog.md` (two closures, one new row), `docs/pipeline.md`, `PROGRESS.md` (own block), the hand-off
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md` (by this claim), and `PROGRESS.md` (own
+block).
+Paired files taken: the gate list in `scripts/gate-baselines.php` and every `tests/fixtures/gate-baselines/ci-log*.txt`, a set
+`GateBaselinesTest` already pairs.
+Namespaces spent: `D188`, answered in planning. No migration and no ADR.
+Prediction:
+- The dry run against run 40696757541 moves exactly the two lines measured, and every new roster entry reads a value.
+- `GateBaselinesTest` is green, both scope mutants are CAUGHT, and the floor mutant exits 2.
+- PHPStan cannot move, because the diff touches only `scripts/`, `tests/` and docs. Pint is green, bare.
+- CI is 7/7, and the BHW job skips itself and passes.
+- **Most likely wrong:** the fixtures' tab bytes surviving the tool layer, and Storybook's two-line pattern inside a single job's block.
+
+## HELD — `M194`, BHW Connect's production advisories cleared, and its audit blocking again (`bhw-dependency-advisories`) (m194-bhw-advisories)
+
+**BUILT — PR #387, not merged.** It is held for the merge point the user names, **last in it, after `M195`** (`D188`).
+- **Run 40705714395 at `8c28020b`:** Meridian's six are green with real step counts — Static analysis 33 · E2E 20 · Contract 16 ·
+  Frontend 12 · Pest 11 · axe 11.
+- **`BHW Connect` is red at step 5 of 19** — *Boundary — a change to the other owner's paths needs their label (`D177`)* — and every
+  later step was skipped. That is the prediction exactly: the pull request is ours and touches jongsky25's tree and `.github/`.
+- **It waits on two things from jongsky25:**
+  - **His `boundary-approved` label**, once he accepts the repository invitation, which was still pending at 2026-10-28 15:14 UTC. Then
+    the BHW job is re-run, and its audit, lint, types, Vitest and build run on this branch for the first time.
+  - **His Supabase keys**, expected 2026-10-29. They go to the user privately and live in `apps/bhw-connect/.env.local`, never in git or
+    chat. Then the map and export screens are checked in a browser — the half of the prediction most likely to be wrong.
+
+**The claim as taken follows.**
 
 Taken 2026-10-28. Branch `m194-bhw-advisories`, cut from `origin/main` at `3f41b551`, PR into main. Asked for by the user (`D187`:
 a Meridian session clears them first, then P1), because `bhw-p1-box` is blocked on this row by `D185`.

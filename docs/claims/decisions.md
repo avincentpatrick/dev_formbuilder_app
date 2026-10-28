@@ -24,10 +24,19 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D187`, the last filed, was asked and answered on 2026-10-28 when merge point 8 was called, and recorded in its close-out. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D188`, the last filed, was asked and answered on 2026-10-28 while `M195` was planned, and recorded in its claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D188 — `M195` (the gate-baselines scraper) is held for the merge point `#387` (`M194`) rides. In what order do the two go live? **A — `M195` first, then `#387`.**
+
+**Asked and answered 2026-10-28 (user decision, in chat), while `M195` was planned; recorded in its claim.** The session prompt held `M195` green "for the merge point #387 rides", and that merge point is still the user's to name (`#387` waits on jongsky25's `boundary-approved` label and on his Supabase keys for the browser check). Only the order inside it was asked.
+
+- **A — `M195` → `#387` (recommended, chosen).** `#387` is the one most likely to slip, because it waits on jongsky25 twice. Putting it last means dropping it moves nothing else. `M195` touches only Meridian's scripts, tests and docs, so its own deploy is a quiet one.
+- **B — `#387` → `M195`.** BHW's fix lands first and the scraper fix after it.
+
+**What the answer files, in the same push:** nothing new. `M194` moves under HELD in `docs/claims/lane-a.md`, last at that merge point, and `M195`'s claim names its place, first. As at every merge point: the user's census before and after, and each pull request only once the previous deploy has finished and `/up` answers. The close-out regenerates `docs/gate-baselines.md` from the post-merge trunk run, with the fixed scraper.
+
 ### D187 — `D185` keeps BHW off the testing server until its production advisories are cleared, and the user wants jongsky25 to see BHW on staging. Who clears them before P1? **A — a Meridian session clears them first, then P1.**
 
 **Asked and answered 2026-10-28 (user decision, in chat), when merge point 8 was called; recorded in its close-out.** The user: *"lets finish the p1 so jong can already see the bhw connect in staging."* `D185` stands; this decides only who does the work and when.
@@ -3806,6 +3815,18 @@ The third Oct 12 batch broke the second clause again, and the first as well: two
 **Why:** one subject with one answer. `D38` = C marks documented, unbuilt `/api/v1` surface as not built, in place, and the six rows are its whole list. `M108`, closing the row that said the six could neither be grouped nor safely split, recorded them as pre-cleared to batch together; that was an increment's word, not the user's, so the batch was put to the user by name. Every edit sits inside an existing line, so no line moves and no citation cascades, and the two files' rows do not interleave.
 
 **Disposition:** the user chose all six together, in chat on 2026-10-28, over the three §7.1 rows alone and over the head row with unrelated rows. Recorded in both places this log requires: inline at the closed rows and in `PROGRESS.md`'s release paragraph. Not a precedent, and the first of its reason, so the escalation rule above is not engaged.
+
+##### #7 — `M195` (2026-10-28) · two rows editing one hub script and its paired fixtures, allowed by the user in chat
+
+**What was not satisfied:** both clauses of item 1. Both rows edit two things:
+- `scripts/gate-baselines.php`, which is in the derived hub set;
+- the ci-log fixtures that `GateBaselinesTest` pairs with that script's gate list.
+
+So two rows edit the same files, and both touch a hub. `R-b31f421e` rewrites how every roster entry is scraped. `R-4130e1fa` adds roster entries, and it also edits `scripts/backlog-triage-controls.php`.
+
+**Why:** one script and one paired fixture set. `R-b31f421e` converts both ci-log fixtures to the shape gh really prints, and every entry `R-4130e1fa` adds owes a line to each of those fixtures. Split into two increments, the second would re-edit every fixture the first had just converted.
+
+**Disposition:** the user chose both together, in chat on 2026-10-28, over the scraper fix alone with `R-4130e1fa` as its own later increment. Recorded in both places this log requires: inline at the closed rows and in `PROGRESS.md`'s release paragraph. Not a precedent, and the first of its reason, so the escalation rule above is not engaged.
 
 ---
 

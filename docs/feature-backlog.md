@@ -8372,7 +8372,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   what it could NOT compute, which is a different shape from anything in this file today.
   **Live.** Filed by `M84`.
 
-- **`minor` · Two PRD acceptance criteria are dispositioned in INDENTED CONTINUATION bullets the
+- ✅ **CLOSED BY `M191` (2026-10-27) — ****`minor` · Two PRD acceptance criteria are dispositioned in INDENTED CONTINUATION bullets the
   collector skips, so `P2e`'s residue reconciles against its own predicate rather than against the
   document.** Measured by `M84`'s fan-out (2026-09-07) while repairing `carries_a_disposition()`. The
   closed row asserted that *"the 93/89 split reconciles exactly against a hand count"*. It does not.
@@ -8385,7 +8385,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `EXPECTED_UNDISPOSITIONED_BULLETS` and its digest, and the question of whether an indented
   continuation may carry a disposition at all is entangled with the open `D24`, whose option 2 retires
   the bullet-level arm outright. Two edits to one constant in one increment, for two different reasons,
-  is how a pinned number stops meaning anything. **Live.** Filed by `M84`. **Tier: after-launch.** ✅ **`D24` ANSWERED option 1 2026-10-08 (`M147`): the bullet-level arm stays, so this is ready — accept the indented continuation in `p2e_acceptance_residue()` and re-pin the constant with its digest; it can ride with `prd-feature-disposition`, which moves the same constant.**
+  is how a pinned number stops meaning anything. **Live.** Filed by `M84`. **Tier: after-launch.** ✅ **`D24` ANSWERED option 1 2026-10-08 (`M147`): the bullet-level arm stays, so this is ready — accept the indented continuation in `p2e_acceptance_residue()` and re-pin the constant with its digest; it can ride with `prd-feature-disposition`, which moves the same constant.** ✅ **CLOSED BY `M191` (2026-10-27) AS SUPERSEDED, on its branch — the continuation form is not accepted, because it is no longer needed:** `M191` retired the residue constant itself and made `P2e` fail per criterion, with the answer the LAST thing on the criterion's own line. Both parents now end in their own `*(Built — I5 …)*`, the continuation bullets stay as prose, and `prd_features()` says in its docblock that an indented continuation is neither a criterion nor its answer.
 
 - **`minor` · `promote()`'s pre-lock shape has two more instances, and one of them is 74 lines above the
   row that named it.** Measured by `M85` (2026-09-07) while closing that row, which named two instances of
@@ -13993,13 +13993,16 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   test extended to name the screen each image shows. **Latent.** The manual reaches the trunk only when `M162` merges.
   Filed by `M162`. **Tier: during-testing.** **Narrowed by `D115` (2026-10-12):** `M163` adds a picture of each builder panel and the capture script; what remains is a picture for the other screens the manual walks through.
 
-- **`nit` · `docs/TESTING-GUIDE.md` still sends its reader to two buttons that have moved, and says single-form OCR is not built.**
+- ✅ **CLOSED BY `M191` (2026-10-27) — ****`nit` · `docs/TESTING-GUIDE.md` still sends its reader to two buttons that have moved, and says single-form OCR is not built.**
   Found by `M162` while checking which labels the in-app manual may quote. §2 step 2 reads *Open **Quarterly Report (draft)** →
   **Edit***: the forms list's icon is now **Open builder** and the hub's button **Edit form**. §3 step 5 reads *→ **Schedule***:
   there is no Schedule button any more; the schedule is a section of **Form settings** and of the hub's **Settings** tab. §18's
   table says single-form OCR is *"Not built"*: it has been on the testing server since `M135`. The remedy is those three
   sentences, plus a pointer to the in-app Help page for the steps a tester follows. **Live.** Filed by `M162`.
-  **Tier: during-testing.**
+  **Tier: during-testing.** ✅ **CLOSED BY `M191` (2026-10-27), on its branch:** §2 step 2 presses **Open builder** in the row's
+  actions (the hub's **Edit form** named beside it), §3 step 5 goes to the **Settings** tab → **Schedule**, §18's OCR row is struck and
+  says how to reach the scan, the linelist row names its own blocker, and the guide's opening points at the in-app **Help** page —
+  each corrected in place, so no line of the guide moved. §18 itself being invisible to the deferral rules is filed as `R-b05055dc`.
 
 - **`nit` · The builder has no link to the Help page.** The builder is where a new author gets stuck, and `M162`'s manual is
   one sidebar click away from it but not linked from it. The remedy is a **Help** link in the builder's toolbar to
@@ -15396,9 +15399,72 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   one needs more. **Latent** — it depends on the repository's default token setting, which the tree cannot show. Filed by `M190`.
   **Tier: before-launch.**
 
-- **`minor` · `PROGRESS.md` has under one close-out of byte headroom, so the next close-out's status bullet can redden the trunk.**
+- ✅ **CLOSED BY `M191` (2026-10-27) — ****`minor` · `PROGRESS.md` has under one close-out of byte headroom, so the next close-out's status bullet can redden the trunk.**
   Measured at merge point 7's close-out (2026-10-27): 126,093 bytes against `tracker-lint` R1's ceiling of 130,000 once `M189`'s and
   `M190`'s bullets were prepended, and `preflight` warns below 4,000 because a status bullet has cost two to three KB. `## Current Status`
   has held every bullet since the last surgery. The remedy, before the next close-out pushes: move the oldest status bullets into
   `PROGRESS_ARCHIVE.md` by pre-measured line index, proved with `scripts/tracker-surgery.php` while uncommitted, the surgery marker at a
-  line's start in the squash body. **Live.** Filed by `M190` (its close-out). **Tier: during-testing.**
+  line's start in the squash body. **Live.** Filed by `M190` (its close-out). **Tier: during-testing.** ✅ **CLOSED BY `M191`
+  (2026-10-27), on the trunk ahead of its branch:** the thirteenth surgery, `770b1b4a`, moved the `M183` down to `M170` bullets (15 lines,
+  20,540 bytes) into the archive above the `M168` bullet, all four `tracker-surgery.php` proofs passing on the first run; `PROGRESS.md`
+  is 105,105 bytes, 24,895 under R1. It went straight to `main` rather than in a squash (the `M143` route), because both files are in
+  `paths-ignore` and the push produced no run.
+
+- **`minor` · A guest who has saved no draft is refused on submit once the owner republishes, so the version a guest started on holds only for a saved draft.**
+  `app/Http/Controllers/Public/GuestSubmissionController.php` answers 409 `form_updated` (*"This form has been updated. Please reload
+  and try again."*) whenever the form's live version has moved past the one the share token pins, unless a draft for that device
+  already exists — a saved draft is promoted against its own version. `tests/Feature/Guest/GuestRuntimeTest.php` pins the refusal.
+  `docs/PRD.md` Feature #3 promises that *"a guest who starts filling out version 3 keeps a consistent experience even if the form
+  owner republishes to version 4 mid-session"*. A tester sees it by publishing a form again while a guest tab is open on it. The
+  remedy: submit against the version the token pins, as the draft path already does, keeping 409 for a version the token never
+  carried, and re-word the test. Found by `M191`'s audit of the PRD against the code. **Live.** Filed by `M191`. **Tier: during-testing.**
+
+- **`minor` · An Owner or Admin can give a member editor or reviewer access to one specific form only through the API; the web grants on a whole scope.**
+  `ResourceGrantController::store()` resolves a `scope_node_id` and nothing else, and `resources/js/components/scopes/GrantModal.vue`
+  is opened from the scopes page; the form-level target exists (`resource_grants` holds a form or a scope node, and
+  `ResourceGrantApiController` accepts a form). `docs/PRD.md` Feature #8 promises access *"to that specific form"*. A tester who wants
+  one colleague to edit one form has to build a scope for it. The remedy: a **People** section on the form hub's Settings tab, for
+  holders of `forms.collaborators.manage`, listing and adding that form's grants through the existing `ResourceGrantService`. Who may
+  grant is not in question — `docs/multi-tenancy-rbac-design.md` keeps `forms.collaborators.manage` to Owner/Admin by design. Found by
+  `M191`'s audit. **Live.** Filed by `M191`. **Tier: during-testing.**
+
+- **`nit` · The SSO settings page and a scan's "still being read" page have no responsive or accessibility scan.**
+  `tests/e2e/responsive-axe.spec.ts` and `tests/e2e/auth-axe.spec.ts` reach the dashboard, forms, responses, settings, builder and
+  sign-in pages; no e2e spec visits `/settings/sso` (`Pages/Settings/Sso.vue`) or `Pages/ocr/ScanStatus.vue`. `R-26905216` covers
+  the four console pages, not these. `docs/PRD.md` Feature #5 asks for every screen at each breakpoint, checked in CI. The remedy: both
+  pages in `responsive-axe.spec.ts`'s page list, at the three viewports. **Latent** — nothing is known broken on either.
+  Filed by `M191`. **Tier: after-launch.**
+
+- **`nit` · Four page stylesheets switch layout at breakpoints the design system does not define, with no written rationale.**
+  `docs/ux/design-system-reference.md` §2.7 defines three — ≤480px, ≤1024px, >1024px. `Pages/submissions/Encode.vue` and
+  `Pages/submissions/Show.vue` switch at `75rem`, `Pages/scopes/Index.vue` at `900px`, `Pages/Welcome.vue` at `48rem`, and none is in
+  `docs/ux/exceptions-log.md`. The remedy: move each to one of the three, or log it with its reason. **Latent** — each layout works at
+  the three scanned viewports. Filed by `M191`. **Tier: after-launch.**
+
+- **`nit` · Nothing checks the design system's three process rules — pages built from the library only, the reference updated with each component, an exception logged — and each has drifted.**
+  `docs/PRD.md` Feature #6 states all three; no lint, test or CI step reads any. Measured by `M191`: `MdsNumberInput` and
+  `MdsPasswordInput` are in the library and absent from `docs/ux/design-system-reference.md`; `packages/design-system/README.md` says
+  39 components and 42 story files where the disk holds 41 and 44; the QR panels' fixed white backgrounds (`SharePanel.vue`,
+  `TwoFactorSetup.vue`) are explained only in inline comments, not in `docs/ux/exceptions-log.md`; and `R-2ce1467b`, `R-dc9be6cd` and
+  `R-1e4eb92f` are one-offs of the same kind. The remedy: a docs gate that fails when a component directory has no reference entry or
+  the README's counts disagree with the disk, and the two QR exceptions logged. **Live.** Filed by `M191`. **Tier: after-launch.**
+
+- **`nit` · The design system has no disclosure component, though its reference specifies one, so each advanced surface improvises its own.**
+  `docs/ux/design-system-reference.md` §5 specifies a collapsed "Advanced" toggle with a chevron and `aria-expanded`; no such component
+  is in `packages/design-system/src/components/`. The builder's advanced settings are an **Advanced** tab at the same weight as Basics,
+  a formula is a peer option on Basics, and a rule's expression is a peer **Expression** choice on Validation. `docs/PRD.md` Feature #6
+  makes progressive disclosure *"a first-class pattern in the system itself"*. The remedy: the component, then the builder's three
+  surfaces moved onto it — or §5 amended to the tab the builder chose. **Live.** Filed by `M191`. **Tier: after-launch.**
+
+- **`nit` · `docs/TESTING-GUIDE.md` §18, the guide's own list of what is not yet built, is invisible to both deferral rules — which is how its single-form OCR row stayed wrong for three weeks.**
+  `P2b` reads a section only when its heading names out-of-scope, non-goals or Deferred, and §18's heading is *"What is *not* built
+  yet"*; `P2c`'s four phrases do not include the bare *"Not built."* its cells use. So nothing makes a row of that table say what became
+  of it: the single-form OCR row read *"Not built"* from `M135` until `M191` (`R-248174d6`), and the *"Real-time notification push"* row
+  still calls the socket layer *"deployment-track work"* while no row in the line carries a realtime transport. The remedy: add the
+  not-built heading form to `declares_a_disposition()` (the `P2b` pin moves 23 → 24), give each of §18's rows a disposition, and queue
+  or decline the realtime transport. **Live.** Filed by `M191`. **Tier: after-launch.**
+
+- **`nit` · `config/ocr.php`'s comment on the confidence tiers still says a value below the review threshold is left blank.**
+  `D108` changed that in `M156`: a value read below 70 is filled in all the same and marked "may be wrong", and `docs/PRD.md` Feature
+  #1 says so. The comment is the first thing a reader of the thresholds meets. The remedy is the comment. **Live.** Filed by `M191`.
+  **Tier: after-launch.**

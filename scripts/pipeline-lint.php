@@ -156,12 +156,16 @@ const MIN_APP_FILES = 600;
  * ⚠️ A GATE WHOSE EXPECTATION AN INCREMENT INVALIDATES MUST BE UPDATED BY THAT INCREMENT, or main
  * merges red. Disposition a site and you lower the constant in the same commit; that is the point.
  *
- * ✅ M190: P2b AND P2c NOW DISCHARGE, AND NOT BY A MARKER. Everything above stays true of markers and
- * of P2a and P2e. What M82 could not find was a discharge that needs no attribution, and the corpus
+ * ✅ M190: P2b AND P2c NOW DISCHARGE, AND NOT BY A MARKER. Everything above stays true of markers.
+ * What M82 could not find was a discharge that needs no attribution, and the corpus
  * already had one: the PRD's end-of-line italic parenthetical, which records an outcome AT THE LINE IT
  * IS ABOUT. So every item of a P2b section and every P2c sentence now ends in one of three words —
  * Built, Queued (naming a row the line holds), Not planned — and a site carrying none is a failure,
  * not a constant to move. The pins stay: they still catch a site set that changed underneath.
+ *
+ * ✅ M191: AND SO DO P2a AND P2e. Every acceptance criterion ends in the same three words, and every
+ * feature's `**Phase:**` line — the line directly under its heading — ends in the word its criteria
+ * roll up to. Nothing in the four corpora is pinned as undischarged any more.
  *
  * ⛔ EACH CORPUS PINS A DIGEST AS WELL AS A COUNT, AND THE DIGEST IS THE HALF THAT EARNS ITS KEEP. A
  * count alone is blind to a SWAP — remove one site, add another — which is exactly the shape
@@ -234,12 +238,14 @@ const EXPECTED_DEFERRAL_SITES = 7;
 const DIGEST_DEFERRAL_SITES = '6dfe8780e5b59052';
 
 /**
- * P2b and P2c — what a deferral site may say became of it (M190).
+ * P2b and P2c — what a deferral site may say became of it (M190) — and since M191 what a PRD feature
+ * (P2a) and acceptance criterion (P2e) may say too. One vocabulary for the four rules, not two.
  *
- * ⛔ A CLOSED VOCABULARY OF THREE, AND `Deferred` IS DELIBERATELY NOT IN IT. P2e accepts "Deferred"
- * because a PRD criterion deferred to a phase is an answer about a promise. Here "deferred" is the
- * QUESTION — every one of these sites already says something is deferred — and accepting the word
- * would let a site answer itself. Each word must name what it rests on after its dash:
+ * ⛔ A CLOSED VOCABULARY OF THREE, AND `Deferred` IS DELIBERATELY NOT IN IT. At a deferral site
+ * "deferred" is the QUESTION — every one of these sites already says something is deferred — and
+ * accepting the word would let a site answer itself. P2e used to accept it, as an answer about a
+ * promise deferred to a phase; M191 retired that, because a "Deferred" naming no row is precisely the
+ * unqueued obligation the line exists to refuse. Each word must name what it rests on after its dash:
  *
  *   Built — <who>          the deferred thing exists now; the document had gone stale
  *   Queued — <ids>         a row in the line carries it; every id in backticks, every one checked
@@ -249,7 +255,7 @@ const DIGEST_DEFERRAL_SITES = '6dfe8780e5b59052';
  * the close-out that takes the row off the line turns this gate red at the site, naming it, until the
  * site says Built. That is P3's own live-and-known join, pointed at prose.
  */
-const DEFERRAL_DISPOSITIONS = ['Built', 'Queued', 'Not planned'];
+const DISPOSITION_WORDS = ['Built', 'Queued', 'Not planned'];
 
 /**
  * Measured at 114 items over the 23 sections when M190 wrote it. The floor sits well below so ordinary
@@ -259,25 +265,23 @@ const DEFERRAL_DISPOSITIONS = ['Built', 'Queued', 'Not planned'];
 const MIN_DISPOSITION_ITEMS = 80;
 
 /**
- * P2e — the PRD's acceptance criteria, and the residue that carries no disposition.
+ * P2e — the PRD's acceptance criteria, each of which says what became of it (M191).
  *
- * ⛔ THE RESIDUE CONSTANT IS WHY THIS RULE CAN MERGE AT ALL. Eighty-nine of ninety-three acceptance
- * bullets carry no disposition; requiring one on each today builds a gate nobody can ever go green
- * against, which M40 established is a gate that gets deleted rather than satisfied. The residue is
- * pinned instead, and it is itself a row in the line — visible work rather than work assumed away.
+ * ✅ THE RESIDUE IS GONE. Until M191 eighty-nine of ninety-three criteria carried no disposition, and
+ * the residue was PINNED rather than required — a gate red on arrival by 89 is one that gets deleted
+ * rather than satisfied (M40) — and itself a row in the line. M191 measured every criterion against
+ * the code and wrote the answer at the criterion's own line, so one carrying none is now a failure, as
+ * M190 made it for P2b and P2c, and the vocabulary is theirs (`Shipped`, `Partially shipped` and `ADR-`
+ * retired with `Deferred`: each let a criterion answer without naming what it rests on).
  *
- * A DISPOSITION IS THE PARENTHETICAL THE PRD ALREADY USES, and the vocabulary is closed for the same
- * reason the roadmap's is: free prose is accountable to nothing.
+ * ⛔ THE CORPUS STAYS PINNED, COUNT AND DIGEST, because deleting a criterion is the one change a
+ * per-criterion failure cannot see: a promise removed is simply one line fewer to check.
  */
-const DISPOSITION_VOCABULARY = ['Shipped', 'Partially shipped', 'Built', 'Deferred', 'ADR-'];
-
 const MIN_ACCEPTANCE_BULLETS = 70;
 
 const EXPECTED_ACCEPTANCE_BULLETS = 93;
 
-const EXPECTED_UNDISPOSITIONED_BULLETS = 89;
-
-const DIGEST_UNDISPOSITIONED_BULLETS = '55529a3ee0686949';
+const DIGEST_ACCEPTANCE_BULLETS = '4de61aeca03b007b';
 
 /**
  * The closed vocabulary a roadmap Status cell may speak.
@@ -422,11 +426,13 @@ p2d_artefact_drift($rows);
 
 // ── P2a / P2b / P2c / P2e. The obligation corpora, over the GENERATOR'S OWN file list. ──────────
 $coverage = coverage_corpus($document);
+$lineIds = line_ids($rows, $offLine);
+$features = prd_features($coverage);
 
-p2a_prd_features($coverage);
-p2b_disposition_sections($coverage, line_ids($rows, $offLine));
-p2c_deferral_sites($coverage, line_ids($rows, $offLine));
-p2e_acceptance_residue($coverage);
+p2a_prd_features($features, $lineIds);
+p2b_disposition_sections($coverage, $lineIds);
+p2c_deferral_sites($coverage, $lineIds);
+p2e_acceptance_criteria($features, $lineIds);
 
 // ── P6. The generated file may not arm the next run. ────────────────────────────────────────────
 p6_self_arming();
@@ -1027,19 +1033,62 @@ function identify(array $sites): array
  * states about itself, and not one of them carried a marker when this rule was written. The heading
  * NUMBER is the identity, not its title: a feature renamed is the same obligation, and the PRD's own
  * §5 records that the numbering is kept for traceability and never renumbered.
+ *
+ * ✅ M191: EACH FEATURE SAYS WHAT BECAME OF IT, ON ITS `**Phase:**` LINE — the feature's own line,
+ * directly under the heading, and appending to it moves no `path:N` citation. ⛔ THE WORD IS NOT FREE:
+ * it must equal what the feature's criteria roll up to (feature_rollup()), because a feature answering
+ * Built over a criterion still Queued is a second copy of the answer that has already drifted from the
+ * first.
+ *
+ * @param  list<array{path: string, number: string, line: int, phase: ?array{line: int, text: string}, criteria: list<array{line: int, text: string}>}>  $features
+ * @param  array{live: array<string, true>, known: array<string, true>}  $ids
  */
-function p2a_prd_features(array $corpus): void
+function p2a_prd_features(array $features, array $ids): void
 {
     $sites = [];
+    $clean = true;
 
-    foreach ($corpus as $file) {
-        foreach ($file['lines'] as $i => $line) {
-            if (preg_match('/^#{1,6} Feature #(\d+)\b/', rtrim($line, "\r"), $m) === 1) {
-                $sites[] = [
-                    'identity' => $file['path'].'#feature-'.$m[1],
-                    'where' => $file['path'].':'.($i + 1),
-                ];
-            }
+    foreach ($features as $feature) {
+        $sites[] = [
+            'identity' => $feature['path'].'#feature-'.$feature['number'],
+            'where' => $feature['path'].':'.$feature['line'],
+        ];
+
+        $name = sprintf('Feature #%s at %s:%d', $feature['number'], $feature['path'], $feature['line']);
+
+        if ($feature['phase'] === null) {
+            $clean = false;
+            fail('P2a features', $name.' has no **Phase:** line directly under its heading, so nothing '
+                .'can say what became of it.');
+
+            continue;
+        }
+
+        $inner = last_disposition($feature['phase']['text']);
+        $error = disposition_error($inner, $ids, 'it is a documented feature');
+
+        if ($error !== null) {
+            $clean = false;
+            fail('P2a features', sprintf('the Phase line of %s %s', $name, $error));
+
+            continue;
+        }
+
+        $word = disposition_word($inner);
+        $owed = feature_rollup(array_map(
+            static fn (array $criterion): ?string => disposition_word(last_disposition($criterion['text'])),
+            $feature['criteria']
+        ));
+
+        if ($owed !== null && $word !== $owed) {
+            $clean = false;
+            fail('P2a features', sprintf(
+                'the Phase line of %s says %s, and its criteria roll up to %s. A feature is Queued while '
+                .'any criterion is, else Built while any criterion is, else Not planned.',
+                $name,
+                $word,
+                $owed
+            ));
         }
     }
 
@@ -1051,6 +1100,104 @@ function p2a_prd_features(array $corpus): void
         EXPECTED_FEATURE_SITES,
         DIGEST_FEATURE_SITES
     );
+
+    if ($clean) {
+        pass('P2a features', sprintf('%d feature(s), each saying the word its criteria roll up to', count($features)));
+    }
+}
+
+/**
+ * The word a feature owes, from its criteria's words: Queued while any is Queued, else Built while
+ * any is Built, else Not planned — or null when no criterion carries a readable word yet (each such
+ * criterion fails P2e on its own, so this rule does not report it twice).
+ *
+ * ⚠️ NOT M190's ITEM RULE, ON PURPOSE. M190 reads one bundled item by its least-finished part, so a
+ * declined part makes the item Not planned. A feature is many promises: one declined criterion does
+ * not make a shipped feature "not planned", and that criterion already says so at its own line.
+ *
+ * @param  list<?string>  $words
+ */
+function feature_rollup(array $words): ?string
+{
+    foreach (['Queued', 'Built', 'Not planned'] as $word) {
+        if (in_array($word, $words, true)) {
+            return $word;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * The PRD's features, each with its `**Phase:**` line and its acceptance criteria — one walk, read by
+ * both P2a and P2e, so the two rules cannot disagree about what a feature holds.
+ *
+ * A feature runs from a `Feature #N` heading to the next heading of any level. Its Phase line is the
+ * first non-blank line under the heading, when that line opens `**Phase`. A criterion is a top-level
+ * `- ` bullet after an `Acceptance criteria` line; several such blocks (one per phase) are one list,
+ * so a criterion's ordinal runs across them. ⚠️ AN INDENTED CONTINUATION IS PROSE, NOT A CRITERION
+ * AND NOT ITS ANSWER: the answer is the last thing on the criterion's own line (`R-283b9c0d`,
+ * superseded by M191 rather than accepted).
+ *
+ * @return list<array{path: string, number: string, line: int, phase: ?array{line: int, text: string}, criteria: list<array{line: int, text: string}>}>
+ */
+function prd_features(array $corpus): array
+{
+    $features = [];
+
+    foreach ($corpus as $file) {
+        $current = null;
+        $inAcceptance = false;
+        $seekingPhase = false;
+
+        foreach ($file['lines'] as $i => $line) {
+            $text = rtrim($line, "\r");
+
+            if (preg_match('/^#{1,6} (.*)$/', $text, $m) === 1) {
+                if ($current !== null) {
+                    $features[] = $current;
+                }
+
+                $current = preg_match('/^Feature #(\d+)\b/', $m[1], $f) === 1
+                    ? ['path' => $file['path'], 'number' => $f[1], 'line' => $i + 1, 'phase' => null, 'criteria' => []]
+                    : null;
+                $inAcceptance = false;
+                $seekingPhase = $current !== null;
+
+                continue;
+            }
+
+            if ($current === null) {
+                continue;
+            }
+
+            if ($seekingPhase && trim($text) !== '') {
+                $seekingPhase = false;
+
+                if (str_starts_with($text, '**Phase')) {
+                    $current['phase'] = ['line' => $i + 1, 'text' => $text];
+
+                    continue;
+                }
+            }
+
+            if (preg_match('/^Acceptance criteria/i', $text) === 1) {
+                $inAcceptance = true;
+
+                continue;
+            }
+
+            if ($inAcceptance && str_starts_with($text, '- ')) {
+                $current['criteria'][] = ['line' => $i + 1, 'text' => $text];
+            }
+        }
+
+        if ($current !== null) {
+            $features[] = $current;
+        }
+    }
+
+    return $features;
 }
 
 /**
@@ -1062,7 +1209,7 @@ function p2a_prd_features(array $corpus): void
  * every heading below it, and that is a renumbering rather than a new obligation.
  *
  * ✅ AND SINCE M190 EVERY ITEM IN EVERY SUCH SECTION SAYS WHAT BECAME OF IT. See deferral_items() for
- * what an item is and DEFERRAL_DISPOSITIONS for what it may say.
+ * what an item is and DISPOSITION_WORDS for what it may say.
  *
  * @param  array{live: array<string, true>, known: array<string, true>}  $ids
  */
@@ -1124,7 +1271,7 @@ function p2b_disposition_sections(array $corpus, array $ids): void
     $clean = true;
 
     foreach ($items as $item) {
-        $error = deferral_disposition_error(last_disposition(without_table_edge($item['text'])), $ids);
+        $error = disposition_error(last_disposition(without_table_edge($item['text'])), $ids, 'the item is a deferral');
 
         if ($error !== null) {
             $clean = false;
@@ -1277,22 +1424,23 @@ function without_table_edge(string $text): string
 }
 
 /**
- * What is wrong with a deferral site's disposition, or null when it is sound.
+ * What is wrong with a site's disposition, or null when it is sound — for all four coverage rules.
+ * `$what` says why the site owes an answer, in the failure that reports it missing.
  *
  * @param  array{live: array<string, true>, known: array<string, true>}  $ids
  */
-function deferral_disposition_error(?string $inner, array $ids): ?string
+function disposition_error(?string $inner, array $ids, string $what): ?string
 {
     if ($inner === null) {
         return 'ends in no disposition. End it with *(Built — <who>)*, *(Queued — `<row id>`)* or '
-            .'*(Not planned — <ground>)*: the item is a deferral, and nothing records what became of it.';
+            .'*(Not planned — <ground>)*: '.$what.', and nothing records what became of it.';
     }
 
-    if (preg_match('/^('.implode('|', DEFERRAL_DISPOSITIONS).') — (\S.*)$/u', $inner, $m) !== 1) {
+    if (preg_match('/^('.implode('|', DISPOSITION_WORDS).') — (\S.*)$/u', $inner, $m) !== 1) {
         return sprintf(
             'ends in *(%s)*, which opens with none of %s followed by " — " and what it rests on.',
             $inner,
-            implode(', ', DEFERRAL_DISPOSITIONS)
+            implode(', ', DISPOSITION_WORDS)
         );
     }
 
@@ -1376,7 +1524,7 @@ function p2c_deferral_sites(array $corpus, array $ids): void
                     'where' => $file['path'].':'.($i + 1),
                 ];
 
-                $error = deferral_disposition_error(last_disposition(without_table_edge(rtrim($line, "\r"))), $ids);
+                $error = disposition_error(last_disposition(without_table_edge(rtrim($line, "\r"))), $ids, 'the item is a deferral');
 
                 if ($error !== null) {
                     $clean = false;
@@ -1420,143 +1568,75 @@ function strip_mentions(string $line): string
 }
 
 /**
- * P2e — the acceptance criteria, and the residue carrying no disposition.
+ * P2e — every acceptance criterion says what became of it (M191).
  *
- * TWO CHECKS, AND THE FIRST IS WHY THE SECOND MEANS ANYTHING. The corpus size is pinned as well as
- * the residue: a rule watching only the residue goes green when a whole feature's criteria are
- * deleted, because deleting an undispositioned bullet lowers the residue exactly as dispositioning
- * one does. The two together say what happened.
+ * TWO HALVES, AND THE SECOND IS WHY THE FIRST MEANS ANYTHING. Each criterion must END in Built, Queued
+ * or Not planned, a Queued one naming rows the line holds. And the corpus is pinned, count and digest:
+ * a rule reading only the criteria that exist goes green when a whole feature's criteria are deleted,
+ * because a deleted promise is one fewer line to check.
+ *
+ * @param  list<array{path: string, number: string, line: int, phase: ?array{line: int, text: string}, criteria: list<array{line: int, text: string}>}>  $features
+ * @param  array{live: array<string, true>, known: array<string, true>}  $ids
  */
-function p2e_acceptance_residue(array $corpus): void
+function p2e_acceptance_criteria(array $features, array $ids): void
 {
-    $bullets = [];
+    $sites = [];
+    $clean = true;
 
-    foreach ($corpus as $file) {
-        $feature = null;
-        $inAcceptance = false;
-        $ordinal = 0;
-
-        foreach ($file['lines'] as $i => $line) {
-            $text = rtrim($line, "\r");
-
-            if (preg_match('/^#{1,6} (.*)$/', $text, $m) === 1) {
-                $feature = preg_match('/^Feature #(\d+)\b/', $m[1], $f) === 1 ? $f[1] : null;
-                $inAcceptance = false;
-                $ordinal = 0;
-
-                continue;
-            }
-
-            if ($feature === null) {
-                continue;
-            }
-
-            if (preg_match('/^Acceptance criteria/i', $text) === 1) {
-                $inAcceptance = true;
-
-                continue;
-            }
-
-            if (! $inAcceptance || ! str_starts_with($text, '- ')) {
-                continue;
-            }
-
-            $ordinal++;
-
-            $bullets[] = [
-                'identity' => $file['path'].'#feature-'.$feature.'#'.$ordinal,
-                'where' => $file['path'].':'.($i + 1),
-                'dispositioned' => carries_a_disposition($text),
+    foreach ($features as $feature) {
+        foreach ($feature['criteria'] as $ordinal => $criterion) {
+            $sites[] = [
+                'identity' => $feature['path'].'#feature-'.$feature['number'].'#'.($ordinal + 1),
+                'where' => $feature['path'].':'.$criterion['line'],
             ];
+
+            $error = disposition_error(last_disposition($criterion['text']), $ids, 'it is a stated product promise');
+
+            if ($error !== null) {
+                $clean = false;
+                fail('P2e criteria', sprintf('the criterion at %s:%d %s', $feature['path'], $criterion['line'], $error));
+            }
         }
     }
 
-    if (count($bullets) < MIN_ACCEPTANCE_BULLETS) {
-        cannot_measure(sprintf(
-            'P2e reached %d acceptance bullet(s), under the floor of %d. The PRD is one file and a '
-            .'walk that cannot see it makes this rule vacuous in the direction that reports green.',
-            count($bullets),
-            MIN_ACCEPTANCE_BULLETS
-        ));
-    }
-
-    if (count($bullets) !== EXPECTED_ACCEPTANCE_BULLETS) {
-        fail('P2e residue', sprintf(
-            'the PRD states %d acceptance criteria and the pinned expectation is %d. A criterion added '
-            .'or removed is a change to what this product promises, and it is not a bookkeeping edit.',
-            count($bullets),
-            EXPECTED_ACCEPTANCE_BULLETS
-        ));
-    }
-
-    // The floor is zero, deliberately: the corpus floor above already refuses a blind walk, and a
-    // residue that has genuinely reached zero is the state this rule wants to be able to report.
     pin(
-        'P2e residue',
-        'undispositioned acceptance bullet(s)',
-        identify(array_values(array_filter($bullets, static fn (array $b): bool => ! $b['dispositioned']))),
-        0,
-        EXPECTED_UNDISPOSITIONED_BULLETS,
-        DIGEST_UNDISPOSITIONED_BULLETS
+        'P2e criteria',
+        'acceptance criteria',
+        identify($sites),
+        MIN_ACCEPTANCE_BULLETS,
+        EXPECTED_ACCEPTANCE_BULLETS,
+        DIGEST_ACCEPTANCE_BULLETS
     );
+
+    if ($clean) {
+        pass('P2e criteria', sprintf('%d criteria, each saying Built, Queued or Not planned', count($sites)));
+    }
 }
 
-/**
- * Does this acceptance bullet record what became of it?
- *
- * The PRD's own device: an italic parenthetical opening with a word from the closed vocabulary. Free
- * prose is not accepted for the reason the roadmap's Status column is not — a cell accountable to no
- * vocabulary is one nothing can read.
- *
- * ⛔ THE DISPOSITION MUST BE THE LAST THING ON THE LINE, AND IT IS THE SAME MENTION-VERSUS-DECLARATION
- * TRAP `P2b` AND `P2c` ALREADY CARRY (M84). This predicate used to take the FIRST italic parenthetical
- * on the bullet, which is wrong in both directions:
- *
- *   UNDER-COLLECTS — a bullet whose prose opens with an incidental parenthetical hides its own real
- *   disposition behind it, so a criterion that HAS been dispositioned is counted as residue.
- *   ⚠️ OVER-COLLECTS, which the row that filed this did not claim and is the worse half — a bullet that
- *   merely QUOTES a disposition discharges itself, so a live product commitment silently leaves the
- *   residue set. A declaration is the one at the END; everything earlier is prose.
- *
- * ⛔ IT FAILS LOUD RATHER THAN SILENT, AND NOT FOR THE REASON THE ROW GAVE. `pin()` compares a COUNT
- * and a DIGEST over site identities, so movement in EITHER direction is red. What the old predicate
- * actually cost was not a green build over a miscount but a false refusal an author could only clear
- * by leaving the constant permanently one too high — recording a dispositioned criterion as residue
- * for good.
- *
- * ⚠️ WHY THIS IS NOT AN ANCHORED REGEX. The obvious repair is a pattern anchored at both ends, and it
- * passes today ONLY by luck: `docs/PRD.md:211` carries an inner `)` earlier in its line, so a
- * `[^)]+` body stops in the wrong place the moment such a bullet also carries a disposition. A
- * LAST-match search plus a suffix test has no such dependency on what the prose contains.
- *
- * ⛔ WHAT THIS DELIBERATELY DOES NOT DO. `docs/PRD.md:311` and `:314` are dispositioned in INDENTED
- * CONTINUATION bullets on the following line, which the collector skips — so the residue count of 89
- * reconciles against this predicate and not against what the document records, where the honest
- * figure is 87. Accepting the continuation form moves a pinned constant and is entangled with the
- * open `D24`, so it is filed rather than smuggled in here.
- */
-function carries_a_disposition(string $bullet): bool
+/** The word a sound disposition opens with, or null when it opens with none of the three. */
+function disposition_word(?string $inner): ?string
 {
-    $inner = last_disposition($bullet);
-
-    if ($inner === null) {
-        return false;
+    if ($inner === null || preg_match('/^('.implode('|', DISPOSITION_WORDS).') — /u', $inner, $m) !== 1) {
+        return null;
     }
 
-    foreach (DISPOSITION_VOCABULARY as $word) {
-        if (stripos($inner, $word) === 0) {
-            return true;
-        }
-    }
-
-    return false;
+    return $m[1];
 }
 
 /**
  * The body of the italic parenthetical that ENDS this text, or null when the text ends in none.
  *
- * Shared by P2e and, since M190, by P2b and P2c, so the suffix rule above — the last thing on the
- * line, found by the last opening rather than the first — is one definition and not three.
+ * Shared by all four coverage rules, so the suffix rule — the last thing on the line, found by the
+ * last opening rather than the first — is one definition and not four.
+ *
+ * ⛔ THE LAST, NOT THE FIRST, AND THAT IS M84's MENTION-VERSUS-DECLARATION TRAP. A first-match reader
+ * is wrong in both directions: a line whose prose opens with an incidental parenthetical hides its
+ * real disposition behind it, and — the worse half — a line that merely QUOTES a disposition
+ * discharges itself. A declaration is the one at the END; everything earlier is prose.
+ *
+ * ⚠️ WHY THIS IS NOT AN ANCHORED REGEX. A pattern anchored at both ends passes only by luck: a line
+ * carrying an inner `)` earlier on (`docs/PRD.md`'s Owner/Editor dashboard criterion does) stops a
+ * `[^)]+` body in the wrong place. A last-match search plus a suffix test has no such dependency.
  */
 function last_disposition(string $text): ?string
 {

@@ -16,7 +16,66 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M197`, `symfony/mime` to v8.1.10, clearing CVE-2026-45070 and the composer audit every CI run now fails (m197-symfony-mime-cve)
+## Status: ACTIVE CLAIM — `M198`, the builder's side panes in `em`, so they grow with the text (`R-63ef1a69`) (m198-builder-panes-in-em)
+
+Taken 2026-10-29. Branch `m198-builder-panes-in-em`, cut from `origin/main` at `57ab7e06`, PR into main. ⛔ **NOT MERGED THIS SESSION:**
+held green for **merge point 10**, by the user's word in chat (2026-10-29). Merge point 9 carries `#390`, `#388`, `#389` and `#387`, and
+this rides after them.
+
+Row — taken alone, on the user's instruction:
+- `R-63ef1a69` — *"The builder's side-pane widths are fixed pixels, so at the largest text size the pane-switch threshold no longer
+  matches the columns it is derived from"*.
+
+The session-start pull read 0 reports, 0 reopened and 0 new comments. jongsky25 has not accepted the invitation and `#387` carries no
+`boundary-approved` label, so `#387`'s browser check could not run — the user's fallback was this row.
+
+### Evidence verified
+Every citation holds.
+- `Builder.vue`'s `.builder__panes` sets `grid-template-columns: 260px minmax(0, 1fr) 340px`.
+- The compact block is `@container (max-width: 60em)` on `.builder`, and `.builder` pins `font-size: var(--mds-type-body-lg-font-size)`.
+- The JR5 comment derives 60em as `260 + 340 + 360 = 960`, which is true only at the standard scale.
+- `docs/ux/exceptions-log.md` #13 states the px columns as its known cost 4.
+
+### Premise verified
+- **The type scale re-points the `--mds-type-*` tokens and never the root font size** (exceptions-log #14), so `rem` would not move and
+  `.builder`'s `em` is the unit. `body-lg` is 16 / 18 / 20px (`theme-overrides.css`).
+- **No JavaScript reads a width.** The `pane` ref's comment holds, and nothing mirrors 960 in script.
+- **No gate renders three panes off the standard scale.** `personalization-axe` forces `extra_large` only, and 1440 − 240 = 1200 is
+  exactly 60em × 20px — compact by the inclusive bound — at every project.
+- **A second copy of 260/340 exists:** `tests/e2e/capture/help-pictures.capture.ts` overrides the grid with `260 + GUTTER` and
+  `340 + GUTTER` px. It is a capture, not a gate, run at the standard scale, where `em` gives the same pixels. Filed as a nit, not taken.
+- **WRONG in the row: *"the palette stops being cramped"*.** Measured at 1680 (a 1440 box, three panes at every scale):
+  - the palette's 27 items stay one line at 34px at all three scales on the trunk, and nothing scrolls sideways;
+  - its scroll height is identical under the `em` grid;
+  - with a question selected, the settings pane fits without scrolling on both grids.
+  On the seeded form the change is width, not wrapping. The row's core holds: the threshold is derived from the columns only at standard.
+- None of the four merge-point-9 PRs touches `Builder.vue`, `VERSION` or `database/data/releases.json`.
+- Every backlog citation into `Builder.vue` sits at or above line 927, above the grid rule, so no edit at or below it moves one.
+
+### Remedy verdict
+**`16.25em minmax(0, 1fr) 21.25em` — works, measured** in the running app, on built assets, by a scratch spec that injects the grid and
+is never committed:
+- **standard:** 260 / 600 / 340 at 1440 on both grids — nothing moves;
+- **large at 1440** (box 1200, above 1080): the trunk gives 260 / 600 / 340, which is 14.44em / 18.89em; `em` gives 292.5 / 525 / 382.5,
+  which is 16.25em / 21.25em;
+- **extra large at 1680** (box 1440): the trunk gives 13em / 17em; `em` gives 325 / 690 / 425.
+
+With the 22.5em canvas minimum the three sum to the 60em threshold at every scale. The canvas gives up the difference: 600 → 525px at
+1440 with Large text.
+
+Files: `resources/js/Pages/forms/Builder.vue`, `resources/js/Pages/forms/builder-layout.test.ts`, `tests/e2e/list-layout.spec.ts`,
+`docs/ux/exceptions-log.md`, `VERSION`, `database/data/releases.json`, `docs/feature-backlog.md`, `docs/pipeline.md`.
+Shared artefacts taken: `docs/ux/exceptions-log.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `tests/e2e/list-layout.spec.ts`.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace.
+Prediction:
+- The new Vitest case and the new desktop E2E case go red on a committed mutant, and green on the fix.
+- CI is 7/7. Pest, Contract and Static analysis are unmoved by CSS, and BHW Connect takes its unchanged path.
+- `list-layout` and `personalization-axe` are green locally.
+- **Most likely wrong:** the E2E case's anti-vacuity at Large on desktop needs the sidebar expanded after `openBuilder` (the scratch run
+  measured a 1200 box). A seeded collapsed-sidebar preference would make it a 1376 box — still wide, but not the arithmetic stated here.
+
+## HELD — `M197`, `symfony/mime` to v8.1.10, clearing CVE-2026-45070 and the composer audit every CI run now fails (m197-symfony-mime-cve)
 
 **BUILT — PR #390, CI 7/7 green with real step counts, NOT MERGED.** Run 40807295694 at `82851599`: Static analysis 33 · BHW Connect 19 ·
 E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11.

@@ -18,6 +18,18 @@ Standing Rule 7(b-bis).
 
 ## Status: ACTIVE CLAIM — `M197`, `symfony/mime` to v8.1.10, clearing CVE-2026-45070 and the composer audit every CI run now fails (m197-symfony-mime-cve)
 
+**BUILT — PR #390, CI 7/7 green with real step counts, NOT MERGED.** Run 40807295694 at `82851599`: Static analysis 33 · BHW Connect 19 ·
+E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11.
+- Static analysis ran 31 of its steps, and the composer audit passed.
+- BHW Connect took its unchanged path.
+- **First at the merge point `#387` rides** (`D192`). The branch carries the row, filed and closed, and the regenerated line.
+
+**How the prediction fared.**
+- **Held:** one package moved in the lock, `composer audit --locked` was clean, and CI was 7/7.
+- **Not named:** the host's Composer 2.8.12 would have downgraded the lock's `plugin-api-version` from 2.9.0 to 2.6.0. The bump was redone
+  with the container's Composer 2.10.3, so only `symfony/mime` moves.
+- **Not wrong, and checked:** no second advisory was published before the run.
+
 Taken 2026-10-29. Branch `m197-symfony-mime-cve`, cut from `origin/main`, PR into main. ⛔ **NOT MERGED THIS SESSION:** held green for the
 merge point `#387` rides, **FIRST**, ahead of `#388` and `#389` (`D192`). It is first because every pull request's static job fails
 until it lands.

@@ -50,6 +50,12 @@ use Illuminate\Support\Str;
  *  - **Derived and bulk values stay out.** {@see self::setConfirmationMessage()} records the translation
  *    LOCALE KEYS, not the map: N locales of the same copy in an append-only, never-pruned table is how a
  *    ledger becomes unqueryable (the same reason `brand_ramp` is excluded in TenantBrandingService).
+ *
+ * And one rule about the row (M199, `D190`): **every setter locks the form row first, then audits and writes the
+ * copy it locked** — never the caller's `$form`, which is whatever route binding loaded. Built from that copy, the
+ * audit names a value the row did not hold (the schedule sweeper flips `schedule_state` under the same lock), and
+ * a save whose value equals the copy's is LOST: nothing is dirty against it, so no UPDATE runs. Each setter still
+ * ends `return $form->refresh()`, so the caller's own instance reads what was saved.
  */
 final class FormService
 {
@@ -150,24 +156,26 @@ final class FormService
     public function updateMetadata(Form $form, string $title, ?string $description, ?User $actor = null): Form
     {
         return DB::transaction(function () use ($form, $title, $description, $actor): Form {
-            $old = ['title' => $form->title, 'description' => $form->description];
+            $locked = Form::query()->whereKey($form->id)->lockForUpdate()->firstOrFail();
+
+            $old = ['title' => $locked->title, 'description' => $locked->description];
             $new = ['title' => $title, 'description' => $description];
 
-            $form->forceFill($new)->save();
+            $locked->forceFill($new)->save();
 
-            if ($form->draft_version_id !== null) {
-                // The `status` predicate is load-bearing, not belt-and-braces (H25 / Risk R5). This method
-                // takes an in-memory $form with no lock and no re-read, so if that model was loaded before
-                // a concurrent publish, `draft_version_id` now names the version that publish just FROZE —
-                // and without this clause an ordinary form-settings save silently rewrites a published
-                // version's title/description, which is precisely the corruption R5 describes. With it the
-                // stale write degrades to a no-op instead (and, since H25, to a 23001 rather than silence).
-                FormVersion::query()->whereKey($form->draft_version_id)
+            if ($locked->draft_version_id !== null) {
+                // The `status` predicate was the only guard here until M199 (H25 / Risk R5). This method took the
+                // caller's $form with no lock and no re-read, so a copy loaded before a concurrent publish named
+                // the version that publish had just FROZE, and an ordinary form-settings save rewrote a published
+                // version's title/description — precisely the corruption R5 describes. Read under the row lock
+                // publish also takes, `draft_version_id` is now the current draft; the predicate stays as the
+                // backstop, so a stale write still degrades to a no-op (and, since H25, to a 23001 rather than silence).
+                FormVersion::query()->whereKey($locked->draft_version_id)
                     ->where('status', FormVersionStatus::Draft->value)
                     ->update(['title' => $title, 'description' => $description]);
             }
 
-            $this->recordFormUpdate($form, $old, $new, $actor);
+            $this->recordFormUpdate($locked, $old, $new, $actor);
 
             return $form->refresh();
         });
@@ -230,12 +238,14 @@ final class FormService
         // docblock above calls this column an AUTHORIZATION INPUT, so a write that landed without its
         // audit row would be a silent capacity change across a whole subtree.
         return DB::transaction(function () use ($form, $node, $actor): Form {
-            $old = ['scope_node_id' => $form->scope_node_id];
+            $locked = Form::query()->whereKey($form->id)->lockForUpdate()->firstOrFail();
+
+            $old = ['scope_node_id' => $locked->scope_node_id];
             $new = ['scope_node_id' => $node?->getKey()];
 
-            $form->forceFill($new)->save();
+            $locked->forceFill($new)->save();
 
-            $this->recordFormUpdate($form, $old, $new, $actor);
+            $this->recordFormUpdate($locked, $old, $new, $actor);
 
             return $form->refresh();
         });
@@ -256,14 +266,15 @@ final class FormService
         $folder = $folderId === null ? null : FormFolder::query()->whereKey($folderId)->firstOrFail();
 
         return DB::transaction(function () use ($form, $folder, $actor): Form {
-            $current = $form->folder_id === null ? null : FormFolder::query()->whereKey($form->folder_id)->first();
+            $locked = Form::query()->whereKey($form->id)->lockForUpdate()->firstOrFail();
+            $current = $locked->folder_id === null ? null : FormFolder::query()->whereKey($locked->folder_id)->first();
 
-            $old = ['folder_id' => $form->folder_id, 'folder_name' => $current?->name];
+            $old = ['folder_id' => $locked->folder_id, 'folder_name' => $current?->name];
             $new = ['folder_id' => $folder?->getKey(), 'folder_name' => $folder?->name];
 
-            $form->forceFill(['folder_id' => $folder?->getKey()])->save();
+            $locked->forceFill(['folder_id' => $folder?->getKey()])->save();
 
-            $this->recordFormUpdate($form, $old, $new, $actor);
+            $this->recordFormUpdate($locked, $old, $new, $actor);
 
             return $form->refresh();
         });
@@ -280,12 +291,14 @@ final class FormService
     public function setTheme(Form $form, ?FormThemePreset $preset, ?User $actor = null): Form
     {
         return DB::transaction(function () use ($form, $preset, $actor): Form {
-            $old = ['theme_preset' => FormThemePreset::fromTheme($form->theme)?->value];
+            $locked = Form::query()->whereKey($form->id)->lockForUpdate()->firstOrFail();
+
+            $old = ['theme_preset' => FormThemePreset::fromTheme($locked->theme)?->value];
             $new = ['theme_preset' => $preset?->value];
 
-            $form->forceFill(['theme' => $preset === null ? null : ['preset' => $preset->value]])->save();
+            $locked->forceFill(['theme' => $preset === null ? null : ['preset' => $preset->value]])->save();
 
-            $this->recordFormUpdate($form, $old, $new, $actor);
+            $this->recordFormUpdate($locked, $old, $new, $actor);
 
             return $form->refresh();
         });
@@ -304,12 +317,14 @@ final class FormService
     public function setSaveAndResume(Form $form, bool $enabled, ?User $actor = null): Form
     {
         return DB::transaction(function () use ($form, $enabled, $actor): Form {
-            $old = ['save_and_resume' => $form->save_and_resume];
+            $locked = Form::query()->whereKey($form->id)->lockForUpdate()->firstOrFail();
+
+            $old = ['save_and_resume' => $locked->save_and_resume];
             $new = ['save_and_resume' => $enabled];
 
-            $form->forceFill($new)->save();
+            $locked->forceFill($new)->save();
 
-            $this->recordFormUpdate($form, $old, $new, $actor);
+            $this->recordFormUpdate($locked, $old, $new, $actor);
 
             return $form->refresh();
         });
@@ -333,12 +348,14 @@ final class FormService
     public function setSinglePageMode(Form $form, bool $singlePage, ?User $actor = null): Form
     {
         return DB::transaction(function () use ($form, $singlePage, $actor): Form {
-            $old = ['single_page_mode' => $form->single_page_mode];
+            $locked = Form::query()->whereKey($form->id)->lockForUpdate()->firstOrFail();
+
+            $old = ['single_page_mode' => $locked->single_page_mode];
             $new = ['single_page_mode' => $singlePage];
 
-            $form->forceFill($new)->save();
+            $locked->forceFill($new)->save();
 
-            $this->recordFormUpdate($form, $old, $new, $actor);
+            $this->recordFormUpdate($locked, $old, $new, $actor);
 
             return $form->refresh();
         });
@@ -363,21 +380,23 @@ final class FormService
     public function setOcrScanning(Form $form, bool $enabled, ?User $actor = null, ?array $guest = null): Form
     {
         return DB::transaction(function () use ($form, $enabled, $actor, $guest): Form {
-            $old = ['allow_ocr_single' => $form->allow_ocr_single];
+            $locked = Form::query()->whereKey($form->id)->lockForUpdate()->firstOrFail();
+
+            $old = ['allow_ocr_single' => $locked->allow_ocr_single];
             $new = ['allow_ocr_single' => $enabled];
 
             if ($guest !== null) {
                 $old += [
-                    'allow_guest_ocr' => $form->allow_guest_ocr,
-                    'guest_ocr_window_minutes' => $form->guest_ocr_window_minutes,
-                    'guest_ocr_daily_cap' => $form->guest_ocr_daily_cap,
+                    'allow_guest_ocr' => $locked->allow_guest_ocr,
+                    'guest_ocr_window_minutes' => $locked->guest_ocr_window_minutes,
+                    'guest_ocr_daily_cap' => $locked->guest_ocr_daily_cap,
                 ];
                 $new += $guest;
             }
 
-            $form->forceFill($new)->save();
+            $locked->forceFill($new)->save();
 
-            $this->recordFormUpdate($form, $old, $new, $actor);
+            $this->recordFormUpdate($locked, $old, $new, $actor);
 
             return $form->refresh();
         });
@@ -402,7 +421,7 @@ final class FormService
      * then follows for the rest.
      *
      * The transaction is not decoration: {@see AuditLogger} requires the row to be atomic with the change it
-     * records, and the sibling single-column setters open none.
+     * records. (It once added "and the sibling single-column setters open none" — every one has opened one since I2.)
      *
      * ── ⚠️ I8b GREW THIS METHOD RATHER THAN ADDING A SIBLING, AND THE AUDIT ROW IS THE WHOLE ARGUMENT ──
      * The numerically dominant pattern on this service is a single-column setter per concern
@@ -450,11 +469,13 @@ final class FormService
         $slug = $slug === null ? null : Str::lower($slug);
 
         return DB::transaction(function () use ($form, $slug, $allowGuests, $botChallenge, $guestRateLimitPerMinute, $actor): Form {
+            $locked = Form::query()->whereKey($form->id)->lockForUpdate()->firstOrFail();
+
             $old = [
-                'public_slug' => $form->public_slug,
-                'allow_guest_submissions' => $form->allow_guest_submissions,
-                'bot_challenge' => $form->bot_challenge->value,
-                'guest_rate_limit_per_minute' => $form->guest_rate_limit_per_minute,
+                'public_slug' => $locked->public_slug,
+                'allow_guest_submissions' => $locked->allow_guest_submissions,
+                'bot_challenge' => $locked->bot_challenge->value,
+                'guest_rate_limit_per_minute' => $locked->guest_rate_limit_per_minute,
             ];
             $new = [
                 'public_slug' => $slug,
@@ -463,12 +484,12 @@ final class FormService
                 'guest_rate_limit_per_minute' => $guestRateLimitPerMinute,
             ];
 
-            $form->forceFill($new)->save();
+            $locked->forceFill($new)->save();
 
             $this->audit->record(
                 AuditEvent::Updated,
                 'form',
-                (string) $form->getKey(),
+                (string) $locked->getKey(),
                 old: $old,
                 new: $new,
                 actorId: $actor?->getKey() === null ? null : (string) $actor->getKey(),
@@ -511,6 +532,7 @@ final class FormService
     public function setConfirmationMessage(Form $form, ?string $message, ?array $translations, ?RedirectTarget $redirect, ?User $actor = null): Form
     {
         return DB::transaction(function () use ($form, $message, $translations, $redirect, $actor): Form {
+            $locked = Form::query()->whereKey($form->id)->lockForUpdate()->firstOrFail();
             $normalized = $translations === null || $translations === [] ? null : $translations;
 
             // The audit records which LOCALES carry a translation, never the translations themselves:
@@ -518,8 +540,8 @@ final class FormService
             // tweak. The message body is recorded because it is the thing that changed and it is short;
             // the locale set is the part that answers "who added Spanish, and when".
             $old = [
-                'confirmation_message' => $form->confirmation_message,
-                'confirmation_message_locales' => array_keys($form->confirmation_message_translations ?? []),
+                'confirmation_message' => $locked->confirmation_message,
+                'confirmation_message_locales' => array_keys($locked->confirmation_message_translations ?? []),
             ];
             $new = [
                 'confirmation_message' => $message,
@@ -532,21 +554,21 @@ final class FormService
             ];
 
             if ($redirect !== null) {
-                $old += ['redirect_form_id' => $form->redirect_form_id, 'redirect_url' => $form->redirect_url];
+                $old += ['redirect_form_id' => $locked->redirect_form_id, 'redirect_url' => $locked->redirect_url];
                 $new += ['redirect_form_id' => $redirect->formId, 'redirect_url' => $redirect->url];
                 $fill += ['redirect_form_id' => $redirect->formId, 'redirect_url' => $redirect->url];
 
                 // M138 (`R-df7f4b62`, `D91`): a destination may carry its delay; null keeps the stored one.
                 if ($redirect->delaySeconds !== null) {
-                    $old += ['redirect_delay_seconds' => $form->redirect_delay_seconds];
+                    $old += ['redirect_delay_seconds' => $locked->redirect_delay_seconds];
                     $new += ['redirect_delay_seconds' => $redirect->delaySeconds];
                     $fill += ['redirect_delay_seconds' => $redirect->delaySeconds];
                 }
             }
 
-            $form->forceFill($fill)->save();
+            $locked->forceFill($fill)->save();
 
-            $this->recordFormUpdate($form, $old, $new, $actor);
+            $this->recordFormUpdate($locked, $old, $new, $actor);
 
             return $form->refresh();
         });
@@ -580,31 +602,35 @@ final class FormService
         }
 
         return DB::transaction(function () use ($form, $opensAt, $closesAt, $timezone, $maxResponses, $actor): Form {
+            // The sweeper flips `schedule_state` under this same lock (`D190`'s race): read off the caller's copy,
+            // the audit recorded the state from before the sweep.
+            $locked = Form::query()->whereKey($form->id)->lockForUpdate()->firstOrFail();
+
             // ISO strings, not Carbon instances — a Carbon serializes into jsonb as
             // {"date":…,"timezone_type":3,…}, which no reader can parse and no diff can render.
             $old = [
-                'opens_at' => $form->opens_at?->toIso8601String(),
-                'closes_at' => $form->closes_at?->toIso8601String(),
-                'timezone' => $form->timezone,
-                'max_responses' => $form->max_responses,
-                'schedule_state' => $form->schedule_state?->value,
+                'opens_at' => $locked->opens_at?->toIso8601String(),
+                'closes_at' => $locked->closes_at?->toIso8601String(),
+                'timezone' => $locked->timezone,
+                'max_responses' => $locked->max_responses,
+                'schedule_state' => $locked->schedule_state?->value,
             ];
 
-            $form->forceFill([
+            $locked->forceFill([
                 'opens_at' => $opensAt,
                 'closes_at' => $closesAt,
                 'timezone' => $timezone,
                 'max_responses' => $maxResponses,
             ]);
-            $form->schedule_state = FormSchedule::initialState($form, CarbonImmutable::now());
-            $form->save();
+            $locked->schedule_state = FormSchedule::initialState($locked, CarbonImmutable::now());
+            $locked->save();
 
-            $this->recordFormUpdate($form, $old, [
+            $this->recordFormUpdate($locked, $old, [
                 'opens_at' => $opensAt?->toIso8601String(),
                 'closes_at' => $closesAt?->toIso8601String(),
                 'timezone' => $timezone,
                 'max_responses' => $maxResponses,
-                'schedule_state' => $form->schedule_state?->value,
+                'schedule_state' => $locked->schedule_state?->value,
             ], $actor);
 
             return $form->refresh();
@@ -676,8 +702,8 @@ final class FormService
      *
      * `$fieldKeys` null means every shareable question (`D60`'s note), never `[]` — the request and the column's
      * CHECK both refuse the empty list. Read under the row lock and audited from the locked copy, for
-     * {@see self::archive()}'s reason: the old value recorded is the one this write replaced. Placed last in the
-     * file because this file is cited by line.
+     * {@see self::archive()}'s reason: the old value recorded is the one this write replaced. The first setter to do
+     * so; since M199 every setter does (the class docblock).
      *
      * @param  list<string>|null  $fieldKeys
      */

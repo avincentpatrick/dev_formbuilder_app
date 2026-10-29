@@ -16,7 +16,74 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M198`, the builder's side panes in `em`, so they grow with the text (`R-63ef1a69`) (m198-builder-panes-in-em)
+## Status: ACTIVE CLAIM — `M199`, the form-settings saves lock the form row and audit the copy they replace, as `setDataSharing` does (`R-5041cc72`, `D190` A) (m199-settings-setters-lock)
+
+Taken 2026-10-29. Branch `m199-settings-setters-lock`, cut from `origin/main` at `75b133ca`, PR into main. ⛔ **NOT MERGED THIS SESSION:**
+held green for **merge point 10, with `#391`**, by the user's word in chat (2026-10-29). The order inside it: `#391`, then this.
+
+Row — taken alone, because its remedy edits a hub (`FormService.php`) and `D13` allows one hub row per batch:
+- `R-5041cc72` — *"`FormService` has seven lock-free writers to `forms` and one locked, and six of them build their audit payload from
+  a model nobody re-read"*.
+
+`D190` A, asked and answered after `M195`'s read-only verification: every settings setter takes the form lock and builds its audit from
+the locked copy. The session-start pull read 0 reports, 0 reopened and 0 new comments. jongsky25 has still not accepted the invitation and
+`#387` carries no `boundary-approved` label, so `#387`'s browser check could not run — the user's fallback was this row.
+
+### Evidence verified
+Held, with one clause false since `M133`.
+- The seven named writers each open a `DB::transaction` and take no `lockForUpdate`.
+- *"Only `archive()` takes one"* is false: `setDataSharing` locks too, and audits the locked copy.
+- `archive()`'s comment holds verbatim: *"an audit built from the stale copy would record a `status` this method never actually saw"*.
+- The "silent" grouping holds: `setShareSettings`' docblock enumerates `updateMetadata`, `assignScope`, `setSaveAndResume`,
+  `setConfirmationMessage`, `setSchedule` and `archive`.
+
+### Premise verified
+- **The row understates itself twice.**
+  - There are eleven lock-free writers, not seven: `assignFolder`, `setTheme`, `setSinglePageMode` and `setOcrScanning` are newer. Ten
+    build `$old` from the caller's copy. `create()` builds none and is right to take no lock, since it creates the row (§3.4 says so).
+  - **The stale copy loses writes, not only audits.** Every setter writes on the caller's `$form`, and `save()` writes only what is
+    dirty against that copy's original. Measured in the container on a `Form` model: setting the values a stale copy already holds
+    (`save_and_resume`, `max_responses`, `theme`) leaves `getDirty()` empty. So while the database holds something else, no `UPDATE`
+    is issued, and the audit records a change that never happened.
+- **The race `D190` names holds.** `FormScheduleSweeper`'s close and open passes flip `schedule_state` under a bulk `lockForUpdate`, and
+  `setSchedule` reads its old `schedule_state` off the caller's copy.
+- **The callers are controllers only**, and none uses the return value. `FormConfirmationMessageController::toast()` reads
+  `$form->currentPublishedVersion` after the save, so the caller's own instance must stay refreshed, as it is today.
+- **No new lock order.** Publish locks the `forms` row and then the version's rows; `updateMetadata` will lock `forms` and then update
+  `form_versions`, the same order. `BuilderLockOrderTest`'s *"the save locked the form row"* concerns `FormBuilderService::updateField`.
+- **No test stages a stale copy** for any setter, `archive` or `setDataSharing`, and none asserts their `for update`.
+- **One live line citation into the file, already stale:** `FormPrintController` cites `FormService.php:80` and `PublishService.php:112`
+  for `schema_snapshot => []`, which now sit at 96 and 183. No backlog row cites `FormService.php` by line, so the new lines move nothing
+  `citation-liveness-lint` reads.
+- **§3.4's list of lock-takers already misses `setDataSharing`.**
+- Of the held branches, only `#389` touches a file this row takes: it appends `D190`'s answer under `R-5041cc72`, and edits §8 of the
+  versioning doc. Both are expected at merge point 10 — keep both sides.
+
+### Remedy verdict
+**`D190` A — works by precedent** (`setDataSharing`, `archive`): lock the row first, build `$old` from the locked copy, then write and
+audit that copy. Each setter still ends `return $form->refresh()`, so the caller's instance stays current. To be measured as a defect
+first: the new stale-copy cases go red against the current service — the stale audit and the lost write both — and then green.
+
+Files:
+- `app/Services/Forms/FormService.php`, `app/Http/Controllers/Tenant/FormPrintController.php` (the stale citation, re-cited by name)
+- new `tests/Feature/Forms/FormSettingsLockingTest.php`
+- `docs/form-versioning-schema-migration.md` (§3.4)
+- `docs/feature-backlog.md` (the closure), `docs/pipeline.md`
+
+Shared artefacts taken: `docs/form-versioning-schema-migration.md`, `docs/feature-backlog.md`, `docs/pipeline.md`.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace. `D190` was answered with `M195`'s built claim.
+No `VERSION` bump, no release note, no migration: nothing a tester sees changes.
+Prediction:
+- The stale-copy cases go red on the current service for the ten setters, with `setDataSharing` as a control that stays green. The
+  lock-order cases go red for the same ten. All green after the fix.
+- Three committed mutants are each caught.
+- The setters' existing suites stay green; PHPStan stays at no errors; Pint is green, bare.
+- CI: six green, and static analysis red only at the composer audit on CVE-2026-45070, which `M197` clears — as for `#389` and `#391`.
+- **Most likely wrong:** a case that counts a settings save's queries, or calls a setter on a model the current context can read but
+  not lock.
+
+## HELD — `M198`, the builder's side panes in `em`, so they grow with the text (`R-63ef1a69`) (m198-builder-panes-in-em)
 
 **BUILT — PR #391, NOT MERGED.** Held for **merge point 10**, by the user's word in chat.
 - **Run 40822742885 at `b6fa013e`:** six green with real step counts — E2E 20 (19 ran; only the failure-upload step skipped) · Pest 11

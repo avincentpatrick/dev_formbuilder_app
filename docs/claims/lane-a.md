@@ -18,6 +18,39 @@ Standing Rule 7(b-bis).
 
 ## Status: ACTIVE CLAIM — `M199`, the form-settings saves lock the form row and audit the copy they replace, as `setDataSharing` does (`R-5041cc72`, `D190` A) (m199-settings-setters-lock)
 
+**BUILT — PR #392, NOT MERGED.** Held for **merge point 10, after `#391`**, by the user's word in chat.
+- **Run 40855187396 at `75aedb15`:** six green with real step counts — E2E 20 (19 ran; only the failure-upload step skipped) · Pest 11
+  · Contract 16 · Frontend 12 · axe 11 · BHW Connect 19, its unchanged path (9 ran).
+- **Static analysis ran 24 of 32 steps, Pint, PHPStan and every lint included, and went red only at step 23, the composer audit,** on
+  CVE-2026-45070 (`symfony/mime`) — the advisory `M197` clears, as for `#389` and `#391`. At merge point 10 the branch merges the trunk
+  after merge point 9 and is run again; the backlog conflicts at `R-5041cc72` with `#389`'s `D190` block — keep both.
+- The branch carries the fix, `FormSettingsLockingTest`, §3.4, the `FormPrintController` citation, the row's closure and the regenerated
+  line. No `VERSION` bump.
+
+**How the prediction fared.**
+- **Held:**
+  - On the old service: 21 red, 4 green. The ten stale-copy cases and the ten lock-order cases were red, and so was the sweeper case.
+    The `setDataSharing` stale control, the `setDataSharing` and `archive` lock cases, and the reflection guard were green. After the
+    fix: 25 of 25.
+  - All ten stale-copy cases failed first on the **lost write**, before reaching the audit assertion. The stale audit is proven on its own
+    by the sweeper case.
+  - Three mutants were caught through `mutate.php`, the sha256 restored each time: `setSchedule` auditing the caller's copy (2 red),
+    `setSaveAndResume` writing on it (2 red), `setTheme` re-reading without the lock (1 red — its lock-order case alone).
+  - The 34 Pest files that call the setters: 380 passed and 19 errors, every one `builderTenant()` undefined in `BuilderDraftGuardTest`
+    (the recorded trap — run without `BuilderRoutesTest.php`). Re-run with it: 28 of 28.
+  - Pint was green, bare. Every host lint gate and preflight with gates and Pint were green, and so was CI's PHPStan.
+  - CI held exactly as written: six green, and static analysis red only at the composer audit.
+- **Wrong:** the one named most likely wrong did not happen. No case counted a settings save's queries, and the `forms` RLS policies are
+  tenant-only for every command, so a row a setter can read it can lock.
+- **Not named:**
+  - The container's PHPStan reports 6 `property.notFound` on `Form` columns with no `@property` (`allow_ocr_single`, the guest OCR
+    limits, `data_sharing_*`). The same reads exist on the trunk under the same names, and CI's PHPStan passed.
+  - `setDataSharing` changed too: it now returns `$form->refresh()`, so the class docblock's "each setter ends `return
+    $form->refresh()`" is true of all eleven. Its one caller ignores the return.
+  - `setShareSettings`' docblock said the sibling setters open no transaction, false since I2; corrected in place.
+  - The plan said "commit the mutants". They ran through `mutate.php` in the working tree instead, because the gate is Pest, which reads
+    the working tree; the commit rule exists for diff-based checks.
+
 Taken 2026-10-29. Branch `m199-settings-setters-lock`, cut from `origin/main` at `75b133ca`, PR into main. ⛔ **NOT MERGED THIS SESSION:**
 held green for **merge point 10, with `#391`**, by the user's word in chat (2026-10-29). The order inside it: `#391`, then this.
 

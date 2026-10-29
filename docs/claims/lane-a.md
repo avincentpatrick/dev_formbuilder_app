@@ -16,7 +16,67 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M196`, a builder edit must carry its `version` token, and the token is checked under the row lock (`R-036f3226`, `D189` A) (m196-builder-token-under-lock)
+## Status: ACTIVE CLAIM — `M197`, `symfony/mime` to v8.1.10, clearing CVE-2026-45070 and the composer audit every CI run now fails (m197-symfony-mime-cve)
+
+Taken 2026-10-29. Branch `m197-symfony-mime-cve`, cut from `origin/main`, PR into main. ⛔ **NOT MERGED THIS SESSION:** held green for the
+merge point `#387` rides, **FIRST**, ahead of `#388` and `#389` (`D192`). It is first because every pull request's static job fails
+until it lands.
+
+Row — new, filed and closed on this branch: *"`symfony/mime` v8.1.0 carries CVE-2026-45070, and `composer audit` fails every CI run
+from 2026-10-28 18:08 UTC"*. It is alone under `D13`, because `composer.lock` is a hub.
+
+### Evidence verified
+- `#389`'s run 40790795523 went red at step 23 of its static job, *Composer audit (SCA)*, on exactly one advisory:
+  - `symfony/mime`, `PKSA-wtxr-p26d-nn42`, CVE-2026-45070, *"Email Header Injection via Non-Token Characters in Mime Parameter
+    Names"*, severity medium;
+  - reported 2026-10-28T18:08:54Z, and fixed in 8.1.10.
+- `composer.lock` pins `symfony/mime` at v8.1.0.
+
+### Premise verified
+- **It is not `#389`'s diff.**
+  - `#388`'s run 40721232507, which finished before the advisory was published, passed the same step.
+  - Every step before the audit passed on `#389`, PHPStan included.
+  - From now on every branch fails this step, and so does the trunk's next run.
+- **The host's own `composer audit` reports a second advisory** (`symfony/http-foundation`, high), but only because the local `vendor/`
+  lags the lock. The lock already pins 8.1.9, which is patched, and CI installs from the lock.
+- `symfony/mime` is transitive: it is not in `composer.json`'s `require`.
+
+### Remedy verdict
+- **`composer update symfony/mime` — works, measured as a dry run.** It moves `symfony/mime` v8.1.0 → v8.1.10 inside its range. The
+  `http-foundation` line in the same dry run is `vendor/` catching up with the lock, not a lock change.
+- **To be confirmed:** `composer audit --locked` clean, and CI 7/7.
+
+Files: `composer.lock`, `docs/feature-backlog.md` (the row, filed and closed), `docs/pipeline.md`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`.
+Paired files taken: none.
+Namespaces spent: `D192`, answered in chat.
+Prediction:
+- One package moves in the lock.
+- CI is 7/7. Pest, E2E and Contract are unmoved by a patch release of a MIME library.
+- **Most likely wrong:** a second advisory published before the run.
+
+## HELD — `M196`, a builder edit must carry its `version` token, and the token is checked under the row lock (`R-036f3226`, `D189` A) (m196-builder-token-under-lock)
+
+**BUILT — PR #389, NOT MERGED.** It rides the merge point `#387` rides, **second, after `M197` and `#388`**, with `#387` last (`D192`).
+- **Run 40790795523 at `61dc1d2d`:** six green with real step counts — E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · BHW
+  Connect 19, its unchanged path.
+- **Static analysis ran 25 of 32 steps, PHPStan included, and went red only at the composer audit.** That is the advisory published
+  on 2026-10-28 at 18:08 UTC that `M197` clears. At the merge point the branch merges the trunk after `M197` and is run again.
+
+**How the prediction fared.**
+- **Held:**
+  - The stale-copy cases were red on the old code and are green now, and the pinning test flips to 422.
+  - Three mutants were each CAUGHT by exactly one case.
+  - Pint passed.
+  - CI's PHPStan passed. The container's own run reports 51 errors on lines this diff never touched, model-property reads in that
+    environment.
+- **Wrong — the premise I measured worst.** *"Only the pinning test sends none"* counted `'version'` mentions, and 36 cases sent
+  `'version' => null`. Every one now sends the row's token, read just before each save, which avoids a one-second flake on a repeated
+  save.
+- **Not named:**
+  - The service's new lines moved 16 backlog citations. Three of them landed on blank lines, which `citation-liveness-lint` caught;
+    all 16 are re-pointed and checked by content.
+  - The container collector truncates `tests/Feature/Forms` (239 of 1,178 cases), so it was run file by file.
 
 Taken 2026-10-29. Branch `m196-builder-token-under-lock`, cut from `origin/main` at `5ffc1239`, PR into main. ⛔ **NOT MERGED THIS SESSION:**
 held green. Its merge point, and its place in it, are the user's to name, asked by name before this session ends. Numbered past the held
@@ -92,7 +152,8 @@ Prediction:
 E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11.
 - BHW Connect ran 9 of its 19 steps. The boundary passed and the job printed *"apps/bhw-connect is unchanged in this pull request: every
   later step is skipped, and the job reports success."*
-- **Held first at the merge point `#387` rides** (`D188`).
+- **Held for the merge point `#387` rides, now second, after `M197`** (`D188`, then `D192`, which put `M197` first because CVE-2026-45070
+  turns every composer audit red until it lands). At the merge point the branch merges the trunk after `M197` and is run again.
 - The branch carries both rows' closures, two filed rows (`R-b3223cf8`, `R-c4ac829b`) and the regenerated line.
 
 **How the prediction fared.**

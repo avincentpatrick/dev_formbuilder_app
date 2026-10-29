@@ -24,10 +24,19 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D191`, the last filed, was asked and answered on 2026-10-29 with `D189` and `D190`, after the read-only verification of the line's next four rows, and recorded with `M195`'s built claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D192`, the last filed, was asked and answered on 2026-10-29 once `M196` was built, and recorded with `M197`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D192 — `M196` (`#389`, the builder's version token) is built and held. Which merge point does it ride? **A — the same one as `#387`, second: `M197`, then `#388`, then `#389`, with `#387` last.**
+
+**Asked and answered 2026-10-29 (user decision, in chat), once `M196` was built; recorded with `M197`'s claim.**
+- **A — the same merge point, second (recommended, chosen).** It keeps `D188`'s reasoning: `#387` is the one most likely to slip, so it goes last, and dropping it moves nothing else. `#389` changes builder saves, so the testers get it at once.
+- **B — a later merge point.** This one would keep only `#388` and `#387`.
+
+⚠️ **The first slot was not part of the question, because it is forced.** `M197` clears CVE-2026-45070, which turned every pull request's composer audit red from 2026-10-28 18:08 UTC, after the question was asked. It must merge before anything else can be green. So the order is `M197` → `#388` → `#389` → `#387`, each branch merging the trunk after `M197` and running again. As at every merge point, the user's census comes before and after, and each pull request goes in only once the previous deploy has finished and `/up` answers.
+
+**What the answer files:** nothing new. `M196` moves under HELD in `docs/claims/lane-a.md`, and `M197`'s claim names its place, first.
 ### D191 — `openapi.json` publishes our internal notes. What is kept out of it, and how? **A — the clear maintainer marks now, with a check that refuses them; the design codes in a later row.** **Tier: during-testing.**
 
 **Asked and answered 2026-10-29 (user decision, in chat), after `M195`'s read-only verification of `R-e568ddd2`; recorded with `M195`'s built claim.** The verification found the row's leak is wider than it says.

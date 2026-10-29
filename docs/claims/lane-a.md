@@ -18,6 +18,27 @@ Standing Rule 7(b-bis).
 
 ## Status: ACTIVE CLAIM — `M198`, the builder's side panes in `em`, so they grow with the text (`R-63ef1a69`) (m198-builder-panes-in-em)
 
+**BUILT — PR #391, NOT MERGED.** Held for **merge point 10**, by the user's word in chat.
+- **Run 40822742885 at `b6fa013e`:** six green with real step counts — E2E 20 (19 ran; only the failure-upload step skipped) · Pest 11
+  · Contract 16 · Frontend 12 · axe 11 · BHW Connect 19, its unchanged path (9 ran).
+- **Static analysis ran 25 of 32 steps, Pint and PHPStan included, and went red only at step 23, the composer audit,** on
+  CVE-2026-45070 (`symfony/mime`) — the advisory `M197` clears, which `#389` met the same way. At merge point 10 the branch merges the
+  trunk after merge point 9 and is run again.
+- The branch carries the row's closure, `R-30be7b88` (nit, after-launch) filed under it, the regenerated line, and 0.16.1's notes —
+  **a draft until the user approves the wording.**
+
+**How the prediction fared.**
+- **Held:**
+  - Both committed mutants were caught. The px columns reddened the new Vitest case alone and the new desktop E2E case (14.44
+    received). A `font-size` on `.builder__panes` reddened the Vitest case alone. `Builder.vue`'s sha256 matched afterwards.
+  - `list-layout` passed 41 with 37 skipped at three projects, and `personalization-axe`'s builder cases passed 6 of 6.
+  - Full Vitest passed 4,332 of 4,333; `token-references` timed out under load and passes 4 of 4 alone, a recorded trap.
+  - Pest `tests/Feature/Releases` passed 24 of 24, and host preflight passed every gate and Pint.
+  - The one I named most likely wrong held: the desktop sidebar was expanded (a 1200 box) in the scratch run and in the case.
+- **Wrong:** *"CI is 7/7"*. The static job is red on the advisory published 2026-10-28, which `#389` had already met. It is not this diff.
+- **Not named:** a Python one-liner opened `VERSION` for writing before reading it and emptied it. It was restored from git's bytes
+  before the commit.
+
 Taken 2026-10-29. Branch `m198-builder-panes-in-em`, cut from `origin/main` at `57ab7e06`, PR into main. ⛔ **NOT MERGED THIS SESSION:**
 held green for **merge point 10**, by the user's word in chat (2026-10-29). Merge point 9 carries `#390`, `#388`, `#389` and `#387`, and
 this rides after them.

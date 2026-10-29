@@ -8887,7 +8887,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ⚠️ `M88`'s re-read guard covers the two mutators it touched — the child re-read is there for exactly this
   family — but the three siblings named in the row above are not covered, and neither is any non-builder
   writer. **Live.** Filed by `M88`. **Tier: during-testing.**
-- **`minor` · `FormService` has seven lock-free writers to `forms` and one locked, and six of them build
+- ✅ **CLOSED BY `M199` (2026-10-29) — ****`minor` · `FormService` has seven lock-free writers to `forms` and one locked, and six of them build
   their audit payload from a model nobody re-read.** Measured by `M88`'s fan-out (2026-09-08) while
   correcting the schedule-window row. `create`, `updateMetadata`, `assignScope`, `setSaveAndResume`,
   `setShareSettings`, `setConfirmationMessage` and `setSchedule` each open a transaction and take no
@@ -8897,7 +8897,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   already exists in that file** for an unrelated reason (six of them are enumerated as the set that is
   "silent"); nobody has applied it to the lock or to the audit read. ⚠️ Filed rather than fixed because
   whether a config setter should serialize against publish is the same §3.4 question the builder rows raise.
-  **Live.** Filed by `M88`. **Tier: during-testing.**
+  **Live.** Filed by `M88`. **Tier: during-testing.** ✅ **CLOSED BY `M199` (2026-10-29), on its branch, under `D190` A (the user, in chat):** every settings setter on `FormService` reads the row under `lockForUpdate`, then audits and writes that copy — `setDataSharing`'s order — and ends `return $form->refresh()`, so the caller's own instance reads what was saved. ⚠️ **The row understated itself twice.** It named seven lock-free writers and there were eleven (`assignFolder`, `setTheme`, `setSinglePageMode` and `setOcrScanning` are newer), ten of them building `$old` from the caller's copy — `create()` creates the row and is right to lock nothing — and *"only `archive()` takes one"* had been false since `M133`'s `setDataSharing`. ⛔ **And the stale copy LOST WRITES, not only audits:** `save()` writes only what is dirty against the model's original, so a save whose value equalled the stale copy's issued no UPDATE while the row held a concurrent value — red on the old service for all ten, and `D190`'s race (the sweeper's `schedule_state` audited from before the sweep) red too. Proof: `tests/Feature/Forms/FormSettingsLockingTest.php` — a stale-copy case per setter, the lock before the write for all twelve lockers, the sweeper case, and a reflection guard that no public `FormService` writer is left off the lock list; three mutants caught (`setSchedule` auditing the caller's copy, `setSaveAndResume` writing on it, and `setTheme` re-reading without the lock, which only its lock-order case sees). §3.4 of `docs/form-versioning-schema-migration.md` lists the settings saves among the lock-takers, and `FormPrintController`'s stale `FormService.php` / `PublishService.php` line citations are re-cited by method name.
 - ~~**`minor` · One `forceFill` writes `closes_at` and `max_responses` together, and the acceptance guard
   treats one as authoritative-under-lock and the other as ignorable-pre-lock.**~~ Measured by `M88`'s fan-out
   (2026-09-08). `FormAcceptanceGuard::assertCapacity()` does not trust the passed-in `$form`: it re-reads

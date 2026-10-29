@@ -725,7 +725,7 @@ final class FormService
 
             $this->recordFormUpdate($locked, $old, $new, $actor);
 
-            return $locked->refresh();
+            return $form->refresh();
         });
     }
 }

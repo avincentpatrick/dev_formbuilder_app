@@ -553,7 +553,13 @@ Prediction:
 - **`BHW Connect` is red at step 5 of 19** — *Boundary — a change to the other owner's paths needs their label (`D177`)* — and every
   later step was skipped. That is the prediction exactly: the pull request is ours and touches jongsky25's tree and `.github/`.
 - **It waits on one thing from jongsky25: his `boundary-approved` label**, once he accepts the repository invitation (still pending at
-  2026-10-30 13:16 UTC). Then the BHW job is re-run, and its audit, lint, types, Vitest and build run on this branch for the first time.
+  2026-10-30 14:43 UTC, though the user believed it accepted). Then the BHW job is re-run, and its audit, lint, types, Vitest and build
+  run on this branch for the first time.
+- **Since 2026-10-30, Static analysis is red at Composer audit (step 23 of 32) on `symfony/mime` CVE-2026-45070** — the same red every
+  open pull request carries until `#390` (`M197`) merges first at merge point 9; it arrived with `origin/main` merged in (`216f2e74`) to
+  clear a conflict in `docs/pipeline.md`, the only conflict.
+- ➕ **EXTENDED 2026-10-30 to `bhw-geo-drilldown-isr`** (the user: putting BHW online is now the main priority): same tier, same tree,
+  same label and merge, and `bhw-p1-box` needed both. See *Extension* below.
 - ✅ **His Supabase keys arrived 2026-10-30** (the user, in `apps/bhw-connect/.env.local`; the five AI, cron and salt values left blank,
   which nothing checked here reads). The pasted URL ended in `/rest/v1/`, so every query 404'd and every page read "—" with nothing
   logged; trimmed to the project URL, `dim_geo` answers 43,783 rows and `agg_geo_summary` 41,052.
@@ -577,7 +583,25 @@ limit. Usage logging was blocked in the browser, so nothing was written to jongs
   They stay ISR while the root layout reads the CSP nonce through `headers()` since `M192`, whose route-table measurement ("every
   `○`/`●` route became `ƒ`") was taken where `generateStaticParams` returned nothing.
 - **Not named in the prediction:** the box's `npm run build` will pre-render against the data source unless that row changes it — the
-  load `bhw-p1-box` must measure.
+  load `bhw-p1-box` must measure. *(It does change it — see below.)*
+
+### Extension — `bhw-geo-drilldown-isr` (2026-10-30), built in `e923ccf2`, markers and line in `76164ae8`
+- **Evidence verified:** seven routes carry `generateStaticParams` with `revalidate` — place, facilities, profiling-status and
+  uuc-phc by `[geoLevel]/[geoCode]`, and uuc-phc's bhw-coverage, criteria and indicators beneath it. The ten `revalidate`-only pages
+  (districts, uuc-phc and the rest) render per request already and answered 200.
+- **Premise verified:** the 500 is the trunk's, from `M192`'s nonce read in `app/layout.tsx`, not this branch's; jongsky25's own
+  deployment never read a nonce, so it never showed. The routes' `generateStaticParams` helpers are his and are left in place.
+- **Remedy verdict — works:** `export const dynamic = "force-dynamic"` on each of the seven. Built without a data source the table
+  still prints `●`, but all seven answer 200 with no `DYNAMIC_SERVER_USAGE`. Built WITH the data source, the table prints `ƒ` for
+  all seven, and the build takes **13 s**: it collects the 1,004 page params but renders none of them. Served from that build,
+  every drill-down kind, Explore and Districts answer 200, and the map worker loads.
+- **Host gates on `e923ccf2`:** Vitest 86 files, 1,251 passed; type-check 0; lint 1 warning (the fixture). The two pages Prettier
+  flags were unformatted before the change; CI runs no Prettier step for BHW.
+- **Wrong in the row as filed:** it expected to measure a data-source build that pre-renders hundreds of pages; with the fix there is
+  none to measure.
+- **Found and filed — `bhw-drilldown-cold-render`** (blocked on `bhw-p1-box`): the first view of a region or province page takes
+  20–40 s against Supabase, and a repeat 0.3–1.4 s, because the data layer caches. The remedy is to request them once at the end of
+  `ops/deploy-bhw.ps1`, and measure again after `bhw-p2-db`.
 
 **The claim as taken follows.**
 

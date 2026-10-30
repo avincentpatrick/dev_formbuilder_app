@@ -1,5 +1,15 @@
 [
     {
+        "version": "0.16.1",
+        "title": "Builder panels that grow with your text",
+        "items": [
+            {
+                "kind": "fixed",
+                "text": "With Text size set to Large or Extra large (Settings → Appearance), the builder’s left panel (Add) and right panel (Settings) now widen with the text, so they keep the same room for their words as at the standard size. The form in the middle gives up that width. At the standard text size nothing changes."
+            }
+        ]
+    },
+    {
         "version": "0.16.0",
         "title": "Compare two versions of a form",
         "items": [

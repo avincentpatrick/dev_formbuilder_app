@@ -567,7 +567,9 @@ full-screen sheet — and none of those moved.
    J7 deliberately did not take: the verdict is batch-scoped rather than per-row, an identical repeated
    failure does not re-announce, and the failed indicator is not tonally distinct.
 4. **At `extra_large` the threshold is 1200px of container, so a 1440px desktop is compact.** That is the
-   `em` choice working as designed — the 260/340 pane columns are px literals that do not grow with the type
+   `em` choice working as designed — ~~the 260/340 pane columns are px literals that do not grow with the type~~
+   (struck by `M198`: the columns are `em` now and grow with the threshold; the desktop is still compact at
+   `extra_large`, because 1440 − 240 = 1200 = 60em × 20px and the bound is inclusive)
    — but it means any test helper keyed on `info.project.name` rather than on what is actually on screen
    would be wrong at the desktop project, and only there. `showBuilderPane()` asks the page.
 5. **`MdsSegmentedControl` has no wrap and no overflow handling**, and `.app-shell { overflow-x: clip }`
@@ -619,6 +621,17 @@ full-screen sheet — and none of those moved.
    `input`. This entry states it correctly (*"inline-flex with no wrap and no overflow handling"*); the copy
    in `personalization-axe.spec.ts` did not, and a backlog row then quoted that copy verbatim. Both are
    corrected. **An error propagated by citation reads as corroboration.**
+
+**⚠️ Amended by M198 (2026-10-29, `R-63ef1a69`): the pane columns are `em` too.** `260 (palette) + 340 (config) + 360`
+was true at the standard scale only: the threshold grew with §2.9's type scale and the two px columns did not, so at
+large and extra large the palette and the settings kept 260 / 340px while the switch moved to 1080 / 1200. They are
+`16.25em minmax(0, 1fr) 21.25em` of `.builder`'s own font size now — the same `em` as the threshold, because
+`.builder__panes` sets none — so `16.25 + 21.25 + 22.5 = 60em` at every scale: 260 / 340 at the standard scale (nothing
+moved there), 292.5 / 382.5 at large, 325 / 425 at extra large. Measured on the seeded form, the change is width, not
+wrapping — the palette's items stay one line at every scale on both grids — and the canvas gives up the difference
+(600 → 525px at 1440 with Large text). `builder-layout.test.ts` pins the sum and the absent `font-size`;
+`list-layout.spec.ts` measures the columns at Large on the desktop project, the one state in the matrix with three
+panes off the standard scale.
 
 **Disposition:** accepted. If the sidebar widths, the pane widths, or `body`'s font-size token ever change,
 re-derive 60em from the same two edges rather than adjusting it by eye.

@@ -16,7 +16,80 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M199`, the form-settings saves lock the form row and audit the copy they replace, as `setDataSharing` does (`R-5041cc72`, `D190` A) (m199-settings-setters-lock)
+## Status: ACTIVE CLAIM — `M200`, the maintainer marks out of `openapi.json`, with a check that refuses them (`R-e568ddd2`, `D191` A) (m200-openapi-maintainer-marks)
+
+Taken 2026-10-30. Branch `m200-openapi-maintainer-marks`, cut from `origin/main` at `014b5c48`, PR into main. ⛔ **NOT MERGED THIS
+SESSION:** held green for **merge point 10, third — after `#391` and `#392`** — by the user's word in chat (2026-10-30).
+
+Row — taken alone, because its remedy edits `openapi.json`, a hub, and `D13` allows one hub row per batch:
+- `R-e568ddd2` — *"A `FormRequest` class docblock is PUBLISHED API DOCUMENTATION, and nothing says so at the place where someone
+  writes one"*.
+
+`D191` A, asked and answered after `M195`'s read-only verification: remove the ⛔/⚠️ marks, M-numbers, test-class names and script
+paths from the sources Scramble reads, and widen `OpenApiContractTest`'s one-off *"not `AppServiceProvider`"* assertion into a denylist
+over the whole committed `openapi.json`. The design codes and `@see` are a later row, `before-launch`, already filed by `M196` on
+`#389`'s branch — not filed again here. The session-start pull read 0 reports, 0 reopened and 0 new comments. jongsky25 has still not
+accepted the invitation and `#387` carries no `boundary-approved` label, so `#387`'s browser check could not run — the user's fallback
+was this row. The user also approved 0.16.1's What's new wording for `#391` as written (2026-10-30).
+
+### Evidence verified
+Held.
+- Scramble emits an `Api/V1` request's class docblock verbatim: 15 of the 17 request classes have a published `description`.
+- `StoreDomainRequest`'s published description names `CustomDomainApiTest`, which exists (`tests/Feature/Api/CustomDomainApiTest.php`)
+  — the pointer `M92` corrected is no longer dead, but it is still a test name in the contract.
+- `scripts/test-pointer-lint.php`'s mention roots are `tests`, `app`, `database` and `routes`: `openapi.json` is not one, so no gate
+  reads a pointer inside it.
+- `preflight --with-gates` runs host lints only; nothing in it exports or reads the contract.
+
+### Premise verified
+- **The row understates itself.** It names `FormRequest` docblocks; the committed document carries **14 marked strings from 12
+  sources**, and only two of those sources are request classes (`StoreDomainRequest`, `StoreOcrScanRequest`). The rest are four enum
+  docblocks (`SyncResultStatus` — ⛔, `M69`, ⚠️ twice; `AnalyticsAxis` — `scripts/controller-gate.php`, `app/Enums`, `docs/PRD.md:203`;
+  `AnalyticsFormSelection` — `docs/PRD.md:197`; `FieldType` — `M183`), two controller method docblocks (`GamificationController`'s
+  leaderboard ⚠️, `PublicFormSchemaController`'s linked choices `M186`), three `//` comments above array keys (`PublicFormPresenter`'s
+  `bot_challenge` ⚠️ + `replay.ts` and `paper_upload` `M165`; `ScoreboardResource`'s `member_count` ⚠️), and one string literal
+  (`SubmissionRefusalResponseExtension`'s ⚠️, emitted three times).
+- **Three neighbouring kinds sit beside the decision's four** and are the same thing: a source-file name (`replay.ts`), a code path
+  (`app/Enums`) and line-numbered document pointers (`docs/PRD.md:197`, `:203`) — the last is the row's own second finding, a pointer
+  inside a generated file no gate reads. They join the denylist. A bare `docs/api-specification.md` stays: it points an integrator at a
+  published document.
+- **The convention the row asks for already exists in one place:** `StoreDomainRequest` keeps its maintainer notes in the class body
+  (`M92`). Recorded traps say where a note is not published: a `//` block above a docblock, or a class body — never a `//` above an
+  array key or a `return` (M78, M137, M141).
+- **Nothing a person sees changes.** Scramble is a dev dependency, `deploy.ps1` runs `composer install --no-dev`, and no route serves
+  `openapi.json`. So no `VERSION` bump and no release note.
+- Of the held branches, only the backlog overlaps: `#389` appends `D191`'s answer under this row, and every held branch edits
+  `docs/feature-backlog.md`. A keep-both at merge point 10. No held branch touches `openapi.json` or any of the twelve sources.
+
+### Remedy verdict
+**`D191` A — works, measured on the trunk's document before any test:** a walk over every string with the widened denylist finds
+exactly the 14 strings above and nothing else, so it has no false positive to carve out today. The row's other half — *"caught LATE"*,
+because the drift check needs a fresh export and the export needs the container's migrated database — is not something a denylist
+over the committed file changes. It is filed as its own row (after-launch), since CI's Contract job still refuses it before the trunk.
+
+Files:
+- `app/Enums/SyncResultStatus.php`, `app/Enums/AnalyticsAxis.php`, `app/Enums/AnalyticsFormSelection.php`, `app/Enums/FieldType.php`
+- `app/Http/Requests/Api/V1/StoreDomainRequest.php`, `app/Http/Requests/Ocr/StoreOcrScanRequest.php`
+- `app/Http/Controllers/Public/PublicFormSchemaController.php`, `app/Http/Controllers/Api/V1/GamificationController.php`
+- `app/Services/Submissions/PublicFormPresenter.php`, `app/Http/Resources/Api/V1/ScoreboardResource.php`
+- `app/Support/OpenApi/SubmissionRefusalResponseExtension.php`
+- `tests/Feature/Api/OpenApiContractTest.php`, `openapi.json`
+- `docs/feature-backlog.md` (the closure and the residual row), `docs/pipeline.md`
+
+Shared artefacts taken: `openapi.json`, `docs/feature-backlog.md`, `docs/pipeline.md`.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace. `D191` was answered with `M195`'s built claim.
+No `VERSION` bump, no release note, no migration: nothing a tester sees changes.
+Prediction:
+- The new case goes red on the trunk's document with exactly the 14 strings, and green after the sources are cleaned and re-exported.
+- The re-export moves only those 14 strings; Redocly stays clean.
+- One mutant per family (glyph, M-number, test name, code path, `.md:` line pointer) and one floor mutant are each caught.
+- Pint is green, bare; PHPStan cannot move (comments and one string literal).
+- CI: six green, and static analysis red only at the composer audit on CVE-2026-45070, which `M197` clears — as for `#391` and `#392`.
+- **Most likely wrong:** the `//` comments above array keys. PHP-Parser attaches every preceding comment to a node, so a clause moved
+  off the key but left inside the literal may still be published. The re-export's diff is what will say.
+
+## HELD — `M199`, the form-settings saves lock the form row and audit the copy they replace, as `setDataSharing` does (`R-5041cc72`, `D190` A) (m199-settings-setters-lock)
 
 **BUILT — PR #392, NOT MERGED.** Held for **merge point 10, after `#391`**, by the user's word in chat.
 - **Run 40855187396 at `75aedb15`:** six green with real step counts — E2E 20 (19 ran; only the failure-upload step skipped) · Pest 11
@@ -125,7 +198,7 @@ Prediction:
   CVE-2026-45070 (`symfony/mime`) — the advisory `M197` clears, which `#389` met the same way. At merge point 10 the branch merges the
   trunk after merge point 9 and is run again.
 - The branch carries the row's closure, `R-30be7b88` (nit, after-launch) filed under it, the regenerated line, and 0.16.1's notes —
-  **a draft until the user approves the wording.**
+  ✅ **the wording approved by the user as written, in chat (2026-10-30).**
 
 **How the prediction fared.**
 - **Held:**

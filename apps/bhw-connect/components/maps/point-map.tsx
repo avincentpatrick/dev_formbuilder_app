@@ -4,6 +4,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { accent, muted } from "@/lib/charts/palette";
 import { pointRadius, type BarangayPoint } from "@/lib/geo/facility-points";
+import { loadMaplibre } from "./load-maplibre";
 
 type GeoJson = {
   type: "FeatureCollection";
@@ -85,7 +86,7 @@ export function PointMap({
     let map: import("maplibre-gl").Map | undefined;
 
     Promise.all([
-      import("maplibre-gl"),
+      loadMaplibre(),
       // A missing or unparseable outline is cosmetic, so it resolves to null rather than
       // rejecting and taking the whole map with it.
       outlineUrl

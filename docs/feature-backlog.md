@@ -9537,7 +9537,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   blocker the eleven-CHECK-constraints row already carries, and the two should be taken together in an
   increment that spends its hub slot on the dictionary. ⚠️ `M92` scoped it out deliberately: its one hub
   slot went to widening `test-pointer-lint` over `routes/tenant.php`. **Live.** Filed by `M92`. **Tier: after-launch.**
-- **`minor` · A `FormRequest` class docblock is PUBLISHED API DOCUMENTATION, and nothing says so at the
+- ✅ **CLOSED BY `M200` (2026-10-30) — `minor` · A `FormRequest` class docblock is PUBLISHED API DOCUMENTATION, and nothing says so at the
   place where someone writes one.** Measured by `M92` (2026-09-11) when the Contract job went red on
   `openapi.json` drift with five of six jobs green. Scramble emits an `App\Http\Requests\Api\V1`
   class docblock **verbatim** as the `description` of that request's schema, so three paragraphs of
@@ -9552,7 +9552,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   mention root. A generated artefact carrying a dead pointer is a copy no gate owns. ⚠️ The cheap remedy
   is a lint that refuses a docblock in that namespace exceeding some size, which is a proxy; the honest
   one is a convention — contract above, maintenance notes inside the class body — with an arm that
-  checks the emitted description against it. **Live.** Filed by `M92`. **Tier: during-testing.**
+  checks the emitted description against it. **Live.** Filed by `M92`. **Tier: during-testing.** ✅ **CLOSED BY `M200` (2026-10-30), on its branch, under `D191` A (the user, in chat):** the honest remedy, built — the convention, plus an arm over everything Scramble emits. `OpenApiContractTest`'s new case walks every string in the committed `openapi.json` (3,068 today, floored at 3,000 with a named anchor) and refuses a ⛔/⚠️ mark, an increment number, a `*Test` name, a repository code path, a source-file name and a line-numbered `.md:` pointer, naming each string by its JSON pointer. ⚠️ **The row understated itself:** 14 published strings from 12 sources carried a mark, and only two of the sources were request classes — four enum docblocks, two controller method docblocks, three `//` comments above array keys, and one extension string literal published three times. Each note moved to a comment Scramble does not publish (a `//` block above the docblock, or the class body); the integrator's meaning stayed, and the re-export moved exactly those 14 strings. Proof: red on the trunk's document with exactly the 14, green after; seven mutants caught through `mutate.php` (one per family, and a walk cut short that only the floor sees). The design codes and `@see` are `M196`'s `before-launch` row; the *"caught LATE"* half is the row below.
+- **`nit` · A source edit that changes `openapi.json` is caught only by CI: no local gate exports the contract and compares it.**
+  Split out of `R-e568ddd2` by `M200` (2026-10-30), whose denylist reads the COMMITTED document and so says nothing until somebody
+  re-exports. The drift check is the Contract job's `scramble:export` and `diff`, and the export needs the app container's migrated
+  database, so `preflight --with-gates` (host lints only) has no arm for it — a docblock edit under `app/` that moves the contract is
+  first seen red after a push. Nothing reaches the trunk: the Contract job refuses it first, which is why this is a convenience and not a
+  defect. The remedy is a `--with-gates` arm that runs the export inside the container (preflight already reaches it to probe for a live
+  suite) and compares it with the committed file. **Live.** Filed by `M200`. **Tier: after-launch.**
 - **`minor` · A gate's SUMMARY LINE is a paired artefact across three files, and nothing declares that
   pairing at the place where somebody edits one.** Measured by `M92` (2026-09-14) during its own close-out.
   Widening `scripts/test-pointer-lint.php` added two numbers to its `passed (...)` line;

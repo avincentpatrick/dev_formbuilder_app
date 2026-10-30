@@ -531,3 +531,53 @@ it('documents the reference-file read as refusing every request, and serving non
         // Notes kept outside what Scramble publishes: the description is the docblock's, never the method's comments.
         ->and($spec['paths']['/public/reference-files/{shareToken}/{file}']['get']['description'])->not->toContain('AppServiceProvider');
 });
+
+it('publishes no maintainer marks anywhere in the contract (R-e568ddd2, D191)', function (): void {
+    // ⛔ THE DRIFT CHECK CANNOT OBJECT TO THIS, SO THIS DOES. Scramble publishes class docblocks, action
+    // docblocks, `//` comments above array keys and some string literals word for word, and the Contract
+    // job only asserts that the committed document matches its source (M78). Fourteen strings carried
+    // internal notes to integrators that way. Design codes (H-, ADR-, D-) and `@see` are a later row.
+    /** @var array<string, mixed> $spec */
+    $spec = json_decode((string) file_get_contents(base_path('openapi.json')), true, flags: JSON_THROW_ON_ERROR);
+
+    $marks = [
+        'a ⛔ or ⚠️ mark' => '/\x{26D4}|\x{26A0}\x{FE0F}?/u',
+        'an increment number' => '/\bM\d{1,3}[a-z]?\b/u',
+        'a test-class name' => '/\b[A-Z][A-Za-z0-9]*Test\b/u',
+        'a repository code path' => '/\b(?:app|bootstrap|config|database|resources|routes|scripts|tests)\//u',
+        'a source-file name' => '/\b[\w-]+\.(?:php|ts|vue|js)\b/u',
+        'a line-numbered document pointer' => '/\.md:\d+/u',
+    ];
+
+    $visited = [];
+    $found = [];
+    $walk = function (mixed $node, string $pointer) use (&$walk, &$visited, &$found, $marks): void {
+        if (is_array($node)) {
+            foreach ($node as $key => $child) {
+                $walk($child, $pointer.'/'.str_replace(['~', '/'], ['~0', '~1'], (string) $key));
+            }
+
+            return;
+        }
+
+        if (! is_string($node)) {
+            return;
+        }
+
+        $visited[] = $pointer;
+
+        foreach ($marks as $kind => $pattern) {
+            if (preg_match($pattern, $node, $match) === 1) {
+                $found[] = "{$pointer}: {$kind} ({$match[0]})";
+            }
+        }
+    };
+    $walk($spec, '');
+
+    // ⛔ A FLOOR, BECAUSE A WALK THAT VISITS NOTHING PASSES. 3,068 strings today; `>=` so a new route cannot
+    // turn it red. The anchor is one of the fourteen, so a walk that stops short of the components fails too.
+    expect(count($visited))->toBeGreaterThanOrEqual(3000)
+        ->and($visited)->toContain('/components/schemas/SyncResultStatus/description');
+
+    expect($found)->toBe([], "openapi.json publishes notes meant for a maintainer. Move each into a `//` block above the docblock, or into the class body — never a `//` above an array key — then re-export openapi.json:\n".implode("\n", $found));
+});

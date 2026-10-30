@@ -43,7 +43,7 @@ final class FormPrintController extends Controller
         // artifact to say so.
         //
         // It is also a hard practical guard. A draft's `schema_snapshot` is literally `[]`
-        // (FormService.php:80 and PublishService.php:112 both write it), so without this the request
+        // (FormService::create() and PublishService::publish()'s next draft both write it), so without this the request
         // would 200 with a document containing a title, a footer and NO QUESTIONS - a failure that
         // looks like an empty form rather than a refused one.
         //

@@ -552,11 +552,32 @@ Prediction:
   Frontend 12 · Pest 11 · axe 11.
 - **`BHW Connect` is red at step 5 of 19** — *Boundary — a change to the other owner's paths needs their label (`D177`)* — and every
   later step was skipped. That is the prediction exactly: the pull request is ours and touches jongsky25's tree and `.github/`.
-- **It waits on two things from jongsky25:**
-  - **His `boundary-approved` label**, once he accepts the repository invitation, which was still pending at 2026-10-28 15:14 UTC. Then
-    the BHW job is re-run, and its audit, lint, types, Vitest and build run on this branch for the first time.
-  - **His Supabase keys**, expected 2026-10-29. They go to the user privately and live in `apps/bhw-connect/.env.local`, never in git or
-    chat. Then the map and export screens are checked in a browser — the half of the prediction most likely to be wrong.
+- **It waits on one thing from jongsky25: his `boundary-approved` label**, once he accepts the repository invitation (still pending at
+  2026-10-30 13:16 UTC). Then the BHW job is re-run, and its audit, lint, types, Vitest and build run on this branch for the first time.
+- ✅ **His Supabase keys arrived 2026-10-30** (the user, in `apps/bhw-connect/.env.local`; the five AI, cron and salt values left blank,
+  which nothing checked here reads). The pasted URL ended in `/rest/v1/`, so every query 404'd and every page read "—" with nothing
+  logged; trimmed to the project URL, `dim_geo` answers 43,783 rows and `agg_geo_summary` 41,052.
+
+### Browser check (2026-10-30) — the half most likely to be wrong, and it was
+Standalone builds under `/bhw-connect`, assembled as `ops/deploy-bhw.ps1` assembles a release and served by `node server.js`, the
+branch beside the trunk (MapLibre 5, Next 16.2.10) on the same keys. Built as CI builds (`BHW_DATA_SOURCE=none`) and served with the
+data: a build with the data source pre-renders hundreds of drill-downs against Supabase, and two at once hit Next's 60-second page
+limit. Usage logging was blocked in the browser, so nothing was written to jongsky25's database.
+- ❌ **Every MapLibre map was blank on `8c28020b`.** MapLibre 6 derives its worker URL from `import.meta.url`, which is not an http
+  URL once Next bundles it, so it starts the worker from `""` ("Worker failed to load", four per Explore load); MapLibre 5 inlined it
+  as a `blob:`. **Fixed in `ee4978a9`:** `predev`/`prebuild` copy the package's self-contained worker into `public/` (git- and
+  ESLint-ignored), and `components/maps/load-maplibre.ts` calls `setWorkerUrl` under the base path with `?v=`. The Explore map then
+  draws the same shaded regions as the trunk's, compared by eye (the PNG bytes differ), with no worker error.
+- ✅ **Exports:** all eleven kinds the pages link (CSV, XLSX, PNG and PPTX figures; districts CSV and XLSX; facilities, profiling-status
+  and UUC-PHC PNGs; UUC-PHC data CSV and XLSX) answer 200 with valid files, byte-identical to the trunk's.
+- **Host gates on `ee4978a9`:** Vitest 86 files, 1,251 passed; type-check 0; lint 0 errors, 1 warning (the fixture); production audit
+  0 critical, 0 high, 3 moderate. A regex guard for a re-split worker was shown to catch all four import forms.
+- **Found, not M194's — filed as `bhw-geo-drilldown-isr` on this branch (`67ac30aa`), with `bhw-p1-box` now blocked on it:** the
+  place, facilities, profiling-status and UUC-PHC drill-downs answer 500 (`DYNAMIC_SERVER_USAGE`) on the trunk and the branch alike.
+  They stay ISR while the root layout reads the CSP nonce through `headers()` since `M192`, whose route-table measurement ("every
+  `○`/`●` route became `ƒ`") was taken where `generateStaticParams` returned nothing.
+- **Not named in the prediction:** the box's `npm run build` will pre-render against the data source unless that row changes it — the
+  load `bhw-p1-box` must measure.
 
 **The claim as taken follows.**
 

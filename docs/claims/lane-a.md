@@ -18,6 +18,41 @@ Standing Rule 7(b-bis).
 
 ## Status: ACTIVE CLAIM — `M200`, the maintainer marks out of `openapi.json`, with a check that refuses them (`R-e568ddd2`, `D191` A) (m200-openapi-maintainer-marks)
 
+**BUILT — PR #393, NOT MERGED.** Held for **merge point 10, third — after `#391` and `#392`**, by the user's word in chat.
+- **Run 41025882753 at `100673bd`:** six green with real step counts — E2E 20 (19 ran; only the failure-upload step skipped) · Pest 11
+  · Contract 16 · Frontend 12 · axe 11 · BHW Connect 19, its unchanged path (9 ran).
+- **Static analysis ran 24 of 32 steps, Pint, PHPStan and every lint included, and went red only at step 23, the composer audit,** on
+  CVE-2026-45070 (`symfony/mime`) — the one advisory `M197` clears, as for `#389`, `#391` and `#392`. At merge point 10 the branch
+  merges the trunk after merge point 9 and is run again; the backlog conflicts at `R-e568ddd2` with `#389`'s `D191` block and its
+  design-codes row — keep both.
+- The branch carries the twelve sources, `OpenApiContractTest`'s new case, the re-exported `openapi.json`, the row's closure,
+  `R-a6e26f79` (nit, after-launch: no local gate exports the contract) filed under it, and the regenerated line. No `VERSION` bump.
+
+**How the prediction fared.**
+- **Held:**
+  - The export was byte-identical to the committed file before any edit.
+  - The new case was red on the trunk's document with exactly the 14 strings (18 entries — four strings carry two kinds), and green
+    after. The re-export moved exactly those 14 values and nothing else, read by a JSON-pointer diff of the two documents.
+  - Redocly: valid, with the one warning the trunk's document also has.
+  - `tests/Feature/Api`: 156 passed (808 assertions).
+  - Seven mutants caught through `mutate.php`, both files' sha256 back to their originals: one per kind on `openapi.json` (a ⛔, `M165`
+    put back, a `*Test` name, an `app/` path, a `.ts` file name, a `.md:197` pointer), and a walk cut to `info` that only the floor sees.
+  - Pint green, bare; the host lints and preflight with gates and Pint green; `pipeline-lint` and `state.php --check` green.
+  - CI held exactly as written: six green, and static analysis red only at the composer audit.
+- **Wrong:** the plan's count. It named six mutants; the file-name kind got its own, so seven.
+- **The one named most likely wrong did not happen:** no clause moved out of an array literal was published. The `//` block above
+  `present()`'s docblock stayed out of the document, as the recorded traps said it would.
+- **Not named:**
+  - `SyncResultStatus` lost its `use` of `SyncSubmissionResultResource`: the moved `{@see}` was its only reference, and Pint's
+    unused-import rule would have flagged it.
+  - The container's PHPStan on the changed files reports 2 `property.notFound` (`allow_guest_ocr`, `allow_ocr_single`) in
+    `PublicFormPresenter::paperUpload()`, code this diff does not touch — the `Form` `@property` family `M199` recorded. CI's PHPStan
+    passed.
+  - `tests/Feature/Docs` in the container: 191 passed, and `SuiteCollectionFloorTest` red at 519 of 598 files — the bind-mount
+    truncation its own message names. CI's Pest job is the authority, and it is green.
+  - Docker Desktop was not running at the start; it was started, and nothing else moved.
+  - The mutants ran in the working tree rather than committed, as `M199`'s did: the gate is Pest, which reads the working tree.
+
 Taken 2026-10-30. Branch `m200-openapi-maintainer-marks`, cut from `origin/main` at `014b5c48`, PR into main. ⛔ **NOT MERGED THIS
 SESSION:** held green for **merge point 10, third — after `#391` and `#392`** — by the user's word in chat (2026-10-30).
 

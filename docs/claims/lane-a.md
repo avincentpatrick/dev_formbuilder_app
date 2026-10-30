@@ -16,7 +16,570 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M194`, BHW Connect's production advisories cleared, and its audit blocking again (`bhw-dependency-advisories`) (m194-bhw-advisories)
+## Status: ACTIVE CLAIM — `M200`, the maintainer marks out of `openapi.json`, with a check that refuses them (`R-e568ddd2`, `D191` A) (m200-openapi-maintainer-marks)
+
+**BUILT — PR #393, NOT MERGED.** Held for **merge point 10, third — after `#391` and `#392`**, by the user's word in chat.
+- **Run 41025882753 at `100673bd`:** six green with real step counts — E2E 20 (19 ran; only the failure-upload step skipped) · Pest 11
+  · Contract 16 · Frontend 12 · axe 11 · BHW Connect 19, its unchanged path (9 ran).
+- **Static analysis ran 24 of 32 steps, Pint, PHPStan and every lint included, and went red only at step 23, the composer audit,** on
+  CVE-2026-45070 (`symfony/mime`) — the one advisory `M197` clears, as for `#389`, `#391` and `#392`. At merge point 10 the branch
+  merges the trunk after merge point 9 and is run again; the backlog conflicts at `R-e568ddd2` with `#389`'s `D191` block and its
+  design-codes row — keep both.
+- The branch carries the twelve sources, `OpenApiContractTest`'s new case, the re-exported `openapi.json`, the row's closure,
+  `R-a6e26f79` (nit, after-launch: no local gate exports the contract) filed under it, and the regenerated line. No `VERSION` bump.
+
+**How the prediction fared.**
+- **Held:**
+  - The export was byte-identical to the committed file before any edit.
+  - The new case was red on the trunk's document with exactly the 14 strings (18 entries — four strings carry two kinds), and green
+    after. The re-export moved exactly those 14 values and nothing else, read by a JSON-pointer diff of the two documents.
+  - Redocly: valid, with the one warning the trunk's document also has.
+  - `tests/Feature/Api`: 156 passed (808 assertions).
+  - Seven mutants caught through `mutate.php`, both files' sha256 back to their originals: one per kind on `openapi.json` (a ⛔, `M165`
+    put back, a `*Test` name, an `app/` path, a `.ts` file name, a `.md:197` pointer), and a walk cut to `info` that only the floor sees.
+  - Pint green, bare; the host lints and preflight with gates and Pint green; `pipeline-lint` and `state.php --check` green.
+  - CI held exactly as written: six green, and static analysis red only at the composer audit.
+- **Wrong:** the plan's count. It named six mutants; the file-name kind got its own, so seven.
+- **The one named most likely wrong did not happen:** no clause moved out of an array literal was published. The `//` block above
+  `present()`'s docblock stayed out of the document, as the recorded traps said it would.
+- **Not named:**
+  - `SyncResultStatus` lost its `use` of `SyncSubmissionResultResource`: the moved `{@see}` was its only reference, and Pint's
+    unused-import rule would have flagged it.
+  - The container's PHPStan on the changed files reports 2 `property.notFound` (`allow_guest_ocr`, `allow_ocr_single`) in
+    `PublicFormPresenter::paperUpload()`, code this diff does not touch — the `Form` `@property` family `M199` recorded. CI's PHPStan
+    passed.
+  - `tests/Feature/Docs` in the container: 191 passed, and `SuiteCollectionFloorTest` red at 519 of 598 files — the bind-mount
+    truncation its own message names. CI's Pest job is the authority, and it is green.
+  - Docker Desktop was not running at the start; it was started, and nothing else moved.
+  - The mutants ran in the working tree rather than committed, as `M199`'s did: the gate is Pest, which reads the working tree.
+
+Taken 2026-10-30. Branch `m200-openapi-maintainer-marks`, cut from `origin/main` at `014b5c48`, PR into main. ⛔ **NOT MERGED THIS
+SESSION:** held green for **merge point 10, third — after `#391` and `#392`** — by the user's word in chat (2026-10-30).
+
+Row — taken alone, because its remedy edits `openapi.json`, a hub, and `D13` allows one hub row per batch:
+- `R-e568ddd2` — *"A `FormRequest` class docblock is PUBLISHED API DOCUMENTATION, and nothing says so at the place where someone
+  writes one"*.
+
+`D191` A, asked and answered after `M195`'s read-only verification: remove the ⛔/⚠️ marks, M-numbers, test-class names and script
+paths from the sources Scramble reads, and widen `OpenApiContractTest`'s one-off *"not `AppServiceProvider`"* assertion into a denylist
+over the whole committed `openapi.json`. The design codes and `@see` are a later row, `before-launch`, already filed by `M196` on
+`#389`'s branch — not filed again here. The session-start pull read 0 reports, 0 reopened and 0 new comments. jongsky25 has still not
+accepted the invitation and `#387` carries no `boundary-approved` label, so `#387`'s browser check could not run — the user's fallback
+was this row. The user also approved 0.16.1's What's new wording for `#391` as written (2026-10-30).
+
+### Evidence verified
+Held.
+- Scramble emits an `Api/V1` request's class docblock verbatim: 15 of the 17 request classes have a published `description`.
+- `StoreDomainRequest`'s published description names `CustomDomainApiTest`, which exists (`tests/Feature/Api/CustomDomainApiTest.php`)
+  — the pointer `M92` corrected is no longer dead, but it is still a test name in the contract.
+- `scripts/test-pointer-lint.php`'s mention roots are `tests`, `app`, `database` and `routes`: `openapi.json` is not one, so no gate
+  reads a pointer inside it.
+- `preflight --with-gates` runs host lints only; nothing in it exports or reads the contract.
+
+### Premise verified
+- **The row understates itself.** It names `FormRequest` docblocks; the committed document carries **14 marked strings from 12
+  sources**, and only two of those sources are request classes (`StoreDomainRequest`, `StoreOcrScanRequest`). The rest are four enum
+  docblocks (`SyncResultStatus` — ⛔, `M69`, ⚠️ twice; `AnalyticsAxis` — `scripts/controller-gate.php`, `app/Enums`, `docs/PRD.md:203`;
+  `AnalyticsFormSelection` — `docs/PRD.md:197`; `FieldType` — `M183`), two controller method docblocks (`GamificationController`'s
+  leaderboard ⚠️, `PublicFormSchemaController`'s linked choices `M186`), three `//` comments above array keys (`PublicFormPresenter`'s
+  `bot_challenge` ⚠️ + `replay.ts` and `paper_upload` `M165`; `ScoreboardResource`'s `member_count` ⚠️), and one string literal
+  (`SubmissionRefusalResponseExtension`'s ⚠️, emitted three times).
+- **Three neighbouring kinds sit beside the decision's four** and are the same thing: a source-file name (`replay.ts`), a code path
+  (`app/Enums`) and line-numbered document pointers (`docs/PRD.md:197`, `:203`) — the last is the row's own second finding, a pointer
+  inside a generated file no gate reads. They join the denylist. A bare `docs/api-specification.md` stays: it points an integrator at a
+  published document.
+- **The convention the row asks for already exists in one place:** `StoreDomainRequest` keeps its maintainer notes in the class body
+  (`M92`). Recorded traps say where a note is not published: a `//` block above a docblock, or a class body — never a `//` above an
+  array key or a `return` (M78, M137, M141).
+- **Nothing a person sees changes.** Scramble is a dev dependency, `deploy.ps1` runs `composer install --no-dev`, and no route serves
+  `openapi.json`. So no `VERSION` bump and no release note.
+- Of the held branches, only the backlog overlaps: `#389` appends `D191`'s answer under this row, and every held branch edits
+  `docs/feature-backlog.md`. A keep-both at merge point 10. No held branch touches `openapi.json` or any of the twelve sources.
+
+### Remedy verdict
+**`D191` A — works, measured on the trunk's document before any test:** a walk over every string with the widened denylist finds
+exactly the 14 strings above and nothing else, so it has no false positive to carve out today. The row's other half — *"caught LATE"*,
+because the drift check needs a fresh export and the export needs the container's migrated database — is not something a denylist
+over the committed file changes. It is filed as its own row (after-launch), since CI's Contract job still refuses it before the trunk.
+
+Files:
+- `app/Enums/SyncResultStatus.php`, `app/Enums/AnalyticsAxis.php`, `app/Enums/AnalyticsFormSelection.php`, `app/Enums/FieldType.php`
+- `app/Http/Requests/Api/V1/StoreDomainRequest.php`, `app/Http/Requests/Ocr/StoreOcrScanRequest.php`
+- `app/Http/Controllers/Public/PublicFormSchemaController.php`, `app/Http/Controllers/Api/V1/GamificationController.php`
+- `app/Services/Submissions/PublicFormPresenter.php`, `app/Http/Resources/Api/V1/ScoreboardResource.php`
+- `app/Support/OpenApi/SubmissionRefusalResponseExtension.php`
+- `tests/Feature/Api/OpenApiContractTest.php`, `openapi.json`
+- `docs/feature-backlog.md` (the closure and the residual row), `docs/pipeline.md`
+
+Shared artefacts taken: `openapi.json`, `docs/feature-backlog.md`, `docs/pipeline.md`.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace. `D191` was answered with `M195`'s built claim.
+No `VERSION` bump, no release note, no migration: nothing a tester sees changes.
+Prediction:
+- The new case goes red on the trunk's document with exactly the 14 strings, and green after the sources are cleaned and re-exported.
+- The re-export moves only those 14 strings; Redocly stays clean.
+- One mutant per family (glyph, M-number, test name, code path, `.md:` line pointer) and one floor mutant are each caught.
+- Pint is green, bare; PHPStan cannot move (comments and one string literal).
+- CI: six green, and static analysis red only at the composer audit on CVE-2026-45070, which `M197` clears — as for `#391` and `#392`.
+- **Most likely wrong:** the `//` comments above array keys. PHP-Parser attaches every preceding comment to a node, so a clause moved
+  off the key but left inside the literal may still be published. The re-export's diff is what will say.
+
+## HELD — `M199`, the form-settings saves lock the form row and audit the copy they replace, as `setDataSharing` does (`R-5041cc72`, `D190` A) (m199-settings-setters-lock)
+
+**BUILT — PR #392, NOT MERGED.** Held for **merge point 10, after `#391`**, by the user's word in chat.
+- **Run 40855187396 at `75aedb15`:** six green with real step counts — E2E 20 (19 ran; only the failure-upload step skipped) · Pest 11
+  · Contract 16 · Frontend 12 · axe 11 · BHW Connect 19, its unchanged path (9 ran).
+- **Static analysis ran 24 of 32 steps, Pint, PHPStan and every lint included, and went red only at step 23, the composer audit,** on
+  CVE-2026-45070 (`symfony/mime`) — the advisory `M197` clears, as for `#389` and `#391`. At merge point 10 the branch merges the trunk
+  after merge point 9 and is run again; the backlog conflicts at `R-5041cc72` with `#389`'s `D190` block — keep both.
+- The branch carries the fix, `FormSettingsLockingTest`, §3.4, the `FormPrintController` citation, the row's closure and the regenerated
+  line. No `VERSION` bump.
+
+**How the prediction fared.**
+- **Held:**
+  - On the old service: 21 red, 4 green. The ten stale-copy cases and the ten lock-order cases were red, and so was the sweeper case.
+    The `setDataSharing` stale control, the `setDataSharing` and `archive` lock cases, and the reflection guard were green. After the
+    fix: 25 of 25.
+  - All ten stale-copy cases failed first on the **lost write**, before reaching the audit assertion. The stale audit is proven on its own
+    by the sweeper case.
+  - Three mutants were caught through `mutate.php`, the sha256 restored each time: `setSchedule` auditing the caller's copy (2 red),
+    `setSaveAndResume` writing on it (2 red), `setTheme` re-reading without the lock (1 red — its lock-order case alone).
+  - The 34 Pest files that call the setters: 380 passed and 19 errors, every one `builderTenant()` undefined in `BuilderDraftGuardTest`
+    (the recorded trap — run without `BuilderRoutesTest.php`). Re-run with it: 28 of 28.
+  - Pint was green, bare. Every host lint gate and preflight with gates and Pint were green, and so was CI's PHPStan.
+  - CI held exactly as written: six green, and static analysis red only at the composer audit.
+- **Wrong:** the one named most likely wrong did not happen. No case counted a settings save's queries, and the `forms` RLS policies are
+  tenant-only for every command, so a row a setter can read it can lock.
+- **Not named:**
+  - The container's PHPStan reports 6 `property.notFound` on `Form` columns with no `@property` (`allow_ocr_single`, the guest OCR
+    limits, `data_sharing_*`). The same reads exist on the trunk under the same names, and CI's PHPStan passed.
+  - `setDataSharing` changed too: it now returns `$form->refresh()`, so the class docblock's "each setter ends `return
+    $form->refresh()`" is true of all eleven. Its one caller ignores the return.
+  - `setShareSettings`' docblock said the sibling setters open no transaction, false since I2; corrected in place.
+  - The plan said "commit the mutants". They ran through `mutate.php` in the working tree instead, because the gate is Pest, which reads
+    the working tree; the commit rule exists for diff-based checks.
+
+Taken 2026-10-29. Branch `m199-settings-setters-lock`, cut from `origin/main` at `75b133ca`, PR into main. ⛔ **NOT MERGED THIS SESSION:**
+held green for **merge point 10, with `#391`**, by the user's word in chat (2026-10-29). The order inside it: `#391`, then this.
+
+Row — taken alone, because its remedy edits a hub (`FormService.php`) and `D13` allows one hub row per batch:
+- `R-5041cc72` — *"`FormService` has seven lock-free writers to `forms` and one locked, and six of them build their audit payload from
+  a model nobody re-read"*.
+
+`D190` A, asked and answered after `M195`'s read-only verification: every settings setter takes the form lock and builds its audit from
+the locked copy. The session-start pull read 0 reports, 0 reopened and 0 new comments. jongsky25 has still not accepted the invitation and
+`#387` carries no `boundary-approved` label, so `#387`'s browser check could not run — the user's fallback was this row.
+
+### Evidence verified
+Held, with one clause false since `M133`.
+- The seven named writers each open a `DB::transaction` and take no `lockForUpdate`.
+- *"Only `archive()` takes one"* is false: `setDataSharing` locks too, and audits the locked copy.
+- `archive()`'s comment holds verbatim: *"an audit built from the stale copy would record a `status` this method never actually saw"*.
+- The "silent" grouping holds: `setShareSettings`' docblock enumerates `updateMetadata`, `assignScope`, `setSaveAndResume`,
+  `setConfirmationMessage`, `setSchedule` and `archive`.
+
+### Premise verified
+- **The row understates itself twice.**
+  - There are eleven lock-free writers, not seven: `assignFolder`, `setTheme`, `setSinglePageMode` and `setOcrScanning` are newer. Ten
+    build `$old` from the caller's copy. `create()` builds none and is right to take no lock, since it creates the row (§3.4 says so).
+  - **The stale copy loses writes, not only audits.** Every setter writes on the caller's `$form`, and `save()` writes only what is
+    dirty against that copy's original. Measured in the container on a `Form` model: setting the values a stale copy already holds
+    (`save_and_resume`, `max_responses`, `theme`) leaves `getDirty()` empty. So while the database holds something else, no `UPDATE`
+    is issued, and the audit records a change that never happened.
+- **The race `D190` names holds.** `FormScheduleSweeper`'s close and open passes flip `schedule_state` under a bulk `lockForUpdate`, and
+  `setSchedule` reads its old `schedule_state` off the caller's copy.
+- **The callers are controllers only**, and none uses the return value. `FormConfirmationMessageController::toast()` reads
+  `$form->currentPublishedVersion` after the save, so the caller's own instance must stay refreshed, as it is today.
+- **No new lock order.** Publish locks the `forms` row and then the version's rows; `updateMetadata` will lock `forms` and then update
+  `form_versions`, the same order. `BuilderLockOrderTest`'s *"the save locked the form row"* concerns `FormBuilderService::updateField`.
+- **No test stages a stale copy** for any setter, `archive` or `setDataSharing`, and none asserts their `for update`.
+- **One live line citation into the file, already stale:** `FormPrintController` cites `FormService.php:80` and `PublishService.php:112`
+  for `schema_snapshot => []`, which now sit at 96 and 183. No backlog row cites `FormService.php` by line, so the new lines move nothing
+  `citation-liveness-lint` reads.
+- **§3.4's list of lock-takers already misses `setDataSharing`.**
+- Of the held branches, only `#389` touches a file this row takes: it appends `D190`'s answer under `R-5041cc72`, and edits §8 of the
+  versioning doc. Both are expected at merge point 10 — keep both sides.
+
+### Remedy verdict
+**`D190` A — works by precedent** (`setDataSharing`, `archive`): lock the row first, build `$old` from the locked copy, then write and
+audit that copy. Each setter still ends `return $form->refresh()`, so the caller's instance stays current. To be measured as a defect
+first: the new stale-copy cases go red against the current service — the stale audit and the lost write both — and then green.
+
+Files:
+- `app/Services/Forms/FormService.php`, `app/Http/Controllers/Tenant/FormPrintController.php` (the stale citation, re-cited by name)
+- new `tests/Feature/Forms/FormSettingsLockingTest.php`
+- `docs/form-versioning-schema-migration.md` (§3.4)
+- `docs/feature-backlog.md` (the closure), `docs/pipeline.md`
+
+Shared artefacts taken: `docs/form-versioning-schema-migration.md`, `docs/feature-backlog.md`, `docs/pipeline.md`.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace. `D190` was answered with `M195`'s built claim.
+No `VERSION` bump, no release note, no migration: nothing a tester sees changes.
+Prediction:
+- The stale-copy cases go red on the current service for the ten setters, with `setDataSharing` as a control that stays green. The
+  lock-order cases go red for the same ten. All green after the fix.
+- Three committed mutants are each caught.
+- The setters' existing suites stay green; PHPStan stays at no errors; Pint is green, bare.
+- CI: six green, and static analysis red only at the composer audit on CVE-2026-45070, which `M197` clears — as for `#389` and `#391`.
+- **Most likely wrong:** a case that counts a settings save's queries, or calls a setter on a model the current context can read but
+  not lock.
+
+## HELD — `M198`, the builder's side panes in `em`, so they grow with the text (`R-63ef1a69`) (m198-builder-panes-in-em)
+
+**BUILT — PR #391, NOT MERGED.** Held for **merge point 10**, by the user's word in chat.
+- **Run 40822742885 at `b6fa013e`:** six green with real step counts — E2E 20 (19 ran; only the failure-upload step skipped) · Pest 11
+  · Contract 16 · Frontend 12 · axe 11 · BHW Connect 19, its unchanged path (9 ran).
+- **Static analysis ran 25 of 32 steps, Pint and PHPStan included, and went red only at step 23, the composer audit,** on
+  CVE-2026-45070 (`symfony/mime`) — the advisory `M197` clears, which `#389` met the same way. At merge point 10 the branch merges the
+  trunk after merge point 9 and is run again.
+- The branch carries the row's closure, `R-30be7b88` (nit, after-launch) filed under it, the regenerated line, and 0.16.1's notes —
+  ✅ **the wording approved by the user as written, in chat (2026-10-30).**
+
+**How the prediction fared.**
+- **Held:**
+  - Both committed mutants were caught. The px columns reddened the new Vitest case alone and the new desktop E2E case (14.44
+    received). A `font-size` on `.builder__panes` reddened the Vitest case alone. `Builder.vue`'s sha256 matched afterwards.
+  - `list-layout` passed 41 with 37 skipped at three projects, and `personalization-axe`'s builder cases passed 6 of 6.
+  - Full Vitest passed 4,332 of 4,333; `token-references` timed out under load and passes 4 of 4 alone, a recorded trap.
+  - Pest `tests/Feature/Releases` passed 24 of 24, and host preflight passed every gate and Pint.
+  - The one I named most likely wrong held: the desktop sidebar was expanded (a 1200 box) in the scratch run and in the case.
+- **Wrong:** *"CI is 7/7"*. The static job is red on the advisory published 2026-10-28, which `#389` had already met. It is not this diff.
+- **Not named:** a Python one-liner opened `VERSION` for writing before reading it and emptied it. It was restored from git's bytes
+  before the commit.
+
+Taken 2026-10-29. Branch `m198-builder-panes-in-em`, cut from `origin/main` at `57ab7e06`, PR into main. ⛔ **NOT MERGED THIS SESSION:**
+held green for **merge point 10**, by the user's word in chat (2026-10-29). Merge point 9 carries `#390`, `#388`, `#389` and `#387`, and
+this rides after them.
+
+Row — taken alone, on the user's instruction:
+- `R-63ef1a69` — *"The builder's side-pane widths are fixed pixels, so at the largest text size the pane-switch threshold no longer
+  matches the columns it is derived from"*.
+
+The session-start pull read 0 reports, 0 reopened and 0 new comments. jongsky25 has not accepted the invitation and `#387` carries no
+`boundary-approved` label, so `#387`'s browser check could not run — the user's fallback was this row.
+
+### Evidence verified
+Every citation holds.
+- `Builder.vue`'s `.builder__panes` sets `grid-template-columns: 260px minmax(0, 1fr) 340px`.
+- The compact block is `@container (max-width: 60em)` on `.builder`, and `.builder` pins `font-size: var(--mds-type-body-lg-font-size)`.
+- The JR5 comment derives 60em as `260 + 340 + 360 = 960`, which is true only at the standard scale.
+- `docs/ux/exceptions-log.md` #13 states the px columns as its known cost 4.
+
+### Premise verified
+- **The type scale re-points the `--mds-type-*` tokens and never the root font size** (exceptions-log #14), so `rem` would not move and
+  `.builder`'s `em` is the unit. `body-lg` is 16 / 18 / 20px (`theme-overrides.css`).
+- **No JavaScript reads a width.** The `pane` ref's comment holds, and nothing mirrors 960 in script.
+- **No gate renders three panes off the standard scale.** `personalization-axe` forces `extra_large` only, and 1440 − 240 = 1200 is
+  exactly 60em × 20px — compact by the inclusive bound — at every project.
+- **A second copy of 260/340 exists:** `tests/e2e/capture/help-pictures.capture.ts` overrides the grid with `260 + GUTTER` and
+  `340 + GUTTER` px. It is a capture, not a gate, run at the standard scale, where `em` gives the same pixels. Filed as a nit, not taken.
+- **WRONG in the row: *"the palette stops being cramped"*.** Measured at 1680 (a 1440 box, three panes at every scale):
+  - the palette's 27 items stay one line at 34px at all three scales on the trunk, and nothing scrolls sideways;
+  - its scroll height is identical under the `em` grid;
+  - with a question selected, the settings pane fits without scrolling on both grids.
+  On the seeded form the change is width, not wrapping. The row's core holds: the threshold is derived from the columns only at standard.
+- None of the four merge-point-9 PRs touches `Builder.vue`, `VERSION` or `database/data/releases.json`.
+- Every backlog citation into `Builder.vue` sits at or above line 927, above the grid rule, so no edit at or below it moves one.
+
+### Remedy verdict
+**`16.25em minmax(0, 1fr) 21.25em` — works, measured** in the running app, on built assets, by a scratch spec that injects the grid and
+is never committed:
+- **standard:** 260 / 600 / 340 at 1440 on both grids — nothing moves;
+- **large at 1440** (box 1200, above 1080): the trunk gives 260 / 600 / 340, which is 14.44em / 18.89em; `em` gives 292.5 / 525 / 382.5,
+  which is 16.25em / 21.25em;
+- **extra large at 1680** (box 1440): the trunk gives 13em / 17em; `em` gives 325 / 690 / 425.
+
+With the 22.5em canvas minimum the three sum to the 60em threshold at every scale. The canvas gives up the difference: 600 → 525px at
+1440 with Large text.
+
+Files: `resources/js/Pages/forms/Builder.vue`, `resources/js/Pages/forms/builder-layout.test.ts`, `tests/e2e/list-layout.spec.ts`,
+`docs/ux/exceptions-log.md`, `VERSION`, `database/data/releases.json`, `docs/feature-backlog.md`, `docs/pipeline.md`.
+Shared artefacts taken: `docs/ux/exceptions-log.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `tests/e2e/list-layout.spec.ts`.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace.
+Prediction:
+- The new Vitest case and the new desktop E2E case go red on a committed mutant, and green on the fix.
+- CI is 7/7. Pest, Contract and Static analysis are unmoved by CSS, and BHW Connect takes its unchanged path.
+- `list-layout` and `personalization-axe` are green locally.
+- **Most likely wrong:** the E2E case's anti-vacuity at Large on desktop needs the sidebar expanded after `openBuilder` (the scratch run
+  measured a 1200 box). A seeded collapsed-sidebar preference would make it a 1376 box — still wide, but not the arithmetic stated here.
+
+## HELD — `M197`, `symfony/mime` to v8.1.10, clearing CVE-2026-45070 and the composer audit every CI run now fails (m197-symfony-mime-cve)
+
+**BUILT — PR #390, CI 7/7 green with real step counts, NOT MERGED.** Run 40807295694 at `82851599`: Static analysis 33 · BHW Connect 19 ·
+E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11.
+- Static analysis ran 31 of its steps, and the composer audit passed.
+- BHW Connect took its unchanged path.
+- **First at the merge point `#387` rides** (`D192`). The branch carries the row, filed and closed, and the regenerated line.
+
+**How the prediction fared.**
+- **Held:** one package moved in the lock, `composer audit --locked` was clean, and CI was 7/7.
+- **Not named:** the host's Composer 2.8.12 would have downgraded the lock's `plugin-api-version` from 2.9.0 to 2.6.0. The bump was redone
+  with the container's Composer 2.10.3, so only `symfony/mime` moves.
+- **Not wrong, and checked:** no second advisory was published before the run.
+
+Taken 2026-10-29. Branch `m197-symfony-mime-cve`, cut from `origin/main`, PR into main. ⛔ **NOT MERGED THIS SESSION:** held green for the
+merge point `#387` rides, **FIRST**, ahead of `#388` and `#389` (`D192`). It is first because every pull request's static job fails
+until it lands.
+
+Row — new, filed and closed on this branch: *"`symfony/mime` v8.1.0 carries CVE-2026-45070, and `composer audit` fails every CI run
+from 2026-10-28 18:08 UTC"*. It is alone under `D13`, because `composer.lock` is a hub.
+
+### Evidence verified
+- `#389`'s run 40790795523 went red at step 23 of its static job, *Composer audit (SCA)*, on exactly one advisory:
+  - `symfony/mime`, `PKSA-wtxr-p26d-nn42`, CVE-2026-45070, *"Email Header Injection via Non-Token Characters in Mime Parameter
+    Names"*, severity medium;
+  - reported 2026-10-28T18:08:54Z, and fixed in 8.1.10.
+- `composer.lock` pins `symfony/mime` at v8.1.0.
+
+### Premise verified
+- **It is not `#389`'s diff.**
+  - `#388`'s run 40721232507, which finished before the advisory was published, passed the same step.
+  - Every step before the audit passed on `#389`, PHPStan included.
+  - From now on every branch fails this step, and so does the trunk's next run.
+- **The host's own `composer audit` reports a second advisory** (`symfony/http-foundation`, high), but only because the local `vendor/`
+  lags the lock. The lock already pins 8.1.9, which is patched, and CI installs from the lock.
+- `symfony/mime` is transitive: it is not in `composer.json`'s `require`.
+
+### Remedy verdict
+- **`composer update symfony/mime` — works, measured as a dry run.** It moves `symfony/mime` v8.1.0 → v8.1.10 inside its range. The
+  `http-foundation` line in the same dry run is `vendor/` catching up with the lock, not a lock change.
+- **To be confirmed:** `composer audit --locked` clean, and CI 7/7.
+
+Files: `composer.lock`, `docs/feature-backlog.md` (the row, filed and closed), `docs/pipeline.md`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`.
+Paired files taken: none.
+Namespaces spent: `D192`, answered in chat.
+Prediction:
+- One package moves in the lock.
+- CI is 7/7. Pest, E2E and Contract are unmoved by a patch release of a MIME library.
+- **Most likely wrong:** a second advisory published before the run.
+
+## HELD — `M196`, a builder edit must carry its `version` token, and the token is checked under the row lock (`R-036f3226`, `D189` A) (m196-builder-token-under-lock)
+
+**BUILT — PR #389, NOT MERGED.** It rides the merge point `#387` rides, **second, after `M197` and `#388`**, with `#387` last (`D192`).
+- **Run 40790795523 at `61dc1d2d`:** six green with real step counts — E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · BHW
+  Connect 19, its unchanged path.
+- **Static analysis ran 25 of 32 steps, PHPStan included, and went red only at the composer audit.** That is the advisory published
+  on 2026-10-28 at 18:08 UTC that `M197` clears. At the merge point the branch merges the trunk after `M197` and is run again.
+
+**How the prediction fared.**
+- **Held:**
+  - The stale-copy cases were red on the old code and are green now, and the pinning test flips to 422.
+  - Three mutants were each CAUGHT by exactly one case.
+  - Pint passed.
+  - CI's PHPStan passed. The container's own run reports 51 errors on lines this diff never touched, model-property reads in that
+    environment.
+- **Wrong — the premise I measured worst.** *"Only the pinning test sends none"* counted `'version'` mentions, and 36 cases sent
+  `'version' => null`. Every one now sends the row's token, read just before each save, which avoids a one-second flake on a repeated
+  save.
+- **Not named:**
+  - The service's new lines moved 16 backlog citations. Three of them landed on blank lines, which `citation-liveness-lint` caught;
+    all 16 are re-pointed and checked by content.
+  - The container collector truncates `tests/Feature/Forms` (239 of 1,178 cases), so it was run file by file.
+
+Taken 2026-10-29. Branch `m196-builder-token-under-lock`, cut from `origin/main` at `5ffc1239`, PR into main. ⛔ **NOT MERGED THIS SESSION:**
+held green. Its merge point, and its place in it, are the user's to name, asked by name before this session ends. Numbered past the held
+`M194` and `M195`.
+
+Row — the head of the line's during-testing tier, on its own because its remedy edits two hub files (`FormBuilderService.php`,
+`UpdateFieldRequest.php`) and `D13` allows one hub row per batch:
+- `R-036f3226` — *"The optimistic-concurrency token §8 substituted for the draft lock is CLIENT-OPTIONAL, and a shipped test pins it
+  that way"*.
+
+`D189` A, asked after a read-only verification: require the token, and close the race it leaves open even when sent. The session-start
+pull read 0 reports, 0 reopened and 0 new comments, so nothing was triaged.
+
+### Evidence verified
+Every citation holds.
+- `UpdateFieldRequest` and `UpdateSectionRequest` each validate `version` as `['nullable', 'string']`.
+- `FormBuilderService::assertNoDrift()` returns without a check when the token is null.
+- `BuilderRoutesTest` *"accepts an edit that carries no concurrency token (overwrite)"* sends `'version' => null` and asserts 200.
+- `docs/form-versioning-schema-migration.md` §3.4 declines the `forms` lock for field-level edits, and §8 makes `updated_at` the token.
+
+### Premise verified
+- **The client contract does not move, so this is a fix, not a decision about the client.**
+  - The shipped builder's field and section payloads always carry `version`, and no client path sets it to null.
+  - The three end-to-end specs that PATCH a field directly (`calculations-and-defaults`, `media-input-hidden-text`, `signature`)
+    each send `version: field.version`.
+  - Of the 20 feature-test files that PATCH a field or section, only the pinning test sends none.
+- **The controller is the only caller** of `updateField()` and `updateSection()` in `app/`, `routes/` and `database/`. The builder
+  routes are not in `openapi.json`, so the contract file does not move.
+- **What the row missed: the token does not close last-write-wins even when sent.**
+  - `assertNoDrift()` runs before the transaction, against the copy route binding loaded.
+  - `writeField()` locks the field row but never re-checks the token under that lock, and `updateSection()` takes no row lock at all.
+  - So two concurrent saves carrying the same valid token both pass. `convertField()` already does it right: lock, then check.
+- **Two weaknesses of the token itself are out of this row's reach.** They are filed as one row, because one remedy (a revision counter)
+  cures both:
+  - It has one-second precision (`timestamp(0)`, recorded at `rowVersion()` since H25), so two edits in the same second share a token.
+  - A rules-only save by the field's last editor leaves the field row clean, so `updated_at` and the token do not move.
+
+### Remedy verdict
+- **Required token — works.** The 422 lands on no shipped client path, as measured above.
+- **The check under the lock — works by precedent.** It follows `convertField()`'s lock-then-check order, re-reading the row under the
+  lock `writeField()` already takes, and taking the one section row's lock in `updateSection()`. That is the row the UPDATE locks anyway,
+  so no new acquisition order is introduced.
+  - To be measured as a defect first: a test that hands the service a route-bound copy older than the row goes red against the current
+    code, then green.
+
+Files:
+- `app/Http/Requests/Forms/UpdateFieldRequest.php`, `app/Http/Requests/Forms/UpdateSectionRequest.php`
+- `app/Services/Forms/FormBuilderService.php`, `app/Http/Controllers/Tenant/FormBuilderController.php`
+- `tests/Feature/Forms/BuilderRoutesTest.php`
+- `docs/form-versioning-schema-migration.md` (§8)
+- `docs/feature-backlog.md` (the closure, the answers to `D190` and `D191` at their rows, and the rows owed), `docs/pipeline.md`
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/form-versioning-schema-migration.md`.
+Paired files taken: none.
+Namespaces spent: nothing new. `D189` was answered with `M195`'s built claim.
+Rows owed on this branch:
+- the token's precision and the rules-only save (one row);
+- `D191`'s design codes and `@see` (`before-launch`);
+- the rule that regenerates `docs/pipeline.md` in a claim push, while that path is outside `paths-ignore`, which made `69d7e56f`
+  deploy.
+
+Prediction:
+- The stale-copy cases go red on the current code and green after the fix, and the pinning test flips to 422.
+- `tests/Feature/Forms` stays green.
+- PHPStan stays at no errors, since the diff touches `app/`. Pint is green, bare.
+- CI is 7/7.
+- **Most likely wrong:** a feature test outside `tests/Feature/Forms` that PATCHes with no token, and a section test that relied on
+  the missing lock.
+
+## HELD — `M195`, the gate baselines read each metric from its own job's lines, and every counted gate is recorded (`R-b31f421e`, `R-4130e1fa`) (m195-gate-baselines-per-job)
+
+**BUILT — PR #388, CI 7/7 green with real step counts, NOT MERGED.** Run 40721232507 at `6810b8bb`: Static analysis 33 · BHW Connect 19 ·
+E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11.
+- BHW Connect ran 9 of its 19 steps. The boundary passed and the job printed *"apps/bhw-connect is unchanged in this pull request: every
+  later step is skipped, and the job reports success."*
+- **Held for the merge point `#387` rides, now second, after `M197`** (`D188`, then `D192`, which put `M197` first because CVE-2026-45070
+  turns every composer audit red until it lands). At the merge point the branch merges the trunk after `M197` and is run again.
+- The branch carries both rows' closures, two filed rows (`R-b3223cf8`, `R-c4ac829b`) and the regenerated line.
+
+**How the prediction fared.**
+- **Held:**
+  - The dry run against run 40696757541 moved exactly the two lines, and all eight new rows read a value.
+  - `GateBaselinesTest` passed 13 cases.
+  - `scripts/mutate.php` CAUGHT both scope mutants, each red in the new case alone.
+  - The committed floor mutant exited 2 with *"ran 9 case(s), under the floor of 10"*.
+  - Pint, the host lints and `preflight --with-gates --with-pint` were green.
+- **Wrong:** "the six other controls harnesses" were five. The mail-attribute linter is a lint and already floors both its counts;
+  corrected above.
+- **Not named:** the container's run of `tests/Feature/Docs` failed `SuiteCollectionFloorTest`, because the bind mount truncates
+  collection (519 of 598 files seen). CI is green on it, and that test names CI as the authority.
+- ⛔ **Also not named, and it was a deploy.** This claim's own push, `69d7e56f`, carried `docs/pipeline.md`, which is outside
+  `ci.yml`'s `paths-ignore`.
+  - It ran CI on main (40718180626, green) and a deploy (40723013140) at 16:08 UTC, outside a merge point.
+  - The deploy's own filter found *"only paths the site does not run"* and took no maintenance window.
+  - `M194`'s claim push, `f134e970`, had done the same an hour earlier.
+  - So this commit carries only paths-ignored files. Answering `D189`–`D191` changes no row in the line, the next regeneration rides
+    `M196`'s branch, and the conflict between the two rules is filed there as a row.
+
+Taken 2026-10-28. Branch `m195-gate-baselines-per-job`, cut from `origin/main` at `f134e970`, PR into main. ⛔ **NOT MERGED THIS SESSION:** held
+green for **the merge point `#387` rides, first, with `#387` last** (`D188`, asked and answered in planning). Numbered past the held `M194`
+(the `M188`/`M190` precedent). The plan is `~/.claude/plans/read-claude-md-run-php-bubbly-meerkat.md`.
+Rows — the one the user asked for by id, and its one file-overlap sibling in the tier:
+- `R-b31f421e` — *"`scripts/gate-baselines.php` matches every metric against the whole run log, so the seventh job's Vitest summary is
+  read as Meridian's"*.
+- `R-4130e1fa` — *"`backlog-triage-controls` is registered in CI and absent from `docs/gate-baselines.md`, so its case count is the one
+  gate number nothing tracks"*.
+
+⛔ **Two rows editing one hub script (`scripts/gate-baselines.php`) and its paired fixtures breaks both clauses of `D13` item 1 —
+exception #7, allowed by the user in chat** and recorded at `D13` in `docs/claims/decisions.md`. The session-start pull read 0 reports,
+0 reopened and 0 new comments (relayed 31: 25 Resolved · 6 Confirmed working), so nothing was triaged.
+
+### Evidence verified
+**`R-b31f421e` — held, measured on the run the row names.**
+- `php scripts/gate-baselines.php --run=40696757541 --dry-run`, which writes nothing, reads `Vitest | 85 files`. That is BHW's figure;
+  the same log carries Meridian's `283 passed (283)` later.
+- The cause is as the row says: the scrape loop runs `preg_match` over `$plain`, the whole log, and a metric's `job` is only the
+  table's third column.
+
+**`R-4130e1fa` — held, with one figure moved.**
+- `ci.yml` runs `composer run backlog-triage-controls` in the static job, and `docs/gate-baselines.md` has no row for it.
+- Its pass line reads *"passed (10 cases, …)"* on run 40696757541, not the row's 8.
+
+### Premise verified
+- **The E2E extras line was wrong before BHW arrived, and the row does not know it.** `$skipped` and the flaky check read the whole log
+  as well. The committed file says `1 skipped`, which is Pest's line; E2E printed `82 skipped`. On run 40696757541 it reads `11 skipped`,
+  BHW's.
+- **gh's log shape is `<job> TAB <step> TAB <timestamp> <text>`**, read off that run. Both committed ci-log fixtures pad the job name
+  with spaces, a shape gh never prints, so both are converted.
+- **No other script scrapes a run log.** Only `scripts/gate-baselines.php` calls `gh run view`.
+- **`R-4130e1fa`'s "the one gate number nothing tracks" is false.** The static job prints eight counted pass lines the roster records
+  nowhere:
+  - the mail-attribute linter and tracker-lint;
+  - the controls of tracker-lint, citation liveness, the pre-push guard, the test-pointer lint, backlog-triage and the boundary check.
+
+  The composer audit, the npm audit judge and gitleaks print verdicts, not counts, and stay out.
+- **None of the five other controls harnesses has a floor on its own case count.** Every "floor" in them is about the gate they test.
+  The mail-attribute linter already floors both its counts. The row asks for the floor on `backlog-triage-controls.php` only; the
+  other five are filed. *(Corrected from "six" at the build: the mail-attribute linter is a lint with floors, not a harness.)*
+- **BHW's figures stay out of the baselines.** That job reports on jongsky25's tree (the ADR named *second-application-under-one-host*),
+  so no metric reads it, and the new fixture uses it only as a decoy.
+
+### Remedy verdict
+- **`R-b31f421e` — works as prescribed, measured on a scratch copy before any test was written.** Each metric, and the E2E extras, read
+  only the lines that carry their job's name before the first tab.
+  - Against run 40696757541 exactly two lines move: `Vitest` 85 → **283 files**, and the extras `11` → **82 skipped**.
+  - Every other row is byte-identical.
+- **`R-4130e1fa` — works, widened to the census above.** The row's pattern matches its pass line; the floor is proved at the build by a
+  mutant that drops one case.
+
+Files:
+- `scripts/gate-baselines.php`, `scripts/backlog-triage-controls.php`
+- `tests/Feature/Docs/GateBaselinesTest.php`
+- `tests/fixtures/gate-baselines/ci-log.txt`, `ci-log-missing-metric.txt`, plus the new `two-jobs-one-summary.json` and
+  `ci-log-two-jobs-one-summary.txt`
+- `docs/feature-backlog.md` (two closures, one new row), `docs/pipeline.md`, `PROGRESS.md` (own block), the hand-off
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md` (by this claim), and `PROGRESS.md` (own
+block).
+Paired files taken: the gate list in `scripts/gate-baselines.php` and every `tests/fixtures/gate-baselines/ci-log*.txt`, a set
+`GateBaselinesTest` already pairs.
+Namespaces spent: `D188`, answered in planning. No migration and no ADR.
+Prediction:
+- The dry run against run 40696757541 moves exactly the two lines measured, and every new roster entry reads a value.
+- `GateBaselinesTest` is green, both scope mutants are CAUGHT, and the floor mutant exits 2.
+- PHPStan cannot move, because the diff touches only `scripts/`, `tests/` and docs. Pint is green, bare.
+- CI is 7/7, and the BHW job skips itself and passes.
+- **Most likely wrong:** the fixtures' tab bytes surviving the tool layer, and Storybook's two-line pattern inside a single job's block.
+
+## HELD — `M194`, BHW Connect's production advisories cleared, and its audit blocking again (`bhw-dependency-advisories`) (m194-bhw-advisories)
+
+**BUILT — PR #387, not merged.** It is held for the merge point the user names, **last in it, after `M195`** (`D188`).
+- **Run 40705714395 at `8c28020b`:** Meridian's six are green with real step counts — Static analysis 33 · E2E 20 · Contract 16 ·
+  Frontend 12 · Pest 11 · axe 11.
+- **`BHW Connect` is red at step 5 of 19** — *Boundary — a change to the other owner's paths needs their label (`D177`)* — and every
+  later step was skipped. That is the prediction exactly: the pull request is ours and touches jongsky25's tree and `.github/`.
+- **It waits on one thing from jongsky25: his `boundary-approved` label**, once he accepts the repository invitation (still pending at
+  2026-10-30 13:16 UTC). Then the BHW job is re-run, and its audit, lint, types, Vitest and build run on this branch for the first time.
+- ✅ **His Supabase keys arrived 2026-10-30** (the user, in `apps/bhw-connect/.env.local`; the five AI, cron and salt values left blank,
+  which nothing checked here reads). The pasted URL ended in `/rest/v1/`, so every query 404'd and every page read "—" with nothing
+  logged; trimmed to the project URL, `dim_geo` answers 43,783 rows and `agg_geo_summary` 41,052.
+
+### Browser check (2026-10-30) — the half most likely to be wrong, and it was
+Standalone builds under `/bhw-connect`, assembled as `ops/deploy-bhw.ps1` assembles a release and served by `node server.js`, the
+branch beside the trunk (MapLibre 5, Next 16.2.10) on the same keys. Built as CI builds (`BHW_DATA_SOURCE=none`) and served with the
+data: a build with the data source pre-renders hundreds of drill-downs against Supabase, and two at once hit Next's 60-second page
+limit. Usage logging was blocked in the browser, so nothing was written to jongsky25's database.
+- ❌ **Every MapLibre map was blank on `8c28020b`.** MapLibre 6 derives its worker URL from `import.meta.url`, which is not an http
+  URL once Next bundles it, so it starts the worker from `""` ("Worker failed to load", four per Explore load); MapLibre 5 inlined it
+  as a `blob:`. **Fixed in `ee4978a9`:** `predev`/`prebuild` copy the package's self-contained worker into `public/` (git- and
+  ESLint-ignored), and `components/maps/load-maplibre.ts` calls `setWorkerUrl` under the base path with `?v=`. The Explore map then
+  draws the same shaded regions as the trunk's, compared by eye (the PNG bytes differ), with no worker error.
+- ✅ **Exports:** all eleven kinds the pages link (CSV, XLSX, PNG and PPTX figures; districts CSV and XLSX; facilities, profiling-status
+  and UUC-PHC PNGs; UUC-PHC data CSV and XLSX) answer 200 with valid files, byte-identical to the trunk's.
+- **Host gates on `ee4978a9`:** Vitest 86 files, 1,251 passed; type-check 0; lint 0 errors, 1 warning (the fixture); production audit
+  0 critical, 0 high, 3 moderate. A regex guard for a re-split worker was shown to catch all four import forms.
+- **Found, not M194's — filed as `bhw-geo-drilldown-isr` on this branch (`67ac30aa`), with `bhw-p1-box` now blocked on it:** the
+  place, facilities, profiling-status and UUC-PHC drill-downs answer 500 (`DYNAMIC_SERVER_USAGE`) on the trunk and the branch alike.
+  They stay ISR while the root layout reads the CSP nonce through `headers()` since `M192`, whose route-table measurement ("every
+  `○`/`●` route became `ƒ`") was taken where `generateStaticParams` returned nothing.
+- **Not named in the prediction:** the box's `npm run build` will pre-render against the data source unless that row changes it — the
+  load `bhw-p1-box` must measure.
+
+**The claim as taken follows.**
 
 Taken 2026-10-28. Branch `m194-bhw-advisories`, cut from `origin/main` at `3f41b551`, PR into main. Asked for by the user (`D187`:
 a Meridian session clears them first, then P1), because `bhw-p1-box` is blocked on this row by `D185`.

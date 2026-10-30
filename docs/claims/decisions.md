@@ -24,10 +24,66 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D187`, the last filed, was asked and answered on 2026-10-28 when merge point 8 was called, and recorded in its close-out. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D192`, the last filed, was asked and answered on 2026-10-29 once `M196` was built, and recorded with `M197`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D192 — `M196` (`#389`, the builder's version token) is built and held. Which merge point does it ride? **A — the same one as `#387`, second: `M197`, then `#388`, then `#389`, with `#387` last.**
+
+**Asked and answered 2026-10-29 (user decision, in chat), once `M196` was built; recorded with `M197`'s claim.**
+- **A — the same merge point, second (recommended, chosen).** It keeps `D188`'s reasoning: `#387` is the one most likely to slip, so it goes last, and dropping it moves nothing else. `#389` changes builder saves, so the testers get it at once.
+- **B — a later merge point.** This one would keep only `#388` and `#387`.
+
+⚠️ **The first slot was not part of the question, because it is forced.** `M197` clears CVE-2026-45070, which turned every pull request's composer audit red from 2026-10-28 18:08 UTC, after the question was asked. It must merge before anything else can be green. So the order is `M197` → `#388` → `#389` → `#387`, each branch merging the trunk after `M197` and running again. As at every merge point, the user's census comes before and after, and each pull request goes in only once the previous deploy has finished and `/up` answers.
+
+**What the answer files:** nothing new. `M196` moves under HELD in `docs/claims/lane-a.md`, and `M197`'s claim names its place, first.
+### D191 — `openapi.json` publishes our internal notes. What is kept out of it, and how? **A — the clear maintainer marks now, with a check that refuses them; the design codes in a later row.** **Tier: during-testing.**
+
+**Asked and answered 2026-10-29 (user decision, in chat), after `M195`'s read-only verification of `R-e568ddd2`; recorded with `M195`'s built claim.** The verification found the row's leak is wider than it says.
+- 15 of the 17 `Api/V1` request classes have their docblock published verbatim.
+- The worst maintainer text now comes from enums, controller methods and inline comments: `SyncResultStatus` carries *"⛔ … (M69)"*, `AnalyticsAxis` names `scripts/controller-gate.php`, and `StoreDomainRequest` names `CustomDomainApiTest`.
+- About seventy design codes (H-, ADR-, D-, "Increment") and 33 `@see` lines sit beside them.
+
+The options:
+- **A — clear marks, with a check (recommended, chosen).** Remove ⛔/⚠️, M-numbers, test-class names and script paths from the sources Scramble reads, and widen the one-off assertion `OpenApiContractTest` already makes into a denylist over the whole committed `openapi.json`. The design codes and `@see` go in a later row.
+- **B — everything, now.** A plus every design code and `@see`, about thirty source files in one increment.
+- **C — the worst only, no check.** Hand-fix a few lines; nothing stops new ones.
+
+**What the answer files:** `R-e568ddd2`'s remedy becomes A, taken as its own increment, because it edits `openapi.json`, a hub. The later row (design codes and `@see`, tier `before-launch`, since integrators are not on the testing server) is filed on the next increment's branch. `docs/feature-backlog.md` is a deploying path on the trunk, so it is not edited in a claim push.
+
+### D190 — Eleven form-settings saves in `FormService` write their audit history from a copy nobody re-read. What should they do? **A — take the form lock first, as `setDataSharing` does.** **Tier: during-testing.**
+
+**Asked and answered 2026-10-29 (user decision, in chat), after `M195`'s read-only verification of `R-5041cc72`; recorded with `M195`'s built claim.** The row's *"only `archive()` takes one"* is now false: `setDataSharing` also locks, and builds its audit from the locked copy. The lock-free writers have grown from seven to eleven (`assignFolder`, `setTheme`, `setSinglePageMode` and `setOcrScanning` are newer), and ten of them build `$old` from the caller's copy. There is a concrete race: the schedule sweeper flips `schedule_state` under the lock, and `setSchedule` can then audit the pre-sweep value.
+
+The options:
+- **A — lock like data sharing (recommended, chosen).** The history is exact, and a settings save may wait a moment behind a publish, restore, import or sweep.
+- **B — re-read without a lock.** A smaller window that never waits, but two settings saves can still race.
+- **C — leave it as is**, with the hazard written down.
+
+**What the answer files:** `R-5041cc72`'s remedy becomes A, and §3.4 of `docs/form-versioning-schema-migration.md` gains the settings setters in its list of lock-takers. It is taken as its own increment, because `FormService.php` is a hub.
+
+### D189 — A builder edit's `version` token is optional, and even when sent it does not stop two saves at the same moment from both winning. What should happen? **A — require it, and re-check it under the row lock.** **Tier: during-testing.**
+
+**Asked and answered 2026-10-29 (user decision, in chat), after `M195`'s read-only verification of `R-036f3226`; recorded with `M195`'s built claim.** The verification found two things:
+- **The client contract does not move.** The shipped builder sends the token on every field and section write, and no client code sets it to null. A token-less PATCH is reachable only from outside the builder.
+- **The token does not close last-write-wins even when it is sent.** `assertNoDrift()` runs before the transaction, against the copy route binding loaded. `writeField` locks the row but never re-checks, and `updateSection` takes no row lock. So two concurrent PATCHes carrying the same valid token both pass. `convertField` does it right: lock, then check.
+
+The options:
+- **A — require it and close the race (recommended, chosen).** `version` becomes required on both update requests, `BuilderRoutesTest`'s *"accepts an edit that carries no concurrency token"* flips to a refusal, and the drift check moves under a row lock in both update paths, as `convertField` does.
+- **B — the same, with an explicit "overwrite anyway" flag** a caller may send.
+- **C — leave it optional**, and document last-save-wins.
+
+**What the answer files:** `R-036f3226`'s remedy becomes A, widened to the race, and it is the head of the line, so it is the next increment. The token's one-second precision, and a validation-only edit that does not bump `updated_at`, are measured there and fixed or filed.
+
+### D188 — `M195` (the gate-baselines scraper) is held for the merge point `#387` (`M194`) rides. In what order do the two go live? **A — `M195` first, then `#387`.**
+
+**Asked and answered 2026-10-28 (user decision, in chat), while `M195` was planned; recorded in its claim.** The session prompt held `M195` green "for the merge point #387 rides", and that merge point is still the user's to name (`#387` waits on jongsky25's `boundary-approved` label and on his Supabase keys for the browser check). Only the order inside it was asked.
+
+- **A — `M195` → `#387` (recommended, chosen).** `#387` is the one most likely to slip, because it waits on jongsky25 twice. Putting it last means dropping it moves nothing else. `M195` touches only Meridian's scripts, tests and docs, so its own deploy is a quiet one.
+- **B — `#387` → `M195`.** BHW's fix lands first and the scraper fix after it.
+
+**What the answer files, in the same push:** nothing new. `M194` moves under HELD in `docs/claims/lane-a.md`, last at that merge point, and `M195`'s claim names its place, first. As at every merge point: the user's census before and after, and each pull request only once the previous deploy has finished and `/up` answers. The close-out regenerates `docs/gate-baselines.md` from the post-merge trunk run, with the fixed scraper.
+
 ### D187 — `D185` keeps BHW off the testing server until its production advisories are cleared, and the user wants jongsky25 to see BHW on staging. Who clears them before P1? **A — a Meridian session clears them first, then P1.**
 
 **Asked and answered 2026-10-28 (user decision, in chat), when merge point 8 was called; recorded in its close-out.** The user: *"lets finish the p1 so jong can already see the bhw connect in staging."* `D185` stands; this decides only who does the work and when.
@@ -3806,6 +3862,18 @@ The third Oct 12 batch broke the second clause again, and the first as well: two
 **Why:** one subject with one answer. `D38` = C marks documented, unbuilt `/api/v1` surface as not built, in place, and the six rows are its whole list. `M108`, closing the row that said the six could neither be grouped nor safely split, recorded them as pre-cleared to batch together; that was an increment's word, not the user's, so the batch was put to the user by name. Every edit sits inside an existing line, so no line moves and no citation cascades, and the two files' rows do not interleave.
 
 **Disposition:** the user chose all six together, in chat on 2026-10-28, over the three §7.1 rows alone and over the head row with unrelated rows. Recorded in both places this log requires: inline at the closed rows and in `PROGRESS.md`'s release paragraph. Not a precedent, and the first of its reason, so the escalation rule above is not engaged.
+
+##### #7 — `M195` (2026-10-28) · two rows editing one hub script and its paired fixtures, allowed by the user in chat
+
+**What was not satisfied:** both clauses of item 1. Both rows edit two things:
+- `scripts/gate-baselines.php`, which is in the derived hub set;
+- the ci-log fixtures that `GateBaselinesTest` pairs with that script's gate list.
+
+So two rows edit the same files, and both touch a hub. `R-b31f421e` rewrites how every roster entry is scraped. `R-4130e1fa` adds roster entries, and it also edits `scripts/backlog-triage-controls.php`.
+
+**Why:** one script and one paired fixture set. `R-b31f421e` converts both ci-log fixtures to the shape gh really prints, and every entry `R-4130e1fa` adds owes a line to each of those fixtures. Split into two increments, the second would re-edit every fixture the first had just converted.
+
+**Disposition:** the user chose both together, in chat on 2026-10-28, over the scraper fix alone with `R-4130e1fa` as its own later increment. Recorded in both places this log requires: inline at the closed rows and in `PROGRESS.md`'s release paragraph. Not a precedent, and the first of its reason, so the escalation rule above is not engaged.
 
 ---
 

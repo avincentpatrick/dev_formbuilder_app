@@ -28,6 +28,13 @@ final class PublicFormPresenter
         private readonly TenantSettingRegistry $settings,
     ) {}
 
+    // ⛔ EVERY `//` ABOVE A KEY IN THE LITERAL BELOW IS PUBLISHED as that property's description in
+    // `openapi.json`, so a maintainer note belongs up here (M200, `D191`). Why `bot_challenge` is a hint and
+    // not a gate: `replay.ts` caches one SchemaResponse per slug per drain pass, so rows 2..n construct a
+    // client that never fetched a schema at all; they recover through api-client's retry-once on a 403
+    // instead. Emitting it as a gate would make the offline path depend on a hint it does not have.
+    // `paper_upload` is M165's.
+
     /**
      * @return array<string, mixed>
      */
@@ -49,12 +56,10 @@ final class PublicFormPresenter
                 // route is still authoritative; this only decides whether the control is shown.
                 'save_and_resume' => $form->save_and_resume && $this->tenantAllowsSaveResume(),
                 // Whether this form requires a proof-of-work spam check before it will accept a submission
-                // (I8b). ⚠️ A HINT, NOT A GATE — and the distinction is load-bearing. The authority is
-                // VerifyGuestBotChallenge on the submit route; this only saves the client a rejected round
-                // trip. It has to be that way because `replay.ts` caches one SchemaResponse per slug per
-                // drain pass, so rows 2..n construct a client that never fetched a schema at all; they
-                // recover through api-client's retry-once on a 403 instead. Emitting it as a gate would
-                // make the offline path depend on a hint it does not have.
+                // (I8b). A hint, not a gate: the submit route decides, and this only saves the client a
+                // rejected round trip. A client replaying queued submissions may send one without having
+                // read it; that submission is refused with a 403, and solving the check and retrying once
+                // recovers it.
                 'bot_challenge' => $form->bot_challenge->value,
                 // The author-editable confirmation copy (Increment H6a, Doc #26 §6.2), emitted RAW — as a
                 // template, with its `${key}` holes unfilled — plus its locale variants. Two reasons it is
@@ -71,7 +76,7 @@ final class PublicFormPresenter
                 // Enforcement is authoritative in the write path ({@see FormAcceptanceGuard}); the schema is
                 // still returned for a closed form so the runtime can render the closed state.
                 'schedule' => $this->schedule($form),
-                // Whether to offer "Upload a filled paper copy" (M165, `D106`), with the limits the picker checks
+                // Whether to offer "Upload a filled paper copy" (`D106`), with the limits the picker checks
                 // before sending; null when the form does not take one. A HINT, like `bot_challenge`: the schema is
                 // cached by the service worker, so `POST f/{shareToken}/scans` decides every upload afresh.
                 'paper_upload' => $this->paperUpload($form),

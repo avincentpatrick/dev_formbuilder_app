@@ -4,22 +4,25 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+// The docblock below is published API documentation — Scramble emits it verbatim as this enum's
+// `description` in `openapi.json` — so the maintainer notes live up here (M200, `D191`).
+//
+// `docs/PRD.md:203` asks for "all forms tagged to one program or campaign", and §D6 records why a tag model
+// is not built: it would be a new tenant table plus a new authorization question ("can a Form Editor see a
+// tag's aggregate?"), invented inside an already-large increment to satisfy one word of an example, when an
+// indexed, grant-integrated, subtree-queryable axis already exists. A tag earns its migration when a tenant
+// needs a grouping ORTHOGONAL to authorization — one form in two campaigns — and not before.
+//
+// Lives in an enum rather than in a controller `match` for a mechanical reason as well as a tidiness one:
+// `scripts/controller-gate.php` counts every `match` arm toward a method's cyclomatic complexity and caps it
+// at 10, and it does not scan `app/Enums`.
+
 /**
  * The axes cross-form analytics may group by (ADR-0011 §D6, Increment H24a).
  *
  * §D6 settles the headline question — **the grouping axis is `forms.scope_node_id` and no tag model is
  * coined** — and names the secondary axes that already exist and may be offered alongside it. This enum is
  * that list, closed: an axis not here is a decision, not an omission.
- *
- * `docs/PRD.md:203` asks for "all forms tagged to one program or campaign", and §D6 records why a tag model
- * is not built: it would be a new tenant table plus a new authorization question ("can a Form Editor see a
- * tag's aggregate?"), invented inside an already-large increment to satisfy one word of an example, when an
- * indexed, grant-integrated, subtree-queryable axis already exists. A tag earns its migration when a tenant
- * needs a grouping ORTHOGONAL to authorization — one form in two campaigns — and not before.
- *
- * Lives in an enum rather than in a controller `match` for a mechanical reason as well as a tidiness one:
- * `scripts/controller-gate.php` counts every `match` arm toward a method's cyclomatic complexity and caps it
- * at 10, and it does not scan `app/Enums`.
  */
 enum AnalyticsAxis: string
 {

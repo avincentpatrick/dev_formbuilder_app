@@ -14,9 +14,8 @@ use Illuminate\Foundation\Http\FormRequest;
  * `domain` is the ONLY accepted field, and that is a security property rather than tidiness: stancl's
  * Domain model is `$guarded = []`, so a request permitted to carry `verified_at` or `activated_at` and
  * handed to `create()` would let a tenant mark its own hostname live. The service builds its attribute
- * array explicitly and never passes request data through, and CustomDomainApiTest asserts that a store
- * request carrying those fields still lands pending — belt and braces, because either alone would be
- * enough and neither alone is obviously enough to a future reader.
+ * array explicitly and never passes request data through, so a claim carrying either field still lands
+ * pending.
  *
  * Authorization is on the route ({@see ApiAbilities::MANAGE_DOMAINS} +
  * `can:tenant.settings.manage`), not here, matching every other Group-B request in this namespace.
@@ -30,10 +29,12 @@ final class StoreDomainRequest extends FormRequest
     // exactly that way; anything that is not about the request CONTRACT belongs inside the class body.
     //
     // What those paragraphs said, kept where it costs nothing:
-    //   · The test name above was corrected — the one it used to carry has never existed in any commit.
-    //     The assertion is real: `tests/Feature/Api/CustomDomainApiTest.php`, "it ignores verification
-    //     fields smuggled into the claim body", which posts both fields and asserts `pending` with both
-    //     timestamps null on the unscoped row.
+    //   · The test that holds the "lands pending" sentence above is `tests/Feature/Api/CustomDomainApiTest.php`,
+    //     "it ignores verification fields smuggled into the claim body", which posts both fields and asserts
+    //     `pending` with both timestamps null on the unscoped row — belt and braces with the service, because
+    //     either alone would be enough and neither alone is obviously enough to a future reader. The docblock
+    //     named it until M200 (`D191`): a test name is not contract, and `openapi.json` published it. The
+    //     name it carried before M92 has never existed in any commit.
     //   · It is written as a PATH rather than a fully-qualified `@see` because Pint's
     //     `fully_qualified_strict_types` rewrites one into a real `use`, putting a test-class import in
     //     production code (measured in M88).

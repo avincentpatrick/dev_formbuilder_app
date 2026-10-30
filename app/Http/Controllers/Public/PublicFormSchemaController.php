@@ -55,7 +55,7 @@ final class PublicFormSchemaController extends Controller
      * other form no longer shares comes back empty with `available: false`. `stamp` changes whenever the list
      * does. `version` must be the share token's own form version; any other request answers the same 404.
      *
-     * `sets` (M186): one entry per question — and per cascade level — whose choices are narrowed by what another form
+     * `sets`: one entry per question — and per cascade level — whose choices are narrowed by what another form
      * recorded: the distinct answers that form holds (`values`), to show only those choices or only the others. `level`
      * is the cascade level's index, or null for a question's own list. A set that cannot be read is `available: false`,
      * and one over 50,000 answers is `truncated: true`; both carry no values, and the page then narrows nothing.

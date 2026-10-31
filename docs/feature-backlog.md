@@ -11258,7 +11258,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   regenerated deliberately. The remedy is to cite the line's rows by `R-` id, which is stable for the life of the row.
   **Live.** Filed by `M108`. **Tier: during-testing.**
 
-- **`minor` · `backlog-triage-controls` is registered in CI and absent from `docs/gate-baselines.md`, so its case
+- ✅ **CLOSED BY `M195` (2026-10-28) — ****`minor` · `backlog-triage-controls` is registered in CI and absent from `docs/gate-baselines.md`, so its case
   count is the one gate number nothing tracks.** Filed 2026-09-24 by `M108`, which registered the gate and found the
   gap while regenerating the baselines from its own post-merge run. `scripts/gate-baselines.php` carries a fixed
   roster of gate patterns, each a regex over that gate's own pass line; the new harness prints
@@ -11272,6 +11272,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   change pushed straight to the trunk without a claim naming a branch is what `scripts/pre-push-guard.php` exists to
   refuse. ⚠️ **It also wants a floor of its own in the same edit**, on the argument above: a case count is only worth
   recording if something refuses a suspiciously small one. **Live.** Filed by `M108`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M195` (2026-10-28), on its branch, under `D13` exception #7 (with `R-b31f421e`, allowed by the user in
+  chat).** `scripts/gate-baselines.php` records the harness's count, which is 10 cases now, not 8. Its floor is
+  `MIN_CASES` in `scripts/backlog-triage-controls.php`: a committed mutant that stops one case from running exits 2
+  with *"ran 9 case(s), under the floor of 10"*. ⚠️ **"The one gate number nothing tracks" was false.** The static job
+  printed eight counted pass lines that nothing recorded, and all eight are recorded now:
+  - the mail-attribute linter and tracker-lint;
+  - the controls of tracker-lint, citation liveness, the pre-push guard, the test-pointer lint, backlog-triage and the
+    boundary check.
+
+  The other five controls harnesses have no floor under their counts, and that is filed below, as is the declared roster
+  that let eight go unrecorded.
 
 - **`minor` · A tab open longer than the build-retention window still asks for a chunk that no longer exists.**
   Filed 2026-09-25 by `M109`, at the moment the window was chosen rather than after. `deploy.ps1` now carries the
@@ -15537,7 +15548,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `openapi.json`'s paths, reading a row that mixes marks (Tenant, Forms, Submissions) path by path. **Latent** — every mark is right
   today, and the first build that changes the API surface is what makes one wrong. Filed by `M193`. **Tier: before-launch.**
 
-- **`minor` · `scripts/gate-baselines.php` matches every metric against the whole run log, so the seventh job's Vitest summary is read as Meridian's: the run after merge point 8 regenerates Vitest as 85 files where Meridian has 283.**
+- ✅ **CLOSED BY `M195` (2026-10-28) — ****`minor` · `scripts/gate-baselines.php` matches every metric against the whole run log, so the seventh job's Vitest summary is read as Meridian's: the run after merge point 8 regenerates Vitest as 85 files where Meridian has 283.**
   Found at merge point 8's close-out (2026-10-28), regenerating from run 40696757541. Each metric names a `job`, but the job is only
   the table's label: the pattern runs over the concatenated log of every job and takes the first match. `M192` added the
   `BHW Connect (lint, types, tests, build)` job, whose Vitest prints the same `Test Files N passed (N)` line earlier in the log than
@@ -15545,6 +15556,80 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   disk, so `docs/gate-baselines.md` was NOT regenerated and stays at run 40449344963. `M192`'s premise that every other Meridian gate
   was already blind to `apps/` missed this one. The remedy: match each pattern only against the lines `gh run view --log` prefixes
   with that job's name, with a fixture of two jobs printing the same summary. **Live.** Filed by `M193`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M195` (2026-10-28), on its branch, under `D13` exception #7 (with `R-4130e1fa`, allowed by the user in chat).**
+  Each metric, and the E2E extras, now read only their own job's lines: the text gh prints before a line's first tab. Against run
+  40696757541, measured before any test was written, exactly two lines move: Vitest 85 → **283 files**, and the extras 11 →
+  **82 skipped**.
+  - ⚠️ **The extras were wrong before BHW arrived.** The committed file's `1 skipped` was Pest's line; E2E prints 82.
+  - Both ci-log fixtures took gh's real `job TAB step TAB timestamp text` shape, which they had never modelled.
+  - The new scenario `two-jobs-one-summary` puts a seventh job first, printing a Vitest summary, a skip count and the word *flaky*,
+    and its table must equal `recent-push`'s.
+  - Two committed-tree mutants, the metric scope and the extras scope each reverted to the whole log, were both CAUGHT by that case
+    alone.
+
+- **`minor` · Five controls harnesses print a case count with nothing under it, so a case that stops running still ends in `passed`.**
+  Found by `M195` (2026-10-28). That increment records each count in `docs/gate-baselines.md` and gives one harness,
+  `scripts/backlog-triage-controls.php`, a `MIN_CASES` floor, as `R-4130e1fa` asked. The other five have no floor on their own
+  counts: tracker-lint's controls, citation liveness's, the pre-push guard's, the test-pointer lint's `--selftest`, and the
+  boundary check's. Every "floor" in them is a floor on the fixtures or the scan of the gate they test. The mail-attribute
+  linter, also newly recorded, already floors both its counts (`MIN_EXPECTED_VIEWS`, `MIN_EXPECTED_ATTRIBUTE_ECHOES`).
+  - A recorded count only shows the drop at the next regeneration, after the merge that lost the case.
+  - The remedy is the same constant and the same `cannot_measure` exit in each harness, proved by a committed mutant that stops
+    one case.
+
+  **Latent** — every count is whole today. Filed by `M195`. **Tier: during-testing.**
+
+- **`minor` · `scripts/gate-baselines.php`'s gate roster is declared, not derived, so a counted gate added to `ci.yml` is recorded nowhere until someone adds it by hand — eight had been.**
+  Found by `M195` (2026-10-28), which recorded the static job's eight unrecorded pass lines by hand. `M90` already named the shape in
+  the roster's own comment (*"a gate added to ci.yml is INVISIBLE here until somebody adds a row"*), and nothing enforces it.
+  `GateBaselinesTest` pairs the roster with its fixtures, never with `ci.yml`.
+  - The remedy is a docs test that reads each `ci.yml` step that runs a repository gate and requires a roster entry or a stated
+    exemption for each. The verdict-only steps (the composer audit, the npm audit judge, gitleaks) and the BHW job are named as
+    exemptions.
+
+  **Latent** — every counted line is recorded today, and the next gate added to `ci.yml` is what makes it wrong. Filed by `M195`.
+  **Tier: during-testing.**
+
+- ✅ **CLOSED BY `M197` (2026-10-29) — ****`minor` · `symfony/mime` v8.1.0 carries CVE-2026-45070 (email header injection through non-token characters in MIME parameter names), and `composer audit` fails every CI run from 2026-10-28 18:08 UTC.**
+  Found when `#389`'s run 40790795523 went red at its static job's *Composer audit (SCA)* step. That step reported exactly one advisory:
+  `PKSA-wtxr-p26d-nn42`, severity medium, reported 2026-10-28T18:08:54Z, fixed in 8.1.10.
+  - It was not that pull request's diff. `#388`'s run, which finished before the advisory was published, passed the same step, and
+    every branch and the trunk fail it from that moment.
+  - `symfony/mime` is transitive, not a direct `require`.
+  - The host's own `composer audit` also names `symfony/http-foundation`, but only because the local `vendor/` lagged the lock. The lock
+    already pinned the patched 8.1.9.
+  - Meridian sends mail through Laravel's mailer, which builds its MIME headers with this package, so the advisory reaches a real
+    path. No form field sets a parameter name, which is why it is `minor`.
+
+  **Live.** Filed by `M197`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M197` (2026-10-29), on its branch.** `composer update symfony/mime`, run with the container's Composer 2.10.3 so the
+  lock's metadata is not downgraded, moves one package in `composer.lock`, v8.1.0 → v8.1.10. `composer audit --locked` now reads *"No
+  security vulnerability advisories found"*. It merges first at the merge point `#387` rides (`D192`), because every other pull
+  request's static job is red until it lands.
+
+- ✅ **CLOSED BY `M201` (2026-10-31) — ****`minor` · `follow-redirects` 1.16.1 carries GHSA-mrwp-f3q8-3g9p (cross-realm sensitiveHeaders arrays are discarded, so custom credentials can follow redirects), and the npm audit judge blocks every CI run.**
+  Found when the trunk's run 41196861583, the first after `M197` merged at merge point 9, went red at the static job's *npm audit*
+  step: `npm-audit-judge: BLOCKED — 1 high in PRODUCTION dependencies`, `follow-redirects — high — 1.16.0 - 1.16.1`. Its deploy was
+  skipped, so nothing went live.
+  - It was not `M197`'s diff. `M197` changed only `composer.lock`, and its own run passed this step on 2026-10-29.
+  - `follow-redirects` is transitive: `axios` requires it as `^1.16.0`. Meridian imports `axios` nowhere itself; it reaches the browser
+    bundle through Inertia, where `axios` uses its XHR adapter and never loads `follow-redirects`. That is why it is `minor`.
+
+  **Live.** Filed by `M201`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M201` (2026-10-31), on its branch.** The lock's one entry is set to 1.16.2 by hand, because the host's npm 11.6.1
+  rewrote 85 unrelated lines on `npm update follow-redirects --package-lock-only`. The registry's 1.16.1 and 1.16.2 records differ only in
+  version, tarball and integrity, and the integrity was recomputed from the downloaded tarball. `npm-audit-judge` now reads *"JUDGED
+  CLEAN at the blocking threshold"*. It merges first of what remains of merge point 9, because every pull request's static job is red
+  until it lands.
+
+- **`minor` · `packages/design-system` locks `vite` 6.4.4, which carries GHSA-8g5g-mxqh-grgj (`server.fs.deny` bypassed with queries), moderate.**
+  Found by `M201` (2026-10-31) in the same audit as the row above. The npm audit judge blocks only high and critical, so it does not
+  turn CI red, and `M201` left it alone to keep its lock change to one entry.
+  - It reaches only Vite's dev server, which the testing box never runs; the box serves built assets.
+  - The remedy is the same one-entry lock change: `packages/design-system/node_modules/vite` to 6.4.5, inside `^6.3.0`, then the design
+    system's build and Storybook's axe run green. An upstream rerating to high would turn every CI run red, as this row's neighbours did.
+
+  **Latent.** Filed by `M201`. **Tier: during-testing.**
 
 - **`minor` · `CLAUDE.md` says a push that records a decision regenerates `docs/pipeline.md` in the same push, and that path is outside `ci.yml`'s `paths-ignore` — so a claim push that follows the rule runs CI and a deploy on the trunk outside a merge point.**
   Found by `M195` (2026-10-28) after the fact. Its claim push `69d7e56f` carried `decisions.md`, `lane-a.md` and the regenerated line.

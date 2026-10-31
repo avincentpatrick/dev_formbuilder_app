@@ -24,10 +24,18 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D192`, the last filed, was asked and answered on 2026-10-29 once `M196` was built, and recorded with `M197`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D193`, the last filed, was asked and answered on 2026-10-31 as merge point 9 began, and recorded with `M194`'s refresh onto the trunk. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D193 — BHW Connect online is now the main priority. Where does `#387` go in merge point 9? **A — second, right after `M197`: `M197` → `#387` → `#388` → `#389`.**
+
+**Asked and answered 2026-10-31 (user decision, in chat), as merge point 9 began; recorded with `M194`'s refresh onto the trunk.** The user, the day before: *"making this online is our main priority now."* This changes `D188` and `D192`'s order; their reasoning, that `#387` must not hold anything else up, still stands.
+- **A — `#387` second (recommended, chosen).** BHW's code reaches the box two merges sooner, about 1 hour 20 minutes. If jongsky25's `boundary-approved` label is not on `#387` when `M197`'s deploy has finished, `#388` and `#389` go next and `#387` follows as soon as it is green, so nothing waits on him.
+- **B — `#387` last, as `D192` had it.**
+
+**What the answer files:** nothing new. `M194`'s claim names its new place, second. As at every merge point, the user's census comes before and after, and each pull request goes in only once the previous deploy has finished and `/up` answers. P1's first build (`ops/deploy-bhw.ps1 -BuildOnly`) runs on the box after `#387`'s deploy and before `#388` merges, because both use the live checkout.
+
 ### D192 — `M196` (`#389`, the builder's version token) is built and held. Which merge point does it ride? **A — the same one as `#387`, second: `M197`, then `#388`, then `#389`, with `#387` last.**
 
 **Asked and answered 2026-10-29 (user decision, in chat), once `M196` was built; recorded with `M197`'s claim.**

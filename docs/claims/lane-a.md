@@ -16,7 +16,50 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M200`, the maintainer marks out of `openapi.json`, with a check that refuses them (`R-e568ddd2`, `D191` A) (m200-openapi-maintainer-marks)
+## Status: ACTIVE CLAIM — `M201`, `follow-redirects` to 1.16.2, clearing GHSA-mrwp-f3q8-3g9p and the npm audit the trunk now fails (m201-follow-redirects)
+
+Taken 2026-10-31, during merge point 9. Branch `m201-follow-redirects`, cut from origin/main at `7147719c` (`M197`, merged first at
+merge point 9), PR into main. ⛔ **It merges FIRST of what remains of merge point 9, ahead of `#387`, `#388` and `#389`**: every pull
+request's static job fails until it lands, as `M197`'s did (`D192`'s forced slot). Nothing has deployed since the user's census before
+(11:25:26 UTC): the trunk's run went red, so its deploy was skipped.
+
+Row — new, filed and closed on this branch: *"`follow-redirects` 1.16.1 carries GHSA-mrwp-f3q8-3g9p (high), and the npm audit judge
+blocks every CI run"*. Alone under `D13`, because `package-lock.json` is a hub.
+
+### Evidence verified
+- The trunk's run 41196861583 at `7147719c`: six jobs green. Static analysis went red at *npm audit (SCA — high/critical in
+  PRODUCTION deps blocks merge)*: `npm-audit-judge: BLOCKED — 1 high in PRODUCTION dependencies`, `follow-redirects — high — 1.16.0 -
+  1.16.1`. Deploy run 41199015085 was skipped; `/up` 200, still 0.16.0.
+- The advisory is GHSA-mrwp-f3q8-3g9p, *"Cross-realm sensitiveHeaders arrays are discarded and custom credentials can follow
+  redirects"*. The registry's latest is 1.16.2.
+- `package-lock.json` pins `node_modules/follow-redirects` at 1.16.1.
+
+### Premise verified
+- **It is not `M197`'s diff.** `M197` changed only `composer.lock`, and its own run 40807295694 passed this step on 2026-10-29. The
+  advisory came after, so every branch and the trunk now fail it.
+- **`follow-redirects` is transitive and in range:** only `node_modules/axios` (production) requires it, as `^1.16.0`, which admits
+  1.16.2.
+- **A second advisory sits in the same audit and does not block:** `vite` 6.4.4 under `packages/design-system`, GHSA-8g5g-mxqh-grgj
+  (`server.fs.deny` bypassed with queries), moderate. The judge blocks only high and critical. Not fixed here; filed as its own row on
+  this branch.
+
+### Remedy verdict
+- **`npm update follow-redirects --package-lock-only` — works in kind, measured on a scratch copy of the trunk's lock:** the audit then
+  reports only the `vite` moderate. ⚠️ The scratch copy had no workspace folders, so npm 11.6.1 also pruned unrelated entries (85 lines).
+  The real bump is made in a full checkout, and **only the `follow-redirects` entry may move**; if npm churns anything else, the entry is
+  set by hand from the registry's 1.16.2 tarball and integrity.
+- **To be confirmed:** the judge passes, and CI is 7/7.
+
+Files: `package-lock.json`, `docs/feature-backlog.md` (the row filed and closed, and the `vite` row filed), `docs/pipeline.md`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace (`D193`, answered in chat, is recorded with `M194`).
+Prediction:
+- One entry moves in the lock.
+- CI is 7/7; nothing runs `follow-redirects` in a test.
+- **Most likely wrong:** a third advisory published before the run. The second came two days after the first.
+
+## HELD — `M200`, the maintainer marks out of `openapi.json`, with a check that refuses them (`R-e568ddd2`, `D191` A) (m200-openapi-maintainer-marks)
 
 **BUILT — PR #393, NOT MERGED.** Held for **merge point 10, third — after `#391` and `#392`**, by the user's word in chat.
 - **Run 41025882753 at `100673bd`:** six green with real step counts — E2E 20 (19 ran; only the failure-upload step skipped) · Pest 11

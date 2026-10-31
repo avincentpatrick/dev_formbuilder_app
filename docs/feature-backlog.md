@@ -15554,3 +15554,27 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   lock's metadata is not downgraded, moves one package in `composer.lock`, v8.1.0 → v8.1.10. `composer audit --locked` now reads *"No
   security vulnerability advisories found"*. It merges first at the merge point `#387` rides (`D192`), because every other pull
   request's static job is red until it lands.
+
+- ✅ **CLOSED BY `M201` (2026-10-31) — ****`minor` · `follow-redirects` 1.16.1 carries GHSA-mrwp-f3q8-3g9p (cross-realm sensitiveHeaders arrays are discarded, so custom credentials can follow redirects), and the npm audit judge blocks every CI run.**
+  Found when the trunk's run 41196861583, the first after `M197` merged at merge point 9, went red at the static job's *npm audit*
+  step: `npm-audit-judge: BLOCKED — 1 high in PRODUCTION dependencies`, `follow-redirects — high — 1.16.0 - 1.16.1`. Its deploy was
+  skipped, so nothing went live.
+  - It was not `M197`'s diff. `M197` changed only `composer.lock`, and its own run passed this step on 2026-10-29.
+  - `follow-redirects` is transitive: `axios` requires it as `^1.16.0`. Meridian imports `axios` nowhere itself; it reaches the browser
+    bundle through Inertia, where `axios` uses its XHR adapter and never loads `follow-redirects`. That is why it is `minor`.
+
+  **Live.** Filed by `M201`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M201` (2026-10-31), on its branch.** The lock's one entry is set to 1.16.2 by hand, because the host's npm 11.6.1
+  rewrote 85 unrelated lines on `npm update follow-redirects --package-lock-only`. The registry's 1.16.1 and 1.16.2 records differ only in
+  version, tarball and integrity, and the integrity was recomputed from the downloaded tarball. `npm-audit-judge` now reads *"JUDGED
+  CLEAN at the blocking threshold"*. It merges first of what remains of merge point 9, because every pull request's static job is red
+  until it lands.
+
+- **`minor` · `packages/design-system` locks `vite` 6.4.4, which carries GHSA-8g5g-mxqh-grgj (`server.fs.deny` bypassed with queries), moderate.**
+  Found by `M201` (2026-10-31) in the same audit as the row above. The npm audit judge blocks only high and critical, so it does not
+  turn CI red, and `M201` left it alone to keep its lock change to one entry.
+  - It reaches only Vite's dev server, which the testing box never runs; the box serves built assets.
+  - The remedy is the same one-entry lock change: `packages/design-system/node_modules/vite` to 6.4.5, inside `^6.3.0`, then the design
+    system's build and Storybook's axe run green. An upstream rerating to high would turn every CI run red, as this row's neighbours did.
+
+  **Latent.** Filed by `M201`. **Tier: during-testing.**

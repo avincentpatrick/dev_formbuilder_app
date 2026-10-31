@@ -15537,3 +15537,20 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   **Latent** — every counted line is recorded today, and the next gate added to `ci.yml` is what makes it wrong. Filed by `M195`.
   **Tier: during-testing.**
+
+- ✅ **CLOSED BY `M197` (2026-10-29) — ****`minor` · `symfony/mime` v8.1.0 carries CVE-2026-45070 (email header injection through non-token characters in MIME parameter names), and `composer audit` fails every CI run from 2026-10-28 18:08 UTC.**
+  Found when `#389`'s run 40790795523 went red at its static job's *Composer audit (SCA)* step. That step reported exactly one advisory:
+  `PKSA-wtxr-p26d-nn42`, severity medium, reported 2026-10-28T18:08:54Z, fixed in 8.1.10.
+  - It was not that pull request's diff. `#388`'s run, which finished before the advisory was published, passed the same step, and
+    every branch and the trunk fail it from that moment.
+  - `symfony/mime` is transitive, not a direct `require`.
+  - The host's own `composer audit` also names `symfony/http-foundation`, but only because the local `vendor/` lagged the lock. The lock
+    already pinned the patched 8.1.9.
+  - Meridian sends mail through Laravel's mailer, which builds its MIME headers with this package, so the advisory reaches a real
+    path. No form field sets a parameter name, which is why it is `minor`.
+
+  **Live.** Filed by `M197`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M197` (2026-10-29), on its branch.** `composer update symfony/mime`, run with the container's Composer 2.10.3 so the
+  lock's metadata is not downgraded, moves one package in `composer.lock`, v8.1.0 → v8.1.10. `composer audit --locked` now reads *"No
+  security vulnerability advisories found"*. It merges first at the merge point `#387` rides (`D192`), because every other pull
+  request's static job is red until it lands.

@@ -77,6 +77,9 @@ const FIGURE_PEER_INDICATORS = [
 ] as const;
 
 export const revalidate = 86_400; // ISR: refresh at most once a day (citymun/barangay; regions/provinces are SSG via generateStaticParams)
+// Per request, not ISR: the root layout reads the per-request CSP nonce (lib/csp.ts), and an ISR
+// render of this page reads it outside a request and answers 500 (DYNAMIC_SERVER_USAGE).
+export const dynamic = "force-dynamic";
 
 /** Plural label for the level one step below the given level, for the
  * "Places within" drill-down heading. Barangay has no children. */

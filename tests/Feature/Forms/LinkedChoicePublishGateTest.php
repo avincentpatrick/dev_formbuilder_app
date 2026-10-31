@@ -195,7 +195,7 @@ it('saves a link through the builder, and refuses a link carrying any other key'
     $patch = fn (array $source) => $this->actingAs($this->admin)
         ->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$add->json('id')}", [
             'key' => $add->json('key'), 'label' => 'Facility', 'is_required' => 'optional',
-            'config' => ['options' => [], 'options_source' => $source], 'validations' => [], 'version' => null,
+            'config' => ['options' => [], 'options_source' => $source], 'validations' => [], 'version' => currentFieldToken($form, $this->admin, $add->json('id')),
         ]);
 
     // A half-picked link saves: the builder PATCHes mid-edit, and publish is where it must be whole (M116).

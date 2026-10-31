@@ -93,7 +93,7 @@ function configRetentionPatch(User $admin, Form $form, string $fieldId, string $
             'is_required' => 'optional',
             'config' => $config,
             'validations' => [],
-            'version' => null,
+            'version' => currentFieldToken($form, $admin, $fieldId),
         ]);
 }
 

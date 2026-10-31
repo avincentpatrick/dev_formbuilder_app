@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/copy-maplibre-worker.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/copy-maplibre-worker.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -22,8 +24,8 @@
     "geist": "1.7.2",
     "html2canvas-pro": "^1.6.7",
     "linkedom": "^0.18.13",
-    "maplibre-gl": "^5.24.0",
-    "next": "16.2.10",
+    "maplibre-gl": "^6.16.0",
+    "next": "16.4.3",
     "nuqs": "^2.9.1",
     "pptxgenjs": "^4.0.1",
     "react": "19.2.4",
@@ -39,11 +41,14 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.10",
+    "eslint-config-next": "16.4.3",
     "pg": "8.23.1",
     "prettier": "^3",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^3"
+  },
+  "overrides": {
+    "image-size": "^2.0.4"
   }
 }

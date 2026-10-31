@@ -14,8 +14,10 @@
  *
  * WHAT IT DELIBERATELY ALLOWS. `style-src 'unsafe-inline'`: server-rendered `style=""` attributes
  * (charts, maps, React's `style={}`) need it, and an injected style cannot act as the signed-in
- * user. `img-src data: blob:` and `worker-src blob:`: html2canvas-pro's exports and maplibre's
- * worker. In development only, `'unsafe-eval'` and `ws:` for React's refresh and the dev server.
+ * user. `img-src data: blob:` and `worker-src blob:`: html2canvas-pro's exports. MapLibre's worker,
+ * a `blob:` before MapLibre 6, is now a module file served from `'self'`
+ * (`components/maps/load-maplibre.ts`). In development only, `'unsafe-eval'` and `ws:` for React's
+ * refresh and the dev server.
  */
 export function contentSecurityPolicy(nonce: string, { dev }: { dev: boolean }): string {
   const directives: Record<string, string[]> = {

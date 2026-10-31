@@ -937,12 +937,10 @@ jobs:
         continue-on-error: true
         run: npm audit --json --omit=dev > npm-audit.json
 
-      # ⚠️ D185 (2026-10-28): WARNS, DOES NOT BLOCK — for now, and on purpose. At the import BHW's
-      # production dependencies carried 2 critical and 8 high advisories (next, maplibre-gl, pptxgenjs …).
-      # Nothing serves BHW from Meridian's origin until bhw-p1-box, and that marker is BLOCKED on
-      # bhw-dependency-advisories, which clears them with the map and export screens checked in a
-      # browser. When it closes, this step goes back to Meridian's rule: delete the exit-1 arm below.
-      - name: npm audit (Meridian's judge — WARNS until bhw-dependency-advisories closes, D185)
+      # Meridian's rule (D185, restored by M194 when bhw-dependency-advisories closed): a high or critical
+      # advisory in BHW's PRODUCTION dependencies fails this job. Only an unreachable registry (the judge's
+      # exit 2) passes with a warning, because reachability is not a merge signal.
+      - name: npm audit (Meridian's judge — high/critical in PRODUCTION deps blocks merge)
         if: steps.changed.outputs.run == 'true'
         working-directory: apps/bhw-connect
         run: |
@@ -953,11 +951,6 @@ jobs:
           if [ "$code" = "2" ]; then
             echo "::warning title=BHW npm audit NOT MEASURED::the advisory endpoint was unreachable; no dependency was judged"
             echo "⚠️ **BHW's npm audit did not run.** The registry was unreachable, so nothing was measured about apps/bhw-connect's dependencies." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          if [ "$code" = "1" ]; then
-            echo "::warning title=BHW production advisories (D185)::high/critical advisories in apps/bhw-connect production dependencies; bhw-p1-box stays blocked until bhw-dependency-advisories clears them"
-            echo "⚠️ **BHW carries high/critical production advisories** (D185): a warning until \`bhw-dependency-advisories\` closes, which BHW must do before it is served from the testing site." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           exit $code

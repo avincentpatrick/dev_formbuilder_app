@@ -4,6 +4,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { colorForValue, NO_DATA_COLOR, type ColorBin } from "@/lib/charts/color-scale";
 import { accent } from "@/lib/charts/palette";
+import { loadMaplibre } from "./load-maplibre";
 
 export type ChoroplethDatum = {
   geoCode: string;
@@ -131,8 +132,8 @@ export function ChoroplethMap({
     let cancelled = false;
     let map: import("maplibre-gl").Map | undefined;
 
-    Promise.all([import("maplibre-gl"), fetch(geojsonUrl).then((r) => r.json())]).then(
-      ([{ default: maplibregl }, geojson]) => {
+    Promise.all([loadMaplibre(), fetch(geojsonUrl).then((r) => r.json())]).then(
+      ([maplibregl, geojson]) => {
         if (cancelled || !containerRef.current) return;
 
         geojsonRef.current = geojson;

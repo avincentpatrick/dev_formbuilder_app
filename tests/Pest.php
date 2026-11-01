@@ -44,6 +44,7 @@ use App\Services\Expressions\ExpressionLexer;
 use App\Services\Expressions\ExpressionParser;
 use App\Services\Expressions\FunctionRegistry;
 use App\Services\Expressions\StructuredRuleLowering;
+use App\Services\Forms\FormBuilderService;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
 use App\Services\Scoping\ScopeNodeService;
@@ -304,6 +305,42 @@ function addFormField(FormVersion $version, User $user, string $key, FieldType $
 function builderHeaders(Form $form): array
 {
     return ['X-Builder-Draft' => (string) $form->draft_version_id];
+}
+
+/**
+ * M196 (`R-036f3226`, `D189`) — the token every builder content save must carry since it became required: the row's own,
+ * as the builder would have read it. Read off the model as the test holds it, like builderHeaders(), so a case that
+ * means to play a stale copy passes that copy. A row with no `updated_at` has no token, and says so rather than
+ * sending an empty one that would read as a conflict.
+ */
+function builderToken(FormField|FormSection $row): string
+{
+    $token = FormBuilderService::rowVersion($row);
+
+    expect($token)->toBeString('the row has no updated_at, so it has no token to send');
+
+    return (string) $token;
+}
+
+/**
+ * M196 — the token of a field as it stands NOW, for a case that saves the same question more than once. The builder
+ * always holds the token its last save returned; a case that captured one at the add would 409 its own second save
+ * whenever the two straddled a second (the token has one-second precision). A read after an HTTP request has lost the
+ * tenant context, so the context is entered first — which the next request's middleware replaces with its own.
+ */
+function currentFieldToken(Form $form, User $user, string $fieldId): string
+{
+    enterTenant($form->tenant_id, $user->id);
+
+    return builderToken(FormField::query()->whereKey($fieldId)->firstOrFail());
+}
+
+/** currentFieldToken(), for a section. */
+function currentSectionToken(Form $form, User $user, string $sectionId): string
+{
+    enterTenant($form->tenant_id, $user->id);
+
+    return builderToken(FormSection::query()->whereKey($sectionId)->firstOrFail());
 }
 
 /*

@@ -2,13 +2,16 @@
 
 declare(strict_types=1);
 
+use App\Enums\FieldType;
 use App\Enums\SubmissionStatus;
+use App\Exceptions\Forms\BuilderConflictException;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormFieldValidation;
 use App\Models\FormSection;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Forms\FormBuilderService;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
 use App\Support\Forms\StepProjection;
@@ -165,7 +168,10 @@ it('rejects a stale field edit with 409 and returns the current row', function (
     expect(FormField::query()->whereKey($fieldId)->value('key'))->not->toBe('age');
 });
 
-it('accepts an edit that carries no concurrency token (overwrite)', function (): void {
+it('refuses an edit that carries no concurrency token, null or absent (D189)', function (): void {
+    // M196 (`R-036f3226`, `D189` A). This case used to assert the opposite — a token-less PATCH accepted as an overwrite,
+    // which made last-write-wins a contract rather than an accident. The shipped builder sends the token on every
+    // field and section write, so the refusal lands on no client path; only a caller outside the builder ever sent none.
     $tenant = builderTenant();
     $admin = User::factory()->create();
     enterTenant($tenant->id, $admin->id);
@@ -177,17 +183,84 @@ it('accepts an edit that carries no concurrency token (overwrite)', function ():
         ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => 'short_text'])
         ->assertOk();
     $fieldId = $add->json('id');
+    $section = $this->actingAs($admin)
+        ->postJson("http://acme.meridian.test/forms/{$form->id}/sections")->assertOk();
+    $sectionId = $section->json('id');
 
-    $this->actingAs($admin)
-        ->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$fieldId}", [
-            'key' => 'forced',
-            'label' => 'Forced',
-            'is_required' => 'optional',
-            'config' => [],
-            'validations' => [],
-            'version' => null,
-        ])
-        ->assertOk()->assertJsonPath('key', 'forced');
+    $field = ['key' => 'forced', 'label' => 'Forced', 'is_required' => 'optional', 'config' => [], 'validations' => []];
+
+    foreach ([['version' => null], []] as $token) {
+        $this->actingAs($admin)
+            ->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$fieldId}", [...$field, ...$token])
+            ->assertStatus(422)->assertJsonValidationErrors('version');
+        $this->actingAs($admin)
+            ->patchJson("http://acme.meridian.test/forms/{$form->id}/sections/{$sectionId}", ['key' => 'forced', 'label' => 'Forced', ...$token])
+            ->assertStatus(422)->assertJsonValidationErrors('version');
+    }
+
+    enterTenant($tenant->id, $admin->id);
+    expect(FormField::query()->whereKey($fieldId)->value('key'))->not->toBe('forced');
+    expect(FormSection::query()->whereKey($sectionId)->value('key'))->not->toBe('forced');
+});
+
+it('checks a field token under the row lock, so a save holding a copy older than the row is refused (D189)', function (): void {
+    // ⛔ M196 (`R-036f3226`). THE TOKEN DID NOT CLOSE LAST-WRITE-WINS EVEN WHEN IT WAS SENT. The drift check ran before the
+    //    transaction, against the copy route binding loaded, and writeField() locked the row without looking again — so two
+    //    saves that both bound the row before either wrote both passed. This is that pair, one step at a time: the copy
+    //    and its token are taken first, the other save lands, and this one arrives holding both.
+    $tenant = builderTenant();
+    $admin = User::factory()->create();
+    enterTenant($tenant->id, $admin->id);
+    makeActiveMember($admin, 'admin');
+    $form = app(FormService::class)->create($tenant, $admin, 'Survey');
+    $builder = app(FormBuilderService::class);
+    $added = $builder->addField($form, $admin, FieldType::ShortText, null);
+
+    $bound = FormField::query()->whereKey($added->id)->firstOrFail();
+    $token = builderToken($bound);
+    FormField::query()->whereKey($added->id)->update(['label' => 'First', 'updated_at' => now()->addMinute()]);
+
+    $refused = null;
+
+    try {
+        $builder->updateField($form, $bound, $admin, [
+            'key' => 'second', 'label' => 'Second', 'is_required' => 'optional', 'config' => [], 'validations' => [],
+        ], $token);
+    } catch (BuilderConflictException $e) {
+        $refused = $e;
+    }
+
+    expect($refused)->toBeInstanceOf(BuilderConflictException::class);
+    // The 409 carries the row as it stands, so the builder can offer the other save's text — never the stale copy.
+    expect($refused?->current->label)->toBe('First');
+    expect(FormField::query()->whereKey($added->id)->value('label'))->toBe('First');
+});
+
+it('checks a section token under the row lock, so a save holding a copy older than the row is refused (D189)', function (): void {
+    // The section half. updateSection() took no row lock at all, so the same pair passed there too.
+    $tenant = builderTenant();
+    $admin = User::factory()->create();
+    enterTenant($tenant->id, $admin->id);
+    makeActiveMember($admin, 'admin');
+    $form = app(FormService::class)->create($tenant, $admin, 'Survey');
+    $builder = app(FormBuilderService::class);
+    $added = $builder->addSection($form);
+
+    $bound = FormSection::query()->whereKey($added->id)->firstOrFail();
+    $token = builderToken($bound);
+    FormSection::query()->whereKey($added->id)->update(['label' => 'First', 'updated_at' => now()->addMinute()]);
+
+    $refused = null;
+
+    try {
+        $builder->updateSection($form, $bound, ['key' => 'second', 'label' => 'Second'], $token);
+    } catch (BuilderConflictException $e) {
+        $refused = $e;
+    }
+
+    expect($refused)->toBeInstanceOf(BuilderConflictException::class);
+    expect($refused?->current->label)->toBe('First');
+    expect(FormSection::query()->whereKey($added->id)->value('label'))->toBe('First');
 });
 
 it('validates the key format, and saves a key another question holds under the next free number (D132)', function (): void {
@@ -209,19 +282,19 @@ it('validates the key format, and saves a key another question holds under the n
     // saved as a's key with the next free number, and the response says which key was kept.
     $this->actingAs($admin)->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$b->json('id')}", [
         'key' => $a->json('key'),
-        'label' => 'Dup', 'is_required' => 'optional', 'config' => [], 'validations' => [], 'version' => null,
+        'label' => 'Dup', 'is_required' => 'optional', 'config' => [], 'validations' => [], 'version' => currentFieldToken($form, $admin, $b->json('id')),
     ])->assertOk()->assertJsonPath('key', $a->json('key').'_2');
 
     // The next clash takes the next number, and the question already holding a key keeps it.
     $this->actingAs($admin)->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$c->json('id')}", [
         'key' => $a->json('key'),
-        'label' => 'Dup again', 'is_required' => 'optional', 'config' => [], 'validations' => [], 'version' => null,
+        'label' => 'Dup again', 'is_required' => 'optional', 'config' => [], 'validations' => [], 'version' => currentFieldToken($form, $admin, $c->json('id')),
     ])->assertOk()->assertJsonPath('key', $a->json('key').'_3');
 
     // A field saved with its OWN key unchanged keeps it — no suffix against itself.
     $this->actingAs($admin)->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$a->json('id')}", [
         'key' => $a->json('key'),
-        'label' => 'Original', 'is_required' => 'optional', 'config' => [], 'validations' => [], 'version' => null,
+        'label' => 'Original', 'is_required' => 'optional', 'config' => [], 'validations' => [], 'version' => currentFieldToken($form, $admin, $a->json('id')),
     ])->assertOk()->assertJsonPath('key', $a->json('key'));
 
     enterTenant($tenant->id, $admin->id);
@@ -231,7 +304,7 @@ it('validates the key format, and saves a key another question holds under the n
     // A bad key format is rejected too.
     $this->actingAs($admin)->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$b->json('id')}", [
         'key' => 'Not A Key',
-        'label' => 'Bad', 'is_required' => 'optional', 'config' => [], 'validations' => [], 'version' => null,
+        'label' => 'Bad', 'is_required' => 'optional', 'config' => [], 'validations' => [], 'version' => currentFieldToken($form, $admin, $b->json('id')),
     ])->assertStatus(422);
 });
 
@@ -266,7 +339,7 @@ it('persists a geospatial map config and rejects an out-of-range coordinate', fu
                 'default_zoom' => 11,
             ],
             'validations' => [],
-            'version' => null,
+            'version' => currentFieldToken($form, $admin, $fieldId),
         ])
         ->assertOk()
         ->assertJsonPath('config.capture_altitude', true)
@@ -281,7 +354,7 @@ it('persists a geospatial map config and rejects an out-of-range coordinate', fu
             'is_required' => 'optional',
             'config' => ['default_center' => ['lat' => 999, 'lon' => 0]],
             'validations' => [],
-            'version' => null,
+            'version' => currentFieldToken($form, $admin, $fieldId),
         ])
         ->assertStatus(422)
         ->assertJsonValidationErrors(['config.default_center.lat']);
@@ -294,7 +367,7 @@ it('persists a geospatial map config and rejects an out-of-range coordinate', fu
             'is_required' => 'optional',
             'config' => [],
             'validations' => [],
-            'version' => null,
+            'version' => currentFieldToken($form, $admin, $fieldId),
         ])
         ->assertOk();
 });
@@ -348,6 +421,7 @@ it('refuses the reserved lead-step key on both authoring routes that accept a ke
         ->patchJson("http://acme.meridian.test/forms/{$form->id}/sections/{$sectionId}", [
             'key' => StepProjection::LEAD_STEP_KEY,
             'label' => 'Lead',
+            'version' => currentSectionToken($form, $admin, $sectionId),
         ])
         ->assertStatus(422)
         ->assertJsonValidationErrors('key');
@@ -359,7 +433,7 @@ it('refuses the reserved lead-step key on both authoring routes that accept a ke
             'is_required' => 'optional',
             'config' => [],
             'validations' => [],
-            'version' => null,
+            'version' => currentFieldToken($form, $admin, $fieldId),
         ])
         ->assertStatus(422)
         ->assertJsonValidationErrors('key');
@@ -377,6 +451,7 @@ it('refuses the reserved lead-step key on both authoring routes that accept a ke
         ->patchJson("http://acme.meridian.test/forms/{$form->id}/sections/{$sectionId}", [
             'key' => 'household',
             'label' => 'Household',
+            'version' => currentSectionToken($form, $admin, $sectionId),
         ])
         ->assertOk()->assertJsonPath('key', 'household');
 
@@ -387,7 +462,7 @@ it('refuses the reserved lead-step key on both authoring routes that accept a ke
             'is_required' => 'optional',
             'config' => [],
             'validations' => [],
-            'version' => null,
+            'version' => currentFieldToken($form, $admin, $fieldId),
         ])
         ->assertOk()->assertJsonPath('key', 'respondent_age');
 });
@@ -404,7 +479,9 @@ it('saves a section key another section holds under the next free number, as for
     $b = $this->actingAs($admin)->postJson("http://acme.meridian.test/forms/{$form->id}/sections")->assertOk();
 
     $this->actingAs($admin)
-        ->patchJson("http://acme.meridian.test/forms/{$form->id}/sections/{$b->json('id')}", ['key' => $a->json('key'), 'label' => 'Second'])
+        ->patchJson("http://acme.meridian.test/forms/{$form->id}/sections/{$b->json('id')}", [
+            'key' => $a->json('key'), 'label' => 'Second', 'version' => currentSectionToken($form, $admin, $b->json('id')),
+        ])
         ->assertOk()
         ->assertJsonPath('key', $a->json('key').'_2');
 });

@@ -76,7 +76,7 @@ final class FormBuilderController extends Controller
     public function updateSection(UpdateSectionRequest $request, Form $form, FormSection $section): JsonResponse
     {
         return $this->respond(fn (): array => $this->presenter->section(
-            $this->builder->updateSection($form, $section, $request->validated(), $request->input('version')),
+            $this->builder->updateSection($form, $section, $request->validated(), $request->string('version')->toString()),
         ));
     }
 
@@ -114,7 +114,7 @@ final class FormBuilderController extends Controller
             $field,
             $this->actor($request),
             $request->payload(),
-            $request->input('version'),
+            $request->string('version')->toString(),
         )));
     }
 

@@ -24,10 +24,21 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D196`, the last filed, was asked and answered on 2026-11-02 while `M202` was planned, and recorded with `M202`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D197`, the last filed, was asked and answered on 2026-11-02 once `M203`'s pull request was open, and recorded the same day. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D197 — `M203` (PR #396, `bhw-migrate-duplicate-versions` + `bhw-admin-signin-csp`) changes only files under `apps/bhw-connect/`. How does it merge? **A — at its own merge point, right after `M202`, as soon as every required check is green and jongsky25 has labelled it.**
+
+**Asked and answered 2026-11-02 (user decision, in chat), once #396 was open; recorded the same day.** `D196` answered for `M202` only and said a later BHW-only pull request asks again. This is that question.
+- **A — its own merge point, on green, after `M202` (recommended, chosen).** Its paths are site-safe for `deploy.ps1`, so there is no Meridian window and nothing a tester sees changes. Then:
+  - one hand run of `deploy-bhw.ps1` at the box;
+  - jongsky25's one sign-in at `/bhw-connect/admin/login`, which proves the CSP half;
+  - P2's baseline step can use the history fix before the cut-over.
+- **B — first in merge point 10**, with #391–#393 and the census before and after. The sign-in fix and P2 would wait for that merge point.
+
+**What the answer files:** nothing new. The label request went on #396 the same day, with the user's OK on the wording.
+
 ### D196 — `M202` (`bhw-deploy-release-leak`) changes only `apps/bhw-connect/ops/deploy-bhw.ps1`. How does it merge? **A — at its own merge point, as soon as every required check is green and jongsky25 has labelled it.**
 
 **Asked and answered 2026-11-02 (user decision, in chat), while `M202` was planned; recorded with its claim.** `bhw-p2-db` is blocked on it.

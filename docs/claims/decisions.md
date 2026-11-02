@@ -24,10 +24,37 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D194`, the last filed, was asked and answered on 2026-11-02 after merge point 9's close-out, and recorded in the same session. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D196`, the last filed, was asked and answered on 2026-11-02 while `M202` was planned, and recorded with `M202`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D196 — `M202` (`bhw-deploy-release-leak`) changes only `apps/bhw-connect/ops/deploy-bhw.ps1`. How does it merge? **A — at its own merge point, as soon as every required check is green and jongsky25 has labelled it.**
+
+**Asked and answered 2026-11-02 (user decision, in chat), while `M202` was planned; recorded with its claim.** `bhw-p2-db` is blocked on it.
+- **A — its own merge point, on green (recommended, chosen).** `deploy.ps1` lists `apps/` as site-safe, so the merge only fast-forwards the box's checkout: no Meridian maintenance window, and nothing a tester sees changes. Then the user runs `deploy-bhw.ps1` at the box once. That fresh build is the fix's proof, and P2's box work is unblocked at once. This is a deliberate exception to "never a lone small PR", whose reason (every merge deploys under the testers) does not hold for a site-safe path.
+- **B — first in merge point 10**, with `#391`, `#392` and `#393` and the census before and after. P2's box steps would wait for that merge point.
+
+**What the answer files:** nothing new. The answer covers `M202` only. A later BHW-only pull request asks again, or names this answer when the user confirms it.
+
+### D195 — BHW's admin sign-in and its feedback screenshots go to Supabase with the same keys its data uses. Between `bhw-p2-db` (the data onto the box) and `bhw-p3-identity` (Meridian's sign-in), how do BHW's admins sign in? **A — keep Supabase's sign-in: the box's PostgREST verifies Supabase's own key secret, and BHW's page policy lets the login reach Supabase until P3.**
+
+**Asked and answered 2026-11-02 (user decision, in chat), while P2 was planned; recorded with `M202`'s claim.** Two findings came out of planning P2:
+- **The keys are shared.** BHW's anon and service keys are legacy HS256 tokens. They go both to PostgREST (`lib/db/data-plane.ts` rewrites only `/rest/v1/`) and to Supabase's sign-in and storage. Keys minted on the box would break sign-in and screenshot uploads at P2.
+- **Admin sign-in is already blocked on staging.** The page policy's `connect-src` is `'self'` only. This is in `lib/csp.ts` and in the header the live `/bhw-connect/admin/login` returns. The login page calls Supabase from the browser, so on the box an admin can't sign in at all. Today the only way in is Vercel, and P2 pauses Vercel.
+
+The options:
+- **A — keep Supabase's sign-in (recommended, chosen).** PostgREST on the box takes Supabase's legacy JWT secret, which jongsky25 sends privately along with the connection string. Today's keys then serve data, sign-in and screenshots unchanged. `connect-src` and `img-src` open to Supabase's origin only while that origin differs from the page's. At P3 the box gets its own secret and newly minted keys. That needs a rebuild, because the anon key is in the client bundle.
+- **B — no admin sign-in until P3.** Keys are minted on the box at P2. Admin pages and feedback screenshots stay off until P3 is built.
+- **C — P2 and P3 in one cut-over.** BHW stays on Supabase until P3 is built as well.
+
+**Who builds it:** this lane, with jongsky25's `boundary-approved` (as `M194` was). jongsky25 checks one admin sign-in on staging after the hand deploy. The user answered this in the same exchange.
+
+**What the answer files, in `docs/adr/0024-second-application-under-one-host.md`:**
+- New `bhw-admin-signin-csp` (during-testing).
+- New `bhw-migrate-duplicate-versions` (during-testing). Found while planning: two pairs of migration files share a version, so `--baseline` stops on the primary key. It now blocks `bhw-p2-db`.
+- `bhw-p2-db` names the shared secret, the live schema as the copy's source (61 tables and 170 recorded migrations on 2026-11-02), and the rehearsal on the dev machine.
+- `bhw-p3-identity` gains the rotation to the box's own secret and keys.
+
 ### D194 — BHW Connect's code runs on the testing box, but its data and its admin sign-in still come from jongsky25's Supabase. What comes first: the move onto the box, or P1's automatic deploys and scheduled jobs? **A — standalone first: the deploy-script fix, then the database (P2), then the sign-in (P3); P1's remainder after.**
 
 **Asked and answered 2026-11-02 (user decision, in chat), after merge point 9's close-out.** The user: *"i thoug we are clear that everything must run standalone in the server? sourcecode, database etc."* `D173` (the database on the box) and `D178` (Meridian's sign-in) stand; this decides only the order. When the session reported BHW public on 2026-11-01, it did not say that the data and the sign-in still lived on Supabase. It should have.

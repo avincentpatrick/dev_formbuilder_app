@@ -16,7 +16,64 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M202`, `bhw-deploy-release-leak`: `New-Release` returns only the release path (m202-bhw-release-leak)
+## Status: ACTIVE CLAIM — `M203`, P2's two BHW prerequisites: the migration history takes a duplicate version, and the admin sign-in reaches Supabase until P3 (`bhw-migrate-duplicate-versions`, `bhw-admin-signin-csp`, `D195` A) (m203-bhw-p2-prereqs)
+
+Taken 2026-11-02. Branch `m203-bhw-p2-prereqs`, cut from origin/main at `1b5e6682`, PR into main. `M202` is built and held below.
+
+Both files are jongsky25's (`/apps/bhw-connect/`, not `ops/`). This lane builds them on the user's answer recorded in `D195` ("Who builds it"), so the PR needs his `boundary-approved`. Its paths are site-safe, as `M202`'s were. Its merge route is confirmed with the user when it is green: `D196` answered for `M202` only.
+
+Rows:
+- `bhw-migrate-duplicate-versions`: "record a version already present without failing, and refuse a new duplicate above the lint floor … before bhw-p2-db records its baseline".
+- `bhw-admin-signin-csp`: "Open connect-src and img-src to the NEXT_PUBLIC_SUPABASE_URL origin only while it differs from the page's own, which ends at bhw-p3-identity (D195), proved by a real admin sign-in on staging".
+
+### Evidence verified
+- **The two version pairs: held.** `supabase/migrations/` holds 111 files with 109 distinct versions. `20260721080000` is `e4_2_agg_population` and `e4_3_income_reclass`, and `20260827180000` is `profile_dataset` and `ref_uuc_phc_list`.
+- **The baseline loop: held, and worse than the row says.** `db/migrate.mjs`'s `migrate()` inserts each covered version unguarded, and **outside a transaction**. Measured on a scratch `postgres:15` with the repository's files:
+  - `--baseline=20260905235804` exits 2 on `schema_migrations_pkey` after **41 of 109** versions are recorded.
+  - `--check` then prints **69 pending** (exit 1). On the box, `ops/deploy-bhw.ps1` would apply those 69 history files over the restored live schema.
+- **`lib/csp.ts`: held.** `connect-src` is `'self'` only (plus `ws:` in development), and `img-src` is `'self' data: blob:`.
+- **The live header: held.** `/bhw-connect/admin/login` served exactly that policy on 2026-11-02.
+- **The two browser calls to Supabase: held.**
+  - `app/admin/login/page.tsx` calls `signInWithPassword` from the browser through `lib/db/supabase-auth-browser.ts` (`createBrowserClient(NEXT_PUBLIC_SUPABASE_URL, …)`).
+  - `lib/db/admin.ts` hands the browser a Supabase `createSignedUrl` link for a screenshot.
+- **The call site: held.** `proxy.ts` builds the policy with `contentSecurityPolicy(nonce, { dev })`, and `lib/csp.test.ts` covers it.
+
+### Premise verified
+- **Ownership.** `.github/CODEOWNERS` gives `/apps/bhw-connect/` to jongsky25 alone. This lane edits it only on the user's answer, with his label, as `M194` did.
+- **The CSP's own reason.** Its docblock says an injected script must not run, because Meridian's session cookie reaches these pages. Opening `connect-src` and `img-src` to one more origin leaves `script-src` untouched, so an injected script still cannot run. The docblock is updated to say why the opening exists and when it ends.
+- **When the opening ends.** It is computed from `NEXT_PUBLIC_SUPABASE_URL`, never hard-coded. P3 rotates the keys and moves sign-in to Meridian, and the opening goes with that value. CI's placeholder (`http://no-data-source.invalid`) opens nothing reachable.
+- **The duplicates are history.** Both sit below `db/lint-migrations.mjs`'s `FLOOR`, and no file above the floor shares a version today.
+- **The tests.** `db/db-tools.test.ts` holds the database cases (`BHW_TEST_DATABASE_URL`, the local docker stack), and `lib/csp.test.ts` the policy's.
+
+### Remedy verdict
+**Both work, measured before any file was edited.**
+- **Duplicate versions.** A scratch copy of `migrate.mjs` had the baseline in one transaction and both inserts `ON CONFLICT (version) DO NOTHING`.
+  - Over the partial history the failed run left, it recorded the other 69 and ended at 109 with 0 pending.
+  - On an empty history it recorded 111 files as 109 versions, with 0 pending, and the unpatched `--check` agrees.
+  - The build adds a ROLLBACK on failure and the refusal of a new duplicate above the floor.
+- **The CSP.** Headless Chromium got the exact live policy, then the patched one, and called `https://ejcuwrnxngdwvecxwrhy.supabase.co` from the page the way the login does.
+  - **Live:** violations on `connect-src` and `img-src`, and the fetch threw "Failed to fetch".
+  - **Patched:** no violation. The fetch reached Supabase (HTTP 401: the probe sent no key), and the image failed only as a 404.
+
+Files: `apps/bhw-connect/db/migrate.mjs`, `apps/bhw-connect/db/db-tools.test.ts`, `apps/bhw-connect/lib/csp.ts`, `apps/bhw-connect/lib/csp.test.ts`. At close-out: ADR-0024's two markers, `docs/pipeline.md`, `PROGRESS.md` (own block).
+Shared artefacts taken: none on Meridian's side. The four files are jongsky25's, under his `boundary-approved`.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace (`M203`).
+Prediction:
+- BHW's own gates run on the host: `npm run lint`, `npm run typecheck` and `npx vitest run`. The database cases are skipped unless `BHW_TEST_DATABASE_URL` is set, so I run them against `docker compose up -d` and say so.
+- CI's BHW Connect job is green, and its boundary step stays red until his label.
+- The part I most expect to be wrong: the duplicate guard. A clean refusal "above the floor" means `migrate.mjs` reading `FLOOR` from `lint-migrations.mjs`, and that module may run its own check on import.
+
+## HELD — `M202`, `bhw-deploy-release-leak`: `New-Release` returns only the release path (m202-bhw-release-leak)
+
+**Built. PR #395 is open, its CI running, and jongsky25 was asked for `boundary-approved` on the PR (2026-11-02, the user approved the wording).** It merges at its own merge point, on green and with that label (`D196`).
+
+Proved on the host with `-BuildOnly` against scratch roots, from a clean worktree at `61fee90b`:
+- **The parent's file:** `built only:` followed by 2,994 characters of npm's log, then the path.
+- **The fixed file:** the path alone, 244 characters.
+- Both runs took about 55 s, and both assembled `server.js`.
+
+Every host gate and Pint passed. The claim as taken follows.
 
 Taken 2026-11-02. Branch `m202-bhw-release-leak`, cut from origin/main at `d949da97`, PR into main. It merges at its own merge point, on green and with jongsky25's `boundary-approved`, per `D196`.
 Row: `bhw-deploy-release-leak` — "ops/deploy-bhw.ps1's New-Release returns the npm ci and npm run build output along with the release path … send the two npm calls to Out-Host, keeping Invoke-Native's output for Get-Census".

@@ -16,7 +16,53 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M203`, P2's two BHW prerequisites: the migration history takes a duplicate version, and the admin sign-in reaches Supabase until P3 (`bhw-migrate-duplicate-versions`, `bhw-admin-signin-csp`, `D195` A) (m203-bhw-p2-prereqs)
+## Status: ACTIVE CLAIM — `M204`, BHW Connect is avincentpatrick's until the handover, so the move's pull requests need nobody's label (`bhw-ownership-until-handover`, `D198` A) (m204-bhw-ownership-until-handover)
+
+Taken 2026-11-02. Branch `m204-bhw-ownership-until-handover`, cut from origin/main at `e0cb402d`, PR into main. It rides merge point 10 (`D198` A, in the answer's own words). `M203` and `M202` are built and held below.
+
+**Why.** The user, 2026-11-02: jongsky25 has not started, and was told to start only once BHW's database is on the box. The user wants the whole move finished before the handover, with nothing left to configure between the two of them, and everything in jongsky25's hands from then on (`D198`, `D199`). The next push records both answers and files the rows.
+
+Row: `bhw-ownership-until-handover`: "jongsky25's lines in .github/CODEOWNERS set aside until the handover, so `*` gives every path to avincentpatrick … the working agreement says so … boundary-check-controls' B0 holds the shipped map to D198".
+
+### Evidence verified
+- **`.github/CODEOWNERS` on `e0cb402d`: held.** `/apps/bhw-connect/` is `@jongsky25`. `ops/`, `/.github/`, `/deploy.ps1` and `/docs/working-agreement.md` are both owners'.
+- **`scripts/boundary-check.php`: held.** A path needs approval when its owners include anyone but the author (`array_diff($owners, [$author])`), and only that other owner's `labeled` event approves it. So every BHW pull request this lane opens needs jongsky25's click: `#395` and `#396` are red at exactly that step today.
+- **`scripts/boundary-check-controls.php` B0: held.** It reads the real `.github/CODEOWNERS` and expects `apps/bhw-connect/lib/x.ts`, by jongsky25, to need nobody. So B0 goes red under the new map unless it changes with it: the controls are a paired file of this change.
+
+### Premise verified
+- **Who must approve this one change.** `.github/CODEOWNERS` and `docs/working-agreement.md` are shared on the base, and the check reads the map from the base. So this pull request needs jongsky25's label once, and none after it.
+- **The handover reverses it without him.** Under the new map every path is avincentpatrick's, so the handover's pull request (`bhw-handover`) needs nobody. jongsky25 sees it before he starts.
+- **Nothing else reads the map.** `git grep CODEOWNERS` outside `apps/` finds only `CLAUDE.md`, the tracker and claims, ADR-0024, the decisions, the working agreement and the two scripts. The ruleset on `main` has `require_code_owner_review: false`, read 2026-11-02, so GitHub's review requests change but nothing blocks on them.
+- **Site-safe.** `deploy.ps1` lists `docs/`, `scripts/` and `.github/` as site-safe, so the merge only fast-forwards the box. It still rides merge point 10, per the answer.
+
+### Remedy verdict
+**Works, measured before any edit.** I used a throwaway repository in the scratchpad running the shipped `boundary-check.php` with no label events, on a change to `apps/bhw-connect/lib/x.ts`, `ops/start.ps1`, `.github/workflows/ci.yml`, `deploy.ps1` and `docs/working-agreement.md`:
+- **Today's map, by avincentpatrick:** exit 1, all 5 owned by `@jongsky25`.
+- **jongsky25's four lines commented out, by avincentpatrick:** exit 0, "5 changed path(s), all on avincentpatrick's own side".
+- **The same map, by jongsky25:** exit 1, all 5 owned by `@avincentpatrick`.
+
+Files: `.github/CODEOWNERS`, `docs/working-agreement.md`, `scripts/boundary-check-controls.php`. At close-out: ADR-0024's marker, `docs/pipeline.md`, `PROGRESS.md` (own block), `docs/gate-baselines.md` (the controls' case count).
+Shared artefacts taken:
+- `.github/CODEOWNERS` and `docs/working-agreement.md`, shared with BHW Connect. They need jongsky25's `boundary-approved`, once.
+- This claim's next push also takes `docs/adr/0024-second-application-under-one-host.md`, `docs/claims/decisions.md` and `docs/pipeline.md`.
+
+Paired files taken: `scripts/boundary-check-controls.php` (B0 reads the shipped map).
+Namespaces spent: nothing from either namespace (`M204`; decisions `D198`, `D199`).
+Prediction:
+- The diff is four CODEOWNERS lines commented out under a dated header, one short section at the top of the working agreement, and B0's expectations moved to the new map plus one case where avincentpatrick needs nobody.
+- `composer run boundary-check-controls` passes on the host with 14 cases, and is red against the old map. That proof is a committed mutation: the old CODEOWNERS restored, then reverted.
+- Pint passes; PHPStan cannot move, because nothing changed under `app/`, `database/` or `routes/`.
+- CI: the six Meridian jobs pass. BHW Connect is red at the boundary until jongsky25's label, then skips its build, since `apps/bhw-connect` is unchanged.
+- The part I most expect to be wrong: GitHub may refuse or warn on a CODEOWNERS whose only rule is `*`.
+
+## HELD — `M203`, P2's two BHW prerequisites: the migration history takes a duplicate version, and the admin sign-in reaches Supabase until P3 (`bhw-migrate-duplicate-versions`, `bhw-admin-signin-csp`, `D195` A) (m203-bhw-p2-prereqs)
+
+**Built. PR #396 is open, its six Meridian checks green, and BHW Connect red only at the boundary step, waiting on jongsky25's label.** The label was asked for on the PR on 2026-11-02, with the user's OK on the wording. It merges at its own merge point right after `M202`, on green (`D197`).
+- Both remedies were measured red, then green.
+- New tests in `db/db-tools.test.ts` and `lib/csp.test.ts` fail on the old code and pass on the fix.
+- `proxy.ts` joined the file list: the call site passes `NEXT_PUBLIC_SUPABASE_URL`.
+
+The claim as taken follows.
 
 Taken 2026-11-02. Branch `m203-bhw-p2-prereqs`, cut from origin/main at `1b5e6682`, PR into main. `M202` is built and held below.
 

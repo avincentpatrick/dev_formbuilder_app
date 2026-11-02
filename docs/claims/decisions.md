@@ -24,10 +24,49 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D197`, the last filed, was asked and answered on 2026-11-02 once `M203`'s pull request was open, and recorded the same day. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D199`, the last filed, was asked and answered on 2026-11-02 with `D198`, once `M204` was claimed, and recorded the same day. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D198 — jongsky25 has not started on BHW Connect, and the user wants the whole move onto the box finished before handing it to him. Meanwhile every BHW pull request needs his `boundary-approved` label. How is that handled? **A — one label, then BHW is avincentpatrick's until the handover.**
+
+**Asked and answered 2026-11-02 (user decision, in chat), once `M202` and `M203` were open; recorded with `M204`'s claim.** The user said jongsky25 starts only when told, once BHW's database is on the box, and asked: "can we finish everything so we won't have to config it with jong and me … when we turn it over to jong, let's make sure that everything is in his hands." The move still needs about six pull requests that touch his paths or the shared ones: #395, #396, P2, P3, P1's deploy wiring and P4.
+- **A — one label, BHW is avincentpatrick's until the handover (recommended, chosen).**
+  - jongsky25 labels once, on one pull request that sets his lines in `.github/CODEOWNERS` aside and says so in the working agreement.
+  - Every later pull request of the move needs nobody.
+  - The handover's pull request puts his lines back.
+  - That pull request rides merge point 10.
+- **B — jongsky25 labels each pull request**: about six times over the move, one click each.
+- **C — hold every BHW pull request until he starts**, P2 included, so BHW stays on his Supabase until then.
+
+**What the answer files, in `docs/adr/0024-second-application-under-one-host.md`:**
+- `bhw-ownership-until-handover`, claimed as `M204`.
+- `bhw-handover`, which puts the ownership back once the move and `D199`'s settings are done.
+
+**Found while answering, 2026-11-02:**
+- This session's Supabase and Vercel connectors are signed in to jongsky25's organisation and team. So P2's connection string and legacy JWT secret (`D195`) can come from the user's own dashboard, if the user's role shows them, with no message to him.
+- His web app never uses the database password; only his offline `ingestion/` scripts do. A reset to build the connection string is therefore safe while he has not started.
+- Vercel refused this session the project's variables (403), so its pause (`D184`) may still need his click.
+
+### D199 — At the handover, what does "everything in jongsky25's hands" cover? **A — his merges deploy themselves, and his app's settings are GitHub repository secrets that the deploy writes onto the box, so he changes them himself.**
+
+**Asked and answered 2026-11-02 (user decision, in chat), with `D198`.**
+- **A — merges deploy; settings via GitHub (recommended, chosen).**
+  - A merge builds, migrates and goes live with no hand step (`bhw-p1-box`'s deploy wiring).
+  - BHW's own settings (his third-party API keys, `CRON_SECRET`, the usage-log salt) are repository secrets that `deploy.yml` writes into `C:\meridian\bhw\.env`.
+  - A handover page says what is his and where it lives.
+- **B — merges deploy; settings through avincentpatrick**, who edits the box's file when asked. This is the working agreement's section 6 today.
+- **C — A, plus his own account on the box** for BHW's service and logs. The agency's IT would have to allow it.
+
+**Premise checked before recording:** on a personal-account repository, a collaborator may create repository secrets, while environment secrets are the owner's alone (GitHub's "Using secrets in GitHub Actions", read 2026-11-02). So the settings are repository secrets, not an environment's.
+- It is trust-based, as `D177`'s label is. A collaborator who can set BHW's secrets can overwrite Meridian's too, and a workflow change can read any secret.
+- After the handover `.github/` is shared again, so such a workflow change needs both owners.
+
+**What the answer files:**
+- `bhw-settings-from-github`, blocked by `bhw-p1-box`.
+- The handover page, in `bhw-handover`.
+- The working agreement's section 6 changes at the handover.
+
 ### D197 — `M203` (PR #396, `bhw-migrate-duplicate-versions` + `bhw-admin-signin-csp`) changes only files under `apps/bhw-connect/`. How does it merge? **A — at its own merge point, right after `M202`, as soon as every required check is green and jongsky25 has labelled it.**
 
 **Asked and answered 2026-11-02 (user decision, in chat), once #396 was open; recorded the same day.** `D196` answered for `M202` only and said a later BHW-only pull request asks again. This is that question.

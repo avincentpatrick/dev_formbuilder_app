@@ -16,7 +16,24 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M201`, `follow-redirects` to 1.16.2, clearing GHSA-mrwp-f3q8-3g9p and the npm audit the trunk now fails (m201-follow-redirects)
+## Status: NO ACTIVE CLAIM — merge point 9 (`D188`, `D192`, `D193`; below) released five increments, all merged and live on staging: `M197` (`symfony/mime`), `M201` (`follow-redirects`), `M195` (the gate baselines per job), `M194` (BHW Connect's advisories and drill-downs) and `M196` (the builder's version token). BHW Connect has been public at `/bhw-connect` since 2026-11-01. `M198`, `M199` and `M200` stay held for merge point 10. The close-out runs on branch `mp9-closeout`, and it also moves the BHW markers in `docs/adr/0024-second-application-under-one-host.md`, which is outside the close-out paths. This line names that branch on the trunk before that push. The next claim is the head of the line's during-testing tier.
+
+## RELEASED — `M201`, `follow-redirects` to 1.16.2, clearing GHSA-mrwp-f3q8-3g9p and the npm audit the trunk now fails (merged as PR #394, `ad481038`, second at merge point 9, with no rebase; 7/7 green with real step counts on its run at `6141adfc` — Static analysis 33 · BHW Connect 19 (the unchanged branch) · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `ad481038` the same, with BHW Connect at 20)
+
+**RELEASED SECOND AT MERGE POINT 9 (`D192`'s forced slot, right after `M197`), 2026-10-31, by the session that built it.**
+- **No rebase:** cut from the trunk at `7147719c`, and the trunk gained nothing before it merged at 12:33 UTC.
+- **The trunk's run 41201654373 on `ad481038` was 7/7**, the first green trunk run of merge point 9.
+- **Deploy 41204286820 took a maintenance window**, because the box moved from `27440f21` across `M197`'s `composer.lock` as well.
+  - Backup `deploy-20261031-131358.dump`, 1,159,813 bytes.
+  - 70 tables and 53,956 rows counted. Nothing to migrate, and every table held at least as many rows after.
+  - **`M197` went live with this deploy**: its own trunk run was red and its deploy was skipped.
+- **How the prediction fared.**
+  - **Held:** one entry moved in the lock, and CI was 7/7. The host's npm churned 85 lines on `npm update`, so the entry was set by hand
+    from the registry's 1.16.2 tarball and integrity, as the remedy verdict allowed.
+  - **The named risk did not happen:** no third advisory was published before the run.
+  - **Filed, not fixed:** the `vite` moderate under `packages/design-system` (during-testing).
+
+**The claim as taken follows.**
 
 Taken 2026-10-31, during merge point 9. Branch `m201-follow-redirects`, cut from origin/main at `7147719c` (`M197`, merged first at
 merge point 9), PR into main. ⛔ **It merges FIRST of what remains of merge point 9, ahead of `#387`, `#388` and `#389`**: every pull
@@ -347,7 +364,18 @@ Prediction:
 - **Most likely wrong:** the E2E case's anti-vacuity at Large on desktop needs the sidebar expanded after `openBuilder` (the scratch run
   measured a 1200 box). A seeded collapsed-sidebar preference would make it a 1376 box — still wide, but not the arithmetic stated here.
 
-## HELD — `M197`, `symfony/mime` to v8.1.10, clearing CVE-2026-45070 and the composer audit every CI run now fails (m197-symfony-mime-cve)
+## RELEASED — `M197`, `symfony/mime` to v8.1.10, clearing CVE-2026-45070 and the composer audit every CI run now fails (merged as PR #390, `7147719c`, first at merge point 9, with no rebase; 7/7 green with real step counts on its run at `82851599` — Static analysis 33 · BHW Connect 19 (the unchanged branch) · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `7147719c` red at Static analysis' npm audit judge, on an advisory published after that run, with the other six green)
+
+**RELEASED FIRST AT MERGE POINT 9 (`D192`), 2026-10-31, by the `M201` session.**
+- **Merged at 11:26 UTC**, a minute after the user's census before (11:25:26 UTC).
+- ⛔ **The trunk's run 41196861583 went red at step 27 of 33**, the npm audit judge: `follow-redirects` 1.16.1, GHSA-mrwp-f3q8-3g9p
+  (high), published after `#390`'s own run passed that step. The other six jobs were green, and the composer audit passed.
+  - Deploy 41199015085 was skipped, so nothing went live. `M201` was claimed and built to clear it, and **`M197` went live with `#394`'s
+    deploy 41204286820** (in `M201`'s release).
+- **How the prediction fared, measured on the trunk:** "no second advisory" held for Composer and failed for npm. **Not named: a held
+  pull request's green run ages.** Two days held was enough for the other package manager's audit to turn the trunk red.
+
+**The claim as taken follows.**
 
 **BUILT — PR #390, CI 7/7 green with real step counts, NOT MERGED.** Run 40807295694 at `82851599`: Static analysis 33 · BHW Connect 19 ·
 E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11.
@@ -398,7 +426,21 @@ Prediction:
 - CI is 7/7. Pest, E2E and Contract are unmoved by a patch release of a MIME library.
 - **Most likely wrong:** a second advisory published before the run.
 
-## HELD — `M196`, a builder edit must carry its `version` token, and the token is checked under the row lock (`R-036f3226`, `D189` A) (m196-builder-token-under-lock)
+## RELEASED — `M196`, a builder edit must carry its `version` token, and the token is checked under the row lock (`R-036f3226`, `D189` A) (merged as PR #389, `d1bd8181`, last at merge point 9, after merging the trunk into its branch at `25d5ed9c` and `a2cecb6f`; 7/7 green with real step counts on its run at `a2cecb6f` — Static analysis 33 · BHW Connect 19 (the unchanged branch) · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `d1bd8181` the same, with BHW Connect at 20)
+
+**RELEASED LAST AT MERGE POINT 9 (`D192`, `D193`), 2026-11-01, by the `M201` session.**
+- **The user's census:** before (2026-10-31 11:25:26 UTC) = after (2026-11-02 01:54:48 UTC), exactly: tenants 1 · users 6 · forms 11 ·
+  form versions 27 · submissions 22 · attachments 62 · feedback reports 31 · notifications 74; statuses confirmed, resolved.
+- **The branch merged the trunk twice:** at `25d5ed9c`, after `M197`, `M201` and `M195`, and at `a2cecb6f`, after `M194`. It merged
+  2026-11-01 at 07:14 UTC.
+- **Deploy 41286462993 took a maintenance window**, because PHP changed.
+  - Backup `deploy-20261101-075508.dump`, 1,158,723 bytes.
+  - 70 tables and 53,951 rows counted. Nothing to migrate, and every table held at least as many rows after.
+  - That is five rows fewer in total than `#394`'s deploy counted a day earlier. The deploy guards only across its own migration, and
+    the user's census of the eight data tables is unchanged.
+  - `/up` answered 200, and so did `/bhw-connect`: Meridian's window left BHW Connect's service and route alone.
+
+**The claim as taken follows.**
 
 **BUILT — PR #389, NOT MERGED.** It rides the merge point `#387` rides, **second, after `M197` and `#388`**, with `#387` last (`D192`).
 - **Run 40790795523 at `61dc1d2d`:** six green with real step counts — E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · BHW
@@ -489,7 +531,21 @@ Prediction:
 - **Most likely wrong:** a feature test outside `tests/Feature/Forms` that PATCHes with no token, and a section test that relied on
   the missing lock.
 
-## HELD — `M195`, the gate baselines read each metric from its own job's lines, and every counted gate is recorded (`R-b31f421e`, `R-4130e1fa`) (m195-gate-baselines-per-job)
+## RELEASED — `M195`, the gate baselines read each metric from its own job's lines, and every counted gate is recorded (`R-b31f421e`, `R-4130e1fa`) (merged as PR #388, `bc7fa0b7`, third at merge point 9, after merging the trunk into its branch at `757fae38` and `bf126cf1`; 7/7 green with real step counts on its run at `bf126cf1` — Static analysis 33 · BHW Connect 19 (the unchanged branch) · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `bc7fa0b7` the same, with BHW Connect at 20)
+
+**RELEASED THIRD AT MERGE POINT 9 (`D193`'s fallback), 2026-10-31, by the `M201` session.**
+- **Third, not fourth:** jongsky25's label was not yet on `#387` when `#394` was live, so `D193`'s fallback sent this next.
+- **The branch merged the trunk twice**, at `757fae38` after `M197` and at `bf126cf1` after `M201`. Both times the backlog conflicted,
+  and both sides were kept, the trunk's first. The generated line was regenerated.
+- **Deploy 41207493356 took no window**, because the nine files it changed are all paths the site does not run.
+- **The baselines are regenerated at this close-out, by this increment's scraper**, from the trunk's run 41283987596 on `d1bd8181`. It is
+  the first regeneration since run 40449344963.
+  - Vitest reads 283 files, Meridian's; the whole-log scrape had read BHW's 85.
+  - Eight gates were never recorded before and now are, from `mail-attribute-lint` to `boundary-check-controls`.
+  - ➕ **Not named: a second figure the whole-log scrape had wrong.** The baseline said E2E skipped 1; the E2E job's own lines say 82,
+    in run 40449344963 and in this one alike.
+
+**The claim as taken follows.**
 
 **BUILT — PR #388, CI 7/7 green with real step counts, NOT MERGED.** Run 40721232507 at `6810b8bb`: Static analysis 33 · BHW Connect 19 ·
 E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11.
@@ -588,7 +644,50 @@ Prediction:
 - CI is 7/7, and the BHW job skips itself and passes.
 - **Most likely wrong:** the fixtures' tab bytes surviving the tool layer, and Storybook's two-line pattern inside a single job's block.
 
-## HELD — `M194`, BHW Connect's production advisories cleared, and its audit blocking again (`bhw-dependency-advisories`) (m194-bhw-advisories)
+## RELEASED — `M194`, BHW Connect's production advisories cleared, and its audit blocking again (`bhw-dependency-advisories`, extended to `bhw-geo-drilldown-isr`) (merged as PR #387, `df66f1f8`, fourth at merge point 9, after merging the trunk into its branch at `3a023030`, `70da54a9` and `62134620`; 7/7 green with real step counts on its run at `62134620`, second attempt — Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `df66f1f8` the same)
+
+**RELEASED FOURTH AT MERGE POINT 9 (`D193`), 2026-10-31, by the `M201` session. BHW Connect public on staging since 2026-11-01.**
+- **jongsky25 applied `boundary-approved` at 13:46:54 UTC.**
+  - The BHW job at `62134620` had gone red at the boundary before the label. Its second attempt passed 20 of 20.
+  - That was the first run of BHW's audit, lint, types, Vitest and build on this branch.
+  - It also closes `M192`'s last owed observation in both halves: the boundary red on a real cross-side pull request without the label,
+    and green with it.
+- **The branch merged the trunk three times**, after `M197`, `M201` and `M195`, keeping both sides of the line and the backlog each time.
+  `D193` was recorded at the first.
+- **Deploy 41210444732 took no window**, because the 21 files it changed are all paths the site does not run. It did not serve BHW:
+  `deploy.yml` does not run `ops/deploy-bhw.ps1` yet (`bhw-p1-box`).
+- **P1's hand steps at the box, the user running one guarded block at a time (2026-10-31 to 2026-11-01):**
+  - **Folders and secrets:** `C:\meridian\bhw` with NETWORK SERVICE given Modify. Its `.env` was written by the operator: 11 names,
+    with `NEXT_PUBLIC_SITE_URL` set to the staging URL. No value is in git or chat.
+  - **The service:** NSSM `bhw-connect`, NetworkService, delayed auto start, logging to `logs\bhw-connect.log`, running `ops/start.ps1`
+    on 127.0.0.1:3100.
+  - ⛔ **`ops/deploy-bhw.ps1 -AppPath C:\meridian\test-app` built release `df66f1f8`, then failed.**
+    - `New-Release` returns npm's output along with the path, so `current` pointed at nothing.
+    - The service paused: `server.js is missing`.
+    - Recovered by removing the junction and running again, because an assembled release returns cleanly. Live at 11:12:31 box time
+      (03:12 UTC), with `deployed-sha` written.
+    - Filed as `bhw-deploy-release-leak` (ready, during-testing). The migration step's native calls print the same way, but nothing
+      captures that function's output, so only `New-Release` is affected.
+  - **Apache:**
+    - `proxy_http_module` loaded in `httpd.conf`.
+    - `meridian.conf`'s virtual host gained `ProxyPass` and `ProxyPassReverse` from `/bhw-connect` to `127.0.0.1:3100`, after the HSTS
+      line. `ProxyPreserveHost On` and `X-Forwarded-Proto https` sit in `<Location "/bhw-connect">`.
+    - Both files were backed up first, and `httpd -t` said Syntax OK before the restart.
+    - `/up`, `/login` and `/bhw-connect` answered 200.
+- **Checked from outside on 2026-11-01, with a headless browser against the public URL:**
+  - **Twelve pages answered 200**, with no CSP refusal, page error or failed request: six top pages, two sub-pages and four
+    drill-downs.
+  - **The `/explore` map** drew its MapLibre canvas, and its hover tooltip answered.
+  - **All eleven exports answered 200** with the right magic bytes (CSV, XLSX, PPTX, PNG).
+  - **Headers:** `_next/static` 200, `X-Robots-Tag: noindex`, and Next's own CSP.
+  - **No writes:** the probe blocked `/api/log`, so nothing was written to jongsky25's Supabase.
+  - **The drill-downs took 19 to 32 s on first view and under 1 s warm.** `bhw-drilldown-cold-render` is now ready.
+- **How the prediction fared.**
+  - **The claim called the maps and the exports with real data most likely to be wrong, and half of that was:** every map was blank on
+    `8c28020b` (fixed in `ee4978a9`), and the exports were not wrong.
+  - **Not named:** the drill-downs' 500, filed and folded in; and the deploy script's return value, which only the box found.
+
+**The claim as taken follows.**
 
 **BUILT — PR #387, not merged.** It is held for the merge point the user names, **last in it, after `M195`** (`D188`).
 - **Run 40705714395 at `8c28020b`:** Meridian's six are green with real step counts — Static analysis 33 · E2E 20 · Contract 16 ·

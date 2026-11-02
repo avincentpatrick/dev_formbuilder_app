@@ -11,7 +11,7 @@ import {
   isMarkedDestructive,
   lintMigrations,
 } from "./lint-migrations.mjs";
-import { census, migrate, pendingMigrations, readMigrations } from "./migrate.mjs";
+import { census, DEFAULT_DIR, migrate, pendingMigrations, readMigrations } from "./migrate.mjs";
 import { mintRoleToken, signJwt } from "./mint-jwt.mjs";
 import {
   dependencyOrder,
@@ -150,6 +150,26 @@ describe("migrate (no database)", () => {
       pendingMigrations(files, new Set(["1", "3"])).map((m: { version: string }) => m.version),
     ).toEqual(["2"]);
   });
+
+  it("refuses two files sharing a version above the floor, and lets the history below it repeat", () => {
+    const dir = tempDir({ "1_a.sql": "SELECT 1;", "1_b.sql": "SELECT 1;" });
+    try {
+      expect(readMigrations(dir).map((m: { file: string }) => m.file)).toEqual([
+        "1_a.sql",
+        "1_b.sql",
+      ]);
+      writeFileSync(join(dir, "29990101000001_c.sql"), "SELECT 1;");
+      writeFileSync(join(dir, "29990101000001_d.sql"), "SELECT 1;");
+      expect(() => readMigrations(dir)).toThrow(/share version 29990101000001/);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  it("reads the migrations committed today, the two history pairs included", () => {
+    const versions = readMigrations(DEFAULT_DIR).map((m: { version: string }) => m.version);
+    expect(versions.length - new Set(versions).size).toBe(2);
+  });
 });
 
 describe("make-seed (no database)", () => {
@@ -238,9 +258,9 @@ describe.skipIf(!DATABASE)("against a real PostgreSQL", () => {
   });
 
   afterAll(async () => {
-    await client.query(`DROP TABLE IF EXISTS ${prefix}_a, ${prefix}_b`);
+    await client.query(`DROP TABLE IF EXISTS ${prefix}_a, ${prefix}_b, ${prefix}_d`);
     await client.query(
-      "DELETE FROM supabase_migrations.schema_migrations WHERE version LIKE '2999%'",
+      "DELETE FROM supabase_migrations.schema_migrations WHERE version LIKE '2999%' OR version LIKE '1999%'",
     );
     await client.query(`DROP SCHEMA IF EXISTS ${prefix}_src CASCADE`);
     await client.query(`DROP SCHEMA IF EXISTS ${prefix}_dst CASCADE`);
@@ -280,6 +300,47 @@ describe.skipIf(!DATABASE)("against a real PostgreSQL", () => {
       const { rows } = await client.query("SELECT to_regclass($1) AS t", [`${prefix}_x`]);
       expect(rows[0].t).toBeNull();
       expect((await migrate(client, { dir, dryRun: true })).pending).toHaveLength(1);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  it("baselines a version two history files share, and finishes a baseline left half-done", async () => {
+    const dir = tempDir({
+      "19990101000001_a.sql": "SELECT 1;",
+      "19990101000001_b.sql": "SELECT 1;",
+      "19990101000002_c.sql": "SELECT 1;",
+    });
+    try {
+      const first = await migrate(client, { dir, baseline: "19990101000002" });
+      expect(first.baselined).toHaveLength(3);
+      expect((await migrate(client, { dir, dryRun: true })).pending).toEqual([]);
+
+      await client.query(
+        "DELETE FROM supabase_migrations.schema_migrations WHERE version = '19990101000002'",
+      );
+      const resumed = await migrate(client, { dir, baseline: "19990101000002" });
+      expect(resumed.baselined.map((m: { file: string }) => m.file)).toEqual([
+        "19990101000002_c.sql",
+      ]);
+      const { rows } = await client.query(
+        "SELECT count(*)::int AS n FROM supabase_migrations.schema_migrations WHERE version LIKE '1999%'",
+      );
+      expect(rows[0].n).toBe(2);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  it("applies both history files that share a version, and records the version once", async () => {
+    const dir = tempDir({
+      "19990101000005_a.sql": `CREATE TABLE ${prefix}_d (id int PRIMARY KEY);`,
+      "19990101000005_b.sql": `INSERT INTO ${prefix}_d VALUES (1);`,
+    });
+    try {
+      expect((await migrate(client, { dir })).applied).toHaveLength(2);
+      expect(((await census(client)) as Record<string, number>)[`${prefix}_d`]).toBe(1);
+      expect((await migrate(client, { dir, dryRun: true })).pending).toEqual([]);
     } finally {
       rmSync(dir, { recursive: true });
     }

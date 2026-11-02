@@ -5,6 +5,19 @@ Meridian jargon. Why it is set up this way is `docs/adr/0024-second-application-
 decisions behind it are `D172`–`D185` in `docs/claims/decisions.md`. Changing this page needs both of you
 (it is shared in `.github/CODEOWNERS`).
 
+## Until the handover (D198, 2026-11-02)
+
+jongsky25 has not started yet. BHW Connect is being moved onto the testing server first: its code, its
+database and its admin sign-in. It is handed over once it runs there on its own. Until then:
+
+- **Every file in this repository is avincentpatrick's**, `apps/bhw-connect/` included, and no pull
+  request needs your label. `.github/CODEOWNERS` says so; your lines are kept in it, set aside.
+- **At the handover:**
+  - your lines come back exactly as they were, and the sections below apply as written;
+  - section 6 is rewritten so that you change BHW's settings yourself, through GitHub (D199);
+  - a handover page says what is yours and where everything lives;
+  - avincentpatrick tells you when to start.
+
 ## 1. Who owns what
 
 - **Everything under `apps/bhw-connect/` is BHW Connect's — jongsky25's.**

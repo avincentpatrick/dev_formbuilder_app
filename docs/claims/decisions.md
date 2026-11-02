@@ -24,10 +24,31 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D193`, the last filed, was asked and answered on 2026-10-31 as merge point 9 began, and recorded with `M194`'s refresh onto the trunk. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D194`, the last filed, was asked and answered on 2026-11-02 after merge point 9's close-out, and recorded in the same session. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D194 — BHW Connect's code runs on the testing box, but its data and its admin sign-in still come from jongsky25's Supabase. What comes first: the move onto the box, or P1's automatic deploys and scheduled jobs? **A — standalone first: the deploy-script fix, then the database (P2), then the sign-in (P3); P1's remainder after.**
+
+**Asked and answered 2026-11-02 (user decision, in chat), after merge point 9's close-out.** The user: *"i thoug we are clear that everything must run standalone in the server? sourcecode, database etc."* `D173` (the database on the box) and `D178` (Meridian's sign-in) stand; this decides only the order. When the session reported BHW public on 2026-11-01, it did not say that the data and the sign-in still lived on Supabase. It should have.
+
+- **A — standalone first (recommended, chosen).**
+  1. `bhw-deploy-release-leak`: P2's migrations run through `ops/deploy-bhw.ps1`, and its first fresh build on the box left `current` pointing at nothing.
+  2. `bhw-p2-db`: by hand at the box, one block at a time, as P1 was.
+  3. `bhw-p3-identity`.
+  4. Then Supabase is paused for 30 days and deleted (`D183`), and P1's remainder follows (automatic deploys, the scheduled jobs, the runner's service grant).
+- **B — the plan's order:** P1's remainder, then P2, then P3. BHW reads Supabase for longer, and every BHW merge stays a hand deploy meanwhile.
+
+**Found while answering:** the plan paused Supabase at P2's end. BHW's admin sign-in (`lib/db/require-admin.ts`, `app/admin/login/page.tsx`) uses Supabase's auth service until P3, so that pause would have locked BHW's admins out between the two. Supabase is now paused only at P3's end.
+
+**What the answer files, in the same push:** no new row. Four of ADR-0024's markers change:
+- `bhw-p2-db` is blocked on `bhw-deploy-release-leak` instead of `bhw-p1-box`. It names the copy from PostgreSQL 17 into 15, using a connection string jongsky25 sends privately, and keeps Supabase up.
+- `bhw-p3-identity` carries the Supabase pause.
+- `bhw-p1-box` is blocked on `bhw-p3-identity`.
+- `bhw-drilldown-cold-render` is blocked on `bhw-p2-db`. Its 20–40 s first view was measured against Supabase across the internet, so it is measured again with the database on the box before any warm-up is built.
+
+`bhw-deploy-release-leak` now names P2's first migration as its deadline.
+
 ### D193 — BHW Connect online is now the main priority. Where does `#387` go in merge point 9? **A — second, right after `M197`: `M197` → `#387` → `#388` → `#389`.**
 
 **Asked and answered 2026-10-31 (user decision, in chat), as merge point 9 began; recorded with `M194`'s refresh onto the trunk.** The user, the day before: *"making this online is our main priority now."* This changes `D188` and `D192`'s order; their reasoning, that `#387` must not hold anything else up, still stands.

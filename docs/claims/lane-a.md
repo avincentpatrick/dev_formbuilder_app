@@ -16,7 +16,51 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — merge point 9 (`D188`, `D192`, `D193`; below) released five increments, all merged and live on staging: `M197` (`symfony/mime`), `M201` (`follow-redirects`), `M195` (the gate baselines per job), `M194` (BHW Connect's advisories and drill-downs) and `M196` (the builder's version token). BHW Connect has been public at `/bhw-connect` since 2026-11-01. `M198`, `M199` and `M200` stay held for merge point 10. The close-out runs on branch `mp9-closeout`, and it also moves the BHW markers in `docs/adr/0024-second-application-under-one-host.md`, which is outside the close-out paths. This line names that branch on the trunk before that push. On 2026-11-02 the same branch also recorded `D194` (BHW standalone first), which retargets four BHW markers in that ADR file. The next claim is `bhw-deploy-release-leak`, then `bhw-p2-db`, as `D194` orders them.
+## Status: ACTIVE CLAIM — `M202`, `bhw-deploy-release-leak`: `New-Release` returns only the release path (m202-bhw-release-leak)
+
+Taken 2026-11-02. Branch `m202-bhw-release-leak`, cut from origin/main at `d949da97`, PR into main. It merges at its own merge point, on green and with jongsky25's `boundary-approved`, per `D196`.
+Row: `bhw-deploy-release-leak` — "ops/deploy-bhw.ps1's New-Release returns the npm ci and npm run build output along with the release path … send the two npm calls to Out-Host, keeping Invoke-Native's output for Get-Census".
+
+This claim push also carries what came out of planning P2: `D195` and `D196`, answered, and two new rows in ADR-0024, `bhw-migrate-duplicate-versions` and `bhw-admin-signin-csp`. The ADR and the regenerated line make this a docs-only push.
+
+### Evidence verified
+- `apps/bhw-connect/ops/deploy-bhw.ps1`, `New-Release`: **held.**
+  - The two calls `Invoke-Native npm.cmd @('ci', '--no-audit', '--no-fund')` and `Invoke-Native npm.cmd @('run', 'build')` stand uncaptured.
+  - `Invoke-Native` runs `& $File @Arguments` with its output passing through.
+  - The caller is `$release = New-Release $plan.Sha`, and `Switch-Release([string]$Release)` is what turns the array into one string.
+- The "already assembled" branch returns `$release` before any npm call: **held.** It matches the 2026-11-01 recovery, recorded in `M194`'s RELEASED claim.
+
+### Premise verified
+- **Ownership.** `/apps/bhw-connect/ops/` is co-owned in `.github/CODEOWNERS` (jongsky25 and avincentpatrick). This lane may edit it, but the pull request needs jongsky25's label.
+  - `scripts/boundary-check.php` reads the actor of the latest `labeled` event, not who is a co-owner.
+  - A label added before a later push still counts. The working agreement asks him to re-add it after a push, and this claim does the same.
+- **No second copy.** `deploy.ps1` has its own `Invoke-Native`, but it calls npm at top level and never inside a function whose return value is captured.
+- **No other leak in the script.**
+  - `mklink` and the three robocopy calls go to `Out-Null`.
+  - `Invoke-Migrations`, `Switch-Release` and `Set-CurrentRelease` are called as statements.
+  - `Get-Census` captures `Invoke-Native`'s output on purpose, and needs it.
+- **No gate reads the script, and none may.** Meridian's gates never read `apps/`, and BHW's tests belong to jongsky25. So the proof is a real build.
+- **Merging takes no Meridian window.** `deploy.ps1` lists `apps/` as site-safe, so a merge only fast-forwards the box.
+- **The next run does a fresh build.** `deploy-bhw.ps1`'s not-served list holds `docs/` and `ingestion/`, not `ops/`. So the user's next hand run at the box builds afresh, which is the very path this fixes.
+
+### Remedy verdict
+**Works, measured before any edit** (Windows PowerShell 5.1.26100, in memory, with no file written):
+- The function's shape as it stands returns `Object[]` of 3 items. Joined, it reads `"npm ci log line" "npm build log line" C:\meridian\bhw\releases\abc`.
+- With `| Out-Host` on both calls, it returns one `String`, the path.
+- A native call exiting 3 still throws through the `| Out-Host` pipe.
+- `Get-Census`'s captured `Invoke-Native` output still parses with `ConvertFrom-Json`.
+
+Files: `apps/bhw-connect/ops/deploy-bhw.ps1`. At close-out: `docs/adr/0024-second-application-under-one-host.md` (the marker done), `docs/pipeline.md`, `PROGRESS.md` (own block), `docs/gate-baselines.md`.
+Shared artefacts taken: `apps/bhw-connect/ops/deploy-bhw.ps1` (shared with BHW Connect: `boundary-approved` from jongsky25). This claim push also takes `docs/adr/0024-second-application-under-one-host.md`, `docs/claims/decisions.md` and `docs/pipeline.md`.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace (`M202`; decisions `D195`, `D196`).
+Prediction:
+- The diff is two calls gaining `| Out-Host`, plus one comment line.
+- `ParseFile` reports 0 errors.
+- On the host, `-BuildOnly` against a scratch root prints the npm log after `built only:` with the parent's file, and one path with the fixed one.
+- CI is 7/7, and BHW Connect runs every step because `apps/bhw-connect` changed.
+- PHPStan cannot move: no `app/`, `database/` or `routes/` change.
+- The part I most expect to be wrong: the host build. It needs `NEXT_PUBLIC_*` values in the scratch `.env`, and a build without a data source may still refuse something at build time.
 
 ## RELEASED — `M201`, `follow-redirects` to 1.16.2, clearing GHSA-mrwp-f3q8-3g9p and the npm audit the trunk now fails (merged as PR #394, `ad481038`, second at merge point 9, with no rebase; 7/7 green with real step counts on its run at `6141adfc` — Static analysis 33 · BHW Connect 19 (the unchanged branch) · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `ad481038` the same, with BHW Connect at 20)
 

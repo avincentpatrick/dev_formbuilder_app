@@ -24,10 +24,46 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D201`, the last filed, was asked and answered on 2026-11-03 once `M206`'s box work was done, and recorded the same day. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D202`–`D205`, the last filed, were asked and answered on 2026-11-03 while `bhw-p3-identity` was planned, and recorded the same day. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D202 — `bhw-p3-identity` changes files under `apps/bhw-connect/`, which `.github/CODEOWNERS` on `main` still gives to jongsky25 until `#397` (`M204`) merges, so its pull request would need his label. When does `#397` merge? **A — now, at its own merge point, once a trunk merge has a fresh green run.**
+
+**Asked and answered 2026-11-03 (user decision, in chat), while `bhw-p3-identity` was planned.** `D198` had `#397` ride merge point 10. The user's goal of the same day finishes P3, `bhw-deploy-db-tools`, P1's remainder, `bhw-settings-from-github` and P4 before merge point 10, and each would have needed his label.
+- **A — now, on its own (recommended, chosen).**
+  - `#397` changes `.github/CODEOWNERS`, `docs/working-agreement.md` and `scripts/boundary-check-controls.php`, all site-safe for `deploy.ps1`, so there is no maintenance window.
+  - It already carries jongsky25's label.
+  - This is the same exception to "never a lone small PR" that `D196`, `D197`, `D200` and `D201` made.
+  - Merge point 10 keeps `#391`–`#393`.
+- **B — keep it in merge point 10**, and ask jongsky25 to label each pull request of the move that touches his paths or the shared ones.
+
+**What the answer files:** nothing new. `bhw-ownership-until-handover` closes when `#397` merges.
+
+### D203 — `bhw-p3-identity` changes Meridian itself (a new `GET /api/v1/auth/whoami`, the API-key mint, the top bar and the footer, `VERSION`), so its deploy opens a Meridian maintenance window under the testers. How does it merge? **A — at its own merge point, with the user's staging census before and after.**
+
+**Asked and answered 2026-11-03 (user decision, in chat), while `bhw-p3-identity` was planned.**
+- **A — its own merge point (recommended, chosen).** The census, the merge on every required check green, the deploy finished and the site answering, the census again. The box steps follow: the admin row, the key rotation and rebuild, and the Supabase pause.
+- **B — inside merge point 10**, with `#391`–`#393` and one census pair. Merge point 10 would move up to P3, ahead of the rest of the move.
+
+**What the answer files:** nothing new.
+
+### D204 — After `bhw-p3-identity`, BHW Connect decides its admins by Meridian account. Its only admin today is jongsky25's Supabase login, and he has no Meridian account on staging. Who is BHW's admin when P3 goes live? **A — the user's own Meridian account now; jongsky25's at the handover.**
+
+**Asked and answered 2026-11-03 (user decision, in chat), while `bhw-p3-identity` was planned.** Measured the same day: `admin_users` has one row (role `admin`, keyed by the Supabase user's uuid), and Meridian's user ids are uuids too, so a Meridian account takes a row with no schema change.
+- **A — the user now, jongsky25 at the handover (recommended, chosen).** Nothing is configured with him before the handover (`D198`). His old row stays, inert, because staging data is never removed.
+- **B — both now.** He would be invited to the staging site, and so emailed, before the handover.
+
+**What the answer files:** `bhw-handover` gains his Meridian account on staging and his `admin_users` row.
+
+### D205 — One address is one origin, so a script on a BHW page could use the visitor's Meridian session to mint a Meridian API key (`docs/adr/0024-second-application-under-one-host.md` §D2). `bhw-p3-identity` puts a password re-check on the mint (`D178`). Which kind? **A — the account's password in every mint request.**
+
+**Asked and answered 2026-11-03 (user decision, in chat), while `bhw-p3-identity` was planned.** Measured the same day: the mint is `POST /api/v1/auth/tokens`, backend-only, with no page that calls it. Meridian's `step-up` gate answers a JSON request with a bare 423 outside the API's error envelope, and lets every request through for 15 minutes after any password confirmation.
+- **A — the password every time (recommended, chosen).** The request carries `password`, checked with the existing `current_password:web` rule, so a script cannot mint a key without it. An account that signs in only with Google or SSO holds a random password and cannot mint a key until it sets one. Nobody mints keys today, since no page does.
+- **B — the existing 15-minute `step-up` window.** It works for SSO accounts, but a script can mint within 15 minutes of any confirmation.
+
+**What the answer files:** `api-key-mint-sso-password` (before-launch), a way for a Google- or SSO-only account to mint a key.
+
 ### D201 — `M206` moved BHW Connect's database onto the box by hand and changed no repository code, so it has no pull request. `preflight` cross-checks the newest released increment against merged pull-request titles and fails every session until one titled `M206` or later merges. How does its close-out land? **A — as a docs-only pull request titled `M206`, merged at its own merge point as soon as every required check is green.**
 
 **Asked and answered 2026-11-03 (user decision, in chat), once the box blocks B3–B9 were done; recorded the same day.**

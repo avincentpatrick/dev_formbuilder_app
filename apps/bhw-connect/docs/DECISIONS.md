@@ -9684,7 +9684,7 @@ It supersedes Increment 2.5's auth choices; the two-layer gate and its fail-clos
   The id is what `/api/v1/auth/whoami` shows that person when signed in. The old row, keyed by the Supabase
   account, stays and matches nobody.
 - **`/admin/login` has no form any more.** It says to sign in on Meridian and come back through the BHW
-  Connect link in Meridian's top bar. Meridian's sign-in takes no return address, because one would be an open
+  Connect link in Meridian's account menu (or its footer). Meridian's sign-in takes no return address, because one would be an open
   redirect. Sign-out posts to Meridian's `/logout`. `proxy.ts` only checks that the cookie exists and makes no
   network call.
 - **Local development without Meridian:** `BHW_AUTH_MODE=stub` signs in a fixed admin

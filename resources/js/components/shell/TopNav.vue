@@ -132,14 +132,6 @@ const activeQuery = computed(() => {
         </div>
 
         <div class="topnav__right">
-            <!-- M207 (`D179`): BHW Connect, the second application on this address (ADR-0024). A plain <a>, never
-                 Inertia's Link: /bhw-connect is served by another server, so an Inertia visit would get a page
-                 that is not an Inertia response. The footer carries the same link, which is what keeps it
-                 reachable below 480px, where this one gives its width back to the bar. -->
-            <a class="topnav__app-link" href="/bhw-connect/">
-                <MdsIcon name="chart-bar" size="md" aria-hidden="true" />
-                <span class="topnav__app-link-label">BHW Connect</span>
-            </a>
             <ThemeQuickToggle />
             <FeedbackButton />
             <NotificationBell />
@@ -307,43 +299,6 @@ const activeQuery = computed(() => {
     min-width: 0;
 }
 
-/* The Feedback trigger's shape, so the two text-bearing controls in the bar read as one family. */
-.topnav__app-link {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--mds-space-2);
-    min-height: 40px;
-    padding: 0 var(--mds-space-3);
-    border-radius: var(--mds-radius-md);
-    color: var(--mds-color-text-secondary);
-    text-decoration: none;
-    white-space: nowrap;
-}
-
-.topnav__app-link:hover {
-    background-color: var(--mds-color-bg-sunken);
-}
-
-.topnav__app-link:focus-visible {
-    outline: 2px solid var(--mds-color-focus-ring);
-    outline-offset: 2px;
-}
-
-/* Visually hidden, not removed, in the tablet band: the icon alone stays a link with a real name. */
-@media (max-width: 1024px) {
-    .topnav__app-link-label {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0 0 0 0);
-        white-space: nowrap;
-        border: 0;
-    }
-}
-
 .topnav__hamburger {
     display: none;
     align-items: center;
@@ -386,12 +341,6 @@ const activeQuery = computed(() => {
 
     .topnav__search-compact {
         display: inline-flex;
-    }
-
-    /* The bar has ~31px of headroom here at the extra_large type scale (see `.topnav__left`), and the
-       footer under every page carries the same link. */
-    .topnav__app-link {
-        display: none;
     }
 
     /* Buys back the width the icon costs. At extra_large with OpenDyslexic's wider advances the display-face

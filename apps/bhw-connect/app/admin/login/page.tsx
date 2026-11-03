@@ -6,7 +6,7 @@ import { meridianUrl } from "@/lib/meridian-url";
  * BHW Connect has no password of its own any more: its admins sign in with their Meridian account
  * (Meridian's decision D178), on the site this app shares an address with. Meridian's sign-in takes no
  * return address — one would be an open redirect — so this page says how to come back instead: the
- * BHW Connect link in Meridian's top bar.
+ * BHW Connect link in Meridian's account menu, or at the foot of its pages.
  *
  * Anyone already signed in goes on to `/admin`, whose layout either lets them in or says they are not
  * an admin.
@@ -28,7 +28,7 @@ export default async function AdminLoginPage() {
 
       <p className="text-sm">
         BHW Connect&apos;s admins sign in with their account on this site. Sign in there, then come back
-        with the <strong>BHW Connect</strong> link at the top of the page.
+        with the <strong>BHW Connect</strong> link in the menu under your name, at the top right.
       </p>
 
       {signIn ? (

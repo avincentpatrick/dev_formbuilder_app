@@ -24,7 +24,10 @@ import { contentSecurityPolicy, createNonce } from "@/lib/csp";
  */
 export async function proxy(request: NextRequest) {
   const nonce = createNonce();
-  const csp = contentSecurityPolicy(nonce, { dev: process.env.NODE_ENV === "development" });
+  const csp = contentSecurityPolicy(nonce, {
+    dev: process.env.NODE_ENV === "development",
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  });
 
   // Built again whenever the Supabase client rewrites the request's cookies, so the page renders
   // with both the refreshed session and the nonce.

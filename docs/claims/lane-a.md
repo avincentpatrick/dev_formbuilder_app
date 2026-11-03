@@ -16,7 +16,24 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M205`, the feedback-pull thread test stops expiring: its fixture's comments fell out of the script's fortnight window on 2026-11-03, and every CI run is red at Pest (m205-feedback-pull-test-clock)
+## Status: NO ACTIVE CLAIM — three increments released on 2026-11-03, all merged and live on staging, each at its own merge point:
+- `M202`: the deploy-script leak (`D196`).
+- `M205`: the expired feedback-pull test, which had turned every CI run red (`D200`).
+- `M203`: P2's two BHW prerequisites (`D197`).
+
+BHW Connect was rebuilt on the box by hand from `9370e532` with no recovery, and its admin sign-in reaches Supabase. `M204` (PR #397) stays held for merge point 10, with `M198`, `M199` and `M200`. The close-out runs on branch `m205-closeout`, and it also moves the BHW markers in `docs/adr/0024-second-application-under-one-host.md`, which is outside the close-out paths. This line names that branch on the trunk before that push. The next claim is `bhw-p2-db` (`D194`), whose two blockers these releases close.
+
+## RELEASED — `M205`, the feedback-pull thread test stops expiring: its fixture's comments fell out of the script's fortnight window on 2026-11-03, and every CI run was red at Pest (merged as PR #398, `6d5d8dee`, first, at its own merge point (`D200`), with no rebase; 7/7 green with real step counts on its run — Static analysis 33 · BHW Connect 19 (the unchanged branch) · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run 41597956531 on `6d5d8dee` the same, with BHW Connect at 20)
+
+**Live.** Deploy 41602220335 found "only paths the site does not run" and fast-forwarded the box with no window. Pest on the trunk read 7,278 passed and 1 skipped, against 7,276 passed, 1 failed and 1 skipped before. That is one more test, as predicted.
+
+**How the prediction fared: right on all three counts.**
+- **The file ran 12 of 12 on the host.** A throwaway commit setting the default to 13 days turned the new case red (11 of 12), and it was never pushed.
+- **CI was 7/7, with Pest one higher.**
+- **The part I most expected to be wrong**, the state file's key, matched the config's URL on the first run.
+- **Not predicted:** `preflight --with-gates --with-pint` reported its Pint probe blocking. The app container had stopped when Docker Desktop restarted that morning. Bare `vendor/bin/pint --test` on the host passed, and CI's static job agreed.
+
+The claim as taken follows.
 
 Taken 2026-11-03. Branch `m205-feedback-pull-test-clock`, cut from origin/main at `19f87694`, PR into main. `M204`, `M203` and `M202` are held below; `M202` merged as `19f87694`.
 
@@ -95,12 +112,21 @@ Prediction:
 - CI: the six Meridian jobs pass. BHW Connect is red at the boundary until jongsky25's label, then skips its build, since `apps/bhw-connect` is unchanged.
 - The part I most expect to be wrong: GitHub may refuse or warn on a CODEOWNERS whose only rule is `*`.
 
-## HELD — `M203`, P2's two BHW prerequisites: the migration history takes a duplicate version, and the admin sign-in reaches Supabase until P3 (`bhw-migrate-duplicate-versions`, `bhw-admin-signin-csp`, `D195` A) (m203-bhw-p2-prereqs)
+## RELEASED — `M203`, P2's two BHW prerequisites: the migration history takes a duplicate version, and the admin sign-in reaches Supabase until P3 (`bhw-migrate-duplicate-versions`, `bhw-admin-signin-csp`, `D195` A) (merged as PR #396, `9370e532`, at its own merge point after `M205` (`D197`, `D200`), with no rebase, and labelled by jongsky25 on 2026-11-03; 7/7 green with real step counts on its run — Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run 41602351599 on `9370e532` the same)
 
-**Built. PR #396 is open, its six Meridian checks green, and BHW Connect red only at the boundary step, waiting on jongsky25's label.** The label was asked for on the PR on 2026-11-02, with the user's OK on the wording. It merges at its own merge point right after `M202`, on green (`D197`).
-- Both remedies were measured red, then green.
-- New tests in `db/db-tools.test.ts` and `lib/csp.test.ts` fail on the old code and pass on the fix.
-- `proxy.ts` joined the file list: the call site passes `NEXT_PUBLIC_SUPABASE_URL`.
+**Live.** Deploy 41606952995 fast-forwarded the box with no window. The user then ran `deploy-bhw.ps1 -AppPath C:\meridian\test-app` at the box once, and it served `M202` and `M203` together: `exit 0 after 82 s`, `current -> C:\meridian\bhw\releases\9370e532…`, `service: Running`.
+
+**The sign-in proof, without jongsky25.** He has not started (`D198`), so a headless Chromium on this machine submitted a wrong password at `/bhw-connect/admin/login` on live staging, before and after.
+- **Before (release `df66f1f8`, while #395's trunk run was going):** the policy said `connect-src 'self'`. The browser blocked `POST …supabase.co/auth/v1/token` twice ("violates … connect-src 'self'"), and no request reached Supabase.
+- **After (release `9370e532`, right after the hand deploy):** `connect-src 'self' https://ejcuwrnxngdwvecxwrhy.supabase.co`, and `img-src` the same. Supabase answered **400** to the POST, and there were no violations.
+- **Found by the probe:** the page says "Couldn't sign in with that email and password" in both cases, even when the browser blocked the request. No row is filed: `bhw-p3-identity` replaces this login page with Meridian's sign-in.
+
+**How the prediction fared:**
+- **The host gates and CI: right.** The boundary step was red until the label, then 20 of 20.
+- **The part I most expected to be wrong, `FLOOR` imported from `lint-migrations.mjs`: wrong to worry.** Its main guard keeps its own check from running on import.
+- **Not predicted:**
+  - `proxy.ts` joined the file list.
+  - The trunk was red for most of a day for an unrelated reason (`M205`), so the label waited for that fix.
 
 The claim as taken follows.
 
@@ -150,7 +176,22 @@ Prediction:
 - CI's BHW Connect job is green, and its boundary step stays red until his label.
 - The part I most expect to be wrong: the duplicate guard. A clean refusal "above the floor" means `migrate.mjs` reading `FLOOR` from `lint-migrations.mjs`, and that module may run its own check on import.
 
-## HELD — `M202`, `bhw-deploy-release-leak`: `New-Release` returns only the release path (m202-bhw-release-leak)
+## RELEASED — `M202`, `bhw-deploy-release-leak`: `New-Release` returns only the release path (merged as PR #395, `19f87694`, at its own merge point (`D196`), with no rebase, and labelled by jongsky25 on 2026-11-03; 7/7 green with real step counts on its run — Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run 41584593412 on `19f87694` RED at Pest on the expired feedback-pull test, which was not this diff and was fixed by `M205`, so its deploy was skipped)
+
+**Live, proved on the box.** It reached the box's checkout with `M205`'s deploy. The user's one hand run of `deploy-bhw.ps1` at `9370e532` was a fresh build, the very path this fixes:
+- `RESULT: exit 0 after 82 s`;
+- `current -> C:\meridian\bhw\releases\9370e532af7274372a0764269439b555785cb428`;
+- `service: Running`;
+- **no `rmdir current` recovery**, unlike 2026-11-01.
+
+**How the prediction fared:**
+- **The diff, `ParseFile`, the host `-BuildOnly` pair and CI: right.** BHW Connect ran every step, 20 of 20.
+- **The host build, the part I most expected to be wrong:** the scratch `.env`'s build values were enough.
+- **Not predicted:**
+  - The trunk's run went red on an unrelated test whose fixture dates expired at 03:00 UTC that morning. That became `M205`, and this went live a deploy later.
+  - The label waited a day: jongsky25 had not started, and the user asked him once for all three.
+
+The claim's held note as written follows.
 
 **Built. PR #395 is open, its CI running, and jongsky25 was asked for `boundary-approved` on the PR (2026-11-02, the user approved the wording).** It merges at its own merge point, on green and with that label (`D196`).
 

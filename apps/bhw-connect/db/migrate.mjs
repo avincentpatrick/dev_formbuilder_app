@@ -22,11 +22,18 @@
  * ⚠️ Each file runs inside a transaction, so a statement that refuses one (CREATE INDEX
  * CONCURRENTLY) cannot be in a migration — as with the Supabase CLI. And on the testing box,
  * migrations are additive only: `db/lint-migrations.mjs` refuses the rest in CI.
+ *
+ * ⚠️ History is keyed on the version, and two pairs of the imported files share one
+ * (20260721080000, 20260827180000). So recording a version that is already there does nothing, and
+ * is never an error. Before, `--baseline` stopped on the primary key after 41 of 109 versions and
+ * left the other 69 pending (measured 2026-11-02, Meridian's `bhw-migrate-duplicate-versions`). A
+ * new file must not share a version: `readMigrations` refuses one above the lint floor.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import pg from "pg";
+import { FLOOR } from "./lint-migrations.mjs";
 
 export const LOCK_KEY = 7_319_204_192;
 export const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -34,9 +41,16 @@ export const DEFAULT_DIR = join(APP_ROOT, "supabase", "migrations");
 
 const FILE_NAME = /^(\d+)_(.+)\.sql$/;
 
-/** Every `<version>_<name>.sql` in the directory, oldest first. A misnamed .sql file is an error. */
-export function readMigrations(dir) {
-  return readdirSync(dir)
+const RECORD =
+  "INSERT INTO supabase_migrations.schema_migrations (version, statements, name) " +
+  "VALUES ($1, $2, $3) ON CONFLICT (version) DO NOTHING";
+
+/**
+ * Every `<version>_<name>.sql` in the directory, oldest first. A misnamed .sql file is an error, and
+ * so are two files sharing a version above `floor`. The two pairs below it are history.
+ */
+export function readMigrations(dir, floor = FLOOR) {
+  const migrations = readdirSync(dir)
     .filter((file) => file.endsWith(".sql"))
     .sort()
     .map((file) => {
@@ -49,6 +63,16 @@ export function readMigrations(dir) {
         sql: readFileSync(join(dir, file), "utf8"),
       };
     });
+  const seen = new Map();
+  for (const m of migrations) {
+    if (seen.has(m.version) && m.version > floor) {
+      throw new Error(
+        `${seen.get(m.version)} and ${m.file} share version ${m.version}: give the new one its own`,
+      );
+    }
+    seen.set(m.version, m.file);
+  }
+  return migrations;
 }
 
 export function pendingMigrations(migrations, applied) {
@@ -87,6 +111,9 @@ export async function census(client) {
 /**
  * The runner. Returns what it found and what it did; throws on a failed file after rolling it back,
  * so the files before it stay applied and the files after it stay pending.
+ *
+ * @param {pg.Client} client
+ * @param {{ dir?: string, dryRun?: boolean, baseline?: string | null, log?: (line: string) => void }} [options]
  */
 export async function migrate(
   client,
@@ -104,12 +131,21 @@ export async function migrate(
         throw new Error(`--baseline=${baseline} names no migration file in ${dir}`);
       }
       if (!dryRun) {
-        for (const m of covered) {
-          await client.query(
-            "INSERT INTO supabase_migrations.schema_migrations (version, statements, name) VALUES ($1, $2, $3)",
-            [m.version, [], m.name],
-          );
-          log(`baselined ${m.file} (recorded, not run)`);
+        // Recorded whole or not at all: a baseline left half-done reads as pending history.
+        await client.query("BEGIN");
+        try {
+          for (const m of covered) {
+            const { rowCount } = await client.query(RECORD, [m.version, [], m.name]);
+            log(
+              rowCount === 1
+                ? `baselined ${m.file} (recorded, not run)`
+                : `baselined ${m.file} (its version is already recorded)`,
+            );
+          }
+          await client.query("COMMIT");
+        } catch (error) {
+          await client.query("ROLLBACK");
+          throw error;
         }
       }
       return { pending, applied: [], baselined: covered };
@@ -122,10 +158,7 @@ export async function migrate(
       await client.query("BEGIN");
       try {
         await client.query(m.sql);
-        await client.query(
-          "INSERT INTO supabase_migrations.schema_migrations (version, statements, name) VALUES ($1, $2, $3)",
-          [m.version, [m.sql], m.name],
-        );
+        await client.query(RECORD, [m.version, [m.sql], m.name]);
         await client.query("COMMIT");
       } catch (error) {
         await client.query("ROLLBACK");

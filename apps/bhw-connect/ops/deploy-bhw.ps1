@@ -257,8 +257,10 @@ function New-Release([string]$Sha) {
         $envProduction = Join-Path $AppDir '.env.production'
         Copy-Item -LiteralPath $EnvFile -Destination $envProduction -Force
         try {
-            Invoke-Native npm.cmd @('ci', '--no-audit', '--no-fund')
-            Invoke-Native npm.cmd @('run', 'build')
+            # To the console, not the pipeline: this function's output is the release path, and npm's
+            # log in it made the caller's $release the whole log (the first fresh build, 2026-11-01).
+            Invoke-Native npm.cmd @('ci', '--no-audit', '--no-fund') | Out-Host
+            Invoke-Native npm.cmd @('run', 'build') | Out-Host
         }
         finally {
             Remove-Item -LiteralPath $envProduction -Force -ErrorAction SilentlyContinue

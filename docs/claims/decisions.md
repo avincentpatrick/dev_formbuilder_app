@@ -24,10 +24,31 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D199`, the last filed, was asked and answered on 2026-11-02 with `D198`, once `M204` was claimed, and recorded the same day. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D201`, the last filed, was asked and answered on 2026-11-03 once `M206`'s box work was done, and recorded the same day. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D201 — `M206` moved BHW Connect's database onto the box by hand and changed no repository code, so it has no pull request. `preflight` cross-checks the newest released increment against merged pull-request titles and fails every session until one titled `M206` or later merges. How does its close-out land? **A — as a docs-only pull request titled `M206`, merged at its own merge point as soon as every required check is green.**
+
+**Asked and answered 2026-11-03 (user decision, in chat), once the box blocks B3–B9 were done; recorded the same day.**
+- **A — a docs-only pull request, merged on green (recommended, chosen).**
+  - Its paths are documentation, which `deploy.ps1` treats as site-safe, so there is no maintenance window.
+  - Its title gives `scripts/state.php` its second, independent `M206`.
+  - This is the same exception to "never a lone small PR" that `D196`, `D197` and `D200` made.
+- **B — a direct push, with a row to teach the cross-check that a release marked "no pull request" agrees.** Every session's preflight would fail until that row was built.
+- **C — the pull request held for merge point 10**, failing preflight until then.
+
+**What the answer files:** nothing new. `M206`'s close-out is that pull request.
+
+### D200 — Since 03:00 UTC on 2026-11-03, every CI run is red at Pest, because a test's fixture dates fell out of the feedback script's fortnight window. Nothing can deploy, `#396` included. `M205` (PR #398) fixes the test. When does it merge? **A — at its own merge point, first, as soon as every required check is green.**
+
+**Asked and answered 2026-11-03 (user decision, in chat), once #398 was open; recorded the same day.**
+- **A — as soon as green, first (recommended, chosen).** Its paths, `tests/` and `docs/`, are site-safe for `deploy.ps1`, so there is no maintenance window. The trunk turns green, and then `#396` merges under `D197`.
+  - This is the same exception to "never a lone small PR" that `D196` made: that rule's reason, a deploy under the testers, does not hold for a site-safe path.
+- **B — with merge point 10**, with `#397` and `#391`–`#393` and the census before and after. `#396` and `bhw-p2-db` would wait for it.
+
+**What the answer files:** nothing new. `M205` files and closes its own row on its branch.
+
 ### D198 — jongsky25 has not started on BHW Connect, and the user wants the whole move onto the box finished before handing it to him. Meanwhile every BHW pull request needs his `boundary-approved` label. How is that handled? **A — one label, then BHW is avincentpatrick's until the handover.**
 
 **Asked and answered 2026-11-02 (user decision, in chat), once `M202` and `M203` were open; recorded with `M204`'s claim.** The user said jongsky25 starts only when told, once BHW's database is on the box, and asked: "can we finish everything so we won't have to config it with jong and me … when we turn it over to jong, let's make sure that everything is in his hands." The move still needs about six pull requests that touch his paths or the shared ones: #395, #396, P2, P3, P1's deploy wiring and P4.

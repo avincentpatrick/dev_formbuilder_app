@@ -16,7 +16,69 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M206` released on 2026-11-03: BHW Connect runs on its own database on the box, live at 13:44:33 UTC after a 13.6-minute freeze. Nothing in the repository changed, so its docs-only close-out is its pull request (`D201`), from branch `m206-bhw-p2-db`. `M204` (PR #397) stays held for merge point 10, with `M198`, `M199` and `M200`. The next BHW claim is `bhw-p3-identity` (`D194`), which this release unblocks.
+## Status: ACTIVE CLAIM — `M207`, BHW Connect's admins sign in with Meridian, its feedback screenshots live on the box, the box mints its own keys, and Supabase is paused (`bhw-p3-identity`, `D178`, `D179`, `D195`, `D202`–`D205`) (m207-bhw-p3-identity)
+
+Taken 2026-11-03. Branch `m207-bhw-p3-identity`, cut from origin/main at `6f69777d`, PR into main. It merges at its own merge point, with the user's census before and after (`D203` A). Before it: `#397` (`M204`) merges on its own (`D202` A), so this pull request needs nobody's label. After it: box blocks C0–C5, one guarded block at a time.
+
+**Why.** The user, 2026-11-03: finish the whole BHW move onto the box, then write jongsky25's handover guide. This is step 1 of 7. BHW's code and data run on the box (`M206`), but its admin sign-in and its feedback screenshots still go to jongsky25's Supabase.
+
+Row: `bhw-p3-identity`: "Meridian's session for BHW admins (GET /api/v1/auth/whoami), screenshots on local disk, the API-key mint behind a password re-check, the links between the two applications, and the box's own JWT secret with freshly minted anon and service keys replacing Supabase's … then Supabase paused for 30 days".
+
+### Evidence verified
+- **Supabase Auth: held at 4 call sites plus 2 factories.**
+  - `lib/db/require-admin.ts` (`auth.getUser()`, then `admin_users` by `user_id`).
+  - `proxy.ts` (`createServerClient`, `/admin*` only).
+  - `app/admin/login/page.tsx` (`signInWithPassword`, in the browser).
+  - `components/admin/sign-out-button.tsx` (`signOut`).
+  - The factories: `lib/db/supabase-auth-{server,browser}.ts`, the only users of `@supabase/ssr`.
+- **Supabase Storage: held at 2.** `app/api/feedback/route.ts` uploads to `feedback-screenshots` at `<session>/<uuid>.<png|jpg>`. `lib/db/admin.ts` signs a 60-second URL that the admin's browser loads from Supabase's origin.
+- **The CSP opening: held.** `lib/csp.ts` opens `connect-src` and `img-src` to `NEXT_PUBLIC_SUPABASE_URL`'s origin, whatever that names. So it only goes when the code changes, not when the value does.
+- **The mint: held, and measured.** On the trunk's code, locally, a session plus the readable `XSRF-TOKEN` mints a key with no password: `POST /api/v1/auth/tokens` → 201. Any script on the origin can do the same.
+- **`whoami` does not exist:** 404 on the trunk, measured locally.
+
+### Premise verified
+- **One admin, keyed by uuid, and Meridian's ids are uuids.** Read 2026-11-03 through the connector: `admin_users` has 1 row (role `admin`, `user_id` = the Supabase auth uuid). `users.id` is a uuid (`HasUuidv7`). So the user's Meridian account takes a row with no schema change and no BHW migration. Whether the box's copy kept the foreign key to `auth.users` is checked read-only at C2.
+- **34 screenshots, 1,963,090 bytes,** in 11 folders of the private bucket, the last on 2026-09-14. The box downloads them itself, because RDP moves no files on this connection.
+- **The keys are still Supabase's.** The box's PostgREST verifies Supabase's legacy secret (`D195`), which was typed into its config and saved nowhere else. The rotation makes a new one and keeps it in `postgrest\jwt-secret.txt`, which `db/mint-jwt.mjs`'s usage already names.
+- **The rebuild needs a new sha or `-BuildOnly`.** `deploy-bhw.ps1` reuses an assembled release for its sha and skips an already-deployed sha. P3's merge commit is a new sha. `-BuildOnly` builds it with the new keys before PostgREST is restarted.
+- **How BHW's server reaches Meridian.** The box's hosts file maps `staging.pitahc.gov.ph` to 127.0.0.1, and that entry must stay (no hairpin). A request to Meridian under `127.0.0.1` is the central host. TLS from Node to the box's own name has never been measured: that is C0, with a plain-HTTP loopback vhost as the fallback.
+- **What `D179`'s links touch.** Meridian's top bar and footer, which `AppLayout.test.ts` and `tests/e2e/whats-new.spec.ts` pin. `MdsMenu` items render through Inertia's `Link`, so the BHW link is an `MdsButton as="a"`.
+- **Who must approve.** Today `.github/CODEOWNERS` on `main` gives `apps/bhw-connect/` to jongsky25. Once `#397` merges, nobody's label is needed (`D202`).
+- **Group A's route filters.** `tests/Pest.php` `groupBRoutes()` and `TenantTwoFactorEnforcementTest` treat every `api.v1.*` name except `api.v1.public.` and `api.v1.tokens.` as a Group B (token) route. A `whoami` named `api.v1.auth.*` would fail both, so it is `api.v1.session.whoami` and the filters learn that prefix.
+
+### Remedy verdict
+**Works, measured before any edit, locally on the trunk's code:**
+- A guest at Group A gets 401 in the API's envelope.
+- A request carrying **only** the `meridian-session` cookie (with `Accept: application/json` and `X-Requested-With`) gets Group A's 200. That is exactly the call BHW's server will make.
+
+Still unmeasured, and measured where it can be:
+- Node's TLS to the box's own name (C0);
+- Next's redirect origin behind Apache's `ProxyPreserveHost` (C4);
+- the rotation's outage (C3).
+
+Files:
+- **Meridian:** `routes/api.php`, `app/Http/Controllers/Api/V1/WhoamiController.php` (new), `app/Http/Controllers/Api/V1/ApiTokenController.php`, `app/Http/Requests/Api/V1/StoreApiTokenRequest.php`, `app/Providers/AppServiceProvider.php` (the `whoami` limiter), `resources/js/components/shell/TopNav.vue`, `resources/js/Layouts/AppLayout.vue`, `VERSION`, `database/data/releases.json`, `openapi.json`.
+- **Meridian tests:** `tests/Pest.php`, `tests/Feature/Api/WhoamiTest.php` (new), `tests/Feature/Api/ApiV1Test.php`, `tests/Feature/Api/ApiAccessGateTest.php`, `tests/Feature/Auth/EmailVerificationGateTest.php`, `tests/Feature/Auth/TenantTwoFactorEnforcementTest.php`, `tests/Feature/Api/OpenApiContractTest.php`, `resources/js/Layouts/AppLayout.test.ts`, `resources/js/components/shell/TopNav.test.ts`, `tests/e2e/whats-new.spec.ts`.
+- **BHW**, all under `apps/bhw-connect/`:
+  - New: `lib/db/meridian-identity.ts`, `lib/storage/screenshots.ts` and `app/api/admin/screenshot/route.ts`, with their tests.
+  - Changed: `lib/db/require-admin.ts`, `proxy.ts`, `app/admin/login/page.tsx`, `components/admin/sign-out-button.tsx`, `app/admin/(dashboard)/layout.tsx`, `app/api/feedback/route.ts`, `lib/db/admin.ts`, `lib/csp.ts`, `components/layout/header.tsx`, `app/page.tsx`, `package.json`, `package-lock.json`, `.env.example`, `docs/DECISIONS.md`.
+  - Tests changed: `require-admin`, the feedback route and `csp`.
+  - Removed: `lib/db/supabase-auth-server.ts`, `lib/db/supabase-auth-browser.ts`.
+- **Docs:** `docs/deployment-infrastructure.md` §8.4. At close-out: ADR-0024's markers, `docs/pipeline.md`, `PROGRESS.md` (own block) and `docs/gate-baselines.md`.
+
+Shared artefacts taken: `openapi.json`, `docs/deployment-infrastructure.md`, `tests/e2e/whats-new.spec.ts`, and at close-out `docs/adr/0024-second-application-under-one-host.md`, `docs/pipeline.md` and `PROGRESS.md`.
+Paired files taken:
+- `VERSION` with `database/data/releases.json`;
+- `openapi.json` with `OpenApiContractTest`;
+- `tests/Pest.php` `groupBRoutes()` with `TenantTwoFactorEnforcementTest`'s copy of that filter.
+
+Namespaces spent: nothing from either namespace (`M207`; decisions `D202`–`D205`, recorded in `6f69777d`).
+Prediction:
+- **Meridian.** Pest stays green after the four existing mint tests learn to send the password. The two route filters need only the new prefix. `openapi.json` regenerates with `/auth/whoami` and the mint's `password`. PHPStan moves by nothing; Pint is clean.
+- **BHW.** Lint, types and Vitest pass, and the build under `/bhw-connect` with `BHW_DATA_SOURCE=none` passes with `@supabase/ssr` gone. The base-path census stays green because the Meridian links are absolute.
+- **CI:** 7/7.
+- **At the box:** C1 copies 34 files and 1,963,090 bytes; C3's outage is under 10 seconds; no `supabase.co` string is left in the new release.
+- **The part I most expect to be wrong:** Node's TLS to `staging.pitahc.gov.ph` through the hosts file (C0), or Next's redirect to Meridian's `/login` coming out under the wrong origin or with the base path left on.
 
 ## RELEASED — `M206`, BHW Connect's database moves onto the box: `bhw_connect` on its PostgreSQL 15, served by PostgREST, copied from the live Supabase schema (`bhw-p2-db`, `D194`, `D195` A) (no code: box blocks B0–B9 run by the user at the box, one guarded block at a time, live at 13:44:33 UTC on 2026-11-03 after a 13.6-minute freeze; its docs-only close-out is its pull request, merged at its own merge point (`D201`))
 

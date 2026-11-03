@@ -19,19 +19,12 @@
  * (`components/maps/load-maplibre.ts`). In development only, `'unsafe-eval'` and `ws:` for React's
  * refresh and the dev server.
  *
- * WHAT IT OPENS TO SUPABASE, AND UNTIL WHEN (Meridian's D195). Until admins sign in through Meridian
- * (Meridian's `bhw-p3-identity`), the login page signs in from the browser against Supabase's own
- * origin, and an admin's feedback screenshot is a Supabase signed link. So `connect-src` and
- * `img-src` take the origin of `NEXT_PUBLIC_SUPABASE_URL`: read from that variable, never written
- * here, so the opening goes when the variable stops naming Supabase. Without it, `connect-src 'self'`
- * blocked every admin sign-in on the testing box (measured 2026-11-02). `script-src` is untouched,
- * so an injected script still cannot run, and so cannot use the opening.
+ * NOTHING IS OPEN TO ANOTHER ORIGIN. From Meridian's D195 until its `bhw-p3-identity`, `connect-src`
+ * and `img-src` also took Supabase's origin, because admins signed in from the browser against
+ * Supabase and viewed screenshots through its signed links. Admins now sign in with Meridian, on this
+ * origin, and screenshots come from this server's disk, so the opening and its parameter are gone.
  */
-export function contentSecurityPolicy(
-  nonce: string,
-  { dev, supabaseUrl }: { dev: boolean; supabaseUrl?: string },
-): string {
-  const supabase = originOf(supabaseUrl);
+export function contentSecurityPolicy(nonce: string, { dev }: { dev: boolean }): string {
   const directives: Record<string, string[]> = {
     "default-src": ["'self'"],
     "script-src": [
@@ -41,9 +34,9 @@ export function contentSecurityPolicy(
       ...(dev ? ["'unsafe-eval'"] : []),
     ],
     "style-src": ["'self'", "'unsafe-inline'"],
-    "img-src": ["'self'", "data:", "blob:", ...supabase],
+    "img-src": ["'self'", "data:", "blob:"],
     "font-src": ["'self'", "data:"],
-    "connect-src": ["'self'", ...supabase, ...(dev ? ["ws:"] : [])],
+    "connect-src": ["'self'", ...(dev ? ["ws:"] : [])],
     "worker-src": ["'self'", "blob:"],
     "child-src": ["'self'", "blob:"],
     "object-src": ["'none'"],
@@ -54,17 +47,6 @@ export function contentSecurityPolicy(
   return Object.entries(directives)
     .map(([name, values]) => `${name} ${values.join(" ")}`)
     .join("; ");
-}
-
-/** The http(s) origin of a URL as a one-item list, or an empty one for an absent or unusable URL. */
-function originOf(url: string | undefined): string[] {
-  if (!url) return [];
-  try {
-    const { protocol, origin } = new URL(url);
-    return protocol === "https:" || protocol === "http:" ? [origin] : [];
-  } catch {
-    return [];
-  }
 }
 
 /** A fresh nonce: 128 random bits, base64. Web Crypto, so it runs wherever the proxy runs. */

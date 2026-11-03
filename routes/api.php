@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\V1\SyncSubmissionController;
 use App\Http\Controllers\Api\V1\TenantApiController;
 use App\Http\Controllers\Api\V1\WebhookDeliveryController;
 use App\Http\Controllers\Api\V1\WebhookEndpointController;
+use App\Http\Controllers\Api\V1\WhoamiController;
 use App\Http\Controllers\Public\GuestAttachmentController;
 use App\Http\Controllers\Public\GuestChallengeController;
 use App\Http\Controllers\Public\GuestContentImageController;
@@ -119,6 +120,14 @@ Route::prefix('api/v1')
         // otherwise reach the query and 500 on a bad cast instead of a clean 404.
         Route::delete('auth/tokens/{id}', [ApiTokenController::class, 'destroy'])
             ->whereNumber('id')->name('tokens.destroy');
+
+        // Who is signed in (M207, ADR-0024 §D5) — read by BHW Connect's server, which forwards the browser's
+        // session cookie from /bhw-connect on this same origin. Named `session.*`, not `auth.*`: every
+        // `api.v1.*` name outside `public.` and `tokens.` is read as a Group B route by the route-group tests
+        // (tests/Pest.php groupBRoutes()), and this one carries a session, not a token. Its own limiter is
+        // keyed by the member, because every call arrives from 127.0.0.1 and the `api` limiter keys on IP.
+        Route::get('auth/whoami', WhoamiController::class)
+            ->middleware('throttle:whoami')->name('session.whoami');
     });
 
 // ── Group B: token-consumed resources (Sanctum bearer auth + ability + policy) ────────────────

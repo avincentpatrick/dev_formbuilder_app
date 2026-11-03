@@ -33,23 +33,10 @@ describe("contentSecurityPolicy", () => {
     expect(production.get("default-src")).toEqual(["'self'"]);
   });
 
-  it("opens only connect-src and img-src to Supabase's origin while admins sign in there", () => {
-    const opened = directives(
-      contentSecurityPolicy("abc123", { dev: false, supabaseUrl: "https://abc.supabase.co/" }),
-    );
-    expect(opened.get("connect-src")).toEqual(["'self'", "https://abc.supabase.co"]);
-    expect(opened.get("img-src")).toEqual(["'self'", "data:", "blob:", "https://abc.supabase.co"]);
-    for (const name of ["script-src", "default-src", "form-action", "frame-ancestors"]) {
-      expect(opened.get(name)).toEqual(production.get(name));
-    }
-  });
-
-  it("opens nothing for an absent or unusable Supabase URL", () => {
-    for (const supabaseUrl of [undefined, "", "not a url", "javascript:alert(1)"]) {
-      const policy = directives(contentSecurityPolicy("abc123", { dev: false, supabaseUrl }));
-      expect(policy.get("connect-src")).toEqual(["'self'"]);
-      expect(policy.get("img-src")).toEqual(["'self'", "data:", "blob:"]);
-    }
+  it("opens nothing to another origin, Supabase's included (Meridian's bhw-p3-identity)", () => {
+    expect(production.get("img-src")).toEqual(["'self'", "data:", "blob:"]);
+    expect(production.get("connect-src")).toEqual(["'self'"]);
+    expect(contentSecurityPolicy("abc123", { dev: false })).not.toMatch(/supabase/i);
   });
 
   it("allows maplibre's blob worker", () => {

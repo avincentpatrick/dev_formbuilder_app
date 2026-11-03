@@ -2123,7 +2123,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   floor, not the headcount, and §D7's actual grant is a member's own position. Recorded as **ADR-0020 §D13**;
   the product call is `D3` in `docs/claims/decisions.md`, filed with this as the recommendation and proceeded
   on rather than waited for.
-  ⚠️ **THE ROW'S ROUTE CITATION WAS WRONG AND ITS HEADLINE EXAMPLE WAS INVERTED.** `routes/api.php:440-442`
+  ⚠️ **THE ROW'S ROUTE CITATION WAS WRONG AND ITS HEADLINE EXAMPLE WAS INVERTED.** `routes/api.php:449-451`
   is comment prose; the route is `:456-458`. And the row offered `/dashboard` as the surface that *correctly
   withholds* the integer — **it disclosed it too**, at `DashboardController.php:124`, in the same Inertia
   payload whose `kpis.members` is nulled four lines above for the same reader. That sixth consumer was
@@ -5125,7 +5125,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `M52`'s could not. Filed by `M52`.
 - ~~**`minor` · `/gamification/me` documents only `200`.**~~ ✅ **DONE — `M54` (2026-09-01).** The route
   now documents the 403 it can answer. ⚠️ **The citation had drifted**: the row cites
-  `routes/api.php:440`, which is the comment block; the route is at `:456-457`. The mechanism was exact
+  `routes/api.php:449`, which is the comment block; the route is at `:456-457`. The mechanism was exact
   and was verified in the vendor source for the version INSTALLED — Scramble v0.13.30's
   `ErrorResponsesExtension:60` adds a 403 **only** for middleware starting `can:` or `Authorize::`, so
   `module:` is invisible to it. ⛔ **Two obvious remedies are wrong and both were rejected on evidence:**

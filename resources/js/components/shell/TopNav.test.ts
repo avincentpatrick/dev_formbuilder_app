@@ -168,3 +168,18 @@ describe('TopNav — the global search field shows the active query', () => {
         wrapper.unmount();
     });
 });
+
+describe('TopNav — the link to BHW Connect (M207, D179)', () => {
+    it('is a plain link to /bhw-connect/, never an Inertia visit', () => {
+        const wrapper = render(false);
+        const link = wrapper.get('.topnav__app-link');
+
+        expect(link.element.tagName).toBe('A');
+        expect(link.attributes('href')).toBe('/bhw-connect/');
+        expect(link.text()).toBe('BHW Connect');
+        // Another server answers /bhw-connect, so Inertia's Link would request a page that is no Inertia
+        // response. The mock renders Link as an <a> too, which is why this asks for the component instead.
+        expect(wrapper.findAllComponents({ name: 'Link' }).map((l) => l.props('href'))).not.toContain('/bhw-connect/');
+        wrapper.unmount();
+    });
+});

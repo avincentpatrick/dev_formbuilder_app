@@ -1,4 +1,6 @@
 import "server-only";
+import { withBasePath } from "@/lib/base-path";
+import { isScreenshotPath } from "@/lib/storage/screenshots";
 import { createSupabaseServiceClient } from "./service-client";
 
 export type FeedbackStatus = "open" | "resolved" | "dismissed";
@@ -28,8 +30,6 @@ export type FeedbackRow = {
   context: FeedbackContext;
   screenshotPath: string | null;
 };
-
-const SCREENSHOT_BUCKET = "feedback-screenshots";
 
 /** Every read here goes through the service-role client — `feedback`/`ingestion_batches`/
  * `ai_provider_quota` are all insert-only or service-role-only to the public (0.3/2.1). */
@@ -62,15 +62,12 @@ export async function listFeedback(status?: FeedbackStatus): Promise<FeedbackRow
   }));
 }
 
-/** Short-lived signed URL for a screenshot in the private bucket (null if the path is missing or
- * signing fails). Screenshots are never public — admins view them through these expiring links. */
+/** Where an admin's browser fetches a screenshot (null when there is none). Screenshots are never
+ * public: the route answers only an admin (`app/api/admin/screenshot/route.ts`), from this server's
+ * disk — a Supabase signed link until Meridian's `bhw-p3-identity`. */
 export async function getFeedbackScreenshotUrl(path: string | null): Promise<string | null> {
-  if (!path) return null;
-  const supabase = createSupabaseServiceClient();
-  const { data, error } = await supabase.storage
-    .from(SCREENSHOT_BUCKET)
-    .createSignedUrl(path, 60);
-  return error || !data ? null : data.signedUrl;
+  if (!path || !isScreenshotPath(path)) return null;
+  return withBasePath(`/api/admin/screenshot?path=${encodeURIComponent(path)}`);
 }
 
 export async function updateFeedbackStatus(id: number, status: FeedbackStatus): Promise<boolean> {

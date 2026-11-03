@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/db/supabase";
-import { createSupabaseServiceClient } from "@/lib/db/service-client";
 import { datasetSlugForPath } from "@/lib/feedback/dataset";
 import type { Json } from "@/lib/db/database.types";
+import { saveScreenshot } from "@/lib/storage/screenshots";
 
 export const runtime = "nodejs";
 
-const SCREENSHOT_BUCKET = "feedback-screenshots";
 // ~4MB base64 ceiling — a downscaled JPEG viewport shot is well under this; anything larger is
 // rejected rather than uploaded.
 const MAX_SCREENSHOT_CHARS = 4 * 1024 * 1024;
@@ -40,19 +39,16 @@ function decodeDataUrl(dataUrl: string): { bytes: Buffer; contentType: string } 
   }
 }
 
-/** Upload a screenshot to the private bucket via the service-role client; null on any failure so a
- * bad/oversized image never blocks the feedback itself. */
-async function uploadScreenshot(sessionId: string, dataUrl: string): Promise<string | null> {
+/** Store a screenshot on this server's disk (`lib/storage/screenshots.ts`; a private Supabase bucket
+ * until Meridian's `bhw-p3-identity`); null on any failure so a bad/oversized image never blocks the
+ * feedback itself. */
+async function storeScreenshot(sessionId: string, dataUrl: string): Promise<string | null> {
   const decoded = decodeDataUrl(dataUrl);
   if (!decoded) return null;
   const ext = decoded.contentType === "image/png" ? "png" : "jpg";
-  const path = `${sessionId}/${crypto.randomUUID()}.${ext}`;
+  const path = `${sessionId.toLowerCase()}/${crypto.randomUUID()}.${ext}`;
   try {
-    const service = createSupabaseServiceClient();
-    const { error } = await service.storage
-      .from(SCREENSHOT_BUCKET)
-      .upload(path, decoded.bytes, { contentType: decoded.contentType, upsert: false });
-    return error ? null : path;
+    return (await saveScreenshot(path, decoded.bytes)) ? path : null;
   } catch {
     return null;
   }
@@ -72,7 +68,7 @@ export async function POST(request: Request) {
 
   const { data } = parsed;
   const screenshotPath = data.screenshot
-    ? await uploadScreenshot(data.sessionId, data.screenshot)
+    ? await storeScreenshot(data.sessionId, data.screenshot)
     : null;
 
   const supabase = createSupabaseServerClient();

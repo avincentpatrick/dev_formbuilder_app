@@ -95,6 +95,9 @@ watch(() => page.url, () => {
                     <Link href="/whats-new" class="app-shell__footer-link">What's new</Link>
                     <span aria-hidden="true">·</span>
                     <Link href="/help" class="app-shell__footer-link">Help</Link>
+                    <!-- M207 (`D179`): a plain <a>, because /bhw-connect is another application's server. -->
+                    <span aria-hidden="true">·</span>
+                    <a href="/bhw-connect/" class="app-shell__footer-link">BHW Connect</a>
                 </footer>
             </main>
         </div>

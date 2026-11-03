@@ -240,6 +240,7 @@ it('mints a tenant-scoped token with the issuer’s abilities', function (): voi
         ->postJson('http://acme.meridian.test/api/v1/auth/tokens', [
             'name' => 'CI key',
             'abilities' => [ApiAbilities::READ_FORMS, ApiAbilities::WRITE_FORMS],
+            'password' => 'password', // UserFactory's; every mint carries it since M207 (D205)
         ])
         ->assertCreated()
         ->assertJsonPath('abilities', [ApiAbilities::READ_FORMS, ApiAbilities::WRITE_FORMS]);
@@ -261,6 +262,7 @@ it('trims requested abilities to the issuer’s RBAC', function (): void {
         ->postJson('http://acme.meridian.test/api/v1/auth/tokens', [
             'name' => 'Viewer key',
             'abilities' => [ApiAbilities::WRITE_FORMS, ApiAbilities::READ_FORMS],
+            'password' => 'password',
         ])
         ->assertCreated()
         ->assertJsonPath('abilities', []); // a viewer holds no forms.* permissions → both trimmed away
@@ -275,10 +277,49 @@ it('validates the requested abilities against the catalog', function (): void {
         ->postJson('http://acme.meridian.test/api/v1/auth/tokens', [
             'name' => 'Bad key',
             'abilities' => ['bogus:ability'],
+            'password' => 'password',
         ])
         ->assertStatus(422)
         ->assertJsonPath('error.code', 'validation_failed')
         ->assertJsonStructure(['error' => ['details' => ['fields' => ['abilities.0']]]]);
+});
+
+// M207 (D205): BHW Connect shares this origin, so a script on one of its pages holds the session and the
+// readable XSRF-TOKEN. Measured on the code before this rule: a mint with both and no password was a 201.
+it('refuses to mint a key without the account’s password', function (): void {
+    $tenant = apiTenant();
+    enterTenant($tenant->id);
+    $admin = apiMember('admin');
+
+    $this->actingAs($admin)
+        ->postJson('http://acme.meridian.test/api/v1/auth/tokens', [
+            'name' => 'No password',
+            'abilities' => [ApiAbilities::READ_FORMS],
+        ])
+        ->assertStatus(422)
+        ->assertJsonPath('error.code', 'validation_failed')
+        ->assertJsonStructure(['error' => ['details' => ['fields' => ['password']]]]);
+
+    enterTenant($tenant->id, $admin->id);
+    expect(PersonalAccessToken::query()->count())->toBe(0);
+});
+
+it('refuses to mint a key with a wrong password', function (): void {
+    $tenant = apiTenant();
+    enterTenant($tenant->id);
+    $admin = apiMember('admin');
+
+    $this->actingAs($admin)
+        ->postJson('http://acme.meridian.test/api/v1/auth/tokens', [
+            'name' => 'Wrong password',
+            'abilities' => [ApiAbilities::READ_FORMS],
+            'password' => 'not-the-password',
+        ])
+        ->assertStatus(422)
+        ->assertJsonStructure(['error' => ['details' => ['fields' => ['password']]]]);
+
+    enterTenant($tenant->id, $admin->id);
+    expect(PersonalAccessToken::query()->count())->toBe(0);
 });
 
 it('requires authentication to mint a token', function (): void {

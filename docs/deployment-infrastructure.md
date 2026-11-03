@@ -664,8 +664,35 @@ worker is):
 
 - `bhw-connect` — `powershell -File C:\meridian\test-app\apps\bhw-connect\ops\start.ps1`: loads `.env`,
   serves `current\server.js` on `127.0.0.1:3100`. Node 24 (the version the builds already use). [`bhw-p1-box`]
-- `bhw-postgrest` — the official PostgREST v16.4 Windows binary on `127.0.0.1:3001`, logging in as
-  `authenticator` to `bhw_connect`. Until it exists BHW reads Supabase. [`bhw-p2-db`]
+- `bhw-postgrest` — the official PostgREST v16.4 Windows binary on **`[::1]:3001`**, logging in as
+  `authenticator` to `bhw_connect`. Not `127.0.0.1`: Server 2016 refuses the IPv4 socket option PostgREST's
+  network library sets, so BHW's `.env` names `SUPABASE_REST_URL=http://[::1]:3001` (measured, `M206`). [`bhw-p2-db`]
+
+**Sign-in** (`D178`, ADR-0024 §D5). BHW has no password of its own. Its server forwards the browser's
+`meridian-session` cookie to Meridian's `GET /api/v1/auth/whoami` at
+`MERIDIAN_INTERNAL_URL=https://staging.pitahc.gov.ph`. ⛔ That call relies on the box's hosts entry sending
+`staging.pitahc.gov.ph` to `127.0.0.1` (the box has no route back to its own public address), so the entry
+stays. Meridian answers only for an active, verified member of the workspace; BHW's `admin_users` decides who
+administers BHW. **Adding a BHW admin:** the person signs in to Meridian and opens
+`/api/v1/auth/whoami`, which shows their id; the operator then runs, as `bhw_app` on `bhw_connect`,
+`insert into admin_users (user_id, role) values ('<id>', 'admin') on conflict do nothing;`. [`bhw-p3-identity`]
+
+**Feedback screenshots** are files under `C:\meridian\bhw\storage\feedback-screenshots\<session>\<uuid>.jpg`
+(`BHW_STORAGE_DIR`), shown to admins only, through `/bhw-connect/api/admin/screenshot`. They sit inside
+`C:\meridian\bhw`, so NETWORK SERVICE's Modify there covers the service's writes. ⚠️ `bhw_connect`'s nightly
+dump does not carry them (`bhw-screenshot-backup`). [`bhw-p3-identity`]
+
+**Keys.** PostgREST verifies a secret of the box's own, kept in `C:\meridian\bhw\postgrest\jwt-secret.txt`
+(the config's ACL). `apps/bhw-connect/db/mint-jwt.mjs` mints the anon and service keys in `.env` from it.
+**To rotate:**
+1. Write a new secret.
+2. Mint both keys into `.env`.
+3. Run `deploy-bhw.ps1 -BuildOnly`: the build compiles the keys in, and a release already built for a sha is
+   reused, so it must be built fresh.
+4. Swap the secret in the PostgREST config and restart `bhw-postgrest`.
+5. Run `deploy-bhw.ps1`.
+
+Between steps 4 and 5 the running build's keys are refused, for seconds. [`bhw-p3-identity`]
 
 **Apache** — three lines in `meridian.conf`'s `*:443` vhost, **before** the PHP handler; back up the file
 and run `httpd -t` before any restart, then re-check `/up` and `/login` at once (§8.3's outage rule):

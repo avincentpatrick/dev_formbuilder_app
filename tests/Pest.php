@@ -1196,10 +1196,10 @@ function policyGates(RoutingRoute $route): array
 /**
  * Group B — the token-consumed resource surface.
  *
- * Keyed on the route-NAME prefix, which is what delimits the group: Group A is `api.v1.tokens.*`
- * (session-authenticated, mints rather than reads) and Group C is `api.v1.public.*` (the unauthenticated
- * guest runtime, whose authorization is a signed share token and which has no `User` to ask a policy
- * about). Every caller asserts a floor on the count, because a filter that silently stopped matching
+ * Keyed on the route-NAME prefix, which is what delimits the group: Group A is `api.v1.tokens.*` and
+ * `api.v1.session.*` (session-authenticated: the mint, and since M207 `whoami`) and Group C is
+ * `api.v1.public.*` (the unauthenticated guest runtime, whose authorization is a signed share token and
+ * which has no `User` to ask a policy about). Every caller asserts a floor on the count, because a filter that silently stopped matching
  * would leave every assertion over it passing on an empty set.
  *
  * @return list<RoutingRoute>
@@ -1213,7 +1213,8 @@ function groupBRoutes(): array
 
             return str_starts_with($name, 'api.v1.')
                 && ! str_starts_with($name, 'api.v1.public.')
-                && ! str_starts_with($name, 'api.v1.tokens.');
+                && ! str_starts_with($name, 'api.v1.tokens.')
+                && ! str_starts_with($name, 'api.v1.session.');
         },
     ));
 }

@@ -16,7 +16,64 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M206`, BHW Connect's database moves onto the box: `bhw_connect` on its PostgreSQL 15, served by PostgREST, copied from the live Supabase schema (`bhw-p2-db`, `D194`, `D195` A) (m206-bhw-p2-db)
+## Status: NO ACTIVE CLAIM — `M206` released on 2026-11-03: BHW Connect runs on its own database on the box, live at 13:44:33 UTC after a 13.6-minute freeze. Nothing in the repository changed, so its docs-only close-out is its pull request (`D201`), from branch `m206-bhw-p2-db`. `M204` (PR #397) stays held for merge point 10, with `M198`, `M199` and `M200`. The next BHW claim is `bhw-p3-identity` (`D194`), which this release unblocks.
+
+## RELEASED — `M206`, BHW Connect's database moves onto the box: `bhw_connect` on its PostgreSQL 15, served by PostgREST, copied from the live Supabase schema (`bhw-p2-db`, `D194`, `D195` A) (no code: box blocks B0–B9 run by the user at the box, one guarded block at a time, live at 13:44:33 UTC on 2026-11-03 after a 13.6-minute freeze; its docs-only close-out is its pull request, merged at its own merge point (`D201`))
+
+**Live.** Every block's figures were read from its own output.
+- **B3, PostgREST 16.4.**
+  - It runs as NSSM `bhw-postgrest`, under `bhw-connect`'s account (NetworkService), delayed auto, after PostgreSQL's service.
+  - The legacy JWT secret was proved before anything was written: it re-signs both keys in BHW's `.env`. A token signed with a wrong secret gets 401.
+  - **It binds `[::1]:3001`, not `127.0.0.1`.** On Windows Server 2016, the IPv4 bind crashed right after the schema loaded, with `Network.Socket.setSockOpt: failed (WSAENOPROTOOPT)`.
+  - The cause: the Haskell `network` library's `socket` sets `DontFragment` (`IP_MTU_DISCOVER`) on every IPv4 socket and does not catch a refusal. An IPv6 socket skips that call.
+  - Proved on the dev machine first: curl and Node's `fetch` reach `[::1]`, and `127.0.0.1` is refused.
+- **B3b, the dump tools on the box.**
+  - RDP moves no files on this connection (B1), so the box dumps from Supabase itself.
+  - It uses EDB's PostgreSQL 17.11 client (340,719,294 B, sha256 `6eabdf00…cfea3`, equal to the dev machine's download), unzipped to `C:\meridian\bhw\pg17`. It is never under Program Files, where Meridian's backup takes the newest `pg_dump`.
+  - A schema-only dump on the box matched the dev machine's to the byte: 254,103 B, and 253,773 B after the strip.
+- **B4, the freeze.**
+  - Vercel's `bhw-connect-phase-2` was paused through the connector with the user's OK. It answered `503 DEPLOYMENT_PAUSED` on every path at 13:29 UTC.
+  - jongsky25's pause had landed on `bhw-connect`, which already answered 404.
+  - `bhw-connect` stopped at 13:30:55 UTC.
+- **B5, the dump.**
+  - 235,211,400 B in 58 s. The strip removed exactly one of each (330 B).
+  - Supabase's census was identical at 13:31:20 and at 13:34:12 UTC: 61 tables, 2,114,275 rows, 170 history versions.
+- **B6, the restore and checks.**
+  - Restored as `bhw_app` in one transaction in 31 s.
+  - Census 61/61, every table equal. 52 sequences, 0 behind.
+  - Baseline: 111 files recorded, 0 pending.
+  - PostgREST: 68 relations and 20 RPCs. `admin_users` gives 0 rows as anon and 1 as `service_role`; `dim_geo` gives 43,783 as anon.
+  - Its first attempt was refused before touching anything: B5 had left `PGSSLMODE=require` set in the same window.
+- **B7, the switch.**
+  - `.env` was backed up to `.env.pre-p2-20261103-134428.bak`, then `SUPABASE_REST_URL=http://[::1]:3001` and `BHW_DATABASE_URL` were added.
+  - Up at 13:44:33 UTC. Seven pages and the districts CSV answered 200 in at most 0.5 s.
+  - One `page_view` usage event landed in `bhw_connect` and not in Supabase, which still reads 6,595 with its newest at 12:52:57 UTC.
+- **From outside:**
+  - 10 top pages, 6 drill-downs and 39 exports answered 200, each export with the right magic bytes (10 CSV, 10 XLSX, 8 PPTX, 11 PNG).
+  - `/place/region/01` took 17.2 s and `/uuc-phc/region/01` 28.5 s on first view, then 0.1 s warm. **The database on the box did not cure the cold render** (`bhw-drilldown-cold-render`).
+- **B8, the deploy script.** `deploy-bhw.ps1` ran with `deployed-sha` set aside (now `deployed-sha.pre-B8`): a fresh build of `13f96732` (1,004 pages, prerendered against the box's PostgREST), `0 pending`, the swap, and live in 51 s with no recovery.
+- **B9, the backup.**
+  - `bhw-connect-db-backup` is registered (SYSTEM, 01:45 daily), with PostgreSQL 15's bin on the PATH in its own command.
+  - Its run took 14 s and wrote 26,221,181 B.
+  - The drill restored it into a scratch database in 29 s: 61 tables, 2,114,279 rows, within the live counts before and after. The scratch database was dropped.
+- **B9c, the cleanup.** Both cut-over SQL files and the PG17 client were deleted. Only the nightly dump remains in `C:\meridian\backups\bhw`.
+
+**How the prediction fared.**
+- **Right:**
+  - B0 found PostgreSQL 15 with no `vector`.
+  - pgvector 0.8.2 built off the box.
+  - B6's census equalled the source exactly.
+- **Wrong:**
+  - `meridian` was reached by four roles, not two: `meridian_app`, `meridian_auth`, `meridian_superadmin` and `postgres`.
+  - **The part I most expected to be wrong, B2m, was not.** Granting the four and revoking PUBLIC caught no unlisted role, and Meridian stayed healthy.
+- **Not predicted:**
+  - PostgREST's IPv4 socket on Server 2016. The plan had seen the Windows exe only print its version. The dev machine is Windows 11, which accepts the option.
+  - RDP moving no files, which forced the on-box dump.
+  - `pg_dump` not on the box's PATH. Filed as `bhw-deploy-db-tools`.
+  - Vercel's pause landing on the wrong project.
+  - `PGSSLMODE` left set between two blocks run in one window.
+
+The claim as taken follows.
 
 Taken 2026-11-03. Branch `m206-bhw-p2-db`, cut from origin/main at `26f2c74a`. Most of this increment is box work, done by the user one guarded block at a time (B0–B9 in `~/.claude/plans/read-claude-md-run-preflight-groovy-snail.md`). Repository edits come only if the box forces one, and each would get its own PR. `M204` (PR #397) stays held for merge point 10. Released just before: `M202`, `M205` and `M203` (below).
 

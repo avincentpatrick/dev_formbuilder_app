@@ -16,12 +16,47 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — three increments released on 2026-11-03, all merged and live on staging, each at its own merge point:
-- `M202`: the deploy-script leak (`D196`).
-- `M205`: the expired feedback-pull test, which had turned every CI run red (`D200`).
-- `M203`: P2's two BHW prerequisites (`D197`).
+## Status: ACTIVE CLAIM — `M206`, BHW Connect's database moves onto the box: `bhw_connect` on its PostgreSQL 15, served by PostgREST, copied from the live Supabase schema (`bhw-p2-db`, `D194`, `D195` A) (m206-bhw-p2-db)
 
-BHW Connect was rebuilt on the box by hand from `9370e532` with no recovery, and its admin sign-in reaches Supabase. `M204` (PR #397) stays held for merge point 10, with `M198`, `M199` and `M200`. The close-out runs on branch `m205-closeout`, and it also moves the BHW markers in `docs/adr/0024-second-application-under-one-host.md`, which is outside the close-out paths. This line names that branch on the trunk before that push. The next claim is `bhw-p2-db` (`D194`), whose two blockers these releases close.
+Taken 2026-11-03. Branch `m206-bhw-p2-db`, cut from origin/main at `26f2c74a`. Most of this increment is box work, done by the user one guarded block at a time (B0–B9 in `~/.claude/plans/read-claude-md-run-preflight-groovy-snail.md`). Repository edits come only if the box forces one, and each would get its own PR. `M204` (PR #397) stays held for merge point 10. Released just before: `M202`, `M205` and `M203` (below).
+
+Row: `bhw-p2-db`: "bhw_connect on the box's PostgreSQL 15 with CONNECT revoked from PUBLIC on both databases, pgvector built off the box, PostgREST verifying Supabase's own legacy JWT secret … the copy of the live public schema and data from Supabase … the rehearsal on the dev machine first".
+
+### Evidence verified
+- **The source, read through the connector at 09:04 UTC on 2026-11-03:** 61 `public` tables and 2,114,264 rows. The history has 170 versions, newest `20260906115008`.
+- **The repo:** 111 migration files under 109 versions, with `FLOOR` `20260905235804`.
+- **The two histories share only 5 versions.** The files carry hand-chosen versions, and Supabase recorded apply-time ones. So the live history cannot say which files ran, and the baseline covers every file up to the floor.
+- **Objects:** every table, view and function the files create is in the copy, except `_district_leaf_map`, which one migration builds and drops. The copy also holds `fact_fhsis_indicator`, `fact_fhsis_workforce`, `ref_fhsis_indicator` and the view `ref_fhsis_reconciliation`, which no file creates and no code under `lib/` or `app/` reads.
+
+### Premise verified
+- **Sign-in stays on Supabase until P3 (`D195` A).** PostgREST on the box takes Supabase's legacy JWT secret, so today's keys keep working. `M203`'s policy opening is live and proved.
+- **Nobody writes to the source.** jongsky25 has not started (`D198`). The only writes are staging visitors' usage events, which come from the box's own BHW, so stopping `bhw-connect` at B4 freezes them.
+- **Vercel still answers**, so `D184`'s pause is owed before B4. The legacy JWT secret is owed before B3.
+
+### Remedy verdict
+**The rehearsal works end to end on the dev machine.** I used the user's saved Session-pooler string, `postgres:17`'s `pg_dump`, and `pgvector/pgvector:0.8.2-pg15` (PostgreSQL 15.18).
+- **Dump:** plain SQL of `public`, 235,210,495 bytes, in 82 s.
+- **Strip:** six lines, each checked by content before removal: `\restrict`, `\unrestrict`, `SET transaction_timeout`, `CREATE SCHEMA public`, and the two-line FK `admin_users_user_id_fkey` → `auth.users`.
+- **Restore as `bhw_app` with `ON_ERROR_STOP`:** bootstrap, then restore (17 s, exit 0), then bootstrap again and `ANALYZE`.
+- **Census:** **61/61 tables and 2,114,264 rows, exactly equal to the source.** All 52 sequence counters are at or past their tables' maxima.
+- **Baseline:** `--baseline=20260905235804` failed at first with "permission denied for database". The rehearsal's database was owned by `postgres`, and `CREATE SCHEMA IF NOT EXISTS` checks the privilege first. **B2 must create the database `OWNER bhw_app`, as it does.** Owned that way, it recorded 109 versions, with 2 "already recorded" (`M203`'s fix): 111 files, **0 pending**.
+- **PostgREST v16.4:** 68 relations and 20 RPCs.
+  - Anonymous reads gave 200, and a forged key 401. `admin_users` gave 0 rows as anon and 1 as `service_role`.
+  - A feedback insert as anon gave 201.
+  - `rpc/search_documents` gave 3 rows with the service key and 0 as anon. That equals Supabase's own answers to the same calls. BHW calls it with the service client.
+  - `rpc/search_geo` gave 8 rows.
+- **BHW `next dev` against it, with the AI keys blanked:** 9 pages answered 200 in 0.4–6 s (home, `/bhw`, a region, a province, `/districts`, `/facilities`, `/profiling-status`, `/uuc-phc`, `/explore`), and the districts CSV export was 200 (786 KB). PostgREST served 199 requests: 186 × 200, 7 × 201, and 7 × 409. The 409s are `ai_provider_quota`'s documented insert race (`lib/ai/quota.ts`), not a fault.
+- **The dump, the copy and both containers were deleted the same hour.** It holds personal data.
+
+Files: none planned in the repository. At close-out: ADR-0024's marker, `docs/pipeline.md`, `PROGRESS.md` (own block), and `docs/gate-baselines.md` if a run moves.
+Shared artefacts taken: none at the claim.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace (`M206`).
+Prediction:
+- B0 finds PostgreSQL 15 on the box with no `vector` extension, and `meridian` reached by two roles.
+- pgvector 0.8.2 builds off the box against the matching EDB PostgreSQL 15 zip.
+- B6's census equals the source at the freeze exactly.
+- The part I most expect to be wrong: B2m. Revoking `CONNECT` from `PUBLIC` on `meridian` may catch a role nobody listed, such as a backup or monitoring login. That is why it has its own block with an automatic rollback.
 
 ## RELEASED — `M205`, the feedback-pull thread test stops expiring: its fixture's comments fell out of the script's fortnight window on 2026-11-03, and every CI run was red at Pest (merged as PR #398, `6d5d8dee`, first, at its own merge point (`D200`), with no rebase; 7/7 green with real step counts on its run — Static analysis 33 · BHW Connect 19 (the unchanged branch) · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run 41597956531 on `6d5d8dee` the same, with BHW Connect at 20)
 

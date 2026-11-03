@@ -16,7 +16,47 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M204`, BHW Connect is avincentpatrick's until the handover, so the move's pull requests need nobody's label (`bhw-ownership-until-handover`, `D198` A) (m204-bhw-ownership-until-handover)
+## Status: ACTIVE CLAIM — `M205`, the feedback-pull thread test stops expiring: its fixture's comments fell out of the script's fortnight window on 2026-11-03, and every CI run is red at Pest (m205-feedback-pull-test-clock)
+
+Taken 2026-11-03. Branch `m205-feedback-pull-test-clock`, cut from origin/main at `19f87694`, PR into main. `M204`, `M203` and `M202` are held below; `M202` merged as `19f87694`.
+
+**Why now.**
+- The trunk's first run after `M202` merged (CI 41584593412 on `19f87694`, started 2026-11-03 05:33 UTC) went red at Pest, 1 of 7,277. Its deploy was skipped, so nothing reached the box.
+- The failure is `FeedbackPullScriptTest` › "it shows REOPENED reports and the members' new comments since the last pull…", at line 213: the output lacks `REOPENED`.
+- `M202` changed only `apps/bhw-connect/ops/deploy-bhw.ps1`, and its own run passed this test on 2026-11-02. Every CI run from now on fails the same way: `#396`, `#397` and merge point 10 included. So this lands first.
+
+Row: filed and closed by this increment in `docs/feature-backlog.md`, on the branch, as `M201` did: "the feedback-pull thread test expired on 2026-11-03".
+
+### Evidence verified
+- **`scripts/feedback-pull.php` `feedback_pull_since()`: held.** With no state file, `since` is `gmdate(..., time() - 14 * 86400)`.
+- **`tests/fixtures/feedback-pull/router.php`: held.** The three comments are dated `2026-10-20T01:00`, `02:00` and `03:00+00:00`.
+- **The test: held.** It writes no state file before its first pull, so it reads the fortnight window. That window passed `2026-10-20T03:00Z` at 03:00 UTC on 2026-11-03.
+- **Reproduced on the host:** `vendor/bin/pest tests/Feature/Docs/FeedbackPullScriptTest.php` gives 10 of 11, failing the same test.
+
+### Premise verified
+- **The script is right; the test is wrong.** A session that has never pulled should look back a fortnight. The test's own name, "since the last pull", describes a state file that it never writes.
+- **No second copy in this file.** The other dated call, `--count --since=2026-10-19T00:00:00Z`, passes its date explicitly. `submitted_at` (`2026-10-16`) is compared only with explicit dates.
+- **Tests only.** `tests/` is site-safe in `deploy.ps1`, so a merge takes no maintenance window.
+- **The fortnight branch loses its accidental coverage.** So a deterministic case for it is added: the printed `since` is within two minutes of now minus 14 days.
+
+### Remedy verdict
+**Works, measured before any edit.** I ran the fixture router by hand with `php -S` and the script against it from the scratchpad:
+- **No state file:** "no reopened reports and no new comments since 2026-10-20T06:12:47Z". That is today's failure.
+- **A state file with `comments_since` set to `2026-10-19T00:00:00Z`:** "1 REOPENED, 1 new comment(s)", with both member comments and not the support reply.
+- **A second pull:** "no reopened reports and no new comments since 2026-10-20T03:00:00+00:00".
+
+Files: `tests/Feature/Docs/FeedbackPullScriptTest.php`, plus the row in `docs/feature-backlog.md` and `docs/pipeline.md` on the branch.
+Shared artefacts taken: `docs/feature-backlog.md` (one row, appended).
+Paired files taken: none.
+Namespaces spent: nothing from either namespace (`M205`).
+Prediction:
+- The test seeds the state file before its first pull, and one new case covers the fortnight default. The file runs 12 of 12 on the host.
+- CI is 7/7, with Pest's count one higher.
+- The part I most expect to be wrong: the state file's key is the config's URL string exactly, so a trailing slash or a port written differently would silently miss.
+
+## HELD — `M204`, BHW Connect is avincentpatrick's until the handover, so the move's pull requests need nobody's label (`bhw-ownership-until-handover`, `D198` A) (m204-bhw-ownership-until-handover)
+
+**Built. PR #397 is open and green, 7/7, with jongsky25's `boundary-approved` (2026-11-03).** Its BHW job ran 19 steps and skipped the build, because `apps/bhw-connect` is unchanged. It rides merge point 10. ⚠️ The claim says "four lines"; there are five.
 
 Taken 2026-11-02. Branch `m204-bhw-ownership-until-handover`, cut from origin/main at `e0cb402d`, PR into main. It rides merge point 10 (`D198` A, in the answer's own words). `M203` and `M202` are built and held below.
 

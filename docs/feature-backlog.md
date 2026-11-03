@@ -15648,3 +15648,15 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
     alone.
 
   **Live.** Filed by `M196`. **Tier: during-testing.**
+
+- ✅ **CLOSED BY `M205` (2026-11-03) — ****`minor` · `FeedbackPullScriptTest`'s thread test expired on 2026-11-03: it never wrote the "last pull" its name describes, so it read the script's own default, the last fortnight, and the fixture's comments, dated 2026-10-20, fell out of it — every CI run red at Pest.**
+  Found when the trunk's run 41584593412 went red at Pest, 1 of 7,277. That was the first run after `M202` merged as `19f87694`, and
+  it failed at line 213, where the output lacked `REOPENED`. Its deploy was skipped, so nothing went live.
+  - It was not `M202`'s diff. `M202` changed only `apps/bhw-connect/ops/deploy-bhw.ps1`, and its own run passed this test on 2026-11-02.
+  - With no state file, `scripts/feedback-pull.php` falls back to `time() - 14 * 86400`. The fixture's three comments are dated
+    2026-10-20, 01:00–03:00 UTC, so the window passed them at 03:00 UTC on 2026-11-03. The script was right; the test was not.
+
+  **Live.** Filed by `M205`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M205` (2026-11-03), on its branch.** The test now seeds a state file recording the last pull on 2026-10-19, and asserts
+  that the state advances to the newest member comment. A new case holds the fortnight default to within two minutes. The file runs 12
+  of 12 on the host, and a throwaway commit that set the default to 13 days turned the new case red.

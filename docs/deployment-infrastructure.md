@@ -740,6 +740,12 @@ site-safe, so **a BHW-only push opens no Meridian window** — unless the previo
 finish cleanly, in which case any push takes the full path. **Rollback:** `ops\deploy-bhw.ps1
 -AppPath C:\meridian\test-app -Rollback` — seconds, no git, no build.
 
+**Measured at `M209` (2026-11-04):**
+- The runner's first BHW deploy (run 41785500136) built a release as NETWORK SERVICE in 51 s and swapped it live.
+- A BHW-only push (run 41789678833) opened no Meridian window, built in 50 s, and swapped.
+- `-Rollback` went back one release in 2.5 s and, run again, forward in 2.4 s, health 200 both times.
+- `-Rollback` leaves `deployed-sha` as it was, so a second `-Rollback` is the way back. Otherwise the next push redeploys.
+
 **Scheduled tasks** (`apps/bhw-connect/ops/register-cron-tasks.ps1`, from the versioned
 `ops/cron-schedule.json`): `bhw-connect-precompute` and `bhw-connect-regression-replay`, daily, each a
 local call to `/bhw-connect/api/cron/…` with the bearer read from `.env` when it runs; and
@@ -755,6 +761,11 @@ drill into `bhw_connect_restoretest` is part of `bhw-p2-db`.
 - The box: 63.5 GB of memory with 57.9 GB free, and 32 logical CPUs at 1%.
 - BHW's node: 132 MB; PostgREST: 71 MB.
 - PostgreSQL, serving both databases: 358 MB; php-cgi: 380 MB.
+
+**The load check** (`M209`'s E2), right after a restart had emptied BHW's caches:
+- Twelve BHW drill-down views ran at once, all 200, in 0.4 to 30.4 s.
+- Meridian's `/up` stayed at 35 ms median and 66 ms worst. CPU peaked at 2.5%, and BHW's node at 134 MB.
+- BHW's slow first views wait rather than compute (`bhw-drilldown-cold-render`), and they do not slow Meridian.
 
 **What can take which down.** BHW cannot take Meridian down through a deploy: it runs outside the
 checkout, from its own database, behind its own service. Only a bad Apache line can, which `httpd -t`

@@ -68,11 +68,24 @@ jobs:
       # aside, migrates with a census, swaps the `current` junction, and swaps back by itself on a failed
       # health check. The runner may stop and start `bhw-connect` because the box gave NETWORK SERVICE the
       # worker's own service right (M209's E1).
+      #
+      # M210 (`D199`): BHW's own settings come first. Each is the repository secret BHW_<NAME>, which
+      # ops/write-settings.ps1 writes into the box's BHW .env. An unset secret arrives empty and keeps the
+      # box's value; GitHub masks every one in this log, and the script prints names, never values. A
+      # changed setting needs a restart, which deploy-bhw.ps1 gives when there is no new release to swap
+      # in. `bhw-settings.yml` does the same on demand, with no push.
       - name: Run BHW Connect's deploy-bhw.ps1 against the same checkout
         shell: powershell
         timeout-minutes: 30
         env:
           MERIDIAN_APP_PATH: ${{ vars.MERIDIAN_APP_PATH }}
+          BHW_SETTING_GEMINI_API_KEY: ${{ secrets.BHW_GEMINI_API_KEY }}
+          BHW_SETTING_GROQ_API_KEY: ${{ secrets.BHW_GROQ_API_KEY }}
+          BHW_SETTING_OPENROUTER_API_KEY: ${{ secrets.BHW_OPENROUTER_API_KEY }}
+          BHW_SETTING_MISTRAL_API_KEY: ${{ secrets.BHW_MISTRAL_API_KEY }}
+          BHW_SETTING_CRON_SECRET: ${{ secrets.BHW_CRON_SECRET }}
+          BHW_SETTING_USAGE_EVENTS_IP_SALT: ${{ secrets.BHW_USAGE_EVENTS_IP_SALT }}
         run: |
           $app = if ($env:MERIDIAN_APP_PATH) { $env:MERIDIAN_APP_PATH } else { 'C:\meridian\app' }
-          & "$app\apps\bhw-connect\ops\deploy-bhw.ps1" -AppPath $app
+          $changed = & "$app\apps\bhw-connect\ops\write-settings.ps1"
+          & "$app\apps\bhw-connect\ops\deploy-bhw.ps1" -AppPath $app -RestartIfSkipped:($changed -gt 0)

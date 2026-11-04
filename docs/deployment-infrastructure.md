@@ -755,7 +755,21 @@ drill into `bhw_connect_restoretest` is part of `bhw-p2-db`.
   answered 200.
 - `CRON_SECRET` was empty, so E1 made one on the box (32 random bytes) and restarted `bhw-connect` to load it.
 - `GEMINI_API_KEY` is set. The Groq, OpenRouter and Mistral fallbacks and `USAGE_EVENTS_IP_SALT` are empty.
-  BHW's settings move to GitHub repository secrets in `bhw-settings-from-github`.
+  These six now come from GitHub (`M210`, `D199`), as described next.
+
+**BHW's own settings from GitHub (`M210`, `D199`).**
+- **What:** `GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `MISTRAL_API_KEY`, `CRON_SECRET` and
+  `USAGE_EVENTS_IP_SALT`, each a repository secret named `BHW_<NAME>`.
+- **How they get there:** `apps/bhw-connect/ops/write-settings.ps1` writes them into `C:\meridian\bhw\.env`,
+  as the runner, before `deploy-bhw.ps1` runs. That happens in `deploy.yml`'s second step, and on demand in
+  `.github/workflows/bhw-settings.yml`, which deploys nothing.
+- **An unset secret keeps the box's value.** Only those six names are ever written, never the database URL,
+  PostgREST's keys or a `NEXT_PUBLIC_` value. The log names what changed and never a value.
+- **A changed setting restarts `bhw-connect`** (`-RestartIfSkipped`) when no new release is swapped in.
+- **Before a change,** `.env` is copied into `C:\meridian\backups\bhw\env` (newest 10), which, unlike the BHW
+  folder, local users cannot read.
+- ⛔ `.env` carries its own ACL, with inheritance off, so the runner needs Modify on the file itself
+  (`M210`'s G1). Without it the step fails before BHW deploys, and Meridian is untouched.
 
 **Room** (`M209`'s E0, 2026-11-04):
 - The box: 63.5 GB of memory with 57.9 GB free, and 32 logical CPUs at 1%.

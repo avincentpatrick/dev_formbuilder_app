@@ -781,6 +781,22 @@ drill into `bhw_connect_restoretest` is part of `bhw-p2-db`.
 - Meridian's `/up` stayed at 35 ms median and 66 ms worst. CPU peaked at 2.5%, and BHW's node at 134 MB.
 - BHW's slow first views wait rather than compute (`bhw-drilldown-cold-render`), and they do not slow Meridian.
 
+**The development copy** (`M211`, `D207`). CI and BHW's local stack build its database from a copy taken
+on the box, never from the box itself.
+- **What it is:**
+  - `apps/bhw-connect/db/baseline/schema.sql`: the live schema, dumped and cleaned of the lines a plain
+    PostgreSQL 15 rejects;
+  - `db/baseline/version.txt`: the newest migration it holds;
+  - `supabase/seed.sql`: `dim_*` and `ref_fhsis_indicator` copied, and every `agg_*` and `fact_*` row
+    generated, so nothing real reaches this public repository.
+- **How it is taken:** `.github/workflows/bhw-dev-snapshot.yml` runs `ops/dev-snapshot.ps1` as the runner,
+  by dispatch only, and uploads the three files for a day. It reads the database and changes nothing.
+  The first run (41867222568, 2026-11-05) gave 298,038, 16 and 7,636,239 bytes. Its seed was byte-identical
+  to one made from Supabase's data at the move.
+- **How it is used:** `db/load-dev.mjs` builds an empty database from it. CI does this for every BHW pull
+  request, in a second database `bhw_seeded`, then builds the app against PostgREST over it and renders five
+  pages.
+
 **What can take which down.** BHW cannot take Meridian down through a deploy: it runs outside the
 checkout, from its own database, behind its own service. Only a bad Apache line can, which `httpd -t`
 prevents. Meridian cannot take BHW down through a deploy either; a PostgreSQL restart affects both.

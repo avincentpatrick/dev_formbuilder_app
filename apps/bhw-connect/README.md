@@ -32,6 +32,19 @@ npm run typecheck
 npm test
 ```
 
+With a database, in the testing box's shape (PostgreSQL 15 with pgvector, and PostgREST), built from the
+committed development copy: the live schema in `db/baseline/`, and a made-up seed in `supabase/seed.sql`
+(real geography, every count and every person generated; real data stays on the testing server):
+
+```bash
+docker compose up -d
+BHW_DEV_DATABASE_URL=postgres://postgres:bhw-local@127.0.0.1:5442/bhw_connect node db/load-dev.mjs
+```
+
+Then set `.env.local` from `.env.example`'s local section, with keys from `node db/mint-jwt.mjs`. The copy
+is refreshed from the testing server by the **BHW Connect dev copy** workflow. The live site is
+https://staging.pitahc.gov.ph/bhw-connect.
+
 ## Key commitments
 
 - **Free-tier only** hosting (Vercel Hobby + Supabase Free) and AI (multi-provider free tiers with auto-pause and graceful degradation — the dashboard never depends on AI availability).

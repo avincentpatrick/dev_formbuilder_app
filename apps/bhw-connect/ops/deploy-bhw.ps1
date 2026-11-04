@@ -33,6 +33,8 @@
   -Rollback points the junction at the previous release and restarts: no git, no build.
   -BuildOnly does steps 2 only (the first install, before the service exists).
   -PlanOnly prints step 1's decision and changes nothing.
+  -RestartIfSkipped restarts the service, and checks its health, when step 1 finds nothing to deploy:
+  ops\write-settings.ps1 changed a setting in .env, which only a restart loads (Meridian's D199).
 
   Plain ASCII on purpose: Windows PowerShell 5.1 reads a file without a BOM as ANSI.
 #>
@@ -44,7 +46,8 @@ param(
     [int]$KeepReleases = 3,
     [switch]$Rollback,
     [switch]$BuildOnly,
-    [switch]$PlanOnly
+    [switch]$PlanOnly,
+    [switch]$RestartIfSkipped
 )
 
 $ErrorActionPreference = 'Stop'
@@ -334,6 +337,14 @@ if ($PlanOnly) {
 }
 if ($plan.Action -eq 'skip' -and -not $BuildOnly) {
     Set-Content -LiteralPath $DeployedShaFile -Value $plan.Sha -Encoding ASCII
+    if ($RestartIfSkipped) {
+        Write-Step "restarting $ServiceName so it loads the changed settings"
+        Restart-Service -Name $ServiceName
+        if (-not (Wait-Healthy)) {
+            throw "BHW did not answer 200 at $HealthUrl within 60 s of its restart. Read $BhwRoot\logs."
+        }
+        Write-Step "$ServiceName restarted and healthy"
+    }
     exit 0
 }
 

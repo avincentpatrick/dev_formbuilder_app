@@ -53,7 +53,13 @@ miss; a root-relative string kept in a variable first is beyond it, so wrap wher
 
 - Change `package-lock.json` with npm 10 (`npx npm@10 install …`): npm 11 rewrites entries the
   change did not touch.
-- Secrets never go in git or in chat. A new one is a line in `.env.example` and a note in the pull
-  request; Meridian's owner adds it on the box before the merge.
+- Secrets never go in git or in chat.
+  - Your own settings are repository secrets named `BHW_<NAME>`, written onto the box by every deploy:
+    the AI keys, `CRON_SECRET` and `USAGE_EVENTS_IP_SALT`.
+  - To change one: set the secret, then run the **BHW Connect settings** workflow (`gh workflow run
+    bhw-settings.yml`), which writes it and restarts the app. An unset secret keeps the box's value.
+  - A new setting is a line in `.env.example` and a note in the pull request. For it to come from GitHub
+    too, add it to `ops/write-settings.ps1`'s list and to both workflows, as `docs/working-agreement.md` §6
+    says. Otherwise Meridian's owner adds it on the box.
 - Every page carries a strict Content-Security-Policy (`lib/csp.ts`): an inline `<script>` runs only
   with the request's nonce, and an external script or font origin must be added to the policy.

@@ -57,3 +57,72 @@ it('keeps production deploys from overlapping', function (): void {
     expect($workflow)->toContain('group: production-deploy')
         ->and($workflow)->toContain('cancel-in-progress: false');
 });
+
+/*
+| M210 (`D199`): BHW's own settings, from repository secrets. Three files must name the same six settings —
+| ops/write-settings.ps1's allowlist and the env of both workflows that run it — or a secret is set in
+| GitHub and silently never reaches the box, or a name reaches the script that it was never meant to write.
+*/
+
+/** The settings ops/write-settings.ps1 may write, as its `$Settings = @(...)` declares them. */
+function bhwSettingsAllowlist(): array
+{
+    $script = (string) file_get_contents(base_path('apps/bhw-connect/ops/write-settings.ps1'));
+    expect(preg_match('/^\$Settings\s*=\s*@\(([^)]*)\)/mu', $script, $m))->toBe(1);
+    preg_match_all("/'([A-Z0-9_]+)'/", $m[1], $names);
+
+    return $names[1];
+}
+
+/** The BHW_SETTING_<NAME>: ${{ secrets.BHW_<NAME> }} pairs a workflow file maps, as NAME => secret name. */
+function bhwSettingsMapped(string $workflow): array
+{
+    $text = (string) file_get_contents(base_path('.github/workflows/'.$workflow));
+    preg_match_all('/^\s+BHW_SETTING_([A-Z0-9_]+):\s*\$\{\{\s*secrets\.([A-Z0-9_]+)\s*\}\}\s*$/mu', $text, $m, PREG_SET_ORDER);
+
+    $mapped = [];
+    foreach ($m as [, $name, $secret]) {
+        $mapped[$name] = $secret;
+    }
+
+    return $mapped;
+}
+
+it('maps exactly the six BHW settings, each from its own BHW_ secret, in both workflows', function (): void {
+    $allowed = bhwSettingsAllowlist();
+
+    expect($allowed)->toEqual(['GEMINI_API_KEY', 'GROQ_API_KEY', 'OPENROUTER_API_KEY', 'MISTRAL_API_KEY', 'CRON_SECRET', 'USAGE_EVENTS_IP_SALT']);
+
+    foreach (['deploy.yml', 'bhw-settings.yml'] as $workflow) {
+        $mapped = bhwSettingsMapped($workflow);
+        expect(array_keys($mapped))->toEqual($allowed, "{$workflow} maps a different set of BHW settings");
+        foreach ($mapped as $name => $secret) {
+            expect($secret)->toBe('BHW_'.$name);
+        }
+    }
+});
+
+it('writes the settings before BHW deploys, and restarts it when one changed', function (): void {
+    $bhw = deployWorkflowSteps()[1];
+
+    $write = strpos($bhw, '& "$app\apps\bhw-connect\ops\write-settings.ps1"');
+    $deploy = strpos($bhw, '& "$app\apps\bhw-connect\ops\deploy-bhw.ps1" -AppPath $app -RestartIfSkipped:($changed -gt 0)');
+    expect($write)->not->toBeFalse()
+        ->and($deploy)->not->toBeFalse()
+        ->and($write)->toBeLessThan($deploy);
+});
+
+it('applies the settings on demand without ever deploying Meridian', function (): void {
+    $text = (string) file_get_contents(base_path('.github/workflows/bhw-settings.yml'));
+
+    // Run by hand only, inside the deploy's own concurrency group, on the box.
+    expect(preg_match('/^on:\s*\n\s+workflow_dispatch:\s*$/mu', $text))->toBe(1);
+    expect(preg_match('/^\s+(push|pull_request|workflow_run|schedule):/mu', $text))->toBe(0);
+    expect($text)->toContain('group: production-deploy')
+        ->and($text)->toContain('runs-on: self-hosted')
+        ->and($text)->toContain('-RestartIfSkipped:($changed -gt 0)');
+
+    // deploy.ps1 moves the checkout; this workflow must only ever use the commit it last moved to.
+    expect($text)->not->toContain('deploy.ps1" -AppPath')
+        ->and($text)->not->toContain('\deploy.ps1');
+});

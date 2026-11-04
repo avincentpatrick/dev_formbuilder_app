@@ -76,9 +76,30 @@ anywhere yet.
 
 ## 6. Secrets
 
-Never in git, never in chat. BHW's live settings are in a file on the server that only avincentpatrick
-writes. A new secret is: a line in `apps/bhw-connect/.env.example`, a note in the pull request, and
-avincentpatrick adds it on the server before the merge.
+Never in git, never in chat. BHW's live settings are in a file on the server, `C:\meridian\bhw\.env`.
+Two kinds of setting live there.
+
+**BHW's own settings: jongsky25's, set in GitHub (`D199`).** These are the AI providers' keys
+(`GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `MISTRAL_API_KEY`), `CRON_SECRET` and
+`USAGE_EVENTS_IP_SALT`.
+- **Where they live:** each is a repository secret named `BHW_<NAME>`, set under the repository's Settings →
+  Secrets and variables → Actions.
+- **When they reach the server:** every deploy writes them into the file before BHW's deploy runs. For a
+  changed key with no code change, run the **BHW Connect settings** workflow from the Actions tab
+  (`gh workflow run bhw-settings.yml`). It writes them and restarts BHW, and it deploys nothing.
+- **An unset secret keeps the server's value**, so a key can't be blanked by accident. The log shows which
+  names changed, never a value.
+
+**The server's own settings: avincentpatrick's, set on the box.** These are the database address, PostgREST's
+keys, and every `NEXT_PUBLIC_` value, which the build compiles in.
+
+**A new BHW setting** is a line in `apps/bhw-connect/.env.example` and a note in the pull request.
+- To make it one of the GitHub-managed ones, add it to `ops/write-settings.ps1`'s list and to both workflows.
+  `tests/Feature/Deploy/DeployWorkflowTest.php` holds the three equal.
+- Otherwise avincentpatrick adds it on the server before the merge.
+
+**Trust.** Anyone who can set repository secrets can set Meridian's too, and a workflow change can read any
+secret. That is why `.github/` is shared and needs both owners after the handover (§1).
 
 ## 7. Each application keeps its own things
 

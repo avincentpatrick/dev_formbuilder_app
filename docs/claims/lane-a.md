@@ -16,9 +16,9 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M209`, BHW Connect deploys itself on every merge, its scheduled jobs run on the box, and a BHW-only push and a rollback prove it (`bhw-p1-box`'s remainder, with `bhw-screenshot-trace` as the BHW-only push) (m209-bhw-p1-box)
+## Status: ACTIVE CLAIM — `M209`, BHW Connect deploys itself on every merge, its scheduled jobs run on the box, and a BHW-only push and a rollback prove it (`bhw-p1-box`'s remainder, with `bhw-screenshot-trace` as the BHW-only push) (m209-bhw-p1-box, m209-bhw-screenshot-trace)
 
-Taken 2026-11-04. Branch `m209-bhw-p1-box`, cut from origin/main at `ca2dbb57`, PR into main. Two pull requests, both titled `M209`:
+Taken 2026-11-04. Branch `m209-bhw-p1-box`, cut from origin/main at `ca2dbb57`, PR into main. Two pull requests, both titled `M209`, on two branches (the second, `m209-bhw-screenshot-trace`, named in this claim by an amendment pushed after its one file was edited: the pre-push guard refused the branch until then):
 - the deploy wiring (`.github/workflows/deploy.yml`, a test that pins it, runbook 8.4);
 - after it, the BHW-only push (`bhw-screenshot-trace`), whose deploy is the proof.
 

@@ -9,8 +9,8 @@
   never see "bhw_connect", so BHW has its own: pg_dump --format=custom into the backup folder, the
   newest -Keep dumps kept. fact_bhw_raw holds personal records, so the folder is readable by the
   operator account only (the runbook's 8.4 sets that ACL once). The connection comes from
-  BHW_DATABASE_URL in <BhwRoot>\.env. Exits non-zero on any failure, so the task's last result
-  shows it.
+  BHW_DATABASE_URL in <BhwRoot>\.env, and pg_dump from Resolve-PgDump (ops\pg-tools.ps1), since the
+  box's PATH has none. Exits non-zero on any failure, so the task's last result shows it.
 
   Plain ASCII on purpose: Windows PowerShell 5.1 reads a file without a BOM as ANSI.
 #>
@@ -22,19 +22,22 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$url = $null
+. (Join-Path $PSScriptRoot 'pg-tools.ps1')
+
+$values = @{}
 foreach ($line in Get-Content -LiteralPath (Join-Path $BhwRoot '.env')) {
-    if ($line -match '^\s*BHW_DATABASE_URL\s*=\s*(.+?)\s*$') {
-        $url = $Matches[1].Trim('"').Trim("'")
+    if ($line -match '^\s*(BHW_DATABASE_URL|BHW_PG_DUMP)\s*=\s*(.+?)\s*$') {
+        $values[$Matches[1]] = $Matches[2].Trim('"').Trim("'")
     }
 }
+$url = $values['BHW_DATABASE_URL']
 if (-not $url) {
     throw "BHW_DATABASE_URL is not set in $BhwRoot\.env; there is no local BHW database to dump yet."
 }
 
 New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
 $file = Join-Path $BackupDir ("bhw_connect-{0}.dump" -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
-& pg_dump --format=custom "--file=$file" --dbname $url
+& (Resolve-PgDump $values) --format=custom "--file=$file" --dbname $url
 if ($LASTEXITCODE -ne 0) {
     Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
     throw "pg_dump exited with code $LASTEXITCODE."

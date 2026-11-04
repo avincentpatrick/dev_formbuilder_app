@@ -9666,3 +9666,35 @@ recomputable against the base it was computed on — but they are *the source's*
 *the source's* ratios. No per-capita figure on this site moves onto them. The entry above says not
 to re-litigate that precedence on the strength of "census is more official"; "FHSIS is more recent"
 is the same argument wearing a different hat, and it gets the same answer.
+
+## 2026-11-03 — Admins sign in with Meridian; screenshots on the box's disk (Meridian's `bhw-p3-identity`)
+
+Written by Meridian's session (`M207`), which owns this folder until the handover (Meridian's `D198`).
+It supersedes Increment 2.5's auth choices; the two-layer gate and its fail-closed default stand.
+
+- **Who is signed in comes from Meridian.** On the testing box this app shares Meridian's address, so the
+  browser already carries Meridian's `meridian-session` cookie here. `lib/db/meridian-identity.ts`
+  forwards that one cookie, unchanged, to Meridian's `GET /api/v1/auth/whoami` (at `MERIDIAN_INTERNAL_URL`)
+  and reads back the person's id, name and email. It caches each answer for 30 seconds per cookie and never
+  caches a failure. Meridian answers only for an active, verified member of its workspace (a 403 otherwise,
+  which reads here as "signed in, not an admin").
+- **Who is an admin is still `admin_users`,** now keyed by the Meridian user's id (a uuid, like the Supabase
+  one it replaces, so no schema change). The first admin is added by Meridian's owner on the box:
+  `insert into admin_users (user_id, role) values ('<Meridian user id>', 'admin') on conflict do nothing;`.
+  The id is what `/api/v1/auth/whoami` shows that person when signed in. The old row, keyed by the Supabase
+  account, stays and matches nobody.
+- **`/admin/login` has no form any more.** It says to sign in on Meridian and come back through the BHW
+  Connect link in Meridian's account menu (or its footer). Meridian's sign-in takes no return address, because one would be an open
+  redirect. Sign-out posts to Meridian's `/logout`. `proxy.ts` only checks that the cookie exists and makes no
+  network call.
+- **Local development without Meridian:** `BHW_AUTH_MODE=stub` signs in a fixed admin
+  (`00000000-0000-4000-8000-000000000001`; give it an `admin_users` row). A production server ignores it.
+- **Feedback screenshots are files**, under `BHW_STORAGE_DIR` (`C:\meridian\bhw\storage` on the box,
+  `./.local-storage` elsewhere), in the bucket's old layout `<session uuid>/<uuid>.jpg|png`, so
+  `feedback.screenshot_path` is unchanged. The box downloaded the 34 the bucket held. Admins see them through
+  `app/api/admin/screenshot/route.ts`, which answers 404 to anyone else and to any path not in that shape.
+- **`@supabase/ssr` is gone.** No Supabase client, URL or key reaches the browser any more (measured on the
+  build: none of `signInWithPassword`, `createBrowserClient` or `supabase` in `.next/static`). The CSP's
+  opening to Supabase's origin (Meridian's `bhw-admin-signin-csp`) is removed with it. `NEXT_PUBLIC_SUPABASE_URL`
+  survives only as the prefix supabase-js puts on REST calls, which `lib/db/data-plane.ts` sends to PostgREST,
+  and the anon and service keys are minted by `db/mint-jwt.mjs` from the box's own secret.

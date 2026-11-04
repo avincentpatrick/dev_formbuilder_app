@@ -24,10 +24,195 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D192`, the last filed, was asked and answered on 2026-10-29 once `M196` was built, and recorded with `M197`'s claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D207`, the last filed, was asked and answered on 2026-11-04 while `bhw-p4-loop` was planned, and recorded the same day. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D207 — `bhw-p4-loop` commits a development copy of BHW's database to this public repository, so CI and jongsky25's Claude sessions get a working database. What does it hold? **A — made-up figures: the real public reference tables (PSGC geography down to barangays, the dataset list), and every count and every person generated.**
+
+**Asked and answered 2026-11-04 (user decision, in chat), while `bhw-p4-loop` was planned.** The user asked first why anything would be invented, since the real data exists. It does, and it stays where it is: on the box, served by staging. This copy is only the small one that CI and cloud sessions load. Those run on GitHub's machines, so the copy must live in git, and this repository is public (`D48`; `D181`: personal records never pass through git).
+- **A — made-up figures (recommended, chosen).** `dim_*` tables are copied whole; `agg_*` and `fact_*` rows are generated in the real shape (real geography codes, plausible ranges). No real count, including a barangay's small one that could point to a person, enters git. Pages work in CI and in development, showing invented numbers.
+- **B — a sample of the real figures**, the seed script's rule until now: about 1,000 real `agg_*` rows per table, people still generated. Real small-area counts would become public, past BHW's own small-cell suppression.
+- **C — no copy in git.** CI keeps testing without BHW's data, and staging stays the only place to check a page.
+
+**What the answer files:** `bhw-p4-loop` builds on it: `db/make-seed.mjs` generates `agg_*` rows too. Found while planning, and filed on `bhw-handover`: archiving jongsky25's old repository is its owner's click (avincentpatrick has push, not admin; `archived: false` on 2026-11-04), so it joins the handover page as `D206`'s deletions did.
+
+### D206 — Supabase's documentation says a project on a paid plan cannot be paused, and jongsky25's organisation is on Pro, so `D183`'s "paused for 30 days as the rollback, then deleted" cannot be done. BHW Connect reads nothing from it since `bhw-p3-identity`. What happens to it? **A — it stays as it is, and the handover page asks jongsky25 to delete it and downgrade his organisation, with the two Vercel projects.**
+
+**Asked and answered 2026-11-04 (user decision, in chat), at `M207`'s last box step.** The user asked first whether it would block the remaining work. It does not: none of `bhw-deploy-db-tools`, P1's remainder, `bhw-settings-from-github`, P4 (its seed comes from the box), merge point 10 or the handover reads Supabase. The user: *"if no, then lets leave it to jong. since we have already fully migrated to the server"*.
+- **A — leave it until the handover (recommended, chosen).** Nobody touches it until then. It keeps `D198`'s one message to jongsky25. His Pro bill runs until he acts.
+- **B — ask jongsky25 now** to delete it and downgrade, which stops his bill sooner and ends the rollback copy at once.
+
+Measured the same day:
+- A move to a Free organisation, the only route to a pause, is closed too: the database is 651 MB against Free's 500 MB.
+- The box holds everything Supabase had at the cut-over and every write since, the 34 screenshots, and nightly dumps with a restore drill.
+- Deleting the project or downgrading the organisation needs its Owner; avincentpatrick is a Developer there.
+
+**What the answer files:** `bhw-supabase-vercel-delete` is retitled for the deletion and the downgrade, blocked by `bhw-handover`. `bhw-handover` names it.
+
+### D202 — `bhw-p3-identity` changes files under `apps/bhw-connect/`, which `.github/CODEOWNERS` on `main` still gives to jongsky25 until `#397` (`M204`) merges, so its pull request would need his label. When does `#397` merge? **A — now, at its own merge point, once a trunk merge has a fresh green run.**
+
+**Asked and answered 2026-11-03 (user decision, in chat), while `bhw-p3-identity` was planned.** `D198` had `#397` ride merge point 10. The user's goal of the same day finishes P3, `bhw-deploy-db-tools`, P1's remainder, `bhw-settings-from-github` and P4 before merge point 10, and each would have needed his label.
+- **A — now, on its own (recommended, chosen).**
+  - `#397` changes `.github/CODEOWNERS`, `docs/working-agreement.md` and `scripts/boundary-check-controls.php`, all site-safe for `deploy.ps1`, so there is no maintenance window.
+  - It already carries jongsky25's label.
+  - This is the same exception to "never a lone small PR" that `D196`, `D197`, `D200` and `D201` made.
+  - Merge point 10 keeps `#391`–`#393`.
+- **B — keep it in merge point 10**, and ask jongsky25 to label each pull request of the move that touches his paths or the shared ones.
+
+**What the answer files:** nothing new. `bhw-ownership-until-handover` closes when `#397` merges.
+
+### D203 — `bhw-p3-identity` changes Meridian itself (a new `GET /api/v1/auth/whoami`, the API-key mint, the top bar and the footer, `VERSION`), so its deploy opens a Meridian maintenance window under the testers. How does it merge? **A — at its own merge point, with the user's staging census before and after.**
+
+**Asked and answered 2026-11-03 (user decision, in chat), while `bhw-p3-identity` was planned.**
+- **A — its own merge point (recommended, chosen).** The census, the merge on every required check green, the deploy finished and the site answering, the census again. The box steps follow: the admin row, the key rotation and rebuild, and the Supabase pause.
+- **B — inside merge point 10**, with `#391`–`#393` and one census pair. Merge point 10 would move up to P3, ahead of the rest of the move.
+
+**What the answer files:** nothing new.
+
+### D204 — After `bhw-p3-identity`, BHW Connect decides its admins by Meridian account. Its only admin today is jongsky25's Supabase login, and he has no Meridian account on staging. Who is BHW's admin when P3 goes live? **A — the user's own Meridian account now; jongsky25's at the handover.**
+
+**Asked and answered 2026-11-03 (user decision, in chat), while `bhw-p3-identity` was planned.** Measured the same day: `admin_users` has one row (role `admin`, keyed by the Supabase user's uuid), and Meridian's user ids are uuids too, so a Meridian account takes a row with no schema change.
+- **A — the user now, jongsky25 at the handover (recommended, chosen).** Nothing is configured with him before the handover (`D198`). His old row stays, inert, because staging data is never removed.
+- **B — both now.** He would be invited to the staging site, and so emailed, before the handover.
+
+**What the answer files:** `bhw-handover` gains his Meridian account on staging and his `admin_users` row.
+
+### D205 — One address is one origin, so a script on a BHW page could use the visitor's Meridian session to mint a Meridian API key (`docs/adr/0024-second-application-under-one-host.md` §D2). `bhw-p3-identity` puts a password re-check on the mint (`D178`). Which kind? **A — the account's password in every mint request.**
+
+**Asked and answered 2026-11-03 (user decision, in chat), while `bhw-p3-identity` was planned.** Measured the same day: the mint is `POST /api/v1/auth/tokens`, backend-only, with no page that calls it. Meridian's `step-up` gate answers a JSON request with a bare 423 outside the API's error envelope, and lets every request through for 15 minutes after any password confirmation.
+- **A — the password every time (recommended, chosen).** The request carries `password`, checked with the existing `current_password:web` rule, so a script cannot mint a key without it. An account that signs in only with Google or SSO holds a random password and cannot mint a key until it sets one. Nobody mints keys today, since no page does.
+- **B — the existing 15-minute `step-up` window.** It works for SSO accounts, but a script can mint within 15 minutes of any confirmation.
+
+**What the answer files:** `api-key-mint-sso-password` (before-launch), a way for a Google- or SSO-only account to mint a key.
+
+### D201 — `M206` moved BHW Connect's database onto the box by hand and changed no repository code, so it has no pull request. `preflight` cross-checks the newest released increment against merged pull-request titles and fails every session until one titled `M206` or later merges. How does its close-out land? **A — as a docs-only pull request titled `M206`, merged at its own merge point as soon as every required check is green.**
+
+**Asked and answered 2026-11-03 (user decision, in chat), once the box blocks B3–B9 were done; recorded the same day.**
+- **A — a docs-only pull request, merged on green (recommended, chosen).**
+  - Its paths are documentation, which `deploy.ps1` treats as site-safe, so there is no maintenance window.
+  - Its title gives `scripts/state.php` its second, independent `M206`.
+  - This is the same exception to "never a lone small PR" that `D196`, `D197` and `D200` made.
+- **B — a direct push, with a row to teach the cross-check that a release marked "no pull request" agrees.** Every session's preflight would fail until that row was built.
+- **C — the pull request held for merge point 10**, failing preflight until then.
+
+**What the answer files:** nothing new. `M206`'s close-out is that pull request.
+
+### D200 — Since 03:00 UTC on 2026-11-03, every CI run is red at Pest, because a test's fixture dates fell out of the feedback script's fortnight window. Nothing can deploy, `#396` included. `M205` (PR #398) fixes the test. When does it merge? **A — at its own merge point, first, as soon as every required check is green.**
+
+**Asked and answered 2026-11-03 (user decision, in chat), once #398 was open; recorded the same day.**
+- **A — as soon as green, first (recommended, chosen).** Its paths, `tests/` and `docs/`, are site-safe for `deploy.ps1`, so there is no maintenance window. The trunk turns green, and then `#396` merges under `D197`.
+  - This is the same exception to "never a lone small PR" that `D196` made: that rule's reason, a deploy under the testers, does not hold for a site-safe path.
+- **B — with merge point 10**, with `#397` and `#391`–`#393` and the census before and after. `#396` and `bhw-p2-db` would wait for it.
+
+**What the answer files:** nothing new. `M205` files and closes its own row on its branch.
+
+### D198 — jongsky25 has not started on BHW Connect, and the user wants the whole move onto the box finished before handing it to him. Meanwhile every BHW pull request needs his `boundary-approved` label. How is that handled? **A — one label, then BHW is avincentpatrick's until the handover.**
+
+**Asked and answered 2026-11-02 (user decision, in chat), once `M202` and `M203` were open; recorded with `M204`'s claim.** The user said jongsky25 starts only when told, once BHW's database is on the box, and asked: "can we finish everything so we won't have to config it with jong and me … when we turn it over to jong, let's make sure that everything is in his hands." The move still needs about six pull requests that touch his paths or the shared ones: #395, #396, P2, P3, P1's deploy wiring and P4.
+- **A — one label, BHW is avincentpatrick's until the handover (recommended, chosen).**
+  - jongsky25 labels once, on one pull request that sets his lines in `.github/CODEOWNERS` aside and says so in the working agreement.
+  - Every later pull request of the move needs nobody.
+  - The handover's pull request puts his lines back.
+  - That pull request rides merge point 10.
+- **B — jongsky25 labels each pull request**: about six times over the move, one click each.
+- **C — hold every BHW pull request until he starts**, P2 included, so BHW stays on his Supabase until then.
+
+**What the answer files, in `docs/adr/0024-second-application-under-one-host.md`:**
+- `bhw-ownership-until-handover`, claimed as `M204`.
+- `bhw-handover`, which puts the ownership back once the move and `D199`'s settings are done.
+
+**Found while answering, 2026-11-02:**
+- This session's Supabase and Vercel connectors are signed in to jongsky25's organisation and team. So P2's connection string and legacy JWT secret (`D195`) can come from the user's own dashboard, if the user's role shows them, with no message to him.
+- His web app never uses the database password; only his offline `ingestion/` scripts do. A reset to build the connection string is therefore safe while he has not started.
+- Vercel refused this session the project's variables (403), so its pause (`D184`) may still need his click.
+
+### D199 — At the handover, what does "everything in jongsky25's hands" cover? **A — his merges deploy themselves, and his app's settings are GitHub repository secrets that the deploy writes onto the box, so he changes them himself.**
+
+**Asked and answered 2026-11-02 (user decision, in chat), with `D198`.**
+- **A — merges deploy; settings via GitHub (recommended, chosen).**
+  - A merge builds, migrates and goes live with no hand step (`bhw-p1-box`'s deploy wiring).
+  - BHW's own settings (his third-party API keys, `CRON_SECRET`, the usage-log salt) are repository secrets that `deploy.yml` writes into `C:\meridian\bhw\.env`.
+  - A handover page says what is his and where it lives.
+- **B — merges deploy; settings through avincentpatrick**, who edits the box's file when asked. This is the working agreement's section 6 today.
+- **C — A, plus his own account on the box** for BHW's service and logs. The agency's IT would have to allow it.
+
+**Premise checked before recording:** on a personal-account repository, a collaborator may create repository secrets, while environment secrets are the owner's alone (GitHub's "Using secrets in GitHub Actions", read 2026-11-02). So the settings are repository secrets, not an environment's.
+- It is trust-based, as `D177`'s label is. A collaborator who can set BHW's secrets can overwrite Meridian's too, and a workflow change can read any secret.
+- After the handover `.github/` is shared again, so such a workflow change needs both owners.
+
+**What the answer files:**
+- `bhw-settings-from-github`, blocked by `bhw-p1-box`.
+- The handover page, in `bhw-handover`.
+- The working agreement's section 6 changes at the handover.
+
+### D197 — `M203` (PR #396, `bhw-migrate-duplicate-versions` + `bhw-admin-signin-csp`) changes only files under `apps/bhw-connect/`. How does it merge? **A — at its own merge point, right after `M202`, as soon as every required check is green and jongsky25 has labelled it.**
+
+**Asked and answered 2026-11-02 (user decision, in chat), once #396 was open; recorded the same day.** `D196` answered for `M202` only and said a later BHW-only pull request asks again. This is that question.
+- **A — its own merge point, on green, after `M202` (recommended, chosen).** Its paths are site-safe for `deploy.ps1`, so there is no Meridian window and nothing a tester sees changes. Then:
+  - one hand run of `deploy-bhw.ps1` at the box;
+  - jongsky25's one sign-in at `/bhw-connect/admin/login`, which proves the CSP half;
+  - P2's baseline step can use the history fix before the cut-over.
+- **B — first in merge point 10**, with #391–#393 and the census before and after. The sign-in fix and P2 would wait for that merge point.
+
+**What the answer files:** nothing new. The label request went on #396 the same day, with the user's OK on the wording.
+
+### D196 — `M202` (`bhw-deploy-release-leak`) changes only `apps/bhw-connect/ops/deploy-bhw.ps1`. How does it merge? **A — at its own merge point, as soon as every required check is green and jongsky25 has labelled it.**
+
+**Asked and answered 2026-11-02 (user decision, in chat), while `M202` was planned; recorded with its claim.** `bhw-p2-db` is blocked on it.
+- **A — its own merge point, on green (recommended, chosen).** `deploy.ps1` lists `apps/` as site-safe, so the merge only fast-forwards the box's checkout: no Meridian maintenance window, and nothing a tester sees changes. Then the user runs `deploy-bhw.ps1` at the box once. That fresh build is the fix's proof, and P2's box work is unblocked at once. This is a deliberate exception to "never a lone small PR", whose reason (every merge deploys under the testers) does not hold for a site-safe path.
+- **B — first in merge point 10**, with `#391`, `#392` and `#393` and the census before and after. P2's box steps would wait for that merge point.
+
+**What the answer files:** nothing new. The answer covers `M202` only. A later BHW-only pull request asks again, or names this answer when the user confirms it.
+
+### D195 — BHW's admin sign-in and its feedback screenshots go to Supabase with the same keys its data uses. Between `bhw-p2-db` (the data onto the box) and `bhw-p3-identity` (Meridian's sign-in), how do BHW's admins sign in? **A — keep Supabase's sign-in: the box's PostgREST verifies Supabase's own key secret, and BHW's page policy lets the login reach Supabase until P3.**
+
+**Asked and answered 2026-11-02 (user decision, in chat), while P2 was planned; recorded with `M202`'s claim.** Two findings came out of planning P2:
+- **The keys are shared.** BHW's anon and service keys are legacy HS256 tokens. They go both to PostgREST (`lib/db/data-plane.ts` rewrites only `/rest/v1/`) and to Supabase's sign-in and storage. Keys minted on the box would break sign-in and screenshot uploads at P2.
+- **Admin sign-in is already blocked on staging.** The page policy's `connect-src` is `'self'` only. This is in `lib/csp.ts` and in the header the live `/bhw-connect/admin/login` returns. The login page calls Supabase from the browser, so on the box an admin can't sign in at all. Today the only way in is Vercel, and P2 pauses Vercel.
+
+The options:
+- **A — keep Supabase's sign-in (recommended, chosen).** PostgREST on the box takes Supabase's legacy JWT secret, which jongsky25 sends privately along with the connection string. Today's keys then serve data, sign-in and screenshots unchanged. `connect-src` and `img-src` open to Supabase's origin only while that origin differs from the page's. At P3 the box gets its own secret and newly minted keys. That needs a rebuild, because the anon key is in the client bundle.
+- **B — no admin sign-in until P3.** Keys are minted on the box at P2. Admin pages and feedback screenshots stay off until P3 is built.
+- **C — P2 and P3 in one cut-over.** BHW stays on Supabase until P3 is built as well.
+
+**Who builds it:** this lane, with jongsky25's `boundary-approved` (as `M194` was). jongsky25 checks one admin sign-in on staging after the hand deploy. The user answered this in the same exchange.
+
+**What the answer files, in `docs/adr/0024-second-application-under-one-host.md`:**
+- New `bhw-admin-signin-csp` (during-testing).
+- New `bhw-migrate-duplicate-versions` (during-testing). Found while planning: two pairs of migration files share a version, so `--baseline` stops on the primary key. It now blocks `bhw-p2-db`.
+- `bhw-p2-db` names the shared secret, the live schema as the copy's source (61 tables and 170 recorded migrations on 2026-11-02), and the rehearsal on the dev machine.
+- `bhw-p3-identity` gains the rotation to the box's own secret and keys.
+
+### D194 — BHW Connect's code runs on the testing box, but its data and its admin sign-in still come from jongsky25's Supabase. What comes first: the move onto the box, or P1's automatic deploys and scheduled jobs? **A — standalone first: the deploy-script fix, then the database (P2), then the sign-in (P3); P1's remainder after.**
+
+**Asked and answered 2026-11-02 (user decision, in chat), after merge point 9's close-out.** The user: *"i thoug we are clear that everything must run standalone in the server? sourcecode, database etc."* `D173` (the database on the box) and `D178` (Meridian's sign-in) stand; this decides only the order. When the session reported BHW public on 2026-11-01, it did not say that the data and the sign-in still lived on Supabase. It should have.
+
+- **A — standalone first (recommended, chosen).**
+  1. `bhw-deploy-release-leak`: P2's migrations run through `ops/deploy-bhw.ps1`, and its first fresh build on the box left `current` pointing at nothing.
+  2. `bhw-p2-db`: by hand at the box, one block at a time, as P1 was.
+  3. `bhw-p3-identity`.
+  4. Then Supabase is paused for 30 days and deleted (`D183`), and P1's remainder follows (automatic deploys, the scheduled jobs, the runner's service grant).
+- **B — the plan's order:** P1's remainder, then P2, then P3. BHW reads Supabase for longer, and every BHW merge stays a hand deploy meanwhile.
+
+**Found while answering:** the plan paused Supabase at P2's end. BHW's admin sign-in (`lib/db/require-admin.ts`, `app/admin/login/page.tsx`) uses Supabase's auth service until P3, so that pause would have locked BHW's admins out between the two. Supabase is now paused only at P3's end.
+
+**What the answer files, in the same push:** no new row. Four of ADR-0024's markers change:
+- `bhw-p2-db` is blocked on `bhw-deploy-release-leak` instead of `bhw-p1-box`. It names the copy from PostgreSQL 17 into 15, using a connection string jongsky25 sends privately, and keeps Supabase up.
+- `bhw-p3-identity` carries the Supabase pause.
+- `bhw-p1-box` is blocked on `bhw-p3-identity`.
+- `bhw-drilldown-cold-render` is blocked on `bhw-p2-db`. Its 20–40 s first view was measured against Supabase across the internet, so it is measured again with the database on the box before any warm-up is built.
+
+`bhw-deploy-release-leak` now names P2's first migration as its deadline.
+
+### D193 — BHW Connect online is now the main priority. Where does `#387` go in merge point 9? **A — second, right after `M197`: `M197` → `#387` → `#388` → `#389`.**
+
+**Asked and answered 2026-10-31 (user decision, in chat), as merge point 9 began; recorded with `M194`'s refresh onto the trunk.** The user, the day before: *"making this online is our main priority now."* This changes `D188` and `D192`'s order; their reasoning, that `#387` must not hold anything else up, still stands.
+- **A — `#387` second (recommended, chosen).** BHW's code reaches the box two merges sooner, about 1 hour 20 minutes. If jongsky25's `boundary-approved` label is not on `#387` when `M197`'s deploy has finished, `#388` and `#389` go next and `#387` follows as soon as it is green, so nothing waits on him.
+- **B — `#387` last, as `D192` had it.**
+
+**What the answer files:** nothing new. `M194`'s claim names its new place, second. As at every merge point, the user's census comes before and after, and each pull request goes in only once the previous deploy has finished and `/up` answers. P1's first build (`ops/deploy-bhw.ps1 -BuildOnly`) runs on the box after `#387`'s deploy and before `#388` merges, because both use the live checkout.
+
 ### D192 — `M196` (`#389`, the builder's version token) is built and held. Which merge point does it ride? **A — the same one as `#387`, second: `M197`, then `#388`, then `#389`, with `#387` last.**
 
 **Asked and answered 2026-10-29 (user decision, in chat), once `M196` was built; recorded with `M197`'s claim.**

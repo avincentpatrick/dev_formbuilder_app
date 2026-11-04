@@ -17,12 +17,33 @@
  * binds on its own root rather than on `document` so a menu inside a dialog closes itself rather than the
  * dialog. The composable keeps `NotificationBell` and `FeedbackButton` as consumers.
  */
-import { computed } from 'vue';
+import { computed, defineComponent, h } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { MdsAvatar, MdsIcon, MdsMenu, type MenuItem } from '@meridian/design-system';
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
+
+/**
+ * M207 (`D179`): BHW Connect, the second application on this address (ADR-0024), in the top bar's menu for
+ * signed-in users. Here and not as a control in the bar itself: the bar's width is measured to the pixel
+ * (ThemeQuickToggle's note), and a labelled link there spilled the theme toggle at 1440px under the largest
+ * type scale — `search-nav.spec.ts` caught it. The footer carries the same link under every page.
+ *
+ * Its item is a plain anchor, because another server answers /bhw-connect and an Inertia visit would get a
+ * page that is no Inertia response. Every other item stays Inertia's Link, with `href` a real prop.
+ */
+const BHW_CONNECT_HREF = '/bhw-connect/';
+
+const MenuLink = defineComponent({
+    props: { href: { type: String, required: true } },
+    setup(props, { slots }) {
+        return () =>
+            props.href === BHW_CONNECT_HREF
+                ? h('a', { href: props.href }, slots.default?.())
+                : h(Link, { href: props.href }, slots.default);
+    },
+});
 
 const items: MenuItem[] = [
     { id: 'settings', label: 'Settings', icon: 'settings', href: '/settings' },
@@ -31,6 +52,7 @@ const items: MenuItem[] = [
     // M179: the page now holds the testing-round comments too, and an Owner's sidebar already has "Feedback"
     // (the workspace's list) — so the account menu names this one apart.
     { id: 'my-feedback', label: 'Feedback & testing', icon: 'feedback', href: '/feedback/mine' },
+    { id: 'bhw-connect', label: 'BHW Connect', icon: 'chart-bar', href: BHW_CONNECT_HREF },
     { id: 'logout', label: 'Log out', icon: 'logout' },
 ];
 
@@ -44,7 +66,7 @@ function onSelect(id: string): void {
         trigger-label="Account menu"
         label="Account"
         :items="items"
-        :link-component="Link"
+        :link-component="MenuLink"
         @select="onSelect"
     >
         <template #trigger>

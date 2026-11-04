@@ -150,13 +150,13 @@ it('takes the field row before any validation row even when the payload is clean
     [$field, $payload] = builderLockOrderPayload($form);
 
     // Write once so the validation row exists and the model matches the payload exactly.
-    app(FormBuilderService::class)->updateField($form, $field, $this->user, $payload, null);
+    app(FormBuilderService::class)->updateField($form, $field, $this->user, $payload, builderToken($field));
 
     /** @var FormField $stored */
     $stored = FormField::query()->whereKey($field->getKey())->firstOrFail();
 
     $log = builderLockOrderSqlDuring(function () use ($form, $stored, $payload): void {
-        app(FormBuilderService::class)->updateField($form, $stored, $this->user, $payload, null);
+        app(FormBuilderService::class)->updateField($form, $stored, $this->user, $payload, builderToken($stored));
     });
 
     // ⛔ THE PREMISE, ASSERTED RATHER THAN ASSUMED. If this resubmit issued an UPDATE, the payload was
@@ -198,14 +198,14 @@ it('takes them in the same order when the payload is dirty, which is the case th
     $form = builderLockOrderDraft($this->tenant, $this->user);
     [$field, $payload] = builderLockOrderPayload($form);
 
-    app(FormBuilderService::class)->updateField($form, $field, $this->user, $payload, null);
+    app(FormBuilderService::class)->updateField($form, $field, $this->user, $payload, builderToken($field));
 
     /** @var FormField $stored */
     $stored = FormField::query()->whereKey($field->getKey())->firstOrFail();
     $payload['label'] = 'A different label';
 
     $log = builderLockOrderSqlDuring(function () use ($form, $stored, $payload): void {
-        app(FormBuilderService::class)->updateField($form, $stored, $this->user, $payload, null);
+        app(FormBuilderService::class)->updateField($form, $stored, $this->user, $payload, builderToken($stored));
     });
 
     // This one DOES issue the update — the discriminator against the case above.
@@ -229,13 +229,13 @@ it('still writes what it was asked to write, and still refuses a stale token', f
     [$field, $payload] = builderLockOrderPayload($form);
     $payload['label'] = 'Household size';
 
-    $written = app(FormBuilderService::class)->updateField($form, $field, $this->user, $payload, null);
+    $written = app(FormBuilderService::class)->updateField($form, $field, $this->user, $payload, builderToken($field));
 
     expect($written->label)->toBe('Household size');
     expect($written->validations()->count())->toBe(1);
 
-    // And the optimistic-concurrency contract is untouched by the new lock: a stale token still loses
-    // before the transaction opens.
+    // And the optimistic-concurrency contract survives the lock: a stale token still loses. Since M196 (`D189`) it
+    // loses UNDER the lock, against the row re-read there, rather than before the transaction opens.
     expect(fn () => app(FormBuilderService::class)->updateField(
         $form,
         $written->refresh(),
@@ -335,7 +335,7 @@ it('locks the sibling a cross-field rule names, ascending, before it writes any 
     $payload = builderLockOrderCrossFieldPayload($higher, $lower);
 
     $log = builderLockOrderSqlDuring(function () use ($form, $higher, $payload): void {
-        app(FormBuilderService::class)->updateField($form, $higher, $this->user, $payload, null);
+        app(FormBuilderService::class)->updateField($form, $higher, $this->user, $payload, builderToken($higher));
     });
 
     $lock = builderLockOrderFirstIndex($log, 'form_fields', 'for update');
@@ -373,13 +373,13 @@ it('locks the sibling on the CLEAN path too, which is the path that carries the 
     [$lower, $higher] = builderLockOrderFields($form);
     $payload = builderLockOrderCrossFieldPayload($higher, $lower);
 
-    app(FormBuilderService::class)->updateField($form, $higher, $this->user, $payload, null);
+    app(FormBuilderService::class)->updateField($form, $higher, $this->user, $payload, builderToken($higher));
 
     /** @var FormField $stored */
     $stored = FormField::query()->whereKey($higher->getKey())->firstOrFail();
 
     $log = builderLockOrderSqlDuring(function () use ($form, $stored, $payload): void {
-        app(FormBuilderService::class)->updateField($form, $stored, $this->user, $payload, null);
+        app(FormBuilderService::class)->updateField($form, $stored, $this->user, $payload, builderToken($stored));
     });
 
     expect(builderLockOrderFirstIndex($log, 'update "form_fields"'))->toBeNull(
@@ -407,7 +407,7 @@ it('locks exactly ONE row when the payload names no sibling, which is §3.4 left
     ];
 
     $log = builderLockOrderSqlDuring(function () use ($form, $higher, $payload): void {
-        app(FormBuilderService::class)->updateField($form, $higher, $this->user, $payload, null);
+        app(FormBuilderService::class)->updateField($form, $higher, $this->user, $payload, builderToken($higher));
     });
 
     $lock = builderLockOrderFirstIndex($log, 'form_fields', 'for update');
@@ -439,7 +439,7 @@ it('writes the question’s history last, naming no row the publisher or the arc
     $payload['label'] = 'A label the history records';
 
     $log = builderLockOrderSqlDuring(function () use ($form, $field, $payload): void {
-        app(FormBuilderService::class)->updateField($form, $field, $this->user, $payload, null);
+        app(FormBuilderService::class)->updateField($form, $field, $this->user, $payload, builderToken($field));
     });
 
     $lock = builderLockOrderFirstIndex($log, 'form_fields', 'for update');

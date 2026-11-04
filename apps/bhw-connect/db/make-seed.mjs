@@ -3,19 +3,23 @@
  * Writes `supabase/seed.sql`: a small, safe-to-publish database for the local stack and CI
  * (decision D182), generated from a full one — the testing box's `bhw_connect`, or a restore of it.
  *
- *     BHW_SEED_SOURCE_URL=postgres://…/bhw_connect node db/make-seed.mjs [--rows=1000] [--fact-rows=200] [--out=supabase/seed.sql]
+ *     BHW_SEED_SOURCE_URL=postgres://…/bhw_connect node db/make-seed.mjs [--rows=200] [--out=supabase/seed.sql]
  *
  * ⛔ THIS REPOSITORY IS PUBLIC, AND `fact_bhw_raw` HOLDS 270,917 PEOPLE. So every rule below denies
  * by default, decided by the table's name:
  *
- *   dim_*    every row — the lookups (geography, programmes, facilities), already public on the site
- *   agg_*    the first --rows rows by primary key — published aggregates
- *   fact_*   SYNTHETIC rows only, never a real record. A column takes a real value only when it is
+ *   dim_*    every row — the lookups (geography, programmes, facilities), already public on the site;
+ *            and REFERENCE_TABLES, public definitions named one by one (the FHSIS indicator list)
+ *   agg_*    GENERATED rows, like fact_* (Meridian's D207): a real small-area count is never copied,
+ *            since a public repository would publish it past the site's own small-cell suppression
+ *   fact_*   GENERATED rows only, never a real record. A column takes a real value only when it is
  *            categorical — at most CATEGORICAL_MAX distinct values, each shared by at least
  *            SHARED_MIN rows on average (sex, status, a region code; a 30-row table of names is not
  *            categorical) — or a foreign key into a table already in the seed; every other column —
  *            a name, an id number, a phone, a free-text field — gets a made-up value of its type
- *            (numbers and dates inside the column's real range, text "synthetic <column> <n>").
+ *            (numbers and dates inside the column's real range, text "synthetic <column> <n>", an
+ *            enum one of its labels). A generated row whose primary key repeats is skipped, so up to
+ *            --rows rows are written per table, and a generated row may point at another generated one.
  *   anything else   no rows (feedback, usage events, admin users, caches: personal or irrelevant)
  *
  * A new table therefore enters the seed empty until a rule here names it. Review the output before
@@ -39,11 +43,16 @@ export const DEFAULT_OUT = join(
   "seed.sql",
 );
 
-/** "all" | "sample" | "synthetic" | "none" — by table name only. */
+/**
+ * Reference tables copied whole besides dim_*: public definitions, named one by one rather than by a ref_
+ * prefix, because ref_uuc_phc_published_delta holds counts taken from an internal-exposure document.
+ */
+export const REFERENCE_TABLES = ["ref_fhsis_indicator"];
+
+/** "all" | "synthetic" | "none" — by table name only. agg_* is generated too (Meridian's D207). */
 export function seedRule(table) {
-  if (table.startsWith("dim_")) return "all";
-  if (table.startsWith("agg_")) return "sample";
-  if (table.startsWith("fact_")) return "synthetic";
+  if (table.startsWith("dim_") || REFERENCE_TABLES.includes(table)) return "all";
+  if (table.startsWith("agg_") || table.startsWith("fact_")) return "synthetic";
   return "none";
 }
 
@@ -85,23 +94,30 @@ function uuidFrom(text) {
 }
 
 /**
- * A made-up value for one column of one synthetic row. `stats` carries what the source says about the
- * column: `categories` (its distinct values, when few), `refValues` (values present in the seeded
- * table a foreign key points at), and `min`/`max` for numbers and dates. Returns the SQL literal.
+ * One of `list`, for row `index`. The first pass walks the list in order; each later pass is shifted by
+ * the column's own `salt`, so two list-valued columns of one table drift apart instead of repeating the
+ * same pairs, and a composite key reaches many more distinct combinations.
  */
-export function syntheticLiteral(table, column, index, stats = {}) {
+function pick(list, index, salt) {
+  return list[(index + Math.floor(index / list.length) * (salt + 1)) % list.length];
+}
+
+/**
+ * A made-up value for one column of one generated row, as a JavaScript value (null for SQL NULL).
+ * `stats` carries what the source says about the column: `refValues` (values present in the seeded table
+ * a foreign key points at), `categories` (its distinct values when few, or an enum's labels), and
+ * `min`/`max` for numbers and dates. `salt` is the column's position, so list-valued columns drift apart.
+ */
+export function syntheticValue(table, column, index, stats = {}, salt = 0) {
   if (stats.refValues) {
-    if (stats.refValues.length)
-      return quoteLiteral(stats.refValues[index % stats.refValues.length]);
-    if (column.is_nullable === "YES") return "NULL";
+    if (stats.refValues.length) return pick(stats.refValues, index, salt);
+    if (column.is_nullable === "YES") return null;
     throw new Error(
       `make-seed: ${table}.${column.column_name} must point at a row, and the table it points at has none in the seed`,
     );
   }
   if (stats.categories) {
-    return stats.categories.length
-      ? quoteLiteral(stats.categories[index % stats.categories.length])
-      : "NULL";
+    return stats.categories.length ? pick(stats.categories, index, salt) : null;
   }
   const type = column.udt_name;
   if (/^(int2|int4|int8|numeric|float4|float8)$/.test(type)) {
@@ -109,29 +125,45 @@ export function syntheticLiteral(table, column, index, stats = {}) {
     const max = Number(stats.max ?? 100);
     const span = Math.max(max - min, 0);
     const value = span === 0 ? min : min + ((index * 7919) % (Math.floor(span) + 1));
-    return quoteLiteral(/^int/.test(type) ? Math.round(value) : value);
+    return /^int/.test(type) ? Math.round(value) : value;
   }
-  if (type === "bool") return quoteLiteral(index % 2 === 0);
-  if (type === "uuid") return quoteLiteral(uuidFrom(`${table}:${column.column_name}:${index}`));
+  if (type === "bool") return index % 2 === 0;
+  if (type === "uuid") return uuidFrom(`${table}:${column.column_name}:${index}`);
   if (/^(date|timestamp|timestamptz)$/.test(type)) {
     const min = Date.parse(stats.min ?? "2025-01-01T00:00:00Z");
     const max = Date.parse(stats.max ?? "2025-12-31T00:00:00Z");
     const day = 24 * 60 * 60 * 1000;
     const days = Math.max(Math.floor((max - min) / day), 0);
     const iso = new Date(min + ((index * 31) % (days + 1)) * day).toISOString();
-    return quoteLiteral(type === "date" ? iso.slice(0, 10) : iso);
+    return type === "date" ? iso.slice(0, 10) : iso;
   }
   if (/^(text|varchar|bpchar|citext)$/.test(type)) {
     const text = `synthetic ${column.column_name} ${index + 1}`;
     const limit = column.character_maximum_length;
-    return quoteLiteral(limit ? text.slice(0, limit) : text);
+    return limit ? text.slice(0, limit) : text;
   }
-  if (type === "json" || type === "jsonb") return quoteLiteral("{}");
-  if (type.startsWith("_")) return quoteLiteral("{}");
-  if (column.is_nullable === "YES") return "NULL";
+  if (type === "json" || type === "jsonb") return "{}";
+  if (type.startsWith("_")) {
+    const length = Number(stats.arrayLength ?? 0);
+    const element = type.slice(1);
+    const items = Array.from({ length }, (_, k) =>
+      /^(int2|int4|int8|numeric|float4|float8)$/.test(element)
+        ? String((index + k * 3) % 10)
+        : element === "bool"
+          ? String((index + k) % 2 === 0)
+          : `"synthetic ${column.column_name} ${index + 1}.${k + 1}"`,
+    );
+    return `{${items.join(",")}}`;
+  }
+  if (column.is_nullable === "YES") return null;
   throw new Error(
     `make-seed cannot invent a value for ${table}.${column.column_name} (${type}, NOT NULL); add a rule for it`,
   );
+}
+
+/** The same value as a SQL literal. */
+export function syntheticLiteral(table, column, index, stats = {}, salt = 0) {
+  return quoteLiteral(syntheticValue(table, column, index, stats, salt));
 }
 
 async function describe(client, schema) {
@@ -165,23 +197,39 @@ async function describe(client, schema) {
       WHERE con.contype = 'f' AND ns.nspname = $1`,
     [schema],
   );
+  const { rows: enumLabels } = await client.query(
+    `SELECT t.typname, e.enumlabel FROM pg_type t JOIN pg_enum e ON e.enumtypid = t.oid
+      ORDER BY t.typname, e.enumsortorder`,
+  );
+  const enums = new Map();
+  for (const { typname, enumlabel } of enumLabels) {
+    if (!enums.has(typname)) enums.set(typname, []);
+    enums.get(typname).push(enumlabel);
+  }
+  const { rows: checked } = await client.query(
+    `SELECT DISTINCT cl.relname AS table_name FROM pg_constraint con
+       JOIN pg_class cl ON cl.oid = con.conrelid JOIN pg_namespace ns ON ns.oid = cl.relnamespace
+      WHERE con.contype = 'c' AND ns.nspname = $1`,
+    [schema],
+  );
+  const withChecks = new Set(checked.map((r) => r.table_name));
   const tables = [...new Set(columns.map((c) => c.table_name))];
   const byTable = new Map(tables.map((t) => [t, columns.filter((c) => c.table_name === t)]));
   const primaryKey = new Map(
     tables.map((t) => [t, keys.filter((k) => k.table_name === t).map((k) => k.column_name)]),
   );
-  return { tables, byTable, primaryKey, foreignKeys };
+  return { tables, byTable, primaryKey, foreignKeys, enums, withChecks };
 }
 
 /** The seed, as SQL text. `targetSchema` lets a test load it somewhere other than where it came from. */
 export async function makeSeed(
   client,
-  { schema = "public", targetSchema = schema, rows = 1000, factRows = 200 } = {},
+  { schema = "public", targetSchema = schema, rows = 200 } = {},
 ) {
-  const { tables, byTable, primaryKey, foreignKeys } = await describe(client, schema);
+  const { tables, byTable, primaryKey, foreignKeys, enums, withChecks } = await describe(client, schema);
   const seeded = new Map(); // table -> Map(column -> values written)
   const out = [
-    "-- Generated by db/make-seed.mjs. dim_* copied, agg_* sampled, fact_* SYNTHETIC — never a real record.",
+    "-- Generated by db/make-seed.mjs. dim_* copied; agg_* and fact_* GENERATED — never a real record or count.",
     "-- Review before committing: this repository is public.",
     "BEGIN;",
   ];
@@ -202,7 +250,7 @@ export async function makeSeed(
     const written = new Map(names.map((n) => [n, []]));
     const valueRows = [];
 
-    if (rule === "all" || rule === "sample") {
+    if (rule === "all") {
       const order = primaryKey.get(table).length ? primaryKey.get(table) : names;
       const select = names
         .map((n) => `quote_nullable(${quoteIdent(n)}::text)`)
@@ -210,7 +258,7 @@ export async function makeSeed(
       const raw = names.map((n) => `${quoteIdent(n)}::text AS ${quoteIdent(n)}`).join(", ");
       const { rows: source } = await client.query(
         `SELECT ${select} AS literal, ${raw} FROM ${quoteIdent(schema)}.${quoteIdent(table)}
-          ORDER BY ${order.map(quoteIdent).join(", ")}${rule === "sample" ? ` LIMIT ${Number(rows)}` : ""}`,
+          ORDER BY ${order.map(quoteIdent).join(", ")}`,
       );
       for (const row of source) {
         valueRows.push(`(${row.literal})`);
@@ -225,17 +273,28 @@ export async function makeSeed(
           stats.set(column.column_name, { refValues: values.filter((v) => v !== null) });
           continue;
         }
+        if (enums.has(column.udt_name)) {
+          stats.set(column.column_name, { categories: enums.get(column.udt_name) });
+          continue;
+        }
         const col = `${quoteIdent(column.column_name)}`;
         const from = `${quoteIdent(schema)}.${quoteIdent(table)}`;
         const { rows: counted } = await client.query(
           `SELECT count(DISTINCT ${col})::int AS n, count(*)::int AS total FROM ${from}`,
         );
         const { n, total } = counted[0];
-        if (isCategorical(n, total) && column.udt_name !== "uuid") {
+        // Only text may take real values as categories (sex, a status, a cadre): a number is never
+        // copied, only its range, so no real count enters the seed in any shape (Meridian's D207).
+        if (/^(text|varchar|bpchar|citext)$/.test(column.udt_name) && isCategorical(n, total)) {
           const { rows: values } = await client.query(
             `SELECT DISTINCT ${col}::text AS v FROM ${from} WHERE ${col} IS NOT NULL ORDER BY 1`,
           );
           stats.set(column.column_name, { categories: values.map((v) => v.v) });
+        } else if (column.udt_name.startsWith("_")) {
+          const { rows: length } = await client.query(
+            `SELECT coalesce(max(array_length(${col}, 1)), 0)::int AS n FROM ${from}`,
+          );
+          stats.set(column.column_name, { arrayLength: length[0].n });
         } else if (
           /^(int2|int4|int8|numeric|float4|float8|date|timestamp|timestamptz)$/.test(
             column.udt_name,
@@ -247,11 +306,48 @@ export async function makeSeed(
           stats.set(column.column_name, range[0]);
         }
       }
-      for (let i = 0; i < factRows; i += 1) {
-        const literals = columns.map((c) =>
-          syntheticLiteral(table, c, i, stats.get(c.column_name)),
+      // Up to `rows` rows; one whose primary key repeats is skipped, and the search gives up after
+      // twenty tries a row, so a key with few possible values yields only those.
+      // A table with CHECK constraints (a suppression flag that must match its counts, an array of a
+      // fixed length) keeps only the rows a scratch copy of it accepts: a temporary table LIKE it, with
+      // its checks, tried row by row inside a transaction that is rolled back.
+      const key = primaryKey.get(table).map((k) => names.indexOf(k));
+      const seen = new Set();
+      const checks = withChecks.has(table);
+      if (checks) {
+        await client.query("BEGIN");
+        await client.query(
+          `CREATE TEMP TABLE seed_check (LIKE ${quoteIdent(schema)}.${quoteIdent(table)} INCLUDING CONSTRAINTS) ON COMMIT DROP`,
         );
-        valueRows.push(`(${literals.join(", ")})`);
+      }
+      try {
+        for (let i = 0; valueRows.length < rows && i < rows * 20; i += 1) {
+          const values = columns.map((c, salt) =>
+            syntheticValue(table, c, i, stats.get(c.column_name), salt),
+          );
+          if (key.length) {
+            const id = JSON.stringify(key.map((k) => values[k]));
+            if (seen.has(id)) continue;
+            seen.add(id);
+          }
+          const literals = values.map(quoteLiteral).join(", ");
+          if (checks) {
+            await client.query("SAVEPOINT seed_row");
+            try {
+              await client.query(
+                `INSERT INTO seed_check (${names.map(quoteIdent).join(", ")}) VALUES (${literals})`,
+              );
+              await client.query("RELEASE SAVEPOINT seed_row");
+            } catch {
+              await client.query("ROLLBACK TO SAVEPOINT seed_row");
+              continue;
+            }
+          }
+          valueRows.push(`(${literals})`);
+          names.forEach((n, j) => written.get(n).push(values[j] === null ? null : String(values[j])));
+        }
+      } finally {
+        if (checks) await client.query("ROLLBACK");
       }
     }
 
@@ -289,8 +385,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     .connect()
     .then(() =>
       makeSeed(client, {
-        rows: Number(option("rows", 1000)),
-        factRows: Number(option("fact-rows", 200)),
+        rows: Number(option("rows", 200)),
       }),
     )
     .then((sql) => {

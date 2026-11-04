@@ -2123,7 +2123,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   floor, not the headcount, and §D7's actual grant is a member's own position. Recorded as **ADR-0020 §D13**;
   the product call is `D3` in `docs/claims/decisions.md`, filed with this as the recommendation and proceeded
   on rather than waited for.
-  ⚠️ **THE ROW'S ROUTE CITATION WAS WRONG AND ITS HEADLINE EXAMPLE WAS INVERTED.** `routes/api.php:440-442`
+  ⚠️ **THE ROW'S ROUTE CITATION WAS WRONG AND ITS HEADLINE EXAMPLE WAS INVERTED.** `routes/api.php:449-451`
   is comment prose; the route is `:456-458`. And the row offered `/dashboard` as the surface that *correctly
   withholds* the integer — **it disclosed it too**, at `DashboardController.php:124`, in the same Inertia
   payload whose `kpis.members` is nulled four lines above for the same reader. That sixth consumer was
@@ -5125,7 +5125,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `M52`'s could not. Filed by `M52`.
 - ~~**`minor` · `/gamification/me` documents only `200`.**~~ ✅ **DONE — `M54` (2026-09-01).** The route
   now documents the 403 it can answer. ⚠️ **The citation had drifted**: the row cites
-  `routes/api.php:440`, which is the comment block; the route is at `:456-457`. The mechanism was exact
+  `routes/api.php:449`, which is the comment block; the route is at `:456-457`. The mechanism was exact
   and was verified in the vendor source for the version INSTALLED — Scramble v0.13.30's
   `ErrorResponsesExtension:60` adds a 403 **only** for middleware starting `can:` or `Authorize::`, so
   `module:` is invisible to it. ⛔ **Two obvious remedies are wrong and both were rejected on evidence:**
@@ -7580,7 +7580,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `routes/tenant.php` with **no** PATCH-the-draft twin anywhere in that block, and:
   ⛔ **THE SHARPER FINDING THE SWEEP MISSED:** `.../fields/{field}/validations` exists on **neither**
   surface. Validations are written inline from the field payload —
-  `app/Services/Forms/FormBuilderService.php:240`, `:276`, `:316-318` and `:572` — so nothing in the tree implements
+  `app/Services/Forms/FormBuilderService.php:252`, `:276`, `:316-318` and `:572` — so nothing in the tree implements
   them as an addressable resource at all. ⚠️ Adjacent and deliberately in scope of the same repair:
   `docs/architecture/technical-architecture.md:441` also pins `POST /api/v1/forms` and
   `PATCH/DELETE /api/v1/forms/{form}`, and only the two GETs exist. **Live.** Filed by `M80`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.** ✅ **CLOSED BY `M193` (2026-10-28), on its branch, under `D13` exception #6 (the six `D38` rows together, allowed by the user in chat):** §7.1's Form draft row is marked **not built (`D38`)** — sections and fields have tenant-web twins only, the draft is read through the builder page, and validations are saved inline with their field — and the Forms row says the two `GET`s are implemented (Increment E) and `POST`, `PATCH` and `DELETE` are not, the tenant-web app creating, editing and archiving forms. `FormApiController`'s class docblock, which said the writes "extend this same pattern in Phase 1", now says only the reads are built; `openapi.json` exported byte-identical. Drift: the forms family is one line lower (`:169` to `:201`), the builder block is `routes/tenant.php:621-680` and no longer all on `FormBuilderController`, and `FormBuilderService` writes validations at `:276`, `:319` and `:993`.
@@ -8867,7 +8867,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   looks like: outside the race the two scopes are identical, and inside it the child's version is now
   PUBLISHED and immutable, so the rule would check uniqueness inside a version no write can reach. Filed as
   a decision. Closed by `M90`. Filed by `M88`.
-- **`minor` · The optimistic-concurrency token §8 substituted for the draft lock is CLIENT-OPTIONAL, and a
+- ✅ **CLOSED BY `M196` (2026-10-29) — ****`minor` · The optimistic-concurrency token §8 substituted for the draft lock is CLIENT-OPTIONAL, and a
   shipped test pins it that way.** Measured by `M88`'s fan-out (2026-09-08).
   `docs/form-versioning-schema-migration.md` §3.4 declines to serialize field-level edits and leaves drift
   detection to the `version` token; both builder requests validate it as `['nullable', 'string']` and
@@ -8877,6 +8877,33 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **deliberate** hole rather than an oversight. ⚠️ **That is what makes it a decision and not a fix**:
   requiring the token is a client-contract change to the builder's fetch sidecar, and the compensating
   control §3.4 names is the thing that is optional. **Live.** Filed by `M88`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M196` (2026-10-29), on its branch, under `D189` A (the user, in chat).**
+  - Both update requests require `version`, and a save without it is refused 422. The pinning test now asserts that refusal for a
+    null and for an absent token.
+  - ⚠️ **"A client-contract change" was false:** the shipped builder already sent the token on every field and section write, and so
+    did every end-to-end spec.
+  - ⛔ **What the row missed, and the larger half: the token did not stop last-write-wins even when it was sent.** `assertNoDrift()`
+    ran before the transaction, against the copy route binding loaded, so two saves that both bound the row before either wrote both
+    passed.
+    - It now runs against the row re-read under its lock: `writeField()`'s existing lock, and a new one-row lock in
+      `updateSection()`.
+    - That is `convertField()`'s order.
+    - A field case and a section case went red on the old code and are green now. Three mutants were each CAUGHT by exactly one case:
+      both checks pointed back at the bound copy, and the token made optional again.
+  - 36 existing cases had sent `'version' => null`. Each now sends the row's token, read just before each save.
+  - The token's one-second precision and the rules-only save are filed below, as one row.
+
+- **`minor` · The builder's concurrency token cannot see two edits in one second, or a rules-only save, so either can still be a lost update.**
+  Found by `M196` (2026-10-29), which closed the race the token was meant to stop. Two weaknesses of the token itself remain:
+  - **One-second precision.** The token is `updated_at`, and `timestampsTz()` makes it `timestamp(0)`. `FormBuilderService::rowVersion()`
+    has recorded this since H25. Two saves to one row inside the same second carry the same token, so the second passes.
+  - **A rules-only save does not move it.** A save that changes only a field's validation rules, by the editor who saved it last,
+    leaves the field row clean. Eloquent issues no UPDATE, so `updated_at` and the token stay put, and a concurrent save holding the
+    old token replaces those rules. `convertField()` already guards against exactly this with a plan fingerprint.
+
+  The remedy is a revision counter, incremented on every content save, as the token for both. It is an additive integer column on
+  `form_fields` and `form_sections`, and the builder sends whatever token it was given. **Live** — rare, but reachable by two
+  collaborators today. Filed by `M196`. **Tier: during-testing.**
 - **`minor` · Three more lock-holding transitions DELETE the child rows a concurrent builder edit is
   writing, and for all three the RLS backstop does not fire.** Measured by `M88`'s fan-out (2026-09-08).
   Publish is not the only transition a builder edit races: `RestoreService` and `XlsformImporter` each run
@@ -8898,6 +8925,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   "silent"); nobody has applied it to the lock or to the audit read. ⚠️ Filed rather than fixed because
   whether a config setter should serialize against publish is the same §3.4 question the builder rows raise.
   **Live.** Filed by `M88`. **Tier: during-testing.**
+  ⚠️ **`D190` ANSWERED 2026-10-29 — A: every settings setter takes the form lock and builds its audit from the locked copy, as
+  `setDataSharing` does.** Re-measured by `M195`'s read-only verification:
+  - *"only `archive()` takes one"* is now false, because `setDataSharing` locks too.
+  - The lock-free writers have grown from seven to eleven: `assignFolder`, `setTheme`, `setSinglePageMode` and `setOcrScanning` are
+    newer.
+  - The schedule sweeper's flip of `schedule_state` can be audited stale by `setSchedule`.
+  - §3.4's list of lock-takers gains the setters when this lands.
 - ~~**`minor` · One `forceFill` writes `closes_at` and `max_responses` together, and the acceptance guard
   treats one as authoritative-under-lock and the other as ignorable-pre-lock.**~~ Measured by `M88`'s fan-out
   (2026-09-08). `FormAcceptanceGuard::assertCapacity()` does not trust the passed-in `$form`: it re-reads
@@ -9394,7 +9428,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   is what the `__lead__` row would have bought. **Latent.** Filed by `M91`. **Tier: after-launch.**
 - **`minor` · A third instance of the citation class `M83` filed in the abstract: three live lines that
   say nothing about what cites them.** Found by `M91` (2026-09-11) while checking what its own edits
-  would shift. `docs/feature-backlog.md:7546` cites `app/Services/Forms/FormBuilderService.php:157`,
+  would shift. `docs/feature-backlog.md:7546` cites `app/Services/Forms/FormBuilderService.php:170`,
   `:322` and `:331` as the sites where *"validations are written inline from the field payload"*. All
   three resolve and all three are alive, so the citation gate passes; `:157` is a docblock terminator,
   `:322` is `$item->increment('usage_count')` inside the field-library counter and `:331` is
@@ -9560,6 +9594,15 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   first seen red after a push. Nothing reaches the trunk: the Contract job refuses it first, which is why this is a convenience and not a
   defect. The remedy is a `--with-gates` arm that runs the export inside the container (preflight already reaches it to probe for a live
   suite) and compares it with the committed file. **Live.** Filed by `M200`. **Tier: after-launch.**
+- **`minor` · `openapi.json` publishes this repository's design codes — about seventy H-, ADR-, D- and "Increment" references — and 33 `@see` lines naming PHP classes an integrator cannot resolve.**
+  Split out by `M196` (2026-10-29) under `D191` A, which took the clear maintainer marks (⛔/⚠️, M-numbers, test and script names) into
+  `R-e568ddd2` and left these for later. They are less alarming than the marks, but they are just as unreadable to an integrator.
+  They also come from the same three sources: class docblocks, method docblocks and inline comments that Scramble emits.
+  - The remedy is either a Scramble transformer that strips `@see` and the codes, or a hand rewrite of about thirty docblocks, plus
+    the denylist widened to cover them.
+
+  Integrators are not on the testing server, which is why this is not tiered with its sibling. **Live.** Filed by `M196`.
+  **Tier: before-launch.**
 - **`minor` · A gate's SUMMARY LINE is a paired artefact across three files, and nothing declares that
   pairing at the place where somebody edits one.** Measured by `M92` (2026-09-14) during its own close-out.
   Widening `scripts/test-pointer-lint.php` added two numbers to its `passed (...)` line;
@@ -11213,7 +11256,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   regenerated deliberately. The remedy is to cite the line's rows by `R-` id, which is stable for the life of the row.
   **Live.** Filed by `M108`. **Tier: during-testing.**
 
-- **`minor` · `backlog-triage-controls` is registered in CI and absent from `docs/gate-baselines.md`, so its case
+- ✅ **CLOSED BY `M195` (2026-10-28) — ****`minor` · `backlog-triage-controls` is registered in CI and absent from `docs/gate-baselines.md`, so its case
   count is the one gate number nothing tracks.** Filed 2026-09-24 by `M108`, which registered the gate and found the
   gap while regenerating the baselines from its own post-merge run. `scripts/gate-baselines.php` carries a fixed
   roster of gate patterns, each a regex over that gate's own pass line; the new harness prints
@@ -11227,6 +11270,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   change pushed straight to the trunk without a claim naming a branch is what `scripts/pre-push-guard.php` exists to
   refuse. ⚠️ **It also wants a floor of its own in the same edit**, on the argument above: a case count is only worth
   recording if something refuses a suspiciously small one. **Live.** Filed by `M108`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M195` (2026-10-28), on its branch, under `D13` exception #7 (with `R-b31f421e`, allowed by the user in
+  chat).** `scripts/gate-baselines.php` records the harness's count, which is 10 cases now, not 8. Its floor is
+  `MIN_CASES` in `scripts/backlog-triage-controls.php`: a committed mutant that stops one case from running exits 2
+  with *"ran 9 case(s), under the floor of 10"*. ⚠️ **"The one gate number nothing tracks" was false.** The static job
+  printed eight counted pass lines that nothing recorded, and all eight are recorded now:
+  - the mail-attribute linter and tracker-lint;
+  - the controls of tracker-lint, citation liveness, the pre-push guard, the test-pointer lint, backlog-triage and the
+    boundary check.
+
+  The other five controls harnesses have no floor under their counts, and that is filed below, as is the declared roster
+  that let eight go unrecorded.
 
 - **`minor` · A tab open longer than the build-retention window still asks for a chunk that no longer exists.**
   Filed 2026-09-25 by `M109`, at the moment the window was chosen rather than after. `deploy.ps1` now carries the
@@ -11284,7 +11338,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the uncertain part:** `$excludeUnvalidatedArrayKeys` may not be settable per-instance in Laravel 12, so the
   reliable route is an explicit `payload()` that merges the raw `config` over `validated()` — measure it before
   writing the test, and write the test against the current code first to watch it fail. **Live.**
-  Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M111` (2026-09-25) — BOTH HALVES SHIPPED, AND THE ROW'S OWN REASON FOR ITS REMEDY WAS WRONG WHILE THE REMEDY WAS RIGHT.** This is `B0` in the form-builder overhaul and it went first because `B2a`'s per-type default validations, `B5a`'s config transfer and `B11a`'s content blocks all write keys `configRules()` does not enumerate — every one would have been eaten on the next save. ⚠️ **EVERY CITATION HELD. TWO PREMISE CLAUSES DID NOT.** (a) The row says **Laravel 12**; `composer.lock:1575-1576` says `laravel/framework` **v13.18.1**. The mechanism is identical between them, so the conclusion survived — but a remedy chosen by reading Laravel 12's source would have been chosen against the wrong tree. (b) The row says `$excludeUnvalidatedArrayKeys` *"may not be settable per-instance"*. **It is** — `Validator.php:162-167` declares it `public`, defaulting to `false` on the class, with the `true` coming from `Factory.php:69-74`. **The prescribed explicit merge was still the right route, for two reasons the row does not give:** the property is instance-WIDE, so setting it would also stop pruning `validations` at `:69`, a behaviour change outside the defect's blast radius; and `withValidator()` at `:170` receives the CONTRACT, which does not declare the property, so the poke needs an `instanceof` narrowing to survive PHPStan. ✅ **TWO HALVES, AND THE MUTATIONS PROVED THEY ARE NOT THE SAME FIX.** `UpdateFieldRequest::payload()` overlays the validated tree onto the RAW request config and `FormBuilderController::updateField()` calls it instead of `validated()`, which fixes the CLASS; and `label_translations` gained real rules on all four arms carrying option or grid lists — `options`, `levels`, `rows`, `columns`, `cells` — which validates the reachable loss rather than merely preserving it. ⛔ **THE MERGE BASE IS THE REQUEST, NEVER THE STORED ROW, AND THAT IS THE WHOLE SAFETY ARGUMENT.** Merging the existing column over the payload — the shape the word *merge* first suggests — would make clearing a key impossible, because deleting the last choice row would leave the old `options` in place. The builder sends the whole config on every save (`useBuilderStore.ts:883`), so raw-over-validated preserves what the author sent and leaves a removal a removal. A test pins that direction explicitly, and it is the one test that had to be **green before the fix and after** — which it was. ✅ **Five tests in `tests/Feature/Forms/FieldConfigRetentionTest.php`, all written against the unchanged code and watched to fail first: four red, the clearing case green throughout, exactly as the claim predicted.** ✅ **Both mutations CAUGHT, and their kill sets are DISJOINT, which is the finding worth more than either:** reverting `payload()` to `validated()` reddens ONLY the un-enumerated-key test, and stripping the new rules from the choices arm reddens ONLY the shape-validation test. **Neither single mutation reddens the `label_translations` tests, because the reachable case is now defended twice** — the rules keep it inside `validated()` and the accessor would restore it anyway. That is double defence measured rather than assumed, and it is also why a one-mutation proof would have read as a gap. ⚠️ **THE ROW UNDERSTATED ITSELF IN THREE WAYS AND TWO ARE NOW FILED.** `matrix` and `likert_matrix` grid-entry `label_translations`, and `config.levels[].label_translations`, have live READ and EXPORT paths (`XlsformExporter.php:574-593` via `:203-228`/`:255-257`, `schema-mapping.ts:222`/`:368`, `BlankFormPrintPresenter.php`) against a write path that only the builder has; and **three sibling request paths share the identical pruning mechanism on other keys**. Both are filed below rather than absorbed here. ⚠️ **A TEST DEFECT FOUND BY ITS OWN FIRST GREEN RUN, AND IT IS A TRAP THIS PROJECT WILL MEET AGAIN:** a `toBe()` on a `label_translations` map asserts **POSTGRES's** key ordering, not the application's — `config` is `jsonb` and jsonb normalises object keys alphabetically, so the assertion failed on wholly correct data with every value present (`es` sorts before `fil`). Asserted per locale now. ⚠️ A direct model read after an HTTP request needs `enterTenant()` again, because the request leaves the test's own connection without the GUCs the RLS policies read — the pattern `BuilderDraftGuardTest.php:203` already follows, and the first run's `ModelNotFoundException` was that and not the defect. ⚠️ **`BuilderRoutesTest.php:262-272` sends an empty config to a field with a full geo block and asserts only `assertOk()`**, so it could not have failed either way; the new clearing test is what covers that behaviour now. ✅ Measured: **441 passed / 1,801 assertions** across `tests/Feature/Forms` and `tests/Feature/Xlsform`. PHPStan reports 15 locally and **none of them in either changed file** — stated as an attribution rather than as a claim about movement, since this diff does touch `app/`.
+  Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M111` (2026-09-25) — BOTH HALVES SHIPPED, AND THE ROW'S OWN REASON FOR ITS REMEDY WAS WRONG WHILE THE REMEDY WAS RIGHT.** This is `B0` in the form-builder overhaul and it went first because `B2a`'s per-type default validations, `B5a`'s config transfer and `B11a`'s content blocks all write keys `configRules()` does not enumerate — every one would have been eaten on the next save. ⚠️ **EVERY CITATION HELD. TWO PREMISE CLAUSES DID NOT.** (a) The row says **Laravel 12**; `composer.lock:1575-1576` says `laravel/framework` **v13.18.1**. The mechanism is identical between them, so the conclusion survived — but a remedy chosen by reading Laravel 12's source would have been chosen against the wrong tree. (b) The row says `$excludeUnvalidatedArrayKeys` *"may not be settable per-instance"*. **It is** — `Validator.php:162-167` declares it `public`, defaulting to `false` on the class, with the `true` coming from `Factory.php:69-74`. **The prescribed explicit merge was still the right route, for two reasons the row does not give:** the property is instance-WIDE, so setting it would also stop pruning `validations` at `:69`, a behaviour change outside the defect's blast radius; and `withValidator()` at `:170` receives the CONTRACT, which does not declare the property, so the poke needs an `instanceof` narrowing to survive PHPStan. ✅ **TWO HALVES, AND THE MUTATIONS PROVED THEY ARE NOT THE SAME FIX.** `UpdateFieldRequest::payload()` overlays the validated tree onto the RAW request config and `FormBuilderController::updateField()` calls it instead of `validated()`, which fixes the CLASS; and `label_translations` gained real rules on all four arms carrying option or grid lists — `options`, `levels`, `rows`, `columns`, `cells` — which validates the reachable loss rather than merely preserving it. ⛔ **THE MERGE BASE IS THE REQUEST, NEVER THE STORED ROW, AND THAT IS THE WHOLE SAFETY ARGUMENT.** Merging the existing column over the payload — the shape the word *merge* first suggests — would make clearing a key impossible, because deleting the last choice row would leave the old `options` in place. The builder sends the whole config on every save (`useBuilderStore.ts:883`), so raw-over-validated preserves what the author sent and leaves a removal a removal. A test pins that direction explicitly, and it is the one test that had to be **green before the fix and after** — which it was. ✅ **Five tests in `tests/Feature/Forms/FieldConfigRetentionTest.php`, all written against the unchanged code and watched to fail first: four red, the clearing case green throughout, exactly as the claim predicted.** ✅ **Both mutations CAUGHT, and their kill sets are DISJOINT, which is the finding worth more than either:** reverting `payload()` to `validated()` reddens ONLY the un-enumerated-key test, and stripping the new rules from the choices arm reddens ONLY the shape-validation test. **Neither single mutation reddens the `label_translations` tests, because the reachable case is now defended twice** — the rules keep it inside `validated()` and the accessor would restore it anyway. That is double defence measured rather than assumed, and it is also why a one-mutation proof would have read as a gap. ⚠️ **THE ROW UNDERSTATED ITSELF IN THREE WAYS AND TWO ARE NOW FILED.** `matrix` and `likert_matrix` grid-entry `label_translations`, and `config.levels[].label_translations`, have live READ and EXPORT paths (`XlsformExporter.php:574-593` via `:203-228`/`:255-257`, `schema-mapping.ts:222`/`:368`, `BlankFormPrintPresenter.php`) against a write path that only the builder has; and **three sibling request paths share the identical pruning mechanism on other keys**. Both are filed below rather than absorbed here. ⚠️ **A TEST DEFECT FOUND BY ITS OWN FIRST GREEN RUN, AND IT IS A TRAP THIS PROJECT WILL MEET AGAIN:** a `toBe()` on a `label_translations` map asserts **POSTGRES's** key ordering, not the application's — `config` is `jsonb` and jsonb normalises object keys alphabetically, so the assertion failed on wholly correct data with every value present (`es` sorts before `fil`). Asserted per locale now. ⚠️ A direct model read after an HTTP request needs `enterTenant()` again, because the request leaves the test's own connection without the GUCs the RLS policies read — the pattern `BuilderDraftGuardTest.php:203` already follows, and the first run's `ModelNotFoundException` was that and not the defect. ⚠️ **`BuilderRoutesTest.php:335-345` sends an empty config to a field with a full geo block and asserts only `assertOk()`**, so it could not have failed either way; the new clearing test is what covers that behaviour now. ✅ Measured: **441 passed / 1,801 assertions** across `tests/Feature/Forms` and `tests/Feature/Xlsform`. PHPStan reports 15 locally and **none of them in either changed file** — stated as an attribution rather than as a claim about movement, since this diff does touch `app/`.
 
 - ✅ **CLOSED BY `M112` (2026-09-26) — `minor` · Publish refuses on the first violation only, as a message-only toast, while the warnings path beside
   it gets a proper banner.** Filed 2026-09-25 by `M110` from the same exploration, and this is the half of *"or if
@@ -12004,7 +12058,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   form ever receives.~~** Found by `M115` (2026-09-27) while building the validation editor's operator half, by
   opening all three doors rather than the one the work needed. ⛔ **Nothing refuses it at any of them.**
   (a) The save door: `UpdateFieldRequest` declares `validations.*.operator` and `validations.*.related_field_key`
-  as plain `nullable` with no cross-field rule (`app/Http/Requests/Forms/UpdateFieldRequest.php:73-78`), so a
+  as plain `nullable` with no cross-field rule (`app/Http/Requests/Forms/UpdateFieldRequest.php:73-79`), so a
   `required_if` row with neither is written as-is. (b) The publish door: `StructuralValidationGate` checks only
   that a **non-null** `related_form_field_id` belongs to the version (`:156`) and that the rule suits the owning
   field's shape (`:185`) — it never asks whether a rule that NEEDS a related field or an operator has one.
@@ -14317,14 +14371,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Select it to see why"*, and on a delete *"That item belongs to a published version and can no longer be edited"*. Measured on
   `0432d03b`: `app/Http/Requests/Forms/UpdateFieldRequest.php:55-60` checks the key against the form's CURRENT draft, ignoring only
   the bound field's id, and a FormRequest runs before `FormBuilderService::assertDraftChild()`
-  (`app/Services/Forms/FormBuilderService.php:652-657`); a publish clones the draft into a new one with new ids and the same keys
+  (`app/Services/Forms/FormBuilderService.php:671-676`); a publish clones the draft into a new one with new ids and the same keys
   (`app/Services/Forms/PublishService.php:175-186`). So a tab still holding the old ids — a publish from the hub
   (`resources/js/Pages/forms/Show.vue:246-253`), the forms list, another tab, the API, or the browser's Back button, which Inertia
   serves from history without asking the server (`docs/feature-backlog.md:2974-2976`; nothing under `resources/js` handles
   `popstate` or encrypts history) — finds the clone and is refused on the key. Changing the key passes the request and the service
   refuses with `FormException::childNotInDraft()` (`app/Exceptions/Forms/FormException.php:67-70`), mapped to 422 with no `errors`
   map (`app/Http/Controllers/Tenant/FormBuilderController.php:259-261`) and so given a Retry that can never succeed; reorder with
-  stale ids is a silent 200 (`FormBuilderService.php:551-575`); publish from the builder does nothing while a refusal stands
+  stale ids is a silent 200 (`FormBuilderService.php:569-593`); publish from the builder does nothing while a refusal stands
   (`resources/js/Pages/forms/Builder.vue:216-218`); a reload loses the edits because the journal is keyed by the draft id
   (`resources/js/components/builder/edit-journal.ts:88-93`). The only HTTP test of the path sends a NEW key
   (`tests/Feature/Forms/BuilderDraftGuardTest.php:66-84`). The remedy: the page already holds `draft.id`
@@ -14341,7 +14395,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M172` (2026-10-15) — ****`minor` · A key clash is refused instead of avoided, the refusal shows only on a tab that selecting the question never opens, and an undo or a journal replay can bring a taken key back.**
   The clash the testers can still hit after the stale-tab row above is fixed: an author types a key another question holds, or an
   undo (`resources/js/components/builder/useBuilderStore.ts:289-307`) or the journal's put-back (`:986-1010`) re-sends a key freed
-  and retaken meanwhile. The server's own keys never clash (`app/Services/Forms/FormBuilderService.php:903-928`, `uniqueKey()` and
+  and retaken meanwhile. The server's own keys never clash (`app/Services/Forms/FormBuilderService.php:922-952`, `uniqueKey()` and
   `copyKey()`); the client never creates one. The refusal is shown under Field key on the Advanced tab only
   (`resources/js/components/builder/ConfigPanel.vue:645-652`), while selecting a question always opens Basics (`:168-173`); the
   alert names every other refused question as "has a change that was not saved. Select it to see why" (`:80`) with no reason and
@@ -14360,7 +14414,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M172` (2026-10-15) — ****`minor` · Deleting a question that a published version with responses still uses gives no warning, and nothing on a response or an export says the question was removed from the form.**
   The testers' request (2026-10-15): delete when the published form has no responses; otherwise ask, retire the question, keep the
   submitted answers with a note, and keep the history. Measured: a delete hard-deletes the row from the draft and nothing else
-  (`app/Services/Forms/FormBuilderService.php:308-320`); older responses keep their answers under their own version
+  (`app/Services/Forms/FormBuilderService.php:326-338`); older responses keep their answers under their own version
   (`submission_answers.answers` keyed by field key, `database/migrations/2026_07_09_000302_create_submission_answers_table.php:28`;
   shown against the submission's version by `app/Services/Submissions/SubmissionInboxPresenter.php:251-295`; exports union keys
   across versions, `app/Services/Submissions/SubmissionRowProjector.php:82`), so no answer is lost today — but no response page,
@@ -14390,7 +14444,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   kobo, every cell can be configured separately, it can pick different type of questions and different set of options for each"*.
   Measured: `resources/js/components/builder/MatrixEditor.vue:46` says "Each cell is a single choice from this shared list";
   `config.cells` is that list (`docs/data-dictionary.md:382`), the request validates rows, columns and cells as value/label lists
-  only (`app/Http/Requests/Forms/UpdateFieldRequest.php:292-324`), the normalizer rejects unknown rows or columns and nothing else
+  only (`app/Http/Requests/Forms/UpdateFieldRequest.php:293-325`), the normalizer rejects unknown rows or columns and nothing else
   (`app/Services/Submissions/StructuralAnswerNormalizer.php:548-593`), publish checks the three lists non-empty and distinct
   (`app/Services/Forms/StructuralValidationGate.php:532-562`), and `app/Enums/FieldType.php:12` claims each cell is
   "independently typed", which is false. KoboToolbox's Question Matrix gives every column its own response type (Select One,
@@ -14427,7 +14481,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M184` (2026-10-23) — ****`minor` · Only a Single choice or Dropdown can take its choices from another form's answers; a Multiple choice cannot.**
   `app/Services/Forms/LinkedChoiceService.php:39` limits a link to single choice and dropdown, and
-  `app/Http/Requests/Forms/UpdateFieldRequest.php:337-349` accepts `config.options_source` for those two only; the Options tab
+  `app/Http/Requests/Forms/UpdateFieldRequest.php:338-350` accepts `config.options_source` for those two only; the Options tab
   offers the link through `resources/js/components/builder/LinkedChoicesEditor.vue` (`ConfigPanel.vue:550-566`). The testers'
   comment (2026-10-15): *"All input forms that has options like radio button, checkboxes, select options … must have an option to
   populate options thru the connection to responses from other forms"*. Split out of `R-5fdbc47c`, which named multi-select as
@@ -14449,7 +14503,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M184` (2026-10-23) — ****`minor` · A text box cannot offer suggestions from a list file or another form's answers.**
   The testers' comment (2026-10-15): *"sometimes even the textbox must have an option to populate options thru the connection to
   responses from other forms"*. `resources/js/components/submissions/FieldInput.vue:224-277` renders a text question as a plain
-  input, and `app/Http/Requests/Forms/UpdateFieldRequest.php:337-349` accepts no source on it. The remedy: `config.suggestions_source
+  input, and `app/Http/Requests/Forms/UpdateFieldRequest.php:338-350` accepts no source on it. The remedy: `config.suggestions_source
   = {kind: list | form, …}` on Short text gives a type-ahead (a `<datalist>`-backed combobox) on the web form, the encode page
   (`app/Services/Submissions/EncodeFormPresenter.php:650-676` already serves linked lists there) and the preview, while free text
   stays accepted and the server never checks it; the chooser reads "Suggestions come from" on a text question. **Live.** Filed by `M172`.
@@ -14664,12 +14718,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M176` (2026-10-18) — ****`major` · Moving a question or a section re-stamps every question's save token, so the author's next edit to any question opens "This item changed elsewhere".**
   The testers' comment (2026-10-11, comment 5): after creating a question and changing only whether it is required, the dialog
   *"This item changed elsewhere — Someone else edited this field since you opened it"* showed the same text on both sides. Measured
-  by reading: `app/Services/Forms/FormBuilderService.php:713` (`reorder()`) writes each position through Eloquent's query builder
+  by reading: `app/Services/Forms/FormBuilderService.php:732` (`reorder()`) writes each position through Eloquent's query builder
   (`:603`, `:612`), whose `update()` adds `updated_at`, so every question and section of the draft gets a new token; the token is that
   timestamp, compared exactly by `assertNoDrift()` (`:740`); `persistOrder()` (`resources/js/components/builder/useBuilderStore.ts:422`)
   ignores the reply, so the page keeps the old tokens. A drag or keyboard move, the Advanced tab's Section choice, an undo of a
   delete or a section move therefore makes the next ordinary edit of any question 409 once a second has passed — a single author
-  meets "someone else". The comments at `FormBuilderService.php:42` and `:582` say the opposite. The remedy: `reorder()` writes
+  meets "someone else". The comments at `FormBuilderService.php:45` and `:582` say the opposite. The remedy: `reorder()` writes
   positions without touching `updated_at`, the comments corrected, and a Pest case that reorders, advances the clock a second and
   saves with the old token (red on this head); the retry of an edit whose request did land is checked in the same pass.
   **Live.** Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M176` (2026-10-18):** `reorder()` writes positions through `toBase()`, so a move never touches `updated_at` (the comments that said so are now true); and a 409 whose row is this page's own landed write takes its token and sends the newer edit once (the row's same-pass retry, measured: M170's check missed it whenever the author typed on). Red first: `ReorderKeepsTokensTest` 4/4 (409 after a move, once its clock moved BEFORE the move — the first draft passed at random) and the own-write case. Mutants caught: `toBase()` dropped on fields and on sections (`mutate.php`), the own-write branch disabled (committed). The citations above read the tree at `cef2a9b0`. Built and held for merge point 2 (`D137`); live since it, 2026-10-19.
@@ -14698,7 +14752,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   expression — not both, not neither."* above *"Rule 1: A validation rule must be …"*. `resources/js/components/builder/ConfigPanel.vue:529`
   prints the reply's `message`, which Laravel fills with the first error, and `:489` lists every error including that one;
   `resources/js/components/builder/field-save-errors.ts:86` names `validations.N` by its position in the request after unfinished
-  rows are withheld, so "Rule 1" can point at the wrong row. The message itself (`app/Http/Requests/Forms/UpdateFieldRequest.php:391`)
+  rows are withheld, so "Rule 1" can point at the wrong row. The message itself (`app/Http/Requests/Forms/UpdateFieldRequest.php:392`)
   speaks of structured rules and expressions. The remedy: a neutral lead line ("This question was not saved. Fix the items below.")
   whenever the reply carries an errors map; rule numbers from the editor's rows; the message in plain words ("Rule 1 is empty.
   Choose what it checks, or remove it."). **Live.** Filed by `M174`. **Tier: early-testing.** ✅ **CLOSED BY `M176` (2026-10-18):** a refusal with a list of items leads with "This question was not saved. Fix the items below." ("the marked items" when they are all marked in place), never Laravel's copy of the first item; a rule is numbered as the Validation tab numbers it (the store records, at send time, the editor row of each sent rule — the tab lists every rule, Required-when ones included); a check set back to the empty choice is withheld like one never chosen; and the server's XOR message is split into "Empty. Choose what it checks, or remove it." and "Has both a check and an expression. Keep one of them." Red first: Pest 2/2, Vitest 5. Mutants caught: the lead back to the reply's message, the row map dropped, the XOR one message. Built and held for merge point 2 (`D137`); live since it, 2026-10-19.
@@ -14727,7 +14781,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   this dialog. `resources/js/components/builder/ConvertFieldDialog.vue:39` says *"It keeps its key, so conditions, calculations and
   text that mention it still point to it"*; `resources/js/components/builder/field-conversion.ts:204` and
   `app/Enums/ConversionWarning.php:50` carry the rest, with `app/Enums/ConversionDropReason.php` and `app/Enums/ConversionImpact.php`;
-  a new question's label is its type's label (`app/Services/Forms/FormBuilderService.php:137`), so the dialog reads *"Current type of
+  a new question's label is its type's label (`app/Services/Forms/FormBuilderService.php:150`), so the dialog reads *"Current type of
   “Date & time”: Date & time"*. The remedy: `docs/ux/design-system-reference.md` gains a voice rule — write for a smart
   high-schooler: short sentences, everyday words, say what happens to the answers — and the dialog, the conversion sentences and the
   three server enums are rewritten to it; the dialog stops repeating the type when the label is the type's own; `manual.ts` and the
@@ -14870,7 +14924,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The testers' comment (2026-10-11, comment 5): *"it is best to have a ledger/list/log of the nitty-gritty changes per field … An
   option to revert changes on each of the field modification … Revert changes should state what the previous state was before
   applying reversal (this can be another module)"*. Undo lives in memory and is lost on reload; the edit journal holds unsent edits
-  only; a question records who last changed it (`app/Services/Forms/FormBuilderService.php:301`) and nothing more; draft edits are
+  only; a question records who last changed it (`app/Services/Forms/FormBuilderService.php:319`) and nothing more; draft edits are
   deliberately kept out of the audit ledger (`docs/audit-compliance-logging-spec.md`, "Deliberately NOT audited"). The remedy: a
   `form_field_revisions` table keyed by the question key (so it survives a publish), written wherever a question is saved,
   converted or moved — who, when, which setting, before and after; a History tab in the right panel lists them, and **Put back**
@@ -15492,7 +15546,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `openapi.json`'s paths, reading a row that mixes marks (Tenant, Forms, Submissions) path by path. **Latent** — every mark is right
   today, and the first build that changes the API surface is what makes one wrong. Filed by `M193`. **Tier: before-launch.**
 
-- **`minor` · `scripts/gate-baselines.php` matches every metric against the whole run log, so the seventh job's Vitest summary is read as Meridian's: the run after merge point 8 regenerates Vitest as 85 files where Meridian has 283.**
+- ✅ **CLOSED BY `M195` (2026-10-28) — ****`minor` · `scripts/gate-baselines.php` matches every metric against the whole run log, so the seventh job's Vitest summary is read as Meridian's: the run after merge point 8 regenerates Vitest as 85 files where Meridian has 283.**
   Found at merge point 8's close-out (2026-10-28), regenerating from run 40696757541. Each metric names a `job`, but the job is only
   the table's label: the pattern runs over the concatenated log of every job and takes the first match. `M192` added the
   `BHW Connect (lint, types, tests, build)` job, whose Vitest prints the same `Test Files N passed (N)` line earlier in the log than
@@ -15500,3 +15554,107 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   disk, so `docs/gate-baselines.md` was NOT regenerated and stays at run 40449344963. `M192`'s premise that every other Meridian gate
   was already blind to `apps/` missed this one. The remedy: match each pattern only against the lines `gh run view --log` prefixes
   with that job's name, with a fixture of two jobs printing the same summary. **Live.** Filed by `M193`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M195` (2026-10-28), on its branch, under `D13` exception #7 (with `R-4130e1fa`, allowed by the user in chat).**
+  Each metric, and the E2E extras, now read only their own job's lines: the text gh prints before a line's first tab. Against run
+  40696757541, measured before any test was written, exactly two lines move: Vitest 85 → **283 files**, and the extras 11 →
+  **82 skipped**.
+  - ⚠️ **The extras were wrong before BHW arrived.** The committed file's `1 skipped` was Pest's line; E2E prints 82.
+  - Both ci-log fixtures took gh's real `job TAB step TAB timestamp text` shape, which they had never modelled.
+  - The new scenario `two-jobs-one-summary` puts a seventh job first, printing a Vitest summary, a skip count and the word *flaky*,
+    and its table must equal `recent-push`'s.
+  - Two committed-tree mutants, the metric scope and the extras scope each reverted to the whole log, were both CAUGHT by that case
+    alone.
+
+- **`minor` · Five controls harnesses print a case count with nothing under it, so a case that stops running still ends in `passed`.**
+  Found by `M195` (2026-10-28). That increment records each count in `docs/gate-baselines.md` and gives one harness,
+  `scripts/backlog-triage-controls.php`, a `MIN_CASES` floor, as `R-4130e1fa` asked. The other five have no floor on their own
+  counts: tracker-lint's controls, citation liveness's, the pre-push guard's, the test-pointer lint's `--selftest`, and the
+  boundary check's. Every "floor" in them is a floor on the fixtures or the scan of the gate they test. The mail-attribute
+  linter, also newly recorded, already floors both its counts (`MIN_EXPECTED_VIEWS`, `MIN_EXPECTED_ATTRIBUTE_ECHOES`).
+  - A recorded count only shows the drop at the next regeneration, after the merge that lost the case.
+  - The remedy is the same constant and the same `cannot_measure` exit in each harness, proved by a committed mutant that stops
+    one case.
+
+  **Latent** — every count is whole today. Filed by `M195`. **Tier: during-testing.**
+
+- **`minor` · `scripts/gate-baselines.php`'s gate roster is declared, not derived, so a counted gate added to `ci.yml` is recorded nowhere until someone adds it by hand — eight had been.**
+  Found by `M195` (2026-10-28), which recorded the static job's eight unrecorded pass lines by hand. `M90` already named the shape in
+  the roster's own comment (*"a gate added to ci.yml is INVISIBLE here until somebody adds a row"*), and nothing enforces it.
+  `GateBaselinesTest` pairs the roster with its fixtures, never with `ci.yml`.
+  - The remedy is a docs test that reads each `ci.yml` step that runs a repository gate and requires a roster entry or a stated
+    exemption for each. The verdict-only steps (the composer audit, the npm audit judge, gitleaks) and the BHW job are named as
+    exemptions.
+
+  **Latent** — every counted line is recorded today, and the next gate added to `ci.yml` is what makes it wrong. Filed by `M195`.
+  **Tier: during-testing.**
+
+- ✅ **CLOSED BY `M197` (2026-10-29) — ****`minor` · `symfony/mime` v8.1.0 carries CVE-2026-45070 (email header injection through non-token characters in MIME parameter names), and `composer audit` fails every CI run from 2026-10-28 18:08 UTC.**
+  Found when `#389`'s run 40790795523 went red at its static job's *Composer audit (SCA)* step. That step reported exactly one advisory:
+  `PKSA-wtxr-p26d-nn42`, severity medium, reported 2026-10-28T18:08:54Z, fixed in 8.1.10.
+  - It was not that pull request's diff. `#388`'s run, which finished before the advisory was published, passed the same step, and
+    every branch and the trunk fail it from that moment.
+  - `symfony/mime` is transitive, not a direct `require`.
+  - The host's own `composer audit` also names `symfony/http-foundation`, but only because the local `vendor/` lagged the lock. The lock
+    already pinned the patched 8.1.9.
+  - Meridian sends mail through Laravel's mailer, which builds its MIME headers with this package, so the advisory reaches a real
+    path. No form field sets a parameter name, which is why it is `minor`.
+
+  **Live.** Filed by `M197`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M197` (2026-10-29), on its branch.** `composer update symfony/mime`, run with the container's Composer 2.10.3 so the
+  lock's metadata is not downgraded, moves one package in `composer.lock`, v8.1.0 → v8.1.10. `composer audit --locked` now reads *"No
+  security vulnerability advisories found"*. It merges first at the merge point `#387` rides (`D192`), because every other pull
+  request's static job is red until it lands.
+
+- ✅ **CLOSED BY `M201` (2026-10-31) — ****`minor` · `follow-redirects` 1.16.1 carries GHSA-mrwp-f3q8-3g9p (cross-realm sensitiveHeaders arrays are discarded, so custom credentials can follow redirects), and the npm audit judge blocks every CI run.**
+  Found when the trunk's run 41196861583, the first after `M197` merged at merge point 9, went red at the static job's *npm audit*
+  step: `npm-audit-judge: BLOCKED — 1 high in PRODUCTION dependencies`, `follow-redirects — high — 1.16.0 - 1.16.1`. Its deploy was
+  skipped, so nothing went live.
+  - It was not `M197`'s diff. `M197` changed only `composer.lock`, and its own run passed this step on 2026-10-29.
+  - `follow-redirects` is transitive: `axios` requires it as `^1.16.0`. Meridian imports `axios` nowhere itself; it reaches the browser
+    bundle through Inertia, where `axios` uses its XHR adapter and never loads `follow-redirects`. That is why it is `minor`.
+
+  **Live.** Filed by `M201`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M201` (2026-10-31), on its branch.** The lock's one entry is set to 1.16.2 by hand, because the host's npm 11.6.1
+  rewrote 85 unrelated lines on `npm update follow-redirects --package-lock-only`. The registry's 1.16.1 and 1.16.2 records differ only in
+  version, tarball and integrity, and the integrity was recomputed from the downloaded tarball. `npm-audit-judge` now reads *"JUDGED
+  CLEAN at the blocking threshold"*. It merges first of what remains of merge point 9, because every pull request's static job is red
+  until it lands.
+
+- **`minor` · `packages/design-system` locks `vite` 6.4.4, which carries GHSA-8g5g-mxqh-grgj (`server.fs.deny` bypassed with queries), moderate.**
+  Found by `M201` (2026-10-31) in the same audit as the row above. The npm audit judge blocks only high and critical, so it does not
+  turn CI red, and `M201` left it alone to keep its lock change to one entry.
+  - It reaches only Vite's dev server, which the testing box never runs; the box serves built assets.
+  - The remedy is the same one-entry lock change: `packages/design-system/node_modules/vite` to 6.4.5, inside `^6.3.0`, then the design
+    system's build and Storybook's axe run green. An upstream rerating to high would turn every CI run red, as this row's neighbours did.
+
+  **Latent.** Filed by `M201`. **Tier: during-testing.**
+
+- **`minor` · `CLAUDE.md` says a push that records a decision regenerates `docs/pipeline.md` in the same push, and that path is outside `ci.yml`'s `paths-ignore` — so a claim push that follows the rule runs CI and a deploy on the trunk outside a merge point.**
+  Found by `M195` (2026-10-28) after the fact. Its claim push `69d7e56f` carried `decisions.md`, `lane-a.md` and the regenerated line.
+  The line is the one path not ignored, so the push ran CI on main (40718180626) and the production deploy (40723013140).
+  - `M194`'s claim push `f134e970` had done the same an hour earlier, and `M193`'s claim push, which left the line alone, ran nothing.
+  - **Harmless only by luck:** the deploy's own filter found *"only paths the site does not run"* and took no maintenance window. One
+    stray PHP comment in the same push would have put the testers' site into a maintenance window.
+  - The two rules contradict each other. *"Merge only at a planned merge point"* forbids what *"regenerates `docs/pipeline.md` in the
+    same push"* requires whenever the push records a decision.
+  - `M195`'s built claim kept to ignored paths and let the regeneration ride `M196`'s branch. That was the safe reading, made by hand.
+
+  The remedies are two, and they are not equivalent:
+  - (a) Put `docs/pipeline.md` in `paths-ignore`. `pipeline-lint` then runs only on a branch, the next merge point regenerates the
+    line anyway, and a stale line on the trunk is exactly the case the `CLAUDE.md` rule was written against.
+  - (b) Reword the rule: a claim push records the decision, and the line is regenerated on the next pull request. Leave the workflow
+    alone.
+
+  **Live.** Filed by `M196`. **Tier: during-testing.**
+
+- ✅ **CLOSED BY `M205` (2026-11-03) — ****`minor` · `FeedbackPullScriptTest`'s thread test expired on 2026-11-03: it never wrote the "last pull" its name describes, so it read the script's own default, the last fortnight, and the fixture's comments, dated 2026-10-20, fell out of it — every CI run red at Pest.**
+  Found when the trunk's run 41584593412 went red at Pest, 1 of 7,277. That was the first run after `M202` merged as `19f87694`, and
+  it failed at line 213, where the output lacked `REOPENED`. Its deploy was skipped, so nothing went live.
+  - It was not `M202`'s diff. `M202` changed only `apps/bhw-connect/ops/deploy-bhw.ps1`, and its own run passed this test on 2026-11-02.
+  - With no state file, `scripts/feedback-pull.php` falls back to `time() - 14 * 86400`. The fixture's three comments are dated
+    2026-10-20, 01:00–03:00 UTC, so the window passed them at 03:00 UTC on 2026-11-03. The script was right; the test was not.
+
+  **Live.** Filed by `M205`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M205` (2026-11-03), on its branch.** The test now seeds a state file recording the last pull on 2026-10-19, and asserts
+  that the state advances to the newest member comment. A new case holds the fortnight default to within two minutes. The file runs 12
+  of 12 on the host, and a throwaway commit that set the default to 13 days turned the new case red.

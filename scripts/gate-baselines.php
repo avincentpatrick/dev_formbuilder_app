@@ -220,8 +220,30 @@ if (trim($log) === '') {
 // which is a NOT FOUND row rather than a wrong number only because of how this file reports.
 $plain = (string) preg_replace('/(?:\x1b|\^\[)\[[0-9;]*m/', '', $log);
 
+// ⛔ M195 (`R-b31f421e`). EACH METRIC IS READ ONLY FROM ITS OWN JOB'S LINES, AND UNTIL M195 THE JOB WAS
+//    ONLY THE TABLE'S THIRD COLUMN. Every pattern ran over the whole log and took the first match. That
+//    held while no two jobs printed the same summary line, and M192's seventh job ended it: BHW Connect's
+//    Vitest prints `Test Files N passed (N)` earlier in the log than Meridian's, so merge point 8's
+//    regeneration read Vitest as 85 files where Meridian has 283.
+// ⚠️ AND THE E2E EXTRAS WERE WRONG BEFORE BHW ARRIVED. Their skip count took the first `N skipped` in the
+//    whole log, which was Pest's — the committed file carried `1 skipped` while E2E printed 82.
+// `gh run view --log` prints every line as `<job> TAB <step> TAB <timestamp> <text>`, so a line's job is
+// what precedes its first tab, and a line with no tab belongs to no job. Exploded on the byte, never
+// split on a regex newline class: that matches a byte inside common UTF-8 emoji.
+$jobLogs = [];
+
+foreach (explode(chr(10), $plain) as $line) {
+    $tab = strpos($line, chr(9));
+
+    if ($tab !== false) {
+        $jobLogs[substr($line, 0, $tab)][] = $line;
+    }
+}
+
+$jobLogs = array_map(static fn (array $lines): string => implode(chr(10), $lines), $jobLogs);
+
 /**
- * Each metric names the job it comes from, so a blank row says WHERE to look.
+ * Each metric names the job it comes from, and since M195 that job is the only text its pattern reads.
  *
  * @var array<string, array{job: string, pattern: string, format: callable(array<int, string>): string}>
  */
@@ -307,22 +329,71 @@ $metrics = [
         'pattern' => '/test-pointer-lint: passed \((\d+) file\(s\) over (\d+) root\(s\), (\d+) test file\(s\) on disk, (\d+) `\*Test` name\(s\) mentioned, (\d+) exemption\(s\)/',
         'format' => static fn (array $m): string => "{$m[1]} files over {$m[2]} roots, {$m[3]} test files on disk, {$m[4]} names, {$m[5]} exemptions",
     ],
+    // M195 (`R-4130e1fa`). ⚠️ THE ROW NAMED ONE UNRECORDED GATE AND THE STATIC JOB PRINTS EIGHT. Each line
+    // below prints a count on every run and was recorded nowhere, so a harness losing half its cases would
+    // still print `passed` and move no number anyone reads. The composer audit, the npm audit judge and
+    // gitleaks print verdicts rather than counts and are deliberately absent.
+    'mail-attribute-lint' => [
+        'job' => 'Static analysis, style & security',
+        'pattern' => '/Mail-attribute linter passed \((\d+) mail view\(s\), (\d+) attribute interpolation\(s\) checked/',
+        'format' => static fn (array $m): string => "{$m[1]} mail views, {$m[2]} attribute interpolations",
+    ],
+    'tracker-lint' => [
+        'job' => 'Static analysis, style & security',
+        'pattern' => '/tracker-lint: passed \((\d+) rule groups/',
+        'format' => static fn (array $m): string => "{$m[1]} rule groups",
+    ],
+    'tracker-lint-controls' => [
+        'job' => 'Static analysis, style & security',
+        'pattern' => '/tracker-lint-controls: passed \((\d+) cases/',
+        'format' => static fn (array $m): string => "{$m[1]} cases",
+    ],
+    'citation-liveness-lint-controls' => [
+        'job' => 'Static analysis, style & security',
+        'pattern' => '/citation-liveness-lint-controls: passed \((\d+) cases/',
+        'format' => static fn (array $m): string => "{$m[1]} cases",
+    ],
+    'pre-push-guard-controls' => [
+        'job' => 'Static analysis, style & security',
+        'pattern' => '/pre-push-guard-controls: passed \((\d+) cases/',
+        'format' => static fn (array $m): string => "{$m[1]} cases",
+    ],
+    'test-pointer-lint-selftest' => [
+        'job' => 'Static analysis, style & security',
+        'pattern' => '/test-pointer-lint selftest: passed \((\d+) case\(s\)/',
+        'format' => static fn (array $m): string => "{$m[1]} cases",
+    ],
+    'backlog-triage-controls' => [
+        'job' => 'Static analysis, style & security',
+        'pattern' => '/backlog-triage-controls: passed \((\d+) cases/',
+        'format' => static fn (array $m): string => "{$m[1]} cases",
+    ],
+    'boundary-check-controls' => [
+        'job' => 'Static analysis, style & security',
+        'pattern' => '/boundary-check-controls: passed \((\d+) cases/',
+        'format' => static fn (array $m): string => "{$m[1]} cases",
+    ],
 ];
 
 $rows = [];
 $missing = 0;
 
 foreach ($metrics as $name => $spec) {
-    if (preg_match($spec['pattern'], $plain, $matches) === 1) {
+    if (preg_match($spec['pattern'], $jobLogs[$spec['job']] ?? '', $matches) === 1) {
         $rows[] = sprintf('| %s | %s | %s |', $name, ($spec['format'])($matches), $spec['job']);
     } else {
+        // ⚠️ "Or the job name": a job renamed in ci.yml now misses every one of its metrics, and advice
+        // naming only the pattern would send the reader to the file that is right (M90's misdirection).
         $missing++;
-        $rows[] = sprintf('| %s | **NOT FOUND** — fix the pattern in `scripts/gate-baselines.php` | %s |', $name, $spec['job']);
+        $rows[] = sprintf('| %s | **NOT FOUND** — fix the pattern, or the job name, in `scripts/gate-baselines.php` | %s |', $name, $spec['job']);
     }
 }
 
-$skipped = preg_match('/(\d+) skipped/', $plain, $m) === 1 ? $m[1].' skipped' : 'no skip line';
-$flaky = str_contains($plain, 'flaky') ? '⚠️ a flaky line IS present' : 'no flaky line';
+// The extras are the E2E job's own, read from its lines alone (M195). The name comes from its metric,
+// so a renamed job is fixed in one place.
+$e2eLog = $jobLogs[$metrics['E2E (Playwright + axe)']['job']] ?? '';
+$skipped = preg_match('/(\d+) skipped/', $e2eLog, $m) === 1 ? $m[1].' skipped' : 'no skip line';
+$flaky = str_contains($e2eLog, 'flaky') ? '⚠️ a flaky line IS present' : 'no flaky line';
 
 $rowsJoined = implode(chr(10), $rows);
 
@@ -368,6 +439,8 @@ that line is load-bearing rather than lucky.
   The ignore set is `PROGRESS.md`, `PROGRESS_ARCHIVE.md`, `docs/claims/**`, `docs/gate-baselines.md`
   and `docs/backlog-triage.md` — measured against the last four close-out commits, every one of which
   touches those paths and nothing else.
+- **Each figure is read from its own job's lines in the run log, never from the whole log** (M195). The
+  BHW Connect job prints the same Vitest summary first, and its figures are not Meridian's to record.
 - **Pint's CI invocation is a BARE `pint --test`** over the whole project. The command every hand-off
   has prescribed — `pint --test app tests database` — scans roughly 40 files fewer and misses
   `scripts/`, `config/`, `routes/` and `bootstrap/` entirely.

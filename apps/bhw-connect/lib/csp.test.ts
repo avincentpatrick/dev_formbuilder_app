@@ -33,6 +33,12 @@ describe("contentSecurityPolicy", () => {
     expect(production.get("default-src")).toEqual(["'self'"]);
   });
 
+  it("opens nothing to another origin, Supabase's included (Meridian's bhw-p3-identity)", () => {
+    expect(production.get("img-src")).toEqual(["'self'", "data:", "blob:"]);
+    expect(production.get("connect-src")).toEqual(["'self'"]);
+    expect(contentSecurityPolicy("abc123", { dev: false })).not.toMatch(/supabase/i);
+  });
+
   it("allows maplibre's blob worker", () => {
     expect(production.get("worker-src")).toContain("blob:");
   });

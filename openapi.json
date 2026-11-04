@@ -6304,6 +6304,55 @@
                     }
                 }
             }
+        },
+        "/auth/whoami": {
+            "get": {
+                "operationId": "v1.session.whoami",
+                "summary": "The signed-in member's id, name and email. A guest gets the 401 envelope from the group's `auth`; an\naccount that is not an active member of this workspace gets the 403 one",
+                "tags": [
+                    "Whoami"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {},
+                                                "name": {
+                                                    "type": "string"
+                                                },
+                                                "email": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "name",
+                                                "email"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -7437,7 +7486,7 @@
             },
             "StoreApiTokenRequest": {
                 "type": "object",
-                "description": "Validation for minting an API key (Increment E). The requested `abilities` must be members of the\ncatalog ({@see ApiAbilities}); the controller then intersects them against the issuer's RBAC, so the\nrequested set is an upper bound, never a grant. Authorization (an authenticated member) is the route's\nsession `auth` middleware.",
+                "description": "Validation for minting an API key (Increment E). The requested `abilities` must be members of the\ncatalog ({@see ApiAbilities}); the controller then intersects them against the issuer's RBAC, so the\nrequested set is an upper bound, never a grant. Authorization (an authenticated member) is the route's\nsession `auth` middleware. Every mint carries the signed-in account's current password.",
                 "properties": {
                     "name": {
                         "type": "string",
@@ -7449,6 +7498,10 @@
                             "null"
                         ],
                         "format": "date-time"
+                    },
+                    "password": {
+                        "type": "string",
+                        "description": "The signed-in account's current password. Every new key asks for it."
                     },
                     "abilities": {
                         "type": "array",
@@ -7476,6 +7529,7 @@
                 },
                 "required": [
                     "name",
+                    "password",
                     "abilities"
                 ],
                 "title": "StoreApiTokenRequest"

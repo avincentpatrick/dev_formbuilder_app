@@ -27,7 +27,7 @@ use App\Support\Search\DestinationCatalog;
 | Same idiom as `NotificationTypeParityTest` (whose reporting shape this borrows) and `PdfFieldRoleTest`
 | (whose placement this borrows).
 |
-| ⚠️ NO DATABASE AND NO CONTAINER — `tests/Pest.php:77` binds TestCase to Feature only, so the repo root is
+| ⚠️ NO DATABASE AND NO CONTAINER — `tests/Pest.php:92` binds TestCase to Feature only, so the repo root is
 | computed from __DIR__ rather than through base_path(). `ShellAbilities::for(null)` is a documented API (its
 | own docblock: "a null user is accepted rather than guarded against") and resolves every key false without
 | booting anything, because the nullsafe operator skips argument evaluation entirely and a ::class constant

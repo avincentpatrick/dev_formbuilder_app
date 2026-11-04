@@ -206,6 +206,12 @@ function feedbackPullPosts(string $log): array
 
 it('shows REOPENED reports and the members\' new comments since the last pull, never our replies, and nothing new the second time', function (): void {
     $out = $this->scratch.'/pull';
+    $state = $this->scratch.'/feedback-pull-state.json';
+    $url = 'http://127.0.0.1:'.$this->port;
+
+    // The last pull, a day before the fixture's comments. Left to the script's own default, the last fortnight,
+    // the fixture's fixed dates fell out of the window on 2026-11-03 and every run went red (M205).
+    file_put_contents($state, json_encode([$url => ['comments_since' => '2026-10-19T00:00:00Z']]));
 
     [$status, $output] = feedbackPull(['--config='.$this->config, '--out='.$out]);
 
@@ -216,11 +222,20 @@ it('shows REOPENED reports and the members\' new comments since the last pull, n
         ->and($output)->toContain('Same on my phone.')
         ->and($output)->not->toContain('Which tablet, please?')
         ->and($output)->toContain('relayed: 4 — 2 Resolved, 1 Ongoing, 1 Confirmed working')
-        ->and(is_file($this->scratch.'/feedback-pull-state.json'))->toBeTrue();
+        ->and(json_decode((string) file_get_contents($state), true)[$url]['comments_since'])->toBe('2026-10-20T03:00:00+00:00');
 
     [, $again] = feedbackPull(['--config='.$this->config, '--out='.$out]);
     expect($again)->toContain('no reopened reports and no new comments')
         ->and($again)->not->toContain('Still cut off on the tablet.');
+});
+
+it('looks back a fortnight when there has been no pull yet', function (): void {
+    [$status, $output] = feedbackPull(['--config='.$this->config, '--out='.$this->scratch.'/pull']);
+    preg_match('/^threads.*?since (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)/m', $output, $match);
+
+    expect($status)->toBe(FEEDBACK_PULL_OK)
+        ->and($match)->toHaveCount(2)
+        ->and(abs(strtotime($match[1]) - (time() - 14 * 86400)))->toBeLessThan(120);
 });
 
 it('relays a file of comments only with the user\'s approval, and says what happened to each', function (): void {

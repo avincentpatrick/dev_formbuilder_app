@@ -75,7 +75,7 @@ it('rejects editing a field that belongs to a published version (409 since M172 
         ->withHeaders(builderHeaders($form))
         ->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$publishedField->id}", [
             'key' => 'hacked', 'label' => 'Hacked', 'is_required' => 'optional',
-            'config' => [], 'validations' => [], 'version' => null,
+            'config' => [], 'validations' => [], 'version' => builderToken($publishedField),
         ])
         ->assertStatus(409)
         ->assertJsonPath('code', 'draft_superseded');
@@ -115,7 +115,7 @@ it('still allows editing the current draft after publishing (positive control)',
         ->withHeaders(builderHeaders($form))
         ->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$draftField->id}", [
             'key' => 'edited', 'label' => 'Edited', 'is_required' => 'optional',
-            'config' => [], 'validations' => [], 'version' => null,
+            'config' => [], 'validations' => [], 'version' => builderToken($draftField),
         ])
         ->assertOk();
 
@@ -197,7 +197,7 @@ it('refuses a field edit whose form was published after the models were bound', 
     expect($boundForm->draft_version_id)->toBe($boundField->form_version_id); // the stale guard agrees
 
     expect(fn () => app(FormBuilderService::class)
-        ->updateField($boundForm, $boundField, $admin, builderFieldPayload('edited'), null))
+        ->updateField($boundForm, $boundField, $admin, builderFieldPayload('edited'), builderToken($boundField)))
         ->toThrow(FormException::class);
 
     enterTenant($tenant->id, $admin->id);
@@ -220,7 +220,7 @@ it('refuses a section edit whose form was published after the models were bound'
 
     expect(fn () => app(FormBuilderService::class)->updateSection($boundForm, $boundSection, [
         'key' => 'edited', 'label' => 'Edited', 'description' => null,
-    ], null))->toThrow(FormException::class);
+    ], builderToken($boundSection)))->toThrow(FormException::class);
 
     enterTenant($tenant->id, $admin->id);
     expect(FormSection::query()->whereKey($boundSection->id)->value('label'))->toBe($original);
@@ -244,7 +244,7 @@ it('refuses a field edit whose row another editor deleted after the models were 
     expect($boundForm->draft_version_id)->toBe($boundField->form_version_id); // still agrees
 
     expect(fn () => app(FormBuilderService::class)
-        ->updateField($boundForm, $boundField, $admin, builderFieldPayload('edited'), null))
+        ->updateField($boundForm, $boundField, $admin, builderFieldPayload('edited'), builderToken($boundField)))
         ->toThrow(FormException::class);
 
     enterTenant($tenant->id, $admin->id);
@@ -286,7 +286,7 @@ it('answers 422, not 500, when the edited field is deleted between the guard and
         ->withHeaders(builderHeaders($form))
         ->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$field->id}", [
             'key' => 'edited', 'label' => 'Edited', 'is_required' => 'optional',
-            'config' => [], 'version' => null,
+            'config' => [], 'version' => builderToken($field),
             'validations' => [['rule_type' => 'min_length', 'rule_value' => '3']],
         ]);
 
@@ -319,7 +319,7 @@ it('names the RELATED field when that is the row a concurrent editor removed', f
                 'rule_value' => 'yes',
             ]],
         ],
-        null
+        builderToken($field)
     ))->toThrow(FormException::class, 'A field this rule refers to was removed by another editor. Refresh the builder and try again.');
 });
 
@@ -339,7 +339,7 @@ it('lets an unrelated constraint violation keep its own behaviour (negative cont
             'key' => 'edited', 'label' => 'Edited', 'is_required' => 'optional', 'config' => [],
             'validations' => [['rule_type' => 'min_length', 'expression' => '${a} > 1', 'rule_value' => '3']],
         ],
-        null
+        builderToken($field)
     ))->toThrow(QueryException::class);
 });
 
@@ -474,7 +474,7 @@ it('answers 409 draft_superseded when a stale tab saves a published field with i
         ->withHeaders(['X-Builder-Draft' => $publishedField->form_version_id])
         ->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$publishedField->id}", [
             'key' => $publishedField->key, 'label' => 'Edited in a stale tab', 'is_required' => 'optional',
-            'config' => [], 'validations' => [], 'version' => null,
+            'config' => [], 'validations' => [], 'version' => builderToken($publishedField),
         ]);
 
     $response->assertStatus(409)
@@ -523,7 +523,7 @@ it('answers 428 when a builder write carries no draft at all', function (): void
     $this->actingAs($admin)
         ->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$draftField->id}", [
             'key' => $draftField->key, 'label' => 'No header', 'is_required' => 'optional',
-            'config' => [], 'validations' => [], 'version' => null,
+            'config' => [], 'validations' => [], 'version' => builderToken($draftField),
         ])
         ->assertStatus(428)
         ->assertJsonPath('code', 'draft_required');
@@ -546,7 +546,7 @@ it('answers the same 409 when the header is current but the item is not — the 
         ->withHeaders(builderHeaders($form))
         ->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$publishedField->id}", [
             'key' => $publishedField->key, 'label' => 'Raced', 'is_required' => 'optional',
-            'config' => [], 'validations' => [], 'version' => null,
+            'config' => [], 'validations' => [], 'version' => builderToken($publishedField),
         ])
         ->assertStatus(409)
         ->assertJsonPath('code', 'draft_superseded')

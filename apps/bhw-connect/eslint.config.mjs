@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // MapLibre's minified worker, copied in by predev/prebuild (scripts/copy-maplibre-worker.mjs).
+    "public/maplibre-gl-worker.mjs",
   ]),
   {
     // Filter state must be read/written through useFilterState, which applies

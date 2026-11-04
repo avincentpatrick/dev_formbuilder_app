@@ -74,7 +74,8 @@ final class UpdateFieldRequest extends FormRequest
             'is_sensitive' => ['boolean'],
             'is_queryable' => ['boolean'],
             'indexed_data_type' => ['nullable', Rule::enum(IndexedDataType::class)],
-            'version' => ['nullable', 'string'],
+            // M196 (`R-036f3226`, `D189`): required — a save without the token it last read is refused, not taken as an overwrite.
+            'version' => ['required', 'string'],
             // M188 (`R-3894369d`, `D167`): the history entry a Put back restores; recorded on the new entry, never trusted further.
             'put_back_of' => ['sometimes', 'nullable', 'uuid'],
             'validations' => ['present', 'array'],

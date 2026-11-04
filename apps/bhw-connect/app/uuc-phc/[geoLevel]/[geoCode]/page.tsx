@@ -29,6 +29,9 @@ import { AskTheList } from "@/components/uuc-phc/ask-the-list";
 // 1 hour. ISR: citymun render on demand; region/province are prerendered. Same reasoning as the
 // landing page — a shorter window bounds how long a transient empty read can stay cached.
 export const revalidate = 3_600;
+// Per request, not ISR: the root layout reads the per-request CSP nonce (lib/csp.ts), and an ISR
+// render of this page reads it outside a request and answers 500 (DYNAMIC_SERVER_USAGE).
+export const dynamic = "force-dynamic";
 
 const CHILD_HEADING: Record<GeoLevel, string | null> = {
   national: "Regions",

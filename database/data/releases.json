@@ -1,5 +1,19 @@
 [
     {
+        "version": "0.17.0",
+        "title": "BHW Connect, one click away",
+        "items": [
+            {
+                "kind": "new",
+                "text": "BHW Connect, the Barangay Health Worker dashboard on this same site, is now linked from your account menu at the top right, and from the footer under every page. Its administrators sign in with their account here; there is no separate BHW Connect password any more."
+            },
+            {
+                "kind": "improved",
+                "text": "Creating an API key now asks for your account’s password every time."
+            }
+        ]
+    },
+    {
         "version": "0.16.0",
         "title": "Compare two versions of a form",
         "items": [

@@ -395,6 +395,16 @@ class AppServiceProvider extends ServiceProvider
                 : 'ip:'.$request->ip(),
         ));
 
+        // Who is signed in (M207, ADR-0024 §D5). Every call comes from BHW Connect's server on 127.0.0.1, so an
+        // IP key would put every visitor in one bucket. ThrottleRequests is sorted after authentication in
+        // bootstrap/app.php's priority list, so the member is resolved here; BHW caches each answer for 30 s,
+        // which makes two calls a minute per visitor the normal rate.
+        RateLimiter::for('whoami', fn (Request $request): Limit => Limit::perMinute(120)->by(
+            $request->user() !== null
+                ? 'user:'.$request->user()->getAuthIdentifier()
+                : 'ip:'.$request->ip(),
+        ));
+
         // The platform support API (M175, ADR-0023) — one caller, the dev session's feedback pull, which makes a
         // handful of requests per session. 60 a minute per token is ample for a pull with screenshots; the
         // per-address limit bounds guessing, since this throttle runs BEFORE the token is looked up. Keyed on a

@@ -187,14 +187,23 @@ describe("AppLayout — the footer and the What's new prompt (M181)", () => {
         return mount(AppLayout, { global: { stubs } });
     }
 
-    it("puts the product, its version, What's new and Help under every page", () => {
+    it("puts the product, its version, What's new, Help and BHW Connect under every page", () => {
         const footer = shellAt('Dashboard').get('.app-shell__content > footer.app-shell__footer');
 
         // Its parts, in order: the gap spaces them on screen, so the markup carries no space between them.
-        expect(footer.findAll(':scope > *').map((part) => part.text())).toEqual(['Meridian v0.9.0', '·', "What's new", '·', 'Help']);
+        expect(footer.findAll(':scope > *').map((part) => part.text())).toEqual([
+            'Meridian v0.9.0',
+            '·',
+            "What's new",
+            '·',
+            'Help',
+            '·',
+            'BHW Connect',
+        ]);
         expect(footer.findAll('a').map((a) => [a.text(), a.attributes('href')])).toEqual([
             ["What's new", '/whats-new'],
             ['Help', '/help'],
+            ['BHW Connect', '/bhw-connect/'],
         ]);
     });
 

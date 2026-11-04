@@ -21,6 +21,9 @@ import { AskTheList } from "@/components/uuc-phc/ask-the-list";
 // 1 hour. Region and province are prerendered by the coverage section's params; citymun renders on
 // demand. Same reasoning as the rest of the section.
 export const revalidate = 3_600;
+// Per request, not ISR: the root layout reads the per-request CSP nonce (lib/csp.ts), and an ISR
+// render of this page reads it outside a request and answers 500 (DYNAMIC_SERVER_USAGE).
+export const dynamic = "force-dynamic";
 
 type Params = { geoLevel: string; geoCode: string };
 

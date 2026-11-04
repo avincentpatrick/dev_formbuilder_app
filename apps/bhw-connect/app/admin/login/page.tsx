@@ -1,30 +1,23 @@
-"use client";
+import { redirect } from "next/navigation";
+import { getAdminAuthResult } from "@/lib/db/require-admin";
+import { meridianUrl } from "@/lib/meridian-url";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { createSupabaseAuthBrowserClient } from "@/lib/db/supabase-auth-browser";
+/**
+ * BHW Connect has no password of its own any more: its admins sign in with their Meridian account
+ * (Meridian's decision D178), on the site this app shares an address with. Meridian's sign-in takes no
+ * return address — one would be an open redirect — so this page says how to come back instead: the
+ * BHW Connect link in Meridian's account menu, or at the foot of its pages.
+ *
+ * Anyone already signed in goes on to `/admin`, whose layout either lets them in or says they are not
+ * an admin.
+ */
+export const dynamic = "force-dynamic";
 
-export default function AdminLoginPage() {
-  const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [status, setStatus] = useState<"idle" | "submitting" | "error">("idle");
+export default async function AdminLoginPage() {
+  const result = await getAdminAuthResult();
+  if (result.status !== "signed_out") redirect("/admin");
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setStatus("submitting");
-
-    const supabase = createSupabaseAuthBrowserClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-    if (error) {
-      setStatus("error");
-      return;
-    }
-
-    router.push("/admin");
-    router.refresh();
-  }
+  const signIn = meridianUrl("/login");
 
   return (
     <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-6 px-4 py-16">
@@ -33,51 +26,23 @@ export default function AdminLoginPage() {
         <p className="mt-1 text-sm text-muted">BHW Connect staff only.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <div>
-          <label htmlFor="admin-email" className="block text-sm font-medium">
-            Email
-          </label>
-          <input
-            id="admin-email"
-            type="email"
-            required
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-          />
-        </div>
+      <p className="text-sm">
+        BHW Connect&apos;s admins sign in with their account on this site. Sign in there, then come back
+        with the <strong>BHW Connect</strong> link in the menu under your name, at the top right.
+      </p>
 
-        <div>
-          <label htmlFor="admin-password" className="block text-sm font-medium">
-            Password
-          </label>
-          <input
-            id="admin-password"
-            type="password"
-            required
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-          />
-        </div>
-
-        {status === "error" && (
-          <p className="text-sm text-danger" role="alert">
-            Couldn&apos;t sign in with that email and password.
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={status === "submitting"}
-          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-foreground disabled:opacity-50"
+      {signIn ? (
+        <a
+          href={signIn}
+          className="rounded-md bg-accent px-4 py-2 text-center text-sm font-medium text-accent-foreground"
         >
-          {status === "submitting" ? "Signing in…" : "Sign in"}
-        </button>
-      </form>
+          Sign in
+        </a>
+      ) : (
+        <p className="text-sm text-muted">
+          Sign-in works where this app runs beside Meridian. On a laptop, set BHW_AUTH_MODE=stub.
+        </p>
+      )}
     </div>
   );
 }

@@ -16,7 +16,50 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M209` released on 2026-11-04: BHW Connect deploys itself on every merge (`deploy.yml`'s second step), its scheduled jobs run on the box, and a BHW-only push and a rollback proved it. Close-out branch `m209-closeout`. The next claim is `bhw-settings-from-github`, step 4 of the user's seven, which this release unblocks.
+## Status: ACTIVE CLAIM — `M210`, BHW Connect's own settings come from GitHub repository secrets, written onto the box by the deploy (`bhw-settings-from-github`, `D199`) (m210-bhw-settings-from-github)
+
+Taken 2026-11-04. Branch `m210-bhw-settings-from-github`, cut from origin/main at `2222aa34`, PR into main. It merges at its own merge point once green, under the user's instruction of 2026-11-03: its paths are site-safe (`.github/`, `apps/`, `tests/`, `docs/`). This is step 4 of the user's seven.
+
+Row: `bhw-settings-from-github`: "BHW's own settings (its third-party API keys, CRON_SECRET, the usage-log salt) as GitHub repository secrets that deploy.yml writes into the box's BHW .env file before ops/deploy-bhw.ps1 runs, never echoed, so jongsky25 changes a key himself after the handover (D199); the working agreement's section 6 rewritten to match".
+
+### Evidence verified
+- **`.github/workflows/deploy.yml`: held.** Since `M209` its second step runs `deploy-bhw.ps1`, and nothing writes BHW's `.env`.
+- **The repository holds no secrets** (`gh secret list`, empty, 2026-11-04). Its variables are only `DEPLOY_ENABLED` and `MERIDIAN_APP_PATH`.
+- **`docs/working-agreement.md` §6** says BHW's live settings are a file that only avincentpatrick writes, so a new secret means a line in `.env.example`, a note in the PR, and avincentpatrick adding it on the box. `apps/bhw-connect/CLAUDE.md` says the same.
+- **The six settings the row names** are all in `.env`: `GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `MISTRAL_API_KEY`, `CRON_SECRET`, `USAGE_EVENTS_IP_SALT` (E0/E1).
+  - `GEMINI_API_KEY` is set, and `CRON_SECRET` was made at the box at `M209`'s E1.
+  - The other four are empty.
+
+### Premise verified
+- **F0, read at the box 2026-11-04 07:27:41 UTC.** `.env` carries its own ACL (inheritance off): SYSTEM FullControl, NETWORK SERVICE **Read**, Administrators FullControl. So the runner cannot write it today, and the box step G1 grants NETWORK SERVICE Modify on that one file.
+  - What the grant adds is small. NETWORK SERVICE already reads every value there, `BHW_DATABASE_URL` with `bhw_app`'s password included, and BHW's own service runs as it.
+  - The script writes only the six allow-listed names, never the database URL or the keys.
+- **`C:\meridian\bhw` grants BUILTIN\Users ReadAndExecute** (F0), so a copy of `.env` made in that folder would be readable by every local user.
+  - The script's backups go to `C:\meridian\backups\bhw\env`, which inherits SYSTEM, NETWORK SERVICE and Administrators only (`M208`).
+  - The four existing `.env.pre-*.bak` were each made by hand with `.env`'s own ACL copied.
+- **An unset secret reaches the step as an empty string.** So "unset" must mean "keep the box's value", or the first deploy would blank `GEMINI_API_KEY`.
+- **None of the six is `NEXT_PUBLIC_`,** so a change needs a restart (`ops/start.ps1` loads `.env`), not a rebuild. The cron tasks read `CRON_SECRET` from `.env` when they run.
+- **A changed secret triggers no workflow,** so applying one without a code push needs a `workflow_dispatch` path. That path must not deploy code: it runs only `deploy-bhw.ps1` against the checkout `deploy.ps1` last moved, which only ever moves to a CI-green commit.
+
+### Remedy verdict
+**Works in shape, to be measured on the dev machine before the PR, and at the box after it:**
+- write-settings with a mix of set, unset and unchanged values against a scratch `.env`;
+- then a real secret set and dispatched.
+
+Files:
+- `apps/bhw-connect/ops/write-settings.ps1` (new) and `apps/bhw-connect/ops/deploy-bhw.ps1` (a `-RestartIfSkipped` switch);
+- `.github/workflows/deploy.yml` and `.github/workflows/bhw-settings.yml` (new);
+- `tests/Feature/Deploy/DeployWorkflowTest.php`;
+- `docs/working-agreement.md` (§6), `docs/deployment-infrastructure.md` (§8.4), `apps/bhw-connect/CLAUDE.md`, `apps/bhw-connect/.env.example`;
+- at close-out: ADR-0024's marker, `docs/pipeline.md`, `PROGRESS.md` (own block), `docs/gate-baselines.md`.
+
+Shared artefacts taken: `.github/workflows/deploy.yml`, `docs/working-agreement.md`, `docs/deployment-infrastructure.md`.
+Paired files taken: the two workflows and `ops/write-settings.ps1`'s allowlist, held equal by `DeployWorkflowTest`.
+Namespaces spent: nothing from either namespace (`M210`).
+Prediction:
+- The PR is 7/7, and its own deploy writes nothing: all six secrets are unset, so "0 changed".
+- After the user's OK, one test secret (`BHW_USAGE_EVENTS_IP_SALT`, random, now empty on the box) set by `gh secret set` and dispatched writes "1 changed" and restarts BHW healthy; a second dispatch writes "0 changed".
+- **The part I most expect to be wrong:** that the runner may replace `.env` in place after G1. `Set-Content` on a file whose ACL is explicit may need more than Modify if it recreates the file.
 
 ## RELEASED — `M209`, BHW Connect deploys itself on every merge, its scheduled jobs run on the box, and a BHW-only push and a rollback prove it (`bhw-p1-box`'s remainder, `bhw-screenshot-trace`)
 

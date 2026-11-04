@@ -60,3 +60,19 @@ jobs:
         run: |
           $app = if ($env:MERIDIAN_APP_PATH) { $env:MERIDIAN_APP_PATH } else { 'C:\meridian\app' }
           & "$app\deploy.ps1" -AppPath $app
+
+      # M209 (`bhw-p1-box`, ADR-0024 §D6): BHW Connect, deployed alone, from the checkout the step above has
+      # just moved to this commit. It has no `if:`, so it runs only when Meridian's deploy succeeded: a BHW
+      # failure never stops Meridian, which is already live when this starts. deploy-bhw.ps1 decides for
+      # itself: a commit that changes nothing BHW's server loads is recorded and skipped; otherwise it builds
+      # aside, migrates with a census, swaps the `current` junction, and swaps back by itself on a failed
+      # health check. The runner may stop and start `bhw-connect` because the box gave NETWORK SERVICE the
+      # worker's own service right (M209's E1).
+      - name: Run BHW Connect's deploy-bhw.ps1 against the same checkout
+        shell: powershell
+        timeout-minutes: 30
+        env:
+          MERIDIAN_APP_PATH: ${{ vars.MERIDIAN_APP_PATH }}
+        run: |
+          $app = if ($env:MERIDIAN_APP_PATH) { $env:MERIDIAN_APP_PATH } else { 'C:\meridian\app' }
+          & "$app\apps\bhw-connect\ops\deploy-bhw.ps1" -AppPath $app

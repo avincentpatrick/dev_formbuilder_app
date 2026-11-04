@@ -634,10 +634,14 @@ from outside on 2026-09-19 was the **agency firewall**, not an absent listener.
 
 ### 8.4 A second application under the same host — BHW Connect (ADR-0024)
 
-⚠️ **AS DESIGNED, NOT YET MEASURED.** Written by `M192` (the import, phase P0), which changed nothing on
-the box. Each part below is built, measured and rewritten from what was measured by the phase named in
-brackets: `bhw-p1-box` (the app and Apache), `bhw-p2-db` (the database), `bhw-p3-identity` (sign-in).
-The decisions are `D172`–`D185` in `docs/claims/decisions.md`; the working agreement between the two
+**MEASURED ON THE BOX.** `M192` wrote this as a design, before anything was on the box. Each part has since
+been built, measured, and rewritten from what was measured, by the phase named in brackets:
+- `bhw-p1-box`: the app and Apache (`M194`), then the wired deploy and the scheduled jobs (`M209`);
+- `bhw-p2-db`: the database (`M206`);
+- `bhw-p3-identity`: sign-in, screenshots and keys (`M207`);
+- `bhw-deploy-db-tools`: the dump tools (`M208`).
+
+The decisions are `D172`–`D206` in `docs/claims/decisions.md`. The working agreement between the two
 developers is `docs/working-agreement.md`.
 
 **What it is.** BHW Connect — a second developer's Next.js 16 application — lives in this repository at
@@ -659,8 +663,15 @@ deploy resets:
 | `C:\meridian\bhw\logs\`, `storage\`, `data\`, `postgrest\` | Service and task logs; feedback screenshots (`bhw-p3-identity`); source data (`D181`); the PostgREST binary and config (`bhw-p2-db`). |
 | `C:\meridian\backups\bhw\` | `bhw_connect`'s dumps. ⛔ ACL'd to the operator account only: `fact_bhw_raw` holds personal records. |
 
-**Services** (NSSM, both loopback-only, both granted to the runner's account for stop/start the way the
-worker is):
+**Services** (NSSM, both loopback-only, both running as NetworkService):
+- **The runner may stop and start `bhw-connect`.** NETWORK SERVICE carries the worker's own service entry,
+  `(A;;CCLCSWRPWPDTLOCRRC;;;NS)`, added by `M209`'s E1 with `sc.exe sdset`. The old descriptor is kept in
+  `C:\meridian\bhw\bhw-connect.sddl.pre-m209.txt`; set that back to undo it.
+- As for the worker, the right belongs to every NETWORK SERVICE process, BHW's own included. That is the
+  before-launch row about the runner's account.
+- `bhw-postgrest` has no such entry: no deploy touches it.
+
+The two services:
 
 - `bhw-connect` — `powershell -File C:\meridian\test-app\apps\bhw-connect\ops\start.ps1`: loads `.env`,
   serves `current\server.js` on `127.0.0.1:3100`. Node 24 (the version the builds already use). [`bhw-p1-box`]
@@ -720,8 +731,10 @@ additive only. Data loads: a file sent privately and loaded by the operator with
 Meridian's `deploy:backup`, `deploy:census` and nightly task are scoped to `meridian` and never see it. [`bhw-p2-db`]
 
 **Deploying it.** `apps/bhw-connect/ops/deploy-bhw.ps1`, run by the same Deploy job right after
-`deploy.ps1` (wired in `bhw-p1-box`): its own deployed sha, a diff over `apps/bhw-connect` only, a build
-aside into `releases\<sha>`, migrations with a census before and after (refusing on a lost row), a
+`deploy.ps1`, as its second step since `M209`. That step has no `if:`, so it runs only when Meridian's deploy
+succeeded, and `tests/Feature/Deploy/DeployWorkflowTest.php` pins the order. The script keeps its own
+deployed sha, diffs `apps/bhw-connect` only, builds aside into `releases\<sha>`, and runs migrations with a
+census before and after (refusing on a lost row), then a
 junction swap with a 60-second health check and an automatic swap back. `pg_dump` is found by `ops/pg-tools.ps1` (`BHW_PG_DUMP`, else the newest PostgreSQL under Program Files, else PATH), because the box's PATH has none; the echo of every step masks a URL password; the newest 10 pre-deploy dumps are kept. ⛔ The runner (NETWORK SERVICE) needs Modify on `C:\meridian\backups\bhw` to write the pre-migration dump (`M208`), which exposes nothing new: it already reads BHW's `.env`. `deploy.ps1` treats `apps/` as
 site-safe, so **a BHW-only push opens no Meridian window** — unless the previous Meridian deploy did not
 finish cleanly, in which case any push takes the full path. **Rollback:** `ops\deploy-bhw.ps1
@@ -732,6 +745,16 @@ finish cleanly, in which case any push takes the full path. **Rollback:** `ops\d
 local call to `/bhw-connect/api/cron/…` with the bearer read from `.env` when it runs; and
 `bhw-connect-db-backup` at 01:45 (`ops/nightly-dump.ps1`: `pg_dump` custom format, keep 14). A restore
 drill into `bhw_connect_restoretest` is part of `bhw-p2-db`.
+- **Registered at `M209`'s E1** (2026-11-04), all three as SYSTEM. The regression replay, run once by hand,
+  answered 200.
+- `CRON_SECRET` was empty, so E1 made one on the box (32 random bytes) and restarted `bhw-connect` to load it.
+- `GEMINI_API_KEY` is set. The Groq, OpenRouter and Mistral fallbacks and `USAGE_EVENTS_IP_SALT` are empty.
+  BHW's settings move to GitHub repository secrets in `bhw-settings-from-github`.
+
+**Room** (`M209`'s E0, 2026-11-04):
+- The box: 63.5 GB of memory with 57.9 GB free, and 32 logical CPUs at 1%.
+- BHW's node: 132 MB; PostgREST: 71 MB.
+- PostgreSQL, serving both databases: 358 MB; php-cgi: 380 MB.
 
 **What can take which down.** BHW cannot take Meridian down through a deploy: it runs outside the
 checkout, from its own database, behind its own service. Only a bad Apache line can, which `httpd -t`

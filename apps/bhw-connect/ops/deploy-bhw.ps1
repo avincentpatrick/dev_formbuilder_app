@@ -22,6 +22,8 @@
        until then the data is on Supabase): db\migrate.mjs --check; when anything is pending, a
        row-count census, a pg_dump of bhw_connect, the migration, and a second census - and a
        table that lost rows stops the deploy before the swap (BHW's additive rule, measured).
+       pg_dump is found by Resolve-PgDump (ops\pg-tools.ps1), since the box's PATH has none, and
+       the newest 10 pre-deploy dumps are kept.
     4. SWAP. Stop the service, point the <BhwRoot>\current junction at the new release, start the
        service, and poll the health URL for HTTP 200 for up to 60 seconds. BHW is down for
        seconds; Meridian is not touched.
@@ -31,6 +33,8 @@
   -Rollback points the junction at the previous release and restarts: no git, no build.
   -BuildOnly does steps 2 only (the first install, before the service exists).
   -PlanOnly prints step 1's decision and changes nothing.
+  -RestartIfSkipped restarts the service, and checks its health, when step 1 finds nothing to deploy:
+  ops\write-settings.ps1 changed a setting in .env, which only a restart loads (Meridian's D199).
 
   Plain ASCII on purpose: Windows PowerShell 5.1 reads a file without a BOM as ANSI.
 #>
@@ -42,10 +46,13 @@ param(
     [int]$KeepReleases = 3,
     [switch]$Rollback,
     [switch]$BuildOnly,
-    [switch]$PlanOnly
+    [switch]$PlanOnly,
+    [switch]$RestartIfSkipped
 )
 
 $ErrorActionPreference = 'Stop'
+
+. (Join-Path $PSScriptRoot 'pg-tools.ps1')
 
 # Paths under apps/bhw-connect that the running server never loads: a change only there needs no
 # release. Everything else deploys.
@@ -63,16 +70,18 @@ function Write-Step([string]$Message) {
     Write-Host ("[{0}] {1}" -f (Get-Date -Format 's'), $Message)
 }
 
-# Runs one native command and throws when it exits non-zero; its output passes through.
+# Runs one native command and throws when it exits non-zero; its output passes through. The echo masks
+# any URL password: the pre-migration pg_dump is handed BHW_DATABASE_URL, and once deploy.yml runs this
+# script the echo is the Actions log.
 function Invoke-Native {
     param(
         [Parameter(Mandatory = $true)][string]$File,
         [string[]]$Arguments = @()
     )
-    Write-Host ("--> {0} {1}" -f $File, ($Arguments -join ' '))
+    Write-Host (Hide-Secret ("--> {0} {1}" -f $File, ($Arguments -join ' ')))
     & $File @Arguments
     if ($LASTEXITCODE -ne 0) {
-        throw ("BHW deploy step failed: '{0} {1}' exited with code {2}." -f $File, ($Arguments -join ' '), $LASTEXITCODE)
+        throw (Hide-Secret ("BHW deploy step failed: '{0} {1}' exited with code {2}." -f $File, ($Arguments -join ' '), $LASTEXITCODE))
     }
 }
 
@@ -225,8 +234,12 @@ function Invoke-Migrations([hashtable]$Env, [string]$Sha) {
     $before = Get-Census $Env
     New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
     $dump = Join-Path $BackupDir ("pre-deploy-{0}-{1}.dump" -f (Get-Date -Format 'yyyyMMdd-HHmmss'), $Sha.Substring(0, 8))
-    Invoke-Native pg_dump @('--format=custom', "--file=$dump", '--dbname', $Env['BHW_DATABASE_URL'])
+    Invoke-Native (Resolve-PgDump $Env) @('--format=custom', "--file=$dump", '--dbname', $Env['BHW_DATABASE_URL'])
     Write-Step "backup: $dump"
+    Get-ChildItem -LiteralPath $BackupDir -Filter 'pre-deploy-*.dump' |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -Skip 10 |
+        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
     Invoke-Native node @('db\migrate.mjs')
     $after = Get-Census $Env
     $dropped = @()
@@ -257,8 +270,10 @@ function New-Release([string]$Sha) {
         $envProduction = Join-Path $AppDir '.env.production'
         Copy-Item -LiteralPath $EnvFile -Destination $envProduction -Force
         try {
-            Invoke-Native npm.cmd @('ci', '--no-audit', '--no-fund')
-            Invoke-Native npm.cmd @('run', 'build')
+            # To the console, not the pipeline: this function's output is the release path, and npm's
+            # log in it made the caller's $release the whole log (the first fresh build, 2026-11-01).
+            Invoke-Native npm.cmd @('ci', '--no-audit', '--no-fund') | Out-Host
+            Invoke-Native npm.cmd @('run', 'build') | Out-Host
         }
         finally {
             Remove-Item -LiteralPath $envProduction -Force -ErrorAction SilentlyContinue
@@ -322,6 +337,14 @@ if ($PlanOnly) {
 }
 if ($plan.Action -eq 'skip' -and -not $BuildOnly) {
     Set-Content -LiteralPath $DeployedShaFile -Value $plan.Sha -Encoding ASCII
+    if ($RestartIfSkipped) {
+        Write-Step "restarting $ServiceName so it loads the changed settings"
+        Restart-Service -Name $ServiceName
+        if (-not (Wait-Healthy)) {
+            throw "BHW did not answer 200 at $HealthUrl within 60 s of its restart. Read $BhwRoot\logs."
+        }
+        Write-Step "$ServiceName restarted and healthy"
+    }
     exit 0
 }
 

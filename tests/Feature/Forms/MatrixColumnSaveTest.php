@@ -65,7 +65,7 @@ function matrixSavePatch(User $admin, Form $form, string $fieldId, string $key, 
             'is_required' => 'optional',
             'config' => $config,
             'validations' => [],
-            'version' => null,
+            'version' => currentFieldToken($form, $admin, $fieldId),
         ]);
 }
 

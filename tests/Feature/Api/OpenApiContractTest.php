@@ -35,6 +35,8 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         '/forms/{form}/versions/{version}/publish',
         '/auth/tokens',
         '/auth/tokens/{id}',
+        // M207 — who is signed in, read by BHW Connect's server (ADR-0024 §D5).
+        '/auth/whoami',
         '/tenant',
         // Increment F5 — the public guest runtime surface.
         '/public/f/{shareToken}',

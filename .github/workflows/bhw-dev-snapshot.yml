@@ -1,0 +1,36 @@
+name: BHW Connect dev copy (schema and a made-up seed, from the box)
+
+# M211 (`bhw-p4-loop`, `D207`). The local stack and CI build BHW's database from a committed copy:
+# apps/bhw-connect/db/baseline/schema.sql (the live schema, cleaned), db/baseline/version.txt (the newest
+# migration it holds) and supabase/seed.sql (dim_* and the named reference tables copied, every agg_* and
+# fact_* row generated — never a real record or count). Only the box's runner can read the box's database
+# from GitHub, so this workflow takes the copy there and uploads it for a day; a pull request commits it.
+# Run it by hand after a schema change ("Run workflow" in the Actions tab, or
+# `gh workflow run bhw-dev-snapshot.yml`), then download the artifact and commit the three files.
+#
+# It deploys nothing and changes nothing on the box: it reads the database and writes into the runner's
+# own temporary folder.
+on:
+  workflow_dispatch:
+
+jobs:
+  snapshot:
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    runs-on: self-hosted
+    steps:
+      - name: Take the schema, its migration version and a made-up seed from the box's bhw_connect
+        shell: powershell
+        timeout-minutes: 20
+        env:
+          MERIDIAN_APP_PATH: ${{ vars.MERIDIAN_APP_PATH }}
+        run: |
+          $app = if ($env:MERIDIAN_APP_PATH) { $env:MERIDIAN_APP_PATH } else { 'C:\meridian\app' }
+          & "$app\apps\bhw-connect\ops\dev-snapshot.ps1" -AppPath $app -OutDir "$env:RUNNER_TEMP\bhw-dev-copy"
+
+      - name: Upload the copy for a day
+        uses: actions/upload-artifact@v4
+        with:
+          name: bhw-dev-copy
+          path: ${{ runner.temp }}/bhw-dev-copy
+          retention-days: 1
+          if-no-files-found: error

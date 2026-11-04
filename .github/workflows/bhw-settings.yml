@@ -1,0 +1,38 @@
+name: BHW Connect settings (apply without a push)
+
+# M210 (`D199`, ADR-0024). BHW Connect's own settings are repository secrets named BHW_<NAME>; every deploy
+# writes them into the box's BHW .env (deploy.yml's second step). A changed secret starts no workflow, so
+# this one is run by hand ("Run workflow" in the Actions tab, or `gh workflow run bhw-settings.yml`) to
+# apply a changed key at once.
+#
+# It deploys no code. It writes the settings, then runs deploy-bhw.ps1 against the checkout deploy.ps1
+# last moved, which only ever moves to a commit whose CI was green: with nothing new there, that is a
+# restart when a setting changed and nothing at all when none did.
+on:
+  workflow_dispatch:
+
+# The deploy's own group, so this never overlaps a deploy.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    runs-on: self-hosted
+    steps:
+      - name: Write BHW Connect's settings, and restart it when one changed
+        shell: powershell
+        timeout-minutes: 15
+        env:
+          MERIDIAN_APP_PATH: ${{ vars.MERIDIAN_APP_PATH }}
+          BHW_SETTING_GEMINI_API_KEY: ${{ secrets.BHW_GEMINI_API_KEY }}
+          BHW_SETTING_GROQ_API_KEY: ${{ secrets.BHW_GROQ_API_KEY }}
+          BHW_SETTING_OPENROUTER_API_KEY: ${{ secrets.BHW_OPENROUTER_API_KEY }}
+          BHW_SETTING_MISTRAL_API_KEY: ${{ secrets.BHW_MISTRAL_API_KEY }}
+          BHW_SETTING_CRON_SECRET: ${{ secrets.BHW_CRON_SECRET }}
+          BHW_SETTING_USAGE_EVENTS_IP_SALT: ${{ secrets.BHW_USAGE_EVENTS_IP_SALT }}
+        run: |
+          $app = if ($env:MERIDIAN_APP_PATH) { $env:MERIDIAN_APP_PATH } else { 'C:\meridian\app' }
+          $changed = & "$app\apps\bhw-connect\ops\write-settings.ps1"
+          & "$app\apps\bhw-connect\ops\deploy-bhw.ps1" -AppPath $app -RestartIfSkipped:($changed -gt 0)

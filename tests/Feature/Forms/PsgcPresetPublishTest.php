@@ -159,8 +159,9 @@ it('saves a level bound to the places, and still refuses any other name with a c
     $form = psgcPresetForm($this->owner, []);
     $field = FormField::query()->where('form_version_id', $form->draft_version_id)->where('key', 'place')->firstOrFail();
     $url = 'http://acme.meridian.test/forms/'.$form->id.'/fields/'.$field->id;
-    $patch = static fn (array $levels): array => [
-        'key' => 'place', 'label' => 'Place', 'is_required' => 'optional', 'version' => null, 'validations' => [],
+    $patch = fn (array $levels): array => [
+        'key' => 'place', 'label' => 'Place', 'is_required' => 'optional', 'validations' => [],
+        'version' => currentFieldToken($form, $this->owner, $field->id),
         'config' => ['levels' => $levels, 'options' => [], 'skip_single_choice_levels' => true],
     ];
 

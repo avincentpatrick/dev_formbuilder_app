@@ -1,11 +1,25 @@
 [
     {
-        "version": "0.16.1",
+        "version": "0.17.1",
         "title": "Builder panels that grow with your text",
         "items": [
             {
                 "kind": "fixed",
                 "text": "With Text size set to Large or Extra large (Settings → Appearance), the builder’s left panel (Add) and right panel (Settings) now widen with the text, so they keep the same room for their words as at the standard size. The form in the middle gives up that width. At the standard text size nothing changes."
+            }
+        ]
+    },
+    {
+        "version": "0.17.0",
+        "title": "BHW Connect, one click away",
+        "items": [
+            {
+                "kind": "new",
+                "text": "BHW Connect, the Barangay Health Worker dashboard on this same site, is now linked from your account menu at the top right, and from the footer under every page. Its administrators sign in with their account here; there is no separate BHW Connect password any more."
+            },
+            {
+                "kind": "improved",
+                "text": "Creating an API key now asks for your account’s password every time."
             }
         ]
     },

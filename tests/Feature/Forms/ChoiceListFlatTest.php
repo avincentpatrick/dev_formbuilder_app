@@ -184,7 +184,7 @@ it('saves a list name through the builder, a blank one while choosing, and refus
     $patch = fn (string $list) => $this->actingAs($this->admin)
         ->patchJson("http://acme.meridian.test/forms/{$this->form->id}/fields/{$add->json('id')}", [
             'key' => $add->json('key'), 'label' => 'Facility', 'is_required' => 'optional',
-            'config' => ['options' => [], 'options_list' => $list], 'validations' => [], 'version' => null,
+            'config' => ['options' => [], 'options_list' => $list], 'validations' => [], 'version' => currentFieldToken($this->form, $this->admin, $add->json('id')),
         ]);
 
     $patch('')->assertOk();

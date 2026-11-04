@@ -1,11 +1,15 @@
-# BHW Connect's local database, in the testing box's shape: PostgreSQL 15 and PostgREST, with the
-# roles and schemas db/bootstrap-roles.sql creates there (Meridian's ADR-0024, decision D182).
+# BHW Connect's local database, in the testing box's shape: PostgreSQL 15 with pgvector and PostgREST,
+# with the roles and schemas db/bootstrap-roles.sql creates there (Meridian's ADR-0024, decision D182).
 #
 #   docker compose up -d                 # from apps/bhw-connect
-#   BHW_DATABASE_URL=postgres://bhw_app:bhw-local@127.0.0.1:5442/bhw_connect node db/migrate.mjs
+#   BHW_DEV_DATABASE_URL=postgres://postgres:bhw-local@127.0.0.1:5442/bhw_connect node db/load-dev.mjs
 #
-# Then point the app at it — NEXT_PUBLIC_SUPABASE_URL and SUPABASE_REST_URL as in .env.example's
-# local section, and keys minted from the JWT secret below with db/mint-jwt.mjs.
+# load-dev.mjs builds the database from the committed development copy (Meridian's bhw-p4-loop, D207):
+# the live schema (db/baseline/), any migration newer than it, and a made-up seed (supabase/seed.sql:
+# real geography, every count and person generated). It builds an empty database only; to start over,
+# `docker compose down -v`, then up again. Then point the app at it — NEXT_PUBLIC_SUPABASE_URL and
+# SUPABASE_REST_URL as in .env.example's local section, and keys minted from the JWT secret below with
+# db/mint-jwt.mjs. The copy itself is refreshed by the "BHW Connect dev copy" workflow.
 #
 # Its own project name and ports, so it never meets Meridian's stack at the repository root
 # (5432, 8080 …). Every password here is a throw-away for this machine; the box's are set by hand.
@@ -13,7 +17,8 @@ name: bhw-connect
 
 services:
   db:
-    image: postgres:15
+    # pgvector, as the box carries it (0.8.2, built for its PostgreSQL 15): doc_chunk_embedding needs it.
+    image: pgvector/pgvector:0.8.2-pg15
     environment:
       POSTGRES_DB: bhw_connect
       POSTGRES_PASSWORD: bhw-local

@@ -33,7 +33,8 @@ final class UpdateSectionRequest extends FormRequest
             // is not refused here — a section that cannot be a table is drawn as cards, and the builder says why.
             'repeat_layout' => ['nullable', 'string', Rule::in(['cards', 'table'])],
             'relevant_expression' => ['nullable', 'string', 'max:2000'],
-            'version' => ['nullable', 'string'],
+            // M196 (`R-036f3226`, `D189`): required — a save without the token it last read is refused, not taken as an overwrite.
+            'version' => ['required', 'string'],
         ];
     }
 

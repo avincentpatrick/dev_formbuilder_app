@@ -16,7 +16,1072 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M198`, the builder's side panes in `em`, so they grow with the text (`R-63ef1a69`) (m198-builder-panes-in-em)
+## Status: NO ACTIVE CLAIM — `M211` released on 2026-11-05: BHW Connect's development loop. The box takes the live schema and a made-up seed through the **BHW Connect dev copy** workflow, and the local stack and CI build a database from them, serve it with PostgREST, and render pages against it. Close-out branch `m211-closeout`. Next is step 6 of the user's seven, the user naming merge point 10, then `bhw-handover`.
+
+## RELEASED — `M211`, BHW Connect's development loop: a schema baseline and a made-up seed from the box, a local stack and CI built from them with PostgREST (`bhw-p4-loop`, `D182`, `D207`)
+
+Merged in two PRs, each at its own merge point, under the user's instruction of 2026-11-03.
+- **PR #405 (`a4cbe7f2`), the tools.**
+  - Its run 41852014703 was 7/7 green with real step counts: Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11.
+  - The trunk's run 41858714265 on `a4cbe7f2` was the same.
+  - Deploy 41866654431 succeeded.
+- **The copy, taken on the box.** The **BHW Connect dev copy** workflow, run 41867222568 on `a4cbe7f2`, produced:
+  - `schema.sql`, 298,038 B;
+  - `version.txt`, `20260905235804`;
+  - `seed.sql`, 7,636,239 B, byte-identical to the one made locally from Supabase's read-only copy.
+- **PR #406 (`f77e45e0`), the copy and the wiring.**
+  - Its first run, 41868393896, was red at BHW Connect's last step. The app was fine: the check asked for `/bhw-connect/`, which answers 308 to `/bhw-connect`. Fixed in `b2cfedb0`.
+  - Run 41869067411 was 7/7 green with real step counts: Static analysis 33 · BHW Connect 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11.
+  - The trunk's run 41874801414 on `f77e45e0` was the same.
+
+**Live.** Every figure below was read from its own output.
+- **CI's seeded database:** `load-dev: done {"version":"20260905235804","baselined":111,"applied":0,"filled":37,"tables":61}`.
+- **PostgREST v16.4** served `dim_geo` with a minted anon key.
+- **Five pages rendered 200** from a build against that database: `/`, `/explore`, `/place/region/01`, `/uuc-phc`, `/sitemap.xml`.
+- **The BHW Connect job** grew from 20 steps to 23, and from 1 min 52 s to 2 min 14 s.
+- **Deploy 41880518942.**
+  - Meridian fast-forwarded with no maintenance window: "only paths the site does not run changed".
+  - `settings: 0 changed (), 1 already equal, 5 not set in GitHub`, then `migrations: nothing pending`.
+  - `BHW Connect f77e45e0… is live` at 01:48:33 box time, 53 s after the plan.
+  - `/up`, `/login` and `/bhw-connect` answered 200.
+
+**How the prediction fared.**
+- **Right:**
+  - The seed script needed more than the two known fixes. Beyond the enum column and recording generated keys for foreign keys, it needed three more:
+    - `fact_*` rows point at `ref_fhsis_indicator`, a reference table not named `dim_*`, so it is copied whole by name (`REFERENCE_TABLES`);
+    - an `agg_*` table's CHECK constraint ties a suppression flag to its counts, so rows are tried against a scratch copy of the table first;
+    - array columns are generated at the source's longest length.
+  - Repeating primary keys were skipped, as predicted for composite keys.
+  - The box's dump, once cleaned, loaded with no error.
+  - A build against the seeded data passed.
+- **Wrong:**
+  - CI's job grew by three steps and 22 s, not five steps and two minutes.
+  - **The part I most expected to be wrong, the seed's size, was inside the range:** 7.6 MB of SQL, against a predicted 5 to 15 MB.
+- **Not predicted:**
+  - A current `pg_dump` (15.14 on) wraps its dump in psql-only `\restrict` lines with a random key. The cleaner strips them, so the baseline is plain SQL whose bytes change only when the schema does.
+  - My own page check was wrong on its first run (the trailing slash).
+
+**For the handover:**
+- jongsky25 refreshes the copy himself after a schema change: run the workflow, download its artifact, and commit the three files in a PR. `apps/bhw-connect/CLAUDE.md` says how.
+- The old repository's archive is his click as owner, in `bhw-handover` (`D207`).
+- `bhw-e2e-in-ci` (before-launch) is no longer blocked: BHW's Playwright specs can now run against the seeded build.
+
+The claim as taken follows.
+
+Taken 2026-11-04. Branches `m211-bhw-p4-loop` (the tools) and then `m211-bhw-dev-copy` (the committed copy and the wiring), both cut from origin/main, both PRs titled `M211`. Each merges at its own merge point once green, under the user's instruction of 2026-11-03: their paths are site-safe (`apps/`, `.github/`, `tests/`, `docs/`). This is step 5 of the user's seven.
+
+Row: `bhw-p4-loop`: "the other developer's loop: the seed from staging (real dim_* reference tables, every agg_* and fact_* row generated, D207), CI's database cases against a seeded PostgREST, the old repository archived". The archive is jongsky25's click as owner and moved to `bhw-handover` (`D207`); avincentpatrick has push, not admin, and `archived: false` was read on 2026-11-04.
+
+### Evidence verified
+- **A fresh database cannot be built from the migrations: held.** On plain PostgreSQL the 19th file stops on `admin_users.user_id … references auth.users (id)`. Then come `storage.buckets` in `feedback_spot.sql` and `create extension vector` in `ai_dataset_registry.sql`. `docker-compose.yml`'s stock `postgres:15` has no pgvector, and its database is owned by `postgres` while `migrate.mjs` runs as `bhw_app`.
+- **The live schema is not the migrations' schema: held.** The files and the live history share 5 versions. The live database holds `fact_fhsis_indicator`, `fact_fhsis_workforce`, `ref_fhsis_indicator` and `ref_fhsis_reconciliation`, which no file creates (`M206`).
+- **`db/make-seed.mjs` fails on the real data, measured 2026-11-04.** Against Supabase (read only), whose schema and reference data equal the box's at the move, it stopped in 32 s: "cannot invent a value for fact_fhsis_indicator.geo_level (geo_level_enum, NOT NULL)". So an enum column is not handled. The code read also shows that the generated branch never records what it wrote, so `fact_honorarium.bhw_id → fact_bhw_raw` cannot resolve.
+- **CI's `bhw-connect` job:** stock `postgres:15`, `bootstrap-roles.sql` only, no PostgREST, no schema. Its five database cases make their own throwaway tables. The build runs with no data source.
+- **No seed is committed** (`supabase/` holds only `migrations/`).
+
+### Premise verified
+- **The live schema loads into PostgreSQL 15 with pgvector 0.8.2, measured 2026-11-04.**
+  - Its `public` schema, dumped schema-only (299,743 bytes), loaded into `pgvector/pgvector:0.8.2-pg15` after `bootstrap-roles.sql`, with 15 errors and all 61 tables present.
+  - All 15 errors are removable by content: 12 grants for Supabase's `supabase_admin`, one PostgreSQL 17 setting, `public` already existing, and the one foreign key into `auth`.
+  - The box's own copy was cleaned of exactly these at the move (`M206`; its `admin_users` has no foreign key, `M207`'s C2), so a dump taken there should load with fewer.
+- **The copy must come from the box** ("the seed from staging"), and only the runner can read the box's database from GitHub. So a dispatch-only workflow on the self-hosted runner takes it, and jongsky25 can refresh it after the handover without box access.
+  - What it publishes is what `D207` puts in public git anyway: the schema, the `dim_*` reference rows, and generated rows.
+- **`D207`'s rule:** `dim_*` copied whole (`dim_geo` 43,783 rows); `agg_*` and `fact_*` generated; everything else empty. The deny-by-default rule stays.
+- **CI can run PostgREST** on its ubuntu runner (`docker run postgrest/postgrest:v16.4`, as `docker-compose.yml` already pins), and `db/mint-jwt.mjs` mints its keys.
+
+### Remedy verdict
+**Partly measured:**
+- the baseline loads (above);
+- the seed script fails at its first generated table (above).
+
+The fixes are measured as they are written: a seed from the real data that loads into the baseline, with every row checked against the rule.
+
+Files:
+- **First PR:**
+  - `apps/bhw-connect/db/make-seed.mjs` and its tests in `db/db-tools.test.ts`;
+  - `apps/bhw-connect/db/clean-baseline.mjs` (new, the strip rules);
+  - `.github/workflows/bhw-dev-snapshot.yml` (new);
+  - ADR-0024's two retitles from `D207`, and `docs/pipeline.md`.
+- **Second PR:**
+  - `apps/bhw-connect/db/baseline/` (new: the schema and the migration history);
+  - `apps/bhw-connect/supabase/seed.sql` (new);
+  - `apps/bhw-connect/docker-compose.yml`;
+  - `.github/workflows/ci.yml` (`bhw-connect` job);
+  - `apps/bhw-connect/README.md`, `apps/bhw-connect/CLAUDE.md`, `docs/deployment-infrastructure.md` §8.4;
+  - `tests/Feature/Deploy/DeployWorkflowTest.php` (the snapshot workflow pinned).
+- **At close-out:** ADR-0024's marker, `docs/pipeline.md`, `PROGRESS.md` (own block), `docs/gate-baselines.md`.
+
+Shared artefacts taken: `.github/workflows/ci.yml`, `docs/adr/0024-second-application-under-one-host.md`, `docs/deployment-infrastructure.md`.
+Paired files taken: the snapshot workflow and the scripts it runs.
+Namespaces spent: nothing from either namespace (`M211`; decision `D207`).
+Prediction:
+- The seed script needs more than the two known fixes. Composite keys in `agg_*` will collide when generated, the likeliest third.
+- The box's dump loads with no error after cleaning.
+- CI's job grows by about five steps and two minutes, and a build with the seeded data passes.
+- **The part I most expect to be wrong:** the seed's size. `dim_geo` alone is 43,783 rows; I expect 5 to 15 MB of SQL, which may be too large to want in git.
+
+## RELEASED — `M210`, BHW Connect's own settings come from GitHub repository secrets, written onto the box by the deploy (`bhw-settings-from-github`, `D199`)
+
+Merged as PR #404 (`8aad1b37`) at its own merge point, under the user's instruction of 2026-11-03.
+- Its run 41793252548 was 7/7 green with real step counts: Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11.
+- The trunk's run 41797646195 on `8aad1b37` was the same.
+
+**Live.** Every figure below was read from its own output.
+- **F0 (read only, 07:27:41 UTC).** `.env` carries its own ACL, with inheritance off. NETWORK SERVICE could only read it. The BHW folder grants BUILTIN\Users read.
+- **G1 (07:48:04 UTC).** NETWORK SERVICE got Modify on `.env`. SYSTEM and Administrators are unchanged.
+- **The merge's own deploy (41801683631).**
+  - `settings: 0 changed (), 0 already equal, 6 not set in GitHub`, so nothing was written.
+  - Then BHW `8aad1b37` built and went live at 16:44:26 box time, with no Meridian window.
+- **The live proof, with the user's OK (2026-11-04).**
+  - `BHW_USAGE_EVENTS_IP_SALT` was set to a random value, piped into `gh secret set` and never shown.
+  - `bhw-settings.yml` run 41801921860 printed `settings: 1 changed (USAGE_EVENTS_IP_SALT)`, then `plan: skip - this commit is already deployed`, then `bhw-connect restarted and healthy`, 2 s.
+  - Run 41802004399 printed `settings: 0 changed (), 1 already equal`, with no restart.
+  - `/up`, `/login` and `/bhw-connect` answered 200.
+
+**How the prediction fared.**
+- **Right:**
+  - The PR was 7/7. Its deploy wrote "0 changed".
+  - The test secret's first dispatch changed one setting and restarted BHW healthy; the second changed nothing.
+- **Wrong:** **the part I most expected to be wrong, the runner rewriting `.env` in place after G1, worked at the first try.** `Set-Content` kept the file's explicit ACL.
+- **Not predicted:** nothing. The design changed once before the build: backups moved from the BHW folder to `backups\bhw\env` when F0 showed that local users can read the BHW folder.
+
+**For the handover:**
+- The only BHW secret set in GitHub is the test salt. jongsky25 sets the rest.
+- An unset secret keeps the box's value: today `GEMINI_API_KEY` and the box-made `CRON_SECRET`.
+
+The claim as taken follows.
+
+Taken 2026-11-04. Branch `m210-bhw-settings-from-github`, cut from origin/main at `2222aa34`, PR into main. It merges at its own merge point once green, under the user's instruction of 2026-11-03: its paths are site-safe (`.github/`, `apps/`, `tests/`, `docs/`). This is step 4 of the user's seven.
+
+Row: `bhw-settings-from-github`: "BHW's own settings (its third-party API keys, CRON_SECRET, the usage-log salt) as GitHub repository secrets that deploy.yml writes into the box's BHW .env file before ops/deploy-bhw.ps1 runs, never echoed, so jongsky25 changes a key himself after the handover (D199); the working agreement's section 6 rewritten to match".
+
+### Evidence verified
+- **`.github/workflows/deploy.yml`: held.** Since `M209` its second step runs `deploy-bhw.ps1`, and nothing writes BHW's `.env`.
+- **The repository holds no secrets** (`gh secret list`, empty, 2026-11-04). Its variables are only `DEPLOY_ENABLED` and `MERIDIAN_APP_PATH`.
+- **`docs/working-agreement.md` §6** says BHW's live settings are a file that only avincentpatrick writes, so a new secret means a line in `.env.example`, a note in the PR, and avincentpatrick adding it on the box. `apps/bhw-connect/CLAUDE.md` says the same.
+- **The six settings the row names** are all in `.env`: `GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `MISTRAL_API_KEY`, `CRON_SECRET`, `USAGE_EVENTS_IP_SALT` (E0/E1).
+  - `GEMINI_API_KEY` is set, and `CRON_SECRET` was made at the box at `M209`'s E1.
+  - The other four are empty.
+
+### Premise verified
+- **F0, read at the box 2026-11-04 07:27:41 UTC.** `.env` carries its own ACL (inheritance off): SYSTEM FullControl, NETWORK SERVICE **Read**, Administrators FullControl. So the runner cannot write it today, and the box step G1 grants NETWORK SERVICE Modify on that one file.
+  - What the grant adds is small. NETWORK SERVICE already reads every value there, `BHW_DATABASE_URL` with `bhw_app`'s password included, and BHW's own service runs as it.
+  - The script writes only the six allow-listed names, never the database URL or the keys.
+- **`C:\meridian\bhw` grants BUILTIN\Users ReadAndExecute** (F0), so a copy of `.env` made in that folder would be readable by every local user.
+  - The script's backups go to `C:\meridian\backups\bhw\env`, which inherits SYSTEM, NETWORK SERVICE and Administrators only (`M208`).
+  - The four existing `.env.pre-*.bak` were each made by hand with `.env`'s own ACL copied.
+- **An unset secret reaches the step as an empty string.** So "unset" must mean "keep the box's value", or the first deploy would blank `GEMINI_API_KEY`.
+- **None of the six is `NEXT_PUBLIC_`,** so a change needs a restart (`ops/start.ps1` loads `.env`), not a rebuild. The cron tasks read `CRON_SECRET` from `.env` when they run.
+- **A changed secret triggers no workflow,** so applying one without a code push needs a `workflow_dispatch` path. That path must not deploy code: it runs only `deploy-bhw.ps1` against the checkout `deploy.ps1` last moved, which only ever moves to a CI-green commit.
+
+### Remedy verdict
+**Works in shape, to be measured on the dev machine before the PR, and at the box after it:**
+- write-settings with a mix of set, unset and unchanged values against a scratch `.env`;
+- then a real secret set and dispatched.
+
+Files:
+- `apps/bhw-connect/ops/write-settings.ps1` (new) and `apps/bhw-connect/ops/deploy-bhw.ps1` (a `-RestartIfSkipped` switch);
+- `.github/workflows/deploy.yml` and `.github/workflows/bhw-settings.yml` (new);
+- `tests/Feature/Deploy/DeployWorkflowTest.php`;
+- `docs/working-agreement.md` (§6), `docs/deployment-infrastructure.md` (§8.4), `apps/bhw-connect/CLAUDE.md`, `apps/bhw-connect/.env.example`;
+- at close-out: ADR-0024's marker, `docs/pipeline.md`, `PROGRESS.md` (own block), `docs/gate-baselines.md`.
+
+Shared artefacts taken: `.github/workflows/deploy.yml`, `docs/working-agreement.md`, `docs/deployment-infrastructure.md`.
+Paired files taken: the two workflows and `ops/write-settings.ps1`'s allowlist, held equal by `DeployWorkflowTest`.
+Namespaces spent: nothing from either namespace (`M210`).
+Prediction:
+- The PR is 7/7, and its own deploy writes nothing: all six secrets are unset, so "0 changed".
+- After the user's OK, one test secret (`BHW_USAGE_EVENTS_IP_SALT`, random, now empty on the box) set by `gh secret set` and dispatched writes "1 changed" and restarts BHW healthy; a second dispatch writes "0 changed".
+- **The part I most expect to be wrong:** that the runner may replace `.env` in place after G1. `Set-Content` on a file whose ACL is explicit may need more than Modify if it recreates the file.
+
+## RELEASED — `M209`, BHW Connect deploys itself on every merge, its scheduled jobs run on the box, and a BHW-only push and a rollback prove it (`bhw-p1-box`'s remainder, `bhw-screenshot-trace`)
+
+Merged as PR #402 (`0c223812`, the wiring) then PR #403 (`dff21734`, the BHW-only push), each at its own merge point under the user's instruction of 2026-11-03. 7/7 green with real step counts:
+- #402: Static analysis 33 · BHW Connect 19 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11.
+- #403: the same, with BHW Connect at 20.
+- The trunk's runs 41782331998 and 41785752321 were 7/7.
+
+**Live.** Every figure below was read from its own output.
+- **E0 (read only, 05:09:30 UTC).**
+  - The runner is NETWORK SERVICE, and Meridian's worker carries `(A;;CCLCSWRPWPDTLOCRRC;;;NS)`; `bhw-connect` had none.
+  - BHW's `.env` named `CRON_SECRET` and the four optional keys.
+  - No cron task was registered.
+  - The box: 63.5 GB of memory with 57.9 GB free, 32 CPUs at 1%.
+- **E1 (05:13:37 UTC).**
+  - The grant was added and read back; the old descriptor is in `C:\meridian\bhw\bhw-connect.sddl.pre-m209.txt`.
+  - `CRON_SECRET` was empty, so it was made on the box and BHW restarted; the backup is `.env.pre-m209-20261104-131329.bak`.
+  - `GEMINI_API_KEY` is set. Groq, OpenRouter, Mistral and `USAGE_EVENTS_IP_SALT` are empty.
+  - Three tasks are registered as SYSTEM: precompute at 20:00 UTC, the regression replay at 22:00 UTC, the backup at 01:45 local. The replay, run by hand, answered 200.
+- **#402's own deploy (41785500136): the runner's first BHW run.**
+  - Meridian fast-forwarded with no window.
+  - `deploy-bhw.ps1`, as NETWORK SERVICE, found 4 served paths changed since `d7ca70a0`, built `0c223812` in 51 s, found no migration pending, and swapped, which proves the grant.
+  - It was live at 14:27:15 box time.
+- **#403's deploy (41789678833): the BHW-only push.**
+  - Meridian: "Only paths the site does not run changed … no maintenance window".
+  - BHW: one served path changed; built in 50 s with no tracing warning; live at 15:05:07.
+  - The trace fix measured on CI's build: 3,404 files and 60.0 MB of standalone output before, 2,770 files and 50.2 MB after, with source and `docs/` no longer in it.
+- **E2 (07:19:19 UTC).**
+  - `-Rollback` went back to `0c223812` in 2.5 s and forward to `dff21734` in 2.4 s, health 200 both times.
+  - Twelve cold drill-down views at once all answered 200, in 0.4 to 30.4 s.
+  - Meridian's `/up` over the same seconds: 35 ms median, 66 ms worst.
+  - CPU peaked at 2.5%, and BHW's node was at 134 MB.
+  - **The slow first views wait; they do not compute.** That was recorded on `bhw-drilldown-cold-render`.
+
+**How the prediction fared.**
+- **Right:**
+  - E1 read back the grant, registered the three tasks, and the replay answered 200.
+  - The wiring PR was 7/7. Its deploy built `M208`'s change as the runner and swapped live.
+  - The BHW-only push opened no Meridian window. The rollback took seconds both ways.
+- **Wrong:**
+  - **The part I most expected to be wrong, the runner's first `npm ci` and build as NETWORK SERVICE, passed at the first run** (51 s).
+  - "`CRON_SECRET` is set or made": it had to be made. The name had been in `.env` since P1, empty.
+- **Not predicted:**
+  - **The pre-push guard refused the BHW-only push's branch**, because the claim named only the first branch. Its one file had been edited before the claim was amended (`b3223707`). That is recorded here, not hidden.
+  - The cold-render finding above.
+
+The claim as taken follows.
+
+Taken 2026-11-04. Branch `m209-bhw-p1-box`, cut from origin/main at `ca2dbb57`, PR into main. Two pull requests, both titled `M209`, on two branches (the second, `m209-bhw-screenshot-trace`, named in this claim by an amendment pushed after its one file was edited: the pre-push guard refused the branch until then):
+- the deploy wiring (`.github/workflows/deploy.yml`, a test that pins it, runbook 8.4);
+- after it, the BHW-only push (`bhw-screenshot-trace`), whose deploy is the proof.
+
+Both merge at their own merge points once green, under the user's instruction of 2026-11-03: their paths are site-safe (`.github/`, `tests/`, `docs/`, `apps/`).
+
+This is step 3 of the user's seven. The user asked to be asked for the runner's grant and `CRON_SECRET` at the box.
+
+Row: `bhw-p1-box`: "what remains comes after bhw-p3-identity: the scheduled tasks with CRON_SECRET, the runner's grant to control the bhw-connect service, deploy.yml running ops/deploy-bhw.ps1, proved by a BHW-only push and a rollback, runbook 8.4 rewritten from what the box measured, and the box-load check". Also `bhw-screenshot-trace`.
+
+### Evidence verified
+- **`.github/workflows/deploy.yml`: held.**
+  - One job on `self-hosted`, one step: `& "$app\deploy.ps1" -AppPath $app`.
+  - `concurrency: production-deploy`; no BHW step; no `timeout-minutes`.
+  - No test pins the file.
+- **`deploy.ps1` runs nothing under `apps/`** (`$SiteSafePrefixes` includes `apps/`), so a BHW change goes live only by hand today: `apps/bhw-connect/ops/deploy-bhw.ps1 -AppPath C:\meridian\test-app`.
+- **The service's rights.** `deploy-bhw.ps1` `Switch-Release` calls `Stop-Service` and `Start-Service` on `bhw-connect`, which needs start, stop and query rights.
+- **E0, read at the box 2026-11-04 05:09:30 UTC.**
+  - `bhw-connect`'s descriptor has no NETWORK SERVICE entry: `D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)S:(AU;FA;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;WD)`.
+  - Meridian's worker carries `(A;;CCLCSWRPWPDTLOCRRC;;;NS)`.
+  - Only `bhw-connect-db-backup` is registered: no cron task.
+- **`lib/storage/screenshots.ts`: held.** The box's build of `d7ca70a0` warned twice that `storageRoot`'s `path.resolve` and `readScreenshot`'s `readFile` trace the whole project into the release.
+
+### Premise verified
+- **The runner.** It is `actions.runner.avincentpatrick-dev_formbuilder_app.DGF97HY2`, as NETWORK SERVICE (E0).
+  - The machine PATH carries nodejs and Git, so its `npm ci` and `git` run as they do for Meridian's deploy.
+  - NETWORK SERVICE has Modify on `C:\meridian\bhw` (`M194`) and on `C:\meridian\backups\bhw` (`M208`).
+- **The grant is the worker's own, copied.** `deploy.ps1`'s `Start-WorkerIfStopped` has passed on every deploy with that entry.
+  - Its known cost is that every NETWORK SERVICE process holds the right, not the runner alone, which is the latent before-launch defect `docs/feature-backlog.md` already records for the worker.
+  - `bhw-connect` itself runs as NetworkService, so BHW's own process could then stop itself: the same exposure, one service over.
+  - `bhw-postgrest` is not touched by `deploy-bhw.ps1` and gets nothing.
+- **BHW's `.env` names `CRON_SECRET`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `MISTRAL_API_KEY` and `USAGE_EVENTS_IP_SALT` already** (E0). Whether each holds a value is read at E1, without printing it.
+- **The cron routes** (`/api/cron/precompute`, `/api/cron/regression-replay`) refuse anything but `Bearer ${CRON_SECRET}`, and refuse everything while it is unset.
+  - `precompute` calls the AI cascade, and a provider without a key is skipped.
+  - `regression-replay` calls no model.
+- **The box's room:** 63.5 GB of memory, 57.9 GB free, 32 CPUs at 1%. BHW's node 132 MB, postgres 358 MB, php-cgi 380 MB (E0).
+- **The deploy plan after the merge.** `deployed-sha` is `d7ca70a0`. `ops/` is served by `Test-NotServed`, so the wiring merge's own deploy finds `M208`'s ops change and builds a release as the runner: the runner's first BHW run.
+
+### Remedy verdict
+- **The grant: works, measured on the box.** The worker's entry has carried the runner's starts since 2026-09-17.
+- **The wiring: unmeasured until it runs.** The first run as the runner is the measurement. The step runs only after `deploy.ps1` succeeds, so a BHW failure never stops Meridian's deploy, and `deploy-bhw.ps1` swaps back by itself on a failed health check.
+- **The trace fix: measured on the dev build when written** (the warning gone).
+
+Files:
+- **First PR:** `.github/workflows/deploy.yml`, `tests/Feature/Deploy/DeployWorkflowTest.php` (new), `docs/deployment-infrastructure.md` (§8.4, rewritten from what the box measured).
+- **Second PR:** `apps/bhw-connect/lib/storage/screenshots.ts` and its test.
+- **At close-out:** ADR-0024's markers, `docs/pipeline.md`, `PROGRESS.md` (own block), `docs/gate-baselines.md`.
+
+Shared artefacts taken: `.github/workflows/deploy.yml`, `docs/deployment-infrastructure.md`.
+Paired files taken: `.github/workflows/deploy.yml` with the new test that pins it.
+Namespaces spent: nothing from either namespace (`M209`).
+Prediction:
+- **E1 at the box:** the grant reads back with the NS entry; `CRON_SECRET` is set or made; the three tasks register; `regression-replay` answers 200 by hand.
+- The first PR is 7/7. Its own deploy runs `deploy-bhw.ps1` as the runner, builds `M208`'s change, and swaps live.
+- The second PR's deploy is the BHW-only push: no Meridian window, a new BHW release.
+- The rollback by hand takes seconds both ways.
+- **The part I most expect to be wrong:** the runner's first `npm ci` and build as NETWORK SERVICE (its npm cache, `.next` in the checkout, robocopy into `releases`). Nobody has run them under that account.
+
+## RELEASED — `M208`, BHW's ops scripts find `pg_dump` themselves, and the deploy never prints the database password (`bhw-deploy-db-tools`) (merged as PR #401, `b18bd1c2`, at its own merge point under the user's instruction of 2026-11-03; 7/7 green with real step counts on its run 41764966886 — Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run 41768894912 on `b18bd1c2` the same; deploy 41772140940 site-safe, no window)
+
+**Live.**
+- **D1 at the box, 2026-11-04 05:03:21 UTC.**
+  - NETWORK SERVICE has Modify on `C:\meridian\backups\bhw`; the ACL reads SYSTEM FullControl, NETWORK SERVICE Modify, Administrators FullControl.
+  - With PostgreSQL taken off the window's PATH, `nightly-dump.ps1` resolved `C:\Program Files\PostgreSQL\15\bin\pg_dump.exe` itself and wrote `bhw_connect-20261104-130312.dump` (26,221,428 bytes).
+
+**How the prediction fared.**
+- **Right:**
+  - The diff was one dot-sourced helper, the masked echo and the keep-10 prune.
+  - CI was 7/7, and BHW's job ran its full 20 steps with no label asked.
+  - The box block wrote a dump with no PostgreSQL on PATH and listed NETWORK SERVICE.
+- **Still unmeasured, as predicted:** whether the runner itself can run `pg_dump` against `bhw_connect`. It waits for `bhw-p1-box` to wire the runner.
+- **Not predicted:** the masked-echo defect was found beside the row's citation, not in it. No hand deploy had yet printed the password, because no BHW migration had been pending.
+
+The claim as taken follows.
+
+Taken 2026-11-04. Branch `m208-bhw-deploy-db-tools`, cut from origin/main at `60a2e557`, PR into main. Under the user's instruction of 2026-11-03 it merges at its own merge point once every required check is green, because its paths are site-safe: `apps/bhw-connect/ops/` and `docs/`. This is step 2 of the user's seven; `bhw-p1-box`'s remainder (step 3) is blocked on it alone.
+
+Row: `bhw-deploy-db-tools`: "BHW's ops scripts call a bare pg_dump (ops/nightly-dump.ps1, and deploy-bhw.ps1's Invoke-Migrations before a migration), and the box's PATH has no PostgreSQL bin … Resolve pg_dump as Meridian's DeployBackupCommand does (a configured path, else the newest PostgreSQL install's, else PATH), and give the runner (NETWORK SERVICE) write on the BHW backup folder under C:/meridian/backups, before bhw-p1-box wires deploy.yml to ops/deploy-bhw.ps1".
+
+### Evidence verified
+- **`ops/nightly-dump.ps1`: held.** `& pg_dump --format=custom "--file=$file" --dbname $url`, bare.
+- **`ops/deploy-bhw.ps1` `Invoke-Migrations`: held.** `Invoke-Native pg_dump @(... '--dbname', $Env['BHW_DATABASE_URL'])`, bare, run only when a migration is pending.
+- **Meridian's `DeployBackupCommand::pgDump()`: held.** It uses `config('deploy.pg_dump')`, else the last of `glob('C:/Program Files/PostgreSQL/*/bin/pg_dump.exe')`, else `pg_dump`.
+- **Found beside the citation, and taken into this claim:**
+  - `Invoke-Native` echoes every argument (`--> {0} {1}`), so the pre-migration `pg_dump` would print `BHW_DATABASE_URL` with `bhw_app`'s password.
+  - No run has printed it yet: no BHW migration has been pending at any hand deploy (`M206`'s ran "nothing pending").
+  - Once `bhw-p1-box` wires `deploy.yml` to this script, it would land in the GitHub Actions log.
+- **Also beside it:** the pre-migration dumps (`pre-deploy-*.dump`) are never pruned, while the nightly ones keep 14 and Meridian's deploy keeps 10.
+
+### Premise verified
+- **The box's PATH has no PostgreSQL bin** (`M206`'s B0; the staging memory says "use C:\Program Files\PostgreSQL\15\bin"). PostgreSQL 15 is the only install there, since the PG 17 client was deleted at B9c, so the newest install is the server's own version.
+- **Who runs the two scripts.**
+  - Today `deploy-bhw.ps1` runs by hand as Administrator. After `bhw-p1-box`, the runner runs it as NETWORK SERVICE.
+  - The nightly task runs as SYSTEM, and `M206` registered it by hand with PostgreSQL's bin on its own PATH.
+  - `ops/register-cron-tasks.ps1` registers it without one. That registration works once the script resolves `pg_dump` itself, and step 3 re-runs it for the cron jobs.
+- **The backup folder `C:\meridian\backups\bhw`** is ACL'd to Administrators and SYSTEM, for `fact_bhw_raw`'s personal records. Granting NETWORK SERVICE Modify exposes nothing new: it already reads `BHW_DATABASE_URL` from `C:\meridian\bhw\.env`, which BHW's service loads as NetworkService.
+- **Nothing else calls `pg_dump`** under `apps/bhw-connect/ops`, `db/migrate.mjs` or `docker-compose.yml` (by grep, 2026-11-04).
+
+### Remedy verdict
+**Works, measured before any edit, on the dev machine, which has the box's shape: PostgreSQL 18 under Program Files and none on PATH.**
+- With PostgreSQL's bin removed from PATH, a bare `pg_dump` fails: "not recognized".
+- The resolver (a configured path, else the highest-numbered `C:\Program Files\PostgreSQL\<n>\bin\pg_dump.exe`, else PATH) returns `C:\Program Files\PostgreSQL\18\bin\pg_dump.exe`, and `--version` prints 18.0.
+- Masking the echo with `(://[^:/@\s]+:)[^@\s]+@` → `$1***@` turns `postgres://bhw_app:s3cr3t%40x@127.0.0.1:5432/bhw_connect` into `postgres://bhw_app:***@…`.
+
+Files: `apps/bhw-connect/ops/pg-tools.ps1` (new), `apps/bhw-connect/ops/nightly-dump.ps1`, `apps/bhw-connect/ops/deploy-bhw.ps1`, `apps/bhw-connect/.env.example`, `docs/deployment-infrastructure.md` (§8.4). At close-out: ADR-0024's marker, `docs/pipeline.md`, `PROGRESS.md` (own block), `docs/gate-baselines.md`.
+Shared artefacts taken: `docs/deployment-infrastructure.md`. `apps/bhw-connect/ops/` is shared on the map, but avincentpatrick's until the handover (`M204`).
+Paired files taken: none.
+Namespaces spent: nothing from either namespace (`M208`).
+Prediction:
+- The diff is one small dot-sourced helper used by both scripts, the masked echo, and a keep-10 prune of the pre-migration dumps.
+- CI is 7/7. BHW's job runs its full steps without the boundary asking for a label; Meridian's six pass untouched.
+- At the box, one block grants NETWORK SERVICE Modify on the backup folder and runs `nightly-dump.ps1` with no PostgreSQL on PATH. It writes a dump, shows the resolved path, and the ACL lists NETWORK SERVICE.
+- **The part I most expect to be wrong:** that the runner's NETWORK SERVICE can run `pg_dump` against `bhw_connect` at all, which nobody can measure until `bhw-p1-box` wires the runner. The masked echo is what makes that first try safe to read.
+
+## RELEASED — `M207`, BHW Connect's admins sign in with Meridian, its feedback screenshots live on the box, the box mints its own keys, and nothing of it reaches Supabase (`bhw-p3-identity`, `D178`, `D179`, `D195`, `D202`–`D206`) (merged as PR #400, `d7ca70a0`, at its own merge point (`D203`), after `#397`; 7/7 green with real step counts on its run 41681161762 — Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run 41687180248 on `d7ca70a0` the same)
+
+**Live.** Every figure below was read from its own output.
+- **The merge point.**
+  - The user's census before (2026-11-03 17:13:40 UTC) equals the census after (2026-11-04 01:19:07 UTC): `1·6·11·27·22·62·31·74`.
+  - Deploy 41691809579 opened the window at 18:18:40 UTC and backed up to `deploy-20261103-181842.dump` (1,167,734 B).
+  - 70 tables and 54,085 rows; nothing to migrate; every table held.
+  - `releases: 1 added … 10 in the table (newest 0.17.0)`; then up.
+  - `/up`, `/login` and `/bhw-connect` answer 200; the sign-in page carries `"version":"0.17.0"`.
+- **C0.** The box's Node v24.14.1 fetched `https://staging.pitahc.gov.ph/up` through the hosts entry: 200. That was the first measurement of TLS from Node to the box's own name.
+- **C1.** All 34 screenshots were copied from the bucket to `C:\meridian\bhw\storage\feedback-screenshots`: 1,963,090 B, exactly the bucket's total.
+- **`whoami`, live.** A guest gets 401. A fresh sign-in gets the user's own id, name and email.
+- **C2.** `admin_users` has no foreign key on the box. The user's Meridian id `01a0aed1-cdcc-7290-943f-8291d7f0e00a` was added as `admin` (1 → 2 rows). jongsky25's old row stays, matching nobody.
+- **C3.** A new 64-character secret is in `C:\meridian\bhw\postgrest\jwt-secret.txt`, and both keys were minted from it with `db/mint-jwt.mjs`.
+  - `.env` gained the keys, `NEXT_PUBLIC_SUPABASE_URL=http://[::1]:3001`, `MERIDIAN_INTERNAL_URL` and `BHW_STORAGE_DIR`. Backups: `.env.pre-p3-20261104-102936.bak` and `postgrest.conf.pre-p3-20261104-102936.bak`.
+  - PostgREST answers the new anon key 200, the new service key 200 and Supabase's old anon key 401.
+  - `-BuildOnly` built `d7ca70a0` in 64 s, then `deploy-bhw.ps1` switched to it, and it was live at 10:31:12 box time.
+  - BHW's data was down about 90 s, from the PostgREST restart to the switch.
+  - Supabase's project id appears 0 times in the release.
+- **C4, signed out, live.**
+  - `/bhw-connect/admin` answers 307 to `https://staging.pitahc.gov.ph/bhw-connect/admin/login`, with or without a forged session cookie.
+  - The sign-in page links to Meridian's `/login`.
+  - The screenshot route answers a guest 404, both for a real file and for `..%2F..%2F.env`.
+  - The CSP no longer names Supabase.
+  - The sitemap carries 2,332 links. It was built while PostgREST accepted the new keys.
+- **C4, signed in.** The user reported (2026-11-04) the account menu → BHW Connect → Admin sign in → the dashboard, signed in as their own email (admin), with the feedback screenshots loading.
+- **C5.** Not done. Supabase's documentation says a project on a paid plan cannot be paused, and jongsky25's organisation is on Pro. The user decided it stays as it is, since nothing of BHW reads it, for jongsky25 to delete at the handover (`D206`).
+
+**How the prediction fared.**
+- **Right:**
+  - Pest stayed green once the four existing mint tests sent the password, and the two route filters needed only the new prefix.
+  - `openapi.json` regenerated with `/auth/whoami` and the mint's `password`; PHPStan and Pint are clean.
+  - BHW's lint, types, Vitest (91 files) and the prefixed build without a data source all passed, and the base-path census stayed green.
+  - CI was 7/7. C1 moved 34 files and 1,963,090 B. Supabase's project is named 0 times in the release.
+  - Next's redirect behind Apache came out on the right origin with the base path kept: the second of the two risks named, held.
+- **Wrong:**
+  - **The risk I named first, Node's TLS to the box's own name, passed at the first try.**
+  - **"C3's outage under 10 seconds" was wrong by an order: it was about 90 s.** Measured while preparing C3: the sitemap reads data as it builds, so building with the new keys before PostgREST accepted them would have baked a thin sitemap into the release. So the build ran after the swap, and BHW's data was down for the build.
+  - **The link in the top bar itself was wrong.** `search-nav.spec.ts` went red on #400's first run (41674298494): the labelled control left the theme toggle 28.8 px short at 1440 px under extra_large + OpenDyslexic. It moved into the account menu (`e18c0eaf`), through a link component that hands every other item to Inertia unchanged. `TopNav.vue` and its test came back to the trunk's, and `AccountMenu.test.ts` is new, red on the trunk's menu.
+  - **Pausing Supabase, the row's own last step, is impossible on Pro** (`D206`).
+- **Not predicted:**
+  - Group A asks nothing about workspace membership, so `whoami` checks for an active member itself.
+  - A bare `abort(403)` renders as `request_failed`, so the check throws `AuthorizationException`.
+  - Inertia's middleware replaces `Vary`, so `Vary: Cookie` was dropped, with `no-store` kept.
+  - A shifted `routes/api.php` killed two backlog citations, which were repointed.
+  - A dev server left running by the M206 session held BHW's `node_modules`, and stopping it was refused. BHW's gates ran in a clean copy.
+  - Windows PowerShell 5.1 hands a JSON array to the pipeline as one object; C1 was corrected for it.
+  - The user's console pastes a block twice, and C2's `Read-Host` took the second copy as its input. From C2 on, blocks are wrapped in `& { }` and take no input.
+  - Turbopack warned that `lib/storage/screenshots.ts`'s dynamic paths trace the whole project into the release → filed `bhw-screenshot-trace`.
+- **Files taken against the claim:**
+  - `resources/js/components/shell/AccountMenu.vue` and its new test were added mid-build without a pushed claim amendment. This is recorded here rather than hidden.
+  - `apps/bhw-connect/lib/meridian-url.ts` and `lib/db/meridian-identity-cookie.ts` were added; `docs/feature-backlog.md` took the two repointed citations.
+  - `TopNav.vue` and `TopNav.test.ts` end unchanged.
+  - `app/admin/(dashboard)/layout.tsx` and `tests/e2e/whats-new.spec.ts` were not edited: the header already shows on admin pages, and the spec reads the footer only by its contents.
+
+The claim as taken follows.
+
+Taken 2026-11-03. Branch `m207-bhw-p3-identity`, cut from origin/main at `6f69777d`, PR into main. It merges at its own merge point, with the user's census before and after (`D203` A). Before it: `#397` (`M204`) merges on its own (`D202` A), so this pull request needs nobody's label. After it: box blocks C0–C5, one guarded block at a time.
+
+**Why.** The user, 2026-11-03: finish the whole BHW move onto the box, then write jongsky25's handover guide. This is step 1 of 7. BHW's code and data run on the box (`M206`), but its admin sign-in and its feedback screenshots still go to jongsky25's Supabase.
+
+Row: `bhw-p3-identity`: "Meridian's session for BHW admins (GET /api/v1/auth/whoami), screenshots on local disk, the API-key mint behind a password re-check, the links between the two applications, and the box's own JWT secret with freshly minted anon and service keys replacing Supabase's … then Supabase paused for 30 days".
+
+### Evidence verified
+- **Supabase Auth: held at 4 call sites plus 2 factories.**
+  - `lib/db/require-admin.ts` (`auth.getUser()`, then `admin_users` by `user_id`).
+  - `proxy.ts` (`createServerClient`, `/admin*` only).
+  - `app/admin/login/page.tsx` (`signInWithPassword`, in the browser).
+  - `components/admin/sign-out-button.tsx` (`signOut`).
+  - The factories: `lib/db/supabase-auth-{server,browser}.ts`, the only users of `@supabase/ssr`.
+- **Supabase Storage: held at 2.** `app/api/feedback/route.ts` uploads to `feedback-screenshots` at `<session>/<uuid>.<png|jpg>`. `lib/db/admin.ts` signs a 60-second URL that the admin's browser loads from Supabase's origin.
+- **The CSP opening: held.** `lib/csp.ts` opens `connect-src` and `img-src` to `NEXT_PUBLIC_SUPABASE_URL`'s origin, whatever that names. So it only goes when the code changes, not when the value does.
+- **The mint: held, and measured.** On the trunk's code, locally, a session plus the readable `XSRF-TOKEN` mints a key with no password: `POST /api/v1/auth/tokens` → 201. Any script on the origin can do the same.
+- **`whoami` does not exist:** 404 on the trunk, measured locally.
+
+### Premise verified
+- **One admin, keyed by uuid, and Meridian's ids are uuids.** Read 2026-11-03 through the connector: `admin_users` has 1 row (role `admin`, `user_id` = the Supabase auth uuid). `users.id` is a uuid (`HasUuidv7`). So the user's Meridian account takes a row with no schema change and no BHW migration. Whether the box's copy kept the foreign key to `auth.users` is checked read-only at C2.
+- **34 screenshots, 1,963,090 bytes,** in 11 folders of the private bucket, the last on 2026-09-14. The box downloads them itself, because RDP moves no files on this connection.
+- **The keys are still Supabase's.** The box's PostgREST verifies Supabase's legacy secret (`D195`), which was typed into its config and saved nowhere else. The rotation makes a new one and keeps it in `postgrest\jwt-secret.txt`, which `db/mint-jwt.mjs`'s usage already names.
+- **The rebuild needs a new sha or `-BuildOnly`.** `deploy-bhw.ps1` reuses an assembled release for its sha and skips an already-deployed sha. P3's merge commit is a new sha. `-BuildOnly` builds it with the new keys before PostgREST is restarted.
+- **How BHW's server reaches Meridian.** The box's hosts file maps `staging.pitahc.gov.ph` to 127.0.0.1, and that entry must stay (no hairpin). A request to Meridian under `127.0.0.1` is the central host. TLS from Node to the box's own name has never been measured: that is C0, with a plain-HTTP loopback vhost as the fallback.
+- **What `D179`'s links touch.** Meridian's top bar and footer, which `AppLayout.test.ts` and `tests/e2e/whats-new.spec.ts` pin. `MdsMenu` items render through Inertia's `Link`, so the BHW link is an `MdsButton as="a"`.
+- **Who must approve.** Today `.github/CODEOWNERS` on `main` gives `apps/bhw-connect/` to jongsky25. Once `#397` merges, nobody's label is needed (`D202`).
+- **Group A's route filters.** `tests/Pest.php` `groupBRoutes()` and `TenantTwoFactorEnforcementTest` treat every `api.v1.*` name except `api.v1.public.` and `api.v1.tokens.` as a Group B (token) route. A `whoami` named `api.v1.auth.*` would fail both, so it is `api.v1.session.whoami` and the filters learn that prefix.
+
+### Remedy verdict
+**Works, measured before any edit, locally on the trunk's code:**
+- A guest at Group A gets 401 in the API's envelope.
+- A request carrying **only** the `meridian-session` cookie (with `Accept: application/json` and `X-Requested-With`) gets Group A's 200. That is exactly the call BHW's server will make.
+
+Still unmeasured, and measured where it can be:
+- Node's TLS to the box's own name (C0);
+- Next's redirect origin behind Apache's `ProxyPreserveHost` (C4);
+- the rotation's outage (C3).
+
+Files:
+- **Meridian:** `routes/api.php`, `app/Http/Controllers/Api/V1/WhoamiController.php` (new), `app/Http/Controllers/Api/V1/ApiTokenController.php`, `app/Http/Requests/Api/V1/StoreApiTokenRequest.php`, `app/Providers/AppServiceProvider.php` (the `whoami` limiter), `resources/js/components/shell/TopNav.vue`, `resources/js/Layouts/AppLayout.vue`, `VERSION`, `database/data/releases.json`, `openapi.json`.
+- **Meridian tests:** `tests/Pest.php`, `tests/Feature/Api/WhoamiTest.php` (new), `tests/Feature/Api/ApiV1Test.php`, `tests/Feature/Api/ApiAccessGateTest.php`, `tests/Feature/Auth/EmailVerificationGateTest.php`, `tests/Feature/Auth/TenantTwoFactorEnforcementTest.php`, `tests/Feature/Api/OpenApiContractTest.php`, `resources/js/Layouts/AppLayout.test.ts`, `resources/js/components/shell/TopNav.test.ts`, `tests/e2e/whats-new.spec.ts`.
+- **BHW**, all under `apps/bhw-connect/`:
+  - New: `lib/db/meridian-identity.ts`, `lib/storage/screenshots.ts` and `app/api/admin/screenshot/route.ts`, with their tests.
+  - Changed: `lib/db/require-admin.ts`, `proxy.ts`, `app/admin/login/page.tsx`, `components/admin/sign-out-button.tsx`, `app/admin/(dashboard)/layout.tsx`, `app/api/feedback/route.ts`, `lib/db/admin.ts`, `lib/csp.ts`, `components/layout/header.tsx`, `app/page.tsx`, `package.json`, `package-lock.json`, `.env.example`, `docs/DECISIONS.md`.
+  - Tests changed: `require-admin`, the feedback route and `csp`.
+  - Removed: `lib/db/supabase-auth-server.ts`, `lib/db/supabase-auth-browser.ts`.
+- **Docs:** `docs/deployment-infrastructure.md` §8.4. At close-out: ADR-0024's markers, `docs/pipeline.md`, `PROGRESS.md` (own block) and `docs/gate-baselines.md`.
+
+Shared artefacts taken: `openapi.json`, `docs/deployment-infrastructure.md`, `tests/e2e/whats-new.spec.ts`, and at close-out `docs/adr/0024-second-application-under-one-host.md`, `docs/pipeline.md` and `PROGRESS.md`.
+Paired files taken:
+- `VERSION` with `database/data/releases.json`;
+- `openapi.json` with `OpenApiContractTest`;
+- `tests/Pest.php` `groupBRoutes()` with `TenantTwoFactorEnforcementTest`'s copy of that filter.
+
+Namespaces spent: nothing from either namespace (`M207`; decisions `D202`–`D205`, recorded in `6f69777d`).
+Prediction:
+- **Meridian.** Pest stays green after the four existing mint tests learn to send the password. The two route filters need only the new prefix. `openapi.json` regenerates with `/auth/whoami` and the mint's `password`. PHPStan moves by nothing; Pint is clean.
+- **BHW.** Lint, types and Vitest pass, and the build under `/bhw-connect` with `BHW_DATA_SOURCE=none` passes with `@supabase/ssr` gone. The base-path census stays green because the Meridian links are absolute.
+- **CI:** 7/7.
+- **At the box:** C1 copies 34 files and 1,963,090 bytes; C3's outage is under 10 seconds; no `supabase.co` string is left in the new release.
+- **The part I most expect to be wrong:** Node's TLS to `staging.pitahc.gov.ph` through the hosts file (C0), or Next's redirect to Meridian's `/login` coming out under the wrong origin or with the base path left on.
+
+## RELEASED — `M206`, BHW Connect's database moves onto the box: `bhw_connect` on its PostgreSQL 15, served by PostgREST, copied from the live Supabase schema (`bhw-p2-db`, `D194`, `D195` A) (no code: box blocks B0–B9 run by the user at the box, one guarded block at a time, live at 13:44:33 UTC on 2026-11-03 after a 13.6-minute freeze; its docs-only close-out is its pull request, merged at its own merge point (`D201`))
+
+**Live.** Every block's figures were read from its own output.
+- **B3, PostgREST 16.4.**
+  - It runs as NSSM `bhw-postgrest`, under `bhw-connect`'s account (NetworkService), delayed auto, after PostgreSQL's service.
+  - The legacy JWT secret was proved before anything was written: it re-signs both keys in BHW's `.env`. A token signed with a wrong secret gets 401.
+  - **It binds `[::1]:3001`, not `127.0.0.1`.** On Windows Server 2016, the IPv4 bind crashed right after the schema loaded, with `Network.Socket.setSockOpt: failed (WSAENOPROTOOPT)`.
+  - The cause: the Haskell `network` library's `socket` sets `DontFragment` (`IP_MTU_DISCOVER`) on every IPv4 socket and does not catch a refusal. An IPv6 socket skips that call.
+  - Proved on the dev machine first: curl and Node's `fetch` reach `[::1]`, and `127.0.0.1` is refused.
+- **B3b, the dump tools on the box.**
+  - RDP moves no files on this connection (B1), so the box dumps from Supabase itself.
+  - It uses EDB's PostgreSQL 17.11 client (340,719,294 B, sha256 `6eabdf00…cfea3`, equal to the dev machine's download), unzipped to `C:\meridian\bhw\pg17`. It is never under Program Files, where Meridian's backup takes the newest `pg_dump`.
+  - A schema-only dump on the box matched the dev machine's to the byte: 254,103 B, and 253,773 B after the strip.
+- **B4, the freeze.**
+  - Vercel's `bhw-connect-phase-2` was paused through the connector with the user's OK. It answered `503 DEPLOYMENT_PAUSED` on every path at 13:29 UTC.
+  - jongsky25's pause had landed on `bhw-connect`, which already answered 404.
+  - `bhw-connect` stopped at 13:30:55 UTC.
+- **B5, the dump.**
+  - 235,211,400 B in 58 s. The strip removed exactly one of each (330 B).
+  - Supabase's census was identical at 13:31:20 and at 13:34:12 UTC: 61 tables, 2,114,275 rows, 170 history versions.
+- **B6, the restore and checks.**
+  - Restored as `bhw_app` in one transaction in 31 s.
+  - Census 61/61, every table equal. 52 sequences, 0 behind.
+  - Baseline: 111 files recorded, 0 pending.
+  - PostgREST: 68 relations and 20 RPCs. `admin_users` gives 0 rows as anon and 1 as `service_role`; `dim_geo` gives 43,783 as anon.
+  - Its first attempt was refused before touching anything: B5 had left `PGSSLMODE=require` set in the same window.
+- **B7, the switch.**
+  - `.env` was backed up to `.env.pre-p2-20261103-134428.bak`, then `SUPABASE_REST_URL=http://[::1]:3001` and `BHW_DATABASE_URL` were added.
+  - Up at 13:44:33 UTC. Seven pages and the districts CSV answered 200 in at most 0.5 s.
+  - One `page_view` usage event landed in `bhw_connect` and not in Supabase, which still reads 6,595 with its newest at 12:52:57 UTC.
+- **From outside:**
+  - 10 top pages, 6 drill-downs and 39 exports answered 200, each export with the right magic bytes (10 CSV, 10 XLSX, 8 PPTX, 11 PNG).
+  - `/place/region/01` took 17.2 s and `/uuc-phc/region/01` 28.5 s on first view, then 0.1 s warm. **The database on the box did not cure the cold render** (`bhw-drilldown-cold-render`).
+- **B8, the deploy script.** `deploy-bhw.ps1` ran with `deployed-sha` set aside (now `deployed-sha.pre-B8`): a fresh build of `13f96732` (1,004 pages, prerendered against the box's PostgREST), `0 pending`, the swap, and live in 51 s with no recovery.
+- **B9, the backup.**
+  - `bhw-connect-db-backup` is registered (SYSTEM, 01:45 daily), with PostgreSQL 15's bin on the PATH in its own command.
+  - Its run took 14 s and wrote 26,221,181 B.
+  - The drill restored it into a scratch database in 29 s: 61 tables, 2,114,279 rows, within the live counts before and after. The scratch database was dropped.
+- **B9c, the cleanup.** Both cut-over SQL files and the PG17 client were deleted. Only the nightly dump remains in `C:\meridian\backups\bhw`.
+
+**How the prediction fared.**
+- **Right:**
+  - B0 found PostgreSQL 15 with no `vector`.
+  - pgvector 0.8.2 built off the box.
+  - B6's census equalled the source exactly.
+- **Wrong:**
+  - `meridian` was reached by four roles, not two: `meridian_app`, `meridian_auth`, `meridian_superadmin` and `postgres`.
+  - **The part I most expected to be wrong, B2m, was not.** Granting the four and revoking PUBLIC caught no unlisted role, and Meridian stayed healthy.
+- **Not predicted:**
+  - PostgREST's IPv4 socket on Server 2016. The plan had seen the Windows exe only print its version. The dev machine is Windows 11, which accepts the option.
+  - RDP moving no files, which forced the on-box dump.
+  - `pg_dump` not on the box's PATH. Filed as `bhw-deploy-db-tools`.
+  - Vercel's pause landing on the wrong project.
+  - `PGSSLMODE` left set between two blocks run in one window.
+
+The claim as taken follows.
+
+Taken 2026-11-03. Branch `m206-bhw-p2-db`, cut from origin/main at `26f2c74a`. Most of this increment is box work, done by the user one guarded block at a time (B0–B9 in `~/.claude/plans/read-claude-md-run-preflight-groovy-snail.md`). Repository edits come only if the box forces one, and each would get its own PR. `M204` (PR #397) stays held for merge point 10. Released just before: `M202`, `M205` and `M203` (below).
+
+Row: `bhw-p2-db`: "bhw_connect on the box's PostgreSQL 15 with CONNECT revoked from PUBLIC on both databases, pgvector built off the box, PostgREST verifying Supabase's own legacy JWT secret … the copy of the live public schema and data from Supabase … the rehearsal on the dev machine first".
+
+### Evidence verified
+- **The source, read through the connector at 09:04 UTC on 2026-11-03:** 61 `public` tables and 2,114,264 rows. The history has 170 versions, newest `20260906115008`.
+- **The repo:** 111 migration files under 109 versions, with `FLOOR` `20260905235804`.
+- **The two histories share only 5 versions.** The files carry hand-chosen versions, and Supabase recorded apply-time ones. So the live history cannot say which files ran, and the baseline covers every file up to the floor.
+- **Objects:** every table, view and function the files create is in the copy, except `_district_leaf_map`, which one migration builds and drops. The copy also holds `fact_fhsis_indicator`, `fact_fhsis_workforce`, `ref_fhsis_indicator` and the view `ref_fhsis_reconciliation`, which no file creates and no code under `lib/` or `app/` reads.
+
+### Premise verified
+- **Sign-in stays on Supabase until P3 (`D195` A).** PostgREST on the box takes Supabase's legacy JWT secret, so today's keys keep working. `M203`'s policy opening is live and proved.
+- **Nobody writes to the source.** jongsky25 has not started (`D198`). The only writes are staging visitors' usage events, which come from the box's own BHW, so stopping `bhw-connect` at B4 freezes them.
+- **Vercel still answers**, so `D184`'s pause is owed before B4. The legacy JWT secret is owed before B3.
+
+### Remedy verdict
+**The rehearsal works end to end on the dev machine.** I used the user's saved Session-pooler string, `postgres:17`'s `pg_dump`, and `pgvector/pgvector:0.8.2-pg15` (PostgreSQL 15.18).
+- **Dump:** plain SQL of `public`, 235,210,495 bytes, in 82 s.
+- **Strip:** six lines, each checked by content before removal: `\restrict`, `\unrestrict`, `SET transaction_timeout`, `CREATE SCHEMA public`, and the two-line FK `admin_users_user_id_fkey` → `auth.users`.
+- **Restore as `bhw_app` with `ON_ERROR_STOP`:** bootstrap, then restore (17 s, exit 0), then bootstrap again and `ANALYZE`.
+- **Census:** **61/61 tables and 2,114,264 rows, exactly equal to the source.** All 52 sequence counters are at or past their tables' maxima.
+- **Baseline:** `--baseline=20260905235804` failed at first with "permission denied for database". The rehearsal's database was owned by `postgres`, and `CREATE SCHEMA IF NOT EXISTS` checks the privilege first. **B2 must create the database `OWNER bhw_app`, as it does.** Owned that way, it recorded 109 versions, with 2 "already recorded" (`M203`'s fix): 111 files, **0 pending**.
+- **PostgREST v16.4:** 68 relations and 20 RPCs.
+  - Anonymous reads gave 200, and a forged key 401. `admin_users` gave 0 rows as anon and 1 as `service_role`.
+  - A feedback insert as anon gave 201.
+  - `rpc/search_documents` gave 3 rows with the service key and 0 as anon. That equals Supabase's own answers to the same calls. BHW calls it with the service client.
+  - `rpc/search_geo` gave 8 rows.
+- **BHW `next dev` against it, with the AI keys blanked:** 9 pages answered 200 in 0.4–6 s (home, `/bhw`, a region, a province, `/districts`, `/facilities`, `/profiling-status`, `/uuc-phc`, `/explore`), and the districts CSV export was 200 (786 KB). PostgREST served 199 requests: 186 × 200, 7 × 201, and 7 × 409. The 409s are `ai_provider_quota`'s documented insert race (`lib/ai/quota.ts`), not a fault.
+- **The dump, the copy and both containers were deleted the same hour.** It holds personal data.
+
+Files: none planned in the repository. At close-out: ADR-0024's marker, `docs/pipeline.md`, `PROGRESS.md` (own block), and `docs/gate-baselines.md` if a run moves.
+Shared artefacts taken: none at the claim.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace (`M206`).
+Prediction:
+- B0 finds PostgreSQL 15 on the box with no `vector` extension, and `meridian` reached by two roles.
+- pgvector 0.8.2 builds off the box against the matching EDB PostgreSQL 15 zip.
+- B6's census equals the source at the freeze exactly.
+- The part I most expect to be wrong: B2m. Revoking `CONNECT` from `PUBLIC` on `meridian` may catch a role nobody listed, such as a backup or monitoring login. That is why it has its own block with an automatic rollback.
+
+## RELEASED — `M205`, the feedback-pull thread test stops expiring: its fixture's comments fell out of the script's fortnight window on 2026-11-03, and every CI run was red at Pest (merged as PR #398, `6d5d8dee`, first, at its own merge point (`D200`), with no rebase; 7/7 green with real step counts on its run — Static analysis 33 · BHW Connect 19 (the unchanged branch) · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run 41597956531 on `6d5d8dee` the same, with BHW Connect at 20)
+
+**Live.** Deploy 41602220335 found "only paths the site does not run" and fast-forwarded the box with no window. Pest on the trunk read 7,278 passed and 1 skipped, against 7,276 passed, 1 failed and 1 skipped before. That is one more test, as predicted.
+
+**How the prediction fared: right on all three counts.**
+- **The file ran 12 of 12 on the host.** A throwaway commit setting the default to 13 days turned the new case red (11 of 12), and it was never pushed.
+- **CI was 7/7, with Pest one higher.**
+- **The part I most expected to be wrong**, the state file's key, matched the config's URL on the first run.
+- **Not predicted:** `preflight --with-gates --with-pint` reported its Pint probe blocking. The app container had stopped when Docker Desktop restarted that morning. Bare `vendor/bin/pint --test` on the host passed, and CI's static job agreed.
+
+The claim as taken follows.
+
+Taken 2026-11-03. Branch `m205-feedback-pull-test-clock`, cut from origin/main at `19f87694`, PR into main. `M204`, `M203` and `M202` are held below; `M202` merged as `19f87694`.
+
+**Why now.**
+- The trunk's first run after `M202` merged (CI 41584593412 on `19f87694`, started 2026-11-03 05:33 UTC) went red at Pest, 1 of 7,277. Its deploy was skipped, so nothing reached the box.
+- The failure is `FeedbackPullScriptTest` › "it shows REOPENED reports and the members' new comments since the last pull…", at line 213: the output lacks `REOPENED`.
+- `M202` changed only `apps/bhw-connect/ops/deploy-bhw.ps1`, and its own run passed this test on 2026-11-02. Every CI run from now on fails the same way: `#396`, `#397` and merge point 10 included. So this lands first.
+
+Row: filed and closed by this increment in `docs/feature-backlog.md`, on the branch, as `M201` did: "the feedback-pull thread test expired on 2026-11-03".
+
+### Evidence verified
+- **`scripts/feedback-pull.php` `feedback_pull_since()`: held.** With no state file, `since` is `gmdate(..., time() - 14 * 86400)`.
+- **`tests/fixtures/feedback-pull/router.php`: held.** The three comments are dated `2026-10-20T01:00`, `02:00` and `03:00+00:00`.
+- **The test: held.** It writes no state file before its first pull, so it reads the fortnight window. That window passed `2026-10-20T03:00Z` at 03:00 UTC on 2026-11-03.
+- **Reproduced on the host:** `vendor/bin/pest tests/Feature/Docs/FeedbackPullScriptTest.php` gives 10 of 11, failing the same test.
+
+### Premise verified
+- **The script is right; the test is wrong.** A session that has never pulled should look back a fortnight. The test's own name, "since the last pull", describes a state file that it never writes.
+- **No second copy in this file.** The other dated call, `--count --since=2026-10-19T00:00:00Z`, passes its date explicitly. `submitted_at` (`2026-10-16`) is compared only with explicit dates.
+- **Tests only.** `tests/` is site-safe in `deploy.ps1`, so a merge takes no maintenance window.
+- **The fortnight branch loses its accidental coverage.** So a deterministic case for it is added: the printed `since` is within two minutes of now minus 14 days.
+
+### Remedy verdict
+**Works, measured before any edit.** I ran the fixture router by hand with `php -S` and the script against it from the scratchpad:
+- **No state file:** "no reopened reports and no new comments since 2026-10-20T06:12:47Z". That is today's failure.
+- **A state file with `comments_since` set to `2026-10-19T00:00:00Z`:** "1 REOPENED, 1 new comment(s)", with both member comments and not the support reply.
+- **A second pull:** "no reopened reports and no new comments since 2026-10-20T03:00:00+00:00".
+
+Files: `tests/Feature/Docs/FeedbackPullScriptTest.php`, plus the row in `docs/feature-backlog.md` and `docs/pipeline.md` on the branch.
+Shared artefacts taken: `docs/feature-backlog.md` (one row, appended).
+Paired files taken: none.
+Namespaces spent: nothing from either namespace (`M205`).
+Prediction:
+- The test seeds the state file before its first pull, and one new case covers the fortnight default. The file runs 12 of 12 on the host.
+- CI is 7/7, with Pest's count one higher.
+- The part I most expect to be wrong: the state file's key is the config's URL string exactly, so a trailing slash or a port written differently would silently miss.
+
+## RELEASED — `M204`, BHW Connect is avincentpatrick's until the handover, so the move's pull requests need nobody's label (`bhw-ownership-until-handover`, `D198` A) (merged as PR #397, `2d94f09c`, on its own at its own merge point (`D202` A, 2026-11-03) ahead of merge point 10, after a trunk merge (`08efedd5`); labelled by jongsky25; 7/7 green with real step counts on its run 41666261066 — Static analysis 33 · BHW Connect 19 (the unchanged app) · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run 41673866248 on `2d94f09c` the same, and its deploy 41679783938 site-safe)
+
+**Released.** It was to ride merge point 10. `D202` brought it forward, because every PR of the move until then would have needed jongsky25's label. After it, `#400` (`M207`) passed the boundary with nobody's label. `boundary-check-controls` passed 14 cases on the merged branch. **The prediction said "four lines"; it was five** (jongsky25's five CODEOWNERS lines), as the held note already recorded. Nothing else about it was wrong.
+
+Taken 2026-11-02. Branch `m204-bhw-ownership-until-handover`, cut from origin/main at `e0cb402d`, PR into main. It rides merge point 10 (`D198` A, in the answer's own words). `M203` and `M202` are built and held below.
+
+**Why.** The user, 2026-11-02: jongsky25 has not started, and was told to start only once BHW's database is on the box. The user wants the whole move finished before the handover, with nothing left to configure between the two of them, and everything in jongsky25's hands from then on (`D198`, `D199`). The next push records both answers and files the rows.
+
+Row: `bhw-ownership-until-handover`: "jongsky25's lines in .github/CODEOWNERS set aside until the handover, so `*` gives every path to avincentpatrick … the working agreement says so … boundary-check-controls' B0 holds the shipped map to D198".
+
+### Evidence verified
+- **`.github/CODEOWNERS` on `e0cb402d`: held.** `/apps/bhw-connect/` is `@jongsky25`. `ops/`, `/.github/`, `/deploy.ps1` and `/docs/working-agreement.md` are both owners'.
+- **`scripts/boundary-check.php`: held.** A path needs approval when its owners include anyone but the author (`array_diff($owners, [$author])`), and only that other owner's `labeled` event approves it. So every BHW pull request this lane opens needs jongsky25's click: `#395` and `#396` are red at exactly that step today.
+- **`scripts/boundary-check-controls.php` B0: held.** It reads the real `.github/CODEOWNERS` and expects `apps/bhw-connect/lib/x.ts`, by jongsky25, to need nobody. So B0 goes red under the new map unless it changes with it: the controls are a paired file of this change.
+
+### Premise verified
+- **Who must approve this one change.** `.github/CODEOWNERS` and `docs/working-agreement.md` are shared on the base, and the check reads the map from the base. So this pull request needs jongsky25's label once, and none after it.
+- **The handover reverses it without him.** Under the new map every path is avincentpatrick's, so the handover's pull request (`bhw-handover`) needs nobody. jongsky25 sees it before he starts.
+- **Nothing else reads the map.** `git grep CODEOWNERS` outside `apps/` finds only `CLAUDE.md`, the tracker and claims, ADR-0024, the decisions, the working agreement and the two scripts. The ruleset on `main` has `require_code_owner_review: false`, read 2026-11-02, so GitHub's review requests change but nothing blocks on them.
+- **Site-safe.** `deploy.ps1` lists `docs/`, `scripts/` and `.github/` as site-safe, so the merge only fast-forwards the box. It still rides merge point 10, per the answer.
+
+### Remedy verdict
+**Works, measured before any edit.** I used a throwaway repository in the scratchpad running the shipped `boundary-check.php` with no label events, on a change to `apps/bhw-connect/lib/x.ts`, `ops/start.ps1`, `.github/workflows/ci.yml`, `deploy.ps1` and `docs/working-agreement.md`:
+- **Today's map, by avincentpatrick:** exit 1, all 5 owned by `@jongsky25`.
+- **jongsky25's four lines commented out, by avincentpatrick:** exit 0, "5 changed path(s), all on avincentpatrick's own side".
+- **The same map, by jongsky25:** exit 1, all 5 owned by `@avincentpatrick`.
+
+Files: `.github/CODEOWNERS`, `docs/working-agreement.md`, `scripts/boundary-check-controls.php`. At close-out: ADR-0024's marker, `docs/pipeline.md`, `PROGRESS.md` (own block), `docs/gate-baselines.md` (the controls' case count).
+Shared artefacts taken:
+- `.github/CODEOWNERS` and `docs/working-agreement.md`, shared with BHW Connect. They need jongsky25's `boundary-approved`, once.
+- This claim's next push also takes `docs/adr/0024-second-application-under-one-host.md`, `docs/claims/decisions.md` and `docs/pipeline.md`.
+
+Paired files taken: `scripts/boundary-check-controls.php` (B0 reads the shipped map).
+Namespaces spent: nothing from either namespace (`M204`; decisions `D198`, `D199`).
+Prediction:
+- The diff is four CODEOWNERS lines commented out under a dated header, one short section at the top of the working agreement, and B0's expectations moved to the new map plus one case where avincentpatrick needs nobody.
+- `composer run boundary-check-controls` passes on the host with 14 cases, and is red against the old map. That proof is a committed mutation: the old CODEOWNERS restored, then reverted.
+- Pint passes; PHPStan cannot move, because nothing changed under `app/`, `database/` or `routes/`.
+- CI: the six Meridian jobs pass. BHW Connect is red at the boundary until jongsky25's label, then skips its build, since `apps/bhw-connect` is unchanged.
+- The part I most expect to be wrong: GitHub may refuse or warn on a CODEOWNERS whose only rule is `*`.
+
+## RELEASED — `M203`, P2's two BHW prerequisites: the migration history takes a duplicate version, and the admin sign-in reaches Supabase until P3 (`bhw-migrate-duplicate-versions`, `bhw-admin-signin-csp`, `D195` A) (merged as PR #396, `9370e532`, at its own merge point after `M205` (`D197`, `D200`), with no rebase, and labelled by jongsky25 on 2026-11-03; 7/7 green with real step counts on its run — Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run 41602351599 on `9370e532` the same)
+
+**Live.** Deploy 41606952995 fast-forwarded the box with no window. The user then ran `deploy-bhw.ps1 -AppPath C:\meridian\test-app` at the box once, and it served `M202` and `M203` together: `exit 0 after 82 s`, `current -> C:\meridian\bhw\releases\9370e532…`, `service: Running`.
+
+**The sign-in proof, without jongsky25.** He has not started (`D198`), so a headless Chromium on this machine submitted a wrong password at `/bhw-connect/admin/login` on live staging, before and after.
+- **Before (release `df66f1f8`, while #395's trunk run was going):** the policy said `connect-src 'self'`. The browser blocked `POST …supabase.co/auth/v1/token` twice ("violates … connect-src 'self'"), and no request reached Supabase.
+- **After (release `9370e532`, right after the hand deploy):** `connect-src 'self' https://ejcuwrnxngdwvecxwrhy.supabase.co`, and `img-src` the same. Supabase answered **400** to the POST, and there were no violations.
+- **Found by the probe:** the page says "Couldn't sign in with that email and password" in both cases, even when the browser blocked the request. No row is filed: `bhw-p3-identity` replaces this login page with Meridian's sign-in.
+
+**How the prediction fared:**
+- **The host gates and CI: right.** The boundary step was red until the label, then 20 of 20.
+- **The part I most expected to be wrong, `FLOOR` imported from `lint-migrations.mjs`: wrong to worry.** Its main guard keeps its own check from running on import.
+- **Not predicted:**
+  - `proxy.ts` joined the file list.
+  - The trunk was red for most of a day for an unrelated reason (`M205`), so the label waited for that fix.
+
+The claim as taken follows.
+
+Taken 2026-11-02. Branch `m203-bhw-p2-prereqs`, cut from origin/main at `1b5e6682`, PR into main. `M202` is built and held below.
+
+Both files are jongsky25's (`/apps/bhw-connect/`, not `ops/`). This lane builds them on the user's answer recorded in `D195` ("Who builds it"), so the PR needs his `boundary-approved`. Its paths are site-safe, as `M202`'s were. Its merge route is confirmed with the user when it is green: `D196` answered for `M202` only.
+
+Rows:
+- `bhw-migrate-duplicate-versions`: "record a version already present without failing, and refuse a new duplicate above the lint floor … before bhw-p2-db records its baseline".
+- `bhw-admin-signin-csp`: "Open connect-src and img-src to the NEXT_PUBLIC_SUPABASE_URL origin only while it differs from the page's own, which ends at bhw-p3-identity (D195), proved by a real admin sign-in on staging".
+
+### Evidence verified
+- **The two version pairs: held.** `supabase/migrations/` holds 111 files with 109 distinct versions. `20260721080000` is `e4_2_agg_population` and `e4_3_income_reclass`, and `20260827180000` is `profile_dataset` and `ref_uuc_phc_list`.
+- **The baseline loop: held, and worse than the row says.** `db/migrate.mjs`'s `migrate()` inserts each covered version unguarded, and **outside a transaction**. Measured on a scratch `postgres:15` with the repository's files:
+  - `--baseline=20260905235804` exits 2 on `schema_migrations_pkey` after **41 of 109** versions are recorded.
+  - `--check` then prints **69 pending** (exit 1). On the box, `ops/deploy-bhw.ps1` would apply those 69 history files over the restored live schema.
+- **`lib/csp.ts`: held.** `connect-src` is `'self'` only (plus `ws:` in development), and `img-src` is `'self' data: blob:`.
+- **The live header: held.** `/bhw-connect/admin/login` served exactly that policy on 2026-11-02.
+- **The two browser calls to Supabase: held.**
+  - `app/admin/login/page.tsx` calls `signInWithPassword` from the browser through `lib/db/supabase-auth-browser.ts` (`createBrowserClient(NEXT_PUBLIC_SUPABASE_URL, …)`).
+  - `lib/db/admin.ts` hands the browser a Supabase `createSignedUrl` link for a screenshot.
+- **The call site: held.** `proxy.ts` builds the policy with `contentSecurityPolicy(nonce, { dev })`, and `lib/csp.test.ts` covers it.
+
+### Premise verified
+- **Ownership.** `.github/CODEOWNERS` gives `/apps/bhw-connect/` to jongsky25 alone. This lane edits it only on the user's answer, with his label, as `M194` did.
+- **The CSP's own reason.** Its docblock says an injected script must not run, because Meridian's session cookie reaches these pages. Opening `connect-src` and `img-src` to one more origin leaves `script-src` untouched, so an injected script still cannot run. The docblock is updated to say why the opening exists and when it ends.
+- **When the opening ends.** It is computed from `NEXT_PUBLIC_SUPABASE_URL`, never hard-coded. P3 rotates the keys and moves sign-in to Meridian, and the opening goes with that value. CI's placeholder (`http://no-data-source.invalid`) opens nothing reachable.
+- **The duplicates are history.** Both sit below `db/lint-migrations.mjs`'s `FLOOR`, and no file above the floor shares a version today.
+- **The tests.** `db/db-tools.test.ts` holds the database cases (`BHW_TEST_DATABASE_URL`, the local docker stack), and `lib/csp.test.ts` the policy's.
+
+### Remedy verdict
+**Both work, measured before any file was edited.**
+- **Duplicate versions.** A scratch copy of `migrate.mjs` had the baseline in one transaction and both inserts `ON CONFLICT (version) DO NOTHING`.
+  - Over the partial history the failed run left, it recorded the other 69 and ended at 109 with 0 pending.
+  - On an empty history it recorded 111 files as 109 versions, with 0 pending, and the unpatched `--check` agrees.
+  - The build adds a ROLLBACK on failure and the refusal of a new duplicate above the floor.
+- **The CSP.** Headless Chromium got the exact live policy, then the patched one, and called `https://ejcuwrnxngdwvecxwrhy.supabase.co` from the page the way the login does.
+  - **Live:** violations on `connect-src` and `img-src`, and the fetch threw "Failed to fetch".
+  - **Patched:** no violation. The fetch reached Supabase (HTTP 401: the probe sent no key), and the image failed only as a 404.
+
+Files: `apps/bhw-connect/db/migrate.mjs`, `apps/bhw-connect/db/db-tools.test.ts`, `apps/bhw-connect/lib/csp.ts`, `apps/bhw-connect/lib/csp.test.ts`. At close-out: ADR-0024's two markers, `docs/pipeline.md`, `PROGRESS.md` (own block).
+Shared artefacts taken: none on Meridian's side. The four files are jongsky25's, under his `boundary-approved`.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace (`M203`).
+Prediction:
+- BHW's own gates run on the host: `npm run lint`, `npm run typecheck` and `npx vitest run`. The database cases are skipped unless `BHW_TEST_DATABASE_URL` is set, so I run them against `docker compose up -d` and say so.
+- CI's BHW Connect job is green, and its boundary step stays red until his label.
+- The part I most expect to be wrong: the duplicate guard. A clean refusal "above the floor" means `migrate.mjs` reading `FLOOR` from `lint-migrations.mjs`, and that module may run its own check on import.
+
+## RELEASED — `M202`, `bhw-deploy-release-leak`: `New-Release` returns only the release path (merged as PR #395, `19f87694`, at its own merge point (`D196`), with no rebase, and labelled by jongsky25 on 2026-11-03; 7/7 green with real step counts on its run — Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run 41584593412 on `19f87694` RED at Pest on the expired feedback-pull test, which was not this diff and was fixed by `M205`, so its deploy was skipped)
+
+**Live, proved on the box.** It reached the box's checkout with `M205`'s deploy. The user's one hand run of `deploy-bhw.ps1` at `9370e532` was a fresh build, the very path this fixes:
+- `RESULT: exit 0 after 82 s`;
+- `current -> C:\meridian\bhw\releases\9370e532af7274372a0764269439b555785cb428`;
+- `service: Running`;
+- **no `rmdir current` recovery**, unlike 2026-11-01.
+
+**How the prediction fared:**
+- **The diff, `ParseFile`, the host `-BuildOnly` pair and CI: right.** BHW Connect ran every step, 20 of 20.
+- **The host build, the part I most expected to be wrong:** the scratch `.env`'s build values were enough.
+- **Not predicted:**
+  - The trunk's run went red on an unrelated test whose fixture dates expired at 03:00 UTC that morning. That became `M205`, and this went live a deploy later.
+  - The label waited a day: jongsky25 had not started, and the user asked him once for all three.
+
+The claim's held note as written follows.
+
+**Built. PR #395 is open, its CI running, and jongsky25 was asked for `boundary-approved` on the PR (2026-11-02, the user approved the wording).** It merges at its own merge point, on green and with that label (`D196`).
+
+Proved on the host with `-BuildOnly` against scratch roots, from a clean worktree at `61fee90b`:
+- **The parent's file:** `built only:` followed by 2,994 characters of npm's log, then the path.
+- **The fixed file:** the path alone, 244 characters.
+- Both runs took about 55 s, and both assembled `server.js`.
+
+Every host gate and Pint passed. The claim as taken follows.
+
+Taken 2026-11-02. Branch `m202-bhw-release-leak`, cut from origin/main at `d949da97`, PR into main. It merges at its own merge point, on green and with jongsky25's `boundary-approved`, per `D196`.
+Row: `bhw-deploy-release-leak` — "ops/deploy-bhw.ps1's New-Release returns the npm ci and npm run build output along with the release path … send the two npm calls to Out-Host, keeping Invoke-Native's output for Get-Census".
+
+This claim push also carries what came out of planning P2: `D195` and `D196`, answered, and two new rows in ADR-0024, `bhw-migrate-duplicate-versions` and `bhw-admin-signin-csp`. The ADR and the regenerated line make this a docs-only push.
+
+### Evidence verified
+- `apps/bhw-connect/ops/deploy-bhw.ps1`, `New-Release`: **held.**
+  - The two calls `Invoke-Native npm.cmd @('ci', '--no-audit', '--no-fund')` and `Invoke-Native npm.cmd @('run', 'build')` stand uncaptured.
+  - `Invoke-Native` runs `& $File @Arguments` with its output passing through.
+  - The caller is `$release = New-Release $plan.Sha`, and `Switch-Release([string]$Release)` is what turns the array into one string.
+- The "already assembled" branch returns `$release` before any npm call: **held.** It matches the 2026-11-01 recovery, recorded in `M194`'s RELEASED claim.
+
+### Premise verified
+- **Ownership.** `/apps/bhw-connect/ops/` is co-owned in `.github/CODEOWNERS` (jongsky25 and avincentpatrick). This lane may edit it, but the pull request needs jongsky25's label.
+  - `scripts/boundary-check.php` reads the actor of the latest `labeled` event, not who is a co-owner.
+  - A label added before a later push still counts. The working agreement asks him to re-add it after a push, and this claim does the same.
+- **No second copy.** `deploy.ps1` has its own `Invoke-Native`, but it calls npm at top level and never inside a function whose return value is captured.
+- **No other leak in the script.**
+  - `mklink` and the three robocopy calls go to `Out-Null`.
+  - `Invoke-Migrations`, `Switch-Release` and `Set-CurrentRelease` are called as statements.
+  - `Get-Census` captures `Invoke-Native`'s output on purpose, and needs it.
+- **No gate reads the script, and none may.** Meridian's gates never read `apps/`, and BHW's tests belong to jongsky25. So the proof is a real build.
+- **Merging takes no Meridian window.** `deploy.ps1` lists `apps/` as site-safe, so a merge only fast-forwards the box.
+- **The next run does a fresh build.** `deploy-bhw.ps1`'s not-served list holds `docs/` and `ingestion/`, not `ops/`. So the user's next hand run at the box builds afresh, which is the very path this fixes.
+
+### Remedy verdict
+**Works, measured before any edit** (Windows PowerShell 5.1.26100, in memory, with no file written):
+- The function's shape as it stands returns `Object[]` of 3 items. Joined, it reads `"npm ci log line" "npm build log line" C:\meridian\bhw\releases\abc`.
+- With `| Out-Host` on both calls, it returns one `String`, the path.
+- A native call exiting 3 still throws through the `| Out-Host` pipe.
+- `Get-Census`'s captured `Invoke-Native` output still parses with `ConvertFrom-Json`.
+
+Files: `apps/bhw-connect/ops/deploy-bhw.ps1`. At close-out: `docs/adr/0024-second-application-under-one-host.md` (the marker done), `docs/pipeline.md`, `PROGRESS.md` (own block), `docs/gate-baselines.md`.
+Shared artefacts taken: `apps/bhw-connect/ops/deploy-bhw.ps1` (shared with BHW Connect: `boundary-approved` from jongsky25). This claim push also takes `docs/adr/0024-second-application-under-one-host.md`, `docs/claims/decisions.md` and `docs/pipeline.md`.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace (`M202`; decisions `D195`, `D196`).
+Prediction:
+- The diff is two calls gaining `| Out-Host`, plus one comment line.
+- `ParseFile` reports 0 errors.
+- On the host, `-BuildOnly` against a scratch root prints the npm log after `built only:` with the parent's file, and one path with the fixed one.
+- CI is 7/7, and BHW Connect runs every step because `apps/bhw-connect` changed.
+- PHPStan cannot move: no `app/`, `database/` or `routes/` change.
+- The part I most expect to be wrong: the host build. It needs `NEXT_PUBLIC_*` values in the scratch `.env`, and a build without a data source may still refuse something at build time.
+
+## RELEASED — `M201`, `follow-redirects` to 1.16.2, clearing GHSA-mrwp-f3q8-3g9p and the npm audit the trunk now fails (merged as PR #394, `ad481038`, second at merge point 9, with no rebase; 7/7 green with real step counts on its run at `6141adfc` — Static analysis 33 · BHW Connect 19 (the unchanged branch) · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `ad481038` the same, with BHW Connect at 20)
+
+**RELEASED SECOND AT MERGE POINT 9 (`D192`'s forced slot, right after `M197`), 2026-10-31, by the session that built it.**
+- **No rebase:** cut from the trunk at `7147719c`, and the trunk gained nothing before it merged at 12:33 UTC.
+- **The trunk's run 41201654373 on `ad481038` was 7/7**, the first green trunk run of merge point 9.
+- **Deploy 41204286820 took a maintenance window**, because the box moved from `27440f21` across `M197`'s `composer.lock` as well.
+  - Backup `deploy-20261031-131358.dump`, 1,159,813 bytes.
+  - 70 tables and 53,956 rows counted. Nothing to migrate, and every table held at least as many rows after.
+  - **`M197` went live with this deploy**: its own trunk run was red and its deploy was skipped.
+- **How the prediction fared.**
+  - **Held:** one entry moved in the lock, and CI was 7/7. The host's npm churned 85 lines on `npm update`, so the entry was set by hand
+    from the registry's 1.16.2 tarball and integrity, as the remedy verdict allowed.
+  - **The named risk did not happen:** no third advisory was published before the run.
+  - **Filed, not fixed:** the `vite` moderate under `packages/design-system` (during-testing).
+
+**The claim as taken follows.**
+
+Taken 2026-10-31, during merge point 9. Branch `m201-follow-redirects`, cut from origin/main at `7147719c` (`M197`, merged first at
+merge point 9), PR into main. ⛔ **It merges FIRST of what remains of merge point 9, ahead of `#387`, `#388` and `#389`**: every pull
+request's static job fails until it lands, as `M197`'s did (`D192`'s forced slot). Nothing has deployed since the user's census before
+(11:25:26 UTC): the trunk's run went red, so its deploy was skipped.
+
+Row — new, filed and closed on this branch: *"`follow-redirects` 1.16.1 carries GHSA-mrwp-f3q8-3g9p (high), and the npm audit judge
+blocks every CI run"*. Alone under `D13`, because `package-lock.json` is a hub.
+
+### Evidence verified
+- The trunk's run 41196861583 at `7147719c`: six jobs green. Static analysis went red at *npm audit (SCA — high/critical in
+  PRODUCTION deps blocks merge)*: `npm-audit-judge: BLOCKED — 1 high in PRODUCTION dependencies`, `follow-redirects — high — 1.16.0 -
+  1.16.1`. Deploy run 41199015085 was skipped; `/up` 200, still 0.16.0.
+- The advisory is GHSA-mrwp-f3q8-3g9p, *"Cross-realm sensitiveHeaders arrays are discarded and custom credentials can follow
+  redirects"*. The registry's latest is 1.16.2.
+- `package-lock.json` pins `node_modules/follow-redirects` at 1.16.1.
+
+### Premise verified
+- **It is not `M197`'s diff.** `M197` changed only `composer.lock`, and its own run 40807295694 passed this step on 2026-10-29. The
+  advisory came after, so every branch and the trunk now fail it.
+- **`follow-redirects` is transitive and in range:** only `node_modules/axios` (production) requires it, as `^1.16.0`, which admits
+  1.16.2.
+- **A second advisory sits in the same audit and does not block:** `vite` 6.4.4 under `packages/design-system`, GHSA-8g5g-mxqh-grgj
+  (`server.fs.deny` bypassed with queries), moderate. The judge blocks only high and critical. Not fixed here; filed as its own row on
+  this branch.
+
+### Remedy verdict
+- **`npm update follow-redirects --package-lock-only` — works in kind, measured on a scratch copy of the trunk's lock:** the audit then
+  reports only the `vite` moderate. ⚠️ The scratch copy had no workspace folders, so npm 11.6.1 also pruned unrelated entries (85 lines).
+  The real bump is made in a full checkout, and **only the `follow-redirects` entry may move**; if npm churns anything else, the entry is
+  set by hand from the registry's 1.16.2 tarball and integrity.
+- **To be confirmed:** the judge passes, and CI is 7/7.
+
+Files: `package-lock.json`, `docs/feature-backlog.md` (the row filed and closed, and the `vite` row filed), `docs/pipeline.md`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace (`D193`, answered in chat, is recorded with `M194`).
+Prediction:
+- One entry moves in the lock.
+- CI is 7/7; nothing runs `follow-redirects` in a test.
+- **Most likely wrong:** a third advisory published before the run. The second came two days after the first.
+
+## HELD — `M200`, the maintainer marks out of `openapi.json`, with a check that refuses them (`R-e568ddd2`, `D191` A) (m200-openapi-maintainer-marks)
+
+**BUILT — PR #393, NOT MERGED.** Held for **merge point 10, third — after `#391` and `#392`**, by the user's word in chat.
+- **Run 41025882753 at `100673bd`:** six green with real step counts — E2E 20 (19 ran; only the failure-upload step skipped) · Pest 11
+  · Contract 16 · Frontend 12 · axe 11 · BHW Connect 19, its unchanged path (9 ran).
+- **Static analysis ran 24 of 32 steps, Pint, PHPStan and every lint included, and went red only at step 23, the composer audit,** on
+  CVE-2026-45070 (`symfony/mime`) — the one advisory `M197` clears, as for `#389`, `#391` and `#392`. At merge point 10 the branch
+  merges the trunk after merge point 9 and is run again; the backlog conflicts at `R-e568ddd2` with `#389`'s `D191` block and its
+  design-codes row — keep both.
+- The branch carries the twelve sources, `OpenApiContractTest`'s new case, the re-exported `openapi.json`, the row's closure,
+  `R-a6e26f79` (nit, after-launch: no local gate exports the contract) filed under it, and the regenerated line. No `VERSION` bump.
+
+**How the prediction fared.**
+- **Held:**
+  - The export was byte-identical to the committed file before any edit.
+  - The new case was red on the trunk's document with exactly the 14 strings (18 entries — four strings carry two kinds), and green
+    after. The re-export moved exactly those 14 values and nothing else, read by a JSON-pointer diff of the two documents.
+  - Redocly: valid, with the one warning the trunk's document also has.
+  - `tests/Feature/Api`: 156 passed (808 assertions).
+  - Seven mutants caught through `mutate.php`, both files' sha256 back to their originals: one per kind on `openapi.json` (a ⛔, `M165`
+    put back, a `*Test` name, an `app/` path, a `.ts` file name, a `.md:197` pointer), and a walk cut to `info` that only the floor sees.
+  - Pint green, bare; the host lints and preflight with gates and Pint green; `pipeline-lint` and `state.php --check` green.
+  - CI held exactly as written: six green, and static analysis red only at the composer audit.
+- **Wrong:** the plan's count. It named six mutants; the file-name kind got its own, so seven.
+- **The one named most likely wrong did not happen:** no clause moved out of an array literal was published. The `//` block above
+  `present()`'s docblock stayed out of the document, as the recorded traps said it would.
+- **Not named:**
+  - `SyncResultStatus` lost its `use` of `SyncSubmissionResultResource`: the moved `{@see}` was its only reference, and Pint's
+    unused-import rule would have flagged it.
+  - The container's PHPStan on the changed files reports 2 `property.notFound` (`allow_guest_ocr`, `allow_ocr_single`) in
+    `PublicFormPresenter::paperUpload()`, code this diff does not touch — the `Form` `@property` family `M199` recorded. CI's PHPStan
+    passed.
+  - `tests/Feature/Docs` in the container: 191 passed, and `SuiteCollectionFloorTest` red at 519 of 598 files — the bind-mount
+    truncation its own message names. CI's Pest job is the authority, and it is green.
+  - Docker Desktop was not running at the start; it was started, and nothing else moved.
+  - The mutants ran in the working tree rather than committed, as `M199`'s did: the gate is Pest, which reads the working tree.
+
+Taken 2026-10-30. Branch `m200-openapi-maintainer-marks`, cut from `origin/main` at `014b5c48`, PR into main. ⛔ **NOT MERGED THIS
+SESSION:** held green for **merge point 10, third — after `#391` and `#392`** — by the user's word in chat (2026-10-30).
+
+Row — taken alone, because its remedy edits `openapi.json`, a hub, and `D13` allows one hub row per batch:
+- `R-e568ddd2` — *"A `FormRequest` class docblock is PUBLISHED API DOCUMENTATION, and nothing says so at the place where someone
+  writes one"*.
+
+`D191` A, asked and answered after `M195`'s read-only verification: remove the ⛔/⚠️ marks, M-numbers, test-class names and script
+paths from the sources Scramble reads, and widen `OpenApiContractTest`'s one-off *"not `AppServiceProvider`"* assertion into a denylist
+over the whole committed `openapi.json`. The design codes and `@see` are a later row, `before-launch`, already filed by `M196` on
+`#389`'s branch — not filed again here. The session-start pull read 0 reports, 0 reopened and 0 new comments. jongsky25 has still not
+accepted the invitation and `#387` carries no `boundary-approved` label, so `#387`'s browser check could not run — the user's fallback
+was this row. The user also approved 0.16.1's What's new wording for `#391` as written (2026-10-30).
+
+### Evidence verified
+Held.
+- Scramble emits an `Api/V1` request's class docblock verbatim: 15 of the 17 request classes have a published `description`.
+- `StoreDomainRequest`'s published description names `CustomDomainApiTest`, which exists (`tests/Feature/Api/CustomDomainApiTest.php`)
+  — the pointer `M92` corrected is no longer dead, but it is still a test name in the contract.
+- `scripts/test-pointer-lint.php`'s mention roots are `tests`, `app`, `database` and `routes`: `openapi.json` is not one, so no gate
+  reads a pointer inside it.
+- `preflight --with-gates` runs host lints only; nothing in it exports or reads the contract.
+
+### Premise verified
+- **The row understates itself.** It names `FormRequest` docblocks; the committed document carries **14 marked strings from 12
+  sources**, and only two of those sources are request classes (`StoreDomainRequest`, `StoreOcrScanRequest`). The rest are four enum
+  docblocks (`SyncResultStatus` — ⛔, `M69`, ⚠️ twice; `AnalyticsAxis` — `scripts/controller-gate.php`, `app/Enums`, `docs/PRD.md:203`;
+  `AnalyticsFormSelection` — `docs/PRD.md:197`; `FieldType` — `M183`), two controller method docblocks (`GamificationController`'s
+  leaderboard ⚠️, `PublicFormSchemaController`'s linked choices `M186`), three `//` comments above array keys (`PublicFormPresenter`'s
+  `bot_challenge` ⚠️ + `replay.ts` and `paper_upload` `M165`; `ScoreboardResource`'s `member_count` ⚠️), and one string literal
+  (`SubmissionRefusalResponseExtension`'s ⚠️, emitted three times).
+- **Three neighbouring kinds sit beside the decision's four** and are the same thing: a source-file name (`replay.ts`), a code path
+  (`app/Enums`) and line-numbered document pointers (`docs/PRD.md:197`, `:203`) — the last is the row's own second finding, a pointer
+  inside a generated file no gate reads. They join the denylist. A bare `docs/api-specification.md` stays: it points an integrator at a
+  published document.
+- **The convention the row asks for already exists in one place:** `StoreDomainRequest` keeps its maintainer notes in the class body
+  (`M92`). Recorded traps say where a note is not published: a `//` block above a docblock, or a class body — never a `//` above an
+  array key or a `return` (M78, M137, M141).
+- **Nothing a person sees changes.** Scramble is a dev dependency, `deploy.ps1` runs `composer install --no-dev`, and no route serves
+  `openapi.json`. So no `VERSION` bump and no release note.
+- Of the held branches, only the backlog overlaps: `#389` appends `D191`'s answer under this row, and every held branch edits
+  `docs/feature-backlog.md`. A keep-both at merge point 10. No held branch touches `openapi.json` or any of the twelve sources.
+
+### Remedy verdict
+**`D191` A — works, measured on the trunk's document before any test:** a walk over every string with the widened denylist finds
+exactly the 14 strings above and nothing else, so it has no false positive to carve out today. The row's other half — *"caught LATE"*,
+because the drift check needs a fresh export and the export needs the container's migrated database — is not something a denylist
+over the committed file changes. It is filed as its own row (after-launch), since CI's Contract job still refuses it before the trunk.
+
+Files:
+- `app/Enums/SyncResultStatus.php`, `app/Enums/AnalyticsAxis.php`, `app/Enums/AnalyticsFormSelection.php`, `app/Enums/FieldType.php`
+- `app/Http/Requests/Api/V1/StoreDomainRequest.php`, `app/Http/Requests/Ocr/StoreOcrScanRequest.php`
+- `app/Http/Controllers/Public/PublicFormSchemaController.php`, `app/Http/Controllers/Api/V1/GamificationController.php`
+- `app/Services/Submissions/PublicFormPresenter.php`, `app/Http/Resources/Api/V1/ScoreboardResource.php`
+- `app/Support/OpenApi/SubmissionRefusalResponseExtension.php`
+- `tests/Feature/Api/OpenApiContractTest.php`, `openapi.json`
+- `docs/feature-backlog.md` (the closure and the residual row), `docs/pipeline.md`
+
+Shared artefacts taken: `openapi.json`, `docs/feature-backlog.md`, `docs/pipeline.md`.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace. `D191` was answered with `M195`'s built claim.
+No `VERSION` bump, no release note, no migration: nothing a tester sees changes.
+Prediction:
+- The new case goes red on the trunk's document with exactly the 14 strings, and green after the sources are cleaned and re-exported.
+- The re-export moves only those 14 strings; Redocly stays clean.
+- One mutant per family (glyph, M-number, test name, code path, `.md:` line pointer) and one floor mutant are each caught.
+- Pint is green, bare; PHPStan cannot move (comments and one string literal).
+- CI: six green, and static analysis red only at the composer audit on CVE-2026-45070, which `M197` clears — as for `#391` and `#392`.
+- **Most likely wrong:** the `//` comments above array keys. PHP-Parser attaches every preceding comment to a node, so a clause moved
+  off the key but left inside the literal may still be published. The re-export's diff is what will say.
+
+## HELD — `M199`, the form-settings saves lock the form row and audit the copy they replace, as `setDataSharing` does (`R-5041cc72`, `D190` A) (m199-settings-setters-lock)
+
+**BUILT — PR #392, NOT MERGED.** Held for **merge point 10, after `#391`**, by the user's word in chat.
+- **Run 40855187396 at `75aedb15`:** six green with real step counts — E2E 20 (19 ran; only the failure-upload step skipped) · Pest 11
+  · Contract 16 · Frontend 12 · axe 11 · BHW Connect 19, its unchanged path (9 ran).
+- **Static analysis ran 24 of 32 steps, Pint, PHPStan and every lint included, and went red only at step 23, the composer audit,** on
+  CVE-2026-45070 (`symfony/mime`) — the advisory `M197` clears, as for `#389` and `#391`. At merge point 10 the branch merges the trunk
+  after merge point 9 and is run again; the backlog conflicts at `R-5041cc72` with `#389`'s `D190` block — keep both.
+- The branch carries the fix, `FormSettingsLockingTest`, §3.4, the `FormPrintController` citation, the row's closure and the regenerated
+  line. No `VERSION` bump.
+
+**How the prediction fared.**
+- **Held:**
+  - On the old service: 21 red, 4 green. The ten stale-copy cases and the ten lock-order cases were red, and so was the sweeper case.
+    The `setDataSharing` stale control, the `setDataSharing` and `archive` lock cases, and the reflection guard were green. After the
+    fix: 25 of 25.
+  - All ten stale-copy cases failed first on the **lost write**, before reaching the audit assertion. The stale audit is proven on its own
+    by the sweeper case.
+  - Three mutants were caught through `mutate.php`, the sha256 restored each time: `setSchedule` auditing the caller's copy (2 red),
+    `setSaveAndResume` writing on it (2 red), `setTheme` re-reading without the lock (1 red — its lock-order case alone).
+  - The 34 Pest files that call the setters: 380 passed and 19 errors, every one `builderTenant()` undefined in `BuilderDraftGuardTest`
+    (the recorded trap — run without `BuilderRoutesTest.php`). Re-run with it: 28 of 28.
+  - Pint was green, bare. Every host lint gate and preflight with gates and Pint were green, and so was CI's PHPStan.
+  - CI held exactly as written: six green, and static analysis red only at the composer audit.
+- **Wrong:** the one named most likely wrong did not happen. No case counted a settings save's queries, and the `forms` RLS policies are
+  tenant-only for every command, so a row a setter can read it can lock.
+- **Not named:**
+  - The container's PHPStan reports 6 `property.notFound` on `Form` columns with no `@property` (`allow_ocr_single`, the guest OCR
+    limits, `data_sharing_*`). The same reads exist on the trunk under the same names, and CI's PHPStan passed.
+  - `setDataSharing` changed too: it now returns `$form->refresh()`, so the class docblock's "each setter ends `return
+    $form->refresh()`" is true of all eleven. Its one caller ignores the return.
+  - `setShareSettings`' docblock said the sibling setters open no transaction, false since I2; corrected in place.
+  - The plan said "commit the mutants". They ran through `mutate.php` in the working tree instead, because the gate is Pest, which reads
+    the working tree; the commit rule exists for diff-based checks.
+
+Taken 2026-10-29. Branch `m199-settings-setters-lock`, cut from `origin/main` at `75b133ca`, PR into main. ⛔ **NOT MERGED THIS SESSION:**
+held green for **merge point 10, with `#391`**, by the user's word in chat (2026-10-29). The order inside it: `#391`, then this.
+
+Row — taken alone, because its remedy edits a hub (`FormService.php`) and `D13` allows one hub row per batch:
+- `R-5041cc72` — *"`FormService` has seven lock-free writers to `forms` and one locked, and six of them build their audit payload from
+  a model nobody re-read"*.
+
+`D190` A, asked and answered after `M195`'s read-only verification: every settings setter takes the form lock and builds its audit from
+the locked copy. The session-start pull read 0 reports, 0 reopened and 0 new comments. jongsky25 has still not accepted the invitation and
+`#387` carries no `boundary-approved` label, so `#387`'s browser check could not run — the user's fallback was this row.
+
+### Evidence verified
+Held, with one clause false since `M133`.
+- The seven named writers each open a `DB::transaction` and take no `lockForUpdate`.
+- *"Only `archive()` takes one"* is false: `setDataSharing` locks too, and audits the locked copy.
+- `archive()`'s comment holds verbatim: *"an audit built from the stale copy would record a `status` this method never actually saw"*.
+- The "silent" grouping holds: `setShareSettings`' docblock enumerates `updateMetadata`, `assignScope`, `setSaveAndResume`,
+  `setConfirmationMessage`, `setSchedule` and `archive`.
+
+### Premise verified
+- **The row understates itself twice.**
+  - There are eleven lock-free writers, not seven: `assignFolder`, `setTheme`, `setSinglePageMode` and `setOcrScanning` are newer. Ten
+    build `$old` from the caller's copy. `create()` builds none and is right to take no lock, since it creates the row (§3.4 says so).
+  - **The stale copy loses writes, not only audits.** Every setter writes on the caller's `$form`, and `save()` writes only what is
+    dirty against that copy's original. Measured in the container on a `Form` model: setting the values a stale copy already holds
+    (`save_and_resume`, `max_responses`, `theme`) leaves `getDirty()` empty. So while the database holds something else, no `UPDATE`
+    is issued, and the audit records a change that never happened.
+- **The race `D190` names holds.** `FormScheduleSweeper`'s close and open passes flip `schedule_state` under a bulk `lockForUpdate`, and
+  `setSchedule` reads its old `schedule_state` off the caller's copy.
+- **The callers are controllers only**, and none uses the return value. `FormConfirmationMessageController::toast()` reads
+  `$form->currentPublishedVersion` after the save, so the caller's own instance must stay refreshed, as it is today.
+- **No new lock order.** Publish locks the `forms` row and then the version's rows; `updateMetadata` will lock `forms` and then update
+  `form_versions`, the same order. `BuilderLockOrderTest`'s *"the save locked the form row"* concerns `FormBuilderService::updateField`.
+- **No test stages a stale copy** for any setter, `archive` or `setDataSharing`, and none asserts their `for update`.
+- **One live line citation into the file, already stale:** `FormPrintController` cites `FormService.php:80` and `PublishService.php:112`
+  for `schema_snapshot => []`, which now sit at 96 and 183. No backlog row cites `FormService.php` by line, so the new lines move nothing
+  `citation-liveness-lint` reads.
+- **§3.4's list of lock-takers already misses `setDataSharing`.**
+- Of the held branches, only `#389` touches a file this row takes: it appends `D190`'s answer under `R-5041cc72`, and edits §8 of the
+  versioning doc. Both are expected at merge point 10 — keep both sides.
+
+### Remedy verdict
+**`D190` A — works by precedent** (`setDataSharing`, `archive`): lock the row first, build `$old` from the locked copy, then write and
+audit that copy. Each setter still ends `return $form->refresh()`, so the caller's instance stays current. To be measured as a defect
+first: the new stale-copy cases go red against the current service — the stale audit and the lost write both — and then green.
+
+Files:
+- `app/Services/Forms/FormService.php`, `app/Http/Controllers/Tenant/FormPrintController.php` (the stale citation, re-cited by name)
+- new `tests/Feature/Forms/FormSettingsLockingTest.php`
+- `docs/form-versioning-schema-migration.md` (§3.4)
+- `docs/feature-backlog.md` (the closure), `docs/pipeline.md`
+
+Shared artefacts taken: `docs/form-versioning-schema-migration.md`, `docs/feature-backlog.md`, `docs/pipeline.md`.
+Paired files taken: none.
+Namespaces spent: nothing from either namespace. `D190` was answered with `M195`'s built claim.
+No `VERSION` bump, no release note, no migration: nothing a tester sees changes.
+Prediction:
+- The stale-copy cases go red on the current service for the ten setters, with `setDataSharing` as a control that stays green. The
+  lock-order cases go red for the same ten. All green after the fix.
+- Three committed mutants are each caught.
+- The setters' existing suites stay green; PHPStan stays at no errors; Pint is green, bare.
+- CI: six green, and static analysis red only at the composer audit on CVE-2026-45070, which `M197` clears — as for `#389` and `#391`.
+- **Most likely wrong:** a case that counts a settings save's queries, or calls a setter on a model the current context can read but
+  not lock.
+
+## HELD — `M198`, the builder's side panes in `em`, so they grow with the text (`R-63ef1a69`) (m198-builder-panes-in-em)
+
+**BUILT — PR #391, NOT MERGED.** Held for **merge point 10**, by the user's word in chat.
+- **Run 40822742885 at `b6fa013e`:** six green with real step counts — E2E 20 (19 ran; only the failure-upload step skipped) · Pest 11
+  · Contract 16 · Frontend 12 · axe 11 · BHW Connect 19, its unchanged path (9 ran).
+- **Static analysis ran 25 of 32 steps, Pint and PHPStan included, and went red only at step 23, the composer audit,** on
+  CVE-2026-45070 (`symfony/mime`) — the advisory `M197` clears, which `#389` met the same way. At merge point 10 the branch merges the
+  trunk after merge point 9 and is run again.
+- The branch carries the row's closure, `R-30be7b88` (nit, after-launch) filed under it, the regenerated line, and 0.16.1's notes —
+  ✅ **the wording approved by the user as written, in chat (2026-10-30).**
+
+**How the prediction fared.**
+- **Held:**
+  - Both committed mutants were caught. The px columns reddened the new Vitest case alone and the new desktop E2E case (14.44
+    received). A `font-size` on `.builder__panes` reddened the Vitest case alone. `Builder.vue`'s sha256 matched afterwards.
+  - `list-layout` passed 41 with 37 skipped at three projects, and `personalization-axe`'s builder cases passed 6 of 6.
+  - Full Vitest passed 4,332 of 4,333; `token-references` timed out under load and passes 4 of 4 alone, a recorded trap.
+  - Pest `tests/Feature/Releases` passed 24 of 24, and host preflight passed every gate and Pint.
+  - The one I named most likely wrong held: the desktop sidebar was expanded (a 1200 box) in the scratch run and in the case.
+- **Wrong:** *"CI is 7/7"*. The static job is red on the advisory published 2026-10-28, which `#389` had already met. It is not this diff.
+- **Not named:** a Python one-liner opened `VERSION` for writing before reading it and emptied it. It was restored from git's bytes
+  before the commit.
 
 Taken 2026-10-29. Branch `m198-builder-panes-in-em`, cut from `origin/main` at `57ab7e06`, PR into main. ⛔ **NOT MERGED THIS SESSION:**
 held green for **merge point 10**, by the user's word in chat (2026-10-29). Merge point 9 carries `#390`, `#388`, `#389` and `#387`, and
@@ -75,7 +1140,18 @@ Prediction:
 - **Most likely wrong:** the E2E case's anti-vacuity at Large on desktop needs the sidebar expanded after `openBuilder` (the scratch run
   measured a 1200 box). A seeded collapsed-sidebar preference would make it a 1376 box — still wide, but not the arithmetic stated here.
 
-## HELD — `M197`, `symfony/mime` to v8.1.10, clearing CVE-2026-45070 and the composer audit every CI run now fails (m197-symfony-mime-cve)
+## RELEASED — `M197`, `symfony/mime` to v8.1.10, clearing CVE-2026-45070 and the composer audit every CI run now fails (merged as PR #390, `7147719c`, first at merge point 9, with no rebase; 7/7 green with real step counts on its run at `82851599` — Static analysis 33 · BHW Connect 19 (the unchanged branch) · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `7147719c` red at Static analysis' npm audit judge, on an advisory published after that run, with the other six green)
+
+**RELEASED FIRST AT MERGE POINT 9 (`D192`), 2026-10-31, by the `M201` session.**
+- **Merged at 11:26 UTC**, a minute after the user's census before (11:25:26 UTC).
+- ⛔ **The trunk's run 41196861583 went red at step 27 of 33**, the npm audit judge: `follow-redirects` 1.16.1, GHSA-mrwp-f3q8-3g9p
+  (high), published after `#390`'s own run passed that step. The other six jobs were green, and the composer audit passed.
+  - Deploy 41199015085 was skipped, so nothing went live. `M201` was claimed and built to clear it, and **`M197` went live with `#394`'s
+    deploy 41204286820** (in `M201`'s release).
+- **How the prediction fared, measured on the trunk:** "no second advisory" held for Composer and failed for npm. **Not named: a held
+  pull request's green run ages.** Two days held was enough for the other package manager's audit to turn the trunk red.
+
+**The claim as taken follows.**
 
 **BUILT — PR #390, CI 7/7 green with real step counts, NOT MERGED.** Run 40807295694 at `82851599`: Static analysis 33 · BHW Connect 19 ·
 E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11.
@@ -126,7 +1202,21 @@ Prediction:
 - CI is 7/7. Pest, E2E and Contract are unmoved by a patch release of a MIME library.
 - **Most likely wrong:** a second advisory published before the run.
 
-## HELD — `M196`, a builder edit must carry its `version` token, and the token is checked under the row lock (`R-036f3226`, `D189` A) (m196-builder-token-under-lock)
+## RELEASED — `M196`, a builder edit must carry its `version` token, and the token is checked under the row lock (`R-036f3226`, `D189` A) (merged as PR #389, `d1bd8181`, last at merge point 9, after merging the trunk into its branch at `25d5ed9c` and `a2cecb6f`; 7/7 green with real step counts on its run at `a2cecb6f` — Static analysis 33 · BHW Connect 19 (the unchanged branch) · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `d1bd8181` the same, with BHW Connect at 20)
+
+**RELEASED LAST AT MERGE POINT 9 (`D192`, `D193`), 2026-11-01, by the `M201` session.**
+- **The user's census:** before (2026-10-31 11:25:26 UTC) = after (2026-11-02 01:54:48 UTC), exactly: tenants 1 · users 6 · forms 11 ·
+  form versions 27 · submissions 22 · attachments 62 · feedback reports 31 · notifications 74; statuses confirmed, resolved.
+- **The branch merged the trunk twice:** at `25d5ed9c`, after `M197`, `M201` and `M195`, and at `a2cecb6f`, after `M194`. It merged
+  2026-11-01 at 07:14 UTC.
+- **Deploy 41286462993 took a maintenance window**, because PHP changed.
+  - Backup `deploy-20261101-075508.dump`, 1,158,723 bytes.
+  - 70 tables and 53,951 rows counted. Nothing to migrate, and every table held at least as many rows after.
+  - That is five rows fewer in total than `#394`'s deploy counted a day earlier. The deploy guards only across its own migration, and
+    the user's census of the eight data tables is unchanged.
+  - `/up` answered 200, and so did `/bhw-connect`: Meridian's window left BHW Connect's service and route alone.
+
+**The claim as taken follows.**
 
 **BUILT — PR #389, NOT MERGED.** It rides the merge point `#387` rides, **second, after `M197` and `#388`**, with `#387` last (`D192`).
 - **Run 40790795523 at `61dc1d2d`:** six green with real step counts — E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · BHW
@@ -217,7 +1307,21 @@ Prediction:
 - **Most likely wrong:** a feature test outside `tests/Feature/Forms` that PATCHes with no token, and a section test that relied on
   the missing lock.
 
-## HELD — `M195`, the gate baselines read each metric from its own job's lines, and every counted gate is recorded (`R-b31f421e`, `R-4130e1fa`) (m195-gate-baselines-per-job)
+## RELEASED — `M195`, the gate baselines read each metric from its own job's lines, and every counted gate is recorded (`R-b31f421e`, `R-4130e1fa`) (merged as PR #388, `bc7fa0b7`, third at merge point 9, after merging the trunk into its branch at `757fae38` and `bf126cf1`; 7/7 green with real step counts on its run at `bf126cf1` — Static analysis 33 · BHW Connect 19 (the unchanged branch) · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `bc7fa0b7` the same, with BHW Connect at 20)
+
+**RELEASED THIRD AT MERGE POINT 9 (`D193`'s fallback), 2026-10-31, by the `M201` session.**
+- **Third, not fourth:** jongsky25's label was not yet on `#387` when `#394` was live, so `D193`'s fallback sent this next.
+- **The branch merged the trunk twice**, at `757fae38` after `M197` and at `bf126cf1` after `M201`. Both times the backlog conflicted,
+  and both sides were kept, the trunk's first. The generated line was regenerated.
+- **Deploy 41207493356 took no window**, because the nine files it changed are all paths the site does not run.
+- **The baselines are regenerated at this close-out, by this increment's scraper**, from the trunk's run 41283987596 on `d1bd8181`. It is
+  the first regeneration since run 40449344963.
+  - Vitest reads 283 files, Meridian's; the whole-log scrape had read BHW's 85.
+  - Eight gates were never recorded before and now are, from `mail-attribute-lint` to `boundary-check-controls`.
+  - ➕ **Not named: a second figure the whole-log scrape had wrong.** The baseline said E2E skipped 1; the E2E job's own lines say 82,
+    in run 40449344963 and in this one alike.
+
+**The claim as taken follows.**
 
 **BUILT — PR #388, CI 7/7 green with real step counts, NOT MERGED.** Run 40721232507 at `6810b8bb`: Static analysis 33 · BHW Connect 19 ·
 E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11.
@@ -316,18 +1420,106 @@ Prediction:
 - CI is 7/7, and the BHW job skips itself and passes.
 - **Most likely wrong:** the fixtures' tab bytes surviving the tool layer, and Storybook's two-line pattern inside a single job's block.
 
-## HELD — `M194`, BHW Connect's production advisories cleared, and its audit blocking again (`bhw-dependency-advisories`) (m194-bhw-advisories)
+## RELEASED — `M194`, BHW Connect's production advisories cleared, and its audit blocking again (`bhw-dependency-advisories`, extended to `bhw-geo-drilldown-isr`) (merged as PR #387, `df66f1f8`, fourth at merge point 9, after merging the trunk into its branch at `3a023030`, `70da54a9` and `62134620`; 7/7 green with real step counts on its run at `62134620`, second attempt — Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run on `df66f1f8` the same)
+
+**RELEASED FOURTH AT MERGE POINT 9 (`D193`), 2026-10-31, by the `M201` session. BHW Connect public on staging since 2026-11-01.**
+- **jongsky25 applied `boundary-approved` at 13:46:54 UTC.**
+  - The BHW job at `62134620` had gone red at the boundary before the label. Its second attempt passed 20 of 20.
+  - That was the first run of BHW's audit, lint, types, Vitest and build on this branch.
+  - It also closes `M192`'s last owed observation in both halves: the boundary red on a real cross-side pull request without the label,
+    and green with it.
+- **The branch merged the trunk three times**, after `M197`, `M201` and `M195`, keeping both sides of the line and the backlog each time.
+  `D193` was recorded at the first.
+- **Deploy 41210444732 took no window**, because the 21 files it changed are all paths the site does not run. It did not serve BHW:
+  `deploy.yml` does not run `ops/deploy-bhw.ps1` yet (`bhw-p1-box`).
+- **P1's hand steps at the box, the user running one guarded block at a time (2026-10-31 to 2026-11-01):**
+  - **Folders and secrets:** `C:\meridian\bhw` with NETWORK SERVICE given Modify. Its `.env` was written by the operator: 11 names,
+    with `NEXT_PUBLIC_SITE_URL` set to the staging URL. No value is in git or chat.
+  - **The service:** NSSM `bhw-connect`, NetworkService, delayed auto start, logging to `logs\bhw-connect.log`, running `ops/start.ps1`
+    on 127.0.0.1:3100.
+  - ⛔ **`ops/deploy-bhw.ps1 -AppPath C:\meridian\test-app` built release `df66f1f8`, then failed.**
+    - `New-Release` returns npm's output along with the path, so `current` pointed at nothing.
+    - The service paused: `server.js is missing`.
+    - Recovered by removing the junction and running again, because an assembled release returns cleanly. Live at 11:12:31 box time
+      (03:12 UTC), with `deployed-sha` written.
+    - Filed as `bhw-deploy-release-leak` (ready, during-testing). The migration step's native calls print the same way, but nothing
+      captures that function's output, so only `New-Release` is affected.
+  - **Apache:**
+    - `proxy_http_module` loaded in `httpd.conf`.
+    - `meridian.conf`'s virtual host gained `ProxyPass` and `ProxyPassReverse` from `/bhw-connect` to `127.0.0.1:3100`, after the HSTS
+      line. `ProxyPreserveHost On` and `X-Forwarded-Proto https` sit in `<Location "/bhw-connect">`.
+    - Both files were backed up first, and `httpd -t` said Syntax OK before the restart.
+    - `/up`, `/login` and `/bhw-connect` answered 200.
+- **Checked from outside on 2026-11-01, with a headless browser against the public URL:**
+  - **Twelve pages answered 200**, with no CSP refusal, page error or failed request: six top pages, two sub-pages and four
+    drill-downs.
+  - **The `/explore` map** drew its MapLibre canvas, and its hover tooltip answered.
+  - **All eleven exports answered 200** with the right magic bytes (CSV, XLSX, PPTX, PNG).
+  - **Headers:** `_next/static` 200, `X-Robots-Tag: noindex`, and Next's own CSP.
+  - **No writes:** the probe blocked `/api/log`, so nothing was written to jongsky25's Supabase.
+  - **The drill-downs took 19 to 32 s on first view and under 1 s warm.** `bhw-drilldown-cold-render` is now ready.
+- **How the prediction fared.**
+  - **The claim called the maps and the exports with real data most likely to be wrong, and half of that was:** every map was blank on
+    `8c28020b` (fixed in `ee4978a9`), and the exports were not wrong.
+  - **Not named:** the drill-downs' 500, filed and folded in; and the deploy script's return value, which only the box found.
+
+**The claim as taken follows.**
 
 **BUILT — PR #387, not merged.** It is held for the merge point the user names, **last in it, after `M195`** (`D188`).
 - **Run 40705714395 at `8c28020b`:** Meridian's six are green with real step counts — Static analysis 33 · E2E 20 · Contract 16 ·
   Frontend 12 · Pest 11 · axe 11.
 - **`BHW Connect` is red at step 5 of 19** — *Boundary — a change to the other owner's paths needs their label (`D177`)* — and every
   later step was skipped. That is the prediction exactly: the pull request is ours and touches jongsky25's tree and `.github/`.
-- **It waits on two things from jongsky25:**
-  - **His `boundary-approved` label**, once he accepts the repository invitation, which was still pending at 2026-10-28 15:14 UTC. Then
-    the BHW job is re-run, and its audit, lint, types, Vitest and build run on this branch for the first time.
-  - **His Supabase keys**, expected 2026-10-29. They go to the user privately and live in `apps/bhw-connect/.env.local`, never in git or
-    chat. Then the map and export screens are checked in a browser — the half of the prediction most likely to be wrong.
+- **It waits on one thing from jongsky25: his `boundary-approved` label**, once he accepts the repository invitation (still pending at
+  2026-10-30 14:43 UTC, though the user believed it accepted). Then the BHW job is re-run, and its audit, lint, types, Vitest and build
+  run on this branch for the first time.
+- **Since 2026-10-30, Static analysis is red at Composer audit (step 23 of 32) on `symfony/mime` CVE-2026-45070** — the same red every
+  open pull request carries until `#390` (`M197`) merges first at merge point 9; it arrived with `origin/main` merged in (`216f2e74`) to
+  clear a conflict in `docs/pipeline.md`, the only conflict.
+- ➕ **EXTENDED 2026-10-30 to `bhw-geo-drilldown-isr`** (the user: putting BHW online is now the main priority): same tier, same tree,
+  same label and merge, and `bhw-p1-box` needed both. See *Extension* below.
+- ✅ **His Supabase keys arrived 2026-10-30** (the user, in `apps/bhw-connect/.env.local`; the five AI, cron and salt values left blank,
+  which nothing checked here reads). The pasted URL ended in `/rest/v1/`, so every query 404'd and every page read "—" with nothing
+  logged; trimmed to the project URL, `dim_geo` answers 43,783 rows and `agg_geo_summary` 41,052.
+
+### Browser check (2026-10-30) — the half most likely to be wrong, and it was
+Standalone builds under `/bhw-connect`, assembled as `ops/deploy-bhw.ps1` assembles a release and served by `node server.js`, the
+branch beside the trunk (MapLibre 5, Next 16.2.10) on the same keys. Built as CI builds (`BHW_DATA_SOURCE=none`) and served with the
+data: a build with the data source pre-renders hundreds of drill-downs against Supabase, and two at once hit Next's 60-second page
+limit. Usage logging was blocked in the browser, so nothing was written to jongsky25's database.
+- ❌ **Every MapLibre map was blank on `8c28020b`.** MapLibre 6 derives its worker URL from `import.meta.url`, which is not an http
+  URL once Next bundles it, so it starts the worker from `""` ("Worker failed to load", four per Explore load); MapLibre 5 inlined it
+  as a `blob:`. **Fixed in `ee4978a9`:** `predev`/`prebuild` copy the package's self-contained worker into `public/` (git- and
+  ESLint-ignored), and `components/maps/load-maplibre.ts` calls `setWorkerUrl` under the base path with `?v=`. The Explore map then
+  draws the same shaded regions as the trunk's, compared by eye (the PNG bytes differ), with no worker error.
+- ✅ **Exports:** all eleven kinds the pages link (CSV, XLSX, PNG and PPTX figures; districts CSV and XLSX; facilities, profiling-status
+  and UUC-PHC PNGs; UUC-PHC data CSV and XLSX) answer 200 with valid files, byte-identical to the trunk's.
+- **Host gates on `ee4978a9`:** Vitest 86 files, 1,251 passed; type-check 0; lint 0 errors, 1 warning (the fixture); production audit
+  0 critical, 0 high, 3 moderate. A regex guard for a re-split worker was shown to catch all four import forms.
+- **Found, not M194's — filed as `bhw-geo-drilldown-isr` on this branch (`67ac30aa`), with `bhw-p1-box` now blocked on it:** the
+  place, facilities, profiling-status and UUC-PHC drill-downs answer 500 (`DYNAMIC_SERVER_USAGE`) on the trunk and the branch alike.
+  They stay ISR while the root layout reads the CSP nonce through `headers()` since `M192`, whose route-table measurement ("every
+  `○`/`●` route became `ƒ`") was taken where `generateStaticParams` returned nothing.
+- **Not named in the prediction:** the box's `npm run build` will pre-render against the data source unless that row changes it — the
+  load `bhw-p1-box` must measure. *(It does change it — see below.)*
+
+### Extension — `bhw-geo-drilldown-isr` (2026-10-30), built in `e923ccf2`, markers and line in `76164ae8`
+- **Evidence verified:** seven routes carry `generateStaticParams` with `revalidate` — place, facilities, profiling-status and
+  uuc-phc by `[geoLevel]/[geoCode]`, and uuc-phc's bhw-coverage, criteria and indicators beneath it. The ten `revalidate`-only pages
+  (districts, uuc-phc and the rest) render per request already and answered 200.
+- **Premise verified:** the 500 is the trunk's, from `M192`'s nonce read in `app/layout.tsx`, not this branch's; jongsky25's own
+  deployment never read a nonce, so it never showed. The routes' `generateStaticParams` helpers are his and are left in place.
+- **Remedy verdict — works:** `export const dynamic = "force-dynamic"` on each of the seven. Built without a data source the table
+  still prints `●`, but all seven answer 200 with no `DYNAMIC_SERVER_USAGE`. Built WITH the data source, the table prints `ƒ` for
+  all seven, and the build takes **13 s**: it collects the 1,004 page params but renders none of them. Served from that build,
+  every drill-down kind, Explore and Districts answer 200, and the map worker loads.
+- **Host gates on `e923ccf2`:** Vitest 86 files, 1,251 passed; type-check 0; lint 1 warning (the fixture). The two pages Prettier
+  flags were unformatted before the change; CI runs no Prettier step for BHW.
+- **Wrong in the row as filed:** it expected to measure a data-source build that pre-renders hundreds of pages; with the fix there is
+  none to measure.
+- **Found and filed — `bhw-drilldown-cold-render`** (blocked on `bhw-p1-box`): the first view of a region or province page takes
+  20–40 s against Supabase, and a repeat 0.3–1.4 s, because the data layer caches. The remedy is to request them once at the end of
+  `ops/deploy-bhw.ps1`, and measure again after `bhw-p2-db`.
 
 **The claim as taken follows.**
 

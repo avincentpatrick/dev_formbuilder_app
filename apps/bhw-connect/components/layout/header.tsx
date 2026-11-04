@@ -6,6 +6,11 @@ import { useState } from "react";
 import { aboutNavLinks, primaryNavLinks } from "./nav-links";
 import { SiteBreadcrumbBar } from "./site-breadcrumbs";
 import { SettingsMenu } from "@/components/settings/settings-menu";
+import { meridianUrl } from "@/lib/meridian-url";
+
+// Meridian's home, on the address this app shares with it on the testing box (Meridian's decision D179:
+// its account menu and footer link here, and this header links back). Null off the box, where no Meridian runs.
+const MERIDIAN_HOME = meridianUrl("/");
 
 function NavLink({ href, label }: { href: string; label: string }) {
   const pathname = usePathname();
@@ -84,6 +89,14 @@ export function Header() {
           >
             ← Portal
           </Link>
+          {MERIDIAN_HOME && (
+            <a
+              href={MERIDIAN_HOME}
+              className="rounded-md px-3 py-2 text-sm font-medium text-muted hover:bg-surface hover:text-foreground"
+            >
+              Meridian
+            </a>
+          )}
           <SettingsMenu />
         </nav>
 
@@ -138,6 +151,16 @@ export function Header() {
                 ← Portal
               </Link>
             </li>
+            {MERIDIAN_HOME && (
+              <li>
+                <a
+                  href={MERIDIAN_HOME}
+                  className="block rounded-md px-3 py-2.5 text-sm font-medium text-muted hover:bg-surface hover:text-foreground"
+                >
+                  Meridian
+                </a>
+              </li>
+            )}
           </ul>
         </nav>
       )}

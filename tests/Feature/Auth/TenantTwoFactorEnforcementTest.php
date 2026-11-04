@@ -190,7 +190,8 @@ it('gates the API token mint on enrolment, structurally', function (): void {
 
             return str_starts_with($name, 'api.v1.')
                 && ! str_starts_with($name, 'api.v1.public.')
-                && ! str_starts_with($name, 'api.v1.tokens.');
+                && ! str_starts_with($name, 'api.v1.tokens.')
+                && ! str_starts_with($name, 'api.v1.session.');
         });
 
     expect($groupB->flatMap(fn ($route): array => $route->gatherMiddleware())->unique())
@@ -220,6 +221,7 @@ it('still mints for an enrolled member under the same enforcement', function ():
         ->postJson('http://acme.meridian.test/api/v1/auth/tokens', [
             'name' => 'ci',
             'abilities' => [ApiAbilities::READ_FORMS],
+            'password' => 'password', // every mint carries it since M207 (D205)
         ])
         ->assertCreated();
 });

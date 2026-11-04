@@ -23,6 +23,9 @@ import { withBasePath } from "@/lib/base-path";
 // a shorter window bounds how long a transient empty read (getProfilingStatus returns null on any
 // read miss) can stay cached as a "no data yet" state; the dataset only changes on the daily cron.
 export const revalidate = 3_600;
+// Per request, not ISR: the root layout reads the per-request CSP nonce (lib/csp.ts), and an ISR
+// render of this page reads it outside a request and answers 500 (DYNAMIC_SERVER_USAGE).
+export const dynamic = "force-dynamic";
 
 const CHILD_HEADING: Record<GeoLevel, string | null> = {
   national: "Regions",

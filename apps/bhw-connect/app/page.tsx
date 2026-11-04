@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DatasetCard } from "@/components/portal/dataset-card";
+import { meridianUrl } from "@/lib/meridian-url";
+
+// The link back to Meridian, which shares this address on the testing box (Meridian's decision D179).
+const MERIDIAN_HOME = meridianUrl("/");
 
 // Absolute title so the root layout's "%s · BHW Connect" template — which is
 // correct for the BHW dataset pages — doesn't get appended to the portal, which
@@ -76,9 +80,16 @@ export default function Portal() {
           <span className="equity-mark sm" aria-hidden="true" />
           <span>An Equity in Health Section innovation.</span>
         </div>
-        <Link href="/admin/login" className="underline underline-offset-2 hover:text-accent">
-          Admin sign in
-        </Link>
+        <div className="flex flex-wrap items-center gap-4">
+          {MERIDIAN_HOME && (
+            <a href={MERIDIAN_HOME} className="underline underline-offset-2 hover:text-accent">
+              Meridian
+            </a>
+          )}
+          <Link href="/admin/login" className="underline underline-offset-2 hover:text-accent">
+            Admin sign in
+          </Link>
+        </div>
       </footer>
     </div>
   );

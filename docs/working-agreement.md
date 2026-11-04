@@ -5,6 +5,19 @@ Meridian jargon. Why it is set up this way is `docs/adr/0024-second-application-
 decisions behind it are `D172`–`D185` in `docs/claims/decisions.md`. Changing this page needs both of you
 (it is shared in `.github/CODEOWNERS`).
 
+## Until the handover (D198, 2026-11-02)
+
+jongsky25 has not started yet. BHW Connect is being moved onto the testing server first: its code, its
+database and its admin sign-in. It is handed over once it runs there on its own. Until then:
+
+- **Every file in this repository is avincentpatrick's**, `apps/bhw-connect/` included, and no pull
+  request needs your label. `.github/CODEOWNERS` says so; your lines are kept in it, set aside.
+- **At the handover:**
+  - your lines come back exactly as they were, and the sections below apply as written;
+  - section 6 is rewritten so that you change BHW's settings yourself, through GitHub (D199);
+  - a handover page says what is yours and where everything lives;
+  - avincentpatrick tells you when to start.
+
 ## 1. Who owns what
 
 - **Everything under `apps/bhw-connect/` is BHW Connect's — jongsky25's.**
@@ -63,9 +76,30 @@ anywhere yet.
 
 ## 6. Secrets
 
-Never in git, never in chat. BHW's live settings are in a file on the server that only avincentpatrick
-writes. A new secret is: a line in `apps/bhw-connect/.env.example`, a note in the pull request, and
-avincentpatrick adds it on the server before the merge.
+Never in git, never in chat. BHW's live settings are in a file on the server, `C:\meridian\bhw\.env`.
+Two kinds of setting live there.
+
+**BHW's own settings: jongsky25's, set in GitHub (`D199`).** These are the AI providers' keys
+(`GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `MISTRAL_API_KEY`), `CRON_SECRET` and
+`USAGE_EVENTS_IP_SALT`.
+- **Where they live:** each is a repository secret named `BHW_<NAME>`, set under the repository's Settings →
+  Secrets and variables → Actions.
+- **When they reach the server:** every deploy writes them into the file before BHW's deploy runs. For a
+  changed key with no code change, run the **BHW Connect settings** workflow from the Actions tab
+  (`gh workflow run bhw-settings.yml`). It writes them and restarts BHW, and it deploys nothing.
+- **An unset secret keeps the server's value**, so a key can't be blanked by accident. The log shows which
+  names changed, never a value.
+
+**The server's own settings: avincentpatrick's, set on the box.** These are the database address, PostgREST's
+keys, and every `NEXT_PUBLIC_` value, which the build compiles in.
+
+**A new BHW setting** is a line in `apps/bhw-connect/.env.example` and a note in the pull request.
+- To make it one of the GitHub-managed ones, add it to `ops/write-settings.ps1`'s list and to both workflows.
+  `tests/Feature/Deploy/DeployWorkflowTest.php` holds the three equal.
+- Otherwise avincentpatrick adds it on the server before the merge.
+
+**Trust.** Anyone who can set repository secrets can set Meridian's too, and a workflow change can read any
+secret. That is why `.github/` is shared and needs both owners after the handover (§1).
 
 ## 7. Each application keeps its own things
 

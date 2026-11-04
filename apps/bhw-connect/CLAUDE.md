@@ -47,13 +47,30 @@ miss; a root-relative string kept in a variable first is beyond it, so wrap wher
   owner must approve the pull request (the boundary step asks for it).
 - Never commit data. `ingestion/data/` is out of git (see its README); a load file reaches the box
   privately and Meridian's owner loads it.
-- A local database in the box's shape: `docker compose up -d` (see `docker-compose.yml`).
+- A local database in the box's shape: `docker compose up -d`, then
+  `BHW_DEV_DATABASE_URL=postgres://postgres:bhw-local@127.0.0.1:5442/bhw_connect node db/load-dev.mjs`
+  (see `docker-compose.yml`).
+  - It builds from the committed **development copy**: `db/baseline/` is the live schema, then every
+    migration newer than it runs, then `supabase/seed.sql`.
+  - The seed is **made up**: real geography, and every count and every person generated. Real data
+    never enters this public repository.
+  - CI builds the same database for every pull request, runs your new migration on it, and renders five
+    pages against it. A migration that breaks a page fails there, before staging.
+  - After a schema change, refresh the copy: run the **BHW Connect dev copy** workflow
+    (`gh workflow run bhw-dev-snapshot.yml`), download its artifact, and commit the three files in a pull
+    request.
 
 ## Small things that bite
 
 - Change `package-lock.json` with npm 10 (`npx npm@10 install …`): npm 11 rewrites entries the
   change did not touch.
-- Secrets never go in git or in chat. A new one is a line in `.env.example` and a note in the pull
-  request; Meridian's owner adds it on the box before the merge.
+- Secrets never go in git or in chat.
+  - Your own settings are repository secrets named `BHW_<NAME>`, written onto the box by every deploy:
+    the AI keys, `CRON_SECRET` and `USAGE_EVENTS_IP_SALT`.
+  - To change one: set the secret, then run the **BHW Connect settings** workflow (`gh workflow run
+    bhw-settings.yml`), which writes it and restarts the app. An unset secret keeps the box's value.
+  - A new setting is a line in `.env.example` and a note in the pull request. For it to come from GitHub
+    too, add it to `ops/write-settings.ps1`'s list and to both workflows, as `docs/working-agreement.md` §6
+    says. Otherwise Meridian's owner adds it on the box.
 - Every page carries a strict Content-Security-Policy (`lib/csp.ts`): an inline `<script>` runs only
   with the request's nonce, and an external script or font origin must be added to the policy.

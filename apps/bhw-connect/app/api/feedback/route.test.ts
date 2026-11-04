@@ -16,16 +16,12 @@ const { insertMock, insertResult, createSupabaseServerClient } = vi.hoisted(() =
 });
 vi.mock("@/lib/db/supabase", () => ({ createSupabaseServerClient }));
 
-const { uploadMock, createSupabaseServiceClient } = vi.hoisted(() => {
-  const uploadMock = vi.fn(async (): Promise<{ error: { message: string } | null }> => ({
-    error: null,
-  }));
-  const createSupabaseServiceClient = vi.fn(() => ({
-    storage: { from: () => ({ upload: uploadMock }) },
-  }));
-  return { uploadMock, createSupabaseServiceClient };
-});
-vi.mock("@/lib/db/service-client", () => ({ createSupabaseServiceClient }));
+// Screenshots go to this server's disk since Meridian's bhw-p3-identity; the store itself is tested in
+// lib/storage/screenshots.test.ts.
+const { saveMock } = vi.hoisted(() => ({
+  saveMock: vi.fn<(path: string, bytes: Uint8Array) => Promise<boolean>>(async () => true),
+}));
+vi.mock("@/lib/storage/screenshots", () => ({ saveScreenshot: saveMock }));
 
 const { POST } = await import("./route");
 
@@ -52,15 +48,15 @@ const baseSpotBody = {
 
 beforeEach(() => {
   insertMock.mockClear();
-  uploadMock.mockClear();
+  saveMock.mockClear();
   insertResult.current = { error: null };
 });
 
 describe("POST /api/feedback", () => {
-  it("accepts a full spot payload, uploads the screenshot, and inserts the context columns", async () => {
+  it("accepts a full spot payload, stores the screenshot, and inserts the context columns", async () => {
     const res = await POST(post(baseSpotBody));
     expect(res.status).toBe(200);
-    expect(uploadMock).toHaveBeenCalledTimes(1);
+    expect(saveMock).toHaveBeenCalledTimes(1);
 
     expect(insertMock).toHaveBeenCalledTimes(1);
     const row = insertMock.mock.calls[0][0] as Record<string, unknown>;
@@ -68,6 +64,9 @@ describe("POST /api/feedback", () => {
     expect(row.target_selector).toBe("#stat-total");
     expect(row.context).toMatchObject({ elementText: "1,234" });
     expect(typeof row.screenshot_path).toBe("string");
+    // The row names exactly the file the store was handed, in the bucket's old layout.
+    expect(row.screenshot_path).toBe(saveMock.mock.calls[0][0]);
+    expect(row.screenshot_path).toMatch(new RegExp(`^${SESSION_ID}/[0-9a-f-]{36}\\.jpg$`));
   });
 
   it("inserts null spot columns for a plain (non-spot) submission", async () => {
@@ -75,7 +74,7 @@ describe("POST /api/feedback", () => {
       post({ sessionId: SESSION_ID, pagePath: "/feedback", category: "suggestion", message: "hi" }),
     );
     expect(res.status).toBe(200);
-    expect(uploadMock).not.toHaveBeenCalled();
+    expect(saveMock).not.toHaveBeenCalled();
     const row = insertMock.mock.calls[0][0] as Record<string, unknown>;
     expect(row.page_url).toBeNull();
     expect(row.target_selector).toBeNull();
@@ -87,7 +86,7 @@ describe("POST /api/feedback", () => {
     const res = await POST(post({ ...baseSpotBody, website: "http://spam.example" }));
     expect(res.status).toBe(200);
     expect(insertMock).not.toHaveBeenCalled();
-    expect(uploadMock).not.toHaveBeenCalled();
+    expect(saveMock).not.toHaveBeenCalled();
   });
 
   it("rejects an empty message with 400", async () => {
@@ -103,8 +102,8 @@ describe("POST /api/feedback", () => {
     expect(insertMock).not.toHaveBeenCalled();
   });
 
-  it("still inserts (with null screenshot_path) when the upload fails", async () => {
-    uploadMock.mockResolvedValueOnce({ error: { message: "boom" } });
+  it("still inserts (with null screenshot_path) when the screenshot cannot be stored", async () => {
+    saveMock.mockResolvedValueOnce(false);
     const res = await POST(post(baseSpotBody));
     expect(res.status).toBe(200);
     const row = insertMock.mock.calls[0][0] as Record<string, unknown>;

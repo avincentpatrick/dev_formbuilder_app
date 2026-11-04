@@ -179,7 +179,7 @@ it('saves the source through the builder, and refuses a shape it does not know',
     $patch = fn (mixed $source) => $this->actingAs($this->owner)
         ->patchJson("http://acme.meridian.test/forms/{$this->form->id}/fields/{$add->json('id')}", [
             'key' => $add->json('key'), 'label' => 'Facility', 'is_required' => 'optional',
-            'config' => ['suggestions_source' => $source], 'validations' => [], 'version' => null,
+            'config' => ['suggestions_source' => $source], 'validations' => [], 'version' => currentFieldToken($this->form, $this->owner, $add->json('id')),
         ]);
 
     $patch(['kind' => 'list', 'name' => ''])->assertOk();

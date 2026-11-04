@@ -24,6 +24,9 @@
 # production
 /build
 
+# MapLibre's worker, copied from node_modules by predev/prebuild (scripts/copy-maplibre-worker.mjs)
+/public/maplibre-gl-worker.mjs
+
 # misc
 .DS_Store
 *.pem

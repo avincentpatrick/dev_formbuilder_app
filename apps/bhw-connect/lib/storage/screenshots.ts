@@ -11,6 +11,10 @@ import { dirname, join, resolve, sep } from "node:path";
  * git-ignored for exactly this. A path is accepted only in the one shape the feedback route writes —
  * `<session uuid>/<uuid>.png|jpg` — and must still resolve inside the folder, so nothing a request
  * names can reach any other file.
+ *
+ * Every file-system call names its path at run time, so each carries `turbopackIgnore`: without it the
+ * build traced the whole project into the release (Meridian's `bhw-screenshot-trace`: 3,404 files and
+ * 60 MB of standalone output, source and docs included, on the build of `d7ca70a0`).
  */
 
 export const SCREENSHOT_FOLDER = "feedback-screenshots";
@@ -23,13 +27,13 @@ export function isScreenshotPath(path: string): boolean {
 }
 
 export function storageRoot(dir: string | undefined = process.env.BHW_STORAGE_DIR): string {
-  return resolve(dir?.trim() || ".local-storage");
+  return resolve(/*turbopackIgnore: true*/ dir?.trim() || ".local-storage");
 }
 
 function locate(path: string, root?: string): string | null {
   if (!isScreenshotPath(path)) return null;
-  const folder = join(storageRoot(root), SCREENSHOT_FOLDER);
-  const full = resolve(folder, path);
+  const folder = join(/*turbopackIgnore: true*/ storageRoot(root), SCREENSHOT_FOLDER);
+  const full = resolve(/*turbopackIgnore: true*/ folder, path);
   return full.startsWith(folder + sep) ? full : null;
 }
 
@@ -37,8 +41,8 @@ function locate(path: string, root?: string): string | null {
 export async function saveScreenshot(path: string, bytes: Uint8Array, root?: string): Promise<boolean> {
   const full = locate(path, root);
   if (!full) return false;
-  await mkdir(dirname(full), { recursive: true });
-  await writeFile(full, bytes, { flag: "wx" });
+  await mkdir(/*turbopackIgnore: true*/ dirname(full), { recursive: true });
+  await writeFile(/*turbopackIgnore: true*/ full, bytes, { flag: "wx" });
   return true;
 }
 
@@ -50,7 +54,7 @@ export async function readScreenshot(
   const full = locate(path, root);
   if (!full) return null;
   try {
-    const bytes = await readFile(full);
+    const bytes = await readFile(/*turbopackIgnore: true*/ full);
     return { bytes, contentType: path.endsWith(".png") ? "image/png" : "image/jpeg" };
   } catch {
     return null;

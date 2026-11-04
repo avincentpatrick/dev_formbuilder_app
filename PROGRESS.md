@@ -214,6 +214,9 @@ lives in [PROGRESS_ARCHIVE.md](PROGRESS_ARCHIVE.md) and in git — do **not** re
 
 ## Current Status
 
+- **🅰️ `M208` IS MERGED AT ITS OWN MERGE POINT (PR #401, `b18bd1c2`; CI 7/7 GREEN WITH REAL STEP COUNTS — Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; deploy site-safe) — BHW'S OPS SCRIPTS FIND `pg_dump` THEMSELVES, AND THE DEPLOY NEVER PRINTS THE DATABASE PASSWORD (`bhw-deploy-db-tools`).**
+  - `ops/pg-tools.ps1` resolves `pg_dump` in Meridian's order, masks URL passwords in the deploy's echo, and keeps 10 pre-deploy dumps. At the box, NETWORK SERVICE got Modify on `C:\meridian\backups\bhw`, and a nightly dump with no PostgreSQL on PATH wrote 26,221,428 bytes.
+  - `bhw-p1-box`'s remainder is unblocked. No user-visible change.
 - **🅰️ `M207` IS MERGED AT ITS OWN MERGE POINT (`D203`; PR #400, `d7ca70a0`; CI 7/7 GREEN WITH REAL STEP COUNTS — Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11) AND BHW CONNECT NOW RUNS WHOLLY ON THE BOX (`bhw-p3-identity`): ITS ADMINS SIGN IN WITH MERIDIAN, ITS SCREENSHOTS ARE ON THE BOX'S DISK, ITS POSTGREST CHECKS A SECRET OF ITS OWN, AND NOTHING OF IT REACHES SUPABASE.**
   - Meridian 0.17.0: `GET /api/v1/auth/whoami` (session only, active members only), a password on every API-key mint (`D205`), BHW Connect in the account menu and the footer (`D179`). The census before = after (`1·6·11·27·22·62·31·74`).
   - At the box: the 34 screenshots copied (1,963,090 B); the user's Meridian account is BHW's admin (`D204`); new secret and keys, PostgREST refusing Supabase's old key, BHW's data down about 90 s for the build. The user confirmed the admin pages and screenshots in a browser.

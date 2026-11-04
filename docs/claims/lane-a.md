@@ -16,7 +16,24 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M208`, BHW's ops scripts find `pg_dump` themselves, and the deploy never prints the database password (`bhw-deploy-db-tools`) (m208-bhw-deploy-db-tools)
+## Status: NO ACTIVE CLAIM — `M208` released on 2026-11-04: BHW's ops scripts find `pg_dump` themselves, and the deploy never prints the database password. The runner (NETWORK SERVICE) may now write BHW's pre-migration dumps. Close-out branch `m208-closeout`. The next claim is `bhw-p1-box`'s remainder, step 3 of the user's seven, which this release unblocks.
+
+## RELEASED — `M208`, BHW's ops scripts find `pg_dump` themselves, and the deploy never prints the database password (`bhw-deploy-db-tools`) (merged as PR #401, `b18bd1c2`, at its own merge point under the user's instruction of 2026-11-03; 7/7 green with real step counts on its run 41764966886 — Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run 41768894912 on `b18bd1c2` the same; deploy 41772140940 site-safe, no window)
+
+**Live.**
+- **D1 at the box, 2026-11-04 05:03:21 UTC.**
+  - NETWORK SERVICE has Modify on `C:\meridian\backups\bhw`; the ACL reads SYSTEM FullControl, NETWORK SERVICE Modify, Administrators FullControl.
+  - With PostgreSQL taken off the window's PATH, `nightly-dump.ps1` resolved `C:\Program Files\PostgreSQL\15\bin\pg_dump.exe` itself and wrote `bhw_connect-20261104-130312.dump` (26,221,428 bytes).
+
+**How the prediction fared.**
+- **Right:**
+  - The diff was one dot-sourced helper, the masked echo and the keep-10 prune.
+  - CI was 7/7, and BHW's job ran its full 20 steps with no label asked.
+  - The box block wrote a dump with no PostgreSQL on PATH and listed NETWORK SERVICE.
+- **Still unmeasured, as predicted:** whether the runner itself can run `pg_dump` against `bhw_connect`. It waits for `bhw-p1-box` to wire the runner.
+- **Not predicted:** the masked-echo defect was found beside the row's citation, not in it. No hand deploy had yet printed the password, because no BHW migration had been pending.
+
+The claim as taken follows.
 
 Taken 2026-11-04. Branch `m208-bhw-deploy-db-tools`, cut from origin/main at `60a2e557`, PR into main. Under the user's instruction of 2026-11-03 it merges at its own merge point once every required check is green, because its paths are site-safe: `apps/bhw-connect/ops/` and `docs/`. This is step 2 of the user's seven; `bhw-p1-box`'s remainder (step 3) is blocked on it alone.
 

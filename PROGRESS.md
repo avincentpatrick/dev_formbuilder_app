@@ -214,6 +214,9 @@ lives in [PROGRESS_ARCHIVE.md](PROGRESS_ARCHIVE.md) and in git — do **not** re
 
 ## Current Status
 
+- **🅰️ `M209` IS MERGED AT ITS OWN MERGE POINTS (PR #402 `0c223812` THE WIRING, PR #403 `dff21734` THE BHW-ONLY PUSH; CI 7/7 GREEN WITH REAL STEP COUNTS ON BOTH) — BHW CONNECT DEPLOYS ITSELF ON EVERY MERGE, ITS SCHEDULED JOBS RUN ON THE BOX, AND A BHW-ONLY PUSH AND A ROLLBACK PROVED IT (`bhw-p1-box`, `bhw-screenshot-trace`).**
+  - At the box: the runner may stop and start `bhw-connect` (the worker's own service entry); `CRON_SECRET` was made; three tasks are registered, and the replay answered 200. The runner's first BHW build took 51 s, and the BHW-only push 50 s with no Meridian window. The rollback took 2.5 s each way.
+  - The load check: twelve cold BHW views at once, Meridian's `/up` at 35 ms median, CPU peak 2.5%. BHW's releases shrink from 60 MB to 50 MB. No user-visible change.
 - **🅰️ `M208` IS MERGED AT ITS OWN MERGE POINT (PR #401, `b18bd1c2`; CI 7/7 GREEN WITH REAL STEP COUNTS — Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; deploy site-safe) — BHW'S OPS SCRIPTS FIND `pg_dump` THEMSELVES, AND THE DEPLOY NEVER PRINTS THE DATABASE PASSWORD (`bhw-deploy-db-tools`).**
   - `ops/pg-tools.ps1` resolves `pg_dump` in Meridian's order, masks URL passwords in the deploy's echo, and keeps 10 pre-deploy dumps. At the box, NETWORK SERVICE got Modify on `C:\meridian\backups\bhw`, and a nightly dump with no PostgreSQL on PATH wrote 26,221,428 bytes.
   - `bhw-p1-box`'s remainder is unblocked. No user-visible change.

@@ -16,7 +16,54 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M209`, BHW Connect deploys itself on every merge, its scheduled jobs run on the box, and a BHW-only push and a rollback prove it (`bhw-p1-box`'s remainder, with `bhw-screenshot-trace` as the BHW-only push) (m209-bhw-p1-box, m209-bhw-screenshot-trace)
+## Status: NO ACTIVE CLAIM — `M209` released on 2026-11-04: BHW Connect deploys itself on every merge (`deploy.yml`'s second step), its scheduled jobs run on the box, and a BHW-only push and a rollback proved it. Close-out branch `m209-closeout`. The next claim is `bhw-settings-from-github`, step 4 of the user's seven, which this release unblocks.
+
+## RELEASED — `M209`, BHW Connect deploys itself on every merge, its scheduled jobs run on the box, and a BHW-only push and a rollback prove it (`bhw-p1-box`'s remainder, `bhw-screenshot-trace`)
+
+Merged as PR #402 (`0c223812`, the wiring) then PR #403 (`dff21734`, the BHW-only push), each at its own merge point under the user's instruction of 2026-11-03. 7/7 green with real step counts:
+- #402: Static analysis 33 · BHW Connect 19 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11.
+- #403: the same, with BHW Connect at 20.
+- The trunk's runs 41782331998 and 41785752321 were 7/7.
+
+**Live.** Every figure below was read from its own output.
+- **E0 (read only, 05:09:30 UTC).**
+  - The runner is NETWORK SERVICE, and Meridian's worker carries `(A;;CCLCSWRPWPDTLOCRRC;;;NS)`; `bhw-connect` had none.
+  - BHW's `.env` named `CRON_SECRET` and the four optional keys.
+  - No cron task was registered.
+  - The box: 63.5 GB of memory with 57.9 GB free, 32 CPUs at 1%.
+- **E1 (05:13:37 UTC).**
+  - The grant was added and read back; the old descriptor is in `C:\meridian\bhw\bhw-connect.sddl.pre-m209.txt`.
+  - `CRON_SECRET` was empty, so it was made on the box and BHW restarted; the backup is `.env.pre-m209-20261104-131329.bak`.
+  - `GEMINI_API_KEY` is set. Groq, OpenRouter, Mistral and `USAGE_EVENTS_IP_SALT` are empty.
+  - Three tasks are registered as SYSTEM: precompute at 20:00 UTC, the regression replay at 22:00 UTC, the backup at 01:45 local. The replay, run by hand, answered 200.
+- **#402's own deploy (41785500136): the runner's first BHW run.**
+  - Meridian fast-forwarded with no window.
+  - `deploy-bhw.ps1`, as NETWORK SERVICE, found 4 served paths changed since `d7ca70a0`, built `0c223812` in 51 s, found no migration pending, and swapped, which proves the grant.
+  - It was live at 14:27:15 box time.
+- **#403's deploy (41789678833): the BHW-only push.**
+  - Meridian: "Only paths the site does not run changed … no maintenance window".
+  - BHW: one served path changed; built in 50 s with no tracing warning; live at 15:05:07.
+  - The trace fix measured on CI's build: 3,404 files and 60.0 MB of standalone output before, 2,770 files and 50.2 MB after, with source and `docs/` no longer in it.
+- **E2 (07:19:19 UTC).**
+  - `-Rollback` went back to `0c223812` in 2.5 s and forward to `dff21734` in 2.4 s, health 200 both times.
+  - Twelve cold drill-down views at once all answered 200, in 0.4 to 30.4 s.
+  - Meridian's `/up` over the same seconds: 35 ms median, 66 ms worst.
+  - CPU peaked at 2.5%, and BHW's node was at 134 MB.
+  - **The slow first views wait; they do not compute.** That was recorded on `bhw-drilldown-cold-render`.
+
+**How the prediction fared.**
+- **Right:**
+  - E1 read back the grant, registered the three tasks, and the replay answered 200.
+  - The wiring PR was 7/7. Its deploy built `M208`'s change as the runner and swapped live.
+  - The BHW-only push opened no Meridian window. The rollback took seconds both ways.
+- **Wrong:**
+  - **The part I most expected to be wrong, the runner's first `npm ci` and build as NETWORK SERVICE, passed at the first run** (51 s).
+  - "`CRON_SECRET` is set or made": it had to be made. The name had been in `.env` since P1, empty.
+- **Not predicted:**
+  - **The pre-push guard refused the BHW-only push's branch**, because the claim named only the first branch. Its one file had been edited before the claim was amended (`b3223707`). That is recorded here, not hidden.
+  - The cold-render finding above.
+
+The claim as taken follows.
 
 Taken 2026-11-04. Branch `m209-bhw-p1-box`, cut from origin/main at `ca2dbb57`, PR into main. Two pull requests, both titled `M209`, on two branches (the second, `m209-bhw-screenshot-trace`, named in this claim by an amendment pushed after its one file was edited: the pre-push guard refused the branch until then):
 - the deploy wiring (`.github/workflows/deploy.yml`, a test that pins it, runbook 8.4);

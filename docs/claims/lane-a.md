@@ -16,7 +16,57 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M211`, BHW Connect's development loop: a schema baseline and a made-up seed from the box, a local stack and CI built from them with PostgREST (`bhw-p4-loop`, `D182`, `D207`) (m211-bhw-p4-loop, m211-bhw-dev-copy)
+## Status: NO ACTIVE CLAIM — `M211` released on 2026-11-05: BHW Connect's development loop. The box takes the live schema and a made-up seed through the **BHW Connect dev copy** workflow, and the local stack and CI build a database from them, serve it with PostgREST, and render pages against it. Close-out branch `m211-closeout`. Next is step 6 of the user's seven, the user naming merge point 10, then `bhw-handover`.
+
+## RELEASED — `M211`, BHW Connect's development loop: a schema baseline and a made-up seed from the box, a local stack and CI built from them with PostgREST (`bhw-p4-loop`, `D182`, `D207`)
+
+Merged in two PRs, each at its own merge point, under the user's instruction of 2026-11-03.
+- **PR #405 (`a4cbe7f2`), the tools.**
+  - Its run 41852014703 was 7/7 green with real step counts: Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11.
+  - The trunk's run 41858714265 on `a4cbe7f2` was the same.
+  - Deploy 41866654431 succeeded.
+- **The copy, taken on the box.** The **BHW Connect dev copy** workflow, run 41867222568 on `a4cbe7f2`, produced:
+  - `schema.sql`, 298,038 B;
+  - `version.txt`, `20260905235804`;
+  - `seed.sql`, 7,636,239 B, byte-identical to the one made locally from Supabase's read-only copy.
+- **PR #406 (`f77e45e0`), the copy and the wiring.**
+  - Its first run, 41868393896, was red at BHW Connect's last step. The app was fine: the check asked for `/bhw-connect/`, which answers 308 to `/bhw-connect`. Fixed in `b2cfedb0`.
+  - Run 41869067411 was 7/7 green with real step counts: Static analysis 33 · BHW Connect 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11.
+  - The trunk's run 41874801414 on `f77e45e0` was the same.
+
+**Live.** Every figure below was read from its own output.
+- **CI's seeded database:** `load-dev: done {"version":"20260905235804","baselined":111,"applied":0,"filled":37,"tables":61}`.
+- **PostgREST v16.4** served `dim_geo` with a minted anon key.
+- **Five pages rendered 200** from a build against that database: `/`, `/explore`, `/place/region/01`, `/uuc-phc`, `/sitemap.xml`.
+- **The BHW Connect job** grew from 20 steps to 23, and from 1 min 52 s to 2 min 14 s.
+- **Deploy 41880518942.**
+  - Meridian fast-forwarded with no maintenance window: "only paths the site does not run changed".
+  - `settings: 0 changed (), 1 already equal, 5 not set in GitHub`, then `migrations: nothing pending`.
+  - `BHW Connect f77e45e0… is live` at 01:48:33 box time, 53 s after the plan.
+  - `/up`, `/login` and `/bhw-connect` answered 200.
+
+**How the prediction fared.**
+- **Right:**
+  - The seed script needed more than the two known fixes. Beyond the enum column and recording generated keys for foreign keys, it needed three more:
+    - `fact_*` rows point at `ref_fhsis_indicator`, a reference table not named `dim_*`, so it is copied whole by name (`REFERENCE_TABLES`);
+    - an `agg_*` table's CHECK constraint ties a suppression flag to its counts, so rows are tried against a scratch copy of the table first;
+    - array columns are generated at the source's longest length.
+  - Repeating primary keys were skipped, as predicted for composite keys.
+  - The box's dump, once cleaned, loaded with no error.
+  - A build against the seeded data passed.
+- **Wrong:**
+  - CI's job grew by three steps and 22 s, not five steps and two minutes.
+  - **The part I most expected to be wrong, the seed's size, was inside the range:** 7.6 MB of SQL, against a predicted 5 to 15 MB.
+- **Not predicted:**
+  - A current `pg_dump` (15.14 on) wraps its dump in psql-only `\restrict` lines with a random key. The cleaner strips them, so the baseline is plain SQL whose bytes change only when the schema does.
+  - My own page check was wrong on its first run (the trailing slash).
+
+**For the handover:**
+- jongsky25 refreshes the copy himself after a schema change: run the workflow, download its artifact, and commit the three files in a PR. `apps/bhw-connect/CLAUDE.md` says how.
+- The old repository's archive is his click as owner, in `bhw-handover` (`D207`).
+- `bhw-e2e-in-ci` (before-launch) is no longer blocked: BHW's Playwright specs can now run against the seeded build.
+
+The claim as taken follows.
 
 Taken 2026-11-04. Branches `m211-bhw-p4-loop` (the tools) and then `m211-bhw-dev-copy` (the committed copy and the wiring), both cut from origin/main, both PRs titled `M211`. Each merges at its own merge point once green, under the user's instruction of 2026-11-03: their paths are site-safe (`apps/`, `.github/`, `tests/`, `docs/`). This is step 5 of the user's seven.
 

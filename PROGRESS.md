@@ -214,6 +214,10 @@ lives in [PROGRESS_ARCHIVE.md](PROGRESS_ARCHIVE.md) and in git — do **not** re
 
 ## Current Status
 
+- **🅰️ `M211` IS MERGED AT ITS OWN MERGE POINTS (PR #405 `a4cbe7f2` THE TOOLS, PR #406 `f77e45e0` THE COPY AND THE WIRING; CI 7/7 GREEN WITH REAL STEP COUNTS ON BOTH — Static analysis 33 · BHW Connect 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11) — BHW CONNECT'S DEVELOPMENT LOOP (`bhw-p4-loop`, `D207`).**
+  - The **BHW Connect dev copy** workflow takes the live schema and a made-up seed on the box: real geography, and every count and person generated. They are committed under `apps/bhw-connect/`.
+  - `db/load-dev.mjs` builds a database from them. CI does the same for every BHW PR: 111 migrations baselined, 61 tables, served by PostgREST, five pages rendered 200.
+  - No user-visible change. `bhw-handover` and `bhw-e2e-in-ci` are no longer blocked.
 - **🅰️ `M210` IS MERGED AT ITS OWN MERGE POINT (PR #404, `8aad1b37`; CI 7/7 GREEN WITH REAL STEP COUNTS — Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11) — BHW CONNECT'S OWN SETTINGS COME FROM GITHUB REPOSITORY SECRETS (`bhw-settings-from-github`, `D199`).**
   - `ops/write-settings.ps1` writes six allow-listed `BHW_<NAME>` secrets into the box's `.env` at every deploy, and on demand from the **BHW Connect settings** workflow. An unset secret keeps the box's value. At the box, NETWORK SERVICE got Modify on `.env`.
   - Proved live: a random `BHW_USAGE_EVENTS_IP_SALT` changed 1 setting and restarted BHW healthy; a second run changed nothing. No user-visible change.

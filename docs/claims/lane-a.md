@@ -16,7 +16,46 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M207` released on 2026-11-04: BHW Connect runs wholly on the box. Its admins sign in with their Meridian accounts, its feedback screenshots live on the box's disk, and its PostgREST checks a key secret of its own; nothing of it reaches Supabase. Supabase cannot be paused on Pro, so it stays as it is for jongsky25 to delete at the handover (`D206`). `M204` (#397) merged on its own (`D202`). Close-out branch `m207-closeout`. The next claim is `bhw-deploy-db-tools`, step 2 of the user's seven.
+## Status: ACTIVE CLAIM — `M208`, BHW's ops scripts find `pg_dump` themselves, and the deploy never prints the database password (`bhw-deploy-db-tools`) (m208-bhw-deploy-db-tools)
+
+Taken 2026-11-04. Branch `m208-bhw-deploy-db-tools`, cut from origin/main at `60a2e557`, PR into main. Under the user's instruction of 2026-11-03 it merges at its own merge point once every required check is green, because its paths are site-safe: `apps/bhw-connect/ops/` and `docs/`. This is step 2 of the user's seven; `bhw-p1-box`'s remainder (step 3) is blocked on it alone.
+
+Row: `bhw-deploy-db-tools`: "BHW's ops scripts call a bare pg_dump (ops/nightly-dump.ps1, and deploy-bhw.ps1's Invoke-Migrations before a migration), and the box's PATH has no PostgreSQL bin … Resolve pg_dump as Meridian's DeployBackupCommand does (a configured path, else the newest PostgreSQL install's, else PATH), and give the runner (NETWORK SERVICE) write on the BHW backup folder under C:/meridian/backups, before bhw-p1-box wires deploy.yml to ops/deploy-bhw.ps1".
+
+### Evidence verified
+- **`ops/nightly-dump.ps1`: held.** `& pg_dump --format=custom "--file=$file" --dbname $url`, bare.
+- **`ops/deploy-bhw.ps1` `Invoke-Migrations`: held.** `Invoke-Native pg_dump @(... '--dbname', $Env['BHW_DATABASE_URL'])`, bare, run only when a migration is pending.
+- **Meridian's `DeployBackupCommand::pgDump()`: held.** It uses `config('deploy.pg_dump')`, else the last of `glob('C:/Program Files/PostgreSQL/*/bin/pg_dump.exe')`, else `pg_dump`.
+- **Found beside the citation, and taken into this claim:**
+  - `Invoke-Native` echoes every argument (`--> {0} {1}`), so the pre-migration `pg_dump` would print `BHW_DATABASE_URL` with `bhw_app`'s password.
+  - No run has printed it yet: no BHW migration has been pending at any hand deploy (`M206`'s ran "nothing pending").
+  - Once `bhw-p1-box` wires `deploy.yml` to this script, it would land in the GitHub Actions log.
+- **Also beside it:** the pre-migration dumps (`pre-deploy-*.dump`) are never pruned, while the nightly ones keep 14 and Meridian's deploy keeps 10.
+
+### Premise verified
+- **The box's PATH has no PostgreSQL bin** (`M206`'s B0; the staging memory says "use C:\Program Files\PostgreSQL\15\bin"). PostgreSQL 15 is the only install there, since the PG 17 client was deleted at B9c, so the newest install is the server's own version.
+- **Who runs the two scripts.**
+  - Today `deploy-bhw.ps1` runs by hand as Administrator. After `bhw-p1-box`, the runner runs it as NETWORK SERVICE.
+  - The nightly task runs as SYSTEM, and `M206` registered it by hand with PostgreSQL's bin on its own PATH.
+  - `ops/register-cron-tasks.ps1` registers it without one. That registration works once the script resolves `pg_dump` itself, and step 3 re-runs it for the cron jobs.
+- **The backup folder `C:\meridian\backups\bhw`** is ACL'd to Administrators and SYSTEM, for `fact_bhw_raw`'s personal records. Granting NETWORK SERVICE Modify exposes nothing new: it already reads `BHW_DATABASE_URL` from `C:\meridian\bhw\.env`, which BHW's service loads as NetworkService.
+- **Nothing else calls `pg_dump`** under `apps/bhw-connect/ops`, `db/migrate.mjs` or `docker-compose.yml` (by grep, 2026-11-04).
+
+### Remedy verdict
+**Works, measured before any edit, on the dev machine, which has the box's shape: PostgreSQL 18 under Program Files and none on PATH.**
+- With PostgreSQL's bin removed from PATH, a bare `pg_dump` fails: "not recognized".
+- The resolver (a configured path, else the highest-numbered `C:\Program Files\PostgreSQL\<n>\bin\pg_dump.exe`, else PATH) returns `C:\Program Files\PostgreSQL\18\bin\pg_dump.exe`, and `--version` prints 18.0.
+- Masking the echo with `(://[^:/@\s]+:)[^@\s]+@` → `$1***@` turns `postgres://bhw_app:s3cr3t%40x@127.0.0.1:5432/bhw_connect` into `postgres://bhw_app:***@…`.
+
+Files: `apps/bhw-connect/ops/pg-tools.ps1` (new), `apps/bhw-connect/ops/nightly-dump.ps1`, `apps/bhw-connect/ops/deploy-bhw.ps1`, `apps/bhw-connect/.env.example`, `docs/deployment-infrastructure.md` (§8.4). At close-out: ADR-0024's marker, `docs/pipeline.md`, `PROGRESS.md` (own block), `docs/gate-baselines.md`.
+Shared artefacts taken: `docs/deployment-infrastructure.md`. `apps/bhw-connect/ops/` is shared on the map, but avincentpatrick's until the handover (`M204`).
+Paired files taken: none.
+Namespaces spent: nothing from either namespace (`M208`).
+Prediction:
+- The diff is one small dot-sourced helper used by both scripts, the masked echo, and a keep-10 prune of the pre-migration dumps.
+- CI is 7/7. BHW's job runs its full steps without the boundary asking for a label; Meridian's six pass untouched.
+- At the box, one block grants NETWORK SERVICE Modify on the backup folder and runs `nightly-dump.ps1` with no PostgreSQL on PATH. It writes a dump, shows the resolved path, and the ACL lists NETWORK SERVICE.
+- **The part I most expect to be wrong:** that the runner's NETWORK SERVICE can run `pg_dump` against `bhw_connect` at all, which nobody can measure until `bhw-p1-box` wires the runner. The masked echo is what makes that first try safe to read.
 
 ## RELEASED — `M207`, BHW Connect's admins sign in with Meridian, its feedback screenshots live on the box, the box mints its own keys, and nothing of it reaches Supabase (`bhw-p3-identity`, `D178`, `D179`, `D195`, `D202`–`D206`) (merged as PR #400, `d7ca70a0`, at its own merge point (`D203`), after `#397`; 7/7 green with real step counts on its run 41681161762 — Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run 41687180248 on `d7ca70a0` the same)
 

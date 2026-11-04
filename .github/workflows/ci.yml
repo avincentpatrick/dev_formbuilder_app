@@ -1016,9 +1016,10 @@ jobs:
           npm run build
           PORT=3100 HOSTNAME=127.0.0.1 node .next/standalone/server.js > server.log 2>&1 &
           for i in $(seq 1 30); do curl -sf http://127.0.0.1:3100/bhw-connect > /dev/null && break; sleep 1; done
-          for page in / /explore /place/region/01 /uuc-phc /sitemap.xml; do
+          # The home page is /bhw-connect itself: /bhw-connect/ answers 308 to it.
+          for page in "" /explore /place/region/01 /uuc-phc /sitemap.xml; do
             code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 120 "http://127.0.0.1:3100/bhw-connect$page")
-            echo "$page $code"
+            echo "${page:-/} $code"
             if [ "$code" != "200" ]; then cat server.log; exit 1; fi
           done
 

@@ -16,7 +16,59 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M210` released on 2026-11-04: BHW Connect's own settings (the four AI keys, `CRON_SECRET`, the usage-log salt) come from GitHub repository secrets named `BHW_<NAME>`, written onto the box by every deploy and on demand by the **BHW Connect settings** workflow. Close-out branch `m210-closeout`. The next claim is `bhw-p4-loop`, step 5 of the user's seven.
+## Status: ACTIVE CLAIM — `M211`, BHW Connect's development loop: a schema baseline and a made-up seed from the box, a local stack and CI built from them with PostgREST (`bhw-p4-loop`, `D182`, `D207`) (m211-bhw-p4-loop, m211-bhw-dev-copy)
+
+Taken 2026-11-04. Branches `m211-bhw-p4-loop` (the tools) and then `m211-bhw-dev-copy` (the committed copy and the wiring), both cut from origin/main, both PRs titled `M211`. Each merges at its own merge point once green, under the user's instruction of 2026-11-03: their paths are site-safe (`apps/`, `.github/`, `tests/`, `docs/`). This is step 5 of the user's seven.
+
+Row: `bhw-p4-loop`: "the other developer's loop: the seed from staging (real dim_* reference tables, every agg_* and fact_* row generated, D207), CI's database cases against a seeded PostgREST, the old repository archived". The archive is jongsky25's click as owner and moved to `bhw-handover` (`D207`); avincentpatrick has push, not admin, and `archived: false` was read on 2026-11-04.
+
+### Evidence verified
+- **A fresh database cannot be built from the migrations: held.** On plain PostgreSQL the 19th file stops on `admin_users.user_id … references auth.users (id)`. Then come `storage.buckets` in `feedback_spot.sql` and `create extension vector` in `ai_dataset_registry.sql`. `docker-compose.yml`'s stock `postgres:15` has no pgvector, and its database is owned by `postgres` while `migrate.mjs` runs as `bhw_app`.
+- **The live schema is not the migrations' schema: held.** The files and the live history share 5 versions. The live database holds `fact_fhsis_indicator`, `fact_fhsis_workforce`, `ref_fhsis_indicator` and `ref_fhsis_reconciliation`, which no file creates (`M206`).
+- **`db/make-seed.mjs` fails on the real data, measured 2026-11-04.** Against Supabase (read only), whose schema and reference data equal the box's at the move, it stopped in 32 s: "cannot invent a value for fact_fhsis_indicator.geo_level (geo_level_enum, NOT NULL)". So an enum column is not handled. The code read also shows that the generated branch never records what it wrote, so `fact_honorarium.bhw_id → fact_bhw_raw` cannot resolve.
+- **CI's `bhw-connect` job:** stock `postgres:15`, `bootstrap-roles.sql` only, no PostgREST, no schema. Its five database cases make their own throwaway tables. The build runs with no data source.
+- **No seed is committed** (`supabase/` holds only `migrations/`).
+
+### Premise verified
+- **The live schema loads into PostgreSQL 15 with pgvector 0.8.2, measured 2026-11-04.**
+  - Its `public` schema, dumped schema-only (299,743 bytes), loaded into `pgvector/pgvector:0.8.2-pg15` after `bootstrap-roles.sql`, with 15 errors and all 61 tables present.
+  - All 15 errors are removable by content: 12 grants for Supabase's `supabase_admin`, one PostgreSQL 17 setting, `public` already existing, and the one foreign key into `auth`.
+  - The box's own copy was cleaned of exactly these at the move (`M206`; its `admin_users` has no foreign key, `M207`'s C2), so a dump taken there should load with fewer.
+- **The copy must come from the box** ("the seed from staging"), and only the runner can read the box's database from GitHub. So a dispatch-only workflow on the self-hosted runner takes it, and jongsky25 can refresh it after the handover without box access.
+  - What it publishes is what `D207` puts in public git anyway: the schema, the `dim_*` reference rows, and generated rows.
+- **`D207`'s rule:** `dim_*` copied whole (`dim_geo` 43,783 rows); `agg_*` and `fact_*` generated; everything else empty. The deny-by-default rule stays.
+- **CI can run PostgREST** on its ubuntu runner (`docker run postgrest/postgrest:v16.4`, as `docker-compose.yml` already pins), and `db/mint-jwt.mjs` mints its keys.
+
+### Remedy verdict
+**Partly measured:**
+- the baseline loads (above);
+- the seed script fails at its first generated table (above).
+
+The fixes are measured as they are written: a seed from the real data that loads into the baseline, with every row checked against the rule.
+
+Files:
+- **First PR:**
+  - `apps/bhw-connect/db/make-seed.mjs` and its tests in `db/db-tools.test.ts`;
+  - `apps/bhw-connect/db/clean-baseline.mjs` (new, the strip rules);
+  - `.github/workflows/bhw-dev-snapshot.yml` (new);
+  - ADR-0024's two retitles from `D207`, and `docs/pipeline.md`.
+- **Second PR:**
+  - `apps/bhw-connect/db/baseline/` (new: the schema and the migration history);
+  - `apps/bhw-connect/supabase/seed.sql` (new);
+  - `apps/bhw-connect/docker-compose.yml`;
+  - `.github/workflows/ci.yml` (`bhw-connect` job);
+  - `apps/bhw-connect/README.md`, `apps/bhw-connect/CLAUDE.md`, `docs/deployment-infrastructure.md` §8.4;
+  - `tests/Feature/Deploy/DeployWorkflowTest.php` (the snapshot workflow pinned).
+- **At close-out:** ADR-0024's marker, `docs/pipeline.md`, `PROGRESS.md` (own block), `docs/gate-baselines.md`.
+
+Shared artefacts taken: `.github/workflows/ci.yml`, `docs/adr/0024-second-application-under-one-host.md`, `docs/deployment-infrastructure.md`.
+Paired files taken: the snapshot workflow and the scripts it runs.
+Namespaces spent: nothing from either namespace (`M211`; decision `D207`).
+Prediction:
+- The seed script needs more than the two known fixes. Composite keys in `agg_*` will collide when generated, the likeliest third.
+- The box's dump loads with no error after cleaning.
+- CI's job grows by about five steps and two minutes, and a build with the seeded data passes.
+- **The part I most expect to be wrong:** the seed's size. `dim_geo` alone is 43,783 rows; I expect 5 to 15 MB of SQL, which may be too large to want in git.
 
 ## RELEASED — `M210`, BHW Connect's own settings come from GitHub repository secrets, written onto the box by the deploy (`bhw-settings-from-github`, `D199`)
 

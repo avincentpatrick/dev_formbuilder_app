@@ -24,10 +24,19 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D206`, the last filed, was asked and answered on 2026-11-04 at `bhw-p3-identity`'s last box step, and recorded the same day. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D207`, the last filed, was asked and answered on 2026-11-04 while `bhw-p4-loop` was planned, and recorded the same day. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D207 — `bhw-p4-loop` commits a development copy of BHW's database to this public repository, so CI and jongsky25's Claude sessions get a working database. What does it hold? **A — made-up figures: the real public reference tables (PSGC geography down to barangays, the dataset list), and every count and every person generated.**
+
+**Asked and answered 2026-11-04 (user decision, in chat), while `bhw-p4-loop` was planned.** The user asked first why anything would be invented, since the real data exists. It does, and it stays where it is: on the box, served by staging. This copy is only the small one that CI and cloud sessions load. Those run on GitHub's machines, so the copy must live in git, and this repository is public (`D48`; `D181`: personal records never pass through git).
+- **A — made-up figures (recommended, chosen).** `dim_*` tables are copied whole; `agg_*` and `fact_*` rows are generated in the real shape (real geography codes, plausible ranges). No real count, including a barangay's small one that could point to a person, enters git. Pages work in CI and in development, showing invented numbers.
+- **B — a sample of the real figures**, the seed script's rule until now: about 1,000 real `agg_*` rows per table, people still generated. Real small-area counts would become public, past BHW's own small-cell suppression.
+- **C — no copy in git.** CI keeps testing without BHW's data, and staging stays the only place to check a page.
+
+**What the answer files:** `bhw-p4-loop` builds on it: `db/make-seed.mjs` generates `agg_*` rows too. Found while planning, and filed on `bhw-handover`: archiving jongsky25's old repository is its owner's click (avincentpatrick has push, not admin; `archived: false` on 2026-11-04), so it joins the handover page as `D206`'s deletions did.
+
 ### D206 — Supabase's documentation says a project on a paid plan cannot be paused, and jongsky25's organisation is on Pro, so `D183`'s "paused for 30 days as the rollback, then deleted" cannot be done. BHW Connect reads nothing from it since `bhw-p3-identity`. What happens to it? **A — it stays as it is, and the handover page asks jongsky25 to delete it and downgrade his organisation, with the two Vercel projects.**
 
 **Asked and answered 2026-11-04 (user decision, in chat), at `M207`'s last box step.** The user asked first whether it would block the remaining work. It does not: none of `bhw-deploy-db-tools`, P1's remainder, `bhw-settings-from-github`, P4 (its seed comes from the box), merge point 10 or the handover reads Supabase. The user: *"if no, then lets leave it to jong. since we have already fully migrated to the server"*.

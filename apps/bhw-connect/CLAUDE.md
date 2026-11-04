@@ -47,7 +47,18 @@ miss; a root-relative string kept in a variable first is beyond it, so wrap wher
   owner must approve the pull request (the boundary step asks for it).
 - Never commit data. `ingestion/data/` is out of git (see its README); a load file reaches the box
   privately and Meridian's owner loads it.
-- A local database in the box's shape: `docker compose up -d` (see `docker-compose.yml`).
+- A local database in the box's shape: `docker compose up -d`, then
+  `BHW_DEV_DATABASE_URL=postgres://postgres:bhw-local@127.0.0.1:5442/bhw_connect node db/load-dev.mjs`
+  (see `docker-compose.yml`).
+  - It builds from the committed **development copy**: `db/baseline/` is the live schema, then every
+    migration newer than it runs, then `supabase/seed.sql`.
+  - The seed is **made up**: real geography, and every count and every person generated. Real data
+    never enters this public repository.
+  - CI builds the same database for every pull request, runs your new migration on it, and renders five
+    pages against it. A migration that breaks a page fails there, before staging.
+  - After a schema change, refresh the copy: run the **BHW Connect dev copy** workflow
+    (`gh workflow run bhw-dev-snapshot.yml`), download its artifact, and commit the three files in a pull
+    request.
 
 ## Small things that bite
 

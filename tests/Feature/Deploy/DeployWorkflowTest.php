@@ -126,3 +126,19 @@ it('applies the settings on demand without ever deploying Meridian', function ()
     expect($text)->not->toContain('deploy.ps1" -AppPath')
         ->and($text)->not->toContain('\deploy.ps1');
 });
+
+it('takes the BHW dev copy on demand, deploying nothing and keeping the upload a day', function (): void {
+    // M211 (`bhw-p4-loop`, `D207`): the schema, its migration version and a made-up seed, from the box's
+    // database, which only the runner can read. It must never become a deploy, and what it uploads is
+    // what a pull request then commits to this public repository, so it lives a day and no longer.
+    $text = (string) file_get_contents(base_path('.github/workflows/bhw-dev-snapshot.yml'));
+
+    expect(preg_match('/^on:\s*\n\s+workflow_dispatch:\s*$/mu', $text))->toBe(1);
+    expect(preg_match('/^\s+(push|pull_request|workflow_run|schedule):/mu', $text))->toBe(0);
+    expect($text)->toContain('runs-on: self-hosted')
+        ->and($text)->toContain('& "$app\apps\bhw-connect\ops\dev-snapshot.ps1" -AppPath $app')
+        ->and($text)->toContain('retention-days: 1');
+    expect($text)->not->toContain('deploy.ps1')
+        ->and($text)->not->toContain('deploy-bhw.ps1')
+        ->and($text)->not->toContain('write-settings.ps1');
+});

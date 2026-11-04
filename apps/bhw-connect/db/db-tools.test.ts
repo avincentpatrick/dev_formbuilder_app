@@ -19,6 +19,7 @@ import {
   makeSeed,
   seedRule,
   syntheticLiteral,
+  syntheticValue,
 } from "./make-seed.mjs";
 
 function tempDir(files: Record<string, string>): string {
@@ -173,9 +174,11 @@ describe("migrate (no database)", () => {
 });
 
 describe("make-seed (no database)", () => {
-  it("denies by default: only dim_, agg_ and fact_ tables enter the seed, and fact_ only as synthetic rows", () => {
+  it("denies by default: dim_ and named reference tables are copied, agg_ and fact_ only generated (Meridian's D207)", () => {
     expect(seedRule("dim_geo")).toBe("all");
-    expect(seedRule("agg_demographics")).toBe("sample");
+    expect(seedRule("ref_fhsis_indicator")).toBe("all");
+    // Generated, never sampled: a real small-area count must not reach a public repository.
+    expect(seedRule("agg_demographics")).toBe("synthetic");
     expect(seedRule("fact_bhw_raw")).toBe("synthetic");
     for (const table of [
       "feedback",
@@ -183,6 +186,8 @@ describe("make-seed (no database)", () => {
       "admin_users",
       "district_correction",
       "ai_narrative_cache",
+      // A ref_ table is not copied by its prefix: this one holds counts from an internal document.
+      "ref_uuc_phc_published_delta",
     ]) {
       expect(seedRule(table)).toBe("none");
     }
@@ -230,6 +235,30 @@ describe("make-seed (no database)", () => {
       expect(value).toBeGreaterThanOrEqual(18);
       expect(value).toBeLessThanOrEqual(70);
     }
+  });
+
+  it("takes an enum's labels, and builds an array at the source's length", () => {
+    const level = { column_name: "geo_level", udt_name: "geo_level_enum", is_nullable: "NO", character_maximum_length: null };
+    const labels = ["region", "province", "city_mun", "barangay"];
+    expect([0, 1, 2, 3].map((i) => syntheticValue("fact_x", level, i, { categories: labels }))).toEqual(labels);
+
+    const bins = { column_name: "bin_counts", udt_name: "_int4", is_nullable: "NO", character_maximum_length: null };
+    const value = syntheticValue("agg_x", bins, 0, { arrayLength: 10 }) as string;
+    expect(value.startsWith("{") && value.endsWith("}")).toBe(true);
+    expect(value.slice(1, -1).split(",")).toHaveLength(10);
+  });
+
+  it("lets two list-valued columns drift apart, so a composite key reaches more than its shortest list", () => {
+    const column = { column_name: "c", udt_name: "text", is_nullable: "NO", character_maximum_length: null };
+    const geos = ["01", "02", "03"];
+    const sexes = ["F", "M"];
+    const pairs = new Set<string>();
+    for (let i = 0; i < 12; i += 1) {
+      const geo = syntheticValue("agg_x", column, i, { refValues: geos }, 0);
+      const sex = syntheticValue("agg_x", column, i, { categories: sexes }, 1);
+      pairs.add(`${geo}/${sex}`);
+    }
+    expect(pairs.size).toBe(6); // every combination, where walking both lists in step gives only 2
   });
 
   it("refuses a NOT NULL foreign key it cannot satisfy, rather than writing a seed that will not load", () => {
@@ -346,7 +375,7 @@ describe.skipIf(!DATABASE)("against a real PostgreSQL", () => {
     }
   });
 
-  it("writes a seed that loads, copies lookups, and carries no real person", async () => {
+  it("writes a seed that loads, copies lookups, and carries no real person or count", async () => {
     const src = `${prefix}_src`;
     const dst = `${prefix}_dst`;
     const ddl = (schema: string) => `
@@ -360,7 +389,20 @@ describe.skipIf(!DATABASE)("against a real PostgreSQL", () => {
         sex text NOT NULL CHECK (sex IN ('F', 'M')),
         age int NOT NULL CHECK (age BETWEEN 18 AND 99)
       );
-      CREATE TABLE ${schema}.feedback (id int PRIMARY KEY, email text);`;
+      CREATE TABLE ${schema}.feedback (id int PRIMARY KEY, email text);
+      CREATE TYPE ${schema}.pay_kind AS ENUM ('monthly', 'bonus');
+      CREATE TABLE ${schema}.fact_pay (
+        id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+        person_id bigint NOT NULL REFERENCES ${schema}.fact_people,
+        kind ${schema}.pay_kind NOT NULL,
+        amount int NOT NULL
+      );
+      CREATE TABLE ${schema}.agg_flags (
+        code text PRIMARY KEY REFERENCES ${schema}.dim_geo,
+        n int,
+        suppressed boolean NOT NULL,
+        CHECK (suppressed = (n IS NULL))
+      );`;
     await client.query(ddl(src));
     await client.query(ddl(dst));
     await client.query(`INSERT INTO ${src}.dim_geo VALUES ('01', 'Ilocos'), ('02', 'Cagayan')`);
@@ -372,7 +414,12 @@ describe.skipIf(!DATABASE)("against a real PostgreSQL", () => {
          FROM generate_series(1, 300) AS g`,
     );
 
-    const sql = await makeSeed(client, { schema: src, targetSchema: dst, rows: 1, factRows: 25 });
+    await client.query(
+      `INSERT INTO ${src}.fact_pay (person_id, kind, amount) SELECT id, 'monthly', 3000 FROM ${src}.fact_people`,
+    );
+    await client.query(`INSERT INTO ${src}.agg_flags VALUES ('01', 5, false), ('02', NULL, true)`);
+
+    const sql = await makeSeed(client, { schema: src, targetSchema: dst, rows: 25 });
     expect(sql).not.toContain("Real Person");
     expect(sql).not.toContain("someone@example.org");
     await client.query(sql);
@@ -380,9 +427,14 @@ describe.skipIf(!DATABASE)("against a real PostgreSQL", () => {
     const count = async (table: string) =>
       Number((await client.query(`SELECT count(*) AS n FROM ${dst}.${table}`)).rows[0].n);
     expect(await count("dim_geo")).toBe(2);
-    expect(await count("agg_counts")).toBe(1);
+    // Generated, one per possible key: agg_counts' key is a dim_geo code, and there are two.
+    expect(await count("agg_counts")).toBe(2);
     expect(await count("fact_people")).toBe(25);
     expect(await count("feedback")).toBe(0);
+    // A generated row may point at another generated one, and an enum takes its labels.
+    expect(await count("fact_pay")).toBe(25);
+    // Only rows the table's CHECK accepts are kept.
+    expect(await count("agg_flags")).toBeGreaterThan(0);
     const { rows } = await client.query(`SELECT DISTINCT sex FROM ${dst}.fact_people ORDER BY 1`);
     expect(rows.map((r) => r.sex)).toEqual(["F", "M"]);
   });

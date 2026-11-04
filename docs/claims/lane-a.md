@@ -16,7 +16,38 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M210`, BHW Connect's own settings come from GitHub repository secrets, written onto the box by the deploy (`bhw-settings-from-github`, `D199`) (m210-bhw-settings-from-github)
+## Status: NO ACTIVE CLAIM — `M210` released on 2026-11-04: BHW Connect's own settings (the four AI keys, `CRON_SECRET`, the usage-log salt) come from GitHub repository secrets named `BHW_<NAME>`, written onto the box by every deploy and on demand by the **BHW Connect settings** workflow. Close-out branch `m210-closeout`. The next claim is `bhw-p4-loop`, step 5 of the user's seven.
+
+## RELEASED — `M210`, BHW Connect's own settings come from GitHub repository secrets, written onto the box by the deploy (`bhw-settings-from-github`, `D199`)
+
+Merged as PR #404 (`8aad1b37`) at its own merge point, under the user's instruction of 2026-11-03.
+- Its run 41793252548 was 7/7 green with real step counts: Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11.
+- The trunk's run 41797646195 on `8aad1b37` was the same.
+
+**Live.** Every figure below was read from its own output.
+- **F0 (read only, 07:27:41 UTC).** `.env` carries its own ACL, with inheritance off. NETWORK SERVICE could only read it. The BHW folder grants BUILTIN\Users read.
+- **G1 (07:48:04 UTC).** NETWORK SERVICE got Modify on `.env`. SYSTEM and Administrators are unchanged.
+- **The merge's own deploy (41801683631).**
+  - `settings: 0 changed (), 0 already equal, 6 not set in GitHub`, so nothing was written.
+  - Then BHW `8aad1b37` built and went live at 16:44:26 box time, with no Meridian window.
+- **The live proof, with the user's OK (2026-11-04).**
+  - `BHW_USAGE_EVENTS_IP_SALT` was set to a random value, piped into `gh secret set` and never shown.
+  - `bhw-settings.yml` run 41801921860 printed `settings: 1 changed (USAGE_EVENTS_IP_SALT)`, then `plan: skip - this commit is already deployed`, then `bhw-connect restarted and healthy`, 2 s.
+  - Run 41802004399 printed `settings: 0 changed (), 1 already equal`, with no restart.
+  - `/up`, `/login` and `/bhw-connect` answered 200.
+
+**How the prediction fared.**
+- **Right:**
+  - The PR was 7/7. Its deploy wrote "0 changed".
+  - The test secret's first dispatch changed one setting and restarted BHW healthy; the second changed nothing.
+- **Wrong:** **the part I most expected to be wrong, the runner rewriting `.env` in place after G1, worked at the first try.** `Set-Content` kept the file's explicit ACL.
+- **Not predicted:** nothing. The design changed once before the build: backups moved from the BHW folder to `backups\bhw\env` when F0 showed that local users can read the BHW folder.
+
+**For the handover:**
+- The only BHW secret set in GitHub is the test salt. jongsky25 sets the rest.
+- An unset secret keeps the box's value: today `GEMINI_API_KEY` and the box-made `CRON_SECRET`.
+
+The claim as taken follows.
 
 Taken 2026-11-04. Branch `m210-bhw-settings-from-github`, cut from origin/main at `2222aa34`, PR into main. It merges at its own merge point once green, under the user's instruction of 2026-11-03: its paths are site-safe (`.github/`, `apps/`, `tests/`, `docs/`). This is step 4 of the user's seven.
 

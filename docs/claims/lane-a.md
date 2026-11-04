@@ -16,7 +16,64 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M207`, BHW Connect's admins sign in with Meridian, its feedback screenshots live on the box, the box mints its own keys, and Supabase is paused (`bhw-p3-identity`, `D178`, `D179`, `D195`, `D202`–`D205`) (m207-bhw-p3-identity)
+## Status: NO ACTIVE CLAIM — `M207` released on 2026-11-04: BHW Connect runs wholly on the box. Its admins sign in with their Meridian accounts, its feedback screenshots live on the box's disk, and its PostgREST checks a key secret of its own; nothing of it reaches Supabase. Supabase cannot be paused on Pro, so it stays as it is for jongsky25 to delete at the handover (`D206`). `M204` (#397) merged on its own (`D202`). Close-out branch `m207-closeout`. The next claim is `bhw-deploy-db-tools`, step 2 of the user's seven.
+
+## RELEASED — `M207`, BHW Connect's admins sign in with Meridian, its feedback screenshots live on the box, the box mints its own keys, and nothing of it reaches Supabase (`bhw-p3-identity`, `D178`, `D179`, `D195`, `D202`–`D206`) (merged as PR #400, `d7ca70a0`, at its own merge point (`D203`), after `#397`; 7/7 green with real step counts on its run 41681161762 — Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run 41687180248 on `d7ca70a0` the same)
+
+**Live.** Every figure below was read from its own output.
+- **The merge point.**
+  - The user's census before (2026-11-03 17:13:40 UTC) equals the census after (2026-11-04 01:19:07 UTC): `1·6·11·27·22·62·31·74`.
+  - Deploy 41691809579 opened the window at 18:18:40 UTC and backed up to `deploy-20261103-181842.dump` (1,167,734 B).
+  - 70 tables and 54,085 rows; nothing to migrate; every table held.
+  - `releases: 1 added … 10 in the table (newest 0.17.0)`; then up.
+  - `/up`, `/login` and `/bhw-connect` answer 200; the sign-in page carries `"version":"0.17.0"`.
+- **C0.** The box's Node v24.14.1 fetched `https://staging.pitahc.gov.ph/up` through the hosts entry: 200. That was the first measurement of TLS from Node to the box's own name.
+- **C1.** All 34 screenshots were copied from the bucket to `C:\meridian\bhw\storage\feedback-screenshots`: 1,963,090 B, exactly the bucket's total.
+- **`whoami`, live.** A guest gets 401. A fresh sign-in gets the user's own id, name and email.
+- **C2.** `admin_users` has no foreign key on the box. The user's Meridian id `01a0aed1-cdcc-7290-943f-8291d7f0e00a` was added as `admin` (1 → 2 rows). jongsky25's old row stays, matching nobody.
+- **C3.** A new 64-character secret is in `C:\meridian\bhw\postgrest\jwt-secret.txt`, and both keys were minted from it with `db/mint-jwt.mjs`.
+  - `.env` gained the keys, `NEXT_PUBLIC_SUPABASE_URL=http://[::1]:3001`, `MERIDIAN_INTERNAL_URL` and `BHW_STORAGE_DIR`. Backups: `.env.pre-p3-20261104-102936.bak` and `postgrest.conf.pre-p3-20261104-102936.bak`.
+  - PostgREST answers the new anon key 200, the new service key 200 and Supabase's old anon key 401.
+  - `-BuildOnly` built `d7ca70a0` in 64 s, then `deploy-bhw.ps1` switched to it, and it was live at 10:31:12 box time.
+  - BHW's data was down about 90 s, from the PostgREST restart to the switch.
+  - Supabase's project id appears 0 times in the release.
+- **C4, signed out, live.**
+  - `/bhw-connect/admin` answers 307 to `https://staging.pitahc.gov.ph/bhw-connect/admin/login`, with or without a forged session cookie.
+  - The sign-in page links to Meridian's `/login`.
+  - The screenshot route answers a guest 404, both for a real file and for `..%2F..%2F.env`.
+  - The CSP no longer names Supabase.
+  - The sitemap carries 2,332 links. It was built while PostgREST accepted the new keys.
+- **C4, signed in.** The user reported (2026-11-04) the account menu → BHW Connect → Admin sign in → the dashboard, signed in as their own email (admin), with the feedback screenshots loading.
+- **C5.** Not done. Supabase's documentation says a project on a paid plan cannot be paused, and jongsky25's organisation is on Pro. The user decided it stays as it is, since nothing of BHW reads it, for jongsky25 to delete at the handover (`D206`).
+
+**How the prediction fared.**
+- **Right:**
+  - Pest stayed green once the four existing mint tests sent the password, and the two route filters needed only the new prefix.
+  - `openapi.json` regenerated with `/auth/whoami` and the mint's `password`; PHPStan and Pint are clean.
+  - BHW's lint, types, Vitest (91 files) and the prefixed build without a data source all passed, and the base-path census stayed green.
+  - CI was 7/7. C1 moved 34 files and 1,963,090 B. Supabase's project is named 0 times in the release.
+  - Next's redirect behind Apache came out on the right origin with the base path kept: the second of the two risks named, held.
+- **Wrong:**
+  - **The risk I named first, Node's TLS to the box's own name, passed at the first try.**
+  - **"C3's outage under 10 seconds" was wrong by an order: it was about 90 s.** Measured while preparing C3: the sitemap reads data as it builds, so building with the new keys before PostgREST accepted them would have baked a thin sitemap into the release. So the build ran after the swap, and BHW's data was down for the build.
+  - **The link in the top bar itself was wrong.** `search-nav.spec.ts` went red on #400's first run (41674298494): the labelled control left the theme toggle 28.8 px short at 1440 px under extra_large + OpenDyslexic. It moved into the account menu (`e18c0eaf`), through a link component that hands every other item to Inertia unchanged. `TopNav.vue` and its test came back to the trunk's, and `AccountMenu.test.ts` is new, red on the trunk's menu.
+  - **Pausing Supabase, the row's own last step, is impossible on Pro** (`D206`).
+- **Not predicted:**
+  - Group A asks nothing about workspace membership, so `whoami` checks for an active member itself.
+  - A bare `abort(403)` renders as `request_failed`, so the check throws `AuthorizationException`.
+  - Inertia's middleware replaces `Vary`, so `Vary: Cookie` was dropped, with `no-store` kept.
+  - A shifted `routes/api.php` killed two backlog citations, which were repointed.
+  - A dev server left running by the M206 session held BHW's `node_modules`, and stopping it was refused. BHW's gates ran in a clean copy.
+  - Windows PowerShell 5.1 hands a JSON array to the pipeline as one object; C1 was corrected for it.
+  - The user's console pastes a block twice, and C2's `Read-Host` took the second copy as its input. From C2 on, blocks are wrapped in `& { }` and take no input.
+  - Turbopack warned that `lib/storage/screenshots.ts`'s dynamic paths trace the whole project into the release → filed `bhw-screenshot-trace`.
+- **Files taken against the claim:**
+  - `resources/js/components/shell/AccountMenu.vue` and its new test were added mid-build without a pushed claim amendment. This is recorded here rather than hidden.
+  - `apps/bhw-connect/lib/meridian-url.ts` and `lib/db/meridian-identity-cookie.ts` were added; `docs/feature-backlog.md` took the two repointed citations.
+  - `TopNav.vue` and `TopNav.test.ts` end unchanged.
+  - `app/admin/(dashboard)/layout.tsx` and `tests/e2e/whats-new.spec.ts` were not edited: the header already shows on admin pages, and the spec reads the footer only by its contents.
+
+The claim as taken follows.
 
 Taken 2026-11-03. Branch `m207-bhw-p3-identity`, cut from origin/main at `6f69777d`, PR into main. It merges at its own merge point, with the user's census before and after (`D203` A). Before it: `#397` (`M204`) merges on its own (`D202` A), so this pull request needs nobody's label. After it: box blocks C0–C5, one guarded block at a time.
 
@@ -225,9 +282,9 @@ Prediction:
 - CI is 7/7, with Pest's count one higher.
 - The part I most expect to be wrong: the state file's key is the config's URL string exactly, so a trailing slash or a port written differently would silently miss.
 
-## HELD — `M204`, BHW Connect is avincentpatrick's until the handover, so the move's pull requests need nobody's label (`bhw-ownership-until-handover`, `D198` A) (m204-bhw-ownership-until-handover)
+## RELEASED — `M204`, BHW Connect is avincentpatrick's until the handover, so the move's pull requests need nobody's label (`bhw-ownership-until-handover`, `D198` A) (merged as PR #397, `2d94f09c`, on its own at its own merge point (`D202` A, 2026-11-03) ahead of merge point 10, after a trunk merge (`08efedd5`); labelled by jongsky25; 7/7 green with real step counts on its run 41666261066 — Static analysis 33 · BHW Connect 19 (the unchanged app) · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run 41673866248 on `2d94f09c` the same, and its deploy 41679783938 site-safe)
 
-**Built. PR #397 is open and green, 7/7, with jongsky25's `boundary-approved` (2026-11-03).** Its BHW job ran 19 steps and skipped the build, because `apps/bhw-connect` is unchanged. It rides merge point 10. ⚠️ The claim says "four lines"; there are five.
+**Released.** It was to ride merge point 10. `D202` brought it forward, because every PR of the move until then would have needed jongsky25's label. After it, `#400` (`M207`) passed the boundary with nobody's label. `boundary-check-controls` passed 14 cases on the merged branch. **The prediction said "four lines"; it was five** (jongsky25's five CODEOWNERS lines), as the held note already recorded. Nothing else about it was wrong.
 
 Taken 2026-11-02. Branch `m204-bhw-ownership-until-handover`, cut from origin/main at `e0cb402d`, PR into main. It rides merge point 10 (`D198` A, in the answer's own words). `M203` and `M202` are built and held below.
 

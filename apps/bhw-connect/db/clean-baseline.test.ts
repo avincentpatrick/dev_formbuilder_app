@@ -4,6 +4,7 @@ import { cleanBaseline } from "./clean-baseline.mjs";
 // The shape a schema-only pg_dump of Supabase's public schema takes, cut to one of each line the
 // cleaner removes and a few it must keep.
 const RAW = [
+  "\\restrict AbC123",
   "SET statement_timeout = 0;",
   "SET transaction_timeout = 0;",
   "CREATE SCHEMA public;",
@@ -17,14 +18,15 @@ const RAW = [
   "ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON TABLES TO anon;",
   "GRANT ALL ON TABLE public.dim_geo TO supabase_admin;",
   "GRANT SELECT ON TABLE public.dim_geo TO anon;",
+  "\\unrestrict AbC123",
 ].join("\n");
 
 describe("clean-baseline", () => {
   it("takes out exactly the lines a plain PostgreSQL 15 rejects, and keeps the rest", () => {
     const { text, stripped } = cleanBaseline(RAW);
 
-    expect(stripped).toEqual({ setting: 1, publicSchema: 2, supabaseForeignKey: 1, supabaseRole: 2 });
-    expect(text).not.toMatch(/transaction_timeout|CREATE SCHEMA public|supabase_admin|auth\.users/);
+    expect(stripped).toEqual({ psqlOnly: 2, setting: 1, publicSchema: 2, supabaseForeignKey: 1, supabaseRole: 2 });
+    expect(text).not.toMatch(/transaction_timeout|CREATE SCHEMA public|supabase_admin|auth\.users|restrict/);
     // The primary key's two lines stay; only the foreign key into auth. and its ALTER line go.
     expect(text).toContain("ADD CONSTRAINT admin_users_pkey PRIMARY KEY (user_id);");
     expect(text.match(/^ALTER TABLE ONLY public\.admin_users$/gm)).toHaveLength(1);

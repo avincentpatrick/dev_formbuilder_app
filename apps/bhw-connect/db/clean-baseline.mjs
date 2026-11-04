@@ -11,6 +11,9 @@
  * `db/bootstrap-roles.sql`, once the lines below are taken out. Each is matched by its content, never by its
  * position, and the run refuses (exit 2) if anything that names Supabase's schemas or roles survives.
  *
+ *   - `\restrict` / `\unrestrict`: psql-only lines a current `pg_dump` (15.14 on) writes around the dump,
+ *     each with a random key, so the baseline is plain SQL any client runs and its bytes change only when
+ *     the schema does;
  *   - `SET transaction_timeout`: a PostgreSQL 17 setting a newer `pg_dump` writes and 15 rejects;
  *   - `CREATE SCHEMA public` / `COMMENT ON SCHEMA public`: the schema already exists;
  *   - a foreign key into `auth.` or `storage.` (two lines: `ALTER TABLE ONLY …` and `ADD CONSTRAINT …`);
@@ -29,9 +32,13 @@ const SUPABASE_SCHEMA = /\b(auth|storage)\.\w/;
 export function cleanBaseline(raw) {
   const lines = raw.split("\n");
   const kept = [];
-  const stripped = { setting: 0, publicSchema: 0, supabaseForeignKey: 0, supabaseRole: 0 };
+  const stripped = { psqlOnly: 0, setting: 0, publicSchema: 0, supabaseForeignKey: 0, supabaseRole: 0 };
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
+    if (/^\\(un)?restrict\b/.test(line)) {
+      stripped.psqlOnly += 1;
+      continue;
+    }
     if (/^SET transaction_timeout\b/.test(line)) {
       stripped.setting += 1;
       continue;

@@ -22,6 +22,8 @@
        until then the data is on Supabase): db\migrate.mjs --check; when anything is pending, a
        row-count census, a pg_dump of bhw_connect, the migration, and a second census - and a
        table that lost rows stops the deploy before the swap (BHW's additive rule, measured).
+       pg_dump is found by Resolve-PgDump (ops\pg-tools.ps1), since the box's PATH has none, and
+       the newest 10 pre-deploy dumps are kept.
     4. SWAP. Stop the service, point the <BhwRoot>\current junction at the new release, start the
        service, and poll the health URL for HTTP 200 for up to 60 seconds. BHW is down for
        seconds; Meridian is not touched.
@@ -47,6 +49,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+. (Join-Path $PSScriptRoot 'pg-tools.ps1')
+
 # Paths under apps/bhw-connect that the running server never loads: a change only there needs no
 # release. Everything else deploys.
 $NotServedPrefixes = @('apps/bhw-connect/docs/', 'apps/bhw-connect/ingestion/')
@@ -63,16 +67,18 @@ function Write-Step([string]$Message) {
     Write-Host ("[{0}] {1}" -f (Get-Date -Format 's'), $Message)
 }
 
-# Runs one native command and throws when it exits non-zero; its output passes through.
+# Runs one native command and throws when it exits non-zero; its output passes through. The echo masks
+# any URL password: the pre-migration pg_dump is handed BHW_DATABASE_URL, and once deploy.yml runs this
+# script the echo is the Actions log.
 function Invoke-Native {
     param(
         [Parameter(Mandatory = $true)][string]$File,
         [string[]]$Arguments = @()
     )
-    Write-Host ("--> {0} {1}" -f $File, ($Arguments -join ' '))
+    Write-Host (Hide-Secret ("--> {0} {1}" -f $File, ($Arguments -join ' ')))
     & $File @Arguments
     if ($LASTEXITCODE -ne 0) {
-        throw ("BHW deploy step failed: '{0} {1}' exited with code {2}." -f $File, ($Arguments -join ' '), $LASTEXITCODE)
+        throw (Hide-Secret ("BHW deploy step failed: '{0} {1}' exited with code {2}." -f $File, ($Arguments -join ' '), $LASTEXITCODE))
     }
 }
 
@@ -225,8 +231,12 @@ function Invoke-Migrations([hashtable]$Env, [string]$Sha) {
     $before = Get-Census $Env
     New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
     $dump = Join-Path $BackupDir ("pre-deploy-{0}-{1}.dump" -f (Get-Date -Format 'yyyyMMdd-HHmmss'), $Sha.Substring(0, 8))
-    Invoke-Native pg_dump @('--format=custom', "--file=$dump", '--dbname', $Env['BHW_DATABASE_URL'])
+    Invoke-Native (Resolve-PgDump $Env) @('--format=custom', "--file=$dump", '--dbname', $Env['BHW_DATABASE_URL'])
     Write-Step "backup: $dump"
+    Get-ChildItem -LiteralPath $BackupDir -Filter 'pre-deploy-*.dump' |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -Skip 10 |
+        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
     Invoke-Native node @('db\migrate.mjs')
     $after = Get-Census $Env
     $dropped = @()

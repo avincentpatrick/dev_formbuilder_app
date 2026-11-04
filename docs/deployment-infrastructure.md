@@ -722,7 +722,7 @@ Meridian's `deploy:backup`, `deploy:census` and nightly task are scoped to `meri
 **Deploying it.** `apps/bhw-connect/ops/deploy-bhw.ps1`, run by the same Deploy job right after
 `deploy.ps1` (wired in `bhw-p1-box`): its own deployed sha, a diff over `apps/bhw-connect` only, a build
 aside into `releases\<sha>`, migrations with a census before and after (refusing on a lost row), a
-junction swap with a 60-second health check and an automatic swap back. `deploy.ps1` treats `apps/` as
+junction swap with a 60-second health check and an automatic swap back. `pg_dump` is found by `ops/pg-tools.ps1` (`BHW_PG_DUMP`, else the newest PostgreSQL under Program Files, else PATH), because the box's PATH has none; the echo of every step masks a URL password; the newest 10 pre-deploy dumps are kept. ⛔ The runner (NETWORK SERVICE) needs Modify on `C:\meridian\backups\bhw` to write the pre-migration dump (`M208`), which exposes nothing new: it already reads BHW's `.env`. `deploy.ps1` treats `apps/` as
 site-safe, so **a BHW-only push opens no Meridian window** — unless the previous Meridian deploy did not
 finish cleanly, in which case any push takes the full path. **Rollback:** `ops\deploy-bhw.ps1
 -AppPath C:\meridian\test-app -Rollback` — seconds, no git, no build.

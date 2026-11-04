@@ -24,10 +24,23 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D202`–`D205`, the last filed, were asked and answered on 2026-11-03 while `bhw-p3-identity` was planned, and recorded the same day. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D206`, the last filed, was asked and answered on 2026-11-04 at `bhw-p3-identity`'s last box step, and recorded the same day. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D206 — Supabase's documentation says a project on a paid plan cannot be paused, and jongsky25's organisation is on Pro, so `D183`'s "paused for 30 days as the rollback, then deleted" cannot be done. BHW Connect reads nothing from it since `bhw-p3-identity`. What happens to it? **A — it stays as it is, and the handover page asks jongsky25 to delete it and downgrade his organisation, with the two Vercel projects.**
+
+**Asked and answered 2026-11-04 (user decision, in chat), at `M207`'s last box step.** The user asked first whether it would block the remaining work. It does not: none of `bhw-deploy-db-tools`, P1's remainder, `bhw-settings-from-github`, P4 (its seed comes from the box), merge point 10 or the handover reads Supabase. The user: *"if no, then lets leave it to jong. since we have already fully migrated to the server"*.
+- **A — leave it until the handover (recommended, chosen).** Nobody touches it until then. It keeps `D198`'s one message to jongsky25. His Pro bill runs until he acts.
+- **B — ask jongsky25 now** to delete it and downgrade, which stops his bill sooner and ends the rollback copy at once.
+
+Measured the same day:
+- A move to a Free organisation, the only route to a pause, is closed too: the database is 651 MB against Free's 500 MB.
+- The box holds everything Supabase had at the cut-over and every write since, the 34 screenshots, and nightly dumps with a restore drill.
+- Deleting the project or downgrading the organisation needs its Owner; avincentpatrick is a Developer there.
+
+**What the answer files:** `bhw-supabase-vercel-delete` is retitled for the deletion and the downgrade, blocked by `bhw-handover`. `bhw-handover` names it.
+
 ### D202 — `bhw-p3-identity` changes files under `apps/bhw-connect/`, which `.github/CODEOWNERS` on `main` still gives to jongsky25 until `#397` (`M204`) merges, so its pull request would need his label. When does `#397` merge? **A — now, at its own merge point, once a trunk merge has a fresh green run.**
 
 **Asked and answered 2026-11-03 (user decision, in chat), while `bhw-p3-identity` was planned.** `D198` had `#397` ride merge point 10. The user's goal of the same day finishes P3, `bhw-deploy-db-tools`, P1's remainder, `bhw-settings-from-github` and P4 before merge point 10, and each would have needed his label.

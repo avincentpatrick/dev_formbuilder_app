@@ -16,7 +16,65 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M208` released on 2026-11-04: BHW's ops scripts find `pg_dump` themselves, and the deploy never prints the database password. The runner (NETWORK SERVICE) may now write BHW's pre-migration dumps. Close-out branch `m208-closeout`. The next claim is `bhw-p1-box`'s remainder, step 3 of the user's seven, which this release unblocks.
+## Status: ACTIVE CLAIM — `M209`, BHW Connect deploys itself on every merge, its scheduled jobs run on the box, and a BHW-only push and a rollback prove it (`bhw-p1-box`'s remainder, with `bhw-screenshot-trace` as the BHW-only push) (m209-bhw-p1-box)
+
+Taken 2026-11-04. Branch `m209-bhw-p1-box`, cut from origin/main at `ca2dbb57`, PR into main. Two pull requests, both titled `M209`:
+- the deploy wiring (`.github/workflows/deploy.yml`, a test that pins it, runbook 8.4);
+- after it, the BHW-only push (`bhw-screenshot-trace`), whose deploy is the proof.
+
+Both merge at their own merge points once green, under the user's instruction of 2026-11-03: their paths are site-safe (`.github/`, `tests/`, `docs/`, `apps/`).
+
+This is step 3 of the user's seven. The user asked to be asked for the runner's grant and `CRON_SECRET` at the box.
+
+Row: `bhw-p1-box`: "what remains comes after bhw-p3-identity: the scheduled tasks with CRON_SECRET, the runner's grant to control the bhw-connect service, deploy.yml running ops/deploy-bhw.ps1, proved by a BHW-only push and a rollback, runbook 8.4 rewritten from what the box measured, and the box-load check". Also `bhw-screenshot-trace`.
+
+### Evidence verified
+- **`.github/workflows/deploy.yml`: held.**
+  - One job on `self-hosted`, one step: `& "$app\deploy.ps1" -AppPath $app`.
+  - `concurrency: production-deploy`; no BHW step; no `timeout-minutes`.
+  - No test pins the file.
+- **`deploy.ps1` runs nothing under `apps/`** (`$SiteSafePrefixes` includes `apps/`), so a BHW change goes live only by hand today: `apps/bhw-connect/ops/deploy-bhw.ps1 -AppPath C:\meridian\test-app`.
+- **The service's rights.** `deploy-bhw.ps1` `Switch-Release` calls `Stop-Service` and `Start-Service` on `bhw-connect`, which needs start, stop and query rights.
+- **E0, read at the box 2026-11-04 05:09:30 UTC.**
+  - `bhw-connect`'s descriptor has no NETWORK SERVICE entry: `D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)S:(AU;FA;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;WD)`.
+  - Meridian's worker carries `(A;;CCLCSWRPWPDTLOCRRC;;;NS)`.
+  - Only `bhw-connect-db-backup` is registered: no cron task.
+- **`lib/storage/screenshots.ts`: held.** The box's build of `d7ca70a0` warned twice that `storageRoot`'s `path.resolve` and `readScreenshot`'s `readFile` trace the whole project into the release.
+
+### Premise verified
+- **The runner.** It is `actions.runner.avincentpatrick-dev_formbuilder_app.DGF97HY2`, as NETWORK SERVICE (E0).
+  - The machine PATH carries nodejs and Git, so its `npm ci` and `git` run as they do for Meridian's deploy.
+  - NETWORK SERVICE has Modify on `C:\meridian\bhw` (`M194`) and on `C:\meridian\backups\bhw` (`M208`).
+- **The grant is the worker's own, copied.** `deploy.ps1`'s `Start-WorkerIfStopped` has passed on every deploy with that entry.
+  - Its known cost is that every NETWORK SERVICE process holds the right, not the runner alone, which is the latent before-launch defect `docs/feature-backlog.md` already records for the worker.
+  - `bhw-connect` itself runs as NetworkService, so BHW's own process could then stop itself: the same exposure, one service over.
+  - `bhw-postgrest` is not touched by `deploy-bhw.ps1` and gets nothing.
+- **BHW's `.env` names `CRON_SECRET`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `MISTRAL_API_KEY` and `USAGE_EVENTS_IP_SALT` already** (E0). Whether each holds a value is read at E1, without printing it.
+- **The cron routes** (`/api/cron/precompute`, `/api/cron/regression-replay`) refuse anything but `Bearer ${CRON_SECRET}`, and refuse everything while it is unset.
+  - `precompute` calls the AI cascade, and a provider without a key is skipped.
+  - `regression-replay` calls no model.
+- **The box's room:** 63.5 GB of memory, 57.9 GB free, 32 CPUs at 1%. BHW's node 132 MB, postgres 358 MB, php-cgi 380 MB (E0).
+- **The deploy plan after the merge.** `deployed-sha` is `d7ca70a0`. `ops/` is served by `Test-NotServed`, so the wiring merge's own deploy finds `M208`'s ops change and builds a release as the runner: the runner's first BHW run.
+
+### Remedy verdict
+- **The grant: works, measured on the box.** The worker's entry has carried the runner's starts since 2026-09-17.
+- **The wiring: unmeasured until it runs.** The first run as the runner is the measurement. The step runs only after `deploy.ps1` succeeds, so a BHW failure never stops Meridian's deploy, and `deploy-bhw.ps1` swaps back by itself on a failed health check.
+- **The trace fix: measured on the dev build when written** (the warning gone).
+
+Files:
+- **First PR:** `.github/workflows/deploy.yml`, `tests/Feature/Deploy/DeployWorkflowTest.php` (new), `docs/deployment-infrastructure.md` (§8.4, rewritten from what the box measured).
+- **Second PR:** `apps/bhw-connect/lib/storage/screenshots.ts` and its test.
+- **At close-out:** ADR-0024's markers, `docs/pipeline.md`, `PROGRESS.md` (own block), `docs/gate-baselines.md`.
+
+Shared artefacts taken: `.github/workflows/deploy.yml`, `docs/deployment-infrastructure.md`.
+Paired files taken: `.github/workflows/deploy.yml` with the new test that pins it.
+Namespaces spent: nothing from either namespace (`M209`).
+Prediction:
+- **E1 at the box:** the grant reads back with the NS entry; `CRON_SECRET` is set or made; the three tasks register; `regression-replay` answers 200 by hand.
+- The first PR is 7/7. Its own deploy runs `deploy-bhw.ps1` as the runner, builds `M208`'s change, and swaps live.
+- The second PR's deploy is the BHW-only push: no Meridian window, a new BHW release.
+- The rollback by hand takes seconds both ways.
+- **The part I most expect to be wrong:** the runner's first `npm ci` and build as NETWORK SERVICE (its npm cache, `.next` in the checkout, robocopy into `releases`). Nobody has run them under that account.
 
 ## RELEASED — `M208`, BHW's ops scripts find `pg_dump` themselves, and the deploy never prints the database password (`bhw-deploy-db-tools`) (merged as PR #401, `b18bd1c2`, at its own merge point under the user's instruction of 2026-11-03; 7/7 green with real step counts on its run 41764966886 — Static analysis 33 · BHW Connect 20 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run 41768894912 on `b18bd1c2` the same; deploy 41772140940 site-safe, no window)
 

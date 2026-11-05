@@ -24,10 +24,21 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D210`, the last filed, was asked and answered on 2026-11-05 as `M214` was claimed, and recorded the same day. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D211`, the last filed, was asked and answered on 2026-11-05 during `M214`, and recorded the same day. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D211 — Each Meridian pull request touching a shared path waits for jongsky25's label, and the user asked: *"are we gonna kept on doing this? … this will delay our development. is there another way to avoid this?"* Who must approve a change to the shared paths? **A — `.github/`, `deploy.ps1` and the working agreement become avincentpatrick's alone; BHW's `ops/` stays shared.**
+
+**Asked and answered 2026-11-05 (user decision, in chat), during `M214`, after #409 waited on his label.**
+- **A — one-way on the three paths (chosen, the session's recommendation).** avincentpatrick's change to them needs nobody, and jongsky25's still needs their label. He loses his say over files that can take BHW down, so avincentpatrick tells him first. BHW's `ops/` stays shared, because it is his application's deploy.
+- **B — keep `D177`'s map, and only fold the third pull request into the second,** which leaves one click now and the same wait on every later shared change.
+- **C — merge over the label with the admin bypass when it is slow.** Rejected: it changes the rule without his agreement, and it teaches the habit the required check exists to stop.
+
+**How the answer was given, so nobody reads more into it.** The session asked the user to send jongsky25 a message that told him this was coming, and to reply *go*. The user replied *"i already sent this to jong"*, and the session took that as the answer. **His `boundary-approved` label on the pull request carrying it is his agreement.** The message asked him to say so before labelling if he objected. If he does, this is undone before it merges.
+
+**What the answer files:** the change itself, on `M214`'s #410. The third pull request folds into #410 as well, so one label is left. Nothing else: no Meridian pull request has been left waiting on him since.
+
 ### D210 — BHW Connect was handed to jongsky25 on 2026-11-05 (`M213`), and nine of its rows were still in Meridian's line, six of them at its head. What happens to them? **A — finish it in one go: five rows built and four off the line, at one merge point.**
 
 **Asked and answered 2026-11-05 (user decision, in chat), when the session took the line's head, `bhw-boundary-hardening`, and asked the user about jongsky25's sign-in.** The user's words: *"if we still have work to do for the bwh then the handoff must not provided to jong. this will cause confusion to both of us. can we finish now all for once?"* They approved the plan that follows (`~/.claude/plans/read-claude-md-then-run-virtual-shannon.md`). The handover stands: jongsky25 has the page and has acted on it.

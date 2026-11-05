@@ -2,8 +2,8 @@
 
 **For:** both developers — avincentpatrick (Meridian) and jongsky25 (BHW Connect). Plain rules, no
 Meridian jargon. Why it is set up this way is `docs/adr/0024-second-application-under-one-host.md`; the
-decisions behind it are `D172`–`D185` in `docs/claims/decisions.md`. Changing this page needs both of you
-(it is shared in `.github/CODEOWNERS`).
+decisions behind it are `D172`–`D185` and `D211` in `docs/claims/decisions.md`. Changes to this page are
+avincentpatrick's to make, and they tell jongsky25 (`D211`).
 
 ## Handed over (2026-11-05)
 
@@ -17,8 +17,9 @@ written. **What is yours, where everything lives and your first-day steps:**
 
 - **Everything under `apps/bhw-connect/` is BHW Connect's — jongsky25's.**
 - **Everything else is Meridian's — avincentpatrick's.**
-- **Shared** (a change here can take the other application down): `.github/`, `deploy.ps1`,
-  `apps/bhw-connect/ops/`, and this page.
+- **Shared:** `apps/bhw-connect/ops/`, BHW's deploy. Each of you needs the other's label there.
+- **avincentpatrick's alone, since `D211`:** `.github/`, `deploy.ps1` and this page. A change here can take BHW
+  down too, so they tell jongsky25 first, but it waits for nobody. A change here from jongsky25 needs their label.
 
 Ownership lives in `.github/CODEOWNERS`. You never need the other person for a change on your own side. A
 pull request that touches the other person's files, or a shared one, needs **their** approval: they add
@@ -97,7 +98,7 @@ keys, and every `NEXT_PUBLIC_` value, which the build compiles in.
 - Otherwise avincentpatrick adds it on the server before the merge.
 
 **Trust.** Anyone who can set repository secrets can set Meridian's too, and a workflow change can read any
-secret. That is why `.github/` is shared and needs both owners after the handover (§1). That rule covers what
+secret. That is why a change to `.github/` from jongsky25 needs avincentpatrick's label (§1). That rule covers what
 merges. A workflow on a branch runs when it is pushed, with no pull request, so this still rests on trust
 between the two of you.
 

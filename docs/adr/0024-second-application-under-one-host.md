@@ -101,7 +101,7 @@ PostgreSQL 15 service), the migration lint and a build under `/bhw-connect` **wi
 (`BHW_DATA_SOURCE=none`: measured, supabase-js retries a failed read for seven seconds, which pushed a page
 past Next's prerender limit). On a pull request that leaves `apps/bhw-connect` alone it skips everything
 and still reports success. Ownership is `.github/CODEOWNERS` — Meridian everything, BHW its folder, and
-`.github/`, `deploy.ps1`, BHW's `ops/` and the working agreement shared — and a required check of its own,
+BHW's `ops/` shared, and since `D211` `.github/`, `deploy.ps1` and the working agreement Meridian's alone — and a required check of its own,
 `.github/workflows/boundary.yml` running `scripts/boundary-check.php` from main's copy (a step in this job until
 `M214`), refuses a pull request that changes another owner's paths without that owner's `boundary-approved`
 label, reading the map from the base commit so a pull request cannot rewrite the map that judges it. "Require review from code owners" stays off: with one owner per side an author

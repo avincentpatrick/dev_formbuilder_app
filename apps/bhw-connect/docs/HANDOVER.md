@@ -13,10 +13,10 @@ we both follow are in `docs/working-agreement.md`. It is short, so read it once.
 
 - **Everything under `apps/bhw-connect/`.** You merge your own pull requests once every check is green. Nobody else
   needs to approve them.
-- **Shared with avincentpatrick:** `apps/bhw-connect/ops/`, `.github/`, `deploy.ps1` and `docs/working-agreement.md`.
-  A change to any of these can take the other app down, so it needs the other person's `boundary-approved` label.
-  - This now works both ways. When one of Meridian's pull requests touches a shared path, it waits for **your**
-    label. Please answer within a working day (working agreement §10).
+- **Shared with avincentpatrick:** `apps/bhw-connect/ops/`. Each of you needs the other's `boundary-approved` label
+  there. Please answer within a working day (working agreement §10).
+- **avincentpatrick's:** `.github/`, `deploy.ps1` and `docs/working-agreement.md`. Your change to them needs their label.
+  Theirs needs nobody, and they tell you first if it could take BHW down.
 - **Your Codex sessions.** Begin each task with `Read apps/bhw-connect/AGENTS.md and follow it.` That page is the full
   handoff for your agent. The repository's root `CLAUDE.md` is Meridian's, so it does not apply to you.
 
@@ -64,7 +64,7 @@ to avincentpatrick privately (a shared Drive file, for example), who loads it on
 ## What still needs avincentpatrick
 
 - Anything on the server: a data load, a server setting, a rollback, or a look at the server's logs.
-- Their label, when you change a shared path or write a destructive migration.
+- Their label, when you change `ops/`, one of their paths, or write a destructive migration.
 - Adding a BHW admin, your own row included (first-day step 3).
 
 ## Your first day

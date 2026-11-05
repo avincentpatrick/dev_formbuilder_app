@@ -39,7 +39,8 @@ instructions, and you never edit them. Numbers like `M214` or `D177` in other fi
 | Paths | Whose | To change them |
 |---|---|---|
 | `apps/bhw-connect/`, except `ops/` | jongsky25 | Nobody else needed. He merges on green. |
-| `apps/bhw-connect/ops/`, `.github/`, `deploy.ps1`, `docs/working-agreement.md` | Shared: a change here can take the other application down | avincentpatrick's `boundary-approved` label |
+| `apps/bhw-connect/ops/` | Shared: BHW's deploy, which a Meridian test also reads | avincentpatrick's `boundary-approved` label |
+| `.github/`, `deploy.ps1`, `docs/working-agreement.md` | avincentpatrick. A change here can take either application down | avincentpatrick's `boundary-approved` label |
 | Everything else | avincentpatrick | Only if jongsky25 says it is agreed, and it needs that label too |
 
 `.github/CODEOWNERS` is the map, and CI reads it from `main`. The rule is about who may change what, so:
@@ -89,18 +90,16 @@ If it is broken, open a revert pull request, or ask avincentpatrick to roll back
 
 ### The checks
 
-Seven are required: Static analysis, style & security · Tests (Pest on PostgreSQL) · Frontend build & type-check ·
-Design system a11y (axe) · Contract tests (OpenAPI) · E2E (Playwright + axe) · BHW Connect (lint, types, tests, build).
+Eight are required: Boundary (from main) · Static analysis, style & security · Tests (Pest on PostgreSQL) · Frontend
+build & type-check · Design system a11y (axe) · Contract tests (OpenAPI) · E2E (Playwright + axe) · BHW Connect (lint,
+types, tests, build).
 
-**Check which of these two worlds you are in, by whether `.github/workflows/boundary.yml` is on `main`:**
-
-| | Not yet on `main` | Once it is (pull request #409) |
-|---|---|---|
-| A BHW-only pull request | All jobs run, about 30–40 minutes | Meridian's jobs skip and show as passed, and the secret scan still runs: minutes |
-| The ownership rule | A step inside the BHW Connect job | Its own eighth required check, **Boundary (from main)**, run from `main`'s copy |
-| After a label is added | Re-run the job by hand | It runs again by itself |
-
-A change under `ops/` is shared, so it always runs every job. Skipped jobs report no steps, and that is correct.
+- **Boundary (from main)** is the ownership rule. It runs from `main`'s copy, so a pull request cannot change the rule
+  that judges it, and it runs again by itself when a label is added or removed.
+- **A BHW-only pull request takes minutes.** Meridian's jobs skip and show as passed, and the secret scan still runs.
+  Skipped jobs report no steps, and that is correct.
+- **A change under `ops/` runs every job,** about 30–40 minutes.
+- **BHW Connect** runs lint, types, unit tests, the migration lint, both builds, five pages and the browser specs in `e2e/`.
 
 ## Your environment
 
@@ -110,9 +109,9 @@ A change under `ops/` is shared, so it always runs every job. Skipped jobs repor
 - **What you probably can't run:** Vitest's database cases need PostgreSQL (`BHW_TEST_DATABASE_URL`) and skip without
   it, and the browser specs need a browser and a running server. CI runs both. **Say plainly in your report what you
   did not run.** A session here reported 1,281 tests passing on 2026-11-05; with the database, the count was 1,286 and 11 skipped.
-- **GitHub access:** Codex pushes through the **ChatGPT Codex Connector** app. A **403 on pushing or creating a branch,
-  while his account shows write access,** means the app is not installed on the repository owner's account. Only
-  avincentpatrick can fix that. It is not a reason to change anything in the repository.
+- **GitHub access:** Codex pushes through the **ChatGPT Codex Connector** app, installed on the repository owner's
+  account on 2026-11-05, and pull requests carry his name. A **403 on pushing or creating a branch** means that access
+  has changed. Only avincentpatrick can fix it, and it is not a reason to change anything in the repository.
 
 ## What needs avincentpatrick
 
@@ -149,12 +148,8 @@ one line. Don't ask him to do things that are on jongsky25's own list.
 ## Where things stand (2026-11-05)
 
 - **Live and healthy.** BHW runs wholly on the box.
-- **Not shipped:** jongsky25's own change on `bhw/hide-profiling-status-card` (commit `de2247b`, one file, five lines
-  removed). It is in his Codex session and never reached GitHub, because of the 403 above.
-- **In progress on the Meridian side, needing his label:** #409 (the boundary check and the fast path), #410 (screenshots
-  in the nightly backup, browser specs in CI) and the pull request that brings this page to `main`.
-  - Until they merge, avoid changing `ops/nightly-dump.ps1`, `playwright.config.ts`, `e2e/`, `CLAUDE.md` and
-    `docs/HANDOVER.md`, and tell avincentpatrick before merging anything.
+- **His own change** hiding the 2026 Profiling Status card from the landing page is pull request #411. Check whether it
+  has merged.
 - **Still his, on his own accounts:** see *Your first day* in `docs/HANDOVER.md`. As measured today, the Supabase project
   and Vercel's `bhw-connect` are gone. Vercel's `bhw-connect-phase-2` remains, the old repository is not archived, and
   only `BHW_USAGE_EVENTS_IP_SALT` is set among the `BHW_` secrets.

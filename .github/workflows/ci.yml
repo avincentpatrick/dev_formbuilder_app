@@ -91,9 +91,49 @@ env:
   NODE_VERSION: "24"
 
 jobs:
+  # ── M214 (`bhw-ci-fast-path`, ADR-0024, D210): does this pull request change only BHW Connect? ──
+  # A pull request that changes nothing of Meridian's used to run all six of its jobs, about 30 minutes,
+  # before BHW's owner could merge. scripts/ci-scope.php answers, and its controls are in
+  # scripts/boundary-check-controls.php. On a push, a schedule or a dispatch the answer is always no.
+  #
+  # ⛔ THE CONDITIONS BELOW ARE WHAT KEEP THIS FROM PASSING WHAT IT NEVER CHECKED, AND BOTH HALVES MATTER.
+  # A job skipped by its condition reports success on a required check, and so does a job whose `needs:`
+  # failed. So each job tests for the literal answer under `!cancelled()`: if this job fails, its output is
+  # empty and every job runs. Measured on a throwaway repository (M214's claim): skipped reads CLEAN, and a
+  # failed detection job ran the required job rather than passing it.
+  #
+  # ⚠️ static-analysis STILL RUNS ITS JOB, WITH ONLY THE CHECKOUT AND THE SECRET SCAN, because a leak in BHW's
+  # files is this repository's leak: the repository is public and the history is what gitleaks reads. That is
+  # why its steps carry the condition one by one. A new step without it runs on a BHW-only pull request too,
+  # which is the safe mistake, and tests/Feature/Docs/BoundaryWorkflowTest.php refuses it.
+  #
+  # ⚠️ A BHW-ONLY PULL REQUEST'S SKIPPED JOBS REPORT NO STEPS. Here that is correct, not a job that never
+  # acquired a runner. It cannot happen to a pull request that changes Meridian.
+  scope:
+    name: Scope (BHW Connect only, or Meridian too)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      bhw_only: ${{ steps.scope.outputs.bhw_only }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The diff is taken from the merge base, as the boundary check's is.
+          fetch-depth: 0
+
+      - name: Does every changed path belong to BHW Connect alone?
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: php scripts/ci-scope.php --event="$EVENT" --base="$BASE_SHA" --head="$HEAD_SHA" >> "$GITHUB_OUTPUT"
+
   # ── Stage 1: static analysis, style & security (fail-fast, cheapest first) ──────────────
   static-analysis:
     name: Static analysis, style & security
+    needs: scope
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -129,6 +169,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup PHP
+        if: needs.scope.outputs.bhw_only != 'true'
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ env.PHP_VERSION }}
@@ -136,24 +177,30 @@ jobs:
           coverage: none
 
       - name: Install PHP dependencies
+        if: needs.scope.outputs.bhw_only != 'true'
         run: composer install --no-interaction --prefer-dist --no-progress
 
       - name: Pint (code style)
+        if: needs.scope.outputs.bhw_only != 'true'
         run: composer run lint
 
       - name: Larastan / PHPStan (level 8)
+        if: needs.scope.outputs.bhw_only != 'true'
         run: composer run analyse
 
       - name: Thin-controller gate (250 lines / complexity 10)
+        if: needs.scope.outputs.bhw_only != 'true'
         run: composer run controller-gate
 
       - name: Tenant-isolation migration linter (RLS on every tenant-scoped table)
+        if: needs.scope.outputs.bhw_only != 'true'
         run: composer run migration-lint
 
       # ADR-0007's companion gate, discharging ADR-0002 §D6. Registered as its own step because no CI
       # job runs `composer run quality` — the four steps above invoke the scripts individually, so a
       # composer.json-only registration would gate nothing.
       - name: Job payload linter (tenant-aware base class, queue name, scalar payloads)
+        if: needs.scope.outputs.bhw_only != 'true'
         run: composer run job-payload-lint
 
       # ADR-0002 §D5. Its companion is tests/Feature/Tenancy/ConstraintBoundaryDriftTest.php, which is
@@ -161,6 +208,7 @@ jobs:
       # service and no .env, which is exactly why the §D5 gate is two halves rather than one: the drift
       # test says which constraint crosses the boundary, this says which migration line wrote it.
       - name: Constraint boundary linter (no FK or unique may span a tenant boundary)
+        if: needs.scope.outputs.bhw_only != 'true'
         run: composer run constraint-boundary-lint
 
       # M28. A PascalCase tag with no import resolves to NOTHING and renders as nothing, and BOTH
@@ -171,6 +219,7 @@ jobs:
       # the note above the job-payload step: no CI job runs `composer run quality`, so a
       # composer.json-only registration would gate nothing.
       - name: Component import linter (no template tag without an import)
+        if: needs.scope.outputs.bhw_only != 'true'
         run: composer run component-import-lint
 
       # M57. `Markdown::withSecuredEncoding()` (AppServiceProvider) swaps the echo encoder for the
@@ -186,6 +235,7 @@ jobs:
       # safe from unsafe here; the CONTEXT is. The script header records the four controls that
       # proved it red, including the one written as `{{ }}`.
       - name: Mail attribute linter (no unescaped Blade echo in a mail-view attribute)
+        if: needs.scope.outputs.bhw_only != 'true'
         run: composer run mail-attribute-lint
 
       # M40. The tracker is documentation, and NOTHING in CI has ever read a documentation diff —
@@ -212,6 +262,7 @@ jobs:
       # indistinguishable from inside the rule, and mistaking them is what cost M48 eight
       # increments. It is also what makes a future `fetch-depth` reduction fail LOUDLY.
       - name: Tracker lint (PROGRESS.md structure, encoding and deletion guard)
+        if: needs.scope.outputs.bhw_only != 'true'
         env:
           TRACKER_LINT_BASE_SHA: ${{ github.event_name == 'push' && github.event.before || '' }}
           TRACKER_LINT_PR_COMMITS: ${{ github.event_name == 'pull_request' && github.event.pull_request.commits || '' }}
@@ -227,6 +278,7 @@ jobs:
       # will ever exercise it, and the composer-only registration would gate nothing — the same
       # reason every linter above is its own step.
       - name: Tracker lint controls (R7's base resolution, both event arms)
+        if: needs.scope.outputs.bhw_only != 'true'
         run: composer run tracker-lint-controls
 
       # M46. A `path:N` citation whose target line is BLANK, a horizontal rule, a fence delimiter, a
@@ -239,6 +291,7 @@ jobs:
       # The class it deliberately cannot catch is named in the script header, with two measured
       # counter-examples from the same increment. Do not sell it as more than it is.
       - name: Citation liveness linter (no citation into a blank line, rule or fence)
+        if: needs.scope.outputs.bhw_only != 'true'
         run: composer run citation-liveness-lint
 
       # M85. The gate above had NO controls of any kind, and M85 changed its resolver — a partial
@@ -251,6 +304,7 @@ jobs:
       # locally while green here, which is the state one open row already describes. The cost, stated
       # in the file: `scripts/mutate.php` cannot drive it, exactly as for tracker-lint-controls.
       - name: Citation liveness controls (the partial-path resolver, both ways)
+        if: needs.scope.outputs.bhw_only != 'true'
         run: composer run citation-liveness-lint-controls
 
       # M104. `scripts/pre-push-guard.php` had NO coverage of any kind until this step, and M104
@@ -268,6 +322,7 @@ jobs:
       # and `git` is not installed in the app container — the same trade citation-liveness-lint-controls
       # and tracker-lint-controls already refused, for the same reason.
       - name: Pre-push guard controls (the documentation exemption, both ways)
+        if: needs.scope.outputs.bhw_only != 'true'
         run: composer run pre-push-guard-controls
 
       # M81. The gate over `docs/pipeline.md`, the one ordered line of remaining work. Five separate
@@ -283,6 +338,7 @@ jobs:
       # ⛔ IT PROVES THAT WHAT IS WRITTEN DOWN IS QUEUED, NEVER THAT EVERYTHING WORTH WRITING DOWN
       # HAS BEEN. An obligation living only in a document no rule reads is still invisible to it.
       - name: Pipeline lint (one queue, no drift, no hidden held row, no dormant documented column)
+        if: needs.scope.outputs.bhw_only != 'true'
         run: composer run pipeline-lint
 
       # ⛔ HOST/RUNNER ONLY, AND THAT IS MEASURED (M90). Inside the app container
@@ -292,12 +348,14 @@ jobs:
       #    nine of them phantoms of the harness. CI's checkout is an ordinary filesystem, so it agrees
       #    with the host, which is what makes the host authoritative.
       - name: Test-class pointer lint (no test names a *Test file that was never written)
+        if: needs.scope.outputs.bhw_only != 'true'
         run: composer run test-pointer-lint
 
       # The gate's own positive control: three synthetic trees plus a collapsed-floor arm, two of which
       # must go RED. scripts/mutate.php cannot drive this one — its truthful container answer is red
       # (docs/feature-backlog.md:8251) — so the control ships with the gate and runs beside it.
       - name: Test-class pointer lint controls (the two red arms and the floor)
+        if: needs.scope.outputs.bhw_only != 'true'
         run: composer run test-pointer-lint-selftest
 
       # M108. scripts/backlog-triage.php derives the hub set that D13's whole grouping rule is
@@ -315,24 +373,30 @@ jobs:
       # five deliberate defects were applied by hand before shipping and every one turned a case
       # red; the verdicts are in M108's release.
       - name: Backlog-triage controls (the citation harvester, both directions)
+        if: needs.scope.outputs.bhw_only != 'true'
         run: composer run backlog-triage-controls
 
-      # M192 (ADR-0024, D177). The bhw-connect job's boundary step decides who may change what
-      # between the two applications in this repository. Host script, for the reason above: it reads
-      # the commit graph. Proved red by a committed mutation, recorded in M192's claim.
+      # M192 (ADR-0024, D177). .github/workflows/boundary.yml decides who may change what between the two
+      # applications in this repository, and since M214 scripts/ci-scope.php decides which of this file's
+      # jobs a pull request may skip. Host script, for the reason above: both read the commit graph. Proved
+      # red by committed mutations, recorded in M192's and M214's claims.
       - name: Boundary-check controls (the ownership rule, both directions)
+        if: needs.scope.outputs.bhw_only != 'true'
         run: composer run boundary-check-controls
 
       - name: Composer audit (SCA)
+        if: needs.scope.outputs.bhw_only != 'true'
         run: composer audit
 
       - name: Setup Node
+        if: needs.scope.outputs.bhw_only != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
       - name: Install JS dependencies
+        if: needs.scope.outputs.bhw_only != 'true'
         # npm install (not ci): the lockfile is generated on Windows and npm can omit
         # Linux-only transitive optional deps (e.g. @emnapi); install reconciles them.
         run: npm install --no-audit --no-fund
@@ -352,6 +416,7 @@ jobs:
       # on a non-shippable dev-tooling DoS. That scope was locked with the user in PR #61; M72 fixed
       # the conflation and moved nothing about the threshold.
       - name: npm audit — fetch advisories (registry reachability is NOT a merge signal)
+        if: needs.scope.outputs.bhw_only != 'true'
         # continue-on-error is load-bearing: without it npm's own exit 1 kills the job before the
         # judge runs and the conflation is back. The step still renders as failed-but-ignored, which
         # is the "fail differently" primitive, and it needs no new job and no new required context.
@@ -359,6 +424,7 @@ jobs:
         run: npm audit --json --omit=dev > npm-audit.json
 
       - name: npm audit (SCA — high/critical in PRODUCTION deps blocks merge)
+        if: needs.scope.outputs.bhw_only != 'true'
         # The severity-threshold flag is gone from the npm command line ON PURPOSE (named, not
         # quoted -- a comment that spells a token a gate forbids is this repo's fifth such trap): the
         # threshold now lives in
@@ -472,6 +538,8 @@ jobs:
   # ── Stage 2: unit + integration tests (real PostgreSQL, never sqlite) ───────────────────
   tests:
     name: Tests (Pest on PostgreSQL)
+    needs: scope
+    if: ${{ !cancelled() && needs.scope.outputs.bhw_only != 'true' }}
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -553,6 +621,8 @@ jobs:
   # ── Stage: frontend build + type-check + token generation ──────────────────────────────
   frontend:
     name: Frontend build & type-check
+    needs: scope
+    if: ${{ !cancelled() && needs.scope.outputs.bhw_only != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -575,6 +645,8 @@ jobs:
   # ── Stage: design-system accessibility (axe on every story, WCAG 2.2 AA, merge-blocking) ─
   design-system-a11y:
     name: Design system a11y (axe)
+    needs: scope
+    if: ${{ !cancelled() && needs.scope.outputs.bhw_only != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -603,6 +675,8 @@ jobs:
   #    match a fresh export (regenerate with `php artisan scramble:export --path=openapi.json` + commit on drift).
   contract-tests:
     name: Contract tests (OpenAPI)
+    needs: scope
+    if: ${{ !cancelled() && needs.scope.outputs.bhw_only != 'true' }}
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -694,6 +768,8 @@ jobs:
   #    horizontal overflow. Central-domain admin (mandatory MFA) is covered by a Storybook story instead.
   e2e:
     name: E2E (Playwright + axe)
+    needs: scope
+    if: ${{ !cancelled() && needs.scope.outputs.bhw_only != 'true' }}
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -819,8 +895,8 @@ jobs:
   #    `paths:` filter would be wrong: a required check that never reports blocks the merge. On main
   #    (push, schedule, dispatch) it always runs.
   #
-  #    ⛔ THE BOUNDARY STEP RUNS ON EVERY PULL REQUEST, BHW OR NOT: D177's rule is about who may
-  #    change what. Its controls are scripts/boundary-check-controls.php (static analysis, above).
+  #    ⛔ THE BOUNDARY IS NOT HERE ANY MORE (M214). It was a step in this job, so a pull request could
+  #    delete it. It is .github/workflows/boundary.yml, judged from main's copy.
   #
   #    ⚠️ THE BUILD HAS NO DATABASE ON PURPOSE (BHW_DATA_SOURCE=none, lib/db/data-plane.ts): every REST
   #    call is answered at once with a status supabase-js does not retry, so pages degrade and the
@@ -833,8 +909,6 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-      issues: read
-      pull-requests: read
     services:
       postgres:
         # pgvector, as the box carries it (M211): the seeded database below needs it for
@@ -853,25 +927,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # The boundary and Changed? steps diff the pull request from its merge base.
+          # The Changed? step diffs the pull request from its merge base.
           fetch-depth: 0
 
-      - name: Setup PHP (the boundary check and the npm audit judge are Meridian's scripts)
+      - name: Setup PHP (the npm audit judge is Meridian's script)
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ env.PHP_VERSION }}
           coverage: none
-
-      - name: Boundary — a change to the other owner's paths needs their label (D177)
-        if: github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          PR: ${{ github.event.pull_request.number }}
-          AUTHOR: ${{ github.event.pull_request.user.login }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: php scripts/boundary-check.php --repo="$REPO" --pr="$PR" --author="$AUTHOR" --base="$BASE_SHA" --head="$HEAD_SHA"
 
       - name: Changed? (a pull request that leaves apps/bhw-connect alone skips the rest and passes)
         id: changed

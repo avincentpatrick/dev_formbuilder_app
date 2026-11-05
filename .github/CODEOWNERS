@@ -1,8 +1,8 @@
 # Who owns what in this repository (M192, ADR-0024, decision D177).
 #
 # The LAST matching line wins, as GitHub reads it. This file is read twice: by GitHub, to request a
-# review from the owners, and by CI's boundary step (scripts/boundary-check.php), which reads it from
-# the BASE commit and refuses a pull request that changes another owner's paths without that owner's
+# review from the owners, and by .github/workflows/boundary.yml (scripts/boundary-check.php), which reads
+# it from the BASE commit and refuses a pull request that changes another owner's paths without that owner's
 # `boundary-approved` label. "Require review from code owners" is deliberately OFF on `main`: with one
 # owner per side, an author could never approve their own pull request.
 #

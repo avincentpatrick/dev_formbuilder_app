@@ -22,8 +22,10 @@ written. **What is yours, where everything lives and your first-day steps:**
 
 Ownership lives in `.github/CODEOWNERS`. You never need the other person for a change on your own side. A
 pull request that touches the other person's files, or a shared one, needs **their** approval: they add
-the label `boundary-approved` to it. CI's `boundary` step checks that, and that the label was added by the
-right person. If you push new commits after they approved, ask them to remove the label and add it again.
+the label `boundary-approved` to it. CI's **Boundary (from main)** check reads that, and that the label was
+added by the right person. It runs from `main`'s copy of the rule, so a pull request can't change the rule that
+judges it, and it runs again by itself when the label changes. If you push new commits after they approved, ask
+them to remove the label and add it again.
 
 ## 2. One trunk
 
@@ -47,8 +49,9 @@ Every merge to `main` deploys to the testing server, `https://staging.pitahc.gov
 
 1. Claude runs the checks in its own session: `npm ci`, `npm run lint`, `npm run typecheck`,
    `npx vitest run`, and the build the way CI builds it (the command is in `apps/bhw-connect/CLAUDE.md`).
-2. Open the pull request. CI's **BHW Connect** check repeats all of it. Meridian's checks run too, so it
-   takes about 30–40 minutes.
+2. Open the pull request. CI's **BHW Connect** check repeats all of it. Meridian's checks skip themselves and
+   show as passed, and the secret scan still runs, so it takes minutes. A change under `ops/` is shared, so it
+   runs them all and takes about 30–40 minutes.
 3. Green → merge it.
 4. Look at it on `https://staging.pitahc.gov.ph/bhw-connect` a few minutes later. **Staging is BHW's
    preview.**
@@ -94,7 +97,9 @@ keys, and every `NEXT_PUBLIC_` value, which the build compiles in.
 - Otherwise avincentpatrick adds it on the server before the merge.
 
 **Trust.** Anyone who can set repository secrets can set Meridian's too, and a workflow change can read any
-secret. That is why `.github/` is shared and needs both owners after the handover (§1).
+secret. That is why `.github/` is shared and needs both owners after the handover (§1). That rule covers what
+merges. A workflow on a branch runs when it is pushed, with no pull request, so this still rests on trust
+between the two of you.
 
 ## 7. Each application keeps its own things
 

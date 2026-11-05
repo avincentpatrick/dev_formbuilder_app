@@ -1,0 +1,73 @@
+name: Boundary
+
+# M214 (`bhw-boundary-hardening`, ADR-0024, D177, D210). Who may change what between the two applications
+# in this repository, judged from MAIN'S copy of this file and of scripts/boundary-check.php.
+#
+# ⛔ WHY THIS IS ITS OWN WORKFLOW ON THIS TRIGGER. The rule used to be a step in ci.yml's bhw-connect job, a
+# pull-request job, and GitHub takes such a job from the pull request's own copy of the file. So a pull
+# request could delete the step, or edit the script it ran, in the same diff the step would have refused.
+# This trigger takes the workflow from the base branch, and the checkout below holds the base branch too, so
+# nothing a pull request changes can reach the judge. Measured on a throwaway repository (M214's claim): with
+# the workflow deleted and the script neutered in the pull request, main's copy ran and the merge was blocked.
+#
+# ⛔ THE PULL REQUEST IS READ AS DATA AND NEVER RUN. This trigger hands a job the base repository's token, so
+# running the head's code here is the classic way to lose that token. That is why, and these are all held by
+# tests/Feature/Docs/BoundaryWorkflowTest.php:
+#   - the checkout names no ref, and keeps no credentials;
+#   - the head's commits are fetched and only read, by `git diff` and `git show`;
+#   - nothing from the event is written into a `run:` line, because a branch name is attacker-chosen text;
+#   - no secret is referenced, and the token can only read;
+#   - there is no job or step `if:`, because a skipped job reports success on a required check.
+#
+# ⚠️ IT CANNOT BE PROVED ON ITS OWN PULL REQUEST. A change to this file judges nothing until it is on main, so
+# the pull request that changes it is checked by hand: read the label, then run the script with --events-file.
+#
+# ⚠️ WHAT IT DOES NOT STOP, MEASURED (ADR-0024's Consequences). Someone with write access can delete the red
+# run and post a green check run from a workflow on a branch, which needs no pull request. Every Actions job
+# is the same app to a required check, so no workflow can close that on a personal repository. It stops
+# accidents and the easy way round, and leaves a deliberate bypass visible. `repo-write-reaches-box` is the row.
+#
+# The required check's name is this job's name, pinned to GitHub Actions' app id in main's ruleset, and it must
+# stay unique across the workflows: a commit status with this name was refused by that pin, and a same-named
+# job in a pull request did not beat a red run, but neither is a reason to invite one.
+on:
+  pull_request_target:
+    branches: [main]
+    # `labeled` and `unlabeled` are the point: the check re-runs by itself when the approval changes, and on
+    # one commit the newest run of this workflow is the one a required check reads (measured).
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+
+# A newer event supersedes a run still going, so the last state of the label is the one that decides.
+concurrency:
+  group: boundary-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  boundary:
+    name: Boundary (from main)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      # actions/checkout v4, pinned to its commit: under this trigger a moved tag would run with this token.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # The runner's own PHP, not a setup action: one less third party under this trigger. A runner image
+      # without PHP fails this step, which is red rather than a pass.
+      - name: Judge the pull request's commits against main's map of who owns what
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git fetch --no-tags origin "$HEAD_SHA"
+          php scripts/boundary-check.php --repo="$REPO" --pr="$PR" --author="$AUTHOR" --base="$BASE_SHA" --head="$HEAD_SHA"

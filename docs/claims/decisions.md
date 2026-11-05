@@ -24,10 +24,22 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D208`, the last filed, was asked and answered on 2026-11-05 once `bhw-p4-loop` was closed out, and recorded the same day. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D209`, the last filed, was asked and answered on 2026-11-05 as `bhw-handover` was claimed, and recorded the same day. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D209 — At the handover jongsky25 needs a Meridian account on staging, because BHW Connect's admin pages sign in through Meridian (`D178`, `D204`). The user invites him at `/members`. Which Meridian role does he get? **C — Admin.**
+
+**Asked and answered 2026-11-05 (user decision, in chat), as `bhw-handover` (`M213`) was claimed.**
+- **A — Viewer (recommended).** Read-only: `submissions.view`, the dashboards and `feedback.submit`. The least of the four roles, and
+  BHW needs only that he can sign in.
+- **B — Form Editor.** Builds and edits forms too, if he is to help test Meridian.
+- **C — Admin (chosen).** Manages members and the workspace's settings as well.
+
+**What the answer files:** nothing new in code. The handover page tells him his account is an Admin's and asks him to treat Meridian's
+testers' data as theirs; the user picks Admin in the invite. His `admin_users` row in BHW is separate and unchanged by the role
+(`D204`).
+
 ### D208 — Step 6 of the user's seven: merge point 10 holds `#391` (`M198`), `#392` (`M199`) and `#393` (`M200`); `#397` already merged alone as `M204` (`D202`). When does it run? **A — now, in that order, after the user's census, with `M212` (three Symfony advisories) first.**
 
 **Asked and answered 2026-11-05 (user decision, in chat), after `M211`'s close-out.**

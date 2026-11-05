@@ -16,7 +16,64 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — merge point 10 done on 2026-11-05 (`D208`): `M212`, `M198`, `M199` and `M200` merged in that order and live, 0.17.1, the user's census before and after equal. Close-out branch `mp10-closeout`. Next is step 7 of the user's seven, `bhw-handover`.
+## Status: ACTIVE CLAIM — `M213`, BHW Connect handed to jongsky25: his CODEOWNERS lines back, the boundary controls held to `D177`'s map, the working agreement's pre-handover section out, and a handover page in plain words (`bhw-handover`, `D198`, `D199`, `D209`) (m213-bhw-handover)
+
+Taken 2026-11-05. Branch `m213-bhw-handover`, cut from origin/main at `8f72848c`, PR into main. Step 7 of the user's seven. Site-safe
+(`.github/`, `scripts/`, `docs/` and `apps/bhw-connect/docs/` only), so it merges at its own merge point once green, as `D201`'s did.
+Row: ADR-0024's marker `bhw-handover` ("Hand BHW Connect to jongsky25 once it runs wholly on the box").
+
+### Evidence verified
+- **The marker** is `state=ready`, tier during-testing, since `M211`'s close-out. Its title names seven parts: his CODEOWNERS lines,
+  the working agreement, his settings as repository secrets, his Meridian account and `admin_users` row (`D204`), Supabase and the
+  two Vercel projects (`D206`), his old repository archived (`D207`), a handover page; then the user tells him to start.
+- **`.github/CODEOWNERS` on `8f72848c`** sets his four lines aside, commented, under "UNTIL THE HANDOVER (D198)", to "come back exactly
+  as they are here".
+- **`docs/working-agreement.md`** opens with "Until the handover (D198, 2026-11-02)". Its §6 was already rewritten by `M210` (`D199`),
+  so that bullet is done. ⚠️ Its §3 still says BHW merges are "not visible anywhere yet" until phase P1 — stale since `M194`/`M209`.
+- **`scripts/boundary-check-controls.php`** B0 and B0b read the shipped CODEOWNERS and hold it to `D198`'s map, saying the handover
+  "puts D177's map back, and these two cases with it". Nothing else in `tests/`, `scripts/` or `.github/` names him.
+- **GitHub, read-only:** jongsky25 is a collaborator with `write`. Of BHW's six `BHW_` repository secrets only
+  `BHW_USAGE_EVENTS_IP_SALT` is set; the other five keep the box's values. `jongsky25/BHW-Connect-Dashboard` is public, not archived,
+  last updated 2026-09-06.
+
+### Premise verified
+- **He can change his own settings (`D199`).** GitHub's secrets guide: on a personal-account repository a *repository* secret can be
+  created by a collaborator (an *environment* secret only by the owner), and the `BHW_` ones are repository secrets; running
+  `bhw-settings.yml` by dispatch needs `write`, which he has. GitHub's pages disagree on this in one place, so the page asks him to
+  change one secret on his first day and the row stays open until that is seen.
+- **The PR needs nobody's label:** the boundary step reads CODEOWNERS from the BASE commit, where every path is avincentpatrick's.
+  ⚠️ **From the next PR on, Meridian's own PRs touching `.github/`, `deploy.ps1` or BHW's `ops/` need jong's `boundary-approved`
+  label** — the trade `D177` chose, now live. §10's "reachable within a working day" starts to bind Meridian's merges too.
+- **His Meridian role is Admin** (`D209` C, the user, in chat). The account is the user's invite at `/members`; his email never passes
+  through this session.
+- **His `admin_users` row needs his Meridian id**, which exists only once he has accepted the invite and signed in — after the start.
+  It is the operator's box step (runbook §8.4, "Adding a BHW admin"), filed as its own row. The archive and the Supabase/Vercel
+  deletions are his clicks as owner (`D206`, `D207`); the page asks for them and rows track them.
+- **No Meridian code changes and nothing a tester sees,** so no `VERSION` and no release note.
+
+### Remedy verdict
+- **CODEOWNERS:** his four lines uncommented byte for byte; the set-aside paragraph becomes a one-line record of the handover.
+- **The controls:** B0 and B0b rewritten to `D177`'s map, plus a third case — his BHW change needs nobody; avincentpatrick's change to
+  BHW's paths needs his label; his change to a shared path or to Meridian needs avincentpatrick's. **To be measured:** red against the
+  trunk's CODEOWNERS (lines set aside), committed, then green once the lines are back.
+- **The working agreement:** the pre-handover section becomes a short "Handed over" note pointing at the page; §3's stale paragraph
+  goes.
+- **The page:** `apps/bhw-connect/docs/HANDOVER.md`, for him, in plain words — what is his, what a merge does, where data, settings
+  and logs live, what still needs avincentpatrick, and his first-day steps.
+- **ADR-0024's markers:** `bhw-handover` stays `ready` until the user says he has told him to start (closed at close-out on that
+  word); new rows for his `admin_users` row and the old repository's archive; `bhw-supabase-vercel-delete` unblocked at close-out.
+
+Files: `.github/CODEOWNERS`, `scripts/boundary-check-controls.php`, `docs/working-agreement.md`, `apps/bhw-connect/docs/HANDOVER.md`,
+`docs/adr/0024-second-application-under-one-host.md`, `docs/pipeline.md`.
+Shared artefacts taken: `docs/working-agreement.md`, `docs/adr/0024-second-application-under-one-host.md`, `docs/pipeline.md`.
+Paired files taken: none.
+Namespaces spent: `D209`, answered in chat.
+Prediction:
+- The rewritten controls go red on the trunk's CODEOWNERS and green with the lines back; the other controls are unmoved.
+- CI 7/7, the BHW Connect job on its full path (a file under `apps/bhw-connect/` changes); the PR's own boundary step passes with no
+  label. The deploy opens no Meridian window, and BHW's plan skips (no file the server loads).
+- **Most likely wrong:** the gate's wording for a path with two owners when one of them is the author — the third case's expected
+  text is written from reading the gate, not from a run.
 
 ## RELEASED — `M212`, `symfony/http-foundation`, `symfony/http-kernel` and `symfony/routing` to v8.1.11, clearing six advisories published 2026-11-04 and the composer audit every CI run now fails (merged as PR #407, `d1315363`, first at merge point 10, with no rebase; 7/7 green with real step counts on its run at `3c759a41` — Static analysis 33 · BHW Connect 22 (the unchanged branch) · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run 41951573060 on `d1315363` 7/7)
 

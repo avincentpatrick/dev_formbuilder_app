@@ -16,7 +16,34 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M213`, BHW Connect handed to jongsky25: his CODEOWNERS lines back, the boundary controls held to `D177`'s map, the working agreement's pre-handover section out, and a handover page in plain words (`bhw-handover`, `D198`, `D199`, `D209`) (m213-bhw-handover)
+## Status: NO ACTIVE CLAIM — `M213` released on 2026-11-05: BHW Connect is handed to jongsky25. His CODEOWNERS lines are back, the boundary controls hold `D177`'s map, and his handover page is `apps/bhw-connect/docs/HANDOVER.md`. Close-out branch `m213-closeout`. The user's seven steps are done; the user tells him to start. What is left of the move is his: `bhw-handover-first-day` and `bhw-supabase-vercel-delete`.
+
+## RELEASED — `M213`, BHW Connect handed to jongsky25: his CODEOWNERS lines back, the boundary controls held to `D177`'s map, the working agreement's pre-handover section out, and a handover page in plain words (`bhw-handover`, `D198`, `D199`, `D209`) (merged as PR #408, `28994112`, at its own merge point; 7/7 green with real step counts on its run 41977555838 at `526ae913` — Static analysis 33 · BHW Connect 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run 41981780383 on `28994112` 7/7)
+
+**RELEASED AT ITS OWN MERGE POINT, 2026-11-05 — STEP 7, THE LAST OF THE USER'S SEVEN.**
+- **Merged at 06:38:32 UTC**, after the claim push's deploy 41979559257 had finished (12 s, no window) and the site answered.
+- **Live with deploy 41984973195, in 12 s:** "Only paths the site does not run changed … no maintenance window", and BHW's plan
+  skipped (one path under `apps/bhw-connect`, none the server loads), both as predicted; `/up`, `/login`, `/bhw-connect` and
+  `/bhw-connect/explore` 200, and the page 200 on GitHub.
+- **How the prediction fared:**
+  - **Held:** B0 and B0b went red against the trunk's map at `33b2d554` (B0 exit 1, B0b exit 0) and green with the lines back, 15
+    cases; the other twelve were unmoved. ⚠️ **B0c passes on both maps.** It pins the half the two maps agree on — his change to a
+    shared path or to Meridian needs avincentpatrick's label — so B0 and B0b alone tell `D198`'s map from `D177`'s.
+  - **Held:** 7/7, BHW Connect on its full path (23 steps), and the PR's own boundary step read "6 changed path(s), all on
+    avincentpatrick's own side" with no label.
+  - **The part expected to be wrong was not:** the gate prints, per path, only the owners other than the author. Read from the gate
+    before the run, B0c's expected text landed on the first run.
+- **How the premise fared — wrong once, and not in the code:** `D204` (2026-11-03) and this claim took it that he had no Meridian
+  account on staging. The user said on 2026-11-05 that he already had an Admin's. The page now signs him in rather than inviting
+  him (`526ae913`), at the cost of one superseded CI run (41976879007, cancelled).
+- **Not done here, by design:** his `admin_users` row. Meridian's `users` table carries FORCE ROW LEVEL SECURITY, so finding his id on
+  the box without his own session would be an untested block. He sends the id `/api/v1/auth/whoami` shows, as runbook §8.4 says, and
+  `bhw-handover-first-day` tracks it.
+- **Checked read-only before the page asks for the deletions:** Supabase `ejcuwrnxngdwvecxwrhy` holds nothing newer than the box's copy
+  of 2026-11-03. Its newest row is a usage event at 12:52:57 UTC, the 6,595th, which `M206` copied; `feedback` (36),
+  `ai_ask_log` (66) and the 34 stored screenshots are all older.
+
+**The claim as taken follows.**
 
 Taken 2026-11-05. Branch `m213-bhw-handover`, cut from origin/main at `8f72848c`, PR into main. Step 7 of the user's seven. Site-safe
 (`.github/`, `scripts/`, `docs/` and `apps/bhw-connect/docs/` only), so it merges at its own merge point once green, as `D201`'s did.

@@ -39,6 +39,8 @@ _None open._ `D209`, the last filed, was asked and answered on 2026-11-05 as `bh
 **What the answer files:** nothing new in code. The handover page tells him his account is an Admin's and asks him to treat Meridian's
 testers' data as theirs; the user picks Admin in the invite. His `admin_users` row in BHW is separate and unchanged by the role
 (`D204`).
+- ⚠️ **Corrected the same day by the user:** he already had an Admin's account on staging, so there is no invite. The page signs him
+  in instead (`M213`, `526ae913`). `D204`'s premise that he had no Meridian account was wrong.
 
 ### D208 — Step 6 of the user's seven: merge point 10 holds `#391` (`M198`), `#392` (`M199`) and `#393` (`M200`); `#397` already merged alone as `M204` (`D202`). When does it run? **A — now, in that order, after the user's census, with `M212` (three Symfony advisories) first.**
 

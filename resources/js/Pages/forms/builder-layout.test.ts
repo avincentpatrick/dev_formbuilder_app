@@ -66,6 +66,31 @@ describe('forms/Builder — the compact-layout threshold', () => {
         expect(source).toMatch(/\.builder\s*\{[^}]*font-size:\s*var\(--mds-type-body-lg-font-size\)/);
     });
 
+    it('sizes the side panes in em, so they and the canvas minimum fill the threshold at every type scale (R-63ef1a69)', () => {
+        // M198. The threshold is `em` so it grows with §2.9's type scale, but the side columns were `260px` and `340px`:
+        // `260 + 340 + 360 = 960` held at the standard scale only, and at extra_large the palette and the settings kept
+        // 260 / 340px while the switch moved to 1200. Both halves are now the same `em`.
+        //
+        // ⚠️ ANCHORED TO COLUMN 0. The selector appears again INSIDE the @container block, indented, where it sets the
+        // compact single column — that rule is not this one.
+        const panes = source.match(/^\.builder__panes \{[^}]*\}/m)?.[0];
+        expect(panes, 'the base .builder__panes rule').toBeDefined();
+
+        const columns = panes?.match(/grid-template-columns:\s*([\d.]+)em minmax\(0, 1fr\) ([\d.]+)em;/);
+        expect(columns, 'the side columns must be em: a px column is right at one type scale only').not.toBeNull();
+
+        const threshold = source.match(/^@container \(max-width:\s*([\d.]+)em\)/m)?.[1];
+        // 360px at the standard scale — the smallest canvas worth having, the third term of the threshold's derivation.
+        const CANVAS_MIN_EM = 22.5;
+        expect(Number(columns?.[1]) + Number(columns?.[2]) + CANVAS_MIN_EM, 'palette + settings + canvas minimum').toBe(
+            Number(threshold),
+        );
+
+        // This rule's `em` resolves against ITS OWN font size and the threshold's against `.builder`'s. They agree only
+        // while this rule inherits, so it must never set one.
+        expect(panes).not.toMatch(/font-size/);
+    });
+
     it('lets the panes have the flexible row, not a warnings banner', () => {
         // `grid-template-rows: auto 1fr` assumed two children. With a banner up there are three, so the
         // BANNER took the `1fr` row — sunken background and all — while the panes fell into an implicit

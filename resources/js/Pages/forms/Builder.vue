@@ -936,9 +936,16 @@ function submitImport(): void {
     font-size: var(--mds-type-body-sm-font-size);
 }
 
+/* M198 (`R-63ef1a69`) — THE SIDE PANES ARE SIZED IN `em`, AND IT IS THE SAME `em` AS THE THRESHOLD BELOW.
+   This rule sets no font size, so its `em` is `.builder`'s pinned `body-lg`: the columns are 260 / 340px at
+   the standard scale (nothing moved there), 292.5 / 382.5 at large and 325 / 425 at extra large, and with the
+   22.5em canvas minimum they fill the 60em threshold at EVERY scale. As px they did that at the standard
+   scale only — the threshold grew with the text and the panes did not.
+   ⚠️ Never give `.builder__panes` a `font-size`: its columns would then scale against a different size from
+   the threshold, and the derivation below would hold at one scale again. `builder-layout.test.ts` pins both. */
 .builder__panes {
     display: grid;
-    grid-template-columns: 260px minmax(0, 1fr) 340px;
+    grid-template-columns: 16.25em minmax(0, 1fr) 21.25em;
     flex: 1;
     min-height: 0;
 }
@@ -1062,8 +1069,10 @@ function submitImport(): void {
    785 − 260 − 340 = 185px, and Playwright's projects are 375/834/1440, so no gate in this repo has
    ever rendered that state.
 
-   60em = 960px, and it is the answer to two independent questions that agree: 260 (palette) + 340 (config)
-   + 360 (the smallest canvas worth having); and 1024 − 64, the widest box the AUTOMATIC rail can leave
+   60em = 960px at the standard scale, and it is the answer to two independent questions that agree:
+   16.25em (palette) + 21.25em (config) + 22.5em (the smallest canvas worth having) — 260 + 340 + 360 at
+   16px, and since M198 the same sum at every scale, because the side panes are `em` too (see
+   `.builder__panes`); and 1024 − 64, the widest box the AUTOMATIC rail can leave
    (M128: a user-collapsed rail is 64px at ANY width, so the box is viewport − 64 — 961 at 1025, three panes on
    a 361px canvas, still continuous). The second keeps the swap CONTINUOUS: compact 1024/1025, panes from 1201.
 

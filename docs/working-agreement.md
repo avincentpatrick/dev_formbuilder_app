@@ -36,8 +36,8 @@ Never push to `main` directly, and never force-push a branch someone else works 
 
 Every merge to `main` deploys to the testing server, `https://staging.pitahc.gov.ph`.
 
-- **A BHW-only merge** — only files under `apps/bhw-connect/` — rebuilds and restarts **only BHW**, in
-  seconds. Meridian is not touched and its testers notice nothing. jongsky25 may merge one **whenever its
+- **A BHW-only merge** — only files under `apps/bhw-connect/` — rebuilds and restarts **only BHW**, about
+  30–60 minutes later, once `main`'s checks have run. Meridian is not touched and its testers notice nothing. jongsky25 may merge one **whenever its
   checks are green**.
 - ⚠️ **Except after a failed deploy.** If the last Deploy run on GitHub is red, the next merge of any kind
   takes Meridian's full path, with a short maintenance window. Look at the last Deploy run first; if it is
@@ -47,13 +47,13 @@ Every merge to `main` deploys to the testing server, `https://staging.pitahc.gov
 
 ## 4. How BHW is tested and shipped — from a phone
 
-1. Claude runs the checks in its own session: `npm ci`, `npm run lint`, `npm run typecheck`,
+1. Your AI session runs the checks: `npm ci`, `npm run lint`, `npm run typecheck`,
    `npx vitest run`, and the build the way CI builds it (the command is in `apps/bhw-connect/CLAUDE.md`).
 2. Open the pull request. CI's **BHW Connect** check repeats all of it. Meridian's checks skip themselves and
    show as passed, and the secret scan still runs, so it takes minutes. A change under `ops/` is shared, so it
    runs them all and takes about 30–40 minutes.
 3. Green → merge it.
-4. Look at it on `https://staging.pitahc.gov.ph/bhw-connect` a few minutes later. **Staging is BHW's
+4. Look at it on `https://staging.pitahc.gov.ph/bhw-connect` about 30–60 minutes later. **Staging is BHW's
    preview.**
 5. Broken? Either open a revert pull request (one more CI run), or ask avincentpatrick to roll back on
    the server — seconds, no rebuild.
@@ -66,7 +66,7 @@ Every merge to `main` deploys to the testing server, `https://staging.pitahc.gov
   DELETE FROM, no type change, no rename. CI refuses them. If one truly has to remove data, its first line
   is `-- bhw:destructive`, and avincentpatrick must approve the pull request.
 - **Data never goes into git** — the repository is public and the BHW dataset is personal data. A new
-  data load is prepared in Claude's session, sent to avincentpatrick privately (for example a shared
+  data load is prepared in your AI session, sent to avincentpatrick privately (for example a shared
   Drive file), and loaded on the server by them.
 - **For development you never need the real data.** The committed development copy — the live schema
   and made-up figures (`D207`) — builds a local database, and CI builds the same one for every pull

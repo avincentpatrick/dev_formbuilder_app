@@ -15,7 +15,7 @@ The user asked for a second, already-built application — **BHW Connect**, a pu
 Philippine Barangay Health Worker dataset, written by a second developer (`jongsky25`) in Next.js 16 with
 Supabase and hosted on Vercel — to live inside this repository and be served from the testing site's own
 address, with its database moved off Supabase onto the testing box. The second developer keeps building
-it, and works only from Claude on a phone; the user keeps building Meridian and drives the box by hand.
+it, and works from an AI coding tool on a phone (ChatGPT Codex; this said Claude until `M214`); the user keeps building Meridian and drives the box by hand.
 Both ship to one Windows Server 2016 box with no Docker. Neither may break the other — in code, in CI,
 in the database, or in a deploy — and the testers on Meridian must never notice a BHW release.
 
@@ -33,7 +33,7 @@ Vitest 3, and hoisting would let one side's upgrade break the other. The import 
 — one commit naming `jongsky25/BHW-Connect-Dashboard@e4237373` — so nothing in BHW's history (an inlined
 key, an unredacted workbook) enters this public repository; its history stays readable in the archived
 repository. Left out: `ingestion/data/` (56 MB of source data, now kept off git), BHW's own CI workflow and
-`vercel.json`. The second developer is a collaborator here and points Claude at this repository; their
+`vercel.json`. The second developer is a collaborator here and points that tool at this repository; their
 old repository is archived. Rejected: a two-way sync between two repositories (every conflict would live
 in it) and two repositories with a second runner on the box (only BHW's owner could register it, and the
 code here would be a copy nobody may edit).

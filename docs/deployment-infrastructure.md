@@ -749,8 +749,9 @@ finish cleanly, in which case any push takes the full path. **Rollback:** `ops\d
 **Scheduled tasks** (`apps/bhw-connect/ops/register-cron-tasks.ps1`, from the versioned
 `ops/cron-schedule.json`): `bhw-connect-precompute` and `bhw-connect-regression-replay`, daily, each a
 local call to `/bhw-connect/api/cron/…` with the bearer read from `.env` when it runs; and
-`bhw-connect-db-backup` at 01:45 (`ops/nightly-dump.ps1`: `pg_dump` custom format, keep 14). A restore
-drill into `bhw_connect_restoretest` is part of `bhw-p2-db`.
+`bhw-connect-db-backup` at 01:45 (`ops/nightly-dump.ps1`: `pg_dump` custom format, keep 14, and since `M214` a
+copy of the feedback screenshots' folder beside each dump, keep 14, because the dump holds only their rows). A restore
+drill into `bhw_connect_restoretest` is part of `bhw-p2-db`; the screenshots' restore drill is recorded in `M214`'s release.
 - **Registered at `M209`'s E1** (2026-11-04), all three as SYSTEM. The regression replay, run once by hand,
   answered 200.
 - `CRON_SECRET` was empty, so E1 made one on the box (32 random bytes) and restarted `bhw-connect` to load it.

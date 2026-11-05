@@ -2,9 +2,8 @@ import { test, expect } from "@playwright/test";
 
 /**
  * Presentation ("Present") mode on /explore: enter, navigate, prove a slide
- * stays interactive, exit. Kept out of the CI-gated smoke path (smoke.spec.ts)
- * per the repo's CI-minute-budget note; fullscreen itself is not asserted
- * (headless browsers report it inconsistently) — the overlay is.
+ * stays interactive, exit. Fullscreen itself is not asserted (headless browsers
+ * report it inconsistently) — the overlay is.
  */
 test("explore -> present -> navigate -> interact -> exit", async ({ page }) => {
   // Deny the Fullscreen API so the test exercises the deterministic fallback
@@ -13,7 +12,7 @@ test("explore -> present -> navigate -> interact -> exit", async ({ page }) => {
   await page.addInitScript(() => {
     HTMLElement.prototype.requestFullscreen = () => Promise.reject(new Error("denied"));
   });
-  await page.goto("/explore");
+  await page.goto("explore");
   await expect(page.getByText(/^N = /).first()).toBeVisible();
 
   // The button renders once at least one slide has registered (client effect).

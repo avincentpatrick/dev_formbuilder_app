@@ -54,8 +54,10 @@ miss; a root-relative string kept in a variable first is beyond it, so wrap wher
     migration newer than it runs, then `supabase/seed.sql`.
   - The seed is **made up**: real geography, and every count and every person generated. Real data
     never enters this public repository.
-  - CI builds the same database for every pull request, runs your new migration on it, and renders five
-    pages against it. A migration that breaks a page fails there, before staging.
+  - CI builds the same database for every pull request, runs your new migration on it, renders five
+    pages against it, and runs the browser specs in `e2e/` against that server. A migration that breaks
+    a page fails there, before staging. Specs navigate relative to the base address (`"explore"`, not
+    `"/explore"`), or they lose the prefix, and only one region has figures in the made-up seed.
   - After a schema change, refresh the copy: run the **BHW Connect dev copy** workflow
     (`gh workflow run bhw-dev-snapshot.yml`), download its artifact, and commit the three files in a pull
     request.

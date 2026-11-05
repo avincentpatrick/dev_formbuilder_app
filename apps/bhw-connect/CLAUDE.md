@@ -14,7 +14,7 @@ developers agreed to is `docs/working-agreement.md` at the repository root — r
   BHW's own documents stay in `apps/bhw-connect/docs/`.
 - Branch from `origin/main`, open a pull request into `main`. Never push to `main`.
 
-## Testing and shipping (all of it works from a Claude session)
+## Testing and shipping (all of it works from an AI coding session)
 
 ```
 npm ci
@@ -26,7 +26,7 @@ NEXT_PUBLIC_BASE_PATH=/bhw-connect BHW_DATA_SOURCE=none NEXT_PUBLIC_SUPABASE_URL
 That last line is the build CI runs: under the prefix, with no database (`lib/db/data-plane.ts`).
 Open the pull request; CI's `bhw-connect` job repeats all of it. When every check is green, merge
 it yourself — a pull request that changes only `apps/bhw-connect/` merges whenever it is green.
-The testing server then redeploys BHW alone, within minutes: check it at
+`main` runs all its checks, and the testing server then redeploys BHW alone, about 30–60 minutes after the merge: check it at
 `https://staging.pitahc.gov.ph/bhw-connect`. Staging is the preview. If a release is broken, open a
 revert pull request, or ask Meridian's owner to run `ops/deploy-bhw.ps1 -Rollback` on the box
 (seconds).
@@ -54,8 +54,10 @@ miss; a root-relative string kept in a variable first is beyond it, so wrap wher
     migration newer than it runs, then `supabase/seed.sql`.
   - The seed is **made up**: real geography, and every count and every person generated. Real data
     never enters this public repository.
-  - CI builds the same database for every pull request, runs your new migration on it, and renders five
-    pages against it. A migration that breaks a page fails there, before staging.
+  - CI builds the same database for every pull request, runs your new migration on it, renders five
+    pages against it, and runs the browser specs in `e2e/` against that server. A migration that breaks
+    a page fails there, before staging. Specs navigate relative to the base address (`"explore"`, not
+    `"/explore"`), or they lose the prefix, and only one region has figures in the made-up seed.
   - After a schema change, refresh the copy: run the **BHW Connect dev copy** workflow
     (`gh workflow run bhw-dev-snapshot.yml`), download its artifact, and commit the three files in a pull
     request.

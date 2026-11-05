@@ -18,8 +18,11 @@
 # BHW Connect: the whole application.
 /apps/bhw-connect/         @jongsky25
 
-# Shared: a change here can take the other application down, so it needs the other owner's label.
+# Shared: BHW's deploy, which a Meridian test also reads. Each owner needs the other's label here.
 /apps/bhw-connect/ops/     @jongsky25 @avincentpatrick
-/.github/                  @avincentpatrick @jongsky25
-/deploy.ps1                @avincentpatrick @jongsky25
-/docs/working-agreement.md @avincentpatrick @jongsky25
+
+# Meridian's alone since D211. A change here can take BHW down too, so avincentpatrick tells jongsky25 first,
+# but it waits for nobody. A change here from jongsky25 still needs avincentpatrick's label.
+/.github/                  @avincentpatrick
+/deploy.ps1                @avincentpatrick
+/docs/working-agreement.md @avincentpatrick

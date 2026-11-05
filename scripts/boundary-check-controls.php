@@ -14,9 +14,10 @@ declare(strict_types=1);
  * HOW IT WORKS. One throwaway git repository holds a base commit with a CODEOWNERS of the shipped
  * shape (synthetic owners `@meridian` and `@bhw`, so the logic is tested apart from who the real
  * owners are). Each case branches from the base, commits its change, and runs the SHIPPED BYTES of the
- * gate from the fixture's root with the label events given as a file. B0, B0b and B0c alone read the
- * real `.github/CODEOWNERS`, so the map that ships is held to the decision in force: D177's, since the
- * handover (bhw-handover, M213). Until then D198 had set jongsky25's lines aside.
+ * gate from the fixture's root with the label events given as a file. B0 to B0d alone read the real
+ * `.github/CODEOWNERS`, so the map that ships is held to the decision in force: D177's as D211 amended it.
+ * From D198 until the handover (bhw-handover, M213) jongsky25's lines were set aside. The synthetic map keeps
+ * two owners on `.github/` and `deploy.ps1`, because that still exercises a path with two owners.
  *
  * M214 added S1 to S10 for `scripts/ci-scope.php`, the same shape of gate over the same commit graph: it
  * decides whether Meridian's CI jobs skip themselves, so a wrong "yes" is a green check that judged nothing.
@@ -165,29 +166,31 @@ check($failures, $ran, 'S10 a commit the clone does not hold cannot be measured 
     run_gate($fixture, SCOPE_GATE, ['--event=pull_request', '--base='.$missing, '--head='.$scopeHead]),
     2, 'CANNOT MEASURE', [], ['bhw_only=']);
 
-// B0, B0b and B0c, last, against the shipped file: who owns what. Since the handover (bhw-handover,
-// M213) it is D177's map: BHW is jongsky25's, Meridian avincentpatrick's, and the shared paths both.
+// B0 to B0d, last, against the shipped file: who owns what. D177's map as D211 amended it: BHW is jongsky25's,
+// Meridian avincentpatrick's, BHW's ops/ both, and `.github/`, `deploy.ps1` and the working agreement avincentpatrick's.
 // The gate prints, for each path, the owners OTHER than the author — the people whose label it needs.
 $shipped = @file_get_contents($root.'/.github/CODEOWNERS');
 if ($shipped === false) {
     cannot_measure('.github/CODEOWNERS does not exist.');
 }
 $base0b = build_base($fixture, $shipped);
-check($failures, $ran, 'B0 the shipped map (D177): jongsky25 changes BHW Connect\'s own files with nobody\'s label',
+check($failures, $ran, 'B0 the shipped map (D177, D211): jongsky25 changes BHW Connect\'s own files with nobody\'s label',
     run_case($fixture, $base0b, 'jongsky25', ['apps/bhw-connect/lib/x.ts' => 'changed', 'apps/bhw-connect/docs/x.md' => 'changed'], []),
     0, 'all on jongsky25\'s own side');
 
-check($failures, $ran, 'B0b the shipped map (D177): avincentpatrick needs jongsky25\'s label for BHW\'s paths and the shared ones, and nobody\'s for Meridian',
+check($failures, $ran, 'B0b the shipped map (D177, D211): avincentpatrick needs jongsky25\'s label for BHW\'s paths and its ops/, and nobody\'s for the rest',
     run_case($fixture, $base0b, 'avincentpatrick', ['apps/bhw-connect/lib/x.ts' => 'changed', 'apps/bhw-connect/ops/start.ps1' => 'changed', 'deploy.ps1' => 'changed', '.github/workflows/ci.yml' => 'changed', 'docs/working-agreement.md' => 'changed', 'app/Kernel.php' => 'changed'], []),
     1, null, [
         'apps/bhw-connect/lib/x.ts — owned by @jongsky25',
         'apps/bhw-connect/ops/start.ps1 — owned by @jongsky25',
-        'deploy.ps1 — owned by @jongsky25',
-        '.github/workflows/ci.yml — owned by @jongsky25',
-        'docs/working-agreement.md — owned by @jongsky25',
-    ], ['app/Kernel.php — owned by', 'owned by @avincentpatrick']);
+    ], ['deploy.ps1 — owned by', '.github/workflows/ci.yml — owned by', 'docs/working-agreement.md — owned by', 'app/Kernel.php — owned by', 'owned by @avincentpatrick']);
 
-check($failures, $ran, 'B0c the shipped map (D177): jongsky25 needs avincentpatrick\'s label for the shared paths and for Meridian',
+// D211: this is the point of the decision, so it gets a case of its own that passes with no label at all.
+check($failures, $ran, 'B0d the shipped map (D211): avincentpatrick changes `.github/`, `deploy.ps1`, the working agreement and Meridian with nobody\'s label',
+    run_case($fixture, $base0b, 'avincentpatrick', ['deploy.ps1' => 'changed', '.github/workflows/ci.yml' => 'changed', 'docs/working-agreement.md' => 'changed', 'app/Kernel.php' => 'changed'], []),
+    0, 'all on avincentpatrick\'s own side');
+
+check($failures, $ran, 'B0c the shipped map (D177, D211): jongsky25 needs avincentpatrick\'s label for ops/, `.github/`, `deploy.ps1`, the working agreement and Meridian',
     run_case($fixture, $base0b, 'jongsky25', ['apps/bhw-connect/ops/start.ps1' => 'changed', 'deploy.ps1' => 'changed', '.github/workflows/ci.yml' => 'changed', 'docs/working-agreement.md' => 'changed', 'app/Kernel.php' => 'changed'], []),
     1, null, [
         'apps/bhw-connect/ops/start.ps1 — owned by @avincentpatrick',

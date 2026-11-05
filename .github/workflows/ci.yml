@@ -1077,6 +1077,10 @@ jobs:
           export NEXT_PUBLIC_SUPABASE_ANON_KEY=$(BHW_JWT_SECRET=bhw-ci-jwt-secret-for-this-runner-only node db/mint-jwt.mjs --role=anon)
           export SUPABASE_SERVICE_ROLE_KEY=$(BHW_JWT_SECRET=bhw-ci-jwt-secret-for-this-runner-only node db/mint-jwt.mjs --role=service_role)
           npm run build
+          # A standalone build leaves its assets beside it, and the deploy copies them in the same way
+          # (ops/deploy-bhw.ps1). Without them the pages below still answer 200, with no script that runs.
+          cp -r .next/static .next/standalone/.next/static
+          cp -r public/. .next/standalone/public/
           PORT=3100 HOSTNAME=127.0.0.1 node .next/standalone/server.js > server.log 2>&1 &
           for i in $(seq 1 30); do curl -sf http://127.0.0.1:3100/bhw-connect > /dev/null && break; sleep 1; done
           # The home page is /bhw-connect itself: /bhw-connect/ answers 308 to it.
@@ -1085,6 +1089,19 @@ jobs:
             echo "${page:-/} $code"
             if [ "$code" != "200" ]; then cat server.log; exit 1; fi
           done
+
+      # M214 (`bhw-e2e-in-ci`, D210): BHW's browser specs, against the server the step above left running
+      # (a background process lives until the job ends). They catch a page that answers 200 and is dead in
+      # a browser, which the five requests above cannot see, before it reaches staging. The specs navigate
+      # relative to this address so the prefix survives, and playwright.config.ts starts no server of its own.
+      - name: Browser tests (Playwright) against that server
+        if: steps.changed.outputs.run == 'true'
+        working-directory: apps/bhw-connect
+        env:
+          BHW_E2E_BASE_URL: http://127.0.0.1:3100/bhw-connect/
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e
 
   # ── Deployment lives in a separate workflow ──────────────────────────────────────────────
   #    .github/workflows/deploy.yml runs on the self-hosted Windows Server runner, triggered by

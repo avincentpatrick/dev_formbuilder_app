@@ -15,7 +15,7 @@ The user asked for a second, already-built application — **BHW Connect**, a pu
 Philippine Barangay Health Worker dataset, written by a second developer (`jongsky25`) in Next.js 16 with
 Supabase and hosted on Vercel — to live inside this repository and be served from the testing site's own
 address, with its database moved off Supabase onto the testing box. The second developer keeps building
-it, and works only from Claude on a phone; the user keeps building Meridian and drives the box by hand.
+it, and works from an AI coding tool on a phone (ChatGPT Codex; this said Claude until `M214`); the user keeps building Meridian and drives the box by hand.
 Both ship to one Windows Server 2016 box with no Docker. Neither may break the other — in code, in CI,
 in the database, or in a deploy — and the testers on Meridian must never notice a BHW release.
 
@@ -33,7 +33,7 @@ Vitest 3, and hoisting would let one side's upgrade break the other. The import 
 — one commit naming `jongsky25/BHW-Connect-Dashboard@e4237373` — so nothing in BHW's history (an inlined
 key, an unredacted workbook) enters this public repository; its history stays readable in the archived
 repository. Left out: `ingestion/data/` (56 MB of source data, now kept off git), BHW's own CI workflow and
-`vercel.json`. The second developer is a collaborator here and points Claude at this repository; their
+`vercel.json`. The second developer is a collaborator here and points that tool at this repository; their
 old repository is archived. Rejected: a two-way sync between two repositories (every conflict would live
 in it) and two repositories with a second runner on the box (only BHW's owner could register it, and the
 code here would be a copy nobody may edit).
@@ -101,7 +101,7 @@ PostgreSQL 15 service), the migration lint and a build under `/bhw-connect` **wi
 (`BHW_DATA_SOURCE=none`: measured, supabase-js retries a failed read for seven seconds, which pushed a page
 past Next's prerender limit). On a pull request that leaves `apps/bhw-connect` alone it skips everything
 and still reports success. Ownership is `.github/CODEOWNERS` — Meridian everything, BHW its folder, and
-`.github/`, `deploy.ps1`, BHW's `ops/` and the working agreement shared — and a required check of its own,
+BHW's `ops/` shared, and since `D211` `.github/`, `deploy.ps1` and the working agreement Meridian's alone — and a required check of its own,
 `.github/workflows/boundary.yml` running `scripts/boundary-check.php` from main's copy (a step in this job until
 `M214`), refuses a pull request that changes another owner's paths without that owner's `boundary-approved`
 label, reading the map from the base commit so a pull request cannot rewrite the map that judges it. "Require review from code owners" stays off: with one owner per side an author
@@ -135,8 +135,8 @@ design — not a page inside Meridian's shell.
 - A pull request that changes only BHW skips Meridian's six jobs and keeps the secret scan (`bhw-ci-fast-path`). A change
   under `ops/` is not BHW-only: it is shared, and a Meridian test reads that folder.
 - No per-pull-request preview for BHW: staging is its preview (`D182`), until `bhw-preview-slot`.
-- BHW's Playwright specs do not run in CI (the deploy's health check catches a dead server, not a dead
-  page) until `bhw-e2e-in-ci`.
+- BHW's Playwright specs run in CI on a pull request that changes it, against the prefixed build and the made-up
+  database (`bhw-e2e-in-ci`). Only one region has figures there, so `compare`'s head-to-head strip is not exercised.
 - The boundary label is trust-based: a label applied before later commits still counts, and the working
   agreement asks the approver to re-apply it.
 - **The boundary stops accidents and the easy way round, and not a determined collaborator.** Since

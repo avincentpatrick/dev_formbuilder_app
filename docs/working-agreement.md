@@ -2,8 +2,8 @@
 
 **For:** both developers — avincentpatrick (Meridian) and jongsky25 (BHW Connect). Plain rules, no
 Meridian jargon. Why it is set up this way is `docs/adr/0024-second-application-under-one-host.md`; the
-decisions behind it are `D172`–`D185` in `docs/claims/decisions.md`. Changing this page needs both of you
-(it is shared in `.github/CODEOWNERS`).
+decisions behind it are `D172`–`D185` and `D211` in `docs/claims/decisions.md`. Changes to this page are
+avincentpatrick's to make, and they tell jongsky25 (`D211`).
 
 ## Handed over (2026-11-05)
 
@@ -17,8 +17,9 @@ written. **What is yours, where everything lives and your first-day steps:**
 
 - **Everything under `apps/bhw-connect/` is BHW Connect's — jongsky25's.**
 - **Everything else is Meridian's — avincentpatrick's.**
-- **Shared** (a change here can take the other application down): `.github/`, `deploy.ps1`,
-  `apps/bhw-connect/ops/`, and this page.
+- **Shared:** `apps/bhw-connect/ops/`, BHW's deploy. Each of you needs the other's label there.
+- **avincentpatrick's alone, since `D211`:** `.github/`, `deploy.ps1` and this page. A change here can take BHW
+  down too, so they tell jongsky25 first, but it waits for nobody. A change here from jongsky25 needs their label.
 
 Ownership lives in `.github/CODEOWNERS`. You never need the other person for a change on your own side. A
 pull request that touches the other person's files, or a shared one, needs **their** approval: they add
@@ -36,8 +37,8 @@ Never push to `main` directly, and never force-push a branch someone else works 
 
 Every merge to `main` deploys to the testing server, `https://staging.pitahc.gov.ph`.
 
-- **A BHW-only merge** — only files under `apps/bhw-connect/` — rebuilds and restarts **only BHW**, in
-  seconds. Meridian is not touched and its testers notice nothing. jongsky25 may merge one **whenever its
+- **A BHW-only merge** — only files under `apps/bhw-connect/` — rebuilds and restarts **only BHW**, about
+  30–60 minutes later, once `main`'s checks have run. Meridian is not touched and its testers notice nothing. jongsky25 may merge one **whenever its
   checks are green**.
 - ⚠️ **Except after a failed deploy.** If the last Deploy run on GitHub is red, the next merge of any kind
   takes Meridian's full path, with a short maintenance window. Look at the last Deploy run first; if it is
@@ -47,13 +48,13 @@ Every merge to `main` deploys to the testing server, `https://staging.pitahc.gov
 
 ## 4. How BHW is tested and shipped — from a phone
 
-1. Claude runs the checks in its own session: `npm ci`, `npm run lint`, `npm run typecheck`,
+1. Your AI session runs the checks: `npm ci`, `npm run lint`, `npm run typecheck`,
    `npx vitest run`, and the build the way CI builds it (the command is in `apps/bhw-connect/CLAUDE.md`).
 2. Open the pull request. CI's **BHW Connect** check repeats all of it. Meridian's checks skip themselves and
    show as passed, and the secret scan still runs, so it takes minutes. A change under `ops/` is shared, so it
    runs them all and takes about 30–40 minutes.
 3. Green → merge it.
-4. Look at it on `https://staging.pitahc.gov.ph/bhw-connect` a few minutes later. **Staging is BHW's
+4. Look at it on `https://staging.pitahc.gov.ph/bhw-connect` about 30–60 minutes later. **Staging is BHW's
    preview.**
 5. Broken? Either open a revert pull request (one more CI run), or ask avincentpatrick to roll back on
    the server — seconds, no rebuild.
@@ -66,7 +67,7 @@ Every merge to `main` deploys to the testing server, `https://staging.pitahc.gov
   DELETE FROM, no type change, no rename. CI refuses them. If one truly has to remove data, its first line
   is `-- bhw:destructive`, and avincentpatrick must approve the pull request.
 - **Data never goes into git** — the repository is public and the BHW dataset is personal data. A new
-  data load is prepared in Claude's session, sent to avincentpatrick privately (for example a shared
+  data load is prepared in your AI session, sent to avincentpatrick privately (for example a shared
   Drive file), and loaded on the server by them.
 - **For development you never need the real data.** The committed development copy — the live schema
   and made-up figures (`D207`) — builds a local database, and CI builds the same one for every pull
@@ -97,7 +98,7 @@ keys, and every `NEXT_PUBLIC_` value, which the build compiles in.
 - Otherwise avincentpatrick adds it on the server before the merge.
 
 **Trust.** Anyone who can set repository secrets can set Meridian's too, and a workflow change can read any
-secret. That is why `.github/` is shared and needs both owners after the handover (§1). That rule covers what
+secret. That is why a change to `.github/` from jongsky25 needs avincentpatrick's label (§1). That rule covers what
 merges. A workflow on a branch runs when it is pushed, with no pull request, so this still rests on trust
 between the two of you.
 

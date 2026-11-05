@@ -8,8 +8,8 @@ declare(strict_types=1);
  * WHY THIS EXISTS.
  *
  * Two developers share one trunk. Meridian (the repository root) is avincentpatrick's; BHW Connect
- * (`apps/bhw-connect/`) is jongsky25's; a few paths — `.github/`, `deploy.ps1`, BHW's `ops/` — are
- * shared, because a change there can take the other application down. D177 chose: a pull request
+ * (`apps/bhw-connect/`) is jongsky25's; BHW's `ops/` is shared, and since D211 `.github/`, `deploy.ps1` and
+ * the working agreement are avincentpatrick's alone. D177 chose: a pull request
  * on your own side needs nobody; one that touches a path the OTHER developer owns needs that
  * developer's approval label. GitHub's "require review from code owners" cannot express it — with
  * one owner per side, an author could never approve their own pull request and both lanes would

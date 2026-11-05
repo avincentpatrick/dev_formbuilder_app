@@ -1,14 +1,14 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * The one CI-gated smoke path BUILD_PLAN.md §5/§7 1.10 asks for: home ->
- * explore -> filter to a barangay -> export CSV. Runs against a production
- * build on every push to main (see .github/workflows/ci.yml), not every PR,
- * to stay within free CI-minute budgets.
+ * The one smoke path BUILD_PLAN.md §5/§7 1.10 asks for: home -> explore ->
+ * filter to a barangay -> export CSV. CI's bhw-connect job runs it, with the
+ * other specs, against the production build under /bhw-connect on every pull
+ * request that changes this app (.github/workflows/ci.yml).
  */
 test("home -> explore -> filter to barangay -> export CSV", async ({ page }) => {
   // The BHW dashboard now lives at /bhw; "/" is the Equity in Health portal.
-  await page.goto("/bhw");
+  await page.goto("bhw");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Barangay Health Workers");
 
   await page.getByRole("link", { name: "Explore" }).click();
@@ -32,7 +32,7 @@ test("home -> explore -> filter to barangay -> export CSV", async ({ page }) => 
 
   const [download] = await Promise.all([
     page.waitForEvent("download"),
-    page.locator('a[href^="/api/export/csv"]').first().click(),
+    page.locator('a[href*="/api/export/csv"]').first().click(),
   ]);
   expect(download.suggestedFilename()).toMatch(/\.csv$/);
 });

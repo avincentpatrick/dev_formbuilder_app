@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { settlePaint } from './support/axe';
+import { forcePersonalization, settlePaint } from './support/axe';
 import { openConsole } from './support/console';
 import { formEntry, openBuilder } from './support/navigate';
 
@@ -180,6 +180,40 @@ test('the builder shows exactly one pane below its threshold, and three above', 
     expect(compact, `${info.project.name} landed on the wrong side of 60em`).toBe(
         info.project.name !== 'desktop',
     );
+});
+
+// ── M198 — THE SIDE PANES GROW WITH THE TEXT (R-63ef1a69) ───────────────────────────────────────────────────────
+// The threshold above is `em`, so it moves with §2.9's type scale; the side columns were `260px` and `340px`, so they
+// did not, and their sum matched the threshold at the standard scale only. `builder-layout.test.ts` pins the CSS text;
+// this measures what it lays out, which nothing else here can — at the standard scale `em` and px give the same pixels,
+// and `personalization-axe` forces only `extra_large`, where every project is compact (1440 − 240 = 1200 = 60em × 20px,
+// and the bound is inclusive). Large on desktop is the one state in the matrix with three panes off the standard scale.
+test('the builder’s side panes are sized in the builder’s own em, so they grow with the text', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'only the desktop box (1440 − 240) clears 60em at the large scale (1080px)');
+
+    await openBuilder(page, 'Community Health Survey');
+    await page.locator('.builder__panes').waitFor({ state: 'visible', timeout: 30_000 });
+    await forcePersonalization(page, { fontSize: 'large' });
+    await settlePaint(page);
+
+    const measured = await page.locator('.builder').evaluate((builder) => {
+        const width = (selector: string): number => builder.querySelector(selector)!.getBoundingClientRect().width;
+        const fontSize = parseFloat(getComputedStyle(builder).fontSize);
+        return {
+            fontSize,
+            box: builder.getBoundingClientRect().width,
+            palette: width('.builder__pane--left') / fontSize,
+            settings: width('.builder__pane--config') / fontSize,
+        };
+    });
+
+    // Anti-vacuity: the scale took, and the box is still wide at it. At the standard scale this case could not fail.
+    expect(measured.fontSize, 'the large scale did not reach .builder').toBe(18);
+    await expect(page.locator('.builder__pane-switch'), `a ${measured.box}px box must stay wide at large`).toBeHidden();
+
+    // px columns give 260 / 18 = 14.44 and 340 / 18 = 18.89 here.
+    expect(measured.palette, JSON.stringify(measured)).toBeCloseTo(16.25, 2);
+    expect(measured.settings, JSON.stringify(measured)).toBeCloseTo(21.25, 2);
 });
 
 // ── M171 — THE USER'S THREE COMPLAINTS, MEASURED ────────────────────────────────────────────────────────────────

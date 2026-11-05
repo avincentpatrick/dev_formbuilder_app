@@ -29,6 +29,9 @@ we both follow are in `docs/working-agreement.md`. It is short, so read it once.
    - The build and switch take about a minute. Meridian is not touched.
 3. Look at it on staging. **Staging is your preview.**
 
+Your pull request's checks take minutes: Meridian's jobs skip themselves and show as passed. A change under
+`apps/bhw-connect/ops/` is shared, so it runs them all and takes about 30–40 minutes.
+
 Before you merge, look at the last **Deploy (production, self-hosted)** run in GitHub's Actions tab. If it is red, tell
 avincentpatrick first.
 
@@ -49,7 +52,7 @@ migration that truly must remove data starts with `-- bhw:destructive` and needs
 | The server's settings: the database address, PostgREST's keys, every `NEXT_PUBLIC_` value | A file on the server | avincentpatrick |
 | Deploy logs | GitHub → Actions → **Deploy (production, self-hosted)**. The second step is BHW's. | Read them any time |
 | The app's own logs, PostgREST's and the scheduled jobs' | On the server | Ask avincentpatrick |
-| Backups | A dump of `bhw_connect` every night at 01:45 (14 kept), and one before every deploy that migrates | Automatic |
+| Backups | A dump of `bhw_connect` every night at 01:45, with a copy of the feedback screenshots beside it (14 of each kept), and a dump before every deploy that migrates | Automatic |
 | Scheduled jobs: precompute and the regression replay, daily | `ops/cron-schedule.json` | You, through a pull request (it is a shared path) |
 | Feedback screenshots | On the server. Admins see them under Admin → Feedback. | Automatic |
 | Who is a BHW admin | The `admin_users` table | avincentpatrick adds a row |
@@ -83,13 +86,31 @@ to avincentpatrick privately (a shared Drive file, for example), who loads it on
      their values.
    - If GitHub will not let you set a secret, tell avincentpatrick. GitHub's documentation says a collaborator can.
 5. **Close the old homes.** Nothing reads them any more. The server's copy was taken on 2026-11-03, and on
-   2026-11-05 Supabase held nothing newer. Do them in this order, and tell avincentpatrick as each is done:
+   2026-11-05 Supabase held nothing newer. Do them in this order. They are yours, and nothing on Meridian's side waits
+   for them:
    1. **Vercel:** delete the projects `bhw-connect` and `bhw-connect-phase-2`.
    2. **Supabase:** delete the project `ejcuwrnxngdwvecxwrhy`, then downgrade your organisation to Free. It is on Pro,
       which is why it could not just be paused (`D206`).
    3. **GitHub:** archive `jongsky25/BHW-Connect-Dashboard` (its Settings → Archive this repository). It stays
       readable (`D207`).
 6. **Start.** Open a Claude session in `apps/bhw-connect/` and pick up your own work.
+
+## Left for you to decide
+
+These were on Meridian's list when BHW was handed over. They are yours now, and none of them is needed today.
+
+- **A preview of a pull request on the server,** as a second BHW service at `/bhw-connect-preview`, if using staging as
+  your preview proves too coarse.
+- **An admin page that takes a data load,** so a load needs no operator. Today a load file goes to avincentpatrick
+  privately (working agreement §5).
+- **The AI insight card.** A place page reaches the visitor at once, and only this card fills in later: 20–35 seconds
+  when its text has to be generated. Measured on staging on 2026-11-05. Two things you may want to look at:
+  - `/uuc-phc/province/05017` took 19–22 seconds on each of three views, while `/uuc-phc/province/12065` was cached after
+    its first. It looks as if an insight that cannot be cached is generated again for every viewer, using your AI
+    providers each time (`lib/ai/narrative.ts`).
+  - The daily precompute (`app/api/cron/precompute/route.ts`) still has the 50-second budget it needed on Vercel, and
+    an insight is cached for two days, so it cannot keep about 137 places warm. This one is read from the code, not
+    measured. The server has no such limit, but a longer budget means more calls on your AI keys.
 
 ## If something goes wrong
 

@@ -17,13 +17,13 @@ we both follow are in `docs/working-agreement.md`. It is short, so read it once.
   A change to any of these can take the other app down, so it needs the other person's `boundary-approved` label.
   - This now works both ways. When one of Meridian's pull requests touches a shared path, it waits for **your**
     label. Please answer within a working day (working agreement §10).
-- **Your Claude sessions.** Open them in `apps/bhw-connect/`. They follow `apps/bhw-connect/CLAUDE.md`, and the
-  repository's root `CLAUDE.md` is Meridian's, so it does not apply to you.
+- **Your Codex sessions.** Begin each task with `Read apps/bhw-connect/AGENTS.md and follow it.` That page is the full
+  handoff for your agent. The repository's root `CLAUDE.md` is Meridian's, so it does not apply to you.
 
 ## What a merge does
 
 1. You merge a pull request that changes only `apps/bhw-connect/`.
-2. The testing server deploys it within minutes.
+2. `main` runs all its checks, and then the testing server deploys it: about 30–60 minutes after you merge.
    - It rebuilds BHW beside the running one and runs your new migrations.
    - It switches over, checks the site answers, and switches back by itself if it does not.
    - The build and switch take about a minute. Meridian is not touched.
@@ -58,7 +58,7 @@ migration that truly must remove data starts with `-- bhw:destructive` and needs
 | Who is a BHW admin | The `admin_users` table | avincentpatrick adds a row |
 
 **Real data never goes into git.** The repository is public and BHW's dataset holds personal records. You never need
-the real data to develop: the made-up copy is enough. A new real data load is prepared in your Claude session and sent
+the real data to develop: the made-up copy is enough. A new real data load is prepared in your Codex session and sent
 to avincentpatrick privately (a shared Drive file, for example), who loads it on the server.
 
 ## What still needs avincentpatrick
@@ -93,7 +93,7 @@ to avincentpatrick privately (a shared Drive file, for example), who loads it on
       which is why it could not just be paused (`D206`).
    3. **GitHub:** archive `jongsky25/BHW-Connect-Dashboard` (its Settings → Archive this repository). It stays
       readable (`D207`).
-6. **Start.** Open a Claude session in `apps/bhw-connect/` and pick up your own work.
+6. **Start.** Open a Codex task, begin it with the line under *What is yours*, and pick up your own work.
 
 ## Left for you to decide
 

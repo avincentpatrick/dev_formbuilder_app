@@ -16,7 +16,35 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M211` released on 2026-11-05: BHW Connect's development loop. The box takes the live schema and a made-up seed through the **BHW Connect dev copy** workflow, and the local stack and CI build a database from them, serve it with PostgREST, and render pages against it. Close-out branch `m211-closeout`. Next is step 6 of the user's seven, the user naming merge point 10, then `bhw-handover`.
+## Status: ACTIVE CLAIM — `M212`, `symfony/http-foundation`, `symfony/http-kernel` and `symfony/routing` to v8.1.11, clearing six advisories published 2026-11-04 and the composer audit every CI run now fails (m212-symfony-advisories)
+
+Taken 2026-11-05. Branch `m212-symfony-advisories`, cut from origin/main at `19747352`, PR into main. It rides **first at merge point 10** (`D208` A), ahead of `#391`, `#392` and `#393`.
+
+### Evidence verified
+- **The audit fails on all three of merge point 10's runs.** Run 41912956010 (`#391`), 41913122807 (`#392`) and 41913818744 (`#393`) each went red at step 23 of the static job, *Composer audit (SCA)*, with the other six jobs green.
+- **"Found 6 security vulnerability advisories affecting 3 packages", every one reported on 2026-11-04:**
+  - `symfony/http-foundation`: `PKSA-24ph-xkrh-y79j` (CVE-2026-118514), `PKSA-pr6q-2w5s-kzzf`, `PKSA-nxjs-s6hn-vb6m` (the `private_ranges` trusted-proxies shortcut) and `PKSA-b2gg-vk1g-6d5q` (generated URLs pointing at a client-chosen host);
+  - `symfony/http-kernel`: `PKSA-3gxv-7xhq-mgmz` (forwarded headers through inline fragments);
+  - `symfony/routing`: `PKSA-y8c5-1b7f-r1gj` (CVE-2026-118516, host placeholders matching the start of the path).
+  - The fixed versions are 8.1.11 on the 8.1 line.
+- **`composer.lock` on the trunk** pins `http-foundation` v8.1.9, `http-kernel` v8.1.1 and `routing` v8.1.0.
+
+### Premise verified
+- **It is not any of the three PRs' diffs.** The trunk's run 41874801414 on `f77e45e0` passed the same step before the advisories were published, and the step fails identically on three unrelated diffs. From now on every branch fails it, and so does the trunk's next run.
+- **Meridian calls neither `trustProxies` nor `trustHosts`** (`bootstrap/app.php`, `app/`, `config/`). So the two proxy advisories do not reach a code path Meridian configures today. The bump is still required, because the audit refuses by package version, not by use.
+- **All three are transitive** through `laravel/framework`, not in `composer.json`'s `require`.
+
+### Remedy verdict
+- **`composer update symfony/http-foundation symfony/http-kernel symfony/routing` works, measured as a dry run on the trunk's lock:** "3 updates, 0 removals", each to v8.1.11 inside its range, and nothing else moved.
+- **To be confirmed:** `composer audit --locked` clean, and CI 7/7.
+
+Files: `composer.lock`, `docs/feature-backlog.md` (the row, filed and closed), `docs/pipeline.md`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`.
+Paired files taken: none.
+Namespaces spent: `D208`, answered in chat.
+Prediction:
+- The PR is 7/7 with no other change.
+- **The part I most expect to be wrong:** that an 8.1.11 patch release changes no behaviour a Meridian test pins. `http-foundation`'s URL-generation fix touches how a host is chosen, and the tenancy tests resolve tenants by host.
 
 ## RELEASED — `M211`, BHW Connect's development loop: a schema baseline and a made-up seed from the box, a local stack and CI built from them with PostgREST (`bhw-p4-loop`, `D182`, `D207`)
 

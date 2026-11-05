@@ -15630,6 +15630,27 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   CLEAN at the blocking threshold"*. It merges first of what remains of merge point 9, because every pull request's static job is red
   until it lands.
 
+- ✅ **CLOSED BY `M212` (2026-11-05) — ****`minor` · `symfony/http-foundation` v8.1.9, `symfony/http-kernel` v8.1.1 and `symfony/routing` v8.1.0 carry six advisories published 2026-11-04, and `composer audit` fails every CI run from then on.**
+  Found when merge point 10's three runs (41912956010, 41913122807, 41913818744) each went red at the static job's *Composer audit
+  (SCA)* step alone: *"Found 6 security vulnerability advisories affecting 3 packages"*, all fixed in 8.1.11.
+  - `http-foundation`: CVE-2026-118514 and three without a CVE. They are the `private_ranges` trusted-proxies shortcut trusting
+    IPv4-mapped, 6to4, Teredo and NAT64 addresses, and generated URLs pointing at a host the client chose.
+  - `http-kernel`: inline fragments letting untrusted forwarded headers set the main request's host, scheme and port.
+  - `routing`: CVE-2026-118516, host placeholders matching the start of the path in compiled URL matchers.
+  - It was not any of the three diffs. The trunk's run 41874801414 passed the same step before the advisories existed.
+  - All three packages are transitive through `laravel/framework`.
+  - Meridian calls neither `trustProxies` nor `trustHosts`, so the proxy advisories reach no path it configures. That is why this row is
+    `minor`.
+
+  **Live.** Filed by `M212`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M212` (2026-11-05), on its branch.** `composer update symfony/http-foundation symfony/http-kernel symfony/routing` was
+  run with the container's Composer 2.10.3. The host's 2.8.12 downgraded the lock's `plugin-api-version` from 2.9.0 to 2.6.0, and that
+  run was discarded.
+  - It moves three packages in `composer.lock`, each to v8.1.11, and nothing else.
+  - `composer audit --locked` reads *"No security vulnerability advisories found"*.
+  - The Tenancy, Http, Security and Auth suites passed against the new packages: 600 tests.
+  - It merges first at merge point 10 (`D208`).
+
 - **`minor` · `packages/design-system` locks `vite` 6.4.4, which carries GHSA-8g5g-mxqh-grgj (`server.fs.deny` bypassed with queries), moderate.**
   Found by `M201` (2026-10-31) in the same audit as the row above. The npm audit judge blocks only high and critical, so it does not
   turn CI red, and `M201` left it alone to keep its lock change to one entry.

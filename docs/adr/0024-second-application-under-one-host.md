@@ -135,8 +135,8 @@ design — not a page inside Meridian's shell.
 - A pull request that changes only BHW skips Meridian's six jobs and keeps the secret scan (`bhw-ci-fast-path`). A change
   under `ops/` is not BHW-only: it is shared, and a Meridian test reads that folder.
 - No per-pull-request preview for BHW: staging is its preview (`D182`), until `bhw-preview-slot`.
-- BHW's Playwright specs do not run in CI (the deploy's health check catches a dead server, not a dead
-  page) until `bhw-e2e-in-ci`.
+- BHW's Playwright specs run in CI on a pull request that changes it, against the prefixed build and the made-up
+  database (`bhw-e2e-in-ci`). Only one region has figures there, so `compare`'s head-to-head strip is not exercised.
 - The boundary label is trust-based: a label applied before later commits still counts, and the working
   agreement asks the approver to re-apply it.
 - **The boundary stops accidents and the easy way round, and not a determined collaborator.** Since

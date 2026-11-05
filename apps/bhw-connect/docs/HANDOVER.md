@@ -67,10 +67,11 @@ to avincentpatrick privately (a shared Drive file, for example), who loads it on
 ## Your first day
 
 1. **Read `docs/working-agreement.md`.**
-2. **Accept your Meridian invite.**
-   - It comes by email from `staging.pitahc.gov.ph`. Set a password, and set up two-factor if it asks.
+2. **Sign in to Meridian on staging** at https://staging.pitahc.gov.ph/login.
+   - You already have an account there, an Admin's (`D209`). If you have forgotten its password, use *Forgot password*
+     on the sign-in page.
    - BHW's admin pages sign you in through this account: BHW has no password of its own.
-   - Your Meridian role is Admin (`D209`). Meridian's testers' forms and answers are theirs: look, don't change.
+   - Meridian's testers' forms and answers are theirs: look, don't change.
 3. **Become a BHW admin.**
    - Signed in, open https://staging.pitahc.gov.ph/api/v1/auth/whoami and copy the `id` it shows. It is an id, not a
      secret.

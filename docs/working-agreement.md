@@ -5,18 +5,13 @@ Meridian jargon. Why it is set up this way is `docs/adr/0024-second-application-
 decisions behind it are `D172`–`D185` in `docs/claims/decisions.md`. Changing this page needs both of you
 (it is shared in `.github/CODEOWNERS`).
 
-## Until the handover (D198, 2026-11-02)
+## Handed over (2026-11-05)
 
-jongsky25 has not started yet. BHW Connect is being moved onto the testing server first: its code, its
-database and its admin sign-in. It is handed over once it runs there on its own. Until then:
-
-- **Every file in this repository is avincentpatrick's**, `apps/bhw-connect/` included, and no pull
-  request needs your label. `.github/CODEOWNERS` says so; your lines are kept in it, set aside.
-- **At the handover:**
-  - your lines come back exactly as they were, and the sections below apply as written;
-  - section 6 is rewritten so that you change BHW's settings yourself, through GitHub (D199);
-  - a handover page says what is yours and where everything lives;
-  - avincentpatrick tells you when to start.
+BHW Connect runs wholly on the testing server — its code, its database, its admin sign-in and its
+settings — and it is jongsky25's (`bhw-handover`; the decisions are `D198`, `D199`, `D204`, `D206`,
+`D207` and `D209`). His lines are back in `.github/CODEOWNERS`, and every section below applies as
+written. **What is yours, where everything lives and your first-day steps:**
+`apps/bhw-connect/docs/HANDOVER.md`.
 
 ## 1. Who owns what
 
@@ -48,9 +43,6 @@ Every merge to `main` deploys to the testing server, `https://staging.pitahc.gov
 - **A Meridian merge** follows Meridian's own merge points (the testers are told), and never touches BHW.
 - **A merge that touches both sides** does both, so it follows Meridian's merge points. Ask first.
 
-Until the testing server runs BHW (phase P1 of the move), BHW merges are checked by CI but not visible
-anywhere yet.
-
 ## 4. How BHW is tested and shipped — from a phone
 
 1. Claude runs the checks in its own session: `npm ci`, `npm run lint`, `npm run typecheck`,
@@ -73,6 +65,9 @@ anywhere yet.
 - **Data never goes into git** — the repository is public and the BHW dataset is personal data. A new
   data load is prepared in Claude's session, sent to avincentpatrick privately (for example a shared
   Drive file), and loaded on the server by them.
+- **For development you never need the real data.** The committed development copy — the live schema
+  and made-up figures (`D207`) — builds a local database, and CI builds the same one for every pull
+  request (`apps/bhw-connect/CLAUDE.md`, *Database*).
 
 ## 6. Secrets
 

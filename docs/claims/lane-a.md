@@ -18,7 +18,7 @@ Standing Rule 7(b-bis).
 
 ## Status: ACTIVE CLAIM — `M214`, BHW Connect finished in one go (`D210`): `bhw-boundary-hardening`, `bhw-ci-fast-path`, `bhw-e2e-in-ci`, `bhw-screenshot-backup` and `bhw-drilldown-cold-render` built; `bhw-handover-first-day`, `bhw-supabase-vercel-delete`, `bhw-preview-slot` and `bhw-data-upload-page` off Meridian's line (m214-bhw-finish)
 
-Taken 2026-11-05. Branches, each cut from origin/main, PRs into main: `m214-bhw-finish` (A, the guard and the fast path, PR #409), `m214b-bhw-ops` (B, the backup, the slow first view and the browser tests) and `m214c-handover-page` (C, the handover page and the live proof). Plan: `~/.claude/plans/read-claude-md-then-run-virtual-shannon.md`.
+Taken 2026-11-05. Branches, each cut from origin/main, PRs into main: `m214-bhw-finish` (A, the guard and the fast path, PR #409), `m214b-bhw-ops` (B, the backup, the slow first view and the browser tests) and `m214c-handover-page` (C, the handover page and the live proof; folded into B by `D211`). Plan: `~/.claude/plans/read-claude-md-then-run-virtual-shannon.md`.
 Row: the nine markers named above, all in `docs/adr/0024-second-application-under-one-host.md`.
 
 ### Evidence verified
@@ -39,6 +39,7 @@ Row: the nine markers named above, all in `docs/adr/0024-second-application-unde
 - ⛔ **Found 2026-11-05, and every page written so far had it wrong: jongsky25 develops BHW with ChatGPT Codex, not Claude.** ADR-0024's Context and §D1, the working agreement §4 and §5, the handover page and BHW's `CLAUDE.md` all say Claude, and Codex reads `AGENTS.md`, which BHW did not have. So `M214` is extended, before these files are opened: `apps/bhw-connect/AGENTS.md`, a full handoff for his agent, and the handover page and BHW's `CLAUDE.md` corrected, on `m214c-handover-page`; ADR-0024 and the working agreement corrected on `m214b-bhw-ops`.
   - The same day's push failure, a 403 for his agent's integration while his account has write, was measured as `write` from GitHub. It points at the ChatGPT Codex Connector app not being installed on the repository owner's account. That is inferred from a community post: OpenAI's pages do not cover a collaborator's repository.
   - A root `AGENTS.md` would load by itself where a nested one does not, but the root is not site-safe in `deploy.ps1`, so it is left out and the page says how to start a task.
+- ⛔ **`D211` (2026-11-05), recorded on `m214b-bhw-ops` with the change: the user asked to stop waiting on jongsky25.** So `M214` is extended, before these files are opened, to make `.github/`, `deploy.ps1` and the working agreement avincentpatrick's alone in `.github/CODEOWNERS`, with `scripts/boundary-check.php`'s header, `scripts/boundary-check-controls.php`, ADR-0024, the working agreement, the handover page and `apps/bhw-connect/AGENTS.md` following. `m214c-handover-page` folds into #410, so one label is left, and the live proof of the fast path moves to jongsky25's own #411.
 
 ### Remedy verdict
 - `bhw-boundary-hardening`: **works, and closes less than the row implies. Measured 2026-11-05 on the throwaway `avincentpatrick/boundary-sandbox-m214`: a stub judge, one required context pinned to app 15368, a ruleset with no bypass, `ubuntu-24.04`, checkout pinned to a full SHA.**

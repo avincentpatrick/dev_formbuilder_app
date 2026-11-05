@@ -101,10 +101,10 @@ PostgreSQL 15 service), the migration lint and a build under `/bhw-connect` **wi
 (`BHW_DATA_SOURCE=none`: measured, supabase-js retries a failed read for seven seconds, which pushed a page
 past Next's prerender limit). On a pull request that leaves `apps/bhw-connect` alone it skips everything
 and still reports success. Ownership is `.github/CODEOWNERS` — Meridian everything, BHW its folder, and
-`.github/`, `deploy.ps1`, BHW's `ops/` and the working agreement shared — and the job's boundary step
-(`scripts/boundary-check.php`) refuses a pull request that changes another owner's paths without that
-owner's `boundary-approved` label, reading the map from the base commit so a pull request cannot rewrite
-the map that judges it. "Require review from code owners" stays off: with one owner per side an author
+`.github/`, `deploy.ps1`, BHW's `ops/` and the working agreement shared — and a required check of its own,
+`.github/workflows/boundary.yml` running `scripts/boundary-check.php` from main's copy (a step in this job until
+`M214`), refuses a pull request that changes another owner's paths without that owner's `boundary-approved`
+label, reading the map from the base commit so a pull request cannot rewrite the map that judges it. "Require review from code owners" stays off: with one owner per side an author
 could never approve their own pull request. BHW's dependency audit runs through Meridian's judge and,
 since `M194`, **blocks** on a high or critical production advisory; it warned only while the two critical
 and eight high BHW carried at the import were open (`D185`), and `bhw-dependency-advisories` cleared them
@@ -132,16 +132,30 @@ design — not a page inside Meridian's shell.
 **Accepted:**
 - One origin for two applications, with the CSP and the password re-check as its mitigations (§D2).
 - Every BHW page rendered per request (the nonce), and a box-load check owed in `bhw-p1-box`.
-- Meridian's six jobs still run on a BHW-only pull request (about 30 minutes) until `bhw-ci-fast-path`.
+- A pull request that changes only BHW skips Meridian's six jobs and keeps the secret scan (`bhw-ci-fast-path`). A change
+  under `ops/` is not BHW-only: it is shared, and a Meridian test reads that folder.
 - No per-pull-request preview for BHW: staging is its preview (`D182`), until `bhw-preview-slot`.
 - BHW's Playwright specs do not run in CI (the deploy's health check catches a dead server, not a dead
   page) until `bhw-e2e-in-ci`.
 - The boundary label is trust-based: a label applied before later commits still counts, and the working
   agreement asks the approver to re-apply it.
-- The boundary runs inside a `pull_request` job, which GitHub takes from the pull request's own copy of
-  `ci.yml` — so a collaborator could delete the step in the same pull request it would have refused. The
-  `.github/` change still shows in the diff, but no check flags it. GitHub cannot limit a collaborator to one
-  folder of a personal repository, so this guard is the whole fence; hardening it is `bhw-boundary-hardening`.
+- **The boundary stops accidents and the easy way round, and not a determined collaborator.** Since
+  `bhw-boundary-hardening` (`M214`) it runs from main's copy, `.github/workflows/boundary.yml` on
+  `pull_request_target`, as a required check pinned to GitHub Actions' app id, because a step in a `pull_request` job
+  came from the pull request's own tree and could be deleted, or its script edited, in the same diff. Measured on a
+  throwaway repository, with no bypass:
+  - Deleting the workflow, neutering the script, a pull request's own same-named job and a person's commit status
+    with the required name all stay blocked. A label turns the same commit green with no re-run.
+  - ⛔ **Deleting the red run and posting a green check run still merges.** A workflow on a side branch, which needs
+    no pull request, can post one under the same app, with nothing in the pull request's diff. A later event on the
+    pull request brings the judge back. Every Actions job is the same app to a required check, so only a dedicated
+    GitHub App could close this, and it takes two deliberate acts that stay visible in the repository's history.
+  - GitHub cannot limit a collaborator to one folder of a personal repository, and a ruleset-required workflow was
+    refused here, so this is the fence there is. The root cause, write access reaching the box and the
+    secrets from a branch, is `repo-write-reaches-box`.
+  - Two more limits, read from `scripts/boundary-check.php` rather than measured: the author it judges is the pull
+    request's opener, so a commit one owner pushes onto the other's open pull request passes as the opener's; and an
+    admin bypasses the ruleset.
 
 **Rejected:** a subdomain; two repositories; a second PostgreSQL instance; staying on Supabase; direct
 Postgres queries; npm workspaces; moving Meridian to `apps/meridian/`; "require review from code owners";

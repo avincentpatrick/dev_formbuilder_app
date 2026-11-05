@@ -203,6 +203,11 @@ the parent commit and accidentally gives the right answer.
   runner and proves nothing.
 - **A push filtered out by `paths-ignore` produces no run at all.** Read that as *correctly skipped* —
   never as *pending*. Require a positive count of completed checks equal to the required set, never merely "none incomplete".
+- **The required set is `main`'s ruleset, not `ci.yml`.** `Boundary (from main)` is its own workflow, and it runs from
+  `main`'s copy, so a change to it judges nothing until it merges: check that pull request's label by hand, with the
+  script's `--events-file`.
+- **A pull request changing only BHW Connect skips Meridian's jobs, which report skipped with no steps.** There it is
+  correct, and CI's `scope` job says why. On any pull request that changes Meridian, no steps still means no runner.
 - ⛔ **A squash merge must land the surgery marker on a line of its own, and neither default does it.**
   An empty `--body` discards the commit bodies outright; GitHub's *default* body renders each commit
   subject as `* <subject>`, which demotes the marker off line start — the trunk then carries the text

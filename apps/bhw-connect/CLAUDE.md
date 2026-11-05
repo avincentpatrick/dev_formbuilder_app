@@ -14,7 +14,7 @@ developers agreed to is `docs/working-agreement.md` at the repository root — r
   BHW's own documents stay in `apps/bhw-connect/docs/`.
 - Branch from `origin/main`, open a pull request into `main`. Never push to `main`.
 
-## Testing and shipping (all of it works from a Claude session)
+## Testing and shipping (all of it works from an AI coding session)
 
 ```
 npm ci
@@ -26,7 +26,7 @@ NEXT_PUBLIC_BASE_PATH=/bhw-connect BHW_DATA_SOURCE=none NEXT_PUBLIC_SUPABASE_URL
 That last line is the build CI runs: under the prefix, with no database (`lib/db/data-plane.ts`).
 Open the pull request; CI's `bhw-connect` job repeats all of it. When every check is green, merge
 it yourself — a pull request that changes only `apps/bhw-connect/` merges whenever it is green.
-The testing server then redeploys BHW alone, within minutes: check it at
+`main` runs all its checks, and the testing server then redeploys BHW alone, about 30–60 minutes after the merge: check it at
 `https://staging.pitahc.gov.ph/bhw-connect`. Staging is the preview. If a release is broken, open a
 revert pull request, or ask Meridian's owner to run `ops/deploy-bhw.ps1 -Rollback` on the box
 (seconds).

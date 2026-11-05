@@ -16,7 +16,20 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M212`, `symfony/http-foundation`, `symfony/http-kernel` and `symfony/routing` to v8.1.11, clearing six advisories published 2026-11-04 and the composer audit every CI run now fails (m212-symfony-advisories)
+## Status: NO ACTIVE CLAIM — merge point 10 done on 2026-11-05 (`D208`): `M212`, `M198`, `M199` and `M200` merged in that order and live, 0.17.1, the user's census before and after equal. Close-out branch `mp10-closeout`. Next is step 7 of the user's seven, `bhw-handover`.
+
+## RELEASED — `M212`, `symfony/http-foundation`, `symfony/http-kernel` and `symfony/routing` to v8.1.11, clearing six advisories published 2026-11-04 and the composer audit every CI run now fails (merged as PR #407, `d1315363`, first at merge point 10, with no rebase; 7/7 green with real step counts on its run at `3c759a41` — Static analysis 33 · BHW Connect 22 (the unchanged branch) · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run 41951573060 on `d1315363` 7/7)
+
+**RELEASED FIRST AT MERGE POINT 10 (`D208`), 2026-11-05.**
+- **Merged at 01:53:45 UTC**, 42 seconds after the user's census before (01:53:03 UTC: 1 · 6 · 11 · 27 · 22 · 62 · 31 · 74).
+- **Live with deploy 41955487536:** backup `deploy-20261105-023347.dump` (1,170,099 B), 70 tables / 54,129 rows, nothing to migrate,
+  census held; the Meridian window about 20 s; `/up`, `/login`, `/bhw-connect` and `/bhw-connect/explore` 200.
+- **How the prediction fared:** "7/7 with no other change" held. **The part expected to be wrong was not:** the URL-generation fix moved
+  no tenancy case — Pest 11 and E2E 20 green on the PR and on the trunk.
+- The trunk's own run 41919141867 on the claim push `176e9b79` went red at the composer audit, as every run did until this merged; its
+  deploy was skipped, so nothing went live between.
+
+**The claim as taken follows.**
 
 Taken 2026-11-05. Branch `m212-symfony-advisories`, cut from origin/main at `19747352`, PR into main. It rides **first at merge point 10** (`D208` A), ahead of `#391`, `#392` and `#393`.
 
@@ -880,7 +893,20 @@ Prediction:
 - CI is 7/7; nothing runs `follow-redirects` in a test.
 - **Most likely wrong:** a third advisory published before the run. The second came two days after the first.
 
-## HELD — `M200`, the maintainer marks out of `openapi.json`, with a check that refuses them (`R-e568ddd2`, `D191` A) (m200-openapi-maintainer-marks)
+## RELEASED — `M200`, the maintainer marks out of `openapi.json`, with a check that refuses them (`R-e568ddd2`, `D191` A) (merged as PR #393, `bffdbbd8`, last at merge point 10, after merging the trunk into its branch at `2ef7f17a` and `e4d58acd`; 7/7 green with real step counts on its run 41960350868 at `e4d58acd` — Static analysis 33 · BHW Connect 22 (the unchanged branch) · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run 41964135539 on `bffdbbd8` 7/7)
+
+**RELEASED LAST AT MERGE POINT 10 (`D208`), 2026-11-05.**
+- **Merged at 03:50:59 UTC**, after M199's deploy had finished and the site answered.
+- **Live with deploy 41967080399:** backup `deploy-20261105-042034.dump` (1,172,717 B), 70 tables / 54,156 rows, nothing to migrate,
+  census held; the Meridian window 18 s; BHW skipped; `/up`, `/login`, `/bhw-connect` and `/bhw-connect/explore` 200.
+- **The user's census after (05:01:36 UTC) equals the census before (01:53:03 UTC):** 1 · 6 · 11 · 27 · 22 · 62 · 31 · 74.
+- **The part expected to be wrong came true, on code written after the build.** "A `//` comment above an array key is published":
+  `M207`'s note above `StoreApiTokenRequest`'s `password` key reached `openapi.json` when the trunk was merged in at `2ef7f17a`,
+  and this increment's own case refused it. The note moved into a comment in the class body, which Scramble does not publish, and
+  the re-export changed only that one description.
+- At merge point 10 it was 7/7 once `M212` cleared the audit.
+
+**The claim as taken follows.**
 
 **BUILT — PR #393, NOT MERGED.** Held for **merge point 10, third — after `#391` and `#392`**, by the user's word in chat.
 - **Run 41025882753 at `100673bd`:** six green with real step counts — E2E 20 (19 ran; only the failure-upload step skipped) · Pest 11
@@ -988,7 +1014,19 @@ Prediction:
 - **Most likely wrong:** the `//` comments above array keys. PHP-Parser attaches every preceding comment to a node, so a clause moved
   off the key but left inside the literal may still be published. The re-export's diff is what will say.
 
-## HELD — `M199`, the form-settings saves lock the form row and audit the copy they replace, as `setDataSharing` does (`R-5041cc72`, `D190` A) (m199-settings-setters-lock)
+## RELEASED — `M199`, the form-settings saves lock the form row and audit the copy they replace, as `setDataSharing` does (`R-5041cc72`, `D190` A) (merged as PR #392, `5204559c`, third at merge point 10, after merging the trunk into its branch at `bb37a146` and `6e407534`; 7/7 green with real step counts on its run 41956313593 at `6e407534` — Static analysis 33 · BHW Connect 22 (the unchanged branch) · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run 41960276812 on `5204559c` 7/7)
+
+**RELEASED THIRD AT MERGE POINT 10 (`D208`), 2026-11-05.**
+- **Merged at 03:13:54 UTC**, after M198's deploy had finished and the site answered.
+- **Live with deploy 41963282312:** backup `deploy-20261105-034353.dump` (1,171,706 B), 70 tables / 54,144 rows, nothing to migrate,
+  census held; the Meridian window 17 s; BHW skipped (no path of its changed); `/up`, `/login` and `/bhw-connect` 200.
+- **How the prediction fared at the merge point:** "static analysis red only at the composer audit" held for as long as the branch
+  was held — first CVE-2026-45070 (`M197`), then the six Symfony advisories of 2026-11-04 (`M212`). After `M212` it was 7/7. **The part
+  expected to be wrong was not:** no query-counting case moved, on the PR or on the trunk.
+- **Not predicted:** a held branch's green run ages twice over. A week held (built 2026-10-29) met two advisory waves, each needing its own increment
+  ahead of the batch — `M197`'s lesson, repeated.
+
+**The claim as taken follows.**
 
 **BUILT — PR #392, NOT MERGED.** Held for **merge point 10, after `#391`**, by the user's word in chat.
 - **Run 40855187396 at `75aedb15`:** six green with real step counts — E2E 20 (19 ran; only the failure-upload step skipped) · Pest 11
@@ -1088,7 +1126,20 @@ Prediction:
 - **Most likely wrong:** a case that counts a settings save's queries, or calls a setter on a model the current context can read but
   not lock.
 
-## HELD — `M198`, the builder's side panes in `em`, so they grow with the text (`R-63ef1a69`) (m198-builder-panes-in-em)
+## RELEASED — `M198`, the builder's side panes in `em`, so they grow with the text (`R-63ef1a69`) (merged as PR #391, `61855370`, second at merge point 10, after merging the trunk into its branch at `f5812d94` and `ec93f6a7`; 7/7 green with real step counts on its run 41951727223 at `ec93f6a7` — Static analysis 33 · BHW Connect 22 (the unchanged branch) · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run 41956206236 on `61855370` 7/7)
+
+**RELEASED SECOND AT MERGE POINT 10 (`D208`), 2026-11-05.**
+- **Merged at 02:35:21 UTC**, after `M212`'s deploy had finished and the site answered.
+- **Live with deploy 41959284550, as 0.17.1** ("Builder panels that grow with your text" in What's new): backup
+  `deploy-20261105-030804.dump` (1,171,402 B), 70 tables / 54,143 rows, nothing to migrate, census held; the Meridian window 18 s;
+  `/up`, `/login`, `/bhw-connect` and `/bhw-connect/explore` 200.
+- **How the prediction fared at the merge point:** "CI is 7/7" held once `M212` cleared the audit. **The E2E case's anti-vacuity**, the
+  part expected to be wrong, held: E2E 20 green on the PR and on the trunk.
+- **Not predicted:** the version. `M207` took 0.17.0 while this was held, so the branch re-bumped to 0.17.1 at its trunk merge
+  (`f5812d94`), with its What's new entry above 0.17.0's. A held pull request that ships a visible change owns a version number it
+  cannot keep.
+
+**The claim as taken follows.**
 
 **BUILT — PR #391, NOT MERGED.** Held for **merge point 10**, by the user's word in chat.
 - **Run 40822742885 at `b6fa013e`:** six green with real step counts — E2E 20 (19 ran; only the failure-upload step skipped) · Pest 11

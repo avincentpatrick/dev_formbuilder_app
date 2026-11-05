@@ -13,7 +13,10 @@ declare(strict_types=1);
  * on your own side needs nobody; one that touches a path the OTHER developer owns needs that
  * developer's approval label. GitHub's "require review from code owners" cannot express it — with
  * one owner per side, an author could never approve their own pull request and both lanes would
- * stall — so this step does, in CI's `bhw-connect` job, on every pull request.
+ * stall — so this does, on every pull request, from `.github/workflows/boundary.yml`.
+ *
+ * ⛔ SINCE M214 IT RUNS FROM MAIN'S COPY, SO A PULL REQUEST CANNOT EDIT THE SCRIPT THAT JUDGES IT. Until
+ * then it was a step in CI's `bhw-connect` job, which GitHub takes from the pull request's own tree.
  *
  * THE RULE.
  *
@@ -29,8 +32,12 @@ declare(strict_types=1);
  *   the base has no `CODEOWNERS` at all — the pull request that introduces the file — the rule is not
  *   enforced, and the step says so.
  *
- *   ⛔ THE LABEL IS READ LIVE, not from the workflow's event payload: re-running the job after the
- *   label is added must see it, and a re-run replays the original payload.
+ *   ⛔ A COMMIT THAT CANNOT BE READ IS NOT A BASE WITH NO `CODEOWNERS` (M214). Reading the map from a
+ *   missing base commit failed exactly as a missing file does, and passed. Both commits are now looked
+ *   up first, and a missing one is "cannot measure".
+ *
+ *   ⛔ THE LABEL IS READ LIVE, not from the workflow's event payload: the label's own event re-runs the
+ *   check, and a re-run by hand replays the original payload.
  *
  *   ⚠️ TRUST-BASED, AND SAID SO (D177): a label applied before later commits still counts. The
  *   working agreement asks the approver to remove and re-apply it after new commits.
@@ -62,6 +69,14 @@ foreach (['author', 'base', 'head'] as $required) {
 $author = strtolower((string) $options['author']);
 $base = (string) $options['base'];
 $head = (string) $options['head'];
+
+foreach (['base' => $base, 'head' => $head] as $name => $commit) {
+    // `cat-file -t` rather than the `^{commit}` form: PHP's exec() runs through cmd.exe on this host, where
+    // the caret is the escape character (CLAUDE.md's traps).
+    if (git_object_type($commit) !== 'commit') {
+        cannot_measure("the {$name} commit {$commit} is not in this clone.");
+    }
+}
 
 $codeowners = git_show($base, '.github/CODEOWNERS');
 
@@ -119,7 +134,7 @@ if ($unapproved === []) {
 
 $whom = array_values(array_unique(array_merge(...array_values($unapproved))));
 fwrite(STDERR, sprintf(
-    "boundary: this pull request by @%s changes %d path(s) the other side owns. It merges once %s applies the `%s` label%s, then re-run this job.\n",
+    "boundary: this pull request by @%s changes %d path(s) the other side owns. It merges once %s applies the `%s` label%s; this check then runs again by itself.\n",
     $author,
     count($unapproved),
     implode(' or ', array_map(static fn (string $o): string => '@'.$o, $whom)),
@@ -273,6 +288,15 @@ function label_approver(array $options): ?string
     }
 
     return $state === '' ? null : $state;
+}
+
+function git_object_type(string $commit): ?string
+{
+    $output = [];
+    $status = 0;
+    exec(sprintf('git cat-file -t %s 2>&1', escapeshellarg($commit)), $output, $status);
+
+    return $status === 0 ? trim(implode('', $output)) : null;
 }
 
 function git_show(string $commit, string $path): ?string

@@ -18,23 +18,30 @@ declare(strict_types=1);
  * real `.github/CODEOWNERS`, so the map that ships is held to the decision in force: D177's, since the
  * handover (bhw-handover, M213). Until then D198 had set jongsky25's lines aside.
  *
+ * M214 added S1 to S10 for `scripts/ci-scope.php`, the same shape of gate over the same commit graph: it
+ * decides whether Meridian's CI jobs skip themselves, so a wrong "yes" is a green check that judged nothing.
+ *
  * Exit 0 = every case landed where it should. Exit 1 = a case landed elsewhere. Exit 2 = the harness
  * could not measure, which is never a pass.
  */
 
 const GATE = 'scripts/boundary-check.php';
+const SCOPE_GATE = 'scripts/ci-scope.php';
 
 $root = str_replace('\\', '/', dirname(__DIR__));
-$gateBytes = @file_get_contents($root.'/'.GATE);
-
-if ($gateBytes === false || trim($gateBytes) === '') {
-    cannot_measure(GATE.' is missing or empty.');
-}
-
 $fixture = str_replace('\\', '/', sys_get_temp_dir()).'/m192-boundary-'.getmypid();
 rrmdir($fixture);
 mkdir($fixture.'/scripts', 0o777, true);
-file_put_contents($fixture.'/'.GATE, $gateBytes);
+
+foreach ([GATE, SCOPE_GATE] as $gate) {
+    $gateBytes = @file_get_contents($root.'/'.$gate);
+
+    if ($gateBytes === false || trim($gateBytes) === '') {
+        cannot_measure($gate.' is missing or empty.');
+    }
+
+    file_put_contents($fixture.'/'.$gate, $gateBytes);
+}
 
 $failures = [];
 $ran = 0;
@@ -100,6 +107,63 @@ check($failures, $ran, 'B11 an additive BHW migration needs nobody',
 check($failures, $ran, 'B12 a rename out of Meridian into apps/ shows both paths and is refused',
     run_case($fixture, $base, 'bhw', ['app/Kernel.php' => null, 'apps/bhw-connect/lib/Kernel.php' => 'base kernel'], []),
     1, 'app/Kernel.php');
+
+// B13 and B14 (M214): a commit the clone does not hold is "cannot measure". The base's half used to read as a
+// base with no CODEOWNERS, and passed.
+$missing = str_repeat('0123456789', 4);
+$realHead = commit_case($fixture, $base, ['app/Kernel.php' => 'changed']);
+
+check($failures, $ran, 'B13 a base commit the clone does not hold cannot be measured, and never passes',
+    run_gate($fixture, GATE, ['--author=bhw', '--base='.$missing, '--head='.$realHead]),
+    2, 'CANNOT MEASURE');
+
+check($failures, $ran, 'B14 a head commit the clone does not hold cannot be measured, and never passes',
+    run_gate($fixture, GATE, ['--author=bhw', '--base='.$base, '--head='.$missing]),
+    2, 'CANNOT MEASURE');
+
+// S1 to S10 (M214): which pull requests may skip Meridian's jobs. A wrong "yes" is the dangerous direction, so
+// nearly every case is a way of nearly being BHW-only.
+check($failures, $ran, 'S1 a pull request changing only BHW Connect is BHW-only',
+    run_scope_case($fixture, $base, ['apps/bhw-connect/lib/x.ts' => 'changed', 'apps/bhw-connect/docs/x.md' => 'changed']),
+    0, 'bhw_only=true');
+
+check($failures, $ran, 'S2 ...and one Meridian file among them is not',
+    run_scope_case($fixture, $base, ['apps/bhw-connect/lib/x.ts' => 'changed', 'app/Kernel.php' => 'changed']),
+    0, 'bhw_only=false', [], ['bhw_only=true']);
+
+check($failures, $ran, 'S3 BHW\'s ops/ is shared, and a Meridian test reads it, so alone it is not BHW-only',
+    run_scope_case($fixture, $base, ['apps/bhw-connect/ops/start.ps1' => 'changed']),
+    0, 'bhw_only=false', [], ['bhw_only=true']);
+
+check($failures, $ran, 'S4 ...and ops/ beside BHW\'s own files is not either, whichever sorts first',
+    run_scope_case($fixture, $base, ['apps/bhw-connect/lib/x.ts' => 'changed', 'apps/bhw-connect/ops/deploy-bhw.ps1' => 'changed']),
+    0, 'bhw_only=false', [], ['bhw_only=true']);
+
+check($failures, $ran, 'S5 a rename out of Meridian into apps/ shows both paths and is not BHW-only',
+    run_scope_case($fixture, $base, ['app/Kernel.php' => null, 'apps/bhw-connect/lib/Kernel.php' => 'base kernel']),
+    0, 'bhw_only=false', [], ['bhw_only=true']);
+
+check($failures, $ran, 'S6 a workflow change is not BHW-only',
+    run_scope_case($fixture, $base, ['.github/workflows/ci.yml' => 'changed']),
+    0, 'bhw_only=false', [], ['bhw_only=true']);
+
+check($failures, $ran, 'S7 a look-alike folder is not BHW-only',
+    run_scope_case($fixture, $base, ['apps/bhw-connect-two/x.ts' => 'changed']),
+    0, 'bhw_only=false', [], ['bhw_only=true']);
+
+check($failures, $ran, 'S8 an empty diff is never a reason to skip',
+    run_scope_case($fixture, $base, []),
+    0, 'bhw_only=false', [], ['bhw_only=true']);
+
+check($failures, $ran, 'S9 a push always runs in full, whatever it changed',
+    run_gate($fixture, SCOPE_GATE, ['--event=push']),
+    0, 'bhw_only=false', [], ['bhw_only=true']);
+
+$scopeHead = commit_case($fixture, $base, ['apps/bhw-connect/lib/x.ts' => 'changed']);
+
+check($failures, $ran, 'S10 a commit the clone does not hold cannot be measured and prints no answer, so every job runs',
+    run_gate($fixture, SCOPE_GATE, ['--event=pull_request', '--base='.$missing, '--head='.$scopeHead]),
+    2, 'CANNOT MEASURE', [], ['bhw_only=']);
 
 // B0, B0b and B0c, last, against the shipped file: who owns what. Since the handover (bhw-handover,
 // M213) it is D177's map: BHW is jongsky25's, Meridian avincentpatrick's, and the shared paths both.
@@ -189,6 +253,34 @@ function build_base(string $fixture, ?string $codeowners): string
  */
 function run_case(string $fixture, string $base, string $author, array $changes, array $events): array
 {
+    $head = commit_case($fixture, $base, $changes);
+
+    $eventsFile = $fixture.'/events.json';
+    file_put_contents($eventsFile, json_encode($events));
+
+    return run_gate($fixture, GATE, ['--author='.$author, '--base='.$base, '--head='.$head, '--events-file='.$eventsFile]);
+}
+
+/**
+ * Branch from the base, apply the change (a null body deletes), commit, and ask which jobs may skip.
+ *
+ * @param  array<string, ?string>  $changes
+ * @return array{0: int, 1: string}
+ */
+function run_scope_case(string $fixture, string $base, array $changes): array
+{
+    $head = commit_case($fixture, $base, $changes);
+
+    return run_gate($fixture, SCOPE_GATE, ['--event=pull_request', '--base='.$base, '--head='.$head]);
+}
+
+/**
+ * Branch from the base, apply the change (a null body deletes), and commit. An empty change makes an empty commit.
+ *
+ * @param  array<string, ?string>  $changes
+ */
+function commit_case(string $fixture, string $base, array $changes): string
+{
     $repo = $fixture.'/repo';
     git($repo, ['checkout', '--quiet', '-B', 'case', $base]);
 
@@ -201,17 +293,24 @@ function run_case(string $fixture, string $base, string $author, array $changes,
     }
 
     git($repo, ['add', '-A']);
-    git($repo, ['commit', '--quiet', '--no-gpg-sign', '-m', 'case']);
-    $head = trim(git($repo, ['rev-parse', 'HEAD']));
+    git($repo, ['commit', '--quiet', '--no-gpg-sign', '--allow-empty', '-m', 'case']);
 
-    $eventsFile = $fixture.'/events.json';
-    file_put_contents($eventsFile, json_encode($events));
+    return trim(git($repo, ['rev-parse', 'HEAD']));
+}
 
+/**
+ * Run the shipped bytes of a gate from the fixture's repository.
+ *
+ * @param  list<string>  $arguments
+ * @return array{0: int, 1: string}
+ */
+function run_gate(string $fixture, string $gate, array $arguments): array
+{
     $process = proc_open(
-        [PHP_BINARY, $fixture.'/'.GATE, '--author='.$author, '--base='.$base, '--head='.$head, '--events-file='.$eventsFile],
+        array_merge([PHP_BINARY, $fixture.'/'.$gate], $arguments),
         [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
         $pipes,
-        $repo
+        $fixture.'/repo'
     );
 
     if (! is_resource($process)) {

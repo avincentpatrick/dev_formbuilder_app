@@ -24,10 +24,19 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D207`, the last filed, was asked and answered on 2026-11-04 while `bhw-p4-loop` was planned, and recorded the same day. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D208`, the last filed, was asked and answered on 2026-11-05 once `bhw-p4-loop` was closed out, and recorded the same day. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D208 — Step 6 of the user's seven: merge point 10 holds `#391` (`M198`), `#392` (`M199`) and `#393` (`M200`); `#397` already merged alone as `M204` (`D202`). When does it run? **A — now, in that order, after the user's census, with `M212` (three Symfony advisories) first.**
+
+**Asked and answered 2026-11-05 (user decision, in chat), after `M211`'s close-out.**
+- **A — now (recommended, chosen).** The user takes the census, then each PR merges in order, each on every required check green and each only once the previous deploy has finished and the site answers. The census is taken again after the last one. `#391` is re-bumped to 0.17.1 above the trunk's 0.17.0.
+- **B — after the handover guide** (step 7 first).
+- **C — later**, held until the user says.
+
+**What the answer files:** each branch was brought up to the trunk at `19747352`, and all three runs went red at Composer audit alone. Six advisories, in `symfony/http-foundation`, `symfony/http-kernel` and `symfony/routing`, were published on 2026-11-04, after the trunk's last green run. Every branch and the trunk's next run fail the same way, as `M197` did at merge point 9. So `M212` bumps the three packages and rides first at merge point 10. No new question: nothing in the batch can merge without it.
+
 ### D207 — `bhw-p4-loop` commits a development copy of BHW's database to this public repository, so CI and jongsky25's Claude sessions get a working database. What does it hold? **A — made-up figures: the real public reference tables (PSGC geography down to barangays, the dataset list), and every count and every person generated.**
 
 **Asked and answered 2026-11-04 (user decision, in chat), while `bhw-p4-loop` was planned.** The user asked first why anything would be invented, since the real data exists. It does, and it stays where it is: on the box, served by staging. This copy is only the small one that CI and cloud sessions load. Those run on GitHub's machines, so the copy must live in git, and this repository is public (`D48`; `D181`: personal records never pass through git).

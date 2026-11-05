@@ -35,7 +35,7 @@ final class ScoreboardResource extends ApiResource
             // needs only this object. ACTIVE members, including those who have earned nothing and are
             // ranked last rather than omitted.
             //
-            // ⚠️ IT IS `<= team.active_members`, NOT EQUAL TO IT, AND THE INEQUALITY IS THE HONEST FORM.
+            // It is `<= team.active_members`, not equal to it, and the inequality is the honest form.
             // `active_members` counts `tenant_users` rows with an active status and nothing else, while
             // this counts the ones whose IDENTITY also resolves — the roster read carries no
             // `withTrashed()`, so a soft-deleted account holding a live membership is a member of the

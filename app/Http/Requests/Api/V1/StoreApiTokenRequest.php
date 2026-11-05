@@ -21,6 +21,15 @@ final class StoreApiTokenRequest extends FormRequest
         return true;
     }
 
+    // Why `password` is required, kept out of everything Scramble publishes (the class docblock, and a
+    // comment above an array key, both reach openapi.json — M200, `D191`):
+    //   · M207 (D205). BHW Connect shares this origin (ADR-0024 §D2), so a script on any of its pages holds
+    //     the session and the readable XSRF-TOKEN, and could mint a key with both — measured before this
+    //     rule: 201. The `step-up` window would still let it through for fifteen minutes after any
+    //     confirmation; a password in the request does not.
+    //   · A Google- or SSO-only account holds a random password and cannot mint until it sets one
+    //     (`api-key-mint-sso-password`).
+
     /**
      * @return array<string, array<int, mixed>>
      */
@@ -31,12 +40,7 @@ final class StoreApiTokenRequest extends FormRequest
             'abilities' => ['required', 'array', 'min:1'],
             'abilities.*' => ['string', Rule::in(ApiAbilities::all())],
             'expires_at' => ['nullable', 'date', 'after:now'],
-            // M207 (D205). BHW Connect shares this origin (ADR-0024 §D2), so a script on any of its pages holds
-            // the session and the readable XSRF-TOKEN, and could mint a key with both — measured before this
-            // rule: 201. The `step-up` window would still let it through for fifteen minutes after any
-            // confirmation; a password in the request does not. A Google- or SSO-only account holds a random
-            // password and cannot mint until it sets one (`api-key-mint-sso-password`). Kept out of the class
-            // docblock above, which Scramble publishes into openapi.json.
+            // The signed-in account's current password. Every new key asks for it.
             'password' => ['required', 'string', 'current_password:web'],
         ];
     }

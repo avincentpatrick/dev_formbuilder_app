@@ -113,7 +113,7 @@ final class GamificationController extends Controller
      * Gated on `dashboard.org.view` — the existing permission, not a new one (ADR-0020 §D7). Entries cover
      * every ACTIVE member, including those who have earned nothing, ranked last rather than omitted.
      *
-     * ⚠️ `team` and `entries` answer different questions and will not reconcile, by design, in three places.
+     * `team` and `entries` answer different questions and will not reconcile, by design, in three places.
      * `team.responses` exceeds the responses credited across `entries` by exactly the GUEST submissions: a
      * response collected through a public link is one the workspace collected and one that credits nobody,
      * because crediting the form's owner would make the ladder a contest between public links rather than

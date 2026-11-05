@@ -100,8 +100,8 @@ final class SubmissionRefusalResponseExtension extends ExceptionToResponseExtens
                 .'`draft_already_finalized` (the row is no longer a draft and can never be saved as one '
                 .'again), `submission_uuid_claimed` (the identifier is already spent in this workspace on '
                 .'a row outside your scope — mint a fresh one), or `submission_conflict` (a copy with '
-                .'materially different answers is already stored under this identifier). ⚠️ A given '
-                .'operation raises a SUBSET of these — the set is a property of the refusal family, not of '
+                .'materially different answers is already stored under this identifier). A given '
+                .'operation raises a subset of these — the set is a property of the refusal family, not of '
                 .'any one route — so treat an unrecognised code as a refusal that must not be retried.'
             : 'Always `submission_version_superseded` — the form version this submission is pinned to is '
                 .'no longer published, so finalizing it would commit against a schema the form has moved past.';

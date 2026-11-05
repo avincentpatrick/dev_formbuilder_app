@@ -6,14 +6,18 @@ namespace App\Enums;
 
 use App\Services\Authorization\ResourceGrantResolver;
 
+// The docblock below is published API documentation — Scramble emits it verbatim as this enum's
+// `description` in `openapi.json` — so its source pointer lives up here (M200, `D191`): the org-wide
+// criteria it names are `docs/PRD.md:197`'s.
+
 /**
  * How an analytics query bounds itself to a set of forms (ADR-0011 §D7(b), Increment H24a).
  *
  * D7 requires every analytics query to be form-bounded. {@see self::All} is spelled as an EXPLICIT mode
  * rather than an omitted parameter so that tenant-wide selection is a stated choice a reader can see in the
- * saved view's stored definition — `docs/PRD.md:197`'s org-wide criteria (total submissions this period vs
- * prior, the volume trend, top forms) require it, and an absent parameter meaning "everything" is the shape
- * that makes an unbounded query look like an oversight rather than a decision.
+ * saved view's stored definition — the PRD's org-wide criteria (total submissions this period vs prior, the
+ * volume trend, top forms) require it, and an absent parameter meaning "everything" is the shape that makes
+ * an unbounded query look like an oversight rather than a decision.
  *
  * Boundedness for `All` comes from the other two rules, which apply to every mode: the mandatory date range
  * with its maximum span, and the fixed-cardinality result.

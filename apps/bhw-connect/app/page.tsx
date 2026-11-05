@@ -58,11 +58,6 @@ export default function Portal() {
             href="/bhw"
           />
           <DatasetCard
-            title="2026 BHW Profiling Status"
-            description="How far the 2026 individual-profiling exercise has progressed — Encode → Validate → Attest — from city/municipality up to national level."
-            href="/profiling-status"
-          />
-          <DatasetCard
             title="2025 UUC for PHC"
             description="The barangays on the 2025 list of Unserved and Underserved Communities for Primary Health Care — where primary care is hardest to reach, from national down to city/municipality level."
             href="/uuc-phc"

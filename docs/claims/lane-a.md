@@ -16,7 +16,40 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M213` released on 2026-11-05: BHW Connect is handed to jongsky25. His CODEOWNERS lines are back, the boundary controls hold `D177`'s map, and his handover page is `apps/bhw-connect/docs/HANDOVER.md`. Close-out branch `m213-closeout`. The user's seven steps are done; the user tells him to start. What is left of the move is his: `bhw-handover-first-day` and `bhw-supabase-vercel-delete`.
+## Status: ACTIVE CLAIM — `M214`, BHW Connect finished in one go (`D210`): `bhw-boundary-hardening`, `bhw-ci-fast-path`, `bhw-e2e-in-ci`, `bhw-screenshot-backup` and `bhw-drilldown-cold-render` built; `bhw-handover-first-day`, `bhw-supabase-vercel-delete`, `bhw-preview-slot` and `bhw-data-upload-page` off Meridian's line (m214-bhw-finish)
+
+Taken 2026-11-05. Branch `m214-bhw-finish`, cut from origin/main at `b614a39d`, PRs into main. Plan: `~/.claude/plans/read-claude-md-then-run-virtual-shannon.md`.
+Row: the nine markers named above, all in `docs/adr/0024-second-application-under-one-host.md`.
+
+### Evidence verified
+- `bhw-boundary-hardening`: **held, and it understates itself.** The step is in `ci.yml`'s `bhw-connect` job, a `pull_request` job, as ADR-0024's Consequences says. It also runs `php scripts/boundary-check.php` from the pull request's own tree, so a pull request can defeat it by editing the script without touching the workflow. The row names only the workflow.
+- `bhw-ci-fast-path`: held. None of `ci.yml`'s six Meridian jobs has a job-level `if:` or `needs:` (read from the job list), so a BHW-only pull request runs them all.
+- `bhw-e2e-in-ci`: held. Three specs in `apps/bhw-connect/e2e/`; no CI step runs them. M211's five-page `curl` check is the nearest thing. `playwright.config.ts` builds unprefixed, and the specs go to bare paths (`/compare`, `/explore`, `/bhw`).
+- `bhw-screenshot-backup`: held. `ops/nightly-dump.ps1` runs `pg_dump` and prunes to 14, and touches nothing else. The storage path is the row's, not yet read at the box.
+- `bhw-drilldown-cold-render`: held in what could be read off the box. Seven `[geoLevel]/[geoCode]` pages; `ops/deploy-bhw.ps1` has no warm-up. The timings are the row's, not re-measured.
+- `bhw-handover-first-day`, `bhw-supabase-vercel-delete`: **partly overtaken, measured 2026-11-05.** The Supabase host `ejcuwrnxngdwvecxwrhy.supabase.co` no longer resolves while another project answers 401, and it is gone from the connector's list. Vercel lists `bhw-connect-phase-2` and `ofis-platform`, so `bhw-connect` is gone. Still his: that Vercel project, the organisation's downgrade (not checked), one `BHW_` secret (only `BHW_USAGE_EVENTS_IP_SALT` is set), and the archive (`archived: false`).
+- `bhw-preview-slot`, `bhw-data-upload-page`: held, and neither is needed now (`D182`, `D181`).
+
+### Premise verified
+- **The rows were written while BHW was this lane's to change, and that has ended.** Since `M213`, `.github/`, `apps/bhw-connect/` and the working agreement need jongsky25's `boundary-approved` label on a pull request from this lane (`.github/CODEOWNERS`; control B0b). `D210` is what lets `M214` work there at all.
+- Who can do what, read from GitHub: a personal repository (owner type User); no branch protection; one ruleset, seven required contexts, only BHW's pinned to GitHub Actions' app id 15368; bypass for the admin role alone; jongsky25 has write; no environments; no open pull request; fork pull requests all need approval (`M98`).
+- **The fast path's only stated carve-out is too small.** The row keeps the secret scan. But `tests/Feature/Deploy/DeployWorkflowTest.php` reads `apps/bhw-connect/ops/write-settings.ps1`, so a change under `ops/` can turn Meridian's Pest red. `ops/` cannot count as BHW-only.
+- `bhw-handover-first-day` says "each seen before this closes", and that is now the wrong condition: `D210` takes it off the line unseen, because these are his to do on his own page.
+- jongsky25 has no commit under `apps/bhw-connect` since 2026-10-01 (all 11 are this lane's), so `M214` collides with nothing of his today. That can change; the message to him names the files.
+
+### Remedy verdict
+- `bhw-boundary-hardening`: **a `pull_request_target` check is plausible, and not yet proved.** GitHub's troubleshooting page names the event as eligible for required checks. Measured on public PR #322 of `amannn/action-semantic-pull-request`: the run's `head_sha` is the PR's head, and the check run sits on that SHA under app 15368. **Not measured:** that it satisfies a required status, red then green on one SHA, and a pull request's own same-named job (the docs say only "ambiguous"). The throwaway repository measures those next, and the answers are recorded here by a pushed commit before `boundary.yml` is written. The row's other arm, a ruleset-required workflow, appears to be organisation-level only; measured there too.
+- `bhw-ci-fast-path`: implementable, with one trap. A job skipped by `if:` reports success, and a job whose `needs:` failed is skipped too, so a failed detection job would pass everything unless only an explicit BHW-only answer skips.
+- `bhw-screenshot-backup`: implementable as prescribed; proved only by the restore at the box.
+- `bhw-drilldown-cold-render`: **half the prescription cannot run where the row puts it.** Seven families over every region and province, at the row's 18 to 30 s for twelve at once, is very roughly 25 minutes against the deploy step's 30-minute limit. It runs in the background after the health check, or not at all. The real count is measured first.
+- `bhw-e2e-in-ci`: unknown until the specs run under the prefix against the development copy. A spec failing on a real BHW bug goes on his page rather than growing this.
+- The four off the line: `state=n/a` is in `scripts/pipeline.php`'s grammar and no marker uses it yet, so it is dry-run before it is relied on.
+
+Files: `.github/workflows/boundary.yml` (new), `.github/workflows/ci.yml`, `scripts/boundary-check.php`, `scripts/boundary-check-controls.php`, a new Pest test for the workflow text, `docs/working-agreement.md`, `docs/adr/0024-second-application-under-one-host.md`, `apps/bhw-connect/ops/nightly-dump.ps1`, `apps/bhw-connect/ops/deploy-bhw.ps1`, `apps/bhw-connect/docs/HANDOVER.md`, `apps/bhw-connect/playwright.config.ts` and possibly `apps/bhw-connect/e2e/*` and the drill-down data layer.
+Shared artefacts taken: `docs/working-agreement.md`, `docs/adr/0024-second-application-under-one-host.md`, `docs/feature-backlog.md`, `docs/claims/decisions.md`, `docs/pipeline.md`, `docs/gate-baselines.md`, `PROGRESS.md`.
+Paired files taken: `.github/workflows/ci.yml` with the tests that read it (`SecretScanDepthTest`, `NpmAuditJudgeTest`, `DeploySkipAllowlistTest`) — none should need a change, and all run before the push.
+Namespaces spent: nothing from the ADR or migration namespaces; `M214`, `D210`.
+Prediction: three pull requests. A (guard and fast path) passes `boundary-check-controls` with one new case and needs the most care around `ci.yml`'s job conditions. B needs one box block. C proves the guard live: red, jongsky25's label, green with no re-run, Meridian's jobs skipped. I most expect `bhw-e2e-in-ci` to be wrong: its specs have never run under the prefix, and its size S was filed before anyone tried.
 
 ## RELEASED — `M213`, BHW Connect handed to jongsky25: his CODEOWNERS lines back, the boundary controls held to `D177`'s map, the working agreement's pre-handover section out, and a handover page in plain words (`bhw-handover`, `D198`, `D199`, `D209`) (merged as PR #408, `28994112`, at its own merge point; 7/7 green with real step counts on its run 41977555838 at `526ae913` — Static analysis 33 · BHW Connect 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11; the trunk's run 41981780383 on `28994112` 7/7)
 

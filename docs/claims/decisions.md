@@ -24,10 +24,23 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D209`, the last filed, was asked and answered on 2026-11-05 as `bhw-handover` was claimed, and recorded the same day. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D210`, the last filed, was asked and answered on 2026-11-05 as `M214` was claimed, and recorded the same day. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D210 — BHW Connect was handed to jongsky25 on 2026-11-05 (`M213`), and nine of its rows were still in Meridian's line, six of them at its head. What happens to them? **A — finish it in one go: five rows built and four off the line, at one merge point.**
+
+**Asked and answered 2026-11-05 (user decision, in chat), when the session took the line's head, `bhw-boundary-hardening`, and asked the user about jongsky25's sign-in.** The user's words: *"if we still have work to do for the bwh then the handoff must not provided to jong. this will cause confusion to both of us. can we finish now all for once?"* They approved the plan that follows (`~/.claude/plans/read-claude-md-then-run-virtual-shannon.md`). The handover stands: jongsky25 has the page and has acted on it.
+- **A — finish it in one go (chosen).** Built: `bhw-boundary-hardening`, `bhw-ci-fast-path`, `bhw-e2e-in-ci`, `bhw-screenshot-backup`, `bhw-drilldown-cold-render`. Off Meridian's line, because they are his (working agreement §7): `bhw-handover-first-day`, `bhw-supabase-vercel-delete`, and, unbuilt, `bhw-preview-slot` and `bhw-data-upload-page`.
+- **B — build all nine.** The plan's one judgement call, put to the user by name. `D182` made staging BHW's preview and `D181` chose a privately sent file over an upload page, so neither is needed now; one adds a second service on the box and the other is a large new feature in his application.
+- **C — leave the rows, marked as his, and go back to Meridian's work (the session's first recommendation).** It left the guard and the backup unbuilt, which is not what the user asked for.
+
+**What the answer files:**
+- `M214` takes the five and moves the four; the user is no longer asked about jongsky25's steps.
+- **Two rules are set aside for `M214` only, by this answer.** It works inside `apps/`, which `CLAUDE.md` otherwise forbids since the handover, under his label and the merge-point rule. And rows sharing `.github/workflows/ci.yml` go into one pull request, which `D13`'s batch rule would otherwise split (precedent: `D128`).
+- It merges at its own merge point, the user's census before and after (`D137`); nothing in it is visible in Meridian, so `VERSION` does not move.
+- Two rows found on the way, Meridian's own: `repo-write-reaches-box` and `secret-scan-depth-arm-blind`, in `docs/feature-backlog.md`.
+
 ### D209 — At the handover jongsky25 needs a Meridian account on staging, because BHW Connect's admin pages sign in through Meridian (`D178`, `D204`). The user invites him at `/members`. Which Meridian role does he get? **C — Admin.**
 
 **Asked and answered 2026-11-05 (user decision, in chat), as `bhw-handover` (`M213`) was claimed.**

@@ -15680,3 +15680,22 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   ✅ **CLOSED BY `M205` (2026-11-03), on its branch.** The test now seeds a state file recording the last pull on 2026-10-19, and asserts
   that the state advances to the newest member comment. A new case holds the fortnight default to within two minutes. The file runs 12
   of 12 on the host, and a throwaway commit that set the default to 13 days turned the new case red.
+
+- **`minor` · `repo-write-reaches-box` — Anyone with write access can run a workflow on the testing box from a branch, with no pull request and no check.**
+  Found by `M214` (2026-11-05) while hardening the boundary, and by none of the rows that came before it.
+  - `deploy.yml`, `bhw-settings.yml` and `bhw-dev-snapshot.yml` run `self-hosted`, on the one runner the box has (labels `self-hosted`, `Windows`, `X64`).
+  - The repository has no environments, and on a personal repository a runner cannot be limited to chosen workflows. A workflow file on a branch, triggered by its own push, can therefore name that runner and read the repository's secrets.
+  - Fork pull requests are not the path: they all need approval (`M98`). A collaborator with write is the path, and jongsky25 has write.
+  - `docs/working-agreement.md` §6 reads as if `.github/` being shared covers this. It covers what merges. `M214`'s guard covers what merges too, and neither can see a branch run.
+  The remedy is the user's call when this is taken: deploy secrets behind an environment with a required reviewer, a second repository (rejected by ADR-0024 for other reasons), or accepting it in writing as trust between two named developers.
+
+  **Live.** Filed by `M214`. **Tier: before-launch.**
+
+- **`minor` · `secret-scan-depth-arm-blind` — `SecretScanDepthTest`'s depth arm can no longer see the job it guards.**
+  Found by `M214` (2026-11-05), reading the test while changing `ci.yml`; it went blind at `M192`, which added the `bhw-connect` job.
+  - The arm asserts that `.github/workflows/ci.yml` contains `fetch-depth: 0`, and its comment says the token occurs exactly once. It occurs twice: the secret-scanning job, and `bhw-connect`.
+  - So bounding the secret-scanning job's depth leaves the arm green, and `scripts/mutate.php`, which refuses a token that is not unique, can no longer prove it.
+  - The scan is still protected at run time: the `--is-shallow-repository` fence in the step does not depend on this arm. What is lost is the test that reddens before the run.
+  The remedy is to read the depth from the secret-scanning job's own text and to give that job's line a token `mutate.php` can drive.
+
+  **Live.** Filed by `M214`. **Tier: during-testing.**

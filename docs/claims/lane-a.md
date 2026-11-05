@@ -18,7 +18,7 @@ Standing Rule 7(b-bis).
 
 ## Status: ACTIVE CLAIM — `M214`, BHW Connect finished in one go (`D210`): `bhw-boundary-hardening`, `bhw-ci-fast-path`, `bhw-e2e-in-ci`, `bhw-screenshot-backup` and `bhw-drilldown-cold-render` built; `bhw-handover-first-day`, `bhw-supabase-vercel-delete`, `bhw-preview-slot` and `bhw-data-upload-page` off Meridian's line (m214-bhw-finish)
 
-Taken 2026-11-05. Branch `m214-bhw-finish`, cut from origin/main at `b614a39d`, PRs into main. Plan: `~/.claude/plans/read-claude-md-then-run-virtual-shannon.md`.
+Taken 2026-11-05. Branches, each cut from origin/main, PRs into main: `m214-bhw-finish` (A, the guard and the fast path, PR #409), `m214b-bhw-ops` (B, the backup, the slow first view and the browser tests) and `m214c-handover-page` (C, the handover page and the live proof). Plan: `~/.claude/plans/read-claude-md-then-run-virtual-shannon.md`.
 Row: the nine markers named above, all in `docs/adr/0024-second-application-under-one-host.md`.
 
 ### Evidence verified

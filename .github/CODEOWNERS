@@ -11,17 +11,15 @@
 # Meridian: everything not given away below.
 *                          @avincentpatrick
 
-# ⛔ UNTIL THE HANDOVER (D198, 2026-11-02). jongsky25 has not started on BHW Connect: its move onto the
-# testing box is finished first. Until then the lines below are set aside, so every path is
-# avincentpatrick's under `*` above, and the move's pull requests need nobody's label. At the handover
-# (the row bhw-handover) they come back exactly as they are here, in a pull request jongsky25 sees
-# before he starts.
+# Handed over (bhw-handover, M213, 2026-11-05). From D198 until then these lines were set aside while
+# BHW Connect moved onto the testing box; they are back exactly as they were. BHW's handover page is
+# apps/bhw-connect/docs/HANDOVER.md.
 
 # BHW Connect: the whole application.
-# /apps/bhw-connect/         @jongsky25
+/apps/bhw-connect/         @jongsky25
 
 # Shared: a change here can take the other application down, so it needs the other owner's label.
-# /apps/bhw-connect/ops/     @jongsky25 @avincentpatrick
-# /.github/                  @avincentpatrick @jongsky25
-# /deploy.ps1                @avincentpatrick @jongsky25
-# /docs/working-agreement.md @avincentpatrick @jongsky25
+/apps/bhw-connect/ops/     @jongsky25 @avincentpatrick
+/.github/                  @avincentpatrick @jongsky25
+/deploy.ps1                @avincentpatrick @jongsky25
+/docs/working-agreement.md @avincentpatrick @jongsky25

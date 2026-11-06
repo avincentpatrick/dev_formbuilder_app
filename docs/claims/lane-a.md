@@ -16,7 +16,7 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M215`, `R-98b2d568`: the hand-off names only startable rows as work (m215-next-section-classes)
+## Status: ACTIVE CLAIM — `M215`, `R-98b2d568`: the hand-off names only startable rows as work (m215-next-section-classes) — BUILT AND HELD: PR #412 green, waiting for the next merge point
 
 Taken 2026-11-06. Branch `m215-next-section-classes`, cut from origin/main at `1cae5bef`, PR into main. Held green for the next merge point (`D137`).
 Row: `R-98b2d568`, *"The Next section and the hand-off list open decisions as work to take."*
@@ -42,6 +42,19 @@ Shared artefacts taken: `docs/pipeline.md`, `docs/feature-backlog.md`; at close-
 Paired files taken: none.
 Namespaces spent: `M215` only; nothing from the migration or ADR namespaces.
 Prediction: the new test file green once wired, and all eight mutants caught, because every one changes a value a test reads directly. Pint and the lint gates green. PHPStan cannot move on a `scripts/` and test diff, and Vitest and E2E are not reached. **Most likely to be wrong:** the live arm's floor, and the hand-off's length after the extra clause, which also has to agree with `state.php --check`.
+
+### Built, and held for the next merge point (2026-11-06)
+**PR #412, head `e7c4772a`, NOT merged (`D137`).** CI run 42196794358, 8/8 with real step counts: Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5. `Boundary (from main)` is green as its own workflow, so all eight contexts of the ruleset are green.
+
+- **⚠️ Until #412 merges, the trunk's line still lists `R-98b2d568` first**, because its close is on the held branch (the `M189` precedent). The next increment takes the row after it.
+- **Every claimed file was edited, and nothing was added to the list.** The row's close and the blocked-only tier row are both in `docs/feature-backlog.md`.
+- **How the prediction has fared so far:**
+  - The live arm's floor and the hand-off's length, which I expected to go wrong, did not. The hand-off grew 219 bytes to 6,998, and `state.php --check` is clean.
+  - Mutants: 13 run, not the eight predicted, all caught.
+  - **What I did not predict:** my first draft used Pest's `toHaveKey(1, $message)`, whose second argument is the expected value. I caught it by reading it back, before the first run.
+  - **Also not predicted:** the local run of `tests/Feature/Docs` was 229 of 230, with `SuiteCollectionFloorTest` red. That is its documented bind-mount behaviour, and it was measured rather than assumed. The 79 files it misses are 40 in `tests/Feature/Submissions` and 39 in `tests/Feature/Forms`, which this diff does not touch, and the new file is collected. CI's Pest job is green.
+- **Not proved by a test:** what the three reports print. The wiring arm reads source (`R-eecdb678`), so the printed lines were read by eye on the host.
+- **Owed at the merge point:** release this claim, regenerate `docs/gate-baselines.md` from the post-merge run, write the status bullet, regenerate the line and run `next.php --write`. `PROGRESS.md` has 6,392 bytes of headroom, so if a close-out leaves less than `tracker-lint`'s growth rate, file the surgery row then.
 
 ## RELEASED — `M214`, BHW Connect finished in one go (`D210`): `bhw-boundary-hardening`, `bhw-ci-fast-path`, `bhw-e2e-in-ci`, `bhw-screenshot-backup` and `bhw-drilldown-cold-render` closed; `bhw-handover-first-day`, `bhw-supabase-vercel-delete`, `bhw-preview-slot` and `bhw-data-upload-page` off Meridian's line (merged as PR #409, `87d58b37`, and PR #410, `323e2639`, at one merge point; #409's run 42019363697 8/8 green with real step counts — Static analysis 33 · BHW Connect 21 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5; the trunk's run 42060213135 on `323e2639` 8/8 — Static analysis 33 · BHW Connect 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5)
 

@@ -10238,8 +10238,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   site back. `git merge-base --is-ancestor X X` exits 0 (INFERRED from git's documented exit status), so that
   guard must run after step 2's already-live check and only when the target differs from `deployed-sha`, or a
   run meant to bring the site back up at its deployed commit would be skipped; a rollback by hand through
-  `-Ref` must bypass it. **Latent.** — needs a push to `main` between one CI run's success and that run's
-  Deploy fetch. Filed by `M98`. **Tier: before-launch.**
+  `-Ref` must bypass it. **Seen live on 2026-11-06, harmlessly (`M214`'s close-out):** CI's run on `2c3255ed` ended at
+  02:38:42 UTC, and its Deploy 42151635152 fetched `origin/main` and shipped `40c52e5d`, whose own run then failed at
+  03:15:38 UTC on a flaky test (`pdf-supersede-test-minute-flake`). Both commits changed documents only. **Live.** —
+  needs a push to `main` between one CI run's success and that run's Deploy fetch, and a close-out's two pushes make
+  one every time. Filed by `M98`. **Tier: before-launch.**
 - ~~**`major` · Every visitor reaches the testing server as one private address, so the per-address limits, the login lockout and every audit IP lose their meaning.**~~
   Found by `M98` (2026-09-17) while measuring which client address the testing server actually sees. Source NAT on
   the agency's inbound rule rewrites every request to 192.168.50.1, so every per-address arm is one bucket for the
@@ -15716,5 +15719,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   - `M214`'s fast path shortens the pull request only. A push to `main` runs in full on purpose, so that a green trunk means the whole trunk.
   - His page tells him to expect this, so nothing is misleading today. It costs him a slower check of each change on staging.
   The remedy, to be measured before it is chosen: let a push that changes only `apps/bhw-connect/`, `ops/` excepted, skip Meridian's jobs as a pull request does. The risk to weigh is a Meridian test that reads a file under that folder without being known to; `ops/` is the one found so far.
+
+  **Live.** Filed by `M214`. **Tier: during-testing.**
+
+- **`minor` · `pdf-supersede-test-minute-flake` — `GeneratePdfJobTest`'s supersede case fails when its two renders fall in different minutes, and a red trunk skips a deploy.**
+  Found by `M214`'s close-out (2026-11-06): the trunk's run 42149951862 on `40c52e5d`, a documents-only push, went red at Pest with "Failed asserting that 2059 is identical to 2056", at the case's flat-gauge assertion. The gate-traps log has the same case failing once before, so it was seen and never filed.
+  - The PDF prints "Generated <time>" to the minute (`app/Services/Submissions/SubmissionPdfRenderer.php`, `Carbon::now()->toDayDateTimeString()`), and the case renders twice on a running clock.
+  - **Measured with a temporary test, removed afterwards:** 60 renders a second apart within one minute were all 2058 bytes; 20 on a pinned clock were all 2058; 60 a minute apart across an hour came to five sizes from 2052 to 2058. So the size moves with the printed minute.
+  - The product is right: after a regeneration the gauge holds one file's size. Only the case's assumption that two renders are the same size is wrong. The case takes about 0.24 s, so a straddle is rare, roughly one run in a few hundred (estimated, not measured).
+  The remedy, to be measured when taken: assert the gauge equals the surviving row's `size_bytes`, which still reddens on an accumulating design and does not care about the clock. Pinning the clock in the case would also work and proves less.
 
   **Live.** Filed by `M214`. **Tier: during-testing.**

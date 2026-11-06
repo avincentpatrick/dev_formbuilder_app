@@ -49,7 +49,7 @@ Prediction: the new test file green once wired, and all eight mutants caught, be
 - **⚠️ Until #412 merges, the trunk's line still lists `R-98b2d568` first**, because its close is on the held branch (the `M189` precedent). The next increment takes the row after it.
 - **Every claimed file was edited, and nothing was added to the list.** The row's close and the blocked-only tier row are both in `docs/feature-backlog.md`.
 - **How the prediction has fared so far:**
-  - The live arm's floor and the hand-off's length, which I expected to go wrong, did not. The hand-off grew 219 bytes to 6,998, and `state.php --check` is clean.
+  - The live arm's floor and the hand-off's length, which I expected to go wrong, did not. The hand-off grew 138 bytes to 6,998, measured with the old and new generators on the same tree, and `state.php --check` is clean.
   - Mutants: 13 run, not the eight predicted, all caught.
   - **What I did not predict:** my first draft used Pest's `toHaveKey(1, $message)`, whose second argument is the expected value. I caught it by reading it back, before the first run.
   - **Also not predicted:** the local run of `tests/Feature/Docs` was 229 of 230, with `SuiteCollectionFloorTest` red. That is its documented bind-mount behaviour, and it was measured rather than assumed. The 79 files it misses are 40 in `tests/Feature/Submissions` and 39 in `tests/Feature/Forms`, which this diff does not touch, and the new file is collected. CI's Pest job is green.

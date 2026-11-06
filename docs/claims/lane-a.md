@@ -16,7 +16,36 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M215`, `R-98b2d568`: the hand-off names only startable rows as work (m215-next-section-classes) — BUILT AND HELD: PR #412 green, waiting for the next merge point
+## Status: ACTIVE CLAIM — `M216`, `R-5f180437` and `R-4bda047a`: the testing site's backups survive a dead disk, and the runbook can rebuild them (m216-testing-backups)
+
+Taken 2026-11-07. Branch `m216-testing-backups`, cut from origin/main at `b65c97e8`, PR into main. Held green for the next merge point (`D137`), with `M215`'s #412. The box's half follows that merge, because it needs the merged code, so the rows close at the close-out and not on the branch.
+Rows: `R-5f180437`, *"The first-boot runbook and the checklist set up none of the database backup §5 prescribes."*; `R-4bda047a`, *"The testing server's database backups sit on the same machine as the database: no off-box copy, no write-ahead-log archiving and no restore drill."* Taken together under `D13` exception #8, on `D212`'s answer.
+
+### Evidence verified
+- `docs/deployment-infrastructure.md` §5's daily dump copied off the box, WAL archiving, 30-day retention and quarterly restore: **held**, item 1 since extended by `M176`'s deploy dumps.
+- §8's PostgreSQL step closing on *"Configure `archive_mode`/`archive_command` (§5)"* and nothing else: **held**.
+- The Testing Server Checklist's database step (read at published version `1789767880-491b`): **held**, and the whole page has zero occurrences of `pg_dump`, `archive_mode`, `archive_command`, `off-box` and `meridian-test-db-backup`.
+- `docs/non-functional-requirements.md`'s RTO, RPO, backup frequency and 30-day retention: **held**.
+- `R-4bda047a`'s nightly task (`meridian-test-db-backup`, 01:30, newest 14): **held in §8.3 and the staging record only**; the box itself was not read when this was written. The read-only box check in this increment reads it.
+
+### Premise verified
+- **`R-5f180437`'s "no Task Scheduler job" expired on 2026-10-12.** The row marked it inferred, and `R-4bda047a`'s session then set the job up. Every deploy has also taken its own dump since `M176`. What is left of the row: the job's script is only on the box (`C:\meridian\backups\nightly-dump.php`, in no tracked file), so §8.2 cannot rebuild it, and its 14 is not §5's 30.
+- **The box is past first boot, so the two rows are one problem.** `R-5f180437` is the runbook's half and `R-4bda047a` is the box's half of the same remedy. `R-4bda047a` says the remedy needs a target from the user, which the line's `ready` does not show.
+- **The row understates itself: the PostgreSQL server is no longer Meridian's alone.** `bhw_connect` has been on it since 2026-11-03 (§8's amendment by ADR-0024, *second-application-under-one-host*). `archive_mode` is server-wide and takes a restart, so the row's remedy would interrupt BHW Connect and put its personal records (`fact_bhw_raw`) in the archive. Neither row could know this.
+- **BHW's own dumps are jongsky25's (`D210`).** They sit on the same disk, and this increment neither touches nor queues them. `apps/` is not opened for editing.
+- **`D212` chose** the daily copy with one restore proved, so the row's alternative (*"record that as a decision"*) is partly taken: §5's fifteen minutes does not bind this site, and a day of data can be lost.
+
+### Remedy verdict
+**Wrong in one mechanism, read from the PostgreSQL 15 manual before anything was written.** *"pg_dump and pg_dumpall do not produce file-system-level backups and cannot be used as part of a continuous-archiving solution. Such dumps are logical and do not contain enough information to be used by WAL replay."* (§26.3). So the row's WAL step plus a daily dump gives no point-in-time recovery, and §5 item 5's *"restore from the latest clean dump + replay WAL"* cannot work. It needs a physical base backup, which §5 never names. Fifteen minutes also needs `archive_timeout`, which §5 omits, and *"archived files that are closed early due to a forced switch are still the same length as completely full files"* (§20.5.3). `archive_mode` *"can only be set at server start"*. §5 is corrected here and production's recovery is filed `before-launch`.
+**The rest works as prescribed:** a scheduled dump with a prune, and one restore. The dump reuses `deploy:backup` with one new option, because that command has already run on every deploy since merge point 2. **Measured on the host, not on the box, until the box's half.**
+
+Files: `app/Console/Commands/DeployBackupCommand.php`, `scripts/nightly-backup.ps1` (new), `tests/Feature/Deploy/DeployBackupCommandTest.php`, `tests/Feature/Docs/BackupRunbookTest.php` (new), `docs/deployment-infrastructure.md`, `docs/non-functional-requirements.md`, `docs/feature-backlog.md`, `docs/pipeline.md` (generated), `docs/claims/lane-a.md`, `docs/claims/decisions.md`. Off the repository: the box's task and folders, one pointer line on the Testing Server Checklist.
+Shared artefacts taken: those under `docs/`; at close-out, `PROGRESS.md` (own block only) and `docs/gate-baselines.md`.
+Paired files taken: none.
+Namespaces spent: `M216`, `D212`, `D13` exception #8, and one more decision when the off-box target is named; nothing from the migration or ADR namespaces.
+Prediction: Pint and the lint gates green, and PHPStan unmoved by one option. Pest green on the four files named in the plan, every mutant caught, and the script's five forced exit codes as designed on the first run. No `VERSION` bump. **Most likely to be wrong:** the restore drill on the box. `pg_restore --no-owner` into a scratch database with PostGIS and cluster-wide roles has never been run there, and it may exit non-zero on warnings. Next most likely: SYSTEM cannot reach the chosen target, if it is a network share.
+
+## HELD — `M215`, `R-98b2d568`: the hand-off names only startable rows as work (m215-next-section-classes) — BUILT AND HELD: PR #412 green, waiting for the next merge point
 
 Taken 2026-11-06. Branch `m215-next-section-classes`, cut from origin/main at `1cae5bef`, PR into main. Held green for the next merge point (`D137`).
 Row: `R-98b2d568`, *"The Next section and the hand-off list open decisions as work to take."*

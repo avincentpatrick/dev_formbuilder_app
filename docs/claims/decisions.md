@@ -24,10 +24,19 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D211`, the last filed, was asked and answered on 2026-11-05 during `M214`, and recorded the same day. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D212`, the last filed, was asked and answered on 2026-11-06 in the planning of `M216`, and recorded on 2026-11-07 in that increment's claim. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D212 — The testing site's backups all sit on the machine that holds its database, and `docs/deployment-infrastructure.md` §5 prescribes a copy off the box, WAL archiving and a restore drill. How much of that binds the testing site? **A — a daily copy off the box and one restore proved; up to a day of data can be lost, and the 15-minute recovery is filed for before launch.**
+
+**Asked and answered 2026-11-06 (user decision, in the planning of `M216`), on `R-5f180437` and `R-4bda047a`.**
+- **A — a daily copy off the box (chosen, the session's recommendation).** Each night's dump also goes off the box with 30 days kept, and one restore is proved. No database restart, and the files are small.
+- **B — the full 15-minute recovery now.** It needs a physical base backup as well as WAL archiving, a restart of the PostgreSQL server that also carries `bhw_connect`, BHW's personal records in the archive, and about 46 GB off the box per 30 days (96 forced 16 MB segments a day: an estimate, not measured).
+- **C — stay on the box.** It writes down that a disk failure loses the testers' data, against the user's 2026-10-12 request that no record be deleted on the testing site during development.
+
+**What it creates:** `M216` builds A. Production's recovery (base backup, WAL, `archive_timeout`, the shared server's restart) is filed `before-launch` in that increment's PR. **Where the copy goes is a separate question:** the user's answer was "check the box first", so a read-only block reads what the box can reach and the target is then asked by name, in `M216`'s session, and recorded as its own decision.
+
 ### D211 — Each Meridian pull request touching a shared path waits for jongsky25's label, and the user asked: *"are we gonna kept on doing this? … this will delay our development. is there another way to avoid this?"* Who must approve a change to the shared paths? **A — `.github/`, `deploy.ps1` and the working agreement become avincentpatrick's alone; BHW's `ops/` stays shared.**
 
 **Asked and answered 2026-11-05 (user decision, in chat), during `M214`, after #409 waited on his label.**
@@ -4106,6 +4115,14 @@ So two rows edit the same files, and both touch a hub. `R-b31f421e` rewrites how
 **Why:** one script and one paired fixture set. `R-b31f421e` converts both ci-log fixtures to the shape gh really prints, and every entry `R-4130e1fa` adds owes a line to each of those fixtures. Split into two increments, the second would re-edit every fixture the first had just converted.
 
 **Disposition:** the user chose both together, in chat on 2026-10-28, over the scraper fix alone with `R-4130e1fa` as its own later increment. Recorded in both places this log requires: inline at the closed rows and in `PROGRESS.md`'s release paragraph. Not a precedent, and the first of its reason, so the escalation rule above is not engaged.
+
+##### #8 — `M216` (2026-11-06) · two rows of one remedy in one runbook, allowed by the user with the plan
+
+**What was not satisfied:** item 1. `R-5f180437` and `R-4bda047a` both edit `docs/deployment-infrastructure.md`, which breaks one clause or the other whichever side of the hub line that file falls on.
+
+**Why:** one remedy seen from two sides. `R-5f180437` is the runbook's half and `R-4bda047a` is the box's half, and one script and one restore close both. Split into two increments, the first would document a job the box does not yet run, or the second would re-edit every sentence the first had just written.
+
+**Disposition:** the user approved the plan that takes both together, on 2026-11-06, with this exception named in it. Recorded in both places this log requires: inline at the closed rows and in `PROGRESS.md`'s release paragraph. Not a precedent, and the first of its reason, so the escalation rule above is not engaged.
 
 ---
 

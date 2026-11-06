@@ -690,8 +690,9 @@ administers BHW. **Adding a BHW admin:** the person signs in to Meridian and ope
 
 **Feedback screenshots** are files under `C:\meridian\bhw\storage\feedback-screenshots\<session>\<uuid>.jpg`
 (`BHW_STORAGE_DIR`), shown to admins only, through `/bhw-connect/api/admin/screenshot`. They sit inside
-`C:\meridian\bhw`, so NETWORK SERVICE's Modify there covers the service's writes. ⚠️ `bhw_connect`'s nightly
-dump does not carry them (`bhw-screenshot-backup`). [`bhw-p3-identity`]
+`C:\meridian\bhw`, so NETWORK SERVICE's Modify there covers the service's writes. `bhw_connect`'s nightly
+backup task copies the folder beside each dump, kept as long as the dumps, and a restore was drilled on
+2026-11-06: 34 files of 34, none different (`bhw-screenshot-backup`). [`bhw-p3-identity`]
 
 **Keys.** PostgREST verifies a secret of the box's own, kept in `C:\meridian\bhw\postgrest\jwt-secret.txt`
 (the config's ACL). `apps/bhw-connect/db/mint-jwt.mjs` mints the anon and service keys in `.env` from it.
@@ -780,7 +781,8 @@ drill into `bhw_connect_restoretest` is part of `bhw-p2-db`; the screenshots' re
 **The load check** (`M209`'s E2), right after a restart had emptied BHW's caches:
 - Twelve BHW drill-down views ran at once, all 200, in 0.4 to 30.4 s.
 - Meridian's `/up` stayed at 35 ms median and 66 ms worst. CPU peaked at 2.5%, and BHW's node at 134 MB.
-- BHW's slow first views wait rather than compute (`bhw-drilldown-cold-render`), and they do not slow Meridian.
+- BHW's slow first views wait rather than compute, and they do not slow Meridian. `M214` measured what on: the
+  page arrives at once, and only its AI insight card fills in later, from a provider (`bhw-drilldown-cold-render`).
 
 **The development copy** (`M211`, `D207`). CI and BHW's local stack build its database from a copy taken
 on the box, never from the box itself.

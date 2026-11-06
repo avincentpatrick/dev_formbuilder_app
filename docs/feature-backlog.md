@@ -15700,3 +15700,21 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy is to read the depth from the secret-scanning job's own text and to give that job's line a token `mutate.php` can drive.
 
   **Live.** Filed by `M214`. **Tier: during-testing.**
+
+- **`minor` · `root-agents-md` — ChatGPT Codex does not load `apps/bhw-connect/AGENTS.md` from a task started at the repository's root, so each task has to name it.**
+  Found by `M214` (2026-11-05), writing jongsky25's handoff, and decided against there.
+  - Codex reads `AGENTS.md` from the root down to its working folder. The repository has none at its root, so a task started there sees no `AGENTS.md` at all unless it begins `Read apps/bhw-connect/AGENTS.md and follow it.`, which is what his page tells him to write.
+  - A task that forgets is not stopped until its pull request: the boundary check still refuses a change outside his folder without a label.
+  - A root file would close it, but `AGENTS.md` is not in `deploy.ps1`'s list of root files the site does not run (`PROGRESS.md`, `PROGRESS_ARCHIVE.md`, `CLAUDE.md`, `README.md`), so its first merge would open a maintenance window under the testers.
+  The remedy is to add `AGENTS.md` to that list in an ordinary merge first, then add a short root file saying which page governs which application.
+
+  **Live.** Filed by `M214`. **Tier: during-testing.**
+
+- **`minor` · `trunk-suite-holds-deploys` — A merge that changes only BHW Connect takes 30 to 60 minutes to go live, because a push to `main` runs Meridian's whole suite first.**
+  Found by `M214`, measured on 2026-11-05: jongsky25's #411 merged at 15:16:59 UTC and was live at 15:46:47 UTC, 30 minutes; #410 merged at 15:57:24 UTC and was live at 16:34:38 UTC, 37 minutes.
+  - `deploy.yml` runs on CI's `workflow_run`, so a deploy waits for every job on the trunk. E2E is most of it: 36 of #410's 37 minutes.
+  - `M214`'s fast path shortens the pull request only. A push to `main` runs in full on purpose, so that a green trunk means the whole trunk.
+  - His page tells him to expect this, so nothing is misleading today. It costs him a slower check of each change on staging.
+  The remedy, to be measured before it is chosen: let a push that changes only `apps/bhw-connect/`, `ops/` excepted, skip Meridian's jobs as a pull request does. The risk to weigh is a Meridian test that reads a file under that folder without being known to; `ops/` is the one found so far.
+
+  **Live.** Filed by `M214`. **Tier: during-testing.**

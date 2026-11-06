@@ -100,7 +100,7 @@ final class DeployBackupCommand extends Command
             return max(1, (int) config('deploy.keep', 10));
         }
 
-        return is_string($option) && ctype_digit($option) && (int) $option >= 1 ? (int) $option : null;
+        return ctype_digit($option) && (int) $option >= 1 ? (int) $option : null;
     }
 
     /** The configured `pg_dump`, else the newest PostgreSQL install's on Windows, else `pg_dump` on PATH. */

@@ -21,15 +21,28 @@ use Symfony\Component\Process\Process;
  *
  * ⚠️ UNPROVEN ON THE BOX UNTIL MERGE POINT 2 (`D143`): the runner is NETWORK SERVICE, and whether it can run `pg_dump` there
  * was never measured — which is why a failure here costs nothing but the deploy.
+ *
+ * The nightly backup calls it too, with its own folder and `--keep` (M216, `scripts/nightly-backup.ps1`, `D212`), so the box
+ * has one way of taking a dump. ⛔ `--keep` IS CHECKED BEFORE ANYTHING RUNS: a typo cast to an integer would be 0, and
+ * `max(1, 0)` would prune the folder down to one dump.
  */
 final class DeployBackupCommand extends Command
 {
-    protected $signature = 'deploy:backup {--dir= : Where the dump goes (default: config deploy.backup_dir)}';
+    protected $signature = 'deploy:backup
+        {--dir= : Where the dump goes (default: config deploy.backup_dir)}
+        {--keep= : How many of its own dumps the folder keeps (default: config deploy.keep)}';
 
     protected $description = "Back up the database before a deploy's migration, or fail so the deploy refuses to migrate";
 
     public function handle(): int
     {
+        $keep = $this->keep();
+        if ($keep === null) {
+            $this->error('No backup was taken: --keep must be a whole number of at least 1.');
+
+            return self::FAILURE;
+        }
+
         $dir = (string) ($this->option('dir') ?: config('deploy.backup_dir'));
         if (! is_dir($dir) && ! @mkdir($dir, 0775, true) && ! is_dir($dir)) {
             $this->error("No backup was taken: the folder '{$dir}' does not exist and cannot be made.");
@@ -73,10 +86,21 @@ final class DeployBackupCommand extends Command
             return self::FAILURE;
         }
 
-        $this->keepNewest($dir, max(1, (int) config('deploy.keep', 10)));
+        $this->keepNewest($dir, $keep);
         $this->info("Backed up to {$file} ({$bytes} bytes).");
 
         return self::SUCCESS;
+    }
+
+    /** `--keep`, else the configured number; null when `--keep` is not a whole number of at least 1. */
+    private function keep(): ?int
+    {
+        $option = $this->option('keep');
+        if ($option === null) {
+            return max(1, (int) config('deploy.keep', 10));
+        }
+
+        return is_string($option) && ctype_digit($option) && (int) $option >= 1 ? (int) $option : null;
     }
 
     /** The configured `pg_dump`, else the newest PostgreSQL install's on Windows, else `pg_dump` on PATH. */

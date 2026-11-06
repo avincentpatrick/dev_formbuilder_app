@@ -16,7 +16,32 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM — `M214` released on 2026-11-06: BHW Connect is finished in one go (`D210`), and Meridian's line holds no `bhw-` row. Five rows closed (four built, one closed by measurement with no code), four moved to jongsky25's own page. Close-out branch `m214-closeout`, which also edits `docs/adr/0024-second-application-under-one-host.md`, `docs/deployment-infrastructure.md`, `docs/feature-backlog.md`, `docs/pipeline.md` and `docs/gate-baselines.md`. Next is the line's during-testing head.
+## Status: ACTIVE CLAIM — `M215`, `R-98b2d568`: the hand-off names only startable rows as work (m215-next-section-classes)
+
+Taken 2026-11-06. Branch `m215-next-section-classes`, cut from origin/main at `1cae5bef`, PR into main. Held green for the next merge point (`D137`).
+Row: `R-98b2d568`, *"The Next section and the hand-off list open decisions as work to take."*
+
+### Evidence verified
+- `derive_testing_gate()` in `scripts/state.php` reads every Next bullet into one list and drops its class: **held**.
+- `scripts/next.php`'s `render_queue()` prints that list after "Take work from the Next section": **held**. So do `scripts/loop.php`'s `cmd_status()` and `scripts/state.php`'s own `next work` line: **held**.
+- Seen in this session's own output: twelve ready rows and twelve blocked rows in one list, `ocr-linelist` among them. The row names open decisions; today there are none, so the live half is the blocked rows, which `M98`'s correction predicted.
+
+### Premise verified
+- **The consumers are the three the row names.** A grep of the repository and the local hooks finds no other reader of `testing_gate.next`, and no test reads it.
+- **`M98`'s claim about `waiting_ids` still holds.** They come from the gate's "Waiting on you:" line, so reclassifying the bullets cannot disturb them.
+- **The row understates itself, twice.** The readers inherit the section's cut with no notice: they print 12 ids of a tier with 168 ready and 76 blocked, because `M99` made the document state the cut and not its readers. And the generator's own *"Take work from here"* sits directly above the blocked bullets, so one sentence in `render_next()` is also part of the defect, though `M98` placed the fix on the reading side.
+- **The decisions half is dormant today** (0 open), so only a fixture can prove it. `D102` has replaced `D66` as the asking rule, which does not change this fix.
+- **`R-2ca49f19` is a separate row** with sentences in two of the same files (the "Decision Board" wording). `D13` keeps it out, and those sentences stay as they are.
+- **`scripts/state.php` and `scripts/next.php` run top to bottom and cannot be required**, which is why `M99` pinned its contract by reading source. A small pure file is what makes real tests and real mutants possible here.
+
+### Remedy verdict
+**Works, measured before any test was written.** `M98`'s fix is to make the reader carry each bullet's class. An end-anchored pattern was run against every version of `docs/pipeline.md` on the trunk: 299 versions, 4,186 bullets, **0 unclassified** (2,296 ready, 1,560 blocked, 330 waiting). The cut note's counts parsed 179 of 179. The row's first option holds. Its second, stopping at the decisions, would still put blocked rows under "Take work from", as `M98` said.
+
+Files: `scripts/next-section.php` (new), `scripts/state.php`, `scripts/next.php`, `scripts/loop.php`, `scripts/pipeline.php`, `tests/Feature/Docs/NextSectionClassTest.php` (new), `docs/pipeline.md` (generated), `docs/feature-backlog.md`, `docs/claims/lane-a.md`.
+Shared artefacts taken: `docs/pipeline.md`, `docs/feature-backlog.md`; at close-out, `PROGRESS.md` (own block only) and `docs/gate-baselines.md`.
+Paired files taken: none.
+Namespaces spent: `M215` only; nothing from the migration or ADR namespaces.
+Prediction: the new test file green once wired, and all eight mutants caught, because every one changes a value a test reads directly. Pint and the lint gates green. PHPStan cannot move on a `scripts/` and test diff, and Vitest and E2E are not reached. **Most likely to be wrong:** the live arm's floor, and the hand-off's length after the extra clause, which also has to agree with `state.php --check`.
 
 ## RELEASED — `M214`, BHW Connect finished in one go (`D210`): `bhw-boundary-hardening`, `bhw-ci-fast-path`, `bhw-e2e-in-ci`, `bhw-screenshot-backup` and `bhw-drilldown-cold-render` closed; `bhw-handover-first-day`, `bhw-supabase-vercel-delete`, `bhw-preview-slot` and `bhw-data-upload-page` off Meridian's line (merged as PR #409, `87d58b37`, and PR #410, `323e2639`, at one merge point; #409's run 42019363697 8/8 green with real step counts — Static analysis 33 · BHW Connect 21 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5; the trunk's run 42060213135 on `323e2639` 8/8 — Static analysis 33 · BHW Connect 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5)
 

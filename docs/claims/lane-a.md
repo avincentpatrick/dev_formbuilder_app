@@ -16,7 +16,7 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M216`, `R-5f180437` and `R-4bda047a`: the testing site's backups survive a dead disk, and the runbook can rebuild them (m216-testing-backups)
+## Status: ACTIVE CLAIM — `M216`, `R-5f180437` and `R-4bda047a`: the testing site's backups survive a dead disk, and the runbook can rebuild them (m216-testing-backups) — BUILT AND HELD: PR #413 green, waiting for the next merge point; the box's half follows that merge
 
 Taken 2026-11-07. Branch `m216-testing-backups`, cut from origin/main at `b65c97e8`, PR into main. Held green for the next merge point (`D137`), with `M215`'s #412. The box's half follows that merge, because it needs the merged code, so the rows close at the close-out and not on the branch.
 Rows: `R-5f180437`, *"The first-boot runbook and the checklist set up none of the database backup §5 prescribes."*; `R-4bda047a`, *"The testing server's database backups sit on the same machine as the database: no off-box copy, no write-ahead-log archiving and no restore drill."* Taken together under `D13` exception #8, on `D212`'s answer.
@@ -44,6 +44,21 @@ Shared artefacts taken: those under `docs/`; at close-out, `PROGRESS.md` (own bl
 Paired files taken: none.
 Namespaces spent: `M216`, `D212`, `D13` exception #8, and one more decision when the off-box target is named; nothing from the migration or ADR namespaces.
 Prediction: Pint and the lint gates green, and PHPStan unmoved by one option. Pest green on the four files named in the plan, every mutant caught, and the script's five forced exit codes as designed on the first run. No `VERSION` bump. **Most likely to be wrong:** the restore drill on the box. `pg_restore --no-owner` into a scratch database with PostGIS and cluster-wide roles has never been run there, and it may exit non-zero on warnings. Next most likely: SYSTEM cannot reach the chosen target, if it is a network share.
+
+### Built, and held for the next merge point (2026-11-07)
+**PR #413, head `95aac853`, NOT merged (`D137`).** CI run 42257024189, 8/8 with real step counts: Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5. `Boundary (from main)` is green in its own workflow. No migration, no `VERSION` bump, no release notes.
+
+- **⛔ Neither row closes on the branch.** The box's half needs `--keep` live, so it follows the merge: install the script, re-register `meridian-test-db-backup` with the target, one run with matching hashes, a restore into scratch `meridian_restoretest`, one pointer line on the Testing Server Checklist. The close-out then rewrites §8.3's sentence from what the box measured and turns `docs/non-functional-requirements.md`'s `Queued` into `Built — M216`, which is a change from the plan: both were written as branch edits, and neither can be true until the box has run it.
+- **The off-box target is not named yet.** The user's answer to `D212`'s second question was "check the box first"; the read-only block has been given and its output has not come back. If nothing is available, `R-4bda047a` stays open on its own decision.
+- **At the merge point:** #412 first. Then merge the trunk into #413, keep both sides at the backlog's end, regenerate the line in a tree with `vendor/`, and let it go green again.
+- **Filed:** `R-139b1662` `production-pitr` (`before-launch`), `R-91237328` `nightly-backup-silent-failure` and `R-38ba2f94` `restore-drill-no-owner` (`during-testing`).
+- **How the prediction has fared so far:**
+  - **Right:** Pint and the lint gates green; Pest green on the four files; no `VERSION` bump.
+  - **Right, and larger than predicted:** the script's exits were forced on Windows PowerShell 5.1 against throwaway folders, 30 checks and all as designed on the first run. That used a fake `artisan`, so SYSTEM, a real `pg_dump` and the real target are still unproved.
+  - **Wrong:** *"PHPStan unmoved by one option."* My `is_string()` on `--keep` was an error of its own, because Larastan reads the signature's `string|null`. Fixed before the push (`95aac853`). The container also reports 51 `property.notFound` reads in files this diff never touches, `M199`'s logged trap; CI is clean.
+  - **Wrong, and my own doing:** the first mutation run proved nothing. `mutate.php` refuses a target with uncommitted changes, so all twelve aborted while my driver exited 0. `M215`'s entry in the traps log already said so, and I had not read it. After committing, **12 of 12 caught**, every file back to its hash, and the two on the changed line caught again after the fix. The mutants ran uncommitted on top of that commit, as `M199`'s did, because the gate is Pest and reads the working tree; the plan had said to commit each one.
+  - **Wrong in the plan:** it took the `D13` exception's number from `state.php`, whose "exceptions entry" is `docs/ux/exceptions-log.md`. `D13`'s own log gave #8.
+  - **Not yet measured:** the restore drill, still the part most likely to be wrong.
 
 ## HELD — `M215`, `R-98b2d568`: the hand-off names only startable rows as work (m215-next-section-classes) — BUILT AND HELD: PR #412 green, waiting for the next merge point
 

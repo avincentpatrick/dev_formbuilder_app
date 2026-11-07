@@ -13806,14 +13806,6 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   - `addSection()` now sets `is_repeatable => false`.
   - A `BuilderRoutesTest` case adds a section, checks the reply says `false`, and sends the reply straight back renamed, as the builder does. It was red before the fix (`null`), and a mutant taking the line out again is CAUGHT.
 
-- **`nit` · `E2eSeederIdempotencyTest` checks the `releases` table's order against the notes file's, but reads the table with no order, so it can fail by chance.**
-  Found 2026-11-08 by `M221`.
-  - #432's Pest job failed on it (run 42393462799) with the rows `0.17.1, 0.17.0, 0.17.4` where the file says `0.17.4, 0.17.1, 0.17.0`. #431's run, with the same kind of version gap, passed, and so did a local run.
-  - `Release::query()->pluck('version')` has no `ORDER BY`, so PostgreSQL answers in the order it holds the rows, and a long suite does not keep them in insertion order.
-  - **The product is not affected:** `WhatsNew::releases()` sorts by `version_compare` itself.
-  - **The remedy:** compare the two lists sorted the same way, by `version_compare`.
-  - **Live**, because it can turn any pull request's Pest job red by chance. Filed by `M221`. **Tier: during-testing.**
-
 - ✅ **CLOSED BY `M151` (2026-10-09) — ****`major` · On a form whose questions carry a place within their section — every XLSForm import — a drag reorders the
   builder's list but not what respondents, the paper and the export see.** Found by `M151` while planning `R-2baef8ea`.
   `XlsformImportParser::assignSequences()` numbers each question within its section, and `XlsformImporter.php` stores it as

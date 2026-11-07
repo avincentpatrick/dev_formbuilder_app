@@ -71,6 +71,11 @@ export default function Portal() {
             href="/districts"
           />
           <DatasetCard
+            title="Health services"
+            description="The DOH FHSIS 2025 partial release — immunisation, maternal care, water and sanitation, TB services, and health workforce context by area."
+            href="/health-services"
+          />
+          <DatasetCard
             title="Ways forward"
             description="Analyses and innovations built on these datasets will join the repository as they mature."
           />

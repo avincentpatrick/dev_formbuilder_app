@@ -68,6 +68,8 @@ export async function getActiveDatasetId(): Promise<number | null> {
  * every individual-level figure; the StepZero quick-count is the aggregate
  * BHW universe used only as the total/denominator. */
 export const DATASET_SLUGS = {
+  /** DOH 2025 annual health services release, partial at retrieval. */
+  fhsis: "fhsis-2025",
   profiled: "bhw-2025",
   stepzero: "bhw-stepzero-2026",
   /** PSA 2024 Census of Population (E4.2). StepZero's own self-reported population is

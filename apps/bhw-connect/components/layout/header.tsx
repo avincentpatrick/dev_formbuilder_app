@@ -47,7 +47,8 @@ export function Header() {
     pathname === "/" ||
     pathname.startsWith("/profiling-status") ||
     pathname.startsWith("/uuc-phc") ||
-    pathname.startsWith("/facilities")
+    pathname.startsWith("/facilities") ||
+    pathname.startsWith("/health-services")
   )
     return null;
 

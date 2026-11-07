@@ -52,8 +52,9 @@ function query(data: unknown, error: unknown = null) {
     neq: vi.fn(),
     order: vi.fn(),
     in: vi.fn(),
+    limit: vi.fn(),
   };
-  for (const fn of [q.select, q.eq, q.neq, q.order, q.in]) fn.mockReturnValue(q);
+  for (const fn of [q.select, q.eq, q.neq, q.order, q.in, q.limit]) fn.mockReturnValue(q);
   return q;
 }
 beforeEach(() => {
@@ -138,15 +139,25 @@ describe("FHSIS read boundary", () => {
     expect(area?.indicators[0].rate).toBe(0);
   });
   it("a successful empty result means not reported, while a failed read is unavailable", async () => {
-    mocks.from.mockImplementation((table: string) =>
-      query(table === "ref_fhsis_indicator" ? [definition] : []),
-    );
+    mocks.from.mockImplementation((table: string) => {
+      if (table === "ref_fhsis_indicator") return query([definition]);
+      const q = query([]);
+      q.limit.mockReturnValue(query([{ id: 99 }]));
+      return q;
+    });
     expect((await getFhsisArea("PH", "national"))?.indicators[0].reported).toBe(false);
     mocks.from.mockImplementation((table: string) =>
       table === "ref_fhsis_indicator" ? query([definition]) : query(null, { message: "timeout" }),
     );
     expect(await getFhsisArea("PH", "national")).toBeNull();
   });
+  it("does not claim nationwide non-reporting when no public total rows are available", async () => {
+    mocks.from.mockImplementation((table: string) =>
+      query(table === "ref_fhsis_indicator" ? [definition] : []),
+    );
+    expect(await getFhsisArea("PH", "national")).toBeNull();
+  });
+
   it("includes children with no FIC report rather than dropping them", async () => {
     mocks.children.mockResolvedValue([
       { geoCode: "01", geoLevel: "region", geoName: "Example region", incomeClass: null },

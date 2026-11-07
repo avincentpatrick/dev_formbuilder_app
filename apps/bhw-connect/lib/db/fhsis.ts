@@ -79,7 +79,20 @@ export const getFhsisDefinitions = cache(async (): Promise<IndicatorDefinition[]
   }
 });
 
-/** null means a failed/unavailable read; an empty successful fact read means not reported. */
+/** Only call a missing area "not reported" once this release has usable total rows somewhere.
+ * RLS can also hide rows, so an empty public probe means unavailable, not "DOH did not report".
+ */
+const hasFhsisReports = cache(async (datasetId: number): Promise<boolean> => {
+  const { data, error } = await createSupabaseServerClient()
+    .from("fact_fhsis_indicator")
+    .select("id")
+    .eq("dataset_id", datasetId)
+    .eq("breakdown", "total")
+    .limit(1);
+  return !error && !!data?.length;
+});
+
+/** null means unavailable; a missing area in an otherwise available release is not reported. */
 export const getFhsisArea = cache(
   async (code: string, level: GeoLevel): Promise<FhsisArea | null> => {
     try {
@@ -87,7 +100,7 @@ export const getFhsisArea = cache(
         getDatasetIdBySlug(DATASET_SLUGS.fhsis),
         getFhsisDefinitions(),
       ]);
-      if (id === null || !definitions) return null;
+      if (id === null || !definitions || !(await hasFhsisReports(id))) return null;
       const client = createSupabaseServerClient();
       const [facts, workforce] = await Promise.all([
         client

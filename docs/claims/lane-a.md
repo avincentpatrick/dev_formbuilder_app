@@ -16,7 +16,31 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M221`, `R-18d9f001`: a section's title is edited in place in Structure, as a question's label already is (m221-section-title-inline)
+## Status: ACTIVE CLAIM — `M222`, `R-0ace5ea8`: a section's drag, grab and drop say the section's name (m222-section-drag-name)
+
+Taken 2026-11-08, under the same instruction as `M219`. Branch `m222-section-drag-name`, cut from origin/main at the claim's parent, PR into main. Held green for a merge point (`D137`).
+**One row, by `D13`:** it edits one hub, `useCanvasReorder.ts`, which no held PR touches. #433 edits `BuilderCanvas.vue`, which this row's tests mount but do not change.
+Row: `R-0ace5ea8`, *"A section drag is announced as "Dragging a section", without the section's name."*
+
+### Evidence verified
+In `useCanvasReorder.ts`, a question's announcements use `fieldLabel(uid)`. A section's use only "Dragging a section", "Grabbed a section" and "Dropped section", each followed by its position from `describeSectionPosition()`: **held**, on the pointer path and the keyboard path alike.
+
+### Premise verified
+- No test asserts any section announcement: a search of `resources/js` and `tests/e2e` for the three phrases finds only the source.
+- So nothing pins the current wording, and nothing would notice the name added or lost. The new cases are the first.
+
+### Remedy verdict
+**Works.** The section's own label, as the store holds it, goes in each of the four messages: drag, pointer drop, grab and keyboard drop. A section with an empty label falls back to "a section".
+
+Files: `resources/js/components/builder/useCanvasReorder.ts`, `resources/js/components/builder/useCanvasReorder.test.ts`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `VERSION` (0.18.1, after #433's 0.18.0), `database/data/releases.json`.
+Paired files taken: none.
+Namespaces spent: `M222`. `state.php` prints a lower next free number because `M215` to `M221` are held and unreleased.
+Prediction:
+- The new Vitest cases go red first.
+- Nothing else moves, because no test pins the old wording.
+
+## HELD — `M221`, `R-18d9f001`: a section's title is edited in place in Structure, as a question's label already is (m221-section-title-inline) — BUILT AND HELD: PR #433, CI running
 
 Taken 2026-11-08, under the same instruction as `M219`. Branch `m221-section-title-inline`, cut from origin/main at `abf068f0`, PR into main. Held green for a merge point (`D137`).
 **One row, by `D13`:** it edits two hubs (`BuilderCanvas.vue`, `useBuilderStore.ts`). `R-c1eaa8b5` (the canvas type column) and `R-0ace5ea8` (a section drag's announcement) edit the same hubs, so each waits for its own increment.

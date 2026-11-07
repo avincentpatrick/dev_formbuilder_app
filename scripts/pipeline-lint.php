@@ -1706,9 +1706,9 @@ function p6_self_arming(): void
  *
  * WHAT IT READS: every file in the generator's corpus, code as well as prose, because a comment cites as
  * readily as a paragraph. Then three files the generator does not read: the backlog, the decisions file
- * and `CLAUDE.md`. Not the generated file itself, and not the claim ledgers or the archive: those are
- * records of what was true when they were written, and the claim template already forbids the citation
- * there.
+ * and `CLAUDE.md`. The generated file is not in the corpus, so it is never read. Neither are the claim
+ * ledgers or the archive: those are records of what was true when they were written, and the claim
+ * template already forbids the citation there.
  *
  * ⚠️ NO FLOOR OF ITS OWN, ON PURPOSE. The list is the generator's, and P5 already floors it; every path
  * in it must be readable or this refuses, because a partial read is a smaller corpus that reads as clean.
@@ -1726,10 +1726,6 @@ function p8_queue_cited_by_row(array $document): void
     $scanned = 0;
 
     foreach ($paths as $path) {
-        if ($path === PIPELINE) {
-            continue;
-        }
-
         if (! is_file($path)) {
             cannot_measure(sprintf(
                 'P8 cannot read %s, so it would rule over a smaller corpus than the generator\'s and read as clean.',

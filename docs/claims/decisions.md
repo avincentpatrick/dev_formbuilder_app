@@ -24,10 +24,20 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D212`, the last filed, was asked and answered on 2026-11-06 in the planning of `M216`, and recorded on 2026-11-07 in that increment's claim. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D213`, the last filed, was asked and answered on 2026-11-07 in `M216`'s session, after its read-only box check. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D213 — The box has nowhere off it to copy the nightly backup: C: and E: sit on one RAID disk, and it has no mapped drives or real shares. Where does the copy go? **A — a shared folder on the user's separate desktop on the agency network, which stays on, set up on Monday 2026-11-09.**
+
+**Asked and answered 2026-11-07 (user decision, in chat), in `M216`'s session, after the read-only box check that `D212`'s second question asked for.** The user's words: *"let's set this up on monday. i have a separate desktop that is always open within the network pc."*
+- **A — another office machine (chosen, the session's recommendation).** It survives losing the whole server and stays inside the agency. It needs the box to be able to reach the machine, and an account the nightly task can use there.
+- **B — a USB drive in the server.** No network or account changes. It survives the server's disks dying, but not a fire or theft in that room, and it holds every tester's account.
+- **C — free cloud storage.** It survives anything at the office, but testers' data leaves the agency, so it needs the agency's agreement and encryption, and more script.
+- **D — E: for now, and decide later.** It works with no help. It covers an accidental delete or C: filling up, but not a dead RAID disk or a lost server, so `R-4bda047a` would stay open.
+
+**What it creates:** no new row, because `M216`'s box half carries it. **Not measured yet, and read first on Monday:** the desktop's name and address, whether the box can reach it on port 445, and how the task signs in there. The box is in a workgroup at 192.168.50.2/26 and the access log has shown office clients as 192.168.1.x, so the two may be on different networks, and SYSTEM has no identity on another machine. If the network team has to open that path, `R-4bda047a` stays open until it is open. The merge point runs first in the same sitting, because the box's half needs the merged code.
+
 ### D212 — The testing site's backups all sit on the machine that holds its database, and `docs/deployment-infrastructure.md` §5 prescribes a copy off the box, WAL archiving and a restore drill. How much of that binds the testing site? **A — a daily copy off the box and one restore proved; up to a day of data can be lost, and the 15-minute recovery is filed for before launch.**
 
 **Asked and answered 2026-11-06 (user decision, in the planning of `M216`), on `R-5f180437` and `R-4bda047a`.**

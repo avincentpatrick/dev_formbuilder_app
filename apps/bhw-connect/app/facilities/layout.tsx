@@ -1,3 +1,4 @@
+import { GeoSearch } from "@/components/home/geo-search";
 import { IconnectMark } from "@/components/branding/iconnect-logo";
 import { InnovationEndorsement } from "@/components/branding/innovation-endorsement";
 import type { Metadata } from "next";
@@ -88,6 +89,12 @@ export default function FacilitiesLayout({ children }: { children: ReactNode }) 
         {/* Static routes get their trail from the pathname; the area pages below need a resolved
             geo name, so they render their own in the same spot. */}
         <SiteBreadcrumbs className="mb-8" />
+        <div className="mb-6 flex flex-col gap-2">
+          <GeoSearch mode="facilities" />
+          <p className="text-xs text-muted">
+            Search any place. Barangays open their city / municipality overview.
+          </p>
+        </div>
         {children}
       </div>
       <SectionFooter />

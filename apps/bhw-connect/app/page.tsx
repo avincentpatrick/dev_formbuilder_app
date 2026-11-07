@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { GeoSearch } from "@/components/home/geo-search";
 import { DatasetCard } from "@/components/portal/dataset-card";
 import { meridianUrl } from "@/lib/meridian-url";
 import { IconnectLogo } from "@/components/branding/iconnect-logo";
@@ -32,6 +33,16 @@ export default function Portal() {
           Open health data, connected insights, and innovations — explore the evidence shaping
           healthier communities.
         </p>
+      </section>
+
+      <section aria-label="Global search" className="flex flex-col items-center gap-3">
+        <h2 className="text-xl font-semibold">Search across datasets</h2>
+        <p className="max-w-2xl text-center text-sm text-muted">
+          Find a barangay, municipality, city, province, region, or legislative district. Choose a
+          dataset in the results to explore that place. Barangays open the municipality overview in
+          UUC, facilities, and health services.
+        </p>
+        <GeoSearch mode="portal" />
       </section>
 
       {/* Disclaimer — publicly available data, no PII. */}

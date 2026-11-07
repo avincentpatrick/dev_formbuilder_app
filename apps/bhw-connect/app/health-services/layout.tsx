@@ -1,3 +1,4 @@
+import { GeoSearch } from "@/components/home/geo-search";
 import { InnovationEndorsement } from "@/components/branding/innovation-endorsement";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -31,6 +32,12 @@ export default function HealthServicesLayout({ children }: { children: ReactNode
       </header>
       <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
         <SiteBreadcrumbs className="mb-8" />
+        <div className="mb-6 flex flex-col gap-2">
+          <GeoSearch mode="health-services" />
+          <p className="text-xs text-muted">
+            Search any place. Barangays open their city / municipality overview.
+          </p>
+        </div>
         {children}
       </div>
       <footer className="border-t border-border">

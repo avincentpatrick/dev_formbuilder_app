@@ -41,6 +41,11 @@ Row: `R-18d9f001`, *"A section's title cannot be edited in Structure."*
 - The keyboard goes back to the head after Enter.
 
 Files: `resources/js/components/builder/BuilderCanvas.vue`, `resources/js/components/builder/useBuilderStore.ts`, `resources/js/components/builder/BuilderCanvas.test.ts`, `tests/e2e/builder-structure.spec.ts`.
+**Extended 2026-11-08, mid-build, before either file was opened: `app/Services/Forms/FormBuilderService.php` and `tests/Feature/Forms/BuilderRoutesTest.php`, for a defect the new e2e case found.**
+- **What happened:** a section just added with "Add section" cannot be saved at all until the page is reloaded. Every save is refused with *"The is repeatable field must be true or false."* and the status reads "Not saved". That holds for the settings pane too, not only the new in-place title.
+- **Measured:** the case renamed a fresh section at all three widths, and all three were refused.
+- **The cause:** `FormBuilderService::addSection()` creates the row without `is_repeatable`, so the returned model never carries the column's default. `BuilderPresenter::section()` then sends `is_repeatable: null`, the store sends it back, and `UpdateSectionRequest`'s `boolean` refuses `null`.
+- **Why here:** naming a section right after adding it is this row's main use, so the row cannot close without it. It is filed as a row and closed by this increment. It is the same row's hub budget, since `FormBuilderService.php` is a hub, and no held PR touches either file.
 Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `VERSION` (a new ability, so the middle number: 0.18.0, after the held 0.17.2 to 0.17.4), `database/data/releases.json`.
 Paired files taken: none.
 Namespaces spent: `M221`. `state.php` prints a lower next free number because `M215` to `M220` are held and unreleased.

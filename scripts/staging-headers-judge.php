@@ -10,8 +10,8 @@ declare(strict_types=1);
  * The only thing keeping `staging.pitahc.gov.ph` out of search results is ONE line of Apache
  * configuration on ONE box: `Header always set X-Robots-Tag "noindex, nofollow, noarchive"`. It is in
  * no tracked file — `git grep` finds no `VirtualHost` anywhere in this repository, and the two
- * web-server files that ARE tracked (`docker/nginx/default.conf`, `public/.htaccess`) set no header at
- * all. No test and no lint read it. So any future vhost edit or Apache reinstall removes it silently,
+ * web-server files that ARE tracked (`docker/nginx/default.conf`, `public/.htaccess`) do not set this
+ * one. No test and no lint read it. So any future vhost edit or Apache reinstall removes it silently,
  * and the first symptom is tester data in a public index. Googlebot is already fetching `/robots.txt`.
  *
  * ⛔ AND THE OBVIOUS FIX — "move it into the application's security-header middleware" — IS REFUTED BY
@@ -97,6 +97,14 @@ const STAGING_HOST = 'staging.pitahc.gov.ph';
  *              header nobody is judging.
  *   forbid     directives that must be ABSENT. `D54` decided `max-age=300` with no `includeSubDomains`
  *              and no `preload`, and a required-only model cannot express the second half of that.
+ *   only       optional: the probes this header is judged on, when it is not all of them. It must name
+ *              probes that exist, or the header would be judged on nothing and still read as present.
+ *
+ * ⚠️ `X-Content-Type-Options` IS JUDGED ON THE TWO STATIC PROBES ONLY, AND THAT IS THE DECISION RATHER THAN A
+ * GAP (`M217`, `R-25dc7ded`; the reasoning is in `AppSecurityHeaders`). `public/.htaccess` sets it because
+ * those files never reach PHP. Whether that line also reaches the PHP paths depends on how the vhost hands
+ * PHP to `mod_proxy_fcgi`, which no document records, and a PHP response names its own type anyway. So
+ * `/up` and the 404 lacking it is not a finding, and the `measured` fixture keeps them without it.
  *
  * Kept as explicit lists rather than a substring match so that a mutation of one directive is a
  * one-token change, which is what makes this gate drivable by `scripts/mutate.php`.
@@ -116,6 +124,12 @@ const STAGING_REQUIRED_HEADERS = [
         'separator' => ';',
         'require' => ['max-age=300'],
         'forbid' => ['includesubdomains', 'preload'],
+    ],
+    'X-Content-Type-Options' => [
+        'separator' => ',',
+        'require' => ['nosniff'],
+        'forbid' => [],
+        'only' => ['/robots.txt', '/favicon.ico'],
     ],
 ];
 
@@ -271,6 +285,18 @@ function staging_judge(string $dir): int
                 implode(', ', $contradiction),
             ));
         }
+
+        // ⛔ `only` NAMING NOTHING REAL WOULD SKIP EVERY PROBE, AND THE HEADER WOULD THEN NEVER APPEAR AMONG
+        //    THE FAILURES. That is the same green that measured nothing, reached through a typo in a path.
+        if (isset($policy['only'])
+            && (! is_array($policy['only'])
+                || $policy['only'] === []
+                || array_diff($policy['only'], STAGING_PROBES) !== [])) {
+            return staging_cannot_measure(
+                "the policy for {$header} limits it to probes that are not all in the probe list, so it "
+                .'would be judged on fewer paths than it says, or on none. Nothing was judged.'
+            );
+        }
     }
 
     $identity = staging_identity_body();
@@ -335,6 +361,10 @@ function staging_judge(string $dir): int
         $measured++;
 
         foreach (STAGING_REQUIRED_HEADERS as $header => $policy) {
+            if (isset($policy['only']) && ! in_array($probe, $policy['only'], true)) {
+                continue;
+            }
+
             $value = $headers[strtolower($header)] ?? null;
 
             if ($value === null) {
@@ -385,13 +415,14 @@ function staging_judge(string $dir): int
             fwrite(STDERR, '  - '.$line."\n");
         }
 
-        fwrite(STDERR, "staging-headers-judge: this protection exists only as vhost configuration on the\n");
-        fwrite(STDERR, "                      box. See docs/deployment-infrastructure.md section 8.3.\n");
+        fwrite(STDERR, "staging-headers-judge: X-Robots-Tag and HSTS exist only as vhost configuration on the\n");
+        fwrite(STDERR, "                      box, and X-Content-Type-Options on a file comes from public/.htaccess.\n");
+        fwrite(STDERR, "                      See docs/deployment-infrastructure.md section 8.3.\n");
 
         return STAGING_EXIT_BLOCKED;
     }
 
-    fwrite(STDOUT, "staging-headers-judge: JUDGED PRESENT on every probe.\n");
+    fwrite(STDOUT, "staging-headers-judge: JUDGED PRESENT on every probe its policy covers.\n");
     fwrite(STDOUT, 'staging-headers-judge: '.$floor."\n");
 
     foreach ($report as $line) {
@@ -478,7 +509,7 @@ function staging_usage(): string
         "not be the same red.\n\n".
         "  --probes           print the URLs to fetch, one per line, in capture order\n".
         "  --captures=<dir>   judge <dir>/<n>.headers and <dir>/<n>.body for the n-th probe\n\n".
-        "  0  judged, and every required header is present on every probe ({$headers})\n".
+        "  0  judged, and every required header is present on every probe its policy covers ({$headers})\n".
         "  1  a required header is missing or weakened — the merge is blocked\n".
         "  2  the responses were never obtained, so NOTHING was judged\n\n".
         "See the block at the top of this file for why exit 2 exists, why the recognition test is\n".

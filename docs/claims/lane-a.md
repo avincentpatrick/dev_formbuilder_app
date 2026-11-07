@@ -16,7 +16,33 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M222`, `R-0ace5ea8`: a section's drag, grab and drop say the section's name (m222-section-drag-name)
+## Status: ACTIVE CLAIM — `M223`: `E2eSeederIdempotencyTest`'s release-order assertion no longer depends on the order the table hands rows back (m223-release-order-assertion)
+
+Taken 2026-11-08. Branch `m223-release-order-assertion`, cut from origin/main at `b47009a7`, PR into main. Held green for a merge point (`D137`), where it must merge **before #432, #433 and #434**, whose Pest it turns red.
+Row: new, filed and closed by this increment: *"`E2eSeederIdempotencyTest` checks the `releases` table's order against the notes file's, but reads the table with no order."* `M221` first filed it on #433's branch; that copy was taken out, so it is filed once.
+
+### Evidence verified
+- `Release::query()->pluck('version')` carries no `ORDER BY`, and the case compares that list with `toBe()` against the file's own order: **held**.
+- Measured red:
+  - CI on #432 (newest entry 0.17.4), twice: run 42393462799 and its re-run;
+  - CI on #433 (0.18.0), run 42396170296;
+  - locally on #434's branch (0.18.1), with `tests/Feature/Deploy/DeployReleaseSyncTest.php`, `tests/Feature/Releases`, `tests/Feature/Seeders` and `tests/Feature/WhatsNew` run together. Each time the newest version came back third or second.
+- Green on #414 (0.17.2) and #431 (0.17.3).
+
+### Premise verified
+- **The product does not depend on the order:** `WhatsNew::releases()` sorts by `version_compare` in PHP. Only the test reads the table's order.
+- ⚠️ **Why the rows come back in that order is NOT established.** The seeder's `releases:sync` runs in-process inside `RefreshDatabase`'s transaction, and no test found commits a release. It does not need to be, because a query with no `ORDER BY` promises no order at all. This claim says so rather than guess.
+
+### Remedy verdict
+**Works:** compare the two lists sorted the same way, by `version_compare` descending. That keeps what the case checks, the same versions and the same count, and drops the order the database never promised.
+
+Files: `tests/Feature/Seeders/E2eSeederIdempotencyTest.php`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`.
+Paired files taken: none.
+Namespaces spent: `M223`. `state.php` prints a lower next free number because `M215` to `M222` are held and unreleased.
+Prediction: with #434's notes file in place, the old assertion fails and the new one passes. Nothing else moves. No `VERSION` bump: no one using the app sees a test.
+
+## HELD — `M222`, `R-0ace5ea8`: a section's drag, grab and drop say the section's name (m222-section-drag-name) — BUILT AND HELD: PR #434, CI running
 
 Taken 2026-11-08, under the same instruction as `M219`. Branch `m222-section-drag-name`, cut from origin/main at the claim's parent, PR into main. Held green for a merge point (`D137`).
 **One row, by `D13`:** it edits one hub, `useCanvasReorder.ts`, which no held PR touches. #433 edits `BuilderCanvas.vue`, which this row's tests mount but do not change.

@@ -6,6 +6,7 @@ const rows = [
   { geo_code: "01", geo_name: "Region", geo_level: "region", parent_code: null },
   { geo_code: "01001", geo_name: "Province", geo_level: "province", parent_code: "01" },
   { geo_code: "0100101", geo_name: "Town", geo_level: "citymun", parent_code: "01001" },
+  { geo_code: "0100101001", geo_name: "Village", geo_level: "barangay", parent_code: "0100101" },
   { geo_code: "0109901", geo_name: "Independent city", geo_level: "citymun", parent_code: "01" },
 ];
 let fail = false;
@@ -71,5 +72,18 @@ describe("catalog hierarchy", () => {
     });
     fail = true;
     expect(await getCatalogGeography({ mode: "all" })).toEqual({ state: "failed" });
+  });
+});
+
+it("browses city children through barangay and stops at the actual leaf", async () => {
+  expect(
+    await getCatalogGeography({ mode: "psgc", level: "citymun", code: "0100101" }),
+  ).toMatchObject({ state: "available", children: [{ code: "0100101001", level: "barangay" }] });
+  expect(
+    await getCatalogGeography({ mode: "psgc", level: "barangay", code: "0100101001" }),
+  ).toMatchObject({
+    state: "available",
+    ancestors: [{ code: "PH" }, { code: "01" }, { code: "01001" }, { code: "0100101" }],
+    children: [],
   });
 });

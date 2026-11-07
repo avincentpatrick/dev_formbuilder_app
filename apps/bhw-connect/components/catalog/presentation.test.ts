@@ -38,6 +38,8 @@ describe("catalog presentation", () => {
   it("keeps zero previews and excludes failed peers", () => {
     expect(previewIndicators(dataset).map((i) => i.id)).toEqual(["nhfr.facilities"]);
     expect(formatValue({ value: 0 }, "facilities")).toBe("0 facilities");
+    expect(formatValue({ value: 1 }, "facilities")).toBe("1 facility");
+    expect(formatValue({ value: 1 }, "barangays")).toBe("1 barangay");
     expect(formatValue({ value: 120 }, "percent (0-100, may exceed)")).toBe("120%");
     expect(formatValue({ value: 500 }, "per 100,000")).toBe("500 per 100,000");
   });

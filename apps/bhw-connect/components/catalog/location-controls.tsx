@@ -91,8 +91,8 @@ export function LocationControls({
         </form>
       ) : (
         <p className="mt-4 text-sm text-muted">
-          {geography.current?.level === "citymun"
-            ? "Barangay figures are not yet available in this catalog."
+          {geography.current?.level === "barangay"
+            ? "This is the barangay level. Only supported source figures are shown."
             : "No further locations are listed here."}
         </p>
       )}

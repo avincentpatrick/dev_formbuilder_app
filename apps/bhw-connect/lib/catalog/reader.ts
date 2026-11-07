@@ -2,14 +2,22 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/db/supabase";
 import { readDatasetBySlug, type DatasetRead } from "@/lib/db/dataset";
 import { ACCEPTED_RELEASES, CATALOG, type IndicatorSpec, type CatalogTable } from "./definitions";
-import type { CatalogSelection } from "./types";
+import { createBarangayReader } from "./barangay";
+import type { CatalogSelection, CatalogIndicator } from "./types";
 
 export type Row = Record<string, unknown>;
-export type RowsRead = { state: "available"; rows: Row[] } | { state: "failed" };
+export type RowsRead =
+  | {
+      state: "available";
+      rows: Row[];
+      note?: { reason: string; partial?: boolean; coverage?: CatalogIndicator["coverage"] };
+    }
+  | { state: "failed" };
 export type ProbeRead =
   { state: "available"; count: number; hasSuppressed: boolean } | { state: "failed" };
 export interface CatalogReader {
   source(slug: string): Promise<DatasetRead>;
+  privacy(spec: IndicatorSpec, datasetId: number): Promise<"clear" | "suppressed" | "failed">;
   rows(
     spec: IndicatorSpec,
     datasetId: number,
@@ -42,6 +50,8 @@ function columns(table: CatalogTable): string {
  * All-locations uses HEAD exact counts: no profiles, rows, or example values leave the database.
  */
 export function createCatalogReader(): CatalogReader {
+  const barangay = createBarangayReader();
+  const privacy = new Map<string, Promise<"clear" | "suppressed" | "failed">>();
   const sources = new Map<string, Promise<DatasetRead>>();
   const rows = new Map<string, Promise<RowsRead>>();
   let definitions: Promise<RowsRead> | undefined;
@@ -51,7 +61,43 @@ export function createCatalogReader(): CatalogReader {
         sources.set(slug, readDatasetBySlug(slug, slug === ACCEPTED_RELEASES.bhw));
       return sources.get(slug)!;
     },
+    privacy(spec, datasetId) {
+      if (!spec.suppression) return Promise.resolve("clear");
+      const key = JSON.stringify([datasetId, spec.table, spec.filters]);
+      if (!privacy.has(key))
+        privacy.set(
+          key,
+          (async () => {
+            try {
+              let query = createSupabaseServerClient()
+                .from(spec.table)
+                .select(spec.suppression!, { head: true, count: "exact" })
+                .eq("dataset_id", datasetId)
+                .eq(spec.suppression!, true);
+              for (const [column, value] of Object.entries(spec.filters ?? {}))
+                query = query.eq(column, value);
+              const result = await query;
+              if (
+                result.error ||
+                result.count === null ||
+                !Number.isSafeInteger(result.count) ||
+                result.count < 0
+              )
+                return "failed";
+              return result.count > 0 ? "suppressed" : "clear";
+            } catch {
+              return "failed";
+            }
+          })(),
+        );
+      return privacy.get(key)!;
+    },
     rows(spec, datasetId, selection) {
+      if (
+        selection.level === "barangay" &&
+        ["agg_nhfr_counts", "agg_uuc_phc_counts", "agg_uuc_phc_criteria"].includes(spec.table)
+      )
+        return barangay(spec.table, datasetId, selection.code);
       const key = JSON.stringify([spec.table, datasetId, selection.level, selection.code]);
       if (!rows.has(key))
         rows.set(

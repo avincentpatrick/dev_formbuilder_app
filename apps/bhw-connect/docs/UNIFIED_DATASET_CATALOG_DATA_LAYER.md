@@ -4,6 +4,7 @@ Implemented by `lib/catalog/catalog.ts` (`getPublicCatalog`) and the fixed regis
 `lib/catalog/definitions.ts`. This is a server-only read API, not a Server Action or public
 HTTP endpoint. The existing portal is unchanged; Increment 3 will connect the first UI.
 It uses the current PostgreSQL/PostgREST public client, never an admin/service-role client.
+Increment 4 extensions are recorded below; they supersede the initial barangay and query-budget limits.
 
 ## Selection and destinations
 
@@ -141,3 +142,47 @@ These tests use synthetic fixtures. No live database, raw source data, credentia
 new UI, or ingestion changes are part of this increment. FHSIS's production cause remains unknown;
 the operator check in `FHSIS_DIAGNOSIS.md` is still pending. Barangay calculations, district
 membership, dedicated details and browser end-to-end verification retain their planned increments.
+
+## Increment 4 — barangay adapters and cross-location privacy
+
+The same 110 canonical indicators remain. Barangay navigation follows actual parents. BHW
+StepZero/profile counts, certification, demographic and payer-honorarium measures can read exact
+barangay aggregates; topic training stays unsupported. FHSIS, population and poverty never inherit
+municipal values. Missing BHW rows remain unavailable rather than fabricated zeros.
+
+`barangay.ts` calculates NHFR count/type/ownership/presence and recorded bed sums from explicitly
+attributed public facilities. It reads only the accepted release and the selected barangay within
+its actual municipal parent. An inner geography join verifies municipal facilities' barangay
+level and parent, so null, wrong-level and wrong-parent attribution all remain excluded. The UI
+reports municipal attribution as `covered / total`, separately from the one-barangay service
+presence denominator. Any excluded municipal facilities make the barangay result a **Partial
+total**; no allocation is attempted. Zero means no attributed registered facilities. A nonempty
+accepted source is checked before a successful empty leaf read may become zero. A leaf read
+reaching 1,000 records fails closed, never silently truncates. No parent total is replaced by a
+sum of leaf records, and no percentages or rates are averaged or summed.
+
+UUC membership comes from `fact_uuc_phc_barangay`, independently of qualification availability.
+A successful absent membership becomes 0 of 1 only after a nonempty accepted list is established.
+It means not listed, not assessed and found well served. Qualification uses the existing public
+`ref_uuc_phc_list` definitions, retaining its recorded health score rather than recalculating
+bounded assessment readings. Missing qualification stays unavailable. An unevaluable health
+route is null, not false; an evaluable route uses one evaluated barangay as denominator. No
+parent listing percentage or health rate is repeated at the leaf.
+
+Before publishing a demographic dimension or payer-honorarium measure at **any catalog scope**,
+the reader checks the accepted source for protected cells in that measure group. If any exist,
+the entire group is withheld across catalog scopes, including All locations. This conservative
+policy prevents parent-minus-peer reconstruction that within-row complementary suppression alone
+cannot prevent. A failed privacy check fails closed. Existing complementary suppression remains
+as a second guard on returned rows. This deliberately reduces available counts for protected
+groups; a less conservative release needs verified cross-geography suppression closure. It does
+not change existing non-catalog routes or claim to repair their historical disclosure behavior.
+No raw person data is read, and no values or private error details enter suppressed payloads.
+
+The ten privacy-group probes are cached per request. Maximum structural query bounds are now
+138 for All locations (including existing probes), 31 through city/municipality, and 30 at
+barangay: four source metadata reads, up to five BHW table reads plus ten privacy probes, five
+NHFR reads, and six UUC reads. The page separately resolves geography. The NHFR independent leaf,
+total and validated-attribution reads run together; repeated indicator reads share their result.
+These are query-count bounds, not a production latency guarantee. Live source completeness still
+requires the existing operator checks; accepted metadata alone never establishes loaded facts.

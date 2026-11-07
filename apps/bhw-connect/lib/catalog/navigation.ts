@@ -16,12 +16,12 @@ export function parseCatalogParams(params: CatalogParams): CatalogRequest | null
     return { selection: { mode: "all" }, dataset: dataset as CatalogId | null };
   }
   if (mode !== "psgc" || !params.location) return null;
-  const match = /^(national|region|province|citymun):(PH|\d{2,10})$/.exec(params.location);
+  const match = /^(national|region|province|citymun|barangay):(PH|\d{2,10})$/.exec(params.location);
   if (!match || (match[1] === "national") !== (match[2] === "PH")) return null;
   return {
     selection: {
       mode: "psgc",
-      level: match[1] as "national" | "region" | "province" | "citymun",
+      level: match[1] as "national" | "region" | "province" | "citymun" | "barangay",
       code: match[2],
     },
     dataset: dataset as CatalogId | null,

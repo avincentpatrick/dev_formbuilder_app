@@ -18,9 +18,17 @@ test("catalog preserves PSGC scope through navigation, refresh and history", asy
   await page.locator('select[name="location"]').selectOption("citymun:0102801");
   await page.getByRole("button", { name: "Show datasets" }).click();
   await expect(page).toHaveURL(/location=citymun%3A0102801/);
+  await page.locator('select[name="location"]').selectOption("barangay:0102801001");
+  await page.getByRole("button", { name: "Show datasets" }).click();
+  await expect(page).toHaveURL(/location=barangay%3A0102801001/);
   await expect(
-    page.getByText("Barangay figures are not yet available in this catalog."),
+    page.getByText("This is the barangay level. Only supported source figures are shown."),
   ).toBeVisible();
+  await expect(page.getByRole("region", { name: "Datasets not shown" })).toContainText(
+    "FHSIS is not available at barangay level",
+  );
+  await page.reload();
+  await expect(page).toHaveURL(/location=barangay%3A0102801001/);
   await page
     .getByRole("navigation", { name: "Location ancestors" })
     .getByRole("link", { name: /REGION I/ })
@@ -71,5 +79,6 @@ test("catalog opens available-source details without claiming national values", 
   await page.reload();
   await expect(page.getByRole("table")).toBeVisible();
   await page.getByRole("link", { name: "All datasets for this selection", exact: false }).click();
-  await expect(page.getByTestId("catalog-scope")).toHaveText("All locations");
+  // All-locations probes stream behind a loading state; allow shared CI database contention.
+  await expect(page.getByTestId("catalog-scope")).toHaveText("All locations", { timeout: 10_000 });
 });

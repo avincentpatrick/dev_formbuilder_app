@@ -5,7 +5,7 @@ import type { CatalogSelection } from "./types";
 export type CatalogPlace = {
   code: string;
   name: string;
-  level: "national" | "region" | "province" | "citymun";
+  level: "national" | "region" | "province" | "citymun" | "barangay";
   parentCode: string | null;
 };
 export type CatalogGeography =
@@ -16,7 +16,7 @@ export type CatalogGeography =
       children: CatalogPlace[];
     }
   | { state: "failed" | "not-found" };
-const LEVELS = ["region", "province", "citymun"] as const;
+const LEVELS = ["region", "province", "citymun", "barangay"] as const;
 const NATIONAL: CatalogPlace = {
   code: "PH",
   name: "Philippines",
@@ -27,11 +27,7 @@ const COLUMNS = "geo_code,geo_name,geo_level,parent_code";
 
 /** Actual parentage, including mixed province/city children. No code slicing or artificial parents. */
 export async function getCatalogGeography(selection: CatalogSelection): Promise<CatalogGeography> {
-  if (
-    selection.mode === "district" ||
-    (selection.mode === "psgc" && selection.level === "barangay")
-  )
-    return { state: "not-found" };
+  if (selection.mode === "district") return { state: "not-found" };
   try {
     const db = createSupabaseServerClient();
     const readPlace = async (code: string): Promise<CatalogPlace | null> => {
@@ -71,7 +67,7 @@ export async function getCatalogGeography(selection: CatalogSelection): Promise<
     }
     if (current && current.level !== "national") ancestors.unshift(NATIONAL);
     const children: CatalogPlace[] = [];
-    if (current?.level !== "citymun") {
+    if (current?.level !== "barangay") {
       // Paginate so a growing geography cannot silently truncate the choices.
       for (let offset = 0; ; offset += 1000) {
         let query = db

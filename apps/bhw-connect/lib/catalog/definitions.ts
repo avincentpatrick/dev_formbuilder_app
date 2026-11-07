@@ -2,6 +2,7 @@ import type { GeoLevel } from "@/lib/filters/schema";
 import type { CatalogId, CatalogSelection } from "./types";
 
 export const AREA_LEVELS = ["national", "region", "province", "citymun"] as const;
+export const BARANGAY_LEVELS = [...AREA_LEVELS, "barangay"] as const;
 export type CatalogTable =
   | "agg_bhw_stepzero_counts"
   | "agg_bhw_counts"
@@ -50,7 +51,13 @@ const make = (
     unit,
     source,
     table,
-    levels: AREA_LEVELS,
+    levels:
+      table === "agg_bhw_stepzero_counts" ||
+      table === "agg_bhw_counts" ||
+      table === "agg_nhfr_counts" ||
+      table === "agg_uuc_phc_counts"
+        ? BARANGAY_LEVELS
+        : AREA_LEVELS,
   }));
 
 // These are accepted releases, not "latest timestamp" or any arbitrary active dataset.
@@ -230,7 +237,7 @@ const bhw: IndicatorSpec[] = [
     table: "agg_certification",
     column: "pct",
     filters: { cert_type: key },
-    levels: AREA_LEVELS,
+    levels: BARANGAY_LEVELS,
     attributes: { numerator: "n" },
   })),
   ...["sex", "civil_status", "bloodtype", "education", "ip_status", "age_band"].map(
@@ -244,7 +251,7 @@ const bhw: IndicatorSpec[] = [
       filters: { dimension: key },
       categoryColumn: "category",
       suppression: "is_suppressed",
-      levels: AREA_LEVELS,
+      levels: BARANGAY_LEVELS,
     }),
   ),
   ...["region", "province", "citymun", "barangay"].map((key): IndicatorSpec => ({
@@ -256,7 +263,7 @@ const bhw: IndicatorSpec[] = [
     column: "pct_receiving",
     filters: { payer_level: key },
     suppression: "is_suppressed",
-    levels: AREA_LEVELS,
+    levels: BARANGAY_LEVELS,
     attributes: { numerator: "n_receiving" },
   })),
 ];
@@ -306,7 +313,7 @@ export const CATALOG: readonly DatasetSpec[] = [
         source: R.uuc,
         table: "agg_uuc_phc_criteria",
         column: `n_route_${key}`,
-        levels: AREA_LEVELS,
+        levels: BARANGAY_LEVELS,
         attributes: { denominator: key === "health" ? "n_health_evaluable" : "n_listed" },
       })),
     ],

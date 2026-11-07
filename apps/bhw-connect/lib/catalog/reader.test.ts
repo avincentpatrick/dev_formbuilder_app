@@ -134,3 +134,17 @@ describe("catalog read boundary", () => {
     );
   });
 });
+
+it("checks protected cells across all source locations before permitting geographic peers", async () => {
+  const { query } = client({ count: 1, data: [] });
+  const db = createCatalogReader();
+  expect(await db.privacy(spec("bhw.demographics.sex"), 42)).toBe("suppressed");
+  expect(await db.privacy(spec("bhw.demographics.sex"), 42)).toBe("suppressed");
+  expect(query.eq.mock.calls).toEqual([
+    ["dataset_id", 42],
+    ["is_suppressed", true],
+    ["dimension", "sex"],
+  ]);
+  expect(query.select).toHaveBeenCalledTimes(1);
+  expect(query.in).not.toHaveBeenCalled();
+});

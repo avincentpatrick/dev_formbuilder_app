@@ -34,6 +34,7 @@ export type CatalogIndicator = {
   values: PublicValue[];
   /** Scalar area observations (one for a selected area); overlapping areas must not be summed. */
   reportedAreaRecords: number | null;
+  coverage?: { label: string; covered: number; total: number };
 };
 export type CatalogDataset = {
   id: CatalogId;

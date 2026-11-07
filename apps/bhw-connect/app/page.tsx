@@ -29,8 +29,8 @@ export default function Portal() {
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Equity in Health</h1>
         <p className="text-lg text-muted">Data &amp; innovation</p>
         <p className="max-w-2xl text-muted">
-          A repository of open, publicly available health datasets and innovations — a shared
-          front door to the work of the Equity in Health Section.
+          A repository of open, publicly available health datasets and innovations — a shared front
+          door to the work of the Equity in Health Section.
         </p>
       </section>
 
@@ -40,15 +40,13 @@ export default function Portal() {
         className="rounded-lg border border-border bg-surface p-4 text-sm text-muted sm:p-5"
       >
         <p>
-          Everything here uses publicly available data with no personally identifiable
-          information. These dashboards never show or export individual-level records — only
-          aggregate counts and percentages, with small groups suppressed to prevent
-          re-identification.
+          Everything here uses publicly available data with no personally identifiable information.
+          These dashboards never show or export individual-level records — only aggregate counts and
+          percentages, with small groups suppressed to prevent re-identification.
         </p>
       </section>
 
-      {/* Dataset cards — one live dataset today, with placeholders signalling the
-          section's ways forward. */}
+      {/* Published dashboards and the section's ways forward. */}
       <section aria-label="Datasets" className="flex flex-col gap-4">
         <h2 className="sr-only">Datasets</h2>
         <div className="grid grid-cols-1 gap-4">
@@ -61,6 +59,16 @@ export default function Portal() {
             title="2025 UUC for PHC"
             description="The barangays on the 2025 list of Unserved and Underserved Communities for Primary Health Care — where primary care is hardest to reach, from national down to city/municipality level."
             href="/uuc-phc"
+          />
+          <DatasetCard
+            title="Health facilities"
+            description="The September 2026 National Health Facility Registry — hospitals, rural health units, barangay health stations, and other facilities, with ownership and geographic coverage."
+            href="/facilities"
+          />
+          <DatasetCard
+            title="Legislative districts"
+            description="Philippine legislative districts and the BHW workforce they cover, with member cities, municipalities, and barangays, mapping sources, and public corrections."
+            href="/districts"
           />
           <DatasetCard
             title="Ways forward"

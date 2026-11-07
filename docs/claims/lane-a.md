@@ -16,7 +16,48 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M218`, `R-ffd296b1`, `R-20b1fe78` and `R-a06e5589`: a seeded form wide enough that the builder's spill reads can fail, the role-locator sweep measured, and the queue file cited by row instead of by line (m218-e2e-fixtures-citations) — BUILT AND HELD: PR #429 green, waiting for a merge point
+## Status: ACTIVE CLAIM — `M219`, `R-1fc57252` and `R-efee4d5c`: an XLSForm appearance too long to store no longer fails the import, and the dev container takes the same uploads the testing server does (m219-import-appearance-upload-limits)
+
+Taken 2026-11-08, on the user's *"for now untill i tell you, lets do the other tasks that can be done and wont conflict the backup setup"*. Branch `m219-import-appearance-upload-limits`, cut from origin/main at `8cf0ce8f`, PR into main. Held green for a merge point (`D137`).
+**Chosen to stay clear:** neither row touches `M216`'s files (the backup command, `scripts/nightly-backup.ps1`, `docs/deployment-infrastructure.md`, `docs/non-functional-requirements.md`), the Testing Server Checklist, or any file of the held #412, #413, #414 or #429. `R-0ceefbb4`, `R-95dffd45` and `R-ddbf337d` were passed over because they edit `XlsformExporter.php`, which #414 holds.
+**Order within the tier:** the line's order inside a tier says only what can start, so the one hub row was chosen on what a tester can reach. `R-b1737198` and `R-6f994627`, both one-sentence document fixes, each edit a hub of their own (the threat model, the data dictionary), and `D13` allows one hub row per increment.
+**`D213`'s date is amended here too.** The user said on 2026-11-08 that they will say when the backup sitting happens, so *"Monday 2026-11-09"* is no longer its date.
+Rows: `R-1fc57252`, *"An XLSForm appearance longer than 60 characters fails the whole import at the database."*; `R-efee4d5c`, *"The dev container keeps PHP's stock upload limits, 2 MB per file and 8 MB per request, so no upload over 2 MB can be tried locally."* Grouped under `D13` as `D15` reads it: `R-1fc57252` is the one row on hubs (`XlsformImportParser.php`), and `R-efee4d5c` edits only `docker/` files.
+
+### Evidence verified
+**`R-1fc57252`.** `XlsformImportParser::resolveAppearance()` returns an author appearance unchanged: **held**. `form_fields.appearance` is `string('appearance', 60)` in the create migration, and no later migration widens it: **held**. The row says *"Read, not run"*; the first test written runs it.
+**`R-efee4d5c`.** `docker/Dockerfile` copies no ini file, and the app container reads `upload_max_filesize` 2M and `post_max_size` 8M with no `php.ini` loaded: **held**. `config/attachments.php` allows 25 MB: **held**.
+
+### Premise verified
+**`R-1fc57252`.**
+- The builder cannot produce a long appearance: `UpdateFieldRequest` holds it to `max:60` and to the field type's allowed list. Only an import brings one in, so the fix belongs in the importer.
+- The parser already collects warnings, and the import result shows them. A value it cannot keep can therefore be dropped with a warning, without failing the row or the import.
+- `XlsformImportTest.php` is edited by #414, so the new cases go in a test file #414 does not touch.
+
+**`R-efee4d5c`.**
+- ⚠️ **The row names PHP's limits only, and a second limit could sit in front of them:** the dev stack's nginx. Measured: `docker/nginx/default.conf` already allows `client_max_body_size 25m`, so PHP is the only block, as the row says.
+- `docker/Dockerfile` is used only by the local stack. CI's jobs set PHP up themselves, so nothing in CI moves.
+- The testing server's figures (25M per file, 30M per request) are read from `docs/deployment-infrastructure.md` §8, not edited. That file is `M216`'s.
+
+### Remedy verdict
+**`R-1fc57252`: the row offers two remedies, refuse or widen, and the first is taken.**
+- Widening needs a migration on the testing site's database, and no width is enough for ODK's `search(...)` calls, so a cap and a warning would be needed anyway.
+- An appearance over the column's width is dropped and the question imported without it, with a warning that names the question and says why.
+- The width becomes a named constant, and a test reads the real column width from the database so the two cannot drift apart.
+
+**`R-efee4d5c`: works.** One ini file in the image, at the testing server's figures, read back from the rebuilt container.
+
+Files: `app/Services/Xlsform/XlsformImportParser.php`, a new `tests/Feature/Xlsform/XlsformImportAppearanceTest.php`, `docker/Dockerfile`, a new `docker/php/uploads.ini`.
+Shared artefacts taken: `docs/claims/decisions.md` (`D213`'s date), `docs/feature-backlog.md`, `docs/pipeline.md`; `VERSION` and `database/data/releases.json` if the import fix ships as a patch.
+Paired files taken: none.
+Namespaces spent: `M219`. `state.php` prints a lower next free number because `M215` to `M218` are held and unreleased.
+Prediction:
+- The new import test goes red first, as a database error on the insert.
+- After the fix, Pest and PHPStan stay clean.
+- The rebuilt container reads 25M and 30M.
+- The gate I most expect to be wrong about is citation liveness, if the backlog cites `XlsformImportParser.php` by line and the edit moves those lines.
+
+## HELD — `M218`, `R-ffd296b1`, `R-20b1fe78` and `R-a06e5589`: a seeded form wide enough that the builder's spill reads can fail, the role-locator sweep measured, and the queue file cited by row instead of by line (m218-e2e-fixtures-citations) — BUILT AND HELD: PR #429 green, waiting for a merge point
 
 Taken 2026-11-07, on the user's *"we cannot stop developing other pending tasks just because of the backup setup"*. Branch `m218-e2e-fixtures-citations`, cut from origin/main at `36de8a83`, PR into main. Held green for a merge point (`D137`). No tester sees any of it, so no `VERSION` bump.
 Skipped on purpose, each for a reason:

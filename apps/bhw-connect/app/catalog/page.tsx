@@ -11,6 +11,9 @@ import {
 } from "@/lib/catalog/navigation";
 import { LocationControls } from "@/components/catalog/location-controls";
 import { CatalogDetails, CatalogResults } from "@/components/catalog/catalog-results";
+import { DistrictControls } from "@/components/catalog/district-controls";
+import { getDistrictGeography } from "@/lib/catalog/district-geography";
+import { getDistrictCatalog } from "@/lib/catalog/district-catalog";
 import CatalogLoading from "./loading";
 
 export const metadata: Metadata = {
@@ -46,7 +49,8 @@ export default async function CatalogPage({
         <section role="alert" className="rounded-xl border border-border bg-surface p-6">
           <h2 className="font-semibold">This catalog selection is not supported</h2>
           <p className="mt-2 text-sm">
-            Choose All locations, National, a region, province, city/municipality, or barangay.
+            Choose All locations, a PSGC location, or a congressional district and its constituent
+            members.
           </p>
           <Link href="/catalog" className="mt-3 inline-block underline">
             Start at All locations
@@ -68,6 +72,58 @@ export default async function CatalogPage({
 }
 
 async function CatalogContent({ request }: { request: CatalogRequest }) {
+  if (request.selection.mode === "district") {
+    const geography = await getDistrictGeography(request.selection);
+    if (geography.state !== "available")
+      return (
+        <section role="alert" className="rounded-xl border border-border p-6">
+          <h2 className="font-semibold">
+            {geography.state === "failed"
+              ? "District membership could not be loaded"
+              : "District member not found"}
+          </h2>
+          <p className="mt-2">No figures from a different area are shown.</p>
+          <Link href="/catalog?mode=district" className="mt-3 inline-block underline">
+            Choose a district
+          </Link>
+        </section>
+      );
+    if (!geography.current)
+      return (
+        <>
+          <DistrictControls geography={geography} />
+          <p role="status">
+            {geography.choices.length
+              ? "Choose a congressional district to view its mapped members and available datasets."
+              : "No public districts are currently available."}
+          </p>
+        </>
+      );
+    const city = geography.scope.cities.find((c) => c.code === geography.selection.citymunCode);
+    const barangay = city?.barangays.find((b) => b.code === geography.selection.barangayCode);
+    const locationName = [
+      geography.current.name,
+      city ? `${city.name}${city.whole ? "" : " (district barangays only)"}` : null,
+      barangay?.name,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    const catalog = await getDistrictCatalog(geography);
+    const dataset = catalog.datasets.find((d) => d.id === request.dataset);
+    return (
+      <div className="space-y-6">
+        <DistrictControls geography={geography} />
+        <h2 className="text-2xl font-semibold" data-testid="catalog-scope">
+          {locationName}
+        </h2>
+        {dataset ? (
+          <CatalogDetails catalog={catalog} dataset={dataset} />
+        ) : (
+          <CatalogResults catalog={catalog} locationName={locationName} />
+        )}
+      </div>
+    );
+  }
   const geography = await getCatalogGeography(request.selection);
   if (geography.state !== "available")
     return (

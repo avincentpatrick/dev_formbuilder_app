@@ -29,7 +29,7 @@ export interface CatalogReader {
 
 const specs = CATALOG.flatMap((d) => d.indicators);
 /** One allowlisted projection per aggregate. Never SELECT * or request a service-role client. */
-function columns(table: CatalogTable): string {
+export function columns(table: CatalogTable): string {
   return [
     ...new Set(
       specs

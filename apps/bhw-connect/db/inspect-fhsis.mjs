@@ -64,6 +64,16 @@ try {
     `SELECT count(*)::int AS rows FROM public.fact_fhsis_indicator f JOIN public.dim_geo g USING (geo_code) WHERE f.geo_level <> g.geo_level`,
   );
   await check(
+    "relation_access",
+    `SELECT c.relname AS relation, pg_get_userbyid(c.relowner) AS owner,
+     c.relrowsecurity AS rls_enabled, c.relforcerowsecurity AS rls_forced,
+     has_table_privilege('anon', c.oid, 'SELECT') AS anon_select
+     FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname = 'public' AND c.relname IN
+     ('fact_fhsis_indicator', 'fact_fhsis_workforce', 'ref_fhsis_indicator')
+     ORDER BY c.relname`,
+  );
+  await check(
     "policies",
     `SELECT tablename, roles, cmd, qual FROM pg_policies WHERE schemaname = 'public' AND tablename IN ('fact_fhsis_indicator', 'fact_fhsis_workforce', 'ref_fhsis_indicator') ORDER BY tablename, policyname`,
   );

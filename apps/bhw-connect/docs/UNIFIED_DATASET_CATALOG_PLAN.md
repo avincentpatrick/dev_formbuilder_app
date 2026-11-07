@@ -1,6 +1,6 @@
 # Public unified dataset catalog implementation plan
 
-Status: Increments 1–4 complete; Increment 5 (congressional district browsing) is next.
+Status: Increments 1–5 complete; Increment 6 (complete details and portal integration) is next.
 Planning date: 2026-11-07.
 
 ## Resume instruction
@@ -188,8 +188,8 @@ Update this table when implementation begins. Record relevant commits/PRs, tests
 | 2. Public catalog data layer | Complete (2026-11-07) | [Data contract](UNIFIED_DATASET_CATALOG_DATA_LAYER.md), `lib/catalog/`: six identities, fixed public indicator inventory, accepted-source adapters, typed availability/failure/suppression states, scope-safe destinations, overview counts/coverage/freshness. Existing pages retain their nullable helpers. Validation and delivery below. |
 | 3. Overview and PSGC through municipality/city | Complete (2026-11-07) | `/catalog` overview/cards, All versus National, real-parent PSGC navigation, scoped details, source dates and typed empty/failure states. URL, hierarchy, presentation and browser verification recorded below. |
 | 4. Barangay support and calculations | Complete (2026-11-07) | Exact barangay BHW aggregates, NHFR attributed calculations and municipal attribution labels, UUC membership/qualification, scope-safe navigation and conservative cross-location suppression. Evidence below and in the data contract. |
-| 5. Congressional districts | Not started | |
-| 6. Details and portal integration | Not started | |
+| 5. Congressional districts | Complete (2026-11-07) | Accepted membership/provenance, disjoint municipal/leaf units, conflict rejection, scope-safe drill-down and explicit calculation rules. Evidence below; source limitations and query bounds in the data contract. |
+| 6. Details and portal integration | Complete (2026-11-07) | Home-page catalog, shared scoped content, definitions and derivation for all measures, accepted-release refresh contract and regression test. Validation below. |
 | 7. End-to-end verification and delivery | Not started | |
 
 ### Increment 1 evidence and handoff — 2026-11-07
@@ -298,3 +298,57 @@ Update this table when implementation begins. Record relevant commits/PRs, tests
 - Live FHSIS load diagnosis and population/poverty verification remain pending. Synthetic values
   do not establish live data completeness. The plan's next increment is congressional district
   membership, non-overlapping aggregation and scope-preserving drill-down.
+
+### Increment 5 evidence and handoff — 2026-11-07
+
+- Increment 4 merged as PR #424 (`36de8a83`). Branch: `feat/bhw-catalog-districts` from that trunk.
+- Added separate Congressional district mode, with district → constituent city/municipality →
+  constituent barangay controls. Mode changes clear geography; scoped cards, details, refresh and
+  ancestor links retain district identity. Invalid or outside-member selections show no other data.
+- Membership follows the accepted live map and actual PSGC parents. Whole-city/explicit-leaf
+  overlap is deduplicated, cross-district conflicts within the same Congress block figures, and
+  unresolved members/rosters are explained. Congress, source receipts, single-source exceptions,
+  correction history and both attributable/shared gaps remain accessible.
+- Added batched public reads and explicit additive count/compatible BHW ratio calculations.
+  Population and FHSIS workforce sums need complete whole-unit coverage. No poverty/service-rate
+  averaging, historical population substitution, raw BHW access or whole-city fallback for split
+  cities. Privacy and query failures fail closed; missing count observations remain labeled partial.
+- Synthetic browser fixtures verified a mixed district: a whole city with 10 facilities plus one
+  attributed leaf facility yielded 11, despite a duplicate overlapping membership. Its split-city
+  page retained only the included barangay and one facility, rejected an outside barangay, retained
+  district scope through details/reload, and withheld all figures after a conflicting district
+  assignment. Fixtures were restored. The 390px page had no overflow or axe violations.
+- Focused tests cover normalization, conflicts, real-parent selection, pagination, rejected and
+  superseded rows, source filtering, batched reads, zero/partial/protected values, rate denominators,
+  unsupported measures, URLs and controls. Validation passed: lint (one existing intentional
+  fixture warning), TypeScript, full Vitest (108 files / 1,390 passed / 11 optional cases skipped
+  with local PostgreSQL enabled), no-database and seeded `/bhw-connect` production builds, and
+  ten catalog/portal-search Playwright tests against the standalone build. Synthetic mixed/split
+  fixtures were also rechecked against that build. `git diff --check` and scoped formatting passed.
+- Next: Increment 6, complete consistent detail presentation and make the catalog the main public
+  browsing experience, preserving existing deep links and all current source/privacy constraints.
+  Live FHSIS load diagnosis and population/poverty verification remain pending; these synthetic
+  checks do not establish live source completeness.
+
+
+### Increment 6 evidence and handoff — 2026-11-07
+
+- Increment 5 merged as PR #425 (`443a8253`). Branch `feat/bhw-catalog-portal` also
+  incorporates the independently merged FHSIS preparation PR #426 (`6487e736`).
+- The home page now starts with All-locations catalog browsing. Both geographic modes reuse
+  the same content as `/catalog`; existing search, dashboard deep links, district mapping and
+  admin entry remain. Profiling Status still exists but contributes no card or indicator.
+- Consistent detail tables include definitions, units, available numerator/denominator and
+  confidence intervals, per-measure reporting coverage, missing/withheld reasons, accepted
+  release/source dates and district derivation. Horizontal tables are keyboard-focusable.
+- FHSIS uses #426's exact published numerator/denominator when available, preserving legacy
+  fallback and the published rate. Source-period notes distinguish annual, Q4 and Q3–Q4 data.
+- The data contract documents the operator load/metadata steps and deliberate accepted-release
+  switch. A regression test verifies refreshed values/dates and stable six-dataset/110-measure
+  identities; duplicate accepted scalar records still fail closed. No production data was loaded.
+- Browser checks: all five catalog specs and six portal-search specs passed on the standalone
+  base-path build; search selectors now distinguish native location choices from search results.
+  Mobile home and BHW/population/poverty details: zero axe violations and no page overflow.
+- Next: Increment 7, final full-flow validation and deployed public checks. Synthetic checks do
+  not establish live FHSIS load status; the new independent loader instructions in FHSIS_LOAD.md
+  supersede the earlier absence of a prepared load path, but operator execution remains separate.

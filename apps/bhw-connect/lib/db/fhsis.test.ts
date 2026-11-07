@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fhsisCaption,
+  fhsisPeriodLabel,
   fhsisRateLabel,
   toFhsisIndicator,
   workforceRatio,
@@ -36,6 +37,8 @@ const row: IndicatorRow = {
   geo_level: "national",
   indicator_key: "fic",
   breakdown: "total",
+  numerator_exact: null,
+  denominator_exact: null,
   numerator: 0,
   denominator: 100,
   rate_pct: 0,
@@ -63,6 +66,22 @@ beforeEach(() => {
   mocks.children.mockResolvedValue([]);
 });
 describe("FHSIS interpretation", () => {
+  it("prefers precise source values, including zero, without rounding to legacy integers", () => {
+    const actual = toFhsisIndicator(definition, {
+      ...row,
+      numerator: 12,
+      numerator_exact: 0,
+      denominator_exact: 12.375,
+    });
+    expect(actual.numerator).toBe(0);
+    expect(actual.denominator).toBe(12.375);
+  });
+  it("identifies quarterly sources separately from annual indicators", () => {
+    expect(fhsisPeriodLabel("anc8")).toBe("Q3–Q4 2025");
+    expect(fhsisPeriodLabel("water_basic")).toBe("Q4 2025");
+    expect(fhsisPeriodLabel("sanitation_basic")).toBe("Q4 2025");
+    expect(fhsisPeriodLabel("fic")).toBe("Annual 2025");
+  });
   it("distinguishes zero, an absent row and a reported row without a rate", () => {
     expect(fhsisRateLabel(toFhsisIndicator(definition, row))).toBe("0%");
     expect(fhsisRateLabel(toFhsisIndicator(definition))).toBe("Not reported in 2025");

@@ -7,10 +7,39 @@ export type CatalogRequest = { selection: CatalogSelection; dataset: CatalogId |
 /** One canonical URL shape for forms, links, refresh and back/forward. No time selector. */
 export function parseCatalogParams(params: CatalogParams): CatalogRequest | null {
   const mode = params.mode ?? "all";
-  if (Array.isArray(mode) || Array.isArray(params.location) || Array.isArray(params.dataset))
+  if (
+    Array.isArray(mode) ||
+    Array.isArray(params.location) ||
+    Array.isArray(params.dataset) ||
+    [params.district, params.citymun, params.barangay].some(Array.isArray)
+  )
     return null;
   const dataset = params.dataset ?? null;
   if (dataset !== null && !IDS.includes(dataset as CatalogId)) return null;
+  if (mode === "district") {
+    if (params.location) return null;
+    const district = params.district as string | undefined;
+    const citymun = params.citymun as string | undefined;
+    const barangay = params.barangay as string | undefined;
+    if (
+      (district && !/^[a-zA-Z0-9_-]{1,100}$/.test(district)) ||
+      (citymun && !/^\d{2,10}$/.test(citymun)) ||
+      (barangay && !/^\d{2,10}$/.test(barangay)) ||
+      (!district && (citymun || barangay || dataset)) ||
+      (barangay && !citymun)
+    )
+      return null;
+    return {
+      selection: {
+        mode: "district",
+        districtCode: district ?? "",
+        ...(citymun ? { citymunCode: citymun } : {}),
+        ...(barangay ? { barangayCode: barangay } : {}),
+      },
+      dataset: dataset as CatalogId | null,
+    };
+  }
+  if (params.district || params.citymun || params.barangay) return null;
   if (mode === "all") {
     if (params.location) return null; // Switching modes must clear the old location.
     return { selection: { mode: "all" }, dataset: dataset as CatalogId | null };
@@ -34,7 +63,12 @@ export function catalogHref(selection: CatalogSelection, dataset?: CatalogId | n
   else if (selection.mode === "psgc") {
     query.set("mode", "psgc");
     query.set("location", `${selection.level}:${selection.code}`);
-  } else throw new Error("District catalog navigation is not implemented yet.");
+  } else {
+    query.set("mode", "district");
+    if (selection.districtCode) query.set("district", selection.districtCode);
+    if (selection.citymunCode) query.set("citymun", selection.citymunCode);
+    if (selection.barangayCode) query.set("barangay", selection.barangayCode);
+  }
   if (dataset) query.set("dataset", dataset);
   return `/catalog?${query}`;
 }

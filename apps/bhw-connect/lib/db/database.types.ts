@@ -16,6 +16,8 @@ export type Database = {
           geo_level: Database["public"]["Enums"]["geo_level_enum"];
           indicator_key: string;
           breakdown: string;
+          numerator_exact: number | null;
+          denominator_exact: number | null;
           numerator: number | null;
           denominator: number | null;
           rate_pct: number | null;
@@ -30,6 +32,8 @@ export type Database = {
           geo_level: Database["public"]["Enums"]["geo_level_enum"];
           indicator_key: string;
           breakdown?: string;
+          numerator_exact?: number | null;
+          denominator_exact?: number | null;
           numerator?: number | null;
           denominator?: number | null;
           rate_pct?: number | null;
@@ -44,6 +48,8 @@ export type Database = {
           geo_level?: Database["public"]["Enums"]["geo_level_enum"];
           indicator_key?: string;
           breakdown?: string;
+          numerator_exact?: number | null;
+          denominator_exact?: number | null;
           numerator?: number | null;
           denominator?: number | null;
           rate_pct?: number | null;
@@ -3421,6 +3427,7 @@ export type Database = {
       };
     };
     Views: {
+      ref_fhsis_reconciliation_exact: Database["public"]["Views"]["ref_fhsis_reconciliation"];
       ref_fhsis_reconciliation: {
         Row: {
           dataset_id: number | null;

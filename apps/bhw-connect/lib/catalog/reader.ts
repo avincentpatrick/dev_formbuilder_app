@@ -29,7 +29,7 @@ export interface CatalogReader {
 
 const specs = CATALOG.flatMap((d) => d.indicators);
 /** One allowlisted projection per aggregate. Never SELECT * or request a service-role client. */
-function columns(table: CatalogTable): string {
+export function columns(table: CatalogTable): string {
   return [
     ...new Set(
       specs
@@ -41,6 +41,7 @@ function columns(table: CatalogTable): string {
           ...(s.suppression ? [s.suppression] : []),
           ...(s.categoryColumn ? [s.categoryColumn] : []),
           ...(s.table === "agg_uuc_phc_criteria" ? ["n_listed"] : []),
+          ...(s.table === "fact_fhsis_indicator" ? ["numerator_exact", "denominator_exact"] : []),
         ]),
     ),
   ].join(",");

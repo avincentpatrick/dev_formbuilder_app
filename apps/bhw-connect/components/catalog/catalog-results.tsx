@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { measureDefinition, derivationNote } from "@/lib/catalog/measure-notes";
 import type { CatalogDataset, PublicCatalog } from "@/lib/catalog/types";
 import { catalogHref } from "@/lib/catalog/navigation";
 import { hasAvailableValue } from "@/lib/catalog/summary";
 import {
   formatValue,
+  isPartialTotal,
   HEADLINES,
   omissionReason,
   previewIndicators,
@@ -15,8 +17,11 @@ export function SourceDates({ dataset }: { dataset: CatalogDataset }) {
     <ul className="mt-4 space-y-2 text-xs text-muted">
       {dataset.sources.map((source) => (
         <li key={source.slug}>
-          <span className="block font-medium">{source.sourceName ?? source.name}</span>Source date:{" "}
-          {sourceDate(source.asOfDate)} · Updated: {sourceDate(source.lastUpdatedAt)}
+          <span className="block font-medium">{source.sourceName ?? source.name}</span>
+          <span className="block">
+            Accepted release: {source.name} ({source.slug})
+          </span>
+          Source date: {sourceDate(source.asOfDate)} · Updated: {sourceDate(source.lastUpdatedAt)}
         </li>
       ))}
     </ul>
@@ -135,13 +140,9 @@ export function CatalogResults({
                   <div key={indicator.id}>
                     <dt className="text-sm text-muted">{indicator.label}</dt>
                     <dd className="text-xl font-semibold">
-                      {indicator.state === "partial" &&
-                        (dataset.id === "population" ||
-                          (dataset.id === "nhfr" &&
-                            catalog.selection.mode === "psgc" &&
-                            catalog.selection.level === "barangay")) && (
-                          <span className="block text-xs font-medium">Partial total</span>
-                        )}
+                      {isPartialTotal(dataset, indicator) && (
+                        <span className="block text-xs font-medium">Partial total</span>
+                      )}
                       {formatValue(indicator.values[0], indicator.unit)}
                     </dd>
                     {indicator.values[0].denominator != null && (
@@ -260,7 +261,12 @@ export function CatalogDetails({
         </p>
       )}
       {available.length > 0 ? (
-        <div className="overflow-x-auto rounded-lg border border-border">
+        <div
+          className="overflow-x-auto rounded-lg border border-border"
+          role="region"
+          aria-label="Scrollable indicator table"
+          tabIndex={0}
+        >
           <table className="w-full text-left text-sm">
             <caption className="sr-only">
               Available {dataset.title} measures for the selected scope
@@ -283,6 +289,14 @@ export function CatalogDetails({
                 <tr key={indicator.id} className="border-t border-border align-top">
                   <th scope="row" className="min-w-40 p-3 font-medium">
                     {indicator.label}
+                    <p className="mt-2 text-xs font-normal text-muted">
+                      {measureDefinition(indicator)}
+                    </p>
+                    {derivationNote(indicator) && (
+                      <p className="mt-2 text-xs font-normal text-muted">
+                        {derivationNote(indicator)}
+                      </p>
+                    )}
                   </th>
                   <td className="min-w-40 p-3">
                     {indicator.values.length ? (
@@ -291,6 +305,11 @@ export function CatalogDetails({
                           <li key={index}>
                             {value.label && `${value.label}: `}
                             {formatValue(value, indicator.unit)}
+                            {value.numerator != null && (
+                              <span className="block text-xs text-muted">
+                                Numerator: {value.numerator.toLocaleString("en-PH")}
+                              </span>
+                            )}
                             {value.denominator != null && (
                               <span className="block text-xs text-muted">
                                 Denominator: {value.denominator.toLocaleString("en-PH")}
@@ -298,7 +317,10 @@ export function CatalogDetails({
                             )}
                             {value.ciLow != null && value.ciHigh != null && (
                               <span className="block text-xs text-muted">
-                                Interval: {value.ciLow}–{value.ciHigh}
+                                {dataset.id === "poverty"
+                                  ? "90% confidence interval"
+                                  : "Confidence interval"}
+                                : {value.ciLow}–{value.ciHigh}
                               </span>
                             )}
                           </li>
@@ -311,9 +333,14 @@ export function CatalogDetails({
                   <td className="min-w-48 p-3 text-xs text-muted">
                     {dataset.sources.find((s) => s.slug === indicator.sourceSlug)?.sourceName ??
                       "Source details unavailable"}
-                    {indicator.state === "partial" &&
-                      dataset.id === "nhfr" &&
-                      indicator.coverage && <p className="font-medium">Partial total</p>}
+                    <p className="mt-2">
+                      Reported area records:{" "}
+                      {indicator.reportedAreaRecords?.toLocaleString("en-PH") ?? "Unknown"}.
+                      Overlapping geographic levels are not additive.
+                    </p>
+                    {isPartialTotal(dataset, indicator) && (
+                      <p className="font-medium">Partial total</p>
+                    )}
                     {indicator.coverage && (
                       <p className="mt-2">
                         {indicator.coverage.label}:{" "}
@@ -322,12 +349,6 @@ export function CatalogDetails({
                       </p>
                     )}
                     {indicator.reason && <p className="mt-2">{indicator.reason}</p>}
-                    {indicator.definition && (
-                      <p className="mt-2">
-                        {indicator.definition.numerator} / {indicator.definition.denominator}.
-                        Source: {indicator.definition.sourceWorkbook}
-                      </p>
-                    )}
                   </td>
                 </tr>
               ))}
@@ -346,6 +367,7 @@ export function CatalogDetails({
             {missing.map((indicator) => (
               <li key={indicator.id}>
                 <strong>{indicator.label}</strong> · {indicator.state}: {indicator.reason}
+                <p className="mt-1 text-muted">{measureDefinition(indicator)}</p>
               </li>
             ))}
           </ul>

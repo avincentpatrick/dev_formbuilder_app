@@ -48,7 +48,16 @@ export function omissionReason(dataset: CatalogDataset, selection: CatalogSelect
   if (dataset.state === "failed") return "Could not load the figures. Please try again.";
   if (dataset.state === "suppressed")
     return "Measures are withheld under the catalog’s privacy rules.";
+  if (dataset.state === "unsupported" && selection.mode === "district")
+    return "No safe calculation is available for this district selection. Check membership limitations or choose a supported constituent member.";
   if (dataset.state === "unsupported")
     return `${dataset.title} is not available at ${selection.mode === "psgc" ? (selection.level === "national" ? "national" : selection.level === "citymun" ? "city/municipality" : selection.level) : "this"} level in the catalog.`;
   return "No usable figures are currently available for this selection.";
+}
+
+export function isPartialTotal(dataset: CatalogDataset, indicator: CatalogIndicator): boolean {
+  return (
+    indicator.state === "partial" &&
+    (indicator.aggregation === "sum" || dataset.id === "population" || dataset.id === "nhfr")
+  );
 }

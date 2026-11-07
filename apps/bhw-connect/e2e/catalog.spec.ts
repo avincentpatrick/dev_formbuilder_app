@@ -82,3 +82,57 @@ test("catalog opens available-source details without claiming national values", 
   // All-locations probes stream behind a loading state; allow shared CI database contention.
   await expect(page.getByTestId("catalog-scope")).toHaveText("All locations", { timeout: 10_000 });
 });
+
+test("district mode clears PSGC selection and retains an empty or selected district safely", async ({
+  page,
+}) => {
+  await page.goto("catalog?mode=psgc&location=region%3A01");
+  await page.getByRole("link", { name: "Congressional districts", exact: true }).click();
+  await expect(page).toHaveURL(/catalog\?mode=district$/);
+  const district = page.getByLabel("Congressional district", { exact: true });
+  await expect(district).toBeVisible();
+  const options = await district
+    .locator("option")
+    .evaluateAll((nodes) => nodes.slice(1).map((n) => (n as HTMLOptionElement).value));
+  if (options.length) {
+    await district.selectOption(options[0]);
+    await page.getByRole("button", { name: "Show district" }).click();
+    await expect(page.getByTestId("catalog-scope")).toBeVisible();
+    const url = page.url();
+    await page.reload();
+    await expect(page).toHaveURL(url);
+    await page.getByText("Mapping provenance and gaps", { exact: true }).click();
+    await expect(
+      page.getByRole("link", { name: "View source receipts, mapping gaps and correction history" }),
+    ).toBeVisible();
+  }
+  await page.getByRole("link", { name: "PSGC / All locations", exact: true }).click();
+  await expect(page).toHaveURL(/mode=all$/);
+  await expect(page.getByTestId("catalog-scope")).toHaveText("All locations", { timeout: 10_000 });
+});
+
+test("home starts with the catalog and every available card has consistent details", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(page.getByRole("region", { name: "Catalog overview" })).toBeVisible();
+  const cards = page.locator("article");
+  await expect(cards.first()).toBeVisible();
+  const links = await cards
+    .locator("h2 a")
+    .evaluateAll((nodes) => nodes.map((n) => n.getAttribute("href")!));
+  expect(links.length).toBeGreaterThan(0);
+  expect(links.length).toBeLessThanOrEqual(6);
+  for (const href of links) {
+    await page.goto(href);
+    await expect(page.getByRole("table")).toBeVisible();
+    await expect(page.getByText("Accepted release:", { exact: false }).first()).toBeVisible();
+    await expect(page.getByRole("table")).not.toContainText("Definition unavailable.");
+    await page.getByRole("link", { name: "All datasets for this selection", exact: false }).click();
+    await expect(page.getByTestId("catalog-scope")).toHaveText("All locations", {
+      timeout: 10_000,
+    });
+  }
+  await page.getByRole("link", { name: "Congressional districts", exact: true }).click();
+  await expect(page.getByLabel("Congressional district", { exact: true })).toBeVisible();
+});

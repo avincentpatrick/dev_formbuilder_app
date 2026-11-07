@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { GeoSearch } from "@/components/home/geo-search";
-import { DatasetCard } from "@/components/portal/dataset-card";
+import { Suspense } from "react";
+import { CatalogContent } from "@/components/catalog/catalog-content";
+import CatalogLoading from "./catalog/loading";
 import { meridianUrl } from "@/lib/meridian-url";
 import { IconnectLogo } from "@/components/branding/iconnect-logo";
 import { InnovationEndorsement } from "@/components/branding/innovation-endorsement";
@@ -18,9 +20,6 @@ export const metadata: Metadata = {
     "A repository of open, publicly available health datasets and innovations — no individual-level data.",
 };
 
-// The portal is a static front door: no data fetching, so a plain Server
-// Component. It supplies its own slim chrome (the shared BHW Header/Footer hide
-// themselves on "/"), keeping the hub visually distinct from any one dataset.
 export default function Portal() {
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-10 px-4 py-8 sm:px-6 sm:py-12">
@@ -35,22 +34,11 @@ export default function Portal() {
         </p>
       </section>
 
-      <section
-        aria-label="Unified dataset catalog"
-        className="rounded-xl border border-border bg-surface p-5 text-center"
-      >
-        <h2 className="text-xl font-semibold">Browse datasets by location</h2>
-        <p className="mt-2 text-sm text-muted">
-          See available measures, coverage and source dates together, from national figures to
-          cities and municipalities.
-        </p>
-        <Link
-          href="/catalog"
-          prefetch={false}
-          className="mt-4 inline-block rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white"
-        >
-          Open dataset catalog →
-        </Link>
+      <section aria-label="Unified dataset catalog" className="space-y-6">
+        <h2 className="text-2xl font-semibold">Browse datasets by location</h2>
+        <Suspense fallback={<CatalogLoading />}>
+          <CatalogContent request={{ selection: { mode: "all" }, dataset: null }} />
+        </Suspense>
       </section>
 
       <section aria-label="Global search" className="flex flex-col items-center gap-3">
@@ -75,40 +63,21 @@ export default function Portal() {
         </p>
       </section>
 
-      {/* Published dashboards and the section's ways forward. */}
-      <section aria-label="Datasets" className="flex flex-col gap-4">
-        <h2 className="sr-only">Datasets</h2>
-        <div className="grid grid-cols-1 gap-4">
-          <DatasetCard
-            title="2025 BHW Census"
-            description="The Philippine BHW workforce — accreditation, training, demographics, and honorarium, down to the city/municipality level."
-            href="/bhw"
-          />
-          <DatasetCard
-            title="2025 UUC for PHC"
-            description="The barangays on the 2025 list of Unserved and Underserved Communities for Primary Health Care — where primary care is hardest to reach, from national down to city/municipality level."
-            href="/uuc-phc"
-          />
-          <DatasetCard
-            title="Health facilities"
-            description="The September 2026 National Health Facility Registry — hospitals, rural health units, barangay health stations, and other facilities, with ownership and geographic coverage."
-            href="/facilities"
-          />
-          <DatasetCard
-            title="Legislative districts"
-            description="Philippine legislative districts and the BHW workforce they cover, with member cities, municipalities, and barangays, mapping sources, and public corrections."
-            href="/districts"
-          />
-          <DatasetCard
-            title="Health services"
-            description="The DOH FHSIS 2025 partial release — immunisation, maternal care, water and sanitation, TB services, and health workforce context by area."
-            href="/health-services"
-          />
-          <DatasetCard
-            title="Ways forward"
-            description="Analyses and innovations built on these datasets will join the repository as they mature."
-          />
-        </div>
+      <section aria-label="More resources" className="space-y-3 border-t border-border pt-5">
+        <h2 className="text-lg font-semibold">More resources</h2>
+        <p className="text-sm text-muted">
+          Existing dashboards and mapping documentation remain available.
+        </p>
+        <nav aria-label="Existing dashboards" className="flex flex-wrap gap-4 text-sm underline">
+          <Link href="/bhw">BHW dashboard</Link>
+          <Link href="/facilities">Facilities dashboard</Link>
+          <Link href="/uuc-phc">UUC-PHC dashboard</Link>
+          <Link href="/health-services">Health services dashboard</Link>
+          <Link href="/districts">District mapping and sources</Link>
+        </nav>
+        <p className="text-sm text-muted">
+          Ways forward: analyses and innovations will join the repository as they mature.
+        </p>
       </section>
 
       {/* Attribution */}

@@ -186,3 +186,100 @@ NHFR reads, and six UUC reads. The page separately resolves geography. The NHFR 
 total and validated-attribution reads run together; repeated indicator reads share their result.
 These are query-count bounds, not a production latency guarantee. Live source completeness still
 requires the existing operator checks; accepted metadata alone never establishes loaded facts.
+
+## Increment 5 — district scope and aggregation
+
+`district-geography.ts` resolves the public district index, live non-rejected/non-superseded
+membership, actual PSGC parents and barangay rosters. It exposes Congress, source/retrieval
+receipts, single-source corroboration exceptions, attributable district gaps and the existing
+mapping-wide gap counts. The accepted single-source exception remains as documented in
+`LEGISLATIVE_DISTRICTS.md`; it is not presented as independent corroboration. Receipt/history
+links lead to the existing mapping pages, not to unscoped dataset figures.
+
+Whole municipalities expand to a set of leaves for overlap checks. The computation then uses
+disjoint whole municipalities plus explicit leaves of split cities. A whole-city row and an
+explicit leaf in that same district count once. A leaf or its whole city assigned to another
+live district in the same Congress blocks figures. Missing places, wrong levels, empty rosters
+and source conflicts also block figures. An explicit leaf roster establishes a whole municipal unit only when it contains every exact
+barangay identity in that municipality’s current PSGC roster; matching row counts or repeated
+leaves alone cannot establish completeness. Cross-district conflicts still block publication.
+
+`getDistrictCatalog` is the verified district entry point. `getPublicCatalog` remains the PSGC/
+All reader and does not resolve district membership on its own. The district reader batches
+the same accepted public aggregates, preserves the source-wide suppression gate, and composes
+only normalized units. Split-city NHFR reads a municipal facility projection once, then filters
+by constituent barangays; facilities in other barangays never enter the district total.
+Unassigned/invalid attribution stays excluded and partial. UUC membership and qualification
+retain the leaf rules from Increment 4. No raw BHW records or legacy overlapping `UNION ALL`
+district aggregate are used.
+
+Approved combined-scope calculations are deliberately explicit:
+
+- Add StepZero's four count measures, validated-profile counts, NHFR counts/recorded beds,
+  and UUC membership/qualification counts over disjoint members. Missing observations may
+  produce a labeled **Partial total** with reporting-unit coverage; they never become zeros.
+- Recompute declared/profile accreditation and topic-training percentages only from complete,
+  compatible source numerators and denominators. Do not average rates or combine source
+  confidence intervals. Training remains unsupported where a constituent requires barangay data.
+- Population and non-BHW FHSIS workforce count sums require every constituent to be a supported
+  whole municipality with complete source observations and verified mapping coverage. They are
+  derived sums, not published district totals; historical district population metadata is unused.
+- FHSIS service rates, poverty incidence, averages, certification percentages without an explicit
+  compatible denominator, demographic breakdowns and payer-honorarium distributions have no new
+  multi-unit calculation. Their existing published values can still be shown for one exact mapped
+  municipal/leaf scope where supported. Municipal values never stand in for a split city.
+
+A failed or protected constituent blocks that measure's total rather than publishing a residual.
+At root district scope (and split-city scopes), known mapping-wide gaps make coverage uncertain:
+shared omissions cannot always be assigned to one district. Count sums are labeled partial and
+calculations requiring complete coverage are withheld. One exact selected barangay or accepted
+whole municipality retains its own published values. This conservative handling does not claim
+that every reported mapping-wide gap belongs to the selected district.
+
+URL state uses `mode=district`, `district`, optional `citymun`, optional `barangay`, and optional
+`dataset`. A barangay requires its constituent city; foreign members and mixed PSGC/district
+parameters are rejected before figure reads. Mode and district switches clear prior geographic
+selection. Card, detail, ancestor, refresh and history links retain the district scope; legacy
+whole-city dataset destinations are omitted even when a district selection could fit them.
+
+Query volume scales with batches of members, not indicators × members: up to 18 shared metadata,
+privacy and dictionary reads; at most 13 table reads per ten whole municipalities and seven per
+ten leaf units, plus two accepted-fact presence probes and paginated NHFR municipal projections.
+The latter stop and fail closed at 10,000 records per municipality; aggregate batches fail at
+1,000 rows instead of truncating. Mapping/geography reads paginate at 1,000 and chunk code lists
+at 100. Constituent composition is sequential with one shared reader and the existing four-job
+indicator pool, preventing parallel pools for every member. These are structural bounds, not
+live-server timing guarantees. Live mapping and source completeness still require operator data.
+
+## Details, portal and accepted-release refresh (Increment 6)
+
+The portal now renders the All-locations catalog directly. `/catalog` remains the canonical
+URL for scoped navigation and details; old dashboard URLs and global search remain available.
+District mapping is a secondary resource, not a dataset card. Profiling Status remains at its
+existing URL but is excluded from the inventory. Ingestion/history stays in the existing admin
+area, reached through Admin sign in; it is not mixed into public figures.
+
+Every counted measure has interpretation text in `measure-notes.ts`, with source dictionary
+numerator/denominator/workbook taking precedence for FHSIS. Details display source-specific
+release names and dates, recorded values and available numerator/denominator/interval attributes,
+reporting coverage, derivation and missing/withheld reasons. Unknown dates are never inferred.
+
+Release refresh is deliberate, not “latest timestamp wins”:
+
+1. The operator loads and validates the accepted source privately, using existing ingestion and
+   reconciliation rules, and refreshes its aggregates. A new NHFR snapshot uses a new slug/row.
+2. Update `dim_dataset.as_of_date` to the source reference date and `last_updated_at` to the
+   successful load/aggregate refresh time. Existing loaders do not all update that metadata;
+   an ingestion-batch timestamp alone is insufficient. Commit the accepted facts, aggregates
+   and metadata coherently before serving the release. No production load is performed here.
+3. For a replacement release, review `ACCEPTED_RELEASES` alongside `DATASET_SLUGS` and any
+   source-specific year/key filters and legacy helpers. Change the explicit selector in a PR;
+   loading another slug alone intentionally does not change public authority. Recheck geographic
+   reconciliation, units, dictionary and suppression before accepting it.
+4. The next request reads fresh source metadata and only that accepted dataset ID. Logical
+   dataset/measure identities stay fixed. `release-refresh.test.ts` simulates a selector change
+   and subsequent metadata/value refresh, verifying one NHFR card, six total identities and no
+   old-release values. Existing duplicate-scalar tests fail ambiguous records closed.
+
+The catalog does not add an ingestion system, automatically accept a release, or change a live
+source. Atomic load/aggregate refresh and operator data verification remain prerequisites.

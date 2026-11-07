@@ -8,10 +8,7 @@ test("health services is discoverable and drills down without borrowing census c
     "The committed synthetic seed has no FHSIS total-breakdown reports; use the populated fixture for this path.",
   );
   await page.goto("./");
-  await page
-    .getByRole("link")
-    .filter({ has: page.getByRole("heading", { name: "Health services", exact: true }) })
-    .click();
+  await page.getByRole("link", { name: "Health services dashboard", exact: true }).click();
   await expect(page).toHaveURL(/\/health-services$/);
   await expect(page.getByRole("heading", { name: "All service indicators" })).toBeVisible();
   await expect(

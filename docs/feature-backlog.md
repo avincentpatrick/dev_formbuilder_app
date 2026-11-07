@@ -15753,3 +15753,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Found by `M216` (2026-11-07). `docs/deployment-infrastructure.md` §5 item 4 says a backup never test-restored is not a verified backup, and asks for a restore every quarter. `M216` proves one on the box, and nothing asks for the next. The testing server has already outlived one quarter with no drill, which is how a prescribed drill goes unrun. The remedy is whatever makes the next one come up on its own, such as a dated row, a scheduled reminder or a check of the last drill's date, and it may share its answer with `nightly-backup-silent-failure`.
 
   **Live.** Filed by `M216`. **Tier: during-testing.**
+
+- **`minor` · `box-c-drive-small` — The testing server keeps its database on a 60 GB C: drive with 21 GB free while nearly 5 TB on E: sits unused, and nothing warns before C: fills.**
+  Found by `M216`'s read-only box check (2026-11-07).
+  - **Measured:** C: is 60 GB with 21 GB free, and E: is 4,963 GB with 4,952 GB free. PostgreSQL's data directory is `C:\Program Files\PostgreSQL\15\data`, read from the service's own command line, and it holds `bhw_connect` as well as `meridian`. Every backup folder this repository's runbook names is on C: too.
+  - **Why it matters:** when C: fills, the database can no longer write, and PostgreSQL can shut down if it cannot write its log, which takes both applications down. Nothing reads the free space today. `nightly-backup-silent-failure` is the same gap for the backup.
+  - **Not urgent, as far as measured:** Meridian's dump is about 1.2 MB a night. What fills the 39 GB in use and how fast it grows have not been measured.
+  - ⚠️ **E: is on the same RAID volume as C:** (disk 0, a Dell PERC H740P), so moving anything there adds room and no protection. `D213`'s copy off the box is what protects the data.
+  The remedy, to be measured when taken: first read what is using C: and how fast it grows, then choose between a free-space warning and moving folders to E:. Moving the data directory restarts the PostgreSQL server, which also interrupts BHW Connect.
+
+  **Latent** — nothing has failed, and the rate of growth is unmeasured. Filed by `M216`. **Tier: during-testing.**

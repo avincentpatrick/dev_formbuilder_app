@@ -16,7 +16,7 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M223`: `E2eSeederIdempotencyTest`'s release-order assertion no longer depends on the order the table hands rows back (m223-release-order-assertion)
+## Status: ACTIVE CLAIM — `M223`: `E2eSeederIdempotencyTest`'s release-order assertion no longer depends on the order the table hands rows back (m223-release-order-assertion) — BUILT AND HELD: PR #435 green, waiting for a merge point, where it merges before #432, #433 and #434
 
 Taken 2026-11-08. Branch `m223-release-order-assertion`, cut from origin/main at `b47009a7`, PR into main. Held green for a merge point (`D137`), where it must merge **before #432, #433 and #434**, whose Pest it turns red.
 Row: new, filed and closed by this increment: *"`E2eSeederIdempotencyTest` checks the `releases` table's order against the notes file's, but reads the table with no order."* `M221` first filed it on #433's branch; that copy was taken out, so it is filed once.
@@ -42,9 +42,18 @@ Paired files taken: none.
 Namespaces spent: `M223`. `state.php` prints a lower next free number because `M215` to `M222` are held and unreleased.
 Prediction: with #434's notes file in place, the old assertion fails and the new one passes. Nothing else moves. No `VERSION` bump: no one using the app sees a test.
 
-## HELD — `M222`, `R-0ace5ea8`: a section's drag, grab and drop say the section's name (m222-section-drag-name) — BUILT AND HELD: PR #434, CI running
+### Build record (2026-11-08, not merged)
+PR #435, head `abb13df1`, run 42399487787: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green.
+- With #434's notes swapped in, the old assertion was red and the new one green.
+- A mutant making `releases:sync` skip one release is CAUGHT.
 
-Taken 2026-11-08, under the same instruction as `M219`. Branch `m222-section-drag-name`, cut from origin/main at the claim's parent, PR into main. Held green for a merge point (`D137`).
+**How the prediction fared:** right, but the evidence above was wrong in one place. #434's own CI run (42396786257) passed this test, though the branch had been red locally. So the order does not follow the version number: it changes from run to run, and a re-run of #432 was still red.
+
+**The merge point owes:** merge it before #432, #433 and #434. Release this claim then.
+
+## HELD — `M222`, `R-0ace5ea8`: a section's drag, grab and drop say the section's name (m222-section-drag-name) — BUILT AND HELD: PR #434 green, waiting for a merge point
+
+Taken 2026-11-08, under the same instruction as `M219`. Branch `m222-section-drag-name`, cut from origin/main at `50064169`, PR into main. Held green for a merge point (`D137`).
 **One row, by `D13`:** it edits one hub, `useCanvasReorder.ts`, which no held PR touches. #433 edits `BuilderCanvas.vue`, which this row's tests mount but do not change.
 Row: `R-0ace5ea8`, *"A section drag is announced as "Dragging a section", without the section's name."*
 
@@ -66,7 +75,16 @@ Prediction:
 - The new Vitest cases go red first.
 - Nothing else moves, because no test pins the old wording.
 
-## HELD — `M221`, `R-18d9f001`: a section's title is edited in place in Structure, as a question's label already is (m221-section-title-inline) — BUILT AND HELD: PR #433, CI running
+### Build record (2026-11-08, not merged)
+PR #434, head `e0c4a9fc`, run 42396786257: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green.
+- 26 of 26 in Vitest.
+- Five mutants, each restored byte for byte, all CAUGHT.
+
+**How the prediction fared:** right. The new cases went red first and nothing else moved. One mutant had to be re-run with the line before it as context, because its text also matched a line with more indentation.
+
+**The merge point owes:** merge after #435 and #433, renumbering 0.18.1 if the order changes. Release this claim then.
+
+## HELD — `M221`, `R-18d9f001`: a section's title is edited in place in Structure, as a question's label already is (m221-section-title-inline) — BUILT AND HELD: PR #433 green but for the release-order assertion #435 fixes, waiting for a merge point
 
 Taken 2026-11-08, under the same instruction as `M219`. Branch `m221-section-title-inline`, cut from origin/main at `abf068f0`, PR into main. Held green for a merge point (`D137`).
 **One row, by `D13`:** it edits two hubs (`BuilderCanvas.vue`, `useBuilderStore.ts`). `R-c1eaa8b5` (the canvas type column) and `R-0ace5ea8` (a section drag's announcement) edit the same hubs, so each waits for its own increment.
@@ -104,7 +122,21 @@ Prediction:
 - The e2e rename survives a reload at all three widths.
 - The gate I most expect to be wrong about is `builder-axe.spec.ts`. Its click-every-tab loops are unaffected, but a new icon button on every section head joins the axe scans, and its name must match its visible label.
 
-## HELD — `M220`, `R-fcdb4594`: a question saved to the field library no longer comes back with a stricter rule group (m220-library-rule-groups) — BUILT AND HELD: PR #432, CI running
+### Build record (2026-11-08, not merged)
+PR #433, head `b9579605`, runs 42396170296 and 42398866018: 7 of 8 jobs green with real step counts, and `Boundary (from main)` green. **Pest red on one case only,** `E2eSeederIdempotencyTest`'s release-order assertion, which `M223` (#435) fixes. 7331 others passed.
+- **Vitest:** 19 of 19, and five mutants all CAUGHT.
+- **Pest:** `BuilderRoutesTest` 12 of 12, and a mutant removing the server fix is CAUGHT.
+- **E2E:** `builder-structure.spec.ts`, 9 of 9 at three widths.
+- **Extended mid-build** to `FormBuilderService::addSection()`, a fresh section's every save refused, found by the new e2e case. That row was filed and closed. The release-order row was filed here first, then moved to `M223`.
+
+**How the prediction fared:**
+- **Right:** Vitest went red first.
+- **Wrong:** `builder-axe.spec.ts` was the wrong gate to fear. CI's E2E was green.
+- **Not predicted:** the e2e rename was refused on a real server. A new section's `is_repeatable` came back `null`, which no unit test could see, because every fixture carries `false`. Also not predicted, Pest went red on a test this PR never touched.
+
+**The merge point owes:** merge after #435 so Pest goes green, renumbering 0.18.0 if the order changes. Release this claim then.
+
+## HELD — `M220`, `R-fcdb4594`: a question saved to the field library no longer comes back with a stricter rule group (m220-library-rule-groups) — BUILT AND HELD: PR #432 green but for the release-order assertion #435 fixes, waiting for a merge point
 
 Taken 2026-11-08, under the same instruction as `M219`: rows that conflict with neither the backup setup nor a held PR. Branch `m220-library-rule-groups`, cut from origin/main at `a208d245`, PR into main. Held green for a merge point (`D137`).
 **One row, by `D13`:** the rows still ready in this tier edit hubs almost without exception. `R-f8893952`, the other field-library row, edits the same hub (`app/Models/FieldLibrary.php`) and needs a migration besides: the library has no appearance column. So it is its own increment, next.
@@ -131,6 +163,17 @@ Prediction:
 - The new case goes red first, with the `or` group's survivor still present.
 - Pest and PHPStan are otherwise unmoved.
 - The gate I most expect to be wrong about is `ReleaseNotesFileTest`, because this branch numbers its version after two other held bumps.
+
+### Build record (2026-11-08, not merged)
+PR #432, head `7a0f290f`, run 42393462799 and its re-run: 7 of 8 jobs green with real step counts, and `Boundary (from main)` green. **Pest red on one case only,** `E2eSeederIdempotencyTest`'s release-order assertion, which `M223` (#435) fixes. 7331 others passed.
+- The new mapper case was red before the fix.
+- Three mutants, all CAUGHT.
+
+**How the prediction fared:**
+- **Right:** the new case went red first.
+- **Wrong about the gate:** `ReleaseNotesFileTest` passed. The trouble came from `E2eSeederIdempotencyTest`, a test this PR never touched, red on both runs.
+
+**The merge point owes:** merge after #435 so Pest goes green, renumbering 0.17.4 if the order changes. Release this claim then.
 
 ## HELD — `M219`, `R-1fc57252` and `R-efee4d5c`: an XLSForm appearance too long to store no longer fails the import, and the dev container takes the same uploads the testing server does (m219-import-appearance-upload-limits) — BUILT AND HELD: PR #431 green, waiting for a merge point
 

@@ -48,6 +48,7 @@ Rows: `R-1fc57252`, *"An XLSForm appearance longer than 60 characters fails the 
 **`R-efee4d5c`: works.** One ini file in the image, at the testing server's figures, read back from the rebuilt container.
 
 Files: `app/Services/Xlsform/XlsformImportParser.php`, a new `tests/Feature/Xlsform/XlsformImportAppearanceTest.php`, `docker/Dockerfile`, a new `docker/php/uploads.ini`.
+**Extended 2026-11-08, mid-build, before the file was opened: `docker/nginx/default.conf`.** The premise check measured nginx's `client_max_body_size 25m`, which is below the 30M request size PHP gets. A file right at the 25 MB attachment limit, plus the form's other fields, would therefore be refused locally by nginx before PHP sees it, while the testing server's PHP takes it. It is the same defect one layer up, so nginx goes to 30m with it.
 Shared artefacts taken: `docs/claims/decisions.md` (`D213`'s date), `docs/feature-backlog.md`, `docs/pipeline.md`; `VERSION` and `database/data/releases.json` if the import fix ships as a patch.
 Paired files taken: none.
 Namespaces spent: `M219`. `state.php` prints a lower next free number because `M215` to `M218` are held and unreleased.

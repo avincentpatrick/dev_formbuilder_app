@@ -11,8 +11,8 @@ export default function Methodology() {
         <a href="https://bit.ly/FHSISPHSannualreports" className="underline">
           public FHSIS annual reports archive
         </a>{" "}
-        supplies the 2025 annual Excel workbooks. This snapshot was retrieved on 6 September 2026
-        and was partial at retrieval; it is not a claim that every 2025 programme is included or
+        supplies the 2025 programme workbooks. This snapshot was retrieved on 7 November 2026 and
+        includes selected programmes; it is not a claim that every 2025 programme is included or
         that this is today’s latest release.
       </p>
       <p>
@@ -20,14 +20,17 @@ export default function Methodology() {
         environmental health and TB, plus eight non-BHW health workforce cadres from Demographics.
         It shows the source’s total breakdown, at national, region, province/HUC and
         city/municipality levels. Eight-visit antenatal care was introduced mid-year and covers
-        Q3–Q4 2025 only; do not compare it directly with full-year four-visit coverage.
+        Q3–Q4 2025 only; do not compare it directly with full-year four-visit coverage. Water and
+        sanitation are Q4 snapshots, not annual totals.
       </p>
       <h2 className="text-xl font-semibold">Geography and missing reports</h2>
       <p>
-        PSGC-coded records join to the site’s geography. The source does not provide barangay-level
-        service indicators in this section. Province/HUC name-keyed programmes such as intrapartum
-        care, nutrition, vital statistics and family planning, and the separate morbidity tables,
-        are not included.
+        PSGC-coded records join to the site’s geography. Source code errors are resolved using area
+        names and province context, with corrections retained in the load audit. Additional hospital
+        rows are excluded from LGU records; published parent totals are retained. The source does
+        not provide barangay-level service indicators in this section. Province/HUC name-keyed
+        programmes such as intrapartum care, nutrition, vital statistics and family planning, and
+        the separate morbidity tables, are not included.
       </p>
       <p>
         A missing indicator row means “Not reported in 2025”, not zero. A row with a zero is
@@ -38,14 +41,18 @@ export default function Methodology() {
       <p>
         Every rate is the source’s own published rate for that area; rates are never averaged or
         recomputed from child areas. Each indicator includes its source numerator and denominator
-        definitions. Most are percentages; TB case notification rates are cases per 100,000
-        population and may normally exceed 100.
+        definitions. Fractional source values are preserved. Water-system and sanitation-facility
+        component shares use households with basic services as denominator; overall basic and safely
+        managed coverage use projected households. Most rates are percentages; TB case notification
+        rates are cases per 100,000 population and may normally exceed 100.
       </p>
       <p>
         Percentage coverage above 100% is retained and marked †, never capped. The source recorded
         more services than its stated denominator; where the denominator is a DOH projected eligible
         population, the true coverage is unknown. TB treatment success uses registered cases as its
-        denominator, not projected population.
+        denominator, not projected population. Some CIC denominators and rates are negative in the
+        source because the projected cohort minus prior FIC is negative; these are retained as
+        reported and should not be interpreted as valid negative coverage.
       </p>
       <p>
         FHSIS’s population and household projections are only its own indicator denominators. BHW

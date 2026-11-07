@@ -16,10 +16,10 @@ export default function Methodology() {
         that this is today’s latest release.
       </p>
       <p>
-        This section covers 20 service indicators in immunisation, maternal antenatal care,
+        This section covers the loaded service indicators in immunisation, maternal care,
         environmental health and TB, plus eight non-BHW health workforce cadres from Demographics.
-        It shows the source’s total breakdown, at national, region, province/HUC and
-        city/municipality levels. Eight-visit antenatal care was introduced mid-year and covers
+        It shows source totals and available age/sex breakdowns, at national, region, province/HUC
+        and city/municipality levels. Eight-visit antenatal care was introduced mid-year and covers
         Q3–Q4 2025 only; do not compare it directly with full-year four-visit coverage. Water and
         sanitation are Q4 snapshots, not annual totals.
       </p>
@@ -28,9 +28,11 @@ export default function Methodology() {
         PSGC-coded records join to the site’s geography. Source code errors are resolved using area
         names and province context, with corrections retained in the load audit. Additional hospital
         rows are excluded from LGU records; published parent totals are retained. The source does
-        not provide barangay-level service indicators in this section. Province/HUC name-keyed
-        programmes such as intrapartum care, nutrition, vital statistics and family planning, and
-        the separate morbidity tables, are not included.
+        not provide barangay-level service indicators in this section. Additional postnatal,
+        delivery/newborn and nutrition programmes are published only after their source load is
+        validated. Those sources report provinces/HUCs and selected separately listed cities, not
+        every municipality. Vital statistics, family planning and the separate morbidity tables
+        remain outside this section.
       </p>
       <p>
         A missing indicator row means “Not reported in 2025”, not zero. A row with a zero is
@@ -39,12 +41,14 @@ export default function Methodology() {
       </p>
       <h2 className="text-xl font-semibold">Rates, units and denominators</h2>
       <p>
-        Every rate is the source’s own published rate for that area; rates are never averaged or
-        recomputed from child areas. Each indicator includes its source numerator and denominator
-        definitions. Fractional source values are preserved. Water-system and sanitation-facility
-        component shares use households with basic services as denominator; overall basic and safely
-        managed coverage use projected households. Most rates are percentages; TB case notification
-        rates are cases per 100,000 population and may normally exceed 100.
+        Age and sex groups are separate views and must not be added together. Rates are not invented
+        for sex-specific counts without matching denominators. Every rate is the source’s own
+        published rate for that area; rates are never averaged or recomputed from child areas. Each
+        indicator includes its source numerator and denominator definitions. Fractional source
+        values are preserved. Water-system and sanitation-facility component shares use households
+        with basic services as denominator; overall basic and safely managed coverage use projected
+        households. Most rates are percentages; TB case notification rates are cases per 100,000
+        population and may normally exceed 100.
       </p>
       <p>
         Percentage coverage above 100% is retained and marked †, never capped. The source recorded

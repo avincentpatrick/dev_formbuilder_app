@@ -82,7 +82,7 @@ Prediction:
 - Pest and PHPStan are otherwise unmoved.
 - The gate I most expect to be wrong about is `ReleaseNotesFileTest`, because this branch numbers its version after two other held bumps.
 
-## HELD — `M219`, `R-1fc57252` and `R-efee4d5c`: an XLSForm appearance too long to store no longer fails the import, and the dev container takes the same uploads the testing server does (m219-import-appearance-upload-limits) — BUILT AND HELD: PR #431, CI running
+## HELD — `M219`, `R-1fc57252` and `R-efee4d5c`: an XLSForm appearance too long to store no longer fails the import, and the dev container takes the same uploads the testing server does (m219-import-appearance-upload-limits) — BUILT AND HELD: PR #431 green, waiting for a merge point
 
 Taken 2026-11-08, on the user's *"for now untill i tell you, lets do the other tasks that can be done and wont conflict the backup setup"*. Branch `m219-import-appearance-upload-limits`, cut from origin/main at `8cf0ce8f`, PR into main. Held green for a merge point (`D137`).
 **Chosen to stay clear:** neither row touches `M216`'s files (the backup command, `scripts/nightly-backup.ps1`, `docs/deployment-infrastructure.md`, `docs/non-functional-requirements.md`), the Testing Server Checklist, or any file of the held #412, #413, #414 or #429. `R-0ceefbb4`, `R-95dffd45` and `R-ddbf337d` were passed over because they edit `XlsformExporter.php`, which #414 holds.
@@ -123,6 +123,24 @@ Prediction:
 - After the fix, Pest and PHPStan stay clean.
 - The rebuilt container reads 25M and 30M.
 - The gate I most expect to be wrong about is citation liveness, if the backlog cites `XlsformImportParser.php` by line and the edit moves those lines.
+
+### Build record (2026-11-08, not merged)
+PR #431, head `ba5e1562`, run 42392756906: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green on its own workflow. Every claimed file was edited, plus the extension (`docker/nginx/default.conf`) and `docs/xlsform-interop-spec.md`'s appearance row, which said a cell is always kept as written.
+
+**Proof:**
+- With the cap taken out, the new test fails with a `QueryException` at the insert, the defect as filed.
+- Four mutants through `scripts/mutate.php`, 4 of 4 CAUGHT.
+- The rebuilt app container reads `25M 30M`, and a throwaway nginx reads `client_max_body_size 30m` as valid.
+
+**How the prediction fared:**
+- **Right:** the test went red as a database error.
+- **Right:** Pest and PHPStan stayed clean.
+- **Right:** the container read 25M and 30M.
+- **Right:** citation liveness was the gate to expect trouble from. A backlog citation of `XlsformImportParser.php` by line landed on a blank line and now cites `normalizeChoices()`.
+- **Not predicted:** the dev nginx sat below PHP's new request size, so the claim was extended.
+- **Not predicted:** this machine runs a gitignored compose override (`php artisan serve` on port 80) that bypasses nginx entirely, and its `web` container does not start. That is local to this machine, not the repository.
+
+**The merge point owes:** merge the trunk in, regenerate the line in a tree with `vendor/`, green again, and merge in the held order. Renumber 0.17.3 if #414 is not ahead of it. Rebuild the local image after the merge (`docker compose build app worker scheduler`). Release this claim then.
 
 ## HELD — `M218`, `R-ffd296b1`, `R-20b1fe78` and `R-a06e5589`: a seeded form wide enough that the builder's spill reads can fail, the role-locator sweep measured, and the queue file cited by row instead of by line (m218-e2e-fixtures-citations) — BUILT AND HELD: PR #429 green, waiting for a merge point
 

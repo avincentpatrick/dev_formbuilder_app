@@ -69,9 +69,14 @@ for (const section of ["uuc-phc", "facilities", "health-services"]) {
 
 test("district search finds member matches", async ({ page }) => {
   await page.goto("districts");
-  await page.getByRole("combobox").fill("Adams");
-  await expect(page.getByRole("option")).toHaveCount(1);
-  await expect(page.getByRole("option")).toContainText("Example district");
+  await page
+    .getByRole("combobox", {
+      name: "Find a district or member city, municipality, or barangay",
+      exact: true,
+    })
+    .fill("Adams");
+  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(1);
+  await expect(page.getByRole("listbox").getByRole("option")).toContainText("Example district");
 });
 
 test("search handles empty and failed responses on mobile", async ({ page }) => {

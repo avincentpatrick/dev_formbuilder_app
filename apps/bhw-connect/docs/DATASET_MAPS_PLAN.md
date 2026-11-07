@@ -2,6 +2,8 @@
 
 Status: planning only. Assessed 7 November 2026. No application, database, deployment or dataset changes are authorized by this document alone.
 
+Implementation has begun at the owner’s request: see [foundation progress and validation commands](DATASET_MAPS_IMPLEMENTATION.md). Card/fullscreen rollout and production validation remain pending.
+
 Every dataset card gets its own embedded map. Each map represents that dataset's indicators, geography, reporting period and source. This applies to existing datasets, additional ingested datasets and planned dataset cards. There is no privileged BHW map with the other datasets relegated to overlays.
 
 The confirmed scope includes embedded maps and a dedicated Map page, dataset-specific fullscreen views, and barangay drill-down where the source data and reliable boundaries support it. Storage capacity is not a current constraint. Shared software and basemap assets are compatible with independent dataset experiences.

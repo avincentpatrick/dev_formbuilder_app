@@ -11246,7 +11246,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   one line: is regenerating the census a close-out obligation, or is the file allowed to lag its own banner? **Live.**
   Filed by `M108`. **Tier: after-launch.**
 
-- **`minor` · `docs/pipeline.md` is cited BY LINE in at least two places, it is regenerated every increment, and the
+- ✅ **CLOSED BY `M218` (2026-11-07) — ****`minor` · `docs/pipeline.md` is cited BY LINE in at least two places, it is regenerated every increment, and the
   citation gate cannot see the rot.** Filed 2026-09-24 by `M108` while verifying `R-4346557c`, whose own citation of
   it had already moved. That row cites line 50 of `docs/pipeline.md`; the line is now `:48`, and a second citer it never named
   sits at `:70`. The identical stale citation sits inside `D38` in `docs/claims/decisions.md`. ⛔ **NEITHER COPY CAN
@@ -11259,6 +11259,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   moves every heading below it without producing a run"* — and the same argument applies with more force to a file
   regenerated deliberately. The remedy is to cite the line's rows by `R-` id, which is stable for the life of the row.
   **Live.** Filed by `M108`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M218` (2026-11-07), on its branch.**
+  - Of the two citations, `R-4346557c`'s had already gone. `D38`'s remained, and it now names `R-fcfc1f52` instead of a line.
+  - It was wrong the day it was written: in `7b45369f`, the commit that wrote it, line 50 held `R-4328a4d9`, and the row it meant sat at line 75.
+  - `scripts/pipeline-lint.php` gains **P8**. It refuses a line citation into the generated file from every file the generator reads, and from the backlog, the decisions file and `CLAUDE.md`, which it does not read. The claim ledgers and the archive are records of the past and are not read.
+  - Before `D38` was repointed, P8 went red on exactly that one line and nothing else.
+  - Four control cases in `PipelineLintControlsTest`, and six mutants through `scripts/mutate.php`, all CAUGHT: the call removed, a pattern that never matches, the lookbehind dropped, the folder made compulsory, the backlog not read, and the refusal removed.
 
 - ✅ **CLOSED BY `M195` (2026-10-28) — ****`minor` · `backlog-triage-controls` is registered in CI and absent from `docs/gate-baselines.md`, so its case
   count is the one gate number nothing tracks.** Filed 2026-09-24 by `M108`, which registered the gate and found the
@@ -12357,7 +12363,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   reads it rather than filing a bug. The honest fix is a live-fields prop on both components with its own gate
   run. **Live.** Filed by `M118`. **Tier: during-testing.**
 
-- **`minor` · `getByRole('tablist')` and friends are viewport-dependent on the builder, because the panes are
+- ✅ **CLOSED BY `M218` (2026-11-07) — ****`minor` · `getByRole('tablist')` and friends are viewport-dependent on the builder, because the panes are
   hidden with `display: none` — so a role-based count there asserts which pane is selected, not the
   invariant.** Found 2026-09-28 by `M118` when a new page-level assertion failed at the tablet project with a
   count of **zero**. A `display: none` subtree is absent from the accessibility tree, and below the builder's
@@ -12370,8 +12376,15 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   construction, and their behaviour at a width where the config pane is hidden is that they iterate ZERO
   elements and scan nothing — passing, silently, having tested nothing. **Live.** Filed by `M118`.
   **Tier: during-testing.**
+  ✅ **CLOSED BY `M218` (2026-11-07), on its branch: the sweep is done, and it found one silent read, which was not role-based.**
+  - Swept: every spec and `tests/e2e/support/`.
+  - **The row's own example had already gone.** The four `builder-axe.spec.ts` loops count `locator('[role="tab"]')`, the DOM rather than the accessibility tree, after `showBuilderPane(page, 'settings')` and a `toBeVisible()` on the first tab. None can loop zero times and pass.
+  - No count or loop uses a role locator. The four negative role counts on builder panes, two in `builder-axe.spec.ts` and two in `builder-preview-authoring.spec.ts`, each follow a positive `toBeFocused()` or `toBeVisible()` in the same pane, so a hidden pane fails loudly. Each was decided to stay as it is.
+  - **The one silent read** was `personalization-axe.spec.ts`'s pane switcher. It sat inside `if (await strip.isVisible())`, so it was skipped without a word whenever the switcher was off screen. It now asserts the switcher is visible and then reads it.
+  - Proved by a mutant that hides the switcher at every width: it went red at all three projects, reporting that the switcher is not on screen. The old code would have skipped the read.
+  - The fix is in `R-ffd296b1`'s file, as that read is one of its four, so this row edited no file of its own.
 
-- **`minor` · No seeded fixture projects to a builder control wide enough to overflow, so all four element-level
+- ✅ **CLOSED BY `M218` (2026-11-07) — ****`minor` · No seeded fixture projects to a builder control wide enough to overflow, so all four element-level
   spill reads on that page are green by FIXTURE rather than by design.** Found 2026-09-28 by `M119` while writing
   the fourth one and refusing to accept it green. ⛔ **MEASURED, NOT INFERRED.** At 375px with `extra_large` and
   OpenDyslexic — the combination `D28` and `M19` are both about — the preview's section strip renders **three**
@@ -12389,6 +12402,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   an existing fixture is not free: six spec files open `Community Health Survey` by title and `builder-axe.spec.ts`
   scans its config panel, so the section count is load-bearing for scans that have nothing to do with overflow.
   **Live.** Filed by `M119`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M218` (2026-11-07), on its branch.** Two new draft forms in `E2eSeeder`, which `deploy.ps1` never runs, so they never reach the testing site.
+  - **`Section Strip Demo`:** seven always-visible sections, exactly `PREVIEW_STRIP_MAX_SEGMENTS`, each name carrying one long word.
+    - ⚠️ **The row's remedy said long section NAMES, and long names are not enough.** A segment shrinks to its longest word and no further, so it is the longest words that overflow.
+    - Measured with `extra_large` and OpenDyslexic: the bar is 335px, 730px and 1160px at the three widths, and five ordinary names shrank to 625px and fitted at two of them.
+    - The preview-strip case pins seven segments. It also takes the `flex-wrap` guard off for one read and requires the strip to spill, at every width and on every run, so the fixture proves on each run that it can still make the read fail.
+  - **`Many Sections Demo`:** eight sections, so the strip draws its select fallback end to end for the first time: visible, eight options, no radios, its bar read and an axe scan.
+  - **Proof:** mutants, each rebuilt and run at all three widths, and each red at all three. The guard set to `nowrap`, and the ceiling raised to 8.
+  - ⚠️ **"All four" was an overstatement, which this records rather than repeats:**
+    - Only the section strip carries author-controlled text, so it is the only read a fixture can move.
+    - The pane switcher and the centre tabs carry fixed labels. The pane-switcher read was skipped whenever the switcher was off screen, which `R-20b1fe78` fixed in this increment.
+    - The config pane's read is `R-db28b120`'s. That row measured it red at `mobile` and green at the other two widths, and it stays queued; it edits this same spec.
 
 - **`nit` · How many tracker surgeries have happened is recorded only in release prose, and one of them never
   recorded itself.** Found 2026-09-28 by `M119` while writing its own. `M111`'s release calls itself *"the sixth

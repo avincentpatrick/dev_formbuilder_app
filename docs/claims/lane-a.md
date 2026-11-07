@@ -16,7 +16,35 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M219`, `R-1fc57252` and `R-efee4d5c`: an XLSForm appearance too long to store no longer fails the import, and the dev container takes the same uploads the testing server does (m219-import-appearance-upload-limits)
+## Status: ACTIVE CLAIM — `M220`, `R-fcdb4594`: a question saved to the field library no longer comes back with a stricter rule group (m220-library-rule-groups)
+
+Taken 2026-11-08, under the same instruction as `M219`: rows that conflict with neither the backup setup nor a held PR. Branch `m220-library-rule-groups`, cut from origin/main at `a208d245`, PR into main. Held green for a merge point (`D137`).
+**One row, by `D13`:** the rows still ready in this tier edit hubs almost without exception. `R-f8893952`, the other field-library row, edits the same hub (`app/Models/FieldLibrary.php`) and needs a migration besides: the library has no appearance column. So it is its own increment, next.
+Row: `R-fcdb4594`, *"Saving a question to the field library drops its cross-field rules but keeps their group, so an "any of these" group comes back stricter."*
+
+### Evidence verified
+`FieldLibrary::fromField()` filters out every validation whose `related_field_key` is set and keeps the rest unchanged, each still carrying its `logic_group_ordinal` from `SchemaSnapshotSerializer`: **held**. The row says *"Read, not run"*; the first test written runs it.
+
+### Premise verified
+- *"Reachable once the builder authors groups"*: **reachable now.** `M131` (`R-799d60f5`, `D80`) gave the builder an all/any switch per rule list (`rule-grouping.ts`, `ValidationEditor.vue`), and a template can carry any grouping.
+- The engines fold each group within its family, and combine units by family: required and skip as ANY, constraints as ALL (the docblock of `rule-grouping.ts`). So a group that loses a member is stricter in both of its uses. An `or` constraint group offers fewer alternatives. An `and` required group holds more often, so the question is required more often.
+- No held PR touches `FieldLibrary.php`, `SchemaSnapshotSerializer.php` or `FieldLibraryMapperTest.php`.
+
+### Remedy verdict
+The row offers two remedies: drop the group whole when any member goes, or ungroup the survivors and say so.
+- **Drop the group whole: works.** Removing a whole unit can only make the copy more permissive, never stricter, in every family.
+- **Ungroup the survivors: wrong.** An ungrouped constraint must pass on its own (ALL), which is stricter still than the shrunken `or` group. An ungrouped required rule is its own ANY unit, which no longer needs its old partners.
+
+Files: `app/Models/FieldLibrary.php`, `tests/Feature/Forms/FieldLibraryMapperTest.php`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`; `VERSION` and `database/data/releases.json` (a tester can reach this).
+Paired files taken: none.
+Namespaces spent: `M220`. `state.php` prints a lower next free number because `M215` to `M219` are held and unreleased.
+Prediction:
+- The new case goes red first, with the `or` group's survivor still present.
+- Pest and PHPStan are otherwise unmoved.
+- The gate I most expect to be wrong about is `ReleaseNotesFileTest`, because this branch numbers its version after two other held bumps.
+
+## HELD — `M219`, `R-1fc57252` and `R-efee4d5c`: an XLSForm appearance too long to store no longer fails the import, and the dev container takes the same uploads the testing server does (m219-import-appearance-upload-limits) — BUILT AND HELD: PR #431, CI running
 
 Taken 2026-11-08, on the user's *"for now untill i tell you, lets do the other tasks that can be done and wont conflict the backup setup"*. Branch `m219-import-appearance-upload-limits`, cut from origin/main at `8cf0ce8f`, PR into main. Held green for a merge point (`D137`).
 **Chosen to stay clear:** neither row touches `M216`'s files (the backup command, `scripts/nightly-backup.ps1`, `docs/deployment-infrastructure.md`, `docs/non-functional-requirements.md`), the Testing Server Checklist, or any file of the held #412, #413, #414 or #429. `R-0ceefbb4`, `R-95dffd45` and `R-ddbf337d` were passed over because they edit `XlsformExporter.php`, which #414 holds.

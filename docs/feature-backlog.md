@@ -13785,11 +13785,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   is short: the grip's fallback, `useCanvasReorder.ts`'s `fieldLabel` and "Move field", "Add a field from the left" and the
   undo entry for an edit still say "field".
 
-- **`minor` · A section's title cannot be edited in Structure.** Found by `M150` beside `R-34edf1f5`, which gives a question's
+- ✅ **CLOSED BY `M221` (2026-11-08) — ****`minor` · A section's title cannot be edited in Structure.** Found by `M150` beside `R-34edf1f5`, which gives a question's
   label an in-place editor: a section's title is still text inside `button.canvas__section-head` in `BuilderCanvas.vue`, edited
   only from the settings pane (`ConfigPanel.vue`'s `setSection`), and the server caps it at 255 characters. The same
   `InlineLabelEdit` serves it, through a `renameSection` beside `renameField`. **Live.** Filed by `M150`.
   **Tier: during-testing.**
+  ✅ **CLOSED BY `M221` (2026-11-08), on its branch, as the row prescribed.**
+  - The store's `renameSection` sits beside `renameField`: set once and saved now through `commitSectionEdit`, so it is one PATCH and one undo entry.
+  - An "Edit title of <section>" button, or a double-click on the head, swaps the head for the same `InlineLabelEdit` at the server's 255-character cap. Enter or a blur saves, Escape keeps the title, a blank title is not an edit, and after Enter the keyboard is back on the head.
+  - Five new `BuilderCanvas.test.ts` cases, and five Vitest mutants, all CAUGHT: the button removed, the save deferred, the cap dropped, the trim removed, the double-click unwired.
+  - A new `builder-structure.spec.ts` case renames a section in a real browser, scans with the editor open, and reads the title back after a reload.
+  - Ships as 0.18.0.
 
 - ✅ **CLOSED BY `M151` (2026-10-09) — ****`major` · On a form whose questions carry a place within their section — every XLSForm import — a drag reorders the
   builder's list but not what respondents, the paper and the export see.** Found by `M151` while planning `R-2baef8ea`.

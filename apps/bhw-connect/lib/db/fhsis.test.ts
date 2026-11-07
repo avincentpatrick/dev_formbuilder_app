@@ -9,6 +9,9 @@ import {
   isFhsisLevel,
   getFhsisArea,
   getFhsisChildren,
+  getFhsisBreakdowns,
+  fhsisBreakdownLabel,
+  fhsisLimitedGeography,
   type IndicatorDefinition,
   type IndicatorRow,
 } from "./fhsis";
@@ -56,8 +59,9 @@ function query(data: unknown, error: unknown = null) {
     order: vi.fn(),
     in: vi.fn(),
     limit: vi.fn(),
+    range: vi.fn(),
   };
-  for (const fn of [q.select, q.eq, q.neq, q.order, q.in, q.limit]) fn.mockReturnValue(q);
+  for (const fn of [q.select, q.eq, q.neq, q.order, q.in, q.limit, q.range]) fn.mockReturnValue(q);
   return q;
 }
 beforeEach(() => {
@@ -190,5 +194,47 @@ describe("FHSIS read boundary", () => {
     expect(children?.[0].fic.reported).toBe(false);
     expect(facts.eq).toHaveBeenCalledWith("indicator_key", "fic");
     expect(facts.eq).toHaveBeenCalledWith("breakdown", "total");
+  });
+});
+
+describe("FHSIS age and sex breakdowns", () => {
+  it("retains source groups and counts without inventing sex-specific rates", async () => {
+    const facts = query([
+      { ...row, breakdown: "male", numerator_exact: 8, denominator: null, rate_pct: null },
+    ]);
+    mocks.from.mockImplementation((table: string) =>
+      table === "ref_fhsis_indicator" ? query([definition]) : facts,
+    );
+    const result = await getFhsisBreakdowns("PH", "national");
+    expect(result?.[0].breakdown).toBe("male");
+    expect(result?.[0].numerator).toBe(8);
+    expect(result?.[0].rate).toBeNull();
+    expect(facts.neq).toHaveBeenCalledWith("breakdown", "total");
+    expect(facts.eq).toHaveBeenCalledWith("geo_code", "PH");
+    expect(facts.eq).toHaveBeenCalledWith("geo_level", "national");
+    expect(facts.eq).toHaveBeenCalledWith("dataset_id", 12);
+  });
+  it("does not return a partial list after a later page fails", async () => {
+    const facts = query([]);
+    facts.range
+      .mockReturnValueOnce(
+        query(Array.from({ length: 500 }, () => ({ ...row, breakdown: "male" }))),
+      )
+      .mockReturnValueOnce(query(null, { message: "failed" }));
+    mocks.from.mockImplementation((table: string) =>
+      table === "ref_fhsis_indicator" ? query([definition]) : facts,
+    );
+    expect(await getFhsisBreakdowns("PH", "national")).toBeNull();
+    expect(facts.range).toHaveBeenLastCalledWith(500, 999);
+  });
+  it("labels counts, age groups and limited geography explicitly", () => {
+    expect(fhsisBreakdownLabel("10-14")).toBe("Age 10–14");
+    expect(
+      fhsisRateLabel(
+        toFhsisIndicator({ ...definition, unit: "count" }, { ...row, rate_pct: null }),
+      ),
+    ).toBe("Count only");
+    expect(fhsisLimitedGeography("nutrition_mam_cured")).toBe(true);
+    expect(fhsisLimitedGeography("vax_opv1_0_12m")).toBe(false);
   });
 });

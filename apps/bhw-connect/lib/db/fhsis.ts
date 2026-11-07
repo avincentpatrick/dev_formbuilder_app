@@ -47,6 +47,7 @@ export function toFhsisIndicator(
 }
 export function fhsisRateLabel(indicator: FhsisIndicator): string {
   if (!indicator.reported) return "Not reported in 2025";
+  if (indicator.unit === "count") return "Count only";
   if (indicator.rate === null) return "Rate not reported";
   const value = indicator.rate.toLocaleString("en-PH", { maximumFractionDigits: 1 });
   return `${value}${indicator.unit.startsWith("percent") ? "%" : " per 100,000"}${indicator.over100 ? "†" : ""}`;
@@ -187,3 +188,61 @@ export const getFhsisReconciliation = cache(async (code: string) => {
     return null;
   }
 });
+
+export type FhsisBreakdown = FhsisIndicator & { breakdown: string };
+export function fhsisBreakdownLabel(key: string): string {
+  return (
+    (
+      {
+        male: "Male",
+        female: "Female",
+        "10-14": "Age 10–14",
+        "15-19": "Age 15–19",
+        "20-49": "Age 20–49",
+        "0-14": "Age 0–14",
+        "15+": "Age 15+",
+        unknown: "Age unknown",
+      } as Record<string, string>
+    )[key] ?? key
+  );
+}
+export function fhsisLimitedGeography(key: string): boolean {
+  return (
+    key.startsWith("birth_") || key.startsWith("nutrition_") || key === "pnc2" || key === "pnc4"
+  );
+}
+/** Fetch only this area; paginate so new programmes cannot silently hit PostgREST's cap. */
+export const getFhsisBreakdowns = cache(
+  async (code: string, level: GeoLevel): Promise<FhsisBreakdown[] | null> => {
+    try {
+      const [id, definitions] = await Promise.all([
+        getDatasetIdBySlug(DATASET_SLUGS.fhsis),
+        getFhsisDefinitions(),
+      ]);
+      if (id === null || !definitions) return null;
+      const result: FhsisBreakdown[] = [];
+      const byKey = new Map(definitions.map((d) => [d.indicator_key, d]));
+      for (let offset = 0; ; offset += 500) {
+        const { data, error } = await createSupabaseServerClient()
+          .from("fact_fhsis_indicator")
+          .select("*")
+          .eq("dataset_id", id)
+          .eq("geo_code", code)
+          .eq("geo_level", level)
+          .neq("breakdown", "total")
+          .order("indicator_key")
+          .order("breakdown")
+          .range(offset, offset + 499);
+        if (error || !data) return null;
+        for (const row of data) {
+          const definition = byKey.get(row.indicator_key);
+          if (definition)
+            result.push({ ...toFhsisIndicator(definition, row), breakdown: row.breakdown });
+        }
+        if (data.length < 500) return result;
+      }
+    } catch {
+      return null;
+    }
+  },
+);

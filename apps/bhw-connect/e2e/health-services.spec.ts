@@ -13,6 +13,9 @@ test("health services is discoverable and drills down without borrowing census c
   await expect(page).toHaveURL(/\/health-services$/);
   await expect(page.getByRole("heading", { name: "All service indicators" })).toBeVisible();
   await expect(
+    page.getByRole("heading", { name: "Age and sex breakdowns", exact: true }),
+  ).toBeVisible();
+  await expect(
     page.getByRole("navigation", { name: "Health services", exact: true }),
   ).toBeVisible();
   await page.getByRole("link", { name: "REGION I (ILOCOS REGION)", exact: true }).click();

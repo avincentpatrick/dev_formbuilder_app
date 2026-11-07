@@ -12,6 +12,9 @@ import {
   fhsisRateLabel,
   fhsisPeriodLabel,
   workforceRatio,
+  getFhsisBreakdowns,
+  fhsisBreakdownLabel,
+  fhsisLimitedGeography,
 } from "@/lib/db/fhsis";
 import type { GeoOption } from "@/lib/db/geo";
 
@@ -29,11 +32,12 @@ const CADRES: Record<string, string> = {
 };
 
 export async function AreaDashboard({ geo }: { geo: GeoOption }) {
-  const [area, children, reconciliation, bhw] = await Promise.all([
+  const [area, children, reconciliation, bhw, breakdowns] = await Promise.all([
     getFhsisArea(geo.geoCode, geo.geoLevel),
     getFhsisChildren(geo.geoCode, geo.geoLevel),
     getFhsisReconciliation(geo.geoCode),
     getBhwCounts(geo.geoCode, geo.geoLevel).catch(() => null),
+    getFhsisBreakdowns(geo.geoCode, geo.geoLevel),
   ]);
   if (!area)
     return (
@@ -152,8 +156,10 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
           All service indicators
         </h2>
         <p className="my-2 text-sm text-muted">
-          {FHSIS_RELEASE_LABEL} · Total breakdown only. TB notification rates are cases per 100,000,
-          not percentages.
+          {FHSIS_RELEASE_LABEL} · Totals; available age and sex breakdowns are below. TB
+          notification rates are cases per 100,000, not percentages. Postnatal care,
+          delivery/newborn care and nutrition sources cover provinces/HUCs and selected separately
+          listed cities; they do not provide every municipality separately.
         </p>
         <div className="overflow-x-auto" role="region" aria-label="Service indicators" tabIndex={0}>
           <table className="w-full min-w-[640px] text-left text-sm">
@@ -189,7 +195,13 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
                       <p className="break-words">Workbook: {i.source_workbook}</p>
                     </details>
                   </th>
-                  <td className="p-3">{fhsisRateLabel(i)}</td>
+                  <td className="p-3">
+                    {!i.reported &&
+                    geo.geoLevel === "citymun" &&
+                    fhsisLimitedGeography(i.indicator_key)
+                      ? "Not separately published for this municipality"
+                      : fhsisRateLabel(i)}
+                  </td>
                   <td className="p-3">{count(i.numerator)}</td>
                   <td className="p-3">{count(i.denominator)}</td>
                 </tr>
@@ -198,6 +210,75 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
           </table>
         </div>
         <p className="mt-3 text-sm text-muted">{FHSIS_OVER_100_NOTE}</p>
+      </section>
+
+      <section aria-labelledby="breakdowns-heading">
+        <h2 id="breakdowns-heading" className="text-xl font-semibold">
+          Age and sex breakdowns
+        </h2>
+        <p className="my-2 text-sm text-muted">
+          These are the source’s reported groups. Age groups and sexes are separate views of the
+          same services; do not add them together. Sex-specific counts have no rate where the source
+          supplies no matching denominator. Age-specific denominators apply only to that age group.
+        </p>
+        {breakdowns === null ? (
+          <p role="status">Breakdown data is temporarily unavailable.</p>
+        ) : breakdowns.length === 0 ? (
+          <p>No age or sex breakdowns were reported for this area.</p>
+        ) : (
+          area.indicators
+            .filter((i) => breakdowns.some((b) => b.indicator_key === i.indicator_key))
+            .map((i) => (
+              <details key={i.indicator_key} className="mb-3 rounded-lg border border-border p-4">
+                <summary className="cursor-pointer font-medium">{i.label} — age / sex</summary>
+                <p className="my-2 text-xs text-muted">
+                  {fhsisPeriodLabel(i.indicator_key)} · {i.source_workbook}
+                </p>
+                <div
+                  className="overflow-x-auto"
+                  role="region"
+                  aria-label={`${i.label} breakdowns`}
+                  tabIndex={0}
+                >
+                  <table className="w-full min-w-[480px] text-left text-sm">
+                    <caption className="sr-only">
+                      Age and sex breakdowns: {i.label}, {geo.geoName}
+                    </caption>
+                    <thead>
+                      <tr>
+                        <th scope="col" className="p-2">
+                          Group
+                        </th>
+                        <th scope="col" className="p-2">
+                          Count
+                        </th>
+                        <th scope="col" className="p-2">
+                          Denominator
+                        </th>
+                        <th scope="col" className="p-2">
+                          Rate
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {breakdowns
+                        .filter((b) => b.indicator_key === i.indicator_key)
+                        .map((b) => (
+                          <tr key={b.breakdown} className="border-t border-border">
+                            <th scope="row" className="p-2 font-medium">
+                              {fhsisBreakdownLabel(b.breakdown)}
+                            </th>
+                            <td className="p-2">{count(b.numerator)}</td>
+                            <td className="p-2">{count(b.denominator)}</td>
+                            <td className="p-2">{fhsisRateLabel(b)}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            ))
+        )}
       </section>
 
       <section aria-labelledby="workforce-heading">

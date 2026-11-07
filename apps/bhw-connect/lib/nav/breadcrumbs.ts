@@ -33,6 +33,8 @@ export const PROFILING_STATUS_CRUMB: Crumb = {
 export const UUC_PHC_CRUMB: Crumb = { label: "2025 UUC for PHC", href: "/uuc-phc" };
 export const FACILITIES_CRUMB: Crumb = { label: "Health facilities", href: "/facilities" };
 
+export const HEALTH_SERVICES_CRUMB: Crumb = { label: "Health services", href: "/health-services" };
+
 const ADMIN_CRUMB: Crumb = { label: "Admin", href: "/admin" };
 
 /** Trails below the 2025 BHW Census, which uses the shared site header. */
@@ -90,6 +92,8 @@ const FACILITIES_TRAILS: Record<string, Crumb[]> = {
 };
 
 const STATIC_TRAILS: Record<string, Crumb[]> = {
+  "/health-services": [HEALTH_SERVICES_CRUMB],
+  "/health-services/methodology": [HEALTH_SERVICES_CRUMB, { label: "Methodology" }],
   ...BHW_TRAILS,
   ...ADMIN_TRAILS,
   ...PROFILING_STATUS_TRAILS,

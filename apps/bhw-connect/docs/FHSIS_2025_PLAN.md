@@ -1,5 +1,22 @@
 # FHSIS 2025 — DOH Field Health Services Information System as a companion dataset
 
+## Implementation status — 2026-11-07
+
+The migrated database baseline already contains `fact_fhsis_indicator`, `fact_fhsis_workforce`,
+`ref_fhsis_indicator` and `ref_fhsis_reconciliation`; the dataset metadata records the
+6 September 2026 retrieval. The baseline is schema evidence, not proof of current production
+row counts. The old F1 fetch/clean/load scripts and cleaning report are absent from this checkout.
+Do not repeat a live load or claim F1 verification solely from this snapshot.
+
+F2 is now implemented: `/health-services`, geographic drill-down, methodology, social cards,
+portal discovery, total-breakdown indicators, workforce context and source subtotal reconciliation.
+The stored dictionary corrects two assumptions in the original plan: eight-visit antenatal care
+is Q3–Q4 only, and TB notification rates are per 100,000 rather than percentages.
+Feedback routing from F6 is included now so the shared feedback widget tags this section correctly.
+The UI reads published rates and definitions, preserves real zeros, and distinguishes missing
+reports from failed reads. The development seed contains invented figures; it is not a source
+for any factual headline. F3–F6 remain separate follow-up increments.
+
 ## Context
 
 `docs/DATASET_SCOPING.md` §3 re-scoped this candidate on 2026-09-06 against the actual source, and

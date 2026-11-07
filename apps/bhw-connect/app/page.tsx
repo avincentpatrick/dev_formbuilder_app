@@ -1,3 +1,4 @@
+import { DatasetMapGallery } from "@/components/maps/dataset-map-gallery";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { GeoSearch } from "@/components/home/geo-search";
@@ -41,6 +42,8 @@ export default function Portal() {
         </Suspense>
       </section>
 
+      <DatasetMapGallery />
+
       <section aria-label="Global search" className="flex flex-col items-center gap-3">
         <h2 className="text-xl font-semibold">Search across datasets</h2>
         <p className="max-w-2xl text-center text-sm text-muted">
@@ -74,6 +77,7 @@ export default function Portal() {
           <Link href="/uuc-phc">UUC-PHC dashboard</Link>
           <Link href="/health-services">Health services dashboard</Link>
           <Link href="/districts">District mapping and sources</Link>
+          <Link href="/map">Dataset maps</Link>
         </nav>
         <p className="text-sm text-muted">
           Ways forward: analyses and innovations will join the repository as they mature.

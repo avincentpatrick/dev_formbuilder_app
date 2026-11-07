@@ -1,6 +1,6 @@
 # Public unified dataset catalog implementation plan
 
-Status: Increments 1–2 complete; Increment 3 is next. Public catalog UI pending.
+Status: Increments 1–3 complete; Increment 4 (barangay support and calculations) is next.
 Planning date: 2026-11-07.
 
 ## Resume instruction
@@ -186,7 +186,7 @@ Update this table when implementation begins. Record relevant commits/PRs, tests
 | --- | --- | --- |
 | 1. Inventory and capabilities | Complete (2026-11-07) | [Inventory and capability audit](UNIFIED_DATASET_CATALOG_INVENTORY.md): accepted sources, canonical measure families, geography matrix, previews, suppression and reconciliation constraints. Public read-only checks confirm BHW/NHFR/UUC figures; FHSIS remains unavailable; direct live population/poverty and database verification remain unknown. Validation and delivery recorded below. |
 | 2. Public catalog data layer | Complete (2026-11-07) | [Data contract](UNIFIED_DATASET_CATALOG_DATA_LAYER.md), `lib/catalog/`: six identities, fixed public indicator inventory, accepted-source adapters, typed availability/failure/suppression states, scope-safe destinations, overview counts/coverage/freshness. Existing pages retain their nullable helpers. Validation and delivery below. |
-| 3. Overview and PSGC through municipality/city | Not started | |
+| 3. Overview and PSGC through municipality/city | Complete (2026-11-07) | `/catalog` overview/cards, All versus National, real-parent PSGC navigation, scoped details, source dates and typed empty/failure states. URL, hierarchy, presentation and browser verification recorded below. |
 | 4. Barangay support and calculations | Not started | |
 | 5. Congressional districts | Not started | |
 | 6. Details and portal integration | Not started | |
@@ -231,3 +231,42 @@ Update this table when implementation begins. Record relevant commits/PRs, tests
   regression was also rerun. Production-style build passed with `/bhw-connect` and
   `BHW_DATA_SOURCE=none`; `git diff --check` passed. No new runtime route/UI to browser-test;
   database-dependent cases remain skipped locally and CI runs its development database checks.
+
+### Increment 3 evidence and handoff — 2026-11-07
+
+- Increment 2 merged as PR #422 (`805690cb`), after green required checks and a successful
+  latest deployment. Implementation branch: `feat/bhw-catalog-psgc-ui` from that trunk.
+- Added `/catalog`, linked from the portal. Six eligible logical datasets share overview,
+  previews, source/update labels, per-source geographic coverage and omission explanations.
+  All locations reports availability, never a sampled national figure. Only datasets with
+  available measures become cards; real zero values remain visible.
+- GET forms and canonical query links preserve scope across refresh/history/shared links.
+  Actual `dim_geo.parent_code` drives children and ancestors, including mixed province/city
+  children and cities without a province. Invalid, ambiguous or mismatched selections fail
+  visibly instead of displaying another place's data. Loading and retry states are included.
+- Basic scoped indicator tables provide a safe card destination for all six datasets.
+  Complete detail presentation and replacement of the existing portal remain Increment 6;
+  district mapping remains a separate link, not a seventh catalog dataset.
+- Validation: lint (zero errors, existing intentional base-path fixture warning), TypeScript,
+  production build under `/bhw-connect`, and full Vitest suite passed: 102 files, 1,358 tests
+  passed / 11 skipped with the local PostgreSQL test connection enabled. Tests cover direct
+  city parentage, query parsing, zero/mixed/empty/failure rendering and scoped destinations.
+- Nine Playwright catalog and portal-search tests passed against the standalone production
+  build and synthetic PostgreSQL/PostgREST seed: All/National,
+  region → province → city, ancestor links, reload/back, invalid URLs, card details, and
+  keyboard navigation at 390px. A temporary local NHFR fixture verified a zero-facility
+  city card and scoped table, then was restored. Mobile pages had no document overflow;
+  axe reported no violations on the All-locations and zero-value city pages. Stopping the
+  local PostgREST service produced an explicit location-read failure with no stale cards;
+  the service was restored after that check.
+- Warm production-server HTTP observations on this local synthetic database: All locations
+  approximately 1.2s, selected region approximately 0.1s. Summary readers retain Increment 2's
+  bound of 128 public reads plus geography lookup; scoped reads are bounded separately.
+  These timings are not a live Windows-server performance claim.
+- The seed generator independently cycles geography codes and levels in aggregate rows.
+  Thus some selected places intentionally produce empty results despite All-locations
+  availability. Strict code **and** level filtering remains intact; no source data was altered.
+  FHSIS live-load diagnosis and live population/poverty validation remain pending.
+- Next: Increment 4. Add barangay capabilities and safe calculations according to the
+  inventory. Extend query parsing/geography controls only alongside supported data readers;
+  retain source-specific denominators, partial coverage and suppression behavior.

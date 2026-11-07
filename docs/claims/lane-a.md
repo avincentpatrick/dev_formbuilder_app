@@ -16,7 +16,40 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M220`, `R-fcdb4594`: a question saved to the field library no longer comes back with a stricter rule group (m220-library-rule-groups)
+## Status: ACTIVE CLAIM — `M221`, `R-18d9f001`: a section's title is edited in place in Structure, as a question's label already is (m221-section-title-inline)
+
+Taken 2026-11-08, under the same instruction as `M219`. Branch `m221-section-title-inline`, cut from origin/main at `abf068f0`, PR into main. Held green for a merge point (`D137`).
+**One row, by `D13`:** it edits two hubs (`BuilderCanvas.vue`, `useBuilderStore.ts`). `R-c1eaa8b5` (the canvas type column) and `R-0ace5ea8` (a section drag's announcement) edit the same hubs, so each waits for its own increment.
+Row: `R-18d9f001`, *"A section's title cannot be edited in Structure."*
+
+### Evidence verified
+- `button.canvas__section-head` in `BuilderCanvas.vue` holds the title as text, with no editor and no edit button. A question row has both (`M150`): **held**.
+- `ConfigPanel.vue`'s `setSection` is the only writer of a section's title: **held**.
+- `UpdateSectionRequest` takes `label` as `required, string, max:255`: **held**.
+- `InlineLabelEdit` takes a `maxlength` and defaults to the question label's limit: **held**.
+
+### Premise verified
+- The same component serves: `InlineLabelEdit` emits `commit(value, via)` and `cancel`. The store's `commitSectionEdit` is the section's counterpart of `commitFieldEdit`, reached through `touch(uid, 'section')` and `flushCommit()`.
+- The two can therefore share one path, one PATCH and one undo entry, as the row says.
+- No held PR touches `BuilderCanvas.vue`, `useBuilderStore.ts`, `BuilderCanvas.test.ts` or `builder-structure.spec.ts`.
+
+### Remedy verdict
+**Works as written.**
+- A `renameSection` beside `renameField`.
+- An "Edit title of <section>" button, and a double-click on the head, open the same editor at the server's 255-character cap.
+- Enter or a blur saves, Escape keeps the title, and a blank title is not an edit.
+- The keyboard goes back to the head after Enter.
+
+Files: `resources/js/components/builder/BuilderCanvas.vue`, `resources/js/components/builder/useBuilderStore.ts`, `resources/js/components/builder/BuilderCanvas.test.ts`, `tests/e2e/builder-structure.spec.ts`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `VERSION` (a new ability, so the middle number: 0.18.0, after the held 0.17.2 to 0.17.4), `database/data/releases.json`.
+Paired files taken: none.
+Namespaces spent: `M221`. `state.php` prints a lower next free number because `M215` to `M220` are held and unreleased.
+Prediction:
+- Vitest goes red first, on the new canvas cases.
+- The e2e rename survives a reload at all three widths.
+- The gate I most expect to be wrong about is `builder-axe.spec.ts`. Its click-every-tab loops are unaffected, but a new icon button on every section head joins the axe scans, and its name must match its visible label.
+
+## HELD — `M220`, `R-fcdb4594`: a question saved to the field library no longer comes back with a stricter rule group (m220-library-rule-groups) — BUILT AND HELD: PR #432, CI running
 
 Taken 2026-11-08, under the same instruction as `M219`: rows that conflict with neither the backup setup nor a held PR. Branch `m220-library-rule-groups`, cut from origin/main at `a208d245`, PR into main. Held green for a merge point (`D137`).
 **One row, by `D13`:** the rows still ready in this tier edit hubs almost without exception. `R-f8893952`, the other field-library row, edits the same hub (`app/Models/FieldLibrary.php`) and needs a migration besides: the library has no appearance column. So it is its own increment, next.

@@ -11333,7 +11333,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Laravel's `Validator::$excludeUnvalidatedArrayKeys` defaults to `true` (`Factory.php:74`), so `validated()`
   skips the top-level key (`Validator.php:659-664`) and rebuilds `config` from the enumerated paths only.
   `FormBuilderService::writeField()` then whole-column-replaces with the result. ⛔ **THIS IS REACHABLE DATA LOSS, NOT A
-  SHAPE COMPLAINT.** Option `label_translations` is written by XLSForm import (`XlsformImportParser.php:319`),
+  SHAPE COMPLAINT.** Option `label_translations` is written by XLSForm import (`XlsformImportParser::normalizeChoices()`),
   read by the runtime (`schema-mapping.ts:183,282-289`), re-exported (`XlsformExporter.php:433`), faithfully sent
   back by the client (`ChoicesEditor.vue:17-20` spreads `{...opt, ...patch}`) — and is not in the allowed rule set
   (`:159-165`). Import a multilingual form, edit any choice field, and every translation is gone. ⚠️ **Only types
@@ -12782,12 +12782,16 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and `tests/e2e/list-layout.spec.ts`. Every layout still holds, because the content box stays continuous across
   1024px. **Not live**. Filed by `M128`. **Tier: during-testing.**
 
-- **`minor` · The dev container keeps PHP's stock upload limits, 2 MB per file and 8 MB per request, so no upload
+- ✅ **CLOSED BY `M219` (2026-11-08) — ****`minor` · The dev container keeps PHP's stock upload limits, 2 MB per file and 8 MB per request, so no upload
   over 2 MB can be tried locally.** Found by `M128` while preparing an OCR probe. `docker/Dockerfile` installs no
   `php.ini`, and `php -r 'echo ini_get(...)'` in the app container reads `2M` and `8M`. Meanwhile `config/attachments.php`
   allows 25 MB and the testing server allows 25M and 30M (`docs/deployment-infrastructure.md` §8, step 1). A phone
   photo for a media field or an OCR scan therefore fails at PHP before the app sees it, and only locally. The remedy is
   one ini file in the image, matching the server. **Live.** Filed by `M128`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M219` (2026-11-08), on its branch.**
+  - `docker/php/uploads.ini` sets `upload_max_filesize = 25M` and `post_max_size = 30M`, the testing server's values, and `docker/Dockerfile` copies it into `conf.d`. Read back from the rebuilt app container: `25M 30M`, where it read `2M 8M` before.
+  - **One layer up, the same defect:** the repository's default stack puts nginx in front of php-fpm, and `docker/nginx/default.conf` allowed a 25m body, below the 30M request PHP now takes. A 25 MB file plus the rest of the form would have been refused there first. It now allows 30m, and a throwaway `nginx:1.27-alpine` reads the file as valid.
+  - Nothing in CI moves: CI's jobs set PHP up themselves.
 
 - ✅ **CLOSED BY `M143` (2026-10-07) — **`minor` · The printed form's stamp identifies the schema, not the layout, so a sheet printed before a layout
   change and one printed after it are the same sheet to the reader.** Found by `M128`, whose own paper fix is the
@@ -12922,12 +12926,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   components that declare a container today. The remedy is that scan as a host lint gate beside
   `component-import-lint.php`. **Not live**. Filed by `M129`. **Tier: after-launch.**
 
-- **`minor` · An XLSForm appearance longer than 60 characters fails the whole import at the database.** Found by
+- ✅ **CLOSED BY `M219` (2026-11-08) — ****`minor` · An XLSForm appearance longer than 60 characters fails the whole import at the database.** Found by
   `M130` while verifying `R-6c76bed2`. `XlsformImportParser::resolveAppearance()` keeps an author appearance
   verbatim, `XlsformImporter` writes it as given, and `form_fields.appearance` is `varchar(60)`, so one long
   appearance cell aborts the insert. ODK appearances are space-separated tokens and its `search(...)` calls run
   long. The remedy is to refuse the cell as a row error the import reports, or to widen the column. Read, not run.
   **Live.** Filed by `M130`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M219` (2026-11-08), on its branch: refused as a warning, not widened.**
+  - Run, not only read: with the cap taken out, the new import test fails with a `QueryException` at the insert, the defect as filed.
+  - `XlsformImportParser::resolveAppearance()` now drops an appearance longer than `APPEARANCE_MAX_LENGTH` (60). The question is imported without it, and the import's warnings name the question.
+  - Not widened: no width holds every ODK `search(...)` call, so a cap would be needed anyway, and widening is a migration on the testing site's database.
+  - `XlsformImportAppearanceTest` reads the real width of `form_fields.appearance` from the database, so the constant and the schema cannot drift apart unseen. It also keeps an appearance of exactly 60.
+  - Four mutants through `scripts/mutate.php`, all CAUGHT: the cap taken out, `>` made `>=`, the width set to 59, and the warning dropped.
+  - Ships as 0.17.3, numbered after #414's 0.17.2.
 
 - **`minor` · An XLSForm appearance is matched as one whole string on import, so `minimal autocomplete` makes a
   Single choice rather than a Dropdown.** Found by `M130` while verifying `R-6c76bed2`.

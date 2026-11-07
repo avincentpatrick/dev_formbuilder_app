@@ -8,6 +8,12 @@ The migrated database baseline already contains `fact_fhsis_indicator`, `fact_fh
 row counts. The old F1 fetch/clean/load scripts and cleaning report are absent from this checkout.
 Do not repeat a live load or claim F1 verification solely from this snapshot.
 
+Live verification on 2026-11-07 found definitions but no matching figures at national,
+Region I, Ilocos Norte or Adams. This does not establish that DOH did not report them.
+The reader now checks for at least one accessible total-breakdown row in the release before
+using area-level “not reported” labels. The unresolved server-side check is documented in
+`FHSIS_DIAGNOSIS.md`; no reload or permission change is justified until it returns.
+
 F2 is now implemented: `/health-services`, geographic drill-down, methodology, social cards,
 portal discovery, total-breakdown indicators, workforce context and source subtotal reconciliation.
 The stored dictionary corrects two assumptions in the original plan: eight-visit antenatal care

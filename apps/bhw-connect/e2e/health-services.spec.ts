@@ -3,6 +3,10 @@ import { test, expect } from "@playwright/test";
 test("health services is discoverable and drills down without borrowing census chrome", async ({
   page,
 }) => {
+  test.skip(
+    process.env.BHW_E2E_FHSIS_HAS_DATA !== "1",
+    "The committed synthetic seed has no FHSIS total-breakdown reports; use the populated fixture for this path.",
+  );
   await page.goto("./");
   await page
     .getByRole("link")
@@ -34,4 +38,16 @@ test("health services rejects unsupported and unknown geographies", async ({ pag
     await page.goto(path);
     await expect(page.getByRole("heading", { name: "Page not found", exact: true })).toBeVisible();
   }
+});
+
+test("an unavailable FHSIS release does not claim nationwide non-reporting", async ({ page }) => {
+  test.skip(process.env.BHW_E2E_FHSIS_HAS_DATA === "1", "This case uses the empty-report seed.");
+  await page.goto("health-services");
+  await expect(page.getByRole("status")).toContainText("Health services data is not available");
+  await expect(page.getByText("Not reported in 2025", { exact: true })).toHaveCount(0);
+  await page
+    .getByRole("navigation", { name: "Health services", exact: true })
+    .getByRole("link", { name: "Methodology" })
+    .click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Health services: methodology");
 });

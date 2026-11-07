@@ -10,6 +10,7 @@ import {
   fhsisAreaHref,
   fhsisCaption,
   fhsisRateLabel,
+  fhsisPeriodLabel,
   workforceRatio,
 } from "@/lib/db/fhsis";
 import type { GeoOption } from "@/lib/db/geo";
@@ -77,7 +78,7 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
         <p className="mt-3 text-sm text-muted">{FHSIS_OVER_100_NOTE}</p>
         <p className="mt-2 text-sm text-muted">
           Eight-visit antenatal care covers Q3–Q4 only; it is not directly comparable with the
-          full-year four-visit figure.
+          full-year four-visit figure. Water and sanitation are Q4 snapshots.
         </p>
       </section>
 
@@ -184,6 +185,7 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
                       <summary className="cursor-pointer">Definition and source</summary>
                       <p className="mt-2">Numerator: {i.numerator_def}</p>
                       <p>Denominator: {i.denominator_def}</p>
+                      <p>Period: {fhsisPeriodLabel(i.indicator_key)}</p>
                       <p className="break-words">Workbook: {i.source_workbook}</p>
                     </details>
                   </th>

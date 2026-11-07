@@ -38,8 +38,8 @@ export function toFhsisIndicator(
   return {
     ...definition,
     reported: row !== undefined,
-    numerator: row?.numerator ?? null,
-    denominator: row?.denominator ?? null,
+    numerator: row?.numerator_exact ?? row?.numerator ?? null,
+    denominator: row?.denominator_exact ?? row?.denominator ?? null,
     rate: row?.rate_pct ?? null,
     // TB notifications use per 100,000: a value above 100 is not excess coverage.
     over100: percentage && !!row && (row.over_100 || (row.rate_pct !== null && row.rate_pct > 100)),
@@ -51,10 +51,15 @@ export function fhsisRateLabel(indicator: FhsisIndicator): string {
   const value = indicator.rate.toLocaleString("en-PH", { maximumFractionDigits: 1 });
   return `${value}${indicator.unit.startsWith("percent") ? "%" : " per 100,000"}${indicator.over100 ? "†" : ""}`;
 }
+export function fhsisPeriodLabel(key: string): string {
+  if (key === "anc8") return "Q3–Q4 2025";
+  if (key.startsWith("water_") || key.startsWith("sanitation_")) return "Q4 2025";
+  return "Annual 2025";
+}
 export function fhsisCaption(indicator: FhsisIndicator, area: string): string {
   const n =
     indicator.denominator === null ? "not reported" : indicator.denominator.toLocaleString("en-PH");
-  return `${indicator.label} · ${area} · ${FHSIS_RELEASE_LABEL} · Denominator N = ${n}: ${indicator.denominator_def}`;
+  return `${indicator.label} · ${area} · ${FHSIS_RELEASE_LABEL} · ${fhsisPeriodLabel(indicator.indicator_key)} · Denominator N = ${n}: ${indicator.denominator_def}`;
 }
 export function workforceRatio(bhwCount: number | null, staffCount: number | null): number | null {
   return bhwCount === null || staffCount === null || staffCount <= 0 ? null : bhwCount / staffCount;
@@ -171,7 +176,7 @@ export const getFhsisReconciliation = cache(async (code: string) => {
     const id = await getDatasetIdBySlug(DATASET_SLUGS.fhsis);
     if (id === null) return null;
     const { data, error } = await createSupabaseServerClient()
-      .from("ref_fhsis_reconciliation")
+      .from("ref_fhsis_reconciliation_exact")
       .select("*")
       .eq("dataset_id", id)
       .eq("parent_geo_code", code)

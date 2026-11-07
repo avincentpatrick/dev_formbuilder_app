@@ -314,6 +314,15 @@ const GENERATED_LINE_PREFIXES = ['**LANE A NEXT PROMPT', '**LANE B NEXT PROMPT']
 const STRUCK_SPAN_THRESHOLD = 3;
 
 /**
+ * P8 — a citation of the generated line BY LINE NUMBER (M218, `R-a06e5589`).
+ *
+ * The lookbehind keeps it to this file: `docs/ocr-pipeline.md:12` or `apps/x/docs/pipeline.md:5` would
+ * end in the same characters and are other files. The `docs/` is optional because a bare
+ * `pipeline.md:48` is the same citation written shorter.
+ */
+const QUEUE_LINE_CITATION = '~(?<![\w./-])(?:docs/)?pipeline\.md:\d+~';
+
+/**
  * ═══ THE TIER RULES (M93, P7d added M108) — P7a, P7b, P7c, P7d, P7e ══════════════════════════════
  *
  * The user's priority became a property of every row — a tier, written at the row's point of truth —
@@ -436,6 +445,9 @@ p2e_acceptance_criteria($features, $lineIds);
 
 // ── P6. The generated file may not arm the next run. ────────────────────────────────────────────
 p6_self_arming();
+
+// ── P8. The generated file is cited by row, never by line. ──────────────────────────────────────
+p8_queue_cited_by_row($document);
 
 // ── Report. ─────────────────────────────────────────────────────────────────────────────────────
 foreach ($notes as $note) {
@@ -1678,6 +1690,70 @@ function p6_self_arming(): void
     }
 
     pass('P6 self-arming', sprintf('%s carries no line-start marker over %d line(s)', PIPELINE, count($lines)));
+}
+
+/**
+ * P8 — the generated line is cited by its row ids, never by its line numbers (M218, `R-a06e5589`).
+ *
+ * ⛔ A LINE CITATION INTO THE GENERATED FILE GOES WRONG WITHIN AN INCREMENT OR TWO, AND NOTHING ELSE CAN
+ * SEE IT. `scripts/pipeline.php` re-ranks the line at every close-out, so the row at a given line changes
+ * while the line itself stays alive, and `scripts/citation-liveness-lint.php` checks only that a cited
+ * line is alive, never that it still says what the citing sentence claims. That gate also excludes
+ * `docs/claims/**` from tier 1, which is where the last such citation lived: `D38`'s, which pointed at
+ * line 50 and was wrong the day it was written, because in the commit that wrote it line 50 held a
+ * different row. A row id lasts as long as the row does, and the generator already cites decisions by
+ * id for the same reason.
+ *
+ * WHAT IT READS: every file in the generator's corpus, code as well as prose, because a comment cites as
+ * readily as a paragraph. Then three files the generator does not read: the backlog, the decisions file
+ * and `CLAUDE.md`. Not the generated file itself, and not the claim ledgers or the archive: those are
+ * records of what was true when they were written, and the claim template already forbids the citation
+ * there.
+ *
+ * ⚠️ NO FLOOR OF ITS OWN, ON PURPOSE. The list is the generator's, and P5 already floors it; every path
+ * in it must be readable or this refuses, because a partial read is a smaller corpus that reads as clean.
+ */
+function p8_queue_cited_by_row(array $document): void
+{
+    if (! isset($document['corpus']) || ! is_array($document['corpus'])) {
+        cannot_measure('P8 has no corpus from the generator, so it would have to walk a tree of its own.');
+    }
+
+    $paths = array_values(array_unique(array_merge(
+        array_values(array_filter($document['corpus'], 'is_string')),
+        [BACKLOG, DECISIONS, IMPERATIVES]
+    )));
+    $scanned = 0;
+
+    foreach ($paths as $path) {
+        if ($path === PIPELINE) {
+            continue;
+        }
+
+        if (! is_file($path)) {
+            cannot_measure(sprintf(
+                'P8 cannot read %s, so it would rule over a smaller corpus than the generator\'s and read as clean.',
+                $path
+            ));
+        }
+
+        $scanned++;
+
+        foreach (explode("\n", (string) file_get_contents($path)) as $i => $line) {
+            if (preg_match_all(QUEUE_LINE_CITATION, $line, $found) > 0) {
+                fail('P8 queue cited by row', sprintf(
+                    '%s line %d cites %s by line number (%s). That file is re-ranked at every close-out, so the '
+                    .'row at a line changes while the citation still resolves. Cite the row by its R- id instead.',
+                    $path,
+                    $i + 1,
+                    PIPELINE,
+                    implode(', ', $found[0])
+                ));
+            }
+        }
+    }
+
+    pass('P8 queue cited by row', sprintf('%d file(s) cite %s by row, never by line', $scanned, PIPELINE));
 }
 
 /**

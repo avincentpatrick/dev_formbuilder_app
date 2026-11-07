@@ -43,8 +43,12 @@ test("catalog rejects ambiguous links and fits a mobile keyboard flow", async ({
   await page.goto("catalog");
   await expect(page.getByTestId("catalog-scope")).toHaveText("All locations");
   const select = page.locator('select[name="location"]');
-  await select.focus();
-  await expect(select).toBeFocused();
+  // The streamed server content may be replaced while Next finishes hydration.
+  // Reacquire the live control before testing native keyboard traversal.
+  await expect(async () => {
+    await select.focus();
+    await expect(select).toBeFocused({ timeout: 500 });
+  }).toPass({ timeout: 10_000 });
   await select.selectOption("region:01");
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Show datasets" })).toBeFocused();

@@ -29,6 +29,8 @@ declare(strict_types=1);
 | ⚠️ THE FIXTURES ARE REAL CAPTURES, taken from the live site on 2026-09-19, with `Set-Cookie` stripped
 | — this repository is public (`D48`) and those lines carried live encrypted session payloads. Only the
 | identity probe's body is read by the judge, so the other bodies are placeholders that say so.
+| ⚠️ ONE LINE IS NOT CAPTURED: `M217` wrote `X-Content-Type-Options: nosniff` into the two static probes' headers by
+| hand, ahead of the deploy that makes it true. A real run against the live site is what proves that line.
 |
 | ⚠️ The exit code is read directly rather than through a pipe, because a pipe hides the exit status.
 |
@@ -104,8 +106,31 @@ it('judges a real capture of the live site as present, and reports a floor', fun
 
     // M106 — the floor counts the POLICY, not just the probes. A header dropped from
     // STAGING_REQUIRED_HEADERS would leave every probe measured and this number one lower.
-    expect($output)->toContain('2 required header(s)');
+    expect($output)->toContain('3 required header(s)');
     expect($output)->toContain('Strict-Transport-Security: max-age=300');
+    expect($output)->toContain('/robots.txt — X-Content-Type-Options: nosniff');
+    expect($output)->toContain('/favicon.ico — X-Content-Type-Options: nosniff');
+});
+
+it('blocks when a static file loses nosniff, and does not ask it of a PHP path (M217, R-25dc7ded)', function (): void {
+    [$status, $output] = stagingHeadersJudge('nosniff-missing');
+
+    expect($status)->toBe(STAGING_HEADERS_JUDGE_BLOCKED, $output);
+    expect($output)->toContain('/favicon.ico — X-Content-Type-Options is ABSENT');
+
+    // ⛔ `/up` and the 404 lack it in this fixture as they do in `measured`. Judging them would make this gate depend
+    // on how the vhost hands PHP over, which is not what was decided and is written down nowhere.
+    expect($output)->not->toContain('/up — X-Content-Type-Options');
+    expect($output)->not->toContain('/nonexistent-static.txt — X-Content-Type-Options');
+    expect($output)->not->toContain('X-Robots-Tag is ABSENT');
+});
+
+it('keeps the nosniff line in the one tracked file that can reach a static response (M217, R-25dc7ded)', function (): void {
+    // The judge only runs at night against the live site, so a pull request that removes the line would otherwise merge
+    // green and go red the night after. There is no Apache in CI to serve the file, so this reads it.
+    $htaccess = (string) file_get_contents(public_path('.htaccess'));
+
+    expect($htaccess)->toMatch('/<IfModule mod_headers\.c>\s+Header always set X-Content-Type-Options "nosniff"\s+<\/IfModule>/');
 });
 
 it('blocks when the header is absent from the one URL crawlers actually fetch', function (): void {

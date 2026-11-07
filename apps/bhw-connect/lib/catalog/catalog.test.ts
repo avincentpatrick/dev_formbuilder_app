@@ -7,6 +7,7 @@ import { POVERTY_SAE_SLUG } from "@/lib/db/poverty";
 
 function reader(tables: Record<string, Row[]> = {}): CatalogReader {
   return {
+    privacy: async () => "clear",
     source: vi.fn<CatalogReader["source"]>(async (slug) => ({
       state: "available",
       value: {
@@ -217,7 +218,6 @@ describe("public catalog contract", () => {
         citymunCode: "0102801",
         barangayCode: "0102801001",
       } as const,
-      { mode: "psgc", level: "barangay", code: "0102801001" } as const,
     ]) {
       const result = await getPublicCatalog(selection, db);
       expect(result.selection).toEqual(selection);
@@ -435,5 +435,75 @@ describe("public catalog contract", () => {
       getPublicCatalog({ mode: "psgc", level: "national", code: "01" }, db),
     ).rejects.toThrow("Invalid catalog");
     expect(db.source).not.toHaveBeenCalled();
+  });
+});
+
+it("supports only verified barangay measures, with derived coverage and no municipality fallback", async () => {
+  const db = reader({ agg_bhw_counts: [{ n_total: 0 }], agg_nhfr_counts: [{ n_facilities: 0 }] });
+  const original = db.rows;
+  db.rows = async (...args) => {
+    const result = await original(...args);
+    return args[0].table === "agg_nhfr_counts" && result.state === "available"
+      ? {
+          ...result,
+          note: {
+            partial: true,
+            reason: "Attributed facilities only.",
+            coverage: { label: "Municipal attribution", covered: 8, total: 10 },
+          },
+        }
+      : result;
+  };
+  const result = await getPublicCatalog(
+    { mode: "psgc", level: "barangay", code: "0102801001" },
+    db,
+  );
+  expect(find(result, "bhw.validated-profiles")).toMatchObject({
+    state: "available",
+    values: [{ value: 0 }],
+  });
+  expect(find(result, "nhfr.facilities")).toMatchObject({
+    state: "partial",
+    values: [{ value: 0 }],
+    coverage: { covered: 8, total: 10 },
+  });
+  for (const id of [
+    "fhsis.fic",
+    "population.residents",
+    "poverty.incidence",
+    "bhw.training.basic_life_support",
+  ])
+    expect(find(result, id).state).toBe("unsupported");
+  expect(
+    vi
+      .mocked(original)
+      .mock.calls.every(
+        ([, , selection]) => selection.level === "barangay" && selection.code === "0102801001",
+      ),
+  ).toBe(true);
+});
+
+it("withholds protected measure groups across parent and child scopes to prevent subtraction", async () => {
+  const db = reader({
+    agg_demographics: [{ dimension: "sex", category: "A", n: 40, is_suppressed: false }],
+    agg_honorarium: [{ payer_level: "province", pct_receiving: 50, is_suppressed: false }],
+  });
+  db.privacy = async () => "suppressed";
+  for (const selection of [
+    { mode: "all" } as const,
+    { mode: "psgc", level: "citymun", code: "0102801" } as const,
+    { mode: "psgc", level: "barangay", code: "0102801001" } as const,
+  ]) {
+    const result = await getPublicCatalog(selection, db);
+    expect(find(result, "bhw.demographics.sex")).toMatchObject({ state: "suppressed", values: [] });
+    expect(find(result, "bhw.honorarium.province")).toMatchObject({
+      state: "suppressed",
+      values: [],
+    });
+  }
+  db.privacy = async () => "failed";
+  expect(find(await getPublicCatalog(area, db), "bhw.demographics.sex")).toMatchObject({
+    state: "failed",
+    values: [],
   });
 });

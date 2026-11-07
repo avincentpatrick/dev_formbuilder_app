@@ -131,13 +131,17 @@ export function CatalogResults({
               </p>
             ) : (
               <dl className="mt-4 space-y-4">
-                {previewIndicators(dataset).map((indicator) => (
+                {previewIndicators(dataset).map((indicator, index) => (
                   <div key={indicator.id}>
                     <dt className="text-sm text-muted">{indicator.label}</dt>
                     <dd className="text-xl font-semibold">
-                      {indicator.state === "partial" && dataset.id === "population" && (
-                        <span className="block text-xs font-medium">Partial total</span>
-                      )}
+                      {indicator.state === "partial" &&
+                        (dataset.id === "population" ||
+                          (dataset.id === "nhfr" &&
+                            catalog.selection.mode === "psgc" &&
+                            catalog.selection.level === "barangay")) && (
+                          <span className="block text-xs font-medium">Partial total</span>
+                        )}
                       {formatValue(indicator.values[0], indicator.unit)}
                     </dd>
                     {indicator.values[0].denominator != null && (
@@ -145,9 +149,19 @@ export function CatalogResults({
                         Denominator: {indicator.values[0].denominator.toLocaleString("en-PH")}
                       </dd>
                     )}
-                    {indicator.reason && (
-                      <dd className="mt-1 text-xs text-muted">{indicator.reason}</dd>
+                    {indicator.coverage && index === 0 && (
+                      <dd className="text-xs text-muted">
+                        {indicator.coverage.label}:{" "}
+                        {indicator.coverage.covered.toLocaleString("en-PH")} of{" "}
+                        {indicator.coverage.total.toLocaleString("en-PH")}
+                      </dd>
                     )}
+                    {indicator.reason &&
+                      !previewIndicators(dataset)
+                        .slice(0, index)
+                        .some((previous) => previous.reason === indicator.reason) && (
+                        <dd className="mt-1 text-xs text-muted">{indicator.reason}</dd>
+                      )}
                   </div>
                 ))}
                 {previewIndicators(dataset).length === 0 && (
@@ -297,6 +311,16 @@ export function CatalogDetails({
                   <td className="min-w-48 p-3 text-xs text-muted">
                     {dataset.sources.find((s) => s.slug === indicator.sourceSlug)?.sourceName ??
                       "Source details unavailable"}
+                    {indicator.state === "partial" &&
+                      dataset.id === "nhfr" &&
+                      indicator.coverage && <p className="font-medium">Partial total</p>}
+                    {indicator.coverage && (
+                      <p className="mt-2">
+                        {indicator.coverage.label}:{" "}
+                        {indicator.coverage.covered.toLocaleString("en-PH")} of{" "}
+                        {indicator.coverage.total.toLocaleString("en-PH")}
+                      </p>
+                    )}
                     {indicator.reason && <p className="mt-2">{indicator.reason}</p>}
                     {indicator.definition && (
                       <p className="mt-2">

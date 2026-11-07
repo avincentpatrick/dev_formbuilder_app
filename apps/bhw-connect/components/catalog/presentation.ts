@@ -25,7 +25,14 @@ export function previewIndicators(dataset: CatalogDataset): CatalogIndicator[] {
 export function formatValue(value: PublicValue, unit: string): string {
   const formatted = value.value.toLocaleString("en-PH", { maximumFractionDigits: 2 });
   if (unit === "%" || unit.startsWith("percent")) return `${formatted}%`;
-  return `${formatted} ${unit}`;
+  const singular: Record<string, string> = {
+    facilities: "facility",
+    barangays: "barangay",
+    people: "person",
+    beds: "bed",
+    years: "year",
+  };
+  return `${formatted} ${value.value === 1 ? (singular[unit] ?? unit) : unit}`;
 }
 export function sourceDate(date: string | null): string {
   return date
@@ -39,7 +46,8 @@ export function sourceDate(date: string | null): string {
 }
 export function omissionReason(dataset: CatalogDataset, selection: CatalogSelection): string {
   if (dataset.state === "failed") return "Could not load the figures. Please try again.";
-  if (dataset.state === "suppressed") return "Available figures are withheld to protect privacy.";
+  if (dataset.state === "suppressed")
+    return "Measures are withheld under the catalog’s privacy rules.";
   if (dataset.state === "unsupported")
     return `${dataset.title} is not available at ${selection.mode === "psgc" ? (selection.level === "national" ? "national" : selection.level === "citymun" ? "city/municipality" : selection.level) : "this"} level in the catalog.`;
   return "No usable figures are currently available for this selection.";

@@ -46,7 +46,7 @@ export default async function CatalogPage({
         <section role="alert" className="rounded-xl border border-border bg-surface p-6">
           <h2 className="font-semibold">This catalog selection is not supported</h2>
           <p className="mt-2 text-sm">
-            Choose All locations, National, a region, province, or city/municipality.
+            Choose All locations, National, a region, province, city/municipality, or barangay.
           </p>
           <Link href="/catalog" className="mt-3 inline-block underline">
             Start at All locations

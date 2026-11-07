@@ -231,6 +231,20 @@ export async function getPublicCatalog(
                 };
               }
             }
+            if (definitionReady && spec.suppression) {
+              const privacy = await reader.privacy(spec, info.datasetId);
+              if (privacy !== "clear") {
+                definitionReady = false;
+                item = {
+                  ...item,
+                  state: privacy,
+                  reason:
+                    privacy === "failed"
+                      ? "Privacy protection could not be verified. Please try again."
+                      : "This measure is withheld across catalog locations because its accepted source contains protected cells. Publishing geographic totals or peer areas could reconstruct withheld values.",
+                };
+              }
+            }
             if (definitionReady) {
               if (selection.mode === "all") {
                 const probe = await reader.probe(spec, info.datasetId);
@@ -272,6 +286,17 @@ export async function getPublicCatalog(
                         reason: "Figures could not be read. Please try again.",
                       }
                     : selectedValues(spec, read.rows, item);
+                if (read.state === "available" && read.note) {
+                  item = {
+                    ...item,
+                    reason: [item.reason, read.note.reason].filter(Boolean).join(" "),
+                    state:
+                      hasAvailableValue(item.state) && read.note.partial ? "partial" : item.state,
+                    ...(hasAvailableValue(item.state) && read.note.coverage
+                      ? { coverage: read.note.coverage }
+                      : {}),
+                  };
+                }
                 if (
                   spec.table === "fact_fhsis_indicator" &&
                   item.unit.startsWith("percent") &&

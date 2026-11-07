@@ -1,6 +1,6 @@
 # Public unified dataset catalog implementation plan
 
-Status: Increments 1–3 complete; Increment 4 (barangay support and calculations) is next.
+Status: Increments 1–4 complete; Increment 5 (congressional district browsing) is next.
 Planning date: 2026-11-07.
 
 ## Resume instruction
@@ -187,7 +187,7 @@ Update this table when implementation begins. Record relevant commits/PRs, tests
 | 1. Inventory and capabilities | Complete (2026-11-07) | [Inventory and capability audit](UNIFIED_DATASET_CATALOG_INVENTORY.md): accepted sources, canonical measure families, geography matrix, previews, suppression and reconciliation constraints. Public read-only checks confirm BHW/NHFR/UUC figures; FHSIS remains unavailable; direct live population/poverty and database verification remain unknown. Validation and delivery recorded below. |
 | 2. Public catalog data layer | Complete (2026-11-07) | [Data contract](UNIFIED_DATASET_CATALOG_DATA_LAYER.md), `lib/catalog/`: six identities, fixed public indicator inventory, accepted-source adapters, typed availability/failure/suppression states, scope-safe destinations, overview counts/coverage/freshness. Existing pages retain their nullable helpers. Validation and delivery below. |
 | 3. Overview and PSGC through municipality/city | Complete (2026-11-07) | `/catalog` overview/cards, All versus National, real-parent PSGC navigation, scoped details, source dates and typed empty/failure states. URL, hierarchy, presentation and browser verification recorded below. |
-| 4. Barangay support and calculations | Not started | |
+| 4. Barangay support and calculations | Complete (2026-11-07) | Exact barangay BHW aggregates, NHFR attributed calculations and municipal attribution labels, UUC membership/qualification, scope-safe navigation and conservative cross-location suppression. Evidence below and in the data contract. |
 | 5. Congressional districts | Not started | |
 | 6. Details and portal integration | Not started | |
 | 7. End-to-end verification and delivery | Not started | |
@@ -270,3 +270,31 @@ Update this table when implementation begins. Record relevant commits/PRs, tests
 - Next: Increment 4. Add barangay capabilities and safe calculations according to the
   inventory. Extend query parsing/geography controls only alongside supported data readers;
   retain source-specific denominators, partial coverage and suppression behavior.
+
+### Increment 4 evidence and handoff — 2026-11-07
+
+- Increment 3 merged as PR #423 (`8d045d1b`). Branch: `feat/bhw-catalog-barangay` from that trunk.
+- Added barangay query state, real-parent navigation and supported BHW aggregates. NHFR uses
+  attributed facilities only, sums recorded beds and reports municipal attribution completeness;
+  null, wrong-level and wrong-parent assignments are excluded, with **Partial total** labels.
+  UUC membership is separate from qualification; unevaluable health qualification stays missing.
+  FHSIS, population, poverty and topic-training data remain unsupported at barangay level.
+- The canonical inventory stays at 110. No raw BHW rows, new source release, migration or external
+  map infrastructure. Existing aggregate rates remain published values, not averaged child rates.
+- Privacy probes withhold protected demographic/payer groups across all catalog scopes to prevent
+  subtraction across parent/peer locations. This is deliberately conservative; details and previews
+  use the same protected response. See the data contract for behavior and updated query bounds.
+- Tests cover complete/partial attribution, valid zeros, malformed values, unassigned geography,
+  no-source and read failures, truncation, UUC denominator/evaluability rules, unsupported levels,
+  source/area filters, cache bounds and protected parent/child responses. Full Vitest: 103 files,
+  1,369 passed / 11 optional cases skipped, with local PostgreSQL checks enabled. Lint passed
+  (one existing intentional fixture warning), TypeScript passed, and both the no-database and
+  seeded production builds under `/bhw-connect` passed. Nine catalog/portal-search browser
+  tests passed against the standalone production build; `git diff --check` passed.
+- Synthetic browser checks exercised national → region → province → city → barangay, reload/back,
+  scoped tables, keyboard controls and a 390px viewport. Temporary fixtures verified complete
+  versus partial NHFR attribution, UUC membership and an unevaluable health route; fixtures were
+  restored. Mobile axe found no violations, and the document had no horizontal overflow.
+- Live FHSIS load diagnosis and population/poverty verification remain pending. Synthetic values
+  do not establish live data completeness. The plan's next increment is congressional district
+  membership, non-overlapping aggregation and scope-preserving drill-down.

@@ -84,3 +84,28 @@ it("explains a fully empty selection and preserves scope when returning from det
   );
   expect(document.documentElement.textContent).toContain("0 facilities");
 });
+
+it("labels partial barangay totals and municipal attribution separately from service presence", () => {
+  const partial = {
+    ...dataset,
+    state: "partial" as const,
+    indicators: dataset.indicators.map((i) => ({
+      ...i,
+      state: "partial" as const,
+      reason: "Unassigned facilities are excluded.",
+      coverage: { label: "Municipal facilities with barangay attribution", covered: 8, total: 10 },
+    })),
+  };
+  const result = {
+    ...catalog([partial]),
+    selection: { mode: "psgc", level: "barangay", code: "0102801001" } as const,
+  };
+  const html = renderToStaticMarkup(<CatalogResults catalog={result} locationName="Village" />);
+  expect(html).toContain("Partial total");
+  expect(html).toContain("Municipal facilities with barangay attribution");
+  expect(html).toContain("8 of 10");
+  expect(html).toContain("0 facilities");
+  const detail = renderToStaticMarkup(<CatalogDetails catalog={result} dataset={partial} />);
+  expect(detail).toContain("Partial total");
+  expect(detail).toContain("8 of 10");
+});

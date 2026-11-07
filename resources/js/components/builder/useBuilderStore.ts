@@ -1150,6 +1150,20 @@ export function useBuilderStore(props: BuilderPageProps) {
     }
 
     /**
+     * A section's title edited in place (M221, `R-18d9f001`): {@link renameField}'s path for a section — set once and saved
+     * now through {@link commitSectionEdit}, so it is one PATCH and one undo entry, and a 409 or a refusal behaves as it does
+     * from the settings pane. A blank or unchanged title is not an edit; the server refuses a blank one anyway (`required`).
+     */
+    function renameSection(uid: Uid, label: string): void {
+        const section = findSection(uid);
+        const next = label.trim();
+        if (!section || next === '' || next === section.label) return;
+        section.label = next;
+        touch(uid, 'section');
+        flushCommit();
+    }
+
+    /**
      * Config keys of one question set as ONE edit (M185, `R-7418e6bd`) — the settings pane's grid lists and the Preview's
      * grid editing write through here, so both make the same PATCH and the same "Edit <label>" undo entry. The pane's edits
      * ride the debounce (a burst of keystrokes is one entry); the Preview's are each a finished edit and are saved `now`,
@@ -1793,6 +1807,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         commitReorder,
         touch,
         renameField,
+        renameSection,
         setFieldConfig,
         select,
         undo,

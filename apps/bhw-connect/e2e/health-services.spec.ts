@@ -1,12 +1,13 @@
 import { test, expect } from "@playwright/test";
 
+// The refreshed development copy contains synthetic total-breakdown reports.
+// Set to 0 only when running against an explicitly empty/unavailable fixture.
+const hasReports = process.env.BHW_E2E_FHSIS_HAS_DATA !== "0";
+
 test("health services is discoverable and drills down without borrowing census chrome", async ({
   page,
 }) => {
-  test.skip(
-    process.env.BHW_E2E_FHSIS_HAS_DATA !== "1",
-    "The committed synthetic seed has no FHSIS total-breakdown reports; use the populated fixture for this path.",
-  );
+  test.skip(!hasReports, "This path requires the populated synthetic fixture.");
   await page.goto("./");
   await page.getByRole("link", { name: "Health services dashboard", exact: true }).click();
   await expect(page).toHaveURL(/\/health-services$/);
@@ -42,7 +43,7 @@ test("health services rejects unsupported and unknown geographies", async ({ pag
 });
 
 test("an unavailable FHSIS release does not claim nationwide non-reporting", async ({ page }) => {
-  test.skip(process.env.BHW_E2E_FHSIS_HAS_DATA === "1", "This case uses the empty-report seed.");
+  test.skip(hasReports, "This case uses an explicitly empty-report fixture.");
   await page.goto("health-services");
   await expect(
     page.getByRole("status").filter({ hasText: "Health services data is not available" }),

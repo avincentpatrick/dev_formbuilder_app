@@ -22,7 +22,7 @@
 export type Crumb = { label: string; href?: string };
 
 /** The front door every trail starts from. */
-export const PORTAL_CRUMB: Crumb = { label: "Equity in Health", href: "/" };
+export const PORTAL_CRUMB: Crumb = { label: "iconnect", href: "/" };
 
 /** Section roots — also the first crumb a dynamic page prepends to its own trail. */
 export const BHW_CRUMB: Crumb = { label: "2025 BHW Census", href: "/bhw" };

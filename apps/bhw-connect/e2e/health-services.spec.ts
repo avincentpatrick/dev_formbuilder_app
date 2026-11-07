@@ -34,7 +34,11 @@ test("health services is discoverable and drills down without borrowing census c
 });
 
 test("health services rejects unsupported and unknown geographies", async ({ page }) => {
-  for (const path of ["health-services/barangay/0102801001", "health-services/region/unknown"]) {
+  for (const path of [
+    "health-services/unsupported/0102801001",
+    "health-services/region/unknown",
+    "health-services/barangay/unknown",
+  ]) {
     await page.goto(path);
     await expect(page.getByRole("heading", { name: "Page not found", exact: true })).toBeVisible();
   }
@@ -43,11 +47,20 @@ test("health services rejects unsupported and unknown geographies", async ({ pag
 test("an unavailable FHSIS release does not claim nationwide non-reporting", async ({ page }) => {
   test.skip(process.env.BHW_E2E_FHSIS_HAS_DATA === "1", "This case uses the empty-report seed.");
   await page.goto("health-services");
-  await expect(page.getByRole("status")).toContainText("Health services data is not available");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Health services data is not available" }),
+  ).toBeVisible();
   await expect(page.getByText("Not reported in 2025", { exact: true })).toHaveCount(0);
   await page
     .getByRole("navigation", { name: "Health services", exact: true })
     .getByRole("link", { name: "Methodology" })
     .click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Health services: methodology");
+});
+
+test("barangay search destinations open their municipality overview", async ({ page }) => {
+  for (const section of ["uuc-phc", "facilities", "health-services"]) {
+    await page.goto(`${section}/barangay/0102801001`);
+    await expect(page).toHaveURL(new RegExp(`/${section}/citymun/0102801$`));
+  }
 });

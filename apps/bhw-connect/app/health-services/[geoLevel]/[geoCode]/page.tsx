@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { AreaDashboard } from "@/components/health-services/area-dashboard";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
@@ -20,6 +20,13 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
 }
 export default async function HealthServicesArea({ params }: { params: Promise<Params> }) {
   const { geoLevel, geoCode } = await params;
+  if (geoLevel === "barangay") {
+    const barangay = await getGeoByCode(geoCode);
+    if (!barangay || barangay.geoLevel !== "barangay") notFound();
+    const ancestors = await getGeoAncestors(geoCode, "barangay");
+    if (!ancestors.citymun) notFound();
+    redirect(`/health-services/citymun/${ancestors.citymun.geoCode}`);
+  }
   const geo = await loadGeo(geoLevel, geoCode);
   if (!geo) notFound();
   const ancestors = await getGeoAncestors(geo.geoCode, geo.geoLevel);

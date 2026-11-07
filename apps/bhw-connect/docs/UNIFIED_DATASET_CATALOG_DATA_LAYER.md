@@ -250,3 +250,36 @@ The latter stop and fail closed at 10,000 records per municipality; aggregate ba
 at 100. Constituent composition is sequential with one shared reader and the existing four-job
 indicator pool, preventing parallel pools for every member. These are structural bounds, not
 live-server timing guarantees. Live mapping and source completeness still require operator data.
+
+## Details, portal and accepted-release refresh (Increment 6)
+
+The portal now renders the All-locations catalog directly. `/catalog` remains the canonical
+URL for scoped navigation and details; old dashboard URLs and global search remain available.
+District mapping is a secondary resource, not a dataset card. Profiling Status remains at its
+existing URL but is excluded from the inventory. Ingestion/history stays in the existing admin
+area, reached through Admin sign in; it is not mixed into public figures.
+
+Every counted measure has interpretation text in `measure-notes.ts`, with source dictionary
+numerator/denominator/workbook taking precedence for FHSIS. Details display source-specific
+release names and dates, recorded values and available numerator/denominator/interval attributes,
+reporting coverage, derivation and missing/withheld reasons. Unknown dates are never inferred.
+
+Release refresh is deliberate, not “latest timestamp wins”:
+
+1. The operator loads and validates the accepted source privately, using existing ingestion and
+   reconciliation rules, and refreshes its aggregates. A new NHFR snapshot uses a new slug/row.
+2. Update `dim_dataset.as_of_date` to the source reference date and `last_updated_at` to the
+   successful load/aggregate refresh time. Existing loaders do not all update that metadata;
+   an ingestion-batch timestamp alone is insufficient. Commit the accepted facts, aggregates
+   and metadata coherently before serving the release. No production load is performed here.
+3. For a replacement release, review `ACCEPTED_RELEASES` alongside `DATASET_SLUGS` and any
+   source-specific year/key filters and legacy helpers. Change the explicit selector in a PR;
+   loading another slug alone intentionally does not change public authority. Recheck geographic
+   reconciliation, units, dictionary and suppression before accepting it.
+4. The next request reads fresh source metadata and only that accepted dataset ID. Logical
+   dataset/measure identities stay fixed. `release-refresh.test.ts` simulates a selector change
+   and subsequent metadata/value refresh, verifying one NHFR card, six total identities and no
+   old-release values. Existing duplicate-scalar tests fail ambiguous records closed.
+
+The catalog does not add an ingestion system, automatically accept a release, or change a live
+source. Atomic load/aggregate refresh and operator data verification remain prerequisites.

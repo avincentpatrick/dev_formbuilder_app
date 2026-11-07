@@ -507,3 +507,35 @@ it("withholds protected measure groups across parent and child scopes to prevent
     values: [],
   });
 });
+
+it("preserves exact FHSIS source inputs while retaining legacy fallback and published rate", async () => {
+  const result = await getPublicCatalog(
+    area,
+    reader({
+      fact_fhsis_indicator: [
+        {
+          indicator_key: "fic",
+          breakdown: "total",
+          rate_pct: 81.23,
+          numerator: 11,
+          denominator: 14,
+          numerator_exact: 11.25,
+          denominator_exact: 13.85,
+        },
+        {
+          indicator_key: "anc4",
+          breakdown: "total",
+          rate_pct: 0,
+          numerator: 0,
+          denominator: 20,
+          numerator_exact: null,
+          denominator_exact: null,
+        },
+      ],
+    }),
+  );
+  expect(find(result, "fhsis.fic").values).toEqual([
+    { value: 81.23, numerator: 11.25, denominator: 13.85 },
+  ]);
+  expect(find(result, "fhsis.anc4").values).toEqual([{ value: 0, numerator: 0, denominator: 20 }]);
+});

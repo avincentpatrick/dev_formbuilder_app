@@ -41,6 +41,7 @@ export function columns(table: CatalogTable): string {
           ...(s.suppression ? [s.suppression] : []),
           ...(s.categoryColumn ? [s.categoryColumn] : []),
           ...(s.table === "agg_uuc_phc_criteria" ? ["n_listed"] : []),
+          ...(s.table === "fact_fhsis_indicator" ? ["numerator_exact", "denominator_exact"] : []),
         ]),
     ),
   ].join(",");

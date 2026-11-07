@@ -110,3 +110,29 @@ test("district mode clears PSGC selection and retains an empty or selected distr
   await expect(page).toHaveURL(/mode=all$/);
   await expect(page.getByTestId("catalog-scope")).toHaveText("All locations", { timeout: 10_000 });
 });
+
+test("home starts with the catalog and every available card has consistent details", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(page.getByRole("region", { name: "Catalog overview" })).toBeVisible();
+  const cards = page.locator("article");
+  await expect(cards.first()).toBeVisible();
+  const links = await cards
+    .locator("h2 a")
+    .evaluateAll((nodes) => nodes.map((n) => n.getAttribute("href")!));
+  expect(links.length).toBeGreaterThan(0);
+  expect(links.length).toBeLessThanOrEqual(6);
+  for (const href of links) {
+    await page.goto(href);
+    await expect(page.getByRole("table")).toBeVisible();
+    await expect(page.getByText("Accepted release:", { exact: false }).first()).toBeVisible();
+    await expect(page.getByRole("table")).not.toContainText("Definition unavailable.");
+    await page.getByRole("link", { name: "All datasets for this selection", exact: false }).click();
+    await expect(page.getByTestId("catalog-scope")).toHaveText("All locations", {
+      timeout: 10_000,
+    });
+  }
+  await page.getByRole("link", { name: "Congressional districts", exact: true }).click();
+  await expect(page.getByLabel("Congressional district", { exact: true })).toBeVisible();
+});

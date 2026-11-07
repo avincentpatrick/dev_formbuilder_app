@@ -35,9 +35,9 @@ test("portal searches all dataset destinations and supports keyboard selection",
   page,
 }) => {
   await page.goto("./");
-  const input = page.getByRole("combobox");
+  const input = page.locator("input[role=combobox]");
   await input.fill("Ilocos");
-  await expect(page.getByRole("option")).toHaveCount(17);
+  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(17);
   for (const place of places) {
     for (const section of ["place", "uuc-phc", "facilities", "health-services"]) {
       await expect(
@@ -46,7 +46,7 @@ test("portal searches all dataset destinations and supports keyboard selection",
     }
   }
   await input.fill(" Ilocos ");
-  await expect(page.getByRole("option")).toHaveCount(17);
+  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(17);
   await input.press("Escape");
   await expect(page.getByRole("listbox")).toHaveCount(0);
   await input.focus();
@@ -58,8 +58,8 @@ test("portal searches all dataset destinations and supports keyboard selection",
 for (const section of ["uuc-phc", "facilities", "health-services"]) {
   test(`${section} keeps place searches within its dataset`, async ({ page }) => {
     await page.goto(section);
-    await page.getByRole("combobox").fill("Ilocos");
-    await expect(page.getByRole("option")).toHaveCount(4);
+    await page.locator("input[role=combobox]").fill("Ilocos");
+    await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(4);
     await expect(page.getByRole("listbox")).not.toContainText("No profile data yet");
     await expect(
       page.locator(`[role=option] a[href$="/${section}/barangay/0102801001"]`),
@@ -83,10 +83,10 @@ test("search handles empty and failed responses on mobile", async ({ page }) => 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route("**/api/geo/search?*", (route) => route.fulfill({ json: { results: [] } }));
   await page.goto("./");
-  await page.getByRole("combobox").fill("Unknown");
+  await page.locator("input[role=combobox]").fill("Unknown");
   await expect(page.getByText("No matching places found.")).toBeVisible();
   await page.route("**/api/geo/search?*", (route) => route.fulfill({ status: 500, json: {} }));
-  await page.getByRole("combobox").fill("Retry");
+  await page.locator("input[role=combobox]").fill("Retry");
   await expect(
     page.getByText("Couldn't search — check your connection and try again."),
   ).toBeVisible();

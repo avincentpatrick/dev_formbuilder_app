@@ -47,6 +47,7 @@ export function Header() {
   // header is suppressed on all of them.
   if (
     pathname === "/" ||
+    pathname === "/catalog" ||
     pathname.startsWith("/profiling-status") ||
     pathname.startsWith("/uuc-phc") ||
     pathname.startsWith("/facilities") ||

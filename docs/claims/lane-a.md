@@ -16,7 +16,58 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M217`, `R-25dc7ded`, `R-dd2876de` and `R-df883cbf`: what the headers cover is written down and `nosniff` reaches the static files, a stale CI comment corrected, and an XLSForm export keeps translations that live only on choices (m217-headers-ci-choices) — BUILT AND HELD: PR #414 green, waiting for a merge point
+## Status: ACTIVE CLAIM — `M218`, `R-ffd296b1`, `R-20b1fe78` and `R-a06e5589`: a seeded form wide enough that the builder's spill reads can fail, the role-locator sweep measured, and the queue file cited by row instead of by line (m218-e2e-fixtures-citations)
+
+Taken 2026-11-07, on the user's *"we cannot stop developing other pending tasks just because of the backup setup"*. Branch `m218-e2e-fixtures-citations`, cut from origin/main at `36de8a83`, PR into main. Held green for a merge point (`D137`). No tester sees any of it, so no `VERSION` bump.
+Skipped on purpose, each for a reason:
+- `R-e6e340c0`: Monday's sitting edits the checklist it reads.
+- `R-7d0853f5`: its own text says a rule built today would pass over an empty set and names its trigger, the next open decision that names a row. There are zero open decisions today.
+- `R-f6eab58d`: the same missing link. An answered decision names its row only in prose.
+- `R-4b57090b`: its missing input is how long a real tab stays open, and only the box's access log can say. That is a read for Monday's sitting.
+Rows: `R-ffd296b1`, *"No seeded fixture projects to a builder control wide enough to overflow, so all four element-level spill reads on that page are green by FIXTURE rather than by design."*; `R-20b1fe78`, *"`getByRole('tablist')` and friends are viewport-dependent on the builder"*; `R-a06e5589`, *"`docs/pipeline.md` is cited BY LINE in at least two places"*. Grouped under `D13` as `D15` reads it, by the files each remedy edits: `R-ffd296b1` edits two non-hub files, `R-20b1fe78` edits none, and `R-a06e5589` is the one row on hubs.
+
+### Evidence verified
+**`R-ffd296b1`.** `tests/e2e/personalization-axe.spec.ts` holds the four reads: the pane switcher, the config pane, the centre control and the section strip. Its own comment records the measurement the row quotes (`Logic Notices Demo` projects three segments, `Community Health Survey` two). `PREVIEW_STRIP_MAX_SEGMENTS` is 7, and no spec opens a form above it: **held**.
+**`R-20b1fe78`.** The row's one concrete case is **gone**. `builder-axe.spec.ts`'s four tab loops count `locator('[role="tab"]')`, which counts the DOM rather than the accessibility tree, and each runs after `showBuilderPane(page, 'settings')` and a `toBeVisible()` on the first tab, so none can loop zero times and pass. `M118`'s tablist count uses the DOM form too.
+**`R-a06e5589`.** Of the two citations the row names, `R-4346557c`'s is gone and `D38`'s `docs/pipeline.md:50` remains. ⚠️ **It was wrong the day it was written, measured:** at `7b45369f`, the commit that wrote it, line 50 held `R-4328a4d9`. The row it meant, the one quoting `docs/api-specification.md:63`, was `R-fcfc1f52`, at line 75. A search of the trunk finds no other line citation into `docs/pipeline.md` outside the released claim ledger.
+
+### Premise verified
+**`R-ffd296b1`.**
+- `deploy.ps1` runs no seeder, so a form added to `E2eSeeder` never reaches the testing site. `DemoSeeder` is not touched.
+- The row's own caution holds: six specs open `Community Health Survey` by title, and `builder-axe.spec.ts` scans its config panel. The new content therefore goes in a NEW form, not an existing one.
+- ⚠️ **"All four" may be an overstatement, still to measure.** The pane switcher, the config pane's Requiredness control and the centre tabs carry fixed labels, so a fixture may not move them. The section strip carries section names, so a fixture certainly moves it. The build measures which reads a wide fixture can turn red, and says so rather than claiming four.
+- ⚠️ **To check before it lands:** any spec that counts the forms list, search results or analytics shifts by one.
+
+**`R-20b1fe78`.** The sweep the row asks for was run today, over every spec and `tests/e2e/support/`:
+- No role-based `.count()`, `.all()` or stored role locator is looped over.
+- The four negative role counts on builder panes, two in `builder-axe.spec.ts` and two in `builder-preview-authoring.spec.ts`, each follow a positive `toBeFocused()` or `toBeVisible()` in the same pane, so a hidden pane fails loudly.
+- **One silent shape is left, and it is not role-based.** `personalization-axe.spec.ts`'s pane-switcher read sits inside `if (await strip.isVisible())`, so it is skipped without a word whenever the switcher is off screen. That read is one of `R-ffd296b1`'s four, so it is fixed there, and this row edits no file.
+
+**`R-a06e5589`.** `scripts/citation-liveness-lint.php` still excludes `docs/claims/**` from tier 1, and nothing else reads a line citation into `docs/pipeline.md`. `scripts/pipeline-lint.php` already reads `docs/claims/decisions.md`, so it can hold the rule without a new reader.
+
+### Remedy verdict
+**`R-ffd296b1`: works for the strip; the rest is to be measured.**
+- A new e2e-only form with enough always-visible sections, under long enough names, to overflow the strip without `flex-wrap`.
+- A second form above `PREVIEW_STRIP_MAX_SEGMENTS`, for the select branch, which has no end-to-end case.
+- The pane-switcher read loses its silent `if`.
+
+**`R-20b1fe78`: the sweep is the remedy, and it is done above.** The row closes on that census.
+
+**`R-a06e5589`: works.**
+- `D38` cites `R-fcfc1f52` instead of a line.
+- A new `pipeline-lint` rule refuses a line citation into `docs/pipeline.md` from any tracked file except the generated file itself and the released ledgers. It is proved red by a committed mutant.
+
+Files: `database/seeders/E2eSeeder.php`, `tests/e2e/personalization-axe.spec.ts`, `scripts/pipeline-lint.php`, `tests/Feature/Docs/PipelineLintControlsTest.php`.
+Shared artefacts taken: `docs/claims/decisions.md` (one sentence of `D38`), `docs/feature-backlog.md`, `docs/pipeline.md`.
+Paired files taken: none.
+Namespaces spent: `M218`. `state.php` prints a lower next free number because `M215`, `M216` and `M217` are held and unreleased.
+Prediction:
+- E2E goes red first. The gate I most expect to be wrong about is a count of the seeded forms somewhere in the specs.
+- The strip's spill read goes red on the new form with `flex-wrap` removed. The other three reads probably do not, and the build record will say so.
+- Pest does not move. PHPStan scans `database`, so the seeder could move it, but I expect it clean.
+- `pipeline-lint` goes red on a planted citation and green once `D38` is repointed.
+
+## HELD — `M217`, `R-25dc7ded`, `R-dd2876de` and `R-df883cbf`: what the headers cover is written down and `nosniff` reaches the static files, a stale CI comment corrected, and an XLSForm export keeps translations that live only on choices (m217-headers-ci-choices) — BUILT AND HELD: PR #414 green, waiting for a merge point
 
 Taken 2026-11-07, on the user's "go". Branch `m217-headers-ci-choices`, cut from origin/main at `b2990273`, PR into main. Held green for a merge point (`D137`): Monday's after #412 and #413 if it is green in time, otherwise the next. `R-e6e340c0`, the next row in the line, is skipped on purpose because Monday's sitting edits the checklist it reads; the rows between are tracker tooling no tester sees.
 Rows: `R-25dc7ded`, *"Five of seven paths on the testing site carry none of the four app security headers, and nothing anywhere says whether that is intended."*; `R-dd2876de`, *"`.github/workflows/ci.yml:84` asserts in the present tense that `DEPLOY_ENABLED` is unset"*; `R-df883cbf`, *"An XLSForm export loses every translation that lives only on choices."* Grouped under `D13`: no non-hub file is shared, and `R-dd2876de` is the one row on a hub (`ci.yml`).

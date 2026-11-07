@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { PORTAL_CRUMB, FACILITIES_CRUMB } from "@/lib/nav/breadcrumbs";
 import { getChildGeos, getGeoAncestors, getGeoByCode } from "@/lib/db/geo";
@@ -86,7 +86,11 @@ export default async function FacilitiesAreaPage({ params }: { params: Promise<P
 
   // A barangay page would restate one row of the city/municipality's facility list, which already
   // names every facility and the barangay it is in. That is where the drill-down ends.
-  if (geo.geoLevel === "barangay") notFound();
+  if (geo.geoLevel === "barangay") {
+    const ancestors = await getGeoAncestors(geo.geoCode, geo.geoLevel);
+    if (!ancestors.citymun) notFound();
+    redirect(`/facilities/citymun/${ancestors.citymun.geoCode}`);
+  }
 
   const isCitymun = geo.geoLevel === "citymun";
   const [counts, children, types, facilities, ancestors, barangays] = await Promise.all([

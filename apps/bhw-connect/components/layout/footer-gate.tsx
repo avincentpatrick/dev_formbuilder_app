@@ -14,6 +14,7 @@ export function FooterGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   if (
     pathname === "/" ||
+    pathname === "/catalog" ||
     pathname.startsWith("/profiling-status") ||
     pathname.startsWith("/uuc-phc") ||
     pathname.startsWith("/facilities") ||

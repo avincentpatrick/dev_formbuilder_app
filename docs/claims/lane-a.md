@@ -16,7 +16,7 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M218`, `R-ffd296b1`, `R-20b1fe78` and `R-a06e5589`: a seeded form wide enough that the builder's spill reads can fail, the role-locator sweep measured, and the queue file cited by row instead of by line (m218-e2e-fixtures-citations)
+## Status: ACTIVE CLAIM — `M218`, `R-ffd296b1`, `R-20b1fe78` and `R-a06e5589`: a seeded form wide enough that the builder's spill reads can fail, the role-locator sweep measured, and the queue file cited by row instead of by line (m218-e2e-fixtures-citations) — BUILT AND HELD: PR #429 green, waiting for a merge point
 
 Taken 2026-11-07, on the user's *"we cannot stop developing other pending tasks just because of the backup setup"*. Branch `m218-e2e-fixtures-citations`, cut from origin/main at `36de8a83`, PR into main. Held green for a merge point (`D137`). No tester sees any of it, so no `VERSION` bump.
 Skipped on purpose, each for a reason:
@@ -66,6 +66,28 @@ Prediction:
 - The strip's spill read goes red on the new form with `flex-wrap` removed. The other three reads probably do not, and the build record will say so.
 - Pest does not move. PHPStan scans `database`, so the seeder could move it, but I expect it clean.
 - `pipeline-lint` goes red on a planted citation and green once `D38` is repointed.
+
+### Build record (2026-11-08, not merged)
+PR #429, head `ace1043a`, run 42388268910: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green on its own workflow. Every claimed file was edited. The trunk was merged in once, because jongsky25's three BHW-only PRs landed during the build; only `apps/` moved.
+
+**Proof:**
+- **P8** went red on exactly one line, `D38`'s, before the repoint. After it: 16 rule groups, 454 rows, 1065 files read.
+- **Six `pipeline-lint` mutants through `scripts/mutate.php`, 6 of 6 CAUGHT,** each restored by byte: the call removed, a pattern that never matches, the lookbehind dropped, the folder made compulsory, the backlog not read, and the refusal removed. Each ran against the P8 cases only, with `--filter=P8`.
+- **Three e2e mutants, each rebuilt and run at all three widths, and each red at all three with its own message:**
+  - the strip's `flex-wrap` set to `nowrap`;
+  - the segment ceiling raised to 8;
+  - the pane switcher hidden.
+- **Local runs:** `personalization-axe.spec.ts` builder cases 9 of 9. Pest: `PipelineLintControlsTest`, `E2eSeederIdempotencyTest` and `DatabaseSeederSmokeTest`, 91 passed. PHPStan on the host 0. Pint clean. Citation ledger 16 of 16.
+
+**How the prediction fared:**
+- **Wrong:** E2E did not go red first, and no spec counts the seeded forms. CI's E2E was green on the first push.
+- **Right in substance, wrong in mechanism:** the fixture was the thing to get wrong, but not by count. Five long NAMES overflowed only at 375px, because a segment shrinks to its longest word. The in-test check, which takes the guard off for one read, caught that at tablet and desktop (`Received: 0`). The fixture became seven sections with one long word each, and the bar widths measured were 335, 730 and 1160px.
+- **Right:** the other reads do not move with a fixture. The pane switcher and centre tabs carry fixed labels, and the config pane's read is `R-db28b120`'s, which stays queued.
+- **Right:** Pest and PHPStan did not move.
+- **Right:** P8 went red on the one live citation and green after.
+- **Not predicted:** the generator's corpus leaves out the backlog, so P8 names it explicitly. And `E2eSeeder` keeps an old copy of a changed fixture in the local database.
+
+**The merge point owes:** merge the trunk in, regenerate the line in a tree with `vendor/`, green again, then merge after #412, #413 and #414, or at a later merge point. Nothing on the box, and nothing for a tester to check. Release this claim then.
 
 ## HELD — `M217`, `R-25dc7ded`, `R-dd2876de` and `R-df883cbf`: what the headers cover is written down and `nosniff` reaches the static files, a stale CI comment corrected, and an XLSForm export keeps translations that live only on choices (m217-headers-ci-choices) — BUILT AND HELD: PR #414 green, waiting for a merge point
 

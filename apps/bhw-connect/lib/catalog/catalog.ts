@@ -108,7 +108,13 @@ function selectedValues(
     const result: PublicValue = { value };
     if (spec.categoryColumn) result.label = text(row[spec.categoryColumn]);
     for (const [key, column] of Object.entries(spec.attributes ?? {})) {
-      result[key as "numerator" | "denominator" | "ciLow" | "ciHigh"] = number(row[column]);
+      const exact =
+        spec.table === "fact_fhsis_indicator" && (key === "numerator" || key === "denominator")
+          ? row[`${key}_exact`]
+          : undefined;
+      result[key as "numerator" | "denominator" | "ciLow" | "ciHigh"] = number(
+        exact ?? row[column],
+      );
     }
     return [result];
   });

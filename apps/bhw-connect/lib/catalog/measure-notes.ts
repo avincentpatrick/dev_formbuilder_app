@@ -75,6 +75,12 @@ export function derivationNote(indicator: CatalogIndicator): string | null {
     return "District calculation: sum of disjoint accepted reporting units. Missing units remain disclosed as partial coverage.";
   if (indicator.aggregation === "ratio")
     return "District calculation: sum of compatible numerators divided by sum of denominators, multiplied by 100. Municipal percentages are not averaged.";
+  if (indicator.id.startsWith("fhsis.") && !indicator.id.startsWith("fhsis.workforce.")) {
+    if (indicator.id === "fhsis.anc8")
+      return "Source period: Q3–Q4 2025; not comparable with full-year 4ANC.";
+    if (/^fhsis\.(water_|sanitation_)/.test(indicator.id)) return "Source period: Q4 2025.";
+    return "Source period: annual 2025.";
+  }
   if (indicator.id.startsWith("nhfr."))
     return "Barangay figures include only facilities attributed to that barangay. Unassigned or invalidly attributed facilities remain in municipal totals; zero does not establish absence of all facilities.";
   if (indicator.id.startsWith("uuc.route."))

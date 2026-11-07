@@ -52,3 +52,10 @@ describe("catalog presentation", () => {
     );
   });
 });
+
+it("does not label a partial-period service rate as a partial total", async () => {
+  const { isPartialTotal } = await import("./presentation");
+  const item = { ...dataset.indicators[0], state: "partial" as const };
+  expect(isPartialTotal({ ...dataset, id: "fhsis" }, item)).toBe(false);
+  expect(isPartialTotal({ ...dataset, id: "bhw" }, { ...item, aggregation: "sum" })).toBe(true);
+});

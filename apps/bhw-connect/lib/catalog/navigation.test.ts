@@ -33,3 +33,30 @@ describe("catalog URL state", () => {
     expect(parseCatalogParams(params)).toBeNull();
   });
 });
+
+it("round trips a district's partial-city barangay and clears geography when modes change", () => {
+  const selection = {
+    mode: "district",
+    districtCode: "quezon-city-1st",
+    citymunCode: "137404",
+    barangayCode: "137404001",
+  } as const;
+  const url = new URL(catalogHref(selection, "nhfr"), "https://example.test");
+  expect(parseCatalogParams(Object.fromEntries(url.searchParams))).toEqual({
+    selection,
+    dataset: "nhfr",
+  });
+  expect(parseCatalogParams({ mode: "district" })).toEqual({
+    selection: { mode: "district", districtCode: "" },
+    dataset: null,
+  });
+  expect(catalogHref({ mode: "all" })).not.toMatch(/district|citymun|barangay/);
+  for (const params of [
+    { mode: "district", district: "d1", location: "citymun:01" },
+    { mode: "psgc", district: "d1", location: "region:01" },
+    { mode: "district", barangay: "01001001" },
+    { mode: "district", district: "d1", barangay: "01001001" },
+    { mode: "district", district: ["d1", "d2"] },
+  ])
+    expect(parseCatalogParams(params)).toBeNull();
+});

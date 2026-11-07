@@ -4,6 +4,7 @@ import { catalogHref } from "@/lib/catalog/navigation";
 import { hasAvailableValue } from "@/lib/catalog/summary";
 import {
   formatValue,
+  isPartialTotal,
   HEADLINES,
   omissionReason,
   previewIndicators,
@@ -135,13 +136,9 @@ export function CatalogResults({
                   <div key={indicator.id}>
                     <dt className="text-sm text-muted">{indicator.label}</dt>
                     <dd className="text-xl font-semibold">
-                      {indicator.state === "partial" &&
-                        (dataset.id === "population" ||
-                          (dataset.id === "nhfr" &&
-                            catalog.selection.mode === "psgc" &&
-                            catalog.selection.level === "barangay")) && (
-                          <span className="block text-xs font-medium">Partial total</span>
-                        )}
+                      {isPartialTotal(dataset, indicator) && (
+                        <span className="block text-xs font-medium">Partial total</span>
+                      )}
                       {formatValue(indicator.values[0], indicator.unit)}
                     </dd>
                     {indicator.values[0].denominator != null && (
@@ -311,9 +308,9 @@ export function CatalogDetails({
                   <td className="min-w-48 p-3 text-xs text-muted">
                     {dataset.sources.find((s) => s.slug === indicator.sourceSlug)?.sourceName ??
                       "Source details unavailable"}
-                    {indicator.state === "partial" &&
-                      dataset.id === "nhfr" &&
-                      indicator.coverage && <p className="font-medium">Partial total</p>}
+                    {isPartialTotal(dataset, indicator) && (
+                      <p className="font-medium">Partial total</p>
+                    )}
                     {indicator.coverage && (
                       <p className="mt-2">
                         {indicator.coverage.label}:{" "}

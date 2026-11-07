@@ -35,6 +35,13 @@ export function LocationControls({
         >
           National figures
         </Link>
+        <Link
+          prefetch={false}
+          href={catalogHref({ mode: "district", districtCode: "" })}
+          className="rounded-md border border-border px-3 py-2 text-sm underline"
+        >
+          Congressional districts
+        </Link>
         <span className="text-sm text-muted">Browse by PSGC</span>
       </div>
       {geography.ancestors.length > 0 && (
@@ -102,7 +109,7 @@ export function LocationControls({
         <Link href="/districts" className="underline underline-offset-4">
           Congressional district mapping
         </Link>{" "}
-        remains available separately.
+        includes source receipts and correction history.
       </p>
     </section>
   );

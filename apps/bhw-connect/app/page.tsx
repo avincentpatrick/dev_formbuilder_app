@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { DatasetCard } from "@/components/portal/dataset-card";
 import { meridianUrl } from "@/lib/meridian-url";
+import { IconnectLogo } from "@/components/branding/iconnect-logo";
+import { InnovationEndorsement } from "@/components/branding/innovation-endorsement";
 
 // The link back to Meridian, which shares this address on the testing box (Meridian's decision D179).
 const MERIDIAN_HOME = meridianUrl("/");
@@ -10,7 +12,7 @@ const MERIDIAN_HOME = meridianUrl("/");
 // correct for the BHW dataset pages — doesn't get appended to the portal, which
 // sits above any single dataset.
 export const metadata: Metadata = {
-  title: { absolute: "Equity in Health · Data & innovation" },
+  title: { absolute: "iconnect · Health data & innovation" },
   description:
     "A repository of open, publicly available health datasets and innovations — no individual-level data.",
 };
@@ -21,16 +23,14 @@ export const metadata: Metadata = {
 export default function Portal() {
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-10 px-4 py-8 sm:px-6 sm:py-12">
-      {/* Hero — the single Equity in Health mark lives here, centered. (An
-          earlier slim upper-left header mark was removed as redundant with this
-          one, per user feedback #11.) */}
-      <section className="flex flex-col items-center gap-4 pt-4 text-center">
-        <span className="equity-mark lg" role="img" aria-label="Equity in Health" />
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Equity in Health</h1>
-        <p className="text-lg text-muted">Data &amp; innovation</p>
+      <section className="flex flex-col items-center gap-6 py-6 text-center sm:py-10">
+        <h1 className="w-full max-w-md">
+          <span className="sr-only">iconnect</span>
+          <IconnectLogo className="iconnect-wordmark" />
+        </h1>
         <p className="max-w-2xl text-muted">
-          A repository of open, publicly available health datasets and innovations — a shared front
-          door to the work of the Equity in Health Section.
+          Open health data, connected insights, and innovations — explore the evidence shaping
+          healthier communities.
         </p>
       </section>
 
@@ -83,11 +83,8 @@ export default function Portal() {
       </section>
 
       {/* Attribution */}
-      <footer className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-border pt-6 text-sm text-muted">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="equity-mark sm" aria-hidden="true" />
-          <span>An Equity in Health Section innovation.</span>
-        </div>
+      <footer className="iconnect-footer mt-auto flex flex-wrap items-center justify-between gap-6 pt-6 text-sm text-muted">
+        <InnovationEndorsement />
         <div className="flex flex-wrap items-center gap-4">
           {MERIDIAN_HOME && (
             <a href={MERIDIAN_HOME} className="underline underline-offset-2 hover:text-accent">

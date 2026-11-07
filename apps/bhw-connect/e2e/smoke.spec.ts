@@ -7,7 +7,7 @@ import { test, expect } from "@playwright/test";
  * request that changes this app (.github/workflows/ci.yml).
  */
 test("home -> explore -> filter to barangay -> export CSV", async ({ page }) => {
-  // The BHW dashboard now lives at /bhw; "/" is the Equity in Health portal.
+  // The BHW dashboard now lives at /bhw; "/" is the iconnect portal.
   await page.goto("bhw");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Barangay Health Workers");
 

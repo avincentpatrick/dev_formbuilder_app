@@ -4,7 +4,7 @@ import type { Crumb } from "@/lib/nav/breadcrumbs";
 /**
  * The site's one breadcrumb rendering, shared by every section.
  *
- * Every trail starts at the Equity in Health portal ("/"), so any page — a BHW
+ * Every trail starts at the iconnect portal ("/"), so any page — a BHW
  * Census sub-page, a UUC for PHC area profile, an admin screen — always shows a
  * route back to the front door. Before this existed, the census section ("/bhw"
  * and its sub-pages) had no on-screen way back to the portal at all: the shared

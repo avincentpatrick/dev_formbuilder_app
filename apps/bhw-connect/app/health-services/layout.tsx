@@ -1,3 +1,4 @@
+import { InnovationEndorsement } from "@/components/branding/innovation-endorsement";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -23,7 +24,7 @@ export default function HealthServicesLayout({ children }: { children: ReactNode
               Methodology
             </Link>
             <Link href="/" className="underline">
-              ← Portal
+              ← iconnect
             </Link>
           </nav>
         </div>
@@ -40,6 +41,9 @@ export default function HealthServicesLayout({ children }: { children: ReactNode
             Sources and methodology
           </Link>
         </p>
+        <div className="mx-auto max-w-5xl px-4 pb-6">
+          <InnovationEndorsement />
+        </div>
       </footer>
     </div>
   );

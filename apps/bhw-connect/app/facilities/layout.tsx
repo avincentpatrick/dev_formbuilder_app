@@ -1,3 +1,5 @@
+import { IconnectMark } from "@/components/branding/iconnect-logo";
+import { InnovationEndorsement } from "@/components/branding/innovation-endorsement";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -24,7 +26,7 @@ function SectionHeader() {
           href="/facilities"
           className="order-1 flex items-center gap-2 text-lg font-semibold tracking-tight"
         >
-          <span className="equity-mark sm" aria-hidden="true" />
+          <IconnectMark />
           <span>Health facilities</span>
           <span className="rounded-full bg-accent-subtle px-2 py-0.5 text-xs font-medium text-accent">
             Sep 2026
@@ -34,7 +36,7 @@ function SectionHeader() {
           href="/"
           className="order-2 ml-auto shrink-0 rounded-md px-3 py-2 text-sm text-muted hover:bg-surface hover:text-foreground lg:order-3 lg:ml-0"
         >
-          ← Portal
+          ← iconnect
         </Link>
         <nav
           aria-label="Health facilities"
@@ -63,14 +65,14 @@ function SectionFooter() {
     <footer className="mt-auto border-t border-border">
       <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-6 text-sm text-muted sm:px-6">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <span className="equity-mark sm" aria-hidden="true" />
+          <InnovationEndorsement />
           <span>
             Source: DOH National Health Facility Registry (nhfr.doh.gov.ph), snapshot as of
             September 2026, retrieved 5 September 2026. Places, not people: contact details in the
             source are not published here.
           </span>
           <Link href="/" className="underline hover:text-accent">
-            Equity in Health portal
+            iconnect home
           </Link>
         </div>
       </div>

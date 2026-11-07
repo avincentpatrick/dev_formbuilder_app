@@ -1,3 +1,4 @@
+import { InnovationEndorsement } from "@/components/branding/innovation-endorsement";
 import Link from "next/link";
 import { getActiveDataset } from "@/lib/db/dataset";
 
@@ -33,13 +34,11 @@ export async function Footer() {
             {dataset?.license ?? "CC BY 4.0"}
           </a>
           .{" "}
-          {dataset?.lastUpdatedAt && (
-            <span>Last updated {formatDate(dataset.lastUpdatedAt)}.</span>
-          )}
+          {dataset?.lastUpdatedAt && <span>Last updated {formatDate(dataset.lastUpdatedAt)}.</span>}
         </p>
         <div className="flex flex-wrap gap-x-4 gap-y-1">
           <Link href="/" className="underline underline-offset-2 hover:text-accent">
-            Equity in Health portal
+            iconnect home
           </Link>
           <Link href="/methodology" className="underline underline-offset-2 hover:text-accent">
             Methodology
@@ -55,10 +54,7 @@ export async function Footer() {
           </Link>
         </div>
         <p>BHW Connect is an independent public-interest project, not affiliated with DOH.</p>
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          <span className="equity-mark sm" aria-hidden="true" />
-          <span>An Equity in Health Section innovation</span>
-        </div>
+        <InnovationEndorsement />
       </div>
     </footer>
   );

@@ -80,6 +80,28 @@ Status and ingestion/history remain separate from the six-card catalog.
 
 ## Deployed public verification
 
-Pending the repository's main-branch CI and authorized self-hosted deployment. This gate is not
-inferred from green pull-request checks. Record the deployment run, observed public paths and
-remaining live-data limits here before marking the plan delivered.
+[Deployment run 42388001630](https://github.com/avincentpatrick/dev_formbuilder_app/actions/runs/42388001630)
+completed successfully. Its log confirms release `c92f143aab8b99cee99aac952208a11d9a59bd2a`
+is live at 2026-11-07 15:48 UTC, following backup, the additive FHSIS exact-value migration,
+service swap and health check. Meridian took its no-maintenance-window path. This is observed
+deployment evidence, not an inference from a workflow's event SHA.
+
+Unauthenticated Playwright checks at [staging](https://staging.pitahc.gov.ph/bhw-connect)
+at 15:48–15:49 UTC passed:
+
+- Home renders All locations with BHW, NHFR, UUC-PHC, Population and Poverty cards.
+  Every available card opens its source/definition table and returns to All without losing scope.
+- National, Region I, Ilocos Norte and Adams show supported values. Poverty appears for Adams;
+  barangay Adams (Pob.) shows BHW, NHFR and UUC-PHC, with municipal-only sources omitted.
+- Abra's at-large district shows BHW, NHFR and UUC-PHC. District selection survives reload;
+  mapping provenance/gaps and the source-history link remain accessible.
+- FHSIS details explain unavailable data and show no fabricated table. Its source load remains
+  the operator step above; the schema deployment alone does not make facts available.
+- Mobile home and NHFR details have zero axe violations and no page overflow. The NHFR national
+  facility count matches the existing public facilities dashboard. This corroborates the accepted
+  public output, not independent source-workbook validation.
+
+Population and poverty are now verified as publicly available in supported selections. Their
+production database/source reconciliation remains unverified directly. No login, administrative
+read, production write or source load was used for these checks. The final verification PR changes
+only tests and this delivery record; the runtime build verified here is unchanged.

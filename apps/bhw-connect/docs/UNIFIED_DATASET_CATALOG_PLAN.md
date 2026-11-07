@@ -1,6 +1,6 @@
 # Public unified dataset catalog implementation plan
 
-Status: Increments 1–6 complete; Increment 7 verification is in progress, awaiting deployed public checks.
+Status: All seven increments complete. Runtime release `c92f143a` deployed and publicly verified on 2026-11-07; final verification PR #428 records delivery.
 Planning date: 2026-11-07.
 
 ## Resume instruction
@@ -190,7 +190,7 @@ Update this table when implementation begins. Record relevant commits/PRs, tests
 | 4. Barangay support and calculations | Complete (2026-11-07) | Exact barangay BHW aggregates, NHFR attributed calculations and municipal attribution labels, UUC membership/qualification, scope-safe navigation and conservative cross-location suppression. Evidence below and in the data contract. |
 | 5. Congressional districts | Complete (2026-11-07) | Accepted membership/provenance, disjoint municipal/leaf units, conflict rejection, scope-safe drill-down and explicit calculation rules. Evidence below; source limitations and query bounds in the data contract. |
 | 6. Details and portal integration | Complete (2026-11-07) | Home-page catalog, shared scoped content, definitions and derivation for all measures, accepted-release refresh contract and regression test. Validation below. |
-| 7. End-to-end verification and delivery | In progress | [Verification report](UNIFIED_DATASET_CATALOG_VERIFICATION.md): local full-flow checks complete; final checks and deployed public verification pending. |
+| 7. End-to-end verification and delivery | Complete (2026-11-07) | [Verification report](UNIFIED_DATASET_CATALOG_VERIFICATION.md): full local checks, synthetic source-to-browser validation, privacy/query/mobile checks and successful deployed public verification. Final delivery PR #428. |
 
 ### Increment 1 evidence and handoff — 2026-11-07
 
@@ -368,4 +368,11 @@ Update this table when implementation begins. Record relevant commits/PRs, tests
   (0 pending), and the prefixed no-data production build passed. The runtime code is unchanged
   from Increment 6's separately verified seeded standalone build. Full browser suite: 17 passed,
   one conditional skipped; populated FHSIS case separately passed with temporary synthetic facts.
-- Deployed public evidence pending before delivery is marked complete.
+- Deployment run [42388001630](https://github.com/avincentpatrick/dev_formbuilder_app/actions/runs/42388001630)
+  succeeded; logs confirm `c92f143a` live at 15:48 UTC. Public home, five available dataset details,
+  National → region → province → municipality → barangay, district reload/provenance, FHSIS
+  unavailability, mobile axe and NHFR legacy-count comparison passed. Full observations and
+  remaining operator/source limits are in the verification report.
+- All planned increments are delivered. No next catalog increment remains. FHSIS facts require
+  the separate operator load in FHSIS_LOAD.md; source reconciliation/coverage limitations remain
+  explicit and are not replaced with estimates. PR #428 contains only final tests and records.

@@ -16,7 +16,7 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M217`, `R-25dc7ded`, `R-dd2876de` and `R-df883cbf`: what the headers cover is written down and `nosniff` reaches the static files, a stale CI comment corrected, and an XLSForm export keeps translations that live only on choices (m217-headers-ci-choices)
+## Status: ACTIVE CLAIM — `M217`, `R-25dc7ded`, `R-dd2876de` and `R-df883cbf`: what the headers cover is written down and `nosniff` reaches the static files, a stale CI comment corrected, and an XLSForm export keeps translations that live only on choices (m217-headers-ci-choices) — BUILT AND HELD: PR #414 green, waiting for a merge point
 
 Taken 2026-11-07, on the user's "go". Branch `m217-headers-ci-choices`, cut from origin/main at `b2990273`, PR into main. Held green for a merge point (`D137`): Monday's after #412 and #413 if it is green in time, otherwise the next. `R-e6e340c0`, the next row in the line, is skipped on purpose because Monday's sitting edits the checklist it reads; the rows between are tracker tooling no tester sees.
 Rows: `R-25dc7ded`, *"Five of seven paths on the testing site carry none of the four app security headers, and nothing anywhere says whether that is intended."*; `R-dd2876de`, *"`.github/workflows/ci.yml:84` asserts in the present tense that `DEPLOY_ENABLED` is unset"*; `R-df883cbf`, *"An XLSForm export loses every translation that lives only on choices."* Grouped under `D13`: no non-hub file is shared, and `R-dd2876de` is the one row on a hub (`ci.yml`).
@@ -60,6 +60,26 @@ Shared artefacts taken: `docs/deployment-infrastructure.md` (§8.3's `.htaccess`
 Paired files taken: none.
 Namespaces spent: `M217`. `state.php` prints a lower next free number because `M215` and `M216` are held and unreleased; both are claimed here.
 Prediction: Pest goes red first on the new export cases, and on the judge's floor when it reads 3 required headers. PHPStan moves only through the exporter, and I expect it to stay clean. Pint stays clean. The gate I most expect to be wrong about is `citation-liveness-lint`: the backlog cites `XlsformExporter.php` by line, and a grid edit moves those lines. On the box, `/robots.txt` and `/favicon.ico` carry `nosniff` after the deploy; I expect `/up` and the 404 to as well, and that half is a guess.
+
+### Build record (2026-11-07, not merged)
+PR #414, head `f3261aee`, run 42354426773: 8 of 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green on its own workflow. Every claimed file was edited; `docs/feature-backlog.md` also took two citations rewritten to symbols and notes on `R-0cf250fa` and the grid-and-level importer row.
+
+**Proof:**
+- 17 of 17 mutants caught, each with its own `CAUGHT` line and restored by byte: 11 in the exporter, 5 in the judge, 1 in `public/.htaccess`.
+- The judge's refusal of a path list naming no real probe was shown separately, from a scratch copy (exit 2), because the ordinary tests turn red under that mutant whether the refusal exists or not.
+- All eight export cases failed before the fix, and `XlsformImportTest` pins the round trip back in.
+- The new judge run against the live site before any deploy reported `nosniff` absent on `/robots.txt` and `/favicon.ico` (exit 1).
+
+**How the prediction fared so far:**
+- Right: `citation-liveness-lint` was the one to expect trouble from. Moving the exporter's lines put `:283` and `:433` on blank lines, 18 against a ceiling of 16. Both closed rows now cite the symbol.
+- Right: Pest went red first on the export cases, and CI's PHPStan and Pint are clean.
+- Wrong in its reason: the judge's 3-header floor never went red by itself, because that test was edited in the same pass. It was proved by the `nosniff-policy-dropped` mutant instead.
+- Not predicted: `mutate.php` aborts on an empty replacement, so three mutants came back with no verdict and had to run again.
+- Still open: the box half of the prediction.
+
+⚠️ **Local PHPStan cannot judge this:** it reports the same 51 phantom `undefined property` errors on the unchanged tree, and none is in a file this diff touches. CI's run is the reading.
+
+**The merge point owes:** merge the trunk in and regenerate the line in a tree with `vendor/`, green again, then merge after #412 and #413 (or at the next merge point). After the deploy, re-run the judge against the live site and expect exit 0, read `/up` and the 404, and count the header's lines on `/login`. Release this claim with those readings. The rows are already closed on the branch; if the live read fails, `R-25dc7ded` reopens.
 
 ## HELD — `M216`, `R-5f180437` and `R-4bda047a`: the testing site's backups survive a dead disk, and the runbook can rebuild them (m216-testing-backups) — BUILT AND HELD: PR #413 green, waiting for the next merge point; the box's half follows that merge
 

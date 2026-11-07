@@ -16,7 +16,52 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M216`, `R-5f180437` and `R-4bda047a`: the testing site's backups survive a dead disk, and the runbook can rebuild them (m216-testing-backups) — BUILT AND HELD: PR #413 green, waiting for the next merge point; the box's half follows that merge
+## Status: ACTIVE CLAIM — `M217`, `R-25dc7ded`, `R-dd2876de` and `R-df883cbf`: what the headers cover is written down and `nosniff` reaches the static files, a stale CI comment corrected, and an XLSForm export keeps translations that live only on choices (m217-headers-ci-choices)
+
+Taken 2026-11-07, on the user's "go". Branch `m217-headers-ci-choices`, cut from origin/main at `b2990273`, PR into main. Held green for a merge point (`D137`): Monday's after #412 and #413 if it is green in time, otherwise the next. `R-e6e340c0`, the next row in the line, is skipped on purpose because Monday's sitting edits the checklist it reads; the rows between are tracker tooling no tester sees.
+Rows: `R-25dc7ded`, *"Five of seven paths on the testing site carry none of the four app security headers, and nothing anywhere says whether that is intended."*; `R-dd2876de`, *"`.github/workflows/ci.yml:84` asserts in the present tense that `DEPLOY_ENABLED` is unset"*; `R-df883cbf`, *"An XLSForm export loses every translation that lives only on choices."* Grouped under `D13`: no non-hub file is shared, and `R-dd2876de` is the one row on a hub (`ci.yml`).
+
+### Evidence verified
+**`R-25dc7ded`.** Measured from outside on 2026-11-07, unchanged from 2026-09-19: `/` and `/login` carry all four; `/up`, `/robots.txt`, `/favicon.ico`, a hashed asset and a 404 carry none. `AppSecurityHeaders`'s docblock holds its per-group mount and says nothing about the consequence: **held**.
+**`R-dd2876de`.** `ci.yml:84` reads as quoted: **held**. `gh variable list`: `DEPLOY_ENABLED` is `true`, set 2026-09-17T14:49:23Z, so the sentence is false.
+**`R-df883cbf`.** `XlsformExporter::extraLanguages()` collects from section labels, field labels and hints, and validation messages, and from nothing inside `config`: **held at source**, not yet executed; the first test written runs it red. `FieldConversionServiceTest`'s workaround comment reads as the row says.
+
+### Premise verified
+**`R-25dc7ded`.**
+- The row understates itself by one path: `/sw.js`, a PHP route outside every group, carries none either. It sets its own type.
+- `docs/deployment-infrastructure.md` §8.3 calls `public/.htaccess` *"the stock, unmodified Laravel file"*, and `scripts/staging-headers-judge.php`'s header says it sets no header. Putting the line there makes both false, so both change.
+- §8.3's *"could not be proved by any gate this repository has"* was about a rewrite exemption. A response header is different: the nightly judge reads it from outside, so this line can be proved.
+- `R-0cf250fa` (*"`.htaccess` is exercised by no gate"*) stays open for the rewrite rules. It gets a note, because the judge now reads one line of that file.
+- BHW Connect is untouched: §8.4 measures that `ProxyPass` resolves before `.htaccess`.
+
+**`R-dd2876de`.** *"It is the only in-tree statement on the subject"* was **false when filed**: `deploy.yml` has said it is set since `M98`, two days earlier. What is left is one stale line, not an unanswerable one.
+
+**`R-df883cbf`.**
+- **The row understates itself: collecting the language is not enough for a grid.** `emitLikertMatrix` and `emitMatrix` write a question per row or cell with `label` only, so a row's or column's translation would get a column and an empty cell. The labels have to be written as well.
+- **The row overstates one source.** It lists levels, but a cascade level has no column in the workbook at all, not even its base label, so collecting its languages would add an empty column. Levels are left out, and the existing importer row (*"multilingual matrix, or a translated cascade LEVEL"*) gets a correction, because it says they round-trip out.
+- Reachable today: an imported workbook writes option translations, and `UpdateFieldRequest` accepts them. **Live** holds.
+
+### Remedy verdict
+**`R-25dc7ded`: works, measured before writing.** The decision it asks for:
+- `nosniff` belongs on static responses, because it is the one of the four that applies to a file.
+- It goes in `public/.htaccess`, not the vhost: tracked, it deploys itself, it needs no Apache restart, and that restart would take BHW Connect down too.
+- **It blocks nothing, measured on the live site today:** JS `text/javascript`, CSS `text/css`, fonts `font/woff2`, icons `image/png` and `image/x-icon`, `application/json`, `text/plain`; those plus PHP are every file type under `public/`.
+- **It cannot take the site down:** the row at §4's permissions records `AllowOverride All` on the document root, `Header` needs the same `FileInfo` override the working `RewriteRule`s already use, and `mod_headers` is loaded because the vhost's own `Header always set` runs.
+- The other three do not belong there: framing protects a session a static file does not have, and `Referrer-Policy`'s value is already the browsers' default.
+
+⚠️ **Not measured, and it decides what the judge requires:** how the vhost hands PHP to `mod_proxy_fcgi`. §4 calls it a balancer handler, which would put `/up` and the 404 under `.htaccess` too, but no document shows the line. So the judge requires the header on the two static probes only, which is what the decision is about, and the other paths are read at the merge point and recorded.
+
+**`R-dd2876de`: works.** Past tense with the date, on the same line, so no `ci.yml:` citation moves.
+
+**`R-df883cbf`: no remedy stated beyond the diagnosis; the implied one is half of it**, per the premise above.
+
+Files: `public/.htaccess`, `app/Http/Middleware/AppSecurityHeaders.php`, `scripts/staging-headers-judge.php`, `tests/Feature/Docs/StagingHeadersJudgeTest.php`, `tests/fixtures/staging-headers/**`, `tests/Feature/Http/AppSecurityHeadersTest.php`, `.github/workflows/ci.yml`, `app/Services/Xlsform/XlsformExporter.php`, `tests/Feature/Xlsform/XlsformExportTest.php`, `tests/Feature/Forms/FieldConversionServiceTest.php`, `VERSION`, `database/data/releases.json`.
+Shared artefacts taken: `docs/deployment-infrastructure.md` (§8.3's `.htaccess` and crawl-protection sentences; #413 edits other parts of it), `docs/xlsform-interop-spec.md`, `docs/PRD.md` (one disposition), `docs/feature-backlog.md`, `docs/pipeline.md`.
+Paired files taken: none.
+Namespaces spent: `M217`. `state.php` prints a lower next free number because `M215` and `M216` are held and unreleased; both are claimed here.
+Prediction: Pest goes red first on the new export cases, and on the judge's floor when it reads 3 required headers. PHPStan moves only through the exporter, and I expect it to stay clean. Pint stays clean. The gate I most expect to be wrong about is `citation-liveness-lint`: the backlog cites `XlsformExporter.php` by line, and a grid edit moves those lines. On the box, `/robots.txt` and `/favicon.ico` carry `nosniff` after the deploy; I expect `/up` and the 404 to as well, and that half is a guess.
+
+## HELD — `M216`, `R-5f180437` and `R-4bda047a`: the testing site's backups survive a dead disk, and the runbook can rebuild them (m216-testing-backups) — BUILT AND HELD: PR #413 green, waiting for the next merge point; the box's half follows that merge
 
 Taken 2026-11-07. Branch `m216-testing-backups`, cut from origin/main at `b65c97e8`, PR into main. Held green for the next merge point (`D137`), with `M215`'s #412. The box's half follows that merge, because it needs the merged code, so the rows close at the close-out and not on the branch.
 Rows: `R-5f180437`, *"The first-boot runbook and the checklist set up none of the database backup §5 prescribes."*; `R-4bda047a`, *"The testing server's database backups sit on the same machine as the database: no off-box copy, no write-ahead-log archiving and no restore drill."* Taken together under `D13` exception #8, on `D212`'s answer.

@@ -1,6 +1,6 @@
 # Public unified dataset catalog implementation plan
 
-Status: Increment 1 complete; Increment 2 is next. Public catalog implementation pending.
+Status: Increments 1–2 complete; Increment 3 is next. Public catalog UI pending.
 Planning date: 2026-11-07.
 
 ## Resume instruction
@@ -185,7 +185,7 @@ Update this table when implementation begins. Record relevant commits/PRs, tests
 | Increment | Status | Evidence and remaining work |
 | --- | --- | --- |
 | 1. Inventory and capabilities | Complete (2026-11-07) | [Inventory and capability audit](UNIFIED_DATASET_CATALOG_INVENTORY.md): accepted sources, canonical measure families, geography matrix, previews, suppression and reconciliation constraints. Public read-only checks confirm BHW/NHFR/UUC figures; FHSIS remains unavailable; direct live population/poverty and database verification remain unknown. Validation and delivery recorded below. |
-| 2. Public catalog data layer | Not started | |
+| 2. Public catalog data layer | Complete (2026-11-07) | [Data contract](UNIFIED_DATASET_CATALOG_DATA_LAYER.md), `lib/catalog/`: six identities, fixed public indicator inventory, accepted-source adapters, typed availability/failure/suppression states, scope-safe destinations, overview counts/coverage/freshness. Existing pages retain their nullable helpers. Validation and delivery below. |
 | 3. Overview and PSGC through municipality/city | Not started | |
 | 4. Barangay support and calculations | Not started | |
 | 5. Congressional districts | Not started | |
@@ -212,3 +212,22 @@ Update this table when implementation begins. Record relevant commits/PRs, tests
   `BHW_DATA_SOURCE=none` all passed. Dependencies installed with `npm ci`; lockfile unchanged.
   Database-dependent skipped tests and browser E2E were not run for this documentation-only
   increment. HTTP observations above are public-page smoke checks, not database verification.
+
+### Increment 2 evidence and handoff — 2026-11-07
+
+- Increment 1 merged as PR #421 (`c8e0c979`), after green required checks and a successful
+  latest deployment. Implementation branch: `feat/bhw-catalog-data-layer` from that trunk.
+- Added `getPublicCatalog`, static source/indicator definitions, per-request public aggregate
+  readers, and pure overview summarization. Added a typed dataset metadata read while keeping
+  legacy nullable helpers and their source-selection semantics.
+- See `UNIFIED_DATASET_CATALOG_DATA_LAYER.md` for the initial counted inventory, coverage meaning,
+  query bounds, unsupported scopes and the exact state/freshness rules. No UI or migration.
+- FHSIS live-load diagnosis remains pending. Tests use synthetic fixtures, not production facts.
+- Next: Increment 3, overview and PSGC browsing through municipality/city. Measure All-locations
+  summary latency; implement hierarchy exceptions and URL state, using the explicit public states.
+- Validation: lint passed (one existing intentional base-path fixture warning; changed files
+  also checked with scoped ESLint); TypeScript passed; full Vitest suite passed, 98 files /
+  1,334 tests with 16 skipped, including 30 new focused tests. The final FHSIS above-100 note
+  regression was also rerun. Production-style build passed with `/bhw-connect` and
+  `BHW_DATA_SOURCE=none`; `git diff --check` passed. No new runtime route/UI to browser-test;
+  database-dependent cases remain skipped locally and CI runs its development database checks.

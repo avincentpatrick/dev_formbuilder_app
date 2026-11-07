@@ -13791,6 +13791,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `InlineLabelEdit` serves it, through a `renameSection` beside `renameField`. **Live.** Filed by `M150`.
   **Tier: during-testing.**
 
+- ✅ **CLOSED BY `M223` (2026-11-08) — ****`nit` · `E2eSeederIdempotencyTest` checks the `releases` table's order against the notes file's, but reads the table with no order.**
+  Found 2026-11-08 by `M221` and `M220`, whose pull requests went red on it.
+  - `Release::query()->pluck('version')` carries no `ORDER BY`, and the case compared it with `toBe()` against the file's order.
+  - Red in CI three times: #432 (newest note 0.17.4, run 42393462799 and its re-run) and #433 (0.18.0, run 42396170296). Red locally on #434's branch (0.18.1). Green on #414 (0.17.2) and #431 (0.17.3).
+  - The product is not affected: `WhatsNew::releases()` sorts by `version_compare` itself. Why the rows came back in that order was not established, and the fix does not need it to be.
+  - Filed by `M223`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M223` (2026-11-08), on its branch.**
+  - Both lists are now sorted newest first by `version_compare` before they are compared. That still checks the same versions, all of them and no others.
+  - With #434's notes file swapped in, the old assertion was red and the new one is green.
+  - A mutant that makes `releases:sync` skip one release is CAUGHT.
+
 - ✅ **CLOSED BY `M151` (2026-10-09) — ****`major` · On a form whose questions carry a place within their section — every XLSForm import — a drag reorders the
   builder's list but not what respondents, the paper and the export see.** Found by `M151` while planning `R-2baef8ea`.
   `XlsformImportParser::assignSequences()` numbers each question within its section, and `XlsformImporter.php` stores it as

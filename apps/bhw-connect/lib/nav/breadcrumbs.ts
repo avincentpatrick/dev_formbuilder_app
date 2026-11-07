@@ -92,6 +92,7 @@ const FACILITIES_TRAILS: Record<string, Crumb[]> = {
 };
 
 const STATIC_TRAILS: Record<string, Crumb[]> = {
+  "/catalog": [{ label: "Dataset catalog" }],
   "/health-services": [HEALTH_SERVICES_CRUMB],
   "/health-services/methodology": [HEALTH_SERVICES_CRUMB, { label: "Methodology" }],
   ...BHW_TRAILS,

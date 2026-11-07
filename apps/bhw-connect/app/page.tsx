@@ -35,6 +35,24 @@ export default function Portal() {
         </p>
       </section>
 
+      <section
+        aria-label="Unified dataset catalog"
+        className="rounded-xl border border-border bg-surface p-5 text-center"
+      >
+        <h2 className="text-xl font-semibold">Browse datasets by location</h2>
+        <p className="mt-2 text-sm text-muted">
+          See available measures, coverage and source dates together, from national figures to
+          cities and municipalities.
+        </p>
+        <Link
+          href="/catalog"
+          prefetch={false}
+          className="mt-4 inline-block rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white"
+        >
+          Open dataset catalog →
+        </Link>
+      </section>
+
       <section aria-label="Global search" className="flex flex-col items-center gap-3">
         <h2 className="text-xl font-semibold">Search across datasets</h2>
         <p className="max-w-2xl text-center text-sm text-muted">

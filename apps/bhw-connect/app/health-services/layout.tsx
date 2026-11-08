@@ -42,7 +42,7 @@ export default function HealthServicesLayout({ children }: { children: ReactNode
       </div>
       <footer className="border-t border-border">
         <p className="mx-auto max-w-5xl px-4 py-6 text-sm text-muted">
-          Source: Department of Health, FHSIS 2025 selected programme workbooks, retrieved on 7
+          Source: Department of Health, FHSIS 2025 selected programme workbooks, retrieved in
           November 2026. Eight-visit antenatal care covers Q3–Q4; water and sanitation cover Q4.{" "}
           <Link href="/health-services/methodology" className="underline">
             Sources and methodology

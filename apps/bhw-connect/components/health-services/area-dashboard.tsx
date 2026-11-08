@@ -189,6 +189,14 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
                 <tr key={i.indicator_key} className="border-b border-border align-top">
                   <th scope="row" className="p-3 font-medium">
                     {i.label}
+                    {i.indicator_key.startsWith("morb_") && i.reported && (
+                      <Link
+                        className="mt-2 block text-sm underline"
+                        href={`/health-services/morbidity/${i.indicator_key}/${geo.geoCode}`}
+                      >
+                        View age and sex case counts
+                      </Link>
+                    )}
                     <details className="mt-2 font-normal text-muted">
                       <summary className="cursor-pointer">Definition and source</summary>
                       <p className="mt-2">Numerator: {i.numerator_def}</p>
@@ -242,6 +250,26 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
           annual rates are withheld because the source adds quarterly populations into the annual
           denominator. Visit counts are retained. These sources cover provinces/HUCs and selected
           cities, not every municipality.
+        </p>
+      )}
+
+      {area.indicators.some((i) => i.program_area === "vital_statistics") && (
+        <p className="text-sm text-muted">
+          Vital statistics distinguish live births from deliveries. Adolescent birth rates are per
+          1,000 source estimated population in the stated age group; infant mortality is per 1,000
+          live births, and maternal mortality ratios are per 100,000 live births. The workbook’s
+          percent headings do not describe these scales. Direct/indirect and resident/nonresident
+          maternal deaths are separate source groups.
+        </p>
+      )}
+      {area.indicators.some((i) => i.program_area === "morbidity") && (
+        <p className="text-sm text-muted">
+          Morbidity covers cumulative January–December case reports, not unique patients. Region
+          XII’s May report is missing. The source counts blank submitted cells as zero; a zero does
+          not prove complete reporting. Do not add overlapping ICD categories. Rates are per 100,000
+          population; regional and national population denominators were not supplied. Provincial
+          rows use the companion Province workbook. Open a disease’s age and sex link for its
+          detailed counts.
         </p>
       )}
 

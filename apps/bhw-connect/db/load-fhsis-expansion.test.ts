@@ -6,6 +6,7 @@ import {
   MORBIDITY_DEFINITIONS,
   MORBIDITY_AGES,
   ORAL_HEALTH_DEFINITIONS,
+  MATERNAL_ORAL_DEFINITIONS,
   NCD_DEFINITIONS,
   SENIOR_NCD_DEFINITIONS,
   FAMILY_PLANNING_DEFINITIONS,
@@ -26,6 +27,7 @@ function fixture(programme = "core") {
     ncd: NCD_DEFINITIONS,
     "ncd-senior": SENIOR_NCD_DEFINITIONS,
     "oral-health": ORAL_HEALTH_DEFINITIONS,
+    "oral-maternal": MATERNAL_ORAL_DEFINITIONS,
     "vital-statistics": VITAL_STATISTICS_DEFINITIONS,
     demographics: DEMOGRAPHICS_DEFINITIONS,
     "combined-delivery": COMBINED_DELIVERY_DEFINITIONS,
@@ -52,9 +54,9 @@ function fixture(programme = "core") {
       geo_level: "national",
       indicator_key: d.indicator_key,
       breakdown: "total",
-      numerator_exact: "12.5",
-      denominator_exact: "100",
-      rate_pct: "12.5",
+      numerator_exact: programme === "oral-maternal" ? "12" : "12.5",
+      denominator_exact: programme === "oral-maternal" ? null : "100",
+      rate_pct: programme === "oral-maternal" ? null : "12.5",
       over_100: false,
       source_file: d.source_workbook,
       source_sheet: "Annual",
@@ -64,6 +66,33 @@ function fixture(programme = "core") {
   };
 }
 describe("FHSIS expansion boundary", () => {
+  it("accepts count-only pregnant oral measures without changing the earlier oral batch", () => {
+    const bundle = fixture("oral-maternal");
+    expect(() => validateExpansion(bundle)).not.toThrow();
+    expect(bundle.definitions).toHaveLength(4);
+    expect(bundle.definitions.every((d: { unit: string }) => d.unit === "count")).toBe(true);
+    const earlier = new Set(
+      ORAL_HEALTH_DEFINITIONS.map((d: { indicator_key: string }) => d.indicator_key),
+    );
+    expect(
+      bundle.definitions.every((d: { indicator_key: string }) => !earlier.has(d.indicator_key)),
+    ).toBe(true);
+    expect(() => validateExpansion({ ...bundle, programme_set: "oral-health" })).toThrow(
+      "reviewed mapping",
+    );
+  });
+  it("rejects invented pregnant oral rates, sex breakdowns and quarterly rows", () => {
+    for (const patch of [
+      { rate_pct: "0.3" },
+      { denominator_exact: "4000" },
+      { breakdown: "female" },
+      { source_sheet: "Qtr1" },
+    ]) {
+      const bundle = fixture("oral-maternal");
+      Object.assign(bundle.indicators[0], patch);
+      expect(() => validateExpansion(bundle)).toThrow("annual age counts only");
+    }
+  });
   it("accepts senior annual measures as a separate batch without changing earlier NCD mappings", () => {
     const bundle = fixture("ncd-senior");
     expect(() => validateExpansion(bundle)).not.toThrow();

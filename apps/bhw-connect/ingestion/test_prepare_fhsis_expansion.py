@@ -5,9 +5,26 @@ from pathlib import Path
 from collections import defaultdict, Counter
 import openpyxl
 from prepare_fhsis import FILES
-from prepare_fhsis_expansion import ExpansionBuilder, senior_ncd_specifications, maternal_specifications, demographic_specifications, convert_excel_percentage, attach_composite_denominator
+from prepare_fhsis_expansion import ExpansionBuilder, maternal_oral_specifications, senior_ncd_specifications, maternal_specifications, demographic_specifications, convert_excel_percentage, attach_composite_denominator
 
 class MappingTests(unittest.TestCase):
+    def test_pregnant_oral_uses_age_counts_and_does_not_import_coverage(self):
+        with tempfile.TemporaryDirectory() as folder:
+            (Path(folder)/'2. Completed 2 Visits.xlsx').touch()
+            specs=maternal_oral_specifications(Path(folder))
+            row=[None]*113;row[92]=4000
+            b=object.__new__(ExpansionBuilder);b.indicators=[];b.missing=Counter()
+            for s in specs:
+                self.assertFalse(s['sex'])
+                n=s['n'];row[n-1]=12;row[n]=0.3
+                row[n-4:n-1]=[2,4,6]
+                b.indicator({},row,s['key'],n,s['d'],s['rate'])
+                for age,cols in zip(['10-14','15-19','20-49'],s['ages']):
+                    b.indicator({},row,s['key'],*cols,breakdown=age)
+            self.assertEqual(len(b.indicators),16)
+            self.assertEqual([r['numerator_exact'] for r in b.indicators],['12','2','4','6']*4)
+            self.assertTrue(all(r['denominator_exact'] is None and r['rate_pct'] is None for r in b.indicators))
+
     def test_senior_annual_uses_annual_columns_and_distinct_denominators(self):
         with tempfile.TemporaryDirectory() as folder:
             (Path(folder)/'1b. NCD Meds Senior Citizens_nofml.xlsx').touch()

@@ -1,4 +1,4 @@
-import { CENSUS_ACCREDITATION_ID } from "./census-accreditation";
+import { isCensusProfileRate } from "./census-accreditation";
 import type { ColorBin } from "@/lib/charts/color-scale";
 import { getDatasetMap } from "./definitions";
 import { prototypeIndicators, type MapChoice, type MapPayload } from "./prototype";
@@ -20,8 +20,8 @@ export function datasetMapExport(
   const navigationOnly = data.valueSupport === "navigation-only";
   const income = choice.dataset === "lgu-income-class";
   const declaredAccreditation = choice.dataset === "bhw-stepzero-2026" && choice.indicator === STEPZERO_ACCREDITATION_ID;
-  const censusAccreditation = choice.dataset === "bhw-2025" && choice.indicator === CENSUS_ACCREDITATION_ID;
-  const accreditation = declaredAccreditation || censusAccreditation;
+  const censusRate = choice.dataset === "bhw-2025" && isCensusProfileRate(choice.indicator);
+  const accreditation = declaredAccreditation || censusRate;
   const fixed = accreditation || income || choice.dataset === "psa-sae-poverty-2023" ||
     choice.dataset === "bhw-profiling-status-2026";
   return {
@@ -30,7 +30,7 @@ export function datasetMapExport(
     selection: { ...choice },
     indicator: { id: metric.id, label: metric.label, unit: metric.unit,
       period: metric.period, denominator: metric.denominator,
-      confidenceLevel: censusAccreditation ? 0.95 : choice.dataset === "psa-sae-poverty-2023" ? 0.9 : null },
+      confidenceLevel: censusRate ? 0.95 : choice.dataset === "psa-sae-poverty-2023" ? 0.9 : null },
     source: { title: data.source, date: data.date, license: data.license,
       attribution: definition.attribution },
     disclosure: definition.disclosure,
@@ -58,7 +58,7 @@ export function datasetMapExport(
       ciLow: navigationOnly ? null : row.ciLow ?? null,
       ciHigh: navigationOnly ? null : row.ciHigh ?? null,
       note: row.note ?? null,
-      ...(censusAccreditation ? { smallSample: row.smallSample === true } : {}),
+      ...(censusRate ? { smallSample: row.smallSample === true } : {}),
       geometry: shapeCodes === null ? "not-checked" : shapeCodes.includes(row.code) ? "available" : "missing",
     })),
   };

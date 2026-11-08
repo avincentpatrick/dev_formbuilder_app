@@ -768,3 +768,27 @@ production build passed. React review confirmed bounded parallel reads, unchange
 lifecycle cleanup, and accessible table/legend alternatives outside the hidden canvas.
 All 31 map browser cases passed on the final build, including rendered Census geometry,
 small-sample legend, profile denominator, Wilson bounds and JSON download semantics.
+
+## Census training-topic maps (8 November 2026)
+
+All 44 named training topics already registered in the catalog are now selectable within
+the independent Census map. Each uses `agg_training` from the active `bhw-2025` release,
+with the exact `topic_slug` filter on both child and parent reads. The source contract in
+`ingestion/build_aggregates.sql` uses `n_trained / n_total`, rounded to two decimals, and
+stored 95% Wilson intervals. The denominator is all validated profiles in that area.
+
+The shared Census percentage adapter preserves valid source values and intervals, including
+reported zero. It rejects missing, duplicate or inconsistent rows and zero denominators;
+it never fills missing topic rows with zero or substitutes accreditation percentages.
+Fixed breaks, fewer-than-30-profile styling/notes and independently reported parent rates
+carry through the map, table, fullscreen and JSON/PNG exports. Unknown topics and barangay
+requests remain unsupported. No course-year interpretation is inferred from the 2025
+Census reporting period, and no personal training records are queried.
+
+Validation: all 44 topic filters tested on both query scopes, plus invalid-topic/geography,
+source-field separation, zero/missing, export and audit cases. Full database-backed Vitest:
+1,610 passed, 11 skipped. Lint (existing fixture warning), typecheck, migration lint and
+prefixed no-data build passed. Actual production row coverage remains a post-deployment
+check; historical boundary acceptance and disclosure gates are unchanged.
+All 32 map browser cases passed, including training-topic switching, missing rows,
+profile denominator, 2025 period and topic-specific JSON download.

@@ -785,3 +785,34 @@ test("Census accreditation preserves profile denominator, Wilson intervals and s
   expect(data.parentMeasure).toMatchObject({ kind: "rate", value: 25 });
   expect(data.rows[0]).toMatchObject({ value: 33.33, ciLow: 6.15, ciHigh: 79.23, smallSample: true });
 });
+
+test("Census training topic changes retain their own rates, period and exports", async ({ page }) => {
+  const requests: string[] = [];
+  await page.route("**/api/dataset-map?**", route => {
+    const indicator = new URL(route.request().url()).searchParams.get("indicator")!;
+    requests.push(indicator);
+    const value = indicator.endsWith("basic_life_support") ? 25 : 75;
+    return route.fulfill({ json: { state: "available", rows: [
+      { code: "01", name: "Synthetic training region", value, ciLow: value - 10, ciHigh: value + 10,
+        smallSample: false, note: "Published Census percentage; 100 validated profiles." },
+      { code: "02", name: "Unreported training region", value: null, ciLow: null, ciHigh: null },
+    ], total: null, parentRate: value, area: "Philippines", childLevel: "region", source: "Synthetic Census",
+    date: "2025-12-31", license: "Test only", geometryUrl: "/bhw-connect/geo/regions.json" } });
+  });
+  await page.goto("map?dataset=bhw-2025&indicator=bhw.training.basic_life_support");
+  await expect(page.getByText(/Reported area rate: 25%/)).toBeVisible();
+  await page.getByLabel("BHW Census 2025 indicator", { exact: true }).selectOption("bhw.training.dengue");
+  await expect(page.getByText(/Reported area rate: 75%/)).toBeVisible();
+  await expect(page.getByText(/Denominator: Validated BHW Census profiles/)).toBeVisible();
+  await page.getByText(/Complete area table/).click();
+  await expect(page.getByRole("row", { name: /Unreported training region Not reported/ })).toBeVisible();
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download map data (JSON)" }).click();
+  const stream = await (await downloaded).createReadStream();
+  const chunks = []; for await (const chunk of stream!) chunks.push(chunk);
+  const data = JSON.parse(Buffer.concat(chunks).toString());
+  expect(data.indicator).toMatchObject({ id: "bhw.training.dengue", period: "2025", confidenceLevel: 0.95 });
+  expect(data.parentMeasure).toMatchObject({ kind: "rate", value: 75 });
+  expect(data.total).toBeNull();
+  expect(requests).toEqual(["bhw.training.basic_life_support", "bhw.training.dengue"]);
+});

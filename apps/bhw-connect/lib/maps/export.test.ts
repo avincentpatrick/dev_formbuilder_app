@@ -46,3 +46,13 @@ it("exports a declared parent rate separately from totals with its readable deno
   expect(result.legend.method).toBe("fixed");
   expect(result.indicator.denominator).toContain("All LGU-declared BHWs");
 });
+
+it("exports a topic-specific Census training rate with its profile denominator and Wilson level", () => {
+  const choice = { ...initialMapChoice("bhw-2025"), indicator: "bhw.training.basic_life_support" };
+  const result = datasetMapExport(choice, { ...data, total: null, parentRate: 75 }, [], null);
+  expect(result.indicator).toMatchObject({ label: "Basic Life Support", period: "2025", confidenceLevel: 0.95 });
+  expect(result.indicator.denominator).toContain("Validated BHW Census profiles");
+  expect(result.parentMeasure).toMatchObject({ kind: "rate", value: 75 });
+  expect(result.total).toBeNull();
+  expect(result.legend.method).toBe("fixed");
+});

@@ -58,3 +58,27 @@ PMTiles still has its separate `scripts/validate-map-hosting.mjs` probe for rang
 GeoJSON check neither replaces that probe nor provides a representative licensed basemap
 archive. Actual PMTiles rendering, range delivery, glyphs and sprites remain outstanding.
 Server/Apache and shared `ops/` changes remain with the operator under the working agreement.
+
+## PMTiles probe hardening (8 November 2026)
+
+The separate `validate-map-hosting.mjs` probe now requires a prefixed archive URL with
+asset and release directories, for example `/bhw-connect/maps/RELEASE/base.pmtiles`.
+It refuses `latest`, credentials, query parameters and fragments before opening files or
+making requests. The supplied local file remains the byte-comparison reference; a path
+name alone does not prove the archive's release provenance.
+
+Each tested range requires one positive integer `max-age`, `public` and `immutable`,
+without `private`, `no-cache`, `no-store` or duplicate age directives. ETags must be
+quoted strong validators, stable across all ranges and unchanged on the conditional 304.
+Oversized reads are cancelled and reader locks are released. MIME, identity encoding,
+exact range offsets and local-byte agreement remain mandatory.
+
+The report explicitly retains `publication_ready: false`, with archive structure and
+licensing untested as well as rendering and performance. The header check is only a
+PMTiles v3 signature check, not a tile-directory or content verifier. Synthetic header
+fixtures used by automated tests are not representative basemaps. No archive was
+published and no actual host or server setting changed in this increment.
+
+Validation: 22 PMTiles probe cases and 1,535 full database-backed tests passed (11 skipped).
+Lint (existing fixture warning), typecheck, migration lint and prefixed no-data build passed.
+Browser tests were not rerun: only offline delivery tooling and documentation changed.

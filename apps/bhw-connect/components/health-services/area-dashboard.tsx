@@ -272,6 +272,16 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
         </p>
       )}
 
+      {area.indicators.some((i) => i.indicator_key.startsWith("oral_pregnant_")) && (
+        <p className="text-sm text-muted">
+          Pregnant-women oral-health counts use the cohort confirmed in the 2025 annual report,
+          despite a conflicting senior-citizen workbook heading. Ages 10–14, 15–19 and 20–49 are
+          reported separately. Coverage rates are withheld because the annual denominator sums
+          quarterly population estimates. Missing quarterly entries mean annual counts do not
+          establish complete reporting in every quarter.
+        </p>
+      )}
+
       {area.indicators.some((i) => i.program_area === "vital_statistics") && (
         <p className="text-sm text-muted">
           Vital statistics distinguish live births from deliveries. Adolescent birth rates are per

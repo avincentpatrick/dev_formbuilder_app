@@ -29,10 +29,10 @@ Qtr1–Qtr4 populations. The displayed source percentages use that sum, so they 
 as annual population coverage without clarification. These 16 rates and denominators are withheld;
 visit counts are preserved. No replacement denominator or recomputed rate is supplied.
 
-The final block of `2. Completed 2 Visits.xlsx` (columns 93–113) has conflicting labels: a senior
-citizen title, an under-one population denominator and age groups 10–14, 15–19 and 20–49. Its four
-measures are withheld entirely until the source owner identifies the cohort. They are not assumed
-to be pregnancy services or relabelled as infant/senior care.
+The final block of `2. Completed 2 Visits.xlsx` (columns 93–113) is now corroborated as pregnant
+women by the annual report, despite its senior-citizen heading. Its four count-only measures are
+prepared separately; see [pregnant oral-health preparation](FHSIS_MATERNAL_ORAL_LOAD.md).
+Its annual coverage rates remain withheld because the denominator sums quarterly populations.
 
 Both sheets report the same 142-area hierarchy, but some source PSGCs point to same-named places
 elsewhere: Quirino, Aurora, Quezon and Rizal in the infant file, and Caraga in the two-visit file.

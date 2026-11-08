@@ -36,6 +36,12 @@ export const SENIOR_NCD_DEFINITIONS = JSON.parse(
 export const ORAL_HEALTH_DEFINITIONS = JSON.parse(
   readFileSync(new URL("../ingestion/fhsis-oral-health-definitions.json", import.meta.url), "utf8"),
 ).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
+export const MATERNAL_ORAL_DEFINITIONS = JSON.parse(
+  readFileSync(
+    new URL("../ingestion/fhsis-maternal-oral-definitions.json", import.meta.url),
+    "utf8",
+  ),
+).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
 export const VITAL_STATISTICS_DEFINITIONS = JSON.parse(
   readFileSync(
     new URL("../ingestion/fhsis-vital-statistics-definitions.json", import.meta.url),
@@ -97,6 +103,7 @@ function reviewedDefinitions(bundle) {
       "ncd",
       "ncd-senior",
       "oral-health",
+      "oral-maternal",
       "vital-statistics",
       "demographics",
       "combined-delivery",
@@ -112,6 +119,7 @@ function reviewedDefinitions(bundle) {
     ncd: NCD_DEFINITIONS,
     "ncd-senior": SENIOR_NCD_DEFINITIONS,
     "oral-health": ORAL_HEALTH_DEFINITIONS,
+    "oral-maternal": MATERNAL_ORAL_DEFINITIONS,
     "vital-statistics": VITAL_STATISTICS_DEFINITIONS,
     demographics: DEMOGRAPHICS_DEFINITIONS,
     "combined-delivery": COMBINED_DELIVERY_DEFINITIONS,
@@ -190,6 +198,18 @@ export function validateExpansion(bundle) {
             Number.isFinite(Number(row[col]))),
         "Invalid numeric source value",
       );
+    if (bundle.programme_set === "oral-maternal") {
+      check(
+        row.source_sheet === "Annual" &&
+          ["total", "10-14", "15-19", "20-49"].includes(row.breakdown) &&
+          row.denominator_exact === null &&
+          row.rate_pct === null &&
+          row.numerator_exact !== null &&
+          Number.isInteger(Number(row.numerator_exact)) &&
+          Number(row.numerator_exact) >= 0,
+        "Pregnant oral measures require annual age counts only",
+      );
+    }
     check(
       row.numerator_exact !== null || row.rate_pct !== null,
       "Denominator alone is not a report",

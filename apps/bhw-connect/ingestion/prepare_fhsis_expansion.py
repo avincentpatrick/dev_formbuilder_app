@@ -267,6 +267,22 @@ def oral_health_specifications(directory):
     return specs
 
 
+def maternal_oral_specifications(directory):
+    """Pregnant cohort corroborated by report pp. 77, 80; retain counts, not coverage."""
+    source='2. Completed 2 Visits.xlsx'
+    if not (directory/source).is_file():raise ValueError(f'Missing source: {source}')
+    specs=[]
+    for key,label,n in [('first_facility','First oral-health visit, facility-based',97),
+                        ('first_nonfacility','First oral-health visit, non-facility-based',102),
+                        ('two_facility','Completed two oral-health visits, facility-based',107),
+                        ('two_nonfacility','Completed two oral-health visits, non-facility-based',112)]:
+        specs.append(dict(key='oral_pregnant_'+key,label=label+', pregnant women',file=source,
+                          n=n,d=None,rate=None,sex=False,ages=[[n-3,None,None],[n-2,None,None],[n-1,None,None]],
+                          start=8,sheet='Annual',coded=False,program='oral_health',
+                          denominator='Count only; annual denominator sums quarterly population estimates, so coverage is withheld'))
+    return specs
+
+
 def vital_specifications(directory):
     source='1. Natality and Mortality_2025_PH.xlsx'
     if not (directory/source).is_file():raise ValueError('Missing vital-statistics workbook')
@@ -383,7 +399,7 @@ def main():
     parser.add_argument('directory',type=Path)
     parser.add_argument('--reference',type=Path,required=True,help='Original private FHSIS directory containing TB geography and dim_geo.json')
     parser.add_argument('--retrieved',required=True)
-    parser.add_argument('--programme-set', choices=['core','child-health','maternal','infectious','family-planning','ncd','oral-health','vital-statistics','demographics','combined-delivery','ncd-senior'], default='core')
+    parser.add_argument('--programme-set', choices=['core','child-health','maternal','infectious','family-planning','ncd','oral-health','vital-statistics','demographics','combined-delivery','ncd-senior','oral-maternal'], default='core')
     args=parser.parse_args()
     geos=json.loads((args.reference/'dim_geo.json').read_text())
     b=ExpansionBuilder(args.reference,geos);b.directory=args.directory
@@ -392,14 +408,14 @@ def main():
             if geo['geo_level']!='barangay':b.canonical[normalise(geo['geo_name'])].add(code)
         b.canonical[normalise('City of Carmona')]={'0402104'}
         b.canonical[normalise('Dr. Jose P. Rizal')]={'1705323'}
-    specs={'core':specifications,'child-health':child_health_specifications,'maternal':maternal_specifications,'infectious':infectious_specifications,'family-planning':family_planning_specifications,'ncd':ncd_specifications,'oral-health':oral_health_specifications,'vital-statistics':vital_specifications,'demographics':demographic_specifications,'combined-delivery':combined_delivery_specifications,'ncd-senior':senior_ncd_specifications}[args.programme_set](args.directory)
+    specs={'core':specifications,'child-health':child_health_specifications,'maternal':maternal_specifications,'infectious':infectious_specifications,'family-planning':family_planning_specifications,'ncd':ncd_specifications,'oral-health':oral_health_specifications,'vital-statistics':vital_specifications,'demographics':demographic_specifications,'combined-delivery':combined_delivery_specifications,'ncd-senior':senior_ncd_specifications,'oral-maternal':maternal_oral_specifications}[args.programme_set](args.directory)
     definitions=[]
     cross_sheet_rows={}
     groups={}
     for spec in specs:groups.setdefault((spec['file'],spec['sheet'],spec['start'],spec['coded']),[]).append(spec)
     for (file,sheet,start,coded),group in groups.items():
         FILES[file]=file
-        source_rows=b.named_rows(file,sheet,start,area_column=2) if args.programme_set=='oral-health' else (b.rows if coded else b.named_rows)(file,sheet,start)
+        source_rows=b.named_rows(file,sheet,start,area_column=2) if args.programme_set in ('oral-health','oral-maternal') else (b.rows if coded else b.named_rows)(file,sheet,start)
         rate_formats={}
         if args.programme_set=='combined-delivery':
             workbook=openpyxl.load_workbook(args.directory/file,read_only=True,data_only=False)
@@ -459,7 +475,10 @@ def main():
         qa['source_year_resolution']={'report':'FHSIS 2025 Annual Report, printed pp. 83–85 (PDF pp. 94–96)', 'source_sheet':'RA', 'annual_columns':'GN:GY', 'conflicting_header':'Q4!A3: Annual 2024', 'decision':'Use 2025 annual RA values corroborated by report; retain conflicting header in provenance', 'quarter_caveat':'Region V and national annual counts differ from sums of quarters; quarterly years not established; do not replace annual values with quarter sums'}
         qa['omitted_columns']=['Quarterly/monthly repeats and December medicine access; sex-specific rates are not provided']
     if args.programme_set=='oral-health':
-        qa['omitted_columns']=['Annual rates and denominators for ages 5–9, 10–19, 20–59 and 60+: denominators sum quarterly populations; retained visit counts', 'Final block columns 93–113: conflicting senior/under-one/maternal-age labels; withheld entirely pending cohort clarification']
+        qa['omitted_columns']=['Annual rates and denominators for ages 5–9, 10–19, 20–59 and 60+: denominators sum quarterly populations; retained visit counts', 'Pregnant-women final block is prepared separately as oral-maternal after annual-report cohort confirmation; coverage rates remain withheld']
+    if args.programme_set=='oral-maternal':
+        qa['cohort_resolution']={'report':'FHSIS 2025 Annual Report, printed pp. 77 and 80 (PDF pp. 88 and 91)', 'cohort':'Pregnant women aged 10–14, 15–19 and 20–49', 'conflicting_header':'Annual!CO2 labels senior citizens; retain original heading in source provenance', 'proxy_denominator':'CO5 under-one population is the report-defined proxy for pregnant women, not the service cohort', 'report_caption':'Figure 1.D.2.3 says non-facility in caption; legend and narrative explicitly distinguish both settings', 'completeness':'Some quarterly age cells have missing markers although annual counts are numeric; annual counts do not prove complete reporting in every quarter'}
+        qa['omitted_columns']=['All coverage rates and denominators: annual denominator sums quarterly population snapshots; do not divide by four or infer corrected coverage', 'Quarterly repeats: retain source annual counts only']
     out=args.directory/'fhsis-expansion.json';out.write_text(json.dumps(bundle,ensure_ascii=False,separators=(',',':')))
     sha=hashlib.sha256(out.read_bytes()).hexdigest();(args.directory/'fhsis-expansion.sha256').write_text(sha+'  fhsis-expansion.json\n')
     (args.directory/'qa-report.json').write_text(json.dumps(qa,ensure_ascii=False,indent=2))

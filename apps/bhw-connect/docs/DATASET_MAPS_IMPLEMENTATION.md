@@ -710,6 +710,23 @@ for each of StepZero population and households. This supersedes their earlier un
 rollout state, with both dated results retained in the coverage evidence. It is not numeric
 production certification for the new rate or for every detailed geography.
 
+## Rate-aware public coverage validation (8 November 2026)
+
+The bounded public coverage audit now recognizes StepZero's declared-accreditation
+contract: a separately reported parent rate, null additive total, and child/parent
+percentages between zero and 100. It rejects a missing parent-rate field, malformed
+percentages, rates labeled as totals, unexpected rate fields on other indicators and
+numeric rates on navigation-only geography. Zero is a reported rate; null is unavailable.
+Reports expose only `hasReportedParentRate`, never the percentage itself. Existing count
+reports keep their format. This closes the audit gap introduced by the rate adapter;
+it does not certify production source values or deployment of that adapter.
+
+Validation includes 11 new synthetic audit cases (19 audit cases total). No UI, schema,
+source data or hosting configuration changes.
+Full database-backed Vitest: 1,527 passed, 11 skipped. Lint (existing fixture warning),
+typecheck, migration lint and prefixed no-data build passed. Browser tests were not
+rerun because only the offline audit script and documentation changed.
+
 ## PNG coverage and selected-value context (8 November 2026)
 
 PNG notes now distinguish geometry that was not checked from confirmed missing polygons,

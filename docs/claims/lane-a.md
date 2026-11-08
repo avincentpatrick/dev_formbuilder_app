@@ -41,6 +41,14 @@ Paired files taken: none.
 Namespaces spent: `M230`.
 Prediction: documents only. The citation and pipeline lints stay green, and nothing else moves. No `VERSION` bump. The one I most expect to be wrong: the citation lint, if another document cites one of these lines by its content.
 
+### Build record (2026-11-09, not merged)
+PR #489, head `01f07dea`, run 42502696904: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green.
+- Locally: the citation lint at 16 rotten, the same as the trunk; `pipeline-lint` 456 rows; `BacklogProvenanceTest` plus `tests/Feature/Webhooks`, 84 passed.
+
+**How the prediction fared:** right. Nothing moved.
+
+**The merge point owes:** merge after #488. Release this claim then.
+
 ## HELD — `M229`, `R-d7e27962` by `D215` = A: a blank form prints in any of its version's languages, and a printout in another language says it must be keyed in (m229-print-in-language) — BUILT AND HELD: PR #488, waiting for a merge point
 
 Taken 2026-11-09, from the plan the user approved on 2026-11-08. Branch `m229-print-in-language`, cut from origin/main at `5937d549`, PR into main. Held green for a merge point (`D137`), after `M228`'s #487.
@@ -75,6 +83,21 @@ Prediction:
 - Every existing print case stays green, because the default stays the default.
 - The one I most expect to be wrong: the form page's axe scan, on the new language dialog.
 
+### Build record (2026-11-09, not merged)
+PR #488, head `791dcfb1`, run 42502416038: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green.
+- New cases, each red first: four on the presenter, one each on the renderer, the route and the form page, and one Vitest case.
+- Six mutants were CAUGHT: the keyed-in footer, `printLocale()`, choice-label languages, blank variants, the `?lang=` query, and the dialog's condition (by hand).
+- Pest: 26 related files, 350 passed. `show.test.ts`: 27 of 27. `vue-tsc` clean.
+- Filed: `ocr-translated-printout` (before launch) and `xlsform-languages-shared`.
+
+**How the prediction fared:** right on the red-first cases. No axe scan opens the dialog, so that fear was moot. **Not predicted:**
+- Inserting `languages()` between `listAt()`'s docblock and its signature took `listAt()`'s types away; PHPStan went 51 → 58 until it was moved.
+- `pipeline-lint` P2b caught `docs/ocr-pipeline-design.md` still queuing the closed row, and it reads every backticked token in a Queued note as a row id.
+- `BacklogProvenanceTest` refused a row that says "Filed by" twice.
+- A failed `preg_replace` returned null and emptied `FormHubPresenter.php`. It was restored from the commit before anything else ran.
+
+**The merge point owes:** merge after #487. Release this claim then.
+
 ## HELD — `M228`, `R-5d7128da`: a short written answer that happens to be a word of the printed text is read, not dropped (m228-ocr-short-answer-static) — BUILT AND HELD: PR #487, waiting for a merge point
 
 Taken 2026-11-08, on the user's *"are there any tasks that can be done the is not blocked by the backup?"*, from the plan they approved. Branch `m228-ocr-short-answer-static`, cut from origin/main at `3257252c`, PR into main. Held green for a merge point (`D137`), after `M227`'s #446.
@@ -106,6 +129,16 @@ Prediction:
 - The new "FORM" case goes red first.
 - Every existing `PrintedFormMatcherTest` and OCR reading case stays green, including the three footer sentences and the wrapped notes.
 - The one I most expect to be wrong: a fixture whose printed hint wraps so that a middle line is one long word.
+
+### Build record (2026-11-09, not merged)
+PR #487, head `415cf8d2`, run 42492093417: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green.
+- Three new `PrintedFormMatcherTest` cases. "FORM" under both footers was red first. A hint whose last word wraps alone is still dropped. "HIS FORM" is read. Three mutants were CAUGHT.
+- OCR feature suites: 177 passed. OCR unit tests: 33 passed. PHPStan: the trunk's local 51.
+- Filed: `ocr-printed-run-answer`, for a multi-word answer that repeats whole printed words, which needs positions.
+
+**How the prediction fared:** right. No existing case moved. **Not predicted:** the row's two remedies were both wrong for this reader. There are no printed positions, and a longer minimum match would read a hint's short last word as an answer. The shape of a wrapped piece was the rule that fit. A mutant on the whole-word rule had no test until one was added.
+
+**The merge point owes:** merge after #446. Release this claim then.
 
 ## HELD — `M227`, `R-cf7d0362`: changing a date question to a time question, or back, warns where a comparison on it stops holding (m227-temporal-census) — BUILT AND HELD: PR #446 green but for the release-order assertion #435 fixes, waiting for a merge point
 

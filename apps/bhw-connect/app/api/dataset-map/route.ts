@@ -18,7 +18,9 @@ export async function GET(request: NextRequest) {
   if (!choice || !spec) return NextResponse.json({ state: "unsupported" }, { status: 400 });
   try {
     const [source, geo] = await Promise.all([
-      readDatasetBySlug(choice.dataset),
+      choice.dataset === "bhw-2025"
+        ? readDatasetBySlug(choice.dataset, true)
+        : readDatasetBySlug(choice.dataset),
       getGeoByCode(choice.code),
     ]);
     if (source.state !== "available")
@@ -41,25 +43,31 @@ export async function GET(request: NextRequest) {
     const children = await query;
     if (children.error || !children.data?.length || children.data.length >= 1000)
       throw new Error("Geography unavailable");
-    const [values, parent] = await Promise.all([
-      db
-        .from(spec.table)
-        .select(`geo_code,${spec.column}`)
-        .eq("dataset_id", source.value.datasetId)
-        .eq("geo_level", childLevel)
-        .in(
-          "geo_code",
-          children.data.map((c) => c.geo_code),
-        )
-        .limit(1000),
-      db
-        .from(spec.table)
-        .select(`geo_code,${spec.column}`)
-        .eq("dataset_id", source.value.datasetId)
-        .eq("geo_level", choice.level)
-        .eq("geo_code", choice.code)
-        .limit(2),
-    ]);
+    // Apply each accepted measure's source filters to BOTH children and the parent.
+    // In particular, population is PSA 2024, never a StepZero fallback or another census year.
+    const projection = `geo_code,${spec.column}`;
+    let childQuery = db
+      .from(spec.table)
+      .select(projection)
+      .eq("dataset_id", source.value.datasetId)
+      .eq("geo_level", childLevel)
+      .in(
+        "geo_code",
+        children.data.map((c) => c.geo_code),
+      )
+      .limit(1000);
+    let parentQuery = db
+      .from(spec.table)
+      .select(projection)
+      .eq("dataset_id", source.value.datasetId)
+      .eq("geo_level", choice.level)
+      .eq("geo_code", choice.code)
+      .limit(2);
+    for (const [column, value] of Object.entries(spec.filters ?? {})) {
+      childQuery = childQuery.eq(column, value);
+      parentQuery = parentQuery.eq(column, value);
+    }
+    const [values, parent] = await Promise.all([childQuery, parentQuery]);
     if (values.error || parent.error || !values.data || values.data.length >= 1000 || !parent.data)
       throw new Error("Values unavailable");
     const rows = joinMapRows(

@@ -154,3 +154,36 @@ A single-finger drag over the map scrolled the page (scrollY 288 → 461). Scrol
 cards and a pending card observed one active map at peak on that phone viewport and zero
 after leaving supported cards. This is not a measured mid-range device/network performance
 claim. Local development figures remain synthetic; live numeric coverage is not certified.
+
+## Count-map rollout and gallery resource limit (8 November 2026)
+
+Adds three independent adapters: BHW Census 2025 validated-profile counts, StepZero 2026
+LGU-declared total/registered/registered-and-accredited/nonregistered counts, and PSA
+population 2024. Census requires the accepted release to be active. StepZero does not
+query validated profiles, and PSA reads only `agg_population` with `census_year = 2024`
+on both child and parent queries. No fallback substitutes StepZero population. Source
+metadata dates continue to display separately from release labels, including discrepancies
+already present in the accepted metadata. No source dates are rewritten.
+
+This remains a count-only rollout: BHW demographic/honorarium breakdowns, rates, StepZero
+household/source-population extensions and the other pending adapters are not enabled by
+loosening the endpoint allowlist. They still require their own measure and disclosure work.
+The existing catalog stays intact; consolidating catalog and map-gallery presentation is
+still a later UI step, not a claim that the whole dataset maps plan is complete.
+
+A per-gallery lease controller now gates both requests and MapLibre instances, with at
+most two owners. Each card retains its own choices and loaded result. Waiting or offscreen
+cards do not fetch values; leaving the map viewport releases the lease. Visibility watches
+the map area, not a long card's remaining footer. Returning to a loaded card reuses its
+result without a second request; reload the page for a fresh source read. Standalone Map
+views have one active dataset. Controllers are created per provider, never shared across
+server requests. Planned cards never join the queue.
+
+Validation: lint (existing fixture warning only), typecheck, migration lint and the
+prefixed production build passed. Seeded-database Vitest: 1,430 passed, 11 skipped.
+Eight browser cases passed, including source/period isolation for the three new adapters,
+a tall viewport with multiple eligible cards limited to two maps/two requested datasets,
+offscreen disposal and cached return. Phone emulation of the population map at 390×844
+had no horizontal overflow, no map-unavailable fallback and no axe violations. These checks
+use the synthetic dev database; they do not certify production coverage, historical
+boundary compatibility, licensed basemap delivery or real-device network performance.

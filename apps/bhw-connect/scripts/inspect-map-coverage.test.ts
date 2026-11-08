@@ -70,3 +70,11 @@ it("rejects rate fields on count indicators and values in navigation-only rate v
   await expect(inspectMapCoverage(rateUrl, async () => response({ ...payload, total: null, parentRate: 0,
     valueSupport: "navigation-only", rows: [] }))).rejects.toThrow("Navigation-only");
 });
+
+it("audits Census rates without treating them as additive totals", async () => {
+  const census = rateUrl.replace("bhw-stepzero-2026", "bhw-2025").replace("bhw.declared-accreditation", "bhw.profile-accreditation").replace("period=2026", "period=2025");
+  const data = { ...payload, total: null, parentRate: 0 };
+  const result = await inspectMapCoverage(census, async target => response(String(target).includes("/geo/") ? geometry : data));
+  expect(result.coverage).toMatchObject({ hasReportedParentTotal: false, hasReportedParentRate: true });
+  await expect(inspectMapCoverage(census, async () => response({ ...data, parentRate: 101 }))).rejects.toThrow("Invalid published rate");
+});

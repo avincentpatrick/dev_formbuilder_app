@@ -1,3 +1,4 @@
+import { CENSUS_ACCREDITATION_ID, joinCensusAccreditation } from "@/lib/maps/census-accreditation";
 import { STEPZERO_ACCREDITATION_ID, joinStepzeroAccreditation } from "@/lib/maps/stepzero-accreditation";
 import { joinUucRouteRows } from "@/lib/maps/uuc-routes";
 import { PROFILING_COLUMNS, joinProfilingRows } from "@/lib/maps/profiling";
@@ -59,6 +60,7 @@ export async function GET(request: NextRequest) {
       value: null,
     })) as MapPayload["rows"];
     const declaredAccreditation = choice.dataset === "bhw-stepzero-2026" && choice.indicator === STEPZERO_ACCREDITATION_ID;
+    const censusAccreditation = choice.dataset === "bhw-2025" && choice.indicator === CENSUS_ACCREDITATION_ID;
     let parentRate: number | null = null;
     let total: number | null = null;
     let totalNote: string | undefined;
@@ -112,6 +114,7 @@ export async function GET(request: NextRequest) {
       const uucRoute = spec.table === "agg_uuc_phc_criteria";
       const projection = uucRoute
         ? `geo_code,${spec.column},n_listed,n_health_evaluable`
+        : censusAccreditation ? "geo_code,pct_accredited,n_accredited,n_total,ci_low,ci_high"
         : declaredAccreditation ? `geo_code,${spec.column},n_registered_accredited,n_total_bhw`
           : `geo_code,${spec.column}`;
       let childQuery = db
@@ -144,14 +147,14 @@ export async function GET(request: NextRequest) {
         !parent.data
       )
         throw new Error("Values unavailable");
-      const join = uucRoute ? joinUucRouteRows : declaredAccreditation ? joinStepzeroAccreditation : joinMapRows;
+      const join = censusAccreditation ? joinCensusAccreditation : uucRoute ? joinUucRouteRows : declaredAccreditation ? joinStepzeroAccreditation : joinMapRows;
       rows = join(children.data, values.data as unknown as Record<string, unknown>[], spec.column);
       const parentRow = join(
         [{ geo_code: choice.code, geo_name: geo.geoName }],
         parent.data as unknown as Record<string, unknown>[],
         spec.column,
       )[0];
-      if (declaredAccreditation) parentRate = parentRow.value;
+      if (declaredAccreditation || censusAccreditation) parentRate = parentRow.value;
       else total = parentRow.value;
       totalNote = parentRow.note;
     }
@@ -159,7 +162,7 @@ export async function GET(request: NextRequest) {
       state: "available",
       rows,
       total,
-      ...(declaredAccreditation ? { parentRate } : {}),
+      ...((declaredAccreditation || censusAccreditation) ? { parentRate } : {}),
       ...(totalNote ? { totalNote } : {}),
       area: geo.geoName,
       childLevel,

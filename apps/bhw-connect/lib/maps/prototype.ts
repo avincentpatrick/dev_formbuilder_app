@@ -14,6 +14,7 @@ export type MapRow = {
   ciLow?: number | null;
   ciHigh?: number | null;
   note?: string;
+  smallSample?: boolean;
 };
 export type MapPayload = {
   state: "available";
@@ -50,7 +51,7 @@ export function prototypeIndicators(slug: string) {
       "nhfr.beds",
       "nhfr.barangay-presence",
     ],
-    "bhw-2025": ["bhw.validated-profiles"],
+    "bhw-2025": ["bhw.validated-profiles", "bhw.profile-accreditation"],
     "bhw-stepzero-2026": [
       "bhw.total",
       "bhw.registered",

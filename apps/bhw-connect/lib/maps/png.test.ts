@@ -48,3 +48,14 @@ it("includes percentage units for selected rates and no unit for unavailable val
   expect(pngNotes(datasetMapExport(choice, { ...context, rows: [{ code: "01", name: "Missing", value: null }] }, [], null)).join("\n"))
     .toContain("Selected value: not available.");
 });
+
+it("preserves Census confidence level, profile denominator and rate semantics in exports", () => {
+  const context = datasetMapExport({ ...initialMapChoice("bhw-2025"), indicator: "bhw.profile-accreditation", selected: "01" },
+    { ...data, total: null, parentRate: 25, rows: [{ code: "01", name: "Synthetic", value: 33.33, ciLow: 6.15, ciHigh: 79.23 }] }, [], ["01"]);
+  expect(context.indicator.confidenceLevel).toBe(0.95);
+  expect(context.parentMeasure).toMatchObject({ kind: "rate", value: 25 });
+  expect(context.total).toBeNull();
+  const notes = pngNotes(context).join("\n");
+  expect(notes).toContain("Published 95% confidence interval: 6.15 to 79.23");
+  expect(notes).toContain("Validated BHW Census profiles");
+});

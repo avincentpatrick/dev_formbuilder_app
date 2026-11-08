@@ -759,3 +759,29 @@ test("StepZero accreditation uses a published parent rate and fixed percentage l
   expect(exported.legend.method).toBe("fixed");
   expect(exported.indicator.period).toBe("2026");
 });
+
+test("Census accreditation preserves profile denominator, Wilson intervals and small-sample notes", async ({ page }) => {
+  await page.route("**/api/dataset-map?**", route => route.fulfill({ json: {
+    state: "available", rows: [{ code: "01", name: "Synthetic Census region", value: 33.33,
+      ciLow: 6.15, ciHigh: 79.23, smallSample: true, note: "Published Census percentage; 3 validated profiles. Few BHWs profiled — unstable." }],
+    total: null, parentRate: 25, area: "Philippines", childLevel: "region",
+    source: "Synthetic Census release", date: "2025-12-31", license: "Test only", geometryUrl: "/bhw-connect/geo/regions.json",
+  } }));
+  await page.goto("map?dataset=bhw-2025&indicator=bhw.profile-accreditation");
+  await expect(page.locator('[data-map-state="ready"]')).toHaveCount(1);
+  await expect(page.getByText("Few BHWs profiled — unstable", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Reported area rate: 25%/)).toBeVisible();
+  await expect(page.getByText(/Denominator: Validated BHW Census profiles/)).toBeVisible();
+  await page.getByText("Complete area table (1)").click();
+  await expect(page.getByRole("columnheader", { name: "Published 95% confidence interval" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "6.15%–79.23%" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: /Few BHWs profiled/ })).toBeVisible();
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download map data (JSON)" }).click();
+  const stream = await (await downloaded).createReadStream();
+  const chunks = []; for await (const chunk of stream!) chunks.push(chunk);
+  const data = JSON.parse(Buffer.concat(chunks).toString());
+  expect(data.indicator).toMatchObject({ period: "2025", confidenceLevel: 0.95 });
+  expect(data.parentMeasure).toMatchObject({ kind: "rate", value: 25 });
+  expect(data.rows[0]).toMatchObject({ value: 33.33, ciLow: 6.15, ciHigh: 79.23, smallSample: true });
+});

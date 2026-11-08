@@ -16,7 +16,35 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M223`: `E2eSeederIdempotencyTest`'s release-order assertion no longer depends on the order the table hands rows back (m223-release-order-assertion) — BUILT AND HELD: PR #435 green, waiting for a merge point, where it merges before #432, #433 and #434
+## Status: ACTIVE CLAIM — `M224`, `R-b1737198` and `R-6f994627`: the threat model stops calling the invitation door filed, and three documents stop saying a file waits for a clean scan (m224-threat-model-scan-status)
+
+Taken 2026-11-08, on the user's instruction to take the line's next `during-testing` rows that touch neither the backup setup nor a held PR's files. Branch `m224-threat-model-scan-status`, cut from origin/main at `b213e38a`, PR into main. Held green for a merge point (`D137`), after #434.
+**Chosen to stay clear:** the rows above these in the line are built in held PRs, or edit a held PR's files (`R-e6e340c0`, `R-7d0853f5`, `R-f6eab58d`, `R-2ca49f19`), or need the box's Apache log read at the sitting (`R-4b57090b`).
+**Two rows in one increment: `D13` exception #9, allowed by the user in chat on 2026-11-08** (*"Pair them"*). Each row edits a hub document, so `D13` gives each its own PR, and every PR merged at the merge point is one more deploy the sitting waits through. Clause 1 holds: the rows share `docs/security-threat-model.md`, a hub, and no non-hub file.
+Rows: `R-b1737198`, *"`docs/security-threat-model.md` lists the invitation door among residuals "each filed in" the ledger, and it is no longer filed."*; `R-6f994627`, *"The data dictionary says an attachment is not served until its scan is `clean`, and every attachment is served while it is `skipped`."*
+
+### Evidence verified
+**`R-b1737198`.** Residual 32 in §9 says *"Three things remain, each filed in `docs/feature-backlog.md`"*, and its second bullet is the invitation door. `R-950ef5f1` is closed by `M121` under `D33` = A, and no open row replaced it: **held**.
+**`R-6f994627`.** `docs/data-dictionary.md` §10's `virus_scan_status` row reads *"Files are not served to other users until `clean`."* `ScanStatus::servable()` admits `clean` and `skipped`, and `ScanAttachmentJob` writes `skipped` while `attachments.scanner_enabled` is false, its default: **held**.
+
+### Premise verified
+**`R-b1737198`.** Residual 32's other two bullets are as they say. The domain re-verification row is open (latent). The self-registration bullet already records its closure by `M140` and its remainder, `R-afa35a60`, which is open. Only the invitation bullet is wrong.
+**`R-6f994627`.** The row says the sentence is the defect, and the row is a floor: the sentence is quoted twice more.
+- `docs/security-threat-model.md` §6 rates malware in an upload **Mitigated** on the strength of it.
+- `docs/ux/form-filling-ux-flow.md` Appendix A quotes it.
+No `AttachmentScanner` implementation exists and `ATTACHMENT_SCANNER_ENABLED` is set nowhere, so every upload is served unscanned. §6's verdict is false, not only its quotation. Wiring a scanner lives only in prose (*"ClamAV, deferred"* in `ScanStatus`'s docblock and `config/attachments.php`), and no row queues it: this increment files one, `before-launch`.
+
+### Remedy verdict
+**`R-b1737198`.** Works as the row says. The bullet calls the door an accepted risk, citing `D33` = A and `R-950ef5f1`'s closure, and the lead sentence stops claiming all three are filed. Edited inside existing lines, so nothing below moves.
+**`R-6f994627`.** Works, extended to the two copies. Each says a file is served while `clean` or `skipped`, never while `pending` or `infected`, and that with no scanner wired every upload is `skipped`. §6's verdict becomes a residual until a scanner is wired, bounded by what is built (the type read from the bytes against the field's allowlist), and cites the new row.
+
+Files: `docs/security-threat-model.md`, `docs/data-dictionary.md`, `docs/ux/form-filling-ux-flow.md`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md` (exception #9, on the branch).
+Paired files taken: none.
+Namespaces spent: `M224`; `D13` exception #9. `state.php` prints a lower next free number because `M215` to `M223` are held and unreleased.
+Prediction: documents only. `DocumentedDefaultDriftTest` and `DocumentedEnumCatalogDriftTest` stay green, because no default or enum cell changes; the citation and pipeline lints stay green; nothing else moves. No `VERSION` bump: no tester reads these documents. The one I most expect to be wrong: `BacklogProvenanceTest` or `pipeline-lint` on the new row's markers.
+
+## HELD — `M223`, a row filed and closed by it: `E2eSeederIdempotencyTest`'s release-order assertion no longer depends on the order the table hands rows back (m223-release-order-assertion) — BUILT AND HELD: PR #435 green, waiting for a merge point, where it merges before #432, #433 and #434
 
 Taken 2026-11-08. Branch `m223-release-order-assertion`, cut from origin/main at `b47009a7`, PR into main. Held green for a merge point (`D137`), where it must merge **before #432, #433 and #434**, whose Pest it turns red.
 Row: new, filed and closed by this increment: *"`E2eSeederIdempotencyTest` checks the `releases` table's order against the notes file's, but reads the table with no order."* `M221` first filed it on #433's branch; that copy was taken out, so it is filed once.

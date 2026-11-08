@@ -47,3 +47,26 @@ it("rejects missing/duplicate query choices before reading and bounds response b
   await expect(inspectMapCoverage(url.replace("/bhw-connect", ""))).rejects.toThrow("prefixed");
   await expect(inspectMapCoverage(url, async () => response("x".repeat(2 * 1024 * 1024)))).rejects.toThrow("size limit");
 });
+
+const rateUrl = url.replace("dataset=nhfr-2026-09", "dataset=bhw-stepzero-2026")
+  .replace("indicator=nhfr.facilities", "indicator=bhw.declared-accreditation").replace("September+2026", "2026");
+it.each([0, 33.33, 100, null])("audits parent rate presence without publishing the rate (%s)", async parentRate => {
+  const data = { ...payload, total: null, parentRate };
+  const report = await inspectMapCoverage(rateUrl, async target => response(String(target).includes("/geo/") ? geometry : data));
+  expect(report.coverage).toMatchObject({ hasReportedParentTotal: false, hasReportedParentRate: parentRate !== null });
+  expect(report).not.toHaveProperty("parentRate");
+  expect(JSON.stringify(report)).not.toContain('"value"');
+});
+it.each([
+  { parentRate: undefined }, { parentRate: -1 }, { parentRate: 101 }, { parentRate: "25" },
+  { parentRate: 25, total: 25 }, { parentRate: 25, rows: [{ code: "01", name: "Invalid", value: 101 }] },
+])("rejects malformed or mislabeled published rates: %j", async override => {
+  await expect(inspectMapCoverage(rateUrl, async () => response({ ...payload, total: null, ...override })))
+    .rejects.toThrow("Invalid published rate");
+});
+it("rejects rate fields on count indicators and values in navigation-only rate views", async () => {
+  await expect(inspectMapCoverage(url, async () => response({ ...payload, parentRate: 25 })))
+    .rejects.toThrow("Unexpected parent rate");
+  await expect(inspectMapCoverage(rateUrl, async () => response({ ...payload, total: null, parentRate: 0,
+    valueSupport: "navigation-only", rows: [] }))).rejects.toThrow("Navigation-only");
+});

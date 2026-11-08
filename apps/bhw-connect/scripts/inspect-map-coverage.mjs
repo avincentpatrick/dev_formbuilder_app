@@ -70,8 +70,16 @@ export async function inspectMapCoverage(input, request = fetch) {
   }
   if (!(payload.total === null || (typeof payload.total === 'number' && Number.isFinite(payload.total) && payload.total >= 0)))
     throw new Error('Invalid reported parent total');
+  const declaredRate = choice.dataset === 'bhw-stepzero-2026' && choice.indicator === 'bhw.declared-accreditation';
+  if (declaredRate) {
+    const validRate = value => value === null || (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100);
+    if (payload.total !== null || !validRate(payload.parentRate) || payload.rows.some(row => !validRate(row.value)))
+      throw new Error('Invalid published rate or rate mislabeled as a total');
+  } else if (payload.parentRate !== undefined) {
+    throw new Error('Unexpected parent rate for this indicator');
+  }
   const navigationOnly = payload.valueSupport === 'navigation-only';
-  if (navigationOnly && (payload.total !== null || payload.rows.some(row => row.value !== null)))
+  if (navigationOnly && (payload.total !== null || (payload.parentRate != null) || payload.rows.some(row => row.value !== null)))
     throw new Error('Navigation-only geography must not claim values');
   const expectedGeometry = `/bhw-connect${scope[2]}`;
   if (payload.geometryUrl !== expectedGeometry) throw new Error('Unexpected geometry path; refusing another origin/scope');
@@ -80,7 +88,8 @@ export async function inspectMapCoverage(input, request = fetch) {
     zeroRows: payload.rows.filter(row => row.value === 0).length,
     missingOrUnavailableRows: navigationOnly ? 0 : payload.rows.filter(row => row.value === null).length,
     navigationOnlyRows: navigationOnly ? payload.rows.length : 0,
-    hasReportedParentTotal: payload.total !== null };
+    hasReportedParentTotal: payload.total !== null,
+    ...(declaredRate ? { hasReportedParentRate: payload.parentRate !== null } : {}) };
   let geometry;
   try {
     const shapes = await readJson(new URL(expectedGeometry, url.origin), 32 * 1024 * 1024, request);

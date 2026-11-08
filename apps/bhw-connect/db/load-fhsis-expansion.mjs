@@ -30,12 +30,21 @@ export const FAMILY_PLANNING_DEFINITIONS = JSON.parse(
 export const NCD_DEFINITIONS = JSON.parse(
   readFileSync(new URL("../ingestion/fhsis-ncd-definitions.json", import.meta.url), "utf8"),
 ).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
+export const ORAL_HEALTH_DEFINITIONS = JSON.parse(
+  readFileSync(new URL("../ingestion/fhsis-oral-health-definitions.json", import.meta.url), "utf8"),
+).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
 function reviewedDefinitions(bundle) {
   const programme = bundle.programme_set ?? "core";
   check(
-    ["core", "child-health", "maternal", "infectious", "family-planning", "ncd"].includes(
-      programme,
-    ),
+    [
+      "core",
+      "child-health",
+      "maternal",
+      "infectious",
+      "family-planning",
+      "ncd",
+      "oral-health",
+    ].includes(programme),
     "Unknown programme set",
   );
   return {
@@ -45,6 +54,7 @@ function reviewedDefinitions(bundle) {
     infectious: INFECTIOUS_DEFINITIONS,
     "family-planning": FAMILY_PLANNING_DEFINITIONS,
     ncd: NCD_DEFINITIONS,
+    "oral-health": ORAL_HEALTH_DEFINITIONS,
   }[programme];
 }
 const DECIMAL = /^-?\d+(?:\.\d+)?$/;

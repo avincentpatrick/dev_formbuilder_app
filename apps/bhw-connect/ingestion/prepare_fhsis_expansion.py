@@ -7,7 +7,7 @@ from collections import Counter
 from decimal import Decimal
 from pathlib import Path
 import openpyxl
-from prepare_fhsis import Builder, FILES, normalise
+from prepare_fhsis import Builder, FILES, normalise, short_code
 
 
 def specifications(directory):
@@ -232,6 +232,27 @@ def ncd_specifications(directory):
     return specs
 
 
+def oral_health_specifications(directory):
+    specs=[]
+    def add(source,key,label,n,d=None,rate=None,denominator=None):
+        if not (directory/source).is_file():raise ValueError(f'Missing source: {source}')
+        specs.append(dict(key='oral_'+key,label=label,file=source,n=n,d=d,rate=rate,sex=True,
+                          ages=None,start=8,sheet='Annual',coded=False,program='oral_health',
+                          denominator=denominator or 'No denominator: source count only'))
+    add('1. 1st Dental Visit.xlsx','infant_first','Infants aged 0–11 months having their first dental visit',6,3,7,
+        'Projected population aged 0–11 months')
+    for age,base,den in [('1_4',6,3),('5_9',24,21),('10_19',42,39),('20_59',60,57),('60plus',78,75)]:
+        label=age.replace('_','–').replace('plus',' and above')+' years'
+        for step,kind in [(0,'first'),(8,'two')]:
+            for offset,setting in [(0,'facility'),(4,'nonfacility')]:
+                n=base+step+offset
+                add('2. Completed 2 Visits.xlsx',f'{age}_{kind}_{setting}',
+                    ('First oral-health visit' if kind=='first' else 'Completed two oral-health visits')+', '+label+', '+('facility-based' if setting=='facility' else 'non-facility-based'),
+                    n,den if age=='1_4' else None,n+1 if age=='1_4' else None,
+                    'Projected population aged 1–4 years' if age=='1_4' else 'Count only; annual denominator sums quarterly populations, so the coverage rate is held for clarification')
+    return specs
+
+
 class ExpansionBuilder(Builder):
     def raw_rows(self, source, sheet, start):
         for number,row in super().raw_rows(source,sheet,start):
@@ -239,16 +260,17 @@ class ExpansionBuilder(Builder):
                 continue
             yield number,row
 
-    def named_rows(self, source, sheet, start):
+    def named_rows(self, source, sheet, start, area_column=1):
         seen, region = set(), None
         workbook=openpyxl.load_workbook(self.directory/FILES[source], read_only=True, data_only=True)
         try:
             for number,row in enumerate(workbook[sheet].iter_rows(min_row=start,values_only=True),start):
-                if not row or not row[0]:
-                    if row and any(v is not None for v in row[1:]):
+                if not row or len(row)<area_column or not row[area_column-1]:
+                    if row and str(row[0]).startswith(('Source:', 'Legend:', 'Asterisk', 'Zero (')):continue
+                    if row and any(v is not None for v in row[area_column:]):
                         raise ValueError(f'Unnamed data: {source}/{sheet}/{number}')
                     continue
-                name=str(row[0]).strip()
+                name=str(row[area_column-1]).strip()
                 if name in ('0 = No Case', '* = No Report'):continue
                 if name.startswith(('Source:', 'Legend:', 'Asterisk', 'Zero (')):continue
                 matched_name='Nueva Ecija' if name=='Nueva Eciea' and FILES[source]=='Annual Tbl 10_19___20_49_yrs_old_Pregnant_Women_EB_nofml.xlsx' else name
@@ -264,7 +286,10 @@ class ExpansionBuilder(Builder):
                 elif geo['geo_level']!='national' and geo['region_code']!=region:
                     raise ValueError(f'Area outside current region: {name}')
                 seen.add(code)
-                yield number,row,dict(geo_code=code,geo_level=geo['geo_level'],source_psgc=None,source_area_name=name,source_file=FILES[source],source_sheet=sheet,source_row=number)
+                raw_psgc=None if area_column==1 or row[0] is None else str(row[0]).removesuffix('.0')
+                if raw_psgc and short_code(raw_psgc)!=code:
+                    self.corrections.append(dict(source=FILES[source],sheet=sheet,row=number,raw_psgc=raw_psgc,name=name,to=code))
+                yield number,row,dict(geo_code=code,geo_level=geo['geo_level'],source_psgc=raw_psgc,source_area_name=name,source_file=FILES[source],source_sheet=sheet,source_row=number)
         finally:workbook.close()
         self.sheet_counts[f'{source}/{sheet}']=len(seen)
 
@@ -274,7 +299,7 @@ def main():
     parser.add_argument('directory',type=Path)
     parser.add_argument('--reference',type=Path,required=True,help='Original private FHSIS directory containing TB geography and dim_geo.json')
     parser.add_argument('--retrieved',required=True)
-    parser.add_argument('--programme-set', choices=['core','child-health','maternal','infectious','family-planning','ncd'], default='core')
+    parser.add_argument('--programme-set', choices=['core','child-health','maternal','infectious','family-planning','ncd','oral-health'], default='core')
     args=parser.parse_args()
     geos=json.loads((args.reference/'dim_geo.json').read_text())
     b=ExpansionBuilder(args.reference,geos);b.directory=args.directory
@@ -283,13 +308,14 @@ def main():
             if geo['geo_level']!='barangay':b.canonical[normalise(geo['geo_name'])].add(code)
         b.canonical[normalise('City of Carmona')]={'0402104'}
         b.canonical[normalise('Dr. Jose P. Rizal')]={'1705323'}
-    specs={'core':specifications,'child-health':child_health_specifications,'maternal':maternal_specifications,'infectious':infectious_specifications,'family-planning':family_planning_specifications,'ncd':ncd_specifications}[args.programme_set](args.directory)
+    specs={'core':specifications,'child-health':child_health_specifications,'maternal':maternal_specifications,'infectious':infectious_specifications,'family-planning':family_planning_specifications,'ncd':ncd_specifications,'oral-health':oral_health_specifications}[args.programme_set](args.directory)
     definitions=[]
     groups={}
     for spec in specs:groups.setdefault((spec['file'],spec['sheet'],spec['start'],spec['coded']),[]).append(spec)
     for (file,sheet,start,coded),group in groups.items():
         FILES[file]=file
-        for _,row,base in (b.rows if coded else b.named_rows)(file,sheet,start):
+        source_rows=b.named_rows(file,sheet,start,area_column=2) if args.programme_set=='oral-health' else (b.rows if coded else b.named_rows)(file,sheet,start)
+        for _,row,base in source_rows:
             for s in group:
                 if s.get('area_column') and normalise(str(row[s['area_column']-1]))!=normalise(base['source_area_name']):
                     raise ValueError('Quarter geography columns disagree')
@@ -321,6 +347,8 @@ def main():
         qa['omitted_columns']=['Pregnancy deworming in STH workbook: duplicates maternal deworming with a different total; held for source reconciliation', 'Schistosomiasis Annual1 chronic diagnosis and treatment rates: denominator not established; retained counts only']
     if args.programme_set=='ncd':
         qa['omitted_columns']=['Senior annual risk-assessment/disease summary: Q4 title says Annual 2024; RA annual values repeat that summary; held pending year clarification', 'Cervical precancerous-lesion rate: no explicit denominator field; retained counts', 'Medicine access: December snapshot only; monthly figures not summed to annual unique people']
+    if args.programme_set=='oral-health':
+        qa['omitted_columns']=['Annual rates and denominators for ages 5–9, 10–19, 20–59 and 60+: denominators sum quarterly populations; retained visit counts', 'Final block columns 93–113: conflicting senior/under-one/maternal-age labels; withheld entirely pending cohort clarification']
     out=args.directory/'fhsis-expansion.json';out.write_text(json.dumps(bundle,ensure_ascii=False,separators=(',',':')))
     sha=hashlib.sha256(out.read_bytes()).hexdigest();(args.directory/'fhsis-expansion.sha256').write_text(sha+'  fhsis-expansion.json\n')
     (args.directory/'qa-report.json').write_text(json.dumps(qa,ensure_ascii=False,indent=2))

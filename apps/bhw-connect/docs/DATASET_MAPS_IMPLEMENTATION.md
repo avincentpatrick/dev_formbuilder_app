@@ -332,3 +332,34 @@ missing rows and independent parent totals. Phone emulation at 390×844 had no a
 horizontal overflow or map-error fallback. Synthetic checks do not certify production
 coverage. The workspace interruption occurred after tests/build and before browser checks;
 the saved results and changes were recovered, and browser verification completed on resume.
+
+## Nationwide barangay candidate reconciliation (8 November 2026)
+
+Completed a full offline comparison of the supplier's pinned v1.1.1 / PSGC 3Q 2026
+high-resolution archive against 41,991 barangays in a local geography-only development
+extract. The supplier's published archive checksum was verified. See
+[the assessment, reproduction commands and remaining gates](BARANGAY_BOUNDARY_CANDIDATE.md)
+and `ingestion/barangay_candidate_summary.json` for aggregate evidence and attribution.
+
+42,006 supplier barangay polygons have unique codes and individually valid geometry;
+41,576 match reference codes, 415 reference codes are missing, and 430 supplier codes are
+unmatched. The documented Manila parent rule resolves hierarchy differences without
+historical remapping. Submunicipal polygons and untyped claimed areas are not counted as
+barangays. All 410 reference Sulu barangays remain unmatched pending a reviewed vintage
+crosswalk. No region prefixes are silently substituted.
+
+10,322 positive-area overlap pairs affect 12,199 matching reference barangays; some overlaps
+cover an entire smaller polygon. The release is therefore not publication-ready. The 29,377
+candidates passing local checks are not certified historical boundaries. No geometry was
+repaired, clipped, redistributed or published. Full details and the permitted extract stay
+outside git; the committed report contains counts/provenance only. MIT and underlying
+NAMRIA/PSA via OCHA COD-AB CC BY 3.0 IGO attribution requirements are documented.
+
+Also corrects the district candidate builder's barangay code length from nine to the app's
+actual ten digits, with regression coverage. No published assets used the incorrect check.
+
+Validation: ten new candidate tests and thirteen district/basic boundary tests passed;
+lint (existing fixture warning), typecheck, migration lint and the prefixed build passed.
+Seeded-database Vitest: 1,459 passed, 11 skipped. No UI changes; browser tests were not rerun.
+Production geography certification, reviewed historical crosswalks, shared-edge-safe
+geometry, accepted versioned storage delivery and actual barangay drill-down remain pending.

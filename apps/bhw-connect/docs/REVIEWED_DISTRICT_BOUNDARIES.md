@@ -45,7 +45,7 @@ A manifest has this structure (illustrative placeholders, not real source eviden
 Paths resolve relative to the manifest. Each roster entry has `district_code` (a district
 slug, never a PSGC code), `district_name`, `congress_no`, `boundary_vintage`, `review_ref`,
 `membership_complete: true`, and `expected_members: [{"geo_level":"citymun",
-"geo_code":"EXACT-SEVEN-DIGIT-CODE"}]`. Barangay codes are exact nine-digit internal
+"geo_code":"EXACT-SEVEN-DIGIT-CODE"}]`. Barangay codes are exact ten-digit internal
 codes. Numeric identifiers, implicit padding, names and centroid dictionaries are rejected.
 Additional barangay source entries use the same manifest shape with `level: "barangay"`.
 

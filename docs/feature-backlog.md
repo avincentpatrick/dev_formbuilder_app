@@ -15392,11 +15392,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   remedy: an ASVS Level 1 table — each control, how it is met, the test that pins it — with every gap filed as a row.
   **Latent** until launch. Filed by `M190`. **Tier: before-launch.**
 
-- **`minor` · A blank form prints only in its default language, so a form translated into Tagalog cannot be printed in Tagalog.**
+- ✅ **CLOSED BY `M229` (2026-11-09) — ****`minor` · A blank form prints only in its default language, so a form translated into Tagalog cannot be printed in Tagalog.**
   `BlankFormPrintPresenter::present()` takes `forms.default_locale`, and its docblock calls a print-in-another-language choice "a real
   gap" recorded in `docs/ocr-pipeline-design.md`, whose out-of-scope list carries it with no row. Translated forms ship today, so a
   tester with one can reach this. The remedy: a language choice beside the print button, defaulting to the form's default, passed to the
   presenter. **Live.** Filed by `M190`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M229` (2026-11-09), on its branch, with `D215` = A (the user, in chat).**
+  - `present()` takes a language, used when the version has text in it (`printLocale()`), and otherwise prints the default. The list is the version's own translations (`LocaleVariant::languagesIn()`), because `forms.supported_locales` is written by nothing (`R-21e88dd1`).
+  - The route takes `?lang=`, and the file name says which language (`…-blank-fil.pdf`).
+  - The form page's "Print blank" asks "Print in which language?" when a version has more than one. The forms list's button still prints the default, because listing every version's languages there would load every snapshot.
+  - **`D215`: the scanner reads the default language only**, so a copy in another language prints *"Scans of this form cannot be read automatically; responses must be keyed in."* Reading such scans is filed below as `ocr-translated-printout`.
+  - New cases, each red first: three on the presenter, one each on the renderer, the route and the form page, and one Vitest case. Ships as 0.19.0.
 
 - **`minor` · No audit row records which values a reviewer changed after an OCR read.**
   `docs/ocr-pipeline-design.md` lists a field-level OCR audit trail out of scope with no ground and no row. An `ocr_scans` row keeps the
@@ -15730,3 +15736,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, to be measured when taken: assert the gauge equals the surviving row's `size_bytes`, which still reddens on an accumulating design and does not care about the clock. Pinning the clock in the case would also work and proves less.
 
   **Live.** Filed by `M214`. **Tier: during-testing.**
+
+- **`minor` · `ocr-translated-printout` — A blank form printed in a language other than the form's default cannot be read by the scanner, so its responses must be keyed in.**
+  Filed by `M229` (2026-11-09), by `D215` = A, which shipped printing in another language and left reading it for later.
+  - `PrintedFormMatcher` builds what it expects from `BlankFormPrintPresenter::present()` in the default language, and ticks are matched by their choice labels. A page with Filipino labels would read badly.
+  - The paper says so in its footer today, so a tester is not misled. `D215`'s option B is the remedy: print the language beside the version stamp, and have the matcher read the page in that language.
+
+  **Live.** Filed by `M229`. **Tier: before-launch.**
+
+- **`nit` · `xlsform-languages-shared` — `XlsformExporter::extraLanguages()` keeps its own copy of the rule that `LocaleVariant::languagesIn()` now holds.**
+  Filed by `M229` (2026-11-09). The print side needed the same list of a version's languages, and #414 holds `XlsformExporter.php`, so the rule moved to `LocaleVariant` and the exporter was left alone.
+  - The two differ today: the exporter also reads validation messages' translations, and the shared rule reads choice labels and section descriptions.
+  The remedy, after #414 merges: decide which translated columns count, and have the exporter call the shared rule.
+
+  **Live.** Filed by `M229`. **Tier: during-testing.**

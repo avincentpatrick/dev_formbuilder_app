@@ -235,6 +235,16 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
         </p>
       )}
 
+      {area.indicators.some((i) => i.indicator_key.startsWith("oral_")) && (
+        <p className="text-sm text-muted">
+          Oral-health first visits and completed two visits are separate measures. Facility and
+          non-facility reports may overlap; do not add them as unique people. For ages 5 and above,
+          annual rates are withheld because the source adds quarterly populations into the annual
+          denominator. Visit counts are retained. These sources cover provinces/HUCs and selected
+          cities, not every municipality.
+        </p>
+      )}
+
       <section aria-labelledby="breakdowns-heading">
         <h2 id="breakdowns-heading" className="text-xl font-semibold">
           Age and sex breakdowns

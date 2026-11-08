@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  ORAL_HEALTH_DEFINITIONS,
   NCD_DEFINITIONS,
   FAMILY_PLANNING_DEFINITIONS,
   INFECTIOUS_DEFINITIONS,
@@ -17,6 +18,7 @@ function fixture(programme = "core") {
     infectious: INFECTIOUS_DEFINITIONS,
     "family-planning": FAMILY_PLANNING_DEFINITIONS,
     ncd: NCD_DEFINITIONS,
+    "oral-health": ORAL_HEALTH_DEFINITIONS,
   };
   const definitions = structuredClone(mapping[programme]);
   const sources = [
@@ -49,6 +51,15 @@ function fixture(programme = "core") {
   };
 }
 describe("FHSIS expansion boundary", () => {
+  it("accepts the reviewed oral-health package without permitting programme substitution", () => {
+    const bundle = fixture("oral-health");
+    expect(bundle.sources).toHaveLength(2);
+    expect(bundle.definitions).toHaveLength(21);
+    expect(() => validateExpansion(bundle)).not.toThrow();
+    expect(() => validateExpansion({ ...bundle, programme_set: "ncd" })).toThrow(
+      "reviewed mapping",
+    );
+  });
   it("accepts only the reviewed NCD batch and all nine source workbooks", () => {
     const bundle = fixture("ncd");
     expect(bundle.sources).toHaveLength(9);

@@ -6,7 +6,8 @@ is documented in [FHSIS_CHILD_HEALTH.md](FHSIS_CHILD_HEALTH.md), and prenatal/ma
 in [FHSIS_MATERNAL.md](FHSIS_MATERNAL.md). Infectious-disease additions are documented in
 [FHSIS_INFECTIOUS.md](FHSIS_INFECTIOUS.md). Family planning is documented in
 [FHSIS_FAMILY_PLANNING.md](FHSIS_FAMILY_PLANNING.md). NCD additions are documented in
-[FHSIS_NCD.md](FHSIS_NCD.md).
+[FHSIS_NCD.md](FHSIS_NCD.md). Oral-health additions are documented in
+[FHSIS_ORAL_HEALTH.md](FHSIS_ORAL_HEALTH.md).
 
 This is an **append**, not a rerun of the original first-load tool. Deploy the release containing
 `db/load-fhsis-expansion.mjs` and the age/sex dashboard before loading. The original FHSIS facts

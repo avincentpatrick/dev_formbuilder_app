@@ -223,6 +223,7 @@ export function fhsisBreakdownLabel(key: string): string {
 export function fhsisLimitedGeography(key: string): boolean {
   return (
     key.startsWith("birth_") ||
+    key.startsWith("oral_") ||
     (key.startsWith("ncd_") &&
       !["ncd_20_59_assessed", "ncd_20_59_htn", "ncd_20_59_dm"].includes(key)) ||
     key.startsWith("fp_") ||

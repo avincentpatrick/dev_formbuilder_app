@@ -48,6 +48,21 @@ class MappingTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'Unresolved name|outside current region'):
                 list(b.named_rows(name,'Annual1',1))
 
+    def test_oral_hierarchy_overrides_wrong_code_for_same_named_municipality(self):
+        with tempfile.TemporaryDirectory() as folder:
+            w=openpyxl.Workbook();w.active.title='Annual'
+            w.active.append(['0200000000','Region',1])
+            w.active.append(['0102915000','Quirino',5])
+            w.save(Path(folder)/'oral.xlsx')
+            b=object.__new__(ExpansionBuilder);b.directory=Path(folder);b.sheet_counts={};b.corrections=[]
+            b.geos={'02':dict(geo_level='region',region_code='02'),'02057':dict(geo_level='province',region_code='02'),'0102915':dict(geo_level='citymun',region_code='01')}
+            b.canonical=defaultdict(set,REGION={'02'},QUIRINO={'02057','0102915'})
+            FILES['oral']='oral.xlsx'
+            rows=list(b.named_rows('oral','Annual',1,area_column=2))
+            self.assertEqual(rows[1][2]['geo_code'],'02057')
+            self.assertEqual(rows[1][2]['source_psgc'],'0102915000')
+            self.assertEqual(b.corrections[0]['to'],'02057')
+
     def test_names_prefer_province_and_use_region_for_ambiguous_city(self):
         with tempfile.TemporaryDirectory() as folder:
             w=openpyxl.Workbook();s=w.active;s.title='Annual'

@@ -50,6 +50,13 @@ export function fhsisRateLabel(indicator: FhsisIndicator): string {
   if (indicator.unit === "count") return "Count only";
   if (indicator.unit.startsWith("persons per ") && indicator.denominator === 0)
     return "Not defined (zero units)";
+  if (
+    ["ncd_cervical_lesions", "infect_schisto_treated"].includes(indicator.indicator_key) &&
+    indicator.rate !== null
+  ) {
+    if (indicator.denominator === 0) return "Not defined (zero denominator)";
+    if (indicator.denominator === null) return "Not defined (denominator missing)";
+  }
   if (indicator.rate === null) return "Rate not reported";
   const value = indicator.rate.toLocaleString(
     "en-PH",

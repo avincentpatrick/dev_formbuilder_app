@@ -62,6 +62,18 @@ function fixture(programme = "core") {
   };
 }
 describe("FHSIS expansion boundary", () => {
+  it("rejects superseded count-only metadata for the confirmed composite rates", () => {
+    for (const [programme, key] of [
+      ["ncd", "ncd_cervical_lesions"],
+      ["infectious", "infect_schisto_treated"],
+    ]) {
+      const bundle = fixture(programme);
+      expect(() => validateExpansion(bundle)).not.toThrow();
+      bundle.definitions.find((d: { indicator_key: string }) => d.indicator_key === key).unit =
+        "count";
+      expect(() => validateExpansion(bundle)).toThrow();
+    }
+  });
   it("accepts the separate combined delivery category without duplicating core definitions", () => {
     const bundle = fixture("combined-delivery");
     expect(() => validateExpansion(bundle)).not.toThrow();

@@ -100,3 +100,5 @@ Vital statistics and the 19 cumulative morbidity chapters are prepared separatel
 Demographic summaries complete the remaining annual-content preparation gap; see [FHSIS_DEMOGRAPHICS_LOAD.md](FHSIS_DEMOGRAPHICS_LOAD.md). The consolidated load remains on HOLD.
 
 Combined vaginal–caesarean deliveries: see [FHSIS_COMBINED_DELIVERY_LOAD.md](FHSIS_COMBINED_DELIVERY_LOAD.md).
+
+The held infectious/NCD batches now include [confirmed composite denominators](FHSIS_CONFIRMED_DENOMINATORS.md). Use their revised checksums; earlier count-only bundles are superseded.

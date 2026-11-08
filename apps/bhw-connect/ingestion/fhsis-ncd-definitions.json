@@ -414,8 +414,8 @@
     "program_area": "ncd",
     "label": "Positive for precancerous lesions, women aged 30–65",
     "numerator_def": "Positive for precancerous lesions, women aged 30–65",
-    "denominator_def": "Count only; source rate held because its denominator is not explicit in a single source field",
-    "unit": "count",
+    "denominator_def": "Women aged 30–65 screened by VIA, Pap smear or HPV DNA (sum of source method counts, excluding assessed-only women); FHSIS 2025 Annual Report, p. 88. Rate undefined when denominator is zero.",
+    "unit": "percent (0-100, may exceed)",
     "source_workbook": "4a. CA_nofml.xlsx",
     "uuc_criterion_d": false
   },

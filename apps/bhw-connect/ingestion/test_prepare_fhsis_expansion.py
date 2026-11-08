@@ -5,9 +5,21 @@ from pathlib import Path
 from collections import defaultdict, Counter
 import openpyxl
 from prepare_fhsis import FILES
-from prepare_fhsis_expansion import ExpansionBuilder, maternal_specifications, demographic_specifications, convert_excel_percentage
+from prepare_fhsis_expansion import ExpansionBuilder, maternal_specifications, demographic_specifications, convert_excel_percentage, attach_composite_denominator
 
 class MappingTests(unittest.TestCase):
+    def test_composite_denominator_preserves_missing_zero_and_source_rate(self):
+        record={'rate_pct':'12.345','numerator_exact':'2'}
+        attach_composite_denominator(record,[{'value':10,'source_column':4},{'value':6,'source_column':5}])
+        self.assertEqual(record['denominator_exact'],'16')
+        self.assertEqual(record['rate_pct'],'12.345')  # Never recompute the published rate.
+        attach_composite_denominator(record,[{'value':0},{'value':0}])
+        self.assertEqual(record['denominator_exact'],'0')
+        for missing in [None,'*']:
+            attach_composite_denominator(record,[{'value':10},{'value':missing}])
+            self.assertIsNone(record['denominator_exact'])
+            self.assertIsNone(record['source_denominator_components'][1]['value'])
+
     def test_excel_percentage_conversion_requires_reviewed_format_and_preserves_raw(self):
         record={'rate_pct':'0.125','over_100':False}
         convert_excel_percentage(record,'0.00%')

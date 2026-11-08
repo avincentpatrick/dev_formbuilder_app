@@ -238,8 +238,17 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
           Risk factors and cancer screening pathways can overlap; do not add them as unique people.
           Suspicious or significant screening findings are not confirmed cancer diagnoses. Most NCD
           sources report provinces/HUCs and selected cities; adult annual risk assessment also
-          includes municipalities. The cervical precancerous-lesion rate is withheld because its
-          denominator is not explicit in the source; its count is retained.
+          includes municipalities. The cervical precancerous-lesion denominator includes VIA, Pap
+          smear and HPV DNA screenings, excluding assessed-only women.
+        </p>
+      )}
+
+      {area.indicators.some(
+        (i) => i.indicator_key === "infect_schisto_treated" && i.unit.startsWith("percent"),
+      ) && (
+        <p className="text-sm text-muted">
+          Schistosomiasis treatment uses confirmed acute plus chronic cases as its denominator.
+          Rates with zero denominators are undefined; reported treatment counts remain visible.
         </p>
       )}
 

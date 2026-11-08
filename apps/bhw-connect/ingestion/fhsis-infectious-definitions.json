@@ -194,8 +194,8 @@
     "program_area": "infectious",
     "label": "Schistosomiasis cases treated in health facilities (source chronic table)",
     "numerator_def": "Schistosomiasis cases treated in health facilities (source chronic table)",
-    "denominator_def": "Count only; source rate withheld because its denominator cannot be established from the annual tables",
-    "unit": "count",
+    "denominator_def": "Confirmed acute plus confirmed chronic schistosomiasis cases; FHSIS 2025 Annual Report, p. 96. Rate undefined when denominator is zero.",
+    "unit": "percent (0-100, may exceed)",
     "source_workbook": "Schisto_2025_EB_nofml.xlsx",
     "uuc_criterion_d": false
   },

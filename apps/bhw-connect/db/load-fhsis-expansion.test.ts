@@ -1,11 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
-import { DEFINITIONS, validateExpansion, loadExpansion } from "./load-fhsis-expansion.mjs";
-function fixture() {
-  const definitions = structuredClone(DEFINITIONS);
+import {
+  CHILD_HEALTH_DEFINITIONS,
+  DEFINITIONS,
+  validateExpansion,
+  loadExpansion,
+} from "./load-fhsis-expansion.mjs";
+function fixture(child = false) {
+  const definitions = structuredClone(child ? CHILD_HEALTH_DEFINITIONS : DEFINITIONS);
   const sources = [
     ...new Set(definitions.map((d: { source_workbook: string }) => d.source_workbook)),
   ].map((file) => ({ file, sha256: "a".repeat(64) }));
   return {
+    programme_set: child ? "child-health" : undefined,
     format: "bhw-fhsis-expansion-v1",
     dataset_slug: "fhsis-2025",
     retrieved: "2026-11-07",
@@ -31,6 +37,20 @@ function fixture() {
   };
 }
 describe("FHSIS expansion boundary", () => {
+  it("accepts only the reviewed child-health batch and its five distinct sources", () => {
+    const child = fixture(true);
+    expect(child.sources).toHaveLength(5);
+    expect(child.definitions).toHaveLength(12);
+    expect(() => validateExpansion(child)).not.toThrow();
+    expect(() => validateExpansion({ ...child, programme_set: undefined })).toThrow(
+      "reviewed mapping",
+    );
+    expect(() => validateExpansion({ ...child, programme_set: "unreviewed" })).toThrow(
+      "Unknown programme",
+    );
+    child.sources.push(child.sources[0]);
+    expect(() => validateExpansion(child)).toThrow("checksummed workbooks");
+  });
   it("requires the reviewed definitions, provenance, unique facts and all national checkpoints", () => {
     expect(() => validateExpansion(fixture())).not.toThrow();
     const altered = fixture();

@@ -13,6 +13,7 @@ import {
 import { withBasePath } from "@/lib/base-path";
 import { computeQuantileBins } from "@/lib/charts/color-scale";
 import { useMapActivity } from "./map-activity";
+import { POVERTY_BINS } from "@/lib/maps/poverty";
 import { MapLegend } from "./map-legend";
 const DatasetCanvas = dynamic(() => import("./dataset-canvas").then((m) => m.DatasetCanvas), {
   ssr: false,
@@ -73,7 +74,17 @@ export function DatasetMapCard({
     return () => controller.abort();
   }, [active, query, key, result?.key]);
   const data = result?.key === key && result.data.state === "available" ? result.data : null;
-  const bins = useMemo(() => computeQuantileBins(data?.rows.map((r) => r.value) ?? []), [data]);
+  const poverty = dataset === "psa-sae-poverty-2023";
+  const navigationOnly = data?.valueSupport === "navigation-only";
+  const bins = useMemo(
+    () =>
+      navigationOnly
+        ? []
+        : poverty
+          ? POVERTY_BINS
+          : computeQuantileBins(data?.rows.map((r) => r.value) ?? []),
+    [data, poverty, navigationOnly],
+  );
   const metric = metrics.find((m) => m.id === choice.indicator);
   const selected = data?.rows.find((r) => r.code === choice.selected);
   const shapeCodes = geometry?.key === key ? geometry.codes : null;
@@ -166,12 +177,19 @@ export function DatasetMapCard({
                   expanded={expanded}
                 />
                 <p className="text-xs text-muted">
-                  Quantiles relative to displayed areas. Gray means no reported value. Missing
-                  shapes remain in the table. Use Ctrl/⌘ + scroll to zoom; two fingers to pan.
+                  {navigationOnly
+                    ? "Geography navigation only. Choose a province to see published city/municipality estimates."
+                    : poverty
+                      ? "Fixed percentage breaks across provinces. Gray means missing coverage, including excluded HUCs; it does not mean zero poverty."
+                      : "Quantiles relative to displayed areas. Gray means no reported value."}{" "}
+                  Missing shapes remain in the table. Use Ctrl/⌘ + scroll to zoom; two fingers to
+                  pan.
                 </p>
                 <MapLegend
                   bins={bins}
-                  hasNoData={data.rows.some((r) => r.value === null)}
+                  valueSuffix={poverty ? "%" : ""}
+                  noDataLabel={poverty ? "Missing coverage (not zero)" : undefined}
+                  hasNoData={!navigationOnly && data.rows.some((r) => r.value === null)}
                   hasSmallN={false}
                 />
               </>
@@ -193,9 +211,15 @@ export function DatasetMapCard({
           {data && (
             <>
               <p className="text-sm">
-                Reported area total:{" "}
-                {data.total === null ? "Not reported" : data.total.toLocaleString()} {metric?.unit}.
-                The total includes areas without drawable shapes.
+                {poverty ? (
+                  "Poverty incidence is published only for cities/municipalities. No provincial, regional or national rate is calculated here."
+                ) : (
+                  <>
+                    Reported area total:{" "}
+                    {data.total === null ? "Not reported" : data.total.toLocaleString()}{" "}
+                    {metric?.unit}. The total includes areas without drawable shapes.
+                  </>
+                )}
               </p>
               <label className="block text-sm">
                 Select an area
@@ -216,9 +240,21 @@ export function DatasetMapCard({
               {selected && (
                 <div className="space-y-2 text-sm">
                   <p>
-                    {selected.name}: {selected.value ?? "Not reported"}{" "}
+                    {selected.name}:{" "}
+                    {navigationOnly
+                      ? "Not published at this level"
+                      : (selected.value ?? "Not reported")}{" "}
                     {selected.value !== null ? metric?.unit : ""}
                   </p>
+                  {poverty && !navigationOnly && (
+                    <p>
+                      Published 90% confidence interval:{" "}
+                      {selected.ciLow != null && selected.ciHigh != null
+                        ? `${selected.ciLow}%–${selected.ciHigh}%`
+                        : "Not available"}
+                      .
+                    </p>
+                  )}
                   {data.childLevel !== "citymun" ? (
                     <button
                       className="underline"
@@ -237,7 +273,9 @@ export function DatasetMapCard({
                     </button>
                   ) : (
                     <p>
-                      Barangay polygons are not yet validated.{" "}
+                      {poverty
+                        ? "No barangay poverty estimates are published in this source."
+                        : "Barangay polygons are not yet validated."}{" "}
                       {dashboard && (
                         <Link
                           className="underline"
@@ -268,6 +306,9 @@ export function DatasetMapCard({
                       <tr>
                         <th scope="col">Area</th>
                         <th scope="col">{metric?.unit}</th>
+                        {poverty && !navigationOnly && (
+                          <th scope="col">Published 90% confidence interval</th>
+                        )}
                         <th scope="col">Geometry</th>
                       </tr>
                     </thead>
@@ -277,7 +318,18 @@ export function DatasetMapCard({
                           <th scope="row" className="py-2 font-normal">
                             {r.name}
                           </th>
-                          <td>{r.value ?? "Not reported"}</td>
+                          <td>
+                            {navigationOnly
+                              ? "Not published at this level"
+                              : (r.value ?? "Not reported")}
+                          </td>
+                          {poverty && !navigationOnly && (
+                            <td>
+                              {r.ciLow != null && r.ciHigh != null
+                                ? `${r.ciLow}%–${r.ciHigh}%`
+                                : "Not available"}
+                            </td>
+                          )}
                           <td>
                             {shapeCodes
                               ? shapeCodes.includes(r.code)

@@ -40,6 +40,7 @@ export function DatasetCanvas({
     const abort = new AbortController();
     let map: import("maplibre-gl").Map | undefined;
     let disposed = false;
+    let resize: ResizeObserver | undefined;
     async function start() {
       try {
         const [gl, response] = await Promise.all([
@@ -85,11 +86,14 @@ export function DatasetCanvas({
           attributionControl: false,
         });
         mapRef.current = map;
+        resize = new ResizeObserver(() => map?.resize());
+        resize.observe(container.current);
         map.on("error", () => {
           if (!disposed) setFailed(true);
         });
         map.on("load", () => {
           if (!map || disposed) return;
+          map.resize();
           map.addSource("areas", { type: "geojson", data: geometry });
           map.addLayer({
             id: "fill",
@@ -125,6 +129,7 @@ export function DatasetCanvas({
     return () => {
       disposed = true;
       abort.abort();
+      resize?.disconnect();
       map?.remove();
       mapRef.current = null;
     };

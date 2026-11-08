@@ -1,4 +1,5 @@
 "use client";
+import { composeMapPng } from "@/lib/maps/png";
 import { datasetMapExport } from "@/lib/maps/export";
 import { PROFILING_BINS } from "@/lib/maps/profiling";
 import dynamic from "next/dynamic";
@@ -51,9 +52,15 @@ export function DatasetMapCard({
   const [visible, setVisible] = useState(expanded);
   const active = useMapActivity(visible && metrics.length > 0);
   const [retry, setRetry] = useState(0);
+  const [capture, setCapture] = useState<{ key: string; run: () => Promise<HTMLCanvasElement> } | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const query = mapHref({ ...choice, selected: null }).split("?")[1];
   const key = `${query}&retry=${retry}`;
+  const exportVersion = `${key}:${choice.selected ?? ""}`;
+  const currentExportVersion = useRef(exportVersion);
+  useEffect(() => { currentExportVersion.current = exportVersion; }, [exportVersion]);
   useEffect(() => {
     if (expanded || !ref.current) return;
     const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting));
@@ -108,6 +115,25 @@ export function DatasetMapCard({
           : profiling
             ? "/profiling-status"
             : null;
+  async function downloadPng() {
+    if (!data || !active || capture?.key !== key) return;
+    setExporting(true); setExportError(null);
+    try {
+      const metadata = datasetMapExport(choice, data, bins, shapeCodes);
+      const frame = await capture.run();
+      if (currentExportVersion.current !== exportVersion) throw new Error("Selection changed");
+      const blob = await composeMapPng(frame, metadata);
+      if (currentExportVersion.current !== exportVersion) throw new Error("Selection changed");
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${choice.dataset}-${choice.indicator}-${choice.code}.png`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      setExportError("Map image could not be captured. Try again or download the JSON data.");
+    } finally { setExporting(false); }
+  }
   function downloadData() {
     if (!data) return;
     const content = JSON.stringify(datasetMapExport(choice, data, bins, shapeCodes), null, 2);
@@ -196,6 +222,7 @@ export function DatasetMapCard({
                   selected={choice.selected}
                   onSelect={(code) => setChoice((c) => ({ ...c, selected: code }))}
                   onGeometry={(codes) => setGeometry({ key, codes })}
+                  onCapture={(run) => setCapture(run ? { key, run } : null)}
                   expanded={expanded}
                 />
                 <p className="text-xs text-muted">
@@ -435,11 +462,19 @@ export function DatasetMapCard({
           boundary compatibility and a detailed basemap remain under review.
         </p>
       )}
+      {exportError && <p role="status">{exportError}</p>}
       <div className="flex flex-wrap gap-4 text-sm underline">
         <Link prefetch={false} href={mapHref(choice)}>
           {expanded ? "Share this map selection" : `Enlarge ${definition.title} map`}
         </Link>
         {dashboard && <Link href={dashboard}>Open dashboard</Link>}
+        {expanded && data && (
+          <button type="button" onClick={downloadPng}
+            disabled={!active || capture?.key !== key || exporting}
+            className="disabled:opacity-50">
+            {exporting ? "Preparing map image…" : "Download map image (PNG)"}
+          </button>
+        )}
         {data && (
           <button type="button" onClick={downloadData}>
             Download map data (JSON)

@@ -515,3 +515,37 @@ an actual downloaded file with failed geometry and a planned-dataset switch. Ful
 Vitest: 1,480 passed, 11 skipped. Lint (existing fixture warning), typecheck, migration lint
 and prefixed no-data production build passed. Browser tests ran against the prefixed local
 production server with development data and explicitly synthetic request fixtures.
+
+## Rendered dataset map PNG downloads (8 November 2026)
+
+Enlarged dataset maps now offer **Download map image (PNG)** after their WebGL map reaches
+idle with drawable geometry. Embedded cards keep their data export and Enlarge action.
+The capture copies MapLibre's canvas synchronously during a fresh render event, before the
+WebGL drawing buffer is discarded. It does not use a DOM screenshot, enable permanent
+`preserveDrawingBuffer`, add another live map or fetch additional dataset values.
+
+A separate canvas composes the actual current viewport with dataset/indicator, period,
+units, geographic scope, exact legend colors/bounds, selected area/value, denominator where
+applicable, published selected poverty uncertainty, complete-table coverage, reported parent
+total, source/date/license/attribution and disclosure notes. It explicitly states that the
+image is only the current viewport and directs readers to the JSON export for complete
+rows and area-specific notes. Boundary availability is not represented as historical
+acceptance. Existing adapted 2023-series boundary provenance is credited; no new candidate
+boundaries are promoted. Long metadata wraps without clipping ordinary words.
+
+The exported frame is 1,200 pixels wide with a bounded height, preserving its aspect ratio.
+Capture has a five-second timeout and rejects removed/failed maps. A loading, unavailable or
+failed map cannot export PNG. Selection changes during asynchronous encoding cancel that
+export, and failures offer an accessible status message plus the JSON alternative. Temporary
+Blob URLs are revoked. Phone dimensions here are automated Chromium viewport tests, not a
+claim about real-device/network performance or production basemap readiness.
+
+Validation: two metadata unit tests; full seeded Vitest 1,483 passed, 11 skipped. Lint
+(existing fixture warning), typecheck, migration lint and prefixed no-data production build
+passed. All 20 dataset-map browser cases passed, then the PNG checks were expanded and all
+three focused cases passed (1,280px and 390px downloads plus failed geometry; 21 distinct
+cases in the final suite). Downloads were decoded and checked for painted map pixels beyond
+the legend's area; the resulting desktop image was also visually inspected. Synthetic
+values explicitly supply the map colors; development NHFR provincial rows alone are missing.
+The React review checked effect cleanup, stable callback refs, lazy map initialization,
+keyboard-accessible controls and no new data-fetching or persistent WebGL-buffer overhead.

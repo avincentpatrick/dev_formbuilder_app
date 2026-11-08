@@ -462,3 +462,56 @@ test("map data download preserves complete rows and selected context when geomet
   await page.getByLabel("Map dataset").selectOption("ways-forward");
   await expect(page.getByRole("button", { name: "Download map data (JSON)" })).toHaveCount(0);
 });
+
+for (const viewportWidth of [1280, 390]) {
+test(`PNG download includes a nonblank rendered WebGL map at ${viewportWidth}px`, async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: viewportWidth, height: 844 });
+  await page.route("**/api/dataset-map?**", (route) => route.fulfill({ json: {
+    state: "available", rows: [
+      { code: "01028", name: "Synthetic Ilocos Norte", value: 0 },
+      { code: "01029", name: "Synthetic Ilocos Sur", value: 20 },
+      { code: "01033", name: "Synthetic La Union", value: 40 },
+      { code: "01055", name: "Synthetic Pangasinan", value: 60 },
+    ], total: 120, area: "Synthetic Region I", childLevel: "province",
+    source: "Synthetic export fixture", date: "2026-09-01", license: "Test only",
+    geometryUrl: "/bhw-connect/geo/provinces/01.json",
+  } }));
+  await page.goto("map?dataset=nhfr-2026-09&level=region&code=01");
+  const button = page.getByRole("button", { name: "Download map image (PNG)" });
+  await expect(button).toBeEnabled();
+  const downloadPromise = page.waitForEvent("download");
+  await button.click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("nhfr-2026-09-nhfr.facilities-01.png");
+  await download.saveAs(testInfo.outputPath("map-export.png"));
+  const stream = await download.createReadStream();
+  const chunks = [];
+  for await (const chunk of stream!) chunks.push(chunk);
+  const bytes = Buffer.concat(chunks);
+  expect(bytes.subarray(1, 4).toString()).toBe("PNG");
+  const pixels = await page.evaluate(async (base64) => {
+    const image = new Image(); image.src = `data:image/png;base64,${base64}`;
+    await image.decode();
+    const canvas = document.createElement("canvas"); canvas.width = image.width; canvas.height = image.height;
+    const ctx = canvas.getContext("2d")!; ctx.drawImage(image, 0, 0);
+    // The minimum colored area below exceeds all legend swatches combined.
+    const rgba = ctx.getImageData(0, 100, canvas.width, canvas.height - 100).data;
+    let colored = 0;
+    for (let i = 0; i < rgba.length; i += 4) {
+      if (Math.max(rgba[i], rgba[i + 1], rgba[i + 2]) - Math.min(rgba[i], rgba[i + 1], rgba[i + 2]) > 20) colored++;
+    }
+    return { width: image.width, height: image.height, colored };
+  }, bytes.toString("base64"));
+  expect(pixels.width).toBe(1200);
+  expect(pixels.height).toBeGreaterThan(800);
+  expect(pixels.colored).toBeGreaterThan(5000);
+});
+}
+
+test("failed geometry cannot produce a PNG", async ({ page }) => {
+  await page.route("**/geo/regions.json", (route) => route.fulfill({ status: 503, body: "Unavailable" }));
+  await page.goto("map?dataset=nhfr-2026-09");
+  await expect(page.getByText("Map unavailable. Use the area selector and complete table below.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Download map image (PNG)" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Download map data (JSON)" })).toBeEnabled();
+});

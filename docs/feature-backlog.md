@@ -13147,12 +13147,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `${related} = '' or . > ${related}`. **Live.** It needs an export of a form carrying such a rule. Filed by `M134`.
   **Tier: during-testing.**
 
-- **`nit` · A structured "contains" on a single choice is a substring test.** Found by `M134` while splitting
+- ✅ **CLOSED BY `M226` (2026-11-08) — ****`nit` · A structured "contains" on a single choice is a substring test.** Found by `M134` while splitting
   `ValueShape`'s choice shape for `R-87160c81`. `ValueShape::allowsOperator()` keeps `contains` on a single choice or
   dropdown, and the lowering reads it as text containment, so "required if colour contains `re`" holds for `red` and
   `green` alike. Kept rather than refused, because refusing it would block publishing forms that use it on purpose;
   `ConversionCensusTest` already calls it a substring test. The remedy is a decision: refuse it, or relabel it in the
   editor. **Live.** Filed by `M134`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M226` (2026-11-08), on its branch, by `D214` = A (relabel), the user's answer in chat.**
+  - `ComparisonOperator::labelFor()` names `contains` on a single choice or dropdown "contains the text". `BuilderPresenter` ships it as the operator's `shape_labels`, and the rule editor shows it wherever the compared question is one of those.
+  - **The condition editor was measured and is not the same trap.** Its "includes" on a single choice writes `selected()`, which is an exact match on one value.
+  - The conflict dialog and the type-change dialog still print the plain "contains"; filed below as `contains-label-in-dialogs`.
+  - New cases: one in `BuilderEnumsPayloadTest` and one Vitest case in `ValidationEditor.test.ts`, each red first. A mutant in the enum and one in the editor are both CAUGHT. Ships as 0.18.2.
 
 - **`nit` · An expression may compare a note with a value, which never holds.** Found by `M134` while classifying
   operands for `R-87160c81`. A note is never answered, so `${remark} = 'x'` is constant false and `${remark} != 'x'`
@@ -15730,3 +15735,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, to be measured when taken: assert the gauge equals the surviving row's `size_bytes`, which still reddens on an accumulating design and does not care about the clock. Pinning the clock in the case would also work and proves less.
 
   **Live.** Filed by `M214`. **Tier: during-testing.**
+
+- **`nit` · `contains-label-in-dialogs` — The conflict dialog and the type-change dialog call a single-choice rule's "contains" plain "contains", while the rule editor now calls it "contains the text".**
+  Found by `M226` (2026-11-08), building `D214`'s relabel.
+  - `conflict-diff.ts` and `field-conversion.ts` each describe a saved rule with `optionLabel(enums.comparison_operators, rule.operator)`, the operator's plain `label`.
+  - `D214`'s answer named the rule editor, so neither changed. Both would need the compared question's shape to pick `shape_labels`, and neither has it to hand today.
+  The remedy, when taken: pass the compared question's value shape to both describers and read `shape_labels` first, as `ValidationEditor` does.
+
+  **Live.** Filed by `M226`. **Tier: during-testing.**

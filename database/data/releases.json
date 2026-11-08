@@ -1,5 +1,15 @@
 [
     {
+        "version": "0.18.3",
+        "title": "Changing a date question to a time warns you first",
+        "items": [
+            {
+                "kind": "improved",
+                "text": "When you change a question from a date to a time, or from a time to a date or a date and time, the builder now warns you about each condition or rule that compares it with a date or a time, because those comparisons would stop working and the form could not be published until you fix them. Changing a date to a date and time still works without a warning."
+            }
+        ]
+    },
+    {
         "version": "0.17.1",
         "title": "Builder panels that grow with your text",
         "items": [

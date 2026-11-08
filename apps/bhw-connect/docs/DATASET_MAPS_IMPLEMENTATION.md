@@ -363,3 +363,32 @@ lint (existing fixture warning), typecheck, migration lint and the prefixed buil
 Seeded-database Vitest: 1,459 passed, 11 skipped. No UI changes; browser tests were not rerun.
 Production geography certification, reviewed historical crosswalks, shared-edge-safe
 geometry, accepted versioned storage delivery and actual barangay drill-down remain pending.
+
+## Upstream topology comparison and joint simplification trial (8 November 2026)
+
+Compared all 10,322 reported candidate-overlap pairs against the pinned unsimplified
+v1.0.1 shapefile source, verified against its supplier checksum. In the source CRS,
+10,314 pairs only touch, three are disjoint and five overlap. Of the touching pairs,
+10,310 cross municipal source-file boundaries. This isolates a downstream processing
+problem for most reported overlaps without claiming nationwide upstream topology is clean.
+See [comparison and reproduction instructions](BARANGAY_TOPOLOGY_COMPARISON.md).
+
+A controlled trial copied all 123 source barangays of Bacarra and Laoag with their original
+coordinates, attributes and CRS. With Mapshaper 0.6.113, identical WGS84/10%-retention settings
+and simplification repair disabled, independent municipal imports reproduced seven overlap
+pairs; the joint input produced zero. Both retained 123 unique codes and 123 polygon
+components, with no invalid/missing polygons. No snap, clipping or cleaning command was used.
+The result supports constructing shared topology before simplifying and splitting delivery
+files. It is not blanket acceptance of nationwide simplification or small-island retention.
+
+Two offline tools pin source/report checksums, preserve unresolved/invalid source cases,
+prepare joint and independent control inputs without editing coordinates, refuse overwrites,
+and retain attribution/CRS/tool versions. Only aggregate evidence is committed; detailed
+pair identifiers, shapefiles and trial geometry remain outside git. Neither tool publishes
+assets or changes dataset boundary versions. The five observed upstream overlaps, historical
+crosswalks, full-country shared-edge checks and actual storage delivery remain unresolved.
+
+Validation: six topology/trial tests, ten candidate tests and thirteen boundary/district
+tests passed (29 total). Lint (existing fixture warning), typecheck, migration lint and
+prefixed production build passed. Seeded-database Vitest: 1,459 passed, 11 skipped.
+No UI changes; browser tests were not rerun.

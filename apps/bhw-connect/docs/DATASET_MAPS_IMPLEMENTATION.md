@@ -792,3 +792,21 @@ prefixed no-data build passed. Actual production row coverage remains a post-dep
 check; historical boundary acceptance and disclosure gates are unchanged.
 All 32 map browser cases passed, including training-topic switching, missing rows,
 profile denominator, 2025 period and topic-specific JSON download.
+
+## Production rate and municipal-coverage follow-up (8 November 2026)
+
+Eight bounded public checks now record deployed Census/StepZero accreditation, municipal
+NHFR/UUC health-route coverage and provincial income classification. Census and StepZero
+returned 18 reported regional rows and 23 reported Ilocos Norte municipal rows with matching
+basic geometry. Both rate views kept parent rates separate from null totals. NHFR/UUC also
+returned 23 municipal rows, while income classification returned four Region I provincial
+rows with no aggregate class. The new Basic Life Support training choice remained unsupported
+pending deployment; no inference about its source rows was made.
+
+See `DATASET_MAP_COVERAGE_AUDIT.md` and appended dated reports. No observation values,
+source extracts, application changes or hosting changes are included. Geometry/topology,
+historical compatibility and source numeric agreement remain separate acceptance checks.
+Validation: eight explicit live probes through the inherited proxy with TLS verification;
+1,610 database-backed tests passed (11 skipped), lint (existing fixture warning), typecheck,
+migration lint and prefixed no-data build passed. Browser tests were not rerun because
+this increment changes only audit evidence and documentation.

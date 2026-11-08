@@ -143,3 +143,56 @@ it("requires an active census release and refuses demographic or honorarium quer
     expect(response.status).toBe(400);
   }
 });
+it("provides poverty navigation without requesting or inventing regional rates", async () => {
+  mock.from.mockReturnValueOnce(
+    query({ data: [{ geo_code: "01", geo_name: "Region" }], error: null }),
+  );
+  const response = await GET(
+    new NextRequest("http://localhost/api/dataset-map?dataset=psa-sae-poverty-2023"),
+  );
+  const data = await response.json();
+  expect(data.valueSupport).toBe("navigation-only");
+  expect(data.total).toBeNull();
+  expect(data.rows[0].value).toBeNull();
+  expect(mock.from.mock.calls.map((c) => c[0])).toEqual(["dim_geo"]);
+});
+it("reads only municipal 2023 poverty observations, preserves CI, and never queries parent rates", async () => {
+  mock.geo.mockResolvedValueOnce({ geoCode: "01028", geoLevel: "province", geoName: "Province" });
+  const values = query({
+    data: [{ geo_code: "0102801", poverty_incidence: 12.5, ci_low: 10.2, ci_high: 14.8 }],
+    error: null,
+  });
+  mock.from
+    .mockReturnValueOnce(query({ data: [{ geo_code: "0102801", geo_name: "Town" }], error: null }))
+    .mockReturnValueOnce(values);
+  const response = await GET(
+    new NextRequest(
+      "http://localhost/api/dataset-map?dataset=psa-sae-poverty-2023&level=province&code=01028",
+    ),
+  );
+  const data = await response.json();
+  expect(data.rows[0]).toEqual({
+    code: "0102801",
+    name: "Town",
+    value: 12.5,
+    ciLow: 10.2,
+    ciHigh: 14.8,
+  });
+  expect(data.total).toBeNull();
+  expect(data.valueSupport).toBe("supported");
+  expect(values.eq).toHaveBeenCalledWith("sae_year", 2023);
+  expect(values.eq).toHaveBeenCalledWith("geo_level", "citymun");
+  expect(mock.from.mock.calls.map((c) => c[0])).toEqual(["dim_geo", "agg_poverty"]);
+});
+it("rejects poverty back-estimate periods and barangay rates", async () => {
+  for (const suffix of ["&period=2021", "&level=barangay&code=0102801001"]) {
+    expect(
+      (
+        await GET(
+          new NextRequest(`http://localhost/api/dataset-map?dataset=psa-sae-poverty-2023${suffix}`),
+        )
+      ).status,
+    ).toBe(400);
+  }
+  expect(mock.from).not.toHaveBeenCalled();
+});

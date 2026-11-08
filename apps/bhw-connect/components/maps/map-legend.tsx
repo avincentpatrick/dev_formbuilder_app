@@ -17,11 +17,13 @@ export function MapLegend({
   valueSuffix = "",
   hasNoData,
   hasSmallN,
+  noDataLabel = "No boundary/data — see list",
 }: {
   bins: ColorBin[];
   valueSuffix?: string;
   hasNoData: boolean;
   hasSmallN: boolean;
+  noDataLabel?: string;
 }) {
   if (bins.length === 0 && !hasNoData) return null;
 
@@ -59,7 +61,7 @@ export function MapLegend({
             className="inline-block h-3 w-3 shrink-0 rounded-sm border border-border"
             style={{ backgroundColor: NO_DATA_COLOR }}
           />
-          <span>No boundary/data — see list</span>
+          <span>{noDataLabel}</span>
         </span>
       )}
     </div>

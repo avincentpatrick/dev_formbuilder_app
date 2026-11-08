@@ -156,3 +156,75 @@ test("many visible cards share at most two maps and only lease owners load rows"
   await expect(population.locator("canvas")).toHaveCount(1);
   expect(datasets.filter((d) => d === "psa-popcen-2024").length).toBe(before);
 });
+
+test("poverty starts with geographic navigation, never regional rates or a parent total", async ({
+  page,
+}) => {
+  await page.goto("map?dataset=psa-sae-poverty-2023");
+  await expect(page.getByText(/Geography navigation only/)).toBeVisible();
+  await page.getByLabel("PSA SAE poverty 2023 area").selectOption("01");
+  await expect(page.locator("p").filter({ hasText: "Not published at this level" })).toBeVisible();
+  await page.getByRole("button", { name: /Show areas within/ }).click();
+  await page.getByLabel("PSA SAE poverty 2023 area").selectOption("01028");
+  await page.getByRole("button", { name: /Show areas within/ }).click();
+  await expect(page.getByText(/Fixed percentage breaks/)).toBeVisible();
+  await expect(page.getByText(/Reported area total/)).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Share this map selection" })).toHaveAttribute(
+    "href",
+    /period=2023&level=province&code=01028/,
+  );
+});
+
+test("poverty table retains published decimal rates, uncertainty, and missing coverage", async ({
+  page,
+}) => {
+  await page.route("**/api/dataset-map?**", (route) =>
+    route.fulfill({
+      json: {
+        state: "available",
+        valueSupport: "supported",
+        rows: [
+          { code: "0102801", name: "Synthetic town", value: 12.345, ciLow: 10.125, ciHigh: 14.875 },
+          {
+            code: "0102802",
+            name: "Synthetic excluded area",
+            value: null,
+            ciLow: null,
+            ciHigh: null,
+          },
+        ],
+        total: null,
+        area: "Synthetic test province",
+        childLevel: "citymun",
+        source: "Synthetic test fixture",
+        date: "2023-01-01",
+        license: "Test only",
+        geometryUrl: `${route.request().url().split("/api/")[0]}/geo/citymun/01028.json`,
+      },
+    }),
+  );
+  await page.goto("map?dataset=psa-sae-poverty-2023&level=province&code=01028");
+  await page.getByText(/Complete area table/).click();
+  await expect(
+    page.getByRole("row", { name: /Synthetic town 12.345 10.125%–14.875%/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("row", { name: /Synthetic excluded area Not reported Not available/ }),
+  ).toBeVisible();
+  await page.getByLabel("PSA SAE poverty 2023 area").selectOption("0102801");
+  await expect(
+    page.getByText("No barangay poverty estimates are published in this source."),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /Show areas within/ })).toHaveCount(0);
+});
+
+test("expanded map follows container resizing without a window resize", async ({ page }) => {
+  await page.goto("map?dataset=psa-sae-poverty-2023&level=province&code=01028");
+  await expect(page.locator("canvas")).toHaveCount(1);
+  await page.locator(".maplibregl-map").evaluate((el) => {
+    el.style.height = "600px";
+  });
+  await expect
+    .poll(() => page.locator("canvas").evaluate((el) => el.clientHeight))
+    .toBeGreaterThanOrEqual(590);
+});

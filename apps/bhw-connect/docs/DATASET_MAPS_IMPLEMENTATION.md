@@ -187,3 +187,37 @@ offscreen disposal and cached return. Phone emulation of the population map at 3
 had no horizontal overflow, no map-unavailable fallback and no axe violations. These checks
 use the synthetic dev database; they do not certify production coverage, historical
 boundary compatibility, licensed basemap delivery or real-device network performance.
+
+## PSA poverty map and published uncertainty (8 November 2026)
+
+Adds an independent PSA SAE poverty 2023 map. National and regional views are explicitly
+geographic navigation: they query geography only, do not request higher-level poverty
+observations, and label their values “Not published at this level.” Selecting a province
+loads only its immediate city/municipality estimates from the accepted source, with
+`sae_year = 2023` and `geo_level = citymun`. No parent rate is requested or derived, no
+percentages are averaged, and 2018/2021 back-estimate periods and barangay scopes remain
+rejected. Missing coverage, including the source's HUC exclusions, is not zero.
+
+The join preserves decimal point estimates and published 90% confidence intervals. Missing,
+invalid or duplicate observations do not become zero. Missing/reversed/non-finite interval
+bounds remain unavailable; valid published bounds are not clamped to 0–100 or rounded.
+Selected-area details and the complete table expose the uncertainty alongside the estimate.
+Fixed descriptive breaks at 10, 20, 30 and 40 percent support comparisons between provinces;
+they are display intervals, not official poverty classifications. Count maps retain their
+existing quantile legends. The map explicitly ends at municipal estimates: boundary work
+cannot create barangay poverty data that the source does not publish.
+
+Expanded canvases now observe their own container size and resize without requiring a
+window resize. This supports layout changes in the enlarged view while retaining the
+same two-map gallery budget and independent choices.
+
+Validation: lint (existing fixture warning only), typecheck, migration lint and the prefixed
+build passed. Seeded-database Vitest passed 1,437 tests, with 11 skipped. API tests confirm no
+poverty aggregate query on navigation levels and no parent query at municipal detail; unit
+fixtures cover decimals, uncertainty, exclusions, duplicates and fixed color cutpoints.
+Eleven browser tests passed, covering navigation → municipal estimates, exact synthetic interval display,
+no barangay drill and container resizing, alongside the existing state-isolation and
+resource-limit checks. A 390×844 phone emulation with the poverty table open had no axe
+violations, no horizontal overflow and no map-error fallback. Synthetic development rows
+are not evidence of complete production coverage. Other adapters, historical boundary
+acceptance, detailed basemap/PMTiles hosting and map PNG export remain pending.

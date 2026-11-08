@@ -7,7 +7,13 @@ export type MapChoice = MapScope & {
   period: string;
   selected: string | null;
 };
-export type MapRow = { code: string; name: string; value: number | null };
+export type MapRow = {
+  code: string;
+  name: string;
+  value: number | null;
+  ciLow?: number | null;
+  ciHigh?: number | null;
+};
 export type MapPayload = {
   state: "available";
   rows: MapRow[];
@@ -18,6 +24,7 @@ export type MapPayload = {
   date: string | null;
   license: string | null;
   geometryUrl: string;
+  valueSupport?: "supported" | "navigation-only";
 };
 export function prototypeIndicators(slug: string) {
   const supported: Record<string, readonly string[]> = {
@@ -41,6 +48,7 @@ export function prototypeIndicators(slug: string) {
       "bhw.nonregistered",
     ],
     "psa-popcen-2024": ["population.residents"],
+    "psa-sae-poverty-2023": ["poverty.incidence"],
   };
   const ids = supported[slug];
   return ids ? getDatasetMap(slug)!.indicators.filter((i) => ids.includes(i.id)) : [];

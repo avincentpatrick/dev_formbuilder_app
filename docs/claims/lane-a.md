@@ -16,7 +16,36 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M226`, `R-526dae72` by `D214` = relabel: a rule's "contains" reads "contains the text" when the compared question is a single choice or dropdown (m226-contains-the-text)
+## Status: ACTIVE CLAIM — `M227`, `R-cf7d0362`: changing a date question to a time question, or back, warns where a comparison on it stops holding (m227-temporal-census)
+
+Taken 2026-11-08, under the same instruction as `M224`. Branch `m227-temporal-census`, cut from origin/main at `d3f5787b`, PR into main. Held green for a merge point (`D137`), after `M226`'s #445.
+**One row, by `D13`.** It edits one hub, `ConversionCensus.php`. `ExpressionOperandJudge.php` and `OperandKind.php` are only read. No held PR touches `ConversionCensus.php`, `ConversionImpact.php` or `ConversionCensusTest.php`; #414 edits `FieldConversionServiceTest.php`, a different file.
+Row: `R-cf7d0362`, *"Converting a date question to a time question, or back, does not warn that an ordering on it stops holding."*
+
+### Evidence verified
+- `ConversionCensus` judges an ordering use only through `numeric()`, which is `ValueShape::allowsOperator(Gt)`, and that refuses every temporal shape. So an ordering on a date is never judged: **held**.
+- `FieldTypeConversion` puts date, time and date-and-time in one family, so the dialog offers the change: **held**.
+- The next publish refuses the result. `ExpressionOperandJudge::temporal()` refuses an ordering whose two sides do not order against each other (`OperandKind::ordersTemporallyWith()`: a time only against a time), and refuses `today()` against a time: **held**.
+
+### Premise verified
+- *"A date orders against dates and `today()`, a time against times"* holds (`ordersWith()`, `ordersTemporallyWith()`).
+- **Date ↔ date-and-time is not a break:** a date orders against a date-and-time. A judge keyed on "the temporal type changed" would warn there for nothing.
+- Which pairs break is already decided by the publish gate. A second table in the census would be one more unguarded mirror, which is the argument `ExpressionKeyUse`'s own docblock makes for sharing one walker.
+- The dialog shows each census entry's server-side `message` (`field-conversion.ts`), so a new impact needs no client copy.
+
+### Remedy verdict
+**Works, as a census judge that asks the publish gate.** For each ordering use, the census records which of date, time and date-and-time `ExpressionOperandJudge::judge()` accepts it as, given the draft's other questions. A change between two temporal types reports a new `temporal_ordering_breaks` impact where the use holds as the old type and is refused as the new one. That is exactly what the next publish would refuse, and nothing it would accept.
+
+Files: `app/Services/Forms/ConversionCensus.php`, `app/Enums/ConversionImpact.php`, `tests/Feature/Forms/ConversionCensusTest.php`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `VERSION` (0.18.3, after #445's 0.18.2), `database/data/releases.json`.
+Paired files taken: none.
+Namespaces spent: `M227`.
+Prediction:
+- The new census cases go red first.
+- The existing census cases do not move, because the new arm reads only temporal-to-temporal changes.
+- The one I most expect to be wrong: a date compared with a text question, which the gate lets through ("may hold a date"), so the judge must stay silent there too.
+
+## HELD — `M226`, `R-526dae72` by `D214` = relabel: a rule's "contains" reads "contains the text" when the compared question is a single choice or dropdown (m226-contains-the-text) — BUILT AND HELD: PR #445, waiting for a merge point
 
 Taken 2026-11-08, under the same instruction as `M224`. Branch `m226-contains-the-text`, cut from origin/main at `93d0b20b`, PR into main. Held green for a merge point (`D137`), after `M225`'s #444.
 **One row, by `D13`.** It edits no hub: `ValueShape.php` is only read.
@@ -78,6 +107,16 @@ Prediction:
 - No `VERSION` bump: no tester sees the contract (`M200`'s precedent).
 - The one I most expect to be wrong: a description I keep on `redirect` or `content_checksum` tripping the marks pattern.
 
+### Build record (2026-11-08, not merged)
+PR #444, head `10351f5a`, run 42430724854: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green.
+- The two new `OpenApiContractTest` cases were red against the old file; all 12 pass. Three mutants of the committed contract are CAUGHT (`save_and_resume` back to a string, the submit's 200, the draft's 201).
+- Pest: the 32 files that reach the guest endpoints or the presenter, 459 passed. The container's fresh export equals the committed file.
+- The trunk took `#443` (BHW Connect only) mid-build; it was merged into the branch and the line regenerated.
+
+**How the prediction fared:** right. No kept description tripped the marks case. **Not predicted:** PHPStan in the container reports 51 errors on this tree, and the same 51 with the trunk's three files swapped back in, while CI reports none. So that number is local noise, and only a change in it means anything.
+
+**The merge point owes:** merge after #442. Release this claim then.
+
 ## HELD — `M224`, `R-b1737198` and `R-6f994627`: the threat model stops calling the invitation door filed, and three documents stop saying a file waits for a clean scan (m224-threat-model-scan-status) — BUILT AND HELD: PR #442, waiting for a merge point
 
 Taken 2026-11-08, on the user's instruction to take the line's next `during-testing` rows that touch neither the backup setup nor a held PR's files. Branch `m224-threat-model-scan-status`, cut from origin/main at `b213e38a`, PR into main. Held green for a merge point (`D137`), after #434.
@@ -105,6 +144,15 @@ Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/cla
 Paired files taken: none.
 Namespaces spent: `M224`; `D13` exception #9. `state.php` prints a lower next free number because `M215` to `M223` are held and unreleased.
 Prediction: documents only. `DocumentedDefaultDriftTest` and `DocumentedEnumCatalogDriftTest` stay green, because no default or enum cell changes; the citation and pipeline lints stay green; nothing else moves. No `VERSION` bump: no tester reads these documents. The one I most expect to be wrong: `BacklogProvenanceTest` or `pipeline-lint` on the new row's markers.
+
+### Build record (2026-11-08, not merged)
+PR #442, head `c818cb0f`, run 42429115279: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green.
+- Locally: `preflight --with-gates --with-pint` OK; the citation lint at 16 rotten, the same as the trunk; `tests/Feature/Docs` plus `DocumentedDefaultDriftTest`, 208 passed, with `SuiteCollectionFloorTest` the known container phantom.
+- Also corrected: §4's guest-upload row, which pointed to §6's verdict. Filed: `virus-scanner-unwired` (`before-launch`) and `invitation-volume-unwatched` (`D33`'s watch, which `M121` noted in prose only).
+
+**How the prediction fared:** right. Nothing moved, and the new rows' markers passed both gates. One step went differently from the claim: exception #9 went to the trunk in a second claim push, as `M216`'s #8 did, not on the branch. So `decisions.md` is not in the PR, and a later increment's exception cannot conflict with it.
+
+**The merge point owes:** merge after #434. Release this claim then.
 
 ## HELD — `M223`, a row filed and closed by it: `E2eSeederIdempotencyTest`'s release-order assertion no longer depends on the order the table hands rows back (m223-release-order-assertion) — BUILT AND HELD: PR #435 green, waiting for a merge point, where it merges before #432, #433 and #434
 

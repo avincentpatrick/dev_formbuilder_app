@@ -273,6 +273,17 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
         </p>
       )}
 
+      {area.indicators.some((i) => i.program_area === "demographics") && (
+        <p className="text-sm text-muted">
+          FHSIS demographic summaries report population, household estimates and counts of
+          barangays, rural health units and barangay health stations. Population per unit is a
+          ratio, not a percentage or a staffing target; it is undefined where the source reports
+          zero units. Facility and barangay summaries cover provinces/HUCs and selected cities, not
+          every municipality. These source totals are separate from the facility registry, the BHW
+          census and the population figures used elsewhere on this site.
+        </p>
+      )}
+
       <section aria-labelledby="breakdowns-heading">
         <h2 id="breakdowns-heading" className="text-xl font-semibold">
           Age and sex breakdowns

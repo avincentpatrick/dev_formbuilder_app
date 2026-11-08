@@ -278,6 +278,23 @@ def vital_specifications(directory):
     return specs
 
 
+def demographic_specifications(directory):
+    source='Demographic_2025_EB_Final.xlsx'
+    if not (directory/source).is_file():raise ValueError('Missing demographic workbook')
+    specs=[]
+    def add(key,label,n,d=None,rate=None,sheet='BGY & BHS',coded=False,unit='count',denominator='No denominator: source count only'):
+        specs.append(dict(key='demo_'+key,label=label,file=source,n=n,d=d,rate=rate,sheet=sheet,
+                          sex=False,ages=None,start=8,coded=coded,program='demographics',unit=unit,denominator=denominator))
+    add('population','FHSIS estimated population',3,sheet='Health Workers',coded=True)
+    add('households','FHSIS estimated households',36,sheet='Health Workers',coded=True)
+    for key,label,n,unit in [('barangays','Barangays',3,'barangay'),('rhu','Rural health units',5,'rural health unit'),('bhs','Barangay health stations',7,'barangay health station')]:
+        add(key,'FHSIS reported '+label.lower(),n)
+        add('population_per_'+key,'FHSIS population per '+unit,2,n,n+1,unit='persons per '+unit,
+            denominator='Source-reported '+label.lower()+'; ratio is undefined when the count is zero. Source ratio retained, not recomputed.')
+        specs[-1]['numerator']='FHSIS estimated population in the BGY & BHS source table'
+    return specs
+
+
 class ExpansionBuilder(Builder):
     def raw_rows(self, source, sheet, start):
         for number,row in super().raw_rows(source,sheet,start):
@@ -324,7 +341,7 @@ def main():
     parser.add_argument('directory',type=Path)
     parser.add_argument('--reference',type=Path,required=True,help='Original private FHSIS directory containing TB geography and dim_geo.json')
     parser.add_argument('--retrieved',required=True)
-    parser.add_argument('--programme-set', choices=['core','child-health','maternal','infectious','family-planning','ncd','oral-health','vital-statistics'], default='core')
+    parser.add_argument('--programme-set', choices=['core','child-health','maternal','infectious','family-planning','ncd','oral-health','vital-statistics','demographics'], default='core')
     args=parser.parse_args()
     geos=json.loads((args.reference/'dim_geo.json').read_text())
     b=ExpansionBuilder(args.reference,geos);b.directory=args.directory
@@ -333,7 +350,7 @@ def main():
             if geo['geo_level']!='barangay':b.canonical[normalise(geo['geo_name'])].add(code)
         b.canonical[normalise('City of Carmona')]={'0402104'}
         b.canonical[normalise('Dr. Jose P. Rizal')]={'1705323'}
-    specs={'core':specifications,'child-health':child_health_specifications,'maternal':maternal_specifications,'infectious':infectious_specifications,'family-planning':family_planning_specifications,'ncd':ncd_specifications,'oral-health':oral_health_specifications,'vital-statistics':vital_specifications}[args.programme_set](args.directory)
+    specs={'core':specifications,'child-health':child_health_specifications,'maternal':maternal_specifications,'infectious':infectious_specifications,'family-planning':family_planning_specifications,'ncd':ncd_specifications,'oral-health':oral_health_specifications,'vital-statistics':vital_specifications,'demographics':demographic_specifications}[args.programme_set](args.directory)
     definitions=[]
     groups={}
     for spec in specs:groups.setdefault((spec['file'],spec['sheet'],spec['start'],spec['coded']),[]).append(spec)
@@ -351,7 +368,7 @@ def main():
                         b.indicator(base,row,s['key'],n,den,breakdown=sex)
                 for age,cols in zip(['10-14','15-19','20-49'],s['ages'] or []):b.indicator(base,row,s['key'],*cols,breakdown=age)
     for s in specs:
-        definitions.append(dict(indicator_key=s['key'],program_area=s['program'],label=s['label'],numerator_def=s['label'],denominator_def=s['denominator'],unit=s.get('unit') or ('percent (0-100, may exceed)' if s['rate'] else 'count'),source_workbook=s['file'],uuc_criterion_d=s['key']=='birth_shp'))
+        definitions.append(dict(indicator_key=s['key'],program_area=s['program'],label=s['label'],numerator_def=s.get('numerator',s['label']),denominator_def=s['denominator'],unit=s.get('unit') or ('percent (0-100, may exceed)' if s['rate'] else 'count'),source_workbook=s['file'],uuc_criterion_d=s['key']=='birth_shp'))
     units={d['indicator_key']:d['unit'] for d in definitions}
     for r in b.indicators:
         if not units[r['indicator_key']].startswith('percent'):r['over_100']=False

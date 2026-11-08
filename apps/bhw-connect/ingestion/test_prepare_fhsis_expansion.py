@@ -5,9 +5,27 @@ from pathlib import Path
 from collections import defaultdict, Counter
 import openpyxl
 from prepare_fhsis import FILES
-from prepare_fhsis_expansion import ExpansionBuilder, maternal_specifications
+from prepare_fhsis_expansion import ExpansionBuilder, maternal_specifications, demographic_specifications
 
 class MappingTests(unittest.TestCase):
+    def test_demographic_ratios_use_population_over_units_and_exclude_bhw(self):
+        with tempfile.TemporaryDirectory() as folder:
+            (Path(folder)/'Demographic_2025_EB_Final.xlsx').touch()
+            specs={s['key']:s for s in demographic_specifications(Path(folder))}
+            self.assertEqual(len(specs),8)
+            self.assertEqual(specs['demo_households']['n'],36)
+            self.assertFalse(any(s['n']==37 for s in specs.values()))
+            s=specs['demo_population_per_rhu']
+            b=object.__new__(ExpansionBuilder);b.indicators=[];b.missing=Counter()
+            b.indicator({},['Area',1000,10,100,5,200,0,0],s['key'],s['n'],s['d'],s['rate'])
+            self.assertEqual(b.indicators[0]['numerator_exact'],'1000')
+            self.assertEqual(b.indicators[0]['denominator_exact'],'5')
+            self.assertEqual(b.indicators[0]['rate_pct'],'200')
+            s=specs['demo_population_per_bhs']
+            b.indicator({},['Area',1000,10,100,5,200,0,0],s['key'],s['n'],s['d'],s['rate'])
+            self.assertEqual(b.indicators[1]['denominator_exact'],'0')
+            self.assertEqual(b.indicators[1]['rate_pct'],'0')
+
     def test_maternal_age_rates_keep_source_denominators_and_withhold_bad_td_rates(self):
         with tempfile.TemporaryDirectory() as folder:
             for prefix in ['2. BMI','3. Td','4. Prenatal','5. Hepatitis','6. Anemia','7. GD','8. Deworm','2. PP Supp']:

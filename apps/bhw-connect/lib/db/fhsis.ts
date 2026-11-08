@@ -48,6 +48,8 @@ export function toFhsisIndicator(
 export function fhsisRateLabel(indicator: FhsisIndicator): string {
   if (!indicator.reported) return "Not reported in 2025";
   if (indicator.unit === "count") return "Count only";
+  if (indicator.unit.startsWith("persons per ") && indicator.denominator === 0)
+    return "Not defined (zero units)";
   if (indicator.rate === null) return "Rate not reported";
   const value = indicator.rate.toLocaleString(
     "en-PH",
@@ -55,6 +57,7 @@ export function fhsisRateLabel(indicator: FhsisIndicator): string {
       ? { maximumSignificantDigits: 3 }
       : { maximumFractionDigits: 1 },
   );
+  if (indicator.unit.startsWith("persons per ")) return `${value} ${indicator.unit}`;
   const suffix = indicator.unit.startsWith("percent")
     ? "%"
     : indicator.unit.includes("1,000")
@@ -239,6 +242,7 @@ export function fhsisBreakdownLabel(key: string): string {
 export function fhsisLimitedGeography(key: string): boolean {
   return (
     key.startsWith("birth_") ||
+    (key.startsWith("demo_") && !["demo_population", "demo_households"].includes(key)) ||
     key.startsWith("vital_") ||
     key.startsWith("morb_") ||
     key.startsWith("oral_") ||

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   VITAL_STATISTICS_DEFINITIONS,
+  DEMOGRAPHICS_DEFINITIONS,
   MORBIDITY_DEFINITIONS,
   MORBIDITY_AGES,
   ORAL_HEALTH_DEFINITIONS,
@@ -23,6 +24,7 @@ function fixture(programme = "core") {
     ncd: NCD_DEFINITIONS,
     "oral-health": ORAL_HEALTH_DEFINITIONS,
     "vital-statistics": VITAL_STATISTICS_DEFINITIONS,
+    demographics: DEMOGRAPHICS_DEFINITIONS,
     "morbidity-01": MORBIDITY_DEFINITIONS.filter((d: { indicator_key: string }) =>
       d.indicator_key.startsWith("morb_01_"),
     ),
@@ -58,6 +60,18 @@ function fixture(programme = "core") {
   };
 }
 describe("FHSIS expansion boundary", () => {
+  it("accepts demographics with person-per-unit ratios, without a BHW measure", () => {
+    const bundle = fixture("demographics");
+    expect(bundle.definitions).toHaveLength(8);
+    expect(bundle.sources).toHaveLength(1);
+    expect(
+      bundle.definitions.some((d: { indicator_key: string }) => d.indicator_key.includes("bhw")),
+    ).toBe(false);
+    expect(() => validateExpansion(bundle)).not.toThrow();
+    expect(() => validateExpansion({ ...bundle, programme_set: "vital-statistics" })).toThrow(
+      "reviewed mapping",
+    );
+  });
   it("requires both morbidity sources and the complete age/sex grid", () => {
     const bundle = fixture("morbidity-01");
     bundle.sources.push({

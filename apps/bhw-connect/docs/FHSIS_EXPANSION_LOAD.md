@@ -96,3 +96,5 @@ could read every added row. The server's PostgreSQL 15 dry run remains necessary
 can only be performed by the operator.
 
 Vital statistics and the 19 cumulative morbidity chapters are prepared separately and remain on HOLD: see [FHSIS_VITAL_MORBIDITY_LOAD.md](FHSIS_VITAL_MORBIDITY_LOAD.md).
+
+Demographic summaries complete the remaining annual-content preparation gap; see [FHSIS_DEMOGRAPHICS_LOAD.md](FHSIS_DEMOGRAPHICS_LOAD.md). The consolidated load remains on HOLD.

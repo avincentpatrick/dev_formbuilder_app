@@ -435,3 +435,30 @@ test("UUC health-route table distinguishes zero, excluded and missing reports", 
   ).toBeVisible();
   await expect(page.getByText(/Reported area total: 20 barangays/)).toBeVisible();
 });
+
+test("map data download preserves complete rows and selected context when geometry fails", async ({ page }) => {
+  await page.route("**/api/dataset-map?**", (route) => route.fulfill({ json: {
+    state: "available", rows: [
+      { code: "01", name: "Synthetic zero", value: 0 },
+      { code: "02", name: "Synthetic missing", value: null },
+      { code: "99", name: "Synthetic unplaced", value: 42 },
+    ], total: 42, area: "Synthetic geography", childLevel: "region", source: "Synthetic source",
+    date: "2026-09-01", license: "Test only", geometryUrl: "/bhw-connect/geo/regions.json",
+  } }));
+  await page.route("**/geo/regions.json", (route) => route.fulfill({ status: 503, body: "Unavailable" }));
+  await page.goto("map?dataset=nhfr-2026-09&selected=99");
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download map data (JSON)" }).click();
+  const download = await downloadPromise;
+  const stream = await download.createReadStream();
+  const chunks = [];
+  for await (const chunk of stream!) chunks.push(chunk);
+  const content = JSON.parse(Buffer.concat(chunks).toString());
+  expect(content.selection).toMatchObject({ dataset: "nhfr-2026-09", selected: "99" });
+  expect(content.indicator.period).toBe("September 2026");
+  expect(content.rows.map((r: { value: number | null }) => r.value)).toEqual([0, null, 42]);
+  expect(content.rows.every((r: { geometry: string }) => r.geometry === "not-checked")).toBe(true);
+  expect(content.total).toBe(42);
+  await page.getByLabel("Map dataset").selectOption("ways-forward");
+  await expect(page.getByRole("button", { name: "Download map data (JSON)" })).toHaveCount(0);
+});

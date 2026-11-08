@@ -1,4 +1,5 @@
 "use client";
+import { datasetMapExport } from "@/lib/maps/export";
 import { PROFILING_BINS } from "@/lib/maps/profiling";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -107,6 +108,16 @@ export function DatasetMapCard({
           : profiling
             ? "/profiling-status"
             : null;
+  function downloadData() {
+    if (!data) return;
+    const content = JSON.stringify(datasetMapExport(choice, data, bins, shapeCodes), null, 2);
+    const url = URL.createObjectURL(new Blob([content], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${choice.dataset}-${choice.indicator}-${choice.code}.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
   function reset() {
     setTrail([]);
     setChoice(initialMapChoice(dataset));
@@ -429,6 +440,11 @@ export function DatasetMapCard({
           {expanded ? "Share this map selection" : `Enlarge ${definition.title} map`}
         </Link>
         {dashboard && <Link href={dashboard}>Open dashboard</Link>}
+        {data && (
+          <button type="button" onClick={downloadData}>
+            Download map data (JSON)
+          </button>
+        )}
       </div>
     </article>
   );

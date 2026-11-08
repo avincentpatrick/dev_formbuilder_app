@@ -694,3 +694,39 @@ test("renderer retry can recover after WebGL becomes available", async ({ page }
   await expect(page.getByRole("button", { name: "Download map image (PNG)" })).toBeEnabled();
   await expect(page.locator(".maplibregl-map")).toHaveCount(1);
 });
+
+test("StepZero source population and households keep their own dates, values and exports", async ({ page }) => {
+  await page.route("**/api/dataset-map?**", (route) => {
+    if (new URL(route.request().url()).searchParams.get("dataset") !== "bhw-stepzero-2026") return route.continue();
+    const column = new URL(route.request().url()).searchParams.get("indicator");
+    return route.fulfill({ json: {
+      state: "available", rows: [
+        { code: "01", name: "Synthetic zero", value: 0 },
+        { code: "02", name: "Synthetic missing", value: null },
+        { code: "99", name: "Synthetic unplaced", value: column === "stepzero.households" ? 12 : 42 },
+      ], total: column === "stepzero.households" ? 25 : 123, area: "Synthetic geography",
+      childLevel: "region", source: "StepZero synthetic source", date: "2026-09-01",
+      license: "Test only", geometryUrl: "/bhw-connect/geo/regions.json",
+    } });
+  });
+  await page.goto("map?dataset=bhw-stepzero-2026&indicator=stepzero.population&period=2026");
+  await expect(page.getByLabel("StepZero 2026 indicator")).toHaveValue("stepzero.population");
+  await page.getByText(/Complete area table/).click();
+  await expect(page.getByRole("row", { name: /Synthetic zero 0/ })).toBeVisible();
+  await expect(page.getByRole("row", { name: /Synthetic missing Not reported/ })).toBeVisible();
+  await expect(page.getByText(/Reported area total: 123 people/)).toBeVisible();
+  await page.getByLabel("StepZero 2026 indicator").selectOption("stepzero.households");
+  await expect(page.getByText(/Reported area total: 25 households/)).toBeVisible();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download map data (JSON)" }).click();
+  const stream = await (await downloadPromise).createReadStream();
+  const chunks = [];
+  for await (const chunk of stream!) chunks.push(chunk);
+  const exported = JSON.parse(Buffer.concat(chunks).toString());
+  expect(exported.indicator).toMatchObject({ id: "stepzero.households", period: "2026", unit: "households" });
+  expect(exported.rows.map((row: { value: number | null }) => row.value)).toEqual([0, null, 12]);
+  expect(exported.total).toBe(25);
+  await page.getByLabel("Map dataset").selectOption("psa-popcen-2024");
+  await expect(page.getByLabel("PSA population 2024 indicator")).toHaveValue("population.residents");
+  await expect(page.getByRole("link", { name: "Share this map selection" })).toHaveAttribute("href", /period=2024/);
+});

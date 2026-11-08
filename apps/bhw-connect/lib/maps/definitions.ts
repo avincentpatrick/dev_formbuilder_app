@@ -20,7 +20,7 @@ export type MapIndicator = {
   levels: readonly MapLevel[];
   denominator: string | null;
   legend: "count" | "rate" | "categorical";
-  /** An allowlisted catalog definition, never a caller-supplied table/column. */
+  /** An allowlisted aggregate read specification, never a caller-supplied table/column. */
   catalogSpec?: IndicatorSpec;
 };
 export type DatasetMapDefinition = {
@@ -67,6 +67,16 @@ function indicator(spec: IndicatorSpec): MapIndicator {
     catalogSpec: spec,
   };
 }
+// Map-only source context: do not reuse the dashboard population fallback or add ratios.
+const stepzeroContext: IndicatorSpec[] = ["population", "households"].map((column) => ({
+  id: `stepzero.${column}`,
+  label: column === "population" ? "Source population (StepZero)" : "Source households (StepZero)",
+  unit: column === "population" ? "people" : "households",
+  source: "bhw-stepzero-2026",
+  table: "agg_bhw_stepzero_counts",
+  column,
+  levels: ["national", "region", "province", "citymun", "barangay"],
+}));
 function catalogMap(
   slug: string,
   title: string,
@@ -75,6 +85,7 @@ function catalogMap(
 ): DatasetMapDefinition {
   const indicators = CATALOG.flatMap((d) => d.indicators)
     .filter((s) => s.source === source)
+    .concat(source === "bhw-stepzero-2026" ? stepzeroContext : [])
     .map(indicator);
   return {
     slug,
@@ -137,7 +148,7 @@ export const DATASET_MAPS: readonly DatasetMapDefinition[] = [
     "bhw-stepzero-2026",
     "StepZero 2026",
     "bhw-stepzero-2026",
-    "LGU-declared counts are distinct from validated profiles. Source population and household measures await their own adapter; never substitute PSA figures.",
+    "LGU-declared counts are distinct from validated profiles. Population and households use only StepZero source columns; missing values are not replaced with PSA figures or another release.",
   ),
   pending(
     "bhw-profiling-status-2026",

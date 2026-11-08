@@ -54,6 +54,8 @@ export function prototypeIndicators(slug: string) {
       "bhw.registered",
       "bhw.registered-accredited",
       "bhw.nonregistered",
+      "stepzero.population",
+      "stepzero.households",
     ],
     "psa-popcen-2024": ["population.residents"],
     "psa-sae-poverty-2023": ["poverty.incidence"],

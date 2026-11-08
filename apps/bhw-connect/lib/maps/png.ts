@@ -41,15 +41,18 @@ export function captureMapFrame(map: LibreMap): Promise<HTMLCanvasElement> {
 export function pngNotes(data: Context): string[] {
   const selected = data.rows.find((row) => row.code === data.selection.selected);
   const missing = data.rows.filter((row) => row.geometry === "missing").length;
+  const unchecked = data.rows.filter((row) => row.geometry === "not-checked").length;
+  const selectedValue = selected?.value == null ? "not available"
+    : `${selected.value}${data.indicator.unit === "%" ? "%" : ` ${data.indicator.unit}`}`;
   return [
     `${data.dataset.title} — ${data.indicator.label}`,
     `${data.indicator.period} | ${data.indicator.unit} | ${data.geography.area}`,
     `Current viewport. Selected: ${selected?.name ?? "none"}.`,
     `Legend: ${data.legend.method}. Gray: unavailable value or navigation-only geography; not zero.`,
-    `Coverage: ${data.rows.length} areas in complete table; ${missing} without drawable geometry. The image shows the current viewport only.`,
+    `Coverage: ${data.rows.length} areas in complete table; ${missing} without drawable geometry; ${unchecked} with geometry not checked. The image shows the current viewport only.`,
     `Reported parent ${data.parentMeasure.kind}: ${data.parentMeasure.value ?? "not available / not applicable"}${data.parentMeasure.kind === "rate" ? "%" : ""}. ${data.totalNote}`,
     ...(data.indicator.denominator ? [`Denominator: ${data.indicator.denominator}`] : []),
-    ...(selected ? [`Selected value: ${selected.value ?? "not available"}${selected.label ? ` (${selected.label})` : ""}. ${selected.note ?? ""}`] : []),
+    ...(selected ? [`Selected value: ${selectedValue}${selected.label ? ` (${selected.label})` : ""}. ${selected.note ?? ""}`] : []),
     ...(selected && data.indicator.confidenceLevel ? [`Published 90% confidence interval: ${selected.ciLow ?? "unavailable"} to ${selected.ciHigh ?? "unavailable"}.`] : []),
     `Source: ${data.source.title}. Source date: ${data.source.date ?? "not supplied"}. License: ${data.source.license ?? "not supplied"}.`,
     `Attribution: ${data.source.attribution}`,

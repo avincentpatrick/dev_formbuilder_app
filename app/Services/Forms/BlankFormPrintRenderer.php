@@ -53,9 +53,9 @@ final class BlankFormPrintRenderer
     ) {}
 
     /** The rendered document, ready to stream. */
-    public function render(Form $form, FormVersion $version): string
+    public function render(Form $form, FormVersion $version, ?string $locale = null): string
     {
-        return $this->toPdf($this->html($form, $version));
+        return $this->toPdf($this->html($form, $version, $locale));
     }
 
     /**
@@ -73,10 +73,10 @@ final class BlankFormPrintRenderer
      * untested parameter pretending to be an API — the same reasoning that kept the first layout's
      * palette out of this method's signature.
      */
-    public function html(Form $form, FormVersion $version): string
+    public function html(Form $form, FormVersion $version, ?string $locale = null): string
     {
         return $this->views->make('pdf.blank-form', [
-            'model' => $this->presenter->present($form, $version),
+            'model' => $this->presenter->present($form, $version, $locale),
         ])->render();
     }
 
@@ -90,11 +90,14 @@ final class BlankFormPrintRenderer
      * entirely non-latin, which slugs to '') falls back to a fixed stem rather than emitting
      * `-v2.pdf`.
      */
-    public function filename(Form $form, FormVersion $version): string
+    public function filename(Form $form, FormVersion $version, ?string $locale = null): string
     {
         $stem = Str::slug($form->title);
+        // M229: a printout in another language says which, slugged like the title; the default needs no suffix.
+        $printed = $this->presenter->printLocale($form, $version, $locale);
+        $language = $printed === $form->default_locale ? '' : Str::slug($printed);
 
-        return ($stem === '' ? 'blank-form' : $stem).'-v'.$version->version_number.'-blank.pdf';
+        return ($stem === '' ? 'blank-form' : $stem).'-v'.$version->version_number.'-blank'.($language === '' ? '' : '-'.$language).'.pdf';
     }
 
     private function toPdf(string $html): string

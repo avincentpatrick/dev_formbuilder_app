@@ -776,7 +776,7 @@ it('renders the printed table', function (): void {
 function printTranslatedFixture(): array
 {
     return printFixture([
-        'sections' => [['key' => 'home', 'label' => 'Home', 'label_translations' => ['fil' => 'Tahanan'], 'sequence' => 1]],
+        'sections' => [['key' => 'home', 'label' => 'Home', 'label_translations' => ['fil' => 'Tahanan'], 'sequence' => 1, 'is_repeatable' => false]],
         'fields' => [
             printField('color', 'single_select', [
                 'section_key' => 'home',

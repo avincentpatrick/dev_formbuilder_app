@@ -7632,9 +7632,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the row honest: `app/Enums/WebhookDeliveryStatus.php:33` is a real `dead_lettered` case and
   `resources/js/Pages/webhooks/Show.vue:271` renders delivery status generically, so the state is visible
   per endpoint — what is missing is the cross-endpoint view and any explicit dead-letter labelling.
-  **Live.** Filed by `M80`. **Tier: during-testing.**
+  **Live.** Filed by `M80`. **Tier: during-testing.** ⚠️ **Half (a) was done by `M230` (2026-11-09), with `R-1d43bef5`:** both stale flat paths now name the nested routes. What stays open is half (b), the cross-endpoint delivery log and its dead-letter labelling.
 
-- **`minor` · §7.1 names a `/api/v1/webhooks/endpoints` path segment that exists nowhere in the tree, and
+- ✅ **CLOSED BY `M230` (2026-11-09) — ****`minor` · §7.1 names a `/api/v1/webhooks/endpoints` path segment that exists nowhere in the tree, and
   it is a floor rather than a census.** Measured by `M79`'s sweeps (2026-09-06), joined and refuted by
   `M80`; the join rated this one `medium` confidence where its neighbours were `high`, and the reason is
   recorded below. Built is `/api/v1/webhooks` — `routes/api.php:317`, `:320`, `:339`, `:342`, `:345` — with
@@ -7650,6 +7650,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   left behind by maintenance that reached their immediate neighbours. ⚠️ Severity is `minor` because
   `openapi.json` is drift-gated in CI and correct, so nobody generating a client is misled; the exposure is
   a reader planning against §7.1. **Live.** Filed by `M80`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M230` (2026-11-09), on its branch.**
+  - §7.1's two webhook rows now name the built routes, each marked **implemented** as its neighbours are. Endpoints are `webhooks`, `webhooks/{webhookEndpoint}`, and its `test` and `rotate-secret`; deliveries are nested under their endpoint.
+  - The design doc's §5 redeliver path was the third copy and is corrected too. Its *"per the API spec's resource inventory"* led back to §7.1, which the inventory only cites.
+  - That is half (a) of `R-c8c8da76`, which stays open for half (b), the cross-endpoint delivery log.
+  - Each edit sits inside its own line, so nothing cited below it moved.
 
 - **`minor` · NFR §8 sets a 30-day soft-delete grace period before a hard-deletion job, and for the three
   entities it names there is no purge job, no grace-period config value, and nothing that soft-deletes.**

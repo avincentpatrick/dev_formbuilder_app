@@ -102,7 +102,7 @@ No integration beyond this list is committed to a phase — consistent with the 
 ## 5. Delivery Observability & Management
 
 - **Per-endpoint delivery log**: status, latency, response code/body excerpt, attempt count — already specified in `docs/architecture/technical-architecture.md` §7.4; this document adds the `dns_rebinding_blocked` status (§2.2) as a new distinguishable outcome alongside the existing success/failure/timeout states.
-- **Manual redeliver** (`POST /api/v1/webhooks/deliveries/{delivery}/redeliver`, per `docs/api-specification.md`'s resource inventory) re-enters the same delivery pipeline as a fresh attempt — including re-running the SSRF re-validation (§2.2), since the redeliver could happen long after the original attempt.
+- **Manual redeliver** (`POST /api/v1/webhooks/{webhookEndpoint}/deliveries/{webhookDelivery}/redeliver`, nested under its endpoint as built; a flat `/webhooks/deliveries/…` path was written here until `M230` and never existed) re-enters the same delivery pipeline as a fresh attempt — including re-running the SSRF re-validation (§2.2), since the redeliver could happen long after the original attempt.
 - **Endpoint testing**: a "Send test event" action (a synthetic `test.ping` event type, not counted against the real event catalog's semantics) lets a tenant verify their endpoint receives and correctly verifies the signature before relying on it for real events.
 - **Secret rotation**: dual-secret grace period (already named in `docs/architecture/technical-architecture.md` §7.2) — during rotation the old secret stays valid for a bounded window, so a receiver's own rotation isn't a hard cutover.
 

@@ -24,10 +24,19 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D213`, the last filed, was asked and answered on 2026-11-07 in `M216`'s session, after its read-only box check. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D214`, the last filed, was asked and answered on 2026-11-08 in `M226`'s session, before its build. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D214 — A rule's "contains" on a single-choice or dropdown question checks the choice's text, so "required if colour contains re" holds for both red and green. What should "contains" do there? **A — relabel it: it keeps working, and the rule editor calls it "contains the text".**
+
+**Asked and answered 2026-11-08 (user decision, in chat), in the session that took `R-526dae72`, whose remedy was this decision.** Filed and answered in one push, with `M226`'s claim.
+- **A — relabel it (chosen, the session's recommendation).** It keeps working, but the rule editor calls it "contains the text" for a single choice or dropdown, so an author sees that it matches text. No form stops publishing.
+- **B — stop offering it.** Hide it for those questions in the rule editor. Rules already saved keep working, and publish still accepts them.
+- **C — refuse it.** Publish refuses any form that uses it until the author changes the rule. This breaks forms that use it on purpose.
+
+**What it creates:** `M226` builds A and closes `R-526dae72`. The condition editor's "includes" was measured and is not the same trap: on a single choice it writes `selected()`, which is an exact match.
+
 ### D213 — The box has nowhere off it to copy the nightly backup: C: and E: sit on one RAID disk, and it has no mapped drives or real shares. Where does the copy go? **A — a shared folder on the user's separate desktop on the agency network, which stays on, set up on Monday 2026-11-09.**
 
 **Asked and answered 2026-11-07 (user decision, in chat), in `M216`'s session, after the read-only box check that `D212`'s second question asked for.** The user's words: *"let's set this up on monday. i have a separate desktop that is always open within the network pc."*

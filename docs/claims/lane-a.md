@@ -16,7 +16,36 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M225`, `R-4ea564fe` and `R-e2c1ba51`: the guest contract publishes `save_and_resume` as a boolean, and the guest submit's and draft save's success bodies as objects (m225-guest-contract-types)
+## Status: ACTIVE CLAIM — `M226`, `R-526dae72` by `D214` = relabel: a rule's "contains" reads "contains the text" when the compared question is a single choice or dropdown (m226-contains-the-text)
+
+Taken 2026-11-08, under the same instruction as `M224`. Branch `m226-contains-the-text`, cut from origin/main at `93d0b20b`, PR into main. Held green for a merge point (`D137`), after `M225`'s #444.
+**One row, by `D13`.** It edits no hub: `ValueShape.php` is only read.
+Row: `R-526dae72`, *"A structured "contains" on a single choice is a substring test."* Its remedy was a decision, and the user answered it in chat on 2026-11-08: **relabel**. That is `D214`, filed and answered in this claim's push.
+
+### Evidence verified
+- `ValueShape::allowsOperator(Contains)` admits `Choice`, which is exactly `SingleSelect` and `Dropdown`: **held**.
+- Both engines lower the structured operator to the internal `contains()`, which is a substring test on one value: PHP's `ExpressionEvaluator::evalMembershipFunction()` (`str_contains`) and the runtime's `evaluator.ts` (`toStr(value).includes(needle)`): **held**.
+- The validation editor labels it `contains`, from `ComparisonOperator::label()` through `BuilderPresenter`'s `comparison_operators`: **held**.
+
+### Premise verified
+- **The condition editor is NOT the same trap, measured.** Its "includes" on a single choice writes `selected()`, and `selected()` on one value is an exact match (`membership()` compares the whole string), not a substring test. Only the validation editor's structured rule needs the new label.
+- Two other places print the operator's plain label in prose: the conflict dialog (`conflict-diff.ts`) and the type-change dialog (`field-conversion.ts`). `D214`'s answer names the rule editor, so they stay as they are and are filed as one `nit`.
+- `ConditionLabelMirrorDriftTest` pins `sentenceLabel()`'s `includes` in the two client files of the condition editor. Neither file changes.
+- No held PR touches `ComparisonOperator.php`, `BuilderPresenter.php`, `types.ts`, `ValidationEditor.vue`, its test or `BuilderEnumsPayloadTest.php`.
+
+### Remedy verdict
+**Works, transmitted rather than restated.** `ComparisonOperator::labelFor(ValueShape)` returns "contains the text" for `Contains` on `Choice`, and `label()` otherwise. `BuilderPresenter` ships each operator's differing labels as `shape_labels`, and `ValidationEditor` shows `shape_labels[shape]` before `label`. Nothing a respondent sees changes, and no form stops publishing.
+
+Files: `app/Enums/ComparisonOperator.php`, `app/Services/Forms/BuilderPresenter.php`, `resources/js/components/builder/types.ts`, `resources/js/components/builder/ValidationEditor.vue`, `resources/js/components/builder/ValidationEditor.test.ts`, `tests/Feature/Forms/BuilderEnumsPayloadTest.php`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md` (`D214`, pushed with this claim), `VERSION` (0.18.2, after #434's 0.18.1), `database/data/releases.json`.
+Paired files taken: none.
+Namespaces spent: `M226`, `D214`.
+Prediction:
+- The new Vitest case is red first, and the Pest payload case too.
+- The other `ValidationEditor` cases stay green, because the label changes only where the shape is a choice.
+- The one I most expect to be wrong: a builder e2e spec that selects the operator by its visible text.
+
+## HELD — `M225`, `R-4ea564fe` and `R-e2c1ba51`: the guest contract publishes `save_and_resume` as a boolean, and the guest submit's and draft save's success bodies as objects (m225-guest-contract-types) — BUILT AND HELD: PR #444, waiting for a merge point
 
 Taken 2026-11-08, under the same instruction as `M224`. Branch `m225-guest-contract-types`, cut from origin/main at `8ecc3ea5`, PR into main. Held green for a merge point (`D137`), after `M224`'s #442.
 **Two rows in one increment: `D13` exception #10, allowed by the user in chat on 2026-11-08** (*"Pair them"*). Both rows land in one regeneration of `openapi.json`, a hub; split, the second PR would regenerate the file the first had just changed. Clause 1 is breached as well: both rows add cases to `tests/Feature/Api/OpenApiContractTest.php`, a non-hub file.

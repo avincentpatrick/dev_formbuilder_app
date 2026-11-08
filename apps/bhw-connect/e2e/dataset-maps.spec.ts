@@ -151,7 +151,9 @@ test("many visible cards share at most two maps and only lease owners load rows"
   await page
     .getByRole("article", { name: "Ways forward map", exact: true })
     .scrollIntoViewIfNeeded();
-  await expect(page.locator(".maplibregl-map")).toHaveCount(0);
+  // Another supported card may be adjacent to Ways forward as adapters roll out.
+  await expect(population.locator(".maplibregl-map")).toHaveCount(0);
+  await expect.poll(() => page.locator(".maplibregl-map").count()).toBeLessThanOrEqual(2);
   await population.scrollIntoViewIfNeeded();
   await expect(population.locator("canvas")).toHaveCount(1);
   expect(datasets.filter((d) => d === "psa-popcen-2024").length).toBe(before);
@@ -227,4 +229,78 @@ test("expanded map follows container resizing without a window resize", async ({
   await expect
     .poll(() => page.locator("canvas").evaluate((el) => el.clientHeight))
     .toBeGreaterThanOrEqual(590);
+});
+
+test("income classes navigate to LGUs with categorical labels, no regional class or totals", async ({
+  page,
+}) => {
+  await page.goto("map?dataset=lgu-income-class");
+  await expect(page.getByText(/Geography navigation only. Choose a region/)).toBeVisible();
+  await page.getByLabel("LGU income classification area").selectOption("01");
+  await page.getByRole("button", { name: /Show areas within/ }).click();
+  await expect(page.locator("ul").getByText("First class", { exact: true })).toBeVisible();
+  await expect(page.locator("ul").getByText("Fifth class", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Reported area total/)).toHaveCount(0);
+  await page.getByLabel("LGU income classification area").selectOption("01028");
+  await page.getByRole("button", { name: /Show areas within/ }).click();
+  await expect(page.getByRole("link", { name: "Share this map selection" })).toHaveAttribute(
+    "href",
+    /period=Effective\+2025-01-01&level=province&code=01028/,
+  );
+});
+
+test("income table separates classified, unclassified and unmatched LGUs", async ({ page }) => {
+  await page.route("**/api/dataset-map?**", (route) =>
+    route.fulfill({
+      json: {
+        state: "available",
+        valueSupport: "supported",
+        rows: [
+          {
+            code: "0102801",
+            name: "Synthetic town",
+            value: 2,
+            note: "Source LGU type: municipality",
+          },
+          {
+            code: "0102802",
+            name: "Synthetic unclassified",
+            value: null,
+            note: "Unclassified in source",
+          },
+          {
+            code: "0102803",
+            name: "Synthetic unmatched",
+            value: null,
+            note: "No matched source record",
+          },
+        ],
+        total: null,
+        area: "Synthetic province",
+        childLevel: "citymun",
+        source: "Synthetic DOF fixture",
+        date: "2024-11-05",
+        license: "Test only",
+        geometryUrl: `${route.request().url().split("/api/")[0]}/geo/citymun/01028.json`,
+      },
+    }),
+  );
+  await page.goto("map?dataset=lgu-income-class&level=province&code=01028");
+  await page.getByText(/Complete area table/).click();
+  await expect(
+    page.getByRole("row", { name: /Synthetic town Second class Source LGU type: municipality/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("row", { name: /Synthetic unclassified Unclassified in source/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("row", { name: /Synthetic unmatched No matched source record/ }),
+  ).toBeVisible();
+  await page.getByLabel("LGU income classification area").selectOption("0102801");
+  await expect(
+    page.getByText(
+      "Barangays have no independently published income class; this classification belongs to the named LGU.",
+    ),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /Show areas within/ })).toHaveCount(0);
 });

@@ -17,6 +17,7 @@ export function MapLegend({
   valueSuffix = "",
   hasNoData,
   hasSmallN,
+  categoryLabels,
   noDataLabel = "No boundary/data — see list",
 }: {
   bins: ColorBin[];
@@ -24,6 +25,7 @@ export function MapLegend({
   hasNoData: boolean;
   hasSmallN: boolean;
   noDataLabel?: string;
+  categoryLabels?: Readonly<Record<number, string>>;
 }) {
   if (bins.length === 0 && !hasNoData) return null;
 
@@ -38,8 +40,8 @@ export function MapLegend({
               style={{ backgroundColor: bin.color }}
             />
             <span>
-              {formatEdge(bin.min, valueSuffix)}
-              {bin.max > bin.min ? `–${formatEdge(bin.max, valueSuffix)}` : ""}
+              {categoryLabels?.[bin.min] ??
+                `${formatEdge(bin.min, valueSuffix)}${bin.max > bin.min ? `–${formatEdge(bin.max, valueSuffix)}` : ""}`}
             </span>
           </li>
         ))}

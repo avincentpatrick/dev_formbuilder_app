@@ -13,6 +13,7 @@ export type MapRow = {
   value: number | null;
   ciLow?: number | null;
   ciHigh?: number | null;
+  note?: string;
 };
 export type MapPayload = {
   state: "available";
@@ -49,6 +50,7 @@ export function prototypeIndicators(slug: string) {
     ],
     "psa-popcen-2024": ["population.residents"],
     "psa-sae-poverty-2023": ["poverty.incidence"],
+    "lgu-income-class": ["income-class"],
   };
   const ids = supported[slug];
   return ids ? getDatasetMap(slug)!.indicators.filter((i) => ids.includes(i.id)) : [];

@@ -739,3 +739,32 @@ Validation: two additional PNG-note tests; full database-backed Vitest 1,518 pas
 no-data build passed.
 All three PNG browser cases passed against the correctly configured local build: desktop
 and phone WebGL downloads plus disabled export when geometry fails.
+
+## Census accreditation map (8 November 2026)
+
+The independent BHW Census map now offers accreditation among validated profiles, from
+`agg_bhw_counts` in the active `bhw-2025` release. The adapter follows the existing
+`ingestion/build_aggregates.sql` contract: accredited profiles divided by all validated
+profiles, rounded to two decimals, with stored 95% Wilson bounds. It never reads personal
+records, substitutes StepZero declarations, derives a missing percentage or averages
+child rates. The separately reported parent percentage remains a rate with null total.
+
+Missing, duplicate, inconsistent and zero-denominator source rows have unavailable values.
+Valid zero and 100% remain values. Invalid or absent confidence bounds remain unavailable
+without clamping or recomputation. Fixed percentage breaks, the profile denominator and
+95% interval labels appear in the independent card/fullscreen/table and JSON/PNG exports.
+The existing fewer-than-30-profile threshold marks small samples in notes, a visible legend,
+faded polygon fills and dashed outlines. PNG notes and JSON preserve that warning. The
+public coverage audit recognizes the Census rate contract without printing observations.
+
+Only this existing aggregate measure is newly allowlisted; demographic and honorarium
+measures retain their existing gates. Geography remains region/province/city-municipality;
+no unaccepted barangay geometry, source records, disclosure changes or schema changes ship.
+This is not production coverage certification. Boundary-vintage acceptance remains separate.
+
+Validation: 13 new unit/API/export/audit cases; full database-backed Vitest 1,561 passed,
+11 skipped. Lint (existing fixture warning), typecheck, migration lint and prefixed no-data
+production build passed. React review confirmed bounded parallel reads, unchanged map
+lifecycle cleanup, and accessible table/legend alternatives outside the hidden canvas.
+All 31 map browser cases passed on the final build, including rendered Census geometry,
+small-sample legend, profile denominator, Wilson bounds and JSON download semantics.

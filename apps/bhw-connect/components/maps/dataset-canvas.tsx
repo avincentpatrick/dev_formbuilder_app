@@ -72,6 +72,7 @@ export function DatasetCanvas({
           const code = feature.properties.geo_code;
           codes.push(code);
           const row = byCode.get(code)!;
+          feature.properties.smallSample = row.value !== null && row.smallSample === true;
           feature.properties.color =
             row.value === null ? NO_DATA_COLOR : colorForValue(row.value, bins);
           for (const position of geometryPositions(feature.geometry)) bounds.extend(position);
@@ -105,13 +106,20 @@ export function DatasetCanvas({
             id: "fill",
             type: "fill",
             source: "areas",
-            paint: { "fill-color": ["get", "color"], "fill-opacity": 0.9 },
+            paint: { "fill-color": ["get", "color"], "fill-opacity": ["case", ["==", ["get", "smallSample"], true], 0.4, 0.9] },
           });
           map.addLayer({
             id: "outline",
             type: "line",
             source: "areas",
             paint: { "line-color": "#fff", "line-width": 1 },
+          });
+          map.addLayer({
+            id: "small-sample",
+            type: "line",
+            source: "areas",
+            filter: ["==", "smallSample", true],
+            paint: { "line-color": "#6b7280", "line-width": 2, "line-dasharray": [2, 2] },
           });
           map.addLayer({
             id: "selection",

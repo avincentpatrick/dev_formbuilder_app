@@ -70,7 +70,8 @@ export async function inspectMapCoverage(input, request = fetch) {
   }
   if (!(payload.total === null || (typeof payload.total === 'number' && Number.isFinite(payload.total) && payload.total >= 0)))
     throw new Error('Invalid reported parent total');
-  const declaredRate = choice.dataset === 'bhw-stepzero-2026' && choice.indicator === 'bhw.declared-accreditation';
+  const declaredRate = (choice.dataset === 'bhw-stepzero-2026' && choice.indicator === 'bhw.declared-accreditation') ||
+    (choice.dataset === 'bhw-2025' && choice.indicator === 'bhw.profile-accreditation');
   if (declaredRate) {
     const validRate = value => value === null || (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100);
     if (payload.total !== null || !validRate(payload.parentRate) || payload.rows.some(row => !validRate(row.value)))

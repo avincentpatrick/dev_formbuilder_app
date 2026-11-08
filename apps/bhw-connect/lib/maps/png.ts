@@ -1,3 +1,4 @@
+import { MIN_LEADER_N } from "@/lib/analysis/thresholds";
 import type { Map as LibreMap } from "maplibre-gl";
 import type { datasetMapExport } from "./export";
 import { NO_DATA_COLOR } from "@/lib/charts/color-scale";
@@ -49,11 +50,12 @@ export function pngNotes(data: Context): string[] {
     `${data.indicator.period} | ${data.indicator.unit} | ${data.geography.area}`,
     `Current viewport. Selected: ${selected?.name ?? "none"}.`,
     `Legend: ${data.legend.method}. Gray: unavailable value or navigation-only geography; not zero.`,
+    ...(data.rows.some(row => "smallSample" in row && row.smallSample) ? [`Faded fills and dashed outlines: few BHWs profiled — unstable (fewer than ${MIN_LEADER_N} profiles).`] : []),
     `Coverage: ${data.rows.length} areas in complete table; ${missing} without drawable geometry; ${unchecked} with geometry not checked. The image shows the current viewport only.`,
     `Reported parent ${data.parentMeasure.kind}: ${data.parentMeasure.value ?? "not available / not applicable"}${data.parentMeasure.kind === "rate" ? "%" : ""}. ${data.totalNote}`,
     ...(data.indicator.denominator ? [`Denominator: ${data.indicator.denominator}`] : []),
     ...(selected ? [`Selected value: ${selectedValue}${selected.label ? ` (${selected.label})` : ""}. ${selected.note ?? ""}`] : []),
-    ...(selected && data.indicator.confidenceLevel ? [`Published 90% confidence interval: ${selected.ciLow ?? "unavailable"} to ${selected.ciHigh ?? "unavailable"}.`] : []),
+    ...(selected && data.indicator.confidenceLevel ? [`Published ${data.indicator.confidenceLevel! * 100}% confidence interval: ${selected.ciLow ?? "unavailable"} to ${selected.ciHigh ?? "unavailable"}.`] : []),
     `Source: ${data.source.title}. Source date: ${data.source.date ?? "not supplied"}. License: ${data.source.license ?? "not supplied"}.`,
     `Attribution: ${data.source.attribution}`,
     "Boundaries: faeldon/philippines-json-maps, 2023 PSGC series (adapted).",

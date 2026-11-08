@@ -378,3 +378,16 @@ it("keeps the published StepZero parent rate separate from totals and child aver
   expect(mock.source).toHaveBeenCalledWith("bhw-stepzero-2026");
   for (const q of [values, parent]) expect(q.select).toHaveBeenCalledWith("geo_code,pct_registered_accredited,n_registered_accredited,n_total_bhw");
 });
+
+it("reads Census accreditation from its active release with independent parent rate and published intervals", async () => {
+  const child = query({ data: [{ geo_code: "01", n_total: 3, n_accredited: 1, pct_accredited: 33.33, ci_low: 6.15, ci_high: 79.23 }], error: null });
+  const parent = query({ data: [{ geo_code: "PH", n_total: 100, n_accredited: 25, pct_accredited: 25 }], error: null });
+  mock.from.mockReturnValueOnce(query({ data: [{ geo_code: "01", geo_name: "Synthetic" }], error: null }))
+    .mockReturnValueOnce(child).mockReturnValueOnce(parent);
+  const result = await GET(new NextRequest("http://localhost/api/dataset-map?dataset=bhw-2025&indicator=bhw.profile-accreditation"));
+  expect(await result.json()).toMatchObject({ total: null, parentRate: 25, rows: [{ value: 33.33, ciLow: 6.15, ciHigh: 79.23 }] });
+  expect(mock.source).toHaveBeenCalledWith("bhw-2025", true);
+  expect(mock.from.mock.calls.map(c => c[0])).toEqual(["dim_geo", "agg_bhw_counts", "agg_bhw_counts"]);
+  expect(child.select).toHaveBeenCalledWith("geo_code,pct_accredited,n_accredited,n_total,ci_low,ci_high");
+  expect(parent.eq).toHaveBeenCalledWith("dataset_id", 7);
+});

@@ -73,7 +73,7 @@ it("rejects rate fields on count indicators and values in navigation-only rate v
 
 it("audits Census rates without treating them as additive totals", async () => {
   const census = rateUrl.replace("bhw-stepzero-2026", "bhw-2025").replace("bhw.declared-accreditation", "bhw.profile-accreditation").replace("period=2026", "period=2025");
-  const data = { ...payload, total: null, parentRate: 0 };
+  const data = { ...payload, total: null, parentRate: 0, rows: payload.rows.map(row => ({ ...row, ciLow: null, ciHigh: null, smallSample: false })) };
   const result = await inspectMapCoverage(census, async target => response(String(target).includes("/geo/") ? geometry : data));
   expect(result.coverage).toMatchObject({ hasReportedParentTotal: false, hasReportedParentRate: true });
   await expect(inspectMapCoverage(census, async () => response({ ...data, parentRate: 101 }))).rejects.toThrow("Invalid published rate");
@@ -81,9 +81,42 @@ it("audits Census rates without treating them as additive totals", async () => {
 
 it("audits training percentages without leaking values or accepting invalid rates", async () => {
   const training = rateUrl.replace("bhw-stepzero-2026", "bhw-2025").replace("bhw.declared-accreditation", "bhw.training.dengue").replace("period=2026", "period=2025");
-  const data = { ...payload, total: null, parentRate: 75 };
+  const data = { ...payload, total: null, parentRate: 75, rows: payload.rows.map(row => ({ ...row, ciLow: null, ciHigh: null, smallSample: false })) };
   const result = await inspectMapCoverage(training, async target => response(String(target).includes("/geo/") ? geometry : data));
   expect(result.coverage).toMatchObject({ hasReportedParentTotal: false, hasReportedParentRate: true });
   expect(JSON.stringify(result)).not.toContain('"value"');
   await expect(inspectMapCoverage(training, async () => response({ ...data, parentRate: 101 }))).rejects.toThrow("Invalid published rate");
+});
+
+const censusUrl = rateUrl.replace("bhw-stepzero-2026", "bhw-2025").replace("bhw.declared-accreditation", "bhw.profile-accreditation").replace("period=2026", "period=2025");
+const censusRow = { code: "01", name: "Private observation name", value: 33.33, ciLow: 6.15, ciHigh: 79.23, smallSample: true };
+it("reports only uncertainty coverage counts, never bounds, flags per area or observations", async () => {
+  const data = { ...payload, total: null, parentRate: 25, rows: [censusRow,
+    { code: "02", name: "Zero", value: 0, ciLow: null, ciHigh: null, smallSample: false },
+    { code: "99", name: "Missing", value: null, ciLow: null, ciHigh: null, smallSample: false }] };
+  const report = await inspectMapCoverage(censusUrl, async target => response(String(target).includes("/geo/") ? geometry : data));
+  expect(report).toHaveProperty("uncertainty", { confidenceLevel: 0.95, rowsWithPublishedInterval: 1,
+    reportedRowsWithoutInterval: 1, smallSampleRows: 1, calculation: "not-recomputed",
+    sampleThreshold: "not-recomputed-from-source-counts" });
+  const text = JSON.stringify(report);
+  for (const forbidden of ['"ciLow"', '"ciHigh"', '"smallSample"', '"value"', "Private observation name", "33.33", "79.23"])
+    expect(text).not.toContain(forbidden);
+});
+it.each([
+  { ciLow: undefined }, { ciHigh: null }, { ciLow: -1 }, { ciHigh: 101 },
+  { ciLow: 40 }, { ciHigh: 20 }, { ciLow: "6.15" }, { value: null },
+  { smallSample: undefined }, { smallSample: "false" },
+  { value: null, ciLow: null, ciHigh: null, smallSample: true },
+])("rejects malformed uncertainty before requesting geometry: %j", async override => {
+  let calls = 0;
+  await expect(inspectMapCoverage(censusUrl, async () => {
+    calls++;
+    return response({ ...payload, total: null, parentRate: 25, rows: [{ ...censusRow, ...override }] });
+  })).rejects.toThrow("uncertainty");
+  expect(calls).toBe(1);
+});
+it.each([0, 100])("accepts endpoint %s with matching interval bounds", async value => {
+  const data = { ...payload, total: null, parentRate: value, rows: [{ ...censusRow, value, ciLow: value, ciHigh: value }] };
+  const report = await inspectMapCoverage(censusUrl, async target => response(String(target).includes("/geo/") ? geometry : data));
+  expect(report).toMatchObject({ uncertainty: { rowsWithPublishedInterval: 1 } });
 });

@@ -70,8 +70,10 @@ export async function inspectMapCoverage(input, request = fetch) {
   }
   if (!(payload.total === null || (typeof payload.total === 'number' && Number.isFinite(payload.total) && payload.total >= 0)))
     throw new Error('Invalid reported parent total');
+  const censusRate = choice.dataset === 'bhw-2025' &&
+    (choice.indicator === 'bhw.profile-accreditation' || choice.indicator.startsWith('bhw.training.'));
   const declaredRate = (choice.dataset === 'bhw-stepzero-2026' && choice.indicator === 'bhw.declared-accreditation') ||
-    (choice.dataset === 'bhw-2025' && (choice.indicator === 'bhw.profile-accreditation' || choice.indicator.startsWith('bhw.training.')));
+    censusRate;
   if (declaredRate) {
     const validRate = value => value === null || (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100);
     if (payload.total !== null || !validRate(payload.parentRate) || payload.rows.some(row => !validRate(row.value)))
@@ -82,6 +84,25 @@ export async function inspectMapCoverage(input, request = fetch) {
   const navigationOnly = payload.valueSupport === 'navigation-only';
   if (navigationOnly && (payload.total !== null || (payload.parentRate != null) || payload.rows.some(row => row.value !== null)))
     throw new Error('Navigation-only geography must not claim values');
+  let uncertainty;
+  if (censusRate) {
+    for (const row of payload.rows) {
+      const absent = row.ciLow === null && row.ciHigh === null;
+      const interval = typeof row.ciLow === 'number' && Number.isFinite(row.ciLow) &&
+        typeof row.ciHigh === 'number' && Number.isFinite(row.ciHigh) && row.value !== null &&
+        row.ciLow >= 0 && row.ciLow <= row.value && row.ciHigh >= row.value && row.ciHigh <= 100;
+      if ((!absent && !interval) || typeof row.smallSample !== 'boolean' ||
+          (row.smallSample && row.value === null)) throw new Error('Invalid Census uncertainty or small-sample metadata');
+    }
+    uncertainty = {
+      confidenceLevel: 0.95,
+      rowsWithPublishedInterval: payload.rows.filter(row => row.ciLow !== null).length,
+      reportedRowsWithoutInterval: payload.rows.filter(row => row.value !== null && row.ciLow === null).length,
+      smallSampleRows: payload.rows.filter(row => row.smallSample).length,
+      calculation: 'not-recomputed',
+      sampleThreshold: 'not-recomputed-from-source-counts',
+    };
+  }
   const expectedGeometry = `/bhw-connect${scope[2]}`;
   if (payload.geometryUrl !== expectedGeometry) throw new Error('Unexpected geometry path; refusing another origin/scope');
   const coverage = { rows: payload.rows.length,
@@ -114,7 +135,7 @@ export async function inspectMapCoverage(input, request = fetch) {
     geometry = { state: 'not-checked', reason: error.message };
   }
   return { ...report, source: { title: payload.source, date: payload.date ?? null, license: payload.license ?? null },
-    coverage, geometry };
+    coverage, geometry, ...(uncertainty ? { uncertainty } : {}) };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

@@ -111,3 +111,30 @@ These checks establish bounded API availability and basic geometry matching for 
 choices only. They do not compare numeric values against source workbooks, certify Wilson
 interval calculations, establish coverage in other provinces or prove historical boundary
 compatibility. The barangay, district and persistent-asset acceptance dependencies remain.
+
+## Census uncertainty and training deployment follow-up
+
+The probe now validates Census accreditation/training interval pairs and small-sample flag
+shape. Bounds must be both null or finite, ordered within 0–100 and contain the reported
+rate. A missing rate cannot carry an interval or a true small-sample flag. Missing metadata,
+half-pairs and nonboolean flags fail before geometry is requested. This leaves StepZero's
+separate contract unchanged: no Census uncertainty fields are required there.
+
+Reports contain only interval-coverage counts and the number of flagged rows, never bounds,
+per-area flags, denominators or observations. They explicitly do not recompute Wilson
+intervals or verify the flag threshold against source counts. Those require separate
+source-level verification. An absent interval remains unavailable, not inferred precision.
+
+Four new read-only checks after the training deployment returned:
+
+| Choice | Scope | Reported rows / rows with intervals | Small-sample flags | Rows with basic geometry |
+| --- | --- | --- | --- | --- |
+| Census accreditation | National → regions | 18 / 18 | 0 | 18 |
+| Basic Life Support training | National → regions | 18 / 18 | 0 | 18 |
+| Basic Life Support training | Ilocos Norte → municipalities | 23 / 23 | 2 | 23 |
+| Dengue training | Ilocos Norte → municipalities | 23 / 23 | 2 | 23 |
+
+All used the 2025 Census release, retained separate parent rates and null additive totals.
+This resolves the earlier unsupported result for the sampled Basic Life Support views;
+the earlier reports are retained as dated evidence. It does not certify all 44 topics,
+all municipalities, source-record agreement or historical boundary compatibility.

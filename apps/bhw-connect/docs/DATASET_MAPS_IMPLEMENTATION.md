@@ -810,3 +810,17 @@ Validation: eight explicit live probes through the inherited proxy with TLS veri
 1,610 database-backed tests passed (11 skipped), lint (existing fixture warning), typecheck,
 migration lint and prefixed no-data build passed. Browser tests were not rerun because
 this increment changes only audit evidence and documentation.
+
+## Census uncertainty audit and training deployment checks (8 November 2026)
+
+Extended the bounded public probe to reject malformed Census uncertainty pairs and
+small-sample flags, with count-only reporting. It does not recompute intervals or infer
+sample sizes. Four live checks now verify interval metadata and basic matching geometry
+for national Census accreditation, national Basic Life Support training, and municipal
+Basic Life Support/dengue training in Ilocos Norte. The sampled training rollout limitation
+is resolved; nationwide/source-level acceptance remains unclaimed. See the dated evidence
+and limits in `DATASET_MAP_COVERAGE_AUDIT.md`.
+Validation: 14 new uncertainty cases (35 probe cases total); 1,624 database-backed tests
+passed, 11 skipped. Lint (existing fixture warning), typecheck, migration lint and prefixed
+no-data build passed. Browser tests were not rerun because this changes only offline
+validation and dated evidence, not the application. Four live probes retained TLS verification.

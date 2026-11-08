@@ -12476,10 +12476,15 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The route side is `tests/Feature/Http/ServiceWorkerCachePrefixRouteTest.php`. A hub file, so this waits for an
   increment that already owns `routes/api.php`. **Live.** Filed by `M121`. **Tier: during-testing.**
 
-- **`nit` · `docs/security-threat-model.md` lists the invitation door among residuals *"each filed in"* the ledger,
+- ✅ **CLOSED BY `M224` (2026-11-08) — ****`nit` · `docs/security-threat-model.md` lists the invitation door among residuals *"each filed in"* the ledger,
   and it is no longer filed.** Measured by `M121`, which closed `R-950ef5f1` by `D33` = A (keep inviting anyone). The
   door is now an ACCEPTED risk with no open row, and the entry should say so and cite `D33`. A hub file.
   **Live.** Filed by `M121`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M224` (2026-11-08), on its branch.**
+  - Residual 32's invitation bullet now opens by calling the door accepted under `D33` = A and closed as `R-950ef5f1` by `M121`, and its lead sentence no longer says all three items are filed. Both edits sit inside existing lines.
+  - The other two bullets were checked and are right: the domain re-verification row is open, and the self-registration bullet already records `M140`'s closure and `R-afa35a60`.
+  - `D33`'s *"watch invitation volume on the testing server"* had no instrument and no row (`M121` noted it in prose only). It is filed below as `invitation-volume-unwatched`.
+  - **`D13` exception #9:** batched with `R-6f994627` in one PR, allowed by the user in chat on 2026-11-08. Each row edits a hub document, and every PR at the merge point is one more deploy.
 
 - ✅ **CLOSED BY `M145` (2026-10-07) — **`minor` · The builder preview can lose every condition in silence, because its draft projection passes rule rows
   to the engine unchecked.** Measured by `M121` while giving the respondent a notice for the same failure. The preview
@@ -12767,12 +12772,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   converts HEIC to JPEG on upload; a file picker on a computer does not. **Not live**. Filed by `M128`.
   **Tier: during-testing.**
 
-- **`nit` · The data dictionary says an attachment is not served until its scan is `clean`, and every attachment is
+- ✅ **CLOSED BY `M224` (2026-11-08) — ****`nit` · The data dictionary says an attachment is not served until its scan is `clean`, and every attachment is
   served while it is `skipped`.** Found by `M128` while reusing the attachment write path for OCR pages.
   `docs/data-dictionary.md` §10's `virus_scan_status` row describes files as withheld until `clean`, while
   `ScanStatus::servable()` admits `clean` and `skipped`, and with no scanner wired every upload is `skipped`. The code
   is the deliberate behaviour (`config/attachments.php`); the sentence is the defect. **Live.** Filed by `M128`.
   **Tier: during-testing.**
+  ✅ **CLOSED BY `M224` (2026-11-08), on its branch.**
+  - §10's `virus_scan_status` cell now says a file is served while `clean` or `skipped` and never while `pending` or `infected`, and that with no scanner wired every upload is `skipped` and served unscanned.
+  - **The sentence had two more copies, and one carried a verdict.** `docs/security-threat-model.md` §6 rated malware in an upload **Mitigated** by quoting it, and §4's guest-upload row pointed there. §6 now rates it a residual until a scanner is wired, bounded by the type read from the bytes. §4 says the same. `docs/ux/form-filling-ux-flow.md` quoted it too and now states the rule.
+  - No scanner implementation exists, and wiring one lived only in prose. It is filed below as `virus-scanner-unwired`, `before-launch`.
+  - **`D13` exception #9:** batched with `R-b1737198` in one PR, allowed by the user in chat on 2026-11-08.
 
 - **`nit` · Prose in four files still derives layout from "a 240px sidebar above 1024px", which a collapsed sidebar
   no longer guarantees.** Found by `M128` while making the sidebar collapsible (`R-33c7fd56`). The derivations that
@@ -15730,3 +15740,20 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, to be measured when taken: assert the gauge equals the surviving row's `size_bytes`, which still reddens on an accumulating design and does not care about the clock. Pinning the clock in the case would also work and proves less.
 
   **Live.** Filed by `M214`. **Tier: during-testing.**
+
+- **`minor` · `virus-scanner-unwired` — No virus scanner is wired, so every uploaded file is served to other users unscanned.**
+  Found by `M224` (2026-11-08), correcting the three documents that said a file waits for a clean scan.
+  - `ScanAttachmentJob` marks every upload `skipped` while `attachments.scanner_enabled` is false, its default, and `ScanStatus::servable()` serves `skipped`. No `AttachmentScanner` implementation exists, and `ATTACHMENT_SCANNER_ENABLED` is set nowhere in the repository.
+  - So a file a respondent or member uploads is served to staff exactly as uploaded. What bounds it today is the type read from the file's bytes and checked against the field's allowlist.
+  - The plan for it lived only in prose: *"ClamAV, deferred"* in `ScanStatus`'s docblock and in `config/attachments.php`.
+  The remedy, to be chosen when taken: a scanner on the box behind the existing `AttachmentScanner` seam, and a decision on the files already marked `skipped`.
+
+  **Live.** Filed by `M224`. **Tier: before-launch.**
+
+- **`nit` · `invitation-volume-unwatched` — Nothing counts invitations, so `D33`'s *"watch invitation volume on the testing server"* has nothing to watch with.**
+  Found by `M224` (2026-11-08). `M121` noted it in prose while closing `R-950ef5f1` and filed nothing.
+  - `D33` = A kept inviting any address and asked in return that invitation volume be watched on the testing server. No instrument, console line or runbook step reads it.
+  - `invite()` writes no audit row (`docs/data-dictionary.md`, the K1c backfill note), so a count has to come from `tenant_users.invited_at`.
+  The remedy, to be chosen when taken: a line on the operator console, or a count in a script the operator already runs.
+
+  **Live.** Filed by `M224`. **Tier: during-testing.**

@@ -76,6 +76,7 @@ export function DatasetMapCard({
     return () => controller.abort();
   }, [active, query, key, result?.key]);
   const data = result?.key === key && result.data.state === "available" ? result.data : null;
+  const uucRoute = dataset === "uuc-phc-2025" && choice.indicator.startsWith("uuc.route.");
   const profiling = dataset === "bhw-profiling-status-2026";
   const income = dataset === "lgu-income-class";
   const poverty = dataset === "psa-sae-poverty-2023";
@@ -262,6 +263,13 @@ export function DatasetMapCard({
                   </>
                 )}
               </p>
+              {uucRoute && (
+                <p className="text-sm">
+                  Published qualifying-route counts, not new classifications or averages of source
+                  percentages. Routes overlap and must not be added together. The health route uses
+                  only barangays with evaluable provincial benchmarks. {data.totalNote}
+                </p>
+              )}
               <label className="block text-sm">
                 Select an area
                 <select
@@ -291,7 +299,7 @@ export function DatasetMapCard({
                         : (selected.value ?? "Not reported")}{" "}
                     {selected.value !== null && !income ? metric?.unit : ""}
                   </p>
-                  {(income || profiling) && <p>{selected.note}</p>}
+                  {(income || profiling || uucRoute) && <p>{selected.note}</p>}
                   {poverty && !navigationOnly && (
                     <p>
                       Published 90% confidence interval:{" "}
@@ -357,7 +365,7 @@ export function DatasetMapCard({
                         {poverty && !navigationOnly && (
                           <th scope="col">Published 90% confidence interval</th>
                         )}
-                        {(income || profiling) && !navigationOnly && (
+                        {(income || profiling || uucRoute) && !navigationOnly && (
                           <th scope="col">Source context</th>
                         )}
                         <th scope="col">Geometry</th>
@@ -385,7 +393,9 @@ export function DatasetMapCard({
                                 : "Not available"}
                             </td>
                           )}
-                          {(income || profiling) && !navigationOnly && <td>{r.note ?? "—"}</td>}
+                          {(income || profiling || uucRoute) && !navigationOnly && (
+                            <td>{r.note ?? "—"}</td>
+                          )}
                           <td>
                             {shapeCodes
                               ? shapeCodes.includes(r.code)

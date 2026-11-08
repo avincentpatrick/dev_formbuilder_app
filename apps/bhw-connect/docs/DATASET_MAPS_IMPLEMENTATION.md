@@ -303,3 +303,32 @@ members, duplicates, source status, barangay polygons vs points, topology, overl
 islands). Lint, typecheck, migration lint and the prefixed production build passed;
 seeded-database Vitest: 1,451 passed, 11 skipped. Lint retains the existing fixture warning.
 No UI or browser behavior changes in this increment; browser tests were not rerun.
+
+## UUC qualifying-route count maps (8 November 2026)
+
+Extends UUC's independent map with the four published qualifying-route counts: Indigenous
+Peoples, conflict-affected/displaced, 4Ps/CCT enrolled, and worse than province on health.
+The listed-barangay indicator stays separate. Each selection retains the UUC source,
+2025 period and geography when enlarged or shared, without changing adjacent dataset maps.
+
+Reads use the accepted `uuc-phc-2025` release and `agg_uuc_phc_criteria`; they never recompute
+eligibility from cleaned or capped indicator measurements. Child rows and the independently
+reported parent total retain the same route projection and denominator context. Tables and
+selection details show listed counts for the first three routes and health-evaluable counts
+plus excluded listed barangays for the health route. Routes overlap and must not be added
+as a partition. No source percentages are averaged or new shares manufactured.
+
+A reported zero health-route count remains zero even when no barangays are evaluable; its
+note explains that a share has no evaluable denominator. Missing/duplicate source rows and
+inconsistent counts remain unavailable, never converted to zero. Areas without geometry
+remain in the table, and the parent total is not replaced by drawable child sums. Municipal
+route rows absent from the synthetic source remain explicitly missing. Barangay polygon
+navigation and accepted historical boundaries remain separate dependencies.
+
+Validation: lint (existing fixture warning), typecheck, migration lint and prefixed production
+build passed. Seeded-database Vitest: 1,457 passed, 11 skipped. All 17 map browser tests passed,
+including independent UUC selection, enlarged-view sharing, route exclusions, reported zero,
+missing rows and independent parent totals. Phone emulation at 390×844 had no axe violations,
+horizontal overflow or map-error fallback. Synthetic checks do not certify production
+coverage. The workspace interruption occurred after tests/build and before browser checks;
+the saved results and changes were recovered, and browser verification completed on resume.

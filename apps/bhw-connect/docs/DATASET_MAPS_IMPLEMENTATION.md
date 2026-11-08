@@ -466,3 +466,22 @@ warning), typecheck, migration lint and prefixed no-data build passed. Seeded-da
 Vitest: 1,463 passed, 11 skipped. Browser tests were not rerun because this increment changes
 only offline packaging and documentation. Geospatial publication remains blocked separately
 from passing software checks.
+
+## Municipality package HTTP verification (8 November 2026)
+
+Added a read-only delivery probe for the private municipality package contract. It verifies
+pinned manifest paths and every file's bytes, JSON MIME, immutable cache policy, strong
+validators, conditional 304 responses and a genuine missing-file 404. Requests are sequential,
+time-limited and bounded. It refuses redirects and never promotes a candidate or modifies
+hosting. See [delivery commands, measured local evidence and production limits](BOUNDARY_HOSTING_VALIDATION.md).
+
+The actual private package passed over controlled loopback HTTP: 1,638 files, 114,148,940
+bytes, all checksums and conditionals matched. This establishes local probe behavior only;
+operator-provisioned persistent storage, production headers, compression, MapLibre/CSP and
+phone performance remain unverified. No UI, public assets, settings or shared deploy files
+changed. The barangay publication gate remains closed.
+
+Validation: eleven new delivery tests passed, including a real local HTTP server. Full
+seeded-database Vitest: 1,476 passed, 11 skipped. Lint (existing fixture warning), typecheck,
+migration lint and prefixed no-data production build passed. Browser tests were not rerun:
+this increment changes only an offline/operator probe and documentation.

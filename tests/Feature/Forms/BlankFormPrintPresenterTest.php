@@ -822,3 +822,20 @@ it('says a printout in another language must be keyed in, because the scanner re
         ->and($this->present->present($form, $version, 'en')['ocr_compatible'])->toBeTrue()
         ->and($this->present->present($form, $version, 'fil')['ocr_compatible'])->toBeFalse();
 });
+
+it('counts a language found only in a choice label, a hint or a section description, and never a blank one (R-d7e27962)', function (): void {
+    [$form, $version] = printFixture([
+        'sections' => [['key' => 's', 'label' => 'S', 'description' => 'About', 'description_translations' => ['ceb' => 'Mahitungod'], 'sequence' => 1, 'is_repeatable' => false]],
+        'fields' => [
+            printField('color', 'single_select', [
+                'section_key' => 's',
+                'hint' => 'Pick one',
+                'hint_translations' => ['ilo' => 'Agpili', 'war' => ''],
+                'config' => ['options' => [['value' => 'r', 'label' => 'Red', 'label_translations' => ['fil' => 'Pula']]]],
+            ]),
+        ],
+    ]);
+
+    // A blank variant is no translation (`LocaleVariant::from()`), so Waray is not offered.
+    expect($this->present->languages($form, $version))->toBe(['en', 'ceb', 'fil', 'ilo']);
+});

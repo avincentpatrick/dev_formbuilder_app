@@ -7,6 +7,7 @@ import {
   MORBIDITY_AGES,
   ORAL_HEALTH_DEFINITIONS,
   NCD_DEFINITIONS,
+  SENIOR_NCD_DEFINITIONS,
   FAMILY_PLANNING_DEFINITIONS,
   INFECTIOUS_DEFINITIONS,
   MATERNAL_DEFINITIONS,
@@ -23,6 +24,7 @@ function fixture(programme = "core") {
     infectious: INFECTIOUS_DEFINITIONS,
     "family-planning": FAMILY_PLANNING_DEFINITIONS,
     ncd: NCD_DEFINITIONS,
+    "ncd-senior": SENIOR_NCD_DEFINITIONS,
     "oral-health": ORAL_HEALTH_DEFINITIONS,
     "vital-statistics": VITAL_STATISTICS_DEFINITIONS,
     demographics: DEMOGRAPHICS_DEFINITIONS,
@@ -62,6 +64,18 @@ function fixture(programme = "core") {
   };
 }
 describe("FHSIS expansion boundary", () => {
+  it("accepts senior annual measures as a separate batch without changing earlier NCD mappings", () => {
+    const bundle = fixture("ncd-senior");
+    expect(() => validateExpansion(bundle)).not.toThrow();
+    expect(bundle.definitions).toHaveLength(3);
+    const earlier = new Set(NCD_DEFINITIONS.map((d: { indicator_key: string }) => d.indicator_key));
+    expect(
+      bundle.definitions.every((d: { indicator_key: string }) => !earlier.has(d.indicator_key)),
+    ).toBe(true);
+    expect(() => validateExpansion({ ...bundle, programme_set: "ncd" })).toThrow(
+      "reviewed mapping",
+    );
+  });
   it("rejects superseded count-only metadata for the confirmed composite rates", () => {
     for (const [programme, key] of [
       ["ncd", "ncd_cervical_lesions"],

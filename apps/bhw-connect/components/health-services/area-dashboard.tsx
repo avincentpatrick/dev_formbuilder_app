@@ -237,9 +237,19 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
           NCD medicine access is a December 2025 snapshot. Other included NCD measures are annual.
           Risk factors and cancer screening pathways can overlap; do not add them as unique people.
           Suspicious or significant screening findings are not confirmed cancer diagnoses. Most NCD
-          sources report provinces/HUCs and selected cities; adult annual risk assessment also
-          includes municipalities. The cervical precancerous-lesion denominator includes VIA, Pap
-          smear and HPV DNA screenings, excluding assessed-only women.
+          sources report provinces/HUCs and selected cities; adult and senior annual PhilPEN
+          reporting also includes municipalities. The cervical precancerous-lesion denominator
+          includes VIA, Pap smear and HPV DNA screenings, excluding assessed-only women.
+        </p>
+      )}
+
+      {area.indicators.some((i) =>
+        ["ncd_60plus_assessed", "ncd_60plus_htn", "ncd_60plus_dm"].includes(i.indicator_key),
+      ) && (
+        <p className="text-sm text-muted">
+          Senior PhilPEN annual figures are corroborated by the 2025 annual report despite a
+          conflicting 2024 workbook heading. Published annual totals are retained; they differ from
+          quarter sums in Region V and the national rollup. Sex breakdowns are counts only.
         </p>
       )}
 

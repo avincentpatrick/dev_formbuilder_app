@@ -73,7 +73,13 @@ beforeEach(() => {
 });
 describe("FHSIS interpretation", () => {
   it("shows confirmed composite rates as undefined for zero or missing denominators, retaining counts", () => {
-    for (const indicator_key of ["ncd_cervical_lesions", "infect_schisto_treated"]) {
+    for (const indicator_key of [
+      "ncd_cervical_lesions",
+      "infect_schisto_treated",
+      "ncd_60plus_assessed",
+      "ncd_60plus_htn",
+      "ncd_60plus_dm",
+    ]) {
       const def = { ...definition, indicator_key };
       const value = toFhsisIndicator(def, { ...row, numerator: 3, denominator: 0 });
       expect(fhsisRateLabel(value)).toBe("Not defined (zero denominator)");
@@ -298,6 +304,7 @@ describe("FHSIS age and sex breakdowns", () => {
     expect(fhsisPeriodLabel("ncd_dec_60plus_htn_total")).toBe("December 2025");
     expect(fhsisLimitedGeography("ncd_senior_ppv")).toBe(true);
     expect(fhsisLimitedGeography("ncd_20_59_assessed")).toBe(false);
+    expect(fhsisLimitedGeography("ncd_60plus_assessed")).toBe(false);
     expect(fhsisLimitedGeography("oral_infant_first")).toBe(true);
     expect(fhsisLimitedGeography("school_hpv1")).toBe(true);
     expect(fhsisLimitedGeography("child_ors")).toBe(true);

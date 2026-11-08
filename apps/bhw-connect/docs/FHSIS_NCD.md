@@ -33,13 +33,11 @@ prevalence. December medicine access is not summed across months into an annual 
 
 ## Held measures and source notes
 
-- Senior annual risk assessment/hypertension/diabetes: `Q4` explicitly says **Annual 2024**, while
-  `RA` is labelled 2025 and its annual block repeats that summary. Hold these three measures pending
-  source-year clarification. The separately dated December 2025 medicine-access and Annual 2025
-  risk-factor tables remain included. Their denominators must not be substituted for each other.
-- Cervical precancerous-lesion rate: no explicit denominator field is provided. The rate appears
-  to use the screening-method subtotal, but we do not reconstruct it. Keep counts only for this
-  indicator; downstream treatment/referral rates use the explicit lesion count.
+- Senior annual risk assessment/hypertension/diabetes are now prepared separately as `ncd-senior`.
+  The official 2025 report corroborates the annual RA block despite the Q4 Annual 2024 heading.
+  See [senior annual preparation](FHSIS_SENIOR_NCD_LOAD.md) for geography and quarter-sum caveats.
+- Cervical precancerous-lesion rates now use the confirmed VIA + Pap + HPV screening denominator;
+  see [confirmed denominators](FHSIS_CONFIRMED_DENOMINATORS.md). Zero denominators are undefined.
 - The cervical screening target is projected women aged 30–65 minus those screened in the prior
   two years, per the workbook footnote. Suspicious findings use assessed-only women as the source
   denominator. The source also warns that collection for this exact age group began in the second
@@ -73,4 +71,4 @@ with the private JSON and SHA256, without `--apply` for a dry run.
 
 After the original live load and all six prepared loadable batches, planned totals are 362,630
 indicator rows, 284 definitions and unchanged 13,952 workforce rows. These are future totals, not
-current live content. Environmental ZOD remains held separately due to its 2024 headings.
+current live content. ZOD remains held: its Q4 figures match the 2025 report, but certified versus uncertified counts conflict.

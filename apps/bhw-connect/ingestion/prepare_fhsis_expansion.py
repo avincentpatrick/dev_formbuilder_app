@@ -295,6 +295,25 @@ def demographic_specifications(directory):
     return specs
 
 
+def combined_delivery_specifications(directory):
+    files=list(directory.glob('1. Total Deliveries*.xlsx'))
+    if len(files)!=1:raise ValueError('Expected one delivery source')
+    return [dict(key='birth_combined_vaginal_caesarean',label='Combined vaginal–caesarean deliveries',
+                 file=files[0].name,n=17,d=2,rate=18,sex=False,
+                 ages=[[14,None,None],[15,None,None],[16,None,None]],sheet='Annual_b',start=7,
+                 coded=False,program='maternal',denominator='Total deliveries; source Excel percentage fraction converted to percent by multiplying by 100')]
+
+
+def convert_excel_percentage(record, number_format):
+    # Only the reviewed source format is accepted; never infer scaling from magnitude.
+    if number_format!='0.00%':raise ValueError('Unexpected delivery percentage format')
+    raw=record['rate_pct']
+    record['source_rate_raw']=raw
+    record['source_rate_number_format']=number_format
+    record['rate_pct']=format(Decimal(raw)*100,'f') if raw is not None else None
+    record['over_100']=raw is not None and Decimal(record['rate_pct'])>100
+
+
 class ExpansionBuilder(Builder):
     def raw_rows(self, source, sheet, start):
         for number,row in super().raw_rows(source,sheet,start):
@@ -341,7 +360,7 @@ def main():
     parser.add_argument('directory',type=Path)
     parser.add_argument('--reference',type=Path,required=True,help='Original private FHSIS directory containing TB geography and dim_geo.json')
     parser.add_argument('--retrieved',required=True)
-    parser.add_argument('--programme-set', choices=['core','child-health','maternal','infectious','family-planning','ncd','oral-health','vital-statistics','demographics'], default='core')
+    parser.add_argument('--programme-set', choices=['core','child-health','maternal','infectious','family-planning','ncd','oral-health','vital-statistics','demographics','combined-delivery'], default='core')
     args=parser.parse_args()
     geos=json.loads((args.reference/'dim_geo.json').read_text())
     b=ExpansionBuilder(args.reference,geos);b.directory=args.directory
@@ -350,18 +369,27 @@ def main():
             if geo['geo_level']!='barangay':b.canonical[normalise(geo['geo_name'])].add(code)
         b.canonical[normalise('City of Carmona')]={'0402104'}
         b.canonical[normalise('Dr. Jose P. Rizal')]={'1705323'}
-    specs={'core':specifications,'child-health':child_health_specifications,'maternal':maternal_specifications,'infectious':infectious_specifications,'family-planning':family_planning_specifications,'ncd':ncd_specifications,'oral-health':oral_health_specifications,'vital-statistics':vital_specifications,'demographics':demographic_specifications}[args.programme_set](args.directory)
+    specs={'core':specifications,'child-health':child_health_specifications,'maternal':maternal_specifications,'infectious':infectious_specifications,'family-planning':family_planning_specifications,'ncd':ncd_specifications,'oral-health':oral_health_specifications,'vital-statistics':vital_specifications,'demographics':demographic_specifications,'combined-delivery':combined_delivery_specifications}[args.programme_set](args.directory)
     definitions=[]
     groups={}
     for spec in specs:groups.setdefault((spec['file'],spec['sheet'],spec['start'],spec['coded']),[]).append(spec)
     for (file,sheet,start,coded),group in groups.items():
         FILES[file]=file
         source_rows=b.named_rows(file,sheet,start,area_column=2) if args.programme_set=='oral-health' else (b.rows if coded else b.named_rows)(file,sheet,start)
+        rate_formats={}
+        if args.programme_set=='combined-delivery':
+            workbook=openpyxl.load_workbook(args.directory/file,read_only=True,data_only=False)
+            try:
+                rate_formats={number:r[17].number_format for number,r in enumerate(workbook[sheet].iter_rows(min_row=start,max_col=18),start)}
+            finally:workbook.close()
         for _,row,base in source_rows:
             for s in group:
                 if s.get('area_column') and normalise(str(row[s['area_column']-1]))!=normalise(base['source_area_name']):
                     raise ValueError('Quarter geography columns disagree')
+                before=len(b.indicators)
                 b.indicator(base,row,s['key'],s['n'],s['d'],s['rate'])
+                if args.programme_set=='combined-delivery' and len(b.indicators)>before:
+                    convert_excel_percentage(b.indicators[-1],rate_formats[base['source_row']])
                 if s['sex']:
                     for i,(sex,n) in enumerate([('male',s['n']-2),('female',s['n']-1)]):
                         den=(s.get('sex_denominators') or [None,None])[i]

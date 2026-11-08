@@ -5,9 +5,24 @@ from pathlib import Path
 from collections import defaultdict, Counter
 import openpyxl
 from prepare_fhsis import FILES
-from prepare_fhsis_expansion import ExpansionBuilder, maternal_specifications, demographic_specifications
+from prepare_fhsis_expansion import ExpansionBuilder, maternal_specifications, demographic_specifications, convert_excel_percentage
 
 class MappingTests(unittest.TestCase):
+    def test_excel_percentage_conversion_requires_reviewed_format_and_preserves_raw(self):
+        record={'rate_pct':'0.125','over_100':False}
+        convert_excel_percentage(record,'0.00%')
+        self.assertEqual(record['rate_pct'],'12.500')
+        self.assertEqual(record['source_rate_raw'],'0.125')
+        self.assertFalse(record['over_100'])
+        record={'rate_pct':'1.25','over_100':False}
+        convert_excel_percentage(record,'0.00%')
+        self.assertTrue(record['over_100'])
+        with self.assertRaisesRegex(ValueError,'Unexpected delivery percentage format'):
+            convert_excel_percentage({'rate_pct':'12.5'},'0.00')
+        record={'rate_pct':None}
+        convert_excel_percentage(record,'0.00%')
+        self.assertIsNone(record['rate_pct'])
+
     def test_demographic_ratios_use_population_over_units_and_exclude_bhw(self):
         with tempfile.TemporaryDirectory() as folder:
             (Path(folder)/'Demographic_2025_EB_Final.xlsx').touch()

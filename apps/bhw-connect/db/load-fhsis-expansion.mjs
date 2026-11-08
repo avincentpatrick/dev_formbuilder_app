@@ -45,6 +45,12 @@ export const DEMOGRAPHICS_DEFINITIONS = JSON.parse(
     "utf8",
   ),
 ).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
+export const COMBINED_DELIVERY_DEFINITIONS = JSON.parse(
+  readFileSync(
+    new URL("../ingestion/fhsis-combined-delivery-definitions.json", import.meta.url),
+    "utf8",
+  ),
+).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
 export const MORBIDITY_DEFINITIONS = JSON.parse(
   readFileSync(new URL("../ingestion/fhsis-morbidity-definitions.json", import.meta.url), "utf8"),
 ).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
@@ -89,6 +95,7 @@ function reviewedDefinitions(bundle) {
       "oral-health",
       "vital-statistics",
       "demographics",
+      "combined-delivery",
     ].includes(programme),
     "Unknown programme set",
   );
@@ -102,6 +109,7 @@ function reviewedDefinitions(bundle) {
     "oral-health": ORAL_HEALTH_DEFINITIONS,
     "vital-statistics": VITAL_STATISTICS_DEFINITIONS,
     demographics: DEMOGRAPHICS_DEFINITIONS,
+    "combined-delivery": COMBINED_DELIVERY_DEFINITIONS,
   }[programme];
 }
 const DECIMAL = /^-?\d+(?:\.\d+)?$/;

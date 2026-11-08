@@ -98,3 +98,5 @@ can only be performed by the operator.
 Vital statistics and the 19 cumulative morbidity chapters are prepared separately and remain on HOLD: see [FHSIS_VITAL_MORBIDITY_LOAD.md](FHSIS_VITAL_MORBIDITY_LOAD.md).
 
 Demographic summaries complete the remaining annual-content preparation gap; see [FHSIS_DEMOGRAPHICS_LOAD.md](FHSIS_DEMOGRAPHICS_LOAD.md). The consolidated load remains on HOLD.
+
+Combined vaginal–caesarean deliveries: see [FHSIS_COMBINED_DELIVERY_LOAD.md](FHSIS_COMBINED_DELIVERY_LOAD.md).

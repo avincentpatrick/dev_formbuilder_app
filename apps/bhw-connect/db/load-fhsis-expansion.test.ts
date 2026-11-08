@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   VITAL_STATISTICS_DEFINITIONS,
   DEMOGRAPHICS_DEFINITIONS,
+  COMBINED_DELIVERY_DEFINITIONS,
   MORBIDITY_DEFINITIONS,
   MORBIDITY_AGES,
   ORAL_HEALTH_DEFINITIONS,
@@ -25,6 +26,7 @@ function fixture(programme = "core") {
     "oral-health": ORAL_HEALTH_DEFINITIONS,
     "vital-statistics": VITAL_STATISTICS_DEFINITIONS,
     demographics: DEMOGRAPHICS_DEFINITIONS,
+    "combined-delivery": COMBINED_DELIVERY_DEFINITIONS,
     "morbidity-01": MORBIDITY_DEFINITIONS.filter((d: { indicator_key: string }) =>
       d.indicator_key.startsWith("morb_01_"),
     ),
@@ -60,6 +62,16 @@ function fixture(programme = "core") {
   };
 }
 describe("FHSIS expansion boundary", () => {
+  it("accepts the separate combined delivery category without duplicating core definitions", () => {
+    const bundle = fixture("combined-delivery");
+    expect(() => validateExpansion(bundle)).not.toThrow();
+    expect(bundle.definitions).toHaveLength(1);
+    expect(
+      DEFINITIONS.some(
+        (d: { indicator_key: string }) => d.indicator_key === bundle.definitions[0].indicator_key,
+      ),
+    ).toBe(false);
+  });
   it("accepts demographics with person-per-unit ratios, without a BHW measure", () => {
     const bundle = fixture("demographics");
     expect(bundle.definitions).toHaveLength(8);

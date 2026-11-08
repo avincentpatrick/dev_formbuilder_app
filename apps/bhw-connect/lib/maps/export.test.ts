@@ -56,3 +56,11 @@ it("exports a topic-specific Census training rate with its profile denominator a
   expect(result.total).toBeNull();
   expect(result.legend.method).toBe("fixed");
 });
+
+it("does not assign accreditation uncertainty to honorarium receipt exports", () => {
+  const result = datasetMapExport({ ...initialMapChoice("bhw-2025"), indicator: "bhw.any-honorarium" },
+    { ...data, total: null, parentRate: 75 }, [], null);
+  expect(result.indicator).toMatchObject({ period: "2025", confidenceLevel: null, unit: "%" });
+  expect(result.indicator.denominator).toContain("Validated BHW Census profiles");
+  expect(result.parentMeasure).toMatchObject({ kind: "rate", value: 75 });
+});

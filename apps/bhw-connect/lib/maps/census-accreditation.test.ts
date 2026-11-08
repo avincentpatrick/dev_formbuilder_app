@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { joinCensusAccreditation, joinCensusTraining } from "./census-accreditation";
+import { joinCensusAccreditation, joinCensusTraining, joinCensusHonorarium } from "./census-accreditation";
 const children = [{ geo_code: "01", geo_name: "Synthetic" }];
 const row = { geo_code: "01", n_total: 3, n_accredited: 1, pct_accredited: 33.33, ci_low: 6.15, ci_high: 79.23 };
 it("preserves published precision, uncertainty and small-sample context", () => {
@@ -29,4 +29,18 @@ it("keeps reported training zero distinct from missing topic rows", () => {
   expect(joinCensusTraining(children, [{ geo_code: "01", n_total: 100, n_trained: 0, coverage_pct: 0 }])[0])
     .toMatchObject({ value: 0, smallSample: false });
   expect(joinCensusTraining(children, [])[0].value).toBeNull();
+});
+
+it.each([0, 33.33, 100])("preserves honorarium percentage %s without reusing accreditation bounds", value => {
+  const result = joinCensusHonorarium(children, [{ ...row, any_honorarium_pct: value }])[0];
+  expect(result).toMatchObject({ value, ciLow: null, ciHigh: null, smallSample: true });
+  expect(result.note).toContain("No confidence interval supplied");
+});
+it.each([{ n_total: 0 }, { n_total: null }, { any_honorarium_pct: null }, { any_honorarium_pct: 101 }])("rejects invalid honorarium fields: %j", fields => {
+  expect(joinCensusHonorarium(children, [{ ...row, any_honorarium_pct: 25, ...fields }])[0].value).toBeNull();
+});
+it("keeps missing or duplicate honorarium rows unavailable", () => {
+  const source = { ...row, any_honorarium_pct: 25 };
+  expect(joinCensusHonorarium(children, [])[0].value).toBeNull();
+  expect(joinCensusHonorarium(children, [source, source])[0].value).toBeNull();
 });

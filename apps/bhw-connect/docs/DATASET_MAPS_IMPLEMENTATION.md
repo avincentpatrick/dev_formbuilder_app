@@ -824,3 +824,28 @@ Validation: 14 new uncertainty cases (35 probe cases total); 1,624 database-back
 passed, 11 skipped. Lint (existing fixture warning), typecheck, migration lint and prefixed
 no-data build passed. Browser tests were not rerun because this changes only offline
 validation and dated evidence, not the application. Four live probes retained TLS verification.
+
+## Census any-honorarium receipt map (8 November 2026)
+
+Enabled the catalog's existing `bhw.any-honorarium` percentage in the independent Census
+map. The source aggregate (`ingestion/build_aggregates.sql`, `honorarium_any`) counts profiles
+with any honorarium record against all validated profiles and stores the rounded percentage.
+The map reads only `geo_code,any_honorarium_pct,n_total` from `agg_bhw_counts` in the active
+Census release. No individual records, payer-level aggregates or amounts are requested.
+
+The adapter preserves the published finite 0–100 percentage with a positive integer profile
+denominator. It does not manufacture a numerator or recompute the percentage. Missing,
+duplicate or invalid records stay unavailable. Reported zero and 100% remain values;
+fewer than 30 profiles retains the existing small-sample styling and notes. A separately
+reported parent percentage remains a rate, never a total or average of child percentages.
+
+No confidence interval is supplied for this measure. The accreditation interval columns on
+the same table are not selected or reused. UI and exports distinguish that absence, and the
+public audit rejects borrowed intervals while retaining small-sample flag checks. The
+2025 reporting period and profile denominator remain explicit. Payer-specific honorarium,
+amounts, demographics and their suppression rules remain gated; no disclosure or schema
+changes are included. Production coverage and historical boundary acceptance remain separate.
+Validation: 11 new adapter/API/export/audit checks; 1,635 database-backed tests passed,
+11 skipped. All 33 map browser cases passed, including honorarium receipt, zero, unavailable
+uncertainty and JSON semantics. Lint (existing fixture warning), typecheck, migration lint
+and prefixed no-data build passed.

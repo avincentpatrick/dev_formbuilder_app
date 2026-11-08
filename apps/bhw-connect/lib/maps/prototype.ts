@@ -52,7 +52,7 @@ export function prototypeIndicators(slug: string) {
       "nhfr.beds",
       "nhfr.barangay-presence",
     ],
-    "bhw-2025": ["bhw.validated-profiles", "bhw.profile-accreditation", ...TRAINING_TOPICS.map(([topic]) => `bhw.training.${topic}`)],
+    "bhw-2025": ["bhw.validated-profiles", "bhw.profile-accreditation", "bhw.any-honorarium", ...TRAINING_TOPICS.map(([topic]) => `bhw.training.${topic}`)],
     "bhw-stepzero-2026": [
       "bhw.total",
       "bhw.registered",

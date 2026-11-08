@@ -30,7 +30,7 @@ export function datasetMapExport(
     selection: { ...choice },
     indicator: { id: metric.id, label: metric.label, unit: metric.unit,
       period: metric.period, denominator: metric.denominator,
-      confidenceLevel: censusRate ? 0.95 : choice.dataset === "psa-sae-poverty-2023" ? 0.9 : null },
+      confidenceLevel: censusRate && metric.catalogSpec?.attributes?.ciLow ? 0.95 : choice.dataset === "psa-sae-poverty-2023" ? 0.9 : null },
     source: { title: data.source, date: data.date, license: data.license,
       attribution: definition.attribution },
     disclosure: definition.disclosure,

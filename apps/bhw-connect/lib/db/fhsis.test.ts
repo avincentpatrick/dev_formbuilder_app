@@ -72,6 +72,21 @@ beforeEach(() => {
   mocks.children.mockResolvedValue([]);
 });
 describe("FHSIS interpretation", () => {
+  it("labels population-per-unit ratios and does not present zero-unit ratios as zero population", () => {
+    const ratio = { ...definition, unit: "persons per rural health unit" };
+    expect(
+      fhsisRateLabel(toFhsisIndicator(ratio, { ...row, rate_pct: 1234.5, over_100: true })),
+    ).toBe("1,234.5 persons per rural health unit");
+    expect(fhsisRateLabel(toFhsisIndicator(ratio, { ...row, denominator: 0, rate_pct: 0 }))).toBe(
+      "Not defined (zero units)",
+    );
+    expect(fhsisRateLabel(toFhsisIndicator(ratio, { ...row, denominator: 5, rate_pct: 0 }))).toBe(
+      "0 persons per rural health unit",
+    );
+    expect(fhsisLimitedGeography("demo_population")).toBe(false);
+    expect(fhsisLimitedGeography("demo_households")).toBe(false);
+    expect(fhsisLimitedGeography("demo_rhu")).toBe(true);
+  });
   it("keeps birth and mortality scales distinct from coverage percentages", () => {
     for (const [unit, suffix] of [
       ["births per 1,000 age-group population", " per 1,000 age-group population"],

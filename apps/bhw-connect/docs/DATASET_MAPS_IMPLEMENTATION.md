@@ -424,3 +424,25 @@ boundary/district tests passed (37 total). Lint (existing fixture warning), type
 lint and prefixed app build passed. Seeded-database Vitest: 1,463 passed, 11 skipped.
 No UI changes; browser tests were not rerun. Geospatial candidate failures are intentionally
 separate from passing software tests and app builds.
+
+## Ring-preserving barangay reconstruction (8 November 2026)
+
+Prepared all 45,585 source exterior/interior rings as protected simplification features,
+with an exact code/part/ring manifest, then reconstructed original barangay geometry types.
+The assembler requires every ring and blocks whole units rather than filling absent holes
+or dropping islands. Source coordinates/CRS remain unchanged during preparation; the
+projection/simplification stage is pinned and explicit. See [ring-retention evidence and
+reproduction commands](BARANGAY_RING_RETENTION.md).
+
+The nationwide result retains 45,572 of 45,573 polygon components and 11 of 12 holes; the
+single missing component/hole belongs to one whole barangay deliberately withheld after its
+extremely thin source ring degenerates on projection. All other parts and holes are retained.
+Four source-null records remain null. All 42,010 codes remain present; no invalid non-null
+polygons are emitted. Eight overlap pairs remain (four upstream overlaps and four touching
+upstream), so publication is still blocked. Historical reference mismatches are unchanged.
+No source ring was silently deleted or filled, and no boundary assets were published.
+
+Validation: eight new ring-pipeline tests plus the previous 37 Python checks passed (45 total).
+Lint (existing fixture warning), typecheck, migration lint and prefixed app build passed.
+Seeded-database Vitest: 1,463 passed, 11 skipped. No UI changes; browser tests were not rerun.
+The geospatial acceptance gate correctly remains failed, separately from software validation.

@@ -572,3 +572,23 @@ after adding independent portal-card coverage and a real complete JSON download 
 selector was filtered (23 distinct final cases). Phone-width checks cover accent/code
 search, no matches, retained selection, keyboard focus, unchanged table/total, no extra
 requests and dataset switching. Existing desktop/phone PNG capture checks still pass.
+
+## Portal lifecycle and throttled performance baseline (8 November 2026)
+
+Added browser regression coverage for hidden-dataset requests, offscreen map disposal,
+returning-card state/data reuse and peak live-map counts, including a tall desktop with
+several visible cards. Added an opt-in six-run Chromium timing probe and an idle/drawable
+readiness marker; canvas insertion alone is not treated as a completed render.
+
+The resource lifecycle checks pass. The throttled 390px profile misses the three-second
+readiness target: portal median 3,340ms and enlarged-map median 3,093ms after document/card
+availability; navigation-to-ready is longer. All six samples miss, so no performance
+acceptance is claimed. See [profile, recorded evidence and remaining work](DATASET_MAP_PERFORMANCE.md).
+No hidden dataset prefetching, additional live maps, CSP changes or boundary publication was
+introduced. Production storage and real-device performance remain unverified.
+
+Validation: seeded Vitest 1,486 passed, 11 skipped; lint (existing fixture warning), typecheck,
+migration lint and prefixed no-data build passed. The 23 existing map browser cases passed;
+both new lifecycle cases passed after correcting the return-scroll target to the map rather
+than the whole tall card (25 distinct final cases). Six throttled timing runs completed
+separately from tests/builds; their target misses are recorded, not treated as test passes.

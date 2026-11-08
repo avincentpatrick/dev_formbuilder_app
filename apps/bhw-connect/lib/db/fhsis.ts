@@ -57,9 +57,12 @@ export function fhsisRateLabel(indicator: FhsisIndicator): string {
   );
   const suffix = indicator.unit.startsWith("percent")
     ? "%"
-    : indicator.unit.includes("10,000")
-      ? " per 10,000"
-      : " per 100,000";
+    : indicator.unit.includes("1,000")
+      ? " per 1,000" +
+        (indicator.unit.includes("live births") ? " live births" : " age-group population")
+      : indicator.unit.includes("10,000")
+        ? " per 10,000"
+        : " per 100,000" + (indicator.unit.includes("live births") ? " live births" : "");
   return `${value}${suffix}${indicator.over100 ? "†" : ""}`;
 }
 export function fhsisPeriodLabel(key: string): string {
@@ -205,6 +208,19 @@ export const getFhsisReconciliation = cache(async (code: string) => {
 
 export type FhsisBreakdown = FhsisIndicator & { breakdown: string };
 export function fhsisBreakdownLabel(key: string): string {
+  if (key.startsWith("age:")) {
+    const [, age, sex] = key.split(":");
+    const ageLabel =
+      (
+        {
+          "0-6d": "0–6 days",
+          "7-28d": "7–28 days",
+          "29d-11m": "29 days–11 months",
+          "60plus": "60 years and above",
+        } as Record<string, string>
+      )[age] ?? `${age.replace("-", "–")} years`;
+    return `${ageLabel}, ${sex === "total" ? "both sexes" : sex}`;
+  }
   return (
     (
       {
@@ -223,6 +239,8 @@ export function fhsisBreakdownLabel(key: string): string {
 export function fhsisLimitedGeography(key: string): boolean {
   return (
     key.startsWith("birth_") ||
+    key.startsWith("vital_") ||
+    key.startsWith("morb_") ||
     key.startsWith("oral_") ||
     (key.startsWith("ncd_") &&
       !["ncd_20_59_assessed", "ncd_20_59_htn", "ncd_20_59_dm"].includes(key)) ||
@@ -238,7 +256,11 @@ export function fhsisLimitedGeography(key: string): boolean {
 }
 /** Fetch only this area; paginate so new programmes cannot silently hit PostgREST's cap. */
 export const getFhsisBreakdowns = cache(
-  async (code: string, level: GeoLevel): Promise<FhsisBreakdown[] | null> => {
+  async (
+    code: string,
+    level: GeoLevel,
+    morbidityKey?: string,
+  ): Promise<FhsisBreakdown[] | null> => {
     try {
       const [id, definitions] = await Promise.all([
         getDatasetIdBySlug(DATASET_SLUGS.fhsis),
@@ -248,7 +270,7 @@ export const getFhsisBreakdowns = cache(
       const result: FhsisBreakdown[] = [];
       const byKey = new Map(definitions.map((d) => [d.indicator_key, d]));
       for (let offset = 0; ; offset += 500) {
-        const { data, error } = await createSupabaseServerClient()
+        const query = createSupabaseServerClient()
           .from("fact_fhsis_indicator")
           .select("*")
           .eq("dataset_id", id)
@@ -258,6 +280,11 @@ export const getFhsisBreakdowns = cache(
           .order("indicator_key")
           .order("breakdown")
           .range(offset, offset + 499);
+        // Morbidity has 50 breakdowns per disease. Read them on its detail page,
+        // keeping the overview bounded as chapters are loaded.
+        const { data, error } = await (morbidityKey
+          ? query.eq("indicator_key", morbidityKey)
+          : query.not("indicator_key", "like", "morb_%"));
         if (error || !data) return null;
         for (const row of data) {
           const definition = byKey.get(row.indicator_key);

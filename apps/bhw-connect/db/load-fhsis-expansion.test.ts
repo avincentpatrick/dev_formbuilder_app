@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  VITAL_STATISTICS_DEFINITIONS,
+  MORBIDITY_DEFINITIONS,
+  MORBIDITY_AGES,
   ORAL_HEALTH_DEFINITIONS,
   NCD_DEFINITIONS,
   FAMILY_PLANNING_DEFINITIONS,
@@ -19,6 +22,10 @@ function fixture(programme = "core") {
     "family-planning": FAMILY_PLANNING_DEFINITIONS,
     ncd: NCD_DEFINITIONS,
     "oral-health": ORAL_HEALTH_DEFINITIONS,
+    "vital-statistics": VITAL_STATISTICS_DEFINITIONS,
+    "morbidity-01": MORBIDITY_DEFINITIONS.filter((d: { indicator_key: string }) =>
+      d.indicator_key.startsWith("morb_01_"),
+    ),
   };
   const definitions = structuredClone(mapping[programme]);
   const sources = [
@@ -51,6 +58,46 @@ function fixture(programme = "core") {
   };
 }
 describe("FHSIS expansion boundary", () => {
+  it("requires both morbidity sources and the complete age/sex grid", () => {
+    const bundle = fixture("morbidity-01");
+    bundle.sources.push({
+      file: String(bundle.sources[0].file).replace("_Region_", "_Province_"),
+      sha256: "b".repeat(64),
+    });
+    bundle.indicators = bundle.indicators.flatMap((r: (typeof bundle.indicators)[number]) =>
+      [
+        "total",
+        "male",
+        "female",
+        ...MORBIDITY_AGES.flatMap((age: string) =>
+          ["male", "female", "total"].map((sex) => `age:${age}:${sex}`),
+        ),
+      ].map((breakdown) => ({
+        ...r,
+        breakdown,
+        numerator_exact: "12",
+        denominator_exact: null,
+        rate_pct: null,
+        source_sheet: "Data",
+      })),
+    ) as typeof bundle.indicators;
+    bundle.qa.indicator_rows = bundle.indicators.length;
+    expect(() => validateExpansion(bundle)).not.toThrow();
+    const copy = structuredClone(bundle);
+    copy.indicators.pop();
+    copy.qa.indicator_rows--;
+    expect(() => validateExpansion(copy)).toThrow("age/sex grid");
+    bundle.sources.pop();
+    expect(() => validateExpansion(bundle)).toThrow("checksummed workbooks");
+  });
+  it("accepts the reviewed vital statistics without interpreting rates as percentages", () => {
+    const bundle = fixture("vital-statistics");
+    expect(bundle.definitions).toHaveLength(11);
+    expect(() => validateExpansion(bundle)).not.toThrow();
+    expect(() => validateExpansion({ ...bundle, programme_set: "maternal" })).toThrow(
+      "reviewed mapping",
+    );
+  });
   it("accepts the reviewed oral-health package without permitting programme substitution", () => {
     const bundle = fixture("oral-health");
     expect(bundle.sources).toHaveLength(2);

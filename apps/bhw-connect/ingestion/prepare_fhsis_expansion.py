@@ -253,6 +253,31 @@ def oral_health_specifications(directory):
     return specs
 
 
+def vital_specifications(directory):
+    source='1. Natality and Mortality_2025_PH.xlsx'
+    if not (directory/source).is_file():raise ValueError('Missing vital-statistics workbook')
+    specs=[]
+    def add(key,label,n,d=None,rate=None,sheet='Annual_a',sex=False,ages=None,unit='count',denominator='No denominator: source count only'):
+        specs.append(dict(key='vital_'+key,label=label,file=source,n=n,d=d,rate=rate,sheet=sheet,
+                          sex=sex,ages=ages,start=7,coded=False,program='vital_statistics',unit=unit,denominator=denominator))
+    add('live_births','Live births',4,sex=True)
+    add('births_under10','Live births to mothers younger than 10 years',7)
+    for age,n,d in [('10_14',8,5),('15_19',10,6)]:
+        add('births_'+age,'Adolescent births, mothers aged '+age.replace('_','–'),n,d,n+1,
+            unit='births per 1,000 age-group population',denominator='Source estimated population aged '+age.replace('_','–')+' years; sex is not stated in the population column header')
+    for cause,base in [('direct',3),('indirect',15)]:
+        for residence,offset in [('resident',0),('nonresident',5)]:
+            n=base+offset+3
+            add('maternal_'+cause+'_'+residence,cause.title()+' maternal deaths, '+residence,n,2,n+1,
+                sheet='Annual_b',ages=[[n-3,None,None],[n-2,None,None],[n-1,None,None]],
+                unit='deaths per 100,000 live births',denominator='Source total live births; age breakdowns retain counts only')
+        n=base+10
+        add('maternal_'+cause+'_total',cause.title()+' maternal deaths, all residences',n,2,n+1,
+            sheet='Annual_b',unit='deaths per 100,000 live births',denominator='Source total live births')
+    add('infant_deaths','Infant deaths',3,2,4,sheet='Annual_c',unit='deaths per 1,000 live births',denominator='Source total live births')
+    return specs
+
+
 class ExpansionBuilder(Builder):
     def raw_rows(self, source, sheet, start):
         for number,row in super().raw_rows(source,sheet,start):
@@ -299,7 +324,7 @@ def main():
     parser.add_argument('directory',type=Path)
     parser.add_argument('--reference',type=Path,required=True,help='Original private FHSIS directory containing TB geography and dim_geo.json')
     parser.add_argument('--retrieved',required=True)
-    parser.add_argument('--programme-set', choices=['core','child-health','maternal','infectious','family-planning','ncd','oral-health'], default='core')
+    parser.add_argument('--programme-set', choices=['core','child-health','maternal','infectious','family-planning','ncd','oral-health','vital-statistics'], default='core')
     args=parser.parse_args()
     geos=json.loads((args.reference/'dim_geo.json').read_text())
     b=ExpansionBuilder(args.reference,geos);b.directory=args.directory
@@ -308,7 +333,7 @@ def main():
             if geo['geo_level']!='barangay':b.canonical[normalise(geo['geo_name'])].add(code)
         b.canonical[normalise('City of Carmona')]={'0402104'}
         b.canonical[normalise('Dr. Jose P. Rizal')]={'1705323'}
-    specs={'core':specifications,'child-health':child_health_specifications,'maternal':maternal_specifications,'infectious':infectious_specifications,'family-planning':family_planning_specifications,'ncd':ncd_specifications,'oral-health':oral_health_specifications}[args.programme_set](args.directory)
+    specs={'core':specifications,'child-health':child_health_specifications,'maternal':maternal_specifications,'infectious':infectious_specifications,'family-planning':family_planning_specifications,'ncd':ncd_specifications,'oral-health':oral_health_specifications,'vital-statistics':vital_specifications}[args.programme_set](args.directory)
     definitions=[]
     groups={}
     for spec in specs:groups.setdefault((spec['file'],spec['sheet'],spec['start'],spec['coded']),[]).append(spec)

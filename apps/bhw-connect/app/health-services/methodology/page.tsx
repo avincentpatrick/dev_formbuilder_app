@@ -11,7 +11,7 @@ export default function Methodology() {
         <a href="https://bit.ly/FHSISPHSannualreports" className="underline">
           public FHSIS annual reports archive
         </a>{" "}
-        supplies the 2025 programme workbooks. This snapshot was retrieved on 7 November 2026 and
+        supplies the 2025 programme workbooks. These snapshots were retrieved in November 2026 and
         includes selected programmes; it is not a claim that every 2025 programme is included or
         that this is today’s latest release.
       </p>
@@ -31,8 +31,8 @@ export default function Methodology() {
         not provide barangay-level service indicators in this section. Additional postnatal,
         delivery/newborn and nutrition programmes are published only after their source load is
         validated. Those sources report provinces/HUCs and selected separately listed cities, not
-        every municipality. Vital statistics, family planning and the separate morbidity tables
-        remain outside this section.
+        every municipality. Available programmes depend on completed, validated source loads; each
+        displayed measure includes its definition, period and source.
       </p>
       <p>
         A missing indicator row means “Not reported in 2025”, not zero. A row with a zero is
@@ -63,6 +63,21 @@ export default function Methodology() {
         density elsewhere on the site continues to use StepZero population with PSA census
         population as fallback. A figure’s denominator N describes that indicator’s eligible
         population or cases, never the national BHW count.
+      </p>
+      <h2 className="text-xl font-semibold">Vital statistics and morbidity</h2>
+      <p>
+        Where available, live births remain distinct from deliveries. Vital-statistics rates use per
+        1,000 for adolescent births and infant deaths, and per 100,000 live births for maternal
+        deaths, despite percent headings in the workbook. Adolescent population columns do not state
+        sex; their source age-group denominators are retained without relabelling them.
+      </p>
+      <p>
+        Cumulative morbidity records case reports, not unique patients. Its source converts blank
+        submitted cells to zero and lacks Region XII’s May report. Therefore a zero is not proof of
+        complete reporting or absence of illness. Overlapping ICD categories must not be summed.
+        Monthly and Top 20 summaries are not loaded as additional cases. National/regional rates
+        retain their published per-100,000 scale without reverse-engineering missing population
+        denominators. Disease detail pages show the supplied age and sex counts.
       </p>
       <h2 className="text-xl font-semibold">Published subtotals</h2>
       <p>

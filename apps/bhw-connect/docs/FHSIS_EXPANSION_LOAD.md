@@ -94,3 +94,5 @@ Local validation used PostgreSQL 17: dry run left no new definitions, apply inse
 package, a digest of all prior indicator facts was unchanged, repeat apply was rejected, and anon
 could read every added row. The server's PostgreSQL 15 dry run remains necessary. Live loading
 can only be performed by the operator.
+
+Vital statistics and the 19 cumulative morbidity chapters are prepared separately and remain on HOLD: see [FHSIS_VITAL_MORBIDITY_LOAD.md](FHSIS_VITAL_MORBIDITY_LOAD.md).

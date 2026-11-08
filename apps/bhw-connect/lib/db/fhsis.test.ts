@@ -56,12 +56,14 @@ function query(data: unknown, error: unknown = null) {
     select: vi.fn(),
     eq: vi.fn(),
     neq: vi.fn(),
+    not: vi.fn(),
     order: vi.fn(),
     in: vi.fn(),
     limit: vi.fn(),
     range: vi.fn(),
   };
-  for (const fn of [q.select, q.eq, q.neq, q.order, q.in, q.limit, q.range]) fn.mockReturnValue(q);
+  for (const fn of [q.select, q.eq, q.neq, q.not, q.order, q.in, q.limit, q.range])
+    fn.mockReturnValue(q);
   return q;
 }
 beforeEach(() => {
@@ -70,6 +72,22 @@ beforeEach(() => {
   mocks.children.mockResolvedValue([]);
 });
 describe("FHSIS interpretation", () => {
+  it("keeps birth and mortality scales distinct from coverage percentages", () => {
+    for (const [unit, suffix] of [
+      ["births per 1,000 age-group population", " per 1,000 age-group population"],
+      ["deaths per 1,000 live births", " per 1,000 live births"],
+      ["deaths per 100,000 live births", " per 100,000 live births"],
+    ]) {
+      const value = toFhsisIndicator(
+        { ...definition, unit },
+        { ...row, rate_pct: 120, over_100: true },
+      );
+      expect(fhsisRateLabel(value)).toBe(`120${suffix}`);
+      expect(value.over100).toBe(false);
+    }
+    expect(fhsisBreakdownLabel("age:29d-11m:female")).toBe("29 days–11 months, female");
+    expect(fhsisBreakdownLabel("age:60plus:total")).toBe("60 years and above, both sexes");
+  });
   it("prefers precise source values, including zero, without rounding to legacy integers", () => {
     const actual = toFhsisIndicator(definition, {
       ...row,
@@ -255,4 +273,18 @@ describe("FHSIS age and sex breakdowns", () => {
     expect(fhsisLimitedGeography("nutrition_mam_cured")).toBe(true);
     expect(fhsisLimitedGeography("vax_opv1_0_12m")).toBe(false);
   });
+});
+
+it("loads one morbidity disease on demand and excludes its age grid from overview", async () => {
+  const defs = query([{ ...definition, indicator_key: "morb_01_001", program_area: "morbidity" }]);
+  const facts = query([{ ...row, indicator_key: "morb_01_001", breakdown: "age:1-4:total" }]);
+  mocks.from.mockImplementation((table: string) =>
+    table === "ref_fhsis_indicator" ? defs : facts,
+  );
+  const result = await getFhsisBreakdowns("PH", "national", "morb_01_001");
+  expect(result).toHaveLength(1);
+  expect(facts.eq).toHaveBeenCalledWith("indicator_key", "morb_01_001");
+  expect(facts.not).not.toHaveBeenCalled();
+  await getFhsisBreakdowns("PH", "national");
+  expect(facts.not).toHaveBeenCalledWith("indicator_key", "like", "morb_%");
 });

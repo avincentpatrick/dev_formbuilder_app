@@ -4134,6 +4134,14 @@ So two rows edit the same files, and both touch a hub. `R-b31f421e` rewrites how
 
 **Disposition:** the user approved the plan that takes both together, on 2026-11-06, with this exception named in it. Recorded in both places this log requires: inline at the closed rows and in `PROGRESS.md`'s release paragraph. Not a precedent, and the first of its reason, so the escalation rule above is not engaged.
 
+##### #9 — `M224` (2026-11-08) · two one-line document rows, each on its own hub, allowed by the user in chat
+
+**What was not satisfied:** item 1's second clause, *at most one row may touch a hub file*. `R-b1737198` edits `docs/security-threat-model.md`; `R-6f994627` edits `docs/data-dictionary.md`, and its two other copies of the same sentence sit in `docs/security-threat-model.md` and `docs/ux/form-filling-ux-flow.md`. All three are hubs. Clause 1 holds: the rows share no non-hub file.
+
+**Why:** the merge point. Merges wait for the user's word (`D137`), and every PR merged there is one more deploy the sitting waits through. Two document corrections as two PRs would add a deploy for no gain in bisection, since neither can redden a gate the other touches.
+
+**Disposition:** the user chose to pair them, in chat on 2026-11-08, asked by name with the alternative of one row per PR. The same answer pairs `R-4ea564fe` with `R-e2c1ba51` for the same reason; that is #10, recorded by its own increment. Recorded in both places this log requires: inline at the closed rows and in `PROGRESS.md`'s release paragraph. The first of its reason, so the escalation rule above is not engaged.
+
 ---
 
 ### D7 — Should `main` get branch protection, with the repository owner as a bypass actor? **Yes.**

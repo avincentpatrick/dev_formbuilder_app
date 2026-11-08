@@ -72,6 +72,22 @@ beforeEach(() => {
   mocks.children.mockResolvedValue([]);
 });
 describe("FHSIS interpretation", () => {
+  it("shows confirmed composite rates as undefined for zero or missing denominators, retaining counts", () => {
+    for (const indicator_key of ["ncd_cervical_lesions", "infect_schisto_treated"]) {
+      const def = { ...definition, indicator_key };
+      const value = toFhsisIndicator(def, { ...row, numerator: 3, denominator: 0 });
+      expect(fhsisRateLabel(value)).toBe("Not defined (zero denominator)");
+      expect(value.numerator).toBe(3);
+      expect(fhsisRateLabel(toFhsisIndicator(def, { ...row, denominator: null }))).toBe(
+        "Not defined (denominator missing)",
+      );
+      expect(fhsisRateLabel(toFhsisIndicator(def, row))).toBe("0%");
+      expect(
+        fhsisRateLabel(toFhsisIndicator(def, { ...row, denominator: null, rate_pct: null })),
+      ).toBe("Rate not reported");
+      expect(fhsisRateLabel(toFhsisIndicator(def))).toBe("Not reported in 2025");
+    }
+  });
   it("labels population-per-unit ratios and does not present zero-unit ratios as zero population", () => {
     const ratio = { ...definition, unit: "persons per rural health unit" };
     expect(

@@ -7,7 +7,7 @@ from collections import Counter
 from decimal import Decimal
 from pathlib import Path
 import openpyxl
-from prepare_fhsis import Builder, FILES, normalise, short_code
+from prepare_fhsis import Builder, FILES, normalise, short_code, numeric
 
 
 def specifications(directory):
@@ -160,7 +160,8 @@ def infectious_specifications(directory):
         add('Schisto',key,label,n,d,n+1,denominator={2:'Total patients seen',5:'Suspected schistosomiasis cases',9:'Acute clinically diagnosed schistosomiasis cases'}[d])
     add('Schisto','schisto_chronic','Chronic clinically diagnosed schistosomiasis cases',4,sheet='Annual1',denominator='Count only; source rate withheld because its denominator cannot be established from the annual tables')
     add('Schisto','schisto_chronic_confirmed','Chronic schistosomiasis cases confirmed by stool examination',8,4,9,sheet='Annual1',denominator='Chronic clinically diagnosed schistosomiasis cases')
-    add('Schisto','schisto_treated','Schistosomiasis cases treated in health facilities (source chronic table)',12,sheet='Annual1',denominator='Count only; source rate withheld because its denominator cannot be established from the annual tables')
+    add('Schisto','schisto_treated','Schistosomiasis cases treated in health facilities (source chronic table)',12,rate=13,sheet='Annual1',denominator='Confirmed acute plus confirmed chronic schistosomiasis cases; FHSIS 2025 Annual Report, p. 96. Rate undefined when denominator is zero.')
+    specs[-1]['denominator_components']=[['Annual',13],['Annual1',8]]
     add('Schisto','schisto_referred','Confirmed chronic schistosomiasis cases referred to hospital',16,8,17,sheet='Annual1',denominator='Confirmed chronic schistosomiasis cases')
     return specs
 
@@ -217,10 +218,11 @@ def ncd_specifications(directory):
         add('2. Visual',key,label+', age 60 and above',n,d,n+1,denominator=den)
     add('3. Immunization','senior_ppv','Senior citizens receiving one PPV dose',6,3,7,denominator='Senior citizens seen who had not previously received PPV')
     add('3. Immunization','senior_flu','Senior citizens receiving one influenza vaccine dose',11,8,12,denominator='Senior citizens seen')
-    for key,label,n,d,rate in [('via','VIA screening',4,None,None),('pap','Pap smear screening',5,None,None),('hpv','HPV DNA screening',6,None,None),('assessed','Assessed only',7,None,None),('screened','Screened or assessed, source total',8,3,9),('suspicious','Suspicious for cervical cancer',10,7,11),('suspicious_treated','Suspicious cases treated',12,10,13),('suspicious_referred','Suspicious cases referred',14,10,15),('suspicious_managed','Suspicious cases treated/referred, source total',16,10,17),('lesions','Positive for precancerous lesions',18,None,None),('lesions_treated','Precancerous lesions treated',20,18,21),('lesions_referred','Precancerous lesions referred',22,18,23),('lesions_managed','Precancerous lesions treated/referred, source total',24,18,25)]:
+    for key,label,n,d,rate in [('via','VIA screening',4,None,None),('pap','Pap smear screening',5,None,None),('hpv','HPV DNA screening',6,None,None),('assessed','Assessed only',7,None,None),('screened','Screened or assessed, source total',8,3,9),('suspicious','Suspicious for cervical cancer',10,7,11),('suspicious_treated','Suspicious cases treated',12,10,13),('suspicious_referred','Suspicious cases referred',14,10,15),('suspicious_managed','Suspicious cases treated/referred, source total',16,10,17),('lesions','Positive for precancerous lesions',18,None,19),('lesions_treated','Precancerous lesions treated',20,18,21),('lesions_referred','Precancerous lesions referred',22,18,23),('lesions_managed','Precancerous lesions treated/referred, source total',24,18,25)]:
         den={3:'Projected women aged 30–65 minus women aged 30–65 screened in the previous two years (source target population)',7:'Women assessed only (source denominator, not all screened women)',10:'Women suspicious for cervical cancer',18:'Women positive for precancerous lesions'}.get(d)
-        if key=='lesions':den='Count only; source rate held because its denominator is not explicit in a single source field'
+        if key=='lesions':den='Women aged 30–65 screened by VIA, Pap smear or HPV DNA (sum of source method counts, excluding assessed-only women); FHSIS 2025 Annual Report, p. 88. Rate undefined when denominator is zero.'
         add('4a.', 'cervical_'+key,label+', women aged 30–65',n,d,rate,False,denominator=den)
+        if key=='lesions':specs[-1]['denominator_components']=[['Annual',4],['Annual',5],['Annual',6]]
     for cohort,desc,items in [('highrisk','high-risk asymptomatic or symptomatic women aged 30–69',[(3,None,None,'cbe'),(4,None,None,'mammogram'),(5,None,None,'screened'),(6,3,7,'cbe_findings'),(8,4,9,'mammogram_findings'),(10,5,11,'findings'),(12,10,13,'care')]),('routine','asymptomatic women aged 50–69',[(16,15,17,'cbe'),(18,15,19,'mammogram'),(20,15,21,'screened'),(22,16,23,'cbe_findings'),(24,18,25,'mammogram_findings'),(26,20,27,'findings'),(28,26,29,'care')])]:
         labels={'cbe':'Clinical breast examination','mammogram':'Mammography','screened':'Breast screening, source total','cbe_findings':'Significant clinical breast examination findings','mammogram_findings':'Significant mammography findings','findings':'Significant breast findings, source total','care':'Breast findings linked to care'}
         for n,d,rate,key in items:
@@ -293,6 +295,15 @@ def demographic_specifications(directory):
             denominator='Source-reported '+label.lower()+'; ratio is undefined when the count is zero. Source ratio retained, not recomputed.')
         specs[-1]['numerator']='FHSIS estimated population in the BGY & BHS source table'
     return specs
+
+
+def attach_composite_denominator(record, components):
+    """Sum explicit source counts, preserving missing inputs and the published rate."""
+    values=[numeric(c['value']) for c in components]
+    record['denominator_exact']=(format(sum(Decimal(v) for v in values),'f')
+                                 if all(v is not None for v in values) else None)
+    record['source_denominator_components']=[{**{k:v for k,v in c.items() if k!='value'},'value':v}
+                                              for c,v in zip(components,values)]
 
 
 def combined_delivery_specifications(directory):
@@ -371,6 +382,7 @@ def main():
         b.canonical[normalise('Dr. Jose P. Rizal')]={'1705323'}
     specs={'core':specifications,'child-health':child_health_specifications,'maternal':maternal_specifications,'infectious':infectious_specifications,'family-planning':family_planning_specifications,'ncd':ncd_specifications,'oral-health':oral_health_specifications,'vital-statistics':vital_specifications,'demographics':demographic_specifications,'combined-delivery':combined_delivery_specifications}[args.programme_set](args.directory)
     definitions=[]
+    cross_sheet_rows={}
     groups={}
     for spec in specs:groups.setdefault((spec['file'],spec['sheet'],spec['start'],spec['coded']),[]).append(spec)
     for (file,sheet,start,coded),group in groups.items():
@@ -388,6 +400,20 @@ def main():
                     raise ValueError('Quarter geography columns disagree')
                 before=len(b.indicators)
                 b.indicator(base,row,s['key'],s['n'],s['d'],s['rate'])
+                if s.get('denominator_components') and len(b.indicators)>before:
+                    components=[]
+                    for component_sheet,column in s['denominator_components']:
+                        component_base,component_row=base,row
+                        if component_sheet!=sheet:
+                            cache_key=(file,component_sheet)
+                            if cache_key not in cross_sheet_rows:
+                                cross_sheet_rows[cache_key]={g['geo_code']:(g,r) for _,r,g in b.named_rows(file,component_sheet,start)}
+                            if base['geo_code'] not in cross_sheet_rows[cache_key]:raise ValueError('Missing denominator geography')
+                            component_base,component_row=cross_sheet_rows[cache_key][base['geo_code']]
+                        components.append(dict(source_file=file,source_sheet=component_sheet,
+                                               source_row=component_base['source_row'],source_column=column,
+                                               geo_code=component_base['geo_code'],value=component_row[column-1]))
+                    attach_composite_denominator(b.indicators[-1],components)
                 if args.programme_set=='combined-delivery' and len(b.indicators)>before:
                     convert_excel_percentage(b.indicators[-1],rate_formats[base['source_row']])
                 if s['sex']:
@@ -414,9 +440,9 @@ def main():
         bundle['programme_set']=args.programme_set
         qa['omitted_columns']=(['Repeat-pregnancy Td age-specific rates: source reports zeros despite nonzero counts; retained age counts only'] if args.programme_set=='maternal' else [])
     if args.programme_set=='infectious':
-        qa['omitted_columns']=['Pregnancy deworming in STH workbook: duplicates maternal deworming with a different total; held for source reconciliation', 'Schistosomiasis Annual1 chronic diagnosis and treatment rates: denominator not established; retained counts only']
+        qa['omitted_columns']=['Pregnancy deworming in STH workbook: duplicates maternal deworming with a different total; held for source reconciliation', 'Schistosomiasis Annual1 chronic diagnosis rate: denominator not established; retained counts only']
     if args.programme_set=='ncd':
-        qa['omitted_columns']=['Senior annual risk-assessment/disease summary: Q4 title says Annual 2024; RA annual values repeat that summary; held pending year clarification', 'Cervical precancerous-lesion rate: no explicit denominator field; retained counts', 'Medicine access: December snapshot only; monthly figures not summed to annual unique people']
+        qa['omitted_columns']=['Senior annual risk-assessment/disease summary: Q4 title says Annual 2024; RA annual values repeat that summary; held pending year clarification', 'Medicine access: December snapshot only; monthly figures not summed to annual unique people']
     if args.programme_set=='oral-health':
         qa['omitted_columns']=['Annual rates and denominators for ages 5–9, 10–19, 20–59 and 60+: denominators sum quarterly populations; retained visit counts', 'Final block columns 93–113: conflicting senior/under-one/maternal-age labels; withheld entirely pending cohort clarification']
     out=args.directory/'fhsis-expansion.json';out.write_text(json.dumps(bundle,ensure_ascii=False,separators=(',',':')))

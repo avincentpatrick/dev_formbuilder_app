@@ -158,8 +158,9 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
         <p className="my-2 text-sm text-muted">
           {FHSIS_RELEASE_LABEL} · Totals; available age and sex breakdowns are below. TB
           notification rates are cases per 100,000, not percentages. Postnatal care,
-          delivery/newborn care and nutrition sources cover provinces/HUCs and selected separately
-          listed cities; they do not provide every municipality separately.
+          delivery/newborn care, nutrition, school vaccination and childhood illness sources cover
+          provinces/HUCs and selected separately listed cities; they do not provide every
+          municipality separately.
         </p>
         <div className="overflow-x-auto" role="region" aria-label="Service indicators" tabIndex={0}>
           <table className="w-full min-w-[640px] text-left text-sm">

@@ -208,7 +208,12 @@ export function fhsisBreakdownLabel(key: string): string {
 }
 export function fhsisLimitedGeography(key: string): boolean {
   return (
-    key.startsWith("birth_") || key.startsWith("nutrition_") || key === "pnc2" || key === "pnc4"
+    key.startsWith("birth_") ||
+    key.startsWith("nutrition_") ||
+    key.startsWith("school_") ||
+    key.startsWith("child_") ||
+    key === "pnc2" ||
+    key === "pnc4"
   );
 }
 /** Fetch only this area; paginate so new programmes cannot silently hit PostgREST's cap. */

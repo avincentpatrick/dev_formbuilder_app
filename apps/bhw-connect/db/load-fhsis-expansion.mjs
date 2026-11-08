@@ -9,32 +9,47 @@ import pg from "pg";
 export const DEFINITIONS = JSON.parse(
   readFileSync(new URL("../ingestion/fhsis-expansion-definitions.json", import.meta.url), "utf8"),
 ).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
-const KEYS = DEFINITIONS.map((d) => d.indicator_key);
+export const CHILD_HEALTH_DEFINITIONS = JSON.parse(
+  readFileSync(
+    new URL("../ingestion/fhsis-child-health-definitions.json", import.meta.url),
+    "utf8",
+  ),
+).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
+function reviewedDefinitions(bundle) {
+  const programme = bundle.programme_set ?? "core";
+  check(["core", "child-health"].includes(programme), "Unknown programme set");
+  return programme === "core" ? DEFINITIONS : CHILD_HEALTH_DEFINITIONS;
+}
 const DECIMAL = /^-?\d+(?:\.\d+)?$/;
 function check(ok, message) {
   if (!ok) throw new Error(message);
 }
 export function validateExpansion(bundle) {
+  const definitions = reviewedDefinitions(bundle);
+  const keys = definitions.map((d) => d.indicator_key);
   check(
     bundle.format === "bhw-fhsis-expansion-v1" && bundle.dataset_slug === "fhsis-2025",
     "Wrong expansion format/dataset",
   );
   check(
-    JSON.stringify(bundle.definitions) === JSON.stringify(DEFINITIONS),
+    JSON.stringify(bundle.definitions) === JSON.stringify(definitions),
     "Definitions differ from the reviewed mapping",
   );
   check(/^\d{4}-\d{2}-\d{2}$/.test(bundle.retrieved), "Invalid retrieval date");
   const sources = new Map(bundle.sources.map((s) => [s.file, s]));
+  const expectedSources = new Set(definitions.map((d) => d.source_workbook));
   check(
-    sources.size === 15 && bundle.sources.every((s) => /^[a-f0-9]{64}$/.test(s.sha256)),
-    "Expected 15 checksummed workbooks",
+    sources.size === expectedSources.size &&
+      sources.size === bundle.sources.length &&
+      bundle.sources.every((s) => expectedSources.has(s.file) && /^[a-f0-9]{64}$/.test(s.sha256)),
+    "Expected the reviewed checksummed workbooks",
   );
   const geos = new Map(bundle.geographies.map((g) => [g.geo_code, g]));
   check(geos.size === bundle.geographies.length, "Duplicate geography");
   const seen = new Set(),
     national = new Set();
   for (const row of bundle.indicators) {
-    const definition = DEFINITIONS.find((d) => d.indicator_key === row.indicator_key);
+    const definition = definitions.find((d) => d.indicator_key === row.indicator_key);
     check(
       definition && definition.source_workbook === row.source_file && sources.has(row.source_file),
       "Unexpected indicator/source",
@@ -80,15 +95,17 @@ export function validateExpansion(bundle) {
     seen.add(key);
     if (row.geo_code === "PH" && row.breakdown === "total") national.add(row.indicator_key);
   }
-  check(national.size === KEYS.length, "Incomplete national checkpoints");
+  check(national.size === keys.length, "Incomplete national checkpoints");
   check(
-    bundle.qa.indicator_rows === bundle.indicators.length && bundle.qa.definitions === KEYS.length,
+    bundle.qa.indicator_rows === bundle.indicators.length && bundle.qa.definitions === keys.length,
     "QA counts disagree",
   );
 }
 
 export async function loadExpansion(client, bundle, sha256, { apply = false } = {}) {
   validateExpansion(bundle);
+  const definitions = reviewedDefinitions(bundle);
+  const keys = definitions.map((d) => d.indicator_key);
   await client.query("BEGIN");
   try {
     await client.query("SET LOCAL lock_timeout = '10s'");
@@ -107,7 +124,7 @@ export async function loadExpansion(client, bundle, sha256, { apply = false } = 
       (SELECT count(*)::int FROM public.fact_fhsis_indicator WHERE dataset_id=$1) AS indicators,
       (SELECT count(*)::int FROM public.fact_fhsis_workforce WHERE dataset_id=$1) AS workforce,
       (SELECT count(*)::int FROM public.fact_fhsis_indicator WHERE dataset_id=$1 AND indicator_key=ANY($2::text[])) AS overlap`,
-      [id, KEYS],
+      [id, keys],
     );
     const before = counts[0];
     check(
@@ -120,7 +137,7 @@ export async function loadExpansion(client, bundle, sha256, { apply = false } = 
     );
     const { rows: existingDefs } = await client.query(
       "SELECT indicator_key FROM public.ref_fhsis_indicator WHERE indicator_key=ANY($1::text[])",
-      [KEYS],
+      [keys],
     );
     check(
       existingDefs.length === 0,
@@ -142,7 +159,7 @@ export async function loadExpansion(client, bundle, sha256, { apply = false } = 
     await client.query(
       `INSERT INTO public.ref_fhsis_indicator
       SELECT * FROM jsonb_to_recordset($1::jsonb) AS d(indicator_key text,program_area text,label text,numerator_def text,denominator_def text,unit text,source_workbook text,uuc_criterion_d boolean)`,
-      [JSON.stringify(DEFINITIONS)],
+      [JSON.stringify(definitions)],
     );
     const inserted = await client.query(
       `INSERT INTO public.fact_fhsis_indicator
@@ -162,15 +179,15 @@ export async function loadExpansion(client, bundle, sha256, { apply = false } = 
     const { rows: checkpoints } = await client.query(
       `SELECT indicator_key,numerator_exact,denominator_exact,rate_pct FROM public.fact_fhsis_indicator
       WHERE dataset_id=$1 AND geo_code='PH' AND breakdown='total' AND indicator_key=ANY($2::text[]) ORDER BY indicator_key`,
-      [id, KEYS],
+      [id, keys],
     );
-    check(checkpoints.length === KEYS.length, "Checkpoint count differs after insert");
+    check(checkpoints.length === keys.length, "Checkpoint count differs after insert");
     if (apply)
       await client.query(
         `INSERT INTO public.ingestion_batches(finished_at,source_file,row_counts,qa_report) VALUES(now(),$1,$2::jsonb,$3::jsonb)`,
         [
           `fhsis-expansion.json sha256:${sha256}`,
-          JSON.stringify({ added_indicators: inserted.rowCount, added_definitions: KEYS.length }),
+          JSON.stringify({ added_indicators: inserted.rowCount, added_definitions: keys.length }),
           JSON.stringify({
             ...bundle.qa,
             sha256,
@@ -186,7 +203,7 @@ export async function loadExpansion(client, bundle, sha256, { apply = false } = 
       sha256,
       before,
       added_indicators: inserted.rowCount,
-      added_definitions: KEYS.length,
+      added_definitions: keys.length,
       checkpoints,
     };
   } catch (error) {

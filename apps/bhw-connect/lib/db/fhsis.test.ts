@@ -234,6 +234,8 @@ describe("FHSIS age and sex breakdowns", () => {
         toFhsisIndicator({ ...definition, unit: "count" }, { ...row, rate_pct: null }),
       ),
     ).toBe("Count only");
+    expect(fhsisLimitedGeography("school_hpv1")).toBe(true);
+    expect(fhsisLimitedGeography("child_ors")).toBe(true);
     expect(fhsisLimitedGeography("nutrition_mam_cured")).toBe(true);
     expect(fhsisLimitedGeography("vax_opv1_0_12m")).toBe(false);
   });

@@ -1,4 +1,8 @@
-# FHSIS 2025 expansion: server handoff
+# FHSIS 2025 expansion: deferred server handoff
+
+**HOLD: prepare all additional datasets before a consolidated server load.** The commands below
+are reference instructions for that later handoff, not a request to load now. Child-health preparation
+is documented in [FHSIS_CHILD_HEALTH.md](FHSIS_CHILD_HEALTH.md).
 
 This is an **append**, not a rerun of the original first-load tool. Deploy the release containing
 `db/load-fhsis-expansion.mjs` and the age/sex dashboard before loading. The original FHSIS facts

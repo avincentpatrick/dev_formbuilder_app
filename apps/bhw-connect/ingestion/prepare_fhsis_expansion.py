@@ -59,6 +59,40 @@ def specifications(directory):
     return specs
 
 
+def child_health_specifications(directory):
+    """Annual child-health source columns, reviewed against workbook headers."""
+    specs = []
+    def add(prefix, key, label, n, d, sex=False, start=7, denominator='', program='immunization', sex_denominators=None):
+        matches = list(directory.glob(prefix+'*.xlsx'))
+        if len(matches) != 1:
+            raise ValueError(f'Expected one source: {prefix}')
+        specs.append(dict(key=key, label=label, file=matches[0].name, n=n, d=d,
+                          rate=n+1, sex=sex, sex_denominators=sex_denominators,
+                          ages=None, sheet='Annual', start=start, coded=False,
+                          program=program, denominator=denominator))
+    for prefix, vaccine in [('11 Grade', 'td'), ('12 Grade', 'mr')]:
+        for grade,n,d in [(1,5,2),(7,10,7)]:
+            add(prefix, f'school_{vaccine}_grade{grade}',
+                f'Grade {grade} learners given one dose of {vaccine.upper()} vaccine', n,d,True,
+                denominator=f'Enrolled Grade {grade} learners')
+    for dose,n in [(1,3),(2,5)]:
+        add('13 9 year', f'school_hpv{dose}', f'HPV dose {dose}, 9-year-old females', n,2,
+            denominator='Projected population of 9-year-old females')
+    for age,n,d,sd in [('6_11',7,4,[2,3]),('12_59',14,11,[9,10])]:
+        add('1 Sick', f'child_sick_vita_{age}m',
+            f'High-risk sick children given vitamin A, {age.replace("_", "–")} months', n,d,True,8,
+            denominator=f'Sick children aged {age.replace("_", "–")} months seen (sex-specific for breakdowns)',
+            program='nutrition', sex_denominators=sd)
+    for key,label,n,d,sd in [('ors','Diarrhea cases given ORS',7,4,[2,3]),
+                           ('ors_zinc','Diarrhea cases given ORS with zinc',11,4,[2,3]),
+                           ('diarrhea_treated','Diarrhea treatment total reported by source',13,4,None),
+                           ('pneumonia_abx','Pneumonia cases given antibiotics',20,17,[15,16])]:
+        add('2 3 Diarrhea', 'child_'+key, label+', 0–59 months',n,d,sd is not None,8,
+            denominator=('Pneumonia' if d==17 else 'Diarrhea')+' cases aged 0–59 months seen (sex-specific where available)',
+            program='child_health',sex_denominators=sd)
+    return specs
+
+
 class ExpansionBuilder(Builder):
     def named_rows(self, source, sheet, start):
         seen, region = set(), None
@@ -91,10 +125,11 @@ def main():
     parser.add_argument('directory',type=Path)
     parser.add_argument('--reference',type=Path,required=True,help='Original private FHSIS directory containing TB geography and dim_geo.json')
     parser.add_argument('--retrieved',required=True)
+    parser.add_argument('--programme-set', choices=['core','child-health'], default='core')
     args=parser.parse_args()
     geos=json.loads((args.reference/'dim_geo.json').read_text())
     b=ExpansionBuilder(args.reference,geos);b.directory=args.directory
-    specs=specifications(args.directory)
+    specs=(child_health_specifications if args.programme_set=='child-health' else specifications)(args.directory)
     definitions=[]
     groups={}
     for spec in specs:groups.setdefault((spec['file'],spec['sheet'],spec['start'],spec['coded']),[]).append(spec)
@@ -104,7 +139,9 @@ def main():
             for s in group:
                 b.indicator(base,row,s['key'],s['n'],s['d'],s['rate'])
                 if s['sex']:
-                    for sex,n in [('male',s['n']-2),('female',s['n']-1)]:b.indicator(base,row,s['key'],n,breakdown=sex)
+                    for i,(sex,n) in enumerate([('male',s['n']-2),('female',s['n']-1)]):
+                        den=(s.get('sex_denominators') or [None,None])[i]
+                        b.indicator(base,row,s['key'],n,den,breakdown=sex)
                 for age,cols in zip(['10-14','15-19','20-49'],s['ages'] or []):b.indicator(base,row,s['key'],*cols,breakdown=age)
     for s in specs:
         definitions.append(dict(indicator_key=s['key'],program_area=s['program'],label=s['label'],numerator_def=s['label'],denominator_def=s['denominator'],unit='percent (0-100, may exceed)' if s['rate'] else 'count',source_workbook=s['file'],uuc_criterion_d=s['key']=='birth_shp'))
@@ -118,6 +155,9 @@ def main():
     used=sorted({r['geo_code'] for r in b.indicators})
     bundle=dict(format='bhw-fhsis-expansion-v1',dataset_slug='fhsis-2025',retrieved=args.retrieved,sources=sources,definitions=definitions,indicators=b.indicators,
                 geographies=[{k:geos[c][k] for k in ('geo_code','geo_level','geo_name','parent_code')} for c in used],qa=qa)
+    if args.programme_set!='core':
+        bundle['programme_set']=args.programme_set
+        qa['omitted_columns']=[]
     out=args.directory/'fhsis-expansion.json';out.write_text(json.dumps(bundle,ensure_ascii=False,separators=(',',':')))
     sha=hashlib.sha256(out.read_bytes()).hexdigest();(args.directory/'fhsis-expansion.sha256').write_text(sha+'  fhsis-expansion.json\n')
     (args.directory/'qa-report.json').write_text(json.dumps(qa,ensure_ascii=False,indent=2))

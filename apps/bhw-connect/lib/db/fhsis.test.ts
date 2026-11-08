@@ -246,6 +246,9 @@ describe("FHSIS age and sex breakdowns", () => {
     expect(fhsisPeriodLabel("fp_demand_q4")).toBe("Q4 2025");
     expect(fhsisPeriodLabel("fp_begin_total")).toBe("Beginning of 2025");
     expect(fhsisPeriodLabel("fp_end_total")).toBe("End of 2025");
+    expect(fhsisPeriodLabel("ncd_dec_60plus_htn_total")).toBe("December 2025");
+    expect(fhsisLimitedGeography("ncd_senior_ppv")).toBe(true);
+    expect(fhsisLimitedGeography("ncd_20_59_assessed")).toBe(false);
     expect(fhsisLimitedGeography("school_hpv1")).toBe(true);
     expect(fhsisLimitedGeography("child_ors")).toBe(true);
     expect(fhsisLimitedGeography("nutrition_mam_cured")).toBe(true);

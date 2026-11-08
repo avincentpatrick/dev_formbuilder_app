@@ -63,6 +63,7 @@ export function fhsisRateLabel(indicator: FhsisIndicator): string {
   return `${value}${suffix}${indicator.over100 ? "†" : ""}`;
 }
 export function fhsisPeriodLabel(key: string): string {
+  if (key.startsWith("ncd_dec_")) return "December 2025";
   if (key === "fp_demand_q4") return "Q4 2025";
   if (key.startsWith("fp_begin_")) return "Beginning of 2025";
   if (key.startsWith("fp_end_")) return "End of 2025";
@@ -222,6 +223,8 @@ export function fhsisBreakdownLabel(key: string): string {
 export function fhsisLimitedGeography(key: string): boolean {
   return (
     key.startsWith("birth_") ||
+    (key.startsWith("ncd_") &&
+      !["ncd_20_59_assessed", "ncd_20_59_htn", "ncd_20_59_dm"].includes(key)) ||
     key.startsWith("fp_") ||
     key.startsWith("infect_") ||
     key.startsWith("maternal_") ||

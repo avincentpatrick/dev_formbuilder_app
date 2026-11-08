@@ -370,3 +370,68 @@ test("profiling shows over-headcount shares and unavailable denominators without
   ).toBeVisible();
   await expect(page.locator("ul").getByText("100% or more", { exact: true })).toBeVisible();
 });
+
+test("UUC qualifying routes preserve independent selections and share the chosen count", async ({
+  page,
+}) => {
+  await page.goto("./");
+  const uuc = page.getByRole("article", { name: "UUC for PHC 2025 map", exact: true });
+  await uuc.scrollIntoViewIfNeeded();
+  await uuc.getByLabel("UUC for PHC 2025 indicator").selectOption("uuc.route.health");
+  await expect(uuc.getByText(/Routes overlap and must not be added together/)).toBeVisible();
+  await expect(uuc.getByRole("link", { name: "Enlarge UUC for PHC 2025 map" })).toHaveAttribute(
+    "href",
+    /indicator=uuc.route.health&period=2025/,
+  );
+  const nhfr = page.getByRole("article", { name: "NHFR September 2026 map", exact: true });
+  await expect(nhfr.getByLabel("NHFR September 2026 indicator")).toHaveValue("nhfr.facilities");
+  await uuc.getByRole("link", { name: "Enlarge UUC for PHC 2025 map" }).click();
+  await expect(page.getByLabel("UUC for PHC 2025 indicator")).toHaveValue("uuc.route.health");
+});
+
+test("UUC health-route table distinguishes zero, excluded and missing reports", async ({
+  page,
+}) => {
+  await page.route("**/api/dataset-map?**", (route) =>
+    route.fulfill({
+      json: {
+        state: "available",
+        rows: [
+          {
+            code: "01",
+            name: "Synthetic partial",
+            value: 4,
+            note: "6 health-evaluable of 10 listed barangays; 4 excluded from health evaluation",
+          },
+          {
+            code: "02",
+            name: "Synthetic zero",
+            value: 0,
+            note: "0 health-evaluable of 5 listed barangays; 5 excluded from health evaluation; no evaluable denominator for a share",
+          },
+          { code: "03", name: "Synthetic missing", value: null, note: "No reported route count" },
+        ],
+        total: 20,
+        totalNote: "30 health-evaluable of 40 listed barangays; 10 excluded from health evaluation",
+        area: "Synthetic national",
+        childLevel: "region",
+        source: "Synthetic UUC",
+        date: "2025-12-31",
+        license: "Test only",
+        geometryUrl: `${route.request().url().split("/api/")[0]}/geo/regions.json`,
+      },
+    }),
+  );
+  await page.goto("map?dataset=uuc-phc-2025&indicator=uuc.route.health");
+  await page.getByText(/Complete area table/).click();
+  await expect(
+    page.getByRole("row", { name: /Synthetic partial 4 6 health-evaluable/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("row", { name: /Synthetic zero 0 0 health-evaluable/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("row", { name: /Synthetic missing Not reported No reported route count/ }),
+  ).toBeVisible();
+  await expect(page.getByText(/Reported area total: 20 barangays/)).toBeVisible();
+});

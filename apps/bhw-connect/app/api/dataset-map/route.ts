@@ -1,3 +1,4 @@
+import { joinUucRouteRows } from "@/lib/maps/uuc-routes";
 import { PROFILING_COLUMNS, joinProfilingRows } from "@/lib/maps/profiling";
 import { INCOME_SOURCE_SLUG, joinIncomeRows } from "@/lib/maps/income-class";
 import { joinPovertyRows } from "@/lib/maps/poverty";
@@ -57,6 +58,7 @@ export async function GET(request: NextRequest) {
       value: null,
     })) as MapPayload["rows"];
     let total: number | null = null;
+    let totalNote: string | undefined;
     if (profiling) {
       const values = await db
         .from("agg_bhw_profiling_status")
@@ -104,7 +106,10 @@ export async function GET(request: NextRequest) {
     } else if (!poverty && !income && spec) {
       // Apply each accepted measure's source filters to BOTH children and the parent.
       // In particular, population is PSA 2024, never a StepZero fallback or another census year.
-      const projection = `geo_code,${spec.column}`;
+      const uucRoute = spec.table === "agg_uuc_phc_criteria";
+      const projection = uucRoute
+        ? `geo_code,${spec.column},n_listed,n_health_evaluable`
+        : `geo_code,${spec.column}`;
       let childQuery = db
         .from(spec.table)
         .select(projection)
@@ -135,21 +140,21 @@ export async function GET(request: NextRequest) {
         !parent.data
       )
         throw new Error("Values unavailable");
-      rows = joinMapRows(
-        children.data,
-        values.data as unknown as Record<string, unknown>[],
-        spec.column,
-      );
-      total = joinMapRows(
+      const join = uucRoute ? joinUucRouteRows : joinMapRows;
+      rows = join(children.data, values.data as unknown as Record<string, unknown>[], spec.column);
+      const parentRow = join(
         [{ geo_code: choice.code, geo_name: geo.geoName }],
         parent.data as unknown as Record<string, unknown>[],
         spec.column,
-      )[0].value;
+      )[0];
+      total = parentRow.value;
+      totalNote = parentRow.note;
     }
     const payload: MapPayload = {
       state: "available",
       rows,
       total,
+      ...(totalNote ? { totalNote } : {}),
       area: geo.geoName,
       childLevel,
       valueSupport,

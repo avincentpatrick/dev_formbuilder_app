@@ -292,3 +292,46 @@ it("rejects profiling periods and individual record fields outside the map contr
   }
   expect(mock.from).not.toHaveBeenCalled();
 });
+
+it("reads UUC route counts and their own denominator context for children and parent", async () => {
+  const values = query({
+    data: [{ geo_code: "01", n_route_health: 4, n_listed: 10, n_health_evaluable: 6 }],
+    error: null,
+  });
+  const parent = query({
+    data: [{ geo_code: "PH", n_route_health: 12, n_listed: 30, n_health_evaluable: 20 }],
+    error: null,
+  });
+  mock.from
+    .mockReturnValueOnce(query({ data: [{ geo_code: "01", geo_name: "Synthetic" }], error: null }))
+    .mockReturnValueOnce(values)
+    .mockReturnValueOnce(parent);
+  const response = await GET(
+    new NextRequest(
+      "http://localhost/api/dataset-map?dataset=uuc-phc-2025&indicator=uuc.route.health",
+    ),
+  );
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    rows: [
+      {
+        value: 4,
+        note: "6 health-evaluable of 10 listed barangays; 4 excluded from health evaluation",
+      },
+    ],
+    total: 12,
+    totalNote: "20 health-evaluable of 30 listed barangays; 10 excluded from health evaluation",
+  });
+  expect(mock.source).toHaveBeenCalledWith("uuc-phc-2025");
+  expect(mock.from.mock.calls.map((c) => c[0])).toEqual([
+    "dim_geo",
+    "agg_uuc_phc_criteria",
+    "agg_uuc_phc_criteria",
+  ]);
+  for (const q of [values, parent]) {
+    expect(q.select).toHaveBeenCalledWith("geo_code,n_route_health,n_listed,n_health_evaluable");
+    expect(q.eq).toHaveBeenCalledWith("dataset_id", 7);
+  }
+  expect(values.eq).toHaveBeenCalledWith("geo_level", "region");
+  expect(parent.eq).toHaveBeenCalledWith("geo_level", "national");
+});

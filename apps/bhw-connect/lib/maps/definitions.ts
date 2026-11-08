@@ -1,3 +1,4 @@
+import { UUC_ROUTE_LABELS } from "./uuc-routes";
 import { CATALOG, type IndicatorSpec } from "@/lib/catalog/definitions";
 import type { GeoLevel } from "@/lib/filters/schema";
 
@@ -49,7 +50,7 @@ const periods: Record<string, string> = {
 function indicator(spec: IndicatorSpec): MapIndicator {
   return {
     id: spec.id,
-    label: spec.label,
+    label: UUC_ROUTE_LABELS[spec.id] ?? spec.label,
     unit: spec.unit,
     period:
       spec.id === "fhsis.anc8"

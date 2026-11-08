@@ -19,6 +19,7 @@ export type MapPayload = {
   state: "available";
   rows: MapRow[];
   total: number | null;
+  totalNote?: string;
   area: string;
   childLevel: "region" | "province" | "citymun";
   source: string;
@@ -29,7 +30,13 @@ export type MapPayload = {
 };
 export function prototypeIndicators(slug: string) {
   const supported: Record<string, readonly string[]> = {
-    "uuc-phc-2025": ["uuc.listed"],
+    "uuc-phc-2025": [
+      "uuc.listed",
+      "uuc.route.ip",
+      "uuc.route.conflict",
+      "uuc.route.four_ps",
+      "uuc.route.health",
+    ],
     "nhfr-2026-09": [
       "nhfr.facilities",
       "nhfr.government",

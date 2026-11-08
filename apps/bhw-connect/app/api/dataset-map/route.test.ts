@@ -426,3 +426,16 @@ it("reads only public honorarium receipt percentage and profile denominator, nev
   expect(mock.from.mock.calls.map(c => c[0])).toEqual(["dim_geo", "agg_bhw_counts", "agg_bhw_counts"]);
   for (const read of [child, parent]) expect(read.select).toHaveBeenCalledWith("geo_code,any_honorarium_pct,n_total");
 });
+
+it("preserves an independent Census parent mean without summing or averaging child means", async () => {
+  const child = query({ data: [{ geo_code: "01", n_total: 5, avg_active_years: 12.34 }], error: null });
+  const parent = query({ data: [{ geo_code: "PH", n_total: 100, avg_active_years: 9.87 }], error: null });
+  mock.from.mockReturnValueOnce(query({ data: [{ geo_code: "01", geo_name: "Synthetic" }], error: null }))
+    .mockReturnValueOnce(child).mockReturnValueOnce(parent);
+  const response = await GET(new NextRequest("http://localhost/api/dataset-map?dataset=bhw-2025&indicator=bhw.active-years"));
+  const data = await response.json();
+  expect(data).toMatchObject({ total: null, parentMean: 9.87, rows: [{ value: 12.34 }] });
+  expect(data).not.toHaveProperty("parentRate");
+  expect(mock.source).toHaveBeenCalledWith("bhw-2025", true);
+  for (const read of [child, parent]) expect(read.select).toHaveBeenCalledWith("geo_code,avg_active_years,n_total");
+});

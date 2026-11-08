@@ -849,3 +849,29 @@ Validation: 11 new adapter/API/export/audit checks; 1,635 database-backed tests 
 11 skipped. All 33 map browser cases passed, including honorarium receipt, zero, unavailable
 uncertainty and JSON semantics. Lint (existing fixture warning), typecheck, migration lint
 and prefixed no-data build passed.
+
+## Census average reported active years (8 November 2026)
+
+Enabled `bhw.active-years` within the independent Census map. The source contract in
+`ingestion/build_aggregates.sql` stores `round(avg(active_years_count), 2)`, and ingestion
+leaves absent active-year counts null. The mean therefore excludes missing counts: total
+validated profiles are not its contributing denominator. The definition, map summary and
+exports state that distinction; neither contributing count nor confidence interval is
+supplied by this aggregate.
+
+The adapter reads only `geo_code,avg_active_years,n_total` from the active Census release.
+It preserves finite nonnegative decimal means, validates a positive profile count, and
+leaves missing/duplicate/invalid rows unavailable. It does not use profile totals to invent
+a small-sample flag, calculate uncertainty or reconstruct a sum. The stored parent mean
+has its own `parentMean` field with null additive total; no child means are averaged.
+JSON labels the parent measure as a mean in years, and PNG preserves that label and unit.
+Area-relative quantiles are explicitly labeled and use year units, not percentage breaks.
+
+Public coverage validation checks the separate parent-mean contract without printing its
+value. Scope remains national/region/province navigation through municipal rows. No
+personal records, schema, disclosure rules or boundary acceptance change. Production row
+coverage remains unverified until the adapter is deployed.
+Validation: 17 new adapter/API/export/audit checks; full database-backed Vitest 1,652 passed,
+11 skipped. All 34 map browser cases passed, including decimal means, year units, the
+contributing-count caveat and JSON semantics. Lint (existing fixture warning), typecheck,
+migration lint and prefixed no-data build passed.

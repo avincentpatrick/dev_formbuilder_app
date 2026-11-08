@@ -27,6 +27,27 @@ class MappingTests(unittest.TestCase):
             self.assertIsNone(b.indicators[-1]['rate_pct'])
             self.assertIsNone(b.indicators[-1]['denominator_exact'])
 
+    def test_infectious_source_alias_preserves_name_and_region_checks(self):
+        with tempfile.TemporaryDirectory() as folder:
+            name='Schisto_2025_EB_nofml.xlsx'
+            w=openpyxl.Workbook();w.active.title='Annual1'
+            for row in [['Region'],['City of Quezon',3],['0 = No Case'],['* = No Report']]:w.active.append(row)
+            w.save(Path(folder)/name)
+            b=object.__new__(ExpansionBuilder);b.directory=Path(folder);b.sheet_counts={};b.corrections=[]
+            b.geos={'13':dict(geo_level='region',region_code='13'),'137404':dict(geo_level='citymun',region_code='13')}
+            b.canonical=defaultdict(set,REGION={'13'},QUEZONCITY={'137404'})
+            # Use the same normalisation as the geography reference.
+            from prepare_fhsis import normalise
+            b.canonical[normalise('Quezon City')]={'137404'}
+            FILES[name]=name
+            rows=list(b.named_rows(name,'Annual1',1))
+            self.assertEqual(len(rows),2)
+            self.assertEqual(rows[1][2]['source_area_name'],'City of Quezon')
+            self.assertEqual(b.corrections[0]['matched'],'Quezon City')
+            b.geos['137404']['region_code']='01'
+            with self.assertRaisesRegex(ValueError,'Unresolved name|outside current region'):
+                list(b.named_rows(name,'Annual1',1))
+
     def test_names_prefer_province_and_use_region_for_ambiguous_city(self):
         with tempfile.TemporaryDirectory() as folder:
             w=openpyxl.Workbook();s=w.active;s.title='Annual'

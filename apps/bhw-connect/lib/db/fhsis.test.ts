@@ -104,6 +104,12 @@ describe("FHSIS interpretation", () => {
       { ...row, rate_pct: 350, over_100: true },
     );
     expect(fhsisRateLabel(tb)).toBe("350 per 100,000");
+    expect(fhsisRateLabel({ ...tb, rate: 0.126738, unit: "cases per 10,000 population" })).toBe(
+      "0.127 per 10,000",
+    );
+    expect(fhsisRateLabel({ ...tb, rate: 0.0063067, unit: "percent (0-100, may exceed)" })).toBe(
+      "0.00631%",
+    );
     expect(tb.over100).toBe(false);
   });
   it("uses the indicator's denominator in the caption", () => {
@@ -235,6 +241,7 @@ describe("FHSIS age and sex breakdowns", () => {
       ),
     ).toBe("Count only");
     expect(fhsisLimitedGeography("maternal_hepb_screened")).toBe(true);
+    expect(fhsisLimitedGeography("infect_leprosy_new")).toBe(true);
     expect(fhsisLimitedGeography("school_hpv1")).toBe(true);
     expect(fhsisLimitedGeography("child_ors")).toBe(true);
     expect(fhsisLimitedGeography("nutrition_mam_cured")).toBe(true);

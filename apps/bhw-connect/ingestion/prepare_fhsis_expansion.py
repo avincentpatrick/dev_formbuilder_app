@@ -127,6 +127,44 @@ def maternal_specifications(directory):
     return specs
 
 
+def infectious_specifications(directory):
+    """Annual infectious programmes; population rates retain their original scale."""
+    specs=[]
+    def add(prefix,key,label,n,d=None,rate=None,sex=True,ages=None,start=8,sheet='Annual',denominator=None,unit=None):
+        matches=list(directory.glob(prefix+'*.xlsx'))
+        if len(matches)!=1:raise ValueError(f'Expected one source: {prefix}')
+        specs.append(dict(key='infect_'+key,label=label,file=matches[0].name,n=n,d=d,rate=rate,
+                          sex=sex,ages=ages,start=start,sheet=sheet,coded=False,program='infectious',
+                          denominator=denominator or 'No denominator: source count only',unit=unit))
+    for prefix,key,name,result in [('1 2 Syphilis','syphilis','Syphilis','positive'),('3 4 HIV','hiv','HIV','screen-reactive')]:
+        add(prefix,key+'_screened',f'Pregnant women screened for {name}',6,2,7,False,
+            [[3,None,None],[4,None,None],[5,None,None]],7,
+            denominator='Source projected population under 1 year (proxy denominator for pregnancy screening)')
+        add(prefix,key+'_positive',f'Pregnant women {name} {result}',11,6,12,False,
+            [[8,3,None],[9,4,None],[10,5,None]],7,
+            denominator=f'Pregnant women screened for {name} (matching age group for age counts)')
+    for age,n,d in [('1–4',5,2),('5–9',10,7)]:
+        add('Annual Tbl 1_4','deworm_'+age.replace('–','_'),f'Children aged {age} years completing two deworming doses',n,d,n+1,
+            denominator=f'Eligible population aged {age} years')
+    add('Annual Tbl 10_19','deworm_10_19','Adolescents aged 10–19 years completing two deworming doses',5,2,6,
+        denominator='Eligible population aged 10–19 years')
+    add('Annual Tbl 10_19','deworm_wra','Women aged 20–49 years completing two deworming doses',8,7,9,False,
+        denominator='Eligible female population aged 20–49 years')
+    add('Filariasis','filaria_positive','Lymphatic filariasis positive cases',5,2,6,denominator='Total examined for lymphatic filariasis')
+    add('Filariasis','filaria_disability','Lymphatic filariasis cases with disability/deformity',9,5,10,denominator='Lymphatic filariasis positive cases')
+    add('Leprosy','leprosy_treatment','Leprosy cases undergoing treatment (prevalence)',5,2,6,denominator='Population',unit='cases per 10,000 population')
+    add('Leprosy','leprosy_new','Newly detected leprosy cases',9,2,10,denominator='Population',unit='cases per 100,000 population')
+    add('Rabies','animal_bites','Reported animal bites',4)
+    add('Rabies','rabies_deaths','Deaths due to rabies (source rate per reported animal bites)',7,4,8,denominator='Reported animal bites; this is not a population mortality rate')
+    for key,label,n,d in [('schisto_suspected','Suspected schistosomiasis cases',5,2),('schisto_acute','Acute clinically diagnosed schistosomiasis cases',9,5),('schisto_acute_confirmed','Acute schistosomiasis cases confirmed by stool examination',13,9)]:
+        add('Schisto',key,label,n,d,n+1,denominator={2:'Total patients seen',5:'Suspected schistosomiasis cases',9:'Acute clinically diagnosed schistosomiasis cases'}[d])
+    add('Schisto','schisto_chronic','Chronic clinically diagnosed schistosomiasis cases',4,sheet='Annual1',denominator='Count only; source rate withheld because its denominator cannot be established from the annual tables')
+    add('Schisto','schisto_chronic_confirmed','Chronic schistosomiasis cases confirmed by stool examination',8,4,9,sheet='Annual1',denominator='Chronic clinically diagnosed schistosomiasis cases')
+    add('Schisto','schisto_treated','Schistosomiasis cases treated in health facilities (source chronic table)',12,sheet='Annual1',denominator='Count only; source rate withheld because its denominator cannot be established from the annual tables')
+    add('Schisto','schisto_referred','Confirmed chronic schistosomiasis cases referred to hospital',16,8,17,sheet='Annual1',denominator='Confirmed chronic schistosomiasis cases')
+    return specs
+
+
 class ExpansionBuilder(Builder):
     def named_rows(self, source, sheet, start):
         seen, region = set(), None
@@ -138,8 +176,12 @@ class ExpansionBuilder(Builder):
                         raise ValueError(f'Unnamed data: {source}/{sheet}/{number}')
                     continue
                 name=str(row[0]).strip()
+                if name in ('0 = No Case', '* = No Report'):continue
                 if name.startswith(('Source:', 'Legend:', 'Asterisk', 'Zero (')):continue
-                candidates=self.canonical[normalise(name)] or ({'19999'} if name=='SGA' else set())
+                matched_name='Nueva Ecija' if name=='Nueva Eciea' and FILES[source]=='Annual Tbl 10_19___20_49_yrs_old_Pregnant_Women_EB_nofml.xlsx' else name
+                if FILES[source]=='Schisto_2025_EB_nofml.xlsx':matched_name={'City of Quezon':'Quezon City','City of Pasay':'Pasay City'}.get(name,matched_name)
+                if matched_name!=name:self.corrections.append(dict(source=FILES[source],sheet=sheet,row=number,original=name,matched=matched_name))
+                candidates=self.canonical[normalise(matched_name)] or ({'19999'} if name=='SGA' else set())
                 high=[c for c in candidates if self.geos[c]['geo_level'] in ('national','region','province')]
                 candidates=high or [c for c in candidates if self.geos[c]['region_code']==region]
                 if len(candidates)!=1:raise ValueError(f'Unresolved name: {source}/{sheet}/{number}: {name}, {candidates}')
@@ -159,11 +201,11 @@ def main():
     parser.add_argument('directory',type=Path)
     parser.add_argument('--reference',type=Path,required=True,help='Original private FHSIS directory containing TB geography and dim_geo.json')
     parser.add_argument('--retrieved',required=True)
-    parser.add_argument('--programme-set', choices=['core','child-health','maternal'], default='core')
+    parser.add_argument('--programme-set', choices=['core','child-health','maternal','infectious'], default='core')
     args=parser.parse_args()
     geos=json.loads((args.reference/'dim_geo.json').read_text())
     b=ExpansionBuilder(args.reference,geos);b.directory=args.directory
-    specs={'core':specifications,'child-health':child_health_specifications,'maternal':maternal_specifications}[args.programme_set](args.directory)
+    specs={'core':specifications,'child-health':child_health_specifications,'maternal':maternal_specifications,'infectious':infectious_specifications}[args.programme_set](args.directory)
     definitions=[]
     groups={}
     for spec in specs:groups.setdefault((spec['file'],spec['sheet'],spec['start'],spec['coded']),[]).append(spec)
@@ -178,7 +220,10 @@ def main():
                         b.indicator(base,row,s['key'],n,den,breakdown=sex)
                 for age,cols in zip(['10-14','15-19','20-49'],s['ages'] or []):b.indicator(base,row,s['key'],*cols,breakdown=age)
     for s in specs:
-        definitions.append(dict(indicator_key=s['key'],program_area=s['program'],label=s['label'],numerator_def=s['label'],denominator_def=s['denominator'],unit='percent (0-100, may exceed)' if s['rate'] else 'count',source_workbook=s['file'],uuc_criterion_d=s['key']=='birth_shp'))
+        definitions.append(dict(indicator_key=s['key'],program_area=s['program'],label=s['label'],numerator_def=s['label'],denominator_def=s['denominator'],unit=s.get('unit') or ('percent (0-100, may exceed)' if s['rate'] else 'count'),source_workbook=s['file'],uuc_criterion_d=s['key']=='birth_shp'))
+    units={d['indicator_key']:d['unit'] for d in definitions}
+    for r in b.indicators:
+        if not units[r['indicator_key']].startswith('percent'):r['over_100']=False
     unique={(r['geo_code'],r['indicator_key'],r['breakdown']) for r in b.indicators}
     if len(unique)!=len(b.indicators):raise ValueError('Duplicate facts')
     checkpoints=[r for r in b.indicators if r['geo_code']=='PH' and r['breakdown']=='total']
@@ -192,6 +237,8 @@ def main():
     if args.programme_set!='core':
         bundle['programme_set']=args.programme_set
         qa['omitted_columns']=(['Repeat-pregnancy Td age-specific rates: source reports zeros despite nonzero counts; retained age counts only'] if args.programme_set=='maternal' else [])
+    if args.programme_set=='infectious':
+        qa['omitted_columns']=['Pregnancy deworming in STH workbook: duplicates maternal deworming with a different total; held for source reconciliation', 'Schistosomiasis Annual1 chronic diagnosis and treatment rates: denominator not established; retained counts only']
     out=args.directory/'fhsis-expansion.json';out.write_text(json.dumps(bundle,ensure_ascii=False,separators=(',',':')))
     sha=hashlib.sha256(out.read_bytes()).hexdigest();(args.directory/'fhsis-expansion.sha256').write_text(sha+'  fhsis-expansion.json\n')
     (args.directory/'qa-report.json').write_text(json.dumps(qa,ensure_ascii=False,indent=2))

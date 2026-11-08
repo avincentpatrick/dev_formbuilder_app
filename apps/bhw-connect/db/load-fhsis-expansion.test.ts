@@ -1,20 +1,33 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  INFECTIOUS_DEFINITIONS,
   MATERNAL_DEFINITIONS,
   CHILD_HEALTH_DEFINITIONS,
   DEFINITIONS,
   validateExpansion,
   loadExpansion,
 } from "./load-fhsis-expansion.mjs";
-function fixture(child = false, maternal = false) {
+function fixture(child = false, maternal = false, infectious = false) {
   const definitions = structuredClone(
-    maternal ? MATERNAL_DEFINITIONS : child ? CHILD_HEALTH_DEFINITIONS : DEFINITIONS,
+    infectious
+      ? INFECTIOUS_DEFINITIONS
+      : maternal
+        ? MATERNAL_DEFINITIONS
+        : child
+          ? CHILD_HEALTH_DEFINITIONS
+          : DEFINITIONS,
   );
   const sources = [
     ...new Set(definitions.map((d: { source_workbook: string }) => d.source_workbook)),
   ].map((file) => ({ file, sha256: "a".repeat(64) }));
   return {
-    programme_set: maternal ? "maternal" : child ? "child-health" : undefined,
+    programme_set: infectious
+      ? "infectious"
+      : maternal
+        ? "maternal"
+        : child
+          ? "child-health"
+          : undefined,
     format: "bhw-fhsis-expansion-v1",
     dataset_slug: "fhsis-2025",
     retrieved: "2026-11-07",
@@ -40,6 +53,18 @@ function fixture(child = false, maternal = false) {
   };
 }
 describe("FHSIS expansion boundary", () => {
+  it("accepts the infectious batch without flagging population rates as excess percentage coverage", () => {
+    const bundle = fixture(false, false, true);
+    expect(bundle.sources).toHaveLength(8);
+    expect(bundle.definitions).toHaveLength(21);
+    const populationRow = bundle.indicators.find(
+      (r: { indicator_key: string }) => r.indicator_key === "infect_leprosy_new",
+    );
+    populationRow.rate_pct = "150";
+    expect(() => validateExpansion(bundle)).not.toThrow();
+    populationRow.over_100 = true;
+    expect(() => validateExpansion(bundle)).toThrow("excess-coverage");
+  });
   it("validates maternal definitions independently from the other approved batches", () => {
     const maternal = fixture(false, true);
     expect(maternal.sources).toHaveLength(8);

@@ -13,6 +13,7 @@ import {
 import { withBasePath } from "@/lib/base-path";
 import { computeQuantileBins } from "@/lib/charts/color-scale";
 import { useMapActivity } from "./map-activity";
+import { INCOME_BINS, INCOME_CLASSES, incomeClassLabel } from "@/lib/maps/income-class";
 import { POVERTY_BINS } from "@/lib/maps/poverty";
 import { MapLegend } from "./map-legend";
 const DatasetCanvas = dynamic(() => import("./dataset-canvas").then((m) => m.DatasetCanvas), {
@@ -74,16 +75,19 @@ export function DatasetMapCard({
     return () => controller.abort();
   }, [active, query, key, result?.key]);
   const data = result?.key === key && result.data.state === "available" ? result.data : null;
+  const income = dataset === "lgu-income-class";
   const poverty = dataset === "psa-sae-poverty-2023";
   const navigationOnly = data?.valueSupport === "navigation-only";
   const bins = useMemo(
     () =>
       navigationOnly
         ? []
-        : poverty
-          ? POVERTY_BINS
-          : computeQuantileBins(data?.rows.map((r) => r.value) ?? []),
-    [data, poverty, navigationOnly],
+        : income
+          ? INCOME_BINS
+          : poverty
+            ? POVERTY_BINS
+            : computeQuantileBins(data?.rows.map((r) => r.value) ?? []),
+    [data, poverty, income, navigationOnly],
   );
   const metric = metrics.find((m) => m.id === choice.indicator);
   const selected = data?.rows.find((r) => r.code === choice.selected);
@@ -178,17 +182,32 @@ export function DatasetMapCard({
                 />
                 <p className="text-xs text-muted">
                   {navigationOnly
-                    ? "Geography navigation only. Choose a province to see published city/municipality estimates."
-                    : poverty
-                      ? "Fixed percentage breaks across provinces. Gray means missing coverage, including excluded HUCs; it does not mean zero poverty."
-                      : "Quantiles relative to displayed areas. Gray means no reported value."}{" "}
+                    ? income
+                      ? "Geography navigation only. Choose a region to see published LGU classes, then a province for its cities and municipalities."
+                      : "Geography navigation only. Choose a province to see published city/municipality estimates."
+                    : income
+                      ? "Published classes, not income amounts or relative quantiles. Gray indicates an unclassified or unmatched area; see the table for the reason."
+                      : poverty
+                        ? "Fixed percentage breaks across provinces. Gray means missing coverage, including excluded HUCs; it does not mean zero poverty."
+                        : "Quantiles relative to displayed areas. Gray means no reported value."}{" "}
                   Missing shapes remain in the table. Use Ctrl/⌘ + scroll to zoom; two fingers to
                   pan.
                 </p>
                 <MapLegend
                   bins={bins}
+                  categoryLabels={
+                    income
+                      ? Object.fromEntries(INCOME_CLASSES.map((c) => [c.value, c.label]))
+                      : undefined
+                  }
                   valueSuffix={poverty ? "%" : ""}
-                  noDataLabel={poverty ? "Missing coverage (not zero)" : undefined}
+                  noDataLabel={
+                    income
+                      ? "Unclassified or unmatched — see table"
+                      : poverty
+                        ? "Missing coverage (not zero)"
+                        : undefined
+                  }
                   hasNoData={!navigationOnly && data.rows.some((r) => r.value === null)}
                   hasSmallN={false}
                 />
@@ -211,7 +230,9 @@ export function DatasetMapCard({
           {data && (
             <>
               <p className="text-sm">
-                {poverty ? (
+                {income ? (
+                  "Income classes are published for LGUs. No total or average class is calculated; barangays have no independently published class. Manila submunicipal entries reflect the city classification."
+                ) : poverty ? (
                   "Poverty incidence is published only for cities/municipalities. No provincial, regional or national rate is calculated here."
                 ) : (
                   <>
@@ -243,9 +264,14 @@ export function DatasetMapCard({
                     {selected.name}:{" "}
                     {navigationOnly
                       ? "Not published at this level"
-                      : (selected.value ?? "Not reported")}{" "}
-                    {selected.value !== null ? metric?.unit : ""}
+                      : income
+                        ? (incomeClassLabel(selected.value) ??
+                          selected.note ??
+                          "No matched source record")
+                        : (selected.value ?? "Not reported")}{" "}
+                    {selected.value !== null && !income ? metric?.unit : ""}
                   </p>
+                  {income && selected.value !== null && <p>{selected.note}</p>}
                   {poverty && !navigationOnly && (
                     <p>
                       Published 90% confidence interval:{" "}
@@ -273,9 +299,11 @@ export function DatasetMapCard({
                     </button>
                   ) : (
                     <p>
-                      {poverty
-                        ? "No barangay poverty estimates are published in this source."
-                        : "Barangay polygons are not yet validated."}{" "}
+                      {income
+                        ? "Barangays have no independently published income class; this classification belongs to the named LGU."
+                        : poverty
+                          ? "No barangay poverty estimates are published in this source."
+                          : "Barangay polygons are not yet validated."}{" "}
                       {dashboard && (
                         <Link
                           className="underline"
@@ -309,6 +337,7 @@ export function DatasetMapCard({
                         {poverty && !navigationOnly && (
                           <th scope="col">Published 90% confidence interval</th>
                         )}
+                        {income && !navigationOnly && <th scope="col">Source context</th>}
                         <th scope="col">Geometry</th>
                       </tr>
                     </thead>
@@ -321,7 +350,11 @@ export function DatasetMapCard({
                           <td>
                             {navigationOnly
                               ? "Not published at this level"
-                              : (r.value ?? "Not reported")}
+                              : income
+                                ? (incomeClassLabel(r.value) ??
+                                  r.note ??
+                                  "No matched source record")
+                                : (r.value ?? "Not reported")}
                           </td>
                           {poverty && !navigationOnly && (
                             <td>
@@ -330,6 +363,7 @@ export function DatasetMapCard({
                                 : "Not available"}
                             </td>
                           )}
+                          {income && !navigationOnly && <td>{r.value !== null ? r.note : "—"}</td>}
                           <td>
                             {shapeCodes
                               ? shapeCodes.includes(r.code)

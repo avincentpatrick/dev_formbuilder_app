@@ -8,7 +8,8 @@ export function DatasetMapGallery() {
       <h2 className="text-2xl font-semibold">Dataset maps</h2>
       <p className="text-sm text-muted">
         Each dataset has its own map and selection. BHW profile counts, StepZero, PSA population,
-        poverty, UUC and NHFR maps are available; other map slots show their readiness.
+        poverty, LGU income class, UUC and NHFR maps are available; other map slots show their
+        readiness.
       </p>
       <MapActivityProvider>
         <div className="grid gap-5 md:grid-cols-2">

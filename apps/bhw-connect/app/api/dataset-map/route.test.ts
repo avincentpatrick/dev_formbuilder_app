@@ -196,3 +196,51 @@ it("rejects poverty back-estimate periods and barangay rates", async () => {
   }
   expect(mock.from).not.toHaveBeenCalled();
 });
+it("pins income source metadata and provides national navigation without a regional class query", async () => {
+  mock.from.mockReturnValueOnce(
+    query({ data: [{ geo_code: "01", geo_name: "Region" }], error: null }),
+  );
+  const response = await GET(
+    new NextRequest("http://localhost/api/dataset-map?dataset=lgu-income-class"),
+  );
+  const data = await response.json();
+  expect(mock.source).toHaveBeenCalledWith("dof-blgf-income-2024");
+  expect(data.valueSupport).toBe("navigation-only");
+  expect(data.total).toBeNull();
+  expect(mock.from.mock.calls.map((c) => c[0])).toEqual(["dim_geo"]);
+});
+it("queries only accepted reclassification records, never old classes or parent aggregates", async () => {
+  mock.geo.mockResolvedValueOnce({ geoCode: "01", geoLevel: "region", geoName: "Region" });
+  const values = query({
+    data: [{ geo_code: "01028", new_class: 1, dof_kind: "province", converted: false }],
+    error: null,
+  });
+  mock.from
+    .mockReturnValueOnce(
+      query({ data: [{ geo_code: "01028", geo_name: "Province" }], error: null }),
+    )
+    .mockReturnValueOnce(values);
+  const response = await GET(
+    new NextRequest(
+      "http://localhost/api/dataset-map?dataset=lgu-income-class&level=region&code=01",
+    ),
+  );
+  const data = await response.json();
+  expect(data.rows[0]).toMatchObject({ value: 1, note: "Source LGU type: province" });
+  expect(data.total).toBeNull();
+  expect(values.eq).toHaveBeenCalledWith("dataset_id", 7);
+  expect(values.eq).toHaveBeenCalledWith("geo_level", "province");
+  expect(values.select).toHaveBeenCalledWith("geo_code,new_class,dof_kind,converted");
+  expect(mock.from.mock.calls.map((c) => c[0])).toEqual(["dim_geo", "dim_lgu_income_reclass"]);
+});
+it("rejects unsupported income periods and barangay scopes", async () => {
+  for (const suffix of ["&period=2008", "&level=barangay&code=0102801001"])
+    expect(
+      (
+        await GET(
+          new NextRequest(`http://localhost/api/dataset-map?dataset=lgu-income-class${suffix}`),
+        )
+      ).status,
+    ).toBe(400);
+  expect(mock.from).not.toHaveBeenCalled();
+});

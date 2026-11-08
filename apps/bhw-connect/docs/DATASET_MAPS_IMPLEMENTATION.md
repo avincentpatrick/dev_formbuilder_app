@@ -221,3 +221,29 @@ resource-limit checks. A 390×844 phone emulation with the poverty table open ha
 violations, no horizontal overflow and no map-error fallback. Synthetic development rows
 are not evidence of complete production coverage. Other adapters, historical boundary
 acceptance, detailed basemap/PMTiles hosting and map PNG export remain pending.
+
+## DOF/BLGF income-class map (8 November 2026)
+
+Adds the independent LGU income-class map to the gallery and dataset-selectable Map page,
+with the existing enlarged/shareable view and per-card state. The adapter reads published
+`dof-blgf-income-2024` metadata and `dim_lgu_income_reclass`, preserving the source date
+(5 November 2024) separately from the effective date (1 January 2025). It selects only
+`new_class`, source LGU type and conversion context, never historical `old_class_dof` or
+`dim_geo.income_class`. National regions provide navigation only. Region and province
+views request only immediate LGUs of the supported level from the accepted dataset.
+
+Five fixed categorical colors and named classes replace numeric quantiles. The table and
+selection distinguish source-unclassified, unmatched, ambiguous and invalid records;
+missing geometry does not remove an LGU. No class total or average is calculated. Source
+conversion notes are preserved, Manila submunicipal entries are disclosed as city context,
+and no barangay is assigned an independently published class. This does not resolve
+historical boundary compatibility or certify nationwide production coverage.
+
+Validation: lint (existing fixture warning only), typecheck, migration lint and the prefixed
+production build passed. Seeded-database Vitest: 1,444 passed, 11 skipped. Thirteen browser
+cases passed, including income navigation, categorical labels, shareable effective date,
+source-unclassified versus unmatched rows and no barangay drill, alongside prior map
+isolation and resource-budget checks. A 390×844 phone emulation with the income table open
+had no axe violations, horizontal overflow or map-error fallback. These use synthetic
+development data. Remaining adapters, boundary acceptance, detailed basemap/PMTiles
+hosting and map PNG export remain pending as described above.

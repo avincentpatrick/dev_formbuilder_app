@@ -1,3 +1,4 @@
+import { INCOME_SOURCE_SLUG, joinIncomeRows } from "@/lib/maps/income-class";
 import { joinPovertyRows } from "@/lib/maps/poverty";
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/db/supabase";
@@ -13,15 +14,17 @@ import {
 
 export async function GET(request: NextRequest) {
   const choice = parseMapChoice(request.nextUrl.searchParams);
-  const spec =
-    choice &&
-    prototypeIndicators(choice.dataset).find((i) => i.id === choice.indicator)?.catalogSpec;
-  if (!choice || !spec) return NextResponse.json({ state: "unsupported" }, { status: 400 });
+  const metric =
+    choice && prototypeIndicators(choice.dataset).find((i) => i.id === choice.indicator);
+  const spec = metric?.catalogSpec;
+  const income = choice?.dataset === "lgu-income-class";
+  if (!choice || !metric || (!spec && !income))
+    return NextResponse.json({ state: "unsupported" }, { status: 400 });
   try {
     const [source, geo] = await Promise.all([
       choice.dataset === "bhw-2025"
         ? readDatasetBySlug(choice.dataset, true)
-        : readDatasetBySlug(choice.dataset),
+        : readDatasetBySlug(income ? INCOME_SOURCE_SLUG : choice.dataset),
       getGeoByCode(choice.code),
     ]);
     if (source.state !== "available")
@@ -45,14 +48,28 @@ export async function GET(request: NextRequest) {
     if (children.error || !children.data?.length || children.data.length >= 1000)
       throw new Error("Geography unavailable");
     const poverty = choice.dataset === "psa-sae-poverty-2023";
-    const valueSupport = spec.levels.includes(childLevel) ? "supported" : "navigation-only";
+    const valueSupport = metric.levels.includes(childLevel) ? "supported" : "navigation-only";
     let rows = children.data.map((child) => ({
       code: child.geo_code,
       name: child.geo_name,
       value: null,
     })) as MapPayload["rows"];
     let total: number | null = null;
-    if (poverty && valueSupport === "supported") {
+    if (income && valueSupport === "supported") {
+      const values = await db
+        .from("dim_lgu_income_reclass")
+        .select("geo_code,new_class,dof_kind,converted")
+        .eq("dataset_id", source.value.datasetId)
+        .eq("geo_level", childLevel)
+        .in(
+          "geo_code",
+          children.data.map((c) => c.geo_code),
+        )
+        .limit(1000);
+      if (values.error || !values.data || values.data.length >= 1000)
+        throw new Error("Classifications unavailable");
+      rows = joinIncomeRows(children.data, values.data);
+    } else if (poverty && valueSupport === "supported") {
       // No province/national aggregate query and no averaging municipal percentages.
       const values = await db
         .from("agg_poverty")
@@ -68,7 +85,7 @@ export async function GET(request: NextRequest) {
       if (values.error || !values.data || values.data.length >= 1000)
         throw new Error("Values unavailable");
       rows = joinPovertyRows(children.data, values.data);
-    } else if (!poverty) {
+    } else if (!poverty && !income && spec) {
       // Apply each accepted measure's source filters to BOTH children and the parent.
       // In particular, population is PSA 2024, never a StepZero fallback or another census year.
       const projection = `geo_code,${spec.column}`;

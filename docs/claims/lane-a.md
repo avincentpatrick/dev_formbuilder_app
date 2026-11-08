@@ -41,6 +41,7 @@ Row: `R-d7e27962`, *"A blank form prints only in its default language, so a form
 - The form page's "Print blank" asks which language when a version has more than one.
 
 Files: `app/Services/Forms/BlankFormPrintPresenter.php`, `app/Services/Forms/BlankFormPrintRenderer.php`, `app/Http/Controllers/Tenant/FormPrintController.php`, `app/Support/Forms/LocaleVariant.php`, `app/Services/Forms/FormHubPresenter.php`, `resources/js/Pages/forms/Show.vue`, `resources/js/Pages/forms/show.test.ts`, `tests/Feature/Forms/BlankFormPrintPresenterTest.php`, `tests/Feature/Forms/BlankFormPrintRendererTest.php`, `tests/Feature/Forms/FormHubPageTest.php`, `docs/ocr-pipeline-design.md`.
+**Extended 2026-11-09, before the file was opened: `tests/Feature/Forms/BlankFormPrintRouteTest.php`**, the route's own test file, for the `?lang=` cases. No held PR touches it.
 Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md` (`D215`, pushed with this claim), `VERSION` (0.19.0, a new ability, after #487's 0.18.4), `database/data/releases.json`.
 Paired files taken: none.
 Namespaces spent: `M229`, `D215`.

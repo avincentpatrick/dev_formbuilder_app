@@ -1,5 +1,5 @@
 "use client";
-import { CENSUS_ACCREDITATION_ID } from "@/lib/maps/census-accreditation";
+import { isCensusProfileRate } from "@/lib/maps/census-accreditation";
 import { STEPZERO_ACCREDITATION_ID, STEPZERO_ACCREDITATION_BINS, STEPZERO_ACCREDITATION_DENOMINATOR } from "@/lib/maps/stepzero-accreditation";
 import { searchMapAreas } from "@/lib/maps/area-search";
 import { composeMapPng } from "@/lib/maps/png";
@@ -101,8 +101,8 @@ export function DatasetMapCard({
   const data = result?.key === key && result.data.state === "available" ? result.data : null;
   const uucRoute = dataset === "uuc-phc-2025" && choice.indicator.startsWith("uuc.route.");
   const declaredAccreditation = dataset === "bhw-stepzero-2026" && choice.indicator === STEPZERO_ACCREDITATION_ID;
-  const censusAccreditation = dataset === "bhw-2025" && choice.indicator === CENSUS_ACCREDITATION_ID;
-  const accreditation = declaredAccreditation || censusAccreditation;
+  const censusRate = dataset === "bhw-2025" && isCensusProfileRate(choice.indicator);
+  const accreditation = declaredAccreditation || censusRate;
   const profiling = dataset === "bhw-profiling-status-2026";
   const income = dataset === "lgu-income-class";
   const poverty = dataset === "psa-sae-poverty-2023";
@@ -262,7 +262,7 @@ export function DatasetMapCard({
                       : poverty
                         ? "Fixed percentage breaks across provinces. Gray means missing coverage, including excluded HUCs; it does not mean zero poverty."
                         : accreditation
-                          ? "Fixed percentage breaks across areas. Gray means the published share or its denominator is unavailable, not zero accreditation."
+                          ? "Fixed percentage breaks across areas. Gray means the published share or its denominator is unavailable, not zero percent."
                         : profiling
                           ? "Fixed share breaks: 0–<25%, 25–<50%, 50–<75%, 75–<100%, and 100% or more. Missing snapshots and zero denominators have no share."
                           : "Quantiles relative to displayed areas. Gray means no reported value."}{" "}
@@ -320,7 +320,7 @@ export function DatasetMapCard({
                 {accreditation ? (
                   <>Reported area rate: {data.parentRate == null ? "Not reported" : `${data.parentRate}%`}.
                     Denominator: {metric?.denominator ?? STEPZERO_ACCREDITATION_DENOMINATOR}. Published percentages are not averaged across areas.
-                    {censusAccreditation ? "Census profile accreditation; published 95% Wilson intervals and small-sample notes appear below." : "This is the LGU declaration, not accreditation among validated Census profiles."}</>
+                    {censusRate ? "Census profile percentage; published 95% Wilson intervals and small-sample notes appear below." : "This is the LGU declaration, not accreditation among validated Census profiles."}</>
                 ) : profiling ? (
                   "Stages are mutually exclusive current workflow states. Shares use each area’s BHW headcount, rounded to whole percentages, not pipeline totals. No regional average is calculated. Not yet encoded is the headcount minus all pipeline stages, floored at zero."
                 ) : income ? (
@@ -398,9 +398,9 @@ export function DatasetMapCard({
                     {selected.value !== null && !income ? metric?.unit : ""}
                   </p>
                   {(income || profiling || uucRoute || accreditation) && <p>{selected.note}</p>}
-                  {(poverty || censusAccreditation) && !navigationOnly && (
+                  {(poverty || censusRate) && !navigationOnly && (
                     <p>
-                      Published {censusAccreditation ? 95 : 90}% confidence interval:{" "}
+                      Published {censusRate ? 95 : 90}% confidence interval:{" "}
                       {selected.ciLow != null && selected.ciHigh != null
                         ? `${selected.ciLow}%–${selected.ciHigh}%`
                         : "Not available"}
@@ -460,8 +460,8 @@ export function DatasetMapCard({
                       <tr>
                         <th scope="col">Area</th>
                         <th scope="col">{metric?.unit}</th>
-                        {(poverty || censusAccreditation) && !navigationOnly && (
-                          <th scope="col">Published {censusAccreditation ? 95 : 90}% confidence interval</th>
+                        {(poverty || censusRate) && !navigationOnly && (
+                          <th scope="col">Published {censusRate ? 95 : 90}% confidence interval</th>
                         )}
                         {(income || profiling || uucRoute || accreditation) && !navigationOnly && (
                           <th scope="col">Source context</th>
@@ -484,7 +484,7 @@ export function DatasetMapCard({
                                   "No matched source record")
                                 : (r.value ?? "Not reported")}
                           </td>
-                          {(poverty || censusAccreditation) && !navigationOnly && (
+                          {(poverty || censusRate) && !navigationOnly && (
                             <td>
                               {r.ciLow != null && r.ciHigh != null
                                 ? `${r.ciLow}%–${r.ciHigh}%`

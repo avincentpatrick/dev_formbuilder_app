@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { joinCensusAccreditation } from "./census-accreditation";
+import { joinCensusAccreditation, joinCensusTraining } from "./census-accreditation";
 const children = [{ geo_code: "01", geo_name: "Synthetic" }];
 const row = { geo_code: "01", n_total: 3, n_accredited: 1, pct_accredited: 33.33, ci_low: 6.15, ci_high: 79.23 };
 it("preserves published precision, uncertainty and small-sample context", () => {
@@ -18,4 +18,15 @@ it("keeps missing and duplicate rows unavailable", () => {
 });
 it("does not manufacture or clamp inconsistent confidence bounds", () => {
   expect(joinCensusAccreditation(children, [{ ...row, ci_low: 40 }])[0]).toMatchObject({ value: 33.33, ciLow: null, ciHigh: null });
+});
+
+it("keeps training numerator and published percentage separate from accreditation", () => {
+  const result = joinCensusTraining(children, [{ ...row, n_trained: 2, coverage_pct: 66.67, ci_low: 20.77, ci_high: 93.85 }])[0];
+  expect(result).toMatchObject({ value: 66.67, ciLow: 20.77, ciHigh: 93.85, smallSample: true });
+  expect(joinCensusTraining(children, [row])[0].value).toBeNull();
+});
+it("keeps reported training zero distinct from missing topic rows", () => {
+  expect(joinCensusTraining(children, [{ geo_code: "01", n_total: 100, n_trained: 0, coverage_pct: 0 }])[0])
+    .toMatchObject({ value: 0, smallSample: false });
+  expect(joinCensusTraining(children, [])[0].value).toBeNull();
 });

@@ -78,3 +78,12 @@ it("audits Census rates without treating them as additive totals", async () => {
   expect(result.coverage).toMatchObject({ hasReportedParentTotal: false, hasReportedParentRate: true });
   await expect(inspectMapCoverage(census, async () => response({ ...data, parentRate: 101 }))).rejects.toThrow("Invalid published rate");
 });
+
+it("audits training percentages without leaking values or accepting invalid rates", async () => {
+  const training = rateUrl.replace("bhw-stepzero-2026", "bhw-2025").replace("bhw.declared-accreditation", "bhw.training.dengue").replace("period=2026", "period=2025");
+  const data = { ...payload, total: null, parentRate: 75 };
+  const result = await inspectMapCoverage(training, async target => response(String(target).includes("/geo/") ? geometry : data));
+  expect(result.coverage).toMatchObject({ hasReportedParentTotal: false, hasReportedParentRate: true });
+  expect(JSON.stringify(result)).not.toContain('"value"');
+  await expect(inspectMapCoverage(training, async () => response({ ...data, parentRate: 101 }))).rejects.toThrow("Invalid published rate");
+});

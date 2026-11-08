@@ -1,3 +1,4 @@
+import { TRAINING_TOPICS } from "@/lib/catalog/definitions";
 import { beforeEach, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 const mock = vi.hoisted(() => ({ source: vi.fn(), geo: vi.fn(), from: vi.fn() }));
@@ -390,4 +391,26 @@ it("reads Census accreditation from its active release with independent parent r
   expect(mock.from.mock.calls.map(c => c[0])).toEqual(["dim_geo", "agg_bhw_counts", "agg_bhw_counts"]);
   expect(child.select).toHaveBeenCalledWith("geo_code,pct_accredited,n_accredited,n_total,ci_low,ci_high");
   expect(parent.eq).toHaveBeenCalledWith("dataset_id", 7);
+});
+
+it.each(TRAINING_TOPICS)("pins Census training topic %s on child and parent reads", async topic => {
+  const child = query({ data: [{ geo_code: "01", n_total: 3, n_trained: 2, coverage_pct: 66.67, ci_low: 20.77, ci_high: 93.85 }], error: null });
+  const parent = query({ data: [{ geo_code: "PH", n_total: 100, n_trained: 75, coverage_pct: 75 }], error: null });
+  mock.from.mockReturnValueOnce(query({ data: [{ geo_code: "01", geo_name: "Synthetic" }], error: null }))
+    .mockReturnValueOnce(child).mockReturnValueOnce(parent);
+  const response = await GET(new NextRequest(`http://localhost/api/dataset-map?dataset=bhw-2025&indicator=bhw.training.${topic}`));
+  expect(await response.json()).toMatchObject({ total: null, parentRate: 75, rows: [{ value: 66.67, ciLow: 20.77, ciHigh: 93.85 }] });
+  expect(mock.source).toHaveBeenCalledWith("bhw-2025", true);
+  expect(mock.from.mock.calls.map(c => c[0])).toEqual(["dim_geo", "agg_training", "agg_training"]);
+  for (const read of [child, parent]) {
+    expect(read.eq).toHaveBeenCalledWith("topic_slug", topic);
+    expect(read.eq).toHaveBeenCalledWith("dataset_id", 7);
+    expect(read.select).toHaveBeenCalledWith("geo_code,coverage_pct,n_trained,n_total,ci_low,ci_high");
+  }
+});
+it("rejects unknown training topics and barangay requests before data access", async () => {
+  for (const suffix of ["indicator=bhw.training.unknown", "indicator=bhw.training.basic_life_support&level=barangay&code=0100101001"]) {
+    expect((await GET(new NextRequest(`http://localhost/api/dataset-map?dataset=bhw-2025&${suffix}`))).status).toBe(400);
+  }
+  expect(mock.source).not.toHaveBeenCalled();
 });

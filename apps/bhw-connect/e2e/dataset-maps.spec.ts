@@ -515,3 +515,65 @@ test("failed geometry cannot produce a PNG", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Download map image (PNG)" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Download map data (JSON)" })).toBeEnabled();
 });
+
+test("area search preserves complete data, missing shapes and selection", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  let requests = 0;
+  await page.route("**/api/dataset-map?**", (route) => {
+    requests++;
+    return route.fulfill({ json: {
+      state: "available", rows: [
+        { code: "01", name: "Santo Niño", value: null },
+        { code: "02", name: "San José", value: 0 },
+        { code: "99", name: "Without shape", value: 42 },
+      ], total: 42, area: "Synthetic geography", childLevel: "region", source: "Test",
+      date: "2026-09-01", license: "Test", geometryUrl: "/bhw-connect/geo/regions.json",
+    } });
+  });
+  await page.route("**/geo/regions.json", (route) => route.fulfill({ status: 503, body: "Unavailable" }));
+  await page.goto("map?dataset=nhfr-2026-09&selected=99");
+  const search = page.getByRole("searchbox", { name: "NHFR September 2026 search areas" });
+  const selector = page.getByLabel("NHFR September 2026 area", { exact: true });
+  await search.fill("NINO");
+  await expect(page.getByText("1 matching areas of 3.", { exact: false })).toBeVisible();
+  await expect(selector).toHaveValue("99");
+  await expect(selector.locator("option")).toHaveCount(3);
+  await search.fill("no matching place");
+  await expect(page.getByText("0 matching areas of 3.", { exact: false })).toBeVisible();
+  await expect(selector).toHaveValue("99");
+  await page.getByRole("button", { name: "Clear area search" }).click();
+  await search.fill("02");
+  await search.press("Tab"); // The visible clear action is keyboard reachable.
+  await expect(page.getByRole("button", { name: "Clear area search" })).toBeFocused();
+  await selector.selectOption("02");
+  await expect(page.getByRole("link", { name: "Share this map selection" })).toHaveAttribute("href", /selected=02/);
+  await page.getByText(/Complete area table/).click();
+  await expect(page.getByRole("table").getByRole("row")).toHaveCount(4);
+  await expect(page.getByText(/Reported area total: 42 facilities/)).toBeVisible();
+  expect(requests).toBe(1);
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download map data (JSON)" }).click();
+  const download = await downloadPromise;
+  const stream = await download.createReadStream();
+  const chunks = [];
+  for await (const chunk of stream!) chunks.push(chunk);
+  const exported = JSON.parse(Buffer.concat(chunks).toString());
+  expect(exported.rows.map((row: { code: string }) => row.code)).toEqual(["01", "02", "99"]);
+  expect(exported.total).toBe(42);
+  await page.getByLabel("NHFR September 2026 indicator").selectOption("nhfr.government");
+  await expect(search).toHaveValue("02");
+  await page.getByLabel("Map dataset").selectOption("uuc-phc-2025");
+  await expect(page.getByRole("searchbox", { name: "UUC for PHC 2025 search areas" })).toHaveValue("");
+});
+
+test("portal card searches remain independent", async ({ page }) => {
+  await page.goto("./");
+  const uuc = page.getByRole("article", { name: "UUC for PHC 2025 map", exact: true });
+  const nhfr = page.getByRole("article", { name: "NHFR September 2026 map", exact: true });
+  await uuc.scrollIntoViewIfNeeded();
+  await uuc.getByRole("searchbox").fill("01");
+  await nhfr.scrollIntoViewIfNeeded();
+  await expect(nhfr.getByRole("searchbox")).toHaveValue("");
+  await nhfr.getByRole("searchbox").fill("02");
+  await expect(uuc.getByRole("searchbox")).toHaveValue("01");
+});

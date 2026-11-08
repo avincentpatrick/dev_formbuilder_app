@@ -112,3 +112,45 @@ card may show explicit unavailability; it must never inherit BHW figures or inve
   mobile gesture or accessibility success is claimed; rerun against the seeded database.
 - Production PMTiles and nationwide supplier reconciliation remain unrun for the explicit
   artifact, reference-extract and operator dependencies above.
+
+## Independent-card prototype (next increment)
+
+The portal now has a map gallery with one independently owned card per dataset release;
+profiling status stays hidden there as previously requested. This prototype adds working
+UUC list-count and NHFR count/type/ownership/bed indicators, and explicit availability
+slots for the remaining definitions. The existing unified catalog remains intact.
+
+`/map` offers a dataset chooser without a BHW default. Enlarge/share links serialize the
+dataset, metric, period, parent geography and selected child. Switching the two implemented
+datasets preserves the current supported geography; pending maps explain their national
+availability view. Cards own their state, and do not use the global BHW filter store.
+
+Public reads use an allowlisted GET adapter and anonymous RLS client. It validates the
+parent against dim_geo, fetches immediate children only (fails closed at the row cap),
+and retains missing child values and the independent authoritative parent total. No BHW,
+FHSIS, income-class or personal-data query is reachable through this adapter. Query errors,
+absent releases, missing rows, zero values and missing geometry have separate handling.
+
+Maps use the existing same-origin MapLibre worker and GeoJSON, with cooperative gestures,
+accessible selection, explicit drill actions and complete tables. National → regional →
+provincial views show children through city/municipality. Barangay polygon drill remains
+blocked on accepted shapes; municipal dashboard links provide existing barangay information.
+No facility coordinates, new UUC classification, cross-vintage redistribution or missing
+values are invented. MapLibre instances are disposed when offscreen; only the two
+implemented cards can allocate WebGL. Planned cards never request observations.
+
+This is an increment, not final rollout: the licensed detailed basemap, production-route
+PMTiles validation, historical crosswalk acceptance, remaining adapters, genuine map PNG
+export, richer geographic search and measured phone/network performance remain pending.
+The three-second target is not claimed. These dependencies do not justify weakening CSP.
+
+Prototype verification: lint passed (one existing fixture warning), typecheck and prefixed
+production build passed; the seeded-database Vitest run passed 1,419 tests with 11 skipped.
+Six Playwright cases passed: independent card state, enlarge/share state, dataset switching
+after drill, unavailable boundaries, invalid choices, synthetic zero/missing-value/missing-
+geometry distinctions, and WebGL failure with usable table/selection controls. A 390×844
+Chromium phone emulation rendered without horizontal overflow; axe reported no violations.
+A single-finger drag over the map scrolled the page (scrollY 288 → 461). Scrolling between
+cards and a pending card observed one active map at peak on that phone viewport and zero
+after leaving supported cards. This is not a measured mid-range device/network performance
+claim. Local development figures remain synthetic; live numeric coverage is not certified.

@@ -1,0 +1,117 @@
+import { expect, test } from "@playwright/test";
+
+test("UUC and NHFR keep independent choices and enlarge with those choices", async ({ page }) => {
+  await page.goto("./");
+  const uuc = page.getByRole("article", { name: "UUC for PHC 2025 map", exact: true });
+  const nhfr = page.getByRole("article", { name: "NHFR September 2026 map", exact: true });
+  await uuc.scrollIntoViewIfNeeded();
+  await expect(uuc.getByLabel("UUC for PHC 2025 area")).toBeVisible();
+  await uuc.getByLabel("UUC for PHC 2025 area").selectOption("01");
+  await nhfr.scrollIntoViewIfNeeded();
+  await nhfr.getByLabel("NHFR September 2026 indicator").selectOption("nhfr.government");
+  await expect(nhfr.getByRole("link", { name: "Enlarge NHFR September 2026 map" })).toHaveAttribute(
+    "href",
+    /indicator=nhfr.government/,
+  );
+  await expect(uuc.getByRole("link", { name: "Enlarge UUC for PHC 2025 map" })).toHaveAttribute(
+    "href",
+    /selected=01/,
+  );
+  await expect.poll(() => page.locator(".maplibregl-map").count()).toBeLessThanOrEqual(2);
+  await nhfr.getByRole("link", { name: "Enlarge NHFR September 2026 map" }).click();
+  await expect(page.getByLabel("Map dataset")).toHaveValue("nhfr-2026-09");
+  await expect(
+    page.getByText("Map unavailable. Use the area selector and complete table below."),
+  ).toHaveCount(0);
+  await expect(page.locator("canvas")).toHaveCount(1);
+  await expect(page.getByLabel("NHFR September 2026 indicator")).toHaveValue("nhfr.government");
+});
+
+test("enlarged selection and dataset switch preserve supported geography", async ({ page }) => {
+  await page.goto("map?dataset=uuc-phc-2025&level=region&code=01&selected=01028");
+  await expect(page.getByLabel("UUC for PHC 2025 area")).toHaveValue("01028");
+  await page.getByRole("button", { name: /Show areas within/ }).click();
+  await expect(page.getByRole("link", { name: "Share this map selection" })).toHaveAttribute(
+    "href",
+    /level=province&code=01028/,
+  );
+  await page.getByLabel("Map dataset").selectOption("nhfr-2026-09");
+  await expect(page).toHaveURL(/level=province&code=01028/);
+  await expect(page.getByLabel("NHFR September 2026 area")).toBeVisible();
+  await page.getByLabel("Map dataset").selectOption("ways-forward");
+  await expect(page.getByText(/This roadmap has no ingested figures/)).toBeVisible();
+  await expect(page.locator("canvas")).toHaveCount(0);
+});
+
+test("failed boundaries retain complete table and accessible selection", async ({ page }) => {
+  await page.route("**/geo/regions.json", (route) =>
+    route.fulfill({ status: 503, body: "Unavailable" }),
+  );
+  await page.goto("map?dataset=nhfr-2026-09");
+  await expect(
+    page.getByText("Map unavailable. Use the area selector and complete table below."),
+  ).toBeVisible();
+  await page.getByText(/Complete area table/).click();
+  await expect(page.getByRole("table")).toBeVisible();
+  await expect(page.getByLabel("NHFR September 2026 area")).toBeEnabled();
+});
+
+test("invalid dataset and period never fall back to BHW", async ({ page, request }) => {
+  const response = await request.get("api/dataset-map?dataset=uuc-phc-2025&period=2026");
+  expect(response.status()).toBe(400);
+  await page.goto("map?dataset=unknown");
+  await expect(page.getByLabel("Map dataset")).toHaveValue("");
+  await expect(page.locator("canvas")).toHaveCount(0);
+});
+
+test("synthetic values preserve zero, missing report and missing geometry independently", async ({
+  page,
+}) => {
+  await page.route("**/api/dataset-map?**", (route) =>
+    route.fulfill({
+      json: {
+        state: "available",
+        rows: [
+          { code: "01", name: "Synthetic zero", value: 0 },
+          { code: "02", name: "Synthetic missing report", value: null },
+          { code: "99", name: "Synthetic missing polygon", value: 42 },
+        ],
+        total: 42,
+        area: "Synthetic test geography",
+        childLevel: "region",
+        source: "Synthetic test fixture",
+        date: "2026-09-01",
+        license: "Test only",
+        geometryUrl: `${route.request().url().split("/api/")[0]}/geo/regions.json`,
+      },
+    }),
+  );
+  await page.goto("map?dataset=nhfr-2026-09");
+  await page.getByText(/Complete area table/).click();
+  await expect(page.getByRole("row", { name: "Synthetic zero 0 Available" })).toBeVisible();
+  await expect(
+    page.getByRole("row", { name: "Synthetic missing report Not reported Available" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("row", { name: "Synthetic missing polygon 42 Missing" }),
+  ).toBeVisible();
+  await expect(page.getByText(/Reported area total: 42 facilities/)).toBeVisible();
+});
+
+test("WebGL failure leaves keyboard selection and the table usable", async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, ...args) {
+      if (String(args[0]).includes("webgl")) return null;
+      return original.apply(this, args);
+    } as typeof original;
+  });
+  await page.goto("map?dataset=uuc-phc-2025");
+  await expect(
+    page.getByText("Map unavailable. Use the area selector and complete table below."),
+  ).toBeVisible();
+  await page.getByLabel("UUC for PHC 2025 area").focus();
+  await expect(page.getByLabel("UUC for PHC 2025 area")).toBeFocused();
+  await page.getByText(/Complete area table/).click();
+  await expect(page.getByRole("table")).toBeVisible();
+});

@@ -242,6 +242,10 @@ describe("FHSIS age and sex breakdowns", () => {
     ).toBe("Count only");
     expect(fhsisLimitedGeography("maternal_hepb_screened")).toBe(true);
     expect(fhsisLimitedGeography("infect_leprosy_new")).toBe(true);
+    expect(fhsisLimitedGeography("fp_end_total")).toBe(true);
+    expect(fhsisPeriodLabel("fp_demand_q4")).toBe("Q4 2025");
+    expect(fhsisPeriodLabel("fp_begin_total")).toBe("Beginning of 2025");
+    expect(fhsisPeriodLabel("fp_end_total")).toBe("End of 2025");
     expect(fhsisLimitedGeography("school_hpv1")).toBe(true);
     expect(fhsisLimitedGeography("child_ors")).toBe(true);
     expect(fhsisLimitedGeography("nutrition_mam_cured")).toBe(true);

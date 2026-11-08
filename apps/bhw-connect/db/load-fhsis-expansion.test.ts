@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  FAMILY_PLANNING_DEFINITIONS,
   INFECTIOUS_DEFINITIONS,
   MATERNAL_DEFINITIONS,
   CHILD_HEALTH_DEFINITIONS,
@@ -7,27 +8,31 @@ import {
   validateExpansion,
   loadExpansion,
 } from "./load-fhsis-expansion.mjs";
-function fixture(child = false, maternal = false, infectious = false) {
+function fixture(child = false, maternal = false, infectious = false, family = false) {
   const definitions = structuredClone(
-    infectious
-      ? INFECTIOUS_DEFINITIONS
-      : maternal
-        ? MATERNAL_DEFINITIONS
-        : child
-          ? CHILD_HEALTH_DEFINITIONS
-          : DEFINITIONS,
+    family
+      ? FAMILY_PLANNING_DEFINITIONS
+      : infectious
+        ? INFECTIOUS_DEFINITIONS
+        : maternal
+          ? MATERNAL_DEFINITIONS
+          : child
+            ? CHILD_HEALTH_DEFINITIONS
+            : DEFINITIONS,
   );
   const sources = [
     ...new Set(definitions.map((d: { source_workbook: string }) => d.source_workbook)),
   ].map((file) => ({ file, sha256: "a".repeat(64) }));
   return {
-    programme_set: infectious
-      ? "infectious"
-      : maternal
-        ? "maternal"
-        : child
-          ? "child-health"
-          : undefined,
+    programme_set: family
+      ? "family-planning"
+      : infectious
+        ? "infectious"
+        : maternal
+          ? "maternal"
+          : child
+            ? "child-health"
+            : undefined,
     format: "bhw-fhsis-expansion-v1",
     dataset_slug: "fhsis-2025",
     retrieved: "2026-11-07",
@@ -53,6 +58,15 @@ function fixture(child = false, maternal = false, infectious = false) {
   };
 }
 describe("FHSIS expansion boundary", () => {
+  it("accepts the reviewed family-planning batch but rejects substitution of another programme", () => {
+    const bundle = fixture(false, false, false, true);
+    expect(bundle.sources).toHaveLength(1);
+    expect(bundle.definitions).toHaveLength(81);
+    expect(() => validateExpansion(bundle)).not.toThrow();
+    expect(() => validateExpansion({ ...bundle, programme_set: "maternal" })).toThrow(
+      "reviewed mapping",
+    );
+  });
   it("accepts the infectious batch without flagging population rates as excess percentage coverage", () => {
     const bundle = fixture(false, false, true);
     expect(bundle.sources).toHaveLength(8);

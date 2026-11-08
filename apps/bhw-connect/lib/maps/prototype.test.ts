@@ -45,3 +45,12 @@ it("keeps census, StepZero and PSA releases and dates independent", () => {
   expect(parseMapChoice(new URLSearchParams("dataset=psa-popcen-2024&period=2026"))).toBeNull();
   expect(parseMapChoice(new URLSearchParams("dataset=bhw-2025&indicator=bhw.total"))).toBeNull();
 });
+
+it("keeps StepZero population and households separate from PSA and other releases", () => {
+  for (const indicator of ["stepzero.population", "stepzero.households"]) {
+    expect(parseMapChoice(new URLSearchParams(`dataset=bhw-stepzero-2026&indicator=${indicator}&period=2026`)))
+      .toMatchObject({ dataset: "bhw-stepzero-2026", indicator, period: "2026" });
+    expect(parseMapChoice(new URLSearchParams(`dataset=psa-popcen-2024&indicator=${indicator}&period=2024`))).toBeNull();
+    expect(parseMapChoice(new URLSearchParams(`dataset=bhw-stepzero-2026&indicator=${indicator}&period=2024`))).toBeNull();
+  }
+});

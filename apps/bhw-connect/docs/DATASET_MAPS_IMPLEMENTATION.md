@@ -631,3 +631,30 @@ typecheck, migration lint and prefixed no-data production build passed. All 27 b
 passed, followed by the added WebGL-recovery case (28 distinct final cases). New checks use
 keyboard activation and cover a temporary 503, repeated failure, one aggregate read across
 retries, retained selection/search, PNG readiness and recovery after WebGL becomes available.
+
+## StepZero source population and households (8 November 2026)
+
+StepZero's independent map now offers **Source population (StepZero)** and **Source
+households (StepZero)** alongside its four BHW count indicators. The map-only specifications
+read `population` or `households` directly from `agg_bhw_stepzero_counts`, pinned to the
+`bhw-stepzero-2026` dataset ID. They reuse the bounded public aggregate reader for child
+rows and the separately reported parent total. This does not change the unified catalog or
+the default StepZero indicator.
+
+The 2026 period identifies the StepZero release, not a newly inferred census reference date.
+Exact source metadata/date still comes from that release. The measures do not call the
+broader StepZero dashboard reader, which can substitute census population in other contexts.
+No PSA population, another release, computed ratio, averaged rate or sum of drawable shapes
+is substituted. Zero remains zero; absent/null/invalid/duplicate values remain unavailable.
+The complete table and exports retain rows without geometry. Switching to PSA still selects
+its independent 2024 census indicator. Barangay boundary publication remains gated.
+
+Validation: three new API/URL checks verify both exact source columns, dataset filters,
+zero/missing values, independent parent totals and rejection of cross-dataset/year choices.
+Full database-backed Vitest: 1,494 passed, 11 skipped. All 29 map browser cases passed,
+including the new indicator switch, complete JSON export and separate PSA date/indicator.
+Lint (existing fixture warning), typecheck, migration lint and prefixed no-data build passed.
+Local seeded API smoke checks returned 18 geography rows for each new indicator, all null;
+that confirms missing coverage stays missing, not numeric coverage. Numeric behavior was
+verified with explicitly synthetic fixtures. Production source coverage is not certified
+by the development seed or these tests.

@@ -335,3 +335,29 @@ it("reads UUC route counts and their own denominator context for children and pa
   expect(values.eq).toHaveBeenCalledWith("geo_level", "region");
   expect(parent.eq).toHaveBeenCalledWith("geo_level", "national");
 });
+
+it.each(["population", "households"])("reads StepZero %s directly without fallback and preserves complete rows", async (column) => {
+  const children = query({ data: [
+    { geo_code: "01", geo_name: "Zero" }, { geo_code: "02", geo_name: "Null" },
+    { geo_code: "03", geo_name: "Absent" }, { geo_code: "04", geo_name: "Present" },
+  ], error: null });
+  const values = query({ data: [
+    { geo_code: "01", [column]: 0 }, { geo_code: "02", [column]: null },
+    { geo_code: "04", [column]: 42 },
+  ], error: null });
+  const parent = query({ data: [{ geo_code: "PH", [column]: 123 }], error: null });
+  mock.from.mockReturnValueOnce(children).mockReturnValueOnce(values).mockReturnValueOnce(parent);
+  const response = await GET(new NextRequest(
+    `http://localhost/api/dataset-map?dataset=bhw-stepzero-2026&indicator=stepzero.${column}&period=2026`,
+  ));
+  expect(response.status).toBe(200);
+  const payload = await response.json();
+  expect(payload.rows.map((row: { value: number | null }) => row.value)).toEqual([0, null, null, 42]);
+  expect(payload.total).toBe(123);
+  expect(mock.source).toHaveBeenCalledWith("bhw-stepzero-2026");
+  expect(mock.from.mock.calls.map((call) => call[0])).toEqual(["dim_geo", "agg_bhw_stepzero_counts", "agg_bhw_stepzero_counts"]);
+  for (const q of [values, parent]) {
+    expect(q.select).toHaveBeenCalledWith(`geo_code,${column}`);
+    expect(q.eq).toHaveBeenCalledWith("dataset_id", 7);
+  }
+});

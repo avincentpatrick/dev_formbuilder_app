@@ -610,3 +610,24 @@ Validation: database-backed Vitest 1,489 passed, 11 skipped; all 25 map browser 
 including hidden requests, disposal/reuse, peak-map count, independent state, failure paths
 and desktop/phone PNG exports. Lint (existing fixture warning), typecheck, migration lint
 and prefixed no-data production build passed. Measurements ran separately from those checks.
+
+## Recoverable map rendering failures (8 November 2026)
+
+Canvas-reported boundary/renderer failures now offer **Retry map rendering** outside the
+assistive-technology-hidden canvas. A retry disposes the failed canvas and recreates only
+that dataset's renderer. It clears stale geometry/capture state but retains indicator,
+period, geographic selection, search, public aggregate payload, complete table and totals.
+It does not reread dataset values or trigger neighboring maps. A loading status announces
+the retry; repeated failures keep the table and JSON available and PNG disabled.
+
+The retry preserves the existing map lifecycle cleanup and limits. It cannot repair an
+invalid source, create missing polygons, enable permanently unavailable WebGL or approve
+candidate boundaries; those cases remain explicit failures with usable data alternatives.
+This addresses transient geometry requests and renderer failures caught by DatasetCanvas,
+not a failure to download the page's own JavaScript.
+
+Validation: database-backed Vitest 1,489 passed, 11 skipped; lint (existing fixture warning),
+typecheck, migration lint and prefixed no-data production build passed. All 27 browser cases
+passed, followed by the added WebGL-recovery case (28 distinct final cases). New checks use
+keyboard activation and cover a temporary 503, repeated failure, one aggregate read across
+retries, retained selection/search, PNG readiness and recovery after WebGL becomes available.

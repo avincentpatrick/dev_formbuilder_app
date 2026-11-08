@@ -25,3 +25,12 @@ it("retains selected published uncertainty and source notes", () => {
   expect(notes).toContain("Published estimate");
   expect(notes).toContain("not available / not applicable");
 });
+
+it("labels a declared parent rate in PNG notes without turning it into a total", () => {
+  const context = datasetMapExport({ ...initialMapChoice("bhw-stepzero-2026"), indicator: "bhw.declared-accreditation" },
+    { ...data, total: null, parentRate: 0 }, [], ["01"]);
+  const notes = pngNotes(context).join("\n");
+  expect(notes).toContain("Reported parent rate: 0%");
+  expect(notes).not.toContain("Reported parent total:");
+  expect(notes).toContain("All LGU-declared BHWs");
+});

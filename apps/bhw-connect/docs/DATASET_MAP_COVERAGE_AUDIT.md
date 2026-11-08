@@ -69,3 +69,13 @@ These samples do not certify every indicator, province, municipality or source r
 Regional aggregate coverage does not prove barangay coverage or source completeness.
 Dataset-specific dates, definitions, disclosures, source licensing and boundary acceptance
 remain separate checks. No real values or source extracts were added to git.
+
+## StepZero deployment follow-up
+
+A later 8 November check after #474 reached the running app returned **available** for both
+`stepzero.population` and `stepzero.households`: each had 18 reported regional rows, a
+reported parent total and 18 matching basic geometries. Dated reports are appended to the
+same evidence file, preserving the earlier unsupported result. This resolves the observed
+rollout limitation for those two regional views; it does not prove detailed national
+coverage, source completeness or historical boundary acceptance. The new accreditation-rate
+map is a separate change and is not certified by these population/household checks.

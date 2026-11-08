@@ -1,6 +1,7 @@
 import type { ColorBin } from "@/lib/charts/color-scale";
 import { getDatasetMap } from "./definitions";
 import { prototypeIndicators, type MapChoice, type MapPayload } from "./prototype";
+import { STEPZERO_ACCREDITATION_ID } from "./stepzero-accreditation";
 import { incomeClassLabel } from "./income-class";
 
 /** Export only the public fields already shown. Never recover withheld values or filter by geometry. */
@@ -17,7 +18,8 @@ export function datasetMapExport(
   if (!definition || !metric) throw new Error("Unsupported map export");
   const navigationOnly = data.valueSupport === "navigation-only";
   const income = choice.dataset === "lgu-income-class";
-  const fixed = income || choice.dataset === "psa-sae-poverty-2023" ||
+  const declaredAccreditation = choice.dataset === "bhw-stepzero-2026" && choice.indicator === STEPZERO_ACCREDITATION_ID;
+  const fixed = declaredAccreditation || income || choice.dataset === "psa-sae-poverty-2023" ||
     choice.dataset === "bhw-profiling-status-2026";
   return {
     schemaVersion: 1,
@@ -40,8 +42,11 @@ export function datasetMapExport(
         ...(income ? { label: incomeClassLabel(bin.min) } : {}),
       })),
     },
+    parentMeasure: { kind: declaredAccreditation ? "rate" : "total",
+      value: navigationOnly ? null : declaredAccreditation ? data.parentRate ?? null : data.total,
+      unit: metric.unit },
     total: navigationOnly ? null : data.total,
-    totalNote: data.totalNote ?? "Reported parent total, not a sum of drawable areas; no aggregate is inferred when absent.",
+    totalNote: data.totalNote ?? (declaredAccreditation ? "Published parent rate; never an average of child percentages." : "Reported parent total, not a sum of drawable areas; no aggregate is inferred when absent."),
     rows: data.rows.map((row) => ({
       code: row.code, name: row.name,
       value: navigationOnly ? null : row.value,

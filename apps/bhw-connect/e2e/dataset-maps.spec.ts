@@ -730,3 +730,32 @@ test("StepZero source population and households keep their own dates, values and
   await expect(page.getByLabel("PSA population 2024 indicator")).toHaveValue("population.residents");
   await expect(page.getByRole("link", { name: "Share this map selection" })).toHaveAttribute("href", /period=2024/);
 });
+
+test("StepZero accreditation uses a published parent rate and fixed percentage legend", async ({ page }) => {
+  await page.route("**/api/dataset-map?**", (route) => route.fulfill({ json: {
+    state: "available", rows: [
+      { code: "01", name: "Synthetic zero", value: 0, note: "Published share" },
+      { code: "02", name: "Synthetic decimal", value: 33.33, note: "Published share" },
+      { code: "99", name: "Synthetic undefined", value: null, note: "No valid positive StepZero BHW denominator or numerator." },
+    ], total: null, parentRate: 25, area: "Synthetic geography", childLevel: "region", source: "Synthetic StepZero",
+    date: "2026-09-01", license: "Test only", geometryUrl: "/bhw-connect/geo/regions.json",
+  } }));
+  await page.goto("map?dataset=bhw-stepzero-2026&indicator=bhw.declared-accreditation&period=2026");
+  await expect(page.getByText(/Reported area rate: 25%/)).toBeVisible();
+  await expect(page.getByText(/Denominator: All LGU-declared BHWs/)).toBeVisible();
+  await expect(page.getByText(/Fixed percentage breaks across areas/)).toBeVisible();
+  await expect(page.getByText(/Reported area total:/)).toHaveCount(0);
+  await page.getByText(/Complete area table/).click();
+  await expect(page.getByRole("row", { name: /Synthetic decimal 33.33/ })).toBeVisible();
+  await expect(page.getByRole("row", { name: /Synthetic undefined Not reported/ })).toBeVisible();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download map data (JSON)" }).click();
+  const stream = await (await downloadPromise).createReadStream();
+  const chunks = [];
+  for await (const chunk of stream!) chunks.push(chunk);
+  const exported = JSON.parse(Buffer.concat(chunks).toString());
+  expect(exported.parentMeasure).toEqual({ kind: "rate", value: 25, unit: "%" });
+  expect(exported.total).toBeNull();
+  expect(exported.legend.method).toBe("fixed");
+  expect(exported.indicator.period).toBe("2026");
+});

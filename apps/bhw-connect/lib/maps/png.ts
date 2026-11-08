@@ -47,7 +47,7 @@ export function pngNotes(data: Context): string[] {
     `Current viewport. Selected: ${selected?.name ?? "none"}.`,
     `Legend: ${data.legend.method}. Gray: unavailable value or navigation-only geography; not zero.`,
     `Coverage: ${data.rows.length} areas in complete table; ${missing} without drawable geometry. The image shows the current viewport only.`,
-    `Reported parent total: ${data.total ?? "not available / not applicable"}. ${data.totalNote}`,
+    `Reported parent ${data.parentMeasure.kind}: ${data.parentMeasure.value ?? "not available / not applicable"}${data.parentMeasure.kind === "rate" ? "%" : ""}. ${data.totalNote}`,
     ...(data.indicator.denominator ? [`Denominator: ${data.indicator.denominator}`] : []),
     ...(selected ? [`Selected value: ${selected.value ?? "not available"}${selected.label ? ` (${selected.label})` : ""}. ${selected.note ?? ""}`] : []),
     ...(selected && data.indicator.confidenceLevel ? [`Published 90% confidence interval: ${selected.ciLow ?? "unavailable"} to ${selected.ciHigh ?? "unavailable"}.`] : []),

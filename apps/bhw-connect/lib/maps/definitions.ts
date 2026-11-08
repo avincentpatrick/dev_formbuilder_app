@@ -1,3 +1,4 @@
+import { STEPZERO_ACCREDITATION_ID, STEPZERO_ACCREDITATION_DENOMINATOR } from "./stepzero-accreditation";
 import { UUC_ROUTE_LABELS } from "./uuc-routes";
 import { CATALOG, type IndicatorSpec } from "@/lib/catalog/definitions";
 import type { GeoLevel } from "@/lib/filters/schema";
@@ -60,7 +61,7 @@ function indicator(spec: IndicatorSpec): MapIndicator {
           : periods[spec.source],
     levels: spec.levels,
     denominator:
-      spec.attributes?.denominator ??
+      (spec.id === STEPZERO_ACCREDITATION_ID ? STEPZERO_ACCREDITATION_DENOMINATOR : spec.attributes?.denominator) ??
       (spec.unit === "%" ? "Required from accepted source definition" : null),
     legend:
       spec.unit === "%" || spec.unit.startsWith("per ") || spec.unit === "years" ? "rate" : "count",

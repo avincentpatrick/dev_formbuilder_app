@@ -678,3 +678,34 @@ Validation: eight new probe tests; database-backed Vitest 1,502 passed, 11 skipp
 (existing fixture warning), typecheck, migration lint and prefixed no-data build passed.
 Live checks used the inherited proxy with TLS verification. Browser tests were not rerun:
 this increment changes only the offline audit tool, tests and documentation.
+
+## Published StepZero accreditation rate (8 November 2026)
+
+StepZero's map now offers its already-defined LGU-declared accreditation percentage. The
+source ingestion contract (`ingestion/ingest_stepzero.py`, `counts_row`) computes the
+published percentage from registered-and-accredited BHWs divided by **all** LGU-declared
+BHWs: registered only + registered/accredited + nonregistered. It is not Census validated-
+profile accreditation and does not use registered BHWs alone as denominator.
+
+The adapter selects the published percentage and its numerator/denominator from the exact
+StepZero release. Positive integer denominators, valid numerators, range and consistency
+with the source's two-decimal rounding are checked. The original valid percentage is
+preserved, including zero; missing, duplicate, invalid or zero-denominator records remain
+unavailable with source-context notes. No rate is manufactured from absent figures.
+
+Child rates are never averaged. The separately reported parent rate is returned as
+`parentRate`, while `total` remains null. The card calls it a rate, uses fixed percentage
+breaks and displays the denominator in plain language. JSON adds an explicit `parentMeasure`
+with rate/total kind, value and unit; PNG notes label the parent rate correctly. Existing
+count exports retain their totals. All rows and missing geometry remain independent.
+
+Validation: 14 new adapter/API/export/PNG checks; full database-backed Vitest 1,516 passed,
+11 skipped. All 30 map browser cases passed, including the new rate, denominator, missing
+rows, fixed legend and JSON semantics. Lint (existing fixture warning), typecheck, migration
+lint and prefixed no-data production build passed. No source records, schema, disclosure
+rules, shared hosting or boundary acceptance changed.
+
+Separately, live post-deployment audits now confirm 18 reported regional rows/basic shapes
+for each of StepZero population and households. This supersedes their earlier unsupported
+rollout state, with both dated results retained in the coverage evidence. It is not numeric
+production certification for the new rate or for every detailed geography.

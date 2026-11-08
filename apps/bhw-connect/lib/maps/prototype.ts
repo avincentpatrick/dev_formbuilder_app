@@ -19,6 +19,8 @@ export type MapPayload = {
   state: "available";
   rows: MapRow[];
   total: number | null;
+  /** Published parent rate, separate from additive totals. Never averaged from children. */
+  parentRate?: number | null;
   totalNote?: string;
   area: string;
   childLevel: "region" | "province" | "citymun";
@@ -54,6 +56,7 @@ export function prototypeIndicators(slug: string) {
       "bhw.registered",
       "bhw.registered-accredited",
       "bhw.nonregistered",
+      "bhw.declared-accreditation",
       "stepzero.population",
       "stepzero.households",
     ],

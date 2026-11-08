@@ -274,3 +274,32 @@ emulation at 390×844 had no axe violations, horizontal overflow or map-error fa
 Production coverage and historical boundary compatibility are not certified by these
 synthetic checks. FHSIS availability, districts, detailed basemap/PMTiles hosting, accepted
 barangay geometry and PNG export remain dependencies in the plan.
+
+## Reviewed district geometry build gate (8 November 2026)
+
+Adds an offline, checksummed district candidate builder and an explicit complete-membership
+review input. This addresses the district geometry dependency before publishing its map:
+existing live membership rows alone cannot prove a district's full legal extent. See
+[the input contract, commands and publication limits](REVIEWED_DISTRICT_BOUNDARIES.md).
+
+The builder requires exact leaf-code matches, pinned geometry/vintage and membership
+provenance. Missing or duplicate members/shapes, inactive/conflicting assignments,
+self-intersections and positive-area overlaps block the entire affected district. It can
+dissolve accepted barangay polygons as well as municipality polygons, preserves islands,
+and never substitutes points or silently repairs invalid topology. Cross-district overlap
+blocks both candidates. Single-source membership remains labeled as such. Reports retain
+input/output hashes, library version, attribution and completeness; output is a private
+candidate, not automatically consumed by the app. Existing public assets remain unchanged.
+
+A fresh Shapely check of the 1,601 committed municipal features found five null geometries
+and one ring self-intersection (`0804808`), in addition to 1,595 valid shapes. This is not
+nationwide reconciliation or acceptance of a newer boundary vintage. No guessed repair
+has been made. Full reviewed membership, historical crosswalks and pinned barangay inputs
+remain required before claiming district completeness. FHSIS still requires the documented
+operator-side read-only diagnosis; no figures or availability have been invented.
+
+Validation: 12 Python boundary tests passed (including checksum/CLI exit codes, missing
+members, duplicates, source status, barangay polygons vs points, topology, overlaps and
+islands). Lint, typecheck, migration lint and the prefixed production build passed;
+seeded-database Vitest: 1,451 passed, 11 skipped. Lint retains the existing fixture warning.
+No UI or browser behavior changes in this increment; browser tests were not rerun.

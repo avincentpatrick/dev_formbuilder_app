@@ -304,3 +304,69 @@ test("income table separates classified, unclassified and unmatched LGUs", async
   ).toBeVisible();
   await expect(page.getByRole("button", { name: /Show areas within/ })).toHaveCount(0);
 });
+
+test("profiling stays hidden on the homepage and has its own stage map and shareable geography", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(
+    page.getByRole("article", { name: "Profiling status 2026 map", exact: true }),
+  ).toHaveCount(0);
+  await page.goto("map?dataset=bhw-profiling-status-2026");
+  await expect(page.getByLabel("Profiling status 2026 indicator")).toHaveValue("encoded");
+  await page.getByLabel("Profiling status 2026 indicator").selectOption("attested");
+  await expect(
+    page.getByText(/Stages are mutually exclusive current workflow states/),
+  ).toBeVisible();
+  await page.getByLabel("Profiling status 2026 area").selectOption("01");
+  await page.getByRole("button", { name: /Show areas within/ }).click();
+  await expect(page.getByRole("link", { name: "Share this map selection" })).toHaveAttribute(
+    "href",
+    /indicator=attested&period=2026&level=region&code=01/,
+  );
+  await expect(page.getByText(/Reported area total/)).toHaveCount(0);
+});
+
+test("profiling shows over-headcount shares and unavailable denominators without capping", async ({
+  page,
+}) => {
+  await page.route("**/api/dataset-map?**", (route) =>
+    route.fulfill({
+      json: {
+        state: "available",
+        rows: [
+          {
+            code: "01",
+            name: "Synthetic overshoot",
+            value: 120,
+            note: "120 records / 100 BHWs to profile; pipeline exceeds headcount; shares are not capped",
+          },
+          {
+            code: "02",
+            name: "Synthetic zero denominator",
+            value: null,
+            note: "5 records; zero BHW headcount — share unavailable",
+          },
+        ],
+        total: null,
+        area: "Philippines",
+        childLevel: "region",
+        source: "Synthetic snapshot",
+        date: "2026-04-01",
+        license: "Test only",
+        geometryUrl: `${route.request().url().split("/api/")[0]}/geo/regions.json`,
+      },
+    }),
+  );
+  await page.goto("map?dataset=bhw-profiling-status-2026&indicator=attested");
+  await page.getByText(/Complete area table/).click();
+  await expect(
+    page.getByRole("row", { name: /Synthetic overshoot 120 120 records/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("row", {
+      name: /Synthetic zero denominator Not reported 5 records; zero BHW headcount/,
+    }),
+  ).toBeVisible();
+  await expect(page.locator("ul").getByText("100% or more", { exact: true })).toBeVisible();
+});

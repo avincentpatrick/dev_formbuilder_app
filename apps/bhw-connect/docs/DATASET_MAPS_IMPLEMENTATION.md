@@ -247,3 +247,30 @@ isolation and resource-budget checks. A 390×844 phone emulation with the income
 had no axe violations, horizontal overflow or map-error fallback. These use synthetic
 development data. Remaining adapters, boundary acceptance, detailed basemap/PMTiles
 hosting and map PNG export remain pending as described above.
+
+## Profiling-status stage map (8 November 2026)
+
+Adds the independent 2026 profiling-status map to the dataset-selectable Map page, with
+stage selection, expanded view and shareable geography. The homepage card remains hidden.
+Bounded anonymous reads use only published `bhw-profiling-status-2026` metadata and its
+`agg_bhw_profiling_status` rows at the requested child level, never census or StepZero rows.
+No parent rate or average of child percentages is requested or calculated.
+
+The four stages follow the existing workflow reader: encoded is drafted + for-validation +
+back-to-encoder, validated excludes approved records, attested is approved, and not-encoded
+is headcount minus all pipeline records, floored at zero. Each share uses the area's own
+`n_total_bhw`, rounded to whole percentages as in the existing dashboard. Fixed breaks retain
+values at or above 100%; an overshooting snapshot is flagged, never normalized to the
+pipeline total or silently capped. Selected details and tables expose counts and denominators.
+Missing, duplicate, malformed or zero-denominator snapshots have no mapped share; a valid
+zero stage count remains zero. Municipal rows absent from the synthetic source stay missing.
+Barangay boundary navigation remains gated on the outstanding geometry acceptance work.
+
+Validation: lint (one existing fixture warning), typecheck, migration lint and prefixed
+production build passed. Seeded-database Vitest: 1,451 passed, 11 skipped. Fifteen browser
+cases passed, including homepage hiding, stage selection, geography sharing, over-headcount
+and zero-denominator fixtures, and prior independent-map/resource-budget checks. Phone
+emulation at 390×844 had no axe violations, horizontal overflow or map-error fallback.
+Production coverage and historical boundary compatibility are not certified by these
+synthetic checks. FHSIS availability, districts, detailed basemap/PMTiles hosting, accepted
+barangay geometry and PNG export remain dependencies in the plan.

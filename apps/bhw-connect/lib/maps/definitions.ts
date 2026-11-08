@@ -143,10 +143,17 @@ export const DATASET_MAPS: readonly DatasetMapDefinition[] = [
     "Profiling status 2026",
     "bhw-profiling-status-2026",
     "profiling-status",
-    "Keep the homepage card hidden. Stages are mutually exclusive; shares use total BHWs to profile, not pipeline totals.",
+    "Stages are mutually exclusive; shares use total BHWs to profile, not pipeline totals.",
     ["encoded", "validated", "attested", "notEncoded"].map((id) => ({
       id,
-      label: id,
+      label: (
+        {
+          encoded: "Encoded, awaiting validation",
+          validated: "Validated, awaiting attestation",
+          attested: "Attested",
+          notEncoded: "Not yet encoded",
+        } as Record<string, string>
+      )[id],
       unit: "%",
       period: "2026",
       levels: ["national", "region", "province", "citymun", "barangay"],

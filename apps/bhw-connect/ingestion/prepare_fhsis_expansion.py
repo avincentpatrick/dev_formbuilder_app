@@ -192,7 +192,53 @@ def family_planning_specifications(directory):
     return specs
 
 
+def ncd_specifications(directory):
+    specs=[]
+    def add(prefix,key,label,n,d=None,rate=None,sex=True,sheet='Annual',denominator=None):
+        matches=list(directory.glob(prefix+'*.xlsx'))
+        if len(matches)!=1:raise ValueError(f'Expected one source: {prefix}')
+        specs.append(dict(key='ncd_'+key,label=label,file=matches[0].name,n=n,d=d,rate=rate,
+                          sex=sex,ages=None,start=8,sheet=sheet,coded=True,program='ncd',
+                          denominator=denominator or 'No denominator: source count only'))
+    for prefix,age in [('1a.','20_59'),('1b.','60plus')]:
+        age_label='20–59 years' if age=='20_59' else '60 years and above'
+        if age=='20_59':
+            for key,label,n,d in [('assessed','Risk-assessed using PhilPEN',198,3),('htn','Identified with hypertension',202,198),('dm','Identified with type 2 diabetes',206,198)]:
+                add(prefix,age+'_'+key,label+', '+age_label,n,d,n+1,sheet='RA',denominator='Projected population aged 20–59' if d==3 else 'Adults aged 20–59 risk-assessed using PhilPEN')
+        for disease,label,first,den in [('htn','Antihypertensive',14,10),('dm','Antidiabetic',28,24)]:
+            for offset,mode,desc in [(0,'facility','100% provided by facility'),(3,'oop','out of pocket'),(6,'total','total access')]:
+                n=first+offset
+                add(prefix,f'dec_{age}_{disease}_{mode}',f'{label} medication, {desc}, {age_label}',n,den if mode=='total' else None,n+1 if mode=='total' else None,
+                    sheet='Dec',denominator=('Identified hypertensive patients' if disease=='htn' else 'Identified type 2 diabetes patients')+' in the same December age cohort' if mode=='total' else None)
+    for prefix,age in [('1c.','20_59'),('1d.','60plus')]:
+        for key,label,n in [('smoking','History of smoking',6),('binge','Binge drinking',10),('inactive','Insufficient physical activity',14),('diet','Unhealthy diet',18),('overweight','Overweight',22),('obese','Obesity',26)]:
+            add(prefix,age+'_'+key,label+', '+('20–59 years' if age=='20_59' else '60 years and above'),n,3,n+1,denominator='Source risk-assessed population in the stated age cohort; risk factors may overlap')
+    for key,label,n,d,den in [('vision_screened','Screened for visual acuity',6,3,'Senior citizens seen'),('eye_disease','Identified with eye disease',10,6,'Senior citizens screened for visual acuity'),('eye_referred','Referred to eye-care professionals',14,10,'Senior citizens identified with eye disease')]:
+        add('2. Visual',key,label+', age 60 and above',n,d,n+1,denominator=den)
+    add('3. Immunization','senior_ppv','Senior citizens receiving one PPV dose',6,3,7,denominator='Senior citizens seen who had not previously received PPV')
+    add('3. Immunization','senior_flu','Senior citizens receiving one influenza vaccine dose',11,8,12,denominator='Senior citizens seen')
+    for key,label,n,d,rate in [('via','VIA screening',4,None,None),('pap','Pap smear screening',5,None,None),('hpv','HPV DNA screening',6,None,None),('assessed','Assessed only',7,None,None),('screened','Screened or assessed, source total',8,3,9),('suspicious','Suspicious for cervical cancer',10,7,11),('suspicious_treated','Suspicious cases treated',12,10,13),('suspicious_referred','Suspicious cases referred',14,10,15),('suspicious_managed','Suspicious cases treated/referred, source total',16,10,17),('lesions','Positive for precancerous lesions',18,None,None),('lesions_treated','Precancerous lesions treated',20,18,21),('lesions_referred','Precancerous lesions referred',22,18,23),('lesions_managed','Precancerous lesions treated/referred, source total',24,18,25)]:
+        den={3:'Projected women aged 30–65 minus women aged 30–65 screened in the previous two years (source target population)',7:'Women assessed only (source denominator, not all screened women)',10:'Women suspicious for cervical cancer',18:'Women positive for precancerous lesions'}.get(d)
+        if key=='lesions':den='Count only; source rate held because its denominator is not explicit in a single source field'
+        add('4a.', 'cervical_'+key,label+', women aged 30–65',n,d,rate,False,denominator=den)
+    for cohort,desc,items in [('highrisk','high-risk asymptomatic or symptomatic women aged 30–69',[(3,None,None,'cbe'),(4,None,None,'mammogram'),(5,None,None,'screened'),(6,3,7,'cbe_findings'),(8,4,9,'mammogram_findings'),(10,5,11,'findings'),(12,10,13,'care')]),('routine','asymptomatic women aged 50–69',[(16,15,17,'cbe'),(18,15,19,'mammogram'),(20,15,21,'screened'),(22,16,23,'cbe_findings'),(24,18,25,'mammogram_findings'),(26,20,27,'findings'),(28,26,29,'care')])]:
+        labels={'cbe':'Clinical breast examination','mammogram':'Mammography','screened':'Breast screening, source total','cbe_findings':'Significant clinical breast examination findings','mammogram_findings':'Significant mammography findings','findings':'Significant breast findings, source total','care':'Breast findings linked to care'}
+        for n,d,rate,key in items:
+            den={3:'Clinical breast examinations in the same cohort',4:'Mammograms in the same cohort',5:'Screening total in the same cohort',10:'Significant findings in the same cohort',15:'Projected female population aged 50–69',16:'Clinical breast examinations in the same cohort',18:'Mammograms in the same cohort',20:'Screening total in the same cohort',26:'Significant findings in the same cohort'}.get(d)
+            add('4b.',f'breast_{cohort}_{key}',labels[key]+', '+desc,n,d,rate,False,denominator=den)
+    for age,n in [('0_9',5),('10_19',8),('20_59',11),('60plus',14)]:
+        add('5. MH','mhgap_'+age,'Mental-health concerns screened using mhGAP, '+age.replace('_','–').replace('plus',' and above')+' years',n)
+    add('5. MH','mhgap_total','Mental-health concerns screened using mhGAP, all ages',15,sex=False)
+    return specs
+
+
 class ExpansionBuilder(Builder):
+    def raw_rows(self, source, sheet, start):
+        for number,row in super().raw_rows(source,sheet,start):
+            if FILES[source]=='4a. CA_nofml.xlsx' and row[1] is None and str(row[0]).startswith(('¹ -','² -','³ -','Note:')):
+                continue
+            yield number,row
+
     def named_rows(self, source, sheet, start):
         seen, region = set(), None
         workbook=openpyxl.load_workbook(self.directory/FILES[source], read_only=True, data_only=True)
@@ -228,11 +274,16 @@ def main():
     parser.add_argument('directory',type=Path)
     parser.add_argument('--reference',type=Path,required=True,help='Original private FHSIS directory containing TB geography and dim_geo.json')
     parser.add_argument('--retrieved',required=True)
-    parser.add_argument('--programme-set', choices=['core','child-health','maternal','infectious','family-planning'], default='core')
+    parser.add_argument('--programme-set', choices=['core','child-health','maternal','infectious','family-planning','ncd'], default='core')
     args=parser.parse_args()
     geos=json.loads((args.reference/'dim_geo.json').read_text())
     b=ExpansionBuilder(args.reference,geos);b.directory=args.directory
-    specs={'core':specifications,'child-health':child_health_specifications,'maternal':maternal_specifications,'infectious':infectious_specifications,'family-planning':family_planning_specifications}[args.programme_set](args.directory)
+    if args.programme_set=='ncd':
+        for code,geo in geos.items():
+            if geo['geo_level']!='barangay':b.canonical[normalise(geo['geo_name'])].add(code)
+        b.canonical[normalise('City of Carmona')]={'0402104'}
+        b.canonical[normalise('Dr. Jose P. Rizal')]={'1705323'}
+    specs={'core':specifications,'child-health':child_health_specifications,'maternal':maternal_specifications,'infectious':infectious_specifications,'family-planning':family_planning_specifications,'ncd':ncd_specifications}[args.programme_set](args.directory)
     definitions=[]
     groups={}
     for spec in specs:groups.setdefault((spec['file'],spec['sheet'],spec['start'],spec['coded']),[]).append(spec)
@@ -268,6 +319,8 @@ def main():
         qa['omitted_columns']=(['Repeat-pregnancy Td age-specific rates: source reports zeros despite nonzero counts; retained age counts only'] if args.programme_set=='maternal' else [])
     if args.programme_set=='infectious':
         qa['omitted_columns']=['Pregnancy deworming in STH workbook: duplicates maternal deworming with a different total; held for source reconciliation', 'Schistosomiasis Annual1 chronic diagnosis and treatment rates: denominator not established; retained counts only']
+    if args.programme_set=='ncd':
+        qa['omitted_columns']=['Senior annual risk-assessment/disease summary: Q4 title says Annual 2024; RA annual values repeat that summary; held pending year clarification', 'Cervical precancerous-lesion rate: no explicit denominator field; retained counts', 'Medicine access: December snapshot only; monthly figures not summed to annual unique people']
     out=args.directory/'fhsis-expansion.json';out.write_text(json.dumps(bundle,ensure_ascii=False,separators=(',',':')))
     sha=hashlib.sha256(out.read_bytes()).hexdigest();(args.directory/'fhsis-expansion.sha256').write_text(sha+'  fhsis-expansion.json\n')
     (args.directory/'qa-report.json').write_text(json.dumps(qa,ensure_ascii=False,indent=2))

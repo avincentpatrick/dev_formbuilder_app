@@ -224,6 +224,17 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
         </p>
       )}
 
+      {area.indicators.some((i) => i.indicator_key.startsWith("ncd_")) && (
+        <p className="text-sm text-muted">
+          NCD medicine access is a December 2025 snapshot. Other included NCD measures are annual.
+          Risk factors and cancer screening pathways can overlap; do not add them as unique people.
+          Suspicious or significant screening findings are not confirmed cancer diagnoses. Most NCD
+          sources report provinces/HUCs and selected cities; adult annual risk assessment also
+          includes municipalities. The cervical precancerous-lesion rate is withheld because its
+          denominator is not explicit in the source; its count is retained.
+        </p>
+      )}
+
       <section aria-labelledby="breakdowns-heading">
         <h2 id="breakdowns-heading" className="text-xl font-semibold">
           Age and sex breakdowns

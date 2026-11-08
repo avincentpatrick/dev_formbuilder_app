@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  NCD_DEFINITIONS,
   FAMILY_PLANNING_DEFINITIONS,
   INFECTIOUS_DEFINITIONS,
   MATERNAL_DEFINITIONS,
@@ -8,31 +9,21 @@ import {
   validateExpansion,
   loadExpansion,
 } from "./load-fhsis-expansion.mjs";
-function fixture(child = false, maternal = false, infectious = false, family = false) {
-  const definitions = structuredClone(
-    family
-      ? FAMILY_PLANNING_DEFINITIONS
-      : infectious
-        ? INFECTIOUS_DEFINITIONS
-        : maternal
-          ? MATERNAL_DEFINITIONS
-          : child
-            ? CHILD_HEALTH_DEFINITIONS
-            : DEFINITIONS,
-  );
+function fixture(programme = "core") {
+  const mapping: Record<string, typeof DEFINITIONS> = {
+    core: DEFINITIONS,
+    "child-health": CHILD_HEALTH_DEFINITIONS,
+    maternal: MATERNAL_DEFINITIONS,
+    infectious: INFECTIOUS_DEFINITIONS,
+    "family-planning": FAMILY_PLANNING_DEFINITIONS,
+    ncd: NCD_DEFINITIONS,
+  };
+  const definitions = structuredClone(mapping[programme]);
   const sources = [
     ...new Set(definitions.map((d: { source_workbook: string }) => d.source_workbook)),
   ].map((file) => ({ file, sha256: "a".repeat(64) }));
   return {
-    programme_set: family
-      ? "family-planning"
-      : infectious
-        ? "infectious"
-        : maternal
-          ? "maternal"
-          : child
-            ? "child-health"
-            : undefined,
+    programme_set: programme === "core" ? undefined : programme,
     format: "bhw-fhsis-expansion-v1",
     dataset_slug: "fhsis-2025",
     retrieved: "2026-11-07",
@@ -58,8 +49,19 @@ function fixture(child = false, maternal = false, infectious = false, family = f
   };
 }
 describe("FHSIS expansion boundary", () => {
+  it("accepts only the reviewed NCD batch and all nine source workbooks", () => {
+    const bundle = fixture("ncd");
+    expect(bundle.sources).toHaveLength(9);
+    expect(bundle.definitions).toHaveLength(64);
+    expect(() => validateExpansion(bundle)).not.toThrow();
+    expect(() => validateExpansion({ ...bundle, programme_set: "maternal" })).toThrow(
+      "reviewed mapping",
+    );
+    bundle.sources.pop();
+    expect(() => validateExpansion(bundle)).toThrow("checksummed workbooks");
+  });
   it("accepts the reviewed family-planning batch but rejects substitution of another programme", () => {
-    const bundle = fixture(false, false, false, true);
+    const bundle = fixture("family-planning");
     expect(bundle.sources).toHaveLength(1);
     expect(bundle.definitions).toHaveLength(81);
     expect(() => validateExpansion(bundle)).not.toThrow();
@@ -68,7 +70,7 @@ describe("FHSIS expansion boundary", () => {
     );
   });
   it("accepts the infectious batch without flagging population rates as excess percentage coverage", () => {
-    const bundle = fixture(false, false, true);
+    const bundle = fixture("infectious");
     expect(bundle.sources).toHaveLength(8);
     expect(bundle.definitions).toHaveLength(21);
     const populationRow = bundle.indicators.find(
@@ -80,7 +82,7 @@ describe("FHSIS expansion boundary", () => {
     expect(() => validateExpansion(bundle)).toThrow("excess-coverage");
   });
   it("validates maternal definitions independently from the other approved batches", () => {
-    const maternal = fixture(false, true);
+    const maternal = fixture("maternal");
     expect(maternal.sources).toHaveLength(8);
     expect(maternal.definitions).toHaveLength(17);
     expect(() => validateExpansion(maternal)).not.toThrow();
@@ -91,7 +93,7 @@ describe("FHSIS expansion boundary", () => {
     expect(() => validateExpansion(maternal)).toThrow("checksummed workbooks");
   });
   it("accepts only the reviewed child-health batch and its five distinct sources", () => {
-    const child = fixture(true);
+    const child = fixture("child-health");
     expect(child.sources).toHaveLength(5);
     expect(child.definitions).toHaveLength(12);
     expect(() => validateExpansion(child)).not.toThrow();

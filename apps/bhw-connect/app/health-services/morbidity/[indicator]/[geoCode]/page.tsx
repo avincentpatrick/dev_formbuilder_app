@@ -8,6 +8,29 @@ import {
   fhsisBreakdownLabel,
 } from "@/lib/db/fhsis";
 
+const BREAKDOWN_ORDER = [
+  "male",
+  "female",
+  ...[
+    "0-6d",
+    "7-28d",
+    "29d-11m",
+    "1-4",
+    "5-9",
+    "10-14",
+    "15-19",
+    "20-24",
+    "25-29",
+    "30-34",
+    "35-39",
+    "40-44",
+    "45-49",
+    "50-54",
+    "55-59",
+    "60plus",
+  ].flatMap((age) => ["male", "female", "total"].map((sex) => `age:${age}:${sex}`)),
+];
+
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Morbidity age and sex · FHSIS 2025" };
 
@@ -25,7 +48,11 @@ export default async function MorbidityBreakdowns({
     (d) => d.indicator_key === indicator && d.program_area === "morbidity",
   );
   if (!definition) notFound();
-  const rows = await getFhsisBreakdowns(geoCode, geo.geoLevel, indicator);
+  const sourceRows = await getFhsisBreakdowns(geoCode, geo.geoLevel, indicator);
+  const rows =
+    sourceRows?.toSorted(
+      (a, b) => BREAKDOWN_ORDER.indexOf(a.breakdown) - BREAKDOWN_ORDER.indexOf(b.breakdown),
+    ) ?? null;
   return (
     <div className="flex flex-col gap-6">
       <Link href={fhsisAreaHref(geo.geoLevel, geoCode)} className="underline">
@@ -70,7 +97,9 @@ export default async function MorbidityBreakdowns({
               {rows.map((r) => (
                 <tr key={r.breakdown} className="border-t border-border">
                   <th scope="row" className="p-3 font-medium">
-                    {fhsisBreakdownLabel(r.breakdown)}
+                    {["male", "female"].includes(r.breakdown)
+                      ? `All ages, ${r.breakdown}`
+                      : fhsisBreakdownLabel(r.breakdown)}
                   </th>
                   <td className="p-3">
                     {r.numerator === null ? "Not reported" : r.numerator.toLocaleString("en-PH")}

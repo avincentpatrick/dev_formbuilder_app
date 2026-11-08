@@ -1,6 +1,7 @@
 "use client";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useState } from "react";
+import { captureMapFrame } from "@/lib/maps/png";
 import { loadMaplibre } from "./load-maplibre";
 import { geometryPositions } from "@/lib/geo/positions";
 import { colorForValue, NO_DATA_COLOR, type ColorBin } from "@/lib/charts/color-scale";
@@ -13,6 +14,7 @@ export function DatasetCanvas({
   selected,
   onSelect,
   onGeometry,
+  onCapture,
   expanded,
 }: {
   url: string;
@@ -21,6 +23,7 @@ export function DatasetCanvas({
   selected: string | null;
   onSelect: (code: string) => void;
   onGeometry: (codes: string[]) => void;
+  onCapture: (capture: (() => Promise<HTMLCanvasElement>) | null) => void;
   expanded: boolean;
 }) {
   const container = useRef<HTMLDivElement>(null);
@@ -32,9 +35,9 @@ export function DatasetCanvas({
       mapRef.current.setFilter("selection", ["==", "geo_code", selected ?? ""]);
   }, [selected]);
   const [failed, setFailed] = useState(false);
-  const callbacks = useRef({ onSelect, onGeometry });
+  const callbacks = useRef({ onSelect, onGeometry, onCapture });
   useEffect(() => {
-    callbacks.current = { onSelect, onGeometry };
+    callbacks.current = { onSelect, onGeometry, onCapture };
   });
   useEffect(() => {
     const abort = new AbortController();
@@ -89,7 +92,7 @@ export function DatasetCanvas({
         resize = new ResizeObserver(() => map?.resize());
         resize.observe(container.current);
         map.on("error", () => {
-          if (!disposed) setFailed(true);
+          if (!disposed) { setFailed(true); callbacks.current.onCapture(null); }
         });
         map.on("load", () => {
           if (!map || disposed) return;
@@ -116,18 +119,25 @@ export function DatasetCanvas({
           });
           if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 20, animate: false });
           map.getCanvas().tabIndex = -1;
+          map.once("idle", () => {
+            if (!disposed && map && codes.length) {
+              const readyMap = map;
+              callbacks.current.onCapture(() => captureMapFrame(readyMap));
+            }
+          });
           map.on("click", "fill", (e) => {
             const code = e.features?.[0]?.properties?.geo_code;
             if (typeof code === "string") callbacks.current.onSelect(code);
           });
         });
       } catch {
-        if (!disposed) setFailed(true);
+        if (!disposed) { setFailed(true); callbacks.current.onCapture(null); }
       }
     }
     void start();
     return () => {
       disposed = true;
+      callbacks.current.onCapture(null);
       abort.abort();
       resize?.disconnect();
       map?.remove();

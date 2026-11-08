@@ -392,3 +392,35 @@ Validation: six topology/trial tests, ten candidate tests and thirteen boundary/
 tests passed (29 total). Lint (existing fixture warning), typecheck, migration lint and
 prefixed production build passed. Seeded-database Vitest: 1,459 passed, 11 skipped.
 No UI changes; browser tests were not rerun.
+
+## National shared-topology build and retention gate (8 November 2026)
+
+Extended the two-municipality trial to three full-country exports from the checksummed
+unsimplified source: 10% with intersection repair disabled, 10% with Mapshaper's default
+intersection repair, and an unsimplified joint export. See the [national build evidence and
+reproduction commands](BARANGAY_NATIONAL_BUILD.md) and aggregate machine-readable summary.
+No candidate passed acceptance, and no public assets or dataset boundary versions changed.
+
+All three retained 42,010 source records/codes, including four null geometries absent from
+the supplier's simplified archive. These are not newly recovered boundaries. Both 10%
+variants lost 493 polygon components across 216 barangays and three holes despite keeping
+every code. The unsimplified export preserved components but lost one hole and introduced
+six invalid polygons. The default-repair control eliminated newly invalid polygons, but
+component/hole loss and eleven overlap pairs remained. A lower overlap count alone is not
+an acceptance criterion: invalid shapes are excluded from those pair checks and separately
+block the gate. Historical code differences and source nulls remain unresolved.
+
+The new offline validator pins source, candidate and reference hashes. It checks exact code
+retention, unexpected/duplicate records, source and candidate validity, lost or gained
+components/holes per code, reference geography and topology. Failed checks write a report
+and exit 1; bad inputs exit 2. Even an automated pass does not set publication readiness.
+Detailed identifiers, source inventory and generated geometry stay outside git; aggregate
+results and reproduction metadata are committed. No snapping, clipping or silent acceptance
+tolerance was introduced. Future builds must verify component/hole preservation and isolate
+import/projection effects before attempting accepted delivery partitions or barangay drill-down.
+
+Validation: eight national retention/gate tests, sixteen candidate/topology tests and thirteen
+boundary/district tests passed (37 total). Lint (existing fixture warning), typecheck, migration
+lint and prefixed app build passed. Seeded-database Vitest: 1,463 passed, 11 skipped.
+No UI changes; browser tests were not rerun. Geospatial candidate failures are intentionally
+separate from passing software tests and app builds.

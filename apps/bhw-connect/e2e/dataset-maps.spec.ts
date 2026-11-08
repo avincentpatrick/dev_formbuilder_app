@@ -632,3 +632,65 @@ test("tall desktop portal keeps the two-map limit when several cards are visible
   await expect(page.locator('[data-map-state="ready"]')).toHaveCount(2);
   expect(await page.evaluate(() => (window as typeof window & { mapPeak: number }).mapPeak)).toBeLessThanOrEqual(2);
 });
+
+test("retrying failed geometry retains choices and avoids rereading dataset values", async ({ page }) => {
+  let geometryReads = 0;
+  let dataReads = 0;
+  page.on("request", (request) => { if (request.url().includes("/api/dataset-map?")) dataReads++; });
+  await page.route("**/geo/regions.json", (route) => {
+    geometryReads++;
+    return geometryReads === 1 ? route.fulfill({ status: 503, body: "Temporary failure" }) : route.continue();
+  });
+  await page.goto("map?dataset=nhfr-2026-09&selected=01");
+  const retry = page.getByRole("button", { name: "Retry map rendering" });
+  await expect(retry).toBeVisible();
+  await page.getByRole("searchbox").fill("01");
+  await expect(page.getByRole("button", { name: "Download map image (PNG)" })).toBeDisabled();
+  await retry.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator('[data-map-state="ready"]')).toHaveCount(1);
+  await expect(retry).toHaveCount(0);
+  await expect(page.getByRole("searchbox")).toHaveValue("01");
+  await expect(page.getByLabel("NHFR September 2026 area", { exact: true })).toHaveValue("01");
+  await expect(page.getByRole("button", { name: "Download map image (PNG)" })).toBeEnabled();
+  expect(dataReads).toBe(1);
+  expect(geometryReads).toBe(2);
+  await expect(page.locator(".maplibregl-map")).toHaveCount(1);
+});
+
+test("repeated rendering failure leaves table and JSON available", async ({ page }) => {
+  let dataReads = 0;
+  page.on("request", (request) => { if (request.url().includes("/api/dataset-map?")) dataReads++; });
+  await page.route("**/geo/regions.json", (route) => route.fulfill({ status: 503, body: "Unavailable" }));
+  await page.goto("map?dataset=uuc-phc-2025");
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await page.getByRole("button", { name: "Retry map rendering" }).click();
+    await expect(page.locator('[data-map-state="failed"]')).toHaveCount(1);
+  }
+  await page.getByText(/Complete area table/).click();
+  await expect(page.getByRole("table")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Download map data (JSON)" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Download map image (PNG)" })).toBeDisabled();
+  expect(dataReads).toBe(1);
+  await expect(page.locator(".maplibregl-map")).toHaveCount(0);
+});
+
+test("renderer retry can recover after WebGL becomes available", async ({ page }) => {
+  await page.addInitScript(() => {
+    const state = window as typeof window & { blockMapContext: boolean };
+    state.blockMapContext = true;
+    const original = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, ...args) {
+      if (state.blockMapContext && String(args[0]).includes("webgl")) return null;
+      return original.apply(this, args);
+    } as typeof original;
+  });
+  await page.goto("map?dataset=uuc-phc-2025&selected=01");
+  await expect(page.locator('[data-map-state="failed"]')).toHaveCount(1);
+  await page.evaluate(() => { (window as typeof window & { blockMapContext: boolean }).blockMapContext = false; });
+  await page.getByRole("button", { name: "Retry map rendering" }).click();
+  await expect(page.locator('[data-map-state="ready"]')).toHaveCount(1);
+  await expect(page.getByLabel("UUC for PHC 2025 area", { exact: true })).toHaveValue("01");
+  await expect(page.getByRole("button", { name: "Download map image (PNG)" })).toBeEnabled();
+  await expect(page.locator(".maplibregl-map")).toHaveCount(1);
+});

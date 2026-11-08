@@ -59,6 +59,7 @@ export function DatasetMapCard({
   const [visible, setVisible] = useState(expanded);
   const active = useMapActivity(visible && metrics.length > 0);
   const [retry, setRetry] = useState(0);
+  const [renderAttempt, setRenderAttempt] = useState(0);
   const [capture, setCapture] = useState<{ key: string; run: () => Promise<HTMLCanvasElement> } | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -229,7 +230,7 @@ export function DatasetMapCard({
             ) : data ? (
               <>
                 <DatasetCanvas
-                  key={key}
+                  key={`${key}:render=${renderAttempt}`}
                   url={data.geometryUrl}
                   rows={data.rows}
                   bins={bins}
@@ -237,6 +238,12 @@ export function DatasetMapCard({
                   onSelect={(code) => setChoice((c) => ({ ...c, selected: code }))}
                   onGeometry={(codes) => setGeometry({ key, codes })}
                   onCapture={(run) => setCapture(run ? { key, run } : null)}
+                  onRetry={() => {
+                    setGeometry(null);
+                    setCapture(null);
+                    setExportError(null);
+                    setRenderAttempt((attempt) => attempt + 1);
+                  }}
                   expanded={expanded}
                 />
                 <p className="text-xs text-muted">

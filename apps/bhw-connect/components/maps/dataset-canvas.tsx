@@ -15,6 +15,7 @@ export function DatasetCanvas({
   onSelect,
   onGeometry,
   onCapture,
+  onRetry,
   expanded,
 }: {
   url: string;
@@ -25,6 +26,7 @@ export function DatasetCanvas({
   onGeometry: (codes: string[]) => void;
   onCapture: (capture: (() => Promise<HTMLCanvasElement>) | null) => void;
   expanded: boolean;
+  onRetry: () => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("maplibre-gl").Map | null>(null);
@@ -158,10 +160,14 @@ export function DatasetCanvas({
             : "h-64 w-full rounded-lg border border-border"
         }
       />
+      {!ready && !failed && <p role="status" className="text-sm">Loading map rendering…</p>}
       {failed && (
-        <p role="status" className="text-sm">
-          Map unavailable. Use the area selector and complete table below.
-        </p>
+        <div className="space-y-2 text-sm">
+          <p role="status">Map unavailable. Use the area selector and complete table below.</p>
+          <button type="button" className="underline" onClick={onRetry}>
+            Retry map rendering
+          </button>
+        </div>
       )}
     </div>
   );

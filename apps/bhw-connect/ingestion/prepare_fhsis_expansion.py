@@ -165,6 +165,33 @@ def infectious_specifications(directory):
     return specs
 
 
+def family_planning_specifications(directory):
+    source='FP_2025_PH.xlsx'
+    if not (directory/source).is_file():raise ValueError('Missing family-planning workbook')
+    methods=[('btl','Female sterilisation (FSTR/BTL)'),('nsv','Male sterilisation (MSTR/NSV)'),
+             ('condom','Condom'),('iud','IUD, interval'),('iud_pp','IUD, postpartum'),
+             ('pop','Progestin-only pills (POP)'),('coc','Combined oral contraceptives (COC)'),
+             ('injectable','Injectables'),('implant','Implants'),('implant_pp','Implants, postpartum'),
+             ('ccm','Cervical mucus method (CCM)'),('bbt','Basal body temperature (BBT)'),
+             ('stm','Symptothermal method (STM)'),('sdm','Standard days method (SDM)'),
+             ('lam','Lactational amenorrhea method (LAM)'),('total','All methods, source total')]
+    specs=[]
+    for group,sheet,label in [('begin','CUB_A','Beginning users'),('new','NA_A','New acceptors'),
+                             ('other','OA_A','Other acceptors'),('dropout','DO_A','Dropouts'),
+                             ('end','CUE_A','Ending users')]:
+        for i,(method,method_label) in enumerate(methods):
+            n=5+4*i
+            specs.append(dict(key=f'fp_{group}_{method}',label=f'{label}: {method_label}',file=source,
+                              n=n,d=None,rate=None,sex=False,ages=[[n-3,None,None],[n-2,None,None],[n-1,None,None]],
+                              start=7,sheet=sheet,coded=False,program='family_planning',
+                              denominator='No denominator: source-reported count, including fractional values; not a unique-person annual total'))
+    specs.append(dict(key='fp_demand_q4',label='Demand for modern family planning satisfied, ages 15–49',
+                      file=source,n=18,d=17,rate=19,sex=False,ages=None,start=7,sheet='Demand Satisfied',
+                      coded=False,program='family_planning',area_column=16,
+                      denominator='Source Q4 women of reproductive age multiplied by total demand factor; retained from Demand Satisfied sheet'))
+    return specs
+
+
 class ExpansionBuilder(Builder):
     def named_rows(self, source, sheet, start):
         seen, region = set(), None
@@ -201,11 +228,11 @@ def main():
     parser.add_argument('directory',type=Path)
     parser.add_argument('--reference',type=Path,required=True,help='Original private FHSIS directory containing TB geography and dim_geo.json')
     parser.add_argument('--retrieved',required=True)
-    parser.add_argument('--programme-set', choices=['core','child-health','maternal','infectious'], default='core')
+    parser.add_argument('--programme-set', choices=['core','child-health','maternal','infectious','family-planning'], default='core')
     args=parser.parse_args()
     geos=json.loads((args.reference/'dim_geo.json').read_text())
     b=ExpansionBuilder(args.reference,geos);b.directory=args.directory
-    specs={'core':specifications,'child-health':child_health_specifications,'maternal':maternal_specifications,'infectious':infectious_specifications}[args.programme_set](args.directory)
+    specs={'core':specifications,'child-health':child_health_specifications,'maternal':maternal_specifications,'infectious':infectious_specifications,'family-planning':family_planning_specifications}[args.programme_set](args.directory)
     definitions=[]
     groups={}
     for spec in specs:groups.setdefault((spec['file'],spec['sheet'],spec['start'],spec['coded']),[]).append(spec)
@@ -213,6 +240,8 @@ def main():
         FILES[file]=file
         for _,row,base in (b.rows if coded else b.named_rows)(file,sheet,start):
             for s in group:
+                if s.get('area_column') and normalise(str(row[s['area_column']-1]))!=normalise(base['source_area_name']):
+                    raise ValueError('Quarter geography columns disagree')
                 b.indicator(base,row,s['key'],s['n'],s['d'],s['rate'])
                 if s['sex']:
                     for i,(sex,n) in enumerate([('male',s['n']-2),('female',s['n']-1)]):

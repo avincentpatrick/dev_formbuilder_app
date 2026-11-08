@@ -214,6 +214,16 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
         <p className="mt-3 text-sm text-muted">{FHSIS_OVER_100_NOTE}</p>
       </section>
 
+      {area.indicators.some((i) => i.indicator_key.startsWith("fp_")) && (
+        <p className="text-sm text-muted">
+          Family-planning beginning and ending users are snapshots. New acceptors, other acceptors
+          and dropouts are separate annual flows; do not add them to user totals. Method totals
+          already include their age groups. Source fractional counts are retained and are not
+          presented as unique people. Demand satisfied is a Q4 measure for ages 15–49 and uses the
+          denominator published in that table.
+        </p>
+      )}
+
       <section aria-labelledby="breakdowns-heading">
         <h2 id="breakdowns-heading" className="text-xl font-semibold">
           Age and sex breakdowns

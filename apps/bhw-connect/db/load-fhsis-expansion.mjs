@@ -21,10 +21,16 @@ export const MATERNAL_DEFINITIONS = JSON.parse(
 export const INFECTIOUS_DEFINITIONS = JSON.parse(
   readFileSync(new URL("../ingestion/fhsis-infectious-definitions.json", import.meta.url), "utf8"),
 ).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
+export const FAMILY_PLANNING_DEFINITIONS = JSON.parse(
+  readFileSync(
+    new URL("../ingestion/fhsis-family-planning-definitions.json", import.meta.url),
+    "utf8",
+  ),
+).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
 function reviewedDefinitions(bundle) {
   const programme = bundle.programme_set ?? "core";
   check(
-    ["core", "child-health", "maternal", "infectious"].includes(programme),
+    ["core", "child-health", "maternal", "infectious", "family-planning"].includes(programme),
     "Unknown programme set",
   );
   return {
@@ -32,6 +38,7 @@ function reviewedDefinitions(bundle) {
     "child-health": CHILD_HEALTH_DEFINITIONS,
     maternal: MATERNAL_DEFINITIONS,
     infectious: INFECTIOUS_DEFINITIONS,
+    "family-planning": FAMILY_PLANNING_DEFINITIONS,
   }[programme];
 }
 const DECIMAL = /^-?\d+(?:\.\d+)?$/;

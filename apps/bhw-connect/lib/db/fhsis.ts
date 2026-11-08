@@ -63,6 +63,9 @@ export function fhsisRateLabel(indicator: FhsisIndicator): string {
   return `${value}${suffix}${indicator.over100 ? "†" : ""}`;
 }
 export function fhsisPeriodLabel(key: string): string {
+  if (key === "fp_demand_q4") return "Q4 2025";
+  if (key.startsWith("fp_begin_")) return "Beginning of 2025";
+  if (key.startsWith("fp_end_")) return "End of 2025";
   if (key === "anc8") return "Q3–Q4 2025";
   if (key.startsWith("water_") || key.startsWith("sanitation_")) return "Q4 2025";
   return "Annual 2025";
@@ -219,6 +222,7 @@ export function fhsisBreakdownLabel(key: string): string {
 export function fhsisLimitedGeography(key: string): boolean {
   return (
     key.startsWith("birth_") ||
+    key.startsWith("fp_") ||
     key.startsWith("infect_") ||
     key.startsWith("maternal_") ||
     key.startsWith("nutrition_") ||

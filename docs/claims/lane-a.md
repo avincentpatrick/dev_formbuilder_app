@@ -46,6 +46,18 @@ Prediction:
 - The existing census cases do not move, because the new arm reads only temporal-to-temporal changes.
 - The one I most expect to be wrong: a date compared with a text question, which the gate lets through ("may hold a date"), so the judge must stay silent there too.
 
+### Build record (2026-11-08, not merged)
+PR #446, head `351c73ea`, run 42434666150: 7 of 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · axe 11 · Scope 5), and `Boundary (from main)` green. **Pest red on one case only** (11 steps, 7,334 passed): `E2eSeederIdempotencyTest`'s release-order assertion, with 0.18.3 coming back third. That is the case #435 fixes.
+- Census: two reporting cases were red first. Two silent cases cover a text question, arithmetic, a pair the old type already broke, and a date to a date-and-time.
+- Four mutants were CAUGHT: the judge flipped; the constraint's `.` owner dropped; the gate's report-once rule copied into the census; and the gate's de-duplication removed.
+- Locally: 28 conversion-related files, 568 passed. The gate's 155 cases pass unchanged after the refactor.
+
+**How the prediction fared:** right on the census, and the text-question silence held. **Not predicted:**
+- Asking the gate's `judge()` from the converted key alone would have missed every question-against-question break where the other key sorts first. That cost a pushed claim extension, to `ExpressionOperandJudge.php`.
+- Pint read `{@see temporal()}` as the imported `Temporal` class. That was fixed by naming `self::temporal()`.
+
+**The merge point owes:** merge after #445, and after #435 so Pest goes green. Release this claim then.
+
 ## HELD — `M226`, `R-526dae72` by `D214` = relabel: a rule's "contains" reads "contains the text" when the compared question is a single choice or dropdown (m226-contains-the-text) — BUILT AND HELD: PR #445, waiting for a merge point
 
 Taken 2026-11-08, under the same instruction as `M224`. Branch `m226-contains-the-text`, cut from origin/main at `93d0b20b`, PR into main. Held green for a merge point (`D137`), after `M225`'s #444.
@@ -74,6 +86,16 @@ Prediction:
 - The new Vitest case is red first, and the Pest payload case too.
 - The other `ValidationEditor` cases stay green, because the label changes only where the shape is a choice.
 - The one I most expect to be wrong: a builder e2e spec that selects the operator by its visible text.
+
+### Build record (2026-11-08, not merged)
+PR #445, head `3d26038f`, run 42433125591: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green.
+- Both new cases were red first: Vitest (`ValidationEditor.test.ts`) and Pest (`BuilderEnumsPayloadTest`). Two mutants were CAUGHT: the enum's label dropped (`mutate.php`) and the editor ignoring `shape_labels` (by hand, with a byte-exact restore).
+- Vitest: all 284 files and 4,336 tests. `vue-tsc` clean. Pest locally: 35 files, 727 passed and 1 failed. The failure was the release-order assertion #435 fixes, which passed alone.
+- Filed: `contains-label-in-dialogs`, because the conflict and type-change dialogs still print "contains".
+
+**How the prediction fared:** right. Both cases went red first, and no e2e spec reads the label. **Not predicted:** the condition editor's "includes" turned out not to be the same trap (`selected()` is exact), which narrowed the change to the rule editor. The release-order assertion went red locally and green in CI, so it is order-dependent, as `M223` recorded.
+
+**The merge point owes:** merge after #444 and after #435. Release this claim then.
 
 ## HELD — `M225`, `R-4ea564fe` and `R-e2c1ba51`: the guest contract publishes `save_and_resume` as a boolean, and the guest submit's and draft save's success bodies as objects (m225-guest-contract-types) — BUILT AND HELD: PR #444, waiting for a merge point
 

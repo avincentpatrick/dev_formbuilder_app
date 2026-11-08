@@ -485,3 +485,33 @@ Validation: eleven new delivery tests passed, including a real local HTTP server
 seeded-database Vitest: 1,476 passed, 11 skipped. Lint (existing fixture warning), typecheck,
 migration lint and prefixed no-data production build passed. Browser tests were not rerun:
 this increment changes only an offline/operator probe and documentation.
+
+## Dataset map data exports (8 November 2026)
+
+Each loaded dataset map now offers **Download map data (JSON)** in its card and enlarged
+view. The export contains its current dataset/indicator/period/geographic selection, units,
+denominator, source name/date/license/attribution, disclosure context, exact legend bins,
+complete area rows, reported parent total and separate geometry availability. It uses only
+the public aggregate payload already displayed; it makes no additional database requests
+and never filters out rows because they lack polygons. No hidden or personal fields are
+copied. Unavailable/planned maps have no export action.
+
+Zeros remain numeric zero; null values remain null with an explicitly ambiguous
+not-reported-or-unavailable state and the reader's note. The current map payload does not
+supply separate suppression reasons, so the export does not invent one or reconstruct a
+withheld value. Navigation-only levels export null values and no legend/aggregate rather
+than fabricated regional rates. Poverty exports retain published 90% confidence intervals;
+income categories retain labels. Quantiles are marked relative to displayed areas, while
+poverty, income and workflow legends retain fixed bins. Geometry not yet checked remains
+not-checked, distinct from a confirmed missing polygon. Boundary-version acceptance remains
+separate from geometry availability.
+
+This is a structured data export, not a rendered map image. WebGL PNG capture, image
+attribution layout and performance remain separate unfinished plan items. Existing barangay
+acceptance and self-hosted delivery gates are unchanged.
+
+Validation: four export unit tests and all 18 dataset-map browser tests passed, including
+an actual downloaded file with failed geometry and a planned-dataset switch. Full seeded
+Vitest: 1,480 passed, 11 skipped. Lint (existing fixture warning), typecheck, migration lint
+and prefixed no-data production build passed. Browser tests ran against the prefixed local
+production server with development data and explicitly synthetic request fixtures.

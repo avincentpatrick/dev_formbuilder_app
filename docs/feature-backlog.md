@@ -15738,14 +15738,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **Live.** Filed by `M214`. **Tier: during-testing.**
 
 - **`minor` · `ocr-translated-printout` — A blank form printed in a language other than the form's default cannot be read by the scanner, so its responses must be keyed in.**
-  Filed by `M229` (2026-11-09), by `D215` = A, which shipped printing in another language and left reading it for later.
+  Found by `M229` (2026-11-09), under `D215` = A, which shipped printing in another language and left reading it for later.
   - `PrintedFormMatcher` builds what it expects from `BlankFormPrintPresenter::present()` in the default language, and ticks are matched by their choice labels. A page with Filipino labels would read badly.
   - The paper says so in its footer today, so a tester is not misled. `D215`'s option B is the remedy: print the language beside the version stamp, and have the matcher read the page in that language.
 
   **Live.** Filed by `M229`. **Tier: before-launch.**
 
 - **`nit` · `xlsform-languages-shared` — `XlsformExporter::extraLanguages()` keeps its own copy of the rule that `LocaleVariant::languagesIn()` now holds.**
-  Filed by `M229` (2026-11-09). The print side needed the same list of a version's languages, and #414 holds `XlsformExporter.php`, so the rule moved to `LocaleVariant` and the exporter was left alone.
+  Found by `M229` (2026-11-09). The print side needed the same list of a version's languages, and #414 holds `XlsformExporter.php`, so the rule moved to `LocaleVariant` and the exporter was left alone.
   - The two differ today: the exporter also reads validation messages' translations, and the shared rule reads choice labels and section descriptions.
   The remedy, after #414 merges: decide which translated columns count, and have the exporter call the shared rule.
 

@@ -1,10 +1,11 @@
 "use client";
+import { searchMapAreas } from "@/lib/maps/area-search";
 import { composeMapPng } from "@/lib/maps/png";
 import { datasetMapExport } from "@/lib/maps/export";
 import { PROFILING_BINS } from "@/lib/maps/profiling";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { getDatasetMap } from "@/lib/maps/definitions";
 import {
   initialMapChoice,
@@ -47,6 +48,10 @@ export function DatasetMapCard({
     onChoiceChange?.(choice);
   }, [choice, onChoiceChange]);
   const [trail, setTrail] = useState<MapChoice[]>([]);
+  const [search, setSearch] = useState({ scope: "", text: "" });
+  const searchStatusId = useId();
+  const searchScope = `${dataset}:${choice.level}:${choice.code}`;
+  const searchText = search.scope === searchScope ? search.text : "";
   const [result, setResult] = useState<{ key: string; data: Result } | null>(null);
   const [geometry, setGeometry] = useState<{ key: string; codes: string[] } | null>(null);
   const [visible, setVisible] = useState(expanded);
@@ -105,6 +110,8 @@ export function DatasetMapCard({
   const metric = metrics.find((m) => m.id === choice.indicator);
   const selected = data?.rows.find((r) => r.code === choice.selected);
   const shapeCodes = geometry?.key === key ? geometry.codes : null;
+  const matchingAreas = useMemo(() => searchMapAreas(data?.rows ?? [], searchText), [data, searchText]);
+  const selectedOutsideSearch = selected && !matchingAreas.some((row) => row.code === selected.code);
   const dashboard =
     dataset === "nhfr-2026-09"
       ? "/facilities"
@@ -309,6 +316,29 @@ export function DatasetMapCard({
                 </p>
               )}
               <label className="block text-sm">
+                Search areas by name or PSGC code
+                <input type="search" maxLength={100}
+                  aria-label={`${definition.title} search areas`}
+                  aria-describedby={searchStatusId}
+                  className="mt-1 block w-full rounded border border-border bg-background p-2"
+                  value={searchText}
+                  onChange={(e) => setSearch({ scope: searchScope, text: e.target.value })}
+                />
+              </label>
+              {searchText && (
+                <button type="button" className="text-sm underline"
+                  onClick={() => setSearch({ scope: searchScope, text: "" })}>
+                  Clear area search
+                </button>
+              )}
+              <p id={searchStatusId} role="status" className="text-sm">
+                {matchingAreas.length} matching areas of {data.rows.length}.
+                {selectedOutsideSearch && " The selected area is retained outside these search results."}
+              </p>
+              <p className="text-sm text-muted">
+                Search narrows the area selector only. The map, totals, complete table and downloads stay unchanged.
+              </p>
+              <label className="block text-sm">
                 Select an area
                 <select
                   aria-label={`${definition.title} area`}
@@ -317,7 +347,10 @@ export function DatasetMapCard({
                   onChange={(e) => setChoice({ ...choice, selected: e.target.value || null })}
                 >
                   <option value="">Choose an area</option>
-                  {data.rows.map((r) => (
+                  {selectedOutsideSearch && (
+                    <option value={selected.code}>{selected.name} (selected; outside search results)</option>
+                  )}
+                  {matchingAreas.map((r) => (
                     <option key={r.code} value={r.code}>
                       {r.name}
                     </option>

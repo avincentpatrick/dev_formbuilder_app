@@ -549,3 +549,26 @@ the legend's area; the resulting desktop image was also visually inspected. Synt
 values explicitly supply the map colors; development NHFR provincial rows alone are missing.
 The React review checked effect cleanup, stable callback refs, lazy map initialization,
 keyboard-accessible controls and no new data-fetching or persistent WebGL-buffer overhead.
+
+## Accessible dataset map area search (8 November 2026)
+
+Loaded dataset cards and enlarged maps now include a labeled search field for current-area
+names and PSGC codes. Matching ignores case and diacritics, accepts multiple words in any
+order, and preserves leading-zero codes. It searches only the authoritative child rows
+already loaded, including rows with missing values or polygons, with no additional requests.
+Search state belongs to each card and geographic scope; indicator changes retain it and
+switching datasets starts with an empty search.
+
+Search narrows only the area selector. The selected area remains available and explicitly
+labeled when outside the matching results. A live match count, no-match state and keyboard
+clear action keep the native selector usable. Maps, legends, totals, complete tables and
+JSON/PNG exports are not filtered. The UI states this distinction next to the search.
+No unsupported geography, new source values or boundary acceptance is inferred.
+
+Validation: three search unit tests; full database-backed Vitest 1,486 passed, 11 skipped.
+Lint (existing fixture warning), typecheck, migration lint and prefixed no-data production
+build passed. All 22 initial map browser cases passed; both focused search cases then passed
+after adding independent portal-card coverage and a real complete JSON download while the
+selector was filtered (23 distinct final cases). Phone-width checks cover accent/code
+search, no matches, retained selection, keyboard focus, unchanged table/total, no extra
+requests and dataset switching. Existing desktop/phone PNG capture checks still pass.

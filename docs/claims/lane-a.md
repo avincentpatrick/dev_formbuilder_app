@@ -16,7 +16,40 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M224`, `R-b1737198` and `R-6f994627`: the threat model stops calling the invitation door filed, and three documents stop saying a file waits for a clean scan (m224-threat-model-scan-status)
+## Status: ACTIVE CLAIM — `M225`, `R-4ea564fe` and `R-e2c1ba51`: the guest contract publishes `save_and_resume` as a boolean, and the guest submit's and draft save's success bodies as objects (m225-guest-contract-types)
+
+Taken 2026-11-08, under the same instruction as `M224`. Branch `m225-guest-contract-types`, cut from origin/main at `8ecc3ea5`, PR into main. Held green for a merge point (`D137`), after `M224`'s #442.
+**Two rows in one increment: `D13` exception #10, allowed by the user in chat on 2026-11-08** (*"Pair them"*). Both rows land in one regeneration of `openapi.json`, a hub; split, the second PR would regenerate the file the first had just changed. Clause 1 is breached as well: both rows add cases to `tests/Feature/Api/OpenApiContractTest.php`, a non-hub file.
+Rows: `R-4ea564fe`, *"`openapi.json` publishes the guest schema's `save_and_resume` as a string; it is a boolean."*; `R-e2c1ba51`, *"`openapi.json` documents the guest submit's success as a bare string, so its body — `id`, `reference`, `status` and, since M130, `redirect` — is in no contract."*
+
+### Evidence verified
+A fresh export in the app container is byte-identical to the committed `openapi.json`, so the committed file is what Scramble infers today.
+**`R-4ea564fe`.** The guest schema's `save_and_resume` is `"type": "string"`, from `PublicFormPresenter`'s `$form->save_and_resume && $this->tenantAllowsSaveResume()`: **held**.
+**`R-e2c1ba51`.** `POST /public/f/{shareToken}/submissions` documents its success as `200: {type: string}` and no 201. `GuestSubmissionController::store()` answers `response()->json([...], $result->created ? 201 : 200)`: **held**.
+
+### Premise verified
+**`R-4ea564fe`.** The row prescribes an array-shape docblock on the presenter. `present()` returns about twenty keys, and Scramble keeps whichever of the docblock and its own inference carries more known types (`RouteResponseTypeRetriever`), so a partial shape would lose and a full one would be twenty keys kept in step by hand.
+**`R-e2c1ba51`.**
+- **The cause is the ternary status code, not a missing annotation.** Measured with a trial edit, since reverted: two returns with literal statuses make Scramble publish both 200 and 201 as an object carrying `id`, `reference`, `status` and `redirect`.
+- **The row is a floor.** `GuestDraftController::store()`, the guest draft save (`POST /public/f/{shareToken}/draft`), has the same ternary and the same `200: {type: string}`. It is the same defect, so it is taken here. The tenant `SubmissionDraftController` has the ternary too, but it is a session route outside the contract.
+- **Once the body is inferred, every `//` comment above an array key is published as that property's description.** The trial published the `reference` key's internal note, and its ⚠️ is what `OpenApiContractTest`'s maintainer-marks case refuses. The notes move above the assignment, as that case's own message says to.
+
+### Remedy verdict
+**`R-4ea564fe`.** The docblock is the wrong tool, for the reason above. **Works instead:** a `bool` result. A `(bool)` cast was measured to export `boolean`; a `bool`-returning method is cleaner, and is measured before it is kept.
+**`R-e2c1ba51`.** **Works** as two literal-status returns, measured, with no annotation. The same change applies to the draft save.
+
+Files: `app/Services/Submissions/PublicFormPresenter.php`, `app/Http/Controllers/Public/GuestSubmissionController.php`, `app/Http/Controllers/Public/GuestDraftController.php`, `openapi.json`, `tests/Feature/Api/OpenApiContractTest.php`.
+Shared artefacts taken: `openapi.json`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md` (exception #10, pushed with this claim).
+Paired files taken: none.
+Namespaces spent: `M225`; `D13` exception #10.
+Prediction:
+- The new contract cases go red against the committed file and green after the re-export.
+- The marks case stays green, because the notes move.
+- CI's Contract drift diff and PHPStan go green.
+- No `VERSION` bump: no tester sees the contract (`M200`'s precedent).
+- The one I most expect to be wrong: a description I keep on `redirect` or `content_checksum` tripping the marks pattern.
+
+## HELD — `M224`, `R-b1737198` and `R-6f994627`: the threat model stops calling the invitation door filed, and three documents stop saying a file waits for a clean scan (m224-threat-model-scan-status) — BUILT AND HELD: PR #442, waiting for a merge point
 
 Taken 2026-11-08, on the user's instruction to take the line's next `during-testing` rows that touch neither the backup setup nor a held PR's files. Branch `m224-threat-model-scan-status`, cut from origin/main at `b213e38a`, PR into main. Held green for a merge point (`D137`), after #434.
 **Chosen to stay clear:** the rows above these in the line are built in held PRs, or edit a held PR's files (`R-e6e340c0`, `R-7d0853f5`, `R-f6eab58d`, `R-2ca49f19`), or need the box's Apache log read at the sitting (`R-4b57090b`).

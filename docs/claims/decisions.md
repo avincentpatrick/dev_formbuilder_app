@@ -4142,6 +4142,14 @@ So two rows edit the same files, and both touch a hub. `R-b31f421e` rewrites how
 
 **Disposition:** the user chose to pair them, in chat on 2026-11-08, asked by name with the alternative of one row per PR. The same answer pairs `R-4ea564fe` with `R-e2c1ba51` for the same reason; that is #10, recorded by its own increment. Recorded in both places this log requires: inline at the closed rows and in `PROGRESS.md`'s release paragraph. The first of its reason, so the escalation rule above is not engaged.
 
+##### #10 — `M225` (2026-11-08) · two contract rows in one regenerated file, allowed by the user in chat
+
+**What was not satisfied:** both clauses of item 1. `R-4ea564fe` edits `app/Services/Submissions/PublicFormPresenter.php`; `R-e2c1ba51` edits `app/Http/Controllers/Public/GuestSubmissionController.php` and `GuestDraftController.php`. Both regenerate `openapi.json`, and those three are hubs. Both add cases to `tests/Feature/Api/OpenApiContractTest.php`, a non-hub file.
+
+**Why:** the merge point, as for #9, and one more. Both rows land in a single regeneration of `openapi.json`. As two PRs, the second would regenerate the file the first had just changed, and each would be one more deploy for the sitting.
+
+**Disposition:** the user chose to pair them, in chat on 2026-11-08, in the same answer as #9. Recorded in both places this log requires: inline at the closed rows and in `PROGRESS.md`'s release paragraph. This is the second exception for the merge-point reason, so the escalation rule is not engaged yet. A third for that reason means the rule needs an answer instead: file a decision about batching while merges wait for a merge point.
+
 ---
 
 ### D7 — Should `main` get branch protection, with the repository owner as a bypass actor? **Yes.**

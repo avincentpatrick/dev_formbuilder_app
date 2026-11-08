@@ -1,0 +1,201 @@
+{
+  "scope": "Six explicit public API samples, not full-country detailed validation. No observation values included.",
+  "reports": [
+    {
+      "measuredAt": "2026-11-08T08:57:34.101Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "uuc-phc-2025",
+        "indicator": "uuc.listed",
+        "period": "2025",
+        "level": "national",
+        "code": "PH"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "2d2eceb209afbf26e11f491f948af2be857f9f95df744ad3bf35708db1649519",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Health (DOH) Bureau of Local Health Systems Development \u2014 2025 list of Unserved and Underserved Communities for Primary Health Care (DC No. 2025-0549), criteria per DOH AO No. 2020-0023",
+        "date": "2025-01-01",
+        "license": null
+      },
+      "coverage": {
+        "rows": 18,
+        "reportedRows": 18,
+        "zeroRows": 1,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "42b4d13ed6b97d4cf22dee07f9019eea4d820b3163f31e5d3bf0a371094762f6",
+        "bytes": 534649,
+        "rowsWithGeometry": 18,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T08:58:29.308Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "nhfr-2026-09",
+        "indicator": "nhfr.facilities",
+        "period": "September 2026",
+        "level": "national",
+        "code": "PH"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "c79271745f9ac91dee3938c47dfe09af4508bb9f6fbad1e9d0d672d3e345608d",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Health (DOH) \u2014 National Health Facility Registry, public facility list export from nhfr.doh.gov.ph, snapshot as of September 2026, retrieved 2026-09-05",
+        "date": "2026-09-01",
+        "license": null
+      },
+      "coverage": {
+        "rows": 18,
+        "reportedRows": 18,
+        "zeroRows": 0,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "42b4d13ed6b97d4cf22dee07f9019eea4d820b3163f31e5d3bf0a371094762f6",
+        "bytes": 534649,
+        "rowsWithGeometry": 18,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T08:58:32.887Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "bhw-stepzero-2026",
+        "indicator": "stepzero.population",
+        "period": "2026",
+        "level": "national",
+        "code": "PH"
+      },
+      "httpStatus": 400,
+      "state": "unsupported",
+      "responseSha256": "4d6824ea211cf3374af1c8b20caeb1185ef9cae0869efb7cdf8725db7f143fce",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "coverage": null,
+      "geometry": null,
+      "reason": "Choice is not supported by this deployed API; not evidence of absent source rows."
+    },
+    {
+      "measuredAt": "2026-11-08T08:58:34.266Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "psa-popcen-2024",
+        "indicator": "population.residents",
+        "period": "2024",
+        "level": "national",
+        "code": "PH"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "bc5a6a294119c7ef379c947801979884dd979cd99d3be58e9724cb275f978b42",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Philippine Statistics Authority \u2014 2024 Census of Population (POPCEN 2024)",
+        "date": "2024-07-01",
+        "license": "PSA open data terms (attribution)"
+      },
+      "coverage": {
+        "rows": 18,
+        "reportedRows": 18,
+        "zeroRows": 0,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "42b4d13ed6b97d4cf22dee07f9019eea4d820b3163f31e5d3bf0a371094762f6",
+        "bytes": 534649,
+        "rowsWithGeometry": 18,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T08:58:35.993Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "psa-sae-poverty-2023",
+        "indicator": "poverty.incidence",
+        "period": "2023",
+        "level": "province",
+        "code": "01028"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "dc50921b140236d1e0030da5f50ea253ea5aa5d149cec1b8ab1b64bec6eb566f",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Philippine Statistics Authority \u2014 2023 City- and Municipal-Level Small Area Estimates of Poverty (national government-funded SAE project)",
+        "date": "2023-12-31",
+        "license": "PSA open data terms (attribution)"
+      },
+      "coverage": {
+        "rows": 23,
+        "reportedRows": 23,
+        "zeroRows": 0,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": false
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "ad905e921c966c589492cfb08dd9fc9f1cc4f5842ccd46431a2ab3ee091aa843",
+        "bytes": 15210,
+        "rowsWithGeometry": 23,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T08:58:36.674Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "fhsis-2025",
+        "indicator": "fhsis.fic",
+        "period": "2025",
+        "level": "national",
+        "code": "PH"
+      },
+      "httpStatus": 400,
+      "state": "unsupported",
+      "responseSha256": "4d6824ea211cf3374af1c8b20caeb1185ef9cae0869efb7cdf8725db7f143fce",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "coverage": null,
+      "geometry": null,
+      "reason": "Choice is not supported by this deployed API; not evidence of absent source rows."
+    }
+  ]
+}

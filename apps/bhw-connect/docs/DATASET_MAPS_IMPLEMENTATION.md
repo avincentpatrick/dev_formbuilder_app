@@ -658,3 +658,23 @@ Local seeded API smoke checks returned 18 geography rows for each new indicator,
 that confirms missing coverage stays missing, not numeric coverage. Numeric behavior was
 verified with explicitly synthetic fixtures. Production source coverage is not certified
 by the development seed or these tests.
+
+## Bounded public map coverage audit (8 November 2026)
+
+Added a read-only Node 24 probe for explicit dataset/indicator/period/geography choices.
+It separates unsupported, unavailable and failed APIs from missing values and navigation-only
+levels; geometry failure is unchecked, not universal missing geometry. Requests are bounded,
+time-limited, redirect-free and restricted to the expected same-origin geometry path. Only
+coverage counts, public source metadata and hashes are reported, not observations or source
+records. Historical compatibility and production readiness are never certified by this probe.
+
+Selected live checks found complete reported regional rows/basic geometry for UUC, NHFR and
+PSA population, and 23 reported municipal poverty rows in Ilocos Norte without an invented
+provincial rate. The deployed API did not recognize the just-merged StepZero population
+indicator or planned FHSIS choice; these are capability/rollout limits, not evidence of absent
+facts. See [audit commands, evidence and limits](DATASET_MAP_COVERAGE_AUDIT.md).
+
+Validation: eight new probe tests; database-backed Vitest 1,502 passed, 11 skipped. Lint
+(existing fixture warning), typecheck, migration lint and prefixed no-data build passed.
+Live checks used the inherited proxy with TLS verification. Browser tests were not rerun:
+this increment changes only the offline audit tool, tests and documentation.

@@ -16,7 +16,32 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M229`, `R-d7e27962` by `D215` = A: a blank form prints in any of its version's languages, and a printout in another language says it must be keyed in (m229-print-in-language)
+## Status: ACTIVE CLAIM — `M230`, `R-1d43bef5`: §7.1 and the webhook design doc name the webhook paths that were built (m230-webhook-paths)
+
+Taken 2026-11-09, from the plan the user approved on 2026-11-08. Branch `m230-webhook-paths`, cut from origin/main at `203196c2`, PR into main. Held green for a merge point (`D137`), after `M229`'s #488.
+**One row, by `D13`,** with the floor its own text names: *"the same table's next line … carries two more wrong paths, repeated a third time at `docs/webhook-integration-design.md` … the two want taking together."* That is half (a) of `R-c8c8da76`, which stays open for half (b), the cross-endpoint delivery log, and gets a note. Two hub documents; no held PR touches either.
+Row: `R-1d43bef5`, *"§7.1 names a `/api/v1/webhooks/endpoints` path segment that exists nowhere in the tree, and it is a floor rather than a census."*
+
+### Evidence verified
+- §7.1's "Webhook endpoints" row reads `GET/POST/PATCH/DELETE /api/v1/webhooks/endpoints`: **held**.
+- The next row reads `GET /api/v1/webhooks/deliveries` and `POST /api/v1/webhooks/deliveries/{delivery}/redeliver`, and `docs/webhook-integration-design.md` §5 repeats the redeliver path: **held**.
+- `routes/api.php` registers `webhooks`, `webhooks/{webhookEndpoint}` (show, update, delete), its `test` and `rotate-secret`, and the nested `webhooks/{webhookEndpoint}/deliveries` with `…/{webhookDelivery}/redeliver`. No `endpoints` segment and no flat `deliveries` path exist: **held**.
+
+### Premise verified
+- `M193`'s §7.1 pass (`D38`) marked the unbuilt rows and did not touch these two. They describe built routes, so they need the right paths, not a "not built" mark.
+- §5's *"per `docs/api-specification.md`'s resource inventory"* leads back to §7.1, because that inventory only cites §7.1. So the three lines are the whole chain.
+- The two tests that mention these documents (`WebhookRedeliverTest`, `DomainEventEnvelopeTest`) do so in comments only.
+
+### Remedy verdict
+**Works.** Each line names the built paths, edited inside its own line so nothing below moves. The §7.1 rows carry the "**implemented**" mark their neighbours use. The deliveries row says the listing is per endpoint and cites `R-c8c8da76` for the cross-endpoint view.
+
+Files: `docs/architecture/technical-architecture.md`, `docs/webhook-integration-design.md`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`.
+Paired files taken: none.
+Namespaces spent: `M230`.
+Prediction: documents only. The citation and pipeline lints stay green, and nothing else moves. No `VERSION` bump. The one I most expect to be wrong: the citation lint, if another document cites one of these lines by its content.
+
+## HELD — `M229`, `R-d7e27962` by `D215` = A: a blank form prints in any of its version's languages, and a printout in another language says it must be keyed in (m229-print-in-language) — BUILT AND HELD: PR #488, waiting for a merge point
 
 Taken 2026-11-09, from the plan the user approved on 2026-11-08. Branch `m229-print-in-language`, cut from origin/main at `5937d549`, PR into main. Held green for a merge point (`D137`), after `M228`'s #487.
 **One row, by `D13`.** It edits two hubs, `BlankFormPrintPresenter.php` and `docs/ocr-pipeline-design.md`, and no held PR touches either.

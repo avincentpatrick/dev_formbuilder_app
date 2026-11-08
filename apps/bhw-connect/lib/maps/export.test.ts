@@ -37,3 +37,12 @@ it("rejects planned datasets and wrong indicator periods", () => {
   expect(() => datasetMapExport(initialMapChoice("ways-forward"), data, [], null)).toThrow();
   expect(() => datasetMapExport({ ...initialMapChoice("nhfr-2026-09"), period: "2025" }, data, [], null)).toThrow();
 });
+
+it("exports a declared parent rate separately from totals with its readable denominator", () => {
+  const choice = { ...initialMapChoice("bhw-stepzero-2026"), indicator: "bhw.declared-accreditation" };
+  const result = datasetMapExport(choice, { ...data, total: null, parentRate: 25 }, [], null);
+  expect(result.parentMeasure).toEqual({ kind: "rate", value: 25, unit: "%" });
+  expect(result.total).toBeNull();
+  expect(result.legend.method).toBe("fixed");
+  expect(result.indicator.denominator).toContain("All LGU-declared BHWs");
+});

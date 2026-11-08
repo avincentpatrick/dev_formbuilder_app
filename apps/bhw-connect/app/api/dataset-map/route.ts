@@ -1,3 +1,4 @@
+import { STEPZERO_ACCREDITATION_ID, joinStepzeroAccreditation } from "@/lib/maps/stepzero-accreditation";
 import { joinUucRouteRows } from "@/lib/maps/uuc-routes";
 import { PROFILING_COLUMNS, joinProfilingRows } from "@/lib/maps/profiling";
 import { INCOME_SOURCE_SLUG, joinIncomeRows } from "@/lib/maps/income-class";
@@ -57,6 +58,8 @@ export async function GET(request: NextRequest) {
       name: child.geo_name,
       value: null,
     })) as MapPayload["rows"];
+    const declaredAccreditation = choice.dataset === "bhw-stepzero-2026" && choice.indicator === STEPZERO_ACCREDITATION_ID;
+    let parentRate: number | null = null;
     let total: number | null = null;
     let totalNote: string | undefined;
     if (profiling) {
@@ -109,7 +112,8 @@ export async function GET(request: NextRequest) {
       const uucRoute = spec.table === "agg_uuc_phc_criteria";
       const projection = uucRoute
         ? `geo_code,${spec.column},n_listed,n_health_evaluable`
-        : `geo_code,${spec.column}`;
+        : declaredAccreditation ? `geo_code,${spec.column},n_registered_accredited,n_total_bhw`
+          : `geo_code,${spec.column}`;
       let childQuery = db
         .from(spec.table)
         .select(projection)
@@ -140,20 +144,22 @@ export async function GET(request: NextRequest) {
         !parent.data
       )
         throw new Error("Values unavailable");
-      const join = uucRoute ? joinUucRouteRows : joinMapRows;
+      const join = uucRoute ? joinUucRouteRows : declaredAccreditation ? joinStepzeroAccreditation : joinMapRows;
       rows = join(children.data, values.data as unknown as Record<string, unknown>[], spec.column);
       const parentRow = join(
         [{ geo_code: choice.code, geo_name: geo.geoName }],
         parent.data as unknown as Record<string, unknown>[],
         spec.column,
       )[0];
-      total = parentRow.value;
+      if (declaredAccreditation) parentRate = parentRow.value;
+      else total = parentRow.value;
       totalNote = parentRow.note;
     }
     const payload: MapPayload = {
       state: "available",
       rows,
       total,
+      ...(declaredAccreditation ? { parentRate } : {}),
       ...(totalNote ? { totalNote } : {}),
       area: geo.geoName,
       childLevel,

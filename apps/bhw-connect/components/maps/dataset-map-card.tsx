@@ -1,4 +1,5 @@
 "use client";
+import { STEPZERO_ACCREDITATION_ID, STEPZERO_ACCREDITATION_BINS, STEPZERO_ACCREDITATION_DENOMINATOR } from "@/lib/maps/stepzero-accreditation";
 import { searchMapAreas } from "@/lib/maps/area-search";
 import { composeMapPng } from "@/lib/maps/png";
 import { datasetMapExport } from "@/lib/maps/export";
@@ -98,6 +99,7 @@ export function DatasetMapCard({
   }, [active, query, key, result?.key]);
   const data = result?.key === key && result.data.state === "available" ? result.data : null;
   const uucRoute = dataset === "uuc-phc-2025" && choice.indicator.startsWith("uuc.route.");
+  const declaredAccreditation = dataset === "bhw-stepzero-2026" && choice.indicator === STEPZERO_ACCREDITATION_ID;
   const profiling = dataset === "bhw-profiling-status-2026";
   const income = dataset === "lgu-income-class";
   const poverty = dataset === "psa-sae-poverty-2023";
@@ -106,6 +108,7 @@ export function DatasetMapCard({
     () =>
       navigationOnly
         ? []
+        : declaredAccreditation ? STEPZERO_ACCREDITATION_BINS
         : profiling
           ? PROFILING_BINS
           : income
@@ -113,7 +116,7 @@ export function DatasetMapCard({
             : poverty
               ? POVERTY_BINS
               : computeQuantileBins(data?.rows.map((r) => r.value) ?? []),
-    [data, poverty, income, profiling, navigationOnly],
+    [data, poverty, income, profiling, navigationOnly, declaredAccreditation],
   );
   const metric = metrics.find((m) => m.id === choice.indicator);
   const selected = data?.rows.find((r) => r.code === choice.selected);
@@ -255,6 +258,8 @@ export function DatasetMapCard({
                       ? "Published classes, not income amounts or relative quantiles. Gray indicates an unclassified or unmatched area; see the table for the reason."
                       : poverty
                         ? "Fixed percentage breaks across provinces. Gray means missing coverage, including excluded HUCs; it does not mean zero poverty."
+                        : declaredAccreditation
+                          ? "Fixed percentage breaks across areas. Gray means the published share or its denominator is unavailable, not zero accreditation."
                         : profiling
                           ? "Fixed share breaks: 0–<25%, 25–<50%, 50–<75%, 75–<100%, and 100% or more. Missing snapshots and zero denominators have no share."
                           : "Quantiles relative to displayed areas. Gray means no reported value."}{" "}
@@ -264,21 +269,22 @@ export function DatasetMapCard({
                 <MapLegend
                   bins={bins}
                   categoryLabels={
-                    profiling
+                    profiling || declaredAccreditation
                       ? {
                           0: "0–<25%",
                           25: "25–<50%",
                           50: "50–<75%",
                           75: "75–<100%",
-                          100: "100% or more",
+                          100: declaredAccreditation ? "100%" : "100% or more",
                         }
                       : income
                         ? Object.fromEntries(INCOME_CLASSES.map((c) => [c.value, c.label]))
                         : undefined
                   }
-                  valueSuffix={poverty || profiling ? "%" : ""}
+                  valueSuffix={poverty || profiling || declaredAccreditation ? "%" : ""}
                   noDataLabel={
-                    profiling
+                    declaredAccreditation ? "Unavailable published share — see table"
+                    : profiling
                       ? "Missing snapshot or unavailable share — see table"
                       : income
                         ? "Unclassified or unmatched — see table"
@@ -308,7 +314,11 @@ export function DatasetMapCard({
           {data && (
             <>
               <p className="text-sm">
-                {profiling ? (
+                {declaredAccreditation ? (
+                  <>Reported area rate: {data.parentRate == null ? "Not reported" : `${data.parentRate}%`}.
+                    Denominator: {STEPZERO_ACCREDITATION_DENOMINATOR}. Published percentages are not averaged across areas.
+                    This is the LGU declaration, not accreditation among validated Census profiles.</>
+                ) : profiling ? (
                   "Stages are mutually exclusive current workflow states. Shares use each area’s BHW headcount, rounded to whole percentages, not pipeline totals. No regional average is calculated. Not yet encoded is the headcount minus all pipeline stages, floored at zero."
                 ) : income ? (
                   "Income classes are published for LGUs. No total or average class is calculated; barangays have no independently published class. Manila submunicipal entries reflect the city classification."
@@ -384,7 +394,7 @@ export function DatasetMapCard({
                         : (selected.value ?? "Not reported")}{" "}
                     {selected.value !== null && !income ? metric?.unit : ""}
                   </p>
-                  {(income || profiling || uucRoute) && <p>{selected.note}</p>}
+                  {(income || profiling || uucRoute || declaredAccreditation) && <p>{selected.note}</p>}
                   {poverty && !navigationOnly && (
                     <p>
                       Published 90% confidence interval:{" "}
@@ -450,7 +460,7 @@ export function DatasetMapCard({
                         {poverty && !navigationOnly && (
                           <th scope="col">Published 90% confidence interval</th>
                         )}
-                        {(income || profiling || uucRoute) && !navigationOnly && (
+                        {(income || profiling || uucRoute || declaredAccreditation) && !navigationOnly && (
                           <th scope="col">Source context</th>
                         )}
                         <th scope="col">Geometry</th>
@@ -478,7 +488,7 @@ export function DatasetMapCard({
                                 : "Not available"}
                             </td>
                           )}
-                          {(income || profiling || uucRoute) && !navigationOnly && (
+                          {(income || profiling || uucRoute || declaredAccreditation) && !navigationOnly && (
                             <td>{r.note ?? "—"}</td>
                           )}
                           <td>

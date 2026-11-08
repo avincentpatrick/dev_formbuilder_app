@@ -1,5 +1,5 @@
 {
-  "scope": "Six explicit public API samples, not full-country detailed validation. No observation values included.",
+  "scope": "Explicit public API samples with dated follow-ups, not full-country detailed validation. No observation values included.",
   "reports": [
     {
       "measuredAt": "2026-11-08T08:57:34.101Z",
@@ -196,6 +196,84 @@
       "coverage": null,
       "geometry": null,
       "reason": "Choice is not supported by this deployed API; not evidence of absent source rows."
+    },
+    {
+      "measuredAt": "2026-11-08T09:42:08.800Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "bhw-stepzero-2026",
+        "indicator": "stepzero.population",
+        "period": "2026",
+        "level": "national",
+        "code": "PH"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "41f3752d85a5234e3cc23fd9f06957048607a78ea86f7f3f6cf36b89b2ce2777",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Health (DOH) BHW Connect StepZero barangay quick-count \u2014 the LGU-reported BHW headcount baseline collected before the 2025 individual profiling exercise (same source initiative as bhw-2025)",
+        "date": "2025-01-01",
+        "license": null
+      },
+      "coverage": {
+        "rows": 18,
+        "reportedRows": 18,
+        "zeroRows": 0,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "42b4d13ed6b97d4cf22dee07f9019eea4d820b3163f31e5d3bf0a371094762f6",
+        "bytes": 534649,
+        "rowsWithGeometry": 18,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T09:42:13.759Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "bhw-stepzero-2026",
+        "indicator": "stepzero.households",
+        "period": "2026",
+        "level": "national",
+        "code": "PH"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "05e9e0c5a542bf7d4621c1dd9dded40fdccc7b3c69666f47fe37a605fc0eed66",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Health (DOH) BHW Connect StepZero barangay quick-count \u2014 the LGU-reported BHW headcount baseline collected before the 2025 individual profiling exercise (same source initiative as bhw-2025)",
+        "date": "2025-01-01",
+        "license": null
+      },
+      "coverage": {
+        "rows": 18,
+        "reportedRows": 18,
+        "zeroRows": 0,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "42b4d13ed6b97d4cf22dee07f9019eea4d820b3163f31e5d3bf0a371094762f6",
+        "bytes": 534649,
+        "rowsWithGeometry": 18,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      }
     }
   ]
 }

@@ -107,7 +107,7 @@ it("pins PSA population to its accepted release and 2024 on both queries without
     "agg_population",
   ]);
 });
-it("reads StepZero counts without validated profiles or unapproved rate measures", async () => {
+it("reads StepZero counts without validated profiles or cross-release rate measures", async () => {
   mock.from
     .mockReturnValueOnce(query({ data: [{ geo_code: "01", geo_name: "A" }], error: null }))
     .mockReturnValueOnce(query({ data: [{ geo_code: "01", n_registered: 4 }], error: null }))
@@ -126,7 +126,7 @@ it("reads StepZero counts without validated profiles or unapproved rate measures
   expect(mock.source).toHaveBeenCalledWith("bhw-stepzero-2026");
   const rate = await GET(
     new NextRequest(
-      "http://localhost/api/dataset-map?dataset=bhw-stepzero-2026&indicator=bhw.declared-accreditation",
+      "http://localhost/api/dataset-map?dataset=bhw-stepzero-2026&indicator=bhw.profile-accreditation",
     ),
   );
   expect(rate.status).toBe(400);
@@ -360,4 +360,21 @@ it.each(["population", "households"])("reads StepZero %s directly without fallba
     expect(q.select).toHaveBeenCalledWith(`geo_code,${column}`);
     expect(q.eq).toHaveBeenCalledWith("dataset_id", 7);
   }
+});
+
+it("keeps the published StepZero parent rate separate from totals and child averages", async () => {
+  const values = query({ data: [
+    { geo_code: "01", n_registered_accredited: 1, n_total_bhw: 3, pct_registered_accredited: 33.33 },
+    { geo_code: "02", n_registered_accredited: 0, n_total_bhw: 0, pct_registered_accredited: 0 },
+  ], error: null });
+  const parent = query({ data: [{ geo_code: "PH", n_registered_accredited: 1, n_total_bhw: 4, pct_registered_accredited: 25 }], error: null });
+  mock.from.mockReturnValueOnce(query({ data: [{ geo_code: "01", geo_name: "A" }, { geo_code: "02", geo_name: "B" }], error: null }))
+    .mockReturnValueOnce(values).mockReturnValueOnce(parent);
+  const response = await GET(new NextRequest("http://localhost/api/dataset-map?dataset=bhw-stepzero-2026&indicator=bhw.declared-accreditation&period=2026"));
+  const payload = await response.json();
+  expect(payload.rows.map((row: { value: number | null }) => row.value)).toEqual([33.33, null]);
+  expect(payload.parentRate).toBe(25);
+  expect(payload.total).toBeNull();
+  expect(mock.source).toHaveBeenCalledWith("bhw-stepzero-2026");
+  for (const q of [values, parent]) expect(q.select).toHaveBeenCalledWith("geo_code,pct_registered_accredited,n_registered_accredited,n_total_bhw");
 });

@@ -37,6 +37,7 @@ Row: `R-cf7d0362`, *"Converting a date question to a time question, or back, doe
 **Works, as a census judge that asks the publish gate.** For each ordering use, the census records which of date, time and date-and-time `ExpressionOperandJudge::judge()` accepts it as, given the draft's other questions. A change between two temporal types reports a new `temporal_ordering_breaks` impact where the use holds as the old type and is refused as the new one. That is exactly what the next publish would refuse, and nothing it would accept.
 
 Files: `app/Services/Forms/ConversionCensus.php`, `app/Enums/ConversionImpact.php`, `tests/Feature/Forms/ConversionCensusTest.php`.
+**Extended 2026-11-08, before the file was opened: `app/Services/Forms/ExpressionOperandJudge.php`.** `judge()` reports a mismatch between two questions once, under the key that sorts first, so asking it about the converted key alone misses every break where the other question's key sorts first. The judge's verdict on one compared operand moves into a public method that both the gate and the census call. The gate's de-duplication stays in the gate, and `ExpressionValidationGateTest`'s *"once, from either side"* cases hold it. Not a hub, and no held PR touches it.
 Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `VERSION` (0.18.3, after #445's 0.18.2), `database/data/releases.json`.
 Paired files taken: none.
 Namespaces spent: `M227`.

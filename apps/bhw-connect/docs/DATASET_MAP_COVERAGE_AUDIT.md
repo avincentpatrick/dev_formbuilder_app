@@ -79,3 +79,35 @@ same evidence file, preserving the earlier unsupported result. This resolves the
 rollout limitation for those two regional views; it does not prove detailed national
 coverage, source completeness or historical boundary acceptance. The new accreditation-rate
 map is a separate change and is not certified by these population/household checks.
+
+## Accreditation and detailed-geography follow-up
+
+Read-only checks on 8 November, after the Census accreditation adapter reached the running
+app, inspected these exact choices. Rates remained separate from totals; their reported
+parent rate was present and their additive total was null. Only technical coverage counts,
+source metadata and response/geometry hashes were retained in the evidence file.
+
+| Map choice | Scope | API state | Reported / returned rows | Rows with basic geometry |
+| --- | --- | --- | --- | --- |
+| Census accreditation, 2025 | National → regions | Available | 18 / 18 | 18 / 18 |
+| Census accreditation, 2025 | Ilocos Norte → municipalities | Available | 23 / 23 | 23 / 23 |
+| StepZero accreditation, 2026 | National → regions | Available | 18 / 18 | 18 / 18 |
+| StepZero accreditation, 2026 | Ilocos Norte → municipalities | Available | 23 / 23 | 23 / 23 |
+| NHFR facilities, September 2026 | Ilocos Norte → municipalities | Available | 23 / 23 | 23 / 23 |
+| UUC health qualifying route, 2025 | Ilocos Norte → municipalities | Available | 23 / 23 | 23 / 23 |
+| LGU income class, Effective 2025-01-01 | Region I → provinces | Available | 4 / 4 | 4 / 4 |
+| Census Basic Life Support training, 2025 | National | Unsupported | Not inspected | Not inspected |
+
+The Census municipal sample included one reported zero; the UUC health-route sample
+included 17. These remain reported observations, not missing reports. The income-class
+view correctly supplied no parent total or averaged class. Its exact supported period is
+`Effective 2025-01-01`, not simply `2025`.
+
+The training choice was merged in #482 immediately before this audit and was not yet
+recognized by the deployed API. Recheck after deployment; this is not evidence that
+training records are absent. Do not reload data or relax filters in response to this result.
+
+These checks establish bounded API availability and basic geometry matching for the named
+choices only. They do not compare numeric values against source workbooks, certify Wilson
+interval calculations, establish coverage in other provinces or prove historical boundary
+compatibility. The barangay, district and persistent-asset acceptance dependencies remain.

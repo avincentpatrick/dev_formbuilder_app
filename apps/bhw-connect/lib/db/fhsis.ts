@@ -209,6 +209,7 @@ export function fhsisBreakdownLabel(key: string): string {
 export function fhsisLimitedGeography(key: string): boolean {
   return (
     key.startsWith("birth_") ||
+    key.startsWith("maternal_") ||
     key.startsWith("nutrition_") ||
     key.startsWith("school_") ||
     key.startsWith("child_") ||

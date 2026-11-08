@@ -15,10 +15,17 @@ export const CHILD_HEALTH_DEFINITIONS = JSON.parse(
     "utf8",
   ),
 ).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
+export const MATERNAL_DEFINITIONS = JSON.parse(
+  readFileSync(new URL("../ingestion/fhsis-maternal-definitions.json", import.meta.url), "utf8"),
+).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
 function reviewedDefinitions(bundle) {
   const programme = bundle.programme_set ?? "core";
-  check(["core", "child-health"].includes(programme), "Unknown programme set");
-  return programme === "core" ? DEFINITIONS : CHILD_HEALTH_DEFINITIONS;
+  check(["core", "child-health", "maternal"].includes(programme), "Unknown programme set");
+  return {
+    core: DEFINITIONS,
+    "child-health": CHILD_HEALTH_DEFINITIONS,
+    maternal: MATERNAL_DEFINITIONS,
+  }[programme];
 }
 const DECIMAL = /^-?\d+(?:\.\d+)?$/;
 function check(ok, message) {

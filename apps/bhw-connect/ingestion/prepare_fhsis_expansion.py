@@ -93,6 +93,40 @@ def child_health_specifications(directory):
     return specs
 
 
+def maternal_specifications(directory):
+    """Annual maternal columns; source age rates use explicitly mapped denominators."""
+    specs = []
+    population = 'Source estimated population (all ages); age rates are shares of this same population, not age-specific coverage'
+    def add(prefix, key, label, n, ages, d=2, denominator=population):
+        matches = list(directory.glob(prefix+'*.xlsx'))
+        if len(matches) != 1:
+            raise ValueError(f'Expected one source: {prefix}')
+        specs.append(dict(key='maternal_'+key, label=label, file=matches[0].name, n=n, d=d,
+                          rate=n+1, sex=False, ages=ages, sheet='Annual', start=7,
+                          coded=False, program='maternal', denominator=denominator))
+    for key,n in [('normal',6),('low',11),('high',16)]:
+        add('2. BMI', 'bmi_'+key, f'First-trimester pregnant women with {key} BMI', n,
+            [[n-3,None,None],[n-2,None,None],[n-1,None,None]])
+    def population_ages(n):
+        return [[n-6,2,n-5],[n-4,2,n-3],[n-2,2,n-1]]
+    add('3. Td', 'td_first', 'First pregnancy: at least two Td-containing vaccine doses',9,population_ages(9))
+    add('3. Td', 'td_repeat', 'Second or later pregnancy: at least three Td-containing vaccine doses',17,
+        [[11,None,None],[13,None,None],[15,None,None]])
+    for key,label,n in [('ifa','Iron with folic acid',9),('mms','Multiple micronutrient',17),('calcium','Calcium carbonate for high-risk pregnancies',25)]:
+        add('4. Prenatal', 'prenatal_'+key, label+' supplementation completed during pregnancy',n,population_ages(n))
+    for prefix,key,test,outcome in [('5. Hepatitis','hepb','Hepatitis B screening','Hepatitis B reactive'),
+                                    ('6. Anemia','anemia','CBC or hemoglobin and hematocrit testing','Anemia diagnosed'),
+                                    ('7. GD','gdm','Gestational diabetes screening','Gestational diabetes positive')]:
+        add(prefix,key+'_screened',test+' during pregnancy',9,population_ages(9))
+        add(prefix,key+'_positive',outcome+' during pregnancy',18,[[12,3,13],[14,5,15],[16,7,17]],9,
+            'Women screened/tested for this condition (matching age group for age breakdowns)')
+    add('8. Deworm', 'dewormed', 'Pregnant women given one dose of deworming tablet',9,population_ages(9))
+    for key,label,n in [('ifa','Postpartum women completing iron with folic acid supplementation',9),
+                        ('vita','Postpartum women given vitamin A',17)]:
+        add('2. PP Supp','postpartum_'+key,label,n,population_ages(n))
+    return specs
+
+
 class ExpansionBuilder(Builder):
     def named_rows(self, source, sheet, start):
         seen, region = set(), None
@@ -125,11 +159,11 @@ def main():
     parser.add_argument('directory',type=Path)
     parser.add_argument('--reference',type=Path,required=True,help='Original private FHSIS directory containing TB geography and dim_geo.json')
     parser.add_argument('--retrieved',required=True)
-    parser.add_argument('--programme-set', choices=['core','child-health'], default='core')
+    parser.add_argument('--programme-set', choices=['core','child-health','maternal'], default='core')
     args=parser.parse_args()
     geos=json.loads((args.reference/'dim_geo.json').read_text())
     b=ExpansionBuilder(args.reference,geos);b.directory=args.directory
-    specs=(child_health_specifications if args.programme_set=='child-health' else specifications)(args.directory)
+    specs={'core':specifications,'child-health':child_health_specifications,'maternal':maternal_specifications}[args.programme_set](args.directory)
     definitions=[]
     groups={}
     for spec in specs:groups.setdefault((spec['file'],spec['sheet'],spec['start'],spec['coded']),[]).append(spec)
@@ -157,7 +191,7 @@ def main():
                 geographies=[{k:geos[c][k] for k in ('geo_code','geo_level','geo_name','parent_code')} for c in used],qa=qa)
     if args.programme_set!='core':
         bundle['programme_set']=args.programme_set
-        qa['omitted_columns']=[]
+        qa['omitted_columns']=(['Repeat-pregnancy Td age-specific rates: source reports zeros despite nonzero counts; retained age counts only'] if args.programme_set=='maternal' else [])
     out=args.directory/'fhsis-expansion.json';out.write_text(json.dumps(bundle,ensure_ascii=False,separators=(',',':')))
     sha=hashlib.sha256(out.read_bytes()).hexdigest();(args.directory/'fhsis-expansion.sha256').write_text(sha+'  fhsis-expansion.json\n')
     (args.directory/'qa-report.json').write_text(json.dumps(qa,ensure_ascii=False,indent=2))

@@ -1,17 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  MATERNAL_DEFINITIONS,
   CHILD_HEALTH_DEFINITIONS,
   DEFINITIONS,
   validateExpansion,
   loadExpansion,
 } from "./load-fhsis-expansion.mjs";
-function fixture(child = false) {
-  const definitions = structuredClone(child ? CHILD_HEALTH_DEFINITIONS : DEFINITIONS);
+function fixture(child = false, maternal = false) {
+  const definitions = structuredClone(
+    maternal ? MATERNAL_DEFINITIONS : child ? CHILD_HEALTH_DEFINITIONS : DEFINITIONS,
+  );
   const sources = [
     ...new Set(definitions.map((d: { source_workbook: string }) => d.source_workbook)),
   ].map((file) => ({ file, sha256: "a".repeat(64) }));
   return {
-    programme_set: child ? "child-health" : undefined,
+    programme_set: maternal ? "maternal" : child ? "child-health" : undefined,
     format: "bhw-fhsis-expansion-v1",
     dataset_slug: "fhsis-2025",
     retrieved: "2026-11-07",
@@ -37,6 +40,17 @@ function fixture(child = false) {
   };
 }
 describe("FHSIS expansion boundary", () => {
+  it("validates maternal definitions independently from the other approved batches", () => {
+    const maternal = fixture(false, true);
+    expect(maternal.sources).toHaveLength(8);
+    expect(maternal.definitions).toHaveLength(17);
+    expect(() => validateExpansion(maternal)).not.toThrow();
+    expect(() => validateExpansion({ ...maternal, programme_set: "child-health" })).toThrow(
+      "reviewed mapping",
+    );
+    maternal.sources.pop();
+    expect(() => validateExpansion(maternal)).toThrow("checksummed workbooks");
+  });
   it("accepts only the reviewed child-health batch and its five distinct sources", () => {
     const child = fixture(true);
     expect(child.sources).toHaveLength(5);

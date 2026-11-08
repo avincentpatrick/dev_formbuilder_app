@@ -592,3 +592,21 @@ migration lint and prefixed no-data build passed. The 23 existing map browser ca
 both new lifecycle cases passed after correcting the return-scroll target to the map rather
 than the whole tall card (25 distinct final cases). Six throttled timing runs completed
 separately from tests/builds; their target misses are recorded, not treated as test passes.
+
+## Parallel visible-map initialization (#469, 8 November 2026)
+
+The measured aggregate → canvas-module → renderer waterfall delayed first drawing despite
+renderer code being independent of the dataset values. Visible cards with activity leases
+now load those modules alongside the aggregate request, while retaining lazy initialization
+for hidden/planned cards. Map/worker creation still waits for valid data. No extra dataset
+reads, additional live maps, boundary promotion or CSP changes.
+
+Fresh three-run medians improved from 3,191ms to 2,461ms in the portal and 3,140ms to 2,695ms
+in the enlarged view. All six optimized post-document/card samples meet 3,000ms. Cold
+navigation, production delivery and physical-device performance are separate; see the
+[performance comparison](DATASET_MAP_PERFORMANCE.md) and retained request waterfalls.
+
+Validation: database-backed Vitest 1,489 passed, 11 skipped; all 25 map browser cases passed,
+including hidden requests, disposal/reuse, peak-map count, independent state, failure paths
+and desktop/phone PNG exports. Lint (existing fixture warning), typecheck, migration lint
+and prefixed no-data production build passed. Measurements ran separately from those checks.

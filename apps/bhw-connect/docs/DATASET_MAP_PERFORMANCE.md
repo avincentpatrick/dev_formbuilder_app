@@ -60,3 +60,30 @@ cost. Next work should inspect the initialization waterfall and evaluate an opti
 against the same profile. Do not silently prefetch hidden dataset values, expand the WebGL
 budget, remove source/coverage checks or relax CSP to make the target pass. Production
 same-origin assets, actual persistent hosting and real-device checks remain outstanding.
+
+## Visible-map initialization optimization (#469)
+
+The new CDP waterfall trace exposed a serial startup path. In a fresh control portal run,
+the aggregate request began at 1,170ms and finished at 1,284ms relative to the first recorded
+asset request; the canvas module began at 1,298ms and the large renderer chunk only at
+1,624ms. Renderer code does not depend on the aggregate values, so this delay is avoidable.
+
+A visible card with an activity lease now loads the canvas module and renderer concurrently
+with its aggregate request. No map or worker is created until valid data reaches the canvas.
+Module loading is shared by the browser module cache. Offscreen/planned cards do not trigger
+this work, and data requests, boundaries, disclosure rules and the two-map budget are unchanged.
+
+[Fresh before/after evidence](DATASET_MAP_INITIALIZATION_COMPARISON.json) uses the same profile
+and three fresh contexts per scenario, separately from tests and builds:
+
+| Scenario | Fresh control median | Optimized median | Optimized range |
+| --- | --- | --- | --- |
+| Portal | 3,191 ms | 2,461 ms | 2,358–2,760 ms |
+| Enlarged UUC map | 3,140 ms | 2,695 ms | 2,612–2,720 ms |
+
+All six optimized samples satisfy the 3,000ms **post-document/card** target in this local
+profile. The recorded cold-navigation timings remain a separate, longer measure. This does
+not establish production or real-handset acceptance. The original baseline above remains
+historical evidence rather than being overwritten with the faster results. The measurement
+script now includes CDP request start/duration timing to make initialization sequencing
+reviewable; unavailable worker completion timings remain null.

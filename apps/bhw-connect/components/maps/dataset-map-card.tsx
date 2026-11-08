@@ -17,10 +17,12 @@ import {
 import { withBasePath } from "@/lib/base-path";
 import { computeQuantileBins } from "@/lib/charts/color-scale";
 import { useMapActivity } from "./map-activity";
+import { loadMaplibre } from "./load-maplibre";
 import { INCOME_BINS, INCOME_CLASSES, incomeClassLabel } from "@/lib/maps/income-class";
 import { POVERTY_BINS } from "@/lib/maps/poverty";
 import { MapLegend } from "./map-legend";
-const DatasetCanvas = dynamic(() => import("./dataset-canvas").then((m) => m.DatasetCanvas), {
+const loadDatasetCanvas = () => import("./dataset-canvas").then((m) => m.DatasetCanvas);
+const DatasetCanvas = dynamic(loadDatasetCanvas, {
   ssr: false,
   loading: () => (
     <p role="status" className="h-64">
@@ -74,6 +76,11 @@ export function DatasetMapCard({
   }, [expanded]);
   useEffect(() => {
     if (!active || result?.key === key) return;
+    // A visible card with a lease may load renderer code alongside its aggregate request.
+    // This creates no map/worker and reads no other dataset. The canvas still waits for data.
+    void Promise.all([loadDatasetCanvas(), loadMaplibre()]).catch(() => {
+      // The normal canvas load/error path remains responsible for user-facing failures.
+    });
     const controller = new AbortController();
     fetch(withBasePath(`/api/dataset-map?${query}`), { signal: controller.signal })
       .then(async (response) => {

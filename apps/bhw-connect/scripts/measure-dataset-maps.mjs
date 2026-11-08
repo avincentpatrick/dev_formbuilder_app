@@ -17,6 +17,16 @@ try {
       page.setDefaultTimeout(120000);
       page.setDefaultNavigationTimeout(120000);
       const cdp = await context.newCDPSession(page);
+      const network = new Map();
+      cdp.on('Network.requestWillBeSent', event => {
+        const path = new URL(event.request.url).pathname;
+        if (/\/(geo\/|api\/dataset-map|maplibre-gl-worker|_next\/static\/)/.test(path))
+          network.set(event.requestId, { path, start: event.timestamp * 1000 });
+      });
+      cdp.on('Network.loadingFinished', event => {
+        const entry = network.get(event.requestId);
+        if (entry) entry.end = event.timestamp * 1000;
+      });
       await cdp.send('Network.enable');
       await cdp.send('Network.setCacheDisabled', { cacheDisabled: true });
       await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 80,
@@ -44,7 +54,10 @@ try {
       results.push({ mode, run, navigationToReadyMs: Math.round(ready - started),
         afterDocumentAndScrollReadyMs: Math.round(ready - visibleStart),
         targetMs: 3000, meetsPostDocumentTarget: ready - visibleStart <= 3000,
-        beforeScrollRequests, requestedDatasets: requested, liveMaps: await page.locator('.maplibregl-map').count(), resources });
+        beforeScrollRequests, requestedDatasets: requested, liveMaps: await page.locator('.maplibregl-map').count(), resources,
+        waterfall: [...network.values()].map(entry => ({ path: entry.path,
+          startMs: Math.round(entry.start - Math.min(...[...network.values()].map(item => item.start))),
+          durationMs: entry.end === undefined ? null : Math.round(entry.end - entry.start) })) });
     } finally { await context.close(); }
   }
   console.log(JSON.stringify({ measuredAt: new Date().toISOString(), origin: base.origin,

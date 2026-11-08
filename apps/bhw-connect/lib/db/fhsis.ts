@@ -51,7 +51,13 @@ export function fhsisRateLabel(indicator: FhsisIndicator): string {
   if (indicator.unit.startsWith("persons per ") && indicator.denominator === 0)
     return "Not defined (zero units)";
   if (
-    ["ncd_cervical_lesions", "infect_schisto_treated"].includes(indicator.indicator_key) &&
+    [
+      "ncd_cervical_lesions",
+      "infect_schisto_treated",
+      "ncd_60plus_assessed",
+      "ncd_60plus_htn",
+      "ncd_60plus_dm",
+    ].includes(indicator.indicator_key) &&
     indicator.rate !== null
   ) {
     if (indicator.denominator === 0) return "Not defined (zero denominator)";
@@ -254,7 +260,14 @@ export function fhsisLimitedGeography(key: string): boolean {
     key.startsWith("morb_") ||
     key.startsWith("oral_") ||
     (key.startsWith("ncd_") &&
-      !["ncd_20_59_assessed", "ncd_20_59_htn", "ncd_20_59_dm"].includes(key)) ||
+      ![
+        "ncd_20_59_assessed",
+        "ncd_20_59_htn",
+        "ncd_20_59_dm",
+        "ncd_60plus_assessed",
+        "ncd_60plus_htn",
+        "ncd_60plus_dm",
+      ].includes(key)) ||
     key.startsWith("fp_") ||
     key.startsWith("infect_") ||
     key.startsWith("maternal_") ||

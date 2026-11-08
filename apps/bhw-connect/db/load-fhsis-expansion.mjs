@@ -30,6 +30,9 @@ export const FAMILY_PLANNING_DEFINITIONS = JSON.parse(
 export const NCD_DEFINITIONS = JSON.parse(
   readFileSync(new URL("../ingestion/fhsis-ncd-definitions.json", import.meta.url), "utf8"),
 ).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
+export const SENIOR_NCD_DEFINITIONS = JSON.parse(
+  readFileSync(new URL("../ingestion/fhsis-senior-ncd-definitions.json", import.meta.url), "utf8"),
+).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
 export const ORAL_HEALTH_DEFINITIONS = JSON.parse(
   readFileSync(new URL("../ingestion/fhsis-oral-health-definitions.json", import.meta.url), "utf8"),
 ).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
@@ -92,6 +95,7 @@ function reviewedDefinitions(bundle) {
       "infectious",
       "family-planning",
       "ncd",
+      "ncd-senior",
       "oral-health",
       "vital-statistics",
       "demographics",
@@ -106,6 +110,7 @@ function reviewedDefinitions(bundle) {
     infectious: INFECTIOUS_DEFINITIONS,
     "family-planning": FAMILY_PLANNING_DEFINITIONS,
     ncd: NCD_DEFINITIONS,
+    "ncd-senior": SENIOR_NCD_DEFINITIONS,
     "oral-health": ORAL_HEALTH_DEFINITIONS,
     "vital-statistics": VITAL_STATISTICS_DEFINITIONS,
     demographics: DEMOGRAPHICS_DEFINITIONS,

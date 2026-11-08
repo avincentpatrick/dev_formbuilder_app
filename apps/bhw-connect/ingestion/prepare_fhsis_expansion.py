@@ -234,6 +234,18 @@ def ncd_specifications(directory):
     return specs
 
 
+def senior_ncd_specifications(directory):
+    """Annual RA block corroborated by FHSIS 2025 report pp. 83–85, not quarter sums."""
+    source='1b. NCD Meds Senior Citizens_nofml.xlsx'
+    if not (directory/source).is_file():raise ValueError(f'Missing source: {source}')
+    specs=[]
+    for key,label,n,d in [('assessed','Risk-assessed using PhilPEN',198,3),('htn','Identified with hypertension',202,198),('dm','Identified with type 2 diabetes',206,198)]:
+        specs.append(dict(key='ncd_60plus_'+key,label=label+', 60 years and above',file=source,
+                          n=n,d=d,rate=n+1,sex=True,ages=None,start=8,sheet='RA',coded=True,program='ncd',
+                          denominator='Projected population aged 60 and above' if d==3 else 'Adults aged 60 and above risk-assessed using PhilPEN'))
+    return specs
+
+
 def oral_health_specifications(directory):
     specs=[]
     def add(source,key,label,n,d=None,rate=None,denominator=None):
@@ -371,16 +383,16 @@ def main():
     parser.add_argument('directory',type=Path)
     parser.add_argument('--reference',type=Path,required=True,help='Original private FHSIS directory containing TB geography and dim_geo.json')
     parser.add_argument('--retrieved',required=True)
-    parser.add_argument('--programme-set', choices=['core','child-health','maternal','infectious','family-planning','ncd','oral-health','vital-statistics','demographics','combined-delivery'], default='core')
+    parser.add_argument('--programme-set', choices=['core','child-health','maternal','infectious','family-planning','ncd','oral-health','vital-statistics','demographics','combined-delivery','ncd-senior'], default='core')
     args=parser.parse_args()
     geos=json.loads((args.reference/'dim_geo.json').read_text())
     b=ExpansionBuilder(args.reference,geos);b.directory=args.directory
-    if args.programme_set=='ncd':
+    if args.programme_set in ('ncd','ncd-senior'):
         for code,geo in geos.items():
             if geo['geo_level']!='barangay':b.canonical[normalise(geo['geo_name'])].add(code)
         b.canonical[normalise('City of Carmona')]={'0402104'}
         b.canonical[normalise('Dr. Jose P. Rizal')]={'1705323'}
-    specs={'core':specifications,'child-health':child_health_specifications,'maternal':maternal_specifications,'infectious':infectious_specifications,'family-planning':family_planning_specifications,'ncd':ncd_specifications,'oral-health':oral_health_specifications,'vital-statistics':vital_specifications,'demographics':demographic_specifications,'combined-delivery':combined_delivery_specifications}[args.programme_set](args.directory)
+    specs={'core':specifications,'child-health':child_health_specifications,'maternal':maternal_specifications,'infectious':infectious_specifications,'family-planning':family_planning_specifications,'ncd':ncd_specifications,'oral-health':oral_health_specifications,'vital-statistics':vital_specifications,'demographics':demographic_specifications,'combined-delivery':combined_delivery_specifications,'ncd-senior':senior_ncd_specifications}[args.programme_set](args.directory)
     definitions=[]
     cross_sheet_rows={}
     groups={}
@@ -442,7 +454,10 @@ def main():
     if args.programme_set=='infectious':
         qa['omitted_columns']=['Pregnancy deworming in STH workbook: duplicates maternal deworming with a different total; held for source reconciliation', 'Schistosomiasis Annual1 chronic diagnosis rate: denominator not established; retained counts only']
     if args.programme_set=='ncd':
-        qa['omitted_columns']=['Senior annual risk-assessment/disease summary: Q4 title says Annual 2024; RA annual values repeat that summary; held pending year clarification', 'Medicine access: December snapshot only; monthly figures not summed to annual unique people']
+        qa['omitted_columns']=['Senior annual risk-assessment/disease summary is prepared separately as ncd-senior after corroboration against the 2025 annual report', 'Medicine access: December snapshot only; monthly figures not summed to annual unique people']
+    if args.programme_set=='ncd-senior':
+        qa['source_year_resolution']={'report':'FHSIS 2025 Annual Report, printed pp. 83–85 (PDF pp. 94–96)', 'source_sheet':'RA', 'annual_columns':'GN:GY', 'conflicting_header':'Q4!A3: Annual 2024', 'decision':'Use 2025 annual RA values corroborated by report; retain conflicting header in provenance', 'quarter_caveat':'Region V and national annual counts differ from sums of quarters; quarterly years not established; do not replace annual values with quarter sums'}
+        qa['omitted_columns']=['Quarterly/monthly repeats and December medicine access; sex-specific rates are not provided']
     if args.programme_set=='oral-health':
         qa['omitted_columns']=['Annual rates and denominators for ages 5–9, 10–19, 20–59 and 60+: denominators sum quarterly populations; retained visit counts', 'Final block columns 93–113: conflicting senior/under-one/maternal-age labels; withheld entirely pending cohort clarification']
     out=args.directory/'fhsis-expansion.json';out.write_text(json.dumps(bundle,ensure_ascii=False,separators=(',',':')))

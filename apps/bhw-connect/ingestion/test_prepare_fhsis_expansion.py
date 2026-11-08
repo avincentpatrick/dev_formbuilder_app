@@ -5,9 +5,25 @@ from pathlib import Path
 from collections import defaultdict, Counter
 import openpyxl
 from prepare_fhsis import FILES
-from prepare_fhsis_expansion import ExpansionBuilder, maternal_specifications, demographic_specifications, convert_excel_percentage, attach_composite_denominator
+from prepare_fhsis_expansion import ExpansionBuilder, senior_ncd_specifications, maternal_specifications, demographic_specifications, convert_excel_percentage, attach_composite_denominator
 
 class MappingTests(unittest.TestCase):
+    def test_senior_annual_uses_annual_columns_and_distinct_denominators(self):
+        with tempfile.TemporaryDirectory() as folder:
+            (Path(folder)/'1b. NCD Meds Senior Citizens_nofml.xlsx').touch()
+            specs=senior_ncd_specifications(Path(folder))
+            row=[None]*207
+            # Different quarter values must not be used as annual totals.
+            for col,value in [(3,1000),(6,999),(198,200),(199,20),(202,50),(203,25),(206,10),(207,5)]:
+                row[col-1]=value
+            b=object.__new__(ExpansionBuilder);b.indicators=[];b.missing=Counter()
+            for s in specs:
+                self.assertEqual(s['sheet'],'RA')
+                b.indicator({},row,s['key'],s['n'],s['d'],s['rate'])
+            self.assertEqual([r['numerator_exact'] for r in b.indicators],['200','50','10'])
+            self.assertEqual([r['denominator_exact'] for r in b.indicators],['1000','200','200'])
+            self.assertEqual([r['rate_pct'] for r in b.indicators],['20','25','5'])
+
     def test_composite_denominator_preserves_missing_zero_and_source_rate(self):
         record={'rate_pct':'12.345','numerator_exact':'2'}
         attach_composite_denominator(record,[{'value':10,'source_column':4},{'value':6,'source_column':5}])

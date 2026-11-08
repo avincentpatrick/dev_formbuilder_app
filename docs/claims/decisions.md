@@ -24,10 +24,18 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D214`, the last filed, was asked and answered on 2026-11-08 in `M226`'s session, before its build. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D215`, the last filed, was asked and answered on 2026-11-09 in `M229`'s session, before its build. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D215 — A blank form can be printed in another of its languages, but the scanner knows only the form's default language, so it cannot read ticks beside, say, Tagalog choice labels. What should a printout in another language do? **A — print it, and its footer says responses must be keyed in; reading scans of translated printouts is filed for later.**
+
+**Asked and answered 2026-11-09 (user decision, in chat), in the session that took `R-d7e27962`, before its build.** Filed and answered in one push, with `M229`'s claim.
+- **A — print, key in by hand (chosen, the session's recommendation).** The language choice ships now. A printout in a language other than the form's default prints the footer sentence *"Scans of this form cannot be read automatically; responses must be keyed in."* Reading such scans is filed as its own row.
+- **B — print and scan both.** The printout also carries its language beside the version stamp, and the scanner reads it in that language. About twice the work, and it changes the scanner's matcher.
+
+**What it creates:** `M229` builds A and closes `R-d7e27962`, and files the reading of translated printouts as a `before-launch` row.
+
 ### D214 — A rule's "contains" on a single-choice or dropdown question checks the choice's text, so "required if colour contains re" holds for both red and green. What should "contains" do there? **A — relabel it: it keeps working, and the rule editor calls it "contains the text".**
 
 **Asked and answered 2026-11-08 (user decision, in chat), in the session that took `R-526dae72`, whose remedy was this decision.** Filed and answered in one push, with `M226`'s claim.

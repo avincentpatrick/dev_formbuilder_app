@@ -16,7 +16,40 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M228`, `R-5d7128da`: a short written answer that happens to be a word of the printed text is read, not dropped (m228-ocr-short-answer-static)
+## Status: ACTIVE CLAIM — `M229`, `R-d7e27962` by `D215` = A: a blank form prints in any of its version's languages, and a printout in another language says it must be keyed in (m229-print-in-language)
+
+Taken 2026-11-09, from the plan the user approved on 2026-11-08. Branch `m229-print-in-language`, cut from origin/main at `5937d549`, PR into main. Held green for a merge point (`D137`), after `M228`'s #487.
+**One row, by `D13`.** It edits two hubs, `BlankFormPrintPresenter.php` and `docs/ocr-pipeline-design.md`, and no held PR touches either.
+Row: `R-d7e27962`, *"A blank form prints only in its default language, so a form translated into Tagalog cannot be printed in Tagalog."* `D215` (the user, in chat, 2026-11-09) chose how a translated printout meets the scanner. It is filed and answered in this push.
+
+### Evidence verified
+- `BlankFormPrintPresenter::present()` takes `$form->default_locale`, and its docblock calls another language "a real gap": **held**.
+- Every label, hint, section text and choice label already goes through one `$locale` (`LocaleVariant::resolve()` and the formatter's options), so the printing half is a parameter: **held**.
+- `docs/ocr-pipeline-design.md` §2.5 lists "One locale per print" as out of scope, and no row queued it until `M190`: **held**.
+
+### Premise verified
+- **"The form's languages" cannot come from `forms.supported_locales`,** because nothing writes it (`R-21e88dd1`). The honest source is the version itself: the languages its labels, hints, section texts and choices are translated into. `XlsformExporter::extraLanguages()` collects the same thing, but #414 holds that file. So the collector goes to the shared `LocaleVariant`, and moving the exporter onto it is filed for after the merge.
+- **The scanner reads in the default language only.** `PrintedFormMatcher` calls `present($form, $version)`, and ticks are matched by choice label. So a translated page would be misread, which is `D215`'s question. The footer already has the sentence for unreadable paper.
+- Tagalog uses the Latin script the PDF's core fonts cover, so it prints. A non-Latin language already fails the documented WinAnsi way (`docs/ocr-pipeline-design.md` §2.5).
+- The form page's version rows load whole versions, so listing each one's languages costs nothing more. The forms list does not, so its "Print blank" keeps the default language.
+
+### Remedy verdict
+**Works, as the row says.**
+- `present()` takes an optional locale, used only when the version has text in it, and otherwise the form's default.
+- A printout in another language prints the keyed-in footer.
+- The print route takes `?lang=`.
+- The form page's "Print blank" asks which language when a version has more than one.
+
+Files: `app/Services/Forms/BlankFormPrintPresenter.php`, `app/Services/Forms/BlankFormPrintRenderer.php`, `app/Http/Controllers/Tenant/FormPrintController.php`, `app/Support/Forms/LocaleVariant.php`, `app/Services/Forms/FormHubPresenter.php`, `resources/js/Pages/forms/Show.vue`, `resources/js/Pages/forms/show.test.ts`, `tests/Feature/Forms/BlankFormPrintPresenterTest.php`, `tests/Feature/Forms/BlankFormPrintRendererTest.php`, `tests/Feature/Forms/FormHubPageTest.php`, `docs/ocr-pipeline-design.md`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md` (`D215`, pushed with this claim), `VERSION` (0.19.0, a new ability, after #487's 0.18.4), `database/data/releases.json`.
+Paired files taken: none.
+Namespaces spent: `M229`, `D215`.
+Prediction:
+- The new presenter, renderer, page and Vitest cases go red first.
+- Every existing print case stays green, because the default stays the default.
+- The one I most expect to be wrong: the form page's axe scan, on the new language dialog.
+
+## HELD — `M228`, `R-5d7128da`: a short written answer that happens to be a word of the printed text is read, not dropped (m228-ocr-short-answer-static) — BUILT AND HELD: PR #487, waiting for a merge point
 
 Taken 2026-11-08, on the user's *"are there any tasks that can be done the is not blocked by the backup?"*, from the plan they approved. Branch `m228-ocr-short-answer-static`, cut from origin/main at `3257252c`, PR into main. Held green for a merge point (`D137`), after `M227`'s #446.
 **One row, by `D13`.** It edits one hub, `OcrAnswerReader.php`, which no held PR touches. `R-0c5e4422` edits the same file, so it waits for the merge point.

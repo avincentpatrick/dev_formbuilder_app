@@ -244,3 +244,51 @@ it("rejects unsupported income periods and barangay scopes", async () => {
     ).toBe(400);
   expect(mock.from).not.toHaveBeenCalled();
 });
+
+it("reads profiling stage snapshots from their own dataset and level without parent averaging", async () => {
+  const values = query({
+    data: [
+      {
+        geo_code: "01",
+        n_total_bhw: 100,
+        n_drafted: 10,
+        n_for_validation: 20,
+        n_back_to_encoder: 5,
+        n_validated: 15,
+        n_approved: 40,
+      },
+    ],
+    error: null,
+  });
+  mock.from
+    .mockReturnValueOnce(query({ data: [{ geo_code: "01", geo_name: "Synthetic" }], error: null }))
+    .mockReturnValueOnce(values);
+  const response = await GET(
+    new NextRequest(
+      "http://localhost/api/dataset-map?dataset=bhw-profiling-status-2026&indicator=encoded",
+    ),
+  );
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({
+    total: null,
+    rows: [{ value: 35, note: "35 records / 100 BHWs to profile" }],
+  });
+  expect(mock.source).toHaveBeenCalledWith("bhw-profiling-status-2026");
+  expect(mock.from.mock.calls.map((c) => c[0])).toEqual(["dim_geo", "agg_bhw_profiling_status"]);
+  expect(values.eq).toHaveBeenCalledWith("dataset_id", 7);
+  expect(values.eq).toHaveBeenCalledWith("geo_level", "region");
+});
+it("rejects profiling periods and individual record fields outside the map contract", async () => {
+  for (const query of ["period=2025", "indicator=n_drafted", "level=barangay&code=0102801001"]) {
+    expect(
+      (
+        await GET(
+          new NextRequest(
+            `http://localhost/api/dataset-map?dataset=bhw-profiling-status-2026&${query}`,
+          ),
+        )
+      ).status,
+    ).toBe(400);
+  }
+  expect(mock.from).not.toHaveBeenCalled();
+});

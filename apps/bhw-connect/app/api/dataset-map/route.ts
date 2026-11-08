@@ -1,3 +1,4 @@
+import { PROFILING_COLUMNS, joinProfilingRows } from "@/lib/maps/profiling";
 import { INCOME_SOURCE_SLUG, joinIncomeRows } from "@/lib/maps/income-class";
 import { joinPovertyRows } from "@/lib/maps/poverty";
 import { NextRequest, NextResponse } from "next/server";
@@ -17,8 +18,9 @@ export async function GET(request: NextRequest) {
   const metric =
     choice && prototypeIndicators(choice.dataset).find((i) => i.id === choice.indicator);
   const spec = metric?.catalogSpec;
+  const profiling = choice?.dataset === "bhw-profiling-status-2026";
   const income = choice?.dataset === "lgu-income-class";
-  if (!choice || !metric || (!spec && !income))
+  if (!choice || !metric || (!spec && !income && !profiling))
     return NextResponse.json({ state: "unsupported" }, { status: 400 });
   try {
     const [source, geo] = await Promise.all([
@@ -55,7 +57,21 @@ export async function GET(request: NextRequest) {
       value: null,
     })) as MapPayload["rows"];
     let total: number | null = null;
-    if (income && valueSupport === "supported") {
+    if (profiling) {
+      const values = await db
+        .from("agg_bhw_profiling_status")
+        .select(PROFILING_COLUMNS)
+        .eq("dataset_id", source.value.datasetId)
+        .eq("geo_level", childLevel)
+        .in(
+          "geo_code",
+          children.data.map((c) => c.geo_code),
+        )
+        .limit(1000);
+      if (values.error || !values.data || values.data.length >= 1000)
+        throw new Error("Snapshot unavailable");
+      rows = joinProfilingRows(children.data, values.data, choice.indicator);
+    } else if (income && valueSupport === "supported") {
       const values = await db
         .from("dim_lgu_income_reclass")
         .select("geo_code,new_class,dof_kind,converted")

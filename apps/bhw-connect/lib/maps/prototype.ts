@@ -51,6 +51,7 @@ export function prototypeIndicators(slug: string) {
     "psa-popcen-2024": ["population.residents"],
     "psa-sae-poverty-2023": ["poverty.incidence"],
     "lgu-income-class": ["income-class"],
+    "bhw-profiling-status-2026": ["encoded", "validated", "attested", "notEncoded"],
   };
   const ids = supported[slug];
   return ids ? getDatasetMap(slug)!.indicators.filter((i) => ids.includes(i.id)) : [];

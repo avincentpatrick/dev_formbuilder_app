@@ -446,3 +446,23 @@ Validation: eight new ring-pipeline tests plus the previous 37 Python checks pas
 Lint (existing fixture warning), typecheck, migration lint and prefixed app build passed.
 Seeded-database Vitest: 1,463 passed, 11 skipped. No UI changes; browser tests were not rerun.
 The geospatial acceptance gate correctly remains failed, separately from software validation.
+
+## Private municipality packages and complete coverage (8 November 2026)
+
+Added offline packaging and verification for the ring-preserving national candidate. Both
+sides of all overlap conflicts are quarantined, along with invalid/null shapes, membership
+mismatches and changed components/holes. Geometry is partitioned without further alteration.
+The private result has 41,567 polygons across 1,636 files and a complete 41,991-barangay
+reference index, including 424 explicit withheld records. All hashes and original coordinates
+match; global cross-partition validation finds no remaining overlaps. This is withholding,
+not repair or acceptance of the source conflicts. See [packaging evidence and commands](BARANGAY_CANDIDATE_PACKAGING.md).
+
+Every manifest remains unpublished with no dataset boundary assignments. Historical
+compatibility and actual self-hosted delivery remain gated; no geometry or detailed
+reference records entered git, and no UI or public map assets changed.
+
+Validation: 52 Python tests passed, including seven packaging tests. Lint (existing fixture
+warning), typecheck, migration lint and prefixed no-data build passed. Seeded-database
+Vitest: 1,463 passed, 11 skipped. Browser tests were not rerun because this increment changes
+only offline packaging and documentation. Geospatial publication remains blocked separately
+from passing software checks.

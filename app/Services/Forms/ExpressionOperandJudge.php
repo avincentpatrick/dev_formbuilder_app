@@ -126,7 +126,7 @@ final class ExpressionOperandJudge
     /**
      * One side of an ordering against a temporal question read as $kind: null when it can hold; otherwise whether it
      * is a time-zone question, the phrase naming what it was compared with, and — for a date or time QUESTION on
-     * the other side — that question's key, which {@see temporal()} uses to report the pair once.
+     * the other side — that question's key, which {@see self::temporal()} uses to report the pair once.
      *
      * @param  array<string, FieldType>  $typeByKey
      * @return array{clock: bool, phrase: string, pair: ?string}|null

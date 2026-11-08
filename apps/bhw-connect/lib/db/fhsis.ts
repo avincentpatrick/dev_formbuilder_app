@@ -49,8 +49,18 @@ export function fhsisRateLabel(indicator: FhsisIndicator): string {
   if (!indicator.reported) return "Not reported in 2025";
   if (indicator.unit === "count") return "Count only";
   if (indicator.rate === null) return "Rate not reported";
-  const value = indicator.rate.toLocaleString("en-PH", { maximumFractionDigits: 1 });
-  return `${value}${indicator.unit.startsWith("percent") ? "%" : " per 100,000"}${indicator.over100 ? "†" : ""}`;
+  const value = indicator.rate.toLocaleString(
+    "en-PH",
+    indicator.rate !== 0 && Math.abs(indicator.rate) < 1
+      ? { maximumSignificantDigits: 3 }
+      : { maximumFractionDigits: 1 },
+  );
+  const suffix = indicator.unit.startsWith("percent")
+    ? "%"
+    : indicator.unit.includes("10,000")
+      ? " per 10,000"
+      : " per 100,000";
+  return `${value}${suffix}${indicator.over100 ? "†" : ""}`;
 }
 export function fhsisPeriodLabel(key: string): string {
   if (key === "anc8") return "Q3–Q4 2025";
@@ -209,6 +219,7 @@ export function fhsisBreakdownLabel(key: string): string {
 export function fhsisLimitedGeography(key: string): boolean {
   return (
     key.startsWith("birth_") ||
+    key.startsWith("infect_") ||
     key.startsWith("maternal_") ||
     key.startsWith("nutrition_") ||
     key.startsWith("school_") ||

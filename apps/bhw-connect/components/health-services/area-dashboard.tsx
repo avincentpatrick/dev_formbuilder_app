@@ -157,10 +157,11 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
         </h2>
         <p className="my-2 text-sm text-muted">
           {FHSIS_RELEASE_LABEL} · Totals; available age and sex breakdowns are below. TB
-          notification rates are cases per 100,000, not percentages. Additional prenatal and
-          postnatal care, delivery/newborn care, nutrition, school vaccination and childhood illness
-          sources cover provinces/HUCs and selected separately listed cities; they do not provide
-          every municipality separately.
+          notification and leprosy detection rates are cases per 100,000; leprosy prevalence is per
+          10,000. These are not percentages. Additional prenatal and postnatal care,
+          delivery/newborn care, nutrition, school vaccination and childhood illness sources cover
+          provinces/HUCs and selected separately listed cities; they do not provide every
+          municipality separately.
         </p>
         <div className="overflow-x-auto" role="region" aria-label="Service indicators" tabIndex={0}>
           <table className="w-full min-w-[640px] text-left text-sm">
@@ -238,6 +239,12 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
                   {fhsisPeriodLabel(i.indicator_key)} · {i.source_workbook}
                 </p>
                 <p className="mb-2 text-sm text-muted">Denominator: {i.denominator_def}</p>
+                {i.indicator_key.startsWith("infect_schisto_") && i.unit === "count" && (
+                  <p className="mb-2 text-sm text-muted">
+                    Source rates are withheld because their denominators could not be established
+                    from the annual tables. Source counts are retained.
+                  </p>
+                )}
                 {i.indicator_key === "maternal_td_repeat" && (
                   <p className="mb-2 text-sm text-muted">
                     Age-group rates are withheld because the source reports zero rates despite

@@ -571,6 +571,198 @@
         "reportedRowsWithoutGeometry": 0,
         "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
       }
+    },
+    {
+      "measuredAt": "2026-11-08T13:58:49.514Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "bhw-2025",
+        "indicator": "bhw.profile-accreditation",
+        "period": "2025",
+        "level": "national",
+        "code": "PH"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "80fffe9b7146fa9a12ad86de00798efe66346115373e77c7ef79260307dd2a4d",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Health (DOH) Barangay Health Worker registration/accreditation dataset",
+        "date": "2025-01-01",
+        "license": "CC BY 4.0"
+      },
+      "coverage": {
+        "rows": 18,
+        "reportedRows": 18,
+        "zeroRows": 0,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": false,
+        "hasReportedParentRate": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "42b4d13ed6b97d4cf22dee07f9019eea4d820b3163f31e5d3bf0a371094762f6",
+        "bytes": 534649,
+        "rowsWithGeometry": 18,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      },
+      "uncertainty": {
+        "confidenceLevel": 0.95,
+        "rowsWithPublishedInterval": 18,
+        "reportedRowsWithoutInterval": 0,
+        "smallSampleRows": 0,
+        "calculation": "not-recomputed",
+        "sampleThreshold": "not-recomputed-from-source-counts"
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T13:58:52.528Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "bhw-2025",
+        "indicator": "bhw.training.basic_life_support",
+        "period": "2025",
+        "level": "national",
+        "code": "PH"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "cc88c8c54e4893632b1720f8497f74277b1bdbdd4620b0cf0c70b3d13bc112d9",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Health (DOH) Barangay Health Worker registration/accreditation dataset",
+        "date": "2025-01-01",
+        "license": "CC BY 4.0"
+      },
+      "coverage": {
+        "rows": 18,
+        "reportedRows": 18,
+        "zeroRows": 0,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": false,
+        "hasReportedParentRate": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "42b4d13ed6b97d4cf22dee07f9019eea4d820b3163f31e5d3bf0a371094762f6",
+        "bytes": 534649,
+        "rowsWithGeometry": 18,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      },
+      "uncertainty": {
+        "confidenceLevel": 0.95,
+        "rowsWithPublishedInterval": 18,
+        "reportedRowsWithoutInterval": 0,
+        "smallSampleRows": 0,
+        "calculation": "not-recomputed",
+        "sampleThreshold": "not-recomputed-from-source-counts"
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T13:58:54.872Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "bhw-2025",
+        "indicator": "bhw.training.basic_life_support",
+        "period": "2025",
+        "level": "province",
+        "code": "01028"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "78ec122d6d197cf16ae67c1671c1c28b1958117d2ed6bafe44e3d3ab1f74a81f",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Health (DOH) Barangay Health Worker registration/accreditation dataset",
+        "date": "2025-01-01",
+        "license": "CC BY 4.0"
+      },
+      "coverage": {
+        "rows": 23,
+        "reportedRows": 23,
+        "zeroRows": 4,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": false,
+        "hasReportedParentRate": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "ad905e921c966c589492cfb08dd9fc9f1cc4f5842ccd46431a2ab3ee091aa843",
+        "bytes": 15210,
+        "rowsWithGeometry": 23,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      },
+      "uncertainty": {
+        "confidenceLevel": 0.95,
+        "rowsWithPublishedInterval": 23,
+        "reportedRowsWithoutInterval": 0,
+        "smallSampleRows": 2,
+        "calculation": "not-recomputed",
+        "sampleThreshold": "not-recomputed-from-source-counts"
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T13:58:55.850Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "bhw-2025",
+        "indicator": "bhw.training.dengue",
+        "period": "2025",
+        "level": "province",
+        "code": "01028"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "891c7d51311e640ccebc1ab8b2077f70c1d7ec1aa43d3cf2fb45ec85939d52f5",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Health (DOH) Barangay Health Worker registration/accreditation dataset",
+        "date": "2025-01-01",
+        "license": "CC BY 4.0"
+      },
+      "coverage": {
+        "rows": 23,
+        "reportedRows": 23,
+        "zeroRows": 19,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": false,
+        "hasReportedParentRate": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "ad905e921c966c589492cfb08dd9fc9f1cc4f5842ccd46431a2ab3ee091aa843",
+        "bytes": 15210,
+        "rowsWithGeometry": 23,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      },
+      "uncertainty": {
+        "confidenceLevel": 0.95,
+        "rowsWithPublishedInterval": 23,
+        "reportedRowsWithoutInterval": 0,
+        "smallSampleRows": 2,
+        "calculation": "not-recomputed",
+        "sampleThreshold": "not-recomputed-from-source-counts"
+      }
     }
   ]
 }

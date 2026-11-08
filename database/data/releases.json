@@ -1,5 +1,15 @@
 [
     {
+        "version": "0.18.2",
+        "title": "Rules say when “contains” matches text",
+        "items": [
+            {
+                "kind": "improved",
+                "text": "In the builder, a rule that compares a single-choice or dropdown question now calls “contains” “contains the text”. It checks the letters of the chosen answer, so “contains re” holds for both Red and Green. Rules you already made work exactly as before."
+            }
+        ]
+    },
+    {
         "version": "0.17.1",
         "title": "Builder panels that grow with your text",
         "items": [

@@ -44,8 +44,8 @@ export function DatasetMapPage({ choice }: { choice: MapChoice | null }) {
         </select>
       </label>
       <p className="text-sm text-muted">
-        Switching between UUC and NHFR retains the supported area. Pending maps open their national
-        availability view; they do not inherit another dataset’s values.
+        Switching between available maps retains the supported area. Pending maps open their
+        national availability view; they do not inherit another dataset’s values.
       </p>
       {choice ? (
         <DatasetMapCard

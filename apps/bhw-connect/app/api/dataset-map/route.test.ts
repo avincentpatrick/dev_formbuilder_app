@@ -85,3 +85,61 @@ it("fails closed on capped or failed child queries", async () => {
   expect(response.status).toBe(503);
   expect(await response.json()).toEqual({ state: "failed" });
 });
+
+it("pins PSA population to its accepted release and 2024 on both queries without fallback", async () => {
+  const child = query({ data: [{ geo_code: "01", population: 12 }], error: null });
+  const parent = query({ data: [{ geo_code: "PH", population: 25 }], error: null });
+  mock.from
+    .mockReturnValueOnce(query({ data: [{ geo_code: "01", geo_name: "A" }], error: null }))
+    .mockReturnValueOnce(child)
+    .mockReturnValueOnce(parent);
+  const response = await GET(
+    new NextRequest("http://localhost/api/dataset-map?dataset=psa-popcen-2024"),
+  );
+  expect(response.status).toBe(200);
+  expect((await response.json()).rows[0].value).toBe(12);
+  expect(child.eq).toHaveBeenCalledWith("census_year", 2024);
+  expect(parent.eq).toHaveBeenCalledWith("census_year", 2024);
+  expect(mock.source).toHaveBeenCalledWith("psa-popcen-2024");
+  expect(mock.from.mock.calls.map((c) => c[0])).toEqual([
+    "dim_geo",
+    "agg_population",
+    "agg_population",
+  ]);
+});
+it("reads StepZero counts without validated profiles or unapproved rate measures", async () => {
+  mock.from
+    .mockReturnValueOnce(query({ data: [{ geo_code: "01", geo_name: "A" }], error: null }))
+    .mockReturnValueOnce(query({ data: [{ geo_code: "01", n_registered: 4 }], error: null }))
+    .mockReturnValueOnce(query({ data: [{ geo_code: "PH", n_registered: 10 }], error: null }));
+  const response = await GET(
+    new NextRequest(
+      "http://localhost/api/dataset-map?dataset=bhw-stepzero-2026&indicator=bhw.registered",
+    ),
+  );
+  expect((await response.json()).rows[0].value).toBe(4);
+  expect(mock.from.mock.calls.map((c) => c[0])).toEqual([
+    "dim_geo",
+    "agg_bhw_stepzero_counts",
+    "agg_bhw_stepzero_counts",
+  ]);
+  expect(mock.source).toHaveBeenCalledWith("bhw-stepzero-2026");
+  const rate = await GET(
+    new NextRequest(
+      "http://localhost/api/dataset-map?dataset=bhw-stepzero-2026&indicator=bhw.declared-accreditation",
+    ),
+  );
+  expect(rate.status).toBe(400);
+});
+it("requires an active census release and refuses demographic or honorarium query access", async () => {
+  mock.source.mockResolvedValueOnce({ state: "unavailable" });
+  await GET(new NextRequest("http://localhost/api/dataset-map?dataset=bhw-2025"));
+  expect(mock.source).toHaveBeenCalledWith("bhw-2025", true);
+  expect(mock.from).not.toHaveBeenCalled();
+  for (const indicator of ["bhw.demographics.sex", "bhw.honorarium.barangay", "bhw.total"]) {
+    const response = await GET(
+      new NextRequest(`http://localhost/api/dataset-map?dataset=bhw-2025&indicator=${indicator}`),
+    );
+    expect(response.status).toBe(400);
+  }
+});

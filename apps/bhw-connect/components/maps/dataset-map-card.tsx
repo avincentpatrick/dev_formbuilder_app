@@ -12,6 +12,7 @@ import {
 } from "@/lib/maps/prototype";
 import { withBasePath } from "@/lib/base-path";
 import { computeQuantileBins } from "@/lib/charts/color-scale";
+import { useMapActivity } from "./map-activity";
 import { MapLegend } from "./map-legend";
 const DatasetCanvas = dynamic(() => import("./dataset-canvas").then((m) => m.DatasetCanvas), {
   ssr: false,
@@ -44,8 +45,9 @@ export function DatasetMapCard({
   const [result, setResult] = useState<{ key: string; data: Result } | null>(null);
   const [geometry, setGeometry] = useState<{ key: string; codes: string[] } | null>(null);
   const [visible, setVisible] = useState(expanded);
+  const active = useMapActivity(visible && metrics.length > 0);
   const [retry, setRetry] = useState(0);
-  const ref = useRef<HTMLElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
   const query = mapHref({ ...choice, selected: null }).split("?")[1];
   const key = `${query}&retry=${retry}`;
   useEffect(() => {
@@ -55,7 +57,7 @@ export function DatasetMapCard({
     return () => observer.disconnect();
   }, [expanded]);
   useEffect(() => {
-    if (!visible || !metrics.length) return;
+    if (!active || result?.key === key) return;
     const controller = new AbortController();
     fetch(withBasePath(`/api/dataset-map?${query}`), { signal: controller.signal })
       .then(async (response) => {
@@ -69,21 +71,26 @@ export function DatasetMapCard({
         if (!controller.signal.aborted) setResult({ key, data: { state: "failed", key } });
       });
     return () => controller.abort();
-  }, [visible, query, key, metrics.length]);
+  }, [active, query, key, result?.key]);
   const data = result?.key === key && result.data.state === "available" ? result.data : null;
   const bins = useMemo(() => computeQuantileBins(data?.rows.map((r) => r.value) ?? []), [data]);
   const metric = metrics.find((m) => m.id === choice.indicator);
   const selected = data?.rows.find((r) => r.code === choice.selected);
   const shapeCodes = geometry?.key === key ? geometry.codes : null;
   const dashboard =
-    dataset === "nhfr-2026-09" ? "/facilities" : dataset === "uuc-phc-2025" ? "/uuc-phc" : null;
+    dataset === "nhfr-2026-09"
+      ? "/facilities"
+      : dataset === "uuc-phc-2025"
+        ? "/uuc-phc"
+        : dataset === "bhw-2025" || dataset === "bhw-stepzero-2026"
+          ? "/bhw"
+          : null;
   function reset() {
     setTrail([]);
     setChoice(initialMapChoice(dataset));
   }
   return (
     <article
-      ref={ref}
       aria-label={`${definition.title} map`}
       className="min-w-0 space-y-4 rounded-xl border border-border bg-background p-5"
     >
@@ -140,41 +147,44 @@ export function DatasetMapCard({
               </button>
             ))}
           </nav>
-          {!visible ? (
-            <p className="min-h-48 bg-surface p-4">
-              Map paused outside the visible area. Your selection is retained.
-            </p>
-          ) : data ? (
-            <>
-              <DatasetCanvas
-                key={key}
-                url={data.geometryUrl}
-                rows={data.rows}
-                bins={bins}
-                selected={choice.selected}
-                onSelect={(code) => setChoice((c) => ({ ...c, selected: code }))}
-                onGeometry={(codes) => setGeometry({ key, codes })}
-                expanded={expanded}
-              />
-              <p className="text-xs text-muted">
-                Quantiles relative to displayed areas. Gray means no reported value. Missing shapes
-                remain in the table. Use Ctrl/⌘ + scroll to zoom; two fingers to pan.
+          <div ref={ref} className="min-h-64">
+            {!active ? (
+              <p className="min-h-64 bg-surface p-4">
+                Map paused. Scroll this card into view or enlarge it to explore. Your selection is
+                retained.
               </p>
-              <MapLegend
-                bins={bins}
-                hasNoData={data.rows.some((r) => r.value === null)}
-                hasSmallN={false}
-              />
-            </>
-          ) : (
-            <p role="status" className="min-h-48 bg-surface p-4">
-              {result?.key !== key
-                ? "Loading dataset map…"
-                : result.data.state === "unavailable"
-                  ? "This dataset is unavailable. No values are shaded."
-                  : "Map data could not be loaded. This does not mean zero."}
-            </p>
-          )}
+            ) : data ? (
+              <>
+                <DatasetCanvas
+                  key={key}
+                  url={data.geometryUrl}
+                  rows={data.rows}
+                  bins={bins}
+                  selected={choice.selected}
+                  onSelect={(code) => setChoice((c) => ({ ...c, selected: code }))}
+                  onGeometry={(codes) => setGeometry({ key, codes })}
+                  expanded={expanded}
+                />
+                <p className="text-xs text-muted">
+                  Quantiles relative to displayed areas. Gray means no reported value. Missing
+                  shapes remain in the table. Use Ctrl/⌘ + scroll to zoom; two fingers to pan.
+                </p>
+                <MapLegend
+                  bins={bins}
+                  hasNoData={data.rows.some((r) => r.value === null)}
+                  hasSmallN={false}
+                />
+              </>
+            ) : (
+              <p role="status" className="min-h-64 bg-surface p-4">
+                {result?.key !== key
+                  ? "Loading dataset map…"
+                  : result.data.state === "unavailable"
+                    ? "This dataset is unavailable. No values are shaded."
+                    : "Map data could not be loaded. This does not mean zero."}
+              </p>
+            )}
+          </div>
           {result?.key === key && result.data.state === "failed" && (
             <button type="button" className="underline" onClick={() => setRetry((r) => r + 1)}>
               Retry map
@@ -229,7 +239,10 @@ export function DatasetMapCard({
                     <p>
                       Barangay polygons are not yet validated.{" "}
                       {dashboard && (
-                        <Link className="underline" href={`${dashboard}/citymun/${selected.code}`}>
+                        <Link
+                          className="underline"
+                          href={`${dashboard === "/bhw" ? "/place" : dashboard}/citymun/${selected.code}`}
+                        >
                           Open municipal dashboard and barangay information
                         </Link>
                       )}

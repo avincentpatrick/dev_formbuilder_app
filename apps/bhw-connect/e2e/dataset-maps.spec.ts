@@ -115,3 +115,44 @@ test("WebGL failure leaves keyboard selection and the table usable", async ({ pa
   await page.getByText(/Complete area table/).click();
   await expect(page.getByRole("table")).toBeVisible();
 });
+
+test("census, StepZero and PSA maps keep their own indicators and periods", async ({ page }) => {
+  await page.goto("map?dataset=bhw-stepzero-2026&indicator=bhw.registered&level=region&code=01");
+  await expect(page.getByLabel("StepZero 2026 indicator")).toHaveValue("bhw.registered");
+  await page.getByLabel("Map dataset").selectOption("psa-popcen-2024");
+  await expect(page).toHaveURL(/period=2024&level=region&code=01/);
+  await expect(page.getByLabel("PSA population 2024 indicator")).toHaveValue(
+    "population.residents",
+  );
+  await page.getByLabel("Map dataset").selectOption("bhw-2025");
+  await expect(page).toHaveURL(/period=2025&level=region&code=01/);
+  await expect(page.getByLabel("BHW Census 2025 indicator")).toHaveValue("bhw.validated-profiles");
+});
+
+test("many visible cards share at most two maps and only lease owners load rows", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1400, height: 8000 });
+  const datasets: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname.endsWith("/api/dataset-map")) datasets.push(url.searchParams.get("dataset")!);
+  });
+  await page.goto("./");
+  await expect(page.locator(".maplibregl-map")).toHaveCount(2);
+  await expect.poll(() => new Set(datasets).size).toBe(2);
+  expect(datasets).not.toContain("fhsis-2025");
+  await page.setViewportSize({ width: 390, height: 844 });
+  const population = page.getByRole("article", { name: "PSA population 2024 map", exact: true });
+  await population.scrollIntoViewIfNeeded();
+  await expect(population.getByLabel("PSA population 2024 area")).toBeVisible();
+  await expect.poll(() => page.locator(".maplibregl-map").count()).toBeLessThanOrEqual(2);
+  const before = datasets.filter((d) => d === "psa-popcen-2024").length;
+  await page
+    .getByRole("article", { name: "Ways forward map", exact: true })
+    .scrollIntoViewIfNeeded();
+  await expect(page.locator(".maplibregl-map")).toHaveCount(0);
+  await population.scrollIntoViewIfNeeded();
+  await expect(population.locator("canvas")).toHaveCount(1);
+  expect(datasets.filter((d) => d === "psa-popcen-2024").length).toBe(before);
+});

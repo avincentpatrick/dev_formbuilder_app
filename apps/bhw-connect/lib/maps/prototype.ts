@@ -20,10 +20,30 @@ export type MapPayload = {
   geometryUrl: string;
 };
 export function prototypeIndicators(slug: string) {
-  if (slug !== "uuc-phc-2025" && slug !== "nhfr-2026-09") return [];
-  return getDatasetMap(slug)!.indicators.filter(
-    (i) => i.catalogSpec?.table === "agg_nhfr_counts" || i.id === "uuc.listed",
-  );
+  const supported: Record<string, readonly string[]> = {
+    "uuc-phc-2025": ["uuc.listed"],
+    "nhfr-2026-09": [
+      "nhfr.facilities",
+      "nhfr.government",
+      "nhfr.private",
+      "nhfr.type.bhs",
+      "nhfr.type.rhu",
+      "nhfr.type.hospital",
+      "nhfr.type.birthing-home",
+      "nhfr.beds",
+      "nhfr.barangay-presence",
+    ],
+    "bhw-2025": ["bhw.validated-profiles"],
+    "bhw-stepzero-2026": [
+      "bhw.total",
+      "bhw.registered",
+      "bhw.registered-accredited",
+      "bhw.nonregistered",
+    ],
+    "psa-popcen-2024": ["population.residents"],
+  };
+  const ids = supported[slug];
+  return ids ? getDatasetMap(slug)!.indicators.filter((i) => ids.includes(i.id)) : [];
 }
 export function initialMapChoice(dataset: string): MapChoice {
   const first = prototypeIndicators(dataset)[0];

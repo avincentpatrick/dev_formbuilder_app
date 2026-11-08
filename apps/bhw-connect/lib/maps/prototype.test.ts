@@ -38,3 +38,10 @@ it("offers explicit empty planned slots", () => {
   expect(choice.indicator).toBe("");
   expect(parseMapChoice(new URLSearchParams(mapHref(choice).split("?")[1]))).toEqual(choice);
 });
+it("keeps census, StepZero and PSA releases and dates independent", () => {
+  expect(initialMapChoice("bhw-2025").indicator).toBe("bhw.validated-profiles");
+  expect(initialMapChoice("bhw-stepzero-2026").period).toBe("2026");
+  expect(initialMapChoice("psa-popcen-2024").period).toBe("2024");
+  expect(parseMapChoice(new URLSearchParams("dataset=psa-popcen-2024&period=2026"))).toBeNull();
+  expect(parseMapChoice(new URLSearchParams("dataset=bhw-2025&indicator=bhw.total"))).toBeNull();
+});

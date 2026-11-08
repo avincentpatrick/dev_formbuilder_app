@@ -157,10 +157,10 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
         </h2>
         <p className="my-2 text-sm text-muted">
           {FHSIS_RELEASE_LABEL} · Totals; available age and sex breakdowns are below. TB
-          notification rates are cases per 100,000, not percentages. Postnatal care,
-          delivery/newborn care, nutrition, school vaccination and childhood illness sources cover
-          provinces/HUCs and selected separately listed cities; they do not provide every
-          municipality separately.
+          notification rates are cases per 100,000, not percentages. Additional prenatal and
+          postnatal care, delivery/newborn care, nutrition, school vaccination and childhood illness
+          sources cover provinces/HUCs and selected separately listed cities; they do not provide
+          every municipality separately.
         </p>
         <div className="overflow-x-auto" role="region" aria-label="Service indicators" tabIndex={0}>
           <table className="w-full min-w-[640px] text-left text-sm">
@@ -220,7 +220,9 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
         <p className="my-2 text-sm text-muted">
           These are the source’s reported groups. Age groups and sexes are separate views of the
           same services; do not add them together. Sex-specific counts have no rate where the source
-          supplies no matching denominator. Age-specific denominators apply only to that age group.
+          supplies no matching denominator. Some maternal age rates use the same all-age estimated
+          population and represent shares of that population; screening-positive rates use the
+          matching age group tested. Check each indicator’s denominator definition.
         </p>
         {breakdowns === null ? (
           <p role="status">Breakdown data is temporarily unavailable.</p>
@@ -235,6 +237,13 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
                 <p className="my-2 text-xs text-muted">
                   {fhsisPeriodLabel(i.indicator_key)} · {i.source_workbook}
                 </p>
+                <p className="mb-2 text-sm text-muted">Denominator: {i.denominator_def}</p>
+                {i.indicator_key === "maternal_td_repeat" && (
+                  <p className="mb-2 text-sm text-muted">
+                    Age-group rates are withheld because the source reports zero rates despite
+                    nonzero counts. Source counts are retained.
+                  </p>
+                )}
                 <div
                   className="overflow-x-auto"
                   role="region"

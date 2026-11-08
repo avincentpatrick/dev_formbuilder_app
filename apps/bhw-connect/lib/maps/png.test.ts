@@ -10,7 +10,7 @@ const data: MapPayload = { state: "available", rows: [
 it("keeps selection, zero, period, source, coverage and relative-legend context in image notes", () => {
   const notes = pngNotes(datasetMapExport({ ...initialMapChoice("nhfr-2026-09"), selected: "01" }, data, [], ["01"])).join("\n");
   expect(notes).toContain("September 2026");
-  expect(notes).toContain("Selected value: 0.");
+  expect(notes).toContain("Selected value: 0 facilities.");
   expect(notes).toContain("2 areas in complete table; 1 without drawable geometry");
   expect(notes).toContain("Reported parent total: 42");
   expect(notes).toContain("quantiles-relative-to-displayed-areas");
@@ -33,4 +33,18 @@ it("labels a declared parent rate in PNG notes without turning it into a total",
   expect(notes).toContain("Reported parent rate: 0%");
   expect(notes).not.toContain("Reported parent total:");
   expect(notes).toContain("All LGU-declared BHWs");
+});
+
+it("keeps unverified geometry separate from confirmed missing polygons", () => {
+  const notes = pngNotes(datasetMapExport(initialMapChoice("nhfr-2026-09"), data, [], null)).join("\n");
+  expect(notes).toContain("0 without drawable geometry; 2 with geometry not checked");
+  const checked = pngNotes(datasetMapExport(initialMapChoice("nhfr-2026-09"), data, [], ["01"])).join("\n");
+  expect(checked).toContain("1 without drawable geometry; 0 with geometry not checked");
+});
+it("includes percentage units for selected rates and no unit for unavailable values", () => {
+  const choice = { ...initialMapChoice("bhw-stepzero-2026"), indicator: "bhw.declared-accreditation", selected: "01" };
+  const context = { ...data, total: null, parentRate: null };
+  expect(pngNotes(datasetMapExport(choice, context, [], ["01"])).join("\n")).toContain("Selected value: 0%.");
+  expect(pngNotes(datasetMapExport(choice, { ...context, rows: [{ code: "01", name: "Missing", value: null }] }, [], null)).join("\n"))
+    .toContain("Selected value: not available.");
 });

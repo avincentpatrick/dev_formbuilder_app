@@ -726,3 +726,16 @@ source data or hosting configuration changes.
 Full database-backed Vitest: 1,527 passed, 11 skipped. Lint (existing fixture warning),
 typecheck, migration lint and prefixed no-data build passed. Browser tests were not
 rerun because only the offline audit script and documentation changed.
+
+## PNG coverage and selected-value context (8 November 2026)
+
+PNG notes now distinguish geometry that was not checked from confirmed missing polygons,
+matching JSON's existing three-state geometry coverage. Selected values carry their own
+indicator unit, including a percent suffix for rates; unavailable values receive no numeric
+unit. No source values, adapter eligibility, disclosure rules or boundaries changed.
+
+Validation: two additional PNG-note tests; full database-backed Vitest 1,518 passed,
+11 skipped. Lint (existing fixture warning), typecheck, migration lint and the prefixed
+no-data build passed.
+All three PNG browser cases passed against the correctly configured local build: desktop
+and phone WebGL downloads plus disabled export when geometry fails.

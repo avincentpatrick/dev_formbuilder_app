@@ -71,7 +71,7 @@ export async function inspectMapCoverage(input, request = fetch) {
   if (!(payload.total === null || (typeof payload.total === 'number' && Number.isFinite(payload.total) && payload.total >= 0)))
     throw new Error('Invalid reported parent total');
   const censusRate = choice.dataset === 'bhw-2025' &&
-    (choice.indicator === 'bhw.profile-accreditation' || choice.indicator.startsWith('bhw.training.'));
+    (choice.indicator === 'bhw.any-honorarium' || choice.indicator === 'bhw.profile-accreditation' || choice.indicator.startsWith('bhw.training.'));
   const declaredRate = (choice.dataset === 'bhw-stepzero-2026' && choice.indicator === 'bhw.declared-accreditation') ||
     censusRate;
   if (declaredRate) {
@@ -86,16 +86,17 @@ export async function inspectMapCoverage(input, request = fetch) {
     throw new Error('Navigation-only geography must not claim values');
   let uncertainty;
   if (censusRate) {
+    const hasIntervals = choice.indicator !== 'bhw.any-honorarium';
     for (const row of payload.rows) {
       const absent = row.ciLow === null && row.ciHigh === null;
       const interval = typeof row.ciLow === 'number' && Number.isFinite(row.ciLow) &&
         typeof row.ciHigh === 'number' && Number.isFinite(row.ciHigh) && row.value !== null &&
         row.ciLow >= 0 && row.ciLow <= row.value && row.ciHigh >= row.value && row.ciHigh <= 100;
-      if ((!absent && !interval) || typeof row.smallSample !== 'boolean' ||
+      if ((!absent && (!hasIntervals || !interval)) || typeof row.smallSample !== 'boolean' ||
           (row.smallSample && row.value === null)) throw new Error('Invalid Census uncertainty or small-sample metadata');
     }
     uncertainty = {
-      confidenceLevel: 0.95,
+      confidenceLevel: hasIntervals ? 0.95 : null,
       rowsWithPublishedInterval: payload.rows.filter(row => row.ciLow !== null).length,
       reportedRowsWithoutInterval: payload.rows.filter(row => row.value !== null && row.ciLow === null).length,
       smallSampleRows: payload.rows.filter(row => row.smallSample).length,

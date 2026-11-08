@@ -120,3 +120,11 @@ it.each([0, 100])("accepts endpoint %s with matching interval bounds", async val
   const report = await inspectMapCoverage(censusUrl, async target => response(String(target).includes("/geo/") ? geometry : data));
   expect(report).toMatchObject({ uncertainty: { rowsWithPublishedInterval: 1 } });
 });
+
+it("accepts unavailable honorarium intervals and rejects borrowed accreditation uncertainty", async () => {
+  const honorariumUrl = censusUrl.replace("bhw.profile-accreditation", "bhw.any-honorarium");
+  const data = { ...payload, total: null, parentRate: 25, rows: [{ ...censusRow, ciLow: null, ciHigh: null }] };
+  const report = await inspectMapCoverage(honorariumUrl, async target => response(String(target).includes("/geo/") ? geometry : data));
+  expect(report).toMatchObject({ uncertainty: { confidenceLevel: null, rowsWithPublishedInterval: 0, reportedRowsWithoutInterval: 1 } });
+  await expect(inspectMapCoverage(honorariumUrl, async () => response({ ...data, rows: [censusRow] }))).rejects.toThrow("uncertainty");
+});

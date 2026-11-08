@@ -138,3 +138,8 @@ All used the 2025 Census release, retained separate parent rates and null additi
 This resolves the earlier unsupported result for the sampled Basic Life Support views;
 the earlier reports are retained as dated evidence. It does not certify all 44 topics,
 all municipalities, source-record agreement or historical boundary compatibility.
+
+For `bhw.any-honorarium`, no confidence interval belongs to the source measure. The probe
+requires null interval fields, rejects borrowed accreditation bounds and reports
+`confidenceLevel: null`. Profile-based small-sample flag checks still apply. This does not
+certify the new measure's production coverage; run an explicit probe after its deployment.

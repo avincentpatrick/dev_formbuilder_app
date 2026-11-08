@@ -816,3 +816,26 @@ test("Census training topic changes retain their own rates, period and exports",
   expect(data.total).toBeNull();
   expect(requests).toEqual(["bhw.training.basic_life_support", "bhw.training.dengue"]);
 });
+
+test("Census honorarium receipt has its own rate and no invented confidence interval", async ({ page }) => {
+  await page.route("**/api/dataset-map?**", route => route.fulfill({ json: {
+    state: "available", rows: [{ code: "01", name: "Synthetic honorarium region", value: 0,
+      ciLow: null, ciHigh: null, smallSample: true, note: "Published share receiving any honorarium; 3 validated profiles. No confidence interval supplied for this measure. Few BHWs profiled — unstable." }],
+    total: null, parentRate: 75, area: "Philippines", childLevel: "region", source: "Synthetic Census", date: "2025-12-31",
+    license: "Test only", geometryUrl: "/bhw-connect/geo/regions.json",
+  } }));
+  await page.goto("map?dataset=bhw-2025&indicator=bhw.any-honorarium");
+  await expect(page.getByText(/Reported area rate: 75%/)).toBeVisible();
+  await expect(page.getByText(/Share receiving any honorarium; no confidence interval/)).toBeVisible();
+  await expect(page.getByText(/published 95% Wilson/)).toHaveCount(0);
+  await page.getByText(/Complete area table/).click();
+  await expect(page.getByRole("row", { name: /Synthetic honorarium region 0/ })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: /confidence interval/ })).toHaveCount(0);
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download map data (JSON)" }).click();
+  const stream = await (await downloaded).createReadStream();
+  const chunks = []; for await (const chunk of stream!) chunks.push(chunk);
+  const data = JSON.parse(Buffer.concat(chunks).toString());
+  expect(data.indicator).toMatchObject({ id: "bhw.any-honorarium", period: "2025", confidenceLevel: null });
+  expect(data.rows[0]).toMatchObject({ value: 0, ciLow: null, ciHigh: null, smallSample: true });
+});

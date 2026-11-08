@@ -132,7 +132,7 @@ it("reads StepZero counts without validated profiles or cross-release rate measu
   );
   expect(rate.status).toBe(400);
 });
-it("requires an active census release and refuses demographic or honorarium query access", async () => {
+it("requires an active census release and refuses demographic or payer-level honorarium query access", async () => {
   mock.source.mockResolvedValueOnce({ state: "unavailable" });
   await GET(new NextRequest("http://localhost/api/dataset-map?dataset=bhw-2025"));
   expect(mock.source).toHaveBeenCalledWith("bhw-2025", true);
@@ -413,4 +413,16 @@ it("rejects unknown training topics and barangay requests before data access", a
     expect((await GET(new NextRequest(`http://localhost/api/dataset-map?dataset=bhw-2025&${suffix}`))).status).toBe(400);
   }
   expect(mock.source).not.toHaveBeenCalled();
+});
+
+it("reads only public honorarium receipt percentage and profile denominator, never payer amounts or accreditation intervals", async () => {
+  const child = query({ data: [{ geo_code: "01", n_total: 3, any_honorarium_pct: 33.33, ci_low: 6.15, ci_high: 79.23 }], error: null });
+  const parent = query({ data: [{ geo_code: "PH", n_total: 100, any_honorarium_pct: 75 }], error: null });
+  mock.from.mockReturnValueOnce(query({ data: [{ geo_code: "01", geo_name: "Synthetic" }], error: null }))
+    .mockReturnValueOnce(child).mockReturnValueOnce(parent);
+  const response = await GET(new NextRequest("http://localhost/api/dataset-map?dataset=bhw-2025&indicator=bhw.any-honorarium"));
+  expect(await response.json()).toMatchObject({ total: null, parentRate: 75, rows: [{ value: 33.33, ciLow: null, ciHigh: null, smallSample: true }] });
+  expect(mock.source).toHaveBeenCalledWith("bhw-2025", true);
+  expect(mock.from.mock.calls.map(c => c[0])).toEqual(["dim_geo", "agg_bhw_counts", "agg_bhw_counts"]);
+  for (const read of [child, parent]) expect(read.select).toHaveBeenCalledWith("geo_code,any_honorarium_pct,n_total");
 });

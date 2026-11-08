@@ -122,6 +122,7 @@ export function DatasetMapCard({
     [data, poverty, income, profiling, navigationOnly, accreditation],
   );
   const metric = metrics.find((m) => m.id === choice.indicator);
+  const censusUncertainty = censusRate && !!metric?.catalogSpec?.attributes?.ciLow;
   const selected = data?.rows.find((r) => r.code === choice.selected);
   const shapeCodes = geometry?.key === key ? geometry.codes : null;
   const matchingAreas = useMemo(() => searchMapAreas(data?.rows ?? [], searchText), [data, searchText]);
@@ -320,7 +321,7 @@ export function DatasetMapCard({
                 {accreditation ? (
                   <>Reported area rate: {data.parentRate == null ? "Not reported" : `${data.parentRate}%`}.
                     Denominator: {metric?.denominator ?? STEPZERO_ACCREDITATION_DENOMINATOR}. Published percentages are not averaged across areas.
-                    {censusRate ? "Census profile percentage; published 95% Wilson intervals and small-sample notes appear below." : "This is the LGU declaration, not accreditation among validated Census profiles."}</>
+                    {censusRate ? (censusUncertainty ? "Census profile percentage; published 95% Wilson intervals and small-sample notes appear below." : "Share receiving any honorarium; no confidence interval is supplied for this measure. This does not describe amounts or receipt from a particular payer.") : "This is the LGU declaration, not accreditation among validated Census profiles."}</>
                 ) : profiling ? (
                   "Stages are mutually exclusive current workflow states. Shares use each area’s BHW headcount, rounded to whole percentages, not pipeline totals. No regional average is calculated. Not yet encoded is the headcount minus all pipeline stages, floored at zero."
                 ) : income ? (
@@ -398,7 +399,7 @@ export function DatasetMapCard({
                     {selected.value !== null && !income ? metric?.unit : ""}
                   </p>
                   {(income || profiling || uucRoute || accreditation) && <p>{selected.note}</p>}
-                  {(poverty || censusRate) && !navigationOnly && (
+                  {(poverty || censusUncertainty) && !navigationOnly && (
                     <p>
                       Published {censusRate ? 95 : 90}% confidence interval:{" "}
                       {selected.ciLow != null && selected.ciHigh != null
@@ -460,7 +461,7 @@ export function DatasetMapCard({
                       <tr>
                         <th scope="col">Area</th>
                         <th scope="col">{metric?.unit}</th>
-                        {(poverty || censusRate) && !navigationOnly && (
+                        {(poverty || censusUncertainty) && !navigationOnly && (
                           <th scope="col">Published {censusRate ? 95 : 90}% confidence interval</th>
                         )}
                         {(income || profiling || uucRoute || accreditation) && !navigationOnly && (
@@ -484,7 +485,7 @@ export function DatasetMapCard({
                                   "No matched source record")
                                 : (r.value ?? "Not reported")}
                           </td>
-                          {(poverty || censusRate) && !navigationOnly && (
+                          {(poverty || censusUncertainty) && !navigationOnly && (
                             <td>
                               {r.ciLow != null && r.ciHigh != null
                                 ? `${r.ciLow}%–${r.ciHigh}%`

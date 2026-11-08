@@ -79,11 +79,17 @@ class ReviewedDistrictTest(unittest.TestCase):
         args[3][0][0]['level'] = 'barangay'
         for i in range(2):
             for row in (args[1][0]['expected_members'][i], args[2][i]):
-                row.update(geo_level='barangay', geo_code=f'01001010{i+1}')
-            args[3][0][1]['features'][i]['properties']['geo_code'] = f'01001010{i+1}'
+                row.update(geo_level='barangay', geo_code=f'010010100{i+1}')
+            args[3][0][1]['features'][i]['properties']['geo_code'] = f'010010100{i+1}'
         self.assertTrue(build(*args)[1]['complete'])
         args[3][0][1]['features'][0]['geometry'] = {'type': 'Point', 'coordinates': [120,10]}
         self.assertFalse(build(*args)[0]['features'])
+
+    def test_nine_digit_barangay_codes_are_rejected(self):
+        args = fixture()
+        args[1][0]['expected_members'][0] = {'geo_level': 'barangay', 'geo_code': '010010101'}
+        with self.assertRaises(ValueError):
+            build(*args)
 
     def test_positive_area_overlap_blocks_but_shared_edges_are_allowed(self):
         args = fixture()

@@ -34,7 +34,7 @@ def pinned_json(root, entry):
 def member_key(row):
     level = row.get('geo_level')
     code = row.get('geo_code')
-    length = {'citymun': 7, 'barangay': 9}.get(level)
+    length = {'citymun': 7, 'barangay': 10}.get(level)
     if not length or not isinstance(code, str) or len(code) != length or not code.isascii() or not code.isdigit():
         raise ValueError('Expected exact normalized citymun/barangay string code')
     return level, code

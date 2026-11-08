@@ -16,7 +16,39 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M227`, `R-cf7d0362`: changing a date question to a time question, or back, warns where a comparison on it stops holding (m227-temporal-census)
+## Status: ACTIVE CLAIM — `M228`, `R-5d7128da`: a short written answer that happens to be a word of the printed text is read, not dropped (m228-ocr-short-answer-static)
+
+Taken 2026-11-08, on the user's *"are there any tasks that can be done the is not blocked by the backup?"*, from the plan they approved. Branch `m228-ocr-short-answer-static`, cut from origin/main at `3257252c`, PR into main. Held green for a merge point (`D137`), after `M227`'s #446.
+**One row, by `D13`.** It edits one hub, `OcrAnswerReader.php`, which no held PR touches. `R-0c5e4422` edits the same file, so it waits for the merge point.
+Row: `R-5d7128da`, *"A short written answer that is a substring of any printed text in its region is dropped as printed text, so "FORM" written in a box above a footer that says "Scans of this form…" reads as blank."*
+
+### Evidence verified
+- `OcrAnswerReader::isStatic()` drops a line whose normal form is at least 4 characters and a substring of any printed string: **held**. Both callers, `answerLines()` and the choice reader, skip such a line.
+- `PrintedFormMatcher` adds all three footer sentences to the printed list, and two contain "form": **held**.
+
+### Premise verified
+- The footer lands in the last question's region (`PrintedFormMatcherTest`'s footer case relies on it), so the row's example is reachable on every scan.
+- **The match is not even on whole words.** `str_contains()` on the normal form matches "form" inside "information", so the exposure is wider than the row says.
+- **What the substring rule is for:** a hint or description that wraps, whose pieces land on separate lines. A wrapped piece is a run of whole words, and a one-word piece can only be the printed text's last word, because the earlier lines take the words before it.
+- The user's standing OCR rule (*"always prefill what was read"*) favours reading a doubtful line over dropping a real answer.
+
+### Remedy verdict
+Of the row's two remedies, line geometry needs printed positions the reader does not have; the printed list is text only. **A narrower match works:**
+- A line of one word counts as printed only when it is the last word of a printed string, which is a wrapped tail.
+- A longer line counts as printed only when it is a run of whole words inside a printed string.
+- The whole-string similarity rule stays as it is.
+So "FORM" above "Scans of this form can be read automatically." is read, a hint's wrapped last word is still dropped, and "form" no longer matches inside "information". Measured by the new case before the fix, together with every existing matcher case.
+
+Files: `app/Services/Ocr/OcrAnswerReader.php`, `tests/Feature/Ocr/PrintedFormMatcherTest.php`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `VERSION` (0.18.4, after #446's 0.18.3), `database/data/releases.json`.
+Paired files taken: none.
+Namespaces spent: `M228`.
+Prediction:
+- The new "FORM" case goes red first.
+- Every existing `PrintedFormMatcherTest` and OCR reading case stays green, including the three footer sentences and the wrapped notes.
+- The one I most expect to be wrong: a fixture whose printed hint wraps so that a middle line is one long word.
+
+## HELD — `M227`, `R-cf7d0362`: changing a date question to a time question, or back, warns where a comparison on it stops holding (m227-temporal-census) — BUILT AND HELD: PR #446 green but for the release-order assertion #435 fixes, waiting for a merge point
 
 Taken 2026-11-08, under the same instruction as `M224`. Branch `m227-temporal-census`, cut from origin/main at `d3f5787b`, PR into main. Held green for a merge point (`D137`), after `M226`'s #445.
 **One row, by `D13`.** It edits one hub, `ConversionCensus.php`. `ExpressionOperandJudge.php` and `OperandKind.php` are only read. No held PR touches `ConversionCensus.php`, `ConversionImpact.php` or `ConversionCensusTest.php`; #414 edits `FieldConversionServiceTest.php`, a different file.

@@ -35,6 +35,7 @@ export function DatasetCanvas({
       mapRef.current.setFilter("selection", ["==", "geo_code", selected ?? ""]);
   }, [selected]);
   const [failed, setFailed] = useState(false);
+  const [ready, setReady] = useState(false);
   const callbacks = useRef({ onSelect, onGeometry, onCapture });
   useEffect(() => {
     callbacks.current = { onSelect, onGeometry, onCapture };
@@ -121,6 +122,7 @@ export function DatasetCanvas({
           map.getCanvas().tabIndex = -1;
           map.once("idle", () => {
             if (!disposed && map && codes.length) {
+              setReady(true);
               const readyMap = map;
               callbacks.current.onCapture(() => captureMapFrame(readyMap));
             }
@@ -148,6 +150,7 @@ export function DatasetCanvas({
     <div>
       <div
         aria-hidden="true"
+        data-map-state={failed ? "failed" : ready ? "ready" : "loading"}
         ref={container}
         className={
           expanded

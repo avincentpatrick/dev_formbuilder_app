@@ -577,3 +577,58 @@ test("portal card searches remain independent", async ({ page }) => {
   await nhfr.getByRole("searchbox").fill("02");
   await expect(uuc.getByRole("searchbox")).toHaveValue("01");
 });
+
+test("phone portal loads only visible datasets and disposes maps without losing state", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname.endsWith("/api/dataset-map")) requests.push(url.searchParams.get("dataset")!);
+  });
+  await page.addInitScript(() => {
+    const state = window as typeof window & { mapPeak: number };
+    state.mapPeak = 0;
+    new MutationObserver(() => {
+      state.mapPeak = Math.max(state.mapPeak, document.querySelectorAll(".maplibregl-map").length);
+    }).observe(document, { childList: true, subtree: true });
+  });
+  await page.goto("./");
+  await page.waitForLoadState("networkidle");
+  expect(requests).toEqual([]);
+  await expect(page.locator(".maplibregl-map")).toHaveCount(0);
+  const uuc = page.getByRole("article", { name: "UUC for PHC 2025 map", exact: true });
+  await uuc.scrollIntoViewIfNeeded();
+  await expect(uuc.locator('[data-map-state="ready"]')).toHaveCount(1);
+  await uuc.getByLabel("UUC for PHC 2025 area", { exact: true }).selectOption("01");
+  await uuc.getByRole("searchbox").fill("01");
+  expect(new Set(requests)).toEqual(new Set(["uuc-phc-2025"]));
+  const firstReads = requests.filter((slug) => slug === "uuc-phc-2025").length;
+  const nhfr = page.getByRole("article", { name: "NHFR September 2026 map", exact: true });
+  await nhfr.scrollIntoViewIfNeeded();
+  await expect(nhfr.locator('[data-map-state="ready"]')).toHaveCount(1);
+  await expect(uuc.locator(".maplibregl-map")).toHaveCount(0);
+  expect(new Set(requests)).toEqual(new Set(["uuc-phc-2025", "nhfr-2026-09"]));
+  await uuc.getByText(/Map paused/).scrollIntoViewIfNeeded();
+  await expect(uuc.locator('[data-map-state="ready"]')).toHaveCount(1);
+  await expect(uuc.getByLabel("UUC for PHC 2025 area", { exact: true })).toHaveValue("01");
+  await expect(uuc.getByRole("searchbox")).toHaveValue("01");
+  expect(requests.filter((slug) => slug === "uuc-phc-2025")).toHaveLength(firstReads);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(page.locator(".maplibregl-map")).toHaveCount(0);
+  expect(await page.evaluate(() => (window as typeof window & { mapPeak: number }).mapPeak)).toBeLessThanOrEqual(2);
+});
+
+test("tall desktop portal keeps the two-map limit when several cards are visible", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 3000 });
+  await page.addInitScript(() => {
+    const state = window as typeof window & { mapPeak: number };
+    state.mapPeak = 0;
+    new MutationObserver(() => {
+      state.mapPeak = Math.max(state.mapPeak, document.querySelectorAll(".maplibregl-map").length);
+    }).observe(document, { childList: true, subtree: true });
+  });
+  await page.goto("./");
+  await page.getByRole("heading", { name: "Dataset maps", exact: true }).scrollIntoViewIfNeeded();
+  await expect(page.locator('[data-map-state="ready"]')).toHaveCount(2);
+  expect(await page.evaluate(() => (window as typeof window & { mapPeak: number }).mapPeak)).toBeLessThanOrEqual(2);
+});

@@ -1,0 +1,235 @@
+{
+  "measuredAt": "2026-11-08T06:30:01.407Z",
+  "origin": "http://127.0.0.1:3100",
+  "browser": "149.0.7827.55",
+  "profile": {
+    "viewport": "390x844",
+    "cpuSlowdown": 4,
+    "latencyMs": 80,
+    "downloadBytesPerSecond": 524288,
+    "uploadBytesPerSecond": 131072,
+    "browserCache": "disabled",
+    "runsPerScenario": 3
+  },
+  "caveat": "Chromium emulation, not a real handset. Server caches are not reset. Post-document timing is not cold navigation latency. No production claim from local results.",
+  "results": [
+    {
+      "mode": "portal",
+      "run": 1,
+      "navigationToReadyMs": 4050,
+      "afterDocumentAndScrollReadyMs": 3248,
+      "targetMs": 3000,
+      "meetsPostDocumentTarget": false,
+      "beforeScrollRequests": [],
+      "requestedDatasets": [
+        "uuc-phc-2025"
+      ],
+      "liveMaps": 1,
+      "resources": [
+        {
+          "path": "/bhw-connect/api/dataset-map",
+          "transferSize": 1871,
+          "encodedBodySize": 1571,
+          "durationMs": 89,
+          "timingValid": true
+        },
+        {
+          "path": "/bhw-connect/geo/regions.json",
+          "transferSize": 179309,
+          "encodedBodySize": 179009,
+          "durationMs": 773,
+          "timingValid": true
+        },
+        {
+          "path": "/bhw-connect/maplibre-gl-worker.mjs",
+          "transferSize": 148631,
+          "encodedBodySize": 148331,
+          "durationMs": null,
+          "timingValid": false
+        }
+      ]
+    },
+    {
+      "mode": "portal",
+      "run": 2,
+      "navigationToReadyMs": 4189,
+      "afterDocumentAndScrollReadyMs": 3509,
+      "targetMs": 3000,
+      "meetsPostDocumentTarget": false,
+      "beforeScrollRequests": [],
+      "requestedDatasets": [
+        "uuc-phc-2025"
+      ],
+      "liveMaps": 1,
+      "resources": [
+        {
+          "path": "/bhw-connect/api/dataset-map",
+          "transferSize": 1871,
+          "encodedBodySize": 1571,
+          "durationMs": 88,
+          "timingValid": true
+        },
+        {
+          "path": "/bhw-connect/geo/regions.json",
+          "transferSize": 179309,
+          "encodedBodySize": 179009,
+          "durationMs": 766,
+          "timingValid": true
+        },
+        {
+          "path": "/bhw-connect/maplibre-gl-worker.mjs",
+          "transferSize": 148631,
+          "encodedBodySize": 148331,
+          "durationMs": null,
+          "timingValid": false
+        }
+      ]
+    },
+    {
+      "mode": "portal",
+      "run": 3,
+      "navigationToReadyMs": 3986,
+      "afterDocumentAndScrollReadyMs": 3340,
+      "targetMs": 3000,
+      "meetsPostDocumentTarget": false,
+      "beforeScrollRequests": [],
+      "requestedDatasets": [
+        "uuc-phc-2025"
+      ],
+      "liveMaps": 1,
+      "resources": [
+        {
+          "path": "/bhw-connect/api/dataset-map",
+          "transferSize": 1871,
+          "encodedBodySize": 1571,
+          "durationMs": 86,
+          "timingValid": true
+        },
+        {
+          "path": "/bhw-connect/geo/regions.json",
+          "transferSize": 179309,
+          "encodedBodySize": 179009,
+          "durationMs": 765,
+          "timingValid": true
+        },
+        {
+          "path": "/bhw-connect/maplibre-gl-worker.mjs",
+          "transferSize": 148631,
+          "encodedBodySize": 148331,
+          "durationMs": null,
+          "timingValid": false
+        }
+      ]
+    },
+    {
+      "mode": "fullscreen",
+      "run": 1,
+      "navigationToReadyMs": 3562,
+      "afterDocumentAndScrollReadyMs": 3093,
+      "targetMs": 3000,
+      "meetsPostDocumentTarget": false,
+      "beforeScrollRequests": [],
+      "requestedDatasets": [
+        "uuc-phc-2025"
+      ],
+      "liveMaps": 1,
+      "resources": [
+        {
+          "path": "/bhw-connect/api/dataset-map",
+          "transferSize": 1871,
+          "encodedBodySize": 1571,
+          "durationMs": 89,
+          "timingValid": true
+        },
+        {
+          "path": "/bhw-connect/geo/regions.json",
+          "transferSize": 179309,
+          "encodedBodySize": 179009,
+          "durationMs": 766,
+          "timingValid": true
+        },
+        {
+          "path": "/bhw-connect/maplibre-gl-worker.mjs",
+          "transferSize": 148631,
+          "encodedBodySize": 148331,
+          "durationMs": null,
+          "timingValid": false
+        }
+      ]
+    },
+    {
+      "mode": "fullscreen",
+      "run": 2,
+      "navigationToReadyMs": 3422,
+      "afterDocumentAndScrollReadyMs": 3056,
+      "targetMs": 3000,
+      "meetsPostDocumentTarget": false,
+      "beforeScrollRequests": [],
+      "requestedDatasets": [
+        "uuc-phc-2025"
+      ],
+      "liveMaps": 1,
+      "resources": [
+        {
+          "path": "/bhw-connect/api/dataset-map",
+          "transferSize": 1871,
+          "encodedBodySize": 1571,
+          "durationMs": 89,
+          "timingValid": true
+        },
+        {
+          "path": "/bhw-connect/geo/regions.json",
+          "transferSize": 179309,
+          "encodedBodySize": 179009,
+          "durationMs": 765,
+          "timingValid": true
+        },
+        {
+          "path": "/bhw-connect/maplibre-gl-worker.mjs",
+          "transferSize": 148631,
+          "encodedBodySize": 148331,
+          "durationMs": null,
+          "timingValid": false
+        }
+      ]
+    },
+    {
+      "mode": "fullscreen",
+      "run": 3,
+      "navigationToReadyMs": 3562,
+      "afterDocumentAndScrollReadyMs": 3149,
+      "targetMs": 3000,
+      "meetsPostDocumentTarget": false,
+      "beforeScrollRequests": [],
+      "requestedDatasets": [
+        "uuc-phc-2025"
+      ],
+      "liveMaps": 1,
+      "resources": [
+        {
+          "path": "/bhw-connect/api/dataset-map",
+          "transferSize": 1871,
+          "encodedBodySize": 1571,
+          "durationMs": 87,
+          "timingValid": true
+        },
+        {
+          "path": "/bhw-connect/geo/regions.json",
+          "transferSize": 179309,
+          "encodedBodySize": 179009,
+          "durationMs": 766,
+          "timingValid": true
+        },
+        {
+          "path": "/bhw-connect/maplibre-gl-worker.mjs",
+          "transferSize": 148631,
+          "encodedBodySize": 148331,
+          "durationMs": null,
+          "timingValid": false
+        }
+      ]
+    }
+  ],
+  "environment": "Local prefixed production build with synthetic development database; no production certification",
+  "base_commit": "f3110a7c"
+}

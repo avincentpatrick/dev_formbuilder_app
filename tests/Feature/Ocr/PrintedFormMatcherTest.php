@@ -730,3 +730,11 @@ it('still drops the last word of a wrapped hint that lands alone on its own line
 
     expect($fields['full_name'])->toMatchArray(['state' => 'read', 'value' => 'JUAN DELA CRUZ']);
 });
+
+it('matches a longer line to printed text only on whole words (R-5d7128da)', function (): void {
+    // "his form" sits inside the footer's "this form", but it starts in the middle of a printed word, so it cannot be a
+    // piece the footer wrapped into. A run of whole printed words is still dropped; only line positions could tell those apart.
+    $fields = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, [...ocrMatchAnswers(), 'notes' => 'HIS FORM']);
+
+    expect($fields['notes'])->toMatchArray(['state' => 'read', 'value' => 'HIS FORM']);
+});

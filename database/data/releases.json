@@ -1,5 +1,15 @@
 [
     {
+        "version": "0.18.4",
+        "title": "A short answer on a scan is no longer mistaken for printed text",
+        "items": [
+            {
+                "kind": "fixed",
+                "text": "When a filled paper copy is scanned, a one-word answer that happens to appear in the form’s printed text, such as “FORM” written above the line that says “Scans of this form…”, is now read as the answer. Before, it was skipped as printed text and the question showed as blank."
+            }
+        ]
+    },
+    {
         "version": "0.17.1",
         "title": "Builder panels that grow with your text",
         "items": [

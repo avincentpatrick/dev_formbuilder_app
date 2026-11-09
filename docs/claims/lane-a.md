@@ -57,6 +57,21 @@ Paired files taken: none.
 Namespaces spent: `M233`.
 Prediction: the new spec passes at all three projects, 9 runs. The wrap rule deleted, committed on a throwaway branch and rebuilt, turns the stress case red at all three, and the two axe cases stay green. No `VERSION` bump, because the one product edit is a CSS comment. Neither `type-check` (its `include` is `resources/js` and the public runtime) nor Vitest nor PHPStan reads an e2e spec, so none can move. Pint and the host lint gates stay clean. The one I most expect to be wrong: the "two lines" guard at 375px, if the stacked segments' tops differ by less than a pixel rounding allows.
 
+### Build record (2026-11-10, not merged)
+PR #497, head `93af09e1`, CI run 42652086518: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5).
+- **`Boundary (from main)` has not started.** Three runs ended in `startup_failure` with no jobs: 42652083895 (`opened`), then 42658803413 and 42659101554 (`edited`, from notes added to the PR's description). Such a run cannot be retried.
+  - Not the repository: since #496's green Boundary run, `main` changed only this file, `boundary.yml` is unchanged since `M214`, every action is allowed, and the pinned `actions/checkout` commit (`v4.4.0`) resolves.
+  - Not billing: the repository is public. GitHub reported Actions operational, and CI started fine in the same minute.
+  - It re-runs when the merge point merges the trunk into this branch (`synchronize`). If it still cannot start then, it blocks #497 under the every-required-check rule, and the cause is investigated then.
+- **Local E2E, this spec only:** 9 passed at mobile, tablet and desktop, before and after the mutant.
+- **Mutant A** (the host's `flex-wrap: wrap` turned into a comment, committed on a throwaway branch and rebuilt): the stress case was red at all three widths, the modal body scrolling 246, 103 and 103px sideways, as the probe predicted. Both axe cases stayed green. The branch was deleted unpushed, the file's sha256 matched, and the real assets were rebuilt and run green again.
+- **Host:** `preflight --with-gates --with-pint` OK, Pint clean over 1,891 files, `pipeline-lint` 461 rows, `tracker-lint` +0 bytes, the citation lint at 16 rotten (the trunk's figure). Vitest, `type-check` and PHPStan do not read an e2e spec. `PROGRESS.md` is untouched until release.
+- The plan said to run `next.php --lane=a --write`. It rewrites `PROGRESS.md`'s hand-off line, so the change was reverted to keep `PROGRESS.md` untouched until release, as with every held build.
+
+**How the prediction fared:** right on every gate it named, including the mutant's widths. The guard I most expected to be wrong held: the stacked segments' tops differ by 34px. **Not predicted:** Boundary's startup failures. **Corrected before the claim, by measuring:** the plan assumed a plain spill read could fail on this host, and that `mutate.php` could drive an e2e mutant. The first is false, and the second is Pest-only (the gate-traps log already said so).
+
+**The merge point owes:** merge after #496, with no dependence on #435 (no release note). Boundary must be green first. Release this claim then.
+
 ## HELD — `M232`, `R-473558cf` and a sibling it files: the secret-scan and npm-audit workflow arms read their own job, not the whole of `ci.yml` (m232-workflow-arms-scoped) — BUILT AND HELD: PR #496, waiting for a merge point
 
 Taken 2026-11-09, from the plan the user approved the same day. Branch `m232-workflow-arms-scoped`, cut from origin/main at `50d027f8`, PR into main. Held green for a merge point (`D137`), after `M231`'s #494.

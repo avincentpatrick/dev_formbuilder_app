@@ -16,7 +16,48 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M232`, `R-473558cf` and a sibling it files: the secret-scan and npm-audit workflow arms read their own job, not the whole of `ci.yml` (m232-workflow-arms-scoped)
+## Status: ACTIVE CLAIM — `M233`, `R-03715adf`: the Sheets rule modal's segmented control gets an e2e gate that can fail (m233-sheets-rule-modal-spill)
+
+Taken 2026-11-09, from the plan the user approved the same day. Branch `m233-sheets-rule-modal-spill`, cut from origin/main at `c92fa2fe`, PR into main. Held green for a merge point (`D137`), after `M232`'s #496.
+**One row, by `D13`.** Test-only plus one comment, edits no hub, and touches no held PR's files. **Chosen to stay clear:** `M232` took line position 41. The rows after it, before this one:
+- `R-f0663272`: its remedy is the push-side scope logic in `ci.yml` (#414).
+- `R-38ba2f94`: closing it rewrites §5 item 4 of `docs/deployment-infrastructure.md`, which cites it (#414).
+- `R-1eaa6e8d`: closing it makes the Slack paragraph of `docs/webhook-integration-design.md` stale (#489). It is also declined on the merits, with no remedy offered.
+- `R-387dd26e`: closing it makes `docs/data-dictionary.md`'s SSO-domains passage stale (#442).
+- `R-1d43bef5`: closed by #489.
+
+Row: `R-03715adf`, *"`.sheets-fields` is probably the worst `MdsSegmentedControl` host in the tree and it is the one with no coverage of any kind."*
+
+### Evidence verified
+- `SheetsRuleFields.vue`'s `modeOptions` are "Create a sheet for me" and "Use one I already have": **held**.
+- The control sits in `MdsModal`, whose panel loses its 520px cap at 480px and below, and whose body is `overflow-y: auto`: **held**. Measured: the body computes `overflow-x: auto`, so a spill there would be a sideways scrollbar that `assertNoHorizontalOverflow` skips by construction.
+- *"No e2e spec opens `RuleFormModal` at all"*, nor the members invite or change-role modal: **held**. Both integrations scans in `responsive-axe.spec.ts` stop at the rule detail page.
+
+### Premise verified
+- **The spill the row expected cannot happen with today's copy, with or without the host's wrap rule. Measured in the real app, at three widths, at default text and at `extra_large` + dyslexia.** All 12 readings of the modal body and the control are 0px, including with `.sheets-fields .mds-segmented` forced to `nowrap`. The mechanism: a segment is a flex item with `min-width: auto` and a label that can break, so it shrinks to its longest word ("already"). The row sized the control by whole labels. Squeezed, the labels break onto 2 to 4 lines instead.
+- **So `M109`'s wrap rule is a second protection today, and it becomes the only one when a label cannot break,** as with a single long word. Measured with labels unbreakable at `extra_large` + dyslexia: with the rule, the segments stack and nothing spills. Without it, the modal body scrolls 246px sideways at 375, and 103px at 834 and 1440. At default text both whole labels fit on one line, so the stress needs the large text.
+- **`SheetsRuleFields.vue`'s comment on that rule says the wrap "is what fixes" an overflow.** That holds only for an unbreakable label. It is corrected here so the mechanism does not spread by quotation, as `M19`'s did.
+- **Opening a NEW rule's modal makes no call to Google, measured.** `RuleFormModal::loadChannels()` returns early for a spreadsheet-type provider, and `SheetsRuleFields`' seed watcher calls only `GET /integrations/connections/{id}/columns`. That was the only connector request at every width, and no `/destinations` call was made. `responsive-axe.spec.ts`'s "does not open the rule modal" notes concern a SAVED rule, whose editor re-inspects its sheet, so they stay true.
+- **`R-db28b120` owns the other hosts** (`.mds-field`, `.encode-field`) and the `.config` widening, which lives in `personalization-axe.spec.ts` (#429). It stays open and gets a note.
+- **No held PR touches `SheetsRuleFields.vue`, `RuleFormModal.vue`, `Index.vue` or a new spec.** `E2eSeeder.php` (#429) holds the Sheets fixture and is not edited. Its comment saying no spec opens the rule modal goes stale, and is filed as a `nit`.
+
+### Remedy verdict
+**Works, measured before the test, with the guard the measurement demands.** The row offered component-level affordances. `M109` chose per-host wraps instead, so what remains is coverage. A plain spill read here is green by construction, so it alone would be decorative. The case must stress the host with labels that cannot break, and prove the stress engaged by asserting that the segments stacked.
+- axe on the open modal, light and dark, at three widths: **clean**. This is the first scan of this modal.
+- A new spec, `tests/e2e/integrations-rule-modal.spec.ts`:
+  - A route guard fails the case on any `/destinations` request.
+  - Sufficiency as shipped at `extra_large` + dyslexia.
+  - The same read with labels made unbreakable, guarded by "it rendered as two radios" and "the segments are on two lines".
+  - `assertClean` in both themes.
+- Mutants for e2e go on a throwaway branch with a rebuild (`mutate.php` is Pest-only, per the gate-traps log).
+
+Files: `tests/e2e/integrations-rule-modal.spec.ts` (new), `resources/js/components/integrations/SheetsRuleFields.vue` (one comment).
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, the top-level `tests/e2e/*.spec.ts` (a new file), `PROGRESS.md` (own block only, at release).
+Paired files taken: none.
+Namespaces spent: `M233`.
+Prediction: the new spec passes at all three projects, 9 runs. The wrap rule deleted, committed on a throwaway branch and rebuilt, turns the stress case red at all three, and the two axe cases stay green. No `VERSION` bump, because the one product edit is a CSS comment. Neither `type-check` (its `include` is `resources/js` and the public runtime) nor Vitest nor PHPStan reads an e2e spec, so none can move. Pint and the host lint gates stay clean. The one I most expect to be wrong: the "two lines" guard at 375px, if the stacked segments' tops differ by less than a pixel rounding allows.
+
+## HELD — `M232`, `R-473558cf` and a sibling it files: the secret-scan and npm-audit workflow arms read their own job, not the whole of `ci.yml` (m232-workflow-arms-scoped) — BUILT AND HELD: PR #496, waiting for a merge point
 
 Taken 2026-11-09, from the plan the user approved the same day. Branch `m232-workflow-arms-scoped`, cut from origin/main at `50d027f8`, PR into main. Held green for a merge point (`D137`), after `M231`'s #494.
 **One row and the sibling it finds, by `D13`.** Both are test-only, edit no hub, and touch no held PR's files. `R-473558cf` is the first during-testing row in the line that no held PR closes or touches. The rows above it: `R-e6e340c0` is a sweep of `docs/deployment-infrastructure.md` (#414); `R-7d0853f5` and `R-2ca49f19` need `state.php` (#494) or `pipeline-lint.php` and `PipelineLintControlsTest` (#429); `R-4b57090b` waits for the box's log read; `R-5e7551aa`'s drift half needs `E2eSeeder.php` (#429). Every other row above it in the line is closed by a held PR or edits a file one holds (`XlsformExporter`, `FieldLibrary`, `OcrAnswerReader`, `useBuilderStore`, `BuilderCanvas`, `FormBuilderService`, the print presenter, `XlsformImportParser`, `CLAUDE.md`, `ci.yml`).

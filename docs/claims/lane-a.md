@@ -46,6 +46,20 @@ Paired files taken: none.
 Namespaces spent: `M231`.
 Prediction: `state.php --check` exits 0 with 12 pairs judged and 2 unresolved. The new test passes, and three committed mutations each turn it red. Pint is clean, and PHPStan cannot move because `scripts/` is outside its scan. The other tests that load `state.php`'s neighbours stay green. No `VERSION` bump, because nothing changes for a tester. The one I most expect to be wrong: `PipelineLintControlsTest` or `BacklogProvenanceTest`, if either pins the shape of a `state.php --json` row and the new `records_retier` field changes it.
 
+### Build record (2026-11-09, not merged)
+PR #494, head `a3add4da`, run 42588431437: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green (run 42588431353, 5 steps).
+- On the host: `state.php --check` exits 0 and reads **12 payloads, 10 rows judged, 2 unresolved** (`D52 R-e6a10f97`, `D53 R-e7d6f223`). End to end, `R-5ecfa6cd` moved to `during-testing` with its bold RETIERED record neutralised made `--check` exit 1, naming `D51`, the row and both tiers. Restored byte for byte.
+- That probe also measured a limit, now in the file's header. **Any** retier recorded at the row passes, including the record of the answer being judged, so `R-5ecfa6cd` stays green at any tier while its record stands.
+- `RetierPayloadTest`: 26 passed. Three mutants were each CAUGHT by `scripts/mutate.php`: the tier comparison (2 red), the list capture (2 red) and the record at the row (1 red). The file restored to its sha256 each time.
+  - They were run through `mutate.php`'s write, run and byte-restore, and not committed. The commit rule guards diff-based checks, and this test reads the file.
+- Container: the RetierPayload, NextSectionClass, PipelineLintControls, BacklogProvenance, TestingGateNotifiedContract and GateBaselines tests, 154 passed.
+- Host: Pint, `pipeline-lint` (460 rows), `tracker-lint`, and the citation lint at 16 rotten (the trunk's figure). `preflight --with-gates --with-pint` OK.
+- `PROGRESS.md` is untouched until release, as with every held build.
+
+**How the prediction fared:** right on every gate. **One figure was worded wrong:** the prediction said 12 pairs *judged*, but 12 were read and 10 judged, because the 2 unresolved are never judged. Neither test I most expected to break moved.
+
+**The merge point owes:** merge after #489, with no dependence on #435 (no release note). Release this claim then.
+
 ## HELD — `M230`, `R-1d43bef5`: §7.1 and the webhook design doc name the webhook paths that were built (m230-webhook-paths) — BUILT AND HELD: PR #489, waiting for a merge point
 
 Taken 2026-11-09, from the plan the user approved on 2026-11-08. Branch `m230-webhook-paths`, cut from origin/main at `203196c2`, PR into main. Held green for a merge point (`D137`), after `M229`'s #488.

@@ -7,4 +7,6 @@ pymupdf
 rapidfuzz
 # reconcile_boundaries.py / build_district_boundaries.py (D3.2) polygon dissolves, and
 # build_barangay_centroids.py (N7) representative points
-shapely
+shapely>=2.0,<3
+# Offline pinned upstream shapefile topology comparison (no repair/reprojection)
+pyshp==2.3.1

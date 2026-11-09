@@ -1,7 +1,11 @@
+import { GeoSearch } from "@/components/home/geo-search";
 import Link from "next/link";
 import { getDistrictIndex } from "@/lib/db/districts";
 import { DistrictIndexTable } from "@/components/districts/district-index-table";
-import { MatchQualityBadge, MATCH_QUALITY_DESCRIPTION } from "@/components/districts/match-quality-badge";
+import {
+  MatchQualityBadge,
+  MATCH_QUALITY_DESCRIPTION,
+} from "@/components/districts/match-quality-badge";
 import type { DistrictMatchQuality } from "@/lib/db/districts";
 import { withBasePath } from "@/lib/base-path";
 
@@ -45,20 +49,30 @@ export default async function DistrictsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Legislative districts</h1>
         <p className="mt-2 max-w-3xl text-muted">
           This mapping of cities, municipalities, and barangays to Philippine legislative districts
-          is <strong className="text-foreground">derived from public sources — Wikipedia and
-          Wikidata — not published by PSA or COMELEC</strong>. It rests on a single source rather
-          than the usual two, because the intended second opinion (COMELEC&apos;s precinct returns)
-          is no longer reachable by anyone. Every row below carries the source page and revision it
-          came from. If you know your own city, municipality, or barangay is placed wrong, open its
-          district below and use the &ldquo;Propose a correction&rdquo; form there — that
-          correction is the second source this mapping is missing. Every proposal, accepted or not,
-          is published with its reason on the{" "}
+          is{" "}
+          <strong className="text-foreground">
+            derived from public sources — Wikipedia and Wikidata — not published by PSA or COMELEC
+          </strong>
+          . It rests on a single source rather than the usual two, because the intended second
+          opinion (COMELEC&apos;s precinct returns) is no longer reachable by anyone. Every row
+          below carries the source page and revision it came from. If you know your own city,
+          municipality, or barangay is placed wrong, open its district below and use the
+          &ldquo;Propose a correction&rdquo; form there — that correction is the second source this
+          mapping is missing. Every proposal, accepted or not, is published with its reason on the{" "}
           <Link href="/districts/corrections" className="underline hover:text-accent">
             correction ledger
           </Link>
           .
         </p>
       </div>
+
+      <section aria-label="Find a legislative district" className="flex flex-col gap-2">
+        <GeoSearch mode="districts" />
+        <p className="text-sm text-muted">
+          Find a district by name or a member city, municipality, or barangay. Use the region filter
+          below to browse.
+        </p>
+      </section>
 
       {rows.length === 0 ? (
         <p className="text-muted">District data is temporarily unavailable.</p>
@@ -91,11 +105,17 @@ export default async function DistrictsPage() {
 
           <p className="text-sm text-muted">
             Download the mapping itself:{" "}
-            <a href={withBasePath("/api/export/districts/csv")} className="underline hover:text-accent">
+            <a
+              href={withBasePath("/api/export/districts/csv")}
+              className="underline hover:text-accent"
+            >
               CSV
             </a>{" "}
             ·{" "}
-            <a href={withBasePath("/api/export/districts/xlsx")} className="underline hover:text-accent">
+            <a
+              href={withBasePath("/api/export/districts/xlsx")}
+              className="underline hover:text-accent"
+            >
               XLSX
             </a>{" "}
             — every live member LGU with its source page, revision, and match method.

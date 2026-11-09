@@ -19,6 +19,7 @@ import { DATASET_SLUGS } from "@/lib/db/dataset";
 
 /** Longest prefix wins, so `/profiling-status/methodology` resolves like its section. */
 const SECTIONS: readonly { prefix: string; slug: string }[] = [
+  { prefix: "/health-services", slug: DATASET_SLUGS.fhsis },
   { prefix: "/uuc-phc", slug: DATASET_SLUGS.uucPhc },
   { prefix: "/profiling-status", slug: DATASET_SLUGS.profilingStatus },
   // The 2025 BHW Census: its landing page and the per-place profiles built from it.

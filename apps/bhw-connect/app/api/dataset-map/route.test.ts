@@ -439,3 +439,10 @@ it("preserves an independent Census parent mean without summing or averaging chi
   expect(mock.source).toHaveBeenCalledWith("bhw-2025", true);
   for (const read of [child, parent]) expect(read.select).toHaveBeenCalledWith("geo_code,avg_active_years,n_total");
 });
+
+it("rejects ambiguous query choices before reading a dataset", async () => {
+  const result = await GET(new NextRequest("http://localhost/api/dataset-map?dataset=bhw-2025&indicator=bhw.validated-profiles&indicator=bhw.any-honorarium"));
+  expect(result.status).toBe(400);
+  expect(mock.source).not.toHaveBeenCalled();
+  expect(mock.from).not.toHaveBeenCalled();
+});

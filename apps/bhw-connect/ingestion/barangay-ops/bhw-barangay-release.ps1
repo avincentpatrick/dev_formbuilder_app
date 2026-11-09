@@ -38,6 +38,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Windows PowerShell 5.1 on the box asks for TLS 1.0 by default; the site needs 1.2, so every web check failed.
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 if ($Release -notmatch '^[a-z0-9][a-z0-9.-]{2,79}$' -or $Release -eq 'latest' -or $Release.Contains('..')) {
     throw "Release '$Release' is not an accepted release name."
 }

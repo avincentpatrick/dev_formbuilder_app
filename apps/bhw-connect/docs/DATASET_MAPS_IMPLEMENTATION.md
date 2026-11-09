@@ -894,3 +894,25 @@ Validation: eight new formatter/export checks; full database-backed Vitest 1,660
 11 skipped. All 35 map browser cases passed, including exact DOM/JSON decimal-label parity
 and desktop/phone PNG downloads. Lint (existing fixture warning), typecheck, migration lint
 and prefixed no-data build passed.
+
+## Unambiguous map-link selections (9 November 2026)
+
+Shared map choices now reject repeated dataset, indicator, period, level, code or selected
+parameters rather than accepting whichever value happens to be read first. The Next.js
+page preserves array-valued search parameters for that validation; previously it discarded
+them, potentially replacing a duplicated indicator with the dataset default. Unrelated
+tracking parameters remain harmless and do not become map state.
+
+A selected child must have the correct code depth: region at national scope, province at
+region scope and city/municipality at province scope. Leading zeros remain intact. Empty,
+wrong-depth and planned-slot selections are rejected. This is syntactic validation, not a
+new historical crosswalk or a claim of parent membership inferred from a code prefix.
+Authoritative geography/data joins continue to control actual rows.
+
+Invalid links render the existing dataset-picker recovery message without loading a
+fallback dataset. Valid links retain their selected geography and independent dataset
+choices. No indicators, source queries, boundaries or disclosure rules are expanded.
+Validation: 18 new parser/API cases; full database-backed Vitest 1,678 passed, 11 skipped.
+All 37 map browser cases passed, including duplicate-indicator and wrong-depth selection
+recovery with no fallback reads. Lint (existing fixture warning), typecheck, migration lint
+and prefixed no-data build passed.

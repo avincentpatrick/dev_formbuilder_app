@@ -84,6 +84,9 @@ export function initialMapChoice(dataset: string): MapChoice {
   };
 }
 export function parseMapChoice(params: URLSearchParams): MapChoice | null {
+  // One meaning per shareable choice; never silently pick the first duplicated value.
+  if (["dataset", "indicator", "period", "level", "code", "selected"].some(key => params.getAll(key).length > 1))
+    return null;
   const dataset = params.get("dataset");
   if (!dataset || !getDatasetMap(dataset)) return null;
   const base = initialMapChoice(dataset);
@@ -108,7 +111,10 @@ export function parseMapChoice(params: URLSearchParams): MapChoice | null {
   )
     return null;
   const selected = params.get("selected");
-  if (selected && !/^\d{2,7}$/.test(selected)) return null;
+  if (selected !== null) {
+    const childLength = level === "national" ? 2 : level === "region" ? 5 : 7;
+    if (!metrics.length || !new RegExp(`^\\d{${childLength}}$`).test(selected)) return null;
+  }
   return { dataset, indicator, period, level: level as MapScope["level"], code, selected };
 }
 export function mapHref(choice: MapChoice) {

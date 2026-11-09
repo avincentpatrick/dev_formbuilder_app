@@ -888,3 +888,29 @@ test("decimal year legends match exported labels without collapsing distinct bre
   expect(result.legend.bins[0]).toMatchObject({ min: 0.01, minInclusive: true, maxInclusive: false });
   expect(result.legend.bins.at(-1)).toMatchObject({ max: 0.03, maxInclusive: true });
 });
+
+for (const query of [
+  "dataset=nhfr-2026-09&indicator=nhfr.facilities&indicator=nhfr.private",
+  "dataset=nhfr-2026-09&level=region&code=01&selected=01",
+]) {
+  test(`invalid map link does not load a fallback and can recover: ${query}`, async ({ page }) => {
+    const requests: string[] = [];
+    await page.route("**/api/dataset-map?**", route => {
+      requests.push(route.request().url());
+      return route.fulfill({ json: { state: "available", rows: [{ code: "01", name: "Synthetic region", value: 1 }],
+        total: 1, area: "Philippines", childLevel: "region", source: "Synthetic NHFR", date: "2026-09-01",
+        license: "Test only", geometryUrl: "/bhw-connect/geo/regions.json" } });
+    });
+    await page.goto(`map?${query}`);
+    await expect(page.getByRole("status")).toContainText("If a shared link has an unsupported indicator");
+    await expect(page.getByRole("article")).toHaveCount(0);
+    expect(requests).toEqual([]);
+    await page.getByLabel("Map dataset", { exact: true }).selectOption("nhfr-2026-09");
+    await expect(page.getByText(/Reported area total: 1/)).toBeVisible();
+    expect(requests).toHaveLength(1);
+    const choice = new URL(requests[0]).searchParams;
+    expect(choice.get("dataset")).toBe("nhfr-2026-09");
+    expect(choice.get("indicator")).toBe("nhfr.facilities");
+    expect(choice.get("level")).toBe("national");
+  });
+}

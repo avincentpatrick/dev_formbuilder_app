@@ -54,3 +54,28 @@ it("keeps StepZero population and households separate from PSA and other release
     expect(parseMapChoice(new URLSearchParams(`dataset=bhw-stepzero-2026&indicator=${indicator}&period=2024`))).toBeNull();
   }
 });
+
+it.each(["dataset", "indicator", "period", "level", "code", "selected"])("rejects duplicate %s choices instead of choosing a value", key => {
+  const params = new URLSearchParams("dataset=nhfr-2026-09&indicator=nhfr.facilities&period=September+2026&level=national&code=PH&selected=01");
+  params.append(key, params.get(key)!);
+  expect(parseMapChoice(params)).toBeNull();
+});
+it.each([
+  ["national", "PH", "01"], ["region", "01", "01028"], ["province", "01028", "0102801"],
+])("preserves a correctly shaped selected child at %s level", (level, code, selected) => {
+  expect(parseMapChoice(new URLSearchParams({ dataset: "nhfr-2026-09", level, code, selected })))
+    .toMatchObject({ level, code, selected });
+});
+it.each([
+  ["national", "PH", "01028"], ["region", "01", "01"], ["province", "01028", "01028"],
+  ["province", "01028", "0102801001"], ["national", "PH", ""], ["national", "PH", "001"],
+])("rejects a selected code with the wrong child depth: %s/%s/%s", (level, code, selected) => {
+  expect(parseMapChoice(new URLSearchParams({ dataset: "nhfr-2026-09", level, code, selected }))).toBeNull();
+});
+it("does not carry selected areas into planned availability slots", () => {
+  expect(parseMapChoice(new URLSearchParams("dataset=ways-forward&selected=01"))).toBeNull();
+});
+it("ignores unrelated tracking parameters without weakening map-choice validation", () => {
+  expect(parseMapChoice(new URLSearchParams("dataset=nhfr-2026-09&utm_source=one&utm_source=two")))
+    .toEqual(initialMapChoice("nhfr-2026-09"));
+});

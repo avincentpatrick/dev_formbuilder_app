@@ -16,7 +16,37 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M230`, `R-1d43bef5`: §7.1 and the webhook design doc name the webhook paths that were built (m230-webhook-paths)
+## Status: ACTIVE CLAIM — `M231`, `R-f6eab58d`: an answered retier is checked to have reached the row it names (m231-retier-payload)
+
+Taken 2026-11-09, from the plan the user approved the same day. Branch `m231-retier-payload`, cut from origin/main at `ea2b85a5`, PR into main. Held green for a merge point (`D137`), after `M230`'s #489.
+**One row, by `D13`.** It edits one hub, `scripts/state.php`, and no held PR touches it, `CLAUDE.md`, or the two new files. It is the first during-testing row in the line that no held PR closes or touches: `R-e6e340c0`'s claims live in `docs/deployment-infrastructure.md` (#414), `R-7d0853f5` edits `scripts/pipeline-lint.php` (#429) and its own text waits for an open decision that names a row, and `R-4b57090b` waits for the box's log read.
+Row: `R-f6eab58d`, *"A retier's PAYLOAD is a change to another file's row, nothing performs it, and the only record of that is a lane ledger."*
+
+### Evidence verified
+- The ledger record: `M105`'s release block in this file says it stripped `D51`'s and `D53`'s Awaits tokens and *"did not apply the retiers they exist to commission"*, and that both states passed `pipeline-lint`, *"fifteen rule groups, green"*: **held**.
+- *"Both states have since been corrected in the line"*: `R-5ecfa6cd` is open at `before-launch`, as `D51` answered. `R-e7d6f223` was closed by `M109`: **held**.
+- *"Nothing would notice the next one"*: no script reads a decision's retier. `pipeline.php`, `pipeline-lint.php`, `next.php` and `state.php` each read a decision's heading, tier and Awaits tokens only: **held**.
+
+### Premise verified
+- **The payload already has a written shape, and that is what makes a check possible.** Since `D104`, an answer's `**What the answer files, in the same push:**` line names each retier as `` `R-x` retiered `tier` ``, sometimes as a list (`D132` names three) and once with a parenthetical before *"is retiered"* (`D104`). The three older questions, `D51` to `D53`, ask *"Which tier?"* in a heading that names one row. Measured on the trunk: **12 pairs, 9 from answers and 3 from headings.**
+- **A row id rots when its row is struck through,** because `state.php` hashes the headline and `~~…~~` changes it. `D52`'s `R-e6a10f97` and `D53`'s `R-e7d6f223` resolve to no row today. Nothing on disk tells a struck row from a reworded one, so an unresolved id is reported, never failed. That is `R-7d0853f5`'s join-key point, met here as a count instead of a gate.
+- **A later retier is legitimate and is recorded at the row**, as a bold `Retiered up from …`, `Retiered down from …` or `RETIERED \`a\` → \`b\``, 55 mentions in the ledger. A row whose tier differs from an old answer passes when it carries one.
+- **Not reachable from here:** a payload that names no id (`D128`'s *"the sixteen UI rows"*) and a plan marker's retier (`D24`'s `deferral-site-disposition`, whose tier lives in its marker, which `state.php` does not parse). Both are said in the new file's header.
+- **The gate's natural home, `pipeline-lint.php`, is held by #429,** so the check goes in `state.php --check`, which every session runs at its start. The row offered a script check or a close-out step; this builds the check and writes the close-out step into `CLAUDE.md`.
+
+### Remedy verdict
+**Works, measured before the test.** A scratch parser read all 12 pairs: the 9 answer pairs are on closed rows at the answered tier, `D51`'s row is open at its answered tier, and the 2 heading ids do not resolve. So the check is **green on arrival, and only a mutation can prove it.**
+- A new pure file, `scripts/retier-payload.php`, does nothing on load, in the shape of `next-section.php`, so a test can call it.
+- `state.php` reads every payload in the ANSWERED half. It fails on an open row at another tier with no retier recorded at the row, and on an unknown tier. It lists unresolved ids without failing.
+- `CLAUDE.md` adds one clause to the sentence about recording an answer: perform the retier at the row, in the same push, in the shape this reads.
+
+Files: `scripts/retier-payload.php` (new), `scripts/state.php`, `CLAUDE.md`, `tests/Feature/Docs/RetierPayloadTest.php` (new).
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md` (own block only).
+Paired files taken: none.
+Namespaces spent: `M231`.
+Prediction: `state.php --check` exits 0 with 12 pairs judged and 2 unresolved. The new test passes, and three committed mutations each turn it red. Pint is clean, and PHPStan cannot move because `scripts/` is outside its scan. The other tests that load `state.php`'s neighbours stay green. No `VERSION` bump, because nothing changes for a tester. The one I most expect to be wrong: `PipelineLintControlsTest` or `BacklogProvenanceTest`, if either pins the shape of a `state.php --json` row and the new `records_retier` field changes it.
+
+## HELD — `M230`, `R-1d43bef5`: §7.1 and the webhook design doc name the webhook paths that were built (m230-webhook-paths) — BUILT AND HELD: PR #489, waiting for a merge point
 
 Taken 2026-11-09, from the plan the user approved on 2026-11-08. Branch `m230-webhook-paths`, cut from origin/main at `203196c2`, PR into main. Held green for a merge point (`D137`), after `M229`'s #488.
 **One row, by `D13`,** with the floor its own text names: *"the same table's next line … carries two more wrong paths, repeated a third time at `docs/webhook-integration-design.md` … the two want taking together."* That is half (a) of `R-c8c8da76`, which stays open for half (b), the cross-endpoint delivery log, and gets a note. Two hub documents; no held PR touches either.

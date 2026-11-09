@@ -21,9 +21,10 @@ it('never restates the section 2 rule in SQL', function (): void {
     // the repeat-group column.
     $sql = OcrCompatibilityBackfill::SELECT_SQL.OcrCompatibilityBackfill::FLIP_SQL;
 
+    // A boolean judged by `toBeFalse`, never `->not->toContain($needle, $message)`: Pest's `toContain` reads the
+    // message as a second needle, so that negation passed for every type whatever the SQL said (M232).
     foreach (FieldType::cases() as $type) {
-        expect($sql)->not->toContain(
-            "'{$type->value}'",
+        expect(str_contains($sql, "'{$type->value}'"))->toBeFalse(
             "the backfill SQL must not classify field types — found {$type->value}",
         );
     }

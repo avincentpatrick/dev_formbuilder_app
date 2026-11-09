@@ -36,61 +36,47 @@ declare(strict_types=1);
 | a green gate proves nothing about a gate you have just written. The depth arm exists to be
 | mutated. It is the same argument `NpmAuditJudgeTest` records for asserting `--omit=dev`.
 |
-| ⚠️ The fence's message in `ci.yml` deliberately does NOT spell the checkout key followed by its
-| value: `mutate.php` aborts unless its token occurs EXACTLY ONCE in the file, so a fence quoting the
-| token it guards would trade this control's provability for a nicer error string. The last case here
-| pins that, because it is invisible until the day someone "improves" the wording.
+| ⛔ M232 — THE DEPTH ARM READS THE SECRET-SCANNING JOB'S OWN CHECKOUT, NEVER THE WHOLE FILE. It used
+| to assert that `ci.yml` contains the key and its value, and a comment here said that token occurred
+| exactly once. `M192` added a second job that checks out with full history and `M214` a third, so
+| the arm stayed green with the scan's own job bounded: measured with `mutate.php`, a depth of 2
+| there left every case here passing (`R-473558cf`). The job is found by the step it runs, not by
+| its id, so renaming it cannot blind the arm either. `tests/Support/WorkflowText.php` is the reader.
+|
+| ⚠️ ITS MUTATION TOKEN IS TWO LINES NOW, NOT ONE. `mutate.php` refuses a token that occurs more than
+| once, and the key alone does. The comment line directly above the key in that job, plus the key, is
+| unique, so the job's own depth stays drivable without editing `ci.yml` to make it so. A third case
+| that kept the fence's message free of the key went with this: it existed only to keep a one-line
+| token unique, and the arm now reads nothing outside the checkout step, so a message quoting the key
+| can neither blind the arm nor block its proof.
 */
 
-/**
- * The workflow's bytes. Read per-case rather than in a `beforeEach` so a case can be run alone.
- */
-function secretScanWorkflow(): string
-{
-    return (string) file_get_contents(base_path('.github/workflows/ci.yml'));
-}
+use Tests\Support\WorkflowText;
 
 /**
- * The `run:` body of the named step in the named job, as text.
- *
- * Parsed by bracketing on the step's `- name:` line rather than with a YAML parser, because no YAML
- * extension is loaded in the app container and adding one to run a test is a worse trade than a
- * bounded scan. The assertions below all fail closed if the bracketing finds nothing.
+ * The secret-scanning job's text: the one job that runs the gitleaks step. Read per-case rather than in a
+ * `beforeEach` so a case can be run alone.
  */
-function secretScanStepBody(string $stepName): string
+function secretScanJob(): string
 {
-    $lines = explode("\n", secretScanWorkflow());
-    $start = null;
+    $workflow = WorkflowText::read('.github/workflows/ci.yml');
 
-    foreach ($lines as $i => $line) {
-        if (str_contains($line, '- name: '.$stepName)) {
-            $start = $i;
-
-            break;
-        }
-    }
-
-    expect($start)->not->toBeNull("no step named '{$stepName}' in ci.yml — this control is scanning nothing");
-
-    $body = [];
-
-    for ($i = $start + 1; $i < count($lines); $i++) {
-        // The next step at the same indentation ends this one.
-        if (preg_match('/^      - name: /', $lines[$i]) === 1) {
-            break;
-        }
-        $body[] = $lines[$i];
-    }
-
-    return implode("\n", $body);
+    return WorkflowText::job($workflow, WorkflowText::jobRunning($workflow, 'Secret scan (gitleaks)'));
 }
 
 it('checks out the secret-scanning job with unbounded history', function (): void {
-    // ⛔ THE MUTATION TARGET. `php scripts/mutate.php --file=.github/workflows/ci.yml` swapping this
-    // token for a bounded depth must turn this case red; that is the only thing that proves this
-    // file is a gate rather than a description. The token occurs exactly once in the workflow, which
-    // is what makes it drivable at all.
-    expect(secretScanWorkflow())->toContain('fetch-depth: 0');
+    // ⛔ THE MUTATION TARGET. `php scripts/mutate.php --file=.github/workflows/ci.yml`, bounding THIS
+    // job's depth, must turn this case red; that is the only thing that proves this file is a gate
+    // rather than a description. Bounding another job's depth must leave it green.
+    $checkout = WorkflowText::executable(WorkflowText::checkout(secretScanJob()));
+
+    preg_match_all('/^\s*fetch-depth:\s*(\S+)\s*$/m', $checkout, $depths);
+
+    expect($depths[1])->toBe(
+        ['0'],
+        'the secret-scanning job must check out with full history, declared once: gitleaks reads git '.
+        'HISTORY, so a bounded clone reports no leaks while blind. Its checkout reads: '.$checkout
+    );
 });
 
 it('fences the secret scan on clone shape, comparing the printed string rather than the exit status', function (): void {
@@ -100,10 +86,7 @@ it('fences the secret scan on clone shape, comparing the printed string rather t
     // fence ran after the scan. That is the sixth instance of this repository's token-in-prose trap
     // and the second inside this very file — `ci.yml` records the --audit-level one fourteen lines
     // above the step being asserted here. A gate reads what RUNS; the prose is free to describe it.
-    $executable = implode("\n", array_filter(
-        explode("\n", secretScanStepBody('Secret scan (gitleaks)')),
-        static fn (string $line): bool => ! str_starts_with(ltrim($line), '#') && trim($line) !== ''
-    ));
+    $executable = WorkflowText::executable(WorkflowText::step(secretScanJob(), 'Secret scan (gitleaks)'));
 
     // The scan itself must still be the thing that runs.
     expect($executable)->toContain('gitleaks detect --source .');
@@ -120,6 +103,9 @@ it('fences the secret scan on clone shape, comparing the printed string rather t
     //     and here there is no reachability excuse: clone shape is always knowable.
     expect($executable)->toContain('exit 1');
 
+    //     And it says why, or CI fails with no explanation.
+    expect($executable)->toContain('::error');
+
     // (4) The fence must run BEFORE the scan, or it fences nothing.
     $fenceAt = strpos($executable, 'is-shallow-repository');
     $scanAt = strpos($executable, 'gitleaks detect');
@@ -127,29 +113,4 @@ it('fences the secret scan on clone shape, comparing the printed string rather t
         $scanAt,
         'the clone-shape fence runs AFTER the scan, so the scan has already reported on a blind clone'
     );
-});
-
-it('keeps the fence message free of the token its own mutation proof depends on', function (): void {
-    // ⛔ THIS IS THE CASE THAT LOOKS LIKE PEDANTRY AND IS NOT. `scripts/mutate.php` refuses to run
-    // unless its old token occurs EXACTLY ONCE in the target file. The natural wording for this
-    // fence's error — "must check out with <key>: 0" — puts a second copy of that token in the file
-    // and turns the proof from CAUGHT into an abort with no verdict. A future reader improving the
-    // message has no way to know that; this case tells them, by name, at the moment they do it.
-    $body = secretScanStepBody('Secret scan (gitleaks)');
-
-    $echoLines = array_values(array_filter(
-        explode("\n", $body),
-        static fn (string $line): bool => str_contains($line, '::error')
-    ));
-
-    expect($echoLines)->not->toBe([], 'the fence emits no ::error annotation — CI would fail with no explanation');
-
-    foreach ($echoLines as $line) {
-        expect($line)->not->toContain(
-            'fetch-depth: 0',
-            'this message spells the exact token scripts/mutate.php mutates, so the token now occurs '.
-            'twice in ci.yml and mutate.php will ABORT rather than prove this gate. Describe the '.
-            'setting instead of quoting it: '.trim($line)
-        );
-    }
 });

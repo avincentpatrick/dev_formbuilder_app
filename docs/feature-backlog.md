@@ -15712,6 +15712,24 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   **Live.** Filed by `M214`. **Tier: during-testing.**
 
+- **`minor` · `npm-audit-arm-blind` — `NpmAuditJudgeTest`'s structural arm can no longer see Meridian's npm-audit steps.**
+  Found by `M232` (2026-11-09), checking what sat next to `secret-scan-depth-arm-blind`. It is the same defect in a second test.
+  - The arm asserts that `.github/workflows/ci.yml` contains `continue-on-error: true`, `set +e`, `set -e`, `scripts/npm-audit-judge.php`, `npm audit --json --omit=dev` and `--omit=dev`. On the trunk each occurs more than once (3, 3, 3, 3, 2 and 4 times). The `bhw-connect` job carries a copy of both npm-audit steps, and its fetch step has the same name. The staging-headers steps use the same fence.
+  - **Measured with `scripts/mutate.php`:** Meridian's fetch step without `continue-on-error`, and Meridian's judge without `set +e`, each left the test green, 9 passed. Either change reverts the design the arm exists to hold: npm's own exit 1, or the judge's, ends the step before the verdict is read.
+  The remedy is to read each token from Meridian's own steps: the job that runs the judge, then the fetch and judge steps in it, executable lines only.
+
+  **Live.** Filed by `M232`. **Tier: during-testing.**
+
+- **`minor` · `negated-contain-message` — A negated `toContain` given a message can never fail, and four tests used one.**
+  Found by `M232` (2026-11-09), when a mutant survived the test it had just built.
+  - Pest's `toContain(mixed ...$needles)` (v4.7.4, in `vendor/`) takes no message. A second argument is a second needle. Under `->not->`, a needle that is never there, such as a message, makes the inner `toContain` throw every time, so the negation passes whatever the value holds. `toContainEqual` is the only other variadic expectation.
+  - **Census by tokenizer over every PHP file under `tests/`:** 4 calls. `NpmAuditJudgeTest`'s `--audit-level` ban (since `M72`), `DeploySkipAllowlistTest`'s "no Vite input under `apps/`", `OcrCompatibilityBackfillTest`'s "the backfill SQL names no field type", and one `M232` had just written.
+  - **Measured with `scripts/mutate.php`:** `--audit-level=high` on Meridian's npm command line, a Vite input under `apps/`, and the SQL naming `short_text` each left its test green. Neither of the last two was violated in the tree: the Vite inputs are three `resources/` paths, and none of the 31 field types appears in the SQL.
+  - The positive calls with several arguments are not this defect: there every needle must be present, so a message would turn the test red.
+  The remedy is to judge a boolean with `toBeFalse($message)`, and a guard that refuses the negated form with more than one argument anywhere under `tests/`.
+
+  **Live.** Filed by `M232`. **Tier: during-testing.**
+
 - **`minor` · `root-agents-md` — ChatGPT Codex does not load `apps/bhw-connect/AGENTS.md` from a task started at the repository's root, so each task has to name it.**
   Found by `M214` (2026-11-05), writing jongsky25's handoff, and decided against there.
   - Codex reads `AGENTS.md` from the root down to its working folder. The repository has none at its root, so a task started there sees no `AGENTS.md` at all unless it begins `Read apps/bhw-connect/AGENTS.md and follow it.`, which is what his page tells him to write.

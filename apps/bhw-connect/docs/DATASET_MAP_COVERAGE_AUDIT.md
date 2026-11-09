@@ -143,3 +143,23 @@ For `bhw.any-honorarium`, no confidence interval belongs to the source measure. 
 requires null interval fields, rejects borrowed accreditation bounds and reports
 `confidenceLevel: null`. Profile-based small-sample flag checks still apply. This does not
 certify the new measure's production coverage; run an explicit probe after its deployment.
+
+## Shared-link validation on the deployed site (9 November 2026)
+
+After the deploy of the unambiguous-selection change (merge `19cf7dcd`, Deploy run 799, finished
+06:23 UTC), a read-only check of the testing site's `/api/dataset-map` and `/map`. No credentials,
+no observation values recorded; the rows returned were not inspected beyond their state.
+
+| Link | API | `/map` page |
+| --- | --- | --- |
+| NHFR, indicator given once | 200 available | map ready, one dataset request |
+| NHFR with repeated `utm_source` | 200 available | map ready, one dataset request |
+| NHFR, `indicator` repeated | 400 unsupported | recovery message, no card, no dataset request |
+| NHFR, region scope, selected `01` (wrong depth) | 400 unsupported (three tries; one earlier try was a transient connection reset) | recovery message, no card, no dataset request |
+| NHFR, national scope, selected `01028` | 400 unsupported | not loaded |
+| NHFR, province scope, selected `01028` | 400 unsupported | not loaded |
+| NHFR, region scope, selected `01028` (province code) | 200 available | not loaded |
+
+This confirms the page now preserves repeated parameters for validation and that invalid links
+recover without a fallback read. It checks code shape only; it does not certify coverage,
+membership of a selected area in its parent, or any dataset beyond NHFR.

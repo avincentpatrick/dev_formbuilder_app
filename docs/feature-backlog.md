@@ -15730,4 +15730,38 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, to be measured when taken: assert the gauge equals the surviving row's `size_bytes`, which still reddens on an accumulating design and does not care about the clock. Pinning the clock in the case would also work and proves less.
 
   **Live.** Filed by `M214`. **Tier: during-testing.**
+
+- **`minor` · `production-pitr` — Production's 15-minute recovery is unbuilt, and it needs a physical base backup and a server restart that the runbook never named.**
+  Found by `M216` (2026-11-07), verifying `R-5f180437`'s remedy against the PostgreSQL 15 manual. `D212` put the testing site on a daily copy, so this is production's.
+  - `docs/non-functional-requirements.md` asks for a 15-minute RPO in Phase 1, by continuous WAL archiving and a daily full backup. `docs/deployment-infrastructure.md` §5 described that as a `pg_dump` plus WAL until `M216` corrected it: the manual says a dump *"cannot be used as part of a continuous-archiving solution"*, because it holds too little for WAL replay.
+  - It needs a `pg_basebackup` job, `archive_mode` (*"can only be set at server start"*), an `archive_command` to an off-box target, an `archive_timeout` no longer than the RPO, a prune that removes old WAL with its base backup, and a drill that recovers to a chosen minute.
+  - **To measure when taken:** the archive's size. A forced switch still archives a full 16 MB file, so at 900 seconds the ceiling is 96 files a day, about 46 GB per 30 days. That is an estimate from the setting, not a measurement.
+  - §8 says a production site gets its own PostgreSQL instance. If that holds, the restart and the archive reach no other application. On the testing site's shared instance they would also reach `bhw_connect`.
+
+  **Latent** — no production site exists yet. Filed by `M216`. **Tier: before-launch.**
+
+- **`minor` · `nightly-backup-silent-failure` — Nobody is told when the nightly backup fails, so a lost off-box copy could go unnoticed for weeks.**
+  Found by `M216` (2026-11-07), writing `scripts/nightly-backup.ps1`.
+  - The script reports through its exit code, which lands in the task's `LastTaskResult`. Only someone who opens Task Scheduler or runs a block on the box ever sees it. The older task had the same gap.
+  - `M100`'s certificate task is the warning: its predecessor logged success every day with its protective arm dead. This script does not read as success when the copy fails, and it still tells no one.
+  - The deploy's own dump is separate and keeps running, so the failure this hides is the off-box half, which is the part that survives a dead disk.
+  The remedy, to be measured when taken: something that already reaches a person, such as a scheduled check of the newest dump's age or a line on the operator console. Which one depends on what can read the target without its credentials.
+
+  **Live.** Filed by `M216`. **Tier: during-testing.**
+
+- **`minor` · `restore-drill-no-owner` — The quarterly restore drill §5 prescribes has no reminder and no owner.**
+  Found by `M216` (2026-11-07). `docs/deployment-infrastructure.md` §5 item 4 says a backup never test-restored is not a verified backup, and asks for a restore every quarter. `M216` proves one on the box, and nothing asks for the next. The testing server has already outlived one quarter with no drill, which is how a prescribed drill goes unrun. The remedy is whatever makes the next one come up on its own, such as a dated row, a scheduled reminder or a check of the last drill's date, and it may share its answer with `nightly-backup-silent-failure`.
+
+  **Live.** Filed by `M216`. **Tier: during-testing.**
+
+- **`minor` · `box-c-drive-small` — The testing server keeps its database on a 60 GB C: drive with 21 GB free while nearly 5 TB on E: sits unused, and nothing warns before C: fills.**
+  Found by `M216`'s read-only box check (2026-11-07).
+  - **Measured:** C: is 60 GB with 21 GB free, and E: is 4,963 GB with 4,952 GB free. PostgreSQL's data directory is `C:\Program Files\PostgreSQL\15\data`, read from the service's own command line, and it holds `bhw_connect` as well as `meridian`. Every backup folder this repository's runbook names is on C: too.
+  - **Why it matters:** when C: fills, the database can no longer write, and PostgreSQL can shut down if it cannot write its log, which takes both applications down. Nothing reads the free space today. `nightly-backup-silent-failure` is the same gap for the backup.
+  - **Not urgent, as far as measured:** Meridian's dump is about 1.2 MB a night. What fills the 39 GB in use and how fast it grows have not been measured.
+  - ⚠️ **E: is on the same RAID volume as C:** (disk 0, a Dell PERC H740P), so moving anything there adds room and no protection. `D213`'s copy off the box is what protects the data.
+  The remedy, to be measured when taken: first read what is using C: and how fast it grows, then choose between a free-space warning and moving folders to E:. Moving the data directory restarts the PostgreSQL server, which also interrupts BHW Connect.
+
+  **Latent** — nothing has failed, and the rate of growth is unmeasured. Filed by `M216`. **Tier: during-testing.**
+
 - **`minor` · A tier holding only blocked rows leaves the Next section with nothing to take, even when a lower tier has ready rows.** Found by `M215` (2026-11-06) while separating ready rows from blocked ones in the reports. `next_work()` in `scripts/pipeline.php` picks the most urgent tier holding a ready or a blocked row and stops there, so once a tier's ready rows run out, its blocked rows hide every ready row below it. `during-testing` holds 76 blocked rows today, so this is what happens the day its 168 ready rows are done. `M215` made the reports say so (*"holds no ready row, so nothing in it can be started"*) instead of printing an empty list, and left the choice of tier alone. The remedy, to be measured when taken: fall through to the next tier with a ready row and name the blocked tier above it. **Latent.** — needs a tier whose open rows are all blocked. Filed by `M215`. **Tier: during-testing.**

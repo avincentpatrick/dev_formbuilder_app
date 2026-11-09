@@ -697,6 +697,7 @@ Prediction: Pint and the lint gates green, and PHPStan unmoved by one option. Pe
   - **Filed from it:** `box-c-drive-small`, on this branch. PostgreSQL's data is on the small C:.
 - **The task's account is Monday's first measurement.** No script change is expected. First choice: SYSTEM with a credential saved in its own vault for that one target, leaving the box's folder rights alone. Fallback: §8.2's dedicated task account. Whichever works, §8.2's share bullet is rewritten at the close-out from what ran.
 - **At the merge point:** #412 first. Then merge the trunk into #413, keep both sides at the backlog's end, regenerate the line in a tree with `vendor/`, and let it go green again.
+- **The close-out branch is `m216-closeout` (2026-11-09).** It is named here before its edits to `docs/deployment-infrastructure.md`, `docs/non-functional-requirements.md`, `docs/feature-backlog.md`, `docs/gate-baselines.md`, `docs/pipeline.md` and `PROGRESS.md` (own block only). Those edits release both `M215` and `M216`.
 - **Filed:** `R-139b1662` `production-pitr` (`before-launch`), `R-91237328` `nightly-backup-silent-failure` and `R-38ba2f94` `restore-drill-no-owner` (`during-testing`).
 - **How the prediction has fared so far:**
   - **Right:** Pint and the lint gates green; Pest green on the four files; no `VERSION` bump.

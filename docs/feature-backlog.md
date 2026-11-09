@@ -15703,24 +15703,24 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   **Live.** Filed by `M214`. **Tier: before-launch.**
 
-- **`minor` · `secret-scan-depth-arm-blind` — `SecretScanDepthTest`'s depth arm can no longer see the job it guards.**
+- ✅ **CLOSED BY `M232` (2026-11-09) — ****`minor` · `secret-scan-depth-arm-blind` — `SecretScanDepthTest`'s depth arm can no longer see the job it guards.**
   Found by `M214` (2026-11-05), reading the test while changing `ci.yml`; it went blind at `M192`, which added the `bhw-connect` job.
   - The arm asserts that `.github/workflows/ci.yml` contains `fetch-depth: 0`, and its comment says the token occurs exactly once. It occurs three times: the secret-scanning job, `bhw-connect`, and since `M214` the `scope` job.
   - So bounding the secret-scanning job's depth leaves the arm green, and `scripts/mutate.php`, which refuses a token that is not unique, can no longer prove it.
   - The scan is still protected at run time: the `--is-shallow-repository` fence in the step does not depend on this arm. What is lost is the test that reddens before the run.
   The remedy is to read the depth from the secret-scanning job's own text and to give that job's line a token `mutate.php` can drive.
 
-  **Live.** Filed by `M214`. **Tier: during-testing.**
+  **Live.** Filed by `M214`. **Tier: during-testing.** ✅ **Closed by `M232` (2026-11-09), WITHOUT EDITING `ci.yml`:** the depth arm reads the checkout step of the one job that runs the gitleaks step, executable lines only, and requires one `fetch-depth` key with the value `0`. `tests/Support/WorkflowText.php` is the reader, and every lookup in it fails closed. The token half of the remedy was not needed: a two-line token (the comment line above the key, plus the key) occurs once, so `mutate.php` drives the job's own depth as it stands. **Measured:** that job bounded to a depth of 2 SURVIVED the old test and is CAUGHT by the new one. The `bhw-connect` job bounded leaves the new arm green, as a scoped arm should. The case that kept the fence's message free of the key went, because it existed only to keep a one-line token unique. Its `::error` check moved into the fence arm.
 
-- **`minor` · `npm-audit-arm-blind` — `NpmAuditJudgeTest`'s structural arm can no longer see Meridian's npm-audit steps.**
+- ✅ **CLOSED BY `M232` (2026-11-09) — ****`minor` · `npm-audit-arm-blind` — `NpmAuditJudgeTest`'s structural arm can no longer see Meridian's npm-audit steps.**
   Found by `M232` (2026-11-09), checking what sat next to `secret-scan-depth-arm-blind`. It is the same defect in a second test.
   - The arm asserts that `.github/workflows/ci.yml` contains `continue-on-error: true`, `set +e`, `set -e`, `scripts/npm-audit-judge.php`, `npm audit --json --omit=dev` and `--omit=dev`. On the trunk each occurs more than once (3, 3, 3, 3, 2 and 4 times). The `bhw-connect` job carries a copy of both npm-audit steps, and its fetch step has the same name. The staging-headers steps use the same fence.
   - **Measured with `scripts/mutate.php`:** Meridian's fetch step without `continue-on-error`, and Meridian's judge without `set +e`, each left the test green, 9 passed. Either change reverts the design the arm exists to hold: npm's own exit 1, or the judge's, ends the step before the verdict is read.
   The remedy is to read each token from Meridian's own steps: the job that runs the judge, then the fetch and judge steps in it, executable lines only.
 
-  **Live.** Filed by `M232`. **Tier: during-testing.**
+  **Live.** Filed by `M232`. **Tier: during-testing.** ✅ **Closed by `M232` (2026-11-09):** the arm finds the one job that runs a step named `npm audit (SCA`. Its fetch step must hold `continue-on-error: true` and `npm audit --json --omit=dev`. Its judge step must run `set +e`, the judge, `code=$?` and `set -e`, in that order, one `toBeInt` per position. **Measured:** the fetch step without `continue-on-error` and the judge without `set +e` each SURVIVED the old test and are CAUGHT by the new one. The `bhw-connect` job's copy is left to that job.
 
-- **`minor` · `negated-contain-message` — A negated `toContain` given a message can never fail, and four tests used one.**
+- ✅ **CLOSED BY `M232` (2026-11-09) — ****`minor` · `negated-contain-message` — A negated `toContain` given a message can never fail, and four tests used one.**
   Found by `M232` (2026-11-09), when a mutant survived the test it had just built.
   - Pest's `toContain(mixed ...$needles)` (v4.7.4, in `vendor/`) takes no message. A second argument is a second needle. Under `->not->`, a needle that is never there, such as a message, makes the inner `toContain` throw every time, so the negation passes whatever the value holds. `toContainEqual` is the only other variadic expectation.
   - **Census by tokenizer over every PHP file under `tests/`:** 4 calls. `NpmAuditJudgeTest`'s `--audit-level` ban (since `M72`), `DeploySkipAllowlistTest`'s "no Vite input under `apps/`", `OcrCompatibilityBackfillTest`'s "the backfill SQL names no field type", and one `M232` had just written.
@@ -15728,7 +15728,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   - The positive calls with several arguments are not this defect: there every needle must be present, so a message would turn the test red.
   The remedy is to judge a boolean with `toBeFalse($message)`, and a guard that refuses the negated form with more than one argument anywhere under `tests/`.
 
-  **Live.** Filed by `M232`. **Tier: during-testing.**
+  **Live.** Filed by `M232`. **Tier: during-testing.** ✅ **Closed by `M232` (2026-11-09):** the four calls now judge a boolean with `toBeFalse` (or `toBeInt`), and each of the three defects above is CAUGHT. `tests/Feature/Docs/NegatedContainArgumentsTest.php` refuses a negated `toContain` or `toContainEqual` with more than one argument anywhere under `tests/`. It reads with a tokenizer, so comments and strings that name the call are not flagged, and through `SourceTree`, so the bind mount cannot blind it. A fixture proves it sees a call split over two lines and passes a trailing comma. Putting the old form back into `DeploySkipAllowlistTest` turns it red.
 
 - **`minor` · `root-agents-md` — ChatGPT Codex does not load `apps/bhw-connect/AGENTS.md` from a task started at the repository's root, so each task has to name it.**
   Found by `M214` (2026-11-05), writing jongsky25's handoff, and decided against there.

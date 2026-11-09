@@ -48,6 +48,15 @@ Paired files taken: none.
 Namespaces spent: `M232`.
 Prediction: both tests pass. Mutants A, B and C are each CAUGHT, and D SURVIVES the new depth arm, as a scoped arm should. Pint is clean. PHPStan cannot move, because `tests/` is outside its scan. The rest of `tests/Feature/Docs` stays green. No `VERSION` bump, because nothing changes for a tester. The one I most expect to be wrong: Pint, over the new helper's closures and docblocks.
 
+### Extended mid-build (2026-11-09, pushed before either new file was opened)
+**Mutant C SURVIVED the new `NpmAuditJudgeTest` arm, and the cause is a third defect, not the arm's scope.** Pest's `toContain(mixed ...$needles)` (v4.7.4, read in `vendor/`) takes no message. A second argument is a second needle. Under `->not->`, a needle that is never present, such as a message, makes the inner `toContain` throw every time, so the negation passes whatever the value. The helper read mutant C correctly (`set +e` at `false`), and the assertion meant to catch it was `->not->toContain(false, '…')`.
+- **Census by tokenizer, over all 625 PHP files under `tests/` (624 tracked plus the new helper): 4 such calls.** One is this increment's own. One is `NpmAuditJudgeTest`'s `--audit-level` ban, which cannot fail and has not since `M72`. One is `DeploySkipAllowlistTest`'s "no Vite input under `apps/`", and one is `OcrCompatibilityBackfillTest`'s "the backfill SQL names no field type".
+- **Neither of the last two hides a violation today, measured:** the Vite inputs are three `resources/` paths, and none of the 31 field types appears in the SQL.
+- `toContainEqual` is the only other variadic expectation. The 15 positive calls with two or more arguments are left alone, because a needle there must be present, so a message would turn the test red rather than silence it.
+
+Extended to: the four calls rewritten as a `str_contains(…)` judged by `toBeFalse($message)` (or `toBeInt`), and a guard, `tests/Feature/Docs/NegatedContainArgumentsTest.php`. The guard fails on any `->not->toContain(` or `->not->toContainEqual(` call with more than one argument anywhere under `tests/`. It reads through `SourceTree`, so the container's bind mount cannot blind it, and a fixture proves it can see one. Filed as a row and closed here.
+Files added: `tests/Feature/Deploy/DeploySkipAllowlistTest.php`, `tests/Unit/OcrCompatibilityBackfillTest.php`, `tests/Feature/Docs/NegatedContainArgumentsTest.php` (new). No held PR touches any of them.
+
 ## HELD — `M231`, `R-f6eab58d`: an answered retier is checked to have reached the row it names (m231-retier-payload) — BUILT AND HELD: PR #494, waiting for a merge point
 
 Taken 2026-11-09, from the plan the user approved the same day. Branch `m231-retier-payload`, cut from origin/main at `ea2b85a5`, PR into main. Held green for a merge point (`D137`), after `M230`'s #489.

@@ -46,6 +46,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__.'/next-section.php';
+require_once __DIR__.'/retier-payload.php';
 
 const CLAIM_FILES = ['a' => 'docs/claims/lane-a.md', 'b' => 'docs/claims/lane-b.md'];
 const TRACKER = 'PROGRESS.md';
@@ -127,6 +128,7 @@ $state = [
 ];
 
 $state['d5'] = derive_d5($state['backlog'], (int) $state['increment']['highest_released']);
+$state['retiers'] = derive_retiers($state['backlog']);
 
 $state['declarations'] = scan_declarations($state);
 $state['check'] = run_check($state);
@@ -659,6 +661,8 @@ function finish_row(array $row): array
         'liveness' => $liveness,
         'tier' => token_value($tierTokens[1] ?? [], ''),
         'awaits' => token_value($awaitsTokens[1] ?? [], 'D'),
+        // Whether the row says its tier was moved, so an answered retier it outlived is not a failure (M231).
+        'records_retier' => row_records_retier($row['body']),
     ];
 }
 
@@ -1253,6 +1257,12 @@ function run_check(array $state): array
         }
     }
 
+    // An answered retier that never reached the row it names (M231, `R-f6eab58d`). An id no row carries is
+    // listed by render_retiers() and never fails: a struck row and a reworded one look the same from here.
+    foreach ($state['retiers']['failures'] as $message) {
+        $failures[] = DECISIONS.' — '.$message;
+    }
+
     return ['failures' => $failures, 'warnings' => $warnings];
 }
 
@@ -1371,6 +1381,7 @@ function render(array $state): void
 
     render_testing_gate($state['testing_gate']);
     render_d5($state['d5']);
+    render_retiers($state['retiers']);
 
     section('Gate baselines');
 
@@ -1551,6 +1562,45 @@ function render_d5(array $d5): void
     //    queue's own exit signal is now the Testing gate above.
     note('D12 ended the series (2026-09-14). These clauses are history; the Testing gate above is the');
     note('signal that replaced them — see D12 in '.DECISIONS.'.');
+}
+
+/**
+ * Every retier an answered decision commissions, judged against the row it names (M231, `R-f6eab58d`).
+ * The parsing and the judgement are in scripts/retier-payload.php, which a test can load; this only feeds it.
+ *
+ * @param  array<string, mixed>  $backlog
+ * @return array{pairs: int, judged: int, failures: list<string>, unresolved: list<string>}
+ */
+function derive_retiers(array $backlog): array
+{
+    return judge_retiers(retier_payloads(read_tracked_file(DECISIONS)), $backlog['severity_rows'], TIERS);
+}
+
+/**
+ * @param  array{pairs: int, judged: int, failures: list<string>, unresolved: list<string>}  $retiers
+ */
+function render_retiers(array $retiers): void
+{
+    section('Retiers answered');
+
+    info('payloads read', $retiers['pairs'].' — '.$retiers['judged'].' row(s) judged, '
+        .count($retiers['unresolved']).' id(s) resolving to no row');
+
+    if ($retiers['unresolved'] !== []) {
+        info('unresolved, never failed', implode(', ', $retiers['unresolved']));
+        note("A struck row's id stops resolving, exactly as a reworded open row's does, and nothing on disk");
+        note('tells the two apart. Check a new one by hand.');
+    }
+
+    if ($retiers['failures'] === []) {
+        pass('every answered retier reached the row it names, or the row records why it moved again');
+
+        return;
+    }
+
+    foreach ($retiers['failures'] as $message) {
+        fail($message);
+    }
 }
 
 function pass(string $message): void

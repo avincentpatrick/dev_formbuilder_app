@@ -57,6 +57,19 @@ Prediction: both tests pass. Mutants A, B and C are each CAUGHT, and D SURVIVES 
 Extended to: the four calls rewritten as a `str_contains(…)` judged by `toBeFalse($message)` (or `toBeInt`), and a guard, `tests/Feature/Docs/NegatedContainArgumentsTest.php`. The guard fails on any `->not->toContain(` or `->not->toContainEqual(` call with more than one argument anywhere under `tests/`. It reads through `SourceTree`, so the container's bind mount cannot blind it, and a fixture proves it can see one. Filed as a row and closed here.
 Files added: `tests/Feature/Deploy/DeploySkipAllowlistTest.php`, `tests/Unit/OcrCompatibilityBackfillTest.php`, `tests/Feature/Docs/NegatedContainArgumentsTest.php` (new). No held PR touches any of them.
 
+### Build record (2026-11-09, not merged)
+PR #496, head `5341a44a`, run 42605712980: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green (run 42605713017, 5 steps).
+- **Mutants, through `mutate.php`'s write, run and byte-restore.** Against the old tests, A (the scan job's depth to 2), B (no `continue-on-error`), C (no `set +e`), E (`--audit-level=high` on Meridian's npm line), F (a Vite input under `apps/`) and G (the backfill SQL naming `short_text`) all SURVIVED. Against the new tests all six are CAUGHT, and so is H (the old negated form put back into `DeploySkipAllowlistTest`, caught by the guard). D (`bhw-connect`'s depth to 2) leaves the new depth arm green, as a scoped arm should.
+  - The old-test runs used byte copies: the edited tests were saved, the committed ones checked out, and mine copied back with every sha256 matching. H needed its target committed first, because `mutate.php` refuses a target with uncommitted changes.
+  - Not committed as mutations: the commit rule guards diff-based checks, and these tests read the file.
+- Container: `tests/Feature/Docs`, `tests/Feature/Deploy` and `OcrCompatibilityBackfillTest`, 293 passed and 5 skipped. The 1 failure is `SuiteCollectionFloorTest`, the bind-mount artefact its own header documents; CI is green on it.
+- The scoped arms read the same on #414's `ci.yml`, which merges first.
+- Host: Pint, `pipeline-lint` (460 rows), `tracker-lint` (+0 bytes), and the citation lint at 16 rotten (the trunk's figure). `preflight --with-gates --with-pint` OK. PHPStan cannot move, because `tests/` is outside its scan. `PROGRESS.md` is untouched until release.
+
+**How the prediction fared:** the original prediction was right on every gate, and **wrong on the one I most expected to be wrong**: Pint was clean first time. **It missed the increment's biggest finding.** The prediction said mutant C would be CAUGHT, and it SURVIVED the first new arm, because that arm used a negated `toContain` with a message. That survival is what found `negated-contain-message` and grew the increment by two files and a guard.
+
+**The merge point owes:** merge after #494, with no dependence on #435 (no release note). Release this claim then.
+
 ## HELD — `M231`, `R-f6eab58d`: an answered retier is checked to have reached the row it names (m231-retier-payload) — BUILT AND HELD: PR #494, waiting for a merge point
 
 Taken 2026-11-09, from the plan the user approved the same day. Branch `m231-retier-payload`, cut from origin/main at `ea2b85a5`, PR into main. Held green for a merge point (`D137`), after `M230`'s #489.

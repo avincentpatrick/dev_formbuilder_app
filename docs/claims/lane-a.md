@@ -16,7 +16,39 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M231`, `R-f6eab58d`: an answered retier is checked to have reached the row it names (m231-retier-payload)
+## Status: ACTIVE CLAIM — `M232`, `R-473558cf` and a sibling it files: the secret-scan and npm-audit workflow arms read their own job, not the whole of `ci.yml` (m232-workflow-arms-scoped)
+
+Taken 2026-11-09, from the plan the user approved the same day. Branch `m232-workflow-arms-scoped`, cut from origin/main at `50d027f8`, PR into main. Held green for a merge point (`D137`), after `M231`'s #494.
+**One row and the sibling it finds, by `D13`.** Both are test-only, edit no hub, and touch no held PR's files. `R-473558cf` is the first during-testing row in the line that no held PR closes or touches. The rows above it: `R-e6e340c0` is a sweep of `docs/deployment-infrastructure.md` (#414); `R-7d0853f5` and `R-2ca49f19` need `state.php` (#494) or `pipeline-lint.php` and `PipelineLintControlsTest` (#429); `R-4b57090b` waits for the box's log read; `R-5e7551aa`'s drift half needs `E2eSeeder.php` (#429). Every other row above it in the line is closed by a held PR or edits a file one holds (`XlsformExporter`, `FieldLibrary`, `OcrAnswerReader`, `useBuilderStore`, `BuilderCanvas`, `FormBuilderService`, the print presenter, `XlsformImportParser`, `CLAUDE.md`, `ci.yml`).
+Row: `R-473558cf`, *"`secret-scan-depth-arm-blind` — `SecretScanDepthTest`'s depth arm can no longer see the job it guards."* And a row this claim files: `NpmAuditJudgeTest`'s structural arm is blind in the same way.
+
+### Evidence verified
+- *"The arm asserts that `ci.yml` contains `fetch-depth: 0`"*: **held**, a whole-file `toContain`.
+- *"It occurs three times: the secret-scanning job, `bhw-connect`, and since `M214` the `scope` job"*: **held**, 3 on the trunk at `50d027f8`.
+- *"Bounding the secret-scanning job's depth leaves the arm green"*: **held, measured.** Mutant A (`static-analysis`'s depth to 2) **SURVIVED** the current test, 3 passed.
+- *"`mutate.php` refuses a token that is not unique, can no longer prove it"*: **held for a one-line token only.** A two-line token, the comment line above plus the key, occurs once, so the job's own key is drivable without editing `ci.yml`.
+- *"The scan is still protected at run time"*: **held**, the `--is-shallow-repository` fence is in the gitleaks step.
+
+### Premise verified
+- **The row is a floor.** `NpmAuditJudgeTest`'s structural arm reads the whole file the same way, and on the trunk each of its tokens occurs more than once: `continue-on-error: true`, `set +e`, `set -e` and the judge's path 3 times each, `npm audit --json --omit=dev` twice, `--omit=dev` 4 times. The `bhw-connect` job carries a copy of both npm-audit steps (the fetch step has the same name), and the staging-headers steps use the same fence. **Measured:** mutant B (Meridian's fetch step without `continue-on-error`) and mutant C (Meridian's judge without `set +e`) both **SURVIVED**, 9 passed. Not filed before today. Filed and closed here.
+- **The other tests that name `ci.yml` are not edited.** `DeploySkipAllowlistTest` reads the `paths-ignore` block, which is not a job's token, and `TrackerSurgeryHarnessTest` and `DatabaseSeederSmokeTest` mention the file only in comments.
+- **The `bhw-connect` job's copies are left unasserted.** That job serves `apps/bhw-connect/`, and a Meridian test must not turn red on BHW's step.
+- **The held PRs:** none touches either test or `tests/Support/`. #414's only `ci.yml` change is one comment near the top, outside both jobs.
+- **The third case in `SecretScanDepthTest`**, which keeps the fence's message free of the token, rests on *"the token occurs exactly once"*. That is false today, and the scoped arm no longer depends on it.
+
+### Remedy verdict
+**Works, measured before the test.** A scratch reader scoped by job, then by step, then to executable lines found all 8 jobs. It placed both arms in `static-analysis` (found from the step each job runs, not from a hard-coded id) and read depth `0` from one key. It saw mutant A (depth `2`), mutant B (no `continue-on-error`) and mutant C (the fence broken), and it ignored mutant D, the `bhw-connect` job's depth bounded.
+- A new `tests/Support/WorkflowText.php` holds the reader, so the two tests share one copy.
+- `SecretScanDepthTest`'s depth arm reads the secret-scanning job's checkout step. Its fence arm reads that job's step. Its third case goes, with the reason in the header.
+- `NpmAuditJudgeTest`'s structural arm reads Meridian's fetch and judge steps. The `--audit-level` ban stays whole-file, because for a ban the wider scope is the stricter one.
+
+Files: `tests/Support/WorkflowText.php` (new), `tests/Feature/Docs/SecretScanDepthTest.php`, `tests/Feature/Docs/NpmAuditJudgeTest.php`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md` (own block only, at release).
+Paired files taken: none.
+Namespaces spent: `M232`.
+Prediction: both tests pass. Mutants A, B and C are each CAUGHT, and D SURVIVES the new depth arm, as a scoped arm should. Pint is clean. PHPStan cannot move, because `tests/` is outside its scan. The rest of `tests/Feature/Docs` stays green. No `VERSION` bump, because nothing changes for a tester. The one I most expect to be wrong: Pint, over the new helper's closures and docblocks.
+
+## HELD — `M231`, `R-f6eab58d`: an answered retier is checked to have reached the row it names (m231-retier-payload) — BUILT AND HELD: PR #494, waiting for a merge point
 
 Taken 2026-11-09, from the plan the user approved the same day. Branch `m231-retier-payload`, cut from origin/main at `ea2b85a5`, PR into main. Held green for a merge point (`D137`), after `M230`'s #489.
 **One row, by `D13`.** It edits one hub, `scripts/state.php`, and no held PR touches it, `CLAUDE.md`, or the two new files. It is the first during-testing row in the line that no held PR closes or touches: `R-e6e340c0`'s claims live in `docs/deployment-infrastructure.md` (#414), `R-7d0853f5` edits `scripts/pipeline-lint.php` (#429) and its own text waits for an open decision that names a row, and `R-4b57090b` waits for the box's log read.

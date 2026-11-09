@@ -1,3 +1,4 @@
+import { CENSUS_ACTIVE_YEARS_ID, joinCensusActiveYears } from "@/lib/maps/census-active-years";
 import { CENSUS_HONORARIUM_ID, isCensusProfileRate, joinCensusAccreditation, joinCensusTraining, joinCensusHonorarium } from "@/lib/maps/census-accreditation";
 import { STEPZERO_ACCREDITATION_ID, joinStepzeroAccreditation } from "@/lib/maps/stepzero-accreditation";
 import { joinUucRouteRows } from "@/lib/maps/uuc-routes";
@@ -63,6 +64,8 @@ export async function GET(request: NextRequest) {
     const censusRate = choice.dataset === "bhw-2025" && isCensusProfileRate(choice.indicator);
     const censusHonorarium = censusRate && choice.indicator === CENSUS_HONORARIUM_ID;
     const censusTraining = censusRate && spec?.table === "agg_training";
+    const censusMean = choice.dataset === "bhw-2025" && choice.indicator === CENSUS_ACTIVE_YEARS_ID;
+    let parentMean: number | null = null;
     let parentRate: number | null = null;
     let total: number | null = null;
     let totalNote: string | undefined;
@@ -116,6 +119,7 @@ export async function GET(request: NextRequest) {
       const uucRoute = spec.table === "agg_uuc_phc_criteria";
       const projection = uucRoute
         ? `geo_code,${spec.column},n_listed,n_health_evaluable`
+        : censusMean ? "geo_code,avg_active_years,n_total"
         : censusHonorarium ? "geo_code,any_honorarium_pct,n_total"
         : censusTraining ? "geo_code,coverage_pct,n_trained,n_total,ci_low,ci_high"
         : censusRate ? "geo_code,pct_accredited,n_accredited,n_total,ci_low,ci_high"
@@ -151,14 +155,15 @@ export async function GET(request: NextRequest) {
         !parent.data
       )
         throw new Error("Values unavailable");
-      const join = censusHonorarium ? joinCensusHonorarium : censusTraining ? joinCensusTraining : censusRate ? joinCensusAccreditation : uucRoute ? joinUucRouteRows : declaredAccreditation ? joinStepzeroAccreditation : joinMapRows;
+      const join = censusMean ? joinCensusActiveYears : censusHonorarium ? joinCensusHonorarium : censusTraining ? joinCensusTraining : censusRate ? joinCensusAccreditation : uucRoute ? joinUucRouteRows : declaredAccreditation ? joinStepzeroAccreditation : joinMapRows;
       rows = join(children.data, values.data as unknown as Record<string, unknown>[], spec.column);
       const parentRow = join(
         [{ geo_code: choice.code, geo_name: geo.geoName }],
         parent.data as unknown as Record<string, unknown>[],
         spec.column,
       )[0];
-      if (declaredAccreditation || censusRate) parentRate = parentRow.value;
+      if (censusMean) parentMean = parentRow.value;
+      else if (declaredAccreditation || censusRate) parentRate = parentRow.value;
       else total = parentRow.value;
       totalNote = parentRow.note;
     }
@@ -166,6 +171,7 @@ export async function GET(request: NextRequest) {
       state: "available",
       rows,
       total,
+      ...(censusMean ? { parentMean } : {}),
       ...((declaredAccreditation || censusRate) ? { parentRate } : {}),
       ...(totalNote ? { totalNote } : {}),
       area: geo.geoName,

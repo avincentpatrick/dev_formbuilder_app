@@ -1,3 +1,4 @@
+import { CENSUS_ACTIVE_YEARS_ID } from "./census-active-years";
 import { isCensusProfileRate } from "./census-accreditation";
 import type { ColorBin } from "@/lib/charts/color-scale";
 import { getDatasetMap } from "./definitions";
@@ -20,6 +21,7 @@ export function datasetMapExport(
   const navigationOnly = data.valueSupport === "navigation-only";
   const income = choice.dataset === "lgu-income-class";
   const declaredAccreditation = choice.dataset === "bhw-stepzero-2026" && choice.indicator === STEPZERO_ACCREDITATION_ID;
+  const censusMean = choice.dataset === "bhw-2025" && choice.indicator === CENSUS_ACTIVE_YEARS_ID;
   const censusRate = choice.dataset === "bhw-2025" && isCensusProfileRate(choice.indicator);
   const accreditation = declaredAccreditation || censusRate;
   const fixed = accreditation || income || choice.dataset === "psa-sae-poverty-2023" ||
@@ -45,11 +47,11 @@ export function datasetMapExport(
         ...(income ? { label: incomeClassLabel(bin.min) } : {}),
       })),
     },
-    parentMeasure: { kind: accreditation ? "rate" : "total",
-      value: navigationOnly ? null : accreditation ? data.parentRate ?? null : data.total,
+    parentMeasure: { kind: censusMean ? "mean" : accreditation ? "rate" : "total",
+      value: navigationOnly ? null : censusMean ? data.parentMean ?? null : accreditation ? data.parentRate ?? null : data.total,
       unit: metric.unit },
     total: navigationOnly ? null : data.total,
-    totalNote: data.totalNote ?? (accreditation ? "Published parent rate; never an average of child percentages." : "Reported parent total, not a sum of drawable areas; no aggregate is inferred when absent."),
+    totalNote: data.totalNote ?? (censusMean ? "Published parent mean; never an average of child means." : accreditation ? "Published parent rate; never an average of child percentages." : "Reported parent total, not a sum of drawable areas; no aggregate is inferred when absent."),
     rows: data.rows.map((row) => ({
       code: row.code, name: row.name,
       value: navigationOnly ? null : row.value,

@@ -1,4 +1,5 @@
 "use client";
+import { CENSUS_ACTIVE_YEARS_ID } from "@/lib/maps/census-active-years";
 import { isCensusProfileRate } from "@/lib/maps/census-accreditation";
 import { STEPZERO_ACCREDITATION_ID, STEPZERO_ACCREDITATION_BINS, STEPZERO_ACCREDITATION_DENOMINATOR } from "@/lib/maps/stepzero-accreditation";
 import { searchMapAreas } from "@/lib/maps/area-search";
@@ -101,6 +102,7 @@ export function DatasetMapCard({
   const data = result?.key === key && result.data.state === "available" ? result.data : null;
   const uucRoute = dataset === "uuc-phc-2025" && choice.indicator.startsWith("uuc.route.");
   const declaredAccreditation = dataset === "bhw-stepzero-2026" && choice.indicator === STEPZERO_ACCREDITATION_ID;
+  const censusMean = dataset === "bhw-2025" && choice.indicator === CENSUS_ACTIVE_YEARS_ID;
   const censusRate = dataset === "bhw-2025" && isCensusProfileRate(choice.indicator);
   const accreditation = declaredAccreditation || censusRate;
   const profiling = dataset === "bhw-profiling-status-2026";
@@ -285,7 +287,7 @@ export function DatasetMapCard({
                         ? Object.fromEntries(INCOME_CLASSES.map((c) => [c.value, c.label]))
                         : undefined
                   }
-                  valueSuffix={poverty || profiling || accreditation ? "%" : ""}
+                  valueSuffix={poverty || profiling || accreditation ? "%" : censusMean ? " years" : ""}
                   noDataLabel={
                     accreditation ? "Unavailable published share — see table"
                     : profiling
@@ -318,7 +320,11 @@ export function DatasetMapCard({
           {data && (
             <>
               <p className="text-sm">
-                {accreditation ? (
+                {censusMean ? (
+                  <>Reported area mean: {data.parentMean == null ? "Not reported" : `${data.parentMean} years`}.
+                    Denominator: {metric?.denominator}. Missing active-year counts are excluded.
+                    Parent means are reported separately, never averaged from children. Contributing sample size and confidence intervals are unavailable.</>
+                ) : accreditation ? (
                   <>Reported area rate: {data.parentRate == null ? "Not reported" : `${data.parentRate}%`}.
                     Denominator: {metric?.denominator ?? STEPZERO_ACCREDITATION_DENOMINATOR}. Published percentages are not averaged across areas.
                     {censusRate ? (censusUncertainty ? "Census profile percentage; published 95% Wilson intervals and small-sample notes appear below." : "Share receiving any honorarium; no confidence interval is supplied for this measure. This does not describe amounts or receipt from a particular payer.") : "This is the LGU declaration, not accreditation among validated Census profiles."}</>
@@ -398,7 +404,7 @@ export function DatasetMapCard({
                         : (selected.value ?? "Not reported")}{" "}
                     {selected.value !== null && !income ? metric?.unit : ""}
                   </p>
-                  {(income || profiling || uucRoute || accreditation) && <p>{selected.note}</p>}
+                  {(income || profiling || uucRoute || accreditation || censusMean) && <p>{selected.note}</p>}
                   {(poverty || censusUncertainty) && !navigationOnly && (
                     <p>
                       Published {censusRate ? 95 : 90}% confidence interval:{" "}
@@ -464,7 +470,7 @@ export function DatasetMapCard({
                         {(poverty || censusUncertainty) && !navigationOnly && (
                           <th scope="col">Published {censusRate ? 95 : 90}% confidence interval</th>
                         )}
-                        {(income || profiling || uucRoute || accreditation) && !navigationOnly && (
+                        {(income || profiling || uucRoute || accreditation || censusMean) && !navigationOnly && (
                           <th scope="col">Source context</th>
                         )}
                         <th scope="col">Geometry</th>
@@ -492,7 +498,7 @@ export function DatasetMapCard({
                                 : "Not available"}
                             </td>
                           )}
-                          {(income || profiling || uucRoute || accreditation) && !navigationOnly && (
+                          {(income || profiling || uucRoute || accreditation || censusMean) && !navigationOnly && (
                             <td>{r.note ?? "—"}</td>
                           )}
                           <td>

@@ -23,6 +23,8 @@ export type MapPayload = {
   total: number | null;
   /** Published parent rate, separate from additive totals. Never averaged from children. */
   parentRate?: number | null;
+  /** Stored parent mean, never averaged from child means. */
+  parentMean?: number | null;
   totalNote?: string;
   area: string;
   childLevel: "region" | "province" | "citymun";
@@ -52,7 +54,7 @@ export function prototypeIndicators(slug: string) {
       "nhfr.beds",
       "nhfr.barangay-presence",
     ],
-    "bhw-2025": ["bhw.validated-profiles", "bhw.profile-accreditation", "bhw.any-honorarium", ...TRAINING_TOPICS.map(([topic]) => `bhw.training.${topic}`)],
+    "bhw-2025": ["bhw.validated-profiles", "bhw.profile-accreditation", "bhw.any-honorarium", "bhw.active-years", ...TRAINING_TOPICS.map(([topic]) => `bhw.training.${topic}`)],
     "bhw-stepzero-2026": [
       "bhw.total",
       "bhw.registered",

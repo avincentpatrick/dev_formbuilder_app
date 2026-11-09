@@ -70,6 +70,11 @@ export async function inspectMapCoverage(input, request = fetch) {
   }
   if (!(payload.total === null || (typeof payload.total === 'number' && Number.isFinite(payload.total) && payload.total >= 0)))
     throw new Error('Invalid reported parent total');
+  const censusMean = choice.dataset === 'bhw-2025' && choice.indicator === 'bhw.active-years';
+  if (censusMean) {
+    if (payload.total !== null || !(payload.parentMean === null || (typeof payload.parentMean === 'number' && Number.isFinite(payload.parentMean) && payload.parentMean >= 0)))
+      throw new Error('Invalid published mean or mean mislabeled as a total');
+  } else if (payload.parentMean !== undefined) throw new Error('Unexpected parent mean for this indicator');
   const censusRate = choice.dataset === 'bhw-2025' &&
     (choice.indicator === 'bhw.any-honorarium' || choice.indicator === 'bhw.profile-accreditation' || choice.indicator.startsWith('bhw.training.'));
   const declaredRate = (choice.dataset === 'bhw-stepzero-2026' && choice.indicator === 'bhw.declared-accreditation') ||
@@ -82,7 +87,7 @@ export async function inspectMapCoverage(input, request = fetch) {
     throw new Error('Unexpected parent rate for this indicator');
   }
   const navigationOnly = payload.valueSupport === 'navigation-only';
-  if (navigationOnly && (payload.total !== null || (payload.parentRate != null) || payload.rows.some(row => row.value !== null)))
+  if (navigationOnly && (payload.total !== null || (payload.parentRate != null) || (payload.parentMean != null) || payload.rows.some(row => row.value !== null)))
     throw new Error('Navigation-only geography must not claim values');
   let uncertainty;
   if (censusRate) {
@@ -112,6 +117,7 @@ export async function inspectMapCoverage(input, request = fetch) {
     missingOrUnavailableRows: navigationOnly ? 0 : payload.rows.filter(row => row.value === null).length,
     navigationOnlyRows: navigationOnly ? payload.rows.length : 0,
     hasReportedParentTotal: payload.total !== null,
+    ...(censusMean ? { hasReportedParentMean: payload.parentMean !== null } : {}),
     ...(declaredRate ? { hasReportedParentRate: payload.parentRate !== null } : {}) };
   let geometry;
   try {

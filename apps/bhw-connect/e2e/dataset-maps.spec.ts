@@ -839,3 +839,27 @@ test("Census honorarium receipt has its own rate and no invented confidence inte
   expect(data.indicator).toMatchObject({ id: "bhw.any-honorarium", period: "2025", confidenceLevel: null });
   expect(data.rows[0]).toMatchObject({ value: 0, ciLow: null, ciHigh: null, smallSample: true });
 });
+
+test("Census active years preserves decimal means, years and the unknown contributing count", async ({ page }) => {
+  await page.route("**/api/dataset-map?**", route => route.fulfill({ json: {
+    state: "available", rows: [{ code: "01", name: "Synthetic years region", value: 12.34,
+      note: "Published mean of reported active-year counts; missing counts excluded. Contributing count and confidence interval are not supplied." }],
+    total: null, parentMean: 9.87, area: "Philippines", childLevel: "region", source: "Synthetic Census", date: "2025-12-31",
+    license: "Test only", geometryUrl: "/bhw-connect/geo/regions.json",
+  } }));
+  await page.goto("map?dataset=bhw-2025&indicator=bhw.active-years");
+  await expect(page.getByText(/Reported area mean: 9.87 years/)).toBeVisible();
+  await expect(page.getByText(/contributing count not supplied/)).toBeVisible();
+  await expect(page.getByText(/Reported area total:|Reported area rate:/)).toHaveCount(0);
+  await page.getByText(/Complete area table/).click();
+  await expect(page.getByRole("columnheader", { name: "years", exact: true })).toBeVisible();
+  await expect(page.getByRole("row", { name: /Synthetic years region 12.34/ })).toBeVisible();
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download map data (JSON)" }).click();
+  const stream = await (await downloaded).createReadStream();
+  const chunks = []; for await (const chunk of stream!) chunks.push(chunk);
+  const data = JSON.parse(Buffer.concat(chunks).toString());
+  expect(data.parentMeasure).toEqual({ kind: "mean", value: 9.87, unit: "years" });
+  expect(data.total).toBeNull();
+  expect(data.indicator).toMatchObject({ period: "2025", confidenceLevel: null });
+});

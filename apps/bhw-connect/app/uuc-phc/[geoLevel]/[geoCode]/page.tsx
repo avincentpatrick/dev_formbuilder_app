@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { PORTAL_CRUMB, UUC_PHC_CRUMB } from "@/lib/nav/breadcrumbs";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getGeoAncestors, getGeoByCode } from "@/lib/db/geo";
 import {
   UUC_PHC_BRAND_LABEL,
@@ -82,7 +82,11 @@ export default async function UucPhcAreaPage({ params }: { params: Promise<Param
 
   // Barangay pages would be a single yes/no — the city/municipality page already names every
   // barangay and its status, so that is where the drill-down ends.
-  if (geo.geoLevel === "barangay") notFound();
+  if (geo.geoLevel === "barangay") {
+    const ancestors = await getGeoAncestors(geo.geoCode, geo.geoLevel);
+    if (!ancestors.citymun) notFound();
+    redirect(`/uuc-phc/citymun/${ancestors.citymun.geoCode}`);
+  }
 
   const isCitymun = geo.geoLevel === "citymun";
   const [counts, children, barangays, details, ancestors] = await Promise.all([

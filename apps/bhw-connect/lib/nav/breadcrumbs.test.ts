@@ -56,7 +56,7 @@ describe("trailForPathname", () => {
   it("labels the admin source viewer without needing the chunk id", () => {
     const trail = trailForPathname("/admin/assistant/source/abc-123");
     expect(trail?.map((c) => c.label)).toEqual([
-      "Equity in Health",
+      "iconnect",
       "2025 BHW Census",
       "Admin",
       "Assistant",

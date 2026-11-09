@@ -1,0 +1,642 @@
+[
+  {
+    "code": "ncd_20_59_assessed",
+    "program_area": "ncd",
+    "label": "Risk-assessed using PhilPEN, 20–59 years",
+    "numerator_def": "Risk-assessed using PhilPEN, 20–59 years",
+    "denominator_def": "Projected population aged 20–59",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1a. NCD Meds Adults_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_20_59_htn",
+    "program_area": "ncd",
+    "label": "Identified with hypertension, 20–59 years",
+    "numerator_def": "Identified with hypertension, 20–59 years",
+    "denominator_def": "Adults aged 20–59 risk-assessed using PhilPEN",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1a. NCD Meds Adults_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_20_59_dm",
+    "program_area": "ncd",
+    "label": "Identified with type 2 diabetes, 20–59 years",
+    "numerator_def": "Identified with type 2 diabetes, 20–59 years",
+    "denominator_def": "Adults aged 20–59 risk-assessed using PhilPEN",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1a. NCD Meds Adults_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_dec_20_59_htn_facility",
+    "program_area": "ncd",
+    "label": "Antihypertensive medication, 100% provided by facility, 20–59 years",
+    "numerator_def": "Antihypertensive medication, 100% provided by facility, 20–59 years",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "1a. NCD Meds Adults_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_dec_20_59_htn_oop",
+    "program_area": "ncd",
+    "label": "Antihypertensive medication, out of pocket, 20–59 years",
+    "numerator_def": "Antihypertensive medication, out of pocket, 20–59 years",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "1a. NCD Meds Adults_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_dec_20_59_htn_total",
+    "program_area": "ncd",
+    "label": "Antihypertensive medication, total access, 20–59 years",
+    "numerator_def": "Antihypertensive medication, total access, 20–59 years",
+    "denominator_def": "Identified hypertensive patients in the same December age cohort",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1a. NCD Meds Adults_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_dec_20_59_dm_facility",
+    "program_area": "ncd",
+    "label": "Antidiabetic medication, 100% provided by facility, 20–59 years",
+    "numerator_def": "Antidiabetic medication, 100% provided by facility, 20–59 years",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "1a. NCD Meds Adults_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_dec_20_59_dm_oop",
+    "program_area": "ncd",
+    "label": "Antidiabetic medication, out of pocket, 20–59 years",
+    "numerator_def": "Antidiabetic medication, out of pocket, 20–59 years",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "1a. NCD Meds Adults_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_dec_20_59_dm_total",
+    "program_area": "ncd",
+    "label": "Antidiabetic medication, total access, 20–59 years",
+    "numerator_def": "Antidiabetic medication, total access, 20–59 years",
+    "denominator_def": "Identified type 2 diabetes patients in the same December age cohort",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1a. NCD Meds Adults_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_dec_60plus_htn_facility",
+    "program_area": "ncd",
+    "label": "Antihypertensive medication, 100% provided by facility, 60 years and above",
+    "numerator_def": "Antihypertensive medication, 100% provided by facility, 60 years and above",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "1b. NCD Meds Senior Citizens_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_dec_60plus_htn_oop",
+    "program_area": "ncd",
+    "label": "Antihypertensive medication, out of pocket, 60 years and above",
+    "numerator_def": "Antihypertensive medication, out of pocket, 60 years and above",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "1b. NCD Meds Senior Citizens_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_dec_60plus_htn_total",
+    "program_area": "ncd",
+    "label": "Antihypertensive medication, total access, 60 years and above",
+    "numerator_def": "Antihypertensive medication, total access, 60 years and above",
+    "denominator_def": "Identified hypertensive patients in the same December age cohort",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1b. NCD Meds Senior Citizens_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_dec_60plus_dm_facility",
+    "program_area": "ncd",
+    "label": "Antidiabetic medication, 100% provided by facility, 60 years and above",
+    "numerator_def": "Antidiabetic medication, 100% provided by facility, 60 years and above",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "1b. NCD Meds Senior Citizens_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_dec_60plus_dm_oop",
+    "program_area": "ncd",
+    "label": "Antidiabetic medication, out of pocket, 60 years and above",
+    "numerator_def": "Antidiabetic medication, out of pocket, 60 years and above",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "1b. NCD Meds Senior Citizens_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_dec_60plus_dm_total",
+    "program_area": "ncd",
+    "label": "Antidiabetic medication, total access, 60 years and above",
+    "numerator_def": "Antidiabetic medication, total access, 60 years and above",
+    "denominator_def": "Identified type 2 diabetes patients in the same December age cohort",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1b. NCD Meds Senior Citizens_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_20_59_smoking",
+    "program_area": "ncd",
+    "label": "History of smoking, 20–59 years",
+    "numerator_def": "History of smoking, 20–59 years",
+    "denominator_def": "Source risk-assessed population in the stated age cohort; risk factors may overlap",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1c. Risk Factors AD_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_20_59_binge",
+    "program_area": "ncd",
+    "label": "Binge drinking, 20–59 years",
+    "numerator_def": "Binge drinking, 20–59 years",
+    "denominator_def": "Source risk-assessed population in the stated age cohort; risk factors may overlap",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1c. Risk Factors AD_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_20_59_inactive",
+    "program_area": "ncd",
+    "label": "Insufficient physical activity, 20–59 years",
+    "numerator_def": "Insufficient physical activity, 20–59 years",
+    "denominator_def": "Source risk-assessed population in the stated age cohort; risk factors may overlap",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1c. Risk Factors AD_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_20_59_diet",
+    "program_area": "ncd",
+    "label": "Unhealthy diet, 20–59 years",
+    "numerator_def": "Unhealthy diet, 20–59 years",
+    "denominator_def": "Source risk-assessed population in the stated age cohort; risk factors may overlap",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1c. Risk Factors AD_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_20_59_overweight",
+    "program_area": "ncd",
+    "label": "Overweight, 20–59 years",
+    "numerator_def": "Overweight, 20–59 years",
+    "denominator_def": "Source risk-assessed population in the stated age cohort; risk factors may overlap",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1c. Risk Factors AD_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_20_59_obese",
+    "program_area": "ncd",
+    "label": "Obesity, 20–59 years",
+    "numerator_def": "Obesity, 20–59 years",
+    "denominator_def": "Source risk-assessed population in the stated age cohort; risk factors may overlap",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1c. Risk Factors AD_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_60plus_smoking",
+    "program_area": "ncd",
+    "label": "History of smoking, 60 years and above",
+    "numerator_def": "History of smoking, 60 years and above",
+    "denominator_def": "Source risk-assessed population in the stated age cohort; risk factors may overlap",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1d. Risk Factors SC_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_60plus_binge",
+    "program_area": "ncd",
+    "label": "Binge drinking, 60 years and above",
+    "numerator_def": "Binge drinking, 60 years and above",
+    "denominator_def": "Source risk-assessed population in the stated age cohort; risk factors may overlap",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1d. Risk Factors SC_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_60plus_inactive",
+    "program_area": "ncd",
+    "label": "Insufficient physical activity, 60 years and above",
+    "numerator_def": "Insufficient physical activity, 60 years and above",
+    "denominator_def": "Source risk-assessed population in the stated age cohort; risk factors may overlap",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1d. Risk Factors SC_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_60plus_diet",
+    "program_area": "ncd",
+    "label": "Unhealthy diet, 60 years and above",
+    "numerator_def": "Unhealthy diet, 60 years and above",
+    "denominator_def": "Source risk-assessed population in the stated age cohort; risk factors may overlap",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1d. Risk Factors SC_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_60plus_overweight",
+    "program_area": "ncd",
+    "label": "Overweight, 60 years and above",
+    "numerator_def": "Overweight, 60 years and above",
+    "denominator_def": "Source risk-assessed population in the stated age cohort; risk factors may overlap",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1d. Risk Factors SC_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_60plus_obese",
+    "program_area": "ncd",
+    "label": "Obesity, 60 years and above",
+    "numerator_def": "Obesity, 60 years and above",
+    "denominator_def": "Source risk-assessed population in the stated age cohort; risk factors may overlap",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1d. Risk Factors SC_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_vision_screened",
+    "program_area": "ncd",
+    "label": "Screened for visual acuity, age 60 and above",
+    "numerator_def": "Screened for visual acuity, age 60 and above",
+    "denominator_def": "Senior citizens seen",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "2. Visual Acuity_Philippines_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_eye_disease",
+    "program_area": "ncd",
+    "label": "Identified with eye disease, age 60 and above",
+    "numerator_def": "Identified with eye disease, age 60 and above",
+    "denominator_def": "Senior citizens screened for visual acuity",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "2. Visual Acuity_Philippines_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_eye_referred",
+    "program_area": "ncd",
+    "label": "Referred to eye-care professionals, age 60 and above",
+    "numerator_def": "Referred to eye-care professionals, age 60 and above",
+    "denominator_def": "Senior citizens identified with eye disease",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "2. Visual Acuity_Philippines_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_senior_ppv",
+    "program_area": "ncd",
+    "label": "Senior citizens receiving one PPV dose",
+    "numerator_def": "Senior citizens receiving one PPV dose",
+    "denominator_def": "Senior citizens seen who had not previously received PPV",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "3. Immunization_Philippines_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_senior_flu",
+    "program_area": "ncd",
+    "label": "Senior citizens receiving one influenza vaccine dose",
+    "numerator_def": "Senior citizens receiving one influenza vaccine dose",
+    "denominator_def": "Senior citizens seen",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "3. Immunization_Philippines_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_cervical_via",
+    "program_area": "ncd",
+    "label": "VIA screening, women aged 30–65",
+    "numerator_def": "VIA screening, women aged 30–65",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "4a. CA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_cervical_pap",
+    "program_area": "ncd",
+    "label": "Pap smear screening, women aged 30–65",
+    "numerator_def": "Pap smear screening, women aged 30–65",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "4a. CA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_cervical_hpv",
+    "program_area": "ncd",
+    "label": "HPV DNA screening, women aged 30–65",
+    "numerator_def": "HPV DNA screening, women aged 30–65",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "4a. CA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_cervical_assessed",
+    "program_area": "ncd",
+    "label": "Assessed only, women aged 30–65",
+    "numerator_def": "Assessed only, women aged 30–65",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "4a. CA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_cervical_screened",
+    "program_area": "ncd",
+    "label": "Screened or assessed, source total, women aged 30–65",
+    "numerator_def": "Screened or assessed, source total, women aged 30–65",
+    "denominator_def": "Projected women aged 30–65 minus women aged 30–65 screened in the previous two years (source target population)",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4a. CA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_cervical_suspicious",
+    "program_area": "ncd",
+    "label": "Suspicious for cervical cancer, women aged 30–65",
+    "numerator_def": "Suspicious for cervical cancer, women aged 30–65",
+    "denominator_def": "Women assessed only (source denominator, not all screened women)",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4a. CA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_cervical_suspicious_treated",
+    "program_area": "ncd",
+    "label": "Suspicious cases treated, women aged 30–65",
+    "numerator_def": "Suspicious cases treated, women aged 30–65",
+    "denominator_def": "Women suspicious for cervical cancer",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4a. CA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_cervical_suspicious_referred",
+    "program_area": "ncd",
+    "label": "Suspicious cases referred, women aged 30–65",
+    "numerator_def": "Suspicious cases referred, women aged 30–65",
+    "denominator_def": "Women suspicious for cervical cancer",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4a. CA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_cervical_suspicious_managed",
+    "program_area": "ncd",
+    "label": "Suspicious cases treated/referred, source total, women aged 30–65",
+    "numerator_def": "Suspicious cases treated/referred, source total, women aged 30–65",
+    "denominator_def": "Women suspicious for cervical cancer",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4a. CA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_cervical_lesions",
+    "program_area": "ncd",
+    "label": "Positive for precancerous lesions, women aged 30–65",
+    "numerator_def": "Positive for precancerous lesions, women aged 30–65",
+    "denominator_def": "Women aged 30–65 screened by VIA, Pap smear or HPV DNA (sum of source method counts, excluding assessed-only women); FHSIS 2025 Annual Report, p. 88. Rate undefined when denominator is zero.",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4a. CA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_cervical_lesions_treated",
+    "program_area": "ncd",
+    "label": "Precancerous lesions treated, women aged 30–65",
+    "numerator_def": "Precancerous lesions treated, women aged 30–65",
+    "denominator_def": "Women positive for precancerous lesions",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4a. CA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_cervical_lesions_referred",
+    "program_area": "ncd",
+    "label": "Precancerous lesions referred, women aged 30–65",
+    "numerator_def": "Precancerous lesions referred, women aged 30–65",
+    "denominator_def": "Women positive for precancerous lesions",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4a. CA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_cervical_lesions_managed",
+    "program_area": "ncd",
+    "label": "Precancerous lesions treated/referred, source total, women aged 30–65",
+    "numerator_def": "Precancerous lesions treated/referred, source total, women aged 30–65",
+    "denominator_def": "Women positive for precancerous lesions",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4a. CA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_breast_highrisk_cbe",
+    "program_area": "ncd",
+    "label": "Clinical breast examination, high-risk asymptomatic or symptomatic women aged 30–69",
+    "numerator_def": "Clinical breast examination, high-risk asymptomatic or symptomatic women aged 30–69",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "4b. BA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_breast_highrisk_mammogram",
+    "program_area": "ncd",
+    "label": "Mammography, high-risk asymptomatic or symptomatic women aged 30–69",
+    "numerator_def": "Mammography, high-risk asymptomatic or symptomatic women aged 30–69",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "4b. BA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_breast_highrisk_screened",
+    "program_area": "ncd",
+    "label": "Breast screening, source total, high-risk asymptomatic or symptomatic women aged 30–69",
+    "numerator_def": "Breast screening, source total, high-risk asymptomatic or symptomatic women aged 30–69",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "4b. BA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_breast_highrisk_cbe_findings",
+    "program_area": "ncd",
+    "label": "Significant clinical breast examination findings, high-risk asymptomatic or symptomatic women aged 30–69",
+    "numerator_def": "Significant clinical breast examination findings, high-risk asymptomatic or symptomatic women aged 30–69",
+    "denominator_def": "Clinical breast examinations in the same cohort",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4b. BA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_breast_highrisk_mammogram_findings",
+    "program_area": "ncd",
+    "label": "Significant mammography findings, high-risk asymptomatic or symptomatic women aged 30–69",
+    "numerator_def": "Significant mammography findings, high-risk asymptomatic or symptomatic women aged 30–69",
+    "denominator_def": "Mammograms in the same cohort",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4b. BA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_breast_highrisk_findings",
+    "program_area": "ncd",
+    "label": "Significant breast findings, source total, high-risk asymptomatic or symptomatic women aged 30–69",
+    "numerator_def": "Significant breast findings, source total, high-risk asymptomatic or symptomatic women aged 30–69",
+    "denominator_def": "Screening total in the same cohort",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4b. BA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_breast_highrisk_care",
+    "program_area": "ncd",
+    "label": "Breast findings linked to care, high-risk asymptomatic or symptomatic women aged 30–69",
+    "numerator_def": "Breast findings linked to care, high-risk asymptomatic or symptomatic women aged 30–69",
+    "denominator_def": "Significant findings in the same cohort",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4b. BA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_breast_routine_cbe",
+    "program_area": "ncd",
+    "label": "Clinical breast examination, asymptomatic women aged 50–69",
+    "numerator_def": "Clinical breast examination, asymptomatic women aged 50–69",
+    "denominator_def": "Projected female population aged 50–69",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4b. BA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_breast_routine_mammogram",
+    "program_area": "ncd",
+    "label": "Mammography, asymptomatic women aged 50–69",
+    "numerator_def": "Mammography, asymptomatic women aged 50–69",
+    "denominator_def": "Projected female population aged 50–69",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4b. BA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_breast_routine_screened",
+    "program_area": "ncd",
+    "label": "Breast screening, source total, asymptomatic women aged 50–69",
+    "numerator_def": "Breast screening, source total, asymptomatic women aged 50–69",
+    "denominator_def": "Projected female population aged 50–69",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4b. BA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_breast_routine_cbe_findings",
+    "program_area": "ncd",
+    "label": "Significant clinical breast examination findings, asymptomatic women aged 50–69",
+    "numerator_def": "Significant clinical breast examination findings, asymptomatic women aged 50–69",
+    "denominator_def": "Clinical breast examinations in the same cohort",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4b. BA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_breast_routine_mammogram_findings",
+    "program_area": "ncd",
+    "label": "Significant mammography findings, asymptomatic women aged 50–69",
+    "numerator_def": "Significant mammography findings, asymptomatic women aged 50–69",
+    "denominator_def": "Mammograms in the same cohort",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4b. BA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_breast_routine_findings",
+    "program_area": "ncd",
+    "label": "Significant breast findings, source total, asymptomatic women aged 50–69",
+    "numerator_def": "Significant breast findings, source total, asymptomatic women aged 50–69",
+    "denominator_def": "Screening total in the same cohort",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4b. BA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_breast_routine_care",
+    "program_area": "ncd",
+    "label": "Breast findings linked to care, asymptomatic women aged 50–69",
+    "numerator_def": "Breast findings linked to care, asymptomatic women aged 50–69",
+    "denominator_def": "Significant findings in the same cohort",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4b. BA_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_mhgap_0_9",
+    "program_area": "ncd",
+    "label": "Mental-health concerns screened using mhGAP, 0–9 years",
+    "numerator_def": "Mental-health concerns screened using mhGAP, 0–9 years",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "5. MH 2025-new_Philippines_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_mhgap_10_19",
+    "program_area": "ncd",
+    "label": "Mental-health concerns screened using mhGAP, 10–19 years",
+    "numerator_def": "Mental-health concerns screened using mhGAP, 10–19 years",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "5. MH 2025-new_Philippines_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_mhgap_20_59",
+    "program_area": "ncd",
+    "label": "Mental-health concerns screened using mhGAP, 20–59 years",
+    "numerator_def": "Mental-health concerns screened using mhGAP, 20–59 years",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "5. MH 2025-new_Philippines_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_mhgap_60plus",
+    "program_area": "ncd",
+    "label": "Mental-health concerns screened using mhGAP, 60 and above years",
+    "numerator_def": "Mental-health concerns screened using mhGAP, 60 and above years",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "5. MH 2025-new_Philippines_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_mhgap_total",
+    "program_area": "ncd",
+    "label": "Mental-health concerns screened using mhGAP, all ages",
+    "numerator_def": "Mental-health concerns screened using mhGAP, all ages",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "5. MH 2025-new_Philippines_nofml.xlsx",
+    "uuc_criterion_d": false
+  }
+]

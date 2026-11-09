@@ -23,6 +23,10 @@ import urllib.request
 from pathlib import Path
 
 PUBLIC_READ_TABLES = [
+    "ref_fhsis_indicator",
+    "fact_fhsis_indicator",
+    "fact_fhsis_workforce",
+    "ref_fhsis_reconciliation",
     "dim_geo",
     "dim_dataset",
     "agg_bhw_counts",

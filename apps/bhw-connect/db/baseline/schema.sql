@@ -3596,7 +3596,9 @@ CREATE TABLE public.fact_fhsis_indicator (
     rate_pct numeric,
     over_100 boolean DEFAULT false NOT NULL,
     source_psgc text,
-    source_area_name text
+    source_area_name text,
+    numerator_exact numeric,
+    denominator_exact numeric
 );
 
 
@@ -3605,6 +3607,20 @@ CREATE TABLE public.fact_fhsis_indicator (
 --
 
 COMMENT ON TABLE public.fact_fhsis_indicator IS 'DOH FHSIS 2025 annual release: 20 service-delivery indicators at national, region, province and city/municipality grain, with the source''s own sex and age-band breakdowns. One row per (dataset, geography, indicator, breakdown). NEVER AVERAGE rate_pct — read the published row for the area instead; every grain is loaded. A rate above 100 is stored as published with over_100 = true and is never capped. READ ref_fhsis_indicator.unit FIRST: the TB notification rates are per 100,000, not percentages. A MISSING (geo, indicator, breakdown) MEANS NOT REPORTED, NOT ZERO. Denominators are DOH projections, this dataset''s own base and nothing else''s. See docs/FHSIS_2025_PLAN.md.';
+
+
+--
+-- Name: COLUMN fact_fhsis_indicator.numerator_exact; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.fact_fhsis_indicator.numerator_exact IS 'Published source value, including decimals. Prefer this to legacy numerator when present.';
+
+
+--
+-- Name: COLUMN fact_fhsis_indicator.denominator_exact; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.fact_fhsis_indicator.denominator_exact IS 'Published denominator, including fractional projections. Prefer this to legacy denominator when present.';
 
 
 --
@@ -4267,6 +4283,49 @@ CREATE VIEW public.ref_fhsis_reconciliation WITH (security_invoker='true') AS
 --
 
 COMMENT ON VIEW public.ref_fhsis_reconciliation IS 'Per FHSIS indicator and breakdown: the sum of an area''s children against the subtotal the source published for that area, and the residual between them. Computed on every read. A NON-ZERO RESIDUAL IS USUALLY NOT AN ERROR — for FIC, 78 of 83 comparable provinces reconcile exactly and the other five differ by precisely the figure of an independent component or highly urbanised city that dim_geo nests under the province while the source''s province row excludes it. NEVER DERIVE A PARENT''S FIGURE BY SUMMING ITS CHILDREN: every grain is loaded, so read the published row for the area. This view exists to explain the difference to a reader who adds them up, not to correct either side. See docs/FHSIS_2025_CLEANING_REPORT.md.';
+
+
+--
+-- Name: ref_fhsis_reconciliation_exact; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.ref_fhsis_reconciliation_exact WITH (security_invoker='true') AS
+ WITH child_of AS (
+         SELECT f.dataset_id,
+            f.indicator_key,
+            f.breakdown,
+            COALESCE(f.numerator_exact, (f.numerator)::numeric) AS numerator,
+            (
+                CASE f.geo_level
+                    WHEN 'citymun'::public.geo_level_enum THEN 'province'::text
+                    WHEN 'province'::public.geo_level_enum THEN 'region'::text
+                    WHEN 'region'::public.geo_level_enum THEN 'national'::text
+                    ELSE NULL::text
+                END)::public.geo_level_enum AS parent_level,
+            g.parent_code
+           FROM (public.fact_fhsis_indicator f
+             JOIN public.dim_geo g ON ((g.geo_code = f.geo_code)))
+          WHERE ((f.geo_level <> 'national'::public.geo_level_enum) AND (COALESCE(f.numerator_exact, (f.numerator)::numeric) IS NOT NULL))
+        )
+ SELECT c.dataset_id,
+    c.indicator_key,
+    c.breakdown,
+    c.parent_level,
+    c.parent_code AS parent_geo_code,
+    p.geo_name AS parent_geo_name,
+    (count(*))::integer AS child_count,
+    sum(c.numerator) AS child_sum,
+    COALESCE(parent.numerator_exact, (parent.numerator)::numeric) AS published_parent,
+    (COALESCE(parent.numerator_exact, (parent.numerator)::numeric) - sum(c.numerator)) AS residual,
+        CASE
+            WHEN ((COALESCE(parent.numerator_exact, (parent.numerator)::numeric) - sum(c.numerator)) = (0)::numeric) THEN 'reconciles'::text
+            WHEN ((COALESCE(parent.numerator_exact, (parent.numerator)::numeric) - sum(c.numerator)) > (0)::numeric) THEN 'leaves short of published parent'::text
+            ELSE 'leaves exceed published parent'::text
+        END AS finding
+   FROM ((child_of c
+     JOIN public.dim_geo p ON ((p.geo_code = c.parent_code)))
+     JOIN public.fact_fhsis_indicator parent ON (((parent.dataset_id = c.dataset_id) AND (parent.geo_code = c.parent_code) AND (parent.indicator_key = c.indicator_key) AND (parent.breakdown = c.breakdown) AND (COALESCE(parent.numerator_exact, (parent.numerator)::numeric) IS NOT NULL))))
+  GROUP BY c.dataset_id, c.indicator_key, c.breakdown, c.parent_level, c.parent_code, p.geo_name, parent.numerator_exact, parent.numerator;
 
 
 --
@@ -8511,6 +8570,15 @@ GRANT ALL ON TABLE public.ref_fhsis_indicator TO service_role;
 GRANT ALL ON TABLE public.ref_fhsis_reconciliation TO anon;
 GRANT ALL ON TABLE public.ref_fhsis_reconciliation TO authenticated;
 GRANT ALL ON TABLE public.ref_fhsis_reconciliation TO service_role;
+
+
+--
+-- Name: TABLE ref_fhsis_reconciliation_exact; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.ref_fhsis_reconciliation_exact TO anon;
+GRANT ALL ON TABLE public.ref_fhsis_reconciliation_exact TO authenticated;
+GRANT ALL ON TABLE public.ref_fhsis_reconciliation_exact TO service_role;
 
 
 --

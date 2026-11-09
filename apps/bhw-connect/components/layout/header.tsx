@@ -1,5 +1,7 @@
 "use client";
 
+import { IconnectMark } from "@/components/branding/iconnect-logo";
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -39,15 +41,17 @@ export function Header() {
     setMobileOpen(false);
   }
 
-  // The Equity in Health portal ("/"), the 2026 BHW Profiling Status section
+  // The iconnect portal ("/"), the 2026 BHW Profiling Status section
   // ("/profiling-status/*"), the UUC for PHC section ("/uuc-phc/*") and the health facilities
   // section ("/facilities/*") each supply their own slim chrome, so the census (BHW Connect)
   // header is suppressed on all of them.
   if (
     pathname === "/" ||
+    pathname === "/catalog" ||
     pathname.startsWith("/profiling-status") ||
     pathname.startsWith("/uuc-phc") ||
-    pathname.startsWith("/facilities")
+    pathname.startsWith("/facilities") ||
+    pathname.startsWith("/health-services")
   )
     return null;
 
@@ -55,7 +59,7 @@ export function Header() {
     <header className="border-b border-border bg-background">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
         <Link href="/bhw" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-          <span className="equity-mark sm" aria-hidden="true" />
+          <IconnectMark />
           <span>BHW Connect</span>
         </Link>
 
@@ -87,7 +91,7 @@ export function Header() {
             href="/"
             className="rounded-md px-3 py-2 text-sm font-medium text-muted hover:bg-surface hover:text-foreground"
           >
-            ← Portal
+            ← iconnect
           </Link>
           {MERIDIAN_HOME && (
             <a
@@ -148,7 +152,7 @@ export function Header() {
                 href="/"
                 className="block rounded-md px-3 py-2.5 text-sm font-medium text-muted hover:bg-surface hover:text-foreground"
               >
-                ← Portal
+                ← iconnect
               </Link>
             </li>
             {MERIDIAN_HOME && (

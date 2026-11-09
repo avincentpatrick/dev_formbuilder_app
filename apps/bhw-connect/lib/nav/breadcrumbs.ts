@@ -22,7 +22,7 @@
 export type Crumb = { label: string; href?: string };
 
 /** The front door every trail starts from. */
-export const PORTAL_CRUMB: Crumb = { label: "Equity in Health", href: "/" };
+export const PORTAL_CRUMB: Crumb = { label: "iconnect", href: "/" };
 
 /** Section roots — also the first crumb a dynamic page prepends to its own trail. */
 export const BHW_CRUMB: Crumb = { label: "2025 BHW Census", href: "/bhw" };
@@ -32,6 +32,8 @@ export const PROFILING_STATUS_CRUMB: Crumb = {
 };
 export const UUC_PHC_CRUMB: Crumb = { label: "2025 UUC for PHC", href: "/uuc-phc" };
 export const FACILITIES_CRUMB: Crumb = { label: "Health facilities", href: "/facilities" };
+
+export const HEALTH_SERVICES_CRUMB: Crumb = { label: "Health services", href: "/health-services" };
 
 const ADMIN_CRUMB: Crumb = { label: "Admin", href: "/admin" };
 
@@ -90,6 +92,10 @@ const FACILITIES_TRAILS: Record<string, Crumb[]> = {
 };
 
 const STATIC_TRAILS: Record<string, Crumb[]> = {
+  "/map": [{ label: "Dataset maps" }],
+  "/catalog": [{ label: "Dataset catalog" }],
+  "/health-services": [HEALTH_SERVICES_CRUMB],
+  "/health-services/methodology": [HEALTH_SERVICES_CRUMB, { label: "Methodology" }],
   ...BHW_TRAILS,
   ...ADMIN_TRAILS,
   ...PROFILING_STATUS_TRAILS,

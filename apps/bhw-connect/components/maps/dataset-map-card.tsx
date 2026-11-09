@@ -414,7 +414,7 @@ export function DatasetMapCard({
                       .
                     </p>
                   )}
-                  {data.childLevel !== "citymun" ? (
+                  {data.childLevel === "region" || data.childLevel === "province" || (data.childLevel === "citymun" && data.barangayDrill) ? (
                     <button
                       className="underline"
                       type="button"
@@ -422,7 +422,7 @@ export function DatasetMapCard({
                         setTrail([...trail, choice]);
                         setChoice({
                           ...choice,
-                          level: data.childLevel as "region" | "province",
+                          level: data.childLevel as "region" | "province" | "citymun",
                           code: selected.code,
                           selected: null,
                         });
@@ -436,11 +436,13 @@ export function DatasetMapCard({
                         ? "Barangays have no independently published income class; this classification belongs to the named LGU."
                         : poverty
                           ? "No barangay poverty estimates are published in this source."
-                          : "Barangay polygons are not yet validated."}{" "}
+                          : data.childLevel === "barangay"
+                            ? "Barangays are the smallest area on this map."
+                            : "Barangay polygons are not yet validated."}{" "}
                       {dashboard && (
                         <Link
                           className="underline"
-                          href={`${dashboard === "/bhw" ? "/place" : dashboard}/citymun/${selected.code}`}
+                          href={`${dashboard === "/bhw" ? "/place" : dashboard}/citymun/${data.childLevel === "barangay" ? choice.code : selected.code}`}
                         >
                           Open municipal dashboard and barangay information
                         </Link>

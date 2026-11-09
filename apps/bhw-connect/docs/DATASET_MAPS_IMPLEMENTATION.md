@@ -916,3 +916,31 @@ Validation: 18 new parser/API cases; full database-backed Vitest 1,678 passed, 1
 All 37 map browser cases passed, including duplicate-indicator and wrong-depth selection
 recovery with no fallback reads. Lint (existing fixture warning), typecheck, migration lint
 and prefixed no-data build passed.
+
+## Barangay drill-down, off until a release is installed (9 November 2026)
+
+A municipality can now drill into its barangays, but only when all three hold: an operator has set
+`BHW_BARANGAY_RELEASE` to an installed package release (never `latest`), the dataset is enabled
+(`BARANGAY_DRILL_DATASETS`: NHFR and UUC first), and the indicator's source carries barangay rows.
+With the setting empty, which is the default, behaviour is unchanged: a selected municipality offers
+its dashboard link, and a link with `level=citymun` is refused with 400 before any data is read.
+BHW Census, StepZero, profiling, poverty and income class stay out; the first two need a barangay-level
+small-count suppression review, the rest have no barangay values.
+
+The scope gains a `citymun` level (seven-digit code, ten-digit barangay selection). The API reads the
+municipality's barangays from `dim_geo`, joins values exactly as for other levels, keeps the parent
+total separate, and points the card at `/maps/<release>/citymun/<code>.json`, the package's own shard
+name. Barangays with no candidate polygon (withheld, unmatched, or a municipality with none) stay in
+the complete table with their values; the map draws only what the shard contains. A missing shard is the
+existing boundary-unavailable state with the table intact. Nothing else in a payload changes, and no
+boundary, value or disclosure rule is widened.
+
+Operator steps, which are outside this tree: install the package under versioned same-origin storage
+with the prior release kept, run `scripts/validate-boundary-hosting.mjs` against the real route, set the
+setting, and restart. Unsetting it, or pointing it at the previous release, is the rollback. Whether
+the live barangay rows exist per dataset is unverified until the setting is on, so the first check after
+enabling is the read-only probe against one municipality of each enabled dataset.
+Validation: 11 new unit/API cases, two browser cases (drill with a withheld barangay in the table, and
+no drill when unavailable), and a deliberate defect in the availability flag that turned a test red.
+Locally only the browser specs that mock the API ran (22 passed); the specs that read the seeded
+database were left to CI because this environment has none.

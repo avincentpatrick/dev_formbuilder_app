@@ -79,3 +79,12 @@ it("ignores unrelated tracking parameters without weakening map-choice validatio
   expect(parseMapChoice(new URLSearchParams("dataset=nhfr-2026-09&utm_source=one&utm_source=two")))
     .toEqual(initialMapChoice("nhfr-2026-09"));
 });
+
+it("accepts a municipality scope with a ten-digit barangay selection, and rejects wrong shapes", () => {
+  const base = { dataset: "nhfr-2026-09", level: "citymun" };
+  expect(parseMapChoice(new URLSearchParams({ ...base, code: "0102801", selected: "0102801001" })))
+    .toMatchObject({ level: "citymun", code: "0102801", selected: "0102801001" });
+  expect(parseMapChoice(new URLSearchParams({ ...base, code: "0102801" }))).toMatchObject({ selected: null });
+  for (const [code, selected] of [["01028", undefined], ["0102801", "0102801"], ["0102801", "010280100"], ["0102801", "01028010011"], ["01028010", undefined]] as const)
+    expect(parseMapChoice(new URLSearchParams({ ...base, code, ...(selected ? { selected } : {}) })), `${code}/${selected}`).toBeNull();
+});

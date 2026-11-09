@@ -1,7 +1,7 @@
 import { TRAINING_TOPICS } from "@/lib/catalog/definitions";
 import { getDatasetMap } from "./definitions";
 
-export type MapScope = { level: "national" | "region" | "province"; code: string };
+export type MapScope = { level: "national" | "region" | "province" | "citymun"; code: string };
 export type MapChoice = MapScope & {
   dataset: string;
   indicator: string;
@@ -27,7 +27,9 @@ export type MapPayload = {
   parentMean?: number | null;
   totalNote?: string;
   area: string;
-  childLevel: "region" | "province" | "citymun";
+  childLevel: "region" | "province" | "citymun" | "barangay";
+  /** True only when the selected child municipality can drill into barangay polygons. */
+  barangayDrill?: boolean;
   source: string;
   date: string | null;
   license: string | null;
@@ -94,13 +96,15 @@ export function parseMapChoice(params: URLSearchParams): MapChoice | null {
   const period = params.get("period") ?? base.period;
   const level = params.get("level") ?? "national";
   const code = params.get("code") ?? "PH";
-  if (!["national", "region", "province"].includes(level)) return null;
+  if (!["national", "region", "province", "citymun"].includes(level)) return null;
   if (
     !(level === "national"
       ? code === "PH"
       : level === "region"
         ? /^\d{2}$/.test(code)
-        : /^\d{5}$/.test(code))
+        : level === "province"
+          ? /^\d{5}$/.test(code)
+          : /^\d{7}$/.test(code))
   )
     return null;
   const metrics = prototypeIndicators(dataset);
@@ -112,7 +116,7 @@ export function parseMapChoice(params: URLSearchParams): MapChoice | null {
     return null;
   const selected = params.get("selected");
   if (selected !== null) {
-    const childLength = level === "national" ? 2 : level === "region" ? 5 : 7;
+    const childLength = level === "national" ? 2 : level === "region" ? 5 : level === "province" ? 7 : 10;
     if (!metrics.length || !new RegExp(`^\\d{${childLength}}$`).test(selected)) return null;
   }
   return { dataset, indicator, period, level: level as MapScope["level"], code, selected };

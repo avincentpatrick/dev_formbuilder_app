@@ -914,3 +914,42 @@ for (const query of [
     expect(choice.get("level")).toBe("national");
   });
 }
+
+const syntheticSource = { source: "Synthetic NHFR", date: "2026-09-01", license: "Test only" };
+function barangayApi(page: import("@playwright/test").Page, barangayDrill: boolean) {
+  return page.route("**/api/dataset-map?**", route => {
+    const province = new URL(route.request().url()).searchParams.get("level") === "province";
+    return route.fulfill({ json: province
+      ? { state: "available", rows: [{ code: "0102801", name: "Adams", value: 3 }], total: 3, area: "Ilocos Norte",
+          childLevel: "citymun", ...(barangayDrill ? { barangayDrill: true } : {}), ...syntheticSource,
+          geometryUrl: "/bhw-connect/geo/citymun/01028.json" }
+      : { state: "available", rows: [{ code: "0102801001", name: "Adams (Pob.)", value: 2 },
+          { code: "0102801002", name: "Bacsil (no boundary yet)", value: 1 }], total: 3, area: "Adams",
+          childLevel: "barangay", ...syntheticSource, geometryUrl: "/bhw-connect/maps/rel-1/citymun/0102801.json" } });
+  });
+}
+const square = (code: string, x: number) => ({ type: "FeatureCollection", features: [{ type: "Feature",
+  properties: { geo_code: code }, geometry: { type: "Polygon",
+    coordinates: [[[x, 18.4], [x + 0.1, 18.4], [x + 0.1, 18.5], [x, 18.5], [x, 18.4]]] } }] });
+
+test("a municipality drills into its barangays, and a barangay without a boundary stays in the table", async ({ page }) => {
+  await barangayApi(page, true);
+  await page.route("**/geo/citymun/01028.json", route => route.fulfill({ json: square("0102801", 120.4) }));
+  await page.route("**/maps/rel-1/citymun/0102801.json", route => route.fulfill({ json: square("0102801001", 120.4) }));
+  await page.goto("map?dataset=nhfr-2026-09&level=province&code=01028&selected=0102801");
+  await page.getByRole("button", { name: /Show areas within/ }).click();
+  await expect(page.getByRole("link", { name: "Share this map selection" })).toHaveAttribute("href", /level=citymun&code=0102801/);
+  await page.getByText(/Complete area table/).click();
+  await expect(page.getByRole("table")).toContainText("Bacsil (no boundary yet)");
+  await page.getByLabel("NHFR September 2026 area").selectOption("0102801001");
+  await expect(page.getByText("Barangays are the smallest area on this map.")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Show areas within/ })).toHaveCount(0);
+});
+
+test("without barangay drill-down a municipality keeps its dashboard link and no drill button", async ({ page }) => {
+  await barangayApi(page, false);
+  await page.route("**/geo/citymun/01028.json", route => route.fulfill({ json: square("0102801", 120.4) }));
+  await page.goto("map?dataset=nhfr-2026-09&level=province&code=01028&selected=0102801");
+  await expect(page.getByText("Barangay polygons are not yet validated.")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Show areas within/ })).toHaveCount(0);
+});

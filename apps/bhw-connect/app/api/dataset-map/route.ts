@@ -10,6 +10,7 @@ import { createSupabaseServerClient } from "@/lib/db/supabase";
 import { readDatasetBySlug } from "@/lib/db/dataset";
 import { getGeoByCode } from "@/lib/db/geo";
 import { withBasePath } from "@/lib/base-path";
+import { barangayDrillAvailable, barangayGeometryUrl, barangayRelease } from "@/lib/maps/barangay-release";
 import {
   joinMapRows,
   parseMapChoice,
@@ -26,6 +27,11 @@ export async function GET(request: NextRequest) {
   const income = choice?.dataset === "lgu-income-class";
   if (!choice || !metric || (!spec && !income && !profiling))
     return NextResponse.json({ state: "unsupported" }, { status: 400 });
+  // Barangay polygons exist only once an accepted package is installed and this dataset is enabled.
+  const release = barangayRelease();
+  const barangayDrill = barangayDrillAvailable(choice.dataset, metric.levels, release);
+  if (choice.level === "citymun" && !barangayDrill)
+    return NextResponse.json({ state: "unsupported" }, { status: 400 });
   try {
     const [source, geo] = await Promise.all([
       choice.dataset === "bhw-2025"
@@ -41,7 +47,13 @@ export async function GET(request: NextRequest) {
     if (!geo || geo.geoLevel !== choice.level)
       return NextResponse.json({ state: "unsupported" }, { status: 400 });
     const childLevel =
-      choice.level === "national" ? "region" : choice.level === "region" ? "province" : "citymun";
+      choice.level === "national"
+        ? "region"
+        : choice.level === "region"
+          ? "province"
+          : choice.level === "province"
+            ? "citymun"
+            : "barangay";
     const db = createSupabaseServerClient();
     let query = db
       .from("dim_geo")
@@ -180,12 +192,15 @@ export async function GET(request: NextRequest) {
       source: source.value.sourceName ?? source.value.name,
       date: source.value.asOfDate,
       license: source.value.license,
+      ...(choice.level === "province" && barangayDrill ? { barangayDrill: true } : {}),
       geometryUrl:
-        choice.level === "national"
-          ? withBasePath("/geo/regions.json")
-          : choice.level === "region"
-            ? withBasePath(`/geo/provinces/${choice.code}.json`)
-            : withBasePath(`/geo/citymun/${choice.code}.json`),
+        choice.level === "citymun"
+          ? barangayGeometryUrl(release!, choice.code)
+          : choice.level === "national"
+            ? withBasePath("/geo/regions.json")
+            : choice.level === "region"
+              ? withBasePath(`/geo/provinces/${choice.code}.json`)
+              : withBasePath(`/geo/citymun/${choice.code}.json`),
     };
     return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });
   } catch {

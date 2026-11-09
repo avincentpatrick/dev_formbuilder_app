@@ -1,3 +1,4 @@
+import { mapBinLabel } from "./legend-label";
 import { CENSUS_ACTIVE_YEARS_ID } from "./census-active-years";
 import { isCensusProfileRate } from "./census-accreditation";
 import type { ColorBin } from "@/lib/charts/color-scale";
@@ -40,11 +41,15 @@ export function datasetMapExport(
       boundaryVersion: definition.boundaryVersion, asset: data.geometryUrl,
       note: "Geometry availability does not establish historical boundary acceptance." },
     legend: {
+      unit: metric.unit,
       method: navigationOnly ? "not-applicable" : fixed ? "fixed" : "quantiles-relative-to-displayed-areas",
-      bins: navigationOnly ? [] : bins.map((bin) => ({
+      bins: navigationOnly ? [] : bins.map((bin, index) => ({
         min: bin.min, max: Number.isFinite(bin.max) ? bin.max : null,
         openEnded: !Number.isFinite(bin.max), color: bin.color,
-        ...(income ? { label: incomeClassLabel(bin.min) } : {}),
+        minInclusive: true,
+        maxInclusive: (bin.min === bin.max || index === bins.length - 1) && Number.isFinite(bin.max),
+        label: income ? incomeClassLabel(bin.min) ?? String(bin.min)
+          : mapBinLabel(bin, index, bins, metric.unit === "%" ? "%" : metric.unit === "years" ? " years" : ""),
       })),
     },
     parentMeasure: { kind: censusMean ? "mean" : accreditation ? "rate" : "total",

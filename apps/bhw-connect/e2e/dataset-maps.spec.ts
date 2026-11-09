@@ -863,3 +863,28 @@ test("Census active years preserves decimal means, years and the unknown contrib
   expect(data.total).toBeNull();
   expect(data.indicator).toMatchObject({ period: "2025", confidenceLevel: null });
 });
+
+test("decimal year legends match exported labels without collapsing distinct breaks", async ({ page }) => {
+  await page.route("**/api/dataset-map?**", route => route.fulfill({ json: {
+    state: "available", rows: [
+      { code: "01", name: "Synthetic low", value: 0.01 },
+      { code: "02", name: "Synthetic middle", value: 0.02 },
+      { code: "03", name: "Synthetic high", value: 0.03 },
+    ], total: null, parentMean: 0.02, area: "Philippines", childLevel: "region", source: "Synthetic Census",
+    date: "2025-12-31", license: "Test only", geometryUrl: "/bhw-connect/geo/regions.json",
+  } }));
+  await page.goto("map?dataset=bhw-2025&indicator=bhw.active-years");
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download map data (JSON)" }).click();
+  const stream = await (await downloaded).createReadStream();
+  const chunks = []; for await (const chunk of stream!) chunks.push(chunk);
+  const result = JSON.parse(Buffer.concat(chunks).toString());
+  expect(result.legend.unit).toBe("years");
+  expect(result.legend.bins.length).toBeGreaterThan(1);
+  for (const bin of result.legend.bins) {
+    await expect(page.getByText(bin.label, { exact: true })).toBeVisible();
+    expect(bin.label).toContain(" years");
+  }
+  expect(result.legend.bins[0]).toMatchObject({ min: 0.01, minInclusive: true, maxInclusive: false });
+  expect(result.legend.bins.at(-1)).toMatchObject({ max: 0.03, maxInclusive: true });
+});

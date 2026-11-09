@@ -875,3 +875,22 @@ Validation: 17 new adapter/API/export/audit checks; full database-backed Vitest 
 11 skipped. All 34 map browser cases passed, including decimal means, year units, the
 contributing-count caveat and JSON semantics. Lint (existing fixture warning), typecheck,
 migration lint and prefixed no-data build passed.
+
+## Legend and export parity (9 November 2026)
+
+A shared legend formatter now preserves distinct decimal breaks and their units in the
+accessible DOM legend and JSON labels consumed by PNG export. Adjacent numeric ranges have
+exclusive upper edges, matching the renderer's highest-cleared-lower-edge rule; the final
+finite edge is inclusive. Single-value categories retain inclusive bounds. JSON now records
+those edge semantics and the legend unit explicitly, alongside unchanged numeric bounds.
+
+This fixes exported percentages/year ranges that previously lacked units and distinctions
+such as 0.01 versus 0.02 being rounded to the same on-screen edge. Published income-class
+labels remain categorical. Profiling's last bin is represented as open-ended (100% or more),
+matching its existing displayed category and renderer behavior; bounded accreditation's
+last bin remains exactly 100%. Exported infinity becomes null plus `openEnded: true`, never
+an invalid JSON number. No dataset values, queries, disclosure rules or boundary assets change.
+Validation: eight new formatter/export checks; full database-backed Vitest 1,660 passed,
+11 skipped. All 35 map browser cases passed, including exact DOM/JSON decimal-label parity
+and desktop/phone PNG downloads. Lint (existing fixture warning), typecheck, migration lint
+and prefixed no-data build passed.

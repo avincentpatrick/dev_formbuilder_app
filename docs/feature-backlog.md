@@ -10506,7 +10506,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   to an unlimited, non-billing tier, restate the seat sentence for it, name the `not_provisioned` rows the choice
   brings with it, and record that an existing workspace changes tier only in the console, because a re-run with a
   different plan is refused. **Live.** Filed by `M98`. **Tier: during-testing.**
-- **`minor` · The first-boot runbook and the checklist set up none of the database backup §5 prescribes.**
+- ✅ **CLOSED BY `M216` (2026-11-09) — ****`minor` · The first-boot runbook and the checklist set up none of the database backup §5 prescribes.**
   Found by `M98` (2026-09-17) while reading the database steps against the backup runbook.
   `docs/deployment-infrastructure.md` §5 prescribes a daily `pg_dump` in custom format written to a backup volume
   and copied off-box, continuous WAL archiving with `archive_mode = on` and an `archive_command` for point-in-time
@@ -10520,6 +10520,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `archive_mode`/`archive_command` on to an off-box target and registers the daily dump and its prune as a Task
   Scheduler job, then prove one restore on the box; if losing the testing data is acceptable instead, record that
   as a decision and say in §8 that §5 does not bind this site. **Live.** Filed by `M98`. **Tier: during-testing.**
+  ✅ **Closed by `M216` (PR #413, `95ff77ea`, 2026-11-09):** §8.2 step 12 now sets up `scripts/nightly-backup.ps1` as the task, and it was rebuilt on the box from that step. `D212` took a daily copy off the box with one restore proved, so WAL archiving is production's, filed as `production-pitr`. The box's run and restore are recorded on `R-4bda047a`.
 - **`minor` · The first-boot steps leave `LOG_LEVEL=debug` and one unrotated log file in place.**
   Found by `M98` (2026-09-17) while reading where the server's `.env` values come from.
   `docs/deployment-infrastructure.md` §8.2 has the operator copy `.env.example` to `.env` and then set a named
@@ -11299,6 +11300,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   because it interrupts a respondent mid-form and cannot see `GeoInput.vue`'s deliberate swallow) or an
   `ASSET_URL`-style immutable asset host, which is a deployment change. **Live** — every deploy ages the previous
   release one day closer to the cutoff. Filed by `M109`. **Tier: during-testing.**
+  ⚠️ **Partly measured at `M216`'s sitting (2026-11-09), read-only, from the box's `meridian-access.log`, which starts at 2026-09-17 13:49:36:** 402 requests under `/build/assets/` returned 404, from 14 addresses. The 20 most recent, all at about 01:02 box time on 2026-11-07, were each to a doubled path, `/build/assets/assets/<chunk>.js`. No page asks for that path, and none of those files was ever served 200. That pattern is a client misresolving the chunks' relative imports, not a tab that outlived the window. The figure this row lacks is still unread: the single-`assets` 404s for files that **were** once served, and how many days after their first 200 each went missing.
 
 - **`minor` · The guest runtime has no asset-version check of any kind, so nothing can ever tell a respondent's tab
   that the release moved.** Filed 2026-09-25 by `M109` while verifying `R-e7d6f223`, whose own text rests on
@@ -14088,7 +14090,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · The preview-drag E2E case timed out once on the tablet project in a 33-test local run, and passed alone.** Found by `M161` (2026-10-12) running the builder specs its diff reaches: `builder-preview-authoring.spec.ts`'s "questions dragged in the preview" case failed at its SECOND drag — the grip's `boundingBox()` after a new section was added — when the 240 s test timeout ended it, 26.9 minutes into the run; run alone on the same build it passed in 1.3 minutes. `M161` changes nothing the Preview uses. `D2` makes a flaky E2E result a CI failure, so a case that fails under load is owed a cause: the stack's slowness late in a long run, or a drag that races the section's render. **Latent** — measured once, locally, and not on CI. Filed by `M161`. **Tier: during-testing.**
 
-- **`minor` · The testing server's database backups sit on the same machine as the database: no off-box copy, no write-ahead-log archiving and no restore drill.** Found by `M160`'s session (2026-10-12) when the user asked that no record be deleted on the testing site during development. `docs/deployment-infrastructure.md` §5 describes a daily `pg_dump` copied off the box, continuous WAL archiving and a quarterly restore drill; none of it existed on the testing server, whose only scheduled task named "backup" is Windows' own SettingSync. A nightly local backup now runs (`meridian-test-db-backup`, 01:30, keeps the newest 14 — set up with the user's yes), but a disk failure would take it with the database. The remedy needs a target off the box from the user — a second disk, a NAS or another machine. **Live.** Filed by `M160`. **Tier: during-testing.**
+- ✅ **CLOSED BY `M216` (2026-11-09) — ****`minor` · The testing server's database backups sit on the same machine as the database: no off-box copy, no write-ahead-log archiving and no restore drill.** Found by `M160`'s session (2026-10-12) when the user asked that no record be deleted on the testing site during development. `docs/deployment-infrastructure.md` §5 describes a daily `pg_dump` copied off the box, continuous WAL archiving and a quarterly restore drill; none of it existed on the testing server, whose only scheduled task named "backup" is Windows' own SettingSync. A nightly local backup now runs (`meridian-test-db-backup`, 01:30, keeps the newest 14 — set up with the user's yes), but a disk failure would take it with the database. The remedy needs a target off the box from the user — a second disk, a NAS or another machine. **Live.** Filed by `M160`. **Tier: during-testing.**
+  ✅ **Closed by `M216`'s box half, the user at both machines on 2026-11-09 (`D212` A, `D213` A):**
+  - **The target:** the hidden share `MeridianBackup$` on `D:\MeridianBackup`, on `DESKTOP-36C5T41` (192.168.1.119). D: is that desktop's own 1 TB hard disk. A local account, `meridianbackup`, has Change on the share and Modify on the folder; the only other rights are the user's, SYSTEM's and Administrators'. The share is encrypted, and a firewall rule admits TCP 445 from 192.168.50.2 alone.
+  - **The account:** SYSTEM, holding a credential for 192.168.1.119 in its own vault, saved by a one-shot task that was then deleted. The plan's first choice worked, so §8.2's dedicated account was not needed. Measured as SYSTEM: the share was reachable, and a file was written, read back and deleted.
+  - **The run:** task `meridian-test-db-backup` rebuilt per §8.2 step 12 (SYSTEM, 01:30, `-OffBoxDir "\\192.168.1.119\MeridianBackup$"`, keeping 30). Its first run returned `LastTaskResult` 0. It wrote `deploy-20261109-050547.dump`, 1,173,778 B, with SHA-256 `A2395B01…37B5D3` on both machines. The old task's definition is kept in `C:\meridian\meridian-test-db-backup.pre-M216.xml`.
+  - **The restore:** that dump went into the scratch database `meridian_restoretest` with `pg_restore --no-owner` as `postgres`. It exited 0 with no messages. All 70 tables were restored. The only count that differed was `public.sessions` (143 in the dump, 127 live; expired sessions were removed after 05:05 UTC). The scratch database was then dropped.
+  - **Left:** a lost copy still tells no one (`nightly-backup-silent-failure`). There is no next drill (`restore-drill-no-owner`). The desktop's address comes from DHCP (`backup-target-dhcp`).
 
 - ✅ **CLOSED BY `M164` (2026-10-12) — ****`minor` · The Help page's contents list sits only at the top, so a reader deep in its twenty-three chapters scrolls all the way back to reach another.**
   The user's comment on `M163`'s Builder reference (2026-10-12, in chat): *"I saw it. but i am having a hard time scrolling up and
@@ -15765,3 +15773,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **Latent** — nothing has failed, and the rate of growth is unmeasured. Filed by `M216`. **Tier: during-testing.**
 
 - **`minor` · A tier holding only blocked rows leaves the Next section with nothing to take, even when a lower tier has ready rows.** Found by `M215` (2026-11-06) while separating ready rows from blocked ones in the reports. `next_work()` in `scripts/pipeline.php` picks the most urgent tier holding a ready or a blocked row and stops there, so once a tier's ready rows run out, its blocked rows hide every ready row below it. `during-testing` holds 76 blocked rows today, so this is what happens the day its 168 ready rows are done. `M215` made the reports say so (*"holds no ready row, so nothing in it can be started"*) instead of printing an empty list, and left the choice of tier alone. The remedy, to be measured when taken: fall through to the next tier with a ready row and name the blocked tier above it. **Latent.** — needs a tier whose open rows are all blocked. Filed by `M215`. **Tier: during-testing.**
+
+- **`minor` · `backup-target-dhcp` — The nightly backup reaches the desktop by an address DHCP hands out, so a new lease breaks the off-box copy, silently.**
+  Found by `M216`'s box half (2026-11-09), reading the target desktop before it was set up.
+  - **Measured:** `DESKTOP-36C5T41` gets 192.168.1.119/24 from DHCP (gateway 192.168.1.254), and its network profile is Public. The box (192.168.50.2/26) is on another subnet, so the task addresses the desktop by IP: `-OffBoxDir "\192.168.1.119\MeridianBackup$"`. SYSTEM's saved credential is also keyed to that address.
+  - **Why it matters:** if the lease changes, the script ends with exit 2 every night while the dump stays on the box. Nobody is told (`nightly-backup-silent-failure`), so the copy that survives a dead disk could stop without anyone knowing.
+  - **The remedy, to be measured when taken:** the network team reserves 192.168.1.119 for this desktop, which needs no change on either machine. A name would need DNS that resolves across the two subnets, and that has not been read.
+
+  **Latent** — the lease has not changed; nothing has failed yet. Filed by `M216`. **Tier: during-testing.**
+
+- **`minor` · `tracker-headroom-held-batch` — `PROGRESS.md` has room for about four more status bullets, and fourteen held increments each owe one at their merge point.**
+  Found by `M216`'s close-out (2026-11-09).
+  - **Measured:** after `M215` and `M216`'s bullet, `PROGRESS.md` is 124,911 bytes against `tracker-lint`'s R1 ceiling of 130,000, so 5,089 bytes are left. That bullet cost 1,303 bytes for two increments, and `M214`'s alone was about the same size.
+  - **What is waiting:** `M217` to `M230`, held as #414 to #489. R9 requires each released increment to have exactly one status bullet, so the next merge point's close-out will cross R1 part of the way through unless the tracker is trimmed first.
+  - **The remedy, to be measured when taken:** a tracker surgery that moves the oldest status bullets to `PROGRESS_ARCHIVE.md` with `scripts/tracker-surgery.php`, run before that merge point's close-out, never during it. Bullets that each name several increments would only delay it.
+
+  **Latent** — nothing is over the ceiling yet. Filed by `M216`. **Tier: during-testing.**

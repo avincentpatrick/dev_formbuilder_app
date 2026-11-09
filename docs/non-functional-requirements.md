@@ -115,7 +115,7 @@ Doc #23 (Observability & Incident Response) instruments against these SLOs — n
 ## 10. Out of Scope / Deferred
 
 - The full OWASP ASVS control-by-control checklist and threat-scenario analysis → Doc #11. *(Queued — `R-3495d9cd`; the threat analysis is docs/security-threat-model.md)*
-- Backup/DR runbook mechanics for the self-hosted Windows PostgreSQL → Doc #22 (ADR-0005). *(Queued — `R-4bda047a`, `R-5f180437`, `R-139b1662`; the runbook is docs/deployment-infrastructure.md §5)*
+- Backup/DR runbook mechanics for the self-hosted Windows PostgreSQL → Doc #22 (ADR-0005). *(Queued — `R-139b1662`, production's 15-minute recovery; the testing site's daily off-box copy and its restore drill were built by M216 on 2026-11-09; the runbook is docs/deployment-infrastructure.md §5)*
 - Metrics, dashboards, alerting, on-call → Doc #23. *(Queued — `R-7ed05f6d`)*
 - Plan-tier-specific quotas (submissions/month, seats, storage) → Doc #24. *(Built — H5b and H5c (QuotaGuard))*
 - UI-chrome translation-management workflow and RTL layout support, if/when either becomes justified by a real customer requirement (§6). *(Not planned — a non-goal until a real customer needs it (§6))*

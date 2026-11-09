@@ -658,7 +658,44 @@ PR #414, head `f3261aee`, run 42354426773: 8 of 8 jobs green with real step coun
 
 **The merge point owes:** merge the trunk in and regenerate the line in a tree with `vendor/`, green again, then merge after #412 and #413 (or at the next merge point). After the deploy, re-run the judge against the live site and expect exit 0, read `/up` and the 404, and count the header's lines on `/login`. Release this claim with those readings. The rows are already closed on the branch; if the live read fails, `R-25dc7ded` reopens.
 
-## HELD — `M216`, `R-5f180437` and `R-4bda047a`: the testing site's backups survive a dead disk, and the runbook can rebuild them (m216-testing-backups) — BUILT AND HELD: PR #413 green, waiting for the next merge point; the box's half follows that merge
+## RELEASED — `M216`, `R-5f180437` and `R-4bda047a`: the testing site's backups survive a dead disk, and the runbook can rebuild them (`D212`, `D213`) (merged as PR #413, `95ff77ea`, second at the backup sitting's merge point, after merging the trunk into its branch at `94432748`; 8/8 green with real step counts on its run 42558925002 — Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5; the trunk's run 42562145797 on `95ff77ea` 8/8, with BHW Connect at 23)
+
+**RELEASED AT THE BACKUP SITTING'S MERGE POINT, 2026-11-09, WITH THE BOX'S HALF ON THE SAME DAY.** The user started the sitting with *"i have an access now to the desktop … for the backup setup"*. They chose to merge only #412 and #413; #414 to #489 stay held.
+
+**The merge point:**
+- **#412 first.** The user's census was at 03:51:14 UTC. #412 merged at 03:51:35, and its deploy (42562052900) changed only paths the site does not run, so it opened no window.
+- **#413's branch took the new trunk at `94432748`.** There was one conflict, in `docs/feature-backlog.md`. Both sides' rows were kept at the end, each slice checked against its source, and the line was regenerated.
+- **#413 merged at 04:29:49.** Its deploy (42564577483) opened a window. It took `deploy-20261109-050212.dump` (1,173,454 B) and counted 70 tables and 54,246 rows. There was nothing to migrate, and every table held. It went live at 05:02:35, with `/up` 200 and version 0.17.1.
+- **The census before and after are equal:** 1·6·11·27·22·62·31·74, statuses confirmed and resolved, at 03:51:14 and 05:05:26 UTC. `VERSION` did not move, because nothing a tester sees changed.
+
+**The box's half, the user at the box and at the desktop:**
+- **The target, `D213` A:** the hidden, encrypted share `MeridianBackup$` on `D:\MeridianBackup`, on `DESKTOP-36C5T41`.
+  - The desktop: Windows 11 Pro, in `WORKGROUP`, address 192.168.1.119 from DHCP, network profile Public, sleep never.
+  - D: is its own 1 TB hard disk, separate from its system SSD.
+  - The account `meridianbackup` has Change on the share and Modify on the folder. The only other rights are the user's, SYSTEM's and Administrators'.
+  - A firewall rule admits TCP 445 from 192.168.50.2 alone. `Test-NetConnection` from the box was true, from 192.168.50.2.
+- **The account, the first choice:** SYSTEM, with a credential for 192.168.1.119 saved in its own vault by a one-shot SYSTEM task. The task was unregistered at once, and the password never reached the chat or the screen. In the same task, as `nt authority\system`, the share was reachable, and a file was written, read back and deleted.
+- **The task:** rebuilt exactly as §8.2 step 12: SYSTEM, 01:30 box time (+08:00), StartWhenAvailable, a one-hour limit, keeping 30. The old definition is in `C:\meridian\meridian-test-db-backup.pre-M216.xml` (3,118 B).
+  - `C:\meridian\nightly-backup.ps1` is the trunk's file byte for byte (SHA-256 `C8B0F9F2…6604`, as committed).
+- **One run:** `LastTaskResult` 0, with log lines `dumped`, `copied … SHA-256` and `result=0`. It wrote `deploy-20261109-050547.dump`, 1,173,778 B, and its SHA-256 `A2395B01…37B5D3` was the same on the box and on the desktop.
+- **The restore drill:** that dump went into the scratch database `meridian_restoretest`, with `pg_restore --no-owner` as `postgres`, the privileged login read from the app's config into memory. It exited 0 with no messages at all.
+  - 70 of 70 tables restored. The one count that differed was `public.sessions`, 143 in the dump against 127 live, from sessions that expired after 05:05.
+  - The scratch database was then dropped.
+
+**How the prediction fared:**
+- **Wrong, the part I most expected to be wrong:** the restore drill. It ran first time with no warning, so `R-38ba2f94` keeps only its reminder half.
+- **Wrong, the next most likely:** SYSTEM reaching a network share. The vaulted credential worked first time, so §8.2's dedicated account was not needed. §8.2's share bullet now says what ran.
+- **Right:** no script change on the box, and no `VERSION` bump.
+- **Not predicted:** the desktop's Public profile and its DHCP address. The firewall rule had to cover every profile while admitting only the box, and the address is filed as `backup-target-dhcp`.
+
+**What went wrong on the way, so nobody reads it as smooth:**
+- ⚠️ **My first desktop block failed one step.** It was meant to hide `meridianbackup` from the sign-in screen, and `New-Item` without `-Force` cannot create a missing parent registry key. It was cosmetic, and a second block fixed it. The account, folder, share and firewall rule were all created by the first block.
+- ⚠️ **My "success looks like" lines were pasted into the box's PowerShell** with the block's output, which left it at a `>>` continuation prompt. Nothing ran from them, and the user cleared it with Ctrl+C.
+- ⚠️ **The restore was from the box's copy, not the desktop's.** The two are the same bytes by SHA-256. Retrieving the file from the desktop onto another machine was not exercised.
+
+**Filed by this close-out:** `backup-target-dhcp` (`during-testing`). The optional read for `R-4b57090b` is recorded on `R-4b57090b`'s own row as partial: 402 asset 404s since 2026-09-17, the newest 20 all to a doubled `/build/assets/assets/` path that was never served.
+
+**The claim as taken follows.**
 
 Taken 2026-11-07. Branch `m216-testing-backups`, cut from origin/main at `b65c97e8`, PR into main. Held green for the next merge point (`D137`), with `M215`'s #412. The box's half follows that merge, because it needs the merged code, so the rows close at the close-out and not on the branch.
 Rows: `R-5f180437`, *"The first-boot runbook and the checklist set up none of the database backup §5 prescribes."*; `R-4bda047a`, *"The testing server's database backups sit on the same machine as the database: no off-box copy, no write-ahead-log archiving and no restore drill."* Taken together under `D13` exception #8, on `D212`'s answer.
@@ -707,7 +744,17 @@ Prediction: Pint and the lint gates green, and PHPStan unmoved by one option. Pe
   - **Wrong in the plan:** it took the `D13` exception's number from `state.php`, whose "exceptions entry" is `docs/ux/exceptions-log.md`. `D13`'s own log gave #8.
   - **Not yet measured:** the restore drill, still the part most likely to be wrong.
 
-## HELD — `M215`, `R-98b2d568`: the hand-off names only startable rows as work (m215-next-section-classes) — BUILT AND HELD: PR #412 green, waiting for the next merge point
+## RELEASED — `M215`, `R-98b2d568`: the hand-off names only startable rows as work (merged as PR #412, `64fd42cf`, first at the backup sitting's merge point, after merging the trunk into its branch at `c5e38b07`; 8/8 green with real step counts on its run 42551130351 — Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5; the trunk's run 42558652846 on `64fd42cf` 8/8, with BHW Connect at 23)
+
+**RELEASED FIRST AT THE BACKUP SITTING'S MERGE POINT, 2026-11-09.**
+- **The merge:** the branch took the trunk at `e9c19e7b` with no conflict, and the line was regenerated. Pint, both lint gates and `state.php --check` were green on the host.
+- **The order:** it merged at 03:51:35 UTC, 21 seconds after the user's census. Its deploy (42562052900) changed only paths the site does not run, so it opened no window.
+- **Read on the trunk after the merge:** `state.php` prints `next work … (12 of 167 ready; the rest are in The line)` and, on a separate line, `blocked, not work …`. So the blocked rows have left the work list, as the row asked.
+- Nothing a tester sees changed, so `VERSION` did not move.
+
+**How the prediction fared:** as recorded at the build below, and nothing new at the merge. The live arm's floor and the hand-off's length, which I expected to go wrong, held then and still hold on the trunk (`state.php --check` clean).
+
+**The claim as taken follows.**
 
 Taken 2026-11-06. Branch `m215-next-section-classes`, cut from origin/main at `1cae5bef`, PR into main. Held green for the next merge point (`D137`).
 Row: `R-98b2d568`, *"The Next section and the hand-off list open decisions as work to take."*

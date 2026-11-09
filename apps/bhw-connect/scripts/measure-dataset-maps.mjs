@@ -1,12 +1,18 @@
 /** Opt-in local/production read-only measurement. Run separately from CI correctness tests.
  * node scripts/measure-dataset-maps.mjs http://127.0.0.1:3100/bhw-connect/
  */
+import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
+// Optional: MEASURE_STUB_API=<ms> answers /api/dataset-map with a synthetic national payload after that
+// delay, for a machine with no database. It measures client start-up only and says so in the report.
+const stubDelayMs = process.env.MEASURE_STUB_API ? Number(process.env.MEASURE_STUB_API) : null;
+const stubRows = stubDelayMs === null ? [] : JSON.parse(readFileSync(new URL('../public/geo/regions.json', import.meta.url), 'utf8'))
+  .features.map((feature, index) => ({ code: feature.properties.geo_code, name: String(feature.properties.geo_code), value: index + 1 }));
 const base = new URL(process.argv[2] ?? 'http://127.0.0.1:3100/bhw-connect/');
 if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password ||
     !base.pathname.endsWith('/bhw-connect/') || base.search || base.hash)
   throw new Error('Supply an HTTP(S) /bhw-connect/ base URL without credentials');
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.MEASURE_CHROMIUM || undefined });
 try {
   const results = [];
   for (const { mode, run } of ['portal', 'fullscreen'].flatMap(mode =>
@@ -32,6 +38,12 @@ try {
       await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 80,
         downloadThroughput: 4 * 1024 * 1024 / 8, uploadThroughput: 1024 * 1024 / 8 });
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+      if (stubDelayMs !== null) await page.route('**/api/dataset-map?**', async route => {
+        await new Promise(resolve => setTimeout(resolve, stubDelayMs));
+        await route.fulfill({ json: { state: 'available', rows: stubRows, total: stubRows.length, area: 'Philippines',
+          childLevel: 'region', source: 'Synthetic', date: '2026-09-01', license: 'Test only',
+          geometryUrl: new URL('geo/regions.json', base).pathname } });
+      });
       const requested = [];
       page.on('request', request => {
         const url = new URL(request.url());
@@ -63,5 +75,5 @@ try {
   console.log(JSON.stringify({ measuredAt: new Date().toISOString(), origin: base.origin,
     browser: browser.version(), profile: { viewport: '390x844', cpuSlowdown: 4, latencyMs: 80,
       downloadBytesPerSecond: 524288, uploadBytesPerSecond: 131072, browserCache: 'disabled', runsPerScenario: 3 },
-    caveat: 'Chromium emulation, not a real handset. Server caches are not reset. Post-document timing is not cold navigation latency. No production claim from local results.', results }, null, 2));
+    stubbedApi: stubDelayMs, caveat: (stubDelayMs === null ? '' : 'Dataset API stubbed with a synthetic payload: client start-up only. ') + 'Chromium emulation, not a real handset. Server caches are not reset. Post-document timing is not cold navigation latency. No production claim from local results.', results }, null, 2));
 } finally { await browser.close(); }

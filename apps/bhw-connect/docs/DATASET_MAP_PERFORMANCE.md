@@ -87,3 +87,28 @@ not establish production or real-handset acceptance. The original baseline above
 historical evidence rather than being overwritten with the faster results. The measurement
 script now includes CDP request start/duration timing to make initialization sequencing
 reviewable; unavailable worker completion timings remain null.
+
+## Boundary download beside the data request (trial, rejected, 9 November 2026)
+
+The boundary asset depends only on the validated scope, yet the canvas fetched it only after
+the aggregate response arrived, so the two downloads ran in series. A trial started the
+boundary for a visible, leased card beside its data request and handed that download to the
+canvas. [Evidence](DATASET_MAP_BOUNDARY_PRELOAD_TRIAL.json), same emulation profile, three
+fresh contexts per scenario, run on a machine with no database, so the dataset API was
+answered by a synthetic payload after 150ms (`MEASURE_STUB_API=150`): client start-up only.
+
+The waterfall did overlap (the boundary began with the data request instead of 530ms later),
+but time to ready got **worse**: portal post-document median 2,644 → 2,963 ms, enlarged map
+2,554 → 2,766 ms, in the same direction in every sample. The boundary's own transfer stretched
+from 512 to 819ms because it shares the emulated 512KB/s link with the renderer chunk and the
+map worker. This profile is bandwidth-bound: the national boundary (179,009 bytes compressed),
+the worker (148,331) and the renderer chunk are about 1.3s of transfer on their own, so
+reordering cannot recover time and contention slightly delays the renderer. The change was not
+shipped.
+
+What remains is bytes, not ordering. Reducing the national boundary's size (coarser geometry or
+coordinate precision for the national view) would need the boundary-acceptance gates, so it is
+recorded here, not attempted. Do not retry request overlap without a change in what is
+transferred. The probe now accepts `MEASURE_STUB_API=<ms>` for a machine with no database and
+`MEASURE_CHROMIUM=<path>` for a pre-installed browser; the report states when the API was
+stubbed. Production hosting and real-handset checks remain outstanding.

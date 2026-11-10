@@ -9421,8 +9421,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   is what the `__lead__` row would have bought. **Latent.** Filed by `M91`. **Tier: after-launch.**
 - **`minor` · A third instance of the citation class `M83` filed in the abstract: three live lines that
   say nothing about what cites them.** Found by `M91` (2026-09-11) while checking what its own edits
-  would shift. `docs/feature-backlog.md:7546` cites `app/Services/Forms/FormBuilderService.php:170`,
-  `:322` and `:331` as the sites where *"validations are written inline from the field payload"*. All
+  would shift. `docs/feature-backlog.md:7546` cites `app/Services/Forms/FormBuilderService.php` at lines
+  170, 322 and 331 as the sites where *"validations are written inline from the field payload"*. All
   three resolve and all three are alive, so the citation gate passes; `:157` is a docblock terminator,
   `:322` is `$item->increment('usage_count')` inside the field-library counter and `:331` is
   `reorder()`'s signature. ⛔ **None of the three has ever been about validations**, and the gate is
@@ -13828,11 +13828,26 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   is short: the grip's fallback, `useCanvasReorder.ts`'s `fieldLabel` and "Move field", "Add a field from the left" and the
   undo entry for an edit still say "field".
 
-- **`minor` · A section's title cannot be edited in Structure.** Found by `M150` beside `R-34edf1f5`, which gives a question's
+- ✅ **CLOSED BY `M221` (2026-11-08) — ****`minor` · A section's title cannot be edited in Structure.** Found by `M150` beside `R-34edf1f5`, which gives a question's
   label an in-place editor: a section's title is still text inside `button.canvas__section-head` in `BuilderCanvas.vue`, edited
   only from the settings pane (`ConfigPanel.vue`'s `setSection`), and the server caps it at 255 characters. The same
   `InlineLabelEdit` serves it, through a `renameSection` beside `renameField`. **Live.** Filed by `M150`.
   **Tier: during-testing.**
+  ✅ **CLOSED BY `M221` (2026-11-08), on its branch, as the row prescribed.**
+  - The store's `renameSection` sits beside `renameField`: set once and saved now through `commitSectionEdit`, so it is one PATCH and one undo entry.
+  - An "Edit title of <section>" button, or a double-click on the head, swaps the head for the same `InlineLabelEdit` at the server's 255-character cap. Enter or a blur saves, Escape keeps the title, a blank title is not an edit, and after Enter the keyboard is back on the head.
+  - Five new `BuilderCanvas.test.ts` cases, and five Vitest mutants, all CAUGHT: the button removed, the save deferred, the cap dropped, the trim removed, the double-click unwired.
+  - A new `builder-structure.spec.ts` case renames a section in a real browser, scans with the editor open, and reads the title back after a reload.
+  - Ships as 0.18.0.
+
+- ✅ **CLOSED BY `M221` (2026-11-08) — ****`minor` · A section just added cannot be saved until the page is reloaded: every edit to it is refused with "The is repeatable field must be true or false."**
+  Found 2026-11-08 by `M221`'s own e2e case, which renamed a fresh section and was refused at all three widths.
+  - **The cause:** `FormBuilderService::addSection()` created the row without `is_repeatable`, and a model made by `create()` never reads the column's default back. So `BuilderPresenter::section()` answered `is_repeatable: null`, the builder sent that back with its first edit, and `UpdateSectionRequest`'s `boolean` refused it.
+  - **What a tester saw:** the status read "Not saved", for a rename from the settings pane as much as for one in place, until a reload fetched the default.
+  - Filed by `M221`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M221` (2026-11-08), on its branch.**
+  - `addSection()` now sets `is_repeatable => false`.
+  - A `BuilderRoutesTest` case adds a section, checks the reply says `false`, and sends the reply straight back renamed, as the builder does. It was red before the fix (`null`), and a mutant taking the line out again is CAUGHT.
 
 - ✅ **CLOSED BY `M223` (2026-11-08) — ****`nit` · `E2eSeederIdempotencyTest` checks the `releases` table's order against the notes file's, but reads the table with no order.**
   Found 2026-11-08 by `M221` and `M220`, whose pull requests went red on it.
@@ -14845,7 +14860,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   this dialog. `resources/js/components/builder/ConvertFieldDialog.vue:39` says *"It keeps its key, so conditions, calculations and
   text that mention it still point to it"*; `resources/js/components/builder/field-conversion.ts:204` and
   `app/Enums/ConversionWarning.php:50` carry the rest, with `app/Enums/ConversionDropReason.php` and `app/Enums/ConversionImpact.php`;
-  a new question's label is its type's label (`app/Services/Forms/FormBuilderService.php:150`), so the dialog reads *"Current type of
+  a new question's label is its type's label (`FormBuilderService::addField()`), so the dialog reads *"Current type of
   “Date & time”: Date & time"*. The remedy: `docs/ux/design-system-reference.md` gains a voice rule — write for a smart
   high-schooler: short sentences, everyday words, say what happens to the answers — and the dialog, the conversion sentences and the
   three server enums are rewritten to it; the dialog stops repeating the type when the label is the type's own; `manual.ts` and the

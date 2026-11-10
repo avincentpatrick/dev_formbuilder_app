@@ -116,6 +116,42 @@ function roundTripSourceForm(User $owner): array
     return [$form, $v->refresh()];
 }
 
+it('keeps a translation that lives only on a choice through export and back in (M217, R-df883cbf)', function (): void {
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+
+    // No field carries a translation of its own: the choices are what must open the language column.
+    $source = makeForm($owner, 'Translated in its choices');
+    $sourceVersion = makeDraftVersion($source);
+    addFormField($sourceVersion, $owner, 'color', FieldType::SingleSelect, 0, ['config' => ['options' => [
+        ['value' => 'r', 'label' => 'Red', 'label_translations' => ['es' => 'Rojo']],
+        ['value' => 'b', 'label' => 'Blue'],
+    ]]]);
+    addFormField($sourceVersion, $owner, 'region', FieldType::CascadingSelect, 1, ['config' => [
+        'levels' => [['key' => 'region'], ['key' => 'province']],
+        'options' => [
+            ['value' => 'ncr', 'label' => 'NCR', 'level' => 'region', 'parent' => null, 'label_translations' => ['es' => 'Capital']],
+            ['value' => 'manila', 'label' => 'Manila', 'level' => 'province', 'parent' => 'ncr'],
+        ],
+    ]]);
+
+    $upload = xlsxUpload(app(XlsformExporter::class)->build($source, $sourceVersion->refresh()));
+
+    [$target, $draft] = emptyTargetForm($owner);
+    app(XlsformImporter::class)->import($target, $upload, $owner);
+
+    $fields = FormField::query()->where('form_version_id', $draft->id)->get()->keyBy('key');
+    $red = collect($fields['color']->config['options'])->firstWhere('value', 'r');
+    $blue = collect($fields['color']->config['options'])->firstWhere('value', 'b');
+    $ncr = collect($fields['region']->config['options'])->firstWhere('value', 'ncr');
+
+    expect($red['label_translations'])->toBe(['es' => 'Rojo'])
+        ->and($blue)->not->toHaveKey('label_translations')
+        ->and($ncr['label_translations'])->toBe(['es' => 'Capital']);
+});
+
 it('round-trips export → import → publish, matching by key', function (): void {
     $tenant = inboxTenant();
     $owner = User::factory()->create();

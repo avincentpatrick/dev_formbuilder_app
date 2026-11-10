@@ -1,0 +1,74 @@
+{
+  "purpose": "Trial: start the boundary download beside the dataset request for a visible, leased card. Rejected: slower.",
+  "environment": "Local prefixed no-data build; dataset API stubbed (150 ms, synthetic payload); Chromium via MEASURE_CHROMIUM; same emulation profile as the other recordings. Client start-up only, not production or a handset.",
+  "measuredAt": "2026-11-09",
+  "baseCommit": "19cf7dcd",
+  "runsPerScenario": 3,
+  "scenarios": {
+    "portal": {
+      "control": {
+        "afterDocumentAndScrollReadyMs": [
+          2652,
+          2637,
+          2644
+        ],
+        "median": 2644,
+        "navigationToReadyMs": [
+          3199,
+          3176,
+          3218
+        ]
+      },
+      "preloadBoundary": {
+        "afterDocumentAndScrollReadyMs": [
+          2866,
+          2965,
+          2963
+        ],
+        "median": 2963,
+        "navigationToReadyMs": [
+          3382,
+          3461,
+          3471
+        ]
+      }
+    },
+    "fullscreen": {
+      "control": {
+        "afterDocumentAndScrollReadyMs": [
+          2554,
+          2624,
+          2514
+        ],
+        "median": 2554,
+        "navigationToReadyMs": [
+          2977,
+          3022,
+          2925
+        ]
+      },
+      "preloadBoundary": {
+        "afterDocumentAndScrollReadyMs": [
+          3122,
+          2745,
+          2766
+        ],
+        "median": 2766,
+        "navigationToReadyMs": [
+          3483,
+          3144,
+          3124
+        ]
+      }
+    }
+  },
+  "waterfallFullscreenRun1": {
+    "control": "dataset-map 992ms (161ms), regions.json 1522ms (512ms)",
+    "preloadBoundary": "regions.json 1176ms (819ms), dataset-map 1178ms (158ms)"
+  },
+  "transferBytes": {
+    "regionsJsonCompressed": 179009,
+    "mapWorker": 148331,
+    "datasetMapPayload": 850
+  }
+}

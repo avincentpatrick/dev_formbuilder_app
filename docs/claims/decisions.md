@@ -24,10 +24,18 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D214`, the last filed, was asked and answered on 2026-11-08 in `M226`'s session, before its build. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D215`, the last filed, was asked and answered on 2026-11-09 in `M229`'s session, before its build. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D215 — A blank form can be printed in another of its languages, but the scanner knows only the form's default language, so it cannot read ticks beside, say, Tagalog choice labels. What should a printout in another language do? **A — print it, and its footer says responses must be keyed in; reading scans of translated printouts is filed for later.**
+
+**Asked and answered 2026-11-09 (user decision, in chat), in the session that took `R-d7e27962`, before its build.** Filed and answered in one push, with `M229`'s claim.
+- **A — print, key in by hand (chosen, the session's recommendation).** The language choice ships now. A printout in a language other than the form's default prints the footer sentence *"Scans of this form cannot be read automatically; responses must be keyed in."* Reading such scans is filed as its own row.
+- **B — print and scan both.** The printout also carries its language beside the version stamp, and the scanner reads it in that language. About twice the work, and it changes the scanner's matcher.
+
+**What it creates:** `M229` builds A and closes `R-d7e27962`, and files the reading of translated printouts as a `before-launch` row.
+
 ### D214 — A rule's "contains" on a single-choice or dropdown question checks the choice's text, so "required if colour contains re" holds for both red and green. What should "contains" do there? **A — relabel it: it keeps working, and the rule editor calls it "contains the text".**
 
 **Asked and answered 2026-11-08 (user decision, in chat), in the session that took `R-526dae72`, whose remedy was this decision.** Filed and answered in one push, with `M226`'s claim.
@@ -46,6 +54,8 @@ _None open._ `D214`, the last filed, was asked and answered on 2026-11-08 in `M2
 - **D — E: for now, and decide later.** It works with no help. It covers an accidental delete or C: filling up, but not a dead RAID disk or a lost server, so `R-4bda047a` would stay open.
 
 **What it creates:** no new row, because `M216`'s box half carries it. **Not measured yet, and read first on Monday:** the desktop's name and address, whether the box can reach it on port 445, and how the task signs in there. The box is in a workgroup at 192.168.50.2/26 and the access log has shown office clients as 192.168.1.x, so the two may be on different networks, and SYSTEM has no identity on another machine. If the network team has to open that path, `R-4bda047a` stays open until it is open. The merge point runs first in the same sitting, because the box's half needs the merged code.
+
+**Date amended 2026-11-08 (user, in chat), recorded during `M219`:** *"i will be the one to tell you if i am ready to do the task for the backup."* The answer, A, stands. The sitting has **no date** now: it happens when the user says so, and no session prompts for it. Every *"Monday"* above, and in `M216`'s claim, reads as *"the day the user names"*.
 
 ### D212 — The testing site's backups all sit on the machine that holds its database, and `docs/deployment-infrastructure.md` §5 prescribes a copy off the box, WAL archiving and a restore drill. How much of that binds the testing site? **A — a daily copy off the box and one restore proved; up to a day of data can be lost, and the 15-minute recovery is filed for before launch.**
 
@@ -3113,8 +3123,9 @@ THE SIX, AND THE OPTION SET WAS MISSING THE ONE THIS REPOSITORY ALREADY PRACTISE
 
 ⚠️ **THE REASON `C` BEATS `A` IS A CASCADE NEITHER `A` NOR `B` MENTIONS.** `docs/api-specification.md` and
 `docs/architecture/technical-architecture.md` are citation **tier 1 with zero tolerance**
-(`scripts/citation-liveness-lint.php:77-78`, run at `.github/workflows/ci.yml:242`), and `docs/pipeline.md:50` —
-itself tier 1 — cites `docs/api-specification.md:63` **by line**. Deleting lines shifts every citation below them,
+(`scripts/citation-liveness-lint.php:77-78`, run at `.github/workflows/ci.yml:242`), and `R-fcfc1f52`'s row in
+`docs/pipeline.md` — itself tier 1 — cites `docs/api-specification.md:63` **by line**. *(`M218`: this sentence cited
+that row by its line number, which was already wrong when it was written; `pipeline-lint`'s P8 now refuses that form.)* Deleting lines shifts every citation below them,
 so option A owes a re-point of every affected citation in the same commit. Annotating in place shifts nothing.
 
 **Consequences, recorded so they are not rediscovered:**

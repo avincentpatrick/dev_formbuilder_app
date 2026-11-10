@@ -5,7 +5,20 @@
 import { open } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
+function immutableCache(value) {
+  const directives = (value ?? "").toLowerCase().split(",").map(s => s.trim());
+  const ages = directives.filter(s => s.startsWith("max-age="));
+  return directives.includes("public") && directives.includes("immutable") &&
+    ages.length === 1 && /^max-age=[1-9][0-9]*$/.test(ages[0]) &&
+    !directives.some(s => /^(private|no-store|no-cache)(=|$)/.test(s));
+}
+
 export async function validateHosting(url, localPath, request = fetch) {
+  const target = new URL(url);
+  if (!["http:", "https:"].includes(target.protocol) || target.username || target.password ||
+      target.search || target.hash || !/^\/bhw-connect\/(?:[a-zA-Z0-9._-]+\/){2,}[a-zA-Z0-9._-]+\.pmtiles$/.test(target.pathname) ||
+      target.pathname.split("/").some(part => part.toLowerCase() === "latest"))
+    throw new Error("Supply a versioned /bhw-connect/ PMTiles URL without credentials or query parameters");
   const file = await open(localPath, "r");
   try {
     const { size } = await file.stat();
@@ -39,22 +52,18 @@ export async function validateHosting(url, localPath, request = fetch) {
         await response.body?.cancel();
         throw new Error("Archive bytes transformed");
       }
-      const type = response.headers.get("content-type")?.split(";")[0];
+      const type = response.headers.get("content-type")?.split(";")[0].trim().toLowerCase();
       if (!["application/vnd.pmtiles", "application/octet-stream"].includes(type)) {
         await response.body?.cancel();
         throw new Error("Unexpected archive MIME type");
       }
       const cache = response.headers.get("cache-control") ?? "";
-      if (
-        !/\bpublic\b/.test(cache) ||
-        !/\bimmutable\b/.test(cache) ||
-        !/max-age=[1-9]\d*/.test(cache)
-      ) {
+      if (!immutableCache(cache)) {
         await response.body?.cancel();
         throw new Error("Versioned archive lacks public immutable cache policy");
       }
       const current = response.headers.get("etag");
-      if (!current || current.startsWith("W/") || (etag && etag !== current)) {
+      if (!current || !/^"[^"\r\n]+"$/.test(current) || (etag && etag !== current)) {
         await response.body?.cancel();
         throw new Error("Missing or inconsistent strong ETag");
       }
@@ -62,18 +71,21 @@ export async function validateHosting(url, localPath, request = fetch) {
       const expected = Buffer.alloc(end - start + 1);
       await file.read(expected, 0, expected.length, start);
       // Bound response consumption even if a broken host streams a whole archive as 206.
+      if (!response.body) throw new Error("Missing range response body");
       const reader = response.body.getReader();
       const chunks = [];
       let bytes = 0;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        bytes += value.length;
-        if (bytes > expected.length) {
-          await reader.cancel();
-          throw new Error("Oversized range response");
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          bytes += value.length;
+          if (bytes > expected.length) throw new Error("Oversized range response");
+          chunks.push(Buffer.from(value));
         }
-        chunks.push(Buffer.from(value));
+      } finally {
+        await reader.cancel();
+        reader.releaseLock();
       }
       if (!Buffer.concat(chunks).equals(expected))
         throw new Error("Hosted bytes differ from local archive");
@@ -85,9 +97,13 @@ export async function validateHosting(url, localPath, request = fetch) {
       signal: AbortSignal.timeout(20000),
     });
     await conditional.body?.cancel();
-    if (conditional.status !== 304) throw new Error("Conditional request did not return 304");
+    if (conditional.status !== 304 || conditional.headers.get("etag") !== etag)
+      throw new Error("Expected conditional 304 with unchanged ETag");
     return {
       size,
+      publication_ready: false,
+      archive_structure: "not-tested",
+      licensing: "not-tested",
       ranges: results,
       conditional: 304,
       rendering: "not-tested",

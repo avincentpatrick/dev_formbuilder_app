@@ -55,6 +55,12 @@ export function useCanvasReorder(
         return `position ${index + 1} of ${siblings.length} in ${where}`;
     }
 
+    /** M222 (`R-0ace5ea8`): a section named as a question is, or "a section" while it has no title. */
+    function sectionName(uid: string): string {
+        const label = store.orderedSections().find((s) => s.uid === uid)?.label;
+        return label ? `section ${label}` : 'a section';
+    }
+
     function describeSectionPosition(uid: string): string {
         const ordered = store.orderedSections();
         const index = ordered.findIndex((s) => s.uid === uid);
@@ -94,7 +100,7 @@ export function useCanvasReorder(
                 announce(
                     kind === 'field'
                         ? `Dragging ${fieldLabel(uid)}. Move over a position and release to drop.`
-                        : 'Dragging a section. Move over a position and release to drop.',
+                        : `Dragging ${sectionName(uid)}. Move over a position and release to drop.`,
                 );
             }
             if (kind === 'field') onFieldDragMove(e, uid);
@@ -109,7 +115,7 @@ export function useCanvasReorder(
                 announce(`Dropped ${fieldLabel(uid)}, ${describeFieldPosition(uid)}.`);
             } else {
                 void store.commitReorder('Move section');
-                announce(`Dropped section, ${describeSectionPosition(uid)}.`);
+                announce(`Dropped ${sectionName(uid)}, ${describeSectionPosition(uid)}.`);
             }
         };
         const cancel = (e: PointerEvent): void => {
@@ -221,7 +227,7 @@ export function useCanvasReorder(
                 grabbedUid.value = uid;
                 store.beginReorder();
                 announce(
-                    `Grabbed a section, ${describeSectionPosition(uid)}. ` +
+                    `Grabbed ${sectionName(uid)}, ${describeSectionPosition(uid)}. ` +
                         'Use up and down arrows to move, Enter to drop, Escape to cancel.',
                 );
             }
@@ -237,7 +243,7 @@ export function useCanvasReorder(
             event.preventDefault();
             grabbedUid.value = null;
             void store.commitReorder('Move section');
-            announce(`Dropped section, ${describeSectionPosition(uid)}.`);
+            announce(`Dropped ${sectionName(uid)}, ${describeSectionPosition(uid)}.`);
         } else if (event.key === 'Escape') {
             event.preventDefault();
             grabbedUid.value = null;

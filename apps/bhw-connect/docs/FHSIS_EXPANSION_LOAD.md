@@ -3,7 +3,11 @@
 **HOLD: prepare all additional datasets before a consolidated server load.** The commands below
 are reference instructions for that later handoff, not a request to load now. Child-health preparation
 is documented in [FHSIS_CHILD_HEALTH.md](FHSIS_CHILD_HEALTH.md), and prenatal/maternal additions
-in [FHSIS_MATERNAL.md](FHSIS_MATERNAL.md).
+in [FHSIS_MATERNAL.md](FHSIS_MATERNAL.md). Infectious-disease additions are documented in
+[FHSIS_INFECTIOUS.md](FHSIS_INFECTIOUS.md). Family planning is documented in
+[FHSIS_FAMILY_PLANNING.md](FHSIS_FAMILY_PLANNING.md). NCD additions are documented in
+[FHSIS_NCD.md](FHSIS_NCD.md). Oral-health additions are documented in
+[FHSIS_ORAL_HEALTH.md](FHSIS_ORAL_HEALTH.md).
 
 This is an **append**, not a rerun of the original first-load tool. Deploy the release containing
 `db/load-fhsis-expansion.mjs` and the age/sex dashboard before loading. The original FHSIS facts
@@ -90,3 +94,11 @@ Local validation used PostgreSQL 17: dry run left no new definitions, apply inse
 package, a digest of all prior indicator facts was unchanged, repeat apply was rejected, and anon
 could read every added row. The server's PostgreSQL 15 dry run remains necessary. Live loading
 can only be performed by the operator.
+
+Vital statistics and the 19 cumulative morbidity chapters are prepared separately and remain on HOLD: see [FHSIS_VITAL_MORBIDITY_LOAD.md](FHSIS_VITAL_MORBIDITY_LOAD.md).
+
+Demographic summaries complete the remaining annual-content preparation gap; see [FHSIS_DEMOGRAPHICS_LOAD.md](FHSIS_DEMOGRAPHICS_LOAD.md). The consolidated load remains on HOLD.
+
+Combined vaginal–caesarean deliveries: see [FHSIS_COMBINED_DELIVERY_LOAD.md](FHSIS_COMBINED_DELIVERY_LOAD.md).
+
+The held infectious/NCD batches now include [confirmed composite denominators](FHSIS_CONFIRMED_DENOMINATORS.md). Use their revised checksums; earlier count-only bundles are superseded.

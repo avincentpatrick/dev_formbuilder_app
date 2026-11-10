@@ -550,7 +550,7 @@ One unified polymorphic table replacing legacy's `image_path`/`file_path`/`excel
 | `duration_seconds` | `integer` | Yes | `NULL` | No | Audio/video only. |
 | `is_encrypted_at_rest` | `boolean` | No | `false` | No | Set true automatically when the owning field is `form_fields.is_sensitive = true` (plan §5 "encryption at rest for sensitive attachments"). |
 | `is_pii` | `boolean` | No | `false` | No | Denormalized copy of the owning field/submission's PII classification, for fast filtering by redaction/export jobs without joining back through `submission_answers` → `form_fields`. |
-| `virus_scan_status` | `varchar(20)` — PHP enum: `ScanStatus` | No | `'pending'` | No | Files are not served to other users until `clean`. |
+| `virus_scan_status` | `varchar(20)` — PHP enum: `ScanStatus` | No | `'pending'` | No | A file is served while `clean` or `skipped` (`ScanStatus::servable()`), and never while `pending` or `infected`. ⚠️ No scanner is wired (`attachments.scanner_enabled` is false by default), so `ScanAttachmentJob` marks every upload `skipped` and every upload is served unscanned. This cell said *"not served until `clean`"* until `M224`. |
 | `ocr_confidence_avg` | `numeric(5,2)` | Yes | `NULL` | No | Only populated for `kind = 'ocr_source_scan'` — average per-field confidence score from the OCR pipeline (Doc #17). |
 | `uploaded_by` | `uuid` | Yes | `NULL` | No | FK to `users.id` (external). `NULL` for guest-uploaded files. |
 | `created_at` | `timestamptz` | No | set by Eloquent | No | — |

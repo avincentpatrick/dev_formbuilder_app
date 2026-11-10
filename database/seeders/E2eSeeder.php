@@ -938,6 +938,50 @@ class E2eSeeder extends Seeder
                 // what `ExpressionValidationGate` refuses, which is the point the rail makes on the card.
             }
 
+            // M218 (`R-ffd296b1`): two DRAFT forms for the builder preview's section strip, opened by
+            // `personalization-axe.spec.ts` and nothing else. Every section has no condition and one visible
+            // question, so every one is a step at the empty answer state.
+            //
+            //  - `Section Strip Demo`: seven sections, exactly `PREVIEW_STRIP_MAX_SEGMENTS`, so the strip still
+            //    draws segments. A segment shrinks to its longest word and no further, so it is the long WORDS
+            //    that make the strip overflow, not long names. Measured with `extra_large` and OpenDyslexic: the
+            //    bar is 335px, 730px and 1160px at the three widths, and five ordinary names shrank to 625px
+            //    and fitted at two of them. Before this form, no seeded form gave the strip more than three short
+            //    segments, so its spill read stayed green whether or not the `flex-wrap` guard existed.
+            //  - `Many Sections Demo`: eight sections, one over that ceiling, so the strip draws the select it
+            //    falls back to. Until now only Vitest had ever rendered that branch.
+            //
+            // ⚠️ NEW FORMS, NOT MORE SECTIONS ON AN EXISTING ONE: six specs open `Community Health Survey` by
+            // title and `builder-axe.spec.ts` scans its config panel, so its section count matters elsewhere.
+            foreach ([
+                'Section Strip Demo' => [
+                    'Sociodemographic profile',
+                    'Hospitalisation history',
+                    'Cardiovascular screening',
+                    'Gastrointestinal symptoms',
+                    'Musculoskeletal assessment',
+                    'Neurodevelopmental milestones',
+                    'Ophthalmological examination',
+                ],
+                'Many Sections Demo' => [
+                    'Household', 'Water', 'Sanitation', 'Maternal care',
+                    'Newborn care', 'Immunisation', 'Nutrition', 'Referral',
+                ],
+            ] as $title => $sectionLabels) {
+                if (Form::query()->where('title', $title)->doesntExist()) {
+                    $stripDemo = app(FormService::class)->create(
+                        $tenant, $owner, $title, 'The builder preview\'s section strip (M218).'
+                    );
+                    $sb = app(FormBuilderService::class);
+
+                    foreach ($sectionLabels as $label) {
+                        $section = $sb->addSection($stripDemo);
+                        $section->update(['label' => $label]);
+                        $sb->addField($stripDemo, $owner, FieldType::ShortText, $section->id)->update(['label' => 'Notes']);
+                    }
+                }
+            }
+
             // A DRAFT form whose first field is a geopoint (Increment G5b2b), so the builder auto-selects it on
             // load and the builder-axe tab-walk mounts + scans the GeoEditor's "Map" tab (capture options +
             // default map view) — the geospatial config editor — at all viewports in light + dark, with no

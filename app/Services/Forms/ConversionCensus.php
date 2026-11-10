@@ -7,6 +7,7 @@ namespace App\Services\Forms;
 use App\Enums\ComparisonOperator;
 use App\Enums\ConversionImpact;
 use App\Enums\FieldType;
+use App\Enums\OperandKind;
 use App\Enums\PipingEligibility;
 use App\Enums\ValueShape;
 use App\Exceptions\Expressions\ExpressionException;
@@ -54,7 +55,14 @@ use App\Support\Forms\FieldTypeConversion;
  * another tab editing a field that names it is not caught at the write. That is acceptable for a warning —
  * publish stays the gate, and only a template hole is one it already enforces.
  *
- * @phpstan-type CensusUse array{site: string, key: string, numeric: bool, list: bool}
+ * ── A fifth judge, for a change between two temporal types (M227, `R-cf7d0362`) ──────────────────────────────
+ * A date, a time and a date-time are never numbers, so the number judge never reads them, and changing one to
+ * another silently made the next publish refuse an ordering on it. Which pairs break is the publish gate's own
+ * decision, so the census asks it: `holds_as` lists the temporal kinds every ordering in the use holds as
+ * ({@see ExpressionOperandJudge::temporalOrderingHolds()}), and a change reports only where the old type held and
+ * the new one does not. A date to a date-time stays silent, because the two order against each other.
+ *
+ * @phpstan-type CensusUse array{site: string, key: string, numeric: bool, list: bool, holds_as: list<string>}
  * @phpstan-type CensusImpact array{code: string, site: string, key: string, message: string}
  */
 final class ConversionCensus
@@ -81,12 +89,14 @@ final class ConversionCensus
 
         /** @var array<string, string> $keysById */
         $keysById = $fields->pluck('key', 'id')->all();
+        /** @var array<string, FieldType> $typeByKey */
+        $typeByKey = $fields->mapWithKeys(static fn (FormField $f): array => [$f->key => $f->field_type])->all();
         $key = $field->key;
         $uses = [];
 
         foreach ($fields as $other) {
-            $uses[] = $this->expressionUse('relevance', $other->key, $other->relevant_expression, $key, false);
-            $uses[] = $this->expressionUse('formula', $other->key, $this->formulaOf($other), $key, false);
+            $uses[] = $this->expressionUse('relevance', $other->key, $other->relevant_expression, $key, false, $typeByKey);
+            $uses[] = $this->expressionUse('formula', $other->key, $this->formulaOf($other), $key, false, $typeByKey);
 
             if ($other->id !== $field->id) {
                 $uses[] = $this->templateUse($other->key, [
@@ -98,7 +108,7 @@ final class ConversionCensus
         }
 
         foreach ($sections as $section) {
-            $uses[] = $this->expressionUse('section_relevance', $section->key, $section->relevant_expression, $key, false);
+            $uses[] = $this->expressionUse('section_relevance', $section->key, $section->relevant_expression, $key, false, $typeByKey);
             $uses[] = $this->templateUse($section->key, [
                 $section->label, $section->description,
                 ...array_values($section->label_translations ?? []),
@@ -114,9 +124,9 @@ final class ConversionCensus
             }
 
             if ($row->expression !== null) {
-                $uses[] = $this->expressionUse('constraint', $ownerKey, $row->expression, $key, $row->form_field_id === $field->id);
+                $uses[] = $this->expressionUse('constraint', $ownerKey, $row->expression, $key, $row->form_field_id === $field->id, $typeByKey);
             } elseif ($row->form_field_id !== $field->id && $row->related_form_field_id === $field->id) {
-                $uses[] = $this->nodeUse('rule', $ownerKey, $this->lowered($row, $keysById), $key, false);
+                $uses[] = $this->nodeUse('rule', $ownerKey, $this->lowered($row, $keysById), $key, false, $typeByKey);
             }
         }
 
@@ -180,11 +190,23 @@ final class ConversionCensus
             $impacts[] = ConversionImpact::ListMeaningChanges;
         }
 
+        // M227: a change between two temporal types breaks an ordering publish accepted as the old type and refuses as the new.
+        $fromKind = OperandKind::for($from);
+        $toKind = OperandKind::for($to);
+
+        if ($fromKind->isTemporal() && $toKind->isTemporal()
+            && in_array($fromKind->value, $use['holds_as'], true) && ! in_array($toKind->value, $use['holds_as'], true)) {
+            $impacts[] = ConversionImpact::TemporalOrderingBreaks;
+        }
+
         return $impacts;
     }
 
-    /** @return CensusUse|null */
-    private function expressionUse(string $site, string $siteKey, ?string $expression, string $key, bool $selfIsKey): ?array
+    /**
+     * @param  array<string, FieldType>  $typeByKey
+     * @return CensusUse|null
+     */
+    private function expressionUse(string $site, string $siteKey, ?string $expression, string $key, bool $selfIsKey, array $typeByKey): ?array
     {
         if ($expression === null || trim($expression) === '') {
             return null;
@@ -196,11 +218,14 @@ final class ConversionCensus
             return null; // the expression gate owns an unparsable expression; a census reads past it
         }
 
-        return $this->nodeUse($site, $siteKey, $node, $key, $selfIsKey);
+        return $this->nodeUse($site, $siteKey, $node, $key, $selfIsKey, $typeByKey);
     }
 
-    /** @return CensusUse|null */
-    private function nodeUse(string $site, string $siteKey, ?Node $node, string $key, bool $selfIsKey): ?array
+    /**
+     * @param  array<string, FieldType>  $typeByKey
+     * @return CensusUse|null
+     */
+    private function nodeUse(string $site, string $siteKey, ?Node $node, string $key, bool $selfIsKey, array $typeByKey): ?array
     {
         if ($node === null) {
             return null;
@@ -208,7 +233,21 @@ final class ConversionCensus
 
         $use = ExpressionKeyUse::of($node, $key, $selfIsKey);
 
-        return $use['present'] ? ['site' => $site, 'key' => $siteKey, 'numeric' => $use['numeric'], 'list' => $use['list']] : null;
+        if (! $use['present']) {
+            return null;
+        }
+
+        // `.` in a constraint is its owner, which is the publish gate's `self` for the site (M227).
+        $selfKey = $site === 'constraint' ? $siteKey : null;
+        $holdsAs = [];
+
+        foreach ([OperandKind::Date, OperandKind::Time, OperandKind::Datetime] as $kind) {
+            if (ExpressionOperandJudge::temporalOrderingHolds($kind, $key, $use, $selfKey, $typeByKey)) {
+                $holdsAs[] = $kind->value;
+            }
+        }
+
+        return ['site' => $site, 'key' => $siteKey, 'numeric' => $use['numeric'], 'list' => $use['list'], 'holds_as' => $holdsAs];
     }
 
     /**
@@ -247,7 +286,8 @@ final class ConversionCensus
 
             foreach ($this->templates->parseLenient($text) as $segment) {
                 if ($segment['type'] === 'hole' && $segment['value'] === $key) {
-                    return ['site' => self::TEMPLATE, 'key' => $siteKey, 'numeric' => false, 'list' => false];
+                    // A hole orders nothing, so it holds as every temporal kind.
+                    return ['site' => self::TEMPLATE, 'key' => $siteKey, 'numeric' => false, 'list' => false, 'holds_as' => [OperandKind::Date->value, OperandKind::Time->value, OperandKind::Datetime->value]];
                 }
             }
         }

@@ -77,49 +77,96 @@ final class ExpressionOperandJudge
         }
 
         foreach ($use['against'] as $other) {
-            $otherKey = match (true) {
-                $other instanceof FieldReferenceNode => $other->key,
-                $other instanceof SelfReferenceNode => $selfKey,
-                default => null,
-            };
+            $verdict = self::againstOperand($kind, $key, $other, $selfKey, $typeByKey);
 
-            if ($otherKey !== null) {
-                $otherType = $typeByKey[$otherKey] ?? null;
-
-                if ($otherType === null || $otherKey === $key) {
-                    continue; // an unknown key is check()'s refusal; a question against itself is the same kind
-                }
-
-                $otherKind = OperandKind::for($otherType);
-
-                if ($otherKind->isTemporal()) {
-                    // Both sides are dates or times: report once, under the key that sorts first.
-                    if (! $kind->ordersTemporallyWith($otherKind) && strcmp($key, $otherKey) < 0) {
-                        return PublishValidationException::expressionOrdersTemporalMismatch($ownerKey, $key, $type->label(), "the {$otherType->label()} question “{$otherKey}”", self::accepts($kind));
-                    }
-
-                    continue;
-                }
-
-                if ($otherKind === OperandKind::Number) {
-                    return PublishValidationException::expressionOrdersTemporalMismatch($ownerKey, $key, $type->label(), "the {$otherType->label()} question “{$otherKey}”", self::accepts($kind));
-                }
-
-                continue; // text, hidden, a single choice or a calculation may hold a date; anything else is refused by its own arm
+            if ($verdict === null) {
+                continue;
             }
 
-            $verdict = self::againstValue($kind, $other);
+            // Both sides are dates or times: report once, under the key that sorts first.
+            if ($verdict['pair'] !== null && strcmp($key, $verdict['pair']) >= 0) {
+                continue;
+            }
 
-            if ($verdict === 'clock') {
+            if ($verdict['clock']) {
                 return PublishValidationException::expressionOrdersDateAgainstClock($ownerKey, $key, $type->label());
             }
 
-            if ($verdict !== null) {
-                return PublishValidationException::expressionOrdersTemporalMismatch($ownerKey, $key, $type->label(), $verdict, self::accepts($kind));
-            }
+            return PublishValidationException::expressionOrdersTemporalMismatch($ownerKey, $key, $type->label(), $verdict['phrase'], self::accepts($kind));
         }
 
         return null;
+    }
+
+    /**
+     * Whether every ordering in $use holds with the question read as $kind: the verdict {@see judge()} gives a date,
+     * time or date-time, without its rule of reporting a pair of questions once (M227, `R-cf7d0362`).
+     * {@see ConversionCensus} asks it of the type a question has and the type it would become, so a change between
+     * two temporal types warns where publish would start refusing, and only there. A question-against-question break
+     * must count from both sides here, or a break filed under the other question's key would go unseen.
+     *
+     * @param  array{present: bool, numeric: bool, list: bool, ordering: bool, arithmetic: bool, equality: bool, temporal: bool, against: list<Node>}  $use
+     * @param  array<string, FieldType>  $typeByKey
+     */
+    public static function temporalOrderingHolds(OperandKind $kind, string $key, array $use, ?string $selfKey, array $typeByKey): bool
+    {
+        if ($use['arithmetic']) {
+            return false;
+        }
+
+        foreach ($use['against'] as $other) {
+            if (self::againstOperand($kind, $key, $other, $selfKey, $typeByKey) !== null) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * One side of an ordering against a temporal question read as $kind: null when it can hold; otherwise whether it
+     * is a time-zone question, the phrase naming what it was compared with, and — for a date or time QUESTION on
+     * the other side — that question's key, which {@see self::temporal()} uses to report the pair once.
+     *
+     * @param  array<string, FieldType>  $typeByKey
+     * @return array{clock: bool, phrase: string, pair: ?string}|null
+     */
+    private static function againstOperand(OperandKind $kind, string $key, Node $other, ?string $selfKey, array $typeByKey): ?array
+    {
+        $otherKey = match (true) {
+            $other instanceof FieldReferenceNode => $other->key,
+            $other instanceof SelfReferenceNode => $selfKey,
+            default => null,
+        };
+
+        if ($otherKey !== null) {
+            $otherType = $typeByKey[$otherKey] ?? null;
+
+            if ($otherType === null || $otherKey === $key) {
+                return null; // an unknown key is check()'s refusal; a question against itself is the same kind
+            }
+
+            $otherKind = OperandKind::for($otherType);
+            $phrase = "the {$otherType->label()} question “{$otherKey}”";
+
+            if ($otherKind->isTemporal()) {
+                return $kind->ordersTemporallyWith($otherKind) ? null : ['clock' => false, 'phrase' => $phrase, 'pair' => $otherKey];
+            }
+
+            if ($otherKind === OperandKind::Number) {
+                return ['clock' => false, 'phrase' => $phrase, 'pair' => null];
+            }
+
+            return null; // text, hidden, a single choice or a calculation may hold a date; anything else is refused by its own arm
+        }
+
+        $verdict = self::againstValue($kind, $other);
+
+        return match ($verdict) {
+            null => null,
+            'clock' => ['clock' => true, 'phrase' => '', 'pair' => null],
+            default => ['clock' => false, 'phrase' => $verdict, 'pair' => null],
+        };
     }
 
     /**

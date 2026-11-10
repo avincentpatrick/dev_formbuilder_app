@@ -583,3 +583,32 @@ it('publishes no maintainer marks anywhere in the contract (R-e568ddd2, D191)', 
 
     expect($found)->toBe([], "openapi.json publishes notes meant for a maintainer. Move each into a `//` block above the docblock, or into the class body — never a `//` above an array key — then re-export openapi.json:\n".implode("\n", $found));
 });
+
+it('publishes the guest schema\'s save_and_resume as a boolean (R-4ea564fe)', function (): void {
+    $form = contractSpec()['paths']['/public/f/{shareToken}']['get']['responses']['200']['content']['application/json']['schema']['properties']['data']['properties']['form']['properties'];
+
+    // Scramble typed `a && b` as a string; a client generated from the contract would read the flag as text.
+    expect($form['save_and_resume']['type'] ?? null)->toBe('boolean');
+});
+
+it('publishes the guest submit\'s and draft save\'s success bodies as objects, on both 200 and 201 (R-e2c1ba51)', function (): void {
+    $spec = contractSpec();
+
+    // Each answers 201 when it creates the row and 200 when it updates one. A status chosen by a ternary
+    // left Scramble unable to infer either, and it published a bare string.
+    $bodies = [
+        '/public/f/{shareToken}/submissions' => ['id', 'reference', 'status', 'redirect'],
+        '/public/f/{shareToken}/draft' => ['id', 'completeness_percent', 'resume_token', 'resume_url', 'expires_at', 'content_checksum'],
+    ];
+
+    foreach ($bodies as $path => $keys) {
+        $responses = $spec['paths'][$path]['post']['responses'];
+
+        foreach ([200, 201] as $status) {
+            $schema = $responses[$status]['content']['application/json']['schema'] ?? [];
+
+            expect($schema['type'] ?? null)->toBe('object', "POST {$path} publishes its {$status} as something other than an object.")
+                ->and(array_keys($schema['properties']['data']['properties'] ?? []))->toBe($keys, "POST {$path}'s {$status} body does not carry the keys the controller sends.");
+        }
+    }
+});

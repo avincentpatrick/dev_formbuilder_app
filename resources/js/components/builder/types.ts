@@ -256,6 +256,10 @@ export interface OperatorOption extends EnumOption {
     // ⚠️ The shapes of the RELATED field, never the rule's owner: a conditional rule's operator compares
     // the value of the field the rule NAMES.
     shapes: string[];
+    // `D214` (`M226`) — the label where the compared question's shape reads the operator more narrowly, keyed by shape
+    // (`ComparisonOperator::shapeLabels()`): `contains` on a single choice is "contains the text". Optional, because a
+    // hand-built operator list in a test carries none, and absent reads as `label`.
+    shape_labels?: Record<string, string>;
 }
 
 export interface BuilderEnums {

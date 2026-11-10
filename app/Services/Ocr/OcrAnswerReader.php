@@ -793,8 +793,14 @@ final class OcrAnswerReader
 
     /**
      * Printed text the model predicts can sit inside a question's region: its hint, a note between
-     * questions, the next section's heading, the footer. Compared on normal forms, as a substring (a hint
-     * wraps across lines) or near enough to the whole string.
+     * questions, the next section's heading, the footer. Compared on normal forms, as a piece of a wrapped
+     * string or near enough to the whole string.
+     *
+     * M228 (`R-5d7128da`): a wrapped piece is a run of WHOLE words, and a piece of one word can only be the
+     * printed text's LAST word, because the lines before it take the words before it. So a one-word line counts
+     * as printed only when it is that last word, and a longer line only when it is a whole-word run of the
+     * text. Any four letters inside the text used to count, so "FORM" written above a footer that says "Scans of
+     * this form…" read as printed and its question as blank, and "form" matched inside "information".
      *
      * @param  list<string>  $static
      */
@@ -805,8 +811,10 @@ final class OcrAnswerReader
             return true;
         }
 
+        $oneWord = ! str_contains($text, ' ');
+
         foreach ($static as $printed) {
-            if (strlen($text) >= 4 && str_contains($printed, $text)) {
+            if (strlen($text) >= 4 && $this->wrappedPiece($text, $printed, $oneWord)) {
                 return true;
             }
             if (OcrText::similarity($text, $printed) >= 0.85) {
@@ -815,6 +823,16 @@ final class OcrAnswerReader
         }
 
         return false;
+    }
+
+    /** Whether a line's normal text is a piece the printed string could have wrapped into: its last word, or a whole-word run. */
+    private function wrappedPiece(string $text, string $printed, bool $oneWord): bool
+    {
+        if ($oneWord) {
+            return str_ends_with(' '.$printed, ' '.$text);
+        }
+
+        return str_contains(' '.$printed.' ', ' '.$text.' ');
     }
 
     /**

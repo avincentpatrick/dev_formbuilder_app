@@ -109,6 +109,29 @@ function commitLabel(uid: string, value: string, via: 'key' | 'blur'): void {
     endEdit(uid, via === 'key');
 }
 
+// ── A section's title edited in place (M221, `R-18d9f001`) ──────────────────────────────────────────────────────────
+// The same editor and the same rules as a question's label above, against the server's own cap on a title
+// (`UpdateSectionRequest`, `max:255`) rather than the question label's.
+const SECTION_TITLE_MAX = 255;
+const editingSectionUid = ref<string | null>(null);
+
+function startSectionEdit(uid: string): void {
+    if (isReordering.value) return;
+    store.select({ kind: 'section', uid });
+    editingSectionUid.value = uid;
+}
+
+function endSectionEdit(uid: string, refocus: boolean): void {
+    editingSectionUid.value = null;
+    if (!refocus) return;
+    void nextTick(() => canvasRoot.value?.querySelector<HTMLElement>(`[data-section-uid="${uid}"] .canvas__section-head`)?.focus());
+}
+
+function commitSectionTitle(uid: string, value: string, via: 'key' | 'blur'): void {
+    store.renameSection(uid, value);
+    endSectionEdit(uid, via === 'key');
+}
+
 // ── The glide (M150, `R-adce6e14`) ──────────────────────────────────────────────────────────────────────────────────
 const order = computed(() =>
     groups.value.map((group) => `${group.section?.uid ?? '-'}:${group.fields.map((field) => field.uid).join(',')}`).join('|'),
@@ -196,17 +219,37 @@ async function requestDelete(field: LocalField): Promise<void> {
                     >
                         <MdsIcon name="grip" size="md" />
                     </button>
+                    <div v-if="editingSectionUid === group.section.uid" class="canvas__section-editing">
+                        <InlineLabelEdit
+                            :ref="setEditor"
+                            :value="group.section.label"
+                            label="Section title"
+                            :maxlength="SECTION_TITLE_MAX"
+                            @commit="(value, via) => commitSectionTitle(group.section!.uid, value, via)"
+                            @cancel="endSectionEdit(group.section!.uid, true)"
+                        />
+                    </div>
                     <button
+                        v-else
                         type="button"
                         class="canvas__section-head"
                         :aria-pressed="isSelectedSection(group.section.uid)"
                         @click="pick({ kind: 'section', uid: group.section.uid })"
+                        @dblclick="startSectionEdit(group.section.uid)"
                     >
                         <MdsIcon name="layout" size="sm" />
                         <span class="canvas__section-label" :title="group.section.label">{{ group.section.label }}</span>
                         <MdsBadge v-if="group.section.is_repeatable" v-bind="statusVariant('draft')" label="Repeatable" />
                     </button>
                     <div class="canvas__section-actions">
+                        <MdsIconButton
+                            v-if="editingSectionUid !== group.section.uid"
+                            icon="edit"
+                            :label="`Edit title of ${group.section.label || 'this section'}`"
+                            size="sm"
+                            :disabled="isReordering"
+                            @click="startSectionEdit(group.section.uid)"
+                        />
                         <MdsIconButton
                             icon="trash"
                             label="Delete section"
@@ -525,8 +568,10 @@ li[data-dragging='true'] .canvas__field {
     cursor: pointer;
 }
 
-/* The row while its label is edited: the main button's footprint, all of it given to the input. */
-.canvas__field-editing {
+/* The row while its label is edited: the main button's footprint, all of it given to the input. M221: a section's head
+   while its title is edited takes the same footprint. */
+.canvas__field-editing,
+.canvas__section-editing {
     display: flex;
     align-items: center;
     flex: 1;

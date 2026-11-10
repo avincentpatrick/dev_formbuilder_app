@@ -292,7 +292,8 @@ function operatorOptionsFor(row: BuilderValidation): SelectOption[] {
 
     for (const operator of props.operators) {
         if (operator.shapes.includes(shape)) {
-            options.push({ value: operator.value, label: operator.label });
+            // D214: the compared question's shape may name the operator more narrowly ("contains the text").
+            options.push({ value: operator.value, label: operator.shape_labels?.[shape] ?? operator.label });
         }
     }
 

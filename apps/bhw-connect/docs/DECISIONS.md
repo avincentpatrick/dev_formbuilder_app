@@ -9723,3 +9723,16 @@ Consequences: the app may deliver the private package's municipality partitions 
 installs them and sets `BHW_BARANGAY_RELEASE`. Drill-down is enabled per dataset (NHFR and UUC first;
 BHW Census and StepZero wait for a barangay-level small-count suppression review), and only where the
 indicator's source carries barangay rows. Barangays without a candidate polygon stay in the table.
+
+## 2026-11-10 — BHW Census and StepZero barangay maps: counts only
+
+The owner decided, on the proposal in BARANGAY_BHW_DISCLOSURE_PROPOSAL.md: (1) BHW counts per barangay may be
+mapped (validated profiles; the StepZero total, registered, registered-and-accredited and non-registered
+counts, with source population and households as context); the registered / non-registered split counts as a
+total. (2) For any future barangay rate the rule is that both groups behind it have at least 5 people (the
+reply was "okay" to that recommendation, recorded so it can be corrected); no barangay rates are built now.
+(3) Honorarium and average years stay at municipality level. (4) No new aggregate build for barangay training
+coverage. (5) The owner signs off the privacy side.
+Noted for the owner: the live dashboards already show barangay rates with a small-sample warning and suppress
+a cell only when fewer than 5 BHWs are represented, which is looser than the rule agreed for map rates. In a
+random sample of 128 barangays, 24% had fewer than 5 validated profiles and 73% fewer than 10.

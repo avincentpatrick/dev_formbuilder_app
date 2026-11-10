@@ -3739,7 +3739,97 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "string"
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "completeness_percent": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "resume_token": {
+                                                    "type": "string"
+                                                },
+                                                "resume_url": {
+                                                    "type": "string"
+                                                },
+                                                "expires_at": {
+                                                    "type": "string"
+                                                },
+                                                "content_checksum": {
+                                                    "type": "string",
+                                                    "description": "The baseline for this device's next save. Send it back with that save; a save made against an\nolder baseline is refused with a 409."
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "completeness_percent",
+                                                "resume_token",
+                                                "resume_url",
+                                                "expires_at",
+                                                "content_checksum"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "completeness_percent": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "resume_token": {
+                                                    "type": "string"
+                                                },
+                                                "resume_url": {
+                                                    "type": "string"
+                                                },
+                                                "expires_at": {
+                                                    "type": "string"
+                                                },
+                                                "content_checksum": {
+                                                    "type": "string",
+                                                    "description": "The baseline for this device's next save. Send it back with that save; a save made against an\nolder baseline is refused with a 409."
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "completeness_percent",
+                                                "resume_token",
+                                                "resume_url",
+                                                "expires_at",
+                                                "content_checksum"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
                                 }
                             }
                         }
@@ -4092,7 +4182,167 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "string"
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "reference": {
+                                                    "type": "string",
+                                                    "description": "The short reference the respondent can quote to the form's owner. A display handle, never a credential."
+                                                },
+                                                "status": {
+                                                    "type": "string"
+                                                },
+                                                "redirect": {
+                                                    "description": "Where to send the respondent after the thank-you screen, as `url` and a `label` naming it, or null\nto stay. Resolved when the response is accepted, so it reflects the form's settings now, and a\ndestination that has stopped taking responses is null rather than a dead end.",
+                                                    "anyOf": [
+                                                        {
+                                                            "type": "null"
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "url": {
+                                                                    "type": [
+                                                                        "string",
+                                                                        "null"
+                                                                    ]
+                                                                },
+                                                                "label": {
+                                                                    "type": "string"
+                                                                },
+                                                                "delay_seconds": {
+                                                                    "type": "integer"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "url",
+                                                                "label",
+                                                                "delay_seconds"
+                                                            ]
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "url": {
+                                                                    "type": "string"
+                                                                },
+                                                                "label": {
+                                                                    "type": "string"
+                                                                },
+                                                                "delay_seconds": {
+                                                                    "type": "integer"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "url",
+                                                                "label",
+                                                                "delay_seconds"
+                                                            ]
+                                                        }
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "reference",
+                                                "status",
+                                                "redirect"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "reference": {
+                                                    "type": "string",
+                                                    "description": "The short reference the respondent can quote to the form's owner. A display handle, never a credential."
+                                                },
+                                                "status": {
+                                                    "type": "string"
+                                                },
+                                                "redirect": {
+                                                    "description": "Where to send the respondent after the thank-you screen, as `url` and a `label` naming it, or null\nto stay. Resolved when the response is accepted, so it reflects the form's settings now, and a\ndestination that has stopped taking responses is null rather than a dead end.",
+                                                    "anyOf": [
+                                                        {
+                                                            "type": "null"
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "url": {
+                                                                    "type": [
+                                                                        "string",
+                                                                        "null"
+                                                                    ]
+                                                                },
+                                                                "label": {
+                                                                    "type": "string"
+                                                                },
+                                                                "delay_seconds": {
+                                                                    "type": "integer"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "url",
+                                                                "label",
+                                                                "delay_seconds"
+                                                            ]
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "url": {
+                                                                    "type": "string"
+                                                                },
+                                                                "label": {
+                                                                    "type": "string"
+                                                                },
+                                                                "delay_seconds": {
+                                                                    "type": "integer"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "url",
+                                                                "label",
+                                                                "delay_seconds"
+                                                            ]
+                                                        }
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "reference",
+                                                "status",
+                                                "redirect"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
                                 }
                             }
                         }
@@ -4261,7 +4511,7 @@
                                                             "description": "Single-page vs. multi-step presentation (UX \u00a73.1); the SPA reads it to pick its flow."
                                                         },
                                                         "save_and_resume": {
-                                                            "type": "string",
+                                                            "type": "boolean",
                                                             "description": "Whether the SPA should offer \"Save and finish later\" (H10, UX \u00a75.2). Both gates must pass:\nthe per-form opt-in AND the tenant plan. The plan half mirrors RequireFeature exactly \u2014\nfail-open when no catalog resolves \u2014 so this flag and the draft route never disagree. The\nroute is still authoritative; this only decides whether the control is shown."
                                                         },
                                                         "bot_challenge": {

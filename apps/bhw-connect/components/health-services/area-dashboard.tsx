@@ -157,10 +157,11 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
         </h2>
         <p className="my-2 text-sm text-muted">
           {FHSIS_RELEASE_LABEL} · Totals; available age and sex breakdowns are below. TB
-          notification rates are cases per 100,000, not percentages. Additional prenatal and
-          postnatal care, delivery/newborn care, nutrition, school vaccination and childhood illness
-          sources cover provinces/HUCs and selected separately listed cities; they do not provide
-          every municipality separately.
+          notification and leprosy detection rates are cases per 100,000; leprosy prevalence is per
+          10,000. These are not percentages. Additional prenatal and postnatal care,
+          delivery/newborn care, nutrition, school vaccination and childhood illness sources cover
+          provinces/HUCs and selected separately listed cities; they do not provide every
+          municipality separately.
         </p>
         <div className="overflow-x-auto" role="region" aria-label="Service indicators" tabIndex={0}>
           <table className="w-full min-w-[640px] text-left text-sm">
@@ -188,6 +189,14 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
                 <tr key={i.indicator_key} className="border-b border-border align-top">
                   <th scope="row" className="p-3 font-medium">
                     {i.label}
+                    {i.indicator_key.startsWith("morb_") && i.reported && (
+                      <Link
+                        className="mt-2 block text-sm underline"
+                        href={`/health-services/morbidity/${i.indicator_key}/${geo.geoCode}`}
+                      >
+                        View age and sex case counts
+                      </Link>
+                    )}
                     <details className="mt-2 font-normal text-muted">
                       <summary className="cursor-pointer">Definition and source</summary>
                       <p className="mt-2">Numerator: {i.numerator_def}</p>
@@ -212,6 +221,97 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
         </div>
         <p className="mt-3 text-sm text-muted">{FHSIS_OVER_100_NOTE}</p>
       </section>
+
+      {area.indicators.some((i) => i.indicator_key.startsWith("fp_")) && (
+        <p className="text-sm text-muted">
+          Family-planning beginning and ending users are snapshots. New acceptors, other acceptors
+          and dropouts are separate annual flows; do not add them to user totals. Method totals
+          already include their age groups. Source fractional counts are retained and are not
+          presented as unique people. Demand satisfied is a Q4 measure for ages 15–49 and uses the
+          denominator published in that table.
+        </p>
+      )}
+
+      {area.indicators.some((i) => i.indicator_key.startsWith("ncd_")) && (
+        <p className="text-sm text-muted">
+          NCD medicine access is a December 2025 snapshot. Other included NCD measures are annual.
+          Risk factors and cancer screening pathways can overlap; do not add them as unique people.
+          Suspicious or significant screening findings are not confirmed cancer diagnoses. Most NCD
+          sources report provinces/HUCs and selected cities; adult and senior annual PhilPEN
+          reporting also includes municipalities. The cervical precancerous-lesion denominator
+          includes VIA, Pap smear and HPV DNA screenings, excluding assessed-only women.
+        </p>
+      )}
+
+      {area.indicators.some((i) =>
+        ["ncd_60plus_assessed", "ncd_60plus_htn", "ncd_60plus_dm"].includes(i.indicator_key),
+      ) && (
+        <p className="text-sm text-muted">
+          Senior PhilPEN annual figures are corroborated by the 2025 annual report despite a
+          conflicting 2024 workbook heading. Published annual totals are retained; they differ from
+          quarter sums in Region V and the national rollup. Sex breakdowns are counts only.
+        </p>
+      )}
+
+      {area.indicators.some(
+        (i) => i.indicator_key === "infect_schisto_treated" && i.unit.startsWith("percent"),
+      ) && (
+        <p className="text-sm text-muted">
+          Schistosomiasis treatment uses confirmed acute plus chronic cases as its denominator.
+          Rates with zero denominators are undefined; reported treatment counts remain visible.
+        </p>
+      )}
+
+      {area.indicators.some((i) => i.indicator_key.startsWith("oral_")) && (
+        <p className="text-sm text-muted">
+          Oral-health first visits and completed two visits are separate measures. Facility and
+          non-facility reports may overlap; do not add them as unique people. For ages 5 and above,
+          annual rates are withheld because the source adds quarterly populations into the annual
+          denominator. Visit counts are retained. These sources cover provinces/HUCs and selected
+          cities, not every municipality.
+        </p>
+      )}
+
+      {area.indicators.some((i) => i.indicator_key.startsWith("oral_pregnant_")) && (
+        <p className="text-sm text-muted">
+          Pregnant-women oral-health counts use the cohort confirmed in the 2025 annual report,
+          despite a conflicting senior-citizen workbook heading. Ages 10–14, 15–19 and 20–49 are
+          reported separately. Coverage rates are withheld because the annual denominator sums
+          quarterly population estimates. Missing quarterly entries mean annual counts do not
+          establish complete reporting in every quarter.
+        </p>
+      )}
+
+      {area.indicators.some((i) => i.program_area === "vital_statistics") && (
+        <p className="text-sm text-muted">
+          Vital statistics distinguish live births from deliveries. Adolescent birth rates are per
+          1,000 source estimated population in the stated age group; infant mortality is per 1,000
+          live births, and maternal mortality ratios are per 100,000 live births. The workbook’s
+          percent headings do not describe these scales. Direct/indirect and resident/nonresident
+          maternal deaths are separate source groups.
+        </p>
+      )}
+      {area.indicators.some((i) => i.program_area === "morbidity") && (
+        <p className="text-sm text-muted">
+          Morbidity covers cumulative January–December case reports, not unique patients. Region
+          XII’s May report is missing. The source counts blank submitted cells as zero; a zero does
+          not prove complete reporting. Do not add overlapping ICD categories. Rates are per 100,000
+          population; regional and national population denominators were not supplied. Provincial
+          rows use the companion Province workbook. Open a disease’s age and sex link for its
+          detailed counts.
+        </p>
+      )}
+
+      {area.indicators.some((i) => i.program_area === "demographics") && (
+        <p className="text-sm text-muted">
+          FHSIS demographic summaries report population, household estimates and counts of
+          barangays, rural health units and barangay health stations. Population per unit is a
+          ratio, not a percentage or a staffing target; it is undefined where the source reports
+          zero units. Facility and barangay summaries cover provinces/HUCs and selected cities, not
+          every municipality. These source totals are separate from the facility registry, the BHW
+          census and the population figures used elsewhere on this site.
+        </p>
+      )}
 
       <section aria-labelledby="breakdowns-heading">
         <h2 id="breakdowns-heading" className="text-xl font-semibold">
@@ -238,6 +338,12 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
                   {fhsisPeriodLabel(i.indicator_key)} · {i.source_workbook}
                 </p>
                 <p className="mb-2 text-sm text-muted">Denominator: {i.denominator_def}</p>
+                {i.indicator_key.startsWith("infect_schisto_") && i.unit === "count" && (
+                  <p className="mb-2 text-sm text-muted">
+                    Source rates are withheld because their denominators could not be established
+                    from the annual tables. Source counts are retained.
+                  </p>
+                )}
                 {i.indicator_key === "maternal_td_repeat" && (
                   <p className="mb-2 text-sm text-muted">
                     Age-group rates are withheld because the source reports zero rates despite

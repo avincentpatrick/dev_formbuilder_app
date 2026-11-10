@@ -404,3 +404,21 @@ it('says of every palette entry whether a label may show its answer, written out
         'single_select', 'multi_select', 'dropdown', 'yes_no', 'cascading_select', 'likert_scale', 'calculated', 'hidden',
     ]);
 });
+
+it('ships "contains the text" for contains on a single choice or dropdown, and no other shape label (D214)', function (): void {
+    // On one chosen value the structured contains is a substring test, so the rule editor names it as one. The label
+    // travels with the operator, keyed by the COMPARED question's shape, so the editor never restates which shapes match text.
+    $operators = [];
+    foreach ($this->payload['enums']['comparison_operators'] as $option) {
+        $operators[$option['value']] = $option;
+    }
+
+    expect($operators['contains']['label'])->toBe('contains')
+        ->and($operators['contains']['shape_labels'])->toBe(['choice' => 'contains the text']);
+
+    foreach ($operators as $value => $option) {
+        if ($value !== 'contains') {
+            expect($option['shape_labels'])->toBe([], "{$value} ships a shape label");
+        }
+    }
+});

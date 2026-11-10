@@ -351,7 +351,17 @@ it("copies the release notes in and seeds one verified member for the What's new
 
     // CI never deploys, so the seeder is what fills `releases`: the committed notes (the sync's own idempotence is
     // `SyncReleasesCommandTest`'s; a second run here cannot see its first run's users under row security).
-    expect(Release::query()->pluck('version')->all())->toBe(array_column((new ReleaseNotes)->load(), 'version'));
+    //
+    // ⛔ M223: SORTED ON BOTH SIDES. A query with no `ORDER BY` promises no order, and this one came back with the newest
+    // version second or third on every branch whose newest note was 0.17.4, 0.18.0 or 0.18.1, red in CI three times.
+    // What's new sorts by `version_compare` itself (`WhatsNew::releases()`), so the order was never what this checks:
+    // the same versions, all of them, and no others.
+    $newestFirst = static fn (array $versions): array => collect($versions)
+        ->sort(static fn (string $a, string $b): int => version_compare($b, $a))
+        ->values()
+        ->all();
+    expect($newestFirst(Release::query()->pluck('version')->all()))
+        ->toBe($newestFirst(array_column((new ReleaseNotes)->load(), 'version')));
 
     // The member the prompt is left for: active (so the dashboard is theirs to land on) and verified (or the sign-in
     // lands on /email/verify instead). Read under a plain tenant context, as the case above explains — the privileged

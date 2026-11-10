@@ -1,0 +1,112 @@
+[
+  {
+    "code": "vital_live_births",
+    "program_area": "vital_statistics",
+    "label": "Live births",
+    "numerator_def": "Live births",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "1. Natality and Mortality_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vital_births_under10",
+    "program_area": "vital_statistics",
+    "label": "Live births to mothers younger than 10 years",
+    "numerator_def": "Live births to mothers younger than 10 years",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "1. Natality and Mortality_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vital_births_10_14",
+    "program_area": "vital_statistics",
+    "label": "Adolescent births, mothers aged 10–14",
+    "numerator_def": "Adolescent births, mothers aged 10–14",
+    "denominator_def": "Source estimated population aged 10–14 years; sex is not stated in the population column header",
+    "unit": "births per 1,000 age-group population",
+    "source_workbook": "1. Natality and Mortality_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vital_births_15_19",
+    "program_area": "vital_statistics",
+    "label": "Adolescent births, mothers aged 15–19",
+    "numerator_def": "Adolescent births, mothers aged 15–19",
+    "denominator_def": "Source estimated population aged 15–19 years; sex is not stated in the population column header",
+    "unit": "births per 1,000 age-group population",
+    "source_workbook": "1. Natality and Mortality_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vital_maternal_direct_resident",
+    "program_area": "vital_statistics",
+    "label": "Direct maternal deaths, resident",
+    "numerator_def": "Direct maternal deaths, resident",
+    "denominator_def": "Source total live births; age breakdowns retain counts only",
+    "unit": "deaths per 100,000 live births",
+    "source_workbook": "1. Natality and Mortality_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vital_maternal_direct_nonresident",
+    "program_area": "vital_statistics",
+    "label": "Direct maternal deaths, nonresident",
+    "numerator_def": "Direct maternal deaths, nonresident",
+    "denominator_def": "Source total live births; age breakdowns retain counts only",
+    "unit": "deaths per 100,000 live births",
+    "source_workbook": "1. Natality and Mortality_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vital_maternal_direct_total",
+    "program_area": "vital_statistics",
+    "label": "Direct maternal deaths, all residences",
+    "numerator_def": "Direct maternal deaths, all residences",
+    "denominator_def": "Source total live births",
+    "unit": "deaths per 100,000 live births",
+    "source_workbook": "1. Natality and Mortality_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vital_maternal_indirect_resident",
+    "program_area": "vital_statistics",
+    "label": "Indirect maternal deaths, resident",
+    "numerator_def": "Indirect maternal deaths, resident",
+    "denominator_def": "Source total live births; age breakdowns retain counts only",
+    "unit": "deaths per 100,000 live births",
+    "source_workbook": "1. Natality and Mortality_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vital_maternal_indirect_nonresident",
+    "program_area": "vital_statistics",
+    "label": "Indirect maternal deaths, nonresident",
+    "numerator_def": "Indirect maternal deaths, nonresident",
+    "denominator_def": "Source total live births; age breakdowns retain counts only",
+    "unit": "deaths per 100,000 live births",
+    "source_workbook": "1. Natality and Mortality_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vital_maternal_indirect_total",
+    "program_area": "vital_statistics",
+    "label": "Indirect maternal deaths, all residences",
+    "numerator_def": "Indirect maternal deaths, all residences",
+    "denominator_def": "Source total live births",
+    "unit": "deaths per 100,000 live births",
+    "source_workbook": "1. Natality and Mortality_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vital_infant_deaths",
+    "program_area": "vital_statistics",
+    "label": "Infant deaths",
+    "numerator_def": "Infant deaths",
+    "denominator_def": "Source total live births",
+    "unit": "deaths per 1,000 live births",
+    "source_workbook": "1. Natality and Mortality_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  }
+]

@@ -48,11 +48,44 @@ export function toFhsisIndicator(
 export function fhsisRateLabel(indicator: FhsisIndicator): string {
   if (!indicator.reported) return "Not reported in 2025";
   if (indicator.unit === "count") return "Count only";
+  if (indicator.unit.startsWith("persons per ") && indicator.denominator === 0)
+    return "Not defined (zero units)";
+  if (
+    [
+      "ncd_cervical_lesions",
+      "infect_schisto_treated",
+      "ncd_60plus_assessed",
+      "ncd_60plus_htn",
+      "ncd_60plus_dm",
+    ].includes(indicator.indicator_key) &&
+    indicator.rate !== null
+  ) {
+    if (indicator.denominator === 0) return "Not defined (zero denominator)";
+    if (indicator.denominator === null) return "Not defined (denominator missing)";
+  }
   if (indicator.rate === null) return "Rate not reported";
-  const value = indicator.rate.toLocaleString("en-PH", { maximumFractionDigits: 1 });
-  return `${value}${indicator.unit.startsWith("percent") ? "%" : " per 100,000"}${indicator.over100 ? "†" : ""}`;
+  const value = indicator.rate.toLocaleString(
+    "en-PH",
+    indicator.rate !== 0 && Math.abs(indicator.rate) < 1
+      ? { maximumSignificantDigits: 3 }
+      : { maximumFractionDigits: 1 },
+  );
+  if (indicator.unit.startsWith("persons per ")) return `${value} ${indicator.unit}`;
+  const suffix = indicator.unit.startsWith("percent")
+    ? "%"
+    : indicator.unit.includes("1,000")
+      ? " per 1,000" +
+        (indicator.unit.includes("live births") ? " live births" : " age-group population")
+      : indicator.unit.includes("10,000")
+        ? " per 10,000"
+        : " per 100,000" + (indicator.unit.includes("live births") ? " live births" : "");
+  return `${value}${suffix}${indicator.over100 ? "†" : ""}`;
 }
 export function fhsisPeriodLabel(key: string): string {
+  if (key.startsWith("ncd_dec_")) return "December 2025";
+  if (key === "fp_demand_q4") return "Q4 2025";
+  if (key.startsWith("fp_begin_")) return "Beginning of 2025";
+  if (key.startsWith("fp_end_")) return "End of 2025";
   if (key === "anc8") return "Q3–Q4 2025";
   if (key.startsWith("water_") || key.startsWith("sanitation_")) return "Q4 2025";
   return "Annual 2025";
@@ -191,6 +224,19 @@ export const getFhsisReconciliation = cache(async (code: string) => {
 
 export type FhsisBreakdown = FhsisIndicator & { breakdown: string };
 export function fhsisBreakdownLabel(key: string): string {
+  if (key.startsWith("age:")) {
+    const [, age, sex] = key.split(":");
+    const ageLabel =
+      (
+        {
+          "0-6d": "0–6 days",
+          "7-28d": "7–28 days",
+          "29d-11m": "29 days–11 months",
+          "60plus": "60 years and above",
+        } as Record<string, string>
+      )[age] ?? `${age.replace("-", "–")} years`;
+    return `${ageLabel}, ${sex === "total" ? "both sexes" : sex}`;
+  }
   return (
     (
       {
@@ -209,6 +255,21 @@ export function fhsisBreakdownLabel(key: string): string {
 export function fhsisLimitedGeography(key: string): boolean {
   return (
     key.startsWith("birth_") ||
+    (key.startsWith("demo_") && !["demo_population", "demo_households"].includes(key)) ||
+    key.startsWith("vital_") ||
+    key.startsWith("morb_") ||
+    key.startsWith("oral_") ||
+    (key.startsWith("ncd_") &&
+      ![
+        "ncd_20_59_assessed",
+        "ncd_20_59_htn",
+        "ncd_20_59_dm",
+        "ncd_60plus_assessed",
+        "ncd_60plus_htn",
+        "ncd_60plus_dm",
+      ].includes(key)) ||
+    key.startsWith("fp_") ||
+    key.startsWith("infect_") ||
     key.startsWith("maternal_") ||
     key.startsWith("nutrition_") ||
     key.startsWith("school_") ||
@@ -219,7 +280,11 @@ export function fhsisLimitedGeography(key: string): boolean {
 }
 /** Fetch only this area; paginate so new programmes cannot silently hit PostgREST's cap. */
 export const getFhsisBreakdowns = cache(
-  async (code: string, level: GeoLevel): Promise<FhsisBreakdown[] | null> => {
+  async (
+    code: string,
+    level: GeoLevel,
+    morbidityKey?: string,
+  ): Promise<FhsisBreakdown[] | null> => {
     try {
       const [id, definitions] = await Promise.all([
         getDatasetIdBySlug(DATASET_SLUGS.fhsis),
@@ -229,7 +294,7 @@ export const getFhsisBreakdowns = cache(
       const result: FhsisBreakdown[] = [];
       const byKey = new Map(definitions.map((d) => [d.indicator_key, d]));
       for (let offset = 0; ; offset += 500) {
-        const { data, error } = await createSupabaseServerClient()
+        const query = createSupabaseServerClient()
           .from("fact_fhsis_indicator")
           .select("*")
           .eq("dataset_id", id)
@@ -239,6 +304,11 @@ export const getFhsisBreakdowns = cache(
           .order("indicator_key")
           .order("breakdown")
           .range(offset, offset + 499);
+        // Morbidity has 50 breakdowns per disease. Read them on its detail page,
+        // keeping the overview bounded as chapters are loaded.
+        const { data, error } = await (morbidityKey
+          ? query.eq("indicator_key", morbidityKey)
+          : query.not("indicator_key", "like", "morb_%"));
         if (error || !data) return null;
         for (const row of data) {
           const definition = byKey.get(row.indicator_key);

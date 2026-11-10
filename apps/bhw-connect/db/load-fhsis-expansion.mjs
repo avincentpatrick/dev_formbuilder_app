@@ -18,13 +18,111 @@ export const CHILD_HEALTH_DEFINITIONS = JSON.parse(
 export const MATERNAL_DEFINITIONS = JSON.parse(
   readFileSync(new URL("../ingestion/fhsis-maternal-definitions.json", import.meta.url), "utf8"),
 ).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
+export const INFECTIOUS_DEFINITIONS = JSON.parse(
+  readFileSync(new URL("../ingestion/fhsis-infectious-definitions.json", import.meta.url), "utf8"),
+).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
+export const FAMILY_PLANNING_DEFINITIONS = JSON.parse(
+  readFileSync(
+    new URL("../ingestion/fhsis-family-planning-definitions.json", import.meta.url),
+    "utf8",
+  ),
+).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
+export const NCD_DEFINITIONS = JSON.parse(
+  readFileSync(new URL("../ingestion/fhsis-ncd-definitions.json", import.meta.url), "utf8"),
+).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
+export const SENIOR_NCD_DEFINITIONS = JSON.parse(
+  readFileSync(new URL("../ingestion/fhsis-senior-ncd-definitions.json", import.meta.url), "utf8"),
+).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
+export const ORAL_HEALTH_DEFINITIONS = JSON.parse(
+  readFileSync(new URL("../ingestion/fhsis-oral-health-definitions.json", import.meta.url), "utf8"),
+).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
+export const MATERNAL_ORAL_DEFINITIONS = JSON.parse(
+  readFileSync(
+    new URL("../ingestion/fhsis-maternal-oral-definitions.json", import.meta.url),
+    "utf8",
+  ),
+).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
+export const VITAL_STATISTICS_DEFINITIONS = JSON.parse(
+  readFileSync(
+    new URL("../ingestion/fhsis-vital-statistics-definitions.json", import.meta.url),
+    "utf8",
+  ),
+).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
+export const DEMOGRAPHICS_DEFINITIONS = JSON.parse(
+  readFileSync(
+    new URL("../ingestion/fhsis-demographics-definitions.json", import.meta.url),
+    "utf8",
+  ),
+).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
+export const COMBINED_DELIVERY_DEFINITIONS = JSON.parse(
+  readFileSync(
+    new URL("../ingestion/fhsis-combined-delivery-definitions.json", import.meta.url),
+    "utf8",
+  ),
+).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
+export const MORBIDITY_DEFINITIONS = JSON.parse(
+  readFileSync(new URL("../ingestion/fhsis-morbidity-definitions.json", import.meta.url), "utf8"),
+).map(({ code, ...definition }) => ({ indicator_key: code, ...definition }));
+export const MORBIDITY_AGES = [
+  "0-6d",
+  "7-28d",
+  "29d-11m",
+  "1-4",
+  "5-9",
+  "10-14",
+  "15-19",
+  "20-24",
+  "25-29",
+  "30-34",
+  "35-39",
+  "40-44",
+  "45-49",
+  "50-54",
+  "55-59",
+  "60plus",
+];
+function definitionSources(definition, morbidity) {
+  return morbidity
+    ? [definition.source_workbook, definition.source_workbook.replace("_Region_", "_Province_")]
+    : [definition.source_workbook];
+}
 function reviewedDefinitions(bundle) {
   const programme = bundle.programme_set ?? "core";
-  check(["core", "child-health", "maternal"].includes(programme), "Unknown programme set");
+  if (/^morbidity-(0[1-9]|1[0-9])$/.test(programme)) {
+    return MORBIDITY_DEFINITIONS.filter((d) =>
+      d.indicator_key.startsWith(`morb_${programme.slice(-2)}_`),
+    );
+  }
+  check(
+    [
+      "core",
+      "child-health",
+      "maternal",
+      "infectious",
+      "family-planning",
+      "ncd",
+      "ncd-senior",
+      "oral-health",
+      "oral-maternal",
+      "vital-statistics",
+      "demographics",
+      "combined-delivery",
+    ].includes(programme),
+    "Unknown programme set",
+  );
   return {
     core: DEFINITIONS,
     "child-health": CHILD_HEALTH_DEFINITIONS,
     maternal: MATERNAL_DEFINITIONS,
+    infectious: INFECTIOUS_DEFINITIONS,
+    "family-planning": FAMILY_PLANNING_DEFINITIONS,
+    ncd: NCD_DEFINITIONS,
+    "ncd-senior": SENIOR_NCD_DEFINITIONS,
+    "oral-health": ORAL_HEALTH_DEFINITIONS,
+    "oral-maternal": MATERNAL_ORAL_DEFINITIONS,
+    "vital-statistics": VITAL_STATISTICS_DEFINITIONS,
+    demographics: DEMOGRAPHICS_DEFINITIONS,
+    "combined-delivery": COMBINED_DELIVERY_DEFINITIONS,
   }[programme];
 }
 const DECIMAL = /^-?\d+(?:\.\d+)?$/;
@@ -34,6 +132,8 @@ function check(ok, message) {
 export function validateExpansion(bundle) {
   const definitions = reviewedDefinitions(bundle);
   const keys = definitions.map((d) => d.indicator_key);
+  const morbidity = bundle.programme_set?.startsWith("morbidity-");
+  const byKey = new Map(definitions.map((d) => [d.indicator_key, d]));
   check(
     bundle.format === "bhw-fhsis-expansion-v1" && bundle.dataset_slug === "fhsis-2025",
     "Wrong expansion format/dataset",
@@ -44,7 +144,7 @@ export function validateExpansion(bundle) {
   );
   check(/^\d{4}-\d{2}-\d{2}$/.test(bundle.retrieved), "Invalid retrieval date");
   const sources = new Map(bundle.sources.map((s) => [s.file, s]));
-  const expectedSources = new Set(definitions.map((d) => d.source_workbook));
+  const expectedSources = new Set(definitions.flatMap((d) => definitionSources(d, morbidity)));
   check(
     sources.size === expectedSources.size &&
       sources.size === bundle.sources.length &&
@@ -53,12 +153,22 @@ export function validateExpansion(bundle) {
   );
   const geos = new Map(bundle.geographies.map((g) => [g.geo_code, g]));
   check(geos.size === bundle.geographies.length, "Duplicate geography");
+  const morbidityBreakdowns = new Set([
+    "total",
+    "male",
+    "female",
+    ...MORBIDITY_AGES.flatMap((age) =>
+      ["male", "female", "total"].map((sex) => `age:${age}:${sex}`),
+    ),
+  ]);
   const seen = new Set(),
     national = new Set();
   for (const row of bundle.indicators) {
-    const definition = definitions.find((d) => d.indicator_key === row.indicator_key);
+    const definition = byKey.get(row.indicator_key);
     check(
-      definition && definition.source_workbook === row.source_file && sources.has(row.source_file),
+      definition &&
+        definitionSources(definition, morbidity).includes(row.source_file) &&
+        sources.has(row.source_file),
       "Unexpected indicator/source",
     );
     const geo = geos.get(row.geo_code);
@@ -69,7 +179,9 @@ export function validateExpansion(bundle) {
       "Invalid geography",
     );
     check(
-      ["total", "male", "female", "10-14", "15-19", "20-49"].includes(row.breakdown),
+      morbidity
+        ? morbidityBreakdowns.has(row.breakdown)
+        : ["total", "male", "female", "10-14", "15-19", "20-49"].includes(row.breakdown),
       "Unexpected breakdown",
     );
     check(
@@ -86,6 +198,18 @@ export function validateExpansion(bundle) {
             Number.isFinite(Number(row[col]))),
         "Invalid numeric source value",
       );
+    if (bundle.programme_set === "oral-maternal") {
+      check(
+        row.source_sheet === "Annual" &&
+          ["total", "10-14", "15-19", "20-49"].includes(row.breakdown) &&
+          row.denominator_exact === null &&
+          row.rate_pct === null &&
+          row.numerator_exact !== null &&
+          Number.isInteger(Number(row.numerator_exact)) &&
+          Number(row.numerator_exact) >= 0,
+        "Pregnant oral measures require annual age counts only",
+      );
+    }
     check(
       row.numerator_exact !== null || row.rate_pct !== null,
       "Denominator alone is not a report",
@@ -97,11 +221,37 @@ export function validateExpansion(bundle) {
           Number(row.rate_pct) > 100),
       "Incorrect excess-coverage flag",
     );
+    if (morbidity) {
+      check(
+        row.source_sheet === "Data" &&
+          row.source_file ===
+            definition.source_workbook.replace(
+              "_Region_",
+              ["national", "region"].includes(row.geo_level) ? "_Region_" : "_Province_",
+            ),
+        "Wrong morbidity source grain",
+      );
+      check(
+        row.numerator_exact !== null &&
+          Number(row.numerator_exact) >= 0 &&
+          Number.isSafeInteger(Number(row.numerator_exact)),
+        "Invalid morbidity count",
+      );
+      check(
+        row.breakdown === "total" || (row.denominator_exact === null && row.rate_pct === null),
+        "Morbidity breakdowns are counts only",
+      );
+    }
     const key = JSON.stringify([row.geo_code, row.indicator_key, row.breakdown]);
     check(!seen.has(key), "Duplicate fact key");
     seen.add(key);
     if (row.geo_code === "PH" && row.breakdown === "total") national.add(row.indicator_key);
   }
+  if (morbidity)
+    check(
+      seen.size === geos.size * keys.length * morbidityBreakdowns.size,
+      "Incomplete morbidity age/sex grid",
+    );
   check(national.size === keys.length, "Incomplete national checkpoints");
   check(
     bundle.qa.indicator_rows === bundle.indicators.length && bundle.qa.definitions === keys.length,
@@ -168,17 +318,21 @@ export async function loadExpansion(client, bundle, sha256, { apply = false } = 
       SELECT * FROM jsonb_to_recordset($1::jsonb) AS d(indicator_key text,program_area text,label text,numerator_def text,denominator_def text,unit text,source_workbook text,uuc_criterion_d boolean)`,
       [JSON.stringify(definitions)],
     );
-    const inserted = await client.query(
-      `INSERT INTO public.fact_fhsis_indicator
+    let insertedCount = 0;
+    for (let offset = 0; offset < bundle.indicators.length; offset += 5000) {
+      const inserted = await client.query(
+        `INSERT INTO public.fact_fhsis_indicator
       (dataset_id,geo_code,geo_level,indicator_key,breakdown,numerator,denominator,numerator_exact,denominator_exact,rate_pct,over_100,source_psgc,source_area_name)
       SELECT $1,geo_code,geo_level::public.geo_level_enum,indicator_key,breakdown,
       CASE WHEN numerator_exact=trunc(numerator_exact) AND numerator_exact BETWEEN -2147483648 AND 2147483647 THEN numerator_exact::integer END,
       CASE WHEN denominator_exact=trunc(denominator_exact) AND denominator_exact BETWEEN -2147483648 AND 2147483647 THEN denominator_exact::integer END,
       numerator_exact,denominator_exact,rate_pct,over_100,source_psgc,source_area_name
       FROM jsonb_to_recordset($2::jsonb) AS s(geo_code text,geo_level text,indicator_key text,breakdown text,numerator_exact numeric,denominator_exact numeric,rate_pct numeric,over_100 boolean,source_psgc text,source_area_name text)`,
-      [id, JSON.stringify(bundle.indicators)],
-    );
-    check(inserted.rowCount === bundle.indicators.length, "Inserted count differs from package");
+        [id, JSON.stringify(bundle.indicators.slice(offset, offset + 5000))],
+      );
+      insertedCount += inserted.rowCount;
+    }
+    check(insertedCount === bundle.indicators.length, "Inserted count differs from package");
     await client.query(
       "UPDATE public.dim_dataset SET version=$1,last_updated_at=now() WHERE dataset_id=$2",
       [`expanded-retrieved-${bundle.retrieved}`, id],
@@ -194,7 +348,7 @@ export async function loadExpansion(client, bundle, sha256, { apply = false } = 
         `INSERT INTO public.ingestion_batches(finished_at,source_file,row_counts,qa_report) VALUES(now(),$1,$2::jsonb,$3::jsonb)`,
         [
           `fhsis-expansion.json sha256:${sha256}`,
-          JSON.stringify({ added_indicators: inserted.rowCount, added_definitions: keys.length }),
+          JSON.stringify({ added_indicators: insertedCount, added_definitions: keys.length }),
           JSON.stringify({
             ...bundle.qa,
             sha256,
@@ -209,7 +363,7 @@ export async function loadExpansion(client, bundle, sha256, { apply = false } = 
       dataset_id: id,
       sha256,
       before,
-      added_indicators: inserted.rowCount,
+      added_indicators: insertedCount,
       added_definitions: keys.length,
       checkpoints,
     };

@@ -1,0 +1,12 @@
+[
+  {
+    "code": "birth_combined_vaginal_caesarean",
+    "program_area": "maternal",
+    "label": "Combined vaginal–caesarean deliveries",
+    "numerator_def": "Combined vaginal–caesarean deliveries",
+    "denominator_def": "Total deliveries; source Excel percentage fraction converted to percent by multiplying by 100",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1. Total Deliveries, SHP, FBD, Delivery Type, Delivery Outcome_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  }
+]

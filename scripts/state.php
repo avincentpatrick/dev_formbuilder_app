@@ -45,6 +45,8 @@ declare(strict_types=1);
  * never a document containing a guessed field.
  */
 
+require_once __DIR__.'/next-section.php';
+
 const CLAIM_FILES = ['a' => 'docs/claims/lane-a.md', 'b' => 'docs/claims/lane-b.md'];
 const TRACKER = 'PROGRESS.md';
 const IMPERATIVES = 'CLAUDE.md';
@@ -1037,8 +1039,7 @@ function derive_testing_gate(): array
         'waiting' => null,
         'held' => null,
         'waiting_ids' => [],
-        'next_tier' => null,
-        'next' => [],
+        'next' => parse_next_section([]),
         // ⛔ NULL, NOT FALSE, AND THE DIFFERENCE IS THE WHOLE GUARD (M99). `false` would mean "measured,
         //    and not yet sent"; `null` means "could not measure", which happens against a pipeline
         //    document written before this line existed. The imperative below fires only on an explicit
@@ -1083,35 +1084,9 @@ function derive_testing_gate(): array
             : null;
     }
 
-    // The Next section has a FIXED shape, so it is read positionally: a `From **<tier>**` line, then one
-    // `- `<id>` — …` line per row, until the next level-two heading. Anything else in it is prose.
-    $inNext = false;
-
-    foreach (lines($body) as $candidate) {
-        if (str_starts_with($candidate, '## ')) {
-            if ($inNext) {
-                break;
-            }
-
-            $inNext = $candidate === '## Next';
-
-            continue;
-        }
-
-        if (! $inNext) {
-            continue;
-        }
-
-        if ($out['next_tier'] === null && preg_match('/^From \*\*([a-z-]+)\*\*/u', $candidate, $t) === 1) {
-            $out['next_tier'] = $t[1];
-
-            continue;
-        }
-
-        if (preg_match('/^- `([^`]+)` — /u', $candidate, $r) === 1) {
-            $out['next'][] = $r[1];
-        }
-    }
+    // ⛔ THE CLASS TRAVELS WITH THE ID (M215, `R-98b2d568`). A flat list of ids here is what put blocked rows
+    //    under "take work from" in every report and in the hand-off. See scripts/next-section.php.
+    $out['next'] = parse_next_section(lines($body));
 
     return $out;
 }
@@ -1497,9 +1472,15 @@ function render_testing_gate(array $gate): void
         info('waiting on you', implode(', ', $gate['waiting_ids']).' — answered on the Decision Board');
     }
 
-    info('next work', $gate['next_tier'] === null
-        ? '(the pipeline lists none)'
-        : $gate['next_tier'].' — '.implode(', ', $gate['next']));
+    foreach (next_section_rows($gate['next']) as $label => $value) {
+        info($label, $value);
+    }
+
+    $unreadable = next_section_unreadable($gate['next']);
+
+    if ($unreadable !== null) {
+        warn($unreadable);
+    }
 
     // ⛔ KEYED ON THE NOTIFIED FACT, NOT ON THE ZERO ALONE (M99). This is an IMPERATIVE — it tells the
     //    reader to send something now — and it used to fire on every run from the moment the tier

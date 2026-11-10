@@ -1,0 +1,692 @@
+[
+  {
+    "code": "vax_pentavalent1_0_12m",
+    "program_area": "immunization",
+    "label": "PENTAVALENT dose 1, 0–12 months",
+    "numerator_def": "PENTAVALENT dose 1, 0–12 months",
+    "denominator_def": "Projected population aged 0–12 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4 DPT-HiB-HepB_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_pentavalent2_0_12m",
+    "program_area": "immunization",
+    "label": "PENTAVALENT dose 2, 0–12 months",
+    "numerator_def": "PENTAVALENT dose 2, 0–12 months",
+    "denominator_def": "Projected population aged 0–12 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4 DPT-HiB-HepB_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_pentavalent3_0_12m",
+    "program_area": "immunization",
+    "label": "PENTAVALENT dose 3, 0–12 months",
+    "numerator_def": "PENTAVALENT dose 3, 0–12 months",
+    "denominator_def": "Projected population aged 0–12 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4 DPT-HiB-HepB_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_pentavalent1_13_23m",
+    "program_area": "immunization",
+    "label": "PENTAVALENT dose 1, 13–23 months",
+    "numerator_def": "PENTAVALENT dose 1, 13–23 months",
+    "denominator_def": "Projected population aged 13–23 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4 DPT-HiB-HepB_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_pentavalent2_13_23m",
+    "program_area": "immunization",
+    "label": "PENTAVALENT dose 2, 13–23 months",
+    "numerator_def": "PENTAVALENT dose 2, 13–23 months",
+    "denominator_def": "Projected population aged 13–23 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4 DPT-HiB-HepB_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_pentavalent3_13_23m",
+    "program_area": "immunization",
+    "label": "PENTAVALENT dose 3, 13–23 months",
+    "numerator_def": "PENTAVALENT dose 3, 13–23 months",
+    "denominator_def": "Projected population aged 13–23 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4 DPT-HiB-HepB_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_opv1_0_12m",
+    "program_area": "immunization",
+    "label": "OPV dose 1, 0–12 months",
+    "numerator_def": "OPV dose 1, 0–12 months",
+    "denominator_def": "Projected population aged 0–12 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "5 OPV 123_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_opv2_0_12m",
+    "program_area": "immunization",
+    "label": "OPV dose 2, 0–12 months",
+    "numerator_def": "OPV dose 2, 0–12 months",
+    "denominator_def": "Projected population aged 0–12 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "5 OPV 123_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_opv3_0_12m",
+    "program_area": "immunization",
+    "label": "OPV dose 3, 0–12 months",
+    "numerator_def": "OPV dose 3, 0–12 months",
+    "denominator_def": "Projected population aged 0–12 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "5 OPV 123_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_opv1_13_23m",
+    "program_area": "immunization",
+    "label": "OPV dose 1, 13–23 months",
+    "numerator_def": "OPV dose 1, 13–23 months",
+    "denominator_def": "Projected population aged 13–23 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "5 OPV 123_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_opv2_13_23m",
+    "program_area": "immunization",
+    "label": "OPV dose 2, 13–23 months",
+    "numerator_def": "OPV dose 2, 13–23 months",
+    "denominator_def": "Projected population aged 13–23 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "5 OPV 123_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_opv3_13_23m",
+    "program_area": "immunization",
+    "label": "OPV dose 3, 13–23 months",
+    "numerator_def": "OPV dose 3, 13–23 months",
+    "denominator_def": "Projected population aged 13–23 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "5 OPV 123_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_ipv1_0_12m",
+    "program_area": "immunization",
+    "label": "IPV dose 1, 0–12 months",
+    "numerator_def": "IPV dose 1, 0–12 months",
+    "denominator_def": "Projected population aged 0–12 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "6 IPV1 and 2_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_ipv2_0_12m",
+    "program_area": "immunization",
+    "label": "IPV dose 2, 0–12 months",
+    "numerator_def": "IPV dose 2, 0–12 months",
+    "denominator_def": "Projected population aged 0–12 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "6 IPV1 and 2_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_ipv1_13_23m",
+    "program_area": "immunization",
+    "label": "IPV dose 1, 13–23 months",
+    "numerator_def": "IPV dose 1, 13–23 months",
+    "denominator_def": "Projected population aged 13–23 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "6 IPV1 and 2_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_ipv2_13_23m",
+    "program_area": "immunization",
+    "label": "IPV dose 2, 13–23 months",
+    "numerator_def": "IPV dose 2, 13–23 months",
+    "denominator_def": "Projected population aged 13–23 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "6 IPV1 and 2_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_pcv1_0_12m",
+    "program_area": "immunization",
+    "label": "PCV dose 1, 0–12 months",
+    "numerator_def": "PCV dose 1, 0–12 months",
+    "denominator_def": "Projected population aged 0–12 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "7 PCV_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_pcv2_0_12m",
+    "program_area": "immunization",
+    "label": "PCV dose 2, 0–12 months",
+    "numerator_def": "PCV dose 2, 0–12 months",
+    "denominator_def": "Projected population aged 0–12 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "7 PCV_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_pcv3_0_12m",
+    "program_area": "immunization",
+    "label": "PCV dose 3, 0–12 months",
+    "numerator_def": "PCV dose 3, 0–12 months",
+    "denominator_def": "Projected population aged 0–12 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "7 PCV_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_pcv1_13_23m",
+    "program_area": "immunization",
+    "label": "PCV dose 1, 13–23 months",
+    "numerator_def": "PCV dose 1, 13–23 months",
+    "denominator_def": "Projected population aged 13–23 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "7 PCV_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_pcv2_13_23m",
+    "program_area": "immunization",
+    "label": "PCV dose 2, 13–23 months",
+    "numerator_def": "PCV dose 2, 13–23 months",
+    "denominator_def": "Projected population aged 13–23 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "7 PCV_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_pcv3_13_23m",
+    "program_area": "immunization",
+    "label": "PCV dose 3, 13–23 months",
+    "numerator_def": "PCV dose 3, 13–23 months",
+    "denominator_def": "Projected population aged 13–23 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "7 PCV_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_mmr1_0_12m",
+    "program_area": "immunization",
+    "label": "MMR dose 1, 0–12 months",
+    "numerator_def": "MMR dose 1, 0–12 months",
+    "denominator_def": "Projected population aged 0–12 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "8 MMR_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_mmr2_0_12m",
+    "program_area": "immunization",
+    "label": "MMR dose 2, 0–12 months",
+    "numerator_def": "MMR dose 2, 0–12 months",
+    "denominator_def": "Projected population aged 0–12 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "8 MMR_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_mmr1_13_23m",
+    "program_area": "immunization",
+    "label": "MMR dose 1, 13–23 months",
+    "numerator_def": "MMR dose 1, 13–23 months",
+    "denominator_def": "Projected population aged 13–23 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "8 MMR_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_mmr2_13_23m",
+    "program_area": "immunization",
+    "label": "MMR dose 2, 13–23 months",
+    "numerator_def": "MMR dose 2, 13–23 months",
+    "denominator_def": "Projected population aged 13–23 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "8 MMR_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_bcg_0_28d",
+    "program_area": "immunization",
+    "label": "BCG within 0–28 days",
+    "numerator_def": "BCG within 0–28 days",
+    "denominator_def": "Projected population aged 0–12 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1 2 3 CPAB, BCG, HepaB1_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_bcg_29d_1y",
+    "program_area": "immunization",
+    "label": "BCG at 29 days–1 year",
+    "numerator_def": "BCG at 29 days–1 year",
+    "denominator_def": "Projected population aged 0–12 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1 2 3 CPAB, BCG, HepaB1_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_hepb_birth",
+    "program_area": "immunization",
+    "label": "Hepatitis B within 24 hours of birth",
+    "numerator_def": "Hepatitis B within 24 hours of birth",
+    "denominator_def": "Projected population aged 0–12 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1 2 3 CPAB, BCG, HepaB1_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_hepb_late",
+    "program_area": "immunization",
+    "label": "Hepatitis B after 24 hours up to 14 days",
+    "numerator_def": "Hepatitis B after 24 hours up to 14 days",
+    "denominator_def": "Projected population aged 0–12 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1 2 3 CPAB, BCG, HepaB1_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "vax_cpab",
+    "program_area": "immunization",
+    "label": "Children protected at birth",
+    "numerator_def": "Children protected at birth",
+    "denominator_def": "Projected population aged 0–11 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1 2 3 CPAB, BCG, HepaB1_MunCity EB 2025_FInal Annual 2025_NF.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "pnc2",
+    "program_area": "maternal",
+    "label": "Women and newborns completing at least two postpartum check-ups",
+    "numerator_def": "Women and newborns completing at least two postpartum check-ups",
+    "denominator_def": "Source-reported total deliveries (age-specific for age breakdowns)",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "2. 2PNC_2025_EB_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "pnc4",
+    "program_area": "maternal",
+    "label": "Women and newborns completing at least four postnatal visits",
+    "numerator_def": "Women and newborns completing at least four postnatal visits",
+    "denominator_def": "Women who delivered and were tracked, including transfers in minus transfers out (age-specific for age breakdowns)",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1. 4PNC_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "birth_deliveries",
+    "program_area": "maternal",
+    "label": "Total deliveries",
+    "numerator_def": "Total deliveries",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "1. Total Deliveries, SHP, FBD, Delivery Type, Delivery Outcome_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "birth_shp",
+    "program_area": "maternal",
+    "label": "Deliveries attended by skilled health professionals",
+    "numerator_def": "Deliveries attended by skilled health professionals",
+    "denominator_def": "Total deliveries",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1. Total Deliveries, SHP, FBD, Delivery Type, Delivery Outcome_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": true
+  },
+  {
+    "code": "birth_shp_physician",
+    "program_area": "maternal",
+    "label": "Deliveries attended by physicians",
+    "numerator_def": "Deliveries attended by physicians",
+    "denominator_def": "Total deliveries",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1. Total Deliveries, SHP, FBD, Delivery Type, Delivery Outcome_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "birth_shp_nurse",
+    "program_area": "maternal",
+    "label": "Deliveries attended by nurses",
+    "numerator_def": "Deliveries attended by nurses",
+    "denominator_def": "Total deliveries",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1. Total Deliveries, SHP, FBD, Delivery Type, Delivery Outcome_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "birth_shp_midwife",
+    "program_area": "maternal",
+    "label": "Deliveries attended by midwives",
+    "numerator_def": "Deliveries attended by midwives",
+    "denominator_def": "Total deliveries",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1. Total Deliveries, SHP, FBD, Delivery Type, Delivery Outcome_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "birth_facility",
+    "program_area": "maternal",
+    "label": "Facility-based deliveries",
+    "numerator_def": "Facility-based deliveries",
+    "denominator_def": "Total deliveries",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1. Total Deliveries, SHP, FBD, Delivery Type, Delivery Outcome_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "birth_facility_public",
+    "program_area": "maternal",
+    "label": "Deliveries in public facilities",
+    "numerator_def": "Deliveries in public facilities",
+    "denominator_def": "Total deliveries",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1. Total Deliveries, SHP, FBD, Delivery Type, Delivery Outcome_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "birth_facility_private",
+    "program_area": "maternal",
+    "label": "Deliveries in private facilities",
+    "numerator_def": "Deliveries in private facilities",
+    "denominator_def": "Total deliveries",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1. Total Deliveries, SHP, FBD, Delivery Type, Delivery Outcome_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "birth_vaginal",
+    "program_area": "maternal",
+    "label": "Vaginal deliveries",
+    "numerator_def": "Vaginal deliveries",
+    "denominator_def": "Total deliveries",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1. Total Deliveries, SHP, FBD, Delivery Type, Delivery Outcome_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "birth_caesarean",
+    "program_area": "maternal",
+    "label": "Caesarean deliveries",
+    "numerator_def": "Caesarean deliveries",
+    "denominator_def": "Total deliveries",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1. Total Deliveries, SHP, FBD, Delivery Type, Delivery Outcome_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "birth_full_term",
+    "program_area": "maternal",
+    "label": "Full-term deliveries",
+    "numerator_def": "Full-term deliveries",
+    "denominator_def": "Total deliveries",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1. Total Deliveries, SHP, FBD, Delivery Type, Delivery Outcome_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "birth_preterm",
+    "program_area": "maternal",
+    "label": "Preterm deliveries",
+    "numerator_def": "Preterm deliveries",
+    "denominator_def": "Total deliveries",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1. Total Deliveries, SHP, FBD, Delivery Type, Delivery Outcome_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "birth_fetal_death",
+    "program_area": "maternal",
+    "label": "Fetal deaths",
+    "numerator_def": "Fetal deaths",
+    "denominator_def": "Total deliveries",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1. Total Deliveries, SHP, FBD, Delivery Type, Delivery Outcome_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "birth_normal_weight",
+    "program_area": "maternal",
+    "label": "Live births weighing at least 2,500 g",
+    "numerator_def": "Live births weighing at least 2,500 g",
+    "denominator_def": "Total live births",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "2. Birth weight_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "birth_low_weight",
+    "program_area": "maternal",
+    "label": "Live births weighing below 2,500 g",
+    "numerator_def": "Live births weighing below 2,500 g",
+    "denominator_def": "Total live births",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "2. Birth weight_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "birth_unknown_weight",
+    "program_area": "maternal",
+    "label": "Live births with unknown birth weight",
+    "numerator_def": "Live births with unknown birth weight",
+    "denominator_def": "Total live births",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "2. Birth weight_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "nutrition_early_bf",
+    "program_area": "nutrition",
+    "label": "Breastfeeding initiated within one hour of birth",
+    "numerator_def": "Breastfeeding initiated within one hour of birth",
+    "denominator_def": "Live births",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1 Breastfeeding and LBW_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "nutrition_lbw_iron",
+    "program_area": "nutrition",
+    "label": "Preterm or low-birth-weight infants given iron",
+    "numerator_def": "Preterm or low-birth-weight infants given iron",
+    "denominator_def": "Low-birth-weight infants in the source workbook",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1 Breastfeeding and LBW_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "nutrition_vitamin_a_6_11m",
+    "program_area": "nutrition",
+    "label": "Vitamin A supplementation, 6–11 months",
+    "numerator_def": "Vitamin A supplementation, 6–11 months",
+    "denominator_def": "Projected population aged 6–11 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "2 3 Vitamin A supplementation_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "nutrition_vitamin_a_12_59m",
+    "program_area": "nutrition",
+    "label": "Vitamin A supplementation, 12–59 months",
+    "numerator_def": "Vitamin A supplementation, 12–59 months",
+    "denominator_def": "Projected population aged 12–59 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "2 3 Vitamin A supplementation_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "nutrition_mnp_6_11m",
+    "program_area": "nutrition",
+    "label": "Micronutrient powder supplementation, 6–11 months",
+    "numerator_def": "Micronutrient powder supplementation, 6–11 months",
+    "denominator_def": "Projected population aged 6–11 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4 MNP_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "nutrition_mnp_12_23m",
+    "program_area": "nutrition",
+    "label": "Micronutrient powder supplementation, 12–23 months",
+    "numerator_def": "Micronutrient powder supplementation, 12–23 months",
+    "denominator_def": "Projected population aged 12–23 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4 MNP_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "nutrition_lns_6_11m",
+    "program_area": "nutrition",
+    "label": "Small-quantity lipid-based nutrient supplementation, 6–11 months",
+    "numerator_def": "Small-quantity lipid-based nutrient supplementation, 6–11 months",
+    "denominator_def": "Projected population aged 6–11 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "5 LNS-SQ_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "nutrition_lns_12_23m",
+    "program_area": "nutrition",
+    "label": "Small-quantity lipid-based nutrient supplementation, 12–23 months",
+    "numerator_def": "Small-quantity lipid-based nutrient supplementation, 12–23 months",
+    "denominator_def": "Projected population aged 12–23 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "5 LNS-SQ_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "nutrition_mam_identified",
+    "program_area": "nutrition",
+    "label": "MAM: identified (supplementary feeding), 0–59 months",
+    "numerator_def": "MAM: identified (supplementary feeding), 0–59 months",
+    "denominator_def": "Children aged 0–59 months seen at health facilities",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "6-10 Nutritional Status, MAM-SFP, SAM-OTC_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "nutrition_mam_enrolled",
+    "program_area": "nutrition",
+    "label": "MAM: enrolled/admitted (supplementary feeding), 0–59 months",
+    "numerator_def": "MAM: enrolled/admitted (supplementary feeding), 0–59 months",
+    "denominator_def": "Children identified with MAM",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "6-10 Nutritional Status, MAM-SFP, SAM-OTC_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "nutrition_mam_cured",
+    "program_area": "nutrition",
+    "label": "MAM: cured (supplementary feeding), 0–59 months",
+    "numerator_def": "MAM: cured (supplementary feeding), 0–59 months",
+    "denominator_def": "Children with MAM enrolled in supplementary feeding",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "6-10 Nutritional Status, MAM-SFP, SAM-OTC_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "nutrition_mam_noncured",
+    "program_area": "nutrition",
+    "label": "MAM: not cured (supplementary feeding), 0–59 months",
+    "numerator_def": "MAM: not cured (supplementary feeding), 0–59 months",
+    "denominator_def": "Children with MAM enrolled in supplementary feeding",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "6-10 Nutritional Status, MAM-SFP, SAM-OTC_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "nutrition_mam_defaulted",
+    "program_area": "nutrition",
+    "label": "MAM: defaulted (supplementary feeding), 0–59 months",
+    "numerator_def": "MAM: defaulted (supplementary feeding), 0–59 months",
+    "denominator_def": "Children with MAM enrolled in supplementary feeding",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "6-10 Nutritional Status, MAM-SFP, SAM-OTC_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "nutrition_mam_died",
+    "program_area": "nutrition",
+    "label": "MAM: died (supplementary feeding), 0–59 months",
+    "numerator_def": "MAM: died (supplementary feeding), 0–59 months",
+    "denominator_def": "Children with MAM enrolled in supplementary feeding",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "6-10 Nutritional Status, MAM-SFP, SAM-OTC_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "nutrition_sam_identified",
+    "program_area": "nutrition",
+    "label": "SAM: identified (outpatient therapeutic care), 0–59 months",
+    "numerator_def": "SAM: identified (outpatient therapeutic care), 0–59 months",
+    "denominator_def": "Children aged 0–59 months seen at health facilities",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "6-10 Nutritional Status, MAM-SFP, SAM-OTC_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "nutrition_sam_enrolled",
+    "program_area": "nutrition",
+    "label": "SAM: enrolled/admitted (outpatient therapeutic care), 0–59 months",
+    "numerator_def": "SAM: enrolled/admitted (outpatient therapeutic care), 0–59 months",
+    "denominator_def": "Children identified with SAM",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "6-10 Nutritional Status, MAM-SFP, SAM-OTC_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "nutrition_sam_cured",
+    "program_area": "nutrition",
+    "label": "SAM: cured (outpatient therapeutic care), 0–59 months",
+    "numerator_def": "SAM: cured (outpatient therapeutic care), 0–59 months",
+    "denominator_def": "Children with SAM enrolled in outpatient therapeutic care",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "6-10 Nutritional Status, MAM-SFP, SAM-OTC_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "nutrition_sam_noncured",
+    "program_area": "nutrition",
+    "label": "SAM: not cured (outpatient therapeutic care), 0–59 months",
+    "numerator_def": "SAM: not cured (outpatient therapeutic care), 0–59 months",
+    "denominator_def": "Children with SAM enrolled in outpatient therapeutic care",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "6-10 Nutritional Status, MAM-SFP, SAM-OTC_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "nutrition_sam_defaulted",
+    "program_area": "nutrition",
+    "label": "SAM: defaulted (outpatient therapeutic care), 0–59 months",
+    "numerator_def": "SAM: defaulted (outpatient therapeutic care), 0–59 months",
+    "denominator_def": "Children with SAM enrolled in outpatient therapeutic care",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "6-10 Nutritional Status, MAM-SFP, SAM-OTC_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "nutrition_sam_died",
+    "program_area": "nutrition",
+    "label": "SAM: died (outpatient therapeutic care), 0–59 months",
+    "numerator_def": "SAM: died (outpatient therapeutic care), 0–59 months",
+    "denominator_def": "Children with SAM enrolled in outpatient therapeutic care",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "6-10 Nutritional Status, MAM-SFP, SAM-OTC_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  }
+]

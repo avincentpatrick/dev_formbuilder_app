@@ -1,0 +1,122 @@
+[
+  {
+    "code": "school_td_grade1",
+    "program_area": "immunization",
+    "label": "Grade 1 learners given one dose of TD vaccine",
+    "numerator_def": "Grade 1 learners given one dose of TD vaccine",
+    "denominator_def": "Enrolled Grade 1 learners",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "11 Grade 1-7_given Td_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "school_td_grade7",
+    "program_area": "immunization",
+    "label": "Grade 7 learners given one dose of TD vaccine",
+    "numerator_def": "Grade 7 learners given one dose of TD vaccine",
+    "denominator_def": "Enrolled Grade 7 learners",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "11 Grade 1-7_given Td_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "school_mr_grade1",
+    "program_area": "immunization",
+    "label": "Grade 1 learners given one dose of MR vaccine",
+    "numerator_def": "Grade 1 learners given one dose of MR vaccine",
+    "denominator_def": "Enrolled Grade 1 learners",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "12 Grade 1-7_given MR_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "school_mr_grade7",
+    "program_area": "immunization",
+    "label": "Grade 7 learners given one dose of MR vaccine",
+    "numerator_def": "Grade 7 learners given one dose of MR vaccine",
+    "denominator_def": "Enrolled Grade 7 learners",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "12 Grade 1-7_given MR_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "school_hpv1",
+    "program_area": "immunization",
+    "label": "HPV dose 1, 9-year-old females",
+    "numerator_def": "HPV dose 1, 9-year-old females",
+    "denominator_def": "Projected population of 9-year-old females",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "13 9 year old given HPV_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "school_hpv2",
+    "program_area": "immunization",
+    "label": "HPV dose 2, 9-year-old females",
+    "numerator_def": "HPV dose 2, 9-year-old females",
+    "denominator_def": "Projected population of 9-year-old females",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "13 9 year old given HPV_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "child_sick_vita_6_11m",
+    "program_area": "nutrition",
+    "label": "High-risk sick children given vitamin A, 6–11 months",
+    "numerator_def": "High-risk sick children given vitamin A, 6–11 months",
+    "denominator_def": "Sick children aged 6–11 months seen (sex-specific for breakdowns)",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1 Sick Received Vitamin A_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "child_sick_vita_12_59m",
+    "program_area": "nutrition",
+    "label": "High-risk sick children given vitamin A, 12–59 months",
+    "numerator_def": "High-risk sick children given vitamin A, 12–59 months",
+    "denominator_def": "Sick children aged 12–59 months seen (sex-specific for breakdowns)",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1 Sick Received Vitamin A_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "child_ors",
+    "program_area": "child_health",
+    "label": "Diarrhea cases given ORS, 0–59 months",
+    "numerator_def": "Diarrhea cases given ORS, 0–59 months",
+    "denominator_def": "Diarrhea cases aged 0–59 months seen (sex-specific where available)",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "2 3 Diarrhea and Pneumonia Received Treatment_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "child_ors_zinc",
+    "program_area": "child_health",
+    "label": "Diarrhea cases given ORS with zinc, 0–59 months",
+    "numerator_def": "Diarrhea cases given ORS with zinc, 0–59 months",
+    "denominator_def": "Diarrhea cases aged 0–59 months seen (sex-specific where available)",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "2 3 Diarrhea and Pneumonia Received Treatment_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "child_diarrhea_treated",
+    "program_area": "child_health",
+    "label": "Diarrhea treatment total reported by source, 0–59 months",
+    "numerator_def": "Diarrhea treatment total reported by source, 0–59 months",
+    "denominator_def": "Diarrhea cases aged 0–59 months seen (sex-specific where available)",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "2 3 Diarrhea and Pneumonia Received Treatment_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "child_pneumonia_abx",
+    "program_area": "child_health",
+    "label": "Pneumonia cases given antibiotics, 0–59 months",
+    "numerator_def": "Pneumonia cases given antibiotics, 0–59 months",
+    "denominator_def": "Pneumonia cases aged 0–59 months seen (sex-specific where available)",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "2 3 Diarrhea and Pneumonia Received Treatment_EB 2025_Annual 2025.xlsx",
+    "uuc_criterion_d": false
+  }
+]

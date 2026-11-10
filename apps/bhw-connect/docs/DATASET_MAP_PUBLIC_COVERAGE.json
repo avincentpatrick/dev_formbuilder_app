@@ -1,0 +1,768 @@
+{
+  "scope": "Explicit public API samples with dated follow-ups, not full-country detailed validation. No observation values included.",
+  "reports": [
+    {
+      "measuredAt": "2026-11-08T08:57:34.101Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "uuc-phc-2025",
+        "indicator": "uuc.listed",
+        "period": "2025",
+        "level": "national",
+        "code": "PH"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "2d2eceb209afbf26e11f491f948af2be857f9f95df744ad3bf35708db1649519",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Health (DOH) Bureau of Local Health Systems Development \u2014 2025 list of Unserved and Underserved Communities for Primary Health Care (DC No. 2025-0549), criteria per DOH AO No. 2020-0023",
+        "date": "2025-01-01",
+        "license": null
+      },
+      "coverage": {
+        "rows": 18,
+        "reportedRows": 18,
+        "zeroRows": 1,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "42b4d13ed6b97d4cf22dee07f9019eea4d820b3163f31e5d3bf0a371094762f6",
+        "bytes": 534649,
+        "rowsWithGeometry": 18,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T08:58:29.308Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "nhfr-2026-09",
+        "indicator": "nhfr.facilities",
+        "period": "September 2026",
+        "level": "national",
+        "code": "PH"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "c79271745f9ac91dee3938c47dfe09af4508bb9f6fbad1e9d0d672d3e345608d",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Health (DOH) \u2014 National Health Facility Registry, public facility list export from nhfr.doh.gov.ph, snapshot as of September 2026, retrieved 2026-09-05",
+        "date": "2026-09-01",
+        "license": null
+      },
+      "coverage": {
+        "rows": 18,
+        "reportedRows": 18,
+        "zeroRows": 0,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "42b4d13ed6b97d4cf22dee07f9019eea4d820b3163f31e5d3bf0a371094762f6",
+        "bytes": 534649,
+        "rowsWithGeometry": 18,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T08:58:32.887Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "bhw-stepzero-2026",
+        "indicator": "stepzero.population",
+        "period": "2026",
+        "level": "national",
+        "code": "PH"
+      },
+      "httpStatus": 400,
+      "state": "unsupported",
+      "responseSha256": "4d6824ea211cf3374af1c8b20caeb1185ef9cae0869efb7cdf8725db7f143fce",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "coverage": null,
+      "geometry": null,
+      "reason": "Choice is not supported by this deployed API; not evidence of absent source rows."
+    },
+    {
+      "measuredAt": "2026-11-08T08:58:34.266Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "psa-popcen-2024",
+        "indicator": "population.residents",
+        "period": "2024",
+        "level": "national",
+        "code": "PH"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "bc5a6a294119c7ef379c947801979884dd979cd99d3be58e9724cb275f978b42",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Philippine Statistics Authority \u2014 2024 Census of Population (POPCEN 2024)",
+        "date": "2024-07-01",
+        "license": "PSA open data terms (attribution)"
+      },
+      "coverage": {
+        "rows": 18,
+        "reportedRows": 18,
+        "zeroRows": 0,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "42b4d13ed6b97d4cf22dee07f9019eea4d820b3163f31e5d3bf0a371094762f6",
+        "bytes": 534649,
+        "rowsWithGeometry": 18,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T08:58:35.993Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "psa-sae-poverty-2023",
+        "indicator": "poverty.incidence",
+        "period": "2023",
+        "level": "province",
+        "code": "01028"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "dc50921b140236d1e0030da5f50ea253ea5aa5d149cec1b8ab1b64bec6eb566f",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Philippine Statistics Authority \u2014 2023 City- and Municipal-Level Small Area Estimates of Poverty (national government-funded SAE project)",
+        "date": "2023-12-31",
+        "license": "PSA open data terms (attribution)"
+      },
+      "coverage": {
+        "rows": 23,
+        "reportedRows": 23,
+        "zeroRows": 0,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": false
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "ad905e921c966c589492cfb08dd9fc9f1cc4f5842ccd46431a2ab3ee091aa843",
+        "bytes": 15210,
+        "rowsWithGeometry": 23,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T08:58:36.674Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "fhsis-2025",
+        "indicator": "fhsis.fic",
+        "period": "2025",
+        "level": "national",
+        "code": "PH"
+      },
+      "httpStatus": 400,
+      "state": "unsupported",
+      "responseSha256": "4d6824ea211cf3374af1c8b20caeb1185ef9cae0869efb7cdf8725db7f143fce",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "coverage": null,
+      "geometry": null,
+      "reason": "Choice is not supported by this deployed API; not evidence of absent source rows."
+    },
+    {
+      "measuredAt": "2026-11-08T09:42:08.800Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "bhw-stepzero-2026",
+        "indicator": "stepzero.population",
+        "period": "2026",
+        "level": "national",
+        "code": "PH"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "41f3752d85a5234e3cc23fd9f06957048607a78ea86f7f3f6cf36b89b2ce2777",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Health (DOH) BHW Connect StepZero barangay quick-count \u2014 the LGU-reported BHW headcount baseline collected before the 2025 individual profiling exercise (same source initiative as bhw-2025)",
+        "date": "2025-01-01",
+        "license": null
+      },
+      "coverage": {
+        "rows": 18,
+        "reportedRows": 18,
+        "zeroRows": 0,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "42b4d13ed6b97d4cf22dee07f9019eea4d820b3163f31e5d3bf0a371094762f6",
+        "bytes": 534649,
+        "rowsWithGeometry": 18,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T09:42:13.759Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "bhw-stepzero-2026",
+        "indicator": "stepzero.households",
+        "period": "2026",
+        "level": "national",
+        "code": "PH"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "05e9e0c5a542bf7d4621c1dd9dded40fdccc7b3c69666f47fe37a605fc0eed66",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Health (DOH) BHW Connect StepZero barangay quick-count \u2014 the LGU-reported BHW headcount baseline collected before the 2025 individual profiling exercise (same source initiative as bhw-2025)",
+        "date": "2025-01-01",
+        "license": null
+      },
+      "coverage": {
+        "rows": 18,
+        "reportedRows": 18,
+        "zeroRows": 0,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "42b4d13ed6b97d4cf22dee07f9019eea4d820b3163f31e5d3bf0a371094762f6",
+        "bytes": 534649,
+        "rowsWithGeometry": 18,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T13:13:24.661Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "bhw-2025",
+        "indicator": "bhw.profile-accreditation",
+        "period": "2025",
+        "level": "national",
+        "code": "PH"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "80fffe9b7146fa9a12ad86de00798efe66346115373e77c7ef79260307dd2a4d",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Health (DOH) Barangay Health Worker registration/accreditation dataset",
+        "date": "2025-01-01",
+        "license": "CC BY 4.0"
+      },
+      "coverage": {
+        "rows": 18,
+        "reportedRows": 18,
+        "zeroRows": 0,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": false,
+        "hasReportedParentRate": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "42b4d13ed6b97d4cf22dee07f9019eea4d820b3163f31e5d3bf0a371094762f6",
+        "bytes": 534649,
+        "rowsWithGeometry": 18,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T13:13:28.902Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "bhw-2025",
+        "indicator": "bhw.profile-accreditation",
+        "period": "2025",
+        "level": "province",
+        "code": "01028"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "14dbd5278dbe174aaec6073b7662fe282819506c07bffc3877ba90917649e7e8",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Health (DOH) Barangay Health Worker registration/accreditation dataset",
+        "date": "2025-01-01",
+        "license": "CC BY 4.0"
+      },
+      "coverage": {
+        "rows": 23,
+        "reportedRows": 23,
+        "zeroRows": 1,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": false,
+        "hasReportedParentRate": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "ad905e921c966c589492cfb08dd9fc9f1cc4f5842ccd46431a2ab3ee091aa843",
+        "bytes": 15210,
+        "rowsWithGeometry": 23,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T13:13:30.565Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "bhw-stepzero-2026",
+        "indicator": "bhw.declared-accreditation",
+        "period": "2026",
+        "level": "national",
+        "code": "PH"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "3477a5e7a19166b05c36b25ae1c4b1165a5468a6b09ac44c4a20d6268600e59d",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Health (DOH) BHW Connect StepZero barangay quick-count \u2014 the LGU-reported BHW headcount baseline collected before the 2025 individual profiling exercise (same source initiative as bhw-2025)",
+        "date": "2025-01-01",
+        "license": null
+      },
+      "coverage": {
+        "rows": 18,
+        "reportedRows": 18,
+        "zeroRows": 0,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": false,
+        "hasReportedParentRate": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "42b4d13ed6b97d4cf22dee07f9019eea4d820b3163f31e5d3bf0a371094762f6",
+        "bytes": 534649,
+        "rowsWithGeometry": 18,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T13:13:33.099Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "bhw-stepzero-2026",
+        "indicator": "bhw.declared-accreditation",
+        "period": "2026",
+        "level": "province",
+        "code": "01028"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "3719654b0faddbcdb03c7cff4423fe940a17eb459a8ab1cbc42170df5b425214",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Health (DOH) BHW Connect StepZero barangay quick-count \u2014 the LGU-reported BHW headcount baseline collected before the 2025 individual profiling exercise (same source initiative as bhw-2025)",
+        "date": "2025-01-01",
+        "license": null
+      },
+      "coverage": {
+        "rows": 23,
+        "reportedRows": 23,
+        "zeroRows": 0,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": false,
+        "hasReportedParentRate": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "ad905e921c966c589492cfb08dd9fc9f1cc4f5842ccd46431a2ab3ee091aa843",
+        "bytes": 15210,
+        "rowsWithGeometry": 23,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T13:13:34.691Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "nhfr-2026-09",
+        "indicator": "nhfr.facilities",
+        "period": "September 2026",
+        "level": "province",
+        "code": "01028"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "6c4392aed68246959e2b8ad214c350d342999a360037f25859d3ae604943e912",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Health (DOH) \u2014 National Health Facility Registry, public facility list export from nhfr.doh.gov.ph, snapshot as of September 2026, retrieved 2026-09-05",
+        "date": "2026-09-01",
+        "license": null
+      },
+      "coverage": {
+        "rows": 23,
+        "reportedRows": 23,
+        "zeroRows": 0,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "ad905e921c966c589492cfb08dd9fc9f1cc4f5842ccd46431a2ab3ee091aa843",
+        "bytes": 15210,
+        "rowsWithGeometry": 23,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T13:13:35.445Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "uuc-phc-2025",
+        "indicator": "uuc.route.health",
+        "period": "2025",
+        "level": "province",
+        "code": "01028"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "ac442b1a7320d15e42baf1b759ca2d9038831eef9d277875ac1ad15444c0fd6b",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Health (DOH) Bureau of Local Health Systems Development \u2014 2025 list of Unserved and Underserved Communities for Primary Health Care (DC No. 2025-0549), criteria per DOH AO No. 2020-0023",
+        "date": "2025-01-01",
+        "license": null
+      },
+      "coverage": {
+        "rows": 23,
+        "reportedRows": 23,
+        "zeroRows": 17,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "ad905e921c966c589492cfb08dd9fc9f1cc4f5842ccd46431a2ab3ee091aa843",
+        "bytes": 15210,
+        "rowsWithGeometry": 23,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T13:13:37.406Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "bhw-2025",
+        "indicator": "bhw.training.basic_life_support",
+        "period": "2025",
+        "level": "national",
+        "code": "PH"
+      },
+      "httpStatus": 400,
+      "state": "unsupported",
+      "responseSha256": "4d6824ea211cf3374af1c8b20caeb1185ef9cae0869efb7cdf8725db7f143fce",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "coverage": null,
+      "geometry": null,
+      "reason": "Choice is not supported by this deployed API; not evidence of absent source rows."
+    },
+    {
+      "measuredAt": "2026-11-08T13:13:52.555Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "lgu-income-class",
+        "indicator": "income-class",
+        "period": "Effective 2025-01-01",
+        "level": "region",
+        "code": "01"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "095e61cd81a3282f84464ce505dd0d3efb4653afb2f0a5fa156141a1d7ebd78f",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Finance (DOF) / Bureau of Local Government Finance (BLGF) \u2014 Department Order No. 074-2024, Schedule of Income Classification (RA 11964), Annex A",
+        "date": "2024-11-05",
+        "license": "Philippine public record (DOF department order); cited with retrieval date"
+      },
+      "coverage": {
+        "rows": 4,
+        "reportedRows": 4,
+        "zeroRows": 0,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": false
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "0b09027ce843490e535a1c7ebc96f3f4fe859be8cb9256abcf7711a0a1a5b1dc",
+        "bytes": 12312,
+        "rowsWithGeometry": 4,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T13:58:49.514Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "bhw-2025",
+        "indicator": "bhw.profile-accreditation",
+        "period": "2025",
+        "level": "national",
+        "code": "PH"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "80fffe9b7146fa9a12ad86de00798efe66346115373e77c7ef79260307dd2a4d",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Health (DOH) Barangay Health Worker registration/accreditation dataset",
+        "date": "2025-01-01",
+        "license": "CC BY 4.0"
+      },
+      "coverage": {
+        "rows": 18,
+        "reportedRows": 18,
+        "zeroRows": 0,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": false,
+        "hasReportedParentRate": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "42b4d13ed6b97d4cf22dee07f9019eea4d820b3163f31e5d3bf0a371094762f6",
+        "bytes": 534649,
+        "rowsWithGeometry": 18,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      },
+      "uncertainty": {
+        "confidenceLevel": 0.95,
+        "rowsWithPublishedInterval": 18,
+        "reportedRowsWithoutInterval": 0,
+        "smallSampleRows": 0,
+        "calculation": "not-recomputed",
+        "sampleThreshold": "not-recomputed-from-source-counts"
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T13:58:52.528Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "bhw-2025",
+        "indicator": "bhw.training.basic_life_support",
+        "period": "2025",
+        "level": "national",
+        "code": "PH"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "cc88c8c54e4893632b1720f8497f74277b1bdbdd4620b0cf0c70b3d13bc112d9",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Health (DOH) Barangay Health Worker registration/accreditation dataset",
+        "date": "2025-01-01",
+        "license": "CC BY 4.0"
+      },
+      "coverage": {
+        "rows": 18,
+        "reportedRows": 18,
+        "zeroRows": 0,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": false,
+        "hasReportedParentRate": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "42b4d13ed6b97d4cf22dee07f9019eea4d820b3163f31e5d3bf0a371094762f6",
+        "bytes": 534649,
+        "rowsWithGeometry": 18,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      },
+      "uncertainty": {
+        "confidenceLevel": 0.95,
+        "rowsWithPublishedInterval": 18,
+        "reportedRowsWithoutInterval": 0,
+        "smallSampleRows": 0,
+        "calculation": "not-recomputed",
+        "sampleThreshold": "not-recomputed-from-source-counts"
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T13:58:54.872Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "bhw-2025",
+        "indicator": "bhw.training.basic_life_support",
+        "period": "2025",
+        "level": "province",
+        "code": "01028"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "78ec122d6d197cf16ae67c1671c1c28b1958117d2ed6bafe44e3d3ab1f74a81f",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Health (DOH) Barangay Health Worker registration/accreditation dataset",
+        "date": "2025-01-01",
+        "license": "CC BY 4.0"
+      },
+      "coverage": {
+        "rows": 23,
+        "reportedRows": 23,
+        "zeroRows": 4,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": false,
+        "hasReportedParentRate": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "ad905e921c966c589492cfb08dd9fc9f1cc4f5842ccd46431a2ab3ee091aa843",
+        "bytes": 15210,
+        "rowsWithGeometry": 23,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      },
+      "uncertainty": {
+        "confidenceLevel": 0.95,
+        "rowsWithPublishedInterval": 23,
+        "reportedRowsWithoutInterval": 0,
+        "smallSampleRows": 2,
+        "calculation": "not-recomputed",
+        "sampleThreshold": "not-recomputed-from-source-counts"
+      }
+    },
+    {
+      "measuredAt": "2026-11-08T13:58:55.850Z",
+      "origin": "https://staging.pitahc.gov.ph",
+      "choice": {
+        "dataset": "bhw-2025",
+        "indicator": "bhw.training.dengue",
+        "period": "2025",
+        "level": "province",
+        "code": "01028"
+      },
+      "httpStatus": 200,
+      "state": "available",
+      "responseSha256": "891c7d51311e640ccebc1ab8b2077f70c1d7ec1aa43d3cf2fb45ec85939d52f5",
+      "observationValuesIncluded": false,
+      "historicalCompatibility": "not-tested",
+      "productionReadiness": "not-certified",
+      "source": {
+        "title": "Department of Health (DOH) Barangay Health Worker registration/accreditation dataset",
+        "date": "2025-01-01",
+        "license": "CC BY 4.0"
+      },
+      "coverage": {
+        "rows": 23,
+        "reportedRows": 23,
+        "zeroRows": 19,
+        "missingOrUnavailableRows": 0,
+        "navigationOnlyRows": 0,
+        "hasReportedParentTotal": false,
+        "hasReportedParentRate": true
+      },
+      "geometry": {
+        "state": "checked",
+        "sha256": "ad905e921c966c589492cfb08dd9fc9f1cc4f5842ccd46431a2ab3ee091aa843",
+        "bytes": 15210,
+        "rowsWithGeometry": 23,
+        "rowsWithoutGeometry": 0,
+        "reportedRowsWithoutGeometry": 0,
+        "note": "Basic polygon/coordinate presence only; topology and rendering are not certified."
+      },
+      "uncertainty": {
+        "confidenceLevel": 0.95,
+        "rowsWithPublishedInterval": 23,
+        "reportedRowsWithoutInterval": 0,
+        "smallSampleRows": 2,
+        "calculation": "not-recomputed",
+        "sampleThreshold": "not-recomputed-from-source-counts"
+      }
+    }
+  ]
+}

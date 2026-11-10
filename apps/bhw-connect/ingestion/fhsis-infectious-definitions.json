@@ -1,0 +1,212 @@
+[
+  {
+    "code": "infect_syphilis_screened",
+    "program_area": "infectious",
+    "label": "Pregnant women screened for Syphilis",
+    "numerator_def": "Pregnant women screened for Syphilis",
+    "denominator_def": "Source projected population under 1 year (proxy denominator for pregnancy screening)",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1 2 Syphilis_EB 2025_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "infect_syphilis_positive",
+    "program_area": "infectious",
+    "label": "Pregnant women Syphilis positive",
+    "numerator_def": "Pregnant women Syphilis positive",
+    "denominator_def": "Pregnant women screened for Syphilis (matching age group for age counts)",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1 2 Syphilis_EB 2025_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "infect_hiv_screened",
+    "program_area": "infectious",
+    "label": "Pregnant women screened for HIV",
+    "numerator_def": "Pregnant women screened for HIV",
+    "denominator_def": "Source projected population under 1 year (proxy denominator for pregnancy screening)",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "3 4 HIV_EB 2025_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "infect_hiv_positive",
+    "program_area": "infectious",
+    "label": "Pregnant women HIV screen-reactive",
+    "numerator_def": "Pregnant women HIV screen-reactive",
+    "denominator_def": "Pregnant women screened for HIV (matching age group for age counts)",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "3 4 HIV_EB 2025_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "infect_deworm_1_4",
+    "program_area": "infectious",
+    "label": "Children aged 1–4 years completing two deworming doses",
+    "numerator_def": "Children aged 1–4 years completing two deworming doses",
+    "denominator_def": "Eligible population aged 1–4 years",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "Annual Tbl 1_4___5_9_yrs_old_EB_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "infect_deworm_5_9",
+    "program_area": "infectious",
+    "label": "Children aged 5–9 years completing two deworming doses",
+    "numerator_def": "Children aged 5–9 years completing two deworming doses",
+    "denominator_def": "Eligible population aged 5–9 years",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "Annual Tbl 1_4___5_9_yrs_old_EB_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "infect_deworm_10_19",
+    "program_area": "infectious",
+    "label": "Adolescents aged 10–19 years completing two deworming doses",
+    "numerator_def": "Adolescents aged 10–19 years completing two deworming doses",
+    "denominator_def": "Eligible population aged 10–19 years",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "Annual Tbl 10_19___20_49_yrs_old_Pregnant_Women_EB_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "infect_deworm_wra",
+    "program_area": "infectious",
+    "label": "Women aged 20–49 years completing two deworming doses",
+    "numerator_def": "Women aged 20–49 years completing two deworming doses",
+    "denominator_def": "Eligible female population aged 20–49 years",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "Annual Tbl 10_19___20_49_yrs_old_Pregnant_Women_EB_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "infect_filaria_positive",
+    "program_area": "infectious",
+    "label": "Lymphatic filariasis positive cases",
+    "numerator_def": "Lymphatic filariasis positive cases",
+    "denominator_def": "Total examined for lymphatic filariasis",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "Filariasis_EB 2025_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "infect_filaria_disability",
+    "program_area": "infectious",
+    "label": "Lymphatic filariasis cases with disability/deformity",
+    "numerator_def": "Lymphatic filariasis cases with disability/deformity",
+    "denominator_def": "Lymphatic filariasis positive cases",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "Filariasis_EB 2025_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "infect_leprosy_treatment",
+    "program_area": "infectious",
+    "label": "Leprosy cases undergoing treatment (prevalence)",
+    "numerator_def": "Leprosy cases undergoing treatment (prevalence)",
+    "denominator_def": "Population",
+    "unit": "cases per 10,000 population",
+    "source_workbook": "Leprosy_2025_EB_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "infect_leprosy_new",
+    "program_area": "infectious",
+    "label": "Newly detected leprosy cases",
+    "numerator_def": "Newly detected leprosy cases",
+    "denominator_def": "Population",
+    "unit": "cases per 100,000 population",
+    "source_workbook": "Leprosy_2025_EB_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "infect_animal_bites",
+    "program_area": "infectious",
+    "label": "Reported animal bites",
+    "numerator_def": "Reported animal bites",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "Rabies_2025_EB_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "infect_rabies_deaths",
+    "program_area": "infectious",
+    "label": "Deaths due to rabies (source rate per reported animal bites)",
+    "numerator_def": "Deaths due to rabies (source rate per reported animal bites)",
+    "denominator_def": "Reported animal bites; this is not a population mortality rate",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "Rabies_2025_EB_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "infect_schisto_suspected",
+    "program_area": "infectious",
+    "label": "Suspected schistosomiasis cases",
+    "numerator_def": "Suspected schistosomiasis cases",
+    "denominator_def": "Total patients seen",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "Schisto_2025_EB_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "infect_schisto_acute",
+    "program_area": "infectious",
+    "label": "Acute clinically diagnosed schistosomiasis cases",
+    "numerator_def": "Acute clinically diagnosed schistosomiasis cases",
+    "denominator_def": "Suspected schistosomiasis cases",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "Schisto_2025_EB_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "infect_schisto_acute_confirmed",
+    "program_area": "infectious",
+    "label": "Acute schistosomiasis cases confirmed by stool examination",
+    "numerator_def": "Acute schistosomiasis cases confirmed by stool examination",
+    "denominator_def": "Acute clinically diagnosed schistosomiasis cases",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "Schisto_2025_EB_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "infect_schisto_chronic",
+    "program_area": "infectious",
+    "label": "Chronic clinically diagnosed schistosomiasis cases",
+    "numerator_def": "Chronic clinically diagnosed schistosomiasis cases",
+    "denominator_def": "Count only; source rate withheld because its denominator cannot be established from the annual tables",
+    "unit": "count",
+    "source_workbook": "Schisto_2025_EB_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "infect_schisto_chronic_confirmed",
+    "program_area": "infectious",
+    "label": "Chronic schistosomiasis cases confirmed by stool examination",
+    "numerator_def": "Chronic schistosomiasis cases confirmed by stool examination",
+    "denominator_def": "Chronic clinically diagnosed schistosomiasis cases",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "Schisto_2025_EB_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "infect_schisto_treated",
+    "program_area": "infectious",
+    "label": "Schistosomiasis cases treated in health facilities (source chronic table)",
+    "numerator_def": "Schistosomiasis cases treated in health facilities (source chronic table)",
+    "denominator_def": "Confirmed acute plus confirmed chronic schistosomiasis cases; FHSIS 2025 Annual Report, p. 96. Rate undefined when denominator is zero.",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "Schisto_2025_EB_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "infect_schisto_referred",
+    "program_area": "infectious",
+    "label": "Confirmed chronic schistosomiasis cases referred to hospital",
+    "numerator_def": "Confirmed chronic schistosomiasis cases referred to hospital",
+    "denominator_def": "Confirmed chronic schistosomiasis cases",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "Schisto_2025_EB_nofml.xlsx",
+    "uuc_criterion_d": false
+  }
+]

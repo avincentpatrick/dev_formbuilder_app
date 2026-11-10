@@ -24,10 +24,27 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D213`, the last filed, was asked and answered on 2026-11-07 in `M216`'s session, after its read-only box check. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D215`, the last filed, was asked and answered on 2026-11-09 in `M229`'s session, before its build. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D215 — A blank form can be printed in another of its languages, but the scanner knows only the form's default language, so it cannot read ticks beside, say, Tagalog choice labels. What should a printout in another language do? **A — print it, and its footer says responses must be keyed in; reading scans of translated printouts is filed for later.**
+
+**Asked and answered 2026-11-09 (user decision, in chat), in the session that took `R-d7e27962`, before its build.** Filed and answered in one push, with `M229`'s claim.
+- **A — print, key in by hand (chosen, the session's recommendation).** The language choice ships now. A printout in a language other than the form's default prints the footer sentence *"Scans of this form cannot be read automatically; responses must be keyed in."* Reading such scans is filed as its own row.
+- **B — print and scan both.** The printout also carries its language beside the version stamp, and the scanner reads it in that language. About twice the work, and it changes the scanner's matcher.
+
+**What it creates:** `M229` builds A and closes `R-d7e27962`, and files the reading of translated printouts as a `before-launch` row.
+
+### D214 — A rule's "contains" on a single-choice or dropdown question checks the choice's text, so "required if colour contains re" holds for both red and green. What should "contains" do there? **A — relabel it: it keeps working, and the rule editor calls it "contains the text".**
+
+**Asked and answered 2026-11-08 (user decision, in chat), in the session that took `R-526dae72`, whose remedy was this decision.** Filed and answered in one push, with `M226`'s claim.
+- **A — relabel it (chosen, the session's recommendation).** It keeps working, but the rule editor calls it "contains the text" for a single choice or dropdown, so an author sees that it matches text. No form stops publishing.
+- **B — stop offering it.** Hide it for those questions in the rule editor. Rules already saved keep working, and publish still accepts them.
+- **C — refuse it.** Publish refuses any form that uses it until the author changes the rule. This breaks forms that use it on purpose.
+
+**What it creates:** `M226` builds A and closes `R-526dae72`. The condition editor's "includes" was measured and is not the same trap: on a single choice it writes `selected()`, which is an exact match.
+
 ### D213 — The box has nowhere off it to copy the nightly backup: C: and E: sit on one RAID disk, and it has no mapped drives or real shares. Where does the copy go? **A — a shared folder on the user's separate desktop on the agency network, which stays on, set up on Monday 2026-11-09.**
 
 **Asked and answered 2026-11-07 (user decision, in chat), in `M216`'s session, after the read-only box check that `D212`'s second question asked for.** The user's words: *"let's set this up on monday. i have a separate desktop that is always open within the network pc."*
@@ -37,6 +54,8 @@ _None open._ `D213`, the last filed, was asked and answered on 2026-11-07 in `M2
 - **D — E: for now, and decide later.** It works with no help. It covers an accidental delete or C: filling up, but not a dead RAID disk or a lost server, so `R-4bda047a` would stay open.
 
 **What it creates:** no new row, because `M216`'s box half carries it. **Not measured yet, and read first on Monday:** the desktop's name and address, whether the box can reach it on port 445, and how the task signs in there. The box is in a workgroup at 192.168.50.2/26 and the access log has shown office clients as 192.168.1.x, so the two may be on different networks, and SYSTEM has no identity on another machine. If the network team has to open that path, `R-4bda047a` stays open until it is open. The merge point runs first in the same sitting, because the box's half needs the merged code.
+
+**Date amended 2026-11-08 (user, in chat), recorded during `M219`:** *"i will be the one to tell you if i am ready to do the task for the backup."* The answer, A, stands. The sitting has **no date** now: it happens when the user says so, and no session prompts for it. Every *"Monday"* above, and in `M216`'s claim, reads as *"the day the user names"*.
 
 ### D212 — The testing site's backups all sit on the machine that holds its database, and `docs/deployment-infrastructure.md` §5 prescribes a copy off the box, WAL archiving and a restore drill. How much of that binds the testing site? **A — a daily copy off the box and one restore proved; up to a day of data can be lost, and the 15-minute recovery is filed for before launch.**
 
@@ -3104,8 +3123,9 @@ THE SIX, AND THE OPTION SET WAS MISSING THE ONE THIS REPOSITORY ALREADY PRACTISE
 
 ⚠️ **THE REASON `C` BEATS `A` IS A CASCADE NEITHER `A` NOR `B` MENTIONS.** `docs/api-specification.md` and
 `docs/architecture/technical-architecture.md` are citation **tier 1 with zero tolerance**
-(`scripts/citation-liveness-lint.php:77-78`, run at `.github/workflows/ci.yml:242`), and `docs/pipeline.md:50` —
-itself tier 1 — cites `docs/api-specification.md:63` **by line**. Deleting lines shifts every citation below them,
+(`scripts/citation-liveness-lint.php:77-78`, run at `.github/workflows/ci.yml:242`), and `R-fcfc1f52`'s row in
+`docs/pipeline.md` — itself tier 1 — cites `docs/api-specification.md:63` **by line**. *(`M218`: this sentence cited
+that row by its line number, which was already wrong when it was written; `pipeline-lint`'s P8 now refuses that form.)* Deleting lines shifts every citation below them,
 so option A owes a re-point of every affected citation in the same commit. Annotating in place shifts nothing.
 
 **Consequences, recorded so they are not rediscovered:**
@@ -4133,6 +4153,22 @@ So two rows edit the same files, and both touch a hub. `R-b31f421e` rewrites how
 **Why:** one remedy seen from two sides. `R-5f180437` is the runbook's half and `R-4bda047a` is the box's half, and one script and one restore close both. Split into two increments, the first would document a job the box does not yet run, or the second would re-edit every sentence the first had just written.
 
 **Disposition:** the user approved the plan that takes both together, on 2026-11-06, with this exception named in it. Recorded in both places this log requires: inline at the closed rows and in `PROGRESS.md`'s release paragraph. Not a precedent, and the first of its reason, so the escalation rule above is not engaged.
+
+##### #9 — `M224` (2026-11-08) · two one-line document rows, each on its own hub, allowed by the user in chat
+
+**What was not satisfied:** item 1's second clause, *at most one row may touch a hub file*. `R-b1737198` edits `docs/security-threat-model.md`; `R-6f994627` edits `docs/data-dictionary.md`, and its two other copies of the same sentence sit in `docs/security-threat-model.md` and `docs/ux/form-filling-ux-flow.md`. All three are hubs. Clause 1 holds: the rows share no non-hub file.
+
+**Why:** the merge point. Merges wait for the user's word (`D137`), and every PR merged there is one more deploy the sitting waits through. Two document corrections as two PRs would add a deploy for no gain in bisection, since neither can redden a gate the other touches.
+
+**Disposition:** the user chose to pair them, in chat on 2026-11-08, asked by name with the alternative of one row per PR. The same answer pairs `R-4ea564fe` with `R-e2c1ba51` for the same reason; that is #10, recorded by its own increment. Recorded in both places this log requires: inline at the closed rows and in `PROGRESS.md`'s release paragraph. The first of its reason, so the escalation rule above is not engaged.
+
+##### #10 — `M225` (2026-11-08) · two contract rows in one regenerated file, allowed by the user in chat
+
+**What was not satisfied:** both clauses of item 1. `R-4ea564fe` edits `app/Services/Submissions/PublicFormPresenter.php`; `R-e2c1ba51` edits `app/Http/Controllers/Public/GuestSubmissionController.php` and `GuestDraftController.php`. Both regenerate `openapi.json`, and those three are hubs. Both add cases to `tests/Feature/Api/OpenApiContractTest.php`, a non-hub file.
+
+**Why:** the merge point, as for #9, and one more. Both rows land in a single regeneration of `openapi.json`. As two PRs, the second would regenerate the file the first had just changed, and each would be one more deploy for the sitting.
+
+**Disposition:** the user chose to pair them, in chat on 2026-11-08, in the same answer as #9. Recorded in both places this log requires: inline at the closed rows and in `PROGRESS.md`'s release paragraph. This is the second exception for the merge-point reason, so the escalation rule is not engaged yet. A third for that reason means the rule needs an answer instead: file a decision about batching while merges wait for a merge point.
 
 ---
 

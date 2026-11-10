@@ -129,17 +129,21 @@ final class GuestSubmissionController extends Controller
             $confirmations->linkFromGuest($paperScan->id, (string) $result->submission->id);
         }
 
-        return response()->json([
+        // Increment J2e — `reference` is the short handle, so the confirmation screen prints the code the TENANT can
+        // actually find rather than one derived client-side that is stored nowhere. Formatted at this boundary: the
+        // client never spells the grouping. Discloses nothing new — this same unauthenticated caller already
+        // receives the full uuid, and a reference is strictly less information. ⚠️ It is a display handle and never
+        // a credential: no route may resolve a submission by reference alone, which
+        // `SubmissionReferenceDisclosureTest` asserts structurally.
+        //
+        // M225 (`R-e2c1ba51`): the body is built once and returned with a literal status on each branch, because
+        // Scramble cannot infer a status chosen by a ternary and published the whole success body as a bare
+        // string. These notes sit here, not above the keys, because Scramble publishes a comment above an array key
+        // as that property's description in `openapi.json`.
+        $body = [
             'data' => [
                 'id' => $result->submission->id,
-                // Increment J2e — the short handle, so the confirmation screen prints the code the TENANT can
-                // actually find rather than one derived client-side that is stored nowhere. Formatted at this
-                // boundary: the client never spells the grouping.
-                //
-                // Discloses nothing new — this same unauthenticated caller already receives the full uuid on
-                // the line above, and a reference is strictly less information. ⚠️ It is a display handle and
-                // never a credential: no route may resolve a submission by reference alone, which
-                // `SubmissionReferenceDisclosureTest` asserts structurally.
+                // The short reference the respondent can quote to the form's owner. A display handle, never a credential.
                 'reference' => SubmissionReference::format($result->submission->reference),
                 'status' => $result->submission->status->value,
                 // Where to send the respondent after the thank-you screen, as `url` and a `label` naming it, or null
@@ -147,7 +151,13 @@ final class GuestSubmissionController extends Controller
                 // destination that has stopped taking responses is null rather than a dead end.
                 'redirect' => $redirects->resolve($form),
             ],
-        ], $result->created ? 201 : 200);
+        ];
+
+        if ($result->created) {
+            return response()->json($body, 201);
+        }
+
+        return response()->json($body);
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Forms;
 
 use App\Enums\FormStatus;
+use App\Enums\FormVersionStatus;
 use App\Enums\SubmissionStatus;
 use App\Models\Form;
 use App\Models\FormVersion;
@@ -60,6 +61,7 @@ final class FormHubPresenter
     public function __construct(
         private readonly FormSharePresenter $share,
         private readonly VersionChangeSummary $changes,
+        private readonly BlankFormPrintPresenter $print,
     ) {}
 
     /**
@@ -98,6 +100,8 @@ final class FormHubPresenter
                 'published_at' => $v->published_at?->toIso8601String(),
                 'changes' => $changes[(string) $v->id] ?? null,
                 'compare_href' => $compare[(string) $v->id] ?? null,
+                // M229 (`R-d7e27962`): the languages "Print blank" offers, the default first. A draft does not print.
+                'print_languages' => $v->status === FormVersionStatus::Draft ? [] : $this->print->languages($form, $v),
             ])->all(),
             'recent' => $this->recent($form, $user),
             'tabs' => FormTabSet::for($form, $user),

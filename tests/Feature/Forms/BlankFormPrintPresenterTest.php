@@ -771,3 +771,71 @@ it('renders the printed table', function (): void {
 
     expect($html)->toContain('Member 5')->and($html)->not->toContain('Member 6');
 });
+
+/** A version translated into Filipino in its label, its choices and a section, with English as the form's default. */
+function printTranslatedFixture(): array
+{
+    return printFixture([
+        'sections' => [['key' => 'home', 'label' => 'Home', 'label_translations' => ['fil' => 'Tahanan'], 'sequence' => 1, 'is_repeatable' => false]],
+        'fields' => [
+            printField('color', 'single_select', [
+                'section_key' => 'home',
+                'label' => 'Colour',
+                'label_translations' => ['fil' => 'Kulay'],
+                'config' => ['options' => [
+                    ['value' => 'r', 'label' => 'Red', 'label_translations' => ['fil' => 'Pula']],
+                    ['value' => 'b', 'label' => 'Blue'],
+                ]],
+            ]),
+        ],
+    ]);
+}
+
+it('prints in another of the version\'s languages when asked, and in the default for one it has no text in (R-d7e27962)', function (): void {
+    [$form, $version] = printTranslatedFixture();
+
+    $filipino = $this->present->present($form, $version, 'fil');
+    $german = $this->present->present($form, $version, 'de');
+    $field = static fn (array $model): array => $model['blocks'][0]['fields'][0];
+
+    expect($filipino['locale'])->toBe('fil')
+        ->and($filipino['blocks'][0]['label'])->toBe('Tahanan')
+        ->and($field($filipino)['label'])->toBe('Kulay')
+        ->and(array_column($field($filipino)['options'], 'label'))->toBe(['Pula', 'Blue'])
+        // The version has no German at all, so the paper stays in the form's own language.
+        ->and($german['locale'])->toBe('en')
+        ->and($field($german)['label'])->toBe('Colour');
+});
+
+it('lists the languages a version has text in, the form default first (R-d7e27962)', function (): void {
+    [$form, $version] = printTranslatedFixture();
+    [$plainForm, $plainVersion] = printFixture(['sections' => [], 'fields' => [printField('name')]]);
+
+    expect($this->present->languages($form, $version))->toBe(['en', 'fil'])
+        ->and($this->present->languages($plainForm, $plainVersion))->toBe(['en']);
+});
+
+it('says a printout in another language must be keyed in, because the scanner reads the default language only (D215)', function (): void {
+    [$form, $version] = printTranslatedFixture();
+
+    expect($this->present->present($form, $version)['ocr_compatible'])->toBeTrue()
+        ->and($this->present->present($form, $version, 'en')['ocr_compatible'])->toBeTrue()
+        ->and($this->present->present($form, $version, 'fil')['ocr_compatible'])->toBeFalse();
+});
+
+it('counts a language found only in a choice label, a hint or a section description, and never a blank one (R-d7e27962)', function (): void {
+    [$form, $version] = printFixture([
+        'sections' => [['key' => 's', 'label' => 'S', 'description' => 'About', 'description_translations' => ['ceb' => 'Mahitungod'], 'sequence' => 1, 'is_repeatable' => false]],
+        'fields' => [
+            printField('color', 'single_select', [
+                'section_key' => 's',
+                'hint' => 'Pick one',
+                'hint_translations' => ['ilo' => 'Agpili', 'war' => ''],
+                'config' => ['options' => [['value' => 'r', 'label' => 'Red', 'label_translations' => ['fil' => 'Pula']]]],
+            ]),
+        ],
+    ]);
+
+    // A blank variant is no translation (`LocaleVariant::from()`), so Waray is not offered.
+    expect($this->present->languages($form, $version))->toBe(['en', 'ceb', 'fil', 'ilo']);
+});

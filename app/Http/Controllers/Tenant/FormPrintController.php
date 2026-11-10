@@ -11,6 +11,7 @@ use App\Models\FormVersion;
 use App\Services\Forms\BlankFormPrintRenderer;
 use App\Services\Submissions\SubmissionPdfRequestService;
 use App\Services\Xlsform\XlsformExporter;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Symfony\Component\HttpFoundation\HeaderUtils;
 
@@ -33,7 +34,7 @@ use Symfony\Component\HttpFoundation\HeaderUtils;
  */
 final class FormPrintController extends Controller
 {
-    public function __invoke(Form $form, FormVersion $version, BlankFormPrintRenderer $renderer): Response
+    public function __invoke(Request $request, Form $form, FormVersion $version, BlankFormPrintRenderer $renderer): Response
     {
         // ⚠️ A DRAFT IS REFUSED, AND IT IS NOT MERELY A POLICY.
         //
@@ -56,7 +57,12 @@ final class FormPrintController extends Controller
         // a fact worth confirming through a different status code.
         abort_if($version->status === FormVersionStatus::Draft, 404);
 
-        return new Response($renderer->render($form, $version), 200, [
+        // M229 (`R-d7e27962`): `?lang=` asks for another of the version's languages. One it has no text in prints the
+        // form's default, which the presenter decides, so a stale or hand-typed link still downloads the paper.
+        $lang = $request->query('lang');
+        $locale = is_string($lang) && $lang !== '' ? $lang : null;
+
+        return new Response($renderer->render($form, $version, $locale), 200, [
             'Content-Type' => 'application/pdf',
             // Built through HeaderUtils rather than by string concatenation. The filename is derived
             // from a tenant-authored title, and even though BlankFormPrintRenderer::filename() has
@@ -64,7 +70,7 @@ final class FormPrintController extends Controller
             // that eventually meets a value that was not slugged.
             'Content-Disposition' => HeaderUtils::makeDisposition(
                 HeaderUtils::DISPOSITION_ATTACHMENT,
-                $renderer->filename($form, $version),
+                $renderer->filename($form, $version, $locale),
             ),
         ]);
     }

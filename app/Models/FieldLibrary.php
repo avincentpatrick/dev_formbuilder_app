@@ -127,16 +127,36 @@ class FieldLibrary extends Model
      * own, a comparison against another field is not (it would resolve to null in a different form anyway).
      * The caller adds `tenant_id`/`created_by`/`is_active`/`usage_count`.
      *
+     * ⛔ M220 (`R-fcdb4594`): A GROUP THAT LOSES A MEMBER IS DROPPED WHOLE. The engines fold a group within its
+     * family and combine units as ANY (required, skip) or ALL (constraints), so a group with a member taken
+     * out is STRICTER in every use: an "any of these" constraint offers fewer alternatives, and an "all of
+     * these" required rule holds more often. Dropping the whole unit can only make the copy more permissive.
+     * Ungrouping the survivors would be stricter still, which is why it is not done.
+     *
      * @param  array<string, mixed>  $meta  optional name/description/category (one-click save sends none)
      * @return array<string, mixed>
      */
     public static function fromField(FormField $field, array $meta): array
     {
         $shape = app(SchemaSnapshotSerializer::class)->snapshotField($field);
+        $all = array_values(array_filter(
+            is_array($shape['validations'] ?? null) ? $shape['validations'] : [],
+            static fn (mixed $v): bool => is_array($v),
+        ));
+
+        $crossField = static fn (array $v): bool => ($v['related_field_key'] ?? null) !== null;
+
+        $brokenGroups = [];
+        foreach ($all as $v) {
+            if ($crossField($v) && ($v['logic_group_ordinal'] ?? null) !== null) {
+                $brokenGroups[$v['logic_group_ordinal']] = true;
+            }
+        }
 
         $validations = array_values(array_filter(
-            is_array($shape['validations'] ?? null) ? $shape['validations'] : [],
-            static fn (mixed $v): bool => is_array($v) && ($v['related_field_key'] ?? null) === null,
+            $all,
+            static fn (array $v): bool => ! $crossField($v)
+                && (($v['logic_group_ordinal'] ?? null) === null || ! isset($brokenGroups[$v['logic_group_ordinal']])),
         ));
 
         $label = $field->label !== '' ? $field->label : 'Untitled question';

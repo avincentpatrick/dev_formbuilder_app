@@ -1,3 +1,4 @@
+import { CENSUS_ACTIVE_YEARS_ID, CENSUS_ACTIVE_YEARS_DENOMINATOR } from "./census-active-years";
 import { isCensusProfileRate, CENSUS_ACCREDITATION_DENOMINATOR } from "./census-accreditation";
 import { STEPZERO_ACCREDITATION_ID, STEPZERO_ACCREDITATION_DENOMINATOR } from "./stepzero-accreditation";
 import { UUC_ROUTE_LABELS } from "./uuc-routes";
@@ -62,7 +63,7 @@ function indicator(spec: IndicatorSpec): MapIndicator {
           : periods[spec.source],
     levels: spec.levels,
     denominator:
-      (isCensusProfileRate(spec.id) ? CENSUS_ACCREDITATION_DENOMINATOR : spec.id === STEPZERO_ACCREDITATION_ID ? STEPZERO_ACCREDITATION_DENOMINATOR : spec.attributes?.denominator) ??
+      (spec.id === CENSUS_ACTIVE_YEARS_ID ? CENSUS_ACTIVE_YEARS_DENOMINATOR : isCensusProfileRate(spec.id) ? CENSUS_ACCREDITATION_DENOMINATOR : spec.id === STEPZERO_ACCREDITATION_ID ? STEPZERO_ACCREDITATION_DENOMINATOR : spec.attributes?.denominator) ??
       (spec.unit === "%" ? "Required from accepted source definition" : null),
     legend:
       spec.unit === "%" || spec.unit.startsWith("per ") || spec.unit === "years" ? "rate" : "count",

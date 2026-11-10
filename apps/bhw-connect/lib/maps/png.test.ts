@@ -59,3 +59,16 @@ it("preserves Census confidence level, profile denominator and rate semantics in
   expect(notes).toContain("Published 95% confidence interval: 6.15 to 79.23");
   expect(notes).toContain("Validated BHW Census profiles");
 });
+
+it("exports a mean in years with a contributing-count caveat, not a total or percentage", () => {
+  const context = datasetMapExport({ ...initialMapChoice("bhw-2025"), indicator: "bhw.active-years" },
+    { ...data, total: null, parentMean: 9.87 }, [], null);
+  expect(context.parentMeasure).toEqual({ kind: "mean", value: 9.87, unit: "years" });
+  expect(context.indicator).toMatchObject({ period: "2025", confidenceLevel: null });
+  expect(context.indicator.denominator).toContain("contributing count not supplied");
+  expect(context.legend.method).toBe("quantiles-relative-to-displayed-areas");
+  const notes = pngNotes(context).join("\n");
+  expect(notes).toContain("Reported parent mean: 9.87 years");
+  expect(notes).not.toContain("9.87%");
+  expect(notes).toContain("never an average of child means");
+});

@@ -1,4 +1,5 @@
 "use client";
+import { CENSUS_ACTIVE_YEARS_ID } from "@/lib/maps/census-active-years";
 import { isCensusProfileRate } from "@/lib/maps/census-accreditation";
 import { STEPZERO_ACCREDITATION_ID, STEPZERO_ACCREDITATION_BINS, STEPZERO_ACCREDITATION_DENOMINATOR } from "@/lib/maps/stepzero-accreditation";
 import { searchMapAreas } from "@/lib/maps/area-search";
@@ -23,6 +24,7 @@ import { loadMaplibre } from "./load-maplibre";
 import { INCOME_BINS, INCOME_CLASSES, incomeClassLabel } from "@/lib/maps/income-class";
 import { POVERTY_BINS } from "@/lib/maps/poverty";
 import { MapLegend } from "./map-legend";
+import { clampBarangayScope } from "@/lib/maps/barangay-support";
 const loadDatasetCanvas = () => import("./dataset-canvas").then((m) => m.DatasetCanvas);
 const DatasetCanvas = dynamic(loadDatasetCanvas, {
   ssr: false,
@@ -60,6 +62,7 @@ export function DatasetMapCard({
   const [geometry, setGeometry] = useState<{ key: string; codes: string[] } | null>(null);
   const [visible, setVisible] = useState(expanded);
   const active = useMapActivity(visible && metrics.length > 0);
+  const [notice, setNotice] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
   const [renderAttempt, setRenderAttempt] = useState(0);
   const [capture, setCapture] = useState<{ key: string; run: () => Promise<HTMLCanvasElement> } | null>(null);
@@ -101,6 +104,7 @@ export function DatasetMapCard({
   const data = result?.key === key && result.data.state === "available" ? result.data : null;
   const uucRoute = dataset === "uuc-phc-2025" && choice.indicator.startsWith("uuc.route.");
   const declaredAccreditation = dataset === "bhw-stepzero-2026" && choice.indicator === STEPZERO_ACCREDITATION_ID;
+  const censusMean = dataset === "bhw-2025" && choice.indicator === CENSUS_ACTIVE_YEARS_ID;
   const censusRate = dataset === "bhw-2025" && isCensusProfileRate(choice.indicator);
   const accreditation = declaredAccreditation || censusRate;
   const profiling = dataset === "bhw-profiling-status-2026";
@@ -195,7 +199,11 @@ export function DatasetMapCard({
               value={choice.indicator}
               onChange={(e) => {
                 const m = metrics.find((i) => i.id === e.target.value)!;
-                setChoice({ ...choice, indicator: m.id, period: m.period });
+                // A barangay view only exists for indicators with a barangay reader.
+                const next = clampBarangayScope({ ...choice, indicator: m.id, period: m.period });
+                if (next.level !== choice.level) setTrail(trail.slice(0, -1));
+                setNotice(next.level !== choice.level ? "This indicator has no barangay map, so it is shown for the province." : null);
+                setChoice(next);
               }}
             >
               {metrics.map((m) => (
@@ -205,6 +213,7 @@ export function DatasetMapCard({
               ))}
             </select>
           </label>
+          {notice && <p role="status" className="text-sm text-muted">{notice}</p>}
           <p className="text-sm">
             {metric?.period} · {metric?.unit} · {data?.area ?? choice.code}
           </p>
@@ -285,7 +294,7 @@ export function DatasetMapCard({
                         ? Object.fromEntries(INCOME_CLASSES.map((c) => [c.value, c.label]))
                         : undefined
                   }
-                  valueSuffix={poverty || profiling || accreditation ? "%" : ""}
+                  valueSuffix={poverty || profiling || accreditation ? "%" : censusMean ? " years" : ""}
                   noDataLabel={
                     accreditation ? "Unavailable published share — see table"
                     : profiling
@@ -318,7 +327,11 @@ export function DatasetMapCard({
           {data && (
             <>
               <p className="text-sm">
-                {accreditation ? (
+                {censusMean ? (
+                  <>Reported area mean: {data.parentMean == null ? "Not reported" : `${data.parentMean} years`}.
+                    Denominator: {metric?.denominator}. Missing active-year counts are excluded.
+                    Parent means are reported separately, never averaged from children. Contributing sample size and confidence intervals are unavailable.</>
+                ) : accreditation ? (
                   <>Reported area rate: {data.parentRate == null ? "Not reported" : `${data.parentRate}%`}.
                     Denominator: {metric?.denominator ?? STEPZERO_ACCREDITATION_DENOMINATOR}. Published percentages are not averaged across areas.
                     {censusRate ? (censusUncertainty ? "Census profile percentage; published 95% Wilson intervals and small-sample notes appear below." : "Share receiving any honorarium; no confidence interval is supplied for this measure. This does not describe amounts or receipt from a particular payer.") : "This is the LGU declaration, not accreditation among validated Census profiles."}</>
@@ -333,6 +346,7 @@ export function DatasetMapCard({
                     Reported area total:{" "}
                     {data.total === null ? "Not reported" : data.total.toLocaleString()}{" "}
                     {metric?.unit}. The total includes areas without drawable shapes.
+                    {data.totalNote ? ` ${data.totalNote}` : ""}
                   </>
                 )}
               </p>
@@ -398,7 +412,7 @@ export function DatasetMapCard({
                         : (selected.value ?? "Not reported")}{" "}
                     {selected.value !== null && !income ? metric?.unit : ""}
                   </p>
-                  {(income || profiling || uucRoute || accreditation) && <p>{selected.note}</p>}
+                  {(income || profiling || uucRoute || accreditation || censusMean) && <p>{selected.note}</p>}
                   {(poverty || censusUncertainty) && !navigationOnly && (
                     <p>
                       Published {censusRate ? 95 : 90}% confidence interval:{" "}
@@ -408,7 +422,7 @@ export function DatasetMapCard({
                       .
                     </p>
                   )}
-                  {data.childLevel !== "citymun" ? (
+                  {data.childLevel === "region" || data.childLevel === "province" || (data.childLevel === "citymun" && data.barangayDrill) ? (
                     <button
                       className="underline"
                       type="button"
@@ -416,7 +430,7 @@ export function DatasetMapCard({
                         setTrail([...trail, choice]);
                         setChoice({
                           ...choice,
-                          level: data.childLevel as "region" | "province",
+                          level: data.childLevel as "region" | "province" | "citymun",
                           code: selected.code,
                           selected: null,
                         });
@@ -430,11 +444,13 @@ export function DatasetMapCard({
                         ? "Barangays have no independently published income class; this classification belongs to the named LGU."
                         : poverty
                           ? "No barangay poverty estimates are published in this source."
-                          : "Barangay polygons are not yet validated."}{" "}
+                          : data.childLevel === "barangay"
+                            ? "Barangays are the smallest area on this map."
+                            : "Barangay polygons are not yet validated."}{" "}
                       {dashboard && (
                         <Link
                           className="underline"
-                          href={`${dashboard === "/bhw" ? "/place" : dashboard}/citymun/${selected.code}`}
+                          href={`${dashboard === "/bhw" ? "/place" : dashboard}/citymun/${data.childLevel === "barangay" ? choice.code : selected.code}`}
                         >
                           Open municipal dashboard and barangay information
                         </Link>
@@ -464,7 +480,7 @@ export function DatasetMapCard({
                         {(poverty || censusUncertainty) && !navigationOnly && (
                           <th scope="col">Published {censusRate ? 95 : 90}% confidence interval</th>
                         )}
-                        {(income || profiling || uucRoute || accreditation) && !navigationOnly && (
+                        {(income || profiling || uucRoute || accreditation || censusMean) && !navigationOnly && (
                           <th scope="col">Source context</th>
                         )}
                         <th scope="col">Geometry</th>
@@ -492,7 +508,7 @@ export function DatasetMapCard({
                                 : "Not available"}
                             </td>
                           )}
-                          {(income || profiling || uucRoute || accreditation) && !navigationOnly && (
+                          {(income || profiling || uucRoute || accreditation || censusMean) && !navigationOnly && (
                             <td>{r.note ?? "—"}</td>
                           )}
                           <td>

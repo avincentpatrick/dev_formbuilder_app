@@ -8,7 +8,7 @@ export const PROFILING_BINS: ColorBin[] = [
   { min: 25, max: 50, color: "#bdd7e7" },
   { min: 50, max: 75, color: "#6baed6" },
   { min: 75, max: 100, color: "#3182bd" },
-  { min: 100, max: 100, color: "#08519c" },
+  { min: 100, max: Infinity, color: "#08519c" },
 ];
 /** Match the existing workflow reader's rounded shares, without treating missing fields as zero. */
 export function joinProfilingRows(

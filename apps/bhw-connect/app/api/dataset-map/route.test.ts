@@ -8,7 +8,7 @@ vi.mock("@/lib/db/supabase", () => ({ createSupabaseServerClient: () => ({ from:
 import { GET } from "./route";
 function query(result: unknown) {
   const chain: Record<string, unknown> = {};
-  for (const name of ["select", "eq", "in", "order", "limit"]) chain[name] = vi.fn(() => chain);
+  for (const name of ["select", "eq", "in", "order", "limit", "range"]) chain[name] = vi.fn(() => chain);
   chain.then = (resolve: (value: unknown) => void) => Promise.resolve(result).then(resolve);
   return chain;
 }
@@ -447,50 +447,92 @@ it("rejects ambiguous query choices before reading a dataset", async () => {
   expect(mock.from).not.toHaveBeenCalled();
 });
 
-const BARANGAY_LINK = "http://localhost/api/dataset-map?dataset=uuc-phc-2025&level=citymun&code=0102801";
+const LINK = (dataset: string, indicator: string, level: string, code: string) =>
+  `http://localhost/api/dataset-map?dataset=${dataset}&indicator=${indicator}&level=${level}&code=${code}`;
+/** Answers by table, since the barangay view reads a source table the municipality view does not. */
+function tables(map: Record<string, unknown>) {
+  mock.from.mockImplementation((table: string) => {
+    if (!(table in map)) throw new Error(`unexpected table ${table}`);
+    return query({ data: map[table], error: null });
+  });
+}
+const BARANGAYS = [
+  { geo_code: "0102801001", geo_name: "Adams (Pob.)" },
+  { geo_code: "0102801002", geo_name: "Bacsil" },
+];
 it("refuses a municipality scope while no barangay release is configured, before reading any data", async () => {
   vi.stubEnv("BHW_BARANGAY_RELEASE", "");
-  const response = await GET(new NextRequest(BARANGAY_LINK));
+  const response = await GET(new NextRequest(LINK("uuc-phc-2025", "uuc.listed", "citymun", "0102801")));
   expect(response.status).toBe(400);
   expect(mock.source).not.toHaveBeenCalled();
   expect(mock.from).not.toHaveBeenCalled();
   vi.unstubAllEnvs();
 });
-it("refuses barangay drill-down for a dataset that is not enabled, even with a release set", async () => {
+it("refuses barangay drill-down for datasets and indicators without a barangay reader, even with a release set", async () => {
   vi.stubEnv("BHW_BARANGAY_RELEASE", "rel-1");
-  const response = await GET(new NextRequest("http://localhost/api/dataset-map?dataset=bhw-stepzero-2026&indicator=bhw.total&level=citymun&code=0102801"));
-  expect(response.status).toBe(400);
+  for (const url of [
+    LINK("bhw-stepzero-2026", "bhw.total", "citymun", "0102801"),
+    LINK("uuc-phc-2025", "uuc.route.ip", "citymun", "0102801"),
+  ])
+    expect((await GET(new NextRequest(url))).status, url).toBe(400);
   expect(mock.source).not.toHaveBeenCalled();
   vi.unstubAllEnvs();
 });
-it("reads a municipality's barangays and points at the pinned release's partition", async () => {
+it("reads UUC list membership per barangay from the source table, with zero for an unlisted barangay", async () => {
   vi.stubEnv("BHW_BARANGAY_RELEASE", "rel-1");
   mock.geo.mockResolvedValue({ geoCode: "0102801", geoLevel: "citymun", geoName: "Adams" });
-  mock.from
-    .mockReturnValueOnce(query({ data: [{ geo_code: "0102801001", geo_name: "Adams (Pob.)" }, { geo_code: "0102801002", geo_name: "Bacsil" }], error: null }))
-    .mockReturnValueOnce(query({ data: [{ geo_code: "0102801001", n_listed: 0 }], error: null }))
-    .mockReturnValueOnce(query({ data: [{ geo_code: "0102801", n_listed: 5 }], error: null }));
-  const response = await GET(new NextRequest(BARANGAY_LINK));
+  tables({ dim_geo: BARANGAYS, fact_uuc_phc_barangay: [{ geo_code: "0102801002" }], agg_uuc_phc_counts: [{ geo_code: "0102801", n_listed: 1 }] });
+  const response = await GET(new NextRequest(LINK("uuc-phc-2025", "uuc.listed", "citymun", "0102801")));
   const data = await response.json();
   expect(response.status).toBe(200);
   expect(data.childLevel).toBe("barangay");
-  expect(data.rows).toEqual([{ code: "0102801001", name: "Adams (Pob.)", value: 0 }, { code: "0102801002", name: "Bacsil", value: null }]);
-  expect(data.total).toBe(5);
+  expect(data.rows).toEqual([{ code: "0102801001", name: "Adams (Pob.)", value: 0 }, { code: "0102801002", name: "Bacsil", value: 1 }]);
+  expect(data.total).toBe(1);
   expect(data.geometryUrl).toMatch(/\/maps\/rel-1\/citymun\/0102801\.json$/);
   expect(data.barangayDrill).toBeUndefined();
   vi.unstubAllEnvs();
 });
-it("tells the card a municipality can drill only when barangay drill-down is available", async () => {
+it("counts NHFR facilities per barangay and says how many have no barangay recorded", async () => {
+  vi.stubEnv("BHW_BARANGAY_RELEASE", "rel-1");
+  mock.geo.mockResolvedValue({ geoCode: "0102801", geoLevel: "citymun", geoName: "Adams" });
+  const facility = (barangay: string | null) => ({ barangay_geo_code: barangay, ownership_major: "Government", facility_type: "Barangay Health Station", bed_capacity: 0 });
+  tables({
+    dim_geo: BARANGAYS,
+    fact_nhfr_facility: [facility("0102801001"), facility("0102801001"), facility(null)],
+    agg_nhfr_counts: [{ geo_code: "0102801", n_facilities: 3 }],
+  });
+  const data = await (await GET(new NextRequest(LINK("nhfr-2026-09", "nhfr.facilities", "citymun", "0102801")))).json();
+  expect(data.rows).toEqual([{ code: "0102801001", name: "Adams (Pob.)", value: 2 }, { code: "0102801002", name: "Bacsil", value: 0 }]);
+  expect(data.total).toBe(3); // the municipal total, never the sum of barangays
+  expect(data.totalNote).toContain("1 of this municipality's facilities have no barangay recorded");
+  vi.unstubAllEnvs();
+});
+it("fails closed rather than showing partial barangay values when the source read fails", async () => {
+  vi.stubEnv("BHW_BARANGAY_RELEASE", "rel-1");
+  mock.geo.mockResolvedValue({ geoCode: "0102801", geoLevel: "citymun", geoName: "Adams" });
+  mock.from.mockImplementation((table: string) =>
+    query(table === "fact_nhfr_facility" ? { data: null, error: { message: "x" } } : { data: table === "dim_geo" ? BARANGAYS : [], error: null }));
+  const response = await GET(new NextRequest(LINK("nhfr-2026-09", "nhfr.facilities", "citymun", "0102801")));
+  expect(response.status).toBe(503);
+  vi.unstubAllEnvs();
+});
+it("tells the card a municipality can drill only for a supported indicator with a release installed", async () => {
   mock.geo.mockResolvedValue({ geoCode: "01028", geoLevel: "province", geoName: "Ilocos Norte" });
-  const rows = (code: string) => query({ data: [{ geo_code: code, n_listed: 1 }], error: null });
-  for (const [release, expected] of [["rel-1", true], ["", undefined]] as const) {
+  const cases: [string, string, string, boolean | undefined][] = [
+    ["rel-1", "uuc-phc-2025", "uuc.listed", true],
+    ["rel-1", "uuc-phc-2025", "uuc.route.ip", undefined],
+    ["", "uuc-phc-2025", "uuc.listed", undefined],
+  ];
+  for (const [release, dataset, indicator, expected] of cases) {
     vi.stubEnv("BHW_BARANGAY_RELEASE", release);
-    mock.from.mockReset()
-      .mockReturnValueOnce(query({ data: [{ geo_code: "0102801", geo_name: "Adams" }], error: null }))
-      .mockReturnValueOnce(rows("0102801")).mockReturnValueOnce(rows("01028"));
-    const data = await (await GET(new NextRequest("http://localhost/api/dataset-map?dataset=uuc-phc-2025&level=province&code=01028"))).json();
+    tables({
+      dim_geo: [{ geo_code: "0102801", geo_name: "Adams" }],
+      agg_uuc_phc_counts: [{ geo_code: "0102801", n_listed: 1, n_barangays: 1 }],
+      agg_uuc_phc_criteria: [{ geo_code: "0102801", n_listed: 1, n_route_ip: 1, n_health_evaluable: 1 }],
+    });
+    const data = await (await GET(new NextRequest(LINK(dataset, indicator, "province", "01028")))).json();
     expect(data.childLevel).toBe("citymun");
-    expect(data.barangayDrill, release).toBe(expected);
+    expect(data.barangayDrill, `${release}/${indicator}`).toBe(expected);
   }
   vi.unstubAllEnvs();
 });

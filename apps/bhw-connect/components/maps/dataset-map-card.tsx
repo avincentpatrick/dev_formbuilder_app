@@ -24,6 +24,7 @@ import { loadMaplibre } from "./load-maplibre";
 import { INCOME_BINS, INCOME_CLASSES, incomeClassLabel } from "@/lib/maps/income-class";
 import { POVERTY_BINS } from "@/lib/maps/poverty";
 import { MapLegend } from "./map-legend";
+import { clampBarangayScope } from "@/lib/maps/barangay-support";
 const loadDatasetCanvas = () => import("./dataset-canvas").then((m) => m.DatasetCanvas);
 const DatasetCanvas = dynamic(loadDatasetCanvas, {
   ssr: false,
@@ -197,7 +198,10 @@ export function DatasetMapCard({
               value={choice.indicator}
               onChange={(e) => {
                 const m = metrics.find((i) => i.id === e.target.value)!;
-                setChoice({ ...choice, indicator: m.id, period: m.period });
+                // A barangay view only exists for indicators with a barangay reader.
+                const next = clampBarangayScope({ ...choice, indicator: m.id, period: m.period });
+                if (next.level !== choice.level) setTrail(trail.slice(0, -1));
+                setChoice(next);
               }}
             >
               {metrics.map((m) => (
@@ -339,6 +343,7 @@ export function DatasetMapCard({
                     Reported area total:{" "}
                     {data.total === null ? "Not reported" : data.total.toLocaleString()}{" "}
                     {metric?.unit}. The total includes areas without drawable shapes.
+                    {data.totalNote ? ` ${data.totalNote}` : ""}
                   </>
                 )}
               </p>

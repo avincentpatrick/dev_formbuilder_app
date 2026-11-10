@@ -1,10 +1,8 @@
 import { withBasePath } from "@/lib/base-path";
 import type { MapLevel } from "./definitions";
+import { barangayIndicatorSupported } from "./barangay-support";
 
-/** Datasets whose barangay rows and polygons are enabled for drill-down. Widen one dataset at a time,
- * and only after its barangay rows and disclosure rules are confirmed; BHW Census and StepZero stay out
- * until their small-count suppression has been reviewed at barangay level. */
-export const BARANGAY_DRILL_DATASETS: readonly string[] = ["nhfr-2026-09", "uuc-phc-2025"];
+export { BARANGAY_DRILL_DATASETS } from "./barangay-support";
 
 const RELEASE = /^[a-z0-9][a-z0-9.-]{2,79}$/;
 
@@ -16,14 +14,16 @@ export function barangayRelease(value: string | undefined = process.env.BHW_BARA
   return release && release !== "latest" && !release.includes("..") && RELEASE.test(release) ? release : null;
 }
 
-/** Barangay drill-down needs all three: an installed release, an enabled dataset, and an indicator whose
- * source actually carries barangay rows. Anything less keeps the municipal dashboard link. */
+/** Barangay drill-down needs all of: an installed release, an indicator with a barangay reader
+ * (lib/maps/barangay-support.ts) and a source that declares barangay level. Anything less keeps the
+ * municipal dashboard link. */
 export function barangayDrillAvailable(
   dataset: string,
+  indicator: string,
   levels: readonly MapLevel[],
   release: string | null,
 ): release is string {
-  return release !== null && BARANGAY_DRILL_DATASETS.includes(dataset) && levels.includes("barangay");
+  return release !== null && barangayIndicatorSupported(dataset, indicator) && levels.includes("barangay");
 }
 
 /** One municipality's partition in the package (`citymun/<code>.json` under the release directory). */

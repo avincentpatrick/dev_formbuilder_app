@@ -944,3 +944,36 @@ Validation: 11 new unit/API cases, two browser cases (drill with a withheld bara
 no drill when unavailable), and a deliberate defect in the availability flag that turned a test red.
 Locally only the browser specs that mock the API ran (22 passed); the specs that read the seeded
 database were left to CI because this environment has none.
+
+## Barangay values read from the source tables (10 November 2026)
+
+The first live probe of barangay drill-down (release `psgc-2026q3-ring-rebuilt-20261109`, NHFR and UUC) found
+the package, shards and polygons correct (every barangay of the sampled municipalities had a polygon) but **no
+barangay with a value in 15 samples**: the summary tables the map read, `agg_nhfr_counts` and
+`agg_uuc_phc_counts`, are municipality-and-above by design (their migrations say a municipality page reads its
+own barangays from the fact tables directly). Drill-down showed correct outlines with every barangay
+"Not reported".
+
+At municipality scope the API now reads the barangays' values from the source tables
+(`lib/maps/barangay-reader.ts`), one municipality at a time, paged and failing closed rather than partial:
+
+- **NHFR** (every indicator): facilities grouped by `barangay_geo_code` from `fact_nhfr_facility`, with the same
+  definitions as `agg_nhfr_counts` (ownership `Government`/`Private`, the four facility types, summed bed
+  capacity, and presence as 1 or 0). A barangay with none reads **0**, as in the municipality summaries.
+  Facilities with no barangay recorded, or a code the geography does not list, stay in the municipal total and
+  are counted in a note ("N of this municipality's facilities have no barangay recorded"); barangay values do
+  not add up to the total and the total is never replaced by their sum. No suppression, as for the summaries:
+  an inventory of places.
+- **UUC**: only `uuc.listed`, 1 if the barangay is on the 2025 list in `fact_uuc_phc_barangay`, else 0.
+  The qualifying-route indicators are published classifications that must not be recomputed per barangay, so
+  they stay at municipality level.
+
+Which indicators have a barangay view is one list (`lib/maps/barangay-support.ts`). Choosing an indicator or
+dataset without one while in a barangay view returns to the municipality's province with it selected, and the
+API refuses such a request. BHW Census and StepZero remain excluded pending the barangay-level small-count
+suppression review. No migration, load or schema change; no dataset's municipal values change.
+Validation: reader and support unit tests (zero versus missing, unplaced facilities, paging, a failed or
+over-large read, the UUC list), API cases by table, three browser cases; deliberate defects in the NHFR
+definition, the unplaced-facility note and the scope fallback each turned a test red. Locally the browser
+specs that mock the API ran (23 passed); those reading the seeded database were left to CI. The live check after
+deploy is the same probe: barangays with a value in the busiest municipalities of each dataset.

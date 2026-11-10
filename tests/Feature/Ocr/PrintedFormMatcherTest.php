@@ -697,3 +697,44 @@ it('reads what was written for a multiple choice that takes its choices from ano
     // One choice per comma: a multiple choice's answer is a list, never one string.
     expect($fields['facilities'])->toMatchArray(['state' => 'read', 'value' => ['SAN JOSE RHU', 'POBLACION BHS'], 'ticks' => false]);
 });
+
+it('reads a one-word answer that is a word of the footer below it, instead of dropping it as printed text (R-5d7128da)', function (): void {
+    // The footer lands in the last question's region, and both of these sentences contain "form". The match used to be any
+    // substring of four letters or more, so a real "FORM" in the box read as printed text and the question as blank.
+    $switchedOff = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, [...ocrMatchAnswers(), 'notes' => 'FORM']);
+    $accepting = ocrMatchFields($this->matcher, $this->form, $this->version, [...$this->model, 'accepts_scans' => true], [...ocrMatchAnswers(), 'notes' => 'FORM']);
+
+    expect($switchedOff['notes'])->toMatchArray(['state' => 'read', 'value' => 'FORM'])
+        ->and($accepting['notes'])->toMatchArray(['state' => 'read', 'value' => 'FORM']);
+});
+
+it('still drops the last word of a wrapped hint that lands alone on its own line (R-5d7128da)', function (): void {
+    // Eighteen four-letter words fill the hint's first printed line, so "carefully" wraps alone onto the second. A wrapped
+    // piece of printed text is a run of whole words, and a one-word piece can only be the text's last word.
+    $hint = 'Copy each name from your card into this with care then sign here once more when done only carefully';
+    $form = app(FormService::class)->create($this->tenant, $this->user, 'Hinted');
+    addFormField($form->draftVersion, $this->user, 'full_name', FieldType::ShortText, 1, ['label' => 'Full name', 'hint' => $hint]);
+    $version = app(PublishService::class)->publish($form->refresh(), $this->user);
+    $form = $form->refresh();
+    $model = app(BlankFormPrintPresenter::class)->present($form, $version);
+
+    $page = PrintedPageTypesetter::fromModel($model, ['full_name' => 'JUAN DELA CRUZ'])->page();
+    $tails = array_values(array_filter($page->words, static fn (OcrWord $w): bool => $w->text === 'carefully'));
+    $sameLine = array_filter($page->words, static fn (OcrWord $w): bool => abs($w->y0 - $tails[0]->y0) < 0.001);
+
+    // The fixture is what it claims: the hint's last word sits alone on its line.
+    expect($tails)->toHaveCount(1)
+        ->and($sameLine)->toHaveCount(1);
+
+    $fields = $this->matcher->match($form, $version, [$page])['fields'];
+
+    expect($fields['full_name'])->toMatchArray(['state' => 'read', 'value' => 'JUAN DELA CRUZ']);
+});
+
+it('matches a longer line to printed text only on whole words (R-5d7128da)', function (): void {
+    // "his form" sits inside the footer's "this form", but it starts in the middle of a printed word, so it cannot be a
+    // piece the footer wrapped into. A run of whole printed words is still dropped; only line positions could tell those apart.
+    $fields = ocrMatchFields($this->matcher, $this->form, $this->version, $this->model, [...ocrMatchAnswers(), 'notes' => 'HIS FORM']);
+
+    expect($fields['notes'])->toMatchArray(['state' => 'read', 'value' => 'HIS FORM']);
+});

@@ -32,7 +32,7 @@ const OPERATORS: OperatorOption[] = [
     { value: 'gte', label: 'at least (≥)', shapes: ['number', 'duration', 'scale'] },
     { value: 'eq', label: 'equals (=)', shapes: ['text', 'number', 'temporal', 'choice'] },
     { value: 'is_null', label: 'is blank', shapes: ['text', 'number', 'temporal', 'choice'] },
-    { value: 'contains', label: 'contains', shapes: ['text', 'choice'] },
+    { value: 'contains', label: 'contains', shapes: ['text', 'choice'], shape_labels: { choice: 'contains the text' } },
 ];
 
 const FIELDS: ComparableField[] = [
@@ -151,6 +151,23 @@ describe('ValidationEditor — the operator, which only four rules read', () => 
         expect(offered).toContain('greater than (>)');
         expect(offered.join(' ')).not.toContain('Gt');
         expect(offered.join(' ')).not.toContain('Gte');
+    });
+
+    it('calls "contains" a text match where the compared question is a single choice or dropdown (D214)', () => {
+        // On one chosen value the structured contains is a substring test, so "colour contains re" holds for red
+        // and green alike. D214 kept it and relabelled it, from the server's `shape_labels`.
+        const comparableFields: ComparableField[] = [...FIELDS, { key: 'colour', label: 'Colour', value_shape: 'choice', computed: false }];
+        const onChoice = mount(ValidationEditor, {
+            props: { validations: [row({ rule_type: 'required_if', related_field_key: 'colour' })], ruleTypes: RULE_TYPES, operators: OPERATORS, valueShape: 'text', comparableFields },
+        });
+        const onText = mount(ValidationEditor, {
+            props: { validations: [row({ rule_type: 'required_if', related_field_key: 'notes' })], ruleTypes: RULE_TYPES, operators: OPERATORS, valueShape: 'text', comparableFields },
+        });
+
+        expect(optionLabels(onChoice, 'Rule 1 operator')).toContain('contains the text');
+        expect(optionLabels(onChoice, 'Rule 1 operator')).not.toContain('contains');
+        expect(optionLabels(onText, 'Rule 1 operator')).toContain('contains');
+        expect(optionLabels(onText, 'Rule 1 operator')).not.toContain('contains the text');
     });
 
     it('offers "is answered" only where an absent operator is itself a condition', () => {

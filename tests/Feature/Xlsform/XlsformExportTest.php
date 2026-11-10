@@ -446,3 +446,120 @@ it('writes each field comparison as its constraint, at least and at most include
         expect(surveyRow($sheets, $key)['constraint'] ?? null)->toBe($constraint, $rule);
     }
 });
+
+/*
+|--------------------------------------------------------------------------
+| M217 (`R-df883cbf`): a translation that lives only inside `config` reaches the workbook.
+|--------------------------------------------------------------------------
+| The languages used to be collected from section labels, field labels, hints and validation messages only, so a form
+| translated only in its choices exported no `label::xx` column at all. Each case below is the ONLY translation on its
+| form, which is what makes it this row: a field-level translation anywhere would open the column and hide the defect.
+*/
+
+/** Build one form holding one field and export it, returning its sheets. */
+function choiceOnlyTranslationSheets(FieldType $type, array $config): array
+{
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+
+    $form = makeForm($owner, 'Translated in its choices');
+    $version = makeDraftVersion($form);
+    addFormField($version, $owner, 'q', $type, 0, ['config' => $config]);
+
+    return app(XlsformExporter::class)->build($form, $version->refresh());
+}
+
+/** Every non-blank value written under one column, across the two sheets that carry labels. */
+function labelCellsFor(array $sheets, string $column): array
+{
+    $cells = array_column([...$sheets['survey']['rows'], ...$sheets['choices']['rows']], $column);
+
+    return array_values(array_filter($cells, static fn (mixed $cell): bool => $cell !== null && $cell !== ''));
+}
+
+it('writes a translation that lives only inside the config, wherever the question keeps it', function (FieldType $type, array $config, array $expected): void {
+    $sheets = choiceOnlyTranslationSheets($type, $config);
+
+    expect($sheets['survey']['headers'])->toContain('label::es')
+        ->and($sheets['choices']['headers'])->toContain('label::es')
+        ->and(labelCellsFor($sheets, 'label::es'))->toEqualCanonicalizing($expected);
+})->with([
+    'a choice' => [FieldType::SingleSelect, [
+        'options' => [['value' => 'r', 'label' => 'Red', 'label_translations' => ['es' => 'Rojo']]],
+    ], ['Rojo']],
+    'a cascade choice' => [FieldType::CascadingSelect, [
+        'levels' => [['key' => 'region']],
+        'options' => [['value' => 'ncr', 'label' => 'NCR', 'level' => 'region', 'parent' => null, 'label_translations' => ['es' => 'Capital']]],
+    ], ['Capital']],
+    'a likert grid row' => [FieldType::LikertMatrix, [
+        'rows' => [['value' => 'speed', 'label' => 'Speed', 'label_translations' => ['es' => 'Rapidez']]],
+        'columns' => [['value' => '1', 'label' => 'Low']],
+    ], ['Rapidez']],
+    'a likert grid column' => [FieldType::LikertMatrix, [
+        'rows' => [['value' => 'speed', 'label' => 'Speed']],
+        'columns' => [['value' => '1', 'label' => 'Low', 'label_translations' => ['es' => 'Bajo']]],
+    ], ['Bajo']],
+    // A cell's label is its row and its column, so a language only one of them has borrows the other's own text.
+    'a grid row' => [FieldType::Matrix, [
+        'rows' => [['value' => 'a', 'label' => 'Clinic', 'label_translations' => ['es' => 'Clínica']]],
+        'columns' => [['value' => 'b', 'label' => 'Staff']],
+        'cells' => [['value' => 'y', 'label' => 'Yes']],
+    ], ['Clínica — Staff']],
+    'a grid column' => [FieldType::Matrix, [
+        'rows' => [['value' => 'a', 'label' => 'Clinic']],
+        'columns' => [['value' => 'b', 'label' => 'Staff', 'label_translations' => ['es' => 'Personal']]],
+        'cells' => [['value' => 'y', 'label' => 'Yes']],
+    ], ['Clinic — Personal']],
+    'a grid cell choice' => [FieldType::Matrix, [
+        'rows' => [['value' => 'a', 'label' => 'Clinic']],
+        'columns' => [['value' => 'b', 'label' => 'Staff']],
+        'cells' => [['value' => 'y', 'label' => 'Yes', 'label_translations' => ['es' => 'Sí']]],
+    ], ['Sí']],
+    'a grid column\'s own choice' => [FieldType::Matrix, [
+        'rows' => [['value' => 'a', 'label' => 'Clinic']],
+        'columns' => [['value' => 'b', 'label' => 'Services', 'type' => 'multi_select', 'options' => [
+            ['value' => 'lab', 'label' => 'Lab', 'label_translations' => ['es' => 'Laboratorio']],
+        ]]],
+    ], ['Laboratorio']],
+]);
+
+it('translates a grid cell from its row and its column together, and leaves a language neither has blank', function (): void {
+    $sheets = choiceOnlyTranslationSheets(FieldType::Matrix, [
+        'rows' => [
+            ['value' => 'a', 'label' => 'Clinic', 'label_translations' => ['es' => 'Clínica']],
+            ['value' => 'z', 'label' => 'Ward'],
+        ],
+        'columns' => [
+            ['value' => 'b', 'label' => 'Staff', 'label_translations' => ['es' => 'Personal', 'fr' => 'Équipe']],
+            ['value' => 'c', 'label' => 'Beds'],
+        ],
+        'cells' => [['value' => 'y', 'label' => 'Yes']],
+    ]);
+
+    expect(surveyRow($sheets, 'q_a_b'))->toMatchArray(['label' => 'Clinic — Staff', 'label::es' => 'Clínica — Personal', 'label::fr' => 'Clinic — Équipe'])
+        ->and(surveyRow($sheets, 'q_a_c'))->toMatchArray(['label::es' => 'Clínica — Beds', 'label::fr' => ''])
+        // ⛔ Blank, never `Ward — Beds` copied into the Spanish column, which would read as a translation someone wrote.
+        ->and(surveyRow($sheets, 'q_z_c'))->toMatchArray(['label' => 'Ward — Beds', 'label::es' => '', 'label::fr' => '']);
+});
+
+it('opens no column for the form\'s own language, which is the plain label', function (): void {
+    $sheets = choiceOnlyTranslationSheets(FieldType::SingleSelect, [
+        'options' => [['value' => 'r', 'label' => 'Red', 'label_translations' => ['en' => 'Red']]],
+    ]);
+
+    expect($sheets['survey']['headers'])->not->toContain('label::en')
+        ->and($sheets['choices']['headers'])->not->toContain('label::en');
+});
+
+it('opens no column for a cascade level, which has nowhere in the workbook to be written', function (): void {
+    // ⚠️ A cascade level writes no row anywhere, not even its default-language label, so collecting its languages
+    // would add a column that is empty on every row. The row listed levels as a source; this pins that correction.
+    $sheets = choiceOnlyTranslationSheets(FieldType::CascadingSelect, [
+        'levels' => [['key' => 'region', 'label' => 'Region', 'label_translations' => ['de' => 'Bereich']]],
+        'options' => [['value' => 'ncr', 'label' => 'NCR', 'level' => 'region', 'parent' => null]],
+    ]);
+
+    expect($sheets['choices']['headers'])->not->toContain('label::de');
+});

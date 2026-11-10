@@ -342,6 +342,9 @@ final class BuilderPresenter
                     // them to PHP is `ConditionLabelMirrorDriftTest`, not this payload. Transmitting a
                     // second label nothing reads would be exactly the decorative surface `M43` measured.
                     'label' => $t->label(),
+                    // `D214` (`M226`): the label where the COMPARED question's shape reads it more narrowly, keyed by
+                    // shape. Today only `contains` on a single choice, which is a text match ("contains the text").
+                    'shape_labels' => $t->shapeLabels(),
                     // ⚠️ These shapes belong to the RELATED field, never the rule's owner: an operator in a
                     // conditional rule compares the value of the field the rule NAMES. See
                     // ValidationRuleType::takesOperator() for where that was measured.

@@ -128,3 +128,18 @@ it("accepts unavailable honorarium intervals and rejects borrowed accreditation 
   expect(report).toMatchObject({ uncertainty: { confidenceLevel: null, rowsWithPublishedInterval: 0, reportedRowsWithoutInterval: 1 } });
   await expect(inspectMapCoverage(honorariumUrl, async () => response({ ...data, rows: [censusRow] }))).rejects.toThrow("uncertainty");
 });
+
+const meanUrl = censusUrl.replace("bhw.profile-accreditation", "bhw.active-years");
+it("records mean presence without emitting or aggregating observations", async () => {
+  const report = await inspectMapCoverage(meanUrl, async target => response(String(target).includes("/geo/") ? geometry : { ...payload, total: null, parentMean: 12.34 }));
+  expect(report.coverage).toMatchObject({ hasReportedParentTotal: false, hasReportedParentMean: true });
+  expect(JSON.stringify(report)).not.toContain("12.34");
+  expect(report).not.toHaveProperty("uncertainty");
+});
+it.each([{ parentMean: undefined }, { parentMean: -1 }, { parentMean: "12" }, { parentMean: 12, total: 12 }])("rejects malformed parent means: %j", async fields => {
+  await expect(inspectMapCoverage(meanUrl, async () => response({ ...payload, total: null, ...fields }))).rejects.toThrow("Invalid published mean");
+});
+it("rejects mean fields on other indicators and numeric means on navigation-only views", async () => {
+  await expect(inspectMapCoverage(url, async () => response({ ...payload, parentMean: 12 }))).rejects.toThrow("Unexpected parent mean");
+  await expect(inspectMapCoverage(meanUrl, async () => response({ ...payload, rows: [], total: null, parentMean: 0, valueSupport: "navigation-only" }))).rejects.toThrow("Navigation-only");
+});

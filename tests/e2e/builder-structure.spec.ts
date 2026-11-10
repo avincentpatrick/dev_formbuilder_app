@@ -91,6 +91,47 @@ test('Builder — a label renamed on its row, and a question dragged by its grip
 });
 
 /*
+ * M221 (`R-18d9f001`) — a section's title renamed on its head in Structure, as a question's label is above, and kept
+ * after a reload. Before it, a title could be changed only from the settings pane.
+ */
+test('Builder — a section title renamed on its head, saved', async ({ page }, info) => {
+    test.setTimeout(180_000);
+    const formId = await createForm(page, `Section title ${info.project.name} ${Date.now()}`);
+
+    try {
+        await showBuilderPane(page, 'fields');
+        await page.locator('.palette').getByRole('button', { name: 'Text', exact: true }).click();
+        await saved(page);
+        await structure(page);
+        await page.getByRole('button', { name: 'Add section' }).click();
+        await saved(page);
+
+        const head = page.locator('[data-section-uid]').first();
+        await head.getByRole('button', { name: 'Edit title of New section' }).click();
+        const input = head.getByRole('textbox', { name: 'Section title' });
+        await expect(input).toBeFocused();
+        await assertClean(page, 'structure with a section title edited in place');
+
+        await input.fill('Household members');
+        const patched = page.waitForResponse(
+            (response) => response.request().method() === 'PATCH' && response.url().includes(`/forms/${formId}/sections/`),
+            { timeout: 20_000 },
+        );
+        await input.press('Enter');
+        await patched;
+        await expect(head.locator('.canvas__section-head')).toContainText('Household members');
+        await expect(head.locator('.canvas__section-head')).toBeFocused();
+        await saved(page);
+
+        await page.reload({ waitUntil: 'networkidle' });
+        await structure(page);
+        await expect(page.locator('[data-section-uid] .canvas__section-label')).toHaveText(['Household members']);
+    } finally {
+        await archive(page, formId);
+    }
+});
+
+/*
  * M177 (`R-4a6f004f`, `D146` A) — the testers' comment 4 (2026-10-11): "Form builder does not all[ow] bulk movement of
  * questions to a section". Two questions ticked in Structure go to a section together, in one order write, and stay
  * there after a reload; one Undo puts both back.

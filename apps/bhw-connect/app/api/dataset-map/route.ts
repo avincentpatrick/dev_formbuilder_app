@@ -1,3 +1,4 @@
+import { CENSUS_ACTIVE_YEARS_ID, joinCensusActiveYears } from "@/lib/maps/census-active-years";
 import { CENSUS_HONORARIUM_ID, isCensusProfileRate, joinCensusAccreditation, joinCensusTraining, joinCensusHonorarium } from "@/lib/maps/census-accreditation";
 import { STEPZERO_ACCREDITATION_ID, joinStepzeroAccreditation } from "@/lib/maps/stepzero-accreditation";
 import { joinUucRouteRows } from "@/lib/maps/uuc-routes";
@@ -9,6 +10,9 @@ import { createSupabaseServerClient } from "@/lib/db/supabase";
 import { readDatasetBySlug } from "@/lib/db/dataset";
 import { getGeoByCode } from "@/lib/db/geo";
 import { withBasePath } from "@/lib/base-path";
+import { barangayDrillAvailable, barangayGeometryUrl, barangayRelease } from "@/lib/maps/barangay-release";
+import { readBarangayRows } from "@/lib/maps/barangay-reader";
+import { BARANGAY_BHW_NOTE, BARANGAY_FACT_DATASETS } from "@/lib/maps/barangay-support";
 import {
   joinMapRows,
   parseMapChoice,
@@ -25,6 +29,11 @@ export async function GET(request: NextRequest) {
   const income = choice?.dataset === "lgu-income-class";
   if (!choice || !metric || (!spec && !income && !profiling))
     return NextResponse.json({ state: "unsupported" }, { status: 400 });
+  // Barangay polygons exist only once an accepted package is installed and this dataset is enabled.
+  const release = barangayRelease();
+  const barangayDrill = barangayDrillAvailable(choice.dataset, choice.indicator, metric.levels, release);
+  if (choice.level === "citymun" && !barangayDrill)
+    return NextResponse.json({ state: "unsupported" }, { status: 400 });
   try {
     const [source, geo] = await Promise.all([
       choice.dataset === "bhw-2025"
@@ -40,7 +49,13 @@ export async function GET(request: NextRequest) {
     if (!geo || geo.geoLevel !== choice.level)
       return NextResponse.json({ state: "unsupported" }, { status: 400 });
     const childLevel =
-      choice.level === "national" ? "region" : choice.level === "region" ? "province" : "citymun";
+      choice.level === "national"
+        ? "region"
+        : choice.level === "region"
+          ? "province"
+          : choice.level === "province"
+            ? "citymun"
+            : "barangay";
     const db = createSupabaseServerClient();
     let query = db
       .from("dim_geo")
@@ -63,9 +78,12 @@ export async function GET(request: NextRequest) {
     const censusRate = choice.dataset === "bhw-2025" && isCensusProfileRate(choice.indicator);
     const censusHonorarium = censusRate && choice.indicator === CENSUS_HONORARIUM_ID;
     const censusTraining = censusRate && spec?.table === "agg_training";
+    const censusMean = choice.dataset === "bhw-2025" && choice.indicator === CENSUS_ACTIVE_YEARS_ID;
+    let parentMean: number | null = null;
     let parentRate: number | null = null;
     let total: number | null = null;
     let totalNote: string | undefined;
+    let unattributed = 0;
     if (profiling) {
       const values = await db
         .from("agg_bhw_profiling_status")
@@ -116,6 +134,7 @@ export async function GET(request: NextRequest) {
       const uucRoute = spec.table === "agg_uuc_phc_criteria";
       const projection = uucRoute
         ? `geo_code,${spec.column},n_listed,n_health_evaluable`
+        : censusMean ? "geo_code,avg_active_years,n_total"
         : censusHonorarium ? "geo_code,any_honorarium_pct,n_total"
         : censusTraining ? "geo_code,coverage_pct,n_trained,n_total,ci_low,ci_high"
         : censusRate ? "geo_code,pct_accredited,n_accredited,n_total,ci_low,ci_high"
@@ -142,7 +161,24 @@ export async function GET(request: NextRequest) {
         childQuery = childQuery.eq(column, value);
         parentQuery = parentQuery.eq(column, value);
       }
-      const [values, parent] = await Promise.all([childQuery, parentQuery]);
+      // NHFR and UUC barangay values come straight from the source tables (their summaries stop at
+      // municipalities); BHW counts read the barangay aggregate rows like any other level.
+      const barangayRead = choice.level === "citymun" && BARANGAY_FACT_DATASETS.includes(choice.dataset);
+      const [values, parent] = await Promise.all([
+        barangayRead
+          ? readBarangayRows(db, {
+              dataset: choice.dataset,
+              column: spec.column,
+              datasetId: source.value.datasetId,
+              citymunCode: choice.code,
+              children: children.data,
+            }).then((read) => {
+              unattributed = read.unattributed;
+              return { data: read.data, error: null };
+            })
+          : childQuery,
+        parentQuery,
+      ]);
       if (
         values.error ||
         parent.error ||
@@ -151,21 +187,32 @@ export async function GET(request: NextRequest) {
         !parent.data
       )
         throw new Error("Values unavailable");
-      const join = censusHonorarium ? joinCensusHonorarium : censusTraining ? joinCensusTraining : censusRate ? joinCensusAccreditation : uucRoute ? joinUucRouteRows : declaredAccreditation ? joinStepzeroAccreditation : joinMapRows;
+      const join = censusMean ? joinCensusActiveYears : censusHonorarium ? joinCensusHonorarium : censusTraining ? joinCensusTraining : censusRate ? joinCensusAccreditation : uucRoute ? joinUucRouteRows : declaredAccreditation ? joinStepzeroAccreditation : joinMapRows;
       rows = join(children.data, values.data as unknown as Record<string, unknown>[], spec.column);
       const parentRow = join(
         [{ geo_code: choice.code, geo_name: geo.geoName }],
         parent.data as unknown as Record<string, unknown>[],
         spec.column,
       )[0];
-      if (declaredAccreditation || censusRate) parentRate = parentRow.value;
+      if (censusMean) parentMean = parentRow.value;
+      else if (declaredAccreditation || censusRate) parentRate = parentRow.value;
       else total = parentRow.value;
       totalNote = parentRow.note;
     }
+    if (choice.level === "citymun" && !BARANGAY_FACT_DATASETS.includes(choice.dataset))
+      totalNote = [totalNote, BARANGAY_BHW_NOTE].filter(Boolean).join(" ");
+    if (unattributed > 0)
+      totalNote = [
+        totalNote,
+        `${unattributed.toLocaleString()} ${metric.unit} in the municipal total come from facilities with no barangay recorded, so barangay values add up to less than the total.`,
+      ]
+        .filter(Boolean)
+        .join(" ");
     const payload: MapPayload = {
       state: "available",
       rows,
       total,
+      ...(censusMean ? { parentMean } : {}),
       ...((declaredAccreditation || censusRate) ? { parentRate } : {}),
       ...(totalNote ? { totalNote } : {}),
       area: geo.geoName,
@@ -174,12 +221,15 @@ export async function GET(request: NextRequest) {
       source: source.value.sourceName ?? source.value.name,
       date: source.value.asOfDate,
       license: source.value.license,
+      ...(choice.level === "province" && barangayDrill ? { barangayDrill: true } : {}),
       geometryUrl:
-        choice.level === "national"
-          ? withBasePath("/geo/regions.json")
-          : choice.level === "region"
-            ? withBasePath(`/geo/provinces/${choice.code}.json`)
-            : withBasePath(`/geo/citymun/${choice.code}.json`),
+        choice.level === "citymun"
+          ? barangayGeometryUrl(release!, choice.code)
+          : choice.level === "national"
+            ? withBasePath("/geo/regions.json")
+            : choice.level === "region"
+              ? withBasePath(`/geo/provinces/${choice.code}.json`)
+              : withBasePath(`/geo/citymun/${choice.code}.json`),
     };
     return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });
   } catch {

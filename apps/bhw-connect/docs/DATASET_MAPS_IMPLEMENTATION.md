@@ -849,3 +849,162 @@ Validation: 11 new adapter/API/export/audit checks; 1,635 database-backed tests 
 11 skipped. All 33 map browser cases passed, including honorarium receipt, zero, unavailable
 uncertainty and JSON semantics. Lint (existing fixture warning), typecheck, migration lint
 and prefixed no-data build passed.
+
+## Census average reported active years (8 November 2026)
+
+Enabled `bhw.active-years` within the independent Census map. The source contract in
+`ingestion/build_aggregates.sql` stores `round(avg(active_years_count), 2)`, and ingestion
+leaves absent active-year counts null. The mean therefore excludes missing counts: total
+validated profiles are not its contributing denominator. The definition, map summary and
+exports state that distinction; neither contributing count nor confidence interval is
+supplied by this aggregate.
+
+The adapter reads only `geo_code,avg_active_years,n_total` from the active Census release.
+It preserves finite nonnegative decimal means, validates a positive profile count, and
+leaves missing/duplicate/invalid rows unavailable. It does not use profile totals to invent
+a small-sample flag, calculate uncertainty or reconstruct a sum. The stored parent mean
+has its own `parentMean` field with null additive total; no child means are averaged.
+JSON labels the parent measure as a mean in years, and PNG preserves that label and unit.
+Area-relative quantiles are explicitly labeled and use year units, not percentage breaks.
+
+Public coverage validation checks the separate parent-mean contract without printing its
+value. Scope remains national/region/province navigation through municipal rows. No
+personal records, schema, disclosure rules or boundary acceptance change. Production row
+coverage remains unverified until the adapter is deployed.
+Validation: 17 new adapter/API/export/audit checks; full database-backed Vitest 1,652 passed,
+11 skipped. All 34 map browser cases passed, including decimal means, year units, the
+contributing-count caveat and JSON semantics. Lint (existing fixture warning), typecheck,
+migration lint and prefixed no-data build passed.
+
+## Legend and export parity (9 November 2026)
+
+A shared legend formatter now preserves distinct decimal breaks and their units in the
+accessible DOM legend and JSON labels consumed by PNG export. Adjacent numeric ranges have
+exclusive upper edges, matching the renderer's highest-cleared-lower-edge rule; the final
+finite edge is inclusive. Single-value categories retain inclusive bounds. JSON now records
+those edge semantics and the legend unit explicitly, alongside unchanged numeric bounds.
+
+This fixes exported percentages/year ranges that previously lacked units and distinctions
+such as 0.01 versus 0.02 being rounded to the same on-screen edge. Published income-class
+labels remain categorical. Profiling's last bin is represented as open-ended (100% or more),
+matching its existing displayed category and renderer behavior; bounded accreditation's
+last bin remains exactly 100%. Exported infinity becomes null plus `openEnded: true`, never
+an invalid JSON number. No dataset values, queries, disclosure rules or boundary assets change.
+Validation: eight new formatter/export checks; full database-backed Vitest 1,660 passed,
+11 skipped. All 35 map browser cases passed, including exact DOM/JSON decimal-label parity
+and desktop/phone PNG downloads. Lint (existing fixture warning), typecheck, migration lint
+and prefixed no-data build passed.
+
+## Unambiguous map-link selections (9 November 2026)
+
+Shared map choices now reject repeated dataset, indicator, period, level, code or selected
+parameters rather than accepting whichever value happens to be read first. The Next.js
+page preserves array-valued search parameters for that validation; previously it discarded
+them, potentially replacing a duplicated indicator with the dataset default. Unrelated
+tracking parameters remain harmless and do not become map state.
+
+A selected child must have the correct code depth: region at national scope, province at
+region scope and city/municipality at province scope. Leading zeros remain intact. Empty,
+wrong-depth and planned-slot selections are rejected. This is syntactic validation, not a
+new historical crosswalk or a claim of parent membership inferred from a code prefix.
+Authoritative geography/data joins continue to control actual rows.
+
+Invalid links render the existing dataset-picker recovery message without loading a
+fallback dataset. Valid links retain their selected geography and independent dataset
+choices. No indicators, source queries, boundaries or disclosure rules are expanded.
+Validation: 18 new parser/API cases; full database-backed Vitest 1,678 passed, 11 skipped.
+All 37 map browser cases passed, including duplicate-indicator and wrong-depth selection
+recovery with no fallback reads. Lint (existing fixture warning), typecheck, migration lint
+and prefixed no-data build passed.
+
+## Barangay drill-down, off until a release is installed (9 November 2026)
+
+A municipality can now drill into its barangays, but only when all three hold: an operator has set
+`BHW_BARANGAY_RELEASE` to an installed package release (never `latest`), the dataset is enabled
+(`BARANGAY_DRILL_DATASETS`: NHFR and UUC first), and the indicator's source carries barangay rows.
+With the setting empty, which is the default, behaviour is unchanged: a selected municipality offers
+its dashboard link, and a link with `level=citymun` is refused with 400 before any data is read.
+BHW Census, StepZero, profiling, poverty and income class stay out; the first two need a barangay-level
+small-count suppression review, the rest have no barangay values.
+
+The scope gains a `citymun` level (seven-digit code, ten-digit barangay selection). The API reads the
+municipality's barangays from `dim_geo`, joins values exactly as for other levels, keeps the parent
+total separate, and points the card at `/maps/<release>/citymun/<code>.json`, the package's own shard
+name. Barangays with no candidate polygon (withheld, unmatched, or a municipality with none) stay in
+the complete table with their values; the map draws only what the shard contains. A missing shard is the
+existing boundary-unavailable state with the table intact. Nothing else in a payload changes, and no
+boundary, value or disclosure rule is widened.
+
+Operator steps, which are outside this tree: install the package under versioned same-origin storage
+with the prior release kept, run `scripts/validate-boundary-hosting.mjs` against the real route, set the
+setting, and restart. Unsetting it, or pointing it at the previous release, is the rollback. Whether
+the live barangay rows exist per dataset is unverified until the setting is on, so the first check after
+enabling is the read-only probe against one municipality of each enabled dataset.
+Validation: 11 new unit/API cases, two browser cases (drill with a withheld barangay in the table, and
+no drill when unavailable), and a deliberate defect in the availability flag that turned a test red.
+Locally only the browser specs that mock the API ran (22 passed); the specs that read the seeded
+database were left to CI because this environment has none.
+
+## Barangay values read from the source tables (10 November 2026)
+
+The first live probe of barangay drill-down (release `psgc-2026q3-ring-rebuilt-20261109`, NHFR and UUC) found
+the package, shards and polygons correct (every barangay of the sampled municipalities had a polygon) but **no
+barangay with a value in 15 samples**: the summary tables the map read, `agg_nhfr_counts` and
+`agg_uuc_phc_counts`, are municipality-and-above by design (their migrations say a municipality page reads its
+own barangays from the fact tables directly). Drill-down showed correct outlines with every barangay
+"Not reported".
+
+At municipality scope the API now reads the barangays' values from the source tables
+(`lib/maps/barangay-reader.ts`), one municipality at a time, paged and failing closed rather than partial:
+
+- **NHFR** (every indicator): facilities grouped by `barangay_geo_code` from `fact_nhfr_facility`, with the same
+  definitions as `agg_nhfr_counts` (ownership `Government`/`Private`, the four facility types, summed bed
+  capacity, and presence as 1 or 0). A barangay with none reads **0**, as in the municipality summaries.
+  Facilities with no barangay recorded, or a code the geography does not list, stay in the municipal total, which
+  is never replaced by the sum of the barangays. A note says how much of that indicator's total they account for
+  ("N facilities/beds in the municipal total come from facilities with no barangay recorded"), and only when
+  it is more than zero: barangay presence, or an indicator the unplaced facilities do not touch, shows none. No suppression, as for the summaries:
+  an inventory of places.
+- **UUC**: only `uuc.listed`, 1 if the barangay is on the 2025 list in `fact_uuc_phc_barangay`, else 0.
+  The qualifying-route indicators are published classifications that must not be recomputed per barangay, so
+  they stay at municipality level.
+
+Which indicators have a barangay view is one list (`lib/maps/barangay-support.ts`). Choosing an indicator or
+dataset without one while in a barangay view returns to the municipality's province with it selected, and the
+API refuses such a request. BHW Census and StepZero remain excluded pending the barangay-level small-count
+suppression review. No migration, load or schema change; no dataset's municipal values change.
+Validation: reader and support unit tests (zero versus missing, unplaced facilities, paging, a failed or
+over-large read, the UUC list), API cases by table, three browser cases; deliberate defects in the NHFR
+definition, the unplaced-facility note and the scope fallback each turned a test red. Locally the browser
+specs that mock the API ran (23 passed); those reading the seeded database were left to CI. The live check after
+deploy is the same probe: barangays with a value in the busiest municipalities of each dataset.
+
+### Live result (10 November 2026)
+
+After the deploy, the read-only probe of the testing site (the busiest municipalities of NHFR and UUC; 15
+municipality-and-indicator combinations) found a value for **700 of 700 barangays** (0 of the first
+15 samples before the reader). Barangay values added up exactly to the municipal total in all but Calamba
+(142 of 144 facilities placed; its note names the 2 that have no barangay recorded), and the UUC list counts
+matched their municipal counts exactly (22, 15 and 14). At barangay level the UUC route indicator, BHW Census and
+StepZero were refused with 400, and the province view offered the drill. A browser rendered the NHFR map for
+Bacarra (43 barangays) and a UUC municipality (21) with the map ready and no "Not reported" rows. Barangay
+drill-down is therefore left on for NHFR and UUC; no rollback was needed.
+
+## BHW Census and StepZero counts per barangay (10 November 2026)
+
+Following the owner's decisions (DECISIONS.md, BARANGAY_BHW_DISCLOSURE_PROPOSAL.md), barangay drill-down now
+covers BHW **counts of totals**: Census validated profiles and the StepZero total, registered,
+registered-and-accredited and non-registered counts, plus StepZero's source population and households as
+context. They read the barangay rows of `agg_bhw_counts` and `agg_bhw_stepzero_counts` through the same path as
+every other level (no fact-table reader, no new data); a barangay with no row reads "Not reported", a zero
+stays zero. Totals are not suppressed (BUILD_PLAN §4.1), as on the dashboards.
+
+Percentages, averages, honorarium and training stay at municipality level; the barangay view says so beside
+the map. A test requires every barangay-mapped BHW indicator to be a count, so a rate cannot be added by
+accident. Choosing an indicator without a barangay map while in a barangay view returns to the province and
+now says so ("This indicator has no barangay map, so it is shown for the province."). The agreed rule for any
+future barangay rate is that both groups behind it have at least 5 people.
+Validation: unit and API cases (counts read from the aggregate tables and never from facts; every rate, the
+mean, honorarium and a training topic refused), a browser assertion of the notice, and deliberate defects (a
+rate added to the barangay list; the note dropped) that turned tests red. The live check after deploy is the
+same probe, on BHW counts in the busiest municipalities.

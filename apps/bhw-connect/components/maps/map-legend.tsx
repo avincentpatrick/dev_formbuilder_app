@@ -1,10 +1,6 @@
+import { mapBinLabel } from "@/lib/maps/legend-label";
 import type { ColorBin } from "@/lib/charts/color-scale";
 import { NO_DATA_COLOR } from "@/lib/charts/color-scale";
-
-function formatEdge(v: number, suffix: string): string {
-  const rounded = Number.isInteger(v) ? v : Math.round(v * 10) / 10;
-  return `${rounded.toLocaleString()}${suffix}`;
-}
 
 /**
  * Real-DOM legend for the choropleth map (E0.1). The map canvas is
@@ -41,7 +37,7 @@ export function MapLegend({
             />
             <span>
               {categoryLabels?.[bin.min] ??
-                `${formatEdge(bin.min, valueSuffix)}${bin.max > bin.min ? `–${formatEdge(bin.max, valueSuffix)}` : ""}`}
+                mapBinLabel(bin, i, bins, valueSuffix)}
             </span>
           </li>
         ))}

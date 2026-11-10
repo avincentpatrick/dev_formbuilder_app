@@ -1,5 +1,6 @@
 import { TRAINING_TOPICS } from "@/lib/catalog/definitions";
 import { getDatasetMap } from "./definitions";
+import { isReleasePublic } from "@/lib/releases/visibility";
 
 export type MapScope = { level: "national" | "region" | "province" | "citymun"; code: string };
 export type MapChoice = MapScope & {
@@ -90,7 +91,7 @@ export function parseMapChoice(params: URLSearchParams): MapChoice | null {
   if (["dataset", "indicator", "period", "level", "code", "selected"].some(key => params.getAll(key).length > 1))
     return null;
   const dataset = params.get("dataset");
-  if (!dataset || !getDatasetMap(dataset)) return null;
+  if (!dataset || !getDatasetMap(dataset) || !isReleasePublic(dataset)) return null;
   const base = initialMapChoice(dataset);
   const indicator = params.get("indicator") ?? base.indicator;
   const period = params.get("period") ?? base.period;

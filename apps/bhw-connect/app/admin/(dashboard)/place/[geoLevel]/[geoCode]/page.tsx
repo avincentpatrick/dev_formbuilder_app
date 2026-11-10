@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { coverageOf, getAreaProfile, type ProfileSection } from "@/lib/db/area-profile";
+import { isReleasePublic, PROFILING_STATUS_SLUG } from "@/lib/releases/visibility";
 import { GEO_LEVELS, type GeoLevel } from "@/lib/filters/schema";
 import { GeoSearch } from "@/components/home/geo-search";
 
@@ -144,13 +145,18 @@ export default async function AdminAreaProfilePage({ params }: { params: Promise
         >
           UUC for PHC
         </Link>
-        {" · "}
-        <Link
-          href={`/profiling-status/${profile.geo.geoLevel}/${profile.geo.geoCode}`}
-          className="underline"
-        >
-          profiling status
-        </Link>
+        {/* The public section answers 404 while the release is hidden; the figures stay on this page. */}
+        {isReleasePublic(PROFILING_STATUS_SLUG) && (
+          <>
+            {" · "}
+            <Link
+              href={`/profiling-status/${profile.geo.geoLevel}/${profile.geo.geoCode}`}
+              className="underline"
+            >
+              profiling status
+            </Link>
+          </>
+        )}
       </p>
     </div>
   );

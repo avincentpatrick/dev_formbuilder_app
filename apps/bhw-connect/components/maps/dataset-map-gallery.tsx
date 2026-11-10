@@ -1,6 +1,7 @@
 import { MapActivityProvider } from "./map-activity";
 import { DATASET_MAPS } from "@/lib/maps/definitions";
 import { DatasetMapCard } from "./dataset-map-card";
+import { isReleasePublic } from "@/lib/releases/visibility";
 /** Every release keeps independent state; the gallery shares only a two-map resource limit. */
 export function DatasetMapGallery() {
   return (
@@ -13,7 +14,7 @@ export function DatasetMapGallery() {
       </p>
       <MapActivityProvider>
         <div className="grid gap-5 md:grid-cols-2">
-          {DATASET_MAPS.filter((d) => d.slug !== "bhw-profiling-status-2026").map((d) => (
+          {DATASET_MAPS.filter((d) => isReleasePublic(d.slug)).map((d) => (
             <DatasetMapCard key={d.slug} dataset={d.slug} />
           ))}
         </div>

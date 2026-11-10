@@ -8744,7 +8744,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   one defect reported twice, the fatal first — so that arm now defers a missing enum to the arm that owns it.
   ⚠️ **Every edit was in place: 1/1 then 2/2 added/removed, zero line-count delta**, so the sibling row's
   ceiling blocker was never engaged. Closed by `M88`. Filed by `M87`.
-- **`minor` · `.sheets-fields` is probably the worst `MdsSegmentedControl` host in the tree and it is the one
+- ✅ **CLOSED BY `M233` (2026-11-10) — ****`minor` · `.sheets-fields` is probably the worst `MdsSegmentedControl` host in the tree and it is the one
   with no coverage of any kind.** Measured by `M87`'s fan-out (2026-09-08) while closing the census row.
   `SheetsRuleFields.vue`'s `modeOptions` are `"Create a sheet for me"` and `"Use one I already have"` — two
   segments whose label text alone is roughly the width of a 520px modal, before padding — inside
@@ -8755,7 +8755,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `responsive-axe.spec.ts` scans the Sheets rule detail PAGE, which is a different surface.
   ⚠️ **It is filed with the spill row rather than folded into it** because the remedy is the same decision:
   if the component gets a wrap or shrink affordance, all four hosts are covered at once. **Live.**
-  Filed by `M87`. **Tier: during-testing.**
+  Filed by `M87`. **Tier: during-testing.** ✅ **Closed by `M233` (2026-11-10), on its branch. Its premise was half wrong, measured in the real app:** the spill it expected cannot happen with today's copy, with or without the host's `flex-wrap`. A segment is a flex item with `min-width: auto` and a label that can break, so it shrinks to its LONGEST word ("already"), not its whole label. At 375, 834 and 1440px, at default text and at `extra_large` + dyslexia, the modal body and the control read 0px in all twelve cases, the host's wrap forced to `nowrap` included; squeezed labels break onto more lines instead. The wrap matters only once a label cannot break: with labels unbreakable at `extra_large` + dyslexia, removing it scrolls the modal body 246px sideways at 375 and 103px at 834 and 1440. The half that held is the coverage: no spec opened `RuleFormModal`. `tests/e2e/integrations-rule-modal.spec.ts` now opens a NEW Sheets rule, which calls only the local `/columns` catalog (measured; a route guard fails the case on any `/destinations` call, the sidecars that reach Google), applies exactly that stress, and guards it by requiring two radios and the two segments on separate lines. It also gives the modal its first axe scan, clean in both themes at all three widths. The wrap deleted, committed on a throwaway branch and rebuilt, turned the stress case red at all three widths (246, 103, 103) and left the axe cases green. `SheetsRuleFields.vue`'s comment on the rule, which said the wrap "is what fixes" an overflow, now states the measured mechanism. The other hosts stay with `R-db28b120`.
 - **`minor` · A `docs/feature-backlog.md` citation into the exceptions log resolves to a live line about a
   different subject, and the citation gate is built to pass exactly that.** Found by `M87`'s fan-out
   (2026-09-08). This file cites `docs/ux/exceptions-log.md:646-651` for an `overflow-x: clip` rationale;
@@ -11337,7 +11337,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   cannot be widened to cover them**: `assertNoHorizontalOverflow` skips subtrees under an `overflow-x: auto|scroll`
   ancestor by construction, and three of the four hosts sit inside `.mds-modal__body`. Each needs its own
   element-level read, and the modal ones need the modal opened first. **Live** — the guards are unasserted today.
-  Filed by `M109`. **Tier: during-testing.**
+  Filed by `M109`. **Tier: during-testing.** ⚠️ **Narrowed by `M233` (2026-11-10):** the `.sheets-fields` host now has its element-level read, `tests/e2e/integrations-rule-modal.spec.ts`, red at all three widths without its wrap. What remains is `.mds-field`, `.encode-field` and widening `.config` beyond 375px. ⚠️ **Measure each host's LONGEST WORD before writing its read:** a segment shrinks to it, so `.sheets-fields` could not spill on its own copy at any width, and needed labels made unbreakable before its read could fail.
 
 - ~~**`major` · Every `config` key that `UpdateFieldRequest::configRules()` does not enumerate is silently dropped
   on every field save, with a 200 OK.**~~ Filed 2026-09-25 by `M110` from a user-directed exploration of the running
@@ -15972,3 +15972,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, after #414 merges: decide which translated columns count, and have the exporter call the shared rule.
 
   **Live.** Filed by `M229`. **Tier: during-testing.**
+
+- **`nit` · `e2e-seeder-rule-modal-comment` — `E2eSeeder::seedConnections()` says no spec opens the rule modal, and since `M233` one does.**
+  Found by `M233` (2026-11-10). Two comments in it, the Slack fixture's (*"the specs never do"*) and the Sheets fixture's (*"which no spec does"*), give that as the reason the seeder triggers no outbound request. `tests/e2e/integrations-rule-modal.spec.ts` now opens a NEW Sheets rule's modal. The reason still holds in substance: that modal calls only the local `/columns` catalog, measured, and a route guard fails the spec on any `/destinations` call. Only the wording is stale.
+  The remedy is to say which modal reaches a provider: a saved Sheets rule's, which re-inspects its sheet, and a Slack rule's, which lists channels. `database/seeders/E2eSeeder.php` is held by #429, so this waits for that merge.
+
+  **Not live** — a comment, not the product. Filed by `M233`. **Tier: during-testing.**

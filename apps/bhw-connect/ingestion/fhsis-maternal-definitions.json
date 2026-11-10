@@ -1,0 +1,172 @@
+[
+  {
+    "code": "maternal_bmi_normal",
+    "program_area": "maternal",
+    "label": "First-trimester pregnant women with normal BMI",
+    "numerator_def": "First-trimester pregnant women with normal BMI",
+    "denominator_def": "Source estimated population (all ages); age rates are shares of this same population, not age-specific coverage",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "2. BMI_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "maternal_bmi_low",
+    "program_area": "maternal",
+    "label": "First-trimester pregnant women with low BMI",
+    "numerator_def": "First-trimester pregnant women with low BMI",
+    "denominator_def": "Source estimated population (all ages); age rates are shares of this same population, not age-specific coverage",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "2. BMI_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "maternal_bmi_high",
+    "program_area": "maternal",
+    "label": "First-trimester pregnant women with high BMI",
+    "numerator_def": "First-trimester pregnant women with high BMI",
+    "denominator_def": "Source estimated population (all ages); age rates are shares of this same population, not age-specific coverage",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "2. BMI_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "maternal_td_first",
+    "program_area": "maternal",
+    "label": "First pregnancy: at least two Td-containing vaccine doses",
+    "numerator_def": "First pregnancy: at least two Td-containing vaccine doses",
+    "denominator_def": "Source estimated population (all ages); age rates are shares of this same population, not age-specific coverage",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "3. Td Vaccines_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "maternal_td_repeat",
+    "program_area": "maternal",
+    "label": "Second or later pregnancy: at least three Td-containing vaccine doses",
+    "numerator_def": "Second or later pregnancy: at least three Td-containing vaccine doses",
+    "denominator_def": "Source estimated population (all ages); age rates are shares of this same population, not age-specific coverage",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "3. Td Vaccines_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "maternal_prenatal_ifa",
+    "program_area": "maternal",
+    "label": "Iron with folic acid supplementation completed during pregnancy",
+    "numerator_def": "Iron with folic acid supplementation completed during pregnancy",
+    "denominator_def": "Source estimated population (all ages); age rates are shares of this same population, not age-specific coverage",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4. Prenatal Supp_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "maternal_prenatal_mms",
+    "program_area": "maternal",
+    "label": "Multiple micronutrient supplementation completed during pregnancy",
+    "numerator_def": "Multiple micronutrient supplementation completed during pregnancy",
+    "denominator_def": "Source estimated population (all ages); age rates are shares of this same population, not age-specific coverage",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4. Prenatal Supp_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "maternal_prenatal_calcium",
+    "program_area": "maternal",
+    "label": "Calcium carbonate for high-risk pregnancies supplementation completed during pregnancy",
+    "numerator_def": "Calcium carbonate for high-risk pregnancies supplementation completed during pregnancy",
+    "denominator_def": "Source estimated population (all ages); age rates are shares of this same population, not age-specific coverage",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "4. Prenatal Supp_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "maternal_hepb_screened",
+    "program_area": "maternal",
+    "label": "Hepatitis B screening during pregnancy",
+    "numerator_def": "Hepatitis B screening during pregnancy",
+    "denominator_def": "Source estimated population (all ages); age rates are shares of this same population, not age-specific coverage",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "5. Hepatitis B Screening_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "maternal_hepb_positive",
+    "program_area": "maternal",
+    "label": "Hepatitis B reactive during pregnancy",
+    "numerator_def": "Hepatitis B reactive during pregnancy",
+    "denominator_def": "Women screened/tested for this condition (matching age group for age breakdowns)",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "5. Hepatitis B Screening_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "maternal_anemia_screened",
+    "program_area": "maternal",
+    "label": "CBC or hemoglobin and hematocrit testing during pregnancy",
+    "numerator_def": "CBC or hemoglobin and hematocrit testing during pregnancy",
+    "denominator_def": "Source estimated population (all ages); age rates are shares of this same population, not age-specific coverage",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "6. Anemia Screening_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "maternal_anemia_positive",
+    "program_area": "maternal",
+    "label": "Anemia diagnosed during pregnancy",
+    "numerator_def": "Anemia diagnosed during pregnancy",
+    "denominator_def": "Women screened/tested for this condition (matching age group for age breakdowns)",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "6. Anemia Screening_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "maternal_gdm_screened",
+    "program_area": "maternal",
+    "label": "Gestational diabetes screening during pregnancy",
+    "numerator_def": "Gestational diabetes screening during pregnancy",
+    "denominator_def": "Source estimated population (all ages); age rates are shares of this same population, not age-specific coverage",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "7. GD Screening_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "maternal_gdm_positive",
+    "program_area": "maternal",
+    "label": "Gestational diabetes positive during pregnancy",
+    "numerator_def": "Gestational diabetes positive during pregnancy",
+    "denominator_def": "Women screened/tested for this condition (matching age group for age breakdowns)",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "7. GD Screening_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "maternal_dewormed",
+    "program_area": "maternal",
+    "label": "Pregnant women given one dose of deworming tablet",
+    "numerator_def": "Pregnant women given one dose of deworming tablet",
+    "denominator_def": "Source estimated population (all ages); age rates are shares of this same population, not age-specific coverage",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "8. Deworming for Pregnant_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "maternal_postpartum_ifa",
+    "program_area": "maternal",
+    "label": "Postpartum women completing iron with folic acid supplementation",
+    "numerator_def": "Postpartum women completing iron with folic acid supplementation",
+    "denominator_def": "Source estimated population (all ages); age rates are shares of this same population, not age-specific coverage",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "2. PP Supp_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "maternal_postpartum_vita",
+    "program_area": "maternal",
+    "label": "Postpartum women given vitamin A",
+    "numerator_def": "Postpartum women given vitamin A",
+    "denominator_def": "Source estimated population (all ages); age rates are shares of this same population, not age-specific coverage",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "2. PP Supp_2025_PH_nofml.xlsx",
+    "uuc_criterion_d": false
+  }
+]

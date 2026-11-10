@@ -1,0 +1,82 @@
+[
+  {
+    "code": "demo_population",
+    "program_area": "demographics",
+    "label": "FHSIS estimated population",
+    "numerator_def": "FHSIS estimated population",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "Demographic_2025_EB_Final.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "demo_households",
+    "program_area": "demographics",
+    "label": "FHSIS estimated households",
+    "numerator_def": "FHSIS estimated households",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "Demographic_2025_EB_Final.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "demo_barangays",
+    "program_area": "demographics",
+    "label": "FHSIS reported barangays",
+    "numerator_def": "FHSIS reported barangays",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "Demographic_2025_EB_Final.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "demo_population_per_barangays",
+    "program_area": "demographics",
+    "label": "FHSIS population per barangay",
+    "numerator_def": "FHSIS estimated population in the BGY & BHS source table",
+    "denominator_def": "Source-reported barangays; ratio is undefined when the count is zero. Source ratio retained, not recomputed.",
+    "unit": "persons per barangay",
+    "source_workbook": "Demographic_2025_EB_Final.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "demo_rhu",
+    "program_area": "demographics",
+    "label": "FHSIS reported rural health units",
+    "numerator_def": "FHSIS reported rural health units",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "Demographic_2025_EB_Final.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "demo_population_per_rhu",
+    "program_area": "demographics",
+    "label": "FHSIS population per rural health unit",
+    "numerator_def": "FHSIS estimated population in the BGY & BHS source table",
+    "denominator_def": "Source-reported rural health units; ratio is undefined when the count is zero. Source ratio retained, not recomputed.",
+    "unit": "persons per rural health unit",
+    "source_workbook": "Demographic_2025_EB_Final.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "demo_bhs",
+    "program_area": "demographics",
+    "label": "FHSIS reported barangay health stations",
+    "numerator_def": "FHSIS reported barangay health stations",
+    "denominator_def": "No denominator: source count only",
+    "unit": "count",
+    "source_workbook": "Demographic_2025_EB_Final.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "demo_population_per_bhs",
+    "program_area": "demographics",
+    "label": "FHSIS population per barangay health station",
+    "numerator_def": "FHSIS estimated population in the BGY & BHS source table",
+    "denominator_def": "Source-reported barangay health stations; ratio is undefined when the count is zero. Source ratio retained, not recomputed.",
+    "unit": "persons per barangay health station",
+    "source_workbook": "Demographic_2025_EB_Final.xlsx",
+    "uuc_criterion_d": false
+  }
+]

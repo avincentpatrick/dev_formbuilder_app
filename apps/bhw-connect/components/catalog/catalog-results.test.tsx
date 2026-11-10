@@ -109,3 +109,78 @@ it("labels partial barangay totals and municipal attribution separately from ser
   expect(detail).toContain("Partial total");
   expect(detail).toContain("8 of 10");
 });
+
+it("retains district context, exact inputs, definitions and reporting coverage in details", () => {
+  const detailed = {
+    ...dataset,
+    id: "fhsis" as const,
+    title: "FHSIS",
+    indicators: [
+      {
+        ...dataset.indicators[0],
+        id: "fhsis.fic",
+        label: "Fully immunized children",
+        unit: "%",
+        values: [{ value: 81.23, numerator: 11.25, denominator: 13.85 }],
+        definition: {
+          numerator: "Children immunized",
+          denominator: "Projected cohort",
+          sourceWorkbook: "Synthetic dictionary",
+        },
+        coverage: { label: "Reporting units", covered: 1, total: 2 },
+      },
+    ],
+  };
+  const result = {
+    ...catalog([detailed]),
+    selection: {
+      mode: "district",
+      districtCode: "example",
+      citymunCode: "0102801",
+      barangayCode: "0102801001",
+    } as const,
+  };
+  const { document } = parseHTML(
+    renderToStaticMarkup(<CatalogDetails catalog={result} dataset={detailed} />),
+  );
+  expect(document.querySelector("a")?.getAttribute("href")).toBe(
+    "/catalog?mode=district&district=example&citymun=0102801&barangay=0102801001",
+  );
+  const text = document.documentElement.textContent;
+  for (const expected of [
+    "Children immunized",
+    "Projected cohort",
+    "Synthetic dictionary",
+    "11.25",
+    "13.85",
+    "Reporting units: 1 of 2",
+    "Source date:",
+    "Updated: Date not provided",
+  ])
+    expect(text).toContain(expected);
+  expect(
+    document.querySelector('[aria-label="Scrollable indicator table"]')?.getAttribute("tabindex"),
+  ).toBe("0");
+});
+
+it.each(["unsupported", "unavailable", "suppressed", "failed"] as const)(
+  "explains %s detail measures without displaying a zero",
+  (state) => {
+    const unavailable = {
+      ...dataset,
+      availableIndicators: 0,
+      state,
+      indicators: [
+        { ...dataset.indicators[0], state, values: [], reason: `Explicit ${state} reason` },
+      ],
+    };
+    const { document } = parseHTML(
+      renderToStaticMarkup(
+        <CatalogDetails catalog={catalog([unavailable])} dataset={unavailable} />,
+      ),
+    );
+    expect(document.documentElement.textContent).toContain(`Explicit ${state} reason`);
+    expect(document.documentElement.textContent).not.toContain("0 facilities");
+    expect(document.querySelector("table")).toBeNull();
+  },
+);

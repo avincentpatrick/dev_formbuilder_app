@@ -1,0 +1,32 @@
+[
+  {
+    "code": "ncd_60plus_assessed",
+    "program_area": "ncd",
+    "label": "Risk-assessed using PhilPEN, 60 years and above",
+    "numerator_def": "Risk-assessed using PhilPEN, 60 years and above",
+    "denominator_def": "Projected population aged 60 and above",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1b. NCD Meds Senior Citizens_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_60plus_htn",
+    "program_area": "ncd",
+    "label": "Identified with hypertension, 60 years and above",
+    "numerator_def": "Identified with hypertension, 60 years and above",
+    "denominator_def": "Adults aged 60 and above risk-assessed using PhilPEN",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1b. NCD Meds Senior Citizens_nofml.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "ncd_60plus_dm",
+    "program_area": "ncd",
+    "label": "Identified with type 2 diabetes, 60 years and above",
+    "numerator_def": "Identified with type 2 diabetes, 60 years and above",
+    "denominator_def": "Adults aged 60 and above risk-assessed using PhilPEN",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1b. NCD Meds Senior Citizens_nofml.xlsx",
+    "uuc_criterion_d": false
+  }
+]

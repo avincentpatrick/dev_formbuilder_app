@@ -1,0 +1,283 @@
+{
+  "summary": {
+    "reference": 41991,
+    "same_code": 41576,
+    "missing": 415,
+    "invalid_geometry": 0,
+    "parent_mismatch": 0,
+    "overlap": 12199,
+    "candidate_usable": 29377,
+    "source_barangay_features": 42006,
+    "source_unique_codes": 42006,
+    "unmatched_source": 430,
+    "duplicate_source_codes": 0,
+    "invalid_source_features": 0,
+    "positive_area_overlap_pairs": 10322
+  },
+  "by_reference_region": {
+    "01": {
+      "reference": 3267,
+      "same_code": 3267,
+      "missing": 0,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 1163,
+      "candidate_usable": 2104
+    },
+    "02": {
+      "reference": 2311,
+      "same_code": 2311,
+      "missing": 0,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 816,
+      "candidate_usable": 1495
+    },
+    "03": {
+      "reference": 3105,
+      "same_code": 3105,
+      "missing": 0,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 1365,
+      "candidate_usable": 1740
+    },
+    "04": {
+      "reference": 3993,
+      "same_code": 3992,
+      "missing": 1,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 1335,
+      "candidate_usable": 2657
+    },
+    "05": {
+      "reference": 3471,
+      "same_code": 3471,
+      "missing": 0,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 810,
+      "candidate_usable": 2661
+    },
+    "06": {
+      "reference": 3389,
+      "same_code": 3389,
+      "missing": 0,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 888,
+      "candidate_usable": 2501
+    },
+    "07": {
+      "reference": 2312,
+      "same_code": 2312,
+      "missing": 0,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 496,
+      "candidate_usable": 1816
+    },
+    "08": {
+      "reference": 4365,
+      "same_code": 4365,
+      "missing": 0,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 712,
+      "candidate_usable": 3653
+    },
+    "09": {
+      "reference": 1904,
+      "same_code": 1904,
+      "missing": 0,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 561,
+      "candidate_usable": 1343
+    },
+    "10": {
+      "reference": 2022,
+      "same_code": 2022,
+      "missing": 0,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 740,
+      "candidate_usable": 1282
+    },
+    "11": {
+      "reference": 1162,
+      "same_code": 1162,
+      "missing": 0,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 362,
+      "candidate_usable": 800
+    },
+    "12": {
+      "reference": 1097,
+      "same_code": 1096,
+      "missing": 1,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 487,
+      "candidate_usable": 609
+    },
+    "13": {
+      "reference": 1701,
+      "same_code": 1701,
+      "missing": 0,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 313,
+      "candidate_usable": 1388
+    },
+    "14": {
+      "reference": 1178,
+      "same_code": 1178,
+      "missing": 0,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 551,
+      "candidate_usable": 627
+    },
+    "16": {
+      "reference": 1311,
+      "same_code": 1311,
+      "missing": 0,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 306,
+      "candidate_usable": 1005
+    },
+    "17": {
+      "reference": 1460,
+      "same_code": 1460,
+      "missing": 0,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 161,
+      "candidate_usable": 1299
+    },
+    "18": {
+      "reference": 1353,
+      "same_code": 1353,
+      "missing": 0,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 391,
+      "candidate_usable": 962
+    },
+    "19": {
+      "reference": 2590,
+      "same_code": 2177,
+      "missing": 413,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 742,
+      "candidate_usable": 1435
+    }
+  },
+  "special_cases": {
+    "NCR": {
+      "reference": 1701,
+      "same_code": 1701,
+      "missing": 0,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 313,
+      "candidate_usable": 1388
+    },
+    "Manila": {
+      "reference": 883,
+      "same_code": 883,
+      "missing": 0,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 38,
+      "candidate_usable": 845
+    },
+    "NIR": {
+      "reference": 1353,
+      "same_code": 1353,
+      "missing": 0,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 391,
+      "candidate_usable": 962
+    },
+    "Sulu": {
+      "reference": 410,
+      "same_code": 0,
+      "missing": 410,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 0,
+      "candidate_usable": 0
+    },
+    "BARMM": {
+      "reference": 2590,
+      "same_code": 2177,
+      "missing": 413,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 742,
+      "candidate_usable": 1435
+    },
+    "SGA": {
+      "reference": 63,
+      "same_code": 63,
+      "missing": 0,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 51,
+      "candidate_usable": 12
+    },
+    "HUC_parent": {
+      "reference": 3046,
+      "same_code": 3046,
+      "missing": 0,
+      "invalid_geometry": 0,
+      "parent_mismatch": 0,
+      "overlap": 465,
+      "candidate_usable": 2581
+    }
+  },
+  "overlap_diagnostics": {
+    "max_fraction_of_smaller_polygon": 1.0,
+    "pairs_above_one_millionth_of_smaller_polygon": 9781,
+    "note": "Diagnostic only; no positive-area overlap is silently accepted."
+  },
+  "source_geometry_origins": {
+    "source": 41998,
+    "dissolved": 1,
+    "plotted": 7
+  },
+  "non_barangay_features": {
+    "None": 2,
+    "SubMun": 14
+  },
+  "historical_compatibility": "not-established; same-code matches are candidates, not accepted historical joins",
+  "publication_ready": false,
+  "provenance": {
+    "release": "v1.1.1-PSGC-2026-3Q",
+    "source": "https://github.com/faeldon/philippines-json-maps/releases/download/v1.1.1/geojson-hires.zip",
+    "archive_sha256": "d6aedda878af0884f112d992183639df61f5e74af380cf71a589055f9437a348",
+    "reference_sha256": "e21e46edbb09995f5a1d2bfd46e621c5b8bed6b7597dc00d4db9dee7a4696fbe",
+    "reference_description": "Local synthetic-development database dim_geo; not production certification",
+    "shapely_version": "2.1.2",
+    "attribution": "James Faeldon (MIT); underlying NAMRIA and PSA boundaries through OCHA COD-AB (CC BY 3.0 IGO).",
+    "normalization": "Supplier integer PSGC padded to ten digits; no historical remapping."
+  },
+  "manila_hierarchy_adaptations": 897,
+  "assessment_date": "2026-11-08",
+  "supplier_metadata": {
+    "version": "1.1.1",
+    "psgc": "2026-3q",
+    "built": "2026-11-07",
+    "metadata_commit": "680e32e62baeccbcd8845d3b1387bc67c1baf78a",
+    "source_repo": "faeldon/philippines-psgc-shapefiles",
+    "source_tag": "v1.0.1"
+  },
+  "report_scope": "Aggregate assessment only. Detailed identifiers and permitted reference extract remain outside git."
+}

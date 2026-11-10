@@ -10006,13 +10006,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   classifier; not measured against the live API). Now that the field type reaches the editor, it can mark
   those fields as not writable. **Latent.** — needs a tenant to map an answer onto a computed field.
   Filed by `M96`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.**
-- **`minor` · The Next section and the hand-off list open decisions as work to take.** Found by `M96`
+- ✅ **CLOSED BY `M215` (2026-11-06) — ****`minor` · The Next section and the hand-off list open decisions as work to take.** Found by `M96`
   (2026-09-15) while verifying the zero-gate row. `scripts/state.php` reads every bullet of
   `docs/pipeline.md`'s Next section into its next-work list, including the bullets waiting on the user, so
   `scripts/next.php`'s "Take work from the Next section" sentence names the open decisions beside the rows,
   and `scripts/loop.php status` prints the same list. A decision is the user's to move, not work an
   increment can take. ⚠️ Carry each bullet's class through, or stop reading at the decisions. **Live.**
-  Filed by `M96`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.**  ⚠️ **Corrected by `M98` (2026-09-18), which verified the row without taking it:** the row is under-scoped, one of its cautions is unnecessary, and the fix is on the reading side rather than the writing side. The hand-off does not merely offer the open decisions as work — it offers the eight BLOCKED rows in the same breath, each blocked on a decision nobody can start, so the row's second option, stopping at the decisions, would still put unstartable rows under "Take work from". And the class is not missing from the document: `docs/pipeline.md` already prints `· ready`, `· blocked (decision: Dnn)` and `· waiting on you` on every Next bullet, and `scripts/state.php` discards that suffix when it reads them. So the fix is to make the READER carry each bullet's class through — ready, blocked or waiting — with only the ready ids named as work and the blocked rows and the decisions listed separately, rather than cutting the list at one boundary. The caution about keeping the ids that feed the waiting sentence can go: `scripts/state.php` reads those from the testing gate's "Waiting on you:" line, not from the Next bullets, so reclassifying the bullets cannot disturb them.  ⛔ **RETIERED `during-testing` → `early-testing` BY `D66` (2026-09-26, `M114`), AND THE REASON IS THE ANSWER ITSELF.** `M98` argued `during-testing` for the sibling row on the ground that *"no tester sees any of this"*. True, and beside the point: the audience for this defect is the USER, not a tester. Shown the generated line, they read its `blocked` and `waiting on you` counts as a demand to decide everything at once — because the line spends the same two words on a question nobody has seen and on a precondition that merely does not hold. `D66` fixes the asking rule in `CLAUDE.md`; this row is the generator half, and it is now in the tier being worked.
+  Filed by `M96`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.**  ⚠️ **Corrected by `M98` (2026-09-18), which verified the row without taking it:** the row is under-scoped, one of its cautions is unnecessary, and the fix is on the reading side rather than the writing side. The hand-off does not merely offer the open decisions as work — it offers the eight BLOCKED rows in the same breath, each blocked on a decision nobody can start, so the row's second option, stopping at the decisions, would still put unstartable rows under "Take work from". And the class is not missing from the document: `docs/pipeline.md` already prints `· ready`, `· blocked (decision: Dnn)` and `· waiting on you` on every Next bullet, and `scripts/state.php` discards that suffix when it reads them. So the fix is to make the READER carry each bullet's class through — ready, blocked or waiting — with only the ready ids named as work and the blocked rows and the decisions listed separately, rather than cutting the list at one boundary. The caution about keeping the ids that feed the waiting sentence can go: `scripts/state.php` reads those from the testing gate's "Waiting on you:" line, not from the Next bullets, so reclassifying the bullets cannot disturb them.  ⛔ **RETIERED `during-testing` → `early-testing` BY `D66` (2026-09-26, `M114`), AND THE REASON IS THE ANSWER ITSELF.** `M98` argued `during-testing` for the sibling row on the ground that *"no tester sees any of this"*. True, and beside the point: the audience for this defect is the USER, not a tester. Shown the generated line, they read its `blocked` and `waiting on you` counts as a demand to decide everything at once — because the line spends the same two words on a question nobody has seen and on a precondition that merely does not hold. `D66` fixes the asking rule in `CLAUDE.md`; this row is the generator half, and it is now in the tier being worked. ✅ **CLOSED BY `M215` (2026-11-06), on its branch:** `M98`'s reader-side fix, measured first: an end-anchored pattern classified all 4,186 Next bullets across the 299 trunk versions of `docs/pipeline.md`. `scripts/next-section.php` is the one reader, and it is pure, so tests call it directly. `scripts/state.php`, `scripts/loop.php status` and `scripts/next.php` now name only ready rows as work and list blocked rows and decisions apart from them. A bullet with no readable class is never named as work and is reported. ⚠️ **The row understated itself twice:** the readers also hid the section's cut, printing 12 ids of a tier with 168 ready and 76 blocked, and they now state it; and `render_next()`'s own *"Take work from here"* sat above the blocked bullets, so that one sentence changed on the writing side too. `tests/Feature/Docs/NextSectionClassTest.php` holds the seam, reading the formats out of `render_next()` so the dormant `waiting on you` class stays guarded while no decision is open; 13 mutants caught. ⚠️ Its wiring arm reads source, because `R-eecdb678` still stands: what the three reports print was read by eye on the host. `R-2ca49f19`'s "Decision Board" sentences are left alone. What this exposed about the tier choice is filed at the backlog's end.
 - **`minor` · The central-host redirect is an absolute `APP_URL`, which a request from another origin cannot
   follow.** Found by `M96` (2026-09-15) while verifying the central landing row. `bootstrap/app.php` renders
   `NotASubdomainException` as a redirect to `config('app.url')`. When a request's own origin is not `APP_URL`
@@ -10506,7 +10506,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   to an unlimited, non-billing tier, restate the seat sentence for it, name the `not_provisioned` rows the choice
   brings with it, and record that an existing workspace changes tier only in the console, because a re-run with a
   different plan is refused. **Live.** Filed by `M98`. **Tier: during-testing.**
-- **`minor` · The first-boot runbook and the checklist set up none of the database backup §5 prescribes.**
+- ✅ **CLOSED BY `M216` (2026-11-09) — ****`minor` · The first-boot runbook and the checklist set up none of the database backup §5 prescribes.**
   Found by `M98` (2026-09-17) while reading the database steps against the backup runbook.
   `docs/deployment-infrastructure.md` §5 prescribes a daily `pg_dump` in custom format written to a backup volume
   and copied off-box, continuous WAL archiving with `archive_mode = on` and an `archive_command` for point-in-time
@@ -10520,6 +10520,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `archive_mode`/`archive_command` on to an off-box target and registers the daily dump and its prune as a Task
   Scheduler job, then prove one restore on the box; if losing the testing data is acceptable instead, record that
   as a decision and say in §8 that §5 does not bind this site. **Live.** Filed by `M98`. **Tier: during-testing.**
+  ✅ **Closed by `M216` (PR #413, `95ff77ea`, 2026-11-09):** §8.2 step 12 now sets up `scripts/nightly-backup.ps1` as the task, and it was rebuilt on the box from that step. `D212` took a daily copy off the box with one restore proved, so WAL archiving is production's, filed as `production-pitr`. The box's run and restore are recorded on `R-4bda047a`.
 - **`minor` · The first-boot steps leave `LOG_LEVEL=debug` and one unrotated log file in place.**
   Found by `M98` (2026-09-17) while reading where the server's `.env` values come from.
   `docs/deployment-infrastructure.md` §8.2 has the operator copy `.env.example` to `.env` and then set a named
@@ -10769,7 +10770,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   added — and neither copy moved. ⚠️ Re-derive the number in both copies, or say in one place that the list is not
   a census and point at the count. **Live** — both sentences are in the tree today. Filed by `M101`.
   **Tier: during-testing.**
-- **`minor` · Five of seven paths on the testing site carry none of the four app security headers, and nothing
+- ✅ **CLOSED BY `M217` (2026-11-07) — ****`minor` · Five of seven paths on the testing site carry none of the four app security headers, and nothing
   anywhere says whether that is intended.** Found by `M101` (2026-09-19) while measuring header coverage from
   outside. `/` and `/login` carry `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options` and
   `Referrer-Policy`; `/up`, `/robots.txt`, `/favicon.ico`, a hashed build asset and a 404 carry **none** of them.
@@ -10777,7 +10778,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and documented — but the CONSEQUENCE is written nowhere, so a reader cannot tell an intended scope from a gap.
   ⚠️ Decide whether `X-Content-Type-Options: nosniff` in particular belongs on static responses, where it is the
   one of the four that actually applies to a file download, and record the answer beside the middleware rather
-  than in a row. **Live** — measured on every response served today. Filed by `M101`. **Tier: during-testing.**
+  than in a row. **Live** — measured on every response served today. Filed by `M101`. **Tier: during-testing.** ✅ **THE ANSWER IS IN `AppSecurityHeaders`'S DOCBLOCK, HEADER BY HEADER.** `nosniff` belongs on a file, and `public/.htaccess` now sets it, because no middleware reaches a file PHP never sees; that needs no box step and no Apache restart. Every type the site serves was read from the live site first (JS, CSS, fonts, icons, JSON, text), so it blocks nothing. The framing headers and `Referrer-Policy` do not belong on those paths, and the docblock says why. `scripts/staging-headers-judge.php` now requires it on the two static probes, and run against the live site before the deploy it reported both absent (exit 1), so it is known to read the real thing. ⚠️ The row understated by one path: `/sw.js` carries none either. ⚠️ **The merge point owes one read:** the same judge run after the deploy, and whether `/up` and the 404 picked the header up too, which depends on vhost wiring no document records. Both go in `M217`'s release.
 - ~~**`minor` · Two documents disagree about which file on the box holds the `X-Robots-Tag` directive, and a runbook
   that names the wrong one sends an operator to the wrong place during an incident.**~~ Found by `M101` (2026-09-19)
   while writing §8.3's authority statement for `R-562bcc2a`. This ledger records it as `Header always set
@@ -10805,7 +10806,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   exemption arm — so the cost has been paid twice and is no longer hypothetical. ⚠️ Either give CI an Apache
   container that actually serves this file, or say in the file's own header that it is unexercised and that any
   change to it ships unproved. **Live** — the next handler path added to that box is swallowed the same way.
-  Filed by `M101`. **Tier: during-testing.**
+  Filed by `M101`. **Tier: during-testing.** ⚠️ **Amended by `M217` (2026-11-07):** the file is no longer stock (one `X-Content-Type-Options` line), and that line is exercised, from outside and at night, by `scripts/staging-headers-judge.php`. The rewrite rules this row is about still are not.
 - **`minor` · This repository asserts what the off-repo Testing Server Checklist says, in prose no gate can
   check, and one such assertion was false for at least one increment.** Found by `M101` (2026-09-19) while
   taking `R-0855052e`, whose remedy was *"delete the check from the checklist"* — and there was nothing there to
@@ -10956,7 +10957,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `R-5ecfa6cd`'s own headline; this one lives in the canonical access document and is a separate edit. **Live** —
   `docs/ACCESS-MATRIX.md` is the document an operator reads to learn what the hosts do. Filed by `M105`.
   **Tier: early-testing.** ✅ **CLOSED BY `M109` (2026-09-25), UNDER RECORDED `D13` EXCEPTION #2** — the sentence now says the central host **redirects** to `APP_URL`, names `NotASubdomainException` in `bootstrap/app.php` by symbol rather than by line, and records that only the `/api/v1` arm answers 404 with `CentralHostFallbackTest` pinning it. Every one of this row's four citations held exactly as written — evidence four for four. ⛔ **BUT THE ROW IS A FLOOR AND NOT A CENSUS, AND ITS PREMISE WAS FALSE: THERE ARE TWO AUTHORED COPIES, NOT ONE.** This row says `M105` *"corrected the sibling copy in `R-5ecfa6cd`'s own headline"*, which is true and is not the whole of it — `R-5ecfa6cd`'s **body** still read *"so the central host answers 404"*, contradicted four lines below it by its own `M96` correction. `M96` and `M98` each corrected that row's body while neither rewrote its headline; `M105` then rewrote the headline and did not strike the body sentence. Both copies are now fixed, in place. ⚠️ A third, byte-identical copy sits in `.kilo/worktrees/obsidian-dogwood/` — the untracked second checkout already filed as its own row, reached by a repo-wide `grep -r` and invisible to ripgrep, which is that row's whole point and not this one's to fix.
-- **`minor` · `.github/workflows/ci.yml:84` asserts in the present tense that `DEPLOY_ENABLED` is unset, which `D47`
+- ✅ **CLOSED BY `M217` (2026-11-07) — ****`minor` · `.github/workflows/ci.yml:84` asserts in the present tense that `DEPLOY_ENABLED` is unset, which `D47`
   made false three days before `D53` was decided on the opposite premise.** Filed 2026-09-20 by `M105` while
   verifying `D53`. The comment reads *"`DEPLOY_ENABLED` is unset, so that was latent rather than live"* and dates
   from `454d9ba` (`M39`, 2026-08-28), well before `D47` turned automatic deploys on. ⛔ **It is the only in-tree
@@ -10964,7 +10965,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `D53`'s central premise — and `DEPLOY_ENABLED` is a GitHub environment variable that no gate here can read, so
   nothing can ever contradict the comment mechanically. The fix is to correct or delete the sentence; the durable
   fix is to stop asserting environment state in a comment no gate can check. **Live.** Filed by `M105`.
-  **Tier: during-testing.**
+  **Tier: during-testing.** ✅ **The line now says `DEPLOY_ENABLED` was unset until 2026-09-17**, read from `gh variable list` (set 2026-09-17T14:49:23Z), so it dates a fact instead of asserting the present, and no `ci.yml:` citation moves. ⛔ **The row's *"only in-tree statement"* was false when filed:** `deploy.yml` had already said it is set, since `M98`, two days earlier. Its dated sentences are correct and stay.
 - ✅ **CLOSED BY `M108` (2026-09-24) — `minor` · ~~The six `D38` rows cannot be grouped into one increment under `D13`, and they cannot safely be taken
   apart either.~~** Filed 2026-09-20 by `M105` on answering `D38`. Three of them edit a single table —
   `docs/architecture/technical-architecture.md` §7.1, lines 443 (Form draft), 449 (Exports) and 454 (Users & roles)
@@ -11305,6 +11306,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   because it interrupts a respondent mid-form and cannot see `GeoInput.vue`'s deliberate swallow) or an
   `ASSET_URL`-style immutable asset host, which is a deployment change. **Live** — every deploy ages the previous
   release one day closer to the cutoff. Filed by `M109`. **Tier: during-testing.**
+  ⚠️ **Partly measured at `M216`'s sitting (2026-11-09), read-only, from the box's `meridian-access.log`, which starts at 2026-09-17 13:49:36:** 402 requests under `/build/assets/` returned 404, from 14 addresses. The 20 most recent, all at about 01:02 box time on 2026-11-07, were each to a doubled path, `/build/assets/assets/<chunk>.js`. No page asks for that path, and none of those files was ever served 200. That pattern is a client misresolving the chunks' relative imports, not a tab that outlived the window. The figure this row lacks is still unread: the single-`assets` 404s for files that **were** once served, and how many days after their first 200 each went missing.
 
 - **`minor` · The guest runtime has no asset-version check of any kind, so nothing can ever tell a respondent's tab
   that the release moved.** Filed 2026-09-25 by `M109` while verifying `R-e7d6f223`, whose own text rests on
@@ -11340,7 +11342,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   skips the top-level key (`Validator.php:659-664`) and rebuilds `config` from the enumerated paths only.
   `FormBuilderService::writeField()` then whole-column-replaces with the result. ⛔ **THIS IS REACHABLE DATA LOSS, NOT A
   SHAPE COMPLAINT.** Option `label_translations` is written by XLSForm import (`XlsformImportParser.php:319`),
-  read by the runtime (`schema-mapping.ts:183,282-289`), re-exported (`XlsformExporter.php:433`), faithfully sent
+  read by the runtime (`schema-mapping.ts:183,282-289`), re-exported (`XlsformExporter::pushPairList()`), faithfully sent
   back by the client (`ChoicesEditor.vue:17-20` spreads `{...opt, ...patch}`) — and is not in the allowed rule set
   (`:159-165`). Import a multilingual form, edit any choice field, and every translation is gone. ⚠️ **Only types
   whose `configRules()` arm is non-empty are affected** — choice, cascading, matrix, likert_matrix, geo, media and
@@ -11865,7 +11867,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the importer gap the whole of what is left. ⚠️ Either teach the importer and `CascadeResolver` to read the
   translation columns the exporter already writes, or record at the exporter that these columns are
   author-authored only. **Latent** — it bites the first multilingual grid or cascade imported from a
-  workbook, and nothing loses data today. Filed by `M111`. **Tier: during-testing.**
+  workbook, and nothing loses data today. Filed by `M111`. **Tier: during-testing.** ⚠️ **Corrected by `M217` (2026-11-07):** a grid's translations do reach the workbook now, on the per-row and per-cell questions and the choices sheet. **A cascade level's do not, and never did:** a level has no row in the workbook, not even its default-language label, so *"round-trips out of the product"* is false for it. What is left for a level is a place to write it at all, not only an importer to read it. An imported grid is flattened into plain questions (the spec's §3), so its translations come back on those.
 
 - ✅ **CLOSED BY `M113` (2026-09-26) — `minor` · The expression and template publish gates still refuse on their first violation, so `M112`'s
   collect-every-violation promise stops at the structural gate.** Found by `M112` (2026-09-26) while closing
@@ -12486,13 +12488,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `calculated_needs_formula` precisely because publish will not. `FieldConversionServiceTest` pins the premise (both
   gates silent). The remedy is a publish refusal naming the field. **Live.** Filed by `M121`. **Tier: early-testing.** ✅ **CLOSED BY `M122`:** `ExpressionValidationGate::checkFormula()` refuses a calculated question whose `calculated_formula` is missing, not a string, or blank after a trim — exactly what the runtime would have skipped — as `calculated_formula_missing`, naming the field. The call site was replaced in place and the check appended, because the gate is cited by line from a design document and from this ledger. ⛔ **The row understated its reach:** an XLSForm `calculate` row with no `calculation` imports as `''` (`XlsformImportParser.php:211-212`) — a third way in, refused now too. ⚠️ **Not retroactive:** an already-published blank formula stays, so the runtime skips stay. The engine's `calculated_needs_formula` warning now says the form cannot be published without one, and the premise pin in `FieldConversionServiceTest` is flipped. ✅ Two mutations CAUGHT: the refusal removed, and the trim dropped.
 
-- **`minor` · An XLSForm export loses every translation that lives only on choices.** Measured by `M121` at source,
+- ✅ **CLOSED BY `M217` (2026-11-07) — ****`minor` · An XLSForm export loses every translation that lives only on choices.** Measured by `M121` at source,
   not executed: `XlsformExporter::extraLanguages()` collects languages from section labels, field labels and hints and
   validation messages — never from an option's, row's, column's or level's `label_translations` — and the choice-list
   writer fills only the languages it collected. A form translated only in its choices exports no `label::xx` column,
   so the round trip drops them. ⚠️ This contradicts `M111`'s note that grid translations have a live export path.
   `M121`'s export test had to add a field-level translation to get a `label::es` choices column at all, and its comment
-  says so. **Live.** Filed by `M121`. **Tier: during-testing.**
+  says so. **Live.** Filed by `M121`. **Tier: during-testing.** ✅ **`extraLanguages()` now reads a question's options, a grid's rows, columns and cells, and a grid column's own choices**, and executing it first turned the row's source reading into a measured failure on all eight. ⛔ **The row understated itself: the language was only half of it for a grid.** `emitLikertMatrix` and `emitMatrix` wrote `label` alone, so collecting the language would have opened a column with an empty cell. A likert row now writes its translation, and a grid cell writes its row's and column's together, borrowing the default-language text when only one has that language and staying blank when neither does. ⚠️ **It overstated one source:** a cascade level has no row in the workbook, so collecting it would only add an empty column. It is left out and pinned. `M121`'s workaround is gone from `FieldConversionServiceTest`, which passes without it, and `XlsformImportTest` now pins the round trip back in.
 
 - **`nit` · `routes/api.php`'s note that *"THE WARNING IS NOW A GATE"* names only the Vitest half.** Measured by
   `M121`. The comment above the resume READ credits `resources/public-runtime/__tests__/sw.test.ts`, whose arm hard-codes
@@ -13815,6 +13817,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `InlineLabelEdit` serves it, through a `renameSection` beside `renameField`. **Live.** Filed by `M150`.
   **Tier: during-testing.**
 
+- ✅ **CLOSED BY `M223` (2026-11-08) — ****`nit` · `E2eSeederIdempotencyTest` checks the `releases` table's order against the notes file's, but reads the table with no order.**
+  Found 2026-11-08 by `M221` and `M220`, whose pull requests went red on it.
+  - `Release::query()->pluck('version')` carries no `ORDER BY`, and the case compared it with `toBe()` against the file's order.
+  - Red in CI three times: #432 (newest note 0.17.4, run 42393462799 and its re-run) and #433 (0.18.0, run 42396170296). Red locally on #434's branch (0.18.1). Green on #414 (0.17.2) and #431 (0.17.3).
+  - The product is not affected: `WhatsNew::releases()` sorts by `version_compare` itself. Why the rows came back in that order was not established, and the fix does not need it to be.
+  - Filed by `M223`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M223` (2026-11-08), on its branch.**
+  - Both lists are now sorted newest first by `version_compare` before they are compared. That still checks the same versions, all of them and no others.
+  - With #434's notes file swapped in, the old assertion was red and the new one is green.
+  - A mutant that makes `releases:sync` skip one release is CAUGHT.
+
 - ✅ **CLOSED BY `M151` (2026-10-09) — ****`major` · On a form whose questions carry a place within their section — every XLSForm import — a drag reorders the
   builder's list but not what respondents, the paper and the export see.** Found by `M151` while planning `R-2baef8ea`.
   `XlsformImportParser::assignSequences()` numbers each question within its section, and `XlsformImporter.php` stores it as
@@ -14112,7 +14125,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · The preview-drag E2E case timed out once on the tablet project in a 33-test local run, and passed alone.** Found by `M161` (2026-10-12) running the builder specs its diff reaches: `builder-preview-authoring.spec.ts`'s "questions dragged in the preview" case failed at its SECOND drag — the grip's `boundingBox()` after a new section was added — when the 240 s test timeout ended it, 26.9 minutes into the run; run alone on the same build it passed in 1.3 minutes. `M161` changes nothing the Preview uses. `D2` makes a flaky E2E result a CI failure, so a case that fails under load is owed a cause: the stack's slowness late in a long run, or a drag that races the section's render. **Latent** — measured once, locally, and not on CI. Filed by `M161`. **Tier: during-testing.**
 
-- **`minor` · The testing server's database backups sit on the same machine as the database: no off-box copy, no write-ahead-log archiving and no restore drill.** Found by `M160`'s session (2026-10-12) when the user asked that no record be deleted on the testing site during development. `docs/deployment-infrastructure.md` §5 describes a daily `pg_dump` copied off the box, continuous WAL archiving and a quarterly restore drill; none of it existed on the testing server, whose only scheduled task named "backup" is Windows' own SettingSync. A nightly local backup now runs (`meridian-test-db-backup`, 01:30, keeps the newest 14 — set up with the user's yes), but a disk failure would take it with the database. The remedy needs a target off the box from the user — a second disk, a NAS or another machine. **Live.** Filed by `M160`. **Tier: during-testing.**
+- ✅ **CLOSED BY `M216` (2026-11-09) — ****`minor` · The testing server's database backups sit on the same machine as the database: no off-box copy, no write-ahead-log archiving and no restore drill.** Found by `M160`'s session (2026-10-12) when the user asked that no record be deleted on the testing site during development. `docs/deployment-infrastructure.md` §5 describes a daily `pg_dump` copied off the box, continuous WAL archiving and a quarterly restore drill; none of it existed on the testing server, whose only scheduled task named "backup" is Windows' own SettingSync. A nightly local backup now runs (`meridian-test-db-backup`, 01:30, keeps the newest 14 — set up with the user's yes), but a disk failure would take it with the database. The remedy needs a target off the box from the user — a second disk, a NAS or another machine. **Live.** Filed by `M160`. **Tier: during-testing.**
+  ✅ **Closed by `M216`'s box half, the user at both machines on 2026-11-09 (`D212` A, `D213` A):**
+  - **The target:** the hidden share `MeridianBackup$` on `D:\MeridianBackup`, on `DESKTOP-36C5T41` (192.168.1.119). D: is that desktop's own 1 TB hard disk. A local account, `meridianbackup`, has Change on the share and Modify on the folder; the only other rights are the user's, SYSTEM's and Administrators'. The share is encrypted, and a firewall rule admits TCP 445 from 192.168.50.2 alone.
+  - **The account:** SYSTEM, holding a credential for 192.168.1.119 in its own vault, saved by a one-shot task that was then deleted. The plan's first choice worked, so §8.2's dedicated account was not needed. Measured as SYSTEM: the share was reachable, and a file was written, read back and deleted.
+  - **The run:** task `meridian-test-db-backup` rebuilt per §8.2 step 12 (SYSTEM, 01:30, `-OffBoxDir "\\192.168.1.119\MeridianBackup$"`, keeping 30). Its first run returned `LastTaskResult` 0. It wrote `deploy-20261109-050547.dump`, 1,173,778 B, with SHA-256 `A2395B01…37B5D3` on both machines. The old task's definition is kept in `C:\meridian\meridian-test-db-backup.pre-M216.xml`.
+  - **The restore:** that dump went into the scratch database `meridian_restoretest` with `pg_restore --no-owner` as `postgres`. It exited 0 with no messages. All 70 tables were restored. The only count that differed was `public.sessions` (143 in the dump, 127 live; expired sessions were removed after 05:05 UTC). The scratch database was then dropped.
+  - **Left:** a lost copy still tells no one (`nightly-backup-silent-failure`). There is no next drill (`restore-drill-no-owner`). The desktop's address comes from DHCP (`backup-target-dhcp`).
 
 - ✅ **CLOSED BY `M164` (2026-10-12) — ****`minor` · The Help page's contents list sits only at the top, so a reader deep in its twenty-three chapters scrolls all the way back to reach another.**
   The user's comment on `M163`'s Builder reference (2026-10-12, in chat): *"I saw it. but i am having a hard time scrolling up and
@@ -15065,7 +15084,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M180` (2026-10-20) — ****`minor` · A question's Default value is saved but never filled in for a respondent, though the Help page says it is.**
   The Advanced tab's **Default value** (`resources/js/components/builder/ConfigPanel.vue:840`) saves `default_value`, but nothing reads it
   when a form opens — `resources/public-runtime/lib/prefill.ts` seeds only a hidden question's fixed value — and it reaches only the
-  XLSForm export (`app/Services/Xlsform/XlsformExporter.php:283`). `resources/js/components/help/manual.ts:815` says *"an answer filled
+  XLSForm export (`XlsformExporter::applyDefault()`). `resources/js/components/help/manual.ts:815` says *"an answer filled
   in before the respondent starts, which they can change"*. The remedy (`D148` A, taken by R4): the default fills the answer when the
   form opens — the public form, the preview and manual entry — and the respondent can change it; a default written as a formula is
   worked out like a calculation, with the picker. **Live.** Filed by `M178`. **Tier: early-testing.** **AMENDED BY `M180` (2026-10-20):** `D154` — a formula default is worked out once, when the form opens, and is then the respondent's answer. Taken by `M180` with `R-fa3223d9` (the same box). ✅ **CLOSED BY `M180` (2026-10-20):** the browser fills a default in when a form opens fresh — the guest form with nothing to restore, staff keying a new response, the builder preview — worked out ONCE (`D154`) and shaped for its control (`resources/public-runtime/lib/defaults.ts`); a draft restored afterwards drops a seeded default it does not hold, so a cleared one stays cleared; each new repeat entry starts from its members' defaults; the box is **Fixed · Formula**, a choice offering its own options, the picker on a formula over the questions before it and the dates. The server injects nothing. Red first: 14 Vitest (the defaults module by absence). Mutants: 5 of 5 caught. Built and held for merge point 3 (`D137`); live since it, 2026-10-20.
@@ -15754,3 +15773,54 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, to be measured when taken: assert the gauge equals the surviving row's `size_bytes`, which still reddens on an accumulating design and does not care about the clock. Pinning the clock in the case would also work and proves less.
 
   **Live.** Filed by `M214`. **Tier: during-testing.**
+
+- **`minor` · `production-pitr` — Production's 15-minute recovery is unbuilt, and it needs a physical base backup and a server restart that the runbook never named.**
+  Found by `M216` (2026-11-07), verifying `R-5f180437`'s remedy against the PostgreSQL 15 manual. `D212` put the testing site on a daily copy, so this is production's.
+  - `docs/non-functional-requirements.md` asks for a 15-minute RPO in Phase 1, by continuous WAL archiving and a daily full backup. `docs/deployment-infrastructure.md` §5 described that as a `pg_dump` plus WAL until `M216` corrected it: the manual says a dump *"cannot be used as part of a continuous-archiving solution"*, because it holds too little for WAL replay.
+  - It needs a `pg_basebackup` job, `archive_mode` (*"can only be set at server start"*), an `archive_command` to an off-box target, an `archive_timeout` no longer than the RPO, a prune that removes old WAL with its base backup, and a drill that recovers to a chosen minute.
+  - **To measure when taken:** the archive's size. A forced switch still archives a full 16 MB file, so at 900 seconds the ceiling is 96 files a day, about 46 GB per 30 days. That is an estimate from the setting, not a measurement.
+  - §8 says a production site gets its own PostgreSQL instance. If that holds, the restart and the archive reach no other application. On the testing site's shared instance they would also reach `bhw_connect`.
+
+  **Latent** — no production site exists yet. Filed by `M216`. **Tier: before-launch.**
+
+- **`minor` · `nightly-backup-silent-failure` — Nobody is told when the nightly backup fails, so a lost off-box copy could go unnoticed for weeks.**
+  Found by `M216` (2026-11-07), writing `scripts/nightly-backup.ps1`.
+  - The script reports through its exit code, which lands in the task's `LastTaskResult`. Only someone who opens Task Scheduler or runs a block on the box ever sees it. The older task had the same gap.
+  - `M100`'s certificate task is the warning: its predecessor logged success every day with its protective arm dead. This script does not read as success when the copy fails, and it still tells no one.
+  - The deploy's own dump is separate and keeps running, so the failure this hides is the off-box half, which is the part that survives a dead disk.
+  The remedy, to be measured when taken: something that already reaches a person, such as a scheduled check of the newest dump's age or a line on the operator console. Which one depends on what can read the target without its credentials.
+
+  **Live.** Filed by `M216`. **Tier: during-testing.**
+
+- **`minor` · `restore-drill-no-owner` — The quarterly restore drill §5 prescribes has no reminder and no owner.**
+  Found by `M216` (2026-11-07). `docs/deployment-infrastructure.md` §5 item 4 says a backup never test-restored is not a verified backup, and asks for a restore every quarter. `M216` proves one on the box, and nothing asks for the next. The testing server has already outlived one quarter with no drill, which is how a prescribed drill goes unrun. The remedy is whatever makes the next one come up on its own, such as a dated row, a scheduled reminder or a check of the last drill's date, and it may share its answer with `nightly-backup-silent-failure`.
+
+  **Live.** Filed by `M216`. **Tier: during-testing.**
+
+- **`minor` · `box-c-drive-small` — The testing server keeps its database on a 60 GB C: drive with 21 GB free while nearly 5 TB on E: sits unused, and nothing warns before C: fills.**
+  Found by `M216`'s read-only box check (2026-11-07).
+  - **Measured:** C: is 60 GB with 21 GB free, and E: is 4,963 GB with 4,952 GB free. PostgreSQL's data directory is `C:\Program Files\PostgreSQL\15\data`, read from the service's own command line, and it holds `bhw_connect` as well as `meridian`. Every backup folder this repository's runbook names is on C: too.
+  - **Why it matters:** when C: fills, the database can no longer write, and PostgreSQL can shut down if it cannot write its log, which takes both applications down. Nothing reads the free space today. `nightly-backup-silent-failure` is the same gap for the backup.
+  - **Not urgent, as far as measured:** Meridian's dump is about 1.2 MB a night. What fills the 39 GB in use and how fast it grows have not been measured.
+  - ⚠️ **E: is on the same RAID volume as C:** (disk 0, a Dell PERC H740P), so moving anything there adds room and no protection. `D213`'s copy off the box is what protects the data.
+  The remedy, to be measured when taken: first read what is using C: and how fast it grows, then choose between a free-space warning and moving folders to E:. Moving the data directory restarts the PostgreSQL server, which also interrupts BHW Connect.
+
+  **Latent** — nothing has failed, and the rate of growth is unmeasured. Filed by `M216`. **Tier: during-testing.**
+
+- **`minor` · A tier holding only blocked rows leaves the Next section with nothing to take, even when a lower tier has ready rows.** Found by `M215` (2026-11-06) while separating ready rows from blocked ones in the reports. `next_work()` in `scripts/pipeline.php` picks the most urgent tier holding a ready or a blocked row and stops there, so once a tier's ready rows run out, its blocked rows hide every ready row below it. `during-testing` holds 76 blocked rows today, so this is what happens the day its 168 ready rows are done. `M215` made the reports say so (*"holds no ready row, so nothing in it can be started"*) instead of printing an empty list, and left the choice of tier alone. The remedy, to be measured when taken: fall through to the next tier with a ready row and name the blocked tier above it. **Latent.** — needs a tier whose open rows are all blocked. Filed by `M215`. **Tier: during-testing.**
+
+- **`minor` · `backup-target-dhcp` — The nightly backup reaches the desktop by an address DHCP hands out, so a new lease breaks the off-box copy, silently.**
+  Found by `M216`'s box half (2026-11-09), reading the target desktop before it was set up.
+  - **Measured:** `DESKTOP-36C5T41` gets 192.168.1.119/24 from DHCP (gateway 192.168.1.254), and its network profile is Public. The box (192.168.50.2/26) is on another subnet, so the task addresses the desktop by IP: `-OffBoxDir "\192.168.1.119\MeridianBackup$"`. SYSTEM's saved credential is also keyed to that address.
+  - **Why it matters:** if the lease changes, the script ends with exit 2 every night while the dump stays on the box. Nobody is told (`nightly-backup-silent-failure`), so the copy that survives a dead disk could stop without anyone knowing.
+  - **The remedy, to be measured when taken:** the network team reserves 192.168.1.119 for this desktop, which needs no change on either machine. A name would need DNS that resolves across the two subnets, and that has not been read.
+
+  **Latent** — the lease has not changed; nothing has failed yet. Filed by `M216`. **Tier: during-testing.**
+
+- **`minor` · `tracker-headroom-held-batch` — `PROGRESS.md` has room for about four more status bullets, and fourteen held increments each owe one at their merge point.**
+  Found by `M216`'s close-out (2026-11-09).
+  - **Measured:** after `M215` and `M216`'s bullet, `PROGRESS.md` is 124,911 bytes against `tracker-lint`'s R1 ceiling of 130,000, so 5,089 bytes are left. That bullet cost 1,303 bytes for two increments, and `M214`'s alone was about the same size.
+  - **What is waiting:** `M217` to `M230`, held as #414 to #489. R9 requires each released increment to have exactly one status bullet, so the next merge point's close-out will cross R1 part of the way through unless the tracker is trimmed first.
+  - **The remedy, to be measured when taken:** a tracker surgery that moves the oldest status bullets to `PROGRESS_ARCHIVE.md` with `scripts/tracker-surgery.php`, run before that merge point's close-out, never during it. Bullets that each name several increments would only delay it.
+
+  **Latent** — nothing is over the ceiling yet. Filed by `M216`. **Tier: during-testing.**

@@ -1,6 +1,7 @@
 "use client";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useState } from "react";
+import { captureMapFrame } from "@/lib/maps/png";
 import { loadMaplibre } from "./load-maplibre";
 import { geometryPositions } from "@/lib/geo/positions";
 import { colorForValue, NO_DATA_COLOR, type ColorBin } from "@/lib/charts/color-scale";
@@ -13,6 +14,8 @@ export function DatasetCanvas({
   selected,
   onSelect,
   onGeometry,
+  onCapture,
+  onRetry,
   expanded,
 }: {
   url: string;
@@ -21,7 +24,9 @@ export function DatasetCanvas({
   selected: string | null;
   onSelect: (code: string) => void;
   onGeometry: (codes: string[]) => void;
+  onCapture: (capture: (() => Promise<HTMLCanvasElement>) | null) => void;
   expanded: boolean;
+  onRetry: () => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("maplibre-gl").Map | null>(null);
@@ -32,14 +37,16 @@ export function DatasetCanvas({
       mapRef.current.setFilter("selection", ["==", "geo_code", selected ?? ""]);
   }, [selected]);
   const [failed, setFailed] = useState(false);
-  const callbacks = useRef({ onSelect, onGeometry });
+  const [ready, setReady] = useState(false);
+  const callbacks = useRef({ onSelect, onGeometry, onCapture });
   useEffect(() => {
-    callbacks.current = { onSelect, onGeometry };
+    callbacks.current = { onSelect, onGeometry, onCapture };
   });
   useEffect(() => {
     const abort = new AbortController();
     let map: import("maplibre-gl").Map | undefined;
     let disposed = false;
+    let resize: ResizeObserver | undefined;
     async function start() {
       try {
         const [gl, response] = await Promise.all([
@@ -65,6 +72,7 @@ export function DatasetCanvas({
           const code = feature.properties.geo_code;
           codes.push(code);
           const row = byCode.get(code)!;
+          feature.properties.smallSample = row.value !== null && row.smallSample === true;
           feature.properties.color =
             row.value === null ? NO_DATA_COLOR : colorForValue(row.value, bins);
           for (const position of geometryPositions(feature.geometry)) bounds.extend(position);
@@ -85,23 +93,33 @@ export function DatasetCanvas({
           attributionControl: false,
         });
         mapRef.current = map;
+        resize = new ResizeObserver(() => map?.resize());
+        resize.observe(container.current);
         map.on("error", () => {
-          if (!disposed) setFailed(true);
+          if (!disposed) { setFailed(true); callbacks.current.onCapture(null); }
         });
         map.on("load", () => {
           if (!map || disposed) return;
+          map.resize();
           map.addSource("areas", { type: "geojson", data: geometry });
           map.addLayer({
             id: "fill",
             type: "fill",
             source: "areas",
-            paint: { "fill-color": ["get", "color"], "fill-opacity": 0.9 },
+            paint: { "fill-color": ["get", "color"], "fill-opacity": ["case", ["==", ["get", "smallSample"], true], 0.4, 0.9] },
           });
           map.addLayer({
             id: "outline",
             type: "line",
             source: "areas",
             paint: { "line-color": "#fff", "line-width": 1 },
+          });
+          map.addLayer({
+            id: "small-sample",
+            type: "line",
+            source: "areas",
+            filter: ["==", "smallSample", true],
+            paint: { "line-color": "#6b7280", "line-width": 2, "line-dasharray": [2, 2] },
           });
           map.addLayer({
             id: "selection",
@@ -112,19 +130,28 @@ export function DatasetCanvas({
           });
           if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 20, animate: false });
           map.getCanvas().tabIndex = -1;
+          map.once("idle", () => {
+            if (!disposed && map && codes.length) {
+              setReady(true);
+              const readyMap = map;
+              callbacks.current.onCapture(() => captureMapFrame(readyMap));
+            }
+          });
           map.on("click", "fill", (e) => {
             const code = e.features?.[0]?.properties?.geo_code;
             if (typeof code === "string") callbacks.current.onSelect(code);
           });
         });
       } catch {
-        if (!disposed) setFailed(true);
+        if (!disposed) { setFailed(true); callbacks.current.onCapture(null); }
       }
     }
     void start();
     return () => {
       disposed = true;
+      callbacks.current.onCapture(null);
       abort.abort();
+      resize?.disconnect();
       map?.remove();
       mapRef.current = null;
     };
@@ -133,6 +160,7 @@ export function DatasetCanvas({
     <div>
       <div
         aria-hidden="true"
+        data-map-state={failed ? "failed" : ready ? "ready" : "loading"}
         ref={container}
         className={
           expanded
@@ -140,10 +168,14 @@ export function DatasetCanvas({
             : "h-64 w-full rounded-lg border border-border"
         }
       />
+      {!ready && !failed && <p role="status" className="text-sm">Loading map rendering…</p>}
       {failed && (
-        <p role="status" className="text-sm">
-          Map unavailable. Use the area selector and complete table below.
-        </p>
+        <div className="space-y-2 text-sm">
+          <p role="status">Map unavailable. Use the area selector and complete table below.</p>
+          <button type="button" className="underline" onClick={onRetry}>
+            Retry map rendering
+          </button>
+        </div>
       )}
     </div>
   );

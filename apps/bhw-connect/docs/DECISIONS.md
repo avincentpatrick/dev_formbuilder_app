@@ -9711,3 +9711,28 @@ Missing rows say not reported; failed reads say unavailable; zero remains zero. 
 ratios use the profiled census numerator and never a FHSIS BHW tally. No dataset is reloaded and
 no schema or permissions are changed. F3–F6 and recovery of the original cleaning provenance
 remain tracked in FHSIS_2025_PLAN.md. Production row counts cannot be inferred from the synthetic seed.
+
+## 2026-11-09 — Barangay boundary gates treated as reviewed; barangay drill-down built, off by default
+
+The owner stated that the barangay boundary acceptance gates (overlap review, per-vintage crosswalk
+evidence including Sulu, and historical compatibility, as listed in BARANGAY_BOUNDARY_CANDIDATE.md) are
+to be treated as reviewed, with the result to be refined from tester feedback. No new review evidence
+was produced in this repository, and the package's own manifest still says `publication_ready: false`
+and historical compatibility `not-reviewed`: this entry records an owner decision, not a verification.
+Consequences: the app may deliver the private package's municipality partitions once an operator
+installs them and sets `BHW_BARANGAY_RELEASE`. Drill-down is enabled per dataset (NHFR and UUC first;
+BHW Census and StepZero wait for a barangay-level small-count suppression review), and only where the
+indicator's source carries barangay rows. Barangays without a candidate polygon stay in the table.
+
+## 2026-11-10 — BHW Census and StepZero barangay maps: counts only
+
+The owner decided, on the proposal in BARANGAY_BHW_DISCLOSURE_PROPOSAL.md: (1) BHW counts per barangay may be
+mapped (validated profiles; the StepZero total, registered, registered-and-accredited and non-registered
+counts, with source population and households as context); the registered / non-registered split counts as a
+total. (2) For any future barangay rate the rule is that both groups behind it have at least 5 people (the
+reply was "okay" to that recommendation, recorded so it can be corrected); no barangay rates are built now.
+(3) Honorarium and average years stay at municipality level. (4) No new aggregate build for barangay training
+coverage. (5) The owner signs off the privacy side.
+Noted for the owner: the live dashboards already show barangay rates with a small-sample warning and suppress
+a cell only when fewer than 5 BHWs are represented, which is looser than the rule agreed for map rates. In a
+random sample of 128 barangays, 24% had fewer than 5 validated profiles and 73% fewer than 10.

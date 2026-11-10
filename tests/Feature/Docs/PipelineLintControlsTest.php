@@ -992,6 +992,54 @@ it('P6 — does NOT fire on an INDENTED marker, which the generator emits by des
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
+// P8 (M218, `R-a06e5589`) — the generated line is cited by row, never by line. The two red cases plant
+// the citation in the two kinds of file the rule reads: one the gate names itself (the backlog, which
+// the generator never reads and where the first such citation lived) and one from the generator's corpus.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+it('P8 — reddens on a line citation of the queue in the backlog, which the generator does not read', function (): void {
+    $backlog = "# Backlog\n\n- nothing filed.\n- **`minor` · A row.** It sits at `docs/pipeline.md:50` today.\n";
+
+    pipelineLintPerturb('docs/feature-backlog.md', $backlog, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('P8 queue cited by row');
+        expect($output)->toContain('docs/feature-backlog.md line 4 cites docs/pipeline.md by line number (docs/pipeline.md:50)');
+    });
+});
+
+it('P8 — reddens on the short form in a corpus document, so dropping the folder does not hide it', function (): void {
+    $tracker = pipelineLintTracker()."\nThe next row is at `pipeline.md:48`.\n";
+
+    pipelineLintPerturb('PROGRESS.md', $tracker, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_FAILED, $output);
+        expect($output)->toContain('PROGRESS.md line');
+        expect($output)->toContain('(pipeline.md:48)');
+    });
+});
+
+it('P8 — does NOT fire on a row id, a bare mention of the file, or another file ending in the same name', function (): void {
+    $decisions = pipelineLintDecisions()
+        ."\n`R-fcfc1f52`'s row in `docs/pipeline.md` cites a line. Regenerate docs/pipeline.md after."
+        ."\nSee `docs/ocr-pipeline.md:12` and `apps/bhw-connect/docs/pipeline.md:5`, which are other files.\n";
+
+    pipelineLintPerturb('docs/claims/decisions.md', $decisions, function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_CLEAN, $output);
+        expect($output)->toContain('P8 queue cited by row');
+    });
+});
+
+it('P8 — REFUSES rather than passing when a corpus file the markdown rules skip is unreadable', function (): void {
+    // The coverage rules read only the corpus's markdown and refuse on a missing document themselves, so a
+    // missing CODE file reaches P8 alone, which is the case this proves.
+    $corpus = array_merge(['PROGRESS.md'], pipelineLintCoverageCorpus(), ['app/NotThere.php']);
+
+    pipelineLintPerturb('fixture-document.json', pipelineLintDocument(['corpus' => $corpus]), function (int $status, string $output): void {
+        expect($status)->toBe(PIPELINE_LINT_CANNOT_MEASURE, $output);
+        expect($output)->toContain('P8 cannot read app/NotThere.php');
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
 // The coverage rules (M82). Every case below perturbs a COPY of a real document, so the predicate
 // under test is measured against the prose it will actually rule over.
 //

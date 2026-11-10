@@ -30,6 +30,13 @@ use App\Support\Forms\OtherSpecify;
 final class XlsformImportParser
 {
     /**
+     * M219 (`R-1fc57252`): the width of `form_fields.appearance`, which is `varchar(60)`. An appearance
+     * longer than this is dropped with a warning ({@see self::resolveAppearance()}). `XlsformImportAppearanceTest`
+     * reads the real column's width from the database, so this and the schema cannot drift apart unseen.
+     */
+    public const APPEARANCE_MAX_LENGTH = 60;
+
+    /**
      * M177 (`R-71509975`): each `or_other` question and the Please specify question made for it, kept as objects so the
      * link survives {@see self::sanitizeKeys()} renaming either key. Reset at every parse.
      *
@@ -204,7 +211,7 @@ final class XlsformImportParser
             defaultValueIsExpression: $defaultIsExpression,
             isRequired: $this->resolveRequired($this->col($row, 'required')),
             relevantExpression: $this->trimToNull($this->col($row, 'relevant')),
-            appearance: $this->resolveAppearance($type, $appearance),
+            appearance: $this->resolveAppearance($type, $appearance, $key, $warnings),
             validations: $this->resolveConstraint($row),
             listName: $listName,
             choiceFilter: $this->trimToNull($this->col($row, 'choice_filter')),
@@ -271,8 +278,15 @@ final class XlsformImportParser
      * Keep a genuine author appearance; drop a synthetic one the exporter forced to carry the type (a
      * `text`/`multiline` LongText round-tripping back must NOT keep `appearance = multiline`, or its config
      * drifts from the original).
+     *
+     * M219 (`R-1fc57252`): AN APPEARANCE LONGER THAN THE COLUMN IS DROPPED WITH A WARNING, rather than
+     * kept and left to fail the whole import at the insert. ODK's `search(...)` appearances run long, and no
+     * width would hold every one, so widening the column would only move the line. The builder can never
+     * write one this long (`UpdateFieldRequest` holds it to the type's own list), so only an import meets it.
+     *
+     * @param  list<string>  $warnings
      */
-    private function resolveAppearance(FieldType $type, ?string $appearance): ?string
+    private function resolveAppearance(FieldType $type, ?string $appearance, string $key, array &$warnings): ?string
     {
         if ($appearance === null) {
             return null;
@@ -280,6 +294,16 @@ final class XlsformImportParser
 
         $forced = $this->types->toXlsform($type)->appearance;
         if ($forced !== null && strcasecmp($forced, $appearance) === 0) {
+            return null;
+        }
+
+        if (mb_strlen($appearance) > self::APPEARANCE_MAX_LENGTH) {
+            $warnings[] = sprintf(
+                'The appearance of “%s” is longer than %d characters, so it was not imported; the question was imported without it.',
+                $key,
+                self::APPEARANCE_MAX_LENGTH
+            );
+
             return null;
         }
 

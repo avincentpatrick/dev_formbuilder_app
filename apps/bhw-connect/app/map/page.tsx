@@ -10,8 +10,10 @@ export default async function MapPage({
 }) {
   const raw = await searchParams;
   const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(raw))
-    if (typeof value === "string") params.set(key, value);
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof value === "string") params.append(key, value);
+    else if (Array.isArray(value)) for (const item of value) params.append(key, item);
+  }
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8">
       <Link href="/" className="text-sm underline">

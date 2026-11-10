@@ -1,0 +1,812 @@
+[
+  {
+    "code": "fp_begin_btl",
+    "program_area": "family_planning",
+    "label": "Beginning users: Female sterilisation (FSTR/BTL)",
+    "numerator_def": "Beginning users: Female sterilisation (FSTR/BTL)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_begin_nsv",
+    "program_area": "family_planning",
+    "label": "Beginning users: Male sterilisation (MSTR/NSV)",
+    "numerator_def": "Beginning users: Male sterilisation (MSTR/NSV)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_begin_condom",
+    "program_area": "family_planning",
+    "label": "Beginning users: Condom",
+    "numerator_def": "Beginning users: Condom",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_begin_iud",
+    "program_area": "family_planning",
+    "label": "Beginning users: IUD, interval",
+    "numerator_def": "Beginning users: IUD, interval",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_begin_iud_pp",
+    "program_area": "family_planning",
+    "label": "Beginning users: IUD, postpartum",
+    "numerator_def": "Beginning users: IUD, postpartum",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_begin_pop",
+    "program_area": "family_planning",
+    "label": "Beginning users: Progestin-only pills (POP)",
+    "numerator_def": "Beginning users: Progestin-only pills (POP)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_begin_coc",
+    "program_area": "family_planning",
+    "label": "Beginning users: Combined oral contraceptives (COC)",
+    "numerator_def": "Beginning users: Combined oral contraceptives (COC)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_begin_injectable",
+    "program_area": "family_planning",
+    "label": "Beginning users: Injectables",
+    "numerator_def": "Beginning users: Injectables",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_begin_implant",
+    "program_area": "family_planning",
+    "label": "Beginning users: Implants",
+    "numerator_def": "Beginning users: Implants",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_begin_implant_pp",
+    "program_area": "family_planning",
+    "label": "Beginning users: Implants, postpartum",
+    "numerator_def": "Beginning users: Implants, postpartum",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_begin_ccm",
+    "program_area": "family_planning",
+    "label": "Beginning users: Cervical mucus method (CCM)",
+    "numerator_def": "Beginning users: Cervical mucus method (CCM)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_begin_bbt",
+    "program_area": "family_planning",
+    "label": "Beginning users: Basal body temperature (BBT)",
+    "numerator_def": "Beginning users: Basal body temperature (BBT)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_begin_stm",
+    "program_area": "family_planning",
+    "label": "Beginning users: Symptothermal method (STM)",
+    "numerator_def": "Beginning users: Symptothermal method (STM)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_begin_sdm",
+    "program_area": "family_planning",
+    "label": "Beginning users: Standard days method (SDM)",
+    "numerator_def": "Beginning users: Standard days method (SDM)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_begin_lam",
+    "program_area": "family_planning",
+    "label": "Beginning users: Lactational amenorrhea method (LAM)",
+    "numerator_def": "Beginning users: Lactational amenorrhea method (LAM)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_begin_total",
+    "program_area": "family_planning",
+    "label": "Beginning users: All methods, source total",
+    "numerator_def": "Beginning users: All methods, source total",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_new_btl",
+    "program_area": "family_planning",
+    "label": "New acceptors: Female sterilisation (FSTR/BTL)",
+    "numerator_def": "New acceptors: Female sterilisation (FSTR/BTL)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_new_nsv",
+    "program_area": "family_planning",
+    "label": "New acceptors: Male sterilisation (MSTR/NSV)",
+    "numerator_def": "New acceptors: Male sterilisation (MSTR/NSV)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_new_condom",
+    "program_area": "family_planning",
+    "label": "New acceptors: Condom",
+    "numerator_def": "New acceptors: Condom",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_new_iud",
+    "program_area": "family_planning",
+    "label": "New acceptors: IUD, interval",
+    "numerator_def": "New acceptors: IUD, interval",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_new_iud_pp",
+    "program_area": "family_planning",
+    "label": "New acceptors: IUD, postpartum",
+    "numerator_def": "New acceptors: IUD, postpartum",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_new_pop",
+    "program_area": "family_planning",
+    "label": "New acceptors: Progestin-only pills (POP)",
+    "numerator_def": "New acceptors: Progestin-only pills (POP)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_new_coc",
+    "program_area": "family_planning",
+    "label": "New acceptors: Combined oral contraceptives (COC)",
+    "numerator_def": "New acceptors: Combined oral contraceptives (COC)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_new_injectable",
+    "program_area": "family_planning",
+    "label": "New acceptors: Injectables",
+    "numerator_def": "New acceptors: Injectables",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_new_implant",
+    "program_area": "family_planning",
+    "label": "New acceptors: Implants",
+    "numerator_def": "New acceptors: Implants",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_new_implant_pp",
+    "program_area": "family_planning",
+    "label": "New acceptors: Implants, postpartum",
+    "numerator_def": "New acceptors: Implants, postpartum",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_new_ccm",
+    "program_area": "family_planning",
+    "label": "New acceptors: Cervical mucus method (CCM)",
+    "numerator_def": "New acceptors: Cervical mucus method (CCM)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_new_bbt",
+    "program_area": "family_planning",
+    "label": "New acceptors: Basal body temperature (BBT)",
+    "numerator_def": "New acceptors: Basal body temperature (BBT)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_new_stm",
+    "program_area": "family_planning",
+    "label": "New acceptors: Symptothermal method (STM)",
+    "numerator_def": "New acceptors: Symptothermal method (STM)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_new_sdm",
+    "program_area": "family_planning",
+    "label": "New acceptors: Standard days method (SDM)",
+    "numerator_def": "New acceptors: Standard days method (SDM)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_new_lam",
+    "program_area": "family_planning",
+    "label": "New acceptors: Lactational amenorrhea method (LAM)",
+    "numerator_def": "New acceptors: Lactational amenorrhea method (LAM)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_new_total",
+    "program_area": "family_planning",
+    "label": "New acceptors: All methods, source total",
+    "numerator_def": "New acceptors: All methods, source total",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_other_btl",
+    "program_area": "family_planning",
+    "label": "Other acceptors: Female sterilisation (FSTR/BTL)",
+    "numerator_def": "Other acceptors: Female sterilisation (FSTR/BTL)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_other_nsv",
+    "program_area": "family_planning",
+    "label": "Other acceptors: Male sterilisation (MSTR/NSV)",
+    "numerator_def": "Other acceptors: Male sterilisation (MSTR/NSV)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_other_condom",
+    "program_area": "family_planning",
+    "label": "Other acceptors: Condom",
+    "numerator_def": "Other acceptors: Condom",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_other_iud",
+    "program_area": "family_planning",
+    "label": "Other acceptors: IUD, interval",
+    "numerator_def": "Other acceptors: IUD, interval",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_other_iud_pp",
+    "program_area": "family_planning",
+    "label": "Other acceptors: IUD, postpartum",
+    "numerator_def": "Other acceptors: IUD, postpartum",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_other_pop",
+    "program_area": "family_planning",
+    "label": "Other acceptors: Progestin-only pills (POP)",
+    "numerator_def": "Other acceptors: Progestin-only pills (POP)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_other_coc",
+    "program_area": "family_planning",
+    "label": "Other acceptors: Combined oral contraceptives (COC)",
+    "numerator_def": "Other acceptors: Combined oral contraceptives (COC)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_other_injectable",
+    "program_area": "family_planning",
+    "label": "Other acceptors: Injectables",
+    "numerator_def": "Other acceptors: Injectables",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_other_implant",
+    "program_area": "family_planning",
+    "label": "Other acceptors: Implants",
+    "numerator_def": "Other acceptors: Implants",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_other_implant_pp",
+    "program_area": "family_planning",
+    "label": "Other acceptors: Implants, postpartum",
+    "numerator_def": "Other acceptors: Implants, postpartum",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_other_ccm",
+    "program_area": "family_planning",
+    "label": "Other acceptors: Cervical mucus method (CCM)",
+    "numerator_def": "Other acceptors: Cervical mucus method (CCM)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_other_bbt",
+    "program_area": "family_planning",
+    "label": "Other acceptors: Basal body temperature (BBT)",
+    "numerator_def": "Other acceptors: Basal body temperature (BBT)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_other_stm",
+    "program_area": "family_planning",
+    "label": "Other acceptors: Symptothermal method (STM)",
+    "numerator_def": "Other acceptors: Symptothermal method (STM)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_other_sdm",
+    "program_area": "family_planning",
+    "label": "Other acceptors: Standard days method (SDM)",
+    "numerator_def": "Other acceptors: Standard days method (SDM)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_other_lam",
+    "program_area": "family_planning",
+    "label": "Other acceptors: Lactational amenorrhea method (LAM)",
+    "numerator_def": "Other acceptors: Lactational amenorrhea method (LAM)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_other_total",
+    "program_area": "family_planning",
+    "label": "Other acceptors: All methods, source total",
+    "numerator_def": "Other acceptors: All methods, source total",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_dropout_btl",
+    "program_area": "family_planning",
+    "label": "Dropouts: Female sterilisation (FSTR/BTL)",
+    "numerator_def": "Dropouts: Female sterilisation (FSTR/BTL)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_dropout_nsv",
+    "program_area": "family_planning",
+    "label": "Dropouts: Male sterilisation (MSTR/NSV)",
+    "numerator_def": "Dropouts: Male sterilisation (MSTR/NSV)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_dropout_condom",
+    "program_area": "family_planning",
+    "label": "Dropouts: Condom",
+    "numerator_def": "Dropouts: Condom",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_dropout_iud",
+    "program_area": "family_planning",
+    "label": "Dropouts: IUD, interval",
+    "numerator_def": "Dropouts: IUD, interval",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_dropout_iud_pp",
+    "program_area": "family_planning",
+    "label": "Dropouts: IUD, postpartum",
+    "numerator_def": "Dropouts: IUD, postpartum",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_dropout_pop",
+    "program_area": "family_planning",
+    "label": "Dropouts: Progestin-only pills (POP)",
+    "numerator_def": "Dropouts: Progestin-only pills (POP)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_dropout_coc",
+    "program_area": "family_planning",
+    "label": "Dropouts: Combined oral contraceptives (COC)",
+    "numerator_def": "Dropouts: Combined oral contraceptives (COC)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_dropout_injectable",
+    "program_area": "family_planning",
+    "label": "Dropouts: Injectables",
+    "numerator_def": "Dropouts: Injectables",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_dropout_implant",
+    "program_area": "family_planning",
+    "label": "Dropouts: Implants",
+    "numerator_def": "Dropouts: Implants",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_dropout_implant_pp",
+    "program_area": "family_planning",
+    "label": "Dropouts: Implants, postpartum",
+    "numerator_def": "Dropouts: Implants, postpartum",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_dropout_ccm",
+    "program_area": "family_planning",
+    "label": "Dropouts: Cervical mucus method (CCM)",
+    "numerator_def": "Dropouts: Cervical mucus method (CCM)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_dropout_bbt",
+    "program_area": "family_planning",
+    "label": "Dropouts: Basal body temperature (BBT)",
+    "numerator_def": "Dropouts: Basal body temperature (BBT)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_dropout_stm",
+    "program_area": "family_planning",
+    "label": "Dropouts: Symptothermal method (STM)",
+    "numerator_def": "Dropouts: Symptothermal method (STM)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_dropout_sdm",
+    "program_area": "family_planning",
+    "label": "Dropouts: Standard days method (SDM)",
+    "numerator_def": "Dropouts: Standard days method (SDM)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_dropout_lam",
+    "program_area": "family_planning",
+    "label": "Dropouts: Lactational amenorrhea method (LAM)",
+    "numerator_def": "Dropouts: Lactational amenorrhea method (LAM)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_dropout_total",
+    "program_area": "family_planning",
+    "label": "Dropouts: All methods, source total",
+    "numerator_def": "Dropouts: All methods, source total",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_end_btl",
+    "program_area": "family_planning",
+    "label": "Ending users: Female sterilisation (FSTR/BTL)",
+    "numerator_def": "Ending users: Female sterilisation (FSTR/BTL)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_end_nsv",
+    "program_area": "family_planning",
+    "label": "Ending users: Male sterilisation (MSTR/NSV)",
+    "numerator_def": "Ending users: Male sterilisation (MSTR/NSV)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_end_condom",
+    "program_area": "family_planning",
+    "label": "Ending users: Condom",
+    "numerator_def": "Ending users: Condom",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_end_iud",
+    "program_area": "family_planning",
+    "label": "Ending users: IUD, interval",
+    "numerator_def": "Ending users: IUD, interval",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_end_iud_pp",
+    "program_area": "family_planning",
+    "label": "Ending users: IUD, postpartum",
+    "numerator_def": "Ending users: IUD, postpartum",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_end_pop",
+    "program_area": "family_planning",
+    "label": "Ending users: Progestin-only pills (POP)",
+    "numerator_def": "Ending users: Progestin-only pills (POP)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_end_coc",
+    "program_area": "family_planning",
+    "label": "Ending users: Combined oral contraceptives (COC)",
+    "numerator_def": "Ending users: Combined oral contraceptives (COC)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_end_injectable",
+    "program_area": "family_planning",
+    "label": "Ending users: Injectables",
+    "numerator_def": "Ending users: Injectables",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_end_implant",
+    "program_area": "family_planning",
+    "label": "Ending users: Implants",
+    "numerator_def": "Ending users: Implants",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_end_implant_pp",
+    "program_area": "family_planning",
+    "label": "Ending users: Implants, postpartum",
+    "numerator_def": "Ending users: Implants, postpartum",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_end_ccm",
+    "program_area": "family_planning",
+    "label": "Ending users: Cervical mucus method (CCM)",
+    "numerator_def": "Ending users: Cervical mucus method (CCM)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_end_bbt",
+    "program_area": "family_planning",
+    "label": "Ending users: Basal body temperature (BBT)",
+    "numerator_def": "Ending users: Basal body temperature (BBT)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_end_stm",
+    "program_area": "family_planning",
+    "label": "Ending users: Symptothermal method (STM)",
+    "numerator_def": "Ending users: Symptothermal method (STM)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_end_sdm",
+    "program_area": "family_planning",
+    "label": "Ending users: Standard days method (SDM)",
+    "numerator_def": "Ending users: Standard days method (SDM)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_end_lam",
+    "program_area": "family_planning",
+    "label": "Ending users: Lactational amenorrhea method (LAM)",
+    "numerator_def": "Ending users: Lactational amenorrhea method (LAM)",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_end_total",
+    "program_area": "family_planning",
+    "label": "Ending users: All methods, source total",
+    "numerator_def": "Ending users: All methods, source total",
+    "denominator_def": "No denominator: source-reported count, including fractional values; not a unique-person annual total",
+    "unit": "count",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "fp_demand_q4",
+    "program_area": "family_planning",
+    "label": "Demand for modern family planning satisfied, ages 15–49",
+    "numerator_def": "Demand for modern family planning satisfied, ages 15–49",
+    "denominator_def": "Source Q4 women of reproductive age multiplied by total demand factor; retained from Demand Satisfied sheet",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "FP_2025_PH.xlsx",
+    "uuc_criterion_d": false
+  }
+]

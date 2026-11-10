@@ -16,9 +16,577 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M222`, `R-0ace5ea8`: a section's drag, grab and drop say the section's name (m222-section-drag-name)
+## Status: ACTIVE CLAIM — `M234`, `R-8311c583`: a refused JSON fetch is proved to leave no toast, and the workarounds built on the pre-`M90` refusal give their real reasons (m234-web-refusal-workarounds)
 
-Taken 2026-11-08, under the same instruction as `M219`. Branch `m222-section-drag-name`, cut from origin/main at the claim's parent, PR into main. Held green for a merge point (`D137`).
+Taken 2026-11-10, from the plan the user approved the same day. Branch `m234-web-refusal-workarounds`, cut from origin/main at `c3f73c2e`, PR into main. Held green for a merge point (`D137`), after `M233`'s #497.
+**One row, by `D13`.** It edits two hubs, `bootstrap/app.php` and `routes/tenant.php`, both for comments only. No held PR touches either, the test file, or any file this claim names. **Chosen to stay clear:**
+- 23 rows in the line are closed by held branches. This was measured from each branch's own `docs/pipeline.md` diff against its merge base.
+- `M231` to `M233` recorded why the open rows above position 47 were passed over, and every reason still stands, because the same PRs are still held.
+- This row is position 48, the first that no held PR closes and whose files none edits.
+- No `VERSION` bump, because nothing changes for a tester. So it does not wait on #435.
+
+Row: `R-8311c583`, *"Three client-side workarounds were built ON the JSON-refusal defect `M90` fixed, and all three can now be simplified — but one of them is load-bearing until it is measured."*
+
+### Evidence verified
+- `useMemberStreak`'s `enabled` guard, *"so a module-disabled tenant never issues the fetch that would write an orphaned session flash"*: **held**. The docblock is headed *"`enabled` IS NOT AN OPTIMISATION"*, and the guard is in `refresh()`.
+- `integrationsClient`, *"read-only-and-never-throwing for the same reason, stated twice in its own header and twice more in `routes/tenant.php`"*: **held, and a floor.**
+  - The header says it at the top and again in its H16b note.
+  - `routes/tenant.php` says it four times: the notifications block, the channels sidecar, the tabular-destination note, and the analytics note, which calls it *"the integrationsClient trap"*.
+- The draft autosave, *"catches locally because a `back()` redirect is unreadable to the composable driving it"*: **held**, in the `SubmissionConflictException` arm's comment. That arm already corrects the reason in place (*"the FIFTH in-repo workaround"*), so it is not edited. `SubmissionDraftController`'s docblocks and `ClientUuidResolver` still give the old reason.
+- `docs/gamification-design.md`'s *"once per navigation forever"*: **held**, never measured.
+- None of the three files has changed since `M90` (`bd64b622`).
+
+### Premise verified
+- **The row's central premise is false by reading, and will be measured before the test.** It says *"every refused web request still writes `->with('toast', …)`"*.
+  - Every redirecting arm is `$webJson(...) ?? back()->with(...)`, so for a caller that `expectsJson()` the right-hand side never runs and no flash is written.
+  - Every sidecar sends `Accept: application/json`: `builderClient` sends it, and so does `useServerAutosave`'s own fetch. So `wantsJson()` is true for all of them.
+  - **Nothing proves it.** `WebJsonRefusalTest`'s module case asserts the body only, and there is no `assertSessionMissing('toast')` anywhere under `tests/`. A refactor that hoisted the fallback into a variable before `$webJson` would write the flash and leave every test green.
+- **"Can now be simplified" holds for none of the three as written.**
+  - **The guard's stated reason is false, but the guard stays as an economy.** Without it, a workspace with the module off sends one refused request per navigation.
+  - **`integrationsClient`'s `null` / `transportFailure()` contract is what `RuleFormModal`, `AirtableRuleFields` and `SheetsRuleFields` read.** `SheetsRuleFields.vue` is held by #497.
+  - **The autosave's catch carries weight for its envelope.** `useServerAutosave` reads `error.code` nested, and `M90`'s web arms answer flat.
+- **The row is a floor.** About 25 comments in 26 files still give the pre-`M90` 302 as current for a fetch. One mechanism spread by quotation.
+  - It was false in one place even before `M90`. *"`TabularDestinationDirectory` never throws, so the failure cannot occur on these two endpoints"* ignores `feature:native_connectors`, whose refusal was a 302 until `M90`.
+- **Two defects next to the citations, filed rather than built here:**
+  - `integrationsClient` discards the server's readable message. Fixing it changes what a tester reads, so it needs `VERSION`, and held PRs hold that file.
+  - A rethrown non-request error leaves `busy` stuck, because no consumer has a `finally`. Fixing it needs `SheetsRuleFields.vue` (#497).
+  - Both are to be verified at filing.
+
+### Remedy verdict
+**The prescribed removal is wrong for all three. What the row actually needs is the measurement it asks for, turned into a gate, plus the false reason corrected wherever it was quoted.**
+- **Measured before the test** (a scratch case, not committed), with the module off:
+  - A JSON fetch is refused with a 403, the session holds no toast, and the next page's `flash.toast` is null.
+  - As a control, the same refusal made as a navigation does carry its toast to the next page. That proves the probe can see one.
+- **`WebJsonRefusalTest`** gets three additions:
+  - The behavioural case.
+  - The control.
+  - A rule in the existing static gate: in every arm that has both, the first `$webJson(` comes before the first `->with(` or `->withErrors(`. That reaches the arms the behavioural case does not.
+- Mutants through `scripts/mutate.php`:
+  - **A:** the module arm's fallback hoisted. The behavioural case and the static rule go red.
+  - **B:** the same hoist in the `GrantException` arm. Only the static rule goes red.
+- Comment edits are line-count-neutral wherever another row cites the file by line.
+
+Files:
+- **Test:** `tests/Feature/Http/WebJsonRefusalTest.php`.
+- **Comments, PHP:** `bootstrap/app.php`, `routes/tenant.php`, `app/Services/Connectors/TabularDestinationDirectory.php`, `app/Services/Connectors/ConnectionTokenRefresher.php`, `app/Http/Controllers/Tenant/ScopeNodeController.php`, `app/Http/Controllers/Tenant/ConnectionController.php`, `app/Http/Controllers/Tenant/AnalyticsController.php`, `app/Http/Controllers/Tenant/SubmissionDraftController.php`, `app/Services/Submissions/ClientUuidResolver.php`.
+- **Comments, frontend:** `resources/js/composables/useMemberStreak.ts`, `resources/js/composables/__tests__/useMemberStreak.test.ts`, `resources/js/components/shell/Sidebar.vue`, `resources/js/components/shell/Sidebar.test.ts`, `resources/js/components/integrations/integrationsClient.ts`, `resources/js/components/scopes/scopesClient.ts`, `resources/js/components/notifications/notificationsClient.ts`, `resources/js/components/achievements/achievementsClient.ts`, `resources/js/Pages/domains/Index.vue`, `resources/js/components/domains/DomainCard.vue`, `resources/js/Pages/scopes/Index.vue`, `resources/js/Pages/analytics/Index.vue`.
+- **Comments, docs and tests:** `docs/gamification-design.md`, `tests/Feature/Scoping/ScopeWebTest.php`, `tests/Feature/Analytics/AnalyticsPageGateTest.php`.
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md` (own block only, at release).
+Paired files taken: none.
+Namespaces spent: `M234`.
+Prediction:
+- **The new cases:** both pass. Mutant A turns the behavioural case and the static rule red, B turns only the static rule red, and the control stays green throughout.
+- **Gates that read the comment edits:**
+  - Pint is clean.
+  - PHPStan does not move, because only prose changes in `app` and `routes`.
+  - Vitest does not move.
+  - The citation lint stays at 16 rotten, the trunk's figure.
+- **The one I most expect to be wrong:** the control. Whether Laravel's test client carries a flash into a second request the way a browser does.
+
+### Build record (2026-11-10, not merged)
+PR #499, head `e352daad`, run 42748812512: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5). `Boundary (from main)` is green (run 42748811999, 5 steps).
+- **The measurement, before the test** (a scratch Pest file, run once and deleted), with gamification off:
+  - **JSON fetch:** 403, no session `toast`, and a null `flash.toast` on the next page.
+  - **Navigation:** 302, the toast written, shown on the next page, and gone from the page after.
+  - Every sidecar sends `Accept: application/json`, so the row's premise is false for all of them.
+- **`WebJsonRefusalTest`: 7 passed** (the 5 it had, plus the behavioural case and its control). The order rule judges at least 14 redirecting arms, with a floor.
+- **Mutants, through `mutate.php`'s write, run and byte-restore.** Neither was committed, because the commit rule guards diff-based checks and this test reads the file.
+  - **A**, the module arm's redirect hoisted above `$webJson`: **CAUGHT**. The behavioural case and the order rule went red; the control and M90's own module case stayed green.
+  - **B**, the same hoist in the `GrantException` arm: **CAUGHT** by the order rule alone.
+  - Not run: dropping the `??`, which M90's existing cases already cover.
+- **Comments:** 26 files, every one edited line for line (insertions equal deletions per file). A sweep with `--text` found no remaining present-tense copy of the old reason. `bootstrap/app.php`'s autosave arm already corrected itself in place and was left alone.
+- **Filed:** `integrations-client-failure-sentences` (`R-ef0d47d7`).
+  - **The claim was wrong on one point:** that the stuck `busy` half needs `SheetsRuleFields.vue` (#497). Both halves are fixed inside `integrationsClient.ts`.
+  - It waits only for `VERSION`, because it changes what a tester reads.
+- **Container, Pest:** `php -d memory_limit=3G vendor/bin/pest` over `tests/Feature/{Http,Gamification,Scoping,Analytics,Connectors,Docs}` and `EncodeDraftTest`: 934 passed, 5 skipped. The one failure is `SuiteCollectionFloorTest`, the bind-mount artefact; CI is green.
+  - The first try, through `artisan test`, died at 128M. That trap is already logged, and I repeated it.
+- **Container, frontend:** Vitest 4,333 passed. Two `token-references` timeouts (load) passed alone. `type-check` is clean.
+- **Host:** PHPStan 0 errors over the whole tree; the container's 51 are the clean trunk's. Pint is clean. `pipeline-lint` 461 rows, `tracker-lint` +0 bytes, the citation lint at 16 rotten (the trunk's figure). `preflight --with-gates --with-pint` OK after merging #495 (BHW only) in.
+- **E2E:** none run locally. No spec reaches a comment; CI's E2E job is green.
+- `PROGRESS.md` is untouched until release.
+
+**How the prediction fared:** right on every gate it named, including both mutants' red sets. **The one I most expected to be wrong held:** the test client carried the flash into exactly one more request, as a browser does. **Not predicted:** the `artisan test` memory death (a known trap, re-run correctly), the two Vitest load timeouts, and that the second filed defect's fix fits in one unheld file.
+
+**The merge point owes:** merge after #497, with no dependence on #435 (no release note). Release this claim then. ⚠️ **#499 now holds a comment in `ConnectionTokenRefresher.php`**, the file `R-593e29cd` (line position 49) edits, so the next build must walk the line against #499's files too.
+
+## HELD — `M233`, `R-03715adf`: the Sheets rule modal's segmented control gets an e2e gate that can fail (m233-sheets-rule-modal-spill) — BUILT AND HELD: PR #497, waiting for a merge point
+
+Taken 2026-11-09, from the plan the user approved the same day. Branch `m233-sheets-rule-modal-spill`, cut from origin/main at `c92fa2fe`, PR into main. Held green for a merge point (`D137`), after `M232`'s #496.
+**One row, by `D13`.** Test-only plus one comment, edits no hub, and touches no held PR's files. **Chosen to stay clear:** `M232` took line position 41. The rows after it, before this one:
+- `R-f0663272`: its remedy is the push-side scope logic in `ci.yml` (#414).
+- `R-38ba2f94`: closing it rewrites §5 item 4 of `docs/deployment-infrastructure.md`, which cites it (#414).
+- `R-1eaa6e8d`: closing it makes the Slack paragraph of `docs/webhook-integration-design.md` stale (#489). It is also declined on the merits, with no remedy offered.
+- `R-387dd26e`: closing it makes `docs/data-dictionary.md`'s SSO-domains passage stale (#442).
+- `R-1d43bef5`: closed by #489.
+
+Row: `R-03715adf`, *"`.sheets-fields` is probably the worst `MdsSegmentedControl` host in the tree and it is the one with no coverage of any kind."*
+
+### Evidence verified
+- `SheetsRuleFields.vue`'s `modeOptions` are "Create a sheet for me" and "Use one I already have": **held**.
+- The control sits in `MdsModal`, whose panel loses its 520px cap at 480px and below, and whose body is `overflow-y: auto`: **held**. Measured: the body computes `overflow-x: auto`, so a spill there would be a sideways scrollbar that `assertNoHorizontalOverflow` skips by construction.
+- *"No e2e spec opens `RuleFormModal` at all"*, nor the members invite or change-role modal: **held**. Both integrations scans in `responsive-axe.spec.ts` stop at the rule detail page.
+
+### Premise verified
+- **The spill the row expected cannot happen with today's copy, with or without the host's wrap rule. Measured in the real app, at three widths, at default text and at `extra_large` + dyslexia.** All 12 readings of the modal body and the control are 0px, including with `.sheets-fields .mds-segmented` forced to `nowrap`. The mechanism: a segment is a flex item with `min-width: auto` and a label that can break, so it shrinks to its longest word ("already"). The row sized the control by whole labels. Squeezed, the labels break onto 2 to 4 lines instead.
+- **So `M109`'s wrap rule is a second protection today, and it becomes the only one when a label cannot break,** as with a single long word. Measured with labels unbreakable at `extra_large` + dyslexia: with the rule, the segments stack and nothing spills. Without it, the modal body scrolls 246px sideways at 375, and 103px at 834 and 1440. At default text both whole labels fit on one line, so the stress needs the large text.
+- **`SheetsRuleFields.vue`'s comment on that rule says the wrap "is what fixes" an overflow.** That holds only for an unbreakable label. It is corrected here so the mechanism does not spread by quotation, as `M19`'s did.
+- **Opening a NEW rule's modal makes no call to Google, measured.** `RuleFormModal::loadChannels()` returns early for a spreadsheet-type provider, and `SheetsRuleFields`' seed watcher calls only `GET /integrations/connections/{id}/columns`. That was the only connector request at every width, and no `/destinations` call was made. `responsive-axe.spec.ts`'s "does not open the rule modal" notes concern a SAVED rule, whose editor re-inspects its sheet, so they stay true.
+- **`R-db28b120` owns the other hosts** (`.mds-field`, `.encode-field`) and the `.config` widening, which lives in `personalization-axe.spec.ts` (#429). It stays open and gets a note.
+- **No held PR touches `SheetsRuleFields.vue`, `RuleFormModal.vue`, `Index.vue` or a new spec.** `E2eSeeder.php` (#429) holds the Sheets fixture and is not edited. Its comment saying no spec opens the rule modal goes stale, and is filed as a `nit`.
+
+### Remedy verdict
+**Works, measured before the test, with the guard the measurement demands.** The row offered component-level affordances. `M109` chose per-host wraps instead, so what remains is coverage. A plain spill read here is green by construction, so it alone would be decorative. The case must stress the host with labels that cannot break, and prove the stress engaged by asserting that the segments stacked.
+- axe on the open modal, light and dark, at three widths: **clean**. This is the first scan of this modal.
+- A new spec, `tests/e2e/integrations-rule-modal.spec.ts`:
+  - A route guard fails the case on any `/destinations` request.
+  - Sufficiency as shipped at `extra_large` + dyslexia.
+  - The same read with labels made unbreakable, guarded by "it rendered as two radios" and "the segments are on two lines".
+  - `assertClean` in both themes.
+- Mutants for e2e go on a throwaway branch with a rebuild (`mutate.php` is Pest-only, per the gate-traps log).
+
+Files: `tests/e2e/integrations-rule-modal.spec.ts` (new), `resources/js/components/integrations/SheetsRuleFields.vue` (one comment).
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, the top-level `tests/e2e/*.spec.ts` (a new file), `PROGRESS.md` (own block only, at release).
+Paired files taken: none.
+Namespaces spent: `M233`.
+Prediction: the new spec passes at all three projects, 9 runs. The wrap rule deleted, committed on a throwaway branch and rebuilt, turns the stress case red at all three, and the two axe cases stay green. No `VERSION` bump, because the one product edit is a CSS comment. Neither `type-check` (its `include` is `resources/js` and the public runtime) nor Vitest nor PHPStan reads an e2e spec, so none can move. Pint and the host lint gates stay clean. The one I most expect to be wrong: the "two lines" guard at 375px, if the stacked segments' tops differ by less than a pixel rounding allows.
+
+### Build record (2026-11-10, not merged)
+PR #497, head `93af09e1`, CI run 42652086518: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5).
+- **`Boundary (from main)` has not started.** Three runs ended in `startup_failure` with no jobs: 42652083895 (`opened`), then 42658803413 and 42659101554 (`edited`, from notes added to the PR's description). Such a run cannot be retried.
+  - Not the repository: since #496's green Boundary run, `main` changed only this file, `boundary.yml` is unchanged since `M214`, every action is allowed, and the pinned `actions/checkout` commit (`v4.4.0`) resolves.
+  - Not billing: the repository is public. GitHub reported Actions operational, and CI started fine in the same minute.
+  - It re-runs when the merge point merges the trunk into this branch (`synchronize`). If it still cannot start then, it blocks #497 under the every-required-check rule, and the cause is investigated then.
+- **Local E2E, this spec only:** 9 passed at mobile, tablet and desktop, before and after the mutant.
+- **Mutant A** (the host's `flex-wrap: wrap` turned into a comment, committed on a throwaway branch and rebuilt): the stress case was red at all three widths, the modal body scrolling 246, 103 and 103px sideways, as the probe predicted. Both axe cases stayed green. The branch was deleted unpushed, the file's sha256 matched, and the real assets were rebuilt and run green again.
+- **Host:** `preflight --with-gates --with-pint` OK, Pint clean over 1,891 files, `pipeline-lint` 461 rows, `tracker-lint` +0 bytes, the citation lint at 16 rotten (the trunk's figure). Vitest, `type-check` and PHPStan do not read an e2e spec. `PROGRESS.md` is untouched until release.
+- The plan said to run `next.php --lane=a --write`. It rewrites `PROGRESS.md`'s hand-off line, so the change was reverted to keep `PROGRESS.md` untouched until release, as with every held build.
+
+**How the prediction fared:** right on every gate it named, including the mutant's widths. The guard I most expected to be wrong held: the stacked segments' tops differ by 34px. **Not predicted:** Boundary's startup failures. **Corrected before the claim, by measuring:** the plan assumed a plain spill read could fail on this host, and that `mutate.php` could drive an e2e mutant. The first is false, and the second is Pest-only (the gate-traps log already said so).
+
+**The merge point owes:** merge after #496, with no dependence on #435 (no release note). Boundary must be green first. Release this claim then.
+
+## HELD — `M232`, `R-473558cf` and a sibling it files: the secret-scan and npm-audit workflow arms read their own job, not the whole of `ci.yml` (m232-workflow-arms-scoped) — BUILT AND HELD: PR #496, waiting for a merge point
+
+Taken 2026-11-09, from the plan the user approved the same day. Branch `m232-workflow-arms-scoped`, cut from origin/main at `50d027f8`, PR into main. Held green for a merge point (`D137`), after `M231`'s #494.
+**One row and the sibling it finds, by `D13`.** Both are test-only, edit no hub, and touch no held PR's files. `R-473558cf` is the first during-testing row in the line that no held PR closes or touches. The rows above it: `R-e6e340c0` is a sweep of `docs/deployment-infrastructure.md` (#414); `R-7d0853f5` and `R-2ca49f19` need `state.php` (#494) or `pipeline-lint.php` and `PipelineLintControlsTest` (#429); `R-4b57090b` waits for the box's log read; `R-5e7551aa`'s drift half needs `E2eSeeder.php` (#429). Every other row above it in the line is closed by a held PR or edits a file one holds (`XlsformExporter`, `FieldLibrary`, `OcrAnswerReader`, `useBuilderStore`, `BuilderCanvas`, `FormBuilderService`, the print presenter, `XlsformImportParser`, `CLAUDE.md`, `ci.yml`).
+Row: `R-473558cf`, *"`secret-scan-depth-arm-blind` — `SecretScanDepthTest`'s depth arm can no longer see the job it guards."* And a row this claim files: `NpmAuditJudgeTest`'s structural arm is blind in the same way.
+
+### Evidence verified
+- *"The arm asserts that `ci.yml` contains `fetch-depth: 0`"*: **held**, a whole-file `toContain`.
+- *"It occurs three times: the secret-scanning job, `bhw-connect`, and since `M214` the `scope` job"*: **held**, 3 on the trunk at `50d027f8`.
+- *"Bounding the secret-scanning job's depth leaves the arm green"*: **held, measured.** Mutant A (`static-analysis`'s depth to 2) **SURVIVED** the current test, 3 passed.
+- *"`mutate.php` refuses a token that is not unique, can no longer prove it"*: **held for a one-line token only.** A two-line token, the comment line above plus the key, occurs once, so the job's own key is drivable without editing `ci.yml`.
+- *"The scan is still protected at run time"*: **held**, the `--is-shallow-repository` fence is in the gitleaks step.
+
+### Premise verified
+- **The row is a floor.** `NpmAuditJudgeTest`'s structural arm reads the whole file the same way, and on the trunk each of its tokens occurs more than once: `continue-on-error: true`, `set +e`, `set -e` and the judge's path 3 times each, `npm audit --json --omit=dev` twice, `--omit=dev` 4 times. The `bhw-connect` job carries a copy of both npm-audit steps (the fetch step has the same name), and the staging-headers steps use the same fence. **Measured:** mutant B (Meridian's fetch step without `continue-on-error`) and mutant C (Meridian's judge without `set +e`) both **SURVIVED**, 9 passed. Not filed before today. Filed and closed here.
+- **The other tests that name `ci.yml` are not edited.** `DeploySkipAllowlistTest` reads the `paths-ignore` block, which is not a job's token, and `TrackerSurgeryHarnessTest` and `DatabaseSeederSmokeTest` mention the file only in comments.
+- **The `bhw-connect` job's copies are left unasserted.** That job serves `apps/bhw-connect/`, and a Meridian test must not turn red on BHW's step.
+- **The held PRs:** none touches either test or `tests/Support/`. #414's only `ci.yml` change is one comment near the top, outside both jobs.
+- **The third case in `SecretScanDepthTest`**, which keeps the fence's message free of the token, rests on *"the token occurs exactly once"*. That is false today, and the scoped arm no longer depends on it.
+
+### Remedy verdict
+**Works, measured before the test.** A scratch reader scoped by job, then by step, then to executable lines found all 8 jobs. It placed both arms in `static-analysis` (found from the step each job runs, not from a hard-coded id) and read depth `0` from one key. It saw mutant A (depth `2`), mutant B (no `continue-on-error`) and mutant C (the fence broken), and it ignored mutant D, the `bhw-connect` job's depth bounded.
+- A new `tests/Support/WorkflowText.php` holds the reader, so the two tests share one copy.
+- `SecretScanDepthTest`'s depth arm reads the secret-scanning job's checkout step. Its fence arm reads that job's step. Its third case goes, with the reason in the header.
+- `NpmAuditJudgeTest`'s structural arm reads Meridian's fetch and judge steps. The `--audit-level` ban stays whole-file, because for a ban the wider scope is the stricter one.
+
+Files: `tests/Support/WorkflowText.php` (new), `tests/Feature/Docs/SecretScanDepthTest.php`, `tests/Feature/Docs/NpmAuditJudgeTest.php`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md` (own block only, at release).
+Paired files taken: none.
+Namespaces spent: `M232`.
+Prediction: both tests pass. Mutants A, B and C are each CAUGHT, and D SURVIVES the new depth arm, as a scoped arm should. Pint is clean. PHPStan cannot move, because `tests/` is outside its scan. The rest of `tests/Feature/Docs` stays green. No `VERSION` bump, because nothing changes for a tester. The one I most expect to be wrong: Pint, over the new helper's closures and docblocks.
+
+### Extended mid-build (2026-11-09, pushed before either new file was opened)
+**Mutant C SURVIVED the new `NpmAuditJudgeTest` arm, and the cause is a third defect, not the arm's scope.** Pest's `toContain(mixed ...$needles)` (v4.7.4, read in `vendor/`) takes no message. A second argument is a second needle. Under `->not->`, a needle that is never present, such as a message, makes the inner `toContain` throw every time, so the negation passes whatever the value. The helper read mutant C correctly (`set +e` at `false`), and the assertion meant to catch it was `->not->toContain(false, '…')`.
+- **Census by tokenizer, over all 625 PHP files under `tests/` (624 tracked plus the new helper): 4 such calls.** One is this increment's own. One is `NpmAuditJudgeTest`'s `--audit-level` ban, which cannot fail and has not since `M72`. One is `DeploySkipAllowlistTest`'s "no Vite input under `apps/`", and one is `OcrCompatibilityBackfillTest`'s "the backfill SQL names no field type".
+- **Neither of the last two hides a violation today, measured:** the Vite inputs are three `resources/` paths, and none of the 31 field types appears in the SQL.
+- `toContainEqual` is the only other variadic expectation. The 15 positive calls with two or more arguments are left alone, because a needle there must be present, so a message would turn the test red rather than silence it.
+
+Extended to: the four calls rewritten as a `str_contains(…)` judged by `toBeFalse($message)` (or `toBeInt`), and a guard, `tests/Feature/Docs/NegatedContainArgumentsTest.php`. The guard fails on any `->not->toContain(` or `->not->toContainEqual(` call with more than one argument anywhere under `tests/`. It reads through `SourceTree`, so the container's bind mount cannot blind it, and a fixture proves it can see one. Filed as a row and closed here.
+Files added: `tests/Feature/Deploy/DeploySkipAllowlistTest.php`, `tests/Unit/OcrCompatibilityBackfillTest.php`, `tests/Feature/Docs/NegatedContainArgumentsTest.php` (new). No held PR touches any of them.
+
+### Build record (2026-11-09, not merged)
+PR #496, head `5341a44a`, run 42605712980: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green (run 42605713017, 5 steps).
+- **Mutants, through `mutate.php`'s write, run and byte-restore.** Against the old tests, A (the scan job's depth to 2), B (no `continue-on-error`), C (no `set +e`), E (`--audit-level=high` on Meridian's npm line), F (a Vite input under `apps/`) and G (the backfill SQL naming `short_text`) all SURVIVED. Against the new tests all six are CAUGHT, and so is H (the old negated form put back into `DeploySkipAllowlistTest`, caught by the guard). D (`bhw-connect`'s depth to 2) leaves the new depth arm green, as a scoped arm should.
+  - The old-test runs used byte copies: the edited tests were saved, the committed ones checked out, and mine copied back with every sha256 matching. H needed its target committed first, because `mutate.php` refuses a target with uncommitted changes.
+  - Not committed as mutations: the commit rule guards diff-based checks, and these tests read the file.
+- Container: `tests/Feature/Docs`, `tests/Feature/Deploy` and `OcrCompatibilityBackfillTest`, 293 passed and 5 skipped. The 1 failure is `SuiteCollectionFloorTest`, the bind-mount artefact its own header documents; CI is green on it.
+- The scoped arms read the same on #414's `ci.yml`, which merges first.
+- Host: Pint, `pipeline-lint` (460 rows), `tracker-lint` (+0 bytes), and the citation lint at 16 rotten (the trunk's figure). `preflight --with-gates --with-pint` OK. PHPStan cannot move, because `tests/` is outside its scan. `PROGRESS.md` is untouched until release.
+
+**How the prediction fared:** the original prediction was right on every gate, and **wrong on the one I most expected to be wrong**: Pint was clean first time. **It missed the increment's biggest finding.** The prediction said mutant C would be CAUGHT, and it SURVIVED the first new arm, because that arm used a negated `toContain` with a message. That survival is what found `negated-contain-message` and grew the increment by two files and a guard.
+
+**The merge point owes:** merge after #494, with no dependence on #435 (no release note). Release this claim then.
+
+## HELD — `M231`, `R-f6eab58d`: an answered retier is checked to have reached the row it names (m231-retier-payload) — BUILT AND HELD: PR #494, waiting for a merge point
+
+Taken 2026-11-09, from the plan the user approved the same day. Branch `m231-retier-payload`, cut from origin/main at `ea2b85a5`, PR into main. Held green for a merge point (`D137`), after `M230`'s #489.
+**One row, by `D13`.** It edits one hub, `scripts/state.php`, and no held PR touches it, `CLAUDE.md`, or the two new files. It is the first during-testing row in the line that no held PR closes or touches: `R-e6e340c0`'s claims live in `docs/deployment-infrastructure.md` (#414), `R-7d0853f5` edits `scripts/pipeline-lint.php` (#429) and its own text waits for an open decision that names a row, and `R-4b57090b` waits for the box's log read.
+Row: `R-f6eab58d`, *"A retier's PAYLOAD is a change to another file's row, nothing performs it, and the only record of that is a lane ledger."*
+
+### Evidence verified
+- The ledger record: `M105`'s release block in this file says it stripped `D51`'s and `D53`'s Awaits tokens and *"did not apply the retiers they exist to commission"*, and that both states passed `pipeline-lint`, *"fifteen rule groups, green"*: **held**.
+- *"Both states have since been corrected in the line"*: `R-5ecfa6cd` is open at `before-launch`, as `D51` answered. `R-e7d6f223` was closed by `M109`: **held**.
+- *"Nothing would notice the next one"*: no script reads a decision's retier. `pipeline.php`, `pipeline-lint.php`, `next.php` and `state.php` each read a decision's heading, tier and Awaits tokens only: **held**.
+
+### Premise verified
+- **The payload already has a written shape, and that is what makes a check possible.** Since `D104`, an answer's `**What the answer files, in the same push:**` line names each retier as `` `R-x` retiered `tier` ``, sometimes as a list (`D132` names three) and once with a parenthetical before *"is retiered"* (`D104`). The three older questions, `D51` to `D53`, ask *"Which tier?"* in a heading that names one row. Measured on the trunk: **12 pairs, 9 from answers and 3 from headings.**
+- **A row id rots when its row is struck through,** because `state.php` hashes the headline and `~~…~~` changes it. `D52`'s `R-e6a10f97` and `D53`'s `R-e7d6f223` resolve to no row today. Nothing on disk tells a struck row from a reworded one, so an unresolved id is reported, never failed. That is `R-7d0853f5`'s join-key point, met here as a count instead of a gate.
+- **A later retier is legitimate and is recorded at the row**, as a bold `Retiered up from …`, `Retiered down from …` or `RETIERED \`a\` → \`b\``, 55 mentions in the ledger. A row whose tier differs from an old answer passes when it carries one.
+- **Not reachable from here:** a payload that names no id (`D128`'s *"the sixteen UI rows"*) and a plan marker's retier (`D24`'s `deferral-site-disposition`, whose tier lives in its marker, which `state.php` does not parse). Both are said in the new file's header.
+- **The gate's natural home, `pipeline-lint.php`, is held by #429,** so the check goes in `state.php --check`, which every session runs at its start. The row offered a script check or a close-out step; this builds the check and writes the close-out step into `CLAUDE.md`.
+
+### Remedy verdict
+**Works, measured before the test.** A scratch parser read all 12 pairs: the 9 answer pairs are on closed rows at the answered tier, `D51`'s row is open at its answered tier, and the 2 heading ids do not resolve. So the check is **green on arrival, and only a mutation can prove it.**
+- A new pure file, `scripts/retier-payload.php`, does nothing on load, in the shape of `next-section.php`, so a test can call it.
+- `state.php` reads every payload in the ANSWERED half. It fails on an open row at another tier with no retier recorded at the row, and on an unknown tier. It lists unresolved ids without failing.
+- `CLAUDE.md` adds one clause to the sentence about recording an answer: perform the retier at the row, in the same push, in the shape this reads.
+
+Files: `scripts/retier-payload.php` (new), `scripts/state.php`, `CLAUDE.md`, `tests/Feature/Docs/RetierPayloadTest.php` (new).
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md` (own block only).
+Paired files taken: none.
+Namespaces spent: `M231`.
+Prediction: `state.php --check` exits 0 with 12 pairs judged and 2 unresolved. The new test passes, and three committed mutations each turn it red. Pint is clean, and PHPStan cannot move because `scripts/` is outside its scan. The other tests that load `state.php`'s neighbours stay green. No `VERSION` bump, because nothing changes for a tester. The one I most expect to be wrong: `PipelineLintControlsTest` or `BacklogProvenanceTest`, if either pins the shape of a `state.php --json` row and the new `records_retier` field changes it.
+
+### Build record (2026-11-09, not merged)
+PR #494, head `a3add4da`, run 42588431437: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green (run 42588431353, 5 steps).
+- On the host: `state.php --check` exits 0 and reads **12 payloads, 10 rows judged, 2 unresolved** (`D52 R-e6a10f97`, `D53 R-e7d6f223`). End to end, `R-5ecfa6cd` moved to `during-testing` with its bold RETIERED record neutralised made `--check` exit 1, naming `D51`, the row and both tiers. Restored byte for byte.
+- That probe also measured a limit, now in the file's header. **Any** retier recorded at the row passes, including the record of the answer being judged, so `R-5ecfa6cd` stays green at any tier while its record stands.
+- `RetierPayloadTest`: 26 passed. Three mutants were each CAUGHT by `scripts/mutate.php`: the tier comparison (2 red), the list capture (2 red) and the record at the row (1 red). The file restored to its sha256 each time.
+  - They were run through `mutate.php`'s write, run and byte-restore, and not committed. The commit rule guards diff-based checks, and this test reads the file.
+- Container: the RetierPayload, NextSectionClass, PipelineLintControls, BacklogProvenance, TestingGateNotifiedContract and GateBaselines tests, 154 passed.
+- Host: Pint, `pipeline-lint` (460 rows), `tracker-lint`, and the citation lint at 16 rotten (the trunk's figure). `preflight --with-gates --with-pint` OK.
+- `PROGRESS.md` is untouched until release, as with every held build.
+
+**How the prediction fared:** right on every gate. **One figure was worded wrong:** the prediction said 12 pairs *judged*, but 12 were read and 10 judged, because the 2 unresolved are never judged. Neither test I most expected to break moved.
+
+**The merge point owes:** merge after #489, with no dependence on #435 (no release note). Release this claim then.
+
+## HELD — `M230`, `R-1d43bef5`: §7.1 and the webhook design doc name the webhook paths that were built (m230-webhook-paths) — BUILT AND HELD: PR #489, waiting for a merge point
+
+Taken 2026-11-09, from the plan the user approved on 2026-11-08. Branch `m230-webhook-paths`, cut from origin/main at `203196c2`, PR into main. Held green for a merge point (`D137`), after `M229`'s #488.
+**One row, by `D13`,** with the floor its own text names: *"the same table's next line … carries two more wrong paths, repeated a third time at `docs/webhook-integration-design.md` … the two want taking together."* That is half (a) of `R-c8c8da76`, which stays open for half (b), the cross-endpoint delivery log, and gets a note. Two hub documents; no held PR touches either.
+Row: `R-1d43bef5`, *"§7.1 names a `/api/v1/webhooks/endpoints` path segment that exists nowhere in the tree, and it is a floor rather than a census."*
+
+### Evidence verified
+- §7.1's "Webhook endpoints" row reads `GET/POST/PATCH/DELETE /api/v1/webhooks/endpoints`: **held**.
+- The next row reads `GET /api/v1/webhooks/deliveries` and `POST /api/v1/webhooks/deliveries/{delivery}/redeliver`, and `docs/webhook-integration-design.md` §5 repeats the redeliver path: **held**.
+- `routes/api.php` registers `webhooks`, `webhooks/{webhookEndpoint}` (show, update, delete), its `test` and `rotate-secret`, and the nested `webhooks/{webhookEndpoint}/deliveries` with `…/{webhookDelivery}/redeliver`. No `endpoints` segment and no flat `deliveries` path exist: **held**.
+
+### Premise verified
+- `M193`'s §7.1 pass (`D38`) marked the unbuilt rows and did not touch these two. They describe built routes, so they need the right paths, not a "not built" mark.
+- §5's *"per `docs/api-specification.md`'s resource inventory"* leads back to §7.1, because that inventory only cites §7.1. So the three lines are the whole chain.
+- The two tests that mention these documents (`WebhookRedeliverTest`, `DomainEventEnvelopeTest`) do so in comments only.
+
+### Remedy verdict
+**Works.** Each line names the built paths, edited inside its own line so nothing below moves. The §7.1 rows carry the "**implemented**" mark their neighbours use. The deliveries row says the listing is per endpoint and cites `R-c8c8da76` for the cross-endpoint view.
+
+Files: `docs/architecture/technical-architecture.md`, `docs/webhook-integration-design.md`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`.
+Paired files taken: none.
+Namespaces spent: `M230`.
+Prediction: documents only. The citation and pipeline lints stay green, and nothing else moves. No `VERSION` bump. The one I most expect to be wrong: the citation lint, if another document cites one of these lines by its content.
+
+### Build record (2026-11-09, not merged)
+PR #489, head `01f07dea`, run 42502696904: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green.
+- Locally: the citation lint at 16 rotten, the same as the trunk; `pipeline-lint` 456 rows; `BacklogProvenanceTest` plus `tests/Feature/Webhooks`, 84 passed.
+
+**How the prediction fared:** right. Nothing moved.
+
+**The merge point owes:** merge after #488. Release this claim then.
+
+## HELD — `M229`, `R-d7e27962` by `D215` = A: a blank form prints in any of its version's languages, and a printout in another language says it must be keyed in (m229-print-in-language) — BUILT AND HELD: PR #488, waiting for a merge point
+
+Taken 2026-11-09, from the plan the user approved on 2026-11-08. Branch `m229-print-in-language`, cut from origin/main at `5937d549`, PR into main. Held green for a merge point (`D137`), after `M228`'s #487.
+**One row, by `D13`.** It edits two hubs, `BlankFormPrintPresenter.php` and `docs/ocr-pipeline-design.md`, and no held PR touches either.
+Row: `R-d7e27962`, *"A blank form prints only in its default language, so a form translated into Tagalog cannot be printed in Tagalog."* `D215` (the user, in chat, 2026-11-09) chose how a translated printout meets the scanner. It is filed and answered in this push.
+
+### Evidence verified
+- `BlankFormPrintPresenter::present()` takes `$form->default_locale`, and its docblock calls another language "a real gap": **held**.
+- Every label, hint, section text and choice label already goes through one `$locale` (`LocaleVariant::resolve()` and the formatter's options), so the printing half is a parameter: **held**.
+- `docs/ocr-pipeline-design.md` §2.5 lists "One locale per print" as out of scope, and no row queued it until `M190`: **held**.
+
+### Premise verified
+- **"The form's languages" cannot come from `forms.supported_locales`,** because nothing writes it (`R-21e88dd1`). The honest source is the version itself: the languages its labels, hints, section texts and choices are translated into. `XlsformExporter::extraLanguages()` collects the same thing, but #414 holds that file. So the collector goes to the shared `LocaleVariant`, and moving the exporter onto it is filed for after the merge.
+- **The scanner reads in the default language only.** `PrintedFormMatcher` calls `present($form, $version)`, and ticks are matched by choice label. So a translated page would be misread, which is `D215`'s question. The footer already has the sentence for unreadable paper.
+- Tagalog uses the Latin script the PDF's core fonts cover, so it prints. A non-Latin language already fails the documented WinAnsi way (`docs/ocr-pipeline-design.md` §2.5).
+- The form page's version rows load whole versions, so listing each one's languages costs nothing more. The forms list does not, so its "Print blank" keeps the default language.
+
+### Remedy verdict
+**Works, as the row says.**
+- `present()` takes an optional locale, used only when the version has text in it, and otherwise the form's default.
+- A printout in another language prints the keyed-in footer.
+- The print route takes `?lang=`.
+- The form page's "Print blank" asks which language when a version has more than one.
+
+Files: `app/Services/Forms/BlankFormPrintPresenter.php`, `app/Services/Forms/BlankFormPrintRenderer.php`, `app/Http/Controllers/Tenant/FormPrintController.php`, `app/Support/Forms/LocaleVariant.php`, `app/Services/Forms/FormHubPresenter.php`, `resources/js/Pages/forms/Show.vue`, `resources/js/Pages/forms/show.test.ts`, `tests/Feature/Forms/BlankFormPrintPresenterTest.php`, `tests/Feature/Forms/BlankFormPrintRendererTest.php`, `tests/Feature/Forms/FormHubPageTest.php`, `docs/ocr-pipeline-design.md`.
+**Extended 2026-11-09, before the file was opened: `tests/Feature/Forms/BlankFormPrintRouteTest.php`**, the route's own test file, for the `?lang=` cases. No held PR touches it.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md` (`D215`, pushed with this claim), `VERSION` (0.19.0, a new ability, after #487's 0.18.4), `database/data/releases.json`.
+Paired files taken: none.
+Namespaces spent: `M229`, `D215`.
+Prediction:
+- The new presenter, renderer, page and Vitest cases go red first.
+- Every existing print case stays green, because the default stays the default.
+- The one I most expect to be wrong: the form page's axe scan, on the new language dialog.
+
+### Build record (2026-11-09, not merged)
+PR #488, head `791dcfb1`, run 42502416038: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green.
+- New cases, each red first: four on the presenter, one each on the renderer, the route and the form page, and one Vitest case.
+- Six mutants were CAUGHT: the keyed-in footer, `printLocale()`, choice-label languages, blank variants, the `?lang=` query, and the dialog's condition (by hand).
+- Pest: 26 related files, 350 passed. `show.test.ts`: 27 of 27. `vue-tsc` clean.
+- Filed: `ocr-translated-printout` (before launch) and `xlsform-languages-shared`.
+
+**How the prediction fared:** right on the red-first cases. No axe scan opens the dialog, so that fear was moot. **Not predicted:**
+- Inserting `languages()` between `listAt()`'s docblock and its signature took `listAt()`'s types away; PHPStan went 51 → 58 until it was moved.
+- `pipeline-lint` P2b caught `docs/ocr-pipeline-design.md` still queuing the closed row, and it reads every backticked token in a Queued note as a row id.
+- `BacklogProvenanceTest` refused a row that says "Filed by" twice.
+- A failed `preg_replace` returned null and emptied `FormHubPresenter.php`. It was restored from the commit before anything else ran.
+
+**The merge point owes:** merge after #487. Release this claim then.
+
+## HELD — `M228`, `R-5d7128da`: a short written answer that happens to be a word of the printed text is read, not dropped (m228-ocr-short-answer-static) — BUILT AND HELD: PR #487, waiting for a merge point
+
+Taken 2026-11-08, on the user's *"are there any tasks that can be done the is not blocked by the backup?"*, from the plan they approved. Branch `m228-ocr-short-answer-static`, cut from origin/main at `3257252c`, PR into main. Held green for a merge point (`D137`), after `M227`'s #446.
+**One row, by `D13`.** It edits one hub, `OcrAnswerReader.php`, which no held PR touches. `R-0c5e4422` edits the same file, so it waits for the merge point.
+Row: `R-5d7128da`, *"A short written answer that is a substring of any printed text in its region is dropped as printed text, so "FORM" written in a box above a footer that says "Scans of this form…" reads as blank."*
+
+### Evidence verified
+- `OcrAnswerReader::isStatic()` drops a line whose normal form is at least 4 characters and a substring of any printed string: **held**. Both callers, `answerLines()` and the choice reader, skip such a line.
+- `PrintedFormMatcher` adds all three footer sentences to the printed list, and two contain "form": **held**.
+
+### Premise verified
+- The footer lands in the last question's region (`PrintedFormMatcherTest`'s footer case relies on it), so the row's example is reachable on every scan.
+- **The match is not even on whole words.** `str_contains()` on the normal form matches "form" inside "information", so the exposure is wider than the row says.
+- **What the substring rule is for:** a hint or description that wraps, whose pieces land on separate lines. A wrapped piece is a run of whole words, and a one-word piece can only be the printed text's last word, because the earlier lines take the words before it.
+- The user's standing OCR rule (*"always prefill what was read"*) favours reading a doubtful line over dropping a real answer.
+
+### Remedy verdict
+Of the row's two remedies, line geometry needs printed positions the reader does not have; the printed list is text only. **A narrower match works:**
+- A line of one word counts as printed only when it is the last word of a printed string, which is a wrapped tail.
+- A longer line counts as printed only when it is a run of whole words inside a printed string.
+- The whole-string similarity rule stays as it is.
+So "FORM" above "Scans of this form can be read automatically." is read, a hint's wrapped last word is still dropped, and "form" no longer matches inside "information". Measured by the new case before the fix, together with every existing matcher case.
+
+Files: `app/Services/Ocr/OcrAnswerReader.php`, `tests/Feature/Ocr/PrintedFormMatcherTest.php`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `VERSION` (0.18.4, after #446's 0.18.3), `database/data/releases.json`.
+Paired files taken: none.
+Namespaces spent: `M228`.
+Prediction:
+- The new "FORM" case goes red first.
+- Every existing `PrintedFormMatcherTest` and OCR reading case stays green, including the three footer sentences and the wrapped notes.
+- The one I most expect to be wrong: a fixture whose printed hint wraps so that a middle line is one long word.
+
+### Build record (2026-11-09, not merged)
+PR #487, head `415cf8d2`, run 42492093417: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green.
+- Three new `PrintedFormMatcherTest` cases. "FORM" under both footers was red first. A hint whose last word wraps alone is still dropped. "HIS FORM" is read. Three mutants were CAUGHT.
+- OCR feature suites: 177 passed. OCR unit tests: 33 passed. PHPStan: the trunk's local 51.
+- Filed: `ocr-printed-run-answer`, for a multi-word answer that repeats whole printed words, which needs positions.
+
+**How the prediction fared:** right. No existing case moved. **Not predicted:** the row's two remedies were both wrong for this reader. There are no printed positions, and a longer minimum match would read a hint's short last word as an answer. The shape of a wrapped piece was the rule that fit. A mutant on the whole-word rule had no test until one was added.
+
+**The merge point owes:** merge after #446. Release this claim then.
+
+## HELD — `M227`, `R-cf7d0362`: changing a date question to a time question, or back, warns where a comparison on it stops holding (m227-temporal-census) — BUILT AND HELD: PR #446 green but for the release-order assertion #435 fixes, waiting for a merge point
+
+Taken 2026-11-08, under the same instruction as `M224`. Branch `m227-temporal-census`, cut from origin/main at `d3f5787b`, PR into main. Held green for a merge point (`D137`), after `M226`'s #445.
+**One row, by `D13`.** It edits one hub, `ConversionCensus.php`. `ExpressionOperandJudge.php` and `OperandKind.php` are only read. No held PR touches `ConversionCensus.php`, `ConversionImpact.php` or `ConversionCensusTest.php`; #414 edits `FieldConversionServiceTest.php`, a different file.
+Row: `R-cf7d0362`, *"Converting a date question to a time question, or back, does not warn that an ordering on it stops holding."*
+
+### Evidence verified
+- `ConversionCensus` judges an ordering use only through `numeric()`, which is `ValueShape::allowsOperator(Gt)`, and that refuses every temporal shape. So an ordering on a date is never judged: **held**.
+- `FieldTypeConversion` puts date, time and date-and-time in one family, so the dialog offers the change: **held**.
+- The next publish refuses the result. `ExpressionOperandJudge::temporal()` refuses an ordering whose two sides do not order against each other (`OperandKind::ordersTemporallyWith()`: a time only against a time), and refuses `today()` against a time: **held**.
+
+### Premise verified
+- *"A date orders against dates and `today()`, a time against times"* holds (`ordersWith()`, `ordersTemporallyWith()`).
+- **Date ↔ date-and-time is not a break:** a date orders against a date-and-time. A judge keyed on "the temporal type changed" would warn there for nothing.
+- Which pairs break is already decided by the publish gate. A second table in the census would be one more unguarded mirror, which is the argument `ExpressionKeyUse`'s own docblock makes for sharing one walker.
+- The dialog shows each census entry's server-side `message` (`field-conversion.ts`), so a new impact needs no client copy.
+
+### Remedy verdict
+**Works, as a census judge that asks the publish gate.** For each ordering use, the census records which of date, time and date-and-time `ExpressionOperandJudge::judge()` accepts it as, given the draft's other questions. A change between two temporal types reports a new `temporal_ordering_breaks` impact where the use holds as the old type and is refused as the new one. That is exactly what the next publish would refuse, and nothing it would accept.
+
+Files: `app/Services/Forms/ConversionCensus.php`, `app/Enums/ConversionImpact.php`, `tests/Feature/Forms/ConversionCensusTest.php`.
+**Extended 2026-11-08, before the file was opened: `app/Services/Forms/ExpressionOperandJudge.php`.** `judge()` reports a mismatch between two questions once, under the key that sorts first, so asking it about the converted key alone misses every break where the other question's key sorts first. The judge's verdict on one compared operand moves into a public method that both the gate and the census call. The gate's de-duplication stays in the gate, and `ExpressionValidationGateTest`'s *"once, from either side"* cases hold it. Not a hub, and no held PR touches it.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `VERSION` (0.18.3, after #445's 0.18.2), `database/data/releases.json`.
+Paired files taken: none.
+Namespaces spent: `M227`.
+Prediction:
+- The new census cases go red first.
+- The existing census cases do not move, because the new arm reads only temporal-to-temporal changes.
+- The one I most expect to be wrong: a date compared with a text question, which the gate lets through ("may hold a date"), so the judge must stay silent there too.
+
+### Build record (2026-11-08, not merged)
+PR #446, head `351c73ea`, run 42434666150: 7 of 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · axe 11 · Scope 5), and `Boundary (from main)` green. **Pest red on one case only** (11 steps, 7,334 passed): `E2eSeederIdempotencyTest`'s release-order assertion, with 0.18.3 coming back third. That is the case #435 fixes.
+- Census: two reporting cases were red first. Two silent cases cover a text question, arithmetic, a pair the old type already broke, and a date to a date-and-time.
+- Four mutants were CAUGHT: the judge flipped; the constraint's `.` owner dropped; the gate's report-once rule copied into the census; and the gate's de-duplication removed.
+- Locally: 28 conversion-related files, 568 passed. The gate's 155 cases pass unchanged after the refactor.
+
+**How the prediction fared:** right on the census, and the text-question silence held. **Not predicted:**
+- Asking the gate's `judge()` from the converted key alone would have missed every question-against-question break where the other key sorts first. That cost a pushed claim extension, to `ExpressionOperandJudge.php`.
+- Pint read `{@see temporal()}` as the imported `Temporal` class. That was fixed by naming `self::temporal()`.
+
+**The merge point owes:** merge after #445, and after #435 so Pest goes green. Release this claim then.
+
+## HELD — `M226`, `R-526dae72` by `D214` = relabel: a rule's "contains" reads "contains the text" when the compared question is a single choice or dropdown (m226-contains-the-text) — BUILT AND HELD: PR #445, waiting for a merge point
+
+Taken 2026-11-08, under the same instruction as `M224`. Branch `m226-contains-the-text`, cut from origin/main at `93d0b20b`, PR into main. Held green for a merge point (`D137`), after `M225`'s #444.
+**One row, by `D13`.** It edits no hub: `ValueShape.php` is only read.
+Row: `R-526dae72`, *"A structured "contains" on a single choice is a substring test."* Its remedy was a decision, and the user answered it in chat on 2026-11-08: **relabel**. That is `D214`, filed and answered in this claim's push.
+
+### Evidence verified
+- `ValueShape::allowsOperator(Contains)` admits `Choice`, which is exactly `SingleSelect` and `Dropdown`: **held**.
+- Both engines lower the structured operator to the internal `contains()`, which is a substring test on one value: PHP's `ExpressionEvaluator::evalMembershipFunction()` (`str_contains`) and the runtime's `evaluator.ts` (`toStr(value).includes(needle)`): **held**.
+- The validation editor labels it `contains`, from `ComparisonOperator::label()` through `BuilderPresenter`'s `comparison_operators`: **held**.
+
+### Premise verified
+- **The condition editor is NOT the same trap, measured.** Its "includes" on a single choice writes `selected()`, and `selected()` on one value is an exact match (`membership()` compares the whole string), not a substring test. Only the validation editor's structured rule needs the new label.
+- Two other places print the operator's plain label in prose: the conflict dialog (`conflict-diff.ts`) and the type-change dialog (`field-conversion.ts`). `D214`'s answer names the rule editor, so they stay as they are and are filed as one `nit`.
+- `ConditionLabelMirrorDriftTest` pins `sentenceLabel()`'s `includes` in the two client files of the condition editor. Neither file changes.
+- No held PR touches `ComparisonOperator.php`, `BuilderPresenter.php`, `types.ts`, `ValidationEditor.vue`, its test or `BuilderEnumsPayloadTest.php`.
+
+### Remedy verdict
+**Works, transmitted rather than restated.** `ComparisonOperator::labelFor(ValueShape)` returns "contains the text" for `Contains` on `Choice`, and `label()` otherwise. `BuilderPresenter` ships each operator's differing labels as `shape_labels`, and `ValidationEditor` shows `shape_labels[shape]` before `label`. Nothing a respondent sees changes, and no form stops publishing.
+
+Files: `app/Enums/ComparisonOperator.php`, `app/Services/Forms/BuilderPresenter.php`, `resources/js/components/builder/types.ts`, `resources/js/components/builder/ValidationEditor.vue`, `resources/js/components/builder/ValidationEditor.test.ts`, `tests/Feature/Forms/BuilderEnumsPayloadTest.php`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md` (`D214`, pushed with this claim), `VERSION` (0.18.2, after #434's 0.18.1), `database/data/releases.json`.
+Paired files taken: none.
+Namespaces spent: `M226`, `D214`.
+Prediction:
+- The new Vitest case is red first, and the Pest payload case too.
+- The other `ValidationEditor` cases stay green, because the label changes only where the shape is a choice.
+- The one I most expect to be wrong: a builder e2e spec that selects the operator by its visible text.
+
+### Build record (2026-11-08, not merged)
+PR #445, head `3d26038f`, run 42433125591: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green.
+- Both new cases were red first: Vitest (`ValidationEditor.test.ts`) and Pest (`BuilderEnumsPayloadTest`). Two mutants were CAUGHT: the enum's label dropped (`mutate.php`) and the editor ignoring `shape_labels` (by hand, with a byte-exact restore).
+- Vitest: all 284 files and 4,336 tests. `vue-tsc` clean. Pest locally: 35 files, 727 passed and 1 failed. The failure was the release-order assertion #435 fixes, which passed alone.
+- Filed: `contains-label-in-dialogs`, because the conflict and type-change dialogs still print "contains".
+
+**How the prediction fared:** right. Both cases went red first, and no e2e spec reads the label. **Not predicted:** the condition editor's "includes" turned out not to be the same trap (`selected()` is exact), which narrowed the change to the rule editor. The release-order assertion went red locally and green in CI, so it is order-dependent, as `M223` recorded.
+
+**The merge point owes:** merge after #444 and after #435. Release this claim then.
+
+## HELD — `M225`, `R-4ea564fe` and `R-e2c1ba51`: the guest contract publishes `save_and_resume` as a boolean, and the guest submit's and draft save's success bodies as objects (m225-guest-contract-types) — BUILT AND HELD: PR #444, waiting for a merge point
+
+Taken 2026-11-08, under the same instruction as `M224`. Branch `m225-guest-contract-types`, cut from origin/main at `8ecc3ea5`, PR into main. Held green for a merge point (`D137`), after `M224`'s #442.
+**Two rows in one increment: `D13` exception #10, allowed by the user in chat on 2026-11-08** (*"Pair them"*). Both rows land in one regeneration of `openapi.json`, a hub; split, the second PR would regenerate the file the first had just changed. Clause 1 is breached as well: both rows add cases to `tests/Feature/Api/OpenApiContractTest.php`, a non-hub file.
+Rows: `R-4ea564fe`, *"`openapi.json` publishes the guest schema's `save_and_resume` as a string; it is a boolean."*; `R-e2c1ba51`, *"`openapi.json` documents the guest submit's success as a bare string, so its body — `id`, `reference`, `status` and, since M130, `redirect` — is in no contract."*
+
+### Evidence verified
+A fresh export in the app container is byte-identical to the committed `openapi.json`, so the committed file is what Scramble infers today.
+**`R-4ea564fe`.** The guest schema's `save_and_resume` is `"type": "string"`, from `PublicFormPresenter`'s `$form->save_and_resume && $this->tenantAllowsSaveResume()`: **held**.
+**`R-e2c1ba51`.** `POST /public/f/{shareToken}/submissions` documents its success as `200: {type: string}` and no 201. `GuestSubmissionController::store()` answers `response()->json([...], $result->created ? 201 : 200)`: **held**.
+
+### Premise verified
+**`R-4ea564fe`.** The row prescribes an array-shape docblock on the presenter. `present()` returns about twenty keys, and Scramble keeps whichever of the docblock and its own inference carries more known types (`RouteResponseTypeRetriever`), so a partial shape would lose and a full one would be twenty keys kept in step by hand.
+**`R-e2c1ba51`.**
+- **The cause is the ternary status code, not a missing annotation.** Measured with a trial edit, since reverted: two returns with literal statuses make Scramble publish both 200 and 201 as an object carrying `id`, `reference`, `status` and `redirect`.
+- **The row is a floor.** `GuestDraftController::store()`, the guest draft save (`POST /public/f/{shareToken}/draft`), has the same ternary and the same `200: {type: string}`. It is the same defect, so it is taken here. The tenant `SubmissionDraftController` has the ternary too, but it is a session route outside the contract.
+- **Once the body is inferred, every `//` comment above an array key is published as that property's description.** The trial published the `reference` key's internal note, and its ⚠️ is what `OpenApiContractTest`'s maintainer-marks case refuses. The notes move above the assignment, as that case's own message says to.
+
+### Remedy verdict
+**`R-4ea564fe`.** The docblock is the wrong tool, for the reason above. **Works instead:** a `bool` result. A `(bool)` cast was measured to export `boolean`; a `bool`-returning method is cleaner, and is measured before it is kept.
+**`R-e2c1ba51`.** **Works** as two literal-status returns, measured, with no annotation. The same change applies to the draft save.
+
+Files: `app/Services/Submissions/PublicFormPresenter.php`, `app/Http/Controllers/Public/GuestSubmissionController.php`, `app/Http/Controllers/Public/GuestDraftController.php`, `openapi.json`, `tests/Feature/Api/OpenApiContractTest.php`.
+Shared artefacts taken: `openapi.json`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md` (exception #10, pushed with this claim).
+Paired files taken: none.
+Namespaces spent: `M225`; `D13` exception #10.
+Prediction:
+- The new contract cases go red against the committed file and green after the re-export.
+- The marks case stays green, because the notes move.
+- CI's Contract drift diff and PHPStan go green.
+- No `VERSION` bump: no tester sees the contract (`M200`'s precedent).
+- The one I most expect to be wrong: a description I keep on `redirect` or `content_checksum` tripping the marks pattern.
+
+### Build record (2026-11-08, not merged)
+PR #444, head `10351f5a`, run 42430724854: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green.
+- The two new `OpenApiContractTest` cases were red against the old file; all 12 pass. Three mutants of the committed contract are CAUGHT (`save_and_resume` back to a string, the submit's 200, the draft's 201).
+- Pest: the 32 files that reach the guest endpoints or the presenter, 459 passed. The container's fresh export equals the committed file.
+- The trunk took `#443` (BHW Connect only) mid-build; it was merged into the branch and the line regenerated.
+
+**How the prediction fared:** right. No kept description tripped the marks case. **Not predicted:** PHPStan in the container reports 51 errors on this tree, and the same 51 with the trunk's three files swapped back in, while CI reports none. So that number is local noise, and only a change in it means anything.
+
+**The merge point owes:** merge after #442. Release this claim then.
+
+## HELD — `M224`, `R-b1737198` and `R-6f994627`: the threat model stops calling the invitation door filed, and three documents stop saying a file waits for a clean scan (m224-threat-model-scan-status) — BUILT AND HELD: PR #442, waiting for a merge point
+
+Taken 2026-11-08, on the user's instruction to take the line's next `during-testing` rows that touch neither the backup setup nor a held PR's files. Branch `m224-threat-model-scan-status`, cut from origin/main at `b213e38a`, PR into main. Held green for a merge point (`D137`), after #434.
+**Chosen to stay clear:** the rows above these in the line are built in held PRs, or edit a held PR's files (`R-e6e340c0`, `R-7d0853f5`, `R-f6eab58d`, `R-2ca49f19`), or need the box's Apache log read at the sitting (`R-4b57090b`).
+**Two rows in one increment: `D13` exception #9, allowed by the user in chat on 2026-11-08** (*"Pair them"*). Each row edits a hub document, so `D13` gives each its own PR, and every PR merged at the merge point is one more deploy the sitting waits through. Clause 1 holds: the rows share `docs/security-threat-model.md`, a hub, and no non-hub file.
+Rows: `R-b1737198`, *"`docs/security-threat-model.md` lists the invitation door among residuals "each filed in" the ledger, and it is no longer filed."*; `R-6f994627`, *"The data dictionary says an attachment is not served until its scan is `clean`, and every attachment is served while it is `skipped`."*
+
+### Evidence verified
+**`R-b1737198`.** Residual 32 in §9 says *"Three things remain, each filed in `docs/feature-backlog.md`"*, and its second bullet is the invitation door. `R-950ef5f1` is closed by `M121` under `D33` = A, and no open row replaced it: **held**.
+**`R-6f994627`.** `docs/data-dictionary.md` §10's `virus_scan_status` row reads *"Files are not served to other users until `clean`."* `ScanStatus::servable()` admits `clean` and `skipped`, and `ScanAttachmentJob` writes `skipped` while `attachments.scanner_enabled` is false, its default: **held**.
+
+### Premise verified
+**`R-b1737198`.** Residual 32's other two bullets are as they say. The domain re-verification row is open (latent). The self-registration bullet already records its closure by `M140` and its remainder, `R-afa35a60`, which is open. Only the invitation bullet is wrong.
+**`R-6f994627`.** The row says the sentence is the defect, and the row is a floor: the sentence is quoted twice more.
+- `docs/security-threat-model.md` §6 rates malware in an upload **Mitigated** on the strength of it.
+- `docs/ux/form-filling-ux-flow.md` Appendix A quotes it.
+No `AttachmentScanner` implementation exists and `ATTACHMENT_SCANNER_ENABLED` is set nowhere, so every upload is served unscanned. §6's verdict is false, not only its quotation. Wiring a scanner lives only in prose (*"ClamAV, deferred"* in `ScanStatus`'s docblock and `config/attachments.php`), and no row queues it: this increment files one, `before-launch`.
+
+### Remedy verdict
+**`R-b1737198`.** Works as the row says. The bullet calls the door an accepted risk, citing `D33` = A and `R-950ef5f1`'s closure, and the lead sentence stops claiming all three are filed. Edited inside existing lines, so nothing below moves.
+**`R-6f994627`.** Works, extended to the two copies. Each says a file is served while `clean` or `skipped`, never while `pending` or `infected`, and that with no scanner wired every upload is `skipped`. §6's verdict becomes a residual until a scanner is wired, bounded by what is built (the type read from the bytes against the field's allowlist), and cites the new row.
+
+Files: `docs/security-threat-model.md`, `docs/data-dictionary.md`, `docs/ux/form-filling-ux-flow.md`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md` (exception #9, on the branch).
+Paired files taken: none.
+Namespaces spent: `M224`; `D13` exception #9. `state.php` prints a lower next free number because `M215` to `M223` are held and unreleased.
+Prediction: documents only. `DocumentedDefaultDriftTest` and `DocumentedEnumCatalogDriftTest` stay green, because no default or enum cell changes; the citation and pipeline lints stay green; nothing else moves. No `VERSION` bump: no tester reads these documents. The one I most expect to be wrong: `BacklogProvenanceTest` or `pipeline-lint` on the new row's markers.
+
+### Build record (2026-11-08, not merged)
+PR #442, head `c818cb0f`, run 42429115279: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green.
+- Locally: `preflight --with-gates --with-pint` OK; the citation lint at 16 rotten, the same as the trunk; `tests/Feature/Docs` plus `DocumentedDefaultDriftTest`, 208 passed, with `SuiteCollectionFloorTest` the known container phantom.
+- Also corrected: §4's guest-upload row, which pointed to §6's verdict. Filed: `virus-scanner-unwired` (`before-launch`) and `invitation-volume-unwatched` (`D33`'s watch, which `M121` noted in prose only).
+
+**How the prediction fared:** right. Nothing moved, and the new rows' markers passed both gates. One step went differently from the claim: exception #9 went to the trunk in a second claim push, as `M216`'s #8 did, not on the branch. So `decisions.md` is not in the PR, and a later increment's exception cannot conflict with it.
+
+**The merge point owes:** merge after #434. Release this claim then.
+
+## HELD — `M223`, a row filed and closed by it: `E2eSeederIdempotencyTest`'s release-order assertion no longer depends on the order the table hands rows back (m223-release-order-assertion) — BUILT AND HELD: PR #435 green, waiting for a merge point, where it merges before #432, #433 and #434
+
+Taken 2026-11-08. Branch `m223-release-order-assertion`, cut from origin/main at `b47009a7`, PR into main. Held green for a merge point (`D137`), where it must merge **before #432, #433 and #434**, whose Pest it turns red.
+Row: new, filed and closed by this increment: *"`E2eSeederIdempotencyTest` checks the `releases` table's order against the notes file's, but reads the table with no order."* `M221` first filed it on #433's branch; that copy was taken out, so it is filed once.
+
+### Evidence verified
+- `Release::query()->pluck('version')` carries no `ORDER BY`, and the case compares that list with `toBe()` against the file's own order: **held**.
+- Measured red:
+  - CI on #432 (newest entry 0.17.4), twice: run 42393462799 and its re-run;
+  - CI on #433 (0.18.0), run 42396170296;
+  - locally on #434's branch (0.18.1), with `tests/Feature/Deploy/DeployReleaseSyncTest.php`, `tests/Feature/Releases`, `tests/Feature/Seeders` and `tests/Feature/WhatsNew` run together. Each time the newest version came back third or second.
+- Green on #414 (0.17.2) and #431 (0.17.3).
+
+### Premise verified
+- **The product does not depend on the order:** `WhatsNew::releases()` sorts by `version_compare` in PHP. Only the test reads the table's order.
+- ⚠️ **Why the rows come back in that order is NOT established.** The seeder's `releases:sync` runs in-process inside `RefreshDatabase`'s transaction, and no test found commits a release. It does not need to be, because a query with no `ORDER BY` promises no order at all. This claim says so rather than guess.
+
+### Remedy verdict
+**Works:** compare the two lists sorted the same way, by `version_compare` descending. That keeps what the case checks, the same versions and the same count, and drops the order the database never promised.
+
+Files: `tests/Feature/Seeders/E2eSeederIdempotencyTest.php`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`.
+Paired files taken: none.
+Namespaces spent: `M223`. `state.php` prints a lower next free number because `M215` to `M222` are held and unreleased.
+Prediction: with #434's notes file in place, the old assertion fails and the new one passes. Nothing else moves. No `VERSION` bump: no one using the app sees a test.
+
+### Build record (2026-11-08, not merged)
+PR #435, head `abb13df1`, run 42399487787: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green.
+- With #434's notes swapped in, the old assertion was red and the new one green.
+- A mutant making `releases:sync` skip one release is CAUGHT.
+
+**How the prediction fared:** right, but the evidence above was wrong in one place. #434's own CI run (42396786257) passed this test, though the branch had been red locally. So the order does not follow the version number: it changes from run to run, and a re-run of #432 was still red.
+
+**The merge point owes:** merge it before #432, #433 and #434. Release this claim then.
+
+## HELD — `M222`, `R-0ace5ea8`: a section's drag, grab and drop say the section's name (m222-section-drag-name) — BUILT AND HELD: PR #434 green, waiting for a merge point
+
+Taken 2026-11-08, under the same instruction as `M219`. Branch `m222-section-drag-name`, cut from origin/main at `50064169`, PR into main. Held green for a merge point (`D137`).
 **One row, by `D13`:** it edits one hub, `useCanvasReorder.ts`, which no held PR touches. #433 edits `BuilderCanvas.vue`, which this row's tests mount but do not change.
 Row: `R-0ace5ea8`, *"A section drag is announced as "Dragging a section", without the section's name."*
 
@@ -40,7 +608,16 @@ Prediction:
 - The new Vitest cases go red first.
 - Nothing else moves, because no test pins the old wording.
 
-## HELD — `M221`, `R-18d9f001`: a section's title is edited in place in Structure, as a question's label already is (m221-section-title-inline) — BUILT AND HELD: PR #433, CI running
+### Build record (2026-11-08, not merged)
+PR #434, head `e0c4a9fc`, run 42396786257: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5), and `Boundary (from main)` green.
+- 26 of 26 in Vitest.
+- Five mutants, each restored byte for byte, all CAUGHT.
+
+**How the prediction fared:** right. The new cases went red first and nothing else moved. One mutant had to be re-run with the line before it as context, because its text also matched a line with more indentation.
+
+**The merge point owes:** merge after #435 and #433, renumbering 0.18.1 if the order changes. Release this claim then.
+
+## HELD — `M221`, `R-18d9f001`: a section's title is edited in place in Structure, as a question's label already is (m221-section-title-inline) — BUILT AND HELD: PR #433 green but for the release-order assertion #435 fixes, waiting for a merge point
 
 Taken 2026-11-08, under the same instruction as `M219`. Branch `m221-section-title-inline`, cut from origin/main at `abf068f0`, PR into main. Held green for a merge point (`D137`).
 **One row, by `D13`:** it edits two hubs (`BuilderCanvas.vue`, `useBuilderStore.ts`). `R-c1eaa8b5` (the canvas type column) and `R-0ace5ea8` (a section drag's announcement) edit the same hubs, so each waits for its own increment.
@@ -78,7 +655,21 @@ Prediction:
 - The e2e rename survives a reload at all three widths.
 - The gate I most expect to be wrong about is `builder-axe.spec.ts`. Its click-every-tab loops are unaffected, but a new icon button on every section head joins the axe scans, and its name must match its visible label.
 
-## HELD — `M220`, `R-fcdb4594`: a question saved to the field library no longer comes back with a stricter rule group (m220-library-rule-groups) — BUILT AND HELD: PR #432, CI running
+### Build record (2026-11-08, not merged)
+PR #433, head `b9579605`, runs 42396170296 and 42398866018: 7 of 8 jobs green with real step counts, and `Boundary (from main)` green. **Pest red on one case only,** `E2eSeederIdempotencyTest`'s release-order assertion, which `M223` (#435) fixes. 7331 others passed.
+- **Vitest:** 19 of 19, and five mutants all CAUGHT.
+- **Pest:** `BuilderRoutesTest` 12 of 12, and a mutant removing the server fix is CAUGHT.
+- **E2E:** `builder-structure.spec.ts`, 9 of 9 at three widths.
+- **Extended mid-build** to `FormBuilderService::addSection()`, a fresh section's every save refused, found by the new e2e case. That row was filed and closed. The release-order row was filed here first, then moved to `M223`.
+
+**How the prediction fared:**
+- **Right:** Vitest went red first.
+- **Wrong:** `builder-axe.spec.ts` was the wrong gate to fear. CI's E2E was green.
+- **Not predicted:** the e2e rename was refused on a real server. A new section's `is_repeatable` came back `null`, which no unit test could see, because every fixture carries `false`. Also not predicted, Pest went red on a test this PR never touched.
+
+**The merge point owes:** merge after #435 so Pest goes green, renumbering 0.18.0 if the order changes. Release this claim then.
+
+## HELD — `M220`, `R-fcdb4594`: a question saved to the field library no longer comes back with a stricter rule group (m220-library-rule-groups) — BUILT AND HELD: PR #432 green but for the release-order assertion #435 fixes, waiting for a merge point
 
 Taken 2026-11-08, under the same instruction as `M219`: rows that conflict with neither the backup setup nor a held PR. Branch `m220-library-rule-groups`, cut from origin/main at `a208d245`, PR into main. Held green for a merge point (`D137`).
 **One row, by `D13`:** the rows still ready in this tier edit hubs almost without exception. `R-f8893952`, the other field-library row, edits the same hub (`app/Models/FieldLibrary.php`) and needs a migration besides: the library has no appearance column. So it is its own increment, next.
@@ -105,6 +696,17 @@ Prediction:
 - The new case goes red first, with the `or` group's survivor still present.
 - Pest and PHPStan are otherwise unmoved.
 - The gate I most expect to be wrong about is `ReleaseNotesFileTest`, because this branch numbers its version after two other held bumps.
+
+### Build record (2026-11-08, not merged)
+PR #432, head `7a0f290f`, run 42393462799 and its re-run: 7 of 8 jobs green with real step counts, and `Boundary (from main)` green. **Pest red on one case only,** `E2eSeederIdempotencyTest`'s release-order assertion, which `M223` (#435) fixes. 7331 others passed.
+- The new mapper case was red before the fix.
+- Three mutants, all CAUGHT.
+
+**How the prediction fared:**
+- **Right:** the new case went red first.
+- **Wrong about the gate:** `ReleaseNotesFileTest` passed. The trouble came from `E2eSeederIdempotencyTest`, a test this PR never touched, red on both runs.
+
+**The merge point owes:** merge after #435 so Pest goes green, renumbering 0.17.4 if the order changes. Release this claim then.
 
 ## HELD — `M219`, `R-1fc57252` and `R-efee4d5c`: an XLSForm appearance too long to store no longer fails the import, and the dev container takes the same uploads the testing server does (m219-import-appearance-upload-limits) — BUILT AND HELD: PR #431 green, waiting for a merge point
 
@@ -304,7 +906,44 @@ PR #414, head `f3261aee`, run 42354426773: 8 of 8 jobs green with real step coun
 
 **The merge point owes:** merge the trunk in and regenerate the line in a tree with `vendor/`, green again, then merge after #412 and #413 (or at the next merge point). After the deploy, re-run the judge against the live site and expect exit 0, read `/up` and the 404, and count the header's lines on `/login`. Release this claim with those readings. The rows are already closed on the branch; if the live read fails, `R-25dc7ded` reopens.
 
-## HELD — `M216`, `R-5f180437` and `R-4bda047a`: the testing site's backups survive a dead disk, and the runbook can rebuild them (m216-testing-backups) — BUILT AND HELD: PR #413 green, waiting for the next merge point; the box's half follows that merge
+## RELEASED — `M216`, `R-5f180437` and `R-4bda047a`: the testing site's backups survive a dead disk, and the runbook can rebuild them (`D212`, `D213`) (merged as PR #413, `95ff77ea`, second at the backup sitting's merge point, after merging the trunk into its branch at `94432748`; 8/8 green with real step counts on its run 42558925002 — Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5; the trunk's run 42562145797 on `95ff77ea` 8/8, with BHW Connect at 23)
+
+**RELEASED AT THE BACKUP SITTING'S MERGE POINT, 2026-11-09, WITH THE BOX'S HALF ON THE SAME DAY.** The user started the sitting with *"i have an access now to the desktop … for the backup setup"*. They chose to merge only #412 and #413; #414 to #489 stay held.
+
+**The merge point:**
+- **#412 first.** The user's census was at 03:51:14 UTC. #412 merged at 03:51:35, and its deploy (42562052900) changed only paths the site does not run, so it opened no window.
+- **#413's branch took the new trunk at `94432748`.** There was one conflict, in `docs/feature-backlog.md`. Both sides' rows were kept at the end, each slice checked against its source, and the line was regenerated.
+- **#413 merged at 04:29:49.** Its deploy (42564577483) opened a window. It took `deploy-20261109-050212.dump` (1,173,454 B) and counted 70 tables and 54,246 rows. There was nothing to migrate, and every table held. It went live at 05:02:35, with `/up` 200 and version 0.17.1.
+- **The census before and after are equal:** 1·6·11·27·22·62·31·74, statuses confirmed and resolved, at 03:51:14 and 05:05:26 UTC. `VERSION` did not move, because nothing a tester sees changed.
+
+**The box's half, the user at the box and at the desktop:**
+- **The target, `D213` A:** the hidden, encrypted share `MeridianBackup$` on `D:\MeridianBackup`, on `DESKTOP-36C5T41`.
+  - The desktop: Windows 11 Pro, in `WORKGROUP`, address 192.168.1.119 from DHCP, network profile Public, sleep never.
+  - D: is its own 1 TB hard disk, separate from its system SSD.
+  - The account `meridianbackup` has Change on the share and Modify on the folder. The only other rights are the user's, SYSTEM's and Administrators'.
+  - A firewall rule admits TCP 445 from 192.168.50.2 alone. `Test-NetConnection` from the box was true, from 192.168.50.2.
+- **The account, the first choice:** SYSTEM, with a credential for 192.168.1.119 saved in its own vault by a one-shot SYSTEM task. The task was unregistered at once, and the password never reached the chat or the screen. In the same task, as `nt authority\system`, the share was reachable, and a file was written, read back and deleted.
+- **The task:** rebuilt exactly as §8.2 step 12: SYSTEM, 01:30 box time (+08:00), StartWhenAvailable, a one-hour limit, keeping 30. The old definition is in `C:\meridian\meridian-test-db-backup.pre-M216.xml` (3,118 B).
+  - `C:\meridian\nightly-backup.ps1` is the trunk's file byte for byte (SHA-256 `C8B0F9F2…6604`, as committed).
+- **One run:** `LastTaskResult` 0, with log lines `dumped`, `copied … SHA-256` and `result=0`. It wrote `deploy-20261109-050547.dump`, 1,173,778 B, and its SHA-256 `A2395B01…37B5D3` was the same on the box and on the desktop.
+- **The restore drill:** that dump went into the scratch database `meridian_restoretest`, with `pg_restore --no-owner` as `postgres`, the privileged login read from the app's config into memory. It exited 0 with no messages at all.
+  - 70 of 70 tables restored. The one count that differed was `public.sessions`, 143 in the dump against 127 live, from sessions that expired after 05:05.
+  - The scratch database was then dropped.
+
+**How the prediction fared:**
+- **Wrong, the part I most expected to be wrong:** the restore drill. It ran first time with no warning, so `R-38ba2f94` keeps only its reminder half.
+- **Wrong, the next most likely:** SYSTEM reaching a network share. The vaulted credential worked first time, so §8.2's dedicated account was not needed. §8.2's share bullet now says what ran.
+- **Right:** no script change on the box, and no `VERSION` bump.
+- **Not predicted:** the desktop's Public profile and its DHCP address. The firewall rule had to cover every profile while admitting only the box, and the address is filed as `backup-target-dhcp`.
+
+**What went wrong on the way, so nobody reads it as smooth:**
+- ⚠️ **My first desktop block failed one step.** It was meant to hide `meridianbackup` from the sign-in screen, and `New-Item` without `-Force` cannot create a missing parent registry key. It was cosmetic, and a second block fixed it. The account, folder, share and firewall rule were all created by the first block.
+- ⚠️ **My "success looks like" lines were pasted into the box's PowerShell** with the block's output, which left it at a `>>` continuation prompt. Nothing ran from them, and the user cleared it with Ctrl+C.
+- ⚠️ **The restore was from the box's copy, not the desktop's.** The two are the same bytes by SHA-256. Retrieving the file from the desktop onto another machine was not exercised.
+
+**Filed by this close-out:** `backup-target-dhcp` (`during-testing`). The optional read for `R-4b57090b` is recorded on `R-4b57090b`'s own row as partial: 402 asset 404s since 2026-09-17, the newest 20 all to a doubled `/build/assets/assets/` path that was never served.
+
+**The claim as taken follows.**
 
 Taken 2026-11-07. Branch `m216-testing-backups`, cut from origin/main at `b65c97e8`, PR into main. Held green for the next merge point (`D137`), with `M215`'s #412. The box's half follows that merge, because it needs the merged code, so the rows close at the close-out and not on the branch.
 Rows: `R-5f180437`, *"The first-boot runbook and the checklist set up none of the database backup §5 prescribes."*; `R-4bda047a`, *"The testing server's database backups sit on the same machine as the database: no off-box copy, no write-ahead-log archiving and no restore drill."* Taken together under `D13` exception #8, on `D212`'s answer.
@@ -343,6 +982,7 @@ Prediction: Pint and the lint gates green, and PHPStan unmoved by one option. Pe
   - **Filed from it:** `box-c-drive-small`, on this branch. PostgreSQL's data is on the small C:.
 - **The task's account is Monday's first measurement.** No script change is expected. First choice: SYSTEM with a credential saved in its own vault for that one target, leaving the box's folder rights alone. Fallback: §8.2's dedicated task account. Whichever works, §8.2's share bullet is rewritten at the close-out from what ran.
 - **At the merge point:** #412 first. Then merge the trunk into #413, keep both sides at the backlog's end, regenerate the line in a tree with `vendor/`, and let it go green again.
+- **The close-out branch is `m216-closeout` (2026-11-09).** It is named here before its edits to `docs/deployment-infrastructure.md`, `docs/non-functional-requirements.md`, `docs/feature-backlog.md`, `docs/gate-baselines.md`, `docs/pipeline.md` and `PROGRESS.md` (own block only). Those edits release both `M215` and `M216`.
 - **Filed:** `R-139b1662` `production-pitr` (`before-launch`), `R-91237328` `nightly-backup-silent-failure` and `R-38ba2f94` `restore-drill-no-owner` (`during-testing`).
 - **How the prediction has fared so far:**
   - **Right:** Pint and the lint gates green; Pest green on the four files; no `VERSION` bump.
@@ -352,7 +992,17 @@ Prediction: Pint and the lint gates green, and PHPStan unmoved by one option. Pe
   - **Wrong in the plan:** it took the `D13` exception's number from `state.php`, whose "exceptions entry" is `docs/ux/exceptions-log.md`. `D13`'s own log gave #8.
   - **Not yet measured:** the restore drill, still the part most likely to be wrong.
 
-## HELD — `M215`, `R-98b2d568`: the hand-off names only startable rows as work (m215-next-section-classes) — BUILT AND HELD: PR #412 green, waiting for the next merge point
+## RELEASED — `M215`, `R-98b2d568`: the hand-off names only startable rows as work (merged as PR #412, `64fd42cf`, first at the backup sitting's merge point, after merging the trunk into its branch at `c5e38b07`; 8/8 green with real step counts on its run 42551130351 — Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5; the trunk's run 42558652846 on `64fd42cf` 8/8, with BHW Connect at 23)
+
+**RELEASED FIRST AT THE BACKUP SITTING'S MERGE POINT, 2026-11-09.**
+- **The merge:** the branch took the trunk at `e9c19e7b` with no conflict, and the line was regenerated. Pint, both lint gates and `state.php --check` were green on the host.
+- **The order:** it merged at 03:51:35 UTC, 21 seconds after the user's census. Its deploy (42562052900) changed only paths the site does not run, so it opened no window.
+- **Read on the trunk after the merge:** `state.php` prints `next work … (12 of 167 ready; the rest are in The line)` and, on a separate line, `blocked, not work …`. So the blocked rows have left the work list, as the row asked.
+- Nothing a tester sees changed, so `VERSION` did not move.
+
+**How the prediction fared:** as recorded at the build below, and nothing new at the merge. The live arm's floor and the hand-off's length, which I expected to go wrong, held then and still hold on the trunk (`state.php --check` clean).
+
+**The claim as taken follows.**
 
 Taken 2026-11-06. Branch `m215-next-section-classes`, cut from origin/main at `1cae5bef`, PR into main. Held green for the next merge point (`D137`).
 Row: `R-98b2d568`, *"The Next section and the hand-off list open decisions as work to take."*

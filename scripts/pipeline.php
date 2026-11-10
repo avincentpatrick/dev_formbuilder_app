@@ -1008,10 +1008,14 @@ function render_next(array $next): string
         return $out."Nothing is open outside held rows and questions waiting on the user.\n";
     }
 
-    $out .= 'From **'.$next['tier']."**, the most urgent tier with open work. Take work from here, and group\n"
-        ."the rows of one tier under `D13`'s file-overlap rule, which since `D15` reads the files a row's\n"
-        ."REMEDY EDITS rather than the files it cites: no two rows may edit the same file, and at most one\n"
-        ."may touch a hub. The close-out artefacts every increment touches by procedure are excluded.\n\n";
+    // ⛔ THE CLASS AT THE END OF EACH BULLET BELOW IS A CONTRACT (M215): scripts/next-section.php reads it, and
+    //    tests/Feature/Docs/NextSectionClassTest.php holds these three formats and the cut note to it.
+    $out .= 'From **'.$next['tier']."**, the most urgent tier with open work. **Take work from the rows marked\n"
+        ."`ready`.** A blocked row or a question waiting on you is listed so it stays visible, and it is not\n"
+        ."work. Group the ready rows of one tier under `D13`'s file-overlap rule, which since `D15` reads the\n"
+        ."files a row's REMEDY EDITS rather than the files it cites: no two rows may edit the same file, and\n"
+        ."at most one may touch a hub. The close-out artefacts every increment touches by procedure are\n"
+        ."excluded.\n\n";
 
     foreach ($next['ready'] as $row) {
         $out .= sprintf("- `%s` — %s · ready\n", $row['id'], cell((string) ($row['headline'] ?? $row['title'] ?? '')));

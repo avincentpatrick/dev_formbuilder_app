@@ -1,5 +1,7 @@
 "use client";
 
+import { geometryPositions } from "@/lib/geo/positions";
+
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { accent, muted } from "@/lib/charts/palette";
@@ -184,13 +186,7 @@ export function PointMap({
           bounds.extend(feature.geometry.coordinates);
         }
         for (const feature of outlineFeatures) {
-          const coords = JSON.stringify(
-            (feature.geometry as { coordinates: unknown }).coordinates,
-          ).match(/-?\d+\.\d+/g);
-          if (!coords) continue;
-          for (let i = 0; i < coords.length - 1; i += 2) {
-            bounds.extend([Number(coords[i]), Number(coords[i + 1])]);
-          }
+          for (const position of geometryPositions(feature.geometry)) bounds.extend(position);
         }
         const fitAll = () => {
           if (map && !bounds.isEmpty()) {

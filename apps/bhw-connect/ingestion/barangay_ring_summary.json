@@ -1,0 +1,71 @@
+{
+  "assessment_date": "2026-11-08",
+  "source_release": "faeldon/philippines-psgc-shapefiles v1.0.1",
+  "mapshaper_version": "0.6.113",
+  "command": "-proj wgs84 -simplify 10% keep-shapes -o format=geojson",
+  "input_barangays": 42010,
+  "input_rings": 45585,
+  "blocked_records": 5,
+  "blocked_source_null": 4,
+  "blocked_after_projection": 1,
+  "retention_counts": {
+    "source_records": 42010,
+    "candidate_records": 42010,
+    "missing_source_codes": 0,
+    "unexpected_candidate_codes": 0,
+    "duplicate_candidate_codes": 0,
+    "non_barangay_features": {},
+    "source_invalid_codes": 4,
+    "candidate_invalid_codes": 5,
+    "newly_invalid_codes": 1,
+    "lost_components": 1,
+    "lost_holes": 1,
+    "gained_components": 0,
+    "gained_holes": 0,
+    "source_components": 45573,
+    "candidate_components": 45572,
+    "source_holes": 12,
+    "candidate_holes": 11
+  },
+  "reconciliation_counts": {
+    "reference": 41991,
+    "same_code": 41580,
+    "missing": 411,
+    "invalid_geometry": 5,
+    "parent_mismatch": 0,
+    "overlap": 8,
+    "candidate_usable": 41567,
+    "source_barangay_features": 42010,
+    "source_unique_codes": 42010,
+    "unmatched_source": 430,
+    "duplicate_source_codes": 0,
+    "invalid_source_features": 5,
+    "positive_area_overlap_pairs": 8
+  },
+  "overlap_relationships": {
+    "touching-upstream": 4,
+    "overlap-present-upstream": 4
+  },
+  "blocking_checks": [
+    "source_invalid_codes",
+    "candidate_invalid_codes",
+    "lost_components",
+    "lost_holes",
+    "missing_reference_codes",
+    "unmatched_source_codes",
+    "positive_area_overlaps"
+  ],
+  "assembly_provenance": {
+    "manifest_sha256": "fbc7c2444e806b984c1f59a50dc257c5a9b2b18398761ce6c9324af8a14b5252",
+    "rings_sha256": "340cdc0e89e5c7ed129c8d7158d702993ec04bfbbd8ede3470f65ed106878779",
+    "output_sha256": "8c3092e28015e73432c3e01cf3a4cf127bef21c0c0e010a9f46a773f735e969f"
+  },
+  "validation_provenance": {
+    "source_sha256": "0c1627035e1bef618a7f57ca96bc93822710aef03aa0c273a922f3b7cd3b198a",
+    "reference_sha256": "e21e46edbb09995f5a1d2bfd46e621c5b8bed6b7597dc00d4db9dee7a4696fbe",
+    "candidate_sha256": "8c3092e28015e73432c3e01cf3a4cf127bef21c0c0e010a9f46a773f735e969f"
+  },
+  "output_bytes": 115874119,
+  "publication_ready": false,
+  "scope": "Full-country ring-preservation experiment. Not historical, production or delivery acceptance."
+}

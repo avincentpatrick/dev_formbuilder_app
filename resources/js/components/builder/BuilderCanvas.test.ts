@@ -228,3 +228,97 @@ describe('BuilderCanvas — a label edited in place (M150)', () => {
         expect(wrapper.find('[aria-label="Question label"]').exists()).toBe(true);
     });
 });
+
+/**
+ * M221 (`R-18d9f001`) — a section's title edited on its head, as a question's label is above: the same editor, one PATCH and
+ * one undo entry per edit. Before it, a section's title could be changed only from the settings pane.
+ */
+describe('BuilderCanvas — a section title edited in place (M221)', () => {
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        vi.restoreAllMocks();
+        document.body.innerHTML = '';
+    });
+
+    function editable() {
+        const fetch = fetchMock().mockResolvedValue(jsonResponse(200, serverSection({ id: 's1', key: 'household', label: 'Household members', sequence: 1 })));
+        const store = useBuilderStore(pageProps({ sections: [serverSection({ id: 's1', key: 'household', label: 'Household', sequence: 1 })], fields: [] }));
+        const wrapper = mount(BuilderCanvas, { props: { store, fieldTypeLabels: { short_text: 'Text' } }, attachTo: document.body });
+        const patches = () => requestLog(fetch).filter((r) => r.method === 'PATCH' && r.url.endsWith('/sections/s1'));
+
+        return { store, wrapper, patches };
+    }
+
+    async function open(wrapper: ReturnType<typeof editable>['wrapper']): Promise<HTMLInputElement> {
+        await wrapper.find('button[aria-label="Edit title of Household"]').trigger('click');
+        return wrapper.find('[aria-label="Section title"]').element as HTMLInputElement;
+    }
+
+    it('swaps the head for a focused input holding the title, at the server\'s 255-character cap', async () => {
+        const { store, wrapper } = editable();
+        const input = await open(wrapper);
+
+        expect(input.value).toBe('Household');
+        expect(document.activeElement).toBe(input);
+        expect(input.getAttribute('maxlength')).toBe('255');
+        expect(wrapper.find('.canvas__section-head').exists()).toBe(false);
+        // Opening the editor selects the section, so the settings pane shows the one being renamed.
+        expect(store.selection.value).toMatchObject({ kind: 'section' });
+        expect(wrapper.emitted('picked')).toBeUndefined();
+    });
+
+    it('saves the trimmed title once on Enter, and gives focus back to the head', async () => {
+        const { store, wrapper, patches } = editable();
+        const input = await open(wrapper);
+
+        await wrapper.find('[aria-label="Section title"]').setValue('  Household members  ');
+        expect(patches()).toHaveLength(0);
+        await wrapper.find('[aria-label="Section title"]').trigger('keydown', { key: 'Enter' });
+        await flushPromises();
+
+        expect(patches()).toHaveLength(1);
+        expect((patches()[0].body as { label: string }).label).toBe('Household members');
+        expect(store.sections.value[0].label).toBe('Household members');
+        expect(input.isConnected).toBe(false);
+        expect(document.activeElement).toBe(wrapper.find('.canvas__section-head').element);
+        expect(wrapper.find('.canvas__section-head').text()).toContain('Household members');
+    });
+
+    it('is one undo entry', async () => {
+        const { store, wrapper, patches } = editable();
+        await open(wrapper);
+        await wrapper.find('[aria-label="Section title"]').setValue('Household members');
+        await wrapper.find('[aria-label="Section title"]').trigger('keydown', { key: 'Enter' });
+        await flushPromises();
+
+        await store.undo();
+        await flushPromises();
+
+        expect(store.sections.value[0].label).toBe('Household');
+        expect(patches()).toHaveLength(2);
+    });
+
+    it('keeps the title on Escape, and when it is left blank, and writes nothing', async () => {
+        const { store, wrapper, patches } = editable();
+        await open(wrapper);
+        await wrapper.find('[aria-label="Section title"]').setValue('Something else');
+        await wrapper.find('[aria-label="Section title"]').trigger('keydown', { key: 'Escape' });
+        await flushPromises();
+
+        await open(wrapper);
+        await wrapper.find('[aria-label="Section title"]').setValue('   ');
+        await wrapper.find('[aria-label="Section title"]').trigger('keydown', { key: 'Enter' });
+        await flushPromises();
+
+        expect(patches()).toHaveLength(0);
+        expect(store.sections.value[0].label).toBe('Household');
+        expect(wrapper.find('.canvas__section-head').text()).toContain('Household');
+    });
+
+    it('opens on a double-click of the head', async () => {
+        const { wrapper } = editable();
+        await wrapper.find('.canvas__section-head').trigger('dblclick');
+
+        expect(wrapper.find('[aria-label="Section title"]').exists()).toBe(true);
+    });
+});

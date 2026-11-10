@@ -79,10 +79,14 @@ final class FormBuilderService
         return DB::transaction(function () use ($form): FormSection {
             $draft = $this->lockDraft($form);
 
+            // M221: `is_repeatable` set here, not left to the column's default. A model made by `create()` never reads a
+            // default back, so the reply said `null`, the builder sent that back with its first edit, and `boolean`
+            // refused every save of the new section until a reload.
             return FormSection::create([
                 'form_version_id' => $draft->id,
                 'key' => $this->uniqueKey($draft, 'section', 'form_sections'),
                 'label' => 'New section',
+                'is_repeatable' => false,
                 'sequence' => $this->nextSectionSequence($draft),
             ]);
         });

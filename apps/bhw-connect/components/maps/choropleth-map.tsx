@@ -1,5 +1,7 @@
 "use client";
 
+import { geometryPositions } from "@/lib/geo/positions";
+
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { colorForValue, NO_DATA_COLOR, type ColorBin } from "@/lib/charts/color-scale";
@@ -208,14 +210,7 @@ export function ChoroplethMap({
 
           const bounds = new maplibregl.LngLatBounds();
           for (const feature of geojson.features) {
-            // Some boundary features carry a null geometry (e.g. the Kalayaan /
-            // Spratly Islands citymun) — skip them rather than crash on `.coordinates`.
-            if (!feature.geometry) continue;
-            const coords = JSON.stringify(feature.geometry.coordinates).match(/-?\d+\.\d+/g);
-            if (!coords) continue;
-            for (let i = 0; i < coords.length - 1; i += 2) {
-              bounds.extend([Number(coords[i]), Number(coords[i + 1])]);
-            }
+            for (const position of geometryPositions(feature.geometry)) bounds.extend(position);
           }
           const fitAll = () => {
             if (map && !bounds.isEmpty()) map.fitBounds(bounds, { padding: 20, animate: false });

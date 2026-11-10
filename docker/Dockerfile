@@ -31,6 +31,10 @@ RUN apk add --no-cache --virtual .build-deps \
 # Composer (from the official image).
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
+# M219 (R-efee4d5c): the testing server's upload limits (25M a file, 30M a request) instead of PHP's stock
+# 2M and 8M, which refused every upload over 2 MB locally and only locally.
+COPY docker/php/uploads.ini /usr/local/etc/php/conf.d/zz-uploads.ini
+
 WORKDIR /var/www/html
 
 # php-fpm listens on 9000 for the nginx "web" service.

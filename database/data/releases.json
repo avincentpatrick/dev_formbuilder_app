@@ -10,6 +10,50 @@
         ]
     },
     {
+        "version": "0.18.0",
+        "title": "Rename a section where you see it",
+        "items": [
+            {
+                "kind": "new",
+                "text": "In the builder’s Structure view, a section’s title can now be edited on the section itself, as a question’s label already can: press the pencil beside it, or double-click it. Enter saves, and Escape keeps the old title."
+            },
+            {
+                "kind": "fixed",
+                "text": "A section you have just added can now be saved straight away. Before, any change to it showed Not saved, with a message about whether it repeats, until you reloaded the page."
+            }
+        ]
+    },
+    {
+        "version": "0.17.4",
+        "title": "Saved questions keep their rules as loose as they were",
+        "items": [
+            {
+                "kind": "fixed",
+                "text": "When you use Save to library on a question whose rules are grouped (any of these, or all of these) and one rule in the group compares with another question, the whole group is now left out of the saved copy. Before, only the comparison was left out, so the copy was stricter than the question you saved. A comparison with another question still cannot be saved to the library, because the other question is not there."
+            }
+        ]
+    },
+    {
+        "version": "0.17.3",
+        "title": "XLSForm imports with long appearances",
+        "items": [
+            {
+                "kind": "fixed",
+                "text": "Importing an XLSForm no longer fails when a question’s appearance is longer than 60 characters, such as an ODK search() lookup. The question is imported without that appearance, and the import’s warnings say which question it was."
+            }
+        ]
+    },
+    {
+        "version": "0.17.2",
+        "title": "XLSForm exports keep translated choices",
+        "items": [
+            {
+                "kind": "fixed",
+                "text": "A form translated only in its answer choices, or in the rows and columns of a grid, now keeps those translations when you export it to XLSForm. Before, the export left them out unless a question's own label was translated too."
+            }
+        ]
+    },
+    {
         "version": "0.17.1",
         "title": "Builder panels that grow with your text",
         "items": [

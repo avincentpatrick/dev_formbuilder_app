@@ -13228,11 +13228,15 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   offering notes in `M134`, so this is reached only by typing the expression. **Live.** Filed by `M134`.
   **Tier: during-testing.**
 
-- **`minor` · Converting a date question to a time question, or back, does not warn that an ordering on it stops
+- ✅ **CLOSED BY `M227` (2026-11-08) — ****`minor` · Converting a date question to a time question, or back, does not warn that an ordering on it stops
   holding.** Found by `M134` while designing `R-62b638e1`. After `M134` a date orders against dates and `today()`, a time
   against times; `ConversionCensus` flags a re-meant numeric use through `ValueShape::allowsOperator(Gt)`, which refuses
   every temporal shape, so the type-change dialog says nothing, and the next publish refuses the ordering as a kind
   mismatch. The remedy is a census judge for a temporal kind change. **Live.** Filed by `M134`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M227` (2026-11-08), on its branch.**
+  - **The judge asks the publish gate, so the two cannot disagree.** For each use, the census records which of date, time and date-and-time `ExpressionOperandJudge::temporalOrderingHolds()` accepts its orderings as. A change between two temporal types reports `temporal_ordering_breaks` where the old type held and the new one does not. A date to a date-and-time stays silent, because the two order against each other.
+  - **Asking `judge()` itself would have missed half the breaks.** It reports a mismatch between two questions once, under the key that sorts first, so a date compared with a question whose key sorts earlier was invisible from the converted side. The verdict on one compared operand moved into `againstOperand()`, which the gate and the census share. The gate keeps its report-once rule, and its 155 cases pass unchanged.
+  - Four census cases: two that report (red first) and two that stay silent (beside a text question, on arithmetic, on a pair the old type already broke, and a date to a date-and-time). Four mutants are CAUGHT, including one that copies the gate's report-once rule into the census. Ships as 0.18.3.
 
 - **`minor` · `"5\n"` is a number on the server and not in the browser.** Found by `M134` while designing the temporal
   parse. `Coercion::NUMERIC_RE` is anchored with `$`, which in PCRE also matches before a final newline, so

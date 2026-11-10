@@ -471,7 +471,11 @@ it("refuses a municipality scope while no barangay release is configured, before
 it("refuses barangay drill-down for datasets and indicators without a barangay reader, even with a release set", async () => {
   vi.stubEnv("BHW_BARANGAY_RELEASE", "rel-1");
   for (const url of [
-    LINK("bhw-stepzero-2026", "bhw.total", "citymun", "0102801"),
+    LINK("bhw-stepzero-2026", "bhw.declared-accreditation", "citymun", "0102801"),
+    LINK("bhw-2025", "bhw.profile-accreditation", "citymun", "0102801"),
+    LINK("bhw-2025", "bhw.any-honorarium", "citymun", "0102801"),
+    LINK("bhw-2025", "bhw.active-years", "citymun", "0102801"),
+    LINK("bhw-2025", `bhw.training.${TRAINING_TOPICS[0][0]}`, "citymun", "0102801"),
     LINK("uuc-phc-2025", "uuc.route.ip", "citymun", "0102801"),
   ])
     expect((await GET(new NextRequest(url))).status, url).toBe(400);
@@ -515,6 +519,34 @@ it("adds no note when the unplaced facilities cannot change the indicator", asyn
   for (const indicator of ["nhfr.barangay-presence", "nhfr.beds", "nhfr.type.hospital"]) {
     const data = await (await GET(new NextRequest(LINK("nhfr-2026-09", indicator, "citymun", "0102801")))).json();
     expect(data.totalNote, indicator).toBeUndefined();
+  }
+  vi.unstubAllEnvs();
+});
+it("maps BHW counts per barangay from the barangay aggregate rows, with a note that rates stay at municipalities", async () => {
+  vi.stubEnv("BHW_BARANGAY_RELEASE", "rel-1");
+  mock.geo.mockResolvedValue({ geoCode: "0102801", geoLevel: "citymun", geoName: "Adams" });
+  for (const [dataset, indicator, table, column] of [
+    ["bhw-2025", "bhw.validated-profiles", "agg_bhw_counts", "n_total"],
+    ["bhw-stepzero-2026", "bhw.total", "agg_bhw_stepzero_counts", "n_total_bhw"],
+    ["bhw-stepzero-2026", "bhw.nonregistered", "agg_bhw_stepzero_counts", "n_non_registered"],
+  ]) {
+    tables({ dim_geo: BARANGAYS, [table]: [{ geo_code: "0102801001", [column]: 3 }, { geo_code: "0102801002", [column]: 0 }, { geo_code: "0102801", [column]: 3 }] });
+    const data = await (await GET(new NextRequest(LINK(dataset, indicator, "citymun", "0102801")))).json();
+    expect(data.childLevel, indicator).toBe("barangay");
+    expect(data.rows, indicator).toEqual([{ code: "0102801001", name: "Adams (Pob.)", value: 3 }, { code: "0102801002", name: "Bacsil", value: 0 }]);
+    expect(data.total, indicator).toBe(3);
+    expect(data.totalNote, indicator).toContain("Barangay maps show counts only");
+    expect(data.geometryUrl).toMatch(/\/maps\/rel-1\/citymun\/0102801\.json$/);
+  }
+  vi.unstubAllEnvs();
+});
+it("offers the barangay drill for a BHW count and not for a BHW rate", async () => {
+  vi.stubEnv("BHW_BARANGAY_RELEASE", "rel-1");
+  mock.geo.mockResolvedValue({ geoCode: "01028", geoLevel: "province", geoName: "Ilocos Norte" });
+  for (const [indicator, expected] of [["bhw.validated-profiles", true], ["bhw.any-honorarium", undefined]] as const) {
+    tables({ dim_geo: [{ geo_code: "0102801", geo_name: "Adams" }], agg_bhw_counts: [{ geo_code: "0102801", n_total: 5, any_honorarium_pct: 10 }, { geo_code: "01028", n_total: 50, any_honorarium_pct: 10 }] });
+    const data = await (await GET(new NextRequest(LINK("bhw-2025", indicator, "province", "01028")))).json();
+    expect(data.barangayDrill, indicator).toBe(expected);
   }
   vi.unstubAllEnvs();
 });

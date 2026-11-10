@@ -989,3 +989,22 @@ matched their municipal counts exactly (22, 15 and 14). At barangay level the UU
 StepZero were refused with 400, and the province view offered the drill. A browser rendered the NHFR map for
 Bacarra (43 barangays) and a UUC municipality (21) with the map ready and no "Not reported" rows. Barangay
 drill-down is therefore left on for NHFR and UUC; no rollback was needed.
+
+## BHW Census and StepZero counts per barangay (10 November 2026)
+
+Following the owner's decisions (DECISIONS.md, BARANGAY_BHW_DISCLOSURE_PROPOSAL.md), barangay drill-down now
+covers BHW **counts of totals**: Census validated profiles and the StepZero total, registered,
+registered-and-accredited and non-registered counts, plus StepZero's source population and households as
+context. They read the barangay rows of `agg_bhw_counts` and `agg_bhw_stepzero_counts` through the same path as
+every other level (no fact-table reader, no new data); a barangay with no row reads "Not reported", a zero
+stays zero. Totals are not suppressed (BUILD_PLAN §4.1), as on the dashboards.
+
+Percentages, averages, honorarium and training stay at municipality level; the barangay view says so beside
+the map. A test requires every barangay-mapped BHW indicator to be a count, so a rate cannot be added by
+accident. Choosing an indicator without a barangay map while in a barangay view returns to the province and
+now says so ("This indicator has no barangay map, so it is shown for the province."). The agreed rule for any
+future barangay rate is that both groups behind it have at least 5 people.
+Validation: unit and API cases (counts read from the aggregate tables and never from facts; every rate, the
+mean, honorarium and a training topic refused), a browser assertion of the notice, and deliberate defects (a
+rate added to the barangay list; the note dropped) that turned tests red. The live check after deploy is the
+same probe, on BHW counts in the busiest municipalities.

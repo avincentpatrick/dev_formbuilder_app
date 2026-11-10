@@ -55,6 +55,8 @@ _None open._ `D215`, the last filed, was asked and answered on 2026-11-09 in `M2
 
 **What it creates:** no new row, because `M216`'s box half carries it. **Not measured yet, and read first on Monday:** the desktop's name and address, whether the box can reach it on port 445, and how the task signs in there. The box is in a workgroup at 192.168.50.2/26 and the access log has shown office clients as 192.168.1.x, so the two may be on different networks, and SYSTEM has no identity on another machine. If the network team has to open that path, `R-4bda047a` stays open until it is open. The merge point runs first in the same sitting, because the box's half needs the merged code.
 
+**Date amended 2026-11-08 (user, in chat), recorded during `M219`:** *"i will be the one to tell you if i am ready to do the task for the backup."* The answer, A, stands. The sitting has **no date** now: it happens when the user says so, and no session prompts for it. Every *"Monday"* above, and in `M216`'s claim, reads as *"the day the user names"*.
+
 ### D212 — The testing site's backups all sit on the machine that holds its database, and `docs/deployment-infrastructure.md` §5 prescribes a copy off the box, WAL archiving and a restore drill. How much of that binds the testing site? **A — a daily copy off the box and one restore proved; up to a day of data can be lost, and the 15-minute recovery is filed for before launch.**
 
 **Asked and answered 2026-11-06 (user decision, in the planning of `M216`), on `R-5f180437` and `R-4bda047a`.**

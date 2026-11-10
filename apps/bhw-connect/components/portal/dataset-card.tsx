@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 /**
- * A single dataset entry on the Equity in Health portal. When `href` is set the
+ * A single dataset entry on the iconnect portal. When `href` is set the
  * card is a real link into that dataset's dashboard; without it the card renders
  * as a muted, non-interactive "coming soon" placeholder that signals the
  * section's roadmap without entering the tab order.

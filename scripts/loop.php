@@ -109,6 +109,8 @@ const STOP_PHRASES = [
     'new module', 'new feature', 'net-new',
 ];
 
+require_once __DIR__.'/next-section.php';
+
 $root = dirname(__DIR__);
 chdir($root);
 
@@ -153,7 +155,17 @@ function cmd_status(): never
     line(sprintf('  %-34s %d open of %d', (string) $gate['tier'], (int) $gate['open'], (int) $gate['total']));
     line(sprintf('  %-34s %s', 'waiting on the user', (array) $gate['waiting_ids'] === [] ? 'none' : implode(', ', (array) $gate['waiting_ids'])));
     line(sprintf('  %-34s %d', 'held in that tier', (int) $gate['held']));
-    line(sprintf('  %-34s %s', 'next work', $gate['next_tier'] === null ? '(none listed)' : $gate['next_tier'].' — '.implode(', ', (array) $gate['next'])));
+
+    foreach (next_section_rows((array) $gate['next']) as $label => $value) {
+        line(sprintf('  %-34s %s', $label, $value));
+    }
+
+    $unreadable = next_section_unreadable((array) $gate['next']);
+
+    if ($unreadable !== null) {
+        line('  ⚠️ '.$unreadable);
+    }
+
     line(sprintf('  %-34s %d, with %d open decision(s)', 'rows in the line', (int) ($state['pipeline']['rows'] ?? -1), count((array) ($state['decisions']['open'] ?? []))));
     line(sprintf('  %-34s M%d', 'highest released', (int) $state['increment']['highest_released']));
     line('');

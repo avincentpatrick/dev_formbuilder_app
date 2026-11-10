@@ -7,10 +7,27 @@ import { logEvent } from "@/lib/usage/log-client";
 import { formatCount } from "@/lib/format";
 import { withBasePath } from "@/lib/base-path";
 
+type SearchMode =
+  | "place"
+  | "explore"
+  | "profiling"
+  | "portal"
+  | "uuc-phc"
+  | "facilities"
+  | "health-services"
+  | "districts";
+const DATASETS = {
+  place: "2025 BHW Census",
+  "uuc-phc": "2025 UUC for PHC",
+  facilities: "Health facilities",
+  "health-services": "Health services",
+} as const;
+
 type GeoParentChain = { region?: string; province?: string; citymun?: string };
 
 type GeoHit = {
   kind: "geo";
+  destination?: keyof typeof DATASETS;
   geoCode: string;
   geoLevel: string;
   geoName: string;
@@ -66,7 +83,12 @@ const RECENTS_MAX = 5;
 
 /** `kind` defaults to `"geo"` when reading an older localStorage entry saved before D3.3 added
  * district results — those entries never carried a `kind` at all. */
-type RecentPlace = { geoCode: string; geoLevel: string; geoName: string; kind?: "geo" | "district" };
+type RecentPlace = {
+  geoCode: string;
+  geoLevel: string;
+  geoName: string;
+  kind?: "geo" | "district";
+};
 
 function loadRecents(): RecentPlace[] {
   try {
@@ -79,8 +101,10 @@ function loadRecents(): RecentPlace[] {
   }
 }
 
-function recentHref(recent: RecentPlace, mode: "place" | "explore" | "profiling"): string {
+function recentHref(recent: RecentPlace, mode: SearchMode): string {
   if (recent.kind === "district") return `/districts/${recent.geoCode}`;
+  if (mode === "uuc-phc" || mode === "facilities" || mode === "health-services")
+    return `/${mode}/${recent.geoLevel}/${recent.geoCode}`;
   return mode === "explore"
     ? `/explore?geoLevel=${recent.geoLevel}&geoCode=${recent.geoCode}`
     : mode === "profiling"
@@ -114,20 +138,24 @@ export function GeoSearch({
    * on Home/place). `explore` → stays on `/explore` with the geo applied as
    * filter params, so the Explore sidebar search browses in place (E1.6).
    * `profiling` → the geo's page in the 2026 BHW Profiling Status section. */
-  mode?: "place" | "explore" | "profiling";
+  mode?: SearchMode;
 }) {
   const router = useRouter();
   // D3.3 — a district result always opens its own `/districts/[code]` receipt page, the same
   // destination regardless of `mode`: a district isn't a geo_level to filter/explore into (plan
   // §1), and that page is already the fuller profile (D3.3's other change).
   const hrefFor = (result: GeoSearchResult) =>
-    result.kind === "district"
-      ? `/districts/${result.districtCode}`
-      : mode === "explore"
-        ? `/explore?geoLevel=${result.geoLevel}&geoCode=${result.geoCode}`
-        : mode === "profiling"
-          ? `/profiling-status/${result.geoLevel}/${result.geoCode}`
-          : `/place/${result.geoLevel}/${result.geoCode}`;
+    recentHref(
+      result.kind === "district"
+        ? {
+            kind: "district",
+            geoCode: result.districtCode,
+            geoLevel: "district",
+            geoName: result.districtName,
+          }
+        : { geoCode: result.geoCode, geoLevel: result.geoLevel, geoName: result.geoName },
+      result.kind === "geo" ? (result.destination ?? mode) : mode,
+    );
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<GeoSearchResult[]>([]);
   const [status, setStatus] = useState<Status>("idle");
@@ -139,6 +167,15 @@ export function GeoSearch({
   const listId = useId();
 
   const trimmed = query.trim();
+  const searchLabel =
+    mode === "districts"
+      ? "Find a district or member city, municipality, or barangay"
+      : ["uuc-phc", "facilities", "health-services"].includes(mode)
+        ? "Find a barangay, municipality, city, province, or region"
+        : "Find a barangay, municipality, city, province, region, or district";
+  const browseHref = ["uuc-phc", "facilities", "health-services", "districts"].includes(mode)
+    ? `/${mode}`
+    : "/explore";
 
   // Recent places are client-only (localStorage), loaded after mount so server
   // and first client render match. The load is deferred to a timeout so the
@@ -151,8 +188,18 @@ export function GeoSearch({
   function rememberRecent(result: GeoSearchResult) {
     const entry: RecentPlace =
       result.kind === "district"
-        ? { geoCode: result.districtCode, geoLevel: "district", geoName: result.districtName, kind: "district" }
-        : { geoCode: result.geoCode, geoLevel: result.geoLevel, geoName: result.geoName, kind: "geo" };
+        ? {
+            geoCode: result.districtCode,
+            geoLevel: "district",
+            geoName: result.districtName,
+            kind: "district",
+          }
+        : {
+            geoCode: result.geoCode,
+            geoLevel: result.geoLevel,
+            geoName: result.geoName,
+            kind: "geo",
+          };
     const next = [entry, ...recents.filter((r) => r.geoCode !== entry.geoCode)].slice(
       0,
       RECENTS_MAX,
@@ -185,8 +232,25 @@ export function GeoSearch({
         try {
           const res = await fetch(withBasePath(`/api/geo/search?q=${encodeURIComponent(trimmed)}`));
           if (currentRequest !== requestId.current) return;
+          if (!res.ok) throw new Error("Search failed");
           const body = await res.json();
-          const next: GeoSearchResult[] = body.results ?? [];
+          if (currentRequest !== requestId.current) return;
+          const hits: GeoSearchResult[] = body.results ?? [];
+          const next: GeoSearchResult[] = hits.flatMap((hit): GeoSearchResult[] => {
+            if (mode === "districts") return hit.kind === "district" ? [hit] : [];
+            if (mode === "portal" && hit.kind === "geo") {
+              return (Object.keys(DATASETS) as (keyof typeof DATASETS)[]).map((destination) => ({
+                ...hit,
+                destination,
+              }));
+            }
+            if (
+              ["uuc-phc", "facilities", "health-services"].includes(mode) &&
+              hit.kind === "district"
+            )
+              return [];
+            return [hit];
+          });
           setResults(next);
           setStatus("done");
           // Auto-highlight the top result so Enter selects it and screen readers
@@ -205,7 +269,7 @@ export function GeoSearch({
     );
 
     return () => clearTimeout(timeout);
-  }, [trimmed]);
+  }, [trimmed, mode]);
 
   // Close the dropdown on any click outside the widget.
   useEffect(() => {
@@ -223,6 +287,12 @@ export function GeoSearch({
   const hintsVisible = open && trimmed.length === 0 && variant === "hero";
   const optionId = (i: number) => `${listId}-opt-${i}`;
 
+  useEffect(() => {
+    if (listVisible && activeIndex >= 0) {
+      document.getElementById(`${listId}-opt-${activeIndex}`)?.scrollIntoView({ block: "nearest" });
+    }
+  }, [activeIndex, listVisible, listId]);
+
   function navigateTo(result: GeoSearchResult) {
     rememberRecent(result);
     setOpen(false);
@@ -231,23 +301,18 @@ export function GeoSearch({
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Escape") {
+      event.preventDefault();
       setOpen(false);
       return;
     }
-    if (!listVisible || results.length === 0) {
-      // With no open list, Enter still submits to the best match once one loads.
-      if (event.key === "Enter" && results.length > 0) {
-        event.preventDefault();
-        navigateTo(results[Math.max(0, activeIndex)]);
-      }
-      return;
-    }
+    if (results.length === 0) return;
     if (event.key === "ArrowDown") {
       event.preventDefault();
       setOpen(true);
       setActiveIndex((i) => (i + 1) % results.length);
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
+      setOpen(true);
       setActiveIndex((i) => (i <= 0 ? results.length - 1 : i - 1));
     } else if (event.key === "Enter") {
       event.preventDefault();
@@ -258,7 +323,7 @@ export function GeoSearch({
   return (
     <div ref={containerRef} className={`relative w-full ${variant === "hero" ? "max-w-md" : ""}`}>
       <label htmlFor="geo-search-input" className="sr-only">
-        Find your barangay, city, province, or region
+        {searchLabel}
       </label>
 
       <div className="relative">
@@ -288,9 +353,16 @@ export function GeoSearch({
               : undefined
           }
           autoComplete="off"
-          placeholder="Find your barangay, city, province, or region"
+          placeholder={searchLabel}
+          maxLength={100}
           value={query}
           onChange={(e) => {
+            if (e.target.value.trim() !== trimmed) {
+              ++requestId.current;
+              setResults([]);
+              setActiveIndex(-1);
+              setStatus(e.target.value.trim() ? "loading" : "idle");
+            }
             setQuery(e.target.value);
             setOpen(true);
           }}
@@ -320,7 +392,7 @@ export function GeoSearch({
       </p>
 
       {listVisible && (
-        <div className="absolute left-0 right-0 z-20 mt-1 overflow-hidden rounded-md border border-border bg-background text-left shadow-lg">
+        <div className="absolute left-0 right-0 z-20 mt-1 max-h-96 overflow-y-auto rounded-md border border-border bg-background text-left shadow-lg">
           {status === "error" ? (
             <p className="px-4 py-3 text-sm text-muted">
               Couldn&apos;t search — check your connection and try again.
@@ -336,7 +408,7 @@ export function GeoSearch({
                 const data = resultData(result);
                 return (
                   <li
-                    key={`${result.kind}-${resultCode(result)}`}
+                    key={`${result.kind}-${resultCode(result)}-${result.kind === "geo" ? (result.destination ?? mode) : "district"}`}
                     id={optionId(i)}
                     role="option"
                     aria-selected={i === activeIndex}
@@ -360,7 +432,15 @@ export function GeoSearch({
                         <span
                           className={`block text-xs ${data.hasData ? "text-muted" : "text-muted/70"}`}
                         >
-                          {data.text}
+                          {result.kind === "geo" && result.destination
+                            ? DATASETS[result.destination]
+                            : mode === "uuc-phc" ||
+                                mode === "facilities" ||
+                                mode === "health-services"
+                              ? result.kind === "geo" && result.geoLevel === "barangay"
+                                ? "Opens the city / municipality overview"
+                                : "Open area overview"
+                              : data.text}
                         </span>
                       </span>
                       <span className="shrink-0 pt-0.5 text-xs text-muted">
@@ -377,7 +457,7 @@ export function GeoSearch({
 
       {hintsVisible && (
         <div className="absolute left-0 right-0 z-20 mt-1 rounded-md border border-border bg-background p-3 text-left shadow-lg">
-          {recents.length > 0 && (
+          {recents.length > 0 && mode !== "portal" && mode !== "districts" && (
             <div className="mb-3 border-b border-border pb-3">
               <p className="text-xs text-muted">Recent places:</p>
               <ul className="mt-1">
@@ -419,7 +499,7 @@ export function GeoSearch({
           <p className="mt-3 text-xs text-muted">
             Not sure of the spelling?{" "}
             <Link
-              href="/explore"
+              href={browseHref}
               className="underline hover:text-accent"
               onClick={() => setOpen(false)}
             >

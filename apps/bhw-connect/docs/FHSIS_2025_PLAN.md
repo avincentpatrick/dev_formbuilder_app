@@ -1,5 +1,28 @@
 # FHSIS 2025 — DOH Field Health Services Information System as a companion dataset
 
+## Implementation status — 2026-11-07
+
+The migrated database baseline already contains `fact_fhsis_indicator`, `fact_fhsis_workforce`,
+`ref_fhsis_indicator` and `ref_fhsis_reconciliation`; the dataset metadata records the
+6 September 2026 retrieval. The baseline is schema evidence, not proof of current production
+row counts. The old F1 fetch/clean/load scripts and cleaning report are absent from this checkout.
+Do not repeat a live load or claim F1 verification solely from this snapshot.
+
+Live verification on 2026-11-07 found definitions but no matching figures at national,
+Region I, Ilocos Norte or Adams. This does not establish that DOH did not report them.
+The reader now checks for at least one accessible total-breakdown row in the release before
+using area-level “not reported” labels. The unresolved server-side check is documented in
+`FHSIS_DIAGNOSIS.md`; no reload or permission change is justified until it returns.
+
+F2 is now implemented: `/health-services`, geographic drill-down, methodology, social cards,
+portal discovery, total-breakdown indicators, workforce context and source subtotal reconciliation.
+The stored dictionary corrects two assumptions in the original plan: eight-visit antenatal care
+is Q3–Q4 only, and TB notification rates are per 100,000 rather than percentages.
+Feedback routing from F6 is included now so the shared feedback widget tags this section correctly.
+The UI reads published rates and definitions, preserves real zeros, and distinguishes missing
+reports from failed reads. The development seed contains invented figures; it is not a source
+for any factual headline. F3–F6 remain separate follow-up increments.
+
 ## Context
 
 `docs/DATASET_SCOPING.md` §3 re-scoped this candidate on 2026-09-06 against the actual source, and
@@ -439,3 +462,12 @@ the same PR** (the omission #146 found for `/api/export/uuc-phc`).
     `ref_uuc_phc_provincial`'s `fic_prov_ref`. They are different years and possibly different
     denominators, so agreement is not required — but the comparison goes in the cleaning report,
     because it is the first time the site has held the same indicator from two sources.
+
+## 2026-11 source recovery and first server load
+
+The server's published registration had zero facts in both FHSIS tables. The recovered source
+workbooks are a new retrieval, not the original September snapshot. The executable preparation,
+source corrections, exact decimal preservation, Q4 WASH periods and transactional operator
+handoff are documented in [FHSIS_LOAD.md](FHSIS_LOAD.md). That document supersedes this plan's
+assumption that all environmental-health sheets are annual or use projected households for
+component shares. Private facts and source workbooks are never committed.

@@ -1,0 +1,42 @@
+[
+  {
+    "code": "oral_pregnant_first_facility",
+    "program_area": "oral_health",
+    "label": "First oral-health visit, facility-based, pregnant women",
+    "numerator_def": "First oral-health visit, facility-based, pregnant women",
+    "denominator_def": "Count only; annual denominator sums quarterly population estimates, so coverage is withheld",
+    "unit": "count",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_pregnant_first_nonfacility",
+    "program_area": "oral_health",
+    "label": "First oral-health visit, non-facility-based, pregnant women",
+    "numerator_def": "First oral-health visit, non-facility-based, pregnant women",
+    "denominator_def": "Count only; annual denominator sums quarterly population estimates, so coverage is withheld",
+    "unit": "count",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_pregnant_two_facility",
+    "program_area": "oral_health",
+    "label": "Completed two oral-health visits, facility-based, pregnant women",
+    "numerator_def": "Completed two oral-health visits, facility-based, pregnant women",
+    "denominator_def": "Count only; annual denominator sums quarterly population estimates, so coverage is withheld",
+    "unit": "count",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_pregnant_two_nonfacility",
+    "program_area": "oral_health",
+    "label": "Completed two oral-health visits, non-facility-based, pregnant women",
+    "numerator_def": "Completed two oral-health visits, non-facility-based, pregnant women",
+    "denominator_def": "Count only; annual denominator sums quarterly population estimates, so coverage is withheld",
+    "unit": "count",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  }
+]

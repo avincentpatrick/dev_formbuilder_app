@@ -9698,3 +9698,28 @@ It supersedes Increment 2.5's auth choices; the two-layer gate and its fail-clos
   opening to Supabase's origin (Meridian's `bhw-admin-signin-csp`) is removed with it. `NEXT_PUBLIC_SUPABASE_URL`
   survives only as the prefix supabase-js puts on REST calls, which `lib/db/data-plane.ts` sends to PostgREST,
   and the anon and service keys are minted by `db/mint-jwt.mjs` from the box's own secret.
+
+
+## 2026-11-07 — FHSIS health-services dashboard (F2)
+
+Continue from the migrated database schema rather than re-creating or reloading the FHSIS tables.
+Add `/health-services` with national, region, province and city/municipality views, methodology,
+source subtotal reconciliation, workforce ratios and social cards; make it discoverable from the portal.
+The dictionary supplies every indicator label, unit, numerator and denominator definition.
+TB notifications are per 100,000, so >100 is not an excess-coverage marker. ANC8 is Q3–Q4 only.
+Missing rows say not reported; failed reads say unavailable; zero remains zero. BHW-per-staff
+ratios use the profiled census numerator and never a FHSIS BHW tally. No dataset is reloaded and
+no schema or permissions are changed. F3–F6 and recovery of the original cleaning provenance
+remain tracked in FHSIS_2025_PLAN.md. Production row counts cannot be inferred from the synthetic seed.
+
+## 2026-11-09 — Barangay boundary gates treated as reviewed; barangay drill-down built, off by default
+
+The owner stated that the barangay boundary acceptance gates (overlap review, per-vintage crosswalk
+evidence including Sulu, and historical compatibility, as listed in BARANGAY_BOUNDARY_CANDIDATE.md) are
+to be treated as reviewed, with the result to be refined from tester feedback. No new review evidence
+was produced in this repository, and the package's own manifest still says `publication_ready: false`
+and historical compatibility `not-reviewed`: this entry records an owner decision, not a verification.
+Consequences: the app may deliver the private package's municipality partitions once an operator
+installs them and sets `BHW_BARANGAY_RELEASE`. Drill-down is enabled per dataset (NHFR and UUC first;
+BHW Census and StepZero wait for a barangay-level small-count suppression review), and only where the
+indicator's source carries barangay rows. Barangays without a candidate polygon stay in the table.

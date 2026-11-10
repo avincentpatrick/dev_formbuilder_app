@@ -12,6 +12,8 @@ const BASE_URL = SITE_URL;
 const STATIC_PATHS = [
   "",
   "/bhw",
+  "/health-services",
+  "/health-services/methodology",
   "/explore",
   "/compare",
   "/methodology",

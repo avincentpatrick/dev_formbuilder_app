@@ -9,6 +9,12 @@ describe("datasetSlugForPath", () => {
     expect(datasetSlugForPath("/uuc-phc/methodology")).toBe("uuc-phc-2025");
   });
 
+  it("routes FHSIS feedback without matching unrelated prefixes", () => {
+    expect(datasetSlugForPath("/health-services/citymun/0102801")).toBe("fhsis-2025");
+    expect(datasetSlugForPath("/health-services/methodology")).toBe("fhsis-2025");
+    expect(datasetSlugForPath("/health-services-archive")).toBeNull();
+  });
+
   it("routes the other single-dataset sections", () => {
     expect(datasetSlugForPath("/profiling-status")).toBe("bhw-profiling-status-2026");
     expect(datasetSlugForPath("/profiling-status/region/07")).toBe("bhw-profiling-status-2026");

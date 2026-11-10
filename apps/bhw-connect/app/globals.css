@@ -7,6 +7,7 @@
   --surface: #f6f7f8;
   --border: #dde1e3;
   --muted: #57616a;
+  --brand-ink: #082b56;
 
   /* Single accent (WCAG AA on white at normal text weight) */
   --accent: #0a6e6e;
@@ -97,6 +98,7 @@
    the no-JS case, scoped so it never overrides an explicit choice.
    --------------------------------------------------------------------------- */
 :root[data-theme="dark"] {
+  --brand-ink: #edf1f1;
   --background: #0f1314;
   --foreground: #edf1f1;
   --surface: #181d1e;
@@ -109,6 +111,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    --brand-ink: #edf1f1;
     --background: #0f1314;
     --foreground: #edf1f1;
     --surface: #181d1e;
@@ -281,6 +284,48 @@ html[data-presenting] [data-feedback-ui] {
 }
 .equity-mark.lg {
   height: 54px;
+}
+
+/* The connected i is the wordmark's first letter, never a second icon above it. */
+.iconnect-wordmark {
+  display: block;
+  width: 100%;
+  height: auto;
+  color: var(--brand-ink);
+}
+
+.iconnect-mark {
+  width: 1.75rem;
+  height: 2rem;
+  flex-shrink: 0;
+  color: var(--brand-ink);
+}
+
+.iconnect-footer {
+  border-top: 1px solid var(--seq-3);
+  border-bottom: 3px solid #009da5;
+  padding-bottom: 1.5rem;
+}
+
+.innovation-endorsement {
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
+  color: var(--brand-ink);
+}
+
+.innovation-endorsement .equity-mark {
+  width: 7.625rem;
+  height: 2.5rem;
+  flex-shrink: 0;
+  background: currentColor;
+}
+
+.innovation-endorsement-label {
+  border-left: 1px solid var(--seq-3);
+  padding-left: 1rem;
+  font-size: 0.9375rem;
+  letter-spacing: 0.12em;
 }
 
 * {

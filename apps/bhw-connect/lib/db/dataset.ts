@@ -33,29 +33,8 @@ export type DatasetInfo = {
  * per render.
  */
 export const getActiveDataset = cache(async (): Promise<DatasetInfo | null> => {
-  try {
-    const supabase = createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from("dim_dataset")
-      .select("dataset_id, slug, name, source_name, license, as_of_date, last_updated_at")
-      .eq("slug", DATASET_SLUGS.profiled)
-      .eq("status", "active")
-      .maybeSingle();
-
-    if (error || !data) return null;
-
-    return {
-      datasetId: data.dataset_id,
-      slug: data.slug,
-      name: data.name,
-      sourceName: data.source_name,
-      license: data.license,
-      asOfDate: data.as_of_date,
-      lastUpdatedAt: data.last_updated_at,
-    };
-  } catch {
-    return null;
-  }
+  const result = await readDatasetBySlug(DATASET_SLUGS.profiled, true);
+  return result.state === "available" ? result.value : null;
 });
 
 /** Convenience accessor for query functions that only need the numeric FK. */
@@ -68,6 +47,8 @@ export async function getActiveDatasetId(): Promise<number | null> {
  * every individual-level figure; the StepZero quick-count is the aggregate
  * BHW universe used only as the total/denominator. */
 export const DATASET_SLUGS = {
+  /** DOH 2025 annual health services release, partial at retrieval. */
+  fhsis: "fhsis-2025",
   profiled: "bhw-2025",
   stepzero: "bhw-stepzero-2026",
   /** PSA 2024 Census of Population (E4.2). StepZero's own self-reported population is
@@ -95,6 +76,41 @@ export const DATASET_SLUGS = {
   nhfr: "nhfr-2026-09",
 } as const;
 
+export type DatasetRead =
+  { state: "available"; value: DatasetInfo } | { state: "unavailable" | "failed" };
+
+/** Typed read boundary for callers that must distinguish absent metadata from a failed read.
+ * Existing nullable accessors retain their behavior. Never expose database errors or credentials.
+ */
+export const readDatasetBySlug = cache(
+  async (slug: string, requireActive = false): Promise<DatasetRead> => {
+    try {
+      let query = createSupabaseServerClient()
+        .from("dim_dataset")
+        .select("dataset_id, slug, name, source_name, license, as_of_date, last_updated_at")
+        .eq("slug", slug);
+      if (requireActive) query = query.eq("status", "active");
+      const { data, error } = await query.maybeSingle();
+      if (error) return { state: "failed" };
+      if (!data) return { state: "unavailable" };
+      return {
+        state: "available",
+        value: {
+          datasetId: data.dataset_id,
+          slug: data.slug,
+          name: data.name,
+          sourceName: data.source_name,
+          license: data.license,
+          asOfDate: data.as_of_date,
+          lastUpdatedAt: data.last_updated_at,
+        },
+      };
+    } catch {
+      return { state: "failed" };
+    }
+  },
+);
+
 /**
  * One dataset by slug regardless of `status`. Used to reach the companion
  * datasets that are intentionally not `status = 'active'` — StepZero,
@@ -109,28 +125,8 @@ export const DATASET_SLUGS = {
  * (`UUC_PHC_2025_PLAN.md` §9 U8).
  */
 export const getDatasetBySlug = cache(async (slug: string): Promise<DatasetInfo | null> => {
-  try {
-    const supabase = createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from("dim_dataset")
-      .select("dataset_id, slug, name, source_name, license, as_of_date, last_updated_at")
-      .eq("slug", slug)
-      .maybeSingle();
-
-    if (error || !data) return null;
-
-    return {
-      datasetId: data.dataset_id,
-      slug: data.slug,
-      name: data.name,
-      sourceName: data.source_name,
-      license: data.license,
-      asOfDate: data.as_of_date,
-      lastUpdatedAt: data.last_updated_at,
-    };
-  } catch {
-    return null;
-  }
+  const result = await readDatasetBySlug(slug);
+  return result.state === "available" ? result.value : null;
 });
 
 /** Convenience accessor for the many query helpers that only need the numeric FK. */

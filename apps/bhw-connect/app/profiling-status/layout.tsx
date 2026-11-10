@@ -1,3 +1,5 @@
+import { IconnectMark } from "@/components/branding/iconnect-logo";
+import { InnovationEndorsement } from "@/components/branding/innovation-endorsement";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -24,7 +26,7 @@ function SectionHeader() {
           href="/profiling-status"
           className="flex items-center gap-2 text-lg font-semibold tracking-tight"
         >
-          <span className="equity-mark sm" aria-hidden="true" />
+          <IconnectMark />
           <span>BHW Profiling Status</span>
           <span className="rounded-full bg-accent-subtle px-2 py-0.5 text-xs font-medium text-accent">
             2026
@@ -50,7 +52,7 @@ function SectionHeader() {
             href="/"
             className="shrink-0 whitespace-nowrap rounded-md px-3 py-2 text-muted hover:bg-surface hover:text-foreground"
           >
-            ← Portal
+            ← iconnect
           </Link>
         </nav>
       </div>
@@ -62,13 +64,13 @@ function SectionFooter() {
   return (
     <footer className="mt-auto border-t border-border">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-6 text-sm text-muted sm:px-6">
-        <span className="equity-mark sm" aria-hidden="true" />
+        <InnovationEndorsement />
         <span>
           Source: DOH BHW Connect — 2026 individual-profiling encoding status. Aggregate counts
           only, no personal data.
         </span>
         <Link href="/" className="underline hover:text-accent">
-          Equity in Health portal
+          iconnect home
         </Link>
       </div>
     </footer>

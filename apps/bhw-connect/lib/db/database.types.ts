@@ -8,6 +8,173 @@ export type Database = {
   };
   public: {
     Tables: {
+      fact_fhsis_indicator: {
+        Row: {
+          id: number;
+          dataset_id: number;
+          geo_code: string;
+          geo_level: Database["public"]["Enums"]["geo_level_enum"];
+          indicator_key: string;
+          breakdown: string;
+          numerator_exact: number | null;
+          denominator_exact: number | null;
+          numerator: number | null;
+          denominator: number | null;
+          rate_pct: number | null;
+          over_100: boolean;
+          source_psgc: string | null;
+          source_area_name: string | null;
+        };
+        Insert: {
+          id?: number;
+          dataset_id: number;
+          geo_code: string;
+          geo_level: Database["public"]["Enums"]["geo_level_enum"];
+          indicator_key: string;
+          breakdown?: string;
+          numerator_exact?: number | null;
+          denominator_exact?: number | null;
+          numerator?: number | null;
+          denominator?: number | null;
+          rate_pct?: number | null;
+          over_100?: boolean;
+          source_psgc?: string | null;
+          source_area_name?: string | null;
+        };
+        Update: {
+          id?: number;
+          dataset_id?: number;
+          geo_code?: string;
+          geo_level?: Database["public"]["Enums"]["geo_level_enum"];
+          indicator_key?: string;
+          breakdown?: string;
+          numerator_exact?: number | null;
+          denominator_exact?: number | null;
+          numerator?: number | null;
+          denominator?: number | null;
+          rate_pct?: number | null;
+          over_100?: boolean;
+          source_psgc?: string | null;
+          source_area_name?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "fact_fhsis_indicator_dataset_id_fkey";
+            columns: ["dataset_id"];
+            isOneToOne: false;
+            referencedRelation: "dim_dataset";
+            referencedColumns: ["dataset_id"];
+          },
+          {
+            foreignKeyName: "fact_fhsis_indicator_geo_code_fkey";
+            columns: ["geo_code"];
+            isOneToOne: false;
+            referencedRelation: "dim_geo";
+            referencedColumns: ["geo_code"];
+          },
+          {
+            foreignKeyName: "fact_fhsis_indicator_indicator_key_fkey";
+            columns: ["indicator_key"];
+            isOneToOne: false;
+            referencedRelation: "ref_fhsis_indicator";
+            referencedColumns: ["indicator_key"];
+          },
+        ];
+      };
+      fact_fhsis_workforce: {
+        Row: {
+          id: number;
+          dataset_id: number;
+          geo_code: string;
+          geo_level: Database["public"]["Enums"]["geo_level_enum"];
+          cadre: string;
+          lgu_hired: number | null;
+          doh_hired: number | null;
+          total: number | null;
+          population_2025: number | null;
+          households_2025: number | null;
+          source_psgc: string | null;
+          source_area_name: string | null;
+        };
+        Insert: {
+          id?: number;
+          dataset_id: number;
+          geo_code: string;
+          geo_level: Database["public"]["Enums"]["geo_level_enum"];
+          cadre: string;
+          lgu_hired?: number | null;
+          doh_hired?: number | null;
+          total?: number | null;
+          population_2025?: number | null;
+          households_2025?: number | null;
+          source_psgc?: string | null;
+          source_area_name?: string | null;
+        };
+        Update: {
+          id?: number;
+          dataset_id?: number;
+          geo_code?: string;
+          geo_level?: Database["public"]["Enums"]["geo_level_enum"];
+          cadre?: string;
+          lgu_hired?: number | null;
+          doh_hired?: number | null;
+          total?: number | null;
+          population_2025?: number | null;
+          households_2025?: number | null;
+          source_psgc?: string | null;
+          source_area_name?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "fact_fhsis_workforce_dataset_id_fkey";
+            columns: ["dataset_id"];
+            isOneToOne: false;
+            referencedRelation: "dim_dataset";
+            referencedColumns: ["dataset_id"];
+          },
+          {
+            foreignKeyName: "fact_fhsis_workforce_geo_code_fkey";
+            columns: ["geo_code"];
+            isOneToOne: false;
+            referencedRelation: "dim_geo";
+            referencedColumns: ["geo_code"];
+          },
+        ];
+      };
+      ref_fhsis_indicator: {
+        Row: {
+          indicator_key: string;
+          program_area: string;
+          label: string;
+          numerator_def: string;
+          denominator_def: string;
+          unit: string;
+          source_workbook: string;
+          uuc_criterion_d: boolean;
+        };
+        Insert: {
+          indicator_key: string;
+          program_area: string;
+          label: string;
+          numerator_def: string;
+          denominator_def: string;
+          unit: string;
+          source_workbook: string;
+          uuc_criterion_d?: boolean;
+        };
+        Update: {
+          indicator_key?: string;
+          program_area?: string;
+          label?: string;
+          numerator_def?: string;
+          denominator_def?: string;
+          unit?: string;
+          source_workbook?: string;
+          uuc_criterion_d?: boolean;
+        };
+        Relationships: [];
+      };
+
       admin_users: {
         Row: {
           role: Database["public"]["Enums"]["admin_role_enum"];
@@ -3260,6 +3427,24 @@ export type Database = {
       };
     };
     Views: {
+      ref_fhsis_reconciliation_exact: Database["public"]["Views"]["ref_fhsis_reconciliation"];
+      ref_fhsis_reconciliation: {
+        Row: {
+          dataset_id: number | null;
+          indicator_key: string | null;
+          breakdown: string | null;
+          parent_level: Database["public"]["Enums"]["geo_level_enum"] | null;
+          parent_geo_code: string | null;
+          parent_geo_name: string | null;
+          child_count: number | null;
+          child_sum: number | null;
+          published_parent: number | null;
+          residual: number | null;
+          finding: string | null;
+        };
+        Relationships: [];
+      };
+
       ref_uuc_phc_benchmark_gaps: {
         Row: {
           finding: string | null;

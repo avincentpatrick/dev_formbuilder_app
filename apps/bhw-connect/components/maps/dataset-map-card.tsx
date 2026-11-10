@@ -334,7 +334,7 @@ export function DatasetMapCard({
                 ) : accreditation ? (
                   <>Reported area rate: {data.parentRate == null ? "Not reported" : `${data.parentRate}%`}.
                     Denominator: {metric?.denominator ?? STEPZERO_ACCREDITATION_DENOMINATOR}. Published percentages are not averaged across areas.
-                    {censusRate ? (censusUncertainty ? "Census profile percentage; published 95% Wilson intervals and small-sample notes appear below." : "Share receiving any honorarium; no confidence interval is supplied for this measure. This does not describe amounts or receipt from a particular payer.") : "This is the LGU declaration, not accreditation among validated Census profiles."}</>
+                    {censusRate ? (censusUncertainty ? "BHW Profiles percentage; published 95% Wilson intervals and small-sample notes appear below." : "Share receiving any honorarium; no confidence interval is supplied for this measure. This does not describe amounts or receipt from a particular payer.") : "This is the LGU declaration, not accreditation among validated Census profiles."}</>
                 ) : profiling ? (
                   "Stages are mutually exclusive current workflow states. Shares use each area’s BHW headcount, rounded to whole percentages, not pipeline totals. No regional average is calculated. Not yet encoded is the headcount minus all pipeline stages, floored at zero."
                 ) : income ? (

@@ -40,7 +40,8 @@ it("offers explicit empty planned slots", () => {
 });
 it("keeps census, StepZero and PSA releases and dates independent", () => {
   expect(initialMapChoice("bhw-2025").indicator).toBe("bhw.validated-profiles");
-  expect(initialMapChoice("bhw-stepzero-2026").period).toBe("2026");
+  // The slug says 2026; the headcount is 2025 data.
+  expect(initialMapChoice("bhw-stepzero-2026").period).toBe("2025");
   expect(initialMapChoice("psa-popcen-2024").period).toBe("2024");
   expect(parseMapChoice(new URLSearchParams("dataset=psa-popcen-2024&period=2026"))).toBeNull();
   expect(parseMapChoice(new URLSearchParams("dataset=bhw-2025&indicator=bhw.total"))).toBeNull();
@@ -48,8 +49,8 @@ it("keeps census, StepZero and PSA releases and dates independent", () => {
 
 it("keeps StepZero population and households separate from PSA and other releases", () => {
   for (const indicator of ["stepzero.population", "stepzero.households"]) {
-    expect(parseMapChoice(new URLSearchParams(`dataset=bhw-stepzero-2026&indicator=${indicator}&period=2026`)))
-      .toMatchObject({ dataset: "bhw-stepzero-2026", indicator, period: "2026" });
+    expect(parseMapChoice(new URLSearchParams(`dataset=bhw-stepzero-2026&indicator=${indicator}&period=2025`)))
+      .toMatchObject({ dataset: "bhw-stepzero-2026", indicator, period: "2025" });
     expect(parseMapChoice(new URLSearchParams(`dataset=psa-popcen-2024&indicator=${indicator}&period=2024`))).toBeNull();
     expect(parseMapChoice(new URLSearchParams(`dataset=bhw-stepzero-2026&indicator=${indicator}&period=2024`))).toBeNull();
   }
@@ -87,4 +88,11 @@ it("accepts a municipality scope with a ten-digit barangay selection, and reject
   expect(parseMapChoice(new URLSearchParams({ ...base, code: "0102801" }))).toMatchObject({ selected: null });
   for (const [code, selected] of [["01028", undefined], ["0102801", "0102801"], ["0102801", "010280100"], ["0102801", "01028010011"], ["01028010", undefined]] as const)
     expect(parseMapChoice(new URLSearchParams({ ...base, code, ...(selected ? { selected } : {}) })), `${code}/${selected}`).toBeNull();
+});
+
+it("opens headcount links shared before its period was corrected from 2026 to 2025", () => {
+  expect(parseMapChoice(new URLSearchParams("dataset=bhw-stepzero-2026&indicator=bhw.total&period=2026")))
+    .toMatchObject({ dataset: "bhw-stepzero-2026", indicator: "bhw.total", period: "2025" });
+  // Only the headcount had the wrong label; no other release gains a 2026 alias.
+  expect(parseMapChoice(new URLSearchParams("dataset=bhw-2025&indicator=bhw.validated-profiles&period=2026"))).toBeNull();
 });

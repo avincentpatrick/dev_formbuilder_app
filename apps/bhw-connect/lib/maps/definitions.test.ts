@@ -7,7 +7,8 @@ describe("independent dataset map contracts", () => {
       getDatasetMap("bhw-2025")?.indicators.every((i) => i.catalogSpec?.source === "bhw-2025"),
     ).toBe(true);
     expect(validMapChoice("bhw-2025", "bhw.total", "2026", "region")).toBe(false);
-    expect(validMapChoice("bhw-stepzero-2026", "bhw.total", "2026", "barangay")).toBe(true);
+    expect(validMapChoice("bhw-stepzero-2026", "bhw.total", "2025", "barangay")).toBe(true);
+    expect(validMapChoice("bhw-stepzero-2026", "bhw.total", "2026", "barangay")).toBe(false);
     expect(getDatasetMap("unknown")).toBeUndefined();
   });
   it("preserves partial periods and refuses invented barangay rates", () => {

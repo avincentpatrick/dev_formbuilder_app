@@ -9736,3 +9736,13 @@ coverage. (5) The owner signs off the privacy side.
 Noted for the owner: the live dashboards already show barangay rates with a small-sample warning and suppress
 a cell only when fewer than 5 BHWs are represented, which is looser than the rule agreed for map rates. In a
 random sample of 128 barangays, 24% had fewer than 5 validated profiles and 73% fewer than 10.
+
+## 2026-11-10 — BHW Headcount and BHW Profiles; 2026 profiling status hidden
+
+Agreed with avincentpatrick (plan: `docs/DATASET_HUB_PLAN.md`). Users now see the StepZero quick-count as
+**BHW Headcount 2025** (all BHWs, as reported by each LGU before profiling began) and the per-person dataset as
+**BHW Profiles 2025** (individually profiled and validated BHWs, 97.4% of registered BHWs in the headcount);
+"LGU-declared" reads "LGU-reported", and `/bhw` is titled **BHW 2025**. "Census" was the wrong word for the
+profiled subset. The headcount's map period is corrected from 2026 to 2025 — its data is 2025 (2026-07-20 entry);
+only the slug says 2026, and slugs, tables and function names are unchanged. No 2026 BHW data is presented yet,
+so `bhw-profiling-status-2026` is hidden by `lib/releases/visibility.ts`; NHFR September 2026 is not.

@@ -475,7 +475,7 @@ export default async function PlacePage({ params }: { params: Promise<PlaceParam
                 headline={`Each BHW here serves about ${overview.householdsPerBhw} households.`}
                 technicalDetails={
                   <p>
-                    StepZero household count divided by Total BHWs (the StepZero universe). A higher
+                    Headcount household count divided by Total BHWs (the BHW Headcount universe). A higher
                     figure means each BHW covers more households.
                   </p>
                 }

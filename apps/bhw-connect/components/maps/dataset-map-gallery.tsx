@@ -8,7 +8,7 @@ export function DatasetMapGallery() {
     <section aria-label="Independent dataset maps" className="space-y-5">
       <h2 className="text-2xl font-semibold">Dataset maps</h2>
       <p className="text-sm text-muted">
-        Each dataset has its own map and selection. BHW profile counts, StepZero, PSA population,
+        Each dataset has its own map and selection. BHW Profiles, BHW Headcount, PSA population,
         poverty, LGU income class, UUC and NHFR maps are available; other map slots show their
         readiness.
       </p>

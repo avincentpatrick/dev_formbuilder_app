@@ -40,7 +40,7 @@ export function AccreditationSourcesFigure({
 
   const headline =
     verified === null
-      ? `The quick-count reports ${formatIndicatorValue(lguReported, "%")} of all BHWs here as accredited.`
+      ? `The BHW Headcount reports ${formatIndicatorValue(lguReported, "%")} of all BHWs here as accredited.`
       : gap !== null && gap >= 5
         ? `The two sources disagree by about ${formatIndicatorValue(gap, "")} points — worth a closer look.`
         : `The two sources roughly agree on accreditation here.`;
@@ -54,7 +54,7 @@ export function AccreditationSourcesFigure({
         <p>
           Two independently collected measures, shown side by side and never averaged.{" "}
           <GlossaryTerm slug="lgu_reported_accreditation">LGU-reported accreditation</GlossaryTerm>{" "}
-          is the StepZero quick-count&apos;s accredited share of the whole BHW universe; the verified
+          is the BHW Headcount&apos;s accredited share of the whole BHW universe; the verified
           rate counts only <GlossaryTerm slug="accredited">accredited</GlossaryTerm> individually
           validated profiles. A gap between them reflects the two sources&apos; different coverage,
           not an error — see{" "}
@@ -68,7 +68,7 @@ export function AccreditationSourcesFigure({
     >
       <dl className="grid grid-cols-2 gap-3">
         <div className="rounded-md border border-border bg-surface/40 p-3">
-          <dt className="text-xs text-muted">Quick-count (all BHWs)</dt>
+          <dt className="text-xs text-muted">Headcount (all BHWs)</dt>
           <dd className="mt-1 text-2xl font-semibold tracking-tight">
             {formatIndicatorValue(lguReported, "%")}
           </dd>

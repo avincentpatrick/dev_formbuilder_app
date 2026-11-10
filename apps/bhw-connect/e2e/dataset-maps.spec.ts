@@ -118,7 +118,7 @@ test("WebGL failure leaves keyboard selection and the table usable", async ({ pa
 
 test("census, StepZero and PSA maps keep their own indicators and periods", async ({ page }) => {
   await page.goto("map?dataset=bhw-stepzero-2026&indicator=bhw.registered&level=region&code=01");
-  await expect(page.getByLabel("StepZero 2026 indicator")).toHaveValue("bhw.registered");
+  await expect(page.getByLabel("BHW Headcount 2025 indicator")).toHaveValue("bhw.registered");
   await page.getByLabel("Map dataset").selectOption("psa-popcen-2024");
   await expect(page).toHaveURL(/period=2024&level=region&code=01/);
   await expect(page.getByLabel("PSA population 2024 indicator")).toHaveValue(
@@ -126,7 +126,7 @@ test("census, StepZero and PSA maps keep their own indicators and periods", asyn
   );
   await page.getByLabel("Map dataset").selectOption("bhw-2025");
   await expect(page).toHaveURL(/period=2025&level=region&code=01/);
-  await expect(page.getByLabel("BHW Census 2025 indicator")).toHaveValue("bhw.validated-profiles");
+  await expect(page.getByLabel("BHW Profiles 2025 indicator")).toHaveValue("bhw.validated-profiles");
 });
 
 test("many visible cards share at most two maps and only lease owners load rows", async ({
@@ -660,13 +660,14 @@ test("StepZero source population and households keep their own dates, values and
       license: "Test only", geometryUrl: "/bhw-connect/geo/regions.json",
     } });
   });
+  // A link shared before the period was corrected still opens, now labelled 2025.
   await page.goto("map?dataset=bhw-stepzero-2026&indicator=stepzero.population&period=2026");
-  await expect(page.getByLabel("StepZero 2026 indicator")).toHaveValue("stepzero.population");
+  await expect(page.getByLabel("BHW Headcount 2025 indicator")).toHaveValue("stepzero.population");
   await page.getByText(/Complete area table/).click();
   await expect(page.getByRole("row", { name: /Synthetic zero 0/ })).toBeVisible();
   await expect(page.getByRole("row", { name: /Synthetic missing Not reported/ })).toBeVisible();
   await expect(page.getByText(/Reported area total: 123 people/)).toBeVisible();
-  await page.getByLabel("StepZero 2026 indicator").selectOption("stepzero.households");
+  await page.getByLabel("BHW Headcount 2025 indicator").selectOption("stepzero.households");
   await expect(page.getByText(/Reported area total: 25 households/)).toBeVisible();
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download map data (JSON)" }).click();
@@ -674,7 +675,7 @@ test("StepZero source population and households keep their own dates, values and
   const chunks = [];
   for await (const chunk of stream!) chunks.push(chunk);
   const exported = JSON.parse(Buffer.concat(chunks).toString());
-  expect(exported.indicator).toMatchObject({ id: "stepzero.households", period: "2026", unit: "households" });
+  expect(exported.indicator).toMatchObject({ id: "stepzero.households", period: "2025", unit: "households" });
   expect(exported.rows.map((row: { value: number | null }) => row.value)).toEqual([0, null, 12]);
   expect(exported.total).toBe(25);
   await page.getByLabel("Map dataset").selectOption("psa-popcen-2024");
@@ -687,13 +688,13 @@ test("StepZero accreditation uses a published parent rate and fixed percentage l
     state: "available", rows: [
       { code: "01", name: "Synthetic zero", value: 0, note: "Published share" },
       { code: "02", name: "Synthetic decimal", value: 33.33, note: "Published share" },
-      { code: "99", name: "Synthetic undefined", value: null, note: "No valid positive StepZero BHW denominator or numerator." },
+      { code: "99", name: "Synthetic undefined", value: null, note: "No valid positive BHW Headcount denominator or numerator." },
     ], total: null, parentRate: 25, area: "Synthetic geography", childLevel: "region", source: "Synthetic StepZero",
     date: "2026-09-01", license: "Test only", geometryUrl: "/bhw-connect/geo/regions.json",
   } }));
-  await page.goto("map?dataset=bhw-stepzero-2026&indicator=bhw.declared-accreditation&period=2026");
+  await page.goto("map?dataset=bhw-stepzero-2026&indicator=bhw.declared-accreditation&period=2025");
   await expect(page.getByText(/Reported area rate: 25%/)).toBeVisible();
-  await expect(page.getByText(/Denominator: All LGU-declared BHWs/)).toBeVisible();
+  await expect(page.getByText(/Denominator: All LGU-reported BHWs/)).toBeVisible();
   await expect(page.getByText(/Fixed percentage breaks across areas/)).toBeVisible();
   await expect(page.getByText(/Reported area total:/)).toHaveCount(0);
   await page.getByText(/Complete area table/).click();
@@ -722,7 +723,7 @@ test("Census accreditation preserves profile denominator, Wilson intervals and s
   await expect(page.locator('[data-map-state="ready"]')).toHaveCount(1);
   await expect(page.getByText("Few BHWs profiled — unstable", { exact: true })).toBeVisible();
   await expect(page.getByText(/Reported area rate: 25%/)).toBeVisible();
-  await expect(page.getByText(/Denominator: Validated BHW Census profiles/)).toBeVisible();
+  await expect(page.getByText(/Denominator: Validated BHW Profiles 2025 records/)).toBeVisible();
   await page.getByText("Complete area table (1)").click();
   await expect(page.getByRole("columnheader", { name: "Published 95% confidence interval" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "6.15%–79.23%" })).toBeVisible();
@@ -752,9 +753,9 @@ test("Census training topic changes retain their own rates, period and exports",
   });
   await page.goto("map?dataset=bhw-2025&indicator=bhw.training.basic_life_support");
   await expect(page.getByText(/Reported area rate: 25%/)).toBeVisible();
-  await page.getByLabel("BHW Census 2025 indicator", { exact: true }).selectOption("bhw.training.dengue");
+  await page.getByLabel("BHW Profiles 2025 indicator", { exact: true }).selectOption("bhw.training.dengue");
   await expect(page.getByText(/Reported area rate: 75%/)).toBeVisible();
-  await expect(page.getByText(/Denominator: Validated BHW Census profiles/)).toBeVisible();
+  await expect(page.getByText(/Denominator: Validated BHW Profiles 2025 records/)).toBeVisible();
   await page.getByText(/Complete area table/).click();
   await expect(page.getByRole("row", { name: /Unreported training region Not reported/ })).toBeVisible();
   const downloaded = page.waitForEvent("download");

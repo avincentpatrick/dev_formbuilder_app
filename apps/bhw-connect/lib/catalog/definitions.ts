@@ -170,18 +170,18 @@ export const TRAINING_TOPICS = [
 
 const bhw: IndicatorSpec[] = [
   ...make(R.stepzero, "agg_bhw_stepzero_counts", "bhw", [
-    ["total", "Total BHWs (LGU-declared)", "n_total_bhw", "people"],
-    ["registered", "Registered only (LGU-declared)", "n_registered", "people"],
+    ["total", "Total BHWs (LGU-reported)", "n_total_bhw", "people"],
+    ["registered", "Registered only (LGU-reported)", "n_registered", "people"],
     [
       "registered-accredited",
-      "Registered and accredited (LGU-declared)",
+      "Registered and accredited (LGU-reported)",
       "n_registered_accredited",
       "people",
     ],
-    ["nonregistered", "Nonregistered BHWs (LGU-declared)", "n_non_registered", "people"],
+    ["nonregistered", "Nonregistered BHWs (LGU-reported)", "n_non_registered", "people"],
     [
       "declared-accreditation",
-      "LGU-declared accreditation share",
+      "LGU-reported accreditation share",
       "pct_registered_accredited",
       "%",
     ],

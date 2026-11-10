@@ -94,7 +94,10 @@ export function parseMapChoice(params: URLSearchParams): MapChoice | null {
   if (!dataset || !getDatasetMap(dataset) || !isReleasePublic(dataset)) return null;
   const base = initialMapChoice(dataset);
   const indicator = params.get("indicator") ?? base.indicator;
-  const period = params.get("period") ?? base.period;
+  const requested = params.get("period");
+  // Links shared before the headcount's period was corrected to 2025 still carry "2026".
+  const period =
+    dataset === "bhw-stepzero-2026" && requested === "2026" ? "2025" : (requested ?? base.period);
   const level = params.get("level") ?? "national";
   const code = params.get("code") ?? "PH";
   if (!["national", "region", "province", "citymun"].includes(level)) return null;

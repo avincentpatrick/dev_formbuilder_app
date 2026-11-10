@@ -1,7 +1,7 @@
 import type { MapRow } from "./prototype";
 import type { ColorBin } from "@/lib/charts/color-scale";
 export const STEPZERO_ACCREDITATION_ID = "bhw.declared-accreditation";
-export const STEPZERO_ACCREDITATION_DENOMINATOR = "All LGU-declared BHWs: registered only, registered and accredited, and nonregistered";
+export const STEPZERO_ACCREDITATION_DENOMINATOR = "All LGU-reported BHWs: registered only, registered and accredited, and nonregistered";
 export const STEPZERO_ACCREDITATION_BINS: ColorBin[] = [
   { min: 0, max: 25, color: "#eff3ff" }, { min: 25, max: 50, color: "#bdd7e7" },
   { min: 50, max: 75, color: "#6baed6" }, { min: 75, max: 100, color: "#3182bd" },
@@ -27,10 +27,10 @@ export function joinStepzeroAccreditation(
     const consistent = validCounts && validRate &&
       Math.abs(rate - 100 * accredited / total) <= 0.005 + Number.EPSILON * 100;
     return { code: child.geo_code, name: child.geo_name, value: consistent ? rate : null,
-      note: !row ? "Missing or duplicate StepZero source row."
-        : !validCounts ? "No valid positive StepZero BHW denominator or numerator."
-          : !validRate ? "Published StepZero percentage is unavailable or invalid."
-            : !consistent ? "Published percentage is inconsistent with StepZero counts."
-            : "Published share of registered and accredited BHWs among all LGU-declared BHWs." };
+      note: !row ? "Missing or duplicate BHW Headcount source row."
+        : !validCounts ? "No valid positive BHW Headcount denominator or numerator."
+          : !validRate ? "Published BHW Headcount percentage is unavailable or invalid."
+            : !consistent ? "Published percentage is inconsistent with BHW Headcount counts."
+            : "Published share of registered and accredited BHWs among all LGU-reported BHWs." };
   });
 }

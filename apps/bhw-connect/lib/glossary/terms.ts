@@ -50,12 +50,12 @@ export const GLOSSARY = {
   total_bhw: {
     term: "Total BHWs",
     definition:
-      "The full count of Barangay Health Workers in an area, from the DOH StepZero quick-count: registered, registered & accredited, and non-registered BHWs combined. This is the universe against which the individually-profiled subset is measured.",
+      "The full count of Barangay Health Workers in an area, from the DOH BHW Headcount 2025: registered, registered & accredited, and non-registered BHWs combined. This is the universe against which the individually-profiled subset is measured.",
   },
   validated_profile: {
     term: "Validated profile",
     definition:
-      "A Barangay Health Worker who has been individually profiled and validated — one anonymized person-level record in the detailed dataset. Every per-person figure on this site (accreditation, demographics, training, honorarium, service years) is computed from these validated profiles, not from the quick-count total.",
+      "A Barangay Health Worker who has been individually profiled and validated — one anonymized person-level record in the detailed dataset. Every per-person figure on this site (accreditation, demographics, training, honorarium, service years) is computed from these validated profiles, not from the BHW Headcount total.",
   },
   profiling_coverage: {
     term: "Profiling coverage",
@@ -65,27 +65,27 @@ export const GLOSSARY = {
   registered_bhw: {
     term: "Registered BHW",
     definition:
-      "A Barangay Health Worker recorded as registered with the DOH, whether or not they are also accredited. In the StepZero quick-count this covers the 'registered' and 'registered & accredited' buckets.",
+      "A Barangay Health Worker recorded as registered with the DOH, whether or not they are also accredited. In the BHW Headcount this covers the 'registered' and 'registered & accredited' buckets.",
   },
   non_registered_bhw: {
     term: "Non-registered BHW",
     definition:
-      "A Barangay Health Worker counted in the StepZero quick-count who is not recorded as registered with the DOH. Non-registered BHWs are part of the total headcount but are not individually profiled.",
+      "A Barangay Health Worker counted in the BHW Headcount who is not recorded as registered with the DOH. Non-registered BHWs are part of the total headcount but are not individually profiled.",
   },
   stepzero: {
-    term: "StepZero quick-count",
+    term: "BHW Headcount 2025",
     definition:
       "A DOH barangay-level aggregate headcount of Barangay Health Workers (registered, accredited, and non-registered) with population and household context. It provides the total BHW universe; it is a coarser, self-reported tally distinct from the individually-validated per-person dataset.",
   },
   census_population: {
     term: "Census population",
     definition:
-      "The official resident count from the Philippine Statistics Authority (PSA) census — the 2024 Census of Population (POPCEN) for the current figure, with the 2020 Census of Population and Housing (CPH) also available. Per-resident rates here prefer the BHW program's own StepZero population figure; the census fills in only where an area has no StepZero population at all. The finest census grain here is city/municipality.",
+      "The official resident count from the Philippine Statistics Authority (PSA) census — the 2024 Census of Population (POPCEN) for the current figure, with the 2020 Census of Population and Housing (CPH) also available. Per-resident rates here prefer the BHW program's own BHW Headcount population figure; the census fills in only where an area has no Headcount population at all. The finest census grain here is city/municipality.",
   },
   households_per_bhw: {
     term: "Households per BHW",
     definition:
-      "The area's household count divided by its Total BHWs (the StepZero universe) — roughly how many households each BHW serves. BHWs in the Philippines are assigned to households, so this ratio is the operative workload measure, and it lets places of very different sizes be compared. Household counts come from the StepZero quick-count and the ratio is unavailable for areas with no StepZero row.",
+      "The area's household count divided by its Total BHWs (the BHW Headcount universe) — roughly how many households each BHW serves. BHWs in the Philippines are assigned to households, so this ratio is the operative workload measure, and it lets places of very different sizes be compared. Household counts come from the BHW Headcount 2025 and the ratio is unavailable for areas with no Headcount row.",
   },
   ref_manual_trained: {
     term: "BHW Reference Manual Training",
@@ -110,7 +110,7 @@ export const GLOSSARY = {
   bhw_per_1000: {
     term: "BHWs per 1,000 residents",
     definition:
-      "Total BHWs divided by the area's population, times 1,000 — how many health workers serve each 1,000 people. Population is StepZero's own self-reported barangay figure, the same source as the BHW counts it divides; where StepZero has no population for an area, the PSA census count is used instead. Higher means denser BHW coverage.",
+      "Total BHWs divided by the area's population, times 1,000 — how many health workers serve each 1,000 people. Population is the BHW Headcount's own self-reported barangay figure, the same source as the BHW counts it divides; where the Headcount has no population for an area, the PSA census count is used instead. Higher means denser BHW coverage.",
   },
   poverty_incidence: {
     term: "Poverty incidence",
@@ -120,7 +120,7 @@ export const GLOSSARY = {
   lgu_reported_accreditation: {
     term: "LGU-reported accreditation",
     definition:
-      "The share of all BHWs an area's own quick-count (StepZero) reports as accredited. It counts the whole BHW universe, unlike the verified accreditation rate, which counts only individually validated profiles. The two use different sources and denominators, so they're shown side by side, never averaged.",
+      "The share of all BHWs an area's own BHW Headcount reports as accredited. It counts the whole BHW universe, unlike the verified accreditation rate, which counts only individually validated profiles. The two use different sources and denominators, so they're shown side by side, never averaged.",
   },
   confidence_interval: {
     term: "confidence interval",

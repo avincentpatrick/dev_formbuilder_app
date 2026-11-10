@@ -43,7 +43,8 @@ export type DatasetMapDefinition = {
 };
 const periods: Record<string, string> = {
   "bhw-2025": "2025",
-  "bhw-stepzero-2026": "2026",
+  // The slug says 2026; the data is the 2025 headcount (docs/DECISIONS.md, 2026-07-20).
+  "bhw-stepzero-2026": "2025",
   "nhfr-2026-09": "September 2026",
   "uuc-phc-2025": "2025",
   "fhsis-2025": "2025",
@@ -73,7 +74,7 @@ function indicator(spec: IndicatorSpec): MapIndicator {
 // Map-only source context: do not reuse the dashboard population fallback or add ratios.
 const stepzeroContext: IndicatorSpec[] = ["population", "households"].map((column) => ({
   id: `stepzero.${column}`,
-  label: column === "population" ? "Source population (StepZero)" : "Source households (StepZero)",
+  label: column === "population" ? "Source population (BHW Headcount)" : "Source households (BHW Headcount)",
   unit: column === "population" ? "people" : "households",
   source: "bhw-stepzero-2026",
   table: "agg_bhw_stepzero_counts",
@@ -143,15 +144,15 @@ function pending(
 export const DATASET_MAPS: readonly DatasetMapDefinition[] = [
   catalogMap(
     "bhw-2025",
-    "BHW Census 2025",
+    "BHW Profiles 2025",
     "bhw-2025",
     "Public aggregates only. Preserve small-cell and complementary suppression, category and payer filters, and measure-specific denominators. Never expose personal records.",
   ),
   catalogMap(
     "bhw-stepzero-2026",
-    "StepZero 2026",
+    "BHW Headcount 2025",
     "bhw-stepzero-2026",
-    "LGU-declared counts are distinct from validated profiles. Population and households use only StepZero source columns; missing values are not replaced with PSA figures or another release.",
+    "LGU-reported counts are distinct from validated profiles. Population and households use only BHW Headcount source columns; missing values are not replaced with PSA figures or another release.",
   ),
   pending(
     "bhw-profiling-status-2026",
@@ -212,7 +213,7 @@ export const DATASET_MAPS: readonly DatasetMapDefinition[] = [
     "psa-popcen-2024",
     "PSA population 2024",
     "psa-popcen-2024",
-    "Census population only; never substitute StepZero population. Verify actual geography coverage.",
+    "Census population only; never substitute BHW Headcount population. Verify actual geography coverage.",
   ),
   catalogMap(
     "psa-sae-poverty-2023",

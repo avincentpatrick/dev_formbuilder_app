@@ -628,7 +628,7 @@ export default async function ExplorePage({
                 )}
                 {!overview.hasStepzero && (
                   <span className="text-xs text-muted">
-                    Quick-count total not available for this area.
+                    Headcount total not available for this area.
                   </span>
                 )}
               </div>

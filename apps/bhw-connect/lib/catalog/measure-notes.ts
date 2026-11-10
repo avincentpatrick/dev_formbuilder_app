@@ -3,15 +3,15 @@ import type { CatalogIndicator } from "./types";
 
 const definitions: Record<string, string> = {
   "bhw.total":
-    "All LGU-declared BHWs, including registered-only, registered-and-accredited and nonregistered workers. This is distinct from validated profiles.",
+    "All LGU-reported BHWs, including registered-only, registered-and-accredited and nonregistered workers. This is distinct from validated profiles.",
   "bhw.registered":
-    "LGU-declared registered-only workers; excludes the registered-and-accredited bucket.",
-  "bhw.registered-accredited": "LGU-declared workers who are both registered and accredited.",
-  "bhw.nonregistered": "LGU-declared workers recorded as nonregistered.",
+    "LGU-reported registered-only workers; excludes the registered-and-accredited bucket.",
+  "bhw.registered-accredited": "LGU-reported workers who are both registered and accredited.",
+  "bhw.nonregistered": "LGU-reported workers recorded as nonregistered.",
   "bhw.declared-accreditation":
-    "Registered-and-accredited LGU-declared workers divided by all LGU-declared BHWs, multiplied by 100.",
+    "Registered-and-accredited LGU-reported workers divided by all LGU-reported BHWs, multiplied by 100.",
   "bhw.validated-profiles":
-    "Validated individual profiles in the accepted BHW census; not the entire LGU-declared workforce.",
+    "Validated individual profiles in BHW Profiles 2025; not the entire LGU-reported workforce.",
   "bhw.profile-accreditation":
     "Accredited validated profiles divided by all validated profiles, multiplied by 100.",
   "bhw.active-years":

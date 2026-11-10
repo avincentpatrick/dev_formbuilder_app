@@ -15,6 +15,6 @@ export function joinCensusActiveYears(children: { geo_code: string; geo_name: st
       typeof mean === "number" && Number.isFinite(mean) && mean >= 0;
     return { code: child.geo_code, name: child.geo_name, value: valid ? mean : null,
       note: valid ? "Published mean of reported active-year counts; missing counts excluded. Contributing count and confidence interval are not supplied."
-        : "Missing, duplicate or invalid Census mean or profile count." };
+        : "Missing, duplicate or invalid BHW Profiles mean or profile count." };
   });
 }

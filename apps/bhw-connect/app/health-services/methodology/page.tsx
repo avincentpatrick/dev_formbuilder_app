@@ -60,7 +60,7 @@ export default function Methodology() {
       </p>
       <p>
         FHSIS’s population and household projections are only its own indicator denominators. BHW
-        density elsewhere on the site continues to use StepZero population with PSA census
+        density elsewhere on the site continues to use BHW Headcount population with PSA census
         population as fallback. A figure’s denominator N describes that indicator’s eligible
         population or cases, never the national BHW count.
       </p>
@@ -93,7 +93,7 @@ export default function Methodology() {
         supplies no BHW count here: the source’s BHW filing tally was excluded at ingestion.
         BHW-per-staff ratios use the profiled workforce from the{" "}
         <Link href="/bhw" className="underline">
-          2025 BHW Census
+          BHW Profiles 2025
         </Link>{" "}
         as numerator and the source’s staff total as denominator. They are descriptive context, not
         staffing targets or evidence of causation. Missing or zero denominators and unavailable or

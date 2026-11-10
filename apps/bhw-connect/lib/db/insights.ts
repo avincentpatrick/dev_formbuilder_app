@@ -472,7 +472,7 @@ const registrationGap: InsightGenerator = {
       id: this.id,
       category: "Registration",
       headline: `${sz.nNonRegistered.toLocaleString()} of the ${sz.nTotalBhw.toLocaleString()} BHWs serving ${ctx.geoName} are not yet registered.`,
-      caption: `LGU-declared headcount · ${ctx.geoName} · StepZero quick count`,
+      caption: `LGU-reported headcount · ${ctx.geoName} · BHW Headcount 2025`,
       score: 40 + Math.round(30 * Math.min(share, 1)),
     };
   },
@@ -491,7 +491,7 @@ const householdCoverage: InsightGenerator = {
       id: this.id,
       category: "Coverage",
       headline: `${ctx.geoName} has roughly 1 BHW for every ${ratio.toLocaleString()} households.`,
-      caption: `${sz.households?.toLocaleString()} households · ${sz.nTotalBhw?.toLocaleString()} BHWs · StepZero quick count`,
+      caption: `${sz.households?.toLocaleString()} households · ${sz.nTotalBhw?.toLocaleString()} BHWs · BHW Headcount 2025`,
       score: 40,
     };
   },

@@ -1,7 +1,7 @@
 # BHW naming, 2026 data, and one full map per dataset — plan
 
-Status: **proposal**, agreed with avincentpatrick on 2026-11-10, for jongsky25 to review. Nothing in this
-file changes the app; each step below is its own pull request.
+Status: agreed with avincentpatrick on 2026-11-10, for jongsky25 to review. **Steps 1 and 2 are built** in
+the pull request that adds this file; Step 3 is still a plan.
 
 ## Why
 
@@ -30,7 +30,7 @@ file changes the app; each step below is its own pull request.
 The 97% figure, stated the same way everywhere: headcount 306,835 total, of which 278,240 registered;
 270,917 profiled = **97.4% of registered BHWs** (88.3% of all counted — unregistered BHWs were not profiled).
 
-## Step 1 — Rename (labels only)
+## Step 1 — Rename (labels only) — built
 
 - Replace user-facing "StepZero", "quick-count", "BHW Census" and "Census profiles" with the names above:
   page text, glossary (`lib/glossary/terms.ts`), methodology, map titles and periods (`lib/maps/definitions.ts`:
@@ -40,20 +40,28 @@ The 97% figure, stated the same way everywhere: headcount 306,835 total, of whic
   identifier — slugs `bhw-stepzero-2026` and `bhw-2025`, table `agg_bhw_stepzero_counts`, `lib/db/stepzero.ts`.
   Renaming those changes stored records and is a destructive migration for no user benefit.
 - Size today: "StepZero" on 88 lines in 27 files, "Census" on 57 lines in 33 files (some of them PSA).
-- Test: a census test that fails on "StepZero" or "BHW Census" in rendered text, like `base-path-census.test.ts`.
+- The `/bhw` dashboard shows both datasets, so its title and breadcrumb read **BHW 2025**.
+- Shared map links that still say `period=2026` for the headcount open it as 2025 (`lib/maps/prototype.ts`);
+  no other release gains that alias.
+- Not changed: the knowledge base and answer-bank text stored in the database, which may still say
+  "StepZero"; the AI prompts now tell the model to use the new names.
 
-## Step 2 — Hide Profiling status 2026
+## Step 2 — Hide Profiling status 2026 — built
 
-One switch, e.g. `lib/releases/visibility.ts` exporting `SHOW_PROFILING_STATUS_2026 = false`, read by:
+One switch, `lib/releases/visibility.ts` (`HIDDEN_RELEASES`), read by:
 
 - `app/profiling-status/layout.tsx` → `notFound()` for the whole section, methodology included;
 - `app/api/export/profiling-status/route.ts` → 404;
 - `app/sitemap.ts` → drop the section and its per-place URLs;
 - `components/home/geo-search.tsx` → no profiling-status result links;
-- `lib/maps/definitions.ts` / `app/api/dataset-map/route.ts` → the release leaves the map picker and the API
-  refuses it;
-- `lib/ai/analysis-tools.ts` and siblings → the area overview omits 2026 profiling status;
-- `lib/feedback/dataset.ts`, header and footer gates → harmless once the section 404s; tidy in the same PR.
+- `lib/maps/prototype.ts` (`parseMapChoice`), the map picker and the gallery → the release leaves the picker and
+  the map API refuses it;
+- the admin place page → its link to the public section is hidden (the figures on that page stay).
+
+The public chat cannot reach profiling status; only the admin assistant can, so the AI tools are unchanged.
+Nothing on the UUC-PHC pages links to the section (an earlier reading of this plan said so; it was a comment).
+The two e2e specs that rendered the profiling map were replaced by one proving it is absent; restore them from
+git history with the release.
 
 The admin place page (`app/admin/(dashboard)/place/...`) keeps its link, so admins can still check it. The
 data and migrations stay; turning the switch on restores everything.

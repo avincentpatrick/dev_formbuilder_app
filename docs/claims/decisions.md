@@ -3121,8 +3121,9 @@ THE SIX, AND THE OPTION SET WAS MISSING THE ONE THIS REPOSITORY ALREADY PRACTISE
 
 ⚠️ **THE REASON `C` BEATS `A` IS A CASCADE NEITHER `A` NOR `B` MENTIONS.** `docs/api-specification.md` and
 `docs/architecture/technical-architecture.md` are citation **tier 1 with zero tolerance**
-(`scripts/citation-liveness-lint.php:77-78`, run at `.github/workflows/ci.yml:242`), and `docs/pipeline.md:50` —
-itself tier 1 — cites `docs/api-specification.md:63` **by line**. Deleting lines shifts every citation below them,
+(`scripts/citation-liveness-lint.php:77-78`, run at `.github/workflows/ci.yml:242`), and `R-fcfc1f52`'s row in
+`docs/pipeline.md` — itself tier 1 — cites `docs/api-specification.md:63` **by line**. *(`M218`: this sentence cited
+that row by its line number, which was already wrong when it was written; `pipeline-lint`'s P8 now refuses that form.)* Deleting lines shifts every citation below them,
 so option A owes a re-point of every affected citation in the same commit. Annotating in place shifts nothing.
 
 **Consequences, recorded so they are not rediscovered:**

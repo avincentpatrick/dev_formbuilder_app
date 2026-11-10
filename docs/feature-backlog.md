@@ -10770,7 +10770,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   added — and neither copy moved. ⚠️ Re-derive the number in both copies, or say in one place that the list is not
   a census and point at the count. **Live** — both sentences are in the tree today. Filed by `M101`.
   **Tier: during-testing.**
-- **`minor` · Five of seven paths on the testing site carry none of the four app security headers, and nothing
+- ✅ **CLOSED BY `M217` (2026-11-07) — ****`minor` · Five of seven paths on the testing site carry none of the four app security headers, and nothing
   anywhere says whether that is intended.** Found by `M101` (2026-09-19) while measuring header coverage from
   outside. `/` and `/login` carry `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options` and
   `Referrer-Policy`; `/up`, `/robots.txt`, `/favicon.ico`, a hashed build asset and a 404 carry **none** of them.
@@ -10778,7 +10778,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and documented — but the CONSEQUENCE is written nowhere, so a reader cannot tell an intended scope from a gap.
   ⚠️ Decide whether `X-Content-Type-Options: nosniff` in particular belongs on static responses, where it is the
   one of the four that actually applies to a file download, and record the answer beside the middleware rather
-  than in a row. **Live** — measured on every response served today. Filed by `M101`. **Tier: during-testing.**
+  than in a row. **Live** — measured on every response served today. Filed by `M101`. **Tier: during-testing.** ✅ **THE ANSWER IS IN `AppSecurityHeaders`'S DOCBLOCK, HEADER BY HEADER.** `nosniff` belongs on a file, and `public/.htaccess` now sets it, because no middleware reaches a file PHP never sees; that needs no box step and no Apache restart. Every type the site serves was read from the live site first (JS, CSS, fonts, icons, JSON, text), so it blocks nothing. The framing headers and `Referrer-Policy` do not belong on those paths, and the docblock says why. `scripts/staging-headers-judge.php` now requires it on the two static probes, and run against the live site before the deploy it reported both absent (exit 1), so it is known to read the real thing. ⚠️ The row understated by one path: `/sw.js` carries none either. ⚠️ **The merge point owes one read:** the same judge run after the deploy, and whether `/up` and the 404 picked the header up too, which depends on vhost wiring no document records. Both go in `M217`'s release.
 - ~~**`minor` · Two documents disagree about which file on the box holds the `X-Robots-Tag` directive, and a runbook
   that names the wrong one sends an operator to the wrong place during an incident.**~~ Found by `M101` (2026-09-19)
   while writing §8.3's authority statement for `R-562bcc2a`. This ledger records it as `Header always set
@@ -10806,7 +10806,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   exemption arm — so the cost has been paid twice and is no longer hypothetical. ⚠️ Either give CI an Apache
   container that actually serves this file, or say in the file's own header that it is unexercised and that any
   change to it ships unproved. **Live** — the next handler path added to that box is swallowed the same way.
-  Filed by `M101`. **Tier: during-testing.**
+  Filed by `M101`. **Tier: during-testing.** ⚠️ **Amended by `M217` (2026-11-07):** the file is no longer stock (one `X-Content-Type-Options` line), and that line is exercised, from outside and at night, by `scripts/staging-headers-judge.php`. The rewrite rules this row is about still are not.
 - **`minor` · This repository asserts what the off-repo Testing Server Checklist says, in prose no gate can
   check, and one such assertion was false for at least one increment.** Found by `M101` (2026-09-19) while
   taking `R-0855052e`, whose remedy was *"delete the check from the checklist"* — and there was nothing there to
@@ -10957,7 +10957,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `R-5ecfa6cd`'s own headline; this one lives in the canonical access document and is a separate edit. **Live** —
   `docs/ACCESS-MATRIX.md` is the document an operator reads to learn what the hosts do. Filed by `M105`.
   **Tier: early-testing.** ✅ **CLOSED BY `M109` (2026-09-25), UNDER RECORDED `D13` EXCEPTION #2** — the sentence now says the central host **redirects** to `APP_URL`, names `NotASubdomainException` in `bootstrap/app.php` by symbol rather than by line, and records that only the `/api/v1` arm answers 404 with `CentralHostFallbackTest` pinning it. Every one of this row's four citations held exactly as written — evidence four for four. ⛔ **BUT THE ROW IS A FLOOR AND NOT A CENSUS, AND ITS PREMISE WAS FALSE: THERE ARE TWO AUTHORED COPIES, NOT ONE.** This row says `M105` *"corrected the sibling copy in `R-5ecfa6cd`'s own headline"*, which is true and is not the whole of it — `R-5ecfa6cd`'s **body** still read *"so the central host answers 404"*, contradicted four lines below it by its own `M96` correction. `M96` and `M98` each corrected that row's body while neither rewrote its headline; `M105` then rewrote the headline and did not strike the body sentence. Both copies are now fixed, in place. ⚠️ A third, byte-identical copy sits in `.kilo/worktrees/obsidian-dogwood/` — the untracked second checkout already filed as its own row, reached by a repo-wide `grep -r` and invisible to ripgrep, which is that row's whole point and not this one's to fix.
-- **`minor` · `.github/workflows/ci.yml:84` asserts in the present tense that `DEPLOY_ENABLED` is unset, which `D47`
+- ✅ **CLOSED BY `M217` (2026-11-07) — ****`minor` · `.github/workflows/ci.yml:84` asserts in the present tense that `DEPLOY_ENABLED` is unset, which `D47`
   made false three days before `D53` was decided on the opposite premise.** Filed 2026-09-20 by `M105` while
   verifying `D53`. The comment reads *"`DEPLOY_ENABLED` is unset, so that was latent rather than live"* and dates
   from `454d9ba` (`M39`, 2026-08-28), well before `D47` turned automatic deploys on. ⛔ **It is the only in-tree
@@ -10965,7 +10965,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `D53`'s central premise — and `DEPLOY_ENABLED` is a GitHub environment variable that no gate here can read, so
   nothing can ever contradict the comment mechanically. The fix is to correct or delete the sentence; the durable
   fix is to stop asserting environment state in a comment no gate can check. **Live.** Filed by `M105`.
-  **Tier: during-testing.**
+  **Tier: during-testing.** ✅ **The line now says `DEPLOY_ENABLED` was unset until 2026-09-17**, read from `gh variable list` (set 2026-09-17T14:49:23Z), so it dates a fact instead of asserting the present, and no `ci.yml:` citation moves. ⛔ **The row's *"only in-tree statement"* was false when filed:** `deploy.yml` had already said it is set, since `M98`, two days earlier. Its dated sentences are correct and stay.
 - ✅ **CLOSED BY `M108` (2026-09-24) — `minor` · ~~The six `D38` rows cannot be grouped into one increment under `D13`, and they cannot safely be taken
   apart either.~~** Filed 2026-09-20 by `M105` on answering `D38`. Three of them edit a single table —
   `docs/architecture/technical-architecture.md` §7.1, lines 443 (Form draft), 449 (Exports) and 454 (Users & roles)
@@ -11336,7 +11336,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   skips the top-level key (`Validator.php:659-664`) and rebuilds `config` from the enumerated paths only.
   `FormBuilderService::writeField()` then whole-column-replaces with the result. ⛔ **THIS IS REACHABLE DATA LOSS, NOT A
   SHAPE COMPLAINT.** Option `label_translations` is written by XLSForm import (`XlsformImportParser.php:319`),
-  read by the runtime (`schema-mapping.ts:183,282-289`), re-exported (`XlsformExporter.php:433`), faithfully sent
+  read by the runtime (`schema-mapping.ts:183,282-289`), re-exported (`XlsformExporter::pushPairList()`), faithfully sent
   back by the client (`ChoicesEditor.vue:17-20` spreads `{...opt, ...patch}`) — and is not in the allowed rule set
   (`:159-165`). Import a multilingual form, edit any choice field, and every translation is gone. ⚠️ **Only types
   whose `configRules()` arm is non-empty are affected** — choice, cascading, matrix, likert_matrix, geo, media and
@@ -11861,7 +11861,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the importer gap the whole of what is left. ⚠️ Either teach the importer and `CascadeResolver` to read the
   translation columns the exporter already writes, or record at the exporter that these columns are
   author-authored only. **Latent** — it bites the first multilingual grid or cascade imported from a
-  workbook, and nothing loses data today. Filed by `M111`. **Tier: during-testing.**
+  workbook, and nothing loses data today. Filed by `M111`. **Tier: during-testing.** ⚠️ **Corrected by `M217` (2026-11-07):** a grid's translations do reach the workbook now, on the per-row and per-cell questions and the choices sheet. **A cascade level's do not, and never did:** a level has no row in the workbook, not even its default-language label, so *"round-trips out of the product"* is false for it. What is left for a level is a place to write it at all, not only an importer to read it. An imported grid is flattened into plain questions (the spec's §3), so its translations come back on those.
 
 - ✅ **CLOSED BY `M113` (2026-09-26) — `minor` · The expression and template publish gates still refuse on their first violation, so `M112`'s
   collect-every-violation promise stops at the structural gate.** Found by `M112` (2026-09-26) while closing
@@ -12464,13 +12464,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `calculated_needs_formula` precisely because publish will not. `FieldConversionServiceTest` pins the premise (both
   gates silent). The remedy is a publish refusal naming the field. **Live.** Filed by `M121`. **Tier: early-testing.** ✅ **CLOSED BY `M122`:** `ExpressionValidationGate::checkFormula()` refuses a calculated question whose `calculated_formula` is missing, not a string, or blank after a trim — exactly what the runtime would have skipped — as `calculated_formula_missing`, naming the field. The call site was replaced in place and the check appended, because the gate is cited by line from a design document and from this ledger. ⛔ **The row understated its reach:** an XLSForm `calculate` row with no `calculation` imports as `''` (`XlsformImportParser.php:211-212`) — a third way in, refused now too. ⚠️ **Not retroactive:** an already-published blank formula stays, so the runtime skips stay. The engine's `calculated_needs_formula` warning now says the form cannot be published without one, and the premise pin in `FieldConversionServiceTest` is flipped. ✅ Two mutations CAUGHT: the refusal removed, and the trim dropped.
 
-- **`minor` · An XLSForm export loses every translation that lives only on choices.** Measured by `M121` at source,
+- ✅ **CLOSED BY `M217` (2026-11-07) — ****`minor` · An XLSForm export loses every translation that lives only on choices.** Measured by `M121` at source,
   not executed: `XlsformExporter::extraLanguages()` collects languages from section labels, field labels and hints and
   validation messages — never from an option's, row's, column's or level's `label_translations` — and the choice-list
   writer fills only the languages it collected. A form translated only in its choices exports no `label::xx` column,
   so the round trip drops them. ⚠️ This contradicts `M111`'s note that grid translations have a live export path.
   `M121`'s export test had to add a field-level translation to get a `label::es` choices column at all, and its comment
-  says so. **Live.** Filed by `M121`. **Tier: during-testing.**
+  says so. **Live.** Filed by `M121`. **Tier: during-testing.** ✅ **`extraLanguages()` now reads a question's options, a grid's rows, columns and cells, and a grid column's own choices**, and executing it first turned the row's source reading into a measured failure on all eight. ⛔ **The row understated itself: the language was only half of it for a grid.** `emitLikertMatrix` and `emitMatrix` wrote `label` alone, so collecting the language would have opened a column with an empty cell. A likert row now writes its translation, and a grid cell writes its row's and column's together, borrowing the default-language text when only one has that language and staying blank when neither does. ⚠️ **It overstated one source:** a cascade level has no row in the workbook, so collecting it would only add an empty column. It is left out and pinned. `M121`'s workaround is gone from `FieldConversionServiceTest`, which passes without it, and `XlsformImportTest` now pins the round trip back in.
 
 - **`nit` · `routes/api.php`'s note that *"THE WARNING IS NOW A GATE"* names only the Vitest half.** Measured by
   `M121`. The comment above the resume READ credits `resources/public-runtime/__tests__/sw.test.ts`, whose arm hard-codes
@@ -15060,7 +15060,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M180` (2026-10-20) — ****`minor` · A question's Default value is saved but never filled in for a respondent, though the Help page says it is.**
   The Advanced tab's **Default value** (`resources/js/components/builder/ConfigPanel.vue:840`) saves `default_value`, but nothing reads it
   when a form opens — `resources/public-runtime/lib/prefill.ts` seeds only a hidden question's fixed value — and it reaches only the
-  XLSForm export (`app/Services/Xlsform/XlsformExporter.php:283`). `resources/js/components/help/manual.ts:815` says *"an answer filled
+  XLSForm export (`XlsformExporter::applyDefault()`). `resources/js/components/help/manual.ts:815` says *"an answer filled
   in before the respondent starts, which they can change"*. The remedy (`D148` A, taken by R4): the default fills the answer when the
   form opens — the public form, the preview and manual entry — and the respondent can change it; a default written as a formula is
   worked out like a calculation, with the picker. **Live.** Filed by `M178`. **Tier: early-testing.** **AMENDED BY `M180` (2026-10-20):** `D154` — a formula default is worked out once, when the form opens, and is then the respondent's answer. Taken by `M180` with `R-fa3223d9` (the same box). ✅ **CLOSED BY `M180` (2026-10-20):** the browser fills a default in when a form opens fresh — the guest form with nothing to restore, staff keying a new response, the builder preview — worked out ONCE (`D154`) and shaped for its control (`resources/public-runtime/lib/defaults.ts`); a draft restored afterwards drops a seeded default it does not hold, so a cleared one stays cleared; each new repeat entry starts from its members' defaults; the box is **Fixed · Formula**, a choice offering its own options, the picker on a formula over the questions before it and the dates. The server injects nothing. Red first: 14 Vitest (the defaults module by absence). Mutants: 5 of 5 caught. Built and held for merge point 3 (`D137`); live since it, 2026-10-20.

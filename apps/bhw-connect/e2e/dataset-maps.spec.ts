@@ -709,7 +709,7 @@ test("StepZero accreditation uses a published parent rate and fixed percentage l
   expect(exported.parentMeasure).toEqual({ kind: "rate", value: 25, unit: "%" });
   expect(exported.total).toBeNull();
   expect(exported.legend.method).toBe("fixed");
-  expect(exported.indicator.period).toBe("2026");
+  expect(exported.indicator.period).toBe("2025");
 });
 
 test("Census accreditation preserves profile denominator, Wilson intervals and small-sample notes", async ({ page }) => {

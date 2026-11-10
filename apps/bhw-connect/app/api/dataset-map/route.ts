@@ -12,6 +12,7 @@ import { getGeoByCode } from "@/lib/db/geo";
 import { withBasePath } from "@/lib/base-path";
 import { barangayDrillAvailable, barangayGeometryUrl, barangayRelease } from "@/lib/maps/barangay-release";
 import { readBarangayRows } from "@/lib/maps/barangay-reader";
+import { BARANGAY_BHW_NOTE, BARANGAY_FACT_DATASETS } from "@/lib/maps/barangay-support";
 import {
   joinMapRows,
   parseMapChoice,
@@ -160,8 +161,9 @@ export async function GET(request: NextRequest) {
         childQuery = childQuery.eq(column, value);
         parentQuery = parentQuery.eq(column, value);
       }
-      // Barangay values come straight from the source tables (the summaries stop at municipalities).
-      const barangayRead = choice.level === "citymun";
+      // NHFR and UUC barangay values come straight from the source tables (their summaries stop at
+      // municipalities); BHW counts read the barangay aggregate rows like any other level.
+      const barangayRead = choice.level === "citymun" && BARANGAY_FACT_DATASETS.includes(choice.dataset);
       const [values, parent] = await Promise.all([
         barangayRead
           ? readBarangayRows(db, {
@@ -197,8 +199,13 @@ export async function GET(request: NextRequest) {
       else total = parentRow.value;
       totalNote = parentRow.note;
     }
+    if (choice.level === "citymun" && !BARANGAY_FACT_DATASETS.includes(choice.dataset))
+      totalNote = [totalNote, BARANGAY_BHW_NOTE].filter(Boolean).join(" ");
     if (unattributed > 0)
-      totalNote = [totalNote, `${unattributed.toLocaleString()} of this municipality's facilities have no barangay recorded, so barangay values do not add up to the municipal total.`]
+      totalNote = [
+        totalNote,
+        `${unattributed.toLocaleString()} ${metric.unit} in the municipal total come from facilities with no barangay recorded, so barangay values add up to less than the total.`,
+      ]
         .filter(Boolean)
         .join(" ");
     const payload: MapPayload = {

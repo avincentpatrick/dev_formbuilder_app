@@ -976,6 +976,7 @@ test("barangay values show, and an indicator without a barangay reader returns t
   await expect(page.getByRole("table")).toContainText("Bacsil");
   await expect(page.getByText("Test note about unplaced facilities.")).toBeVisible();
   await page.getByLabel("UUC for PHC 2025 indicator").selectOption("uuc.route.ip");
+  await expect(page.getByRole("status").filter({ hasText: "no barangay map" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Share this map selection" })).toHaveAttribute("href", /level=province&code=01028/);
   await expect(page.getByRole("button", { name: /Show areas within/ })).toHaveCount(0);
 });

@@ -37,9 +37,10 @@ const NHFR_COLUMN: Record<string, (facilities: Fact[]) => number> = {
 
 /** Per-barangay rows shaped like the aggregate rows the municipality-level join expects
  * (`{ geo_code, [column]: n }`). A barangay with no facility, or not on the list, reads zero: a zero is a
- * finding here, as in the municipality summaries. `unattributed` counts facilities of the municipality
- * that cannot be placed in a listed barangay (no barangay recorded, or a code the geography does not
- * list), which the municipality total still includes. */
+ * finding here, as in the municipality summaries. `unattributed` is how much of THIS indicator's municipal
+ * total comes from facilities that cannot be placed in a listed barangay (no barangay recorded, or a code
+ * the geography does not list): their count, government count or beds, as the indicator is. It is zero
+ * for barangay presence, which unplaced facilities cannot affect. */
 export async function readBarangayRows(
   db: Db,
   input: { dataset: string; column: string; datasetId: number; citymunCode: string; children: Child[] },
@@ -59,12 +60,13 @@ export async function readBarangayRows(
         .range(from, to),
     );
     const byBarangay = new Map<string, Fact[]>(codes.map((code) => [code, []]));
-    let unattributed = 0;
+    const unplaced: Fact[] = [];
     for (const facility of facilities) {
       const bucket = byBarangay.get(String(facility.barangay_geo_code ?? ""));
       if (bucket) bucket.push(facility);
-      else unattributed += 1;
+      else unplaced.push(facility);
     }
+    const unattributed = column === "n_barangays_with_facility" ? 0 : value(unplaced);
     return { data: codes.map((code) => ({ geo_code: code, [column]: value(byBarangay.get(code)!) })), unattributed };
   }
   if (dataset === "uuc-phc-2025" && column === "n_listed") {

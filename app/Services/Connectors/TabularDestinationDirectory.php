@@ -23,12 +23,12 @@ use App\Support\Connectors\TabularDestination;
  * behaviour; the routes moved with it (`/destinations`), which is safe because both are internal sidecars
  * consumed only by this app's own client.
  *
- * NOTHING HERE THROWS, the {@see ConnectorChannelDirectory} contract, and for a sharper reason than that class
- * had. `bootstrap/app.php` keys its JSON error branch on the `api/v1/*` PATH, so a domain exception raised on
- * a tenant-web route renders as `back()->with('toast')` — a 302. A `fetch` client follows it, sees `ok`, and
- * chokes parsing HTML; `integrationsClient.ts` says so in its own docblock, which is why it was READ-ONLY
- * until H16b. Answering 200-with-`error` for every outcome is what lets a WRITE (`create`) live behind the
- * same client without that hazard, and it keeps the tenant on the half-filled form they were writing.
+ * NOTHING HERE THROWS, the {@see ConnectorChannelDirectory} contract. It was first argued from a 302: until M90
+ * a domain exception on a tenant-web route rendered as `back()->with('toast')` even to a `fetch`, which followed
+ * it into HTML. Since M90 `bootstrap/app.php` answers a JSON caller in JSON and writes no flash, so that hazard
+ * is gone — and the routes' own `feature:native_connectors` refusal, which this class never covered, is now a
+ * readable 402. The contract still earns its place: 200-with-`error` for every outcome is what lets the picker
+ * say WHY a destination failed, and it keeps the tenant on the half-filled form they were writing.
  *
  * ⚠️ THE ERROR STRINGS ARE THE FEATURE, NOT PADDING. The whole reason this seam exists is that an unreachable
  * destination used to be discovered at DELIVERY time, where it surfaces as a paused rule and reads like an

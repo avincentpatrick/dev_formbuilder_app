@@ -83,9 +83,9 @@ it('403s a member holding neither dashboard permission', function (): void {
 });
 
 it('redirects a Professional tenant with an upgrade toast, NOT a 402', function (): void {
-    // `bootstrap/app.php` keys its JSON branch on the `api/v1/*` PATH, so a `feature:` refusal on a web
-    // route takes the `back()->with('toast')` arm. Asserting 402 here would assert the API's behaviour on a
-    // surface that does not have it.
+    // A page load does not expect JSON, so a `feature:` refusal on this web route takes the
+    // `back()->with('toast')` arm. (A JSON fetch would get a flat 402 since M90 — WebJsonRefusalTest pins
+    // that half; this case pins the page's.)
     $this->withoutVite();
     assignPlanTier(PlanTier::Professional);
 

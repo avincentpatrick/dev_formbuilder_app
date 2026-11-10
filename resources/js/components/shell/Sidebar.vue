@@ -67,10 +67,10 @@ const visibleGroups = computed(() =>
  * subscription; that is safe exclusively because `AppLayout` is a PERSISTENT Inertia layout, so the sidebar
  * mounts once per session and survives every visit. The `useNotificationFeed` contract one file over.
  *
- * ⚠️ AND IT IS HANDED THE DESTINATION'S OWN VISIBILITY RATHER THAN FETCHING UNCONDITIONALLY. The sidecar
- * route is `module:gamification`-gated, and a refusal on a web path is a `back()` WITH A SESSION FLASH —
- * so a tenant that switched the module off would collect a "switched off" toast on a random page once per
- * navigation, provoked by nothing they did. Passing the same predicate the item is rendered under means
+ * AND IT IS HANDED THE DESTINATION'S OWN VISIBILITY RATHER THAN FETCHING UNCONDITIONALLY. The sidecar
+ * route is `module:gamification`-gated, so a tenant that switched the module off would be refused on every
+ * navigation. (Until M90 each refusal also left a "switched off" toast on the next page; since M90 a JSON
+ * caller gets no flash, measured by M234.) Passing the same predicate the item is rendered under means
  * this never asks. The composable re-reads it per attempt, so switching the module back on recovers at the
  * next navigation.
  */

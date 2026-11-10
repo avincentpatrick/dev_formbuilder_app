@@ -29,8 +29,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * token; the `can:` gate IS the authorization on this surface (the H14/H15b convention in routes/tenant.php).
  *
  * Filters travel in the query string and come back as Inertia partial reloads, never as `/api/v1` calls:
- * a tenant page takes Inertia props, there is no session-authed API client, and a domain exception on a web
- * route returns a 302 with a flash — which an XHR would follow, see `ok`, and then choke parsing as JSON.
+ * a tenant page takes Inertia props, and there is no session-authed API client. (The third reason once given,
+ * that a domain exception on a web route 302s even to an XHR, stopped holding at M90; see bootstrap/app.php.)
  */
 final class AnalyticsController extends Controller
 {

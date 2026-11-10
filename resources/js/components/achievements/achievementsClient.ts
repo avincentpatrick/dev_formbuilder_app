@@ -1,6 +1,6 @@
 // The achievements nav badge's transport (Increment K1e). Fifth consumer of `builderClient`, after the
-// builder, `scopesClient`, `integrationsClient` and `notificationsClient` — and read-only, like three of
-// those four.
+// builder, `scopesClient`, `integrationsClient` and `notificationsClient` — and read-only, like
+// `scopesClient` alone of those four (the builder and the other two write).
 //
 // ── Why a sidecar fetch at all, rather than a shared Inertia prop ──────────────────────────────────────
 // `routes/tenant.php`'s notification block records the mechanism and doc #28 §10 turns it into an

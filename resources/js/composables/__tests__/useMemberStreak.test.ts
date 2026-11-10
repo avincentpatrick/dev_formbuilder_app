@@ -9,11 +9,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * cannot see:
  *
  *  1. IT MUST NOT FETCH WHEN THE DESTINATION IS HIDDEN. The sidecar route carries `module:gamification`,
- *     and `bootstrap/app.php` answers a web ModuleDisabledException with `back()->with('toast', …)` —
- *     the branch keys on the request PATH, not the Accept header. So an unguarded fetch by a workspace
- *     that switched gamification off writes a SESSION FLASH, and the next Inertia render pops
- *     "switched off for this workspace" as a toast the member did nothing to provoke, on a random page,
- *     once per navigation forever. The fetch itself degrades silently; only the absence of the REQUEST
+ *     so a workspace that switched gamification off would be refused on every navigation. Until M90 that
+ *     refusal also wrote a SESSION FLASH, a "switched off" toast on the member's next page; since M90 a
+ *     JSON caller gets a JSON 403 and no flash (measured and gated by M234 in
+ *     `tests/Feature/Http/WebJsonRefusalTest.php`). What is left is the economy: a question nobody wants
+ *     answered is not asked. The fetch itself degrades silently; only the absence of the REQUEST
  *     can be asserted.
  *  2. A FAILED FETCH MUST NOT BLANK THE BADGE. `null` means "ask again next navigation", never "your
  *     streak is zero" — a five-second network blip must not tell somebody their fourteen-day run ended.
@@ -85,9 +85,9 @@ describe('useMemberStreak', () => {
     });
 
     it('does NOT ask at all while the destination is hidden', async () => {
-        // ⚠️ THE PHANTOM-TOAST GUARD. See this file's header: an unguarded fetch against a module-disabled
-        // workspace leaves a session flash behind, and the member collects a toast they did not provoke on
-        // a random page, once per navigation. Nothing inside the composable misbehaves while it happens.
+        // The guard built against the pre-M90 phantom toast, kept as an economy. See this file's header: a
+        // module-disabled workspace would otherwise send one refused request per navigation, and nothing
+        // inside the composable would show it.
         mocks.fetchMemberStreak.mockResolvedValue({ current: 7 });
 
         const scope = effectScope();

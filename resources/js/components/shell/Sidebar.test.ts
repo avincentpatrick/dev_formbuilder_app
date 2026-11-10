@@ -661,10 +661,10 @@ describe('Sidebar — the Achievements streak badge (K1e)', () => {
     });
 
     it('tells the composable not to fetch while the destination is hidden', () => {
-        // ⚠️ THE PHANTOM-TOAST GUARD, ASSERTED AT THE WIRING RATHER THAN INSIDE THE COMPOSABLE. The sidecar
-        // is `module:gamification`-gated and a web refusal is a `back()` WITH A SESSION FLASH, so a fetch
-        // by a workspace that switched gamification off leaves a "switched off" toast to surface on a
-        // random page, once per navigation. The composable honours the predicate; this proves the sidebar
+        // THE STREAK GUARD, ASSERTED AT THE WIRING RATHER THAN INSIDE THE COMPOSABLE. The sidecar is
+        // `module:gamification`-gated, so a workspace that switched gamification off would be refused on
+        // every navigation (and until M90 left a "switched off" toast each time; M234 measured that gone).
+        // The guard is an economy now. The composable honours the predicate; this proves the sidebar
         // hands it the right one.
         mocks.streak = 7;
         const off = render(allAbilities(), {});

@@ -285,9 +285,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // same is true of a browser navigation, which is why the shipped redirect assertions stay green.
         //
         // ⚠️ WHY EVERY ARM AND NOT THE ONE THAT WAS FILED. Only one route is reachable in a denied state
-        // today; the other surfaces are guarded ON THE CLIENT, and `useMemberStreak.ts` carries a
-        // thirteen-line docblock plus a runtime guard whose only purpose is to keep a request off this
-        // path. Three client-side workarounds for one server-side defect is the argument for repairing the
+        // today; the other surfaces are guarded ON THE CLIENT, and `useMemberStreak.ts` carries a runtime
+        // guard built to keep a request off this path (M234 measured that no flash is written now, and kept
+        // it as an economy). Three client-side workarounds for one server-side defect argued for repairing the
         // server once, rather than for repairing the one client that forgot.
         $webJson = function (Request $request, int $status, string $message, array $payload = []): ?JsonResponse {
             if (! $request->expectsJson()) {

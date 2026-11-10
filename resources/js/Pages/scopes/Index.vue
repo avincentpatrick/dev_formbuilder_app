@@ -4,10 +4,10 @@
  * makes the Reviewer role assignable by a human.
  *
  * TRANSPORT. Every mutation is an Inertia visit; the only fetches are the two read-only sidecars (a node's
- * blast-radius preview and its grant list). That is forced, not stylistic: bootstrap/app.php keys its
- * API/web exception split on the `api/v1/*` PATH and Laravel runs custom render callbacks before the
- * JSON-negotiation check, so a refused move on a web route comes back as a 302 carrying a flash toast — even
- * to an XHR. A fetch client would follow it, receive HTML with a 200, and throw parsing it.
+ * blast-radius preview and its grant list). That was forced when built: until M90 a refused move on a web
+ * route came back as a 302 carrying a flash toast even to an XHR, which a fetch client would follow into
+ * HTML. Since M90 a JSON caller gets a flat JSON refusal and no flash; the visits stay as built, and an
+ * Inertia visit still gets the redirect and its toast, which is what the two consequences below rely on.
  *
  * Two consequences worth stating, both easy to get wrong:
  *   - A REFUSAL ARRIVES THROUGH onSuccess, not onError. `back()->with('toast')` is a 2xx page response, so

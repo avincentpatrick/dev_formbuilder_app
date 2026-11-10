@@ -24,12 +24,12 @@ use Inertia\Response;
  * Authorization is the route `can:` middleware against ScopeNodePolicy (every method of which is
  * `scopes.manage`); RLS scopes every query to the current tenant.
  *
- * Every MUTATION here is an Inertia visit, never a fetch. That is not stylistic: `bootstrap/app.php` keys its
- * API/web exception split on `$request->is('api/v1/*')`, and Laravel runs custom render callbacks BEFORE the
- * `shouldRenderJsonWhen` check — so a ScopeNodeException raised on a web route returns `back()->with('toast')`,
- * a 302, even to an XHR. A fetch client following that redirect gets HTML with a 200 and blows up parsing it.
- * The two read-only sidecars ({@see impact()}, {@see grants()}) are safe because they raise no domain
- * exception, and a 403/404 on them falls through to the JSON renderer.
+ * Every MUTATION here is an Inertia visit, never a fetch. It was first FORCED: until M90 a ScopeNodeException
+ * raised on a web route returned `back()->with('toast')`, a 302, even to an XHR, and a fetch client following
+ * it got HTML with a 200. Since M90 `bootstrap/app.php` answers a JSON caller with a flat JSON 422 and writes
+ * no flash, so a fetch would now read the refusal; the mutations stay visits as built, nothing forces it.
+ * The two read-only sidecars ({@see impact()}, {@see grants()}) raise no domain exception, and a 403/404 on
+ * them falls through to the JSON renderer.
  */
 final class ScopeNodeController extends Controller
 {

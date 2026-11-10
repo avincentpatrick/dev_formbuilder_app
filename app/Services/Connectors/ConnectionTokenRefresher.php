@@ -198,9 +198,9 @@ final class ConnectionTokenRefresher
 
             RefreshOneConnectionJob::dispatch((string) $connection->tenant_id, $connectionId);
         } catch (Throwable $e) {
-            // Both callers answer every outcome with a sentence rather than an exception (a throw on a
-            // tenant-web route renders as a redirect their fetch client cannot read). A hand-off that cannot
-            // be queued degrades to no hand-off, and the caller reports what the provider said.
+            // Both callers answer every outcome with a sentence rather than an exception (their fetch client
+            // shows the sentence; an unexpected throw would reach it only as a generic 500). A hand-off that
+            // cannot be queued degrades to no hand-off, and the caller reports what the provider said.
             report($e);
 
             return null;

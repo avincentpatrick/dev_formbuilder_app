@@ -28,9 +28,9 @@ uses(RefreshDatabase::class);
 |   - every route is gated on scopes.manage / forms.collaborators.manage (Owner + Admin only);
 |   - PATCH must route `is_active` to setActive(), because update() hard-filters it out and would
 |     otherwise drop a deactivation on the floor while reporting success;
-|   - a refused move (cycle / depth cap) comes back as a redirect carrying an error toast, NOT as JSON —
-|     bootstrap/app.php keys its API branch on the `api/v1/*` PATH, so a web route always takes the
-|     back()->with('toast') arm. That is the whole reason mutations here are Inertia visits, not fetches.
+|   - a refused move (cycle / depth cap) made as a form post or Inertia visit comes back as a redirect
+|     carrying an error toast, NOT as JSON. (Until M90 a fetch got the same 302, which is why mutations here
+|     are Inertia visits; since M90 a JSON caller gets a flat JSON 422 — WebJsonRefusalTest pins that half.)
 |
 | A request tears the tenant GUC down on terminate, so enterTenant() is re-called before any post-request
 | assertion that reads through RLS.
@@ -174,10 +174,10 @@ it('refuses a cycling move through the web branch, as a redirect with an error t
     $response = $this->actingAs($this->admin)->withoutVite()
         ->post(scopeUrl("scopes/{$parent->id}/move"), ['parent_id' => $child->id]);
 
-    // The load-bearing assertion for the whole transport decision: bootstrap/app.php's $isApi closure keys
-    // on the `api/v1/*` PATH, and Laravel runs custom render callbacks BEFORE shouldRenderJsonWhen — so a
-    // ScopeNodeException on a web route is a 302 carrying a flash toast, even for an XHR. A fetch-based
-    // client would follow that redirect, get HTML with a 200, and throw parsing it.
+    // A ScopeNodeException on a web route, reached by a plain post that does not expect JSON, is a 302
+    // carrying a flash toast — the Inertia page's refusal path. Until M90 an XHR got the same, which is what
+    // made this surface's mutations Inertia visits; since M90 a JSON caller is answered in JSON instead, with
+    // no flash (tests/Feature/Http/WebJsonRefusalTest.php).
     $response->assertRedirect();
     $response->assertSessionHas('toast', fn (array $toast): bool => $toast['type'] === 'error');
 

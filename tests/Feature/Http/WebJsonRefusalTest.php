@@ -155,6 +155,8 @@ it('leaves no exception renderable that redirects without a JSON sibling', funct
     $redirecting = [];
     $unguarded = [];
     $uncaptured = [];
+    $ordered = [];
+    $flashFirst = [];
 
     foreach ($starts as $i => $start) {
         $end = $starts[$i + 1] ?? strlen((string) $source);
@@ -191,6 +193,26 @@ it('leaves no exception renderable that redirects without a JSON sibling', funct
 
         if (! str_contains($arm, '$webJson(')) {
             $unguarded[] = $label;
+
+            continue;
+        }
+
+        // ⛔ THE ORDER ARM (M234). A sibling is not enough: the JSON answer must be DECIDED before anything
+        // writes the session. `back()->with('toast', …)` flashes the moment it is evaluated, not when it is
+        // returned, so an arm that builds its redirect first — `$fallback = back()->with(…); return
+        // $webJson(…) ?? $fallback;`, a tidy-looking refactor — answers the fetch in JSON and still leaves a
+        // toast for the next page the member opens. Every arm today is `$webJson(…) ?? back()->with(…)` or
+        // returns `$webJson`'s answer before redirecting, and the `??` is what keeps the flash unwritten.
+        // `->withHeaders(` is deliberately not a flash write and is not matched.
+        $webJsonAt = strpos($arm, '$webJson(');
+        preg_match('/->with(?:Errors)?\(/', $arm, $flash, PREG_OFFSET_CAPTURE);
+
+        if (isset($flash[0])) {
+            $ordered[] = $label;
+
+            if ($flash[0][1] < $webJsonAt) {
+                $flashFirst[] = $label;
+            }
         }
     }
 
@@ -199,6 +221,10 @@ it('leaves no exception renderable that redirects without a JSON sibling', funct
     expect($unguarded)->toBe([], 'these exception renderables redirect with no $webJson sibling, so a JSON fetch reaching one gets HTML it cannot parse: '.implode(' · ', $unguarded));
 
     expect($uncaptured)->toBe([], 'these renderables CALL $webJson without capturing it in their use clause, which is an undefined-variable 500 on the refusal path: '.implode(' · ', $uncaptured));
+
+    expect(count($ordered))->toBeGreaterThanOrEqual(14, 'the flash-write census collapsed — the ->with( pattern stopped matching, which is a blind order arm rather than a clean file');
+
+    expect($flashFirst)->toBe([], 'these renderables write their toast BEFORE $webJson decides, so a JSON fetch is answered in JSON and still leaves a toast for the next page: '.implode(' · ', $flashFirst));
 });
 
 it('answers a JSON fetch at a module-gated web route with a readable JSON refusal', function (): void {
@@ -214,4 +240,51 @@ it('answers a JSON fetch at a module-gated web route with a readable JSON refusa
     $response->assertStatus(403)->assertJsonPath('code', 'module_disabled');
     expect($response->json('message'))->toBeString()->not->toBe('');
     $response->assertJsonMissingPath('error');
+});
+
+/*
+| ── THE FLASH HALF (M234, R-8311c583) ──────────────────────────────────────────────────────────────────────
+| Before M90 a refused fetch got a 302 AND a session flash, and the flash was the worse half: the next page
+| the member opened popped a toast they did nothing to provoke. `useMemberStreak`'s `enabled` guard was built
+| to keep its request off that path. The cases above prove the body; nothing proved the flash was gone, and the
+| backlog row that asked believed it was still written. Measured: it is not — the `??` never evaluates the
+| redirect for a JSON caller.
+|
+| ⛔ THE SECOND CASE IS WHAT MAKES THE FIRST ONE ABLE TO FAIL. A read of the next page's `flash.toast` that
+| could not see a toast would pass the first case forever. The same refusal made as a navigation writes one,
+| and the same read finds it there — so a null in the first case is a measurement, not a blind spot.
+*/
+
+it('leaves no toast behind a refused JSON fetch, so the next page the member opens shows none', function (): void {
+    $this->withoutVite();
+    [$tenant, $admin] = webJsonRefusalTenant(PlanTier::Business);
+    app(TenantSettingRegistry::class)->put($tenant, ['modules.gamification' => false], $admin);
+
+    $this->actingAs($admin)
+        ->getJson('http://acme.meridian.test/achievements/streak')
+        ->assertStatus(403)
+        ->assertSessionMissing('toast');
+
+    $next = $this->actingAs($admin)->get('http://acme.meridian.test/dashboard')->assertOk()->viewData('page')['props'];
+
+    // The key is asserted first so a renamed prop reads as a broken probe, not as "no toast".
+    expect($next['flash'])->toHaveKey('toast')
+        ->and($next['flash']['toast'])->toBeNull();
+});
+
+it('carries the same refusal as a navigation to the next page as a toast, which proves the read above can see one', function (): void {
+    $this->withoutVite();
+    [$tenant, $admin] = webJsonRefusalTenant(PlanTier::Business);
+    app(TenantSettingRegistry::class)->put($tenant, ['modules.gamification' => false], $admin);
+
+    $this->actingAs($admin)
+        ->from('http://acme.meridian.test/dashboard')
+        ->get('http://acme.meridian.test/achievements/streak')
+        ->assertRedirect('http://acme.meridian.test/dashboard')
+        ->assertSessionHas('toast');
+
+    $next = $this->actingAs($admin)->get('http://acme.meridian.test/dashboard')->assertOk()->viewData('page')['props'];
+
+    expect($next['flash']['toast']['type'] ?? null)->toBe('error')
+        ->and($next['flash']['toast']['message'] ?? '')->toContain('switched off for this workspace');
 });

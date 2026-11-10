@@ -12,9 +12,9 @@
  * hostname serves anything. A greyed-out control would imply the tenant is one permission away from it;
  * a sentence says what is actually happening.
  *
- * Every mutation is an Inertia visit that redirects with a flash — never a JSON fetch. A refusal on a web
- * route returns a 302 even to an XHR (the integrationsClient trap), so a client that expected JSON would
- * parse HTML and throw.
+ * Every mutation is an Inertia visit that redirects with a flash — never a JSON fetch. (This was chosen
+ * when a refusal on a web route was a 302 even to an XHR, which a JSON client would parse as HTML and
+ * throw on; since M90 a JSON caller gets JSON.)
  */
 import { computed } from 'vue';
 import { MdsBadge, MdsButton, MdsIcon, statusVariant } from '@meridian/design-system';

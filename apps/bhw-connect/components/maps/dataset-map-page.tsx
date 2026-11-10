@@ -8,6 +8,7 @@ import {
   prototypeIndicators,
   type MapChoice,
 } from "@/lib/maps/prototype";
+import { clampBarangayScope } from "@/lib/maps/barangay-support";
 import { DatasetMapCard } from "./dataset-map-card";
 export function DatasetMapPage({ choice }: { choice: MapChoice | null }) {
   const router = useRouter();
@@ -30,7 +31,7 @@ export function DatasetMapPage({ choice }: { choice: MapChoice | null }) {
               next.level = current.current.level;
               next.selected = current.current.selected;
             }
-            router.push(mapHref(next));
+            router.push(mapHref(clampBarangayScope(next)));
           }}
         >
           <option value="" disabled>
@@ -44,8 +45,8 @@ export function DatasetMapPage({ choice }: { choice: MapChoice | null }) {
         </select>
       </label>
       <p className="text-sm text-muted">
-        Switching between UUC and NHFR retains the supported area. Pending maps open their national
-        availability view; they do not inherit another dataset’s values.
+        Switching between available maps retains the supported area. Pending maps open their
+        national availability view; they do not inherit another dataset’s values.
       </p>
       {choice ? (
         <DatasetMapCard

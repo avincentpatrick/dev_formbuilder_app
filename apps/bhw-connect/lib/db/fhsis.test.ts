@@ -56,12 +56,14 @@ function query(data: unknown, error: unknown = null) {
     select: vi.fn(),
     eq: vi.fn(),
     neq: vi.fn(),
+    not: vi.fn(),
     order: vi.fn(),
     in: vi.fn(),
     limit: vi.fn(),
     range: vi.fn(),
   };
-  for (const fn of [q.select, q.eq, q.neq, q.order, q.in, q.limit, q.range]) fn.mockReturnValue(q);
+  for (const fn of [q.select, q.eq, q.neq, q.not, q.order, q.in, q.limit, q.range])
+    fn.mockReturnValue(q);
   return q;
 }
 beforeEach(() => {
@@ -70,6 +72,59 @@ beforeEach(() => {
   mocks.children.mockResolvedValue([]);
 });
 describe("FHSIS interpretation", () => {
+  it("shows confirmed composite rates as undefined for zero or missing denominators, retaining counts", () => {
+    for (const indicator_key of [
+      "ncd_cervical_lesions",
+      "infect_schisto_treated",
+      "ncd_60plus_assessed",
+      "ncd_60plus_htn",
+      "ncd_60plus_dm",
+    ]) {
+      const def = { ...definition, indicator_key };
+      const value = toFhsisIndicator(def, { ...row, numerator: 3, denominator: 0 });
+      expect(fhsisRateLabel(value)).toBe("Not defined (zero denominator)");
+      expect(value.numerator).toBe(3);
+      expect(fhsisRateLabel(toFhsisIndicator(def, { ...row, denominator: null }))).toBe(
+        "Not defined (denominator missing)",
+      );
+      expect(fhsisRateLabel(toFhsisIndicator(def, row))).toBe("0%");
+      expect(
+        fhsisRateLabel(toFhsisIndicator(def, { ...row, denominator: null, rate_pct: null })),
+      ).toBe("Rate not reported");
+      expect(fhsisRateLabel(toFhsisIndicator(def))).toBe("Not reported in 2025");
+    }
+  });
+  it("labels population-per-unit ratios and does not present zero-unit ratios as zero population", () => {
+    const ratio = { ...definition, unit: "persons per rural health unit" };
+    expect(
+      fhsisRateLabel(toFhsisIndicator(ratio, { ...row, rate_pct: 1234.5, over_100: true })),
+    ).toBe("1,234.5 persons per rural health unit");
+    expect(fhsisRateLabel(toFhsisIndicator(ratio, { ...row, denominator: 0, rate_pct: 0 }))).toBe(
+      "Not defined (zero units)",
+    );
+    expect(fhsisRateLabel(toFhsisIndicator(ratio, { ...row, denominator: 5, rate_pct: 0 }))).toBe(
+      "0 persons per rural health unit",
+    );
+    expect(fhsisLimitedGeography("demo_population")).toBe(false);
+    expect(fhsisLimitedGeography("demo_households")).toBe(false);
+    expect(fhsisLimitedGeography("demo_rhu")).toBe(true);
+  });
+  it("keeps birth and mortality scales distinct from coverage percentages", () => {
+    for (const [unit, suffix] of [
+      ["births per 1,000 age-group population", " per 1,000 age-group population"],
+      ["deaths per 1,000 live births", " per 1,000 live births"],
+      ["deaths per 100,000 live births", " per 100,000 live births"],
+    ]) {
+      const value = toFhsisIndicator(
+        { ...definition, unit },
+        { ...row, rate_pct: 120, over_100: true },
+      );
+      expect(fhsisRateLabel(value)).toBe(`120${suffix}`);
+      expect(value.over100).toBe(false);
+    }
+    expect(fhsisBreakdownLabel("age:29d-11m:female")).toBe("29 days–11 months, female");
+    expect(fhsisBreakdownLabel("age:60plus:total")).toBe("60 years and above, both sexes");
+  });
   it("prefers precise source values, including zero, without rounding to legacy integers", () => {
     const actual = toFhsisIndicator(definition, {
       ...row,
@@ -104,6 +159,12 @@ describe("FHSIS interpretation", () => {
       { ...row, rate_pct: 350, over_100: true },
     );
     expect(fhsisRateLabel(tb)).toBe("350 per 100,000");
+    expect(fhsisRateLabel({ ...tb, rate: 0.126738, unit: "cases per 10,000 population" })).toBe(
+      "0.127 per 10,000",
+    );
+    expect(fhsisRateLabel({ ...tb, rate: 0.0063067, unit: "percent (0-100, may exceed)" })).toBe(
+      "0.00631%",
+    );
     expect(tb.over100).toBe(false);
   });
   it("uses the indicator's denominator in the caption", () => {
@@ -234,7 +295,34 @@ describe("FHSIS age and sex breakdowns", () => {
         toFhsisIndicator({ ...definition, unit: "count" }, { ...row, rate_pct: null }),
       ),
     ).toBe("Count only");
+    expect(fhsisLimitedGeography("maternal_hepb_screened")).toBe(true);
+    expect(fhsisLimitedGeography("infect_leprosy_new")).toBe(true);
+    expect(fhsisLimitedGeography("fp_end_total")).toBe(true);
+    expect(fhsisPeriodLabel("fp_demand_q4")).toBe("Q4 2025");
+    expect(fhsisPeriodLabel("fp_begin_total")).toBe("Beginning of 2025");
+    expect(fhsisPeriodLabel("fp_end_total")).toBe("End of 2025");
+    expect(fhsisPeriodLabel("ncd_dec_60plus_htn_total")).toBe("December 2025");
+    expect(fhsisLimitedGeography("ncd_senior_ppv")).toBe(true);
+    expect(fhsisLimitedGeography("ncd_20_59_assessed")).toBe(false);
+    expect(fhsisLimitedGeography("ncd_60plus_assessed")).toBe(false);
+    expect(fhsisLimitedGeography("oral_infant_first")).toBe(true);
+    expect(fhsisLimitedGeography("school_hpv1")).toBe(true);
+    expect(fhsisLimitedGeography("child_ors")).toBe(true);
     expect(fhsisLimitedGeography("nutrition_mam_cured")).toBe(true);
     expect(fhsisLimitedGeography("vax_opv1_0_12m")).toBe(false);
   });
+});
+
+it("loads one morbidity disease on demand and excludes its age grid from overview", async () => {
+  const defs = query([{ ...definition, indicator_key: "morb_01_001", program_area: "morbidity" }]);
+  const facts = query([{ ...row, indicator_key: "morb_01_001", breakdown: "age:1-4:total" }]);
+  mocks.from.mockImplementation((table: string) =>
+    table === "ref_fhsis_indicator" ? defs : facts,
+  );
+  const result = await getFhsisBreakdowns("PH", "national", "morb_01_001");
+  expect(result).toHaveLength(1);
+  expect(facts.eq).toHaveBeenCalledWith("indicator_key", "morb_01_001");
+  expect(facts.not).not.toHaveBeenCalled();
+  await getFhsisBreakdowns("PH", "national");
+  expect(facts.not).toHaveBeenCalledWith("indicator_key", "like", "morb_%");
 });

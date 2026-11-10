@@ -1,29 +1,78 @@
+import { TRAINING_TOPICS } from "@/lib/catalog/definitions";
 import { getDatasetMap } from "./definitions";
 
-export type MapScope = { level: "national" | "region" | "province"; code: string };
+export type MapScope = { level: "national" | "region" | "province" | "citymun"; code: string };
 export type MapChoice = MapScope & {
   dataset: string;
   indicator: string;
   period: string;
   selected: string | null;
 };
-export type MapRow = { code: string; name: string; value: number | null };
+export type MapRow = {
+  code: string;
+  name: string;
+  value: number | null;
+  ciLow?: number | null;
+  ciHigh?: number | null;
+  note?: string;
+  smallSample?: boolean;
+};
 export type MapPayload = {
   state: "available";
   rows: MapRow[];
   total: number | null;
+  /** Published parent rate, separate from additive totals. Never averaged from children. */
+  parentRate?: number | null;
+  /** Stored parent mean, never averaged from child means. */
+  parentMean?: number | null;
+  totalNote?: string;
   area: string;
-  childLevel: "region" | "province" | "citymun";
+  childLevel: "region" | "province" | "citymun" | "barangay";
+  /** True only when the selected child municipality can drill into barangay polygons. */
+  barangayDrill?: boolean;
   source: string;
   date: string | null;
   license: string | null;
   geometryUrl: string;
+  valueSupport?: "supported" | "navigation-only";
 };
 export function prototypeIndicators(slug: string) {
-  if (slug !== "uuc-phc-2025" && slug !== "nhfr-2026-09") return [];
-  return getDatasetMap(slug)!.indicators.filter(
-    (i) => i.catalogSpec?.table === "agg_nhfr_counts" || i.id === "uuc.listed",
-  );
+  const supported: Record<string, readonly string[]> = {
+    "uuc-phc-2025": [
+      "uuc.listed",
+      "uuc.route.ip",
+      "uuc.route.conflict",
+      "uuc.route.four_ps",
+      "uuc.route.health",
+    ],
+    "nhfr-2026-09": [
+      "nhfr.facilities",
+      "nhfr.government",
+      "nhfr.private",
+      "nhfr.type.bhs",
+      "nhfr.type.rhu",
+      "nhfr.type.hospital",
+      "nhfr.type.birthing-home",
+      "nhfr.beds",
+      "nhfr.barangay-presence",
+    ],
+    "bhw-2025": ["bhw.validated-profiles", "bhw.profile-accreditation", "bhw.any-honorarium", "bhw.active-years", ...TRAINING_TOPICS.map(([topic]) => `bhw.training.${topic}`)],
+    "bhw-stepzero-2026": [
+      "bhw.total",
+      "bhw.registered",
+      "bhw.registered-accredited",
+      "bhw.nonregistered",
+      "bhw.declared-accreditation",
+      "stepzero.population",
+      "stepzero.households",
+    ],
+    "psa-popcen-2024": ["population.residents"],
+    "psa-sae-poverty-2023": ["poverty.incidence"],
+    "lgu-income-class": ["income-class"],
+    "bhw-profiling-status-2026": ["encoded", "validated", "attested", "notEncoded"],
+  };
+  const ids = supported[slug];
+  return ids ? getDatasetMap(slug)!.indicators.filter((i) => ids.includes(i.id)) : [];
 }
 export function initialMapChoice(dataset: string): MapChoice {
   const first = prototypeIndicators(dataset)[0];
@@ -37,6 +86,9 @@ export function initialMapChoice(dataset: string): MapChoice {
   };
 }
 export function parseMapChoice(params: URLSearchParams): MapChoice | null {
+  // One meaning per shareable choice; never silently pick the first duplicated value.
+  if (["dataset", "indicator", "period", "level", "code", "selected"].some(key => params.getAll(key).length > 1))
+    return null;
   const dataset = params.get("dataset");
   if (!dataset || !getDatasetMap(dataset)) return null;
   const base = initialMapChoice(dataset);
@@ -44,13 +96,15 @@ export function parseMapChoice(params: URLSearchParams): MapChoice | null {
   const period = params.get("period") ?? base.period;
   const level = params.get("level") ?? "national";
   const code = params.get("code") ?? "PH";
-  if (!["national", "region", "province"].includes(level)) return null;
+  if (!["national", "region", "province", "citymun"].includes(level)) return null;
   if (
     !(level === "national"
       ? code === "PH"
       : level === "region"
         ? /^\d{2}$/.test(code)
-        : /^\d{5}$/.test(code))
+        : level === "province"
+          ? /^\d{5}$/.test(code)
+          : /^\d{7}$/.test(code))
   )
     return null;
   const metrics = prototypeIndicators(dataset);
@@ -61,7 +115,10 @@ export function parseMapChoice(params: URLSearchParams): MapChoice | null {
   )
     return null;
   const selected = params.get("selected");
-  if (selected && !/^\d{2,7}$/.test(selected)) return null;
+  if (selected !== null) {
+    const childLength = level === "national" ? 2 : level === "region" ? 5 : level === "province" ? 7 : 10;
+    if (!metrics.length || !new RegExp(`^\\d{${childLength}}$`).test(selected)) return null;
+  }
   return { dataset, indicator, period, level: level as MapScope["level"], code, selected };
 }
 export function mapHref(choice: MapChoice) {

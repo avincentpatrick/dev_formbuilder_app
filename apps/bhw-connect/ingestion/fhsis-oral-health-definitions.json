@@ -1,0 +1,212 @@
+[
+  {
+    "code": "oral_infant_first",
+    "program_area": "oral_health",
+    "label": "Infants aged 0–11 months having their first dental visit",
+    "numerator_def": "Infants aged 0–11 months having their first dental visit",
+    "denominator_def": "Projected population aged 0–11 months",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "1. 1st Dental Visit.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_1_4_first_facility",
+    "program_area": "oral_health",
+    "label": "First oral-health visit, 1–4 years, facility-based",
+    "numerator_def": "First oral-health visit, 1–4 years, facility-based",
+    "denominator_def": "Projected population aged 1–4 years",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_1_4_first_nonfacility",
+    "program_area": "oral_health",
+    "label": "First oral-health visit, 1–4 years, non-facility-based",
+    "numerator_def": "First oral-health visit, 1–4 years, non-facility-based",
+    "denominator_def": "Projected population aged 1–4 years",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_1_4_two_facility",
+    "program_area": "oral_health",
+    "label": "Completed two oral-health visits, 1–4 years, facility-based",
+    "numerator_def": "Completed two oral-health visits, 1–4 years, facility-based",
+    "denominator_def": "Projected population aged 1–4 years",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_1_4_two_nonfacility",
+    "program_area": "oral_health",
+    "label": "Completed two oral-health visits, 1–4 years, non-facility-based",
+    "numerator_def": "Completed two oral-health visits, 1–4 years, non-facility-based",
+    "denominator_def": "Projected population aged 1–4 years",
+    "unit": "percent (0-100, may exceed)",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_5_9_first_facility",
+    "program_area": "oral_health",
+    "label": "First oral-health visit, 5–9 years, facility-based",
+    "numerator_def": "First oral-health visit, 5–9 years, facility-based",
+    "denominator_def": "Count only; annual denominator sums quarterly populations, so the coverage rate is held for clarification",
+    "unit": "count",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_5_9_first_nonfacility",
+    "program_area": "oral_health",
+    "label": "First oral-health visit, 5–9 years, non-facility-based",
+    "numerator_def": "First oral-health visit, 5–9 years, non-facility-based",
+    "denominator_def": "Count only; annual denominator sums quarterly populations, so the coverage rate is held for clarification",
+    "unit": "count",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_5_9_two_facility",
+    "program_area": "oral_health",
+    "label": "Completed two oral-health visits, 5–9 years, facility-based",
+    "numerator_def": "Completed two oral-health visits, 5–9 years, facility-based",
+    "denominator_def": "Count only; annual denominator sums quarterly populations, so the coverage rate is held for clarification",
+    "unit": "count",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_5_9_two_nonfacility",
+    "program_area": "oral_health",
+    "label": "Completed two oral-health visits, 5–9 years, non-facility-based",
+    "numerator_def": "Completed two oral-health visits, 5–9 years, non-facility-based",
+    "denominator_def": "Count only; annual denominator sums quarterly populations, so the coverage rate is held for clarification",
+    "unit": "count",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_10_19_first_facility",
+    "program_area": "oral_health",
+    "label": "First oral-health visit, 10–19 years, facility-based",
+    "numerator_def": "First oral-health visit, 10–19 years, facility-based",
+    "denominator_def": "Count only; annual denominator sums quarterly populations, so the coverage rate is held for clarification",
+    "unit": "count",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_10_19_first_nonfacility",
+    "program_area": "oral_health",
+    "label": "First oral-health visit, 10–19 years, non-facility-based",
+    "numerator_def": "First oral-health visit, 10–19 years, non-facility-based",
+    "denominator_def": "Count only; annual denominator sums quarterly populations, so the coverage rate is held for clarification",
+    "unit": "count",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_10_19_two_facility",
+    "program_area": "oral_health",
+    "label": "Completed two oral-health visits, 10–19 years, facility-based",
+    "numerator_def": "Completed two oral-health visits, 10–19 years, facility-based",
+    "denominator_def": "Count only; annual denominator sums quarterly populations, so the coverage rate is held for clarification",
+    "unit": "count",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_10_19_two_nonfacility",
+    "program_area": "oral_health",
+    "label": "Completed two oral-health visits, 10–19 years, non-facility-based",
+    "numerator_def": "Completed two oral-health visits, 10–19 years, non-facility-based",
+    "denominator_def": "Count only; annual denominator sums quarterly populations, so the coverage rate is held for clarification",
+    "unit": "count",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_20_59_first_facility",
+    "program_area": "oral_health",
+    "label": "First oral-health visit, 20–59 years, facility-based",
+    "numerator_def": "First oral-health visit, 20–59 years, facility-based",
+    "denominator_def": "Count only; annual denominator sums quarterly populations, so the coverage rate is held for clarification",
+    "unit": "count",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_20_59_first_nonfacility",
+    "program_area": "oral_health",
+    "label": "First oral-health visit, 20–59 years, non-facility-based",
+    "numerator_def": "First oral-health visit, 20–59 years, non-facility-based",
+    "denominator_def": "Count only; annual denominator sums quarterly populations, so the coverage rate is held for clarification",
+    "unit": "count",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_20_59_two_facility",
+    "program_area": "oral_health",
+    "label": "Completed two oral-health visits, 20–59 years, facility-based",
+    "numerator_def": "Completed two oral-health visits, 20–59 years, facility-based",
+    "denominator_def": "Count only; annual denominator sums quarterly populations, so the coverage rate is held for clarification",
+    "unit": "count",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_20_59_two_nonfacility",
+    "program_area": "oral_health",
+    "label": "Completed two oral-health visits, 20–59 years, non-facility-based",
+    "numerator_def": "Completed two oral-health visits, 20–59 years, non-facility-based",
+    "denominator_def": "Count only; annual denominator sums quarterly populations, so the coverage rate is held for clarification",
+    "unit": "count",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_60plus_first_facility",
+    "program_area": "oral_health",
+    "label": "First oral-health visit, 60 and above years, facility-based",
+    "numerator_def": "First oral-health visit, 60 and above years, facility-based",
+    "denominator_def": "Count only; annual denominator sums quarterly populations, so the coverage rate is held for clarification",
+    "unit": "count",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_60plus_first_nonfacility",
+    "program_area": "oral_health",
+    "label": "First oral-health visit, 60 and above years, non-facility-based",
+    "numerator_def": "First oral-health visit, 60 and above years, non-facility-based",
+    "denominator_def": "Count only; annual denominator sums quarterly populations, so the coverage rate is held for clarification",
+    "unit": "count",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_60plus_two_facility",
+    "program_area": "oral_health",
+    "label": "Completed two oral-health visits, 60 and above years, facility-based",
+    "numerator_def": "Completed two oral-health visits, 60 and above years, facility-based",
+    "denominator_def": "Count only; annual denominator sums quarterly populations, so the coverage rate is held for clarification",
+    "unit": "count",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  },
+  {
+    "code": "oral_60plus_two_nonfacility",
+    "program_area": "oral_health",
+    "label": "Completed two oral-health visits, 60 and above years, non-facility-based",
+    "numerator_def": "Completed two oral-health visits, 60 and above years, non-facility-based",
+    "denominator_def": "Count only; annual denominator sums quarterly populations, so the coverage rate is held for clarification",
+    "unit": "count",
+    "source_workbook": "2. Completed 2 Visits.xlsx",
+    "uuc_criterion_d": false
+  }
+]

@@ -504,7 +504,18 @@ it("counts NHFR facilities per barangay and says how many have no barangay recor
   const data = await (await GET(new NextRequest(LINK("nhfr-2026-09", "nhfr.facilities", "citymun", "0102801")))).json();
   expect(data.rows).toEqual([{ code: "0102801001", name: "Adams (Pob.)", value: 2 }, { code: "0102801002", name: "Bacsil", value: 0 }]);
   expect(data.total).toBe(3); // the municipal total, never the sum of barangays
-  expect(data.totalNote).toContain("1 of this municipality's facilities have no barangay recorded");
+  expect(data.totalNote).toContain("1 facilities in the municipal total come from facilities with no barangay recorded");
+  vi.unstubAllEnvs();
+});
+it("adds no note when the unplaced facilities cannot change the indicator", async () => {
+  vi.stubEnv("BHW_BARANGAY_RELEASE", "rel-1");
+  mock.geo.mockResolvedValue({ geoCode: "0102801", geoLevel: "citymun", geoName: "Adams" });
+  const facility = (barangay: string | null) => ({ barangay_geo_code: barangay, ownership_major: "Government", facility_type: "Barangay Health Station", bed_capacity: 0 });
+  tables({ dim_geo: BARANGAYS, fact_nhfr_facility: [facility("0102801001"), facility(null)], agg_nhfr_counts: [{ geo_code: "0102801", n_barangays_with_facility: 1 }] });
+  for (const indicator of ["nhfr.barangay-presence", "nhfr.beds", "nhfr.type.hospital"]) {
+    const data = await (await GET(new NextRequest(LINK("nhfr-2026-09", indicator, "citymun", "0102801")))).json();
+    expect(data.totalNote, indicator).toBeUndefined();
+  }
   vi.unstubAllEnvs();
 });
 it("fails closed rather than showing partial barangay values when the source read fails", async () => {

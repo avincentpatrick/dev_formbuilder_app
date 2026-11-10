@@ -198,7 +198,10 @@ export async function GET(request: NextRequest) {
       totalNote = parentRow.note;
     }
     if (unattributed > 0)
-      totalNote = [totalNote, `${unattributed.toLocaleString()} of this municipality's facilities have no barangay recorded, so barangay values do not add up to the municipal total.`]
+      totalNote = [
+        totalNote,
+        `${unattributed.toLocaleString()} ${metric.unit} in the municipal total come from facilities with no barangay recorded, so barangay values add up to less than the total.`,
+      ]
         .filter(Boolean)
         .join(" ");
     const payload: MapPayload = {

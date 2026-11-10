@@ -960,9 +960,10 @@ At municipality scope the API now reads the barangays' values from the source ta
 - **NHFR** (every indicator): facilities grouped by `barangay_geo_code` from `fact_nhfr_facility`, with the same
   definitions as `agg_nhfr_counts` (ownership `Government`/`Private`, the four facility types, summed bed
   capacity, and presence as 1 or 0). A barangay with none reads **0**, as in the municipality summaries.
-  Facilities with no barangay recorded, or a code the geography does not list, stay in the municipal total and
-  are counted in a note ("N of this municipality's facilities have no barangay recorded"); barangay values do
-  not add up to the total and the total is never replaced by their sum. No suppression, as for the summaries:
+  Facilities with no barangay recorded, or a code the geography does not list, stay in the municipal total, which
+  is never replaced by the sum of the barangays. A note says how much of that indicator's total they account for
+  ("N facilities/beds in the municipal total come from facilities with no barangay recorded"), and only when
+  it is more than zero: barangay presence, or an indicator the unplaced facilities do not touch, shows none. No suppression, as for the summaries:
   an inventory of places.
 - **UUC**: only `uuc.listed`, 1 if the barangay is on the 2025 list in `fact_uuc_phc_barangay`, else 0.
   The qualifying-route indicators are published classifications that must not be recomputed per barangay, so
@@ -977,3 +978,14 @@ over-large read, the UUC list), API cases by table, three browser cases; deliber
 definition, the unplaced-facility note and the scope fallback each turned a test red. Locally the browser
 specs that mock the API ran (23 passed); those reading the seeded database were left to CI. The live check after
 deploy is the same probe: barangays with a value in the busiest municipalities of each dataset.
+
+### Live result (10 November 2026)
+
+After the deploy, the read-only probe of the testing site (the busiest municipalities of NHFR and UUC; 15
+municipality-and-indicator combinations) found a value for **700 of 700 barangays** (0 of the first
+15 samples before the reader). Barangay values added up exactly to the municipal total in all but Calamba
+(142 of 144 facilities placed; its note names the 2 that have no barangay recorded), and the UUC list counts
+matched their municipal counts exactly (22, 15 and 14). At barangay level the UUC route indicator, BHW Census and
+StepZero were refused with 400, and the province view offered the drill. A browser rendered the NHFR map for
+Bacarra (43 barangays) and a UUC municipality (21) with the map ready and no "Not reported" rows. Barangay
+drill-down is therefore left on for NHFR and UUC; no rollback was needed.

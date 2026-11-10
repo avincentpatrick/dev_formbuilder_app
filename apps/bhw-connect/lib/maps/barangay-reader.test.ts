@@ -58,6 +58,20 @@ it("reads only the requested dataset and municipality, and reports facilities it
   expect(db.calls[0].table).toBe("fact_nhfr_facility");
   expect(db.calls[0].filters).toEqual(expect.arrayContaining([["eq", "dataset_id", 7], ["eq", "geo_code", "0102801"]]));
 });
+it("reports the unplaced part of the indicator's own total: its count, its beds, and nothing for presence", async () => {
+  const unplaced = [
+    fac(null, { ownership_major: "Private", bed_capacity: 10 }),
+    fac("0999999999", { ownership_major: "Government", bed_capacity: 5 }),
+  ];
+  const pages = [[fac("0102801001", { bed_capacity: 1 }), ...unplaced]];
+  const unattributed = async (column: string) => (await input(fakeDb({ fact_nhfr_facility: pages }), column)).unattributed;
+  expect(await unattributed("n_facilities")).toBe(2);
+  expect(await unattributed("n_government")).toBe(1);
+  expect(await unattributed("n_private")).toBe(1);
+  expect(await unattributed("total_bed_capacity")).toBe(15);
+  expect(await unattributed("n_hospital")).toBe(0);
+  expect(await unattributed("n_barangays_with_facility")).toBe(0);
+});
 it("pages through a large municipality and fails closed on a failed or over-large read", async () => {
   const full = Array.from({ length: 1000 }, () => fac("0102801001"));
   const db = fakeDb({ fact_nhfr_facility: [full, [fac("0102801002")]] });

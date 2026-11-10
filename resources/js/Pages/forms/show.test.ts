@@ -566,3 +566,25 @@ describe('form hub — the stat tiles never break a word (M171)', () => {
         wrapper.unmount();
     });
 });
+
+describe('form hub — printing in another of the version\'s languages (R-d7e27962, D215)', () => {
+    it('asks which language when a version has more than one, and links each language to its printout', async () => {
+        const wrapper = render({
+            versions: [{ id: 'v-3', version_number: 3, status: 'published', published_at: '2026-07-01T00:00:00+00:00', print_languages: ['en', 'fil'] }] as never,
+        });
+
+        const print = wrapper.findAll('button').find((button) => button.text() === 'Print blank');
+        await print!.trigger('click');
+
+        const links = wrapper.findAll('a[data-print-language]');
+        expect(links.map((link) => link.text())).toEqual(['English', 'Filipino']);
+        expect(links.map((link) => link.attributes('href'))).toEqual([
+            `/forms/${FORM_ID}/versions/v-3/print`,
+            `/forms/${FORM_ID}/versions/v-3/print?lang=fil`,
+        ]);
+        // D215: the scanner reads the form's own language only, and the dialog says so before anyone prints.
+        expect(wrapper.text()).toContain('keyed in');
+
+        wrapper.unmount();
+    });
+});

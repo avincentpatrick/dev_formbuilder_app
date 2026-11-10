@@ -583,10 +583,12 @@ the twelve URLs it tells an operator to open is a status handler, and it already
 substitute this section recommends. So no checklist edit was owed, and the defect was entirely in the
 repository's description of an artifact no gate can read. ⚠️ **Nothing here may assert what the checklist says
 without opening it**, and a row is open for the fact that such assertions are ungated.
-`public/.htaccess` is the **stock, unmodified Laravel file** — routing unknown paths to the front
-controller is its purpose, not a defect — and it is **inert in every environment except this box**, since
-the local stack is nginx and there is no Apache in CI. An exemption added there could not be proved by any
-gate this repository has, which is the same reason `R-4ff3e848` declined its own `.htaccess` arm.
+`public/.htaccess` is the **stock Laravel file plus one header** (`X-Content-Type-Options`, `M217`) — routing
+unknown paths to the front controller is its purpose, not a defect — and it is **inert in every environment
+except this box**, since the local stack is nginx and there is no Apache in CI. A rewrite exemption added there
+could not be proved by any gate this repository has, which is the same reason `R-4ff3e848` declined its own
+`.htaccess` arm. A response header can be: `scripts/staging-headers-judge.php` reads that one from outside, on
+the two static probes, every night. Why that header is there and the other three are not is in `AppSecurityHeaders`.
 
 ⚠️ **Also on the box, unfiled against any step here:** a `*:80` vhost for `staging.pitahc.gov.ph` in
 `conf\extra\httpd-vhosts.conf`, carrying a bare `Redirect permanent` to the `https://` origin and **no
@@ -609,8 +611,8 @@ not blocked**; crawlers do fetch it, Googlebot included.
 - **The vhost is authoritative for SERVING the header.** It cannot move into the application, and that is
   measured rather than preferred: `/robots.txt` and `/favicon.ico` are static files Apache serves
   **without invoking PHP at all**, and `/up` is a PHP route outside every group `AppSecurityHeaders` is
-  mounted on. All three carry `X-Robots-Tag` and none of them carries the four headers that middleware
-  sets. Moving it would lose the header on the one URL crawlers actually fetch.
+  mounted on. All three carry `X-Robots-Tag` and none of them gets a header from that middleware. Moving it
+  would lose the header on the one URL crawlers actually fetch.
 - **`scripts/staging-headers-judge.php` is authoritative for its SURVIVAL.** It runs from
   `.github/workflows/ci.yml` on the **nightly schedule** and on any **manual re-verification** run,
   probes six paths spanning both mechanisms, and blocks if the header is absent or its directives are

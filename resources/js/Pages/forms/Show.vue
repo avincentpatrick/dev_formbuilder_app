@@ -61,6 +61,8 @@ type VersionRow = {
     changes: VersionChanges | null;
     /** M189 (`D169`): the Compare page against the version before (the draft: against the live one); null for the first. */
     compare_href: string | null;
+    /** M229 (`R-d7e27962`): the languages this version prints in, the form's default first; none for the draft. */
+    print_languages?: string[];
 };
 
 type VersionChanges = {
@@ -320,7 +322,34 @@ function submitRestore(): void {
  * Inertia response and this route returns a document. Same shape the forms list uses for the same route.
  */
 function printBlank(version: VersionRow): void {
-    window.location.href = `/forms/${props.form.id}/versions/${version.id}/print`;
+    // M229 (`R-d7e27962`): a version with text in more than one language asks which one first.
+    if ((version.print_languages?.length ?? 0) > 1) {
+        printTarget.value = version;
+
+        return;
+    }
+
+    window.location.href = printHref(version, null);
+}
+
+/** The version a "Print in which language?" dialog is open for, or null. */
+const printTarget = ref<VersionRow | null>(null);
+
+/** The print route for a version, in `language` when it is not the form's default (the first of `print_languages`). */
+function printHref(version: VersionRow, language: string | null): string {
+    const base = `/forms/${props.form.id}/versions/${version.id}/print`;
+    const fallback = version.print_languages?.[0];
+
+    return language === null || language === fallback ? base : `${base}?lang=${encodeURIComponent(language)}`;
+}
+
+/** A language code as a reader would name it ("fil" is "Filipino"), or the code itself when the browser cannot name it. */
+function languageName(code: string): string {
+    try {
+        return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) ?? code;
+    } catch {
+        return code;
+    }
 }
 
 /** A published version only. The print route 404s a draft, whose `schema_snapshot` is literally empty. */
@@ -572,6 +601,33 @@ function isPrintable(version: VersionRow): boolean {
             </template>
         </MdsModal>
 
+        <!-- M229 (`R-d7e27962`, `D215`): one link per language. The scanner reads the form's own language only,
+             so a copy in any other is for keying in, and the dialog says so before anyone prints a stack. -->
+        <MdsModal :open="printTarget !== null" title="Print in which language?" @close="printTarget = null">
+            <p class="hub__prose">
+                Choose the language for this blank copy of v{{ printTarget?.version_number }}. A copy in a language
+                other than {{ languageName(printTarget?.print_languages?.[0] ?? '') }} can't be read by the scanner,
+                so its responses must be keyed in.
+            </p>
+            <div class="hub__print-languages">
+                <MdsButton
+                    v-for="language in printTarget?.print_languages ?? []"
+                    :key="language"
+                    as="a"
+                    :href="printTarget ? printHref(printTarget, language) : undefined"
+                    variant="secondary"
+                    icon-left="download"
+                    data-print-language
+                    @click="printTarget = null"
+                >
+                    {{ languageName(language) }}
+                </MdsButton>
+            </div>
+            <template #actions>
+                <MdsButton variant="tertiary" @click="printTarget = null">Cancel</MdsButton>
+            </template>
+        </MdsModal>
+
         <ShareModal
             v-if="share"
             v-model:open="shareOpen"
@@ -677,6 +733,14 @@ function isPrintable(version: VersionRow): boolean {
     color: var(--mds-color-text-body);
     font-size: var(--mds-type-body-md-font-size);
     line-height: var(--mds-type-body-md-line-height);
+}
+
+/* M229: one link per language, wrapping at narrow widths rather than spilling past the dialog. */
+.hub__print-languages {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mds-space-2);
+    margin-top: var(--mds-space-4);
 }
 
 /* The tiles collapse to one column before the grid's own minmax would, so a 375px viewport never gets a

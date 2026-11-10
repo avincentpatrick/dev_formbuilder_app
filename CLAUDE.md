@@ -127,7 +127,8 @@ file, never copy out of it. `state.php` reports how far behind the trunk that fi
 - ⛔ **A push that changes `PROGRESS.md`, `docs/claims/decisions.md`, or any row's tier, awaits or liveness
   regenerates `docs/pipeline.md` in the same push.** The first two sit in `paths-ignore`, so a stale line
   reaches the trunk with no run to notice it. **Recording an answer also strips or retargets every Awaits
-  token that names it.**
+  token that names it, and performs every retier it answers at the row itself**, written on the answer's
+  *What the answer files* line as `` `R-x` retiered `tier` `` — the shape `state.php --check` reads.
 - ⛔ **The session that closes the last open `before-testing` row tells the user the app is ready for a
   testing server** — a push notification, then the Testing Server Checklist page, sent to them as a file.
   **It is owed ONCE, by that session, and the gate records that it was sent.** The zero is not the signal

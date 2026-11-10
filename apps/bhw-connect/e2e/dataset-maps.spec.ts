@@ -953,3 +953,30 @@ test("without barangay drill-down a municipality keeps its dashboard link and no
   await expect(page.getByText("Barangay polygons are not yet validated.")).toBeVisible();
   await expect(page.getByRole("button", { name: /Show areas within/ })).toHaveCount(0);
 });
+
+test("barangay values show, and an indicator without a barangay reader returns the view to its province", async ({ page }) => {
+  await page.route("**/api/dataset-map?**", route => {
+    const params = new URL(route.request().url()).searchParams;
+    const supported = params.get("indicator") === "uuc.listed";
+    return route.fulfill({ json: params.get("level") === "citymun"
+      ? { state: "available", rows: [{ code: "0102801001", name: "Adams (Pob.)", value: 0 },
+          { code: "0102801002", name: "Bacsil", value: 1 }], total: 1, area: "Adams", childLevel: "barangay",
+          totalNote: "Test note about unplaced facilities.", ...syntheticSource,
+          geometryUrl: "/bhw-connect/maps/rel-1/citymun/0102801.json" }
+      : { state: "available", rows: [{ code: "0102801", name: "Adams", value: 1 }], total: 1, area: "Ilocos Norte",
+          childLevel: "citymun", ...(supported ? { barangayDrill: true } : {}), ...syntheticSource,
+          geometryUrl: "/bhw-connect/geo/citymun/01028.json" } });
+  });
+  await page.route("**/geo/citymun/01028.json", route => route.fulfill({ json: square("0102801", 120.4) }));
+  await page.route("**/maps/rel-1/citymun/0102801.json", route => route.fulfill({ json: square("0102801002", 120.4) }));
+  await page.goto("map?dataset=uuc-phc-2025&level=province&code=01028&selected=0102801");
+  await page.getByRole("button", { name: /Show areas within/ }).click();
+  await expect(page.getByRole("link", { name: "Share this map selection" })).toHaveAttribute("href", /level=citymun&code=0102801/);
+  await page.getByText(/Complete area table/).click();
+  await expect(page.getByRole("table")).toContainText("Bacsil");
+  await expect(page.getByText("Test note about unplaced facilities.")).toBeVisible();
+  await page.getByLabel("UUC for PHC 2025 indicator").selectOption("uuc.route.ip");
+  await expect(page.getByRole("status").filter({ hasText: "no barangay map" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Share this map selection" })).toHaveAttribute("href", /level=province&code=01028/);
+  await expect(page.getByRole("button", { name: /Show areas within/ })).toHaveCount(0);
+});

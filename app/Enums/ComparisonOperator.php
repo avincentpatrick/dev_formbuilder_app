@@ -49,6 +49,38 @@ enum ComparisonOperator: string
     }
 
     /**
+     * The rule-row label when the compared question has this shape. It is `label()` except where the operator means
+     * something narrower on that shape than the word says.
+     *
+     * `D214` (`M226`, `R-526dae72`): on a single choice or dropdown, `contains` is a substring test of the one chosen
+     * value (both engines' internal `contains()`), so "colour contains re" holds for red and green alike. It was kept
+     * rather than refused, because forms use it on purpose, and it is named for what it does.
+     */
+    public function labelFor(ValueShape $shape): string
+    {
+        return $this === self::Contains && $shape === ValueShape::Choice ? 'contains the text' : $this->label();
+    }
+
+    /**
+     * Every shape this operator may compare whose rule-row label differs from `label()`, keyed by the shape's value.
+     * The builder ships it beside the label, so the editor never restates which shapes read differently.
+     *
+     * @return array<string, string>
+     */
+    public function shapeLabels(): array
+    {
+        $labels = [];
+
+        foreach (ValueShape::cases() as $shape) {
+            if ($shape->allowsOperator($this) && $this->labelFor($shape) !== $this->label()) {
+                $labels[$shape->value] = $this->labelFor($shape);
+            }
+        }
+
+        return $labels;
+    }
+
+    /**
      * How this operator reads INSIDE A SENTENCE: "Age is at least 18" (Increment M115, `D59` option C).
      *
      * ⚠️ TWO RENDERINGS AND NOT TWO ENUMS, because the same operator genuinely reads differently in the

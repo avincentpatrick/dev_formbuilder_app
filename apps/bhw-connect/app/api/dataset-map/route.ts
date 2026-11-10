@@ -11,6 +11,8 @@ import { readDatasetBySlug } from "@/lib/db/dataset";
 import { getGeoByCode } from "@/lib/db/geo";
 import { withBasePath } from "@/lib/base-path";
 import { barangayDrillAvailable, barangayGeometryUrl, barangayRelease } from "@/lib/maps/barangay-release";
+import { readBarangayRows } from "@/lib/maps/barangay-reader";
+import { BARANGAY_BHW_NOTE, BARANGAY_FACT_DATASETS } from "@/lib/maps/barangay-support";
 import {
   joinMapRows,
   parseMapChoice,
@@ -29,7 +31,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ state: "unsupported" }, { status: 400 });
   // Barangay polygons exist only once an accepted package is installed and this dataset is enabled.
   const release = barangayRelease();
-  const barangayDrill = barangayDrillAvailable(choice.dataset, metric.levels, release);
+  const barangayDrill = barangayDrillAvailable(choice.dataset, choice.indicator, metric.levels, release);
   if (choice.level === "citymun" && !barangayDrill)
     return NextResponse.json({ state: "unsupported" }, { status: 400 });
   try {
@@ -81,6 +83,7 @@ export async function GET(request: NextRequest) {
     let parentRate: number | null = null;
     let total: number | null = null;
     let totalNote: string | undefined;
+    let unattributed = 0;
     if (profiling) {
       const values = await db
         .from("agg_bhw_profiling_status")
@@ -158,7 +161,24 @@ export async function GET(request: NextRequest) {
         childQuery = childQuery.eq(column, value);
         parentQuery = parentQuery.eq(column, value);
       }
-      const [values, parent] = await Promise.all([childQuery, parentQuery]);
+      // NHFR and UUC barangay values come straight from the source tables (their summaries stop at
+      // municipalities); BHW counts read the barangay aggregate rows like any other level.
+      const barangayRead = choice.level === "citymun" && BARANGAY_FACT_DATASETS.includes(choice.dataset);
+      const [values, parent] = await Promise.all([
+        barangayRead
+          ? readBarangayRows(db, {
+              dataset: choice.dataset,
+              column: spec.column,
+              datasetId: source.value.datasetId,
+              citymunCode: choice.code,
+              children: children.data,
+            }).then((read) => {
+              unattributed = read.unattributed;
+              return { data: read.data, error: null };
+            })
+          : childQuery,
+        parentQuery,
+      ]);
       if (
         values.error ||
         parent.error ||
@@ -179,6 +199,15 @@ export async function GET(request: NextRequest) {
       else total = parentRow.value;
       totalNote = parentRow.note;
     }
+    if (choice.level === "citymun" && !BARANGAY_FACT_DATASETS.includes(choice.dataset))
+      totalNote = [totalNote, BARANGAY_BHW_NOTE].filter(Boolean).join(" ");
+    if (unattributed > 0)
+      totalNote = [
+        totalNote,
+        `${unattributed.toLocaleString()} ${metric.unit} in the municipal total come from facilities with no barangay recorded, so barangay values add up to less than the total.`,
+      ]
+        .filter(Boolean)
+        .join(" ");
     const payload: MapPayload = {
       state: "available",
       rows,

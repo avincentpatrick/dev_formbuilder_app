@@ -13475,7 +13475,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the matcher reads. Revisit when images are pre-processed server-side (ADR-0014 names GD's arrival as a revisit
   trigger) or the provider decodes codes. ⚠️ **The first trigger has fired:** `M160` put GD in the app image for the ink reader (`docker/Dockerfile`), so the premise above is no longer true and the registration-mark half is open work (noted by `M190`, whose audit of `docs/ocr-pipeline-design.md`'s out-of-scope list found it). **Latent.** Filed by `M143`. **Tier: after-launch.**
 
-- **`nit` · A short written answer that is a substring of any printed text in its region is dropped as printed text, so
+- ✅ **CLOSED BY `M228` (2026-11-08) — ****`nit` · A short written answer that is a substring of any printed text in its region is dropped as printed text, so
   "FORM" written in a box above a footer that says "Scans of this form…" reads as blank.** Found by `M143` while
   deciding where the instruction banner may go. `OcrAnswerReader::isStatic()` drops an answer line of four or more
   characters whose normalised text is a SUBSTRING of a static string (a hint, a block label, a footer sentence), so a
@@ -13483,6 +13483,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   one. The exposure predates `M143` (the old footer carried "form" too) and is why the banner is kept out of the static
   list. A fix compares by line geometry (a static line is where the printed text IS, not any line that reads like a
   piece of it) or asks a longer match of a substring hit. **Live.** Filed by `M143`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M228` (2026-11-08), on its branch.**
+  - Neither prescribed remedy was taken. Geometry needs printed positions the reader does not have, and a longer match would read a wrapped hint's short last word as an answer.
+  - **What was taken is the shape of a wrapped piece.** It is a run of whole words, and a one-word piece can only be the printed text's last word. So a one-word line counts as printed only as that last word, and a longer line only as a whole-word run. "FORM" above either footer sentence now reads, and "form" no longer matches inside "information".
+  - Three new `PrintedFormMatcherTest` cases: "FORM" under both footers (red first); a hint whose last word wraps alone (still dropped); and "HIS FORM", which starts inside "this" (read). Three mutants were CAUGHT. The OCR suites: 177 and 33 passed. Ships as 0.18.4.
+  - A multi-word answer that repeats whole printed words in its region is still dropped. Filed below as `ocr-printed-run-answer`.
 
 - **`nit` · The root `package-lock.json` records the design-system workspace's `vue` range as `^3.5.39` while
   `packages/design-system/package.json` asks for `^3.5.43`, so an `npm install` in the node container rewrites the
@@ -15915,3 +15920,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, when taken: pass the compared question's value shape to both describers and read `shape_labels` first, as `ValidationEditor` does.
 
   **Live.** Filed by `M226`. **Tier: during-testing.**
+
+- **`nit` · `ocr-printed-run-answer` — A written answer of two or more words that repeats a run of whole printed words in its region (for example "THIS FORM" above the footer) is still dropped as printed text.**
+  Found by `M228` (2026-11-08), narrowing `OcrAnswerReader::isStatic()` for `R-5d7128da`.
+  - A wrapped hint's middle line is a run of whole words too, so the text alone cannot tell the two apart.
+  - Only where the line sits can: whether it is in the answer box or where the printed text was set. The reader has no printed positions today, only the strings.
+  - Rare, because an answer has to repeat two or more printed words in order.
+  The remedy, when taken: give the reader each printed string's place in the region, and drop a line as printed only where it sits there.
+
+  **Live.** Filed by `M228`. **Tier: during-testing.**

@@ -102,7 +102,9 @@ it('lets another application under apps/ ship without a Meridian window, because
     preg_match('/input:\s*\[([^\]]*)\]/u', (string) file_get_contents(base_path('vite.config.ts')), $input);
 
     expect($input)->toHaveCount(2, 'vite.config.ts no longer declares its inputs as one array literal.');
-    expect($input[1])->not->toContain('apps/', 'A Vite input under apps/ would ship in a build deploy.ps1 skips.');
+    // A boolean judged by `toBeFalse`, never `->not->toContain($needle, $message)`: Pest's `toContain` reads a
+    // message as a second needle, so that negation could not fail (M232).
+    expect(str_contains($input[1], 'apps/'))->toBeFalse('A Vite input under apps/ would ship in a build deploy.ps1 skips.');
 
     $package = json_decode((string) file_get_contents(base_path('package.json')), true);
 

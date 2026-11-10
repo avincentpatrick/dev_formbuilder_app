@@ -84,6 +84,32 @@ Prediction:
   - The citation lint stays at 16 rotten, the trunk's figure.
 - **The one I most expect to be wrong:** the control. Whether Laravel's test client carries a flash into a second request the way a browser does.
 
+### Build record (2026-11-10, not merged)
+PR #499, head `e352daad`, run 42748812512: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5). `Boundary (from main)` is green (run 42748811999, 5 steps).
+- **The measurement, before the test** (a scratch Pest file, run once and deleted), with gamification off:
+  - **JSON fetch:** 403, no session `toast`, and a null `flash.toast` on the next page.
+  - **Navigation:** 302, the toast written, shown on the next page, and gone from the page after.
+  - Every sidecar sends `Accept: application/json`, so the row's premise is false for all of them.
+- **`WebJsonRefusalTest`: 7 passed** (the 5 it had, plus the behavioural case and its control). The order rule judges at least 14 redirecting arms, with a floor.
+- **Mutants, through `mutate.php`'s write, run and byte-restore.** Neither was committed, because the commit rule guards diff-based checks and this test reads the file.
+  - **A**, the module arm's redirect hoisted above `$webJson`: **CAUGHT**. The behavioural case and the order rule went red; the control and M90's own module case stayed green.
+  - **B**, the same hoist in the `GrantException` arm: **CAUGHT** by the order rule alone.
+  - Not run: dropping the `??`, which M90's existing cases already cover.
+- **Comments:** 26 files, every one edited line for line (insertions equal deletions per file). A sweep with `--text` found no remaining present-tense copy of the old reason. `bootstrap/app.php`'s autosave arm already corrected itself in place and was left alone.
+- **Filed:** `integrations-client-failure-sentences` (`R-ef0d47d7`).
+  - **The claim was wrong on one point:** that the stuck `busy` half needs `SheetsRuleFields.vue` (#497). Both halves are fixed inside `integrationsClient.ts`.
+  - It waits only for `VERSION`, because it changes what a tester reads.
+- **Container, Pest:** `php -d memory_limit=3G vendor/bin/pest` over `tests/Feature/{Http,Gamification,Scoping,Analytics,Connectors,Docs}` and `EncodeDraftTest`: 934 passed, 5 skipped. The one failure is `SuiteCollectionFloorTest`, the bind-mount artefact; CI is green.
+  - The first try, through `artisan test`, died at 128M. That trap is already logged, and I repeated it.
+- **Container, frontend:** Vitest 4,333 passed. Two `token-references` timeouts (load) passed alone. `type-check` is clean.
+- **Host:** PHPStan 0 errors over the whole tree; the container's 51 are the clean trunk's. Pint is clean. `pipeline-lint` 461 rows, `tracker-lint` +0 bytes, the citation lint at 16 rotten (the trunk's figure). `preflight --with-gates --with-pint` OK after merging #495 (BHW only) in.
+- **E2E:** none run locally. No spec reaches a comment; CI's E2E job is green.
+- `PROGRESS.md` is untouched until release.
+
+**How the prediction fared:** right on every gate it named, including both mutants' red sets. **The one I most expected to be wrong held:** the test client carried the flash into exactly one more request, as a browser does. **Not predicted:** the `artisan test` memory death (a known trap, re-run correctly), the two Vitest load timeouts, and that the second filed defect's fix fits in one unheld file.
+
+**The merge point owes:** merge after #497, with no dependence on #435 (no release note). Release this claim then. ⚠️ **#499 now holds a comment in `ConnectionTokenRefresher.php`**, the file `R-593e29cd` (line position 49) edits, so the next build must walk the line against #499's files too.
+
 ## HELD — `M233`, `R-03715adf`: the Sheets rule modal's segmented control gets an e2e gate that can fail (m233-sheets-rule-modal-spill) — BUILT AND HELD: PR #497, waiting for a merge point
 
 Taken 2026-11-09, from the plan the user approved the same day. Branch `m233-sheets-rule-modal-spill`, cut from origin/main at `c92fa2fe`, PR into main. Held green for a merge point (`D137`), after `M232`'s #496.

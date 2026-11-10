@@ -514,3 +514,28 @@ it('counts the responses that hold an answer to a question, in any version, for 
         ->and($count('full_name'))->toBe(4)
         ->and($count('subscribe'))->toBe(0);
 });
+
+it('answers a new section with is_repeatable false, so the builder can save it before a reload (M221)', function (): void {
+    // M221 found it renaming a fresh section in place: `addSection()` created the row without `is_repeatable`, the reply
+    // carried `null`, the builder sent that back with the first edit, and the `boolean` rule refused every save of the
+    // section ("Not saved") until a reload fetched the column's default. The settings pane's edits were refused the same way.
+    $tenant = builderTenant();
+    $admin = User::factory()->create();
+    enterTenant($tenant->id, $admin->id);
+    makeActiveMember($admin, 'admin');
+    $form = app(FormService::class)->create($tenant, $admin, 'Fresh Section');
+    test()->withHeaders(builderHeaders($form));
+
+    $created = $this->actingAs($admin)
+        ->postJson("http://acme.meridian.test/forms/{$form->id}/sections")->assertOk();
+
+    expect($created->json('is_repeatable'))->toBe(false);
+
+    // The builder's first edit: the section as the server described it, renamed, sent straight back.
+    $sent = collect($created->json())->except(['id', 'sequence'])->merge(['label' => 'Household members'])->all();
+
+    $this->actingAs($admin)
+        ->patchJson("http://acme.meridian.test/forms/{$form->id}/sections/{$created->json('id')}", $sent)
+        ->assertOk()
+        ->assertJsonPath('label', 'Household members');
+});

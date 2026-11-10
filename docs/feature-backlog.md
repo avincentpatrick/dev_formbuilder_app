@@ -7632,9 +7632,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the row honest: `app/Enums/WebhookDeliveryStatus.php:33` is a real `dead_lettered` case and
   `resources/js/Pages/webhooks/Show.vue:271` renders delivery status generically, so the state is visible
   per endpoint — what is missing is the cross-endpoint view and any explicit dead-letter labelling.
-  **Live.** Filed by `M80`. **Tier: during-testing.**
+  **Live.** Filed by `M80`. **Tier: during-testing.** ⚠️ **Half (a) was done by `M230` (2026-11-09), with `R-1d43bef5`:** both stale flat paths now name the nested routes. What stays open is half (b), the cross-endpoint delivery log and its dead-letter labelling.
 
-- **`minor` · §7.1 names a `/api/v1/webhooks/endpoints` path segment that exists nowhere in the tree, and
+- ✅ **CLOSED BY `M230` (2026-11-09) — ****`minor` · §7.1 names a `/api/v1/webhooks/endpoints` path segment that exists nowhere in the tree, and
   it is a floor rather than a census.** Measured by `M79`'s sweeps (2026-09-06), joined and refuted by
   `M80`; the join rated this one `medium` confidence where its neighbours were `high`, and the reason is
   recorded below. Built is `/api/v1/webhooks` — `routes/api.php:317`, `:320`, `:339`, `:342`, `:345` — with
@@ -7650,6 +7650,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   left behind by maintenance that reached their immediate neighbours. ⚠️ Severity is `minor` because
   `openapi.json` is drift-gated in CI and correct, so nobody generating a client is misled; the exposure is
   a reader planning against §7.1. **Live.** Filed by `M80`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M230` (2026-11-09), on its branch.**
+  - §7.1's two webhook rows now name the built routes, each marked **implemented** as its neighbours are. Endpoints are `webhooks`, `webhooks/{webhookEndpoint}`, and its `test` and `rotate-secret`; deliveries are nested under their endpoint.
+  - The design doc's §5 redeliver path was the third copy and is corrected too. Its *"per the API spec's resource inventory"* led back to §7.1, which the inventory only cites.
+  - That is half (a) of `R-c8c8da76`, which stays open for half (b), the cross-endpoint delivery log.
+  - Each edit sits inside its own line, so nothing cited below it moved.
 
 - **`minor` · NFR §8 sets a 30-day soft-delete grace period before a hard-deletion job, and for the three
   entities it names there is no purge job, no grace-period config value, and nothing that soft-deletes.**
@@ -8739,7 +8744,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   one defect reported twice, the fatal first — so that arm now defers a missing enum to the arm that owns it.
   ⚠️ **Every edit was in place: 1/1 then 2/2 added/removed, zero line-count delta**, so the sibling row's
   ceiling blocker was never engaged. Closed by `M88`. Filed by `M87`.
-- **`minor` · `.sheets-fields` is probably the worst `MdsSegmentedControl` host in the tree and it is the one
+- ✅ **CLOSED BY `M233` (2026-11-10) — ****`minor` · `.sheets-fields` is probably the worst `MdsSegmentedControl` host in the tree and it is the one
   with no coverage of any kind.** Measured by `M87`'s fan-out (2026-09-08) while closing the census row.
   `SheetsRuleFields.vue`'s `modeOptions` are `"Create a sheet for me"` and `"Use one I already have"` — two
   segments whose label text alone is roughly the width of a 520px modal, before padding — inside
@@ -8750,7 +8755,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `responsive-axe.spec.ts` scans the Sheets rule detail PAGE, which is a different surface.
   ⚠️ **It is filed with the spill row rather than folded into it** because the remedy is the same decision:
   if the component gets a wrap or shrink affordance, all four hosts are covered at once. **Live.**
-  Filed by `M87`. **Tier: during-testing.**
+  Filed by `M87`. **Tier: during-testing.** ✅ **Closed by `M233` (2026-11-10), on its branch. Its premise was half wrong, measured in the real app:** the spill it expected cannot happen with today's copy, with or without the host's `flex-wrap`. A segment is a flex item with `min-width: auto` and a label that can break, so it shrinks to its LONGEST word ("already"), not its whole label. At 375, 834 and 1440px, at default text and at `extra_large` + dyslexia, the modal body and the control read 0px in all twelve cases, the host's wrap forced to `nowrap` included; squeezed labels break onto more lines instead. The wrap matters only once a label cannot break: with labels unbreakable at `extra_large` + dyslexia, removing it scrolls the modal body 246px sideways at 375 and 103px at 834 and 1440. The half that held is the coverage: no spec opened `RuleFormModal`. `tests/e2e/integrations-rule-modal.spec.ts` now opens a NEW Sheets rule, which calls only the local `/columns` catalog (measured; a route guard fails the case on any `/destinations` call, the sidecars that reach Google), applies exactly that stress, and guards it by requiring two radios and the two segments on separate lines. It also gives the modal its first axe scan, clean in both themes at all three widths. The wrap deleted, committed on a throwaway branch and rebuilt, turned the stress case red at all three widths (246, 103, 103) and left the axe cases green. `SheetsRuleFields.vue`'s comment on the rule, which said the wrap "is what fixes" an overflow, now states the measured mechanism. The other hosts stay with `R-db28b120`.
 - **`minor` · A `docs/feature-backlog.md` citation into the exceptions log resolves to a live line about a
   different subject, and the citation gate is built to pass exactly that.** Found by `M87`'s fan-out
   (2026-09-08). This file cites `docs/ux/exceptions-log.md:646-651` for an `overflow-x: clip` rationale;
@@ -9421,8 +9426,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   is what the `__lead__` row would have bought. **Latent.** Filed by `M91`. **Tier: after-launch.**
 - **`minor` · A third instance of the citation class `M83` filed in the abstract: three live lines that
   say nothing about what cites them.** Found by `M91` (2026-09-11) while checking what its own edits
-  would shift. `docs/feature-backlog.md:7546` cites `app/Services/Forms/FormBuilderService.php:170`,
-  `:322` and `:331` as the sites where *"validations are written inline from the field payload"*. All
+  would shift. `docs/feature-backlog.md:7546` cites `app/Services/Forms/FormBuilderService.php` at lines
+  170, 322 and 331 as the sites where *"validations are written inline from the field payload"*. All
   three resolve and all three are alive, so the citation gate passes; `:157` is a docblock terminator,
   `:322` is `$item->increment('usage_count')` inside the field-library counter and `:331` is
   `reorder()`'s signature. ⛔ **None of the three has ever been about validations**, and the gate is
@@ -10770,7 +10775,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   added — and neither copy moved. ⚠️ Re-derive the number in both copies, or say in one place that the list is not
   a census and point at the count. **Live** — both sentences are in the tree today. Filed by `M101`.
   **Tier: during-testing.**
-- **`minor` · Five of seven paths on the testing site carry none of the four app security headers, and nothing
+- ✅ **CLOSED BY `M217` (2026-11-07) — ****`minor` · Five of seven paths on the testing site carry none of the four app security headers, and nothing
   anywhere says whether that is intended.** Found by `M101` (2026-09-19) while measuring header coverage from
   outside. `/` and `/login` carry `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options` and
   `Referrer-Policy`; `/up`, `/robots.txt`, `/favicon.ico`, a hashed build asset and a 404 carry **none** of them.
@@ -10778,7 +10783,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and documented — but the CONSEQUENCE is written nowhere, so a reader cannot tell an intended scope from a gap.
   ⚠️ Decide whether `X-Content-Type-Options: nosniff` in particular belongs on static responses, where it is the
   one of the four that actually applies to a file download, and record the answer beside the middleware rather
-  than in a row. **Live** — measured on every response served today. Filed by `M101`. **Tier: during-testing.**
+  than in a row. **Live** — measured on every response served today. Filed by `M101`. **Tier: during-testing.** ✅ **THE ANSWER IS IN `AppSecurityHeaders`'S DOCBLOCK, HEADER BY HEADER.** `nosniff` belongs on a file, and `public/.htaccess` now sets it, because no middleware reaches a file PHP never sees; that needs no box step and no Apache restart. Every type the site serves was read from the live site first (JS, CSS, fonts, icons, JSON, text), so it blocks nothing. The framing headers and `Referrer-Policy` do not belong on those paths, and the docblock says why. `scripts/staging-headers-judge.php` now requires it on the two static probes, and run against the live site before the deploy it reported both absent (exit 1), so it is known to read the real thing. ⚠️ The row understated by one path: `/sw.js` carries none either. ⚠️ **The merge point owes one read:** the same judge run after the deploy, and whether `/up` and the 404 picked the header up too, which depends on vhost wiring no document records. Both go in `M217`'s release.
 - ~~**`minor` · Two documents disagree about which file on the box holds the `X-Robots-Tag` directive, and a runbook
   that names the wrong one sends an operator to the wrong place during an incident.**~~ Found by `M101` (2026-09-19)
   while writing §8.3's authority statement for `R-562bcc2a`. This ledger records it as `Header always set
@@ -10806,7 +10811,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   exemption arm — so the cost has been paid twice and is no longer hypothetical. ⚠️ Either give CI an Apache
   container that actually serves this file, or say in the file's own header that it is unexercised and that any
   change to it ships unproved. **Live** — the next handler path added to that box is swallowed the same way.
-  Filed by `M101`. **Tier: during-testing.**
+  Filed by `M101`. **Tier: during-testing.** ⚠️ **Amended by `M217` (2026-11-07):** the file is no longer stock (one `X-Content-Type-Options` line), and that line is exercised, from outside and at night, by `scripts/staging-headers-judge.php`. The rewrite rules this row is about still are not.
 - **`minor` · This repository asserts what the off-repo Testing Server Checklist says, in prose no gate can
   check, and one such assertion was false for at least one increment.** Found by `M101` (2026-09-19) while
   taking `R-0855052e`, whose remedy was *"delete the check from the checklist"* — and there was nothing there to
@@ -10957,7 +10962,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `R-5ecfa6cd`'s own headline; this one lives in the canonical access document and is a separate edit. **Live** —
   `docs/ACCESS-MATRIX.md` is the document an operator reads to learn what the hosts do. Filed by `M105`.
   **Tier: early-testing.** ✅ **CLOSED BY `M109` (2026-09-25), UNDER RECORDED `D13` EXCEPTION #2** — the sentence now says the central host **redirects** to `APP_URL`, names `NotASubdomainException` in `bootstrap/app.php` by symbol rather than by line, and records that only the `/api/v1` arm answers 404 with `CentralHostFallbackTest` pinning it. Every one of this row's four citations held exactly as written — evidence four for four. ⛔ **BUT THE ROW IS A FLOOR AND NOT A CENSUS, AND ITS PREMISE WAS FALSE: THERE ARE TWO AUTHORED COPIES, NOT ONE.** This row says `M105` *"corrected the sibling copy in `R-5ecfa6cd`'s own headline"*, which is true and is not the whole of it — `R-5ecfa6cd`'s **body** still read *"so the central host answers 404"*, contradicted four lines below it by its own `M96` correction. `M96` and `M98` each corrected that row's body while neither rewrote its headline; `M105` then rewrote the headline and did not strike the body sentence. Both copies are now fixed, in place. ⚠️ A third, byte-identical copy sits in `.kilo/worktrees/obsidian-dogwood/` — the untracked second checkout already filed as its own row, reached by a repo-wide `grep -r` and invisible to ripgrep, which is that row's whole point and not this one's to fix.
-- **`minor` · `.github/workflows/ci.yml:84` asserts in the present tense that `DEPLOY_ENABLED` is unset, which `D47`
+- ✅ **CLOSED BY `M217` (2026-11-07) — ****`minor` · `.github/workflows/ci.yml:84` asserts in the present tense that `DEPLOY_ENABLED` is unset, which `D47`
   made false three days before `D53` was decided on the opposite premise.** Filed 2026-09-20 by `M105` while
   verifying `D53`. The comment reads *"`DEPLOY_ENABLED` is unset, so that was latent rather than live"* and dates
   from `454d9ba` (`M39`, 2026-08-28), well before `D47` turned automatic deploys on. ⛔ **It is the only in-tree
@@ -10965,7 +10970,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `D53`'s central premise — and `DEPLOY_ENABLED` is a GitHub environment variable that no gate here can read, so
   nothing can ever contradict the comment mechanically. The fix is to correct or delete the sentence; the durable
   fix is to stop asserting environment state in a comment no gate can check. **Live.** Filed by `M105`.
-  **Tier: during-testing.**
+  **Tier: during-testing.** ✅ **The line now says `DEPLOY_ENABLED` was unset until 2026-09-17**, read from `gh variable list` (set 2026-09-17T14:49:23Z), so it dates a fact instead of asserting the present, and no `ci.yml:` citation moves. ⛔ **The row's *"only in-tree statement"* was false when filed:** `deploy.yml` had already said it is set, since `M98`, two days earlier. Its dated sentences are correct and stay.
 - ✅ **CLOSED BY `M108` (2026-09-24) — `minor` · ~~The six `D38` rows cannot be grouped into one increment under `D13`, and they cannot safely be taken
   apart either.~~** Filed 2026-09-20 by `M105` on answering `D38`. Three of them edit a single table —
   `docs/architecture/technical-architecture.md` §7.1, lines 443 (Form draft), 449 (Exports) and 454 (Users & roles)
@@ -11208,9 +11213,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   vacuous today**: zero open decisions name a row id, so a rule added now would pass over an empty set, and
   `M108` declined to ship a green arm it could not exercise. ⚠️ **But the shape recurred three times in one month**
   (`D51`, `D52`, `D53`), so the trigger to build it is the next open decision that names a row. **Live.**
-  Filed by `M108`. **Tier: during-testing.**
+  Filed by `M108`. **Tier: during-testing.** ⚠️ **Noted by `M231` (2026-11-09):** the ANSWERED half of this shape now has a reader — `scripts/retier-payload.php` parses a heading that names a row and asks its tier, and `state.php --check` judges the answer against the row. What is left is this row's OPEN half, still with no open decision to exercise it.
 
-- **`minor` · A retier's PAYLOAD is a change to another file's row, nothing performs it, and the only record of that
+- ✅ **CLOSED BY `M231` (2026-11-09) — ****`minor` · A retier's PAYLOAD is a change to another file's row, nothing performs it, and the only record of that
   is a lane ledger.** Filed 2026-09-24 by `M108` while verifying `R-b6a4ea79`. `docs/claims/lane-a.md` records `M105`
   answering `D51` and `D53`, stripping both awaits tokens, and **not applying the retiers those decisions existed to
   commission** — `R-5ecfa6cd` stayed `early-testing` after being answered `before-launch`, `R-e7d6f223` stayed
@@ -11221,7 +11226,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   it is that nothing would notice the next one. ⚠️ **Distinct from the row above, and the difference decides the
   remedy:** that one asks for a RULE relating two tiers, this one asks that answering a retier decision perform its own
   payload — a close-out step, or a `scripts/next.php` check that an answered retier decision left the row it names at
-  the tier it was answered to. **Live.** Filed by `M108`. **Tier: during-testing.**
+  the tier it was answered to. **Live.** Filed by `M108`. **Tier: during-testing.** ✅ **BOTH HALVES, AND THE CHECK IS IN `state.php --check` RATHER THAN `next.php`.** `scripts/retier-payload.php` reads every retier an answered decision commissions — the `` `R-x` retiered `tier` `` runs on an answer's *What the answer files* line, lists and parentheticals included, and `D51`–`D53`'s *"Which tier?"* headings — and judges the latest answer for each row against it: an open row at another tier with no retier recorded at the row fails `--check`, which every session runs at its start. `CLAUDE.md` now asks the recording session to perform the retier at the row, in that shape. Measured first: **12 payloads, 10 rows judged and all consistent, so it is green on arrival**; three mutations (the tier comparison, the list capture, the record at the row) were each CAUGHT by `RetierPayloadTest`. ⛔ **The row's own example cannot be judged any more:** `D53`'s `R-e7d6f223`, like `D52`'s `R-e6a10f97`, was later struck through, and a struck row's id stops resolving, exactly as a reworded one's does. So an unresolved id is listed and never failed. ⚠️ **Out of its reach, said in the file's header:** a payload that names no id (`D128`'s *"the sixteen UI rows"*), a plan marker's retier (`D24`), and a row that recorded the answer's retier and later moved again without a record. **The gate half waits on `pipeline-lint.php`, which a held PR (#429) touches;** the check can move there after that merge point.
 
 - **`minor` · A bare Vue component name is invisible to the citation harvester, and PSR-4 cannot reach it.** Filed
   2026-09-24 by `M108`, which widened the harvester to resolve PHP class names and deliberately stopped there.
@@ -11247,7 +11252,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   one line: is regenerating the census a close-out obligation, or is the file allowed to lag its own banner? **Live.**
   Filed by `M108`. **Tier: after-launch.**
 
-- **`minor` · `docs/pipeline.md` is cited BY LINE in at least two places, it is regenerated every increment, and the
+- ✅ **CLOSED BY `M218` (2026-11-07) — ****`minor` · `docs/pipeline.md` is cited BY LINE in at least two places, it is regenerated every increment, and the
   citation gate cannot see the rot.** Filed 2026-09-24 by `M108` while verifying `R-4346557c`, whose own citation of
   it had already moved. That row cites line 50 of `docs/pipeline.md`; the line is now `:48`, and a second citer it never named
   sits at `:70`. The identical stale citation sits inside `D38` in `docs/claims/decisions.md`. ⛔ **NEITHER COPY CAN
@@ -11260,6 +11265,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   moves every heading below it without producing a run"* — and the same argument applies with more force to a file
   regenerated deliberately. The remedy is to cite the line's rows by `R-` id, which is stable for the life of the row.
   **Live.** Filed by `M108`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M218` (2026-11-07), on its branch.**
+  - Of the two citations, `R-4346557c`'s had already gone. `D38`'s remained, and it now names `R-fcfc1f52` instead of a line.
+  - It was wrong the day it was written: in `7b45369f`, the commit that wrote it, line 50 held `R-4328a4d9`, and the row it meant sat at line 75.
+  - `scripts/pipeline-lint.php` gains **P8**. It refuses a line citation into the generated file from every file the generator reads, and from the backlog, the decisions file and `CLAUDE.md`, which it does not read. The claim ledgers and the archive are records of the past and are not read.
+  - Before `D38` was repointed, P8 went red on exactly that one line and nothing else.
+  - Four control cases in `PipelineLintControlsTest`, and six mutants through `scripts/mutate.php`, all CAUGHT: the call removed, a pattern that never matches, the lookbehind dropped, the folder made compulsory, the backlog not read, and the refusal removed.
 
 - ✅ **CLOSED BY `M195` (2026-10-28) — ****`minor` · `backlog-triage-controls` is registered in CI and absent from `docs/gate-baselines.md`, so its case
   count is the one gate number nothing tracks.** Filed 2026-09-24 by `M108`, which registered the gate and found the
@@ -11326,7 +11337,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   cannot be widened to cover them**: `assertNoHorizontalOverflow` skips subtrees under an `overflow-x: auto|scroll`
   ancestor by construction, and three of the four hosts sit inside `.mds-modal__body`. Each needs its own
   element-level read, and the modal ones need the modal opened first. **Live** — the guards are unasserted today.
-  Filed by `M109`. **Tier: during-testing.**
+  Filed by `M109`. **Tier: during-testing.** ⚠️ **Narrowed by `M233` (2026-11-10):** the `.sheets-fields` host now has its element-level read, `tests/e2e/integrations-rule-modal.spec.ts`, red at all three widths without its wrap. What remains is `.mds-field`, `.encode-field` and widening `.config` beyond 375px. ⚠️ **Measure each host's LONGEST WORD before writing its read:** a segment shrinks to it, so `.sheets-fields` could not spill on its own copy at any width, and needed labels made unbreakable before its read could fail.
 
 - ~~**`major` · Every `config` key that `UpdateFieldRequest::configRules()` does not enumerate is silently dropped
   on every field save, with a 200 OK.**~~ Filed 2026-09-25 by `M110` from a user-directed exploration of the running
@@ -11335,8 +11346,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Laravel's `Validator::$excludeUnvalidatedArrayKeys` defaults to `true` (`Factory.php:74`), so `validated()`
   skips the top-level key (`Validator.php:659-664`) and rebuilds `config` from the enumerated paths only.
   `FormBuilderService::writeField()` then whole-column-replaces with the result. ⛔ **THIS IS REACHABLE DATA LOSS, NOT A
-  SHAPE COMPLAINT.** Option `label_translations` is written by XLSForm import (`XlsformImportParser.php:319`),
-  read by the runtime (`schema-mapping.ts:183,282-289`), re-exported (`XlsformExporter.php:433`), faithfully sent
+  SHAPE COMPLAINT.** Option `label_translations` is written by XLSForm import (`XlsformImportParser::normalizeChoices()`),
+  read by the runtime (`schema-mapping.ts:183,282-289`), re-exported (`XlsformExporter::pushPairList()`), faithfully sent
   back by the client (`ChoicesEditor.vue:17-20` spreads `{...opt, ...patch}`) — and is not in the allowed rule set
   (`:159-165`). Import a multilingual form, edit any choice field, and every translation is gone. ⚠️ **Only types
   whose `configRules()` arm is non-empty are affected** — choice, cascading, matrix, likert_matrix, geo, media and
@@ -11861,7 +11872,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the importer gap the whole of what is left. ⚠️ Either teach the importer and `CascadeResolver` to read the
   translation columns the exporter already writes, or record at the exporter that these columns are
   author-authored only. **Latent** — it bites the first multilingual grid or cascade imported from a
-  workbook, and nothing loses data today. Filed by `M111`. **Tier: during-testing.**
+  workbook, and nothing loses data today. Filed by `M111`. **Tier: during-testing.** ⚠️ **Corrected by `M217` (2026-11-07):** a grid's translations do reach the workbook now, on the per-row and per-cell questions and the choices sheet. **A cascade level's do not, and never did:** a level has no row in the workbook, not even its default-language label, so *"round-trips out of the product"* is false for it. What is left for a level is a place to write it at all, not only an importer to read it. An imported grid is flattened into plain questions (the spec's §3), so its translations come back on those.
 
 - ✅ **CLOSED BY `M113` (2026-09-26) — `minor` · The expression and template publish gates still refuse on their first violation, so `M112`'s
   collect-every-violation promise stops at the structural gate.** Found by `M112` (2026-09-26) while closing
@@ -12359,7 +12370,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   reads it rather than filing a bug. The honest fix is a live-fields prop on both components with its own gate
   run. **Live.** Filed by `M118`. **Tier: during-testing.**
 
-- **`minor` · `getByRole('tablist')` and friends are viewport-dependent on the builder, because the panes are
+- ✅ **CLOSED BY `M218` (2026-11-07) — ****`minor` · `getByRole('tablist')` and friends are viewport-dependent on the builder, because the panes are
   hidden with `display: none` — so a role-based count there asserts which pane is selected, not the
   invariant.** Found 2026-09-28 by `M118` when a new page-level assertion failed at the tablet project with a
   count of **zero**. A `display: none` subtree is absent from the accessibility tree, and below the builder's
@@ -12372,8 +12383,15 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   construction, and their behaviour at a width where the config pane is hidden is that they iterate ZERO
   elements and scan nothing — passing, silently, having tested nothing. **Live.** Filed by `M118`.
   **Tier: during-testing.**
+  ✅ **CLOSED BY `M218` (2026-11-07), on its branch: the sweep is done, and it found one silent read, which was not role-based.**
+  - Swept: every spec and `tests/e2e/support/`.
+  - **The row's own example had already gone.** The four `builder-axe.spec.ts` loops count `locator('[role="tab"]')`, the DOM rather than the accessibility tree, after `showBuilderPane(page, 'settings')` and a `toBeVisible()` on the first tab. None can loop zero times and pass.
+  - No count or loop uses a role locator. The four negative role counts on builder panes, two in `builder-axe.spec.ts` and two in `builder-preview-authoring.spec.ts`, each follow a positive `toBeFocused()` or `toBeVisible()` in the same pane, so a hidden pane fails loudly. Each was decided to stay as it is.
+  - **The one silent read** was `personalization-axe.spec.ts`'s pane switcher. It sat inside `if (await strip.isVisible())`, so it was skipped without a word whenever the switcher was off screen. It now asserts the switcher is visible and then reads it.
+  - Proved by a mutant that hides the switcher at every width: it went red at all three projects, reporting that the switcher is not on screen. The old code would have skipped the read.
+  - The fix is in `R-ffd296b1`'s file, as that read is one of its four, so this row edited no file of its own.
 
-- **`minor` · No seeded fixture projects to a builder control wide enough to overflow, so all four element-level
+- ✅ **CLOSED BY `M218` (2026-11-07) — ****`minor` · No seeded fixture projects to a builder control wide enough to overflow, so all four element-level
   spill reads on that page are green by FIXTURE rather than by design.** Found 2026-09-28 by `M119` while writing
   the fourth one and refusing to accept it green. ⛔ **MEASURED, NOT INFERRED.** At 375px with `extra_large` and
   OpenDyslexic — the combination `D28` and `M19` are both about — the preview's section strip renders **three**
@@ -12391,6 +12409,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   an existing fixture is not free: six spec files open `Community Health Survey` by title and `builder-axe.spec.ts`
   scans its config panel, so the section count is load-bearing for scans that have nothing to do with overflow.
   **Live.** Filed by `M119`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M218` (2026-11-07), on its branch.** Two new draft forms in `E2eSeeder`, which `deploy.ps1` never runs, so they never reach the testing site.
+  - **`Section Strip Demo`:** seven always-visible sections, exactly `PREVIEW_STRIP_MAX_SEGMENTS`, each name carrying one long word.
+    - ⚠️ **The row's remedy said long section NAMES, and long names are not enough.** A segment shrinks to its longest word and no further, so it is the longest words that overflow.
+    - Measured with `extra_large` and OpenDyslexic: the bar is 335px, 730px and 1160px at the three widths, and five ordinary names shrank to 625px and fitted at two of them.
+    - The preview-strip case pins seven segments. It also takes the `flex-wrap` guard off for one read and requires the strip to spill, at every width and on every run, so the fixture proves on each run that it can still make the read fail.
+  - **`Many Sections Demo`:** eight sections, so the strip draws its select fallback end to end for the first time: visible, eight options, no radios, its bar read and an axe scan.
+  - **Proof:** mutants, each rebuilt and run at all three widths, and each red at all three. The guard set to `nowrap`, and the ceiling raised to 8.
+  - ⚠️ **"All four" was an overstatement, which this records rather than repeats:**
+    - Only the section strip carries author-controlled text, so it is the only read a fixture can move.
+    - The pane switcher and the centre tabs carry fixed labels. The pane-switcher read was skipped whenever the switcher was off screen, which `R-20b1fe78` fixed in this increment.
+    - The config pane's read is `R-db28b120`'s. That row measured it red at `mobile` and green at the other two widths, and it stays queued; it edits this same spec.
 
 - **`nit` · How many tracker surgeries have happened is recorded only in release prose, and one of them never
   recorded itself.** Found 2026-09-28 by `M119` while writing its own. `M111`'s release calls itself *"the sixth
@@ -12464,13 +12493,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `calculated_needs_formula` precisely because publish will not. `FieldConversionServiceTest` pins the premise (both
   gates silent). The remedy is a publish refusal naming the field. **Live.** Filed by `M121`. **Tier: early-testing.** ✅ **CLOSED BY `M122`:** `ExpressionValidationGate::checkFormula()` refuses a calculated question whose `calculated_formula` is missing, not a string, or blank after a trim — exactly what the runtime would have skipped — as `calculated_formula_missing`, naming the field. The call site was replaced in place and the check appended, because the gate is cited by line from a design document and from this ledger. ⛔ **The row understated its reach:** an XLSForm `calculate` row with no `calculation` imports as `''` (`XlsformImportParser.php:211-212`) — a third way in, refused now too. ⚠️ **Not retroactive:** an already-published blank formula stays, so the runtime skips stay. The engine's `calculated_needs_formula` warning now says the form cannot be published without one, and the premise pin in `FieldConversionServiceTest` is flipped. ✅ Two mutations CAUGHT: the refusal removed, and the trim dropped.
 
-- **`minor` · An XLSForm export loses every translation that lives only on choices.** Measured by `M121` at source,
+- ✅ **CLOSED BY `M217` (2026-11-07) — ****`minor` · An XLSForm export loses every translation that lives only on choices.** Measured by `M121` at source,
   not executed: `XlsformExporter::extraLanguages()` collects languages from section labels, field labels and hints and
   validation messages — never from an option's, row's, column's or level's `label_translations` — and the choice-list
   writer fills only the languages it collected. A form translated only in its choices exports no `label::xx` column,
   so the round trip drops them. ⚠️ This contradicts `M111`'s note that grid translations have a live export path.
   `M121`'s export test had to add a field-level translation to get a `label::es` choices column at all, and its comment
-  says so. **Live.** Filed by `M121`. **Tier: during-testing.**
+  says so. **Live.** Filed by `M121`. **Tier: during-testing.** ✅ **`extraLanguages()` now reads a question's options, a grid's rows, columns and cells, and a grid column's own choices**, and executing it first turned the row's source reading into a measured failure on all eight. ⛔ **The row understated itself: the language was only half of it for a grid.** `emitLikertMatrix` and `emitMatrix` wrote `label` alone, so collecting the language would have opened a column with an empty cell. A likert row now writes its translation, and a grid cell writes its row's and column's together, borrowing the default-language text when only one has that language and staying blank when neither does. ⚠️ **It overstated one source:** a cascade level has no row in the workbook, so collecting it would only add an empty column. It is left out and pinned. `M121`'s workaround is gone from `FieldConversionServiceTest`, which passes without it, and `XlsformImportTest` now pins the round trip back in.
 
 - **`nit` · `routes/api.php`'s note that *"THE WARNING IS NOW A GATE"* names only the Vitest half.** Measured by
   `M121`. The comment above the resume READ credits `resources/public-runtime/__tests__/sw.test.ts`, whose arm hard-codes
@@ -12478,10 +12507,15 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The route side is `tests/Feature/Http/ServiceWorkerCachePrefixRouteTest.php`. A hub file, so this waits for an
   increment that already owns `routes/api.php`. **Live.** Filed by `M121`. **Tier: during-testing.**
 
-- **`nit` · `docs/security-threat-model.md` lists the invitation door among residuals *"each filed in"* the ledger,
+- ✅ **CLOSED BY `M224` (2026-11-08) — ****`nit` · `docs/security-threat-model.md` lists the invitation door among residuals *"each filed in"* the ledger,
   and it is no longer filed.** Measured by `M121`, which closed `R-950ef5f1` by `D33` = A (keep inviting anyone). The
   door is now an ACCEPTED risk with no open row, and the entry should say so and cite `D33`. A hub file.
   **Live.** Filed by `M121`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M224` (2026-11-08), on its branch.**
+  - Residual 32's invitation bullet now opens by calling the door accepted under `D33` = A and closed as `R-950ef5f1` by `M121`, and its lead sentence no longer says all three items are filed. Both edits sit inside existing lines.
+  - The other two bullets were checked and are right: the domain re-verification row is open, and the self-registration bullet already records `M140`'s closure and `R-afa35a60`.
+  - `D33`'s *"watch invitation volume on the testing server"* had no instrument and no row (`M121` noted it in prose only). It is filed below as `invitation-volume-unwatched`.
+  - **`D13` exception #9:** batched with `R-6f994627` in one PR, allowed by the user in chat on 2026-11-08. Each row edits a hub document, and every PR at the merge point is one more deploy.
 
 - ✅ **CLOSED BY `M145` (2026-10-07) — **`minor` · The builder preview can lose every condition in silence, because its draft projection passes rule rows
   to the engine unchecked.** Measured by `M121` while giving the respondent a notice for the same failure. The preview
@@ -12769,12 +12803,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   converts HEIC to JPEG on upload; a file picker on a computer does not. **Not live**. Filed by `M128`.
   **Tier: during-testing.**
 
-- **`nit` · The data dictionary says an attachment is not served until its scan is `clean`, and every attachment is
+- ✅ **CLOSED BY `M224` (2026-11-08) — ****`nit` · The data dictionary says an attachment is not served until its scan is `clean`, and every attachment is
   served while it is `skipped`.** Found by `M128` while reusing the attachment write path for OCR pages.
   `docs/data-dictionary.md` §10's `virus_scan_status` row describes files as withheld until `clean`, while
   `ScanStatus::servable()` admits `clean` and `skipped`, and with no scanner wired every upload is `skipped`. The code
   is the deliberate behaviour (`config/attachments.php`); the sentence is the defect. **Live.** Filed by `M128`.
   **Tier: during-testing.**
+  ✅ **CLOSED BY `M224` (2026-11-08), on its branch.**
+  - §10's `virus_scan_status` cell now says a file is served while `clean` or `skipped` and never while `pending` or `infected`, and that with no scanner wired every upload is `skipped` and served unscanned.
+  - **The sentence had two more copies, and one carried a verdict.** `docs/security-threat-model.md` §6 rated malware in an upload **Mitigated** by quoting it, and §4's guest-upload row pointed there. §6 now rates it a residual until a scanner is wired, bounded by the type read from the bytes. §4 says the same. `docs/ux/form-filling-ux-flow.md` quoted it too and now states the rule.
+  - No scanner implementation exists, and wiring one lived only in prose. It is filed below as `virus-scanner-unwired`, `before-launch`.
+  - **`D13` exception #9:** batched with `R-b1737198` in one PR, allowed by the user in chat on 2026-11-08.
 
 - **`nit` · Prose in four files still derives layout from "a 240px sidebar above 1024px", which a collapsed sidebar
   no longer guarantees.** Found by `M128` while making the sidebar collapsible (`R-33c7fd56`). The derivations that
@@ -12784,12 +12823,16 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and `tests/e2e/list-layout.spec.ts`. Every layout still holds, because the content box stays continuous across
   1024px. **Not live**. Filed by `M128`. **Tier: during-testing.**
 
-- **`minor` · The dev container keeps PHP's stock upload limits, 2 MB per file and 8 MB per request, so no upload
+- ✅ **CLOSED BY `M219` (2026-11-08) — ****`minor` · The dev container keeps PHP's stock upload limits, 2 MB per file and 8 MB per request, so no upload
   over 2 MB can be tried locally.** Found by `M128` while preparing an OCR probe. `docker/Dockerfile` installs no
   `php.ini`, and `php -r 'echo ini_get(...)'` in the app container reads `2M` and `8M`. Meanwhile `config/attachments.php`
   allows 25 MB and the testing server allows 25M and 30M (`docs/deployment-infrastructure.md` §8, step 1). A phone
   photo for a media field or an OCR scan therefore fails at PHP before the app sees it, and only locally. The remedy is
   one ini file in the image, matching the server. **Live.** Filed by `M128`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M219` (2026-11-08), on its branch.**
+  - `docker/php/uploads.ini` sets `upload_max_filesize = 25M` and `post_max_size = 30M`, the testing server's values, and `docker/Dockerfile` copies it into `conf.d`. Read back from the rebuilt app container: `25M 30M`, where it read `2M 8M` before.
+  - **One layer up, the same defect:** the repository's default stack puts nginx in front of php-fpm, and `docker/nginx/default.conf` allowed a 25m body, below the 30M request PHP now takes. A 25 MB file plus the rest of the form would have been refused there first. It now allows 30m, and a throwaway `nginx:1.27-alpine` reads the file as valid.
+  - Nothing in CI moves: CI's jobs set PHP up themselves.
 
 - ✅ **CLOSED BY `M143` (2026-10-07) — **`minor` · The printed form's stamp identifies the schema, not the layout, so a sheet printed before a layout
   change and one printed after it are the same sheet to the reader.** Found by `M128`, whose own paper fix is the
@@ -12924,12 +12967,19 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   components that declare a container today. The remedy is that scan as a host lint gate beside
   `component-import-lint.php`. **Not live**. Filed by `M129`. **Tier: after-launch.**
 
-- **`minor` · An XLSForm appearance longer than 60 characters fails the whole import at the database.** Found by
+- ✅ **CLOSED BY `M219` (2026-11-08) — ****`minor` · An XLSForm appearance longer than 60 characters fails the whole import at the database.** Found by
   `M130` while verifying `R-6c76bed2`. `XlsformImportParser::resolveAppearance()` keeps an author appearance
   verbatim, `XlsformImporter` writes it as given, and `form_fields.appearance` is `varchar(60)`, so one long
   appearance cell aborts the insert. ODK appearances are space-separated tokens and its `search(...)` calls run
   long. The remedy is to refuse the cell as a row error the import reports, or to widen the column. Read, not run.
   **Live.** Filed by `M130`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M219` (2026-11-08), on its branch: refused as a warning, not widened.**
+  - Run, not only read: with the cap taken out, the new import test fails with a `QueryException` at the insert, the defect as filed.
+  - `XlsformImportParser::resolveAppearance()` now drops an appearance longer than `APPEARANCE_MAX_LENGTH` (60). The question is imported without it, and the import's warnings name the question.
+  - Not widened: no width holds every ODK `search(...)` call, so a cap would be needed anyway, and widening is a migration on the testing site's database.
+  - `XlsformImportAppearanceTest` reads the real width of `form_fields.appearance` from the database, so the constant and the schema cannot drift apart unseen. It also keeps an appearance of exactly 60.
+  - Four mutants through `scripts/mutate.php`, all CAUGHT: the cap taken out, `>` made `>=`, the width set to 59, and the warning dropped.
+  - Ships as 0.17.3, numbered after #414's 0.17.2.
 
 - **`minor` · An XLSForm appearance is matched as one whole string on import, so `minimal autocomplete` makes a
   Single choice rather than a Dropdown.** Found by `M130` while verifying `R-6c76bed2`.
@@ -12969,10 +13019,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   default is 60.** Found by `M130`. Its rate-limit table against `config/guest.php`'s `submit_per_ip` default.
   **Not live**. Filed by `M130`. **Tier: during-testing.**
 
-- **`nit` · `openapi.json` publishes the guest schema's `save_and_resume` as a string; it is a boolean.** Found by
+- ✅ **CLOSED BY `M225` (2026-11-08) — ****`nit` · `openapi.json` publishes the guest schema's `save_and_resume` as a string; it is a boolean.** Found by
   `M130`. Scramble infers it from `PublicFormPresenter`'s `&&` expression and gets the type wrong, so a client
   generated from the contract types the flag as text. An explicit array-shape docblock on the presenter fixes the
   inference. **Live.** Filed by `M130`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M225` (2026-11-08), on its branch.**
+  - The flag now comes from `offersSaveAndResume()`, a method returning `bool`, and the export publishes it as `boolean`. The prescribed docblock was not used: `present()` returns about twenty keys, and Scramble keeps a docblock only when it carries more known types than its own inference.
+  - A new `OpenApiContractTest` case pins the type; it was red against the old file, and a mutant flipping the type back is CAUGHT.
+  - **`D13` exception #10:** batched with `R-e2c1ba51` in one PR, allowed by the user in chat on 2026-11-08.
 
 - **`minor` · No test checks the guest schema's real response against `openapi.json`.** Found by `M130`. CI
   byte-diffs a fresh export against the committed file, which proves the document matches the code's inference,
@@ -13036,12 +13090,18 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   button and no setting exists. A form meant to be answered once per respondent therefore invites a second response.
   **Not live**. Filed by `M130`. **Tier: before-launch.**
 
-- **`minor` · `openapi.json` documents the guest submit's success as a bare string, so its body — `id`, `reference`,
+- ✅ **CLOSED BY `M225` (2026-11-08) — ****`minor` · `openapi.json` documents the guest submit's success as a bare string, so its body — `id`, `reference`,
   `status` and, since M130, `redirect` — is in no contract.** Found by `M130` while regenerating the document for
   `R-db169c29`. `GuestSubmissionController::store()` answers `201` or `200` from one expression, and Scramble documents
   that as `200: {type: string}`; adding `redirect` changed nothing in the export. A client generated from the contract
   cannot read the reference or the destination. An explicit response annotation fixes it. **Live.** Filed by `M130`.
   **Tier: during-testing.**
+  ✅ **CLOSED BY `M225` (2026-11-08), on its branch.**
+  - **The cause was the ternary status code, not a missing annotation.** The body is now built once and returned with a literal status on each branch, and the export publishes both 200 and 201 as an object carrying `id`, `reference`, `status` and `redirect`.
+  - **The guest draft save had the same defect** (`GuestDraftController::store()`, `POST /public/f/{shareToken}/draft`), and is fixed the same way. The tenant `SubmissionDraftController` has the same ternary, but it is a session route outside the contract.
+  - Once a body is inferred, Scramble publishes a `//` comment above an array key as that property's description, so the internal notes moved above the assignment, and only short descriptions for integrators stay on `reference`, `redirect` and `content_checksum`.
+  - A new `OpenApiContractTest` case pins both bodies on both statuses; it was red against the old file, and mutants on the submit's 200 and the draft's 201 are CAUGHT.
+  - **`D13` exception #10:** batched with `R-4ea564fe` in one PR, allowed by the user in chat on 2026-11-08.
 
 - **`minor` · CI's E2E job proves no service-worker behaviour: the secure-origin launch flag does not take on its origin,
   so every offline case in `tests/e2e/public-runtime-offline.spec.ts` skips there or runs without its service-worker leg.**
@@ -13056,12 +13116,18 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   replaced), or serve CI's E2E on a `*.localhost` origin; then make a skip in CI fail rather than pass quietly.
   **Live.** Filed by `M130`. **Tier: during-testing.**
 
-- **`minor` · Saving a question to the field library drops its cross-field rules but keeps their group, so an "any of
+- ✅ **CLOSED BY `M220` (2026-11-08) — ****`minor` · Saving a question to the field library drops its cross-field rules but keeps their group, so an "any of
   these" group comes back stricter.** Found by `M131` while verifying `R-799d60f5`. `FieldLibrary::fromField()` drops
   every rule that names another question and keeps the remaining rows' group ordinals, so an OR group that loses a
   field comparison offers fewer alternatives and refuses answers the original accepted. Reachable once the builder
   authors groups. The remedy is to drop a group whole when any member goes, or to ungroup the survivors and say so.
   Read, not run. **Live.** Filed by `M131`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M220` (2026-11-08), on its branch: the group is dropped whole.**
+  - Run, not only read: the new `FieldLibraryMapperTest` case failed before the fix, with the `or` group's survivor (`min_value:0`) back on its own.
+  - `FieldLibrary::fromField()` now drops every rule of a group that has a cross-field member. Rules in a group with no such member travel together, still one group, and an ungrouped comparison is dropped as before.
+  - **The other remedy, ungrouping the survivors, is wrong and was not taken.** The engines combine units as ANY (required, skip) or ALL (constraints), so an ungrouped constraint must pass on its own, which is stricter still.
+  - Three mutants through `scripts/mutate.php`, all CAUGHT.
+  - Ships as 0.17.4, numbered after #414 and #431.
 
 - **`minor` · A form's preset theme reaches the guest page and the builder preview and nothing else.** Found by `M131`
   while verifying `R-6017d6d8`. Mail and the response PDF read `BrandPalette`, not the brand partial, and the encode
@@ -13149,12 +13215,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `${related} = '' or . > ${related}`. **Live.** It needs an export of a form carrying such a rule. Filed by `M134`.
   **Tier: during-testing.**
 
-- **`nit` · A structured "contains" on a single choice is a substring test.** Found by `M134` while splitting
+- ✅ **CLOSED BY `M226` (2026-11-08) — ****`nit` · A structured "contains" on a single choice is a substring test.** Found by `M134` while splitting
   `ValueShape`'s choice shape for `R-87160c81`. `ValueShape::allowsOperator()` keeps `contains` on a single choice or
   dropdown, and the lowering reads it as text containment, so "required if colour contains `re`" holds for `red` and
   `green` alike. Kept rather than refused, because refusing it would block publishing forms that use it on purpose;
   `ConversionCensusTest` already calls it a substring test. The remedy is a decision: refuse it, or relabel it in the
   editor. **Live.** Filed by `M134`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M226` (2026-11-08), on its branch, by `D214` = A (relabel), the user's answer in chat.**
+  - `ComparisonOperator::labelFor()` names `contains` on a single choice or dropdown "contains the text". `BuilderPresenter` ships it as the operator's `shape_labels`, and the rule editor shows it wherever the compared question is one of those.
+  - **The condition editor was measured and is not the same trap.** Its "includes" on a single choice writes `selected()`, which is an exact match on one value.
+  - The conflict dialog and the type-change dialog still print the plain "contains"; filed below as `contains-label-in-dialogs`.
+  - New cases: one in `BuilderEnumsPayloadTest` and one Vitest case in `ValidationEditor.test.ts`, each red first. A mutant in the enum and one in the editor are both CAUGHT. Ships as 0.18.2.
 
 - **`nit` · An expression may compare a note with a value, which never holds.** Found by `M134` while classifying
   operands for `R-87160c81`. A note is never answered, so `${remark} = 'x'` is constant false and `${remark} != 'x'`
@@ -13162,11 +13233,15 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   offering notes in `M134`, so this is reached only by typing the expression. **Live.** Filed by `M134`.
   **Tier: during-testing.**
 
-- **`minor` · Converting a date question to a time question, or back, does not warn that an ordering on it stops
+- ✅ **CLOSED BY `M227` (2026-11-08) — ****`minor` · Converting a date question to a time question, or back, does not warn that an ordering on it stops
   holding.** Found by `M134` while designing `R-62b638e1`. After `M134` a date orders against dates and `today()`, a time
   against times; `ConversionCensus` flags a re-meant numeric use through `ValueShape::allowsOperator(Gt)`, which refuses
   every temporal shape, so the type-change dialog says nothing, and the next publish refuses the ordering as a kind
   mismatch. The remedy is a census judge for a temporal kind change. **Live.** Filed by `M134`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M227` (2026-11-08), on its branch.**
+  - **The judge asks the publish gate, so the two cannot disagree.** For each use, the census records which of date, time and date-and-time `ExpressionOperandJudge::temporalOrderingHolds()` accepts its orderings as. A change between two temporal types reports `temporal_ordering_breaks` where the old type held and the new one does not. A date to a date-and-time stays silent, because the two order against each other.
+  - **Asking `judge()` itself would have missed half the breaks.** It reports a mismatch between two questions once, under the key that sorts first, so a date compared with a question whose key sorts earlier was invisible from the converted side. The verdict on one compared operand moved into `againstOperand()`, which the gate and the census share. The gate keeps its report-once rule, and its 155 cases pass unchanged.
+  - Four census cases: two that report (red first) and two that stay silent (beside a text question, on arithmetic, on a pair the old type already broke, and a date to a date-and-time). Four mutants are CAUGHT, including one that copies the gate's report-once rule into the census. Ships as 0.18.3.
 
 - **`minor` · `"5\n"` is a number on the server and not in the browser.** Found by `M134` while designing the temporal
   parse. `Coercion::NUMERIC_RE` is anchored with `$`, which in PCRE also matches before a final newline, so
@@ -13405,7 +13480,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the matcher reads. Revisit when images are pre-processed server-side (ADR-0014 names GD's arrival as a revisit
   trigger) or the provider decodes codes. ⚠️ **The first trigger has fired:** `M160` put GD in the app image for the ink reader (`docker/Dockerfile`), so the premise above is no longer true and the registration-mark half is open work (noted by `M190`, whose audit of `docs/ocr-pipeline-design.md`'s out-of-scope list found it). **Latent.** Filed by `M143`. **Tier: after-launch.**
 
-- **`nit` · A short written answer that is a substring of any printed text in its region is dropped as printed text, so
+- ✅ **CLOSED BY `M228` (2026-11-08) — ****`nit` · A short written answer that is a substring of any printed text in its region is dropped as printed text, so
   "FORM" written in a box above a footer that says "Scans of this form…" reads as blank.** Found by `M143` while
   deciding where the instruction banner may go. `OcrAnswerReader::isStatic()` drops an answer line of four or more
   characters whose normalised text is a SUBSTRING of a static string (a hint, a block label, a footer sentence), so a
@@ -13413,6 +13488,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   one. The exposure predates `M143` (the old footer carried "form" too) and is why the banner is kept out of the static
   list. A fix compares by line geometry (a static line is where the printed text IS, not any line that reads like a
   piece of it) or asks a longer match of a substring hit. **Live.** Filed by `M143`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M228` (2026-11-08), on its branch.**
+  - Neither prescribed remedy was taken. Geometry needs printed positions the reader does not have, and a longer match would read a wrapped hint's short last word as an answer.
+  - **What was taken is the shape of a wrapped piece.** It is a run of whole words, and a one-word piece can only be the printed text's last word. So a one-word line counts as printed only as that last word, and a longer line only as a whole-word run. "FORM" above either footer sentence now reads, and "form" no longer matches inside "information".
+  - Three new `PrintedFormMatcherTest` cases: "FORM" under both footers (red first); a hint whose last word wraps alone (still dropped); and "HIS FORM", which starts inside "this" (read). Three mutants were CAUGHT. The OCR suites: 177 and 33 passed. Ships as 0.18.4.
+  - A multi-word answer that repeats whole printed words in its region is still dropped. Filed below as `ocr-printed-run-answer`.
 
 - **`nit` · The root `package-lock.json` records the design-system workspace's `vue` range as `^3.5.39` while
   `packages/design-system/package.json` asks for `^3.5.43`, so an `npm install` in the node container rewrites the
@@ -13774,9 +13854,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   inside the first one's reorder session, and Enter there announces the second as dropped. The remedy acts on `grabbedUid`,
   or cancels a grab when its grip loses focus. **Live.** Filed by `M150`. **Tier: during-testing.**
 
-- **`nit` · A section drag is announced as "Dragging a section", without the section's name.** Found by `M150` in
+- ✅ **CLOSED BY `M222` (2026-11-08) — ****`nit` · A section drag is announced as "Dragging a section", without the section's name.** Found by `M150` in
   `useCanvasReorder.ts`: a question's drag, grab and drop name the question, and a section's name only its position
   ("Dropped section, section 2 of 3"). **Live.** Filed by `M150`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M222` (2026-11-08), on its branch.**
+  - `useCanvasReorder.ts`'s new `sectionName()` puts the section's title into all four messages: drag, pointer drop, grab and keyboard drop. A section with no title yet says "a section".
+  - No test pinned any section announcement before. Three new `useCanvasReorder.test.ts` cases do now, and two were red before the fix.
+  - Five Vitest mutants, each restored byte for byte, all CAUGHT.
+  - Ships as 0.18.1.
 
 - **`nit` · Every question's Duplicate and Delete buttons share one name, "Duplicate field" and "Delete field".** Found by
   `M150` in `BuilderCanvas.vue`: a screen reader listing the buttons hears the same two names on every row, and the builder
@@ -13787,11 +13872,37 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   is short: the grip's fallback, `useCanvasReorder.ts`'s `fieldLabel` and "Move field", "Add a field from the left" and the
   undo entry for an edit still say "field".
 
-- **`minor` · A section's title cannot be edited in Structure.** Found by `M150` beside `R-34edf1f5`, which gives a question's
+- ✅ **CLOSED BY `M221` (2026-11-08) — ****`minor` · A section's title cannot be edited in Structure.** Found by `M150` beside `R-34edf1f5`, which gives a question's
   label an in-place editor: a section's title is still text inside `button.canvas__section-head` in `BuilderCanvas.vue`, edited
   only from the settings pane (`ConfigPanel.vue`'s `setSection`), and the server caps it at 255 characters. The same
   `InlineLabelEdit` serves it, through a `renameSection` beside `renameField`. **Live.** Filed by `M150`.
   **Tier: during-testing.**
+  ✅ **CLOSED BY `M221` (2026-11-08), on its branch, as the row prescribed.**
+  - The store's `renameSection` sits beside `renameField`: set once and saved now through `commitSectionEdit`, so it is one PATCH and one undo entry.
+  - An "Edit title of <section>" button, or a double-click on the head, swaps the head for the same `InlineLabelEdit` at the server's 255-character cap. Enter or a blur saves, Escape keeps the title, a blank title is not an edit, and after Enter the keyboard is back on the head.
+  - Five new `BuilderCanvas.test.ts` cases, and five Vitest mutants, all CAUGHT: the button removed, the save deferred, the cap dropped, the trim removed, the double-click unwired.
+  - A new `builder-structure.spec.ts` case renames a section in a real browser, scans with the editor open, and reads the title back after a reload.
+  - Ships as 0.18.0.
+
+- ✅ **CLOSED BY `M221` (2026-11-08) — ****`minor` · A section just added cannot be saved until the page is reloaded: every edit to it is refused with "The is repeatable field must be true or false."**
+  Found 2026-11-08 by `M221`'s own e2e case, which renamed a fresh section and was refused at all three widths.
+  - **The cause:** `FormBuilderService::addSection()` created the row without `is_repeatable`, and a model made by `create()` never reads the column's default back. So `BuilderPresenter::section()` answered `is_repeatable: null`, the builder sent that back with its first edit, and `UpdateSectionRequest`'s `boolean` refused it.
+  - **What a tester saw:** the status read "Not saved", for a rename from the settings pane as much as for one in place, until a reload fetched the default.
+  - Filed by `M221`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M221` (2026-11-08), on its branch.**
+  - `addSection()` now sets `is_repeatable => false`.
+  - A `BuilderRoutesTest` case adds a section, checks the reply says `false`, and sends the reply straight back renamed, as the builder does. It was red before the fix (`null`), and a mutant taking the line out again is CAUGHT.
+
+- ✅ **CLOSED BY `M223` (2026-11-08) — ****`nit` · `E2eSeederIdempotencyTest` checks the `releases` table's order against the notes file's, but reads the table with no order.**
+  Found 2026-11-08 by `M221` and `M220`, whose pull requests went red on it.
+  - `Release::query()->pluck('version')` carries no `ORDER BY`, and the case compared it with `toBe()` against the file's order.
+  - Red in CI three times: #432 (newest note 0.17.4, run 42393462799 and its re-run) and #433 (0.18.0, run 42396170296). Red locally on #434's branch (0.18.1). Green on #414 (0.17.2) and #431 (0.17.3).
+  - The product is not affected: `WhatsNew::releases()` sorts by `version_compare` itself. Why the rows came back in that order was not established, and the fix does not need it to be.
+  - Filed by `M223`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M223` (2026-11-08), on its branch.**
+  - Both lists are now sorted newest first by `version_compare` before they are compared. That still checks the same versions, all of them and no others.
+  - With #434's notes file swapped in, the old assertion was red and the new one is green.
+  - A mutant that makes `releases:sync` skip one release is CAUGHT.
 
 - ✅ **CLOSED BY `M151` (2026-10-09) — ****`major` · On a form whose questions carry a place within their section — every XLSForm import — a drag reorders the
   builder's list but not what respondents, the paper and the export see.** Found by `M151` while planning `R-2baef8ea`.
@@ -14793,7 +14904,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   this dialog. `resources/js/components/builder/ConvertFieldDialog.vue:39` says *"It keeps its key, so conditions, calculations and
   text that mention it still point to it"*; `resources/js/components/builder/field-conversion.ts:204` and
   `app/Enums/ConversionWarning.php:50` carry the rest, with `app/Enums/ConversionDropReason.php` and `app/Enums/ConversionImpact.php`;
-  a new question's label is its type's label (`app/Services/Forms/FormBuilderService.php:150`), so the dialog reads *"Current type of
+  a new question's label is its type's label (`FormBuilderService::addField()`), so the dialog reads *"Current type of
   “Date & time”: Date & time"*. The remedy: `docs/ux/design-system-reference.md` gains a voice rule — write for a smart
   high-schooler: short sentences, everyday words, say what happens to the answers — and the dialog, the conversion sentences and the
   three server enums are rewritten to it; the dialog stops repeating the type when the label is the type's own; `manual.ts` and the
@@ -15049,7 +15160,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M180` (2026-10-20) — ****`minor` · A question's Default value is saved but never filled in for a respondent, though the Help page says it is.**
   The Advanced tab's **Default value** (`resources/js/components/builder/ConfigPanel.vue:840`) saves `default_value`, but nothing reads it
   when a form opens — `resources/public-runtime/lib/prefill.ts` seeds only a hidden question's fixed value — and it reaches only the
-  XLSForm export (`app/Services/Xlsform/XlsformExporter.php:283`). `resources/js/components/help/manual.ts:815` says *"an answer filled
+  XLSForm export (`XlsformExporter::applyDefault()`). `resources/js/components/help/manual.ts:815` says *"an answer filled
   in before the respondent starts, which they can change"*. The remedy (`D148` A, taken by R4): the default fills the answer when the
   form opens — the public form, the preview and manual entry — and the respondent can change it; a default written as a formula is
   worked out like a calculation, with the picker. **Live.** Filed by `M178`. **Tier: early-testing.** **AMENDED BY `M180` (2026-10-20):** `D154` — a formula default is worked out once, when the form opens, and is then the respondent's answer. Taken by `M180` with `R-fa3223d9` (the same box). ✅ **CLOSED BY `M180` (2026-10-20):** the browser fills a default in when a form opens fresh — the guest form with nothing to restore, staff keying a new response, the builder preview — worked out ONCE (`D154`) and shaped for its control (`resources/public-runtime/lib/defaults.ts`); a draft restored afterwards drops a seeded default it does not hold, so a cleared one stays cleared; each new repeat entry starts from its members' defaults; the box is **Fixed · Formula**, a choice offering its own options, the picker on a formula over the questions before it and the dates. The server injects nothing. Red first: 14 Vitest (the defaults module by absence). Mutants: 5 of 5 caught. Built and held for merge point 3 (`D137`); live since it, 2026-10-20.
@@ -15400,11 +15511,17 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   remedy: an ASVS Level 1 table — each control, how it is met, the test that pins it — with every gap filed as a row.
   **Latent** until launch. Filed by `M190`. **Tier: before-launch.**
 
-- **`minor` · A blank form prints only in its default language, so a form translated into Tagalog cannot be printed in Tagalog.**
+- ✅ **CLOSED BY `M229` (2026-11-09) — ****`minor` · A blank form prints only in its default language, so a form translated into Tagalog cannot be printed in Tagalog.**
   `BlankFormPrintPresenter::present()` takes `forms.default_locale`, and its docblock calls a print-in-another-language choice "a real
   gap" recorded in `docs/ocr-pipeline-design.md`, whose out-of-scope list carries it with no row. Translated forms ship today, so a
   tester with one can reach this. The remedy: a language choice beside the print button, defaulting to the form's default, passed to the
   presenter. **Live.** Filed by `M190`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M229` (2026-11-09), on its branch, with `D215` = A (the user, in chat).**
+  - `present()` takes a language, used when the version has text in it (`printLocale()`), and otherwise prints the default. The list is the version's own translations (`LocaleVariant::languagesIn()`), because `forms.supported_locales` is written by nothing (`R-21e88dd1`).
+  - The route takes `?lang=`, and the file name says which language (`…-blank-fil.pdf`).
+  - The form page's "Print blank" asks "Print in which language?" when a version has more than one. The forms list's button still prints the default, because listing every version's languages there would load every snapshot.
+  - **`D215`: the scanner reads the default language only**, so a copy in another language prints *"Scans of this form cannot be read automatically; responses must be keyed in."* Reading such scans is filed below as `ocr-translated-printout`.
+  - New cases, each red first: three on the presenter, one each on the renderer, the route and the form page, and one Vitest case. Ships as 0.19.0.
 
 - **`minor` · No audit row records which values a reviewer changed after an OCR read.**
   `docs/ocr-pipeline-design.md` lists a field-level OCR audit trail out of scope with no ground and no row. An `ocr_scans` row keeps the
@@ -15703,14 +15820,32 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   **Live.** Filed by `M214`. **Tier: before-launch.**
 
-- **`minor` · `secret-scan-depth-arm-blind` — `SecretScanDepthTest`'s depth arm can no longer see the job it guards.**
+- ✅ **CLOSED BY `M232` (2026-11-09) — ****`minor` · `secret-scan-depth-arm-blind` — `SecretScanDepthTest`'s depth arm can no longer see the job it guards.**
   Found by `M214` (2026-11-05), reading the test while changing `ci.yml`; it went blind at `M192`, which added the `bhw-connect` job.
   - The arm asserts that `.github/workflows/ci.yml` contains `fetch-depth: 0`, and its comment says the token occurs exactly once. It occurs three times: the secret-scanning job, `bhw-connect`, and since `M214` the `scope` job.
   - So bounding the secret-scanning job's depth leaves the arm green, and `scripts/mutate.php`, which refuses a token that is not unique, can no longer prove it.
   - The scan is still protected at run time: the `--is-shallow-repository` fence in the step does not depend on this arm. What is lost is the test that reddens before the run.
   The remedy is to read the depth from the secret-scanning job's own text and to give that job's line a token `mutate.php` can drive.
 
-  **Live.** Filed by `M214`. **Tier: during-testing.**
+  **Live.** Filed by `M214`. **Tier: during-testing.** ✅ **Closed by `M232` (2026-11-09), WITHOUT EDITING `ci.yml`:** the depth arm reads the checkout step of the one job that runs the gitleaks step, executable lines only, and requires one `fetch-depth` key with the value `0`. `tests/Support/WorkflowText.php` is the reader, and every lookup in it fails closed. The token half of the remedy was not needed: a two-line token (the comment line above the key, plus the key) occurs once, so `mutate.php` drives the job's own depth as it stands. **Measured:** that job bounded to a depth of 2 SURVIVED the old test and is CAUGHT by the new one. The `bhw-connect` job bounded leaves the new arm green, as a scoped arm should. The case that kept the fence's message free of the key went, because it existed only to keep a one-line token unique. Its `::error` check moved into the fence arm.
+
+- ✅ **CLOSED BY `M232` (2026-11-09) — ****`minor` · `npm-audit-arm-blind` — `NpmAuditJudgeTest`'s structural arm can no longer see Meridian's npm-audit steps.**
+  Found by `M232` (2026-11-09), checking what sat next to `secret-scan-depth-arm-blind`. It is the same defect in a second test.
+  - The arm asserts that `.github/workflows/ci.yml` contains `continue-on-error: true`, `set +e`, `set -e`, `scripts/npm-audit-judge.php`, `npm audit --json --omit=dev` and `--omit=dev`. On the trunk each occurs more than once (3, 3, 3, 3, 2 and 4 times). The `bhw-connect` job carries a copy of both npm-audit steps, and its fetch step has the same name. The staging-headers steps use the same fence.
+  - **Measured with `scripts/mutate.php`:** Meridian's fetch step without `continue-on-error`, and Meridian's judge without `set +e`, each left the test green, 9 passed. Either change reverts the design the arm exists to hold: npm's own exit 1, or the judge's, ends the step before the verdict is read.
+  The remedy is to read each token from Meridian's own steps: the job that runs the judge, then the fetch and judge steps in it, executable lines only.
+
+  **Live.** Filed by `M232`. **Tier: during-testing.** ✅ **Closed by `M232` (2026-11-09):** the arm finds the one job that runs a step named `npm audit (SCA`. Its fetch step must hold `continue-on-error: true` and `npm audit --json --omit=dev`. Its judge step must run `set +e`, the judge, `code=$?` and `set -e`, in that order, one `toBeInt` per position. **Measured:** the fetch step without `continue-on-error` and the judge without `set +e` each SURVIVED the old test and are CAUGHT by the new one. The `bhw-connect` job's copy is left to that job.
+
+- ✅ **CLOSED BY `M232` (2026-11-09) — ****`minor` · `negated-contain-message` — A negated `toContain` given a message can never fail, and four tests used one.**
+  Found by `M232` (2026-11-09), when a mutant survived the test it had just built.
+  - Pest's `toContain(mixed ...$needles)` (v4.7.4, in `vendor/`) takes no message. A second argument is a second needle. Under `->not->`, a needle that is never there, such as a message, makes the inner `toContain` throw every time, so the negation passes whatever the value holds. `toContainEqual` is the only other variadic expectation.
+  - **Census by tokenizer over every PHP file under `tests/`:** 4 calls. `NpmAuditJudgeTest`'s `--audit-level` ban (since `M72`), `DeploySkipAllowlistTest`'s "no Vite input under `apps/`", `OcrCompatibilityBackfillTest`'s "the backfill SQL names no field type", and one `M232` had just written.
+  - **Measured with `scripts/mutate.php`:** `--audit-level=high` on Meridian's npm command line, a Vite input under `apps/`, and the SQL naming `short_text` each left its test green. Neither of the last two was violated in the tree: the Vite inputs are three `resources/` paths, and none of the 31 field types appears in the SQL.
+  - The positive calls with several arguments are not this defect: there every needle must be present, so a message would turn the test red.
+  The remedy is to judge a boolean with `toBeFalse($message)`, and a guard that refuses the negated form with more than one argument anywhere under `tests/`.
+
+  **Live.** Filed by `M232`. **Tier: during-testing.** ✅ **Closed by `M232` (2026-11-09):** the four calls now judge a boolean with `toBeFalse` (or `toBeInt`), and each of the three defects above is CAUGHT. `tests/Feature/Docs/NegatedContainArgumentsTest.php` refuses a negated `toContain` or `toContainEqual` with more than one argument anywhere under `tests/`. It reads with a tokenizer, so comments and strings that name the call are not flagged, and through `SourceTree`, so the bind mount cannot blind it. A fixture proves it sees a call split over two lines and passes a trailing comma. Putting the old form back into `DeploySkipAllowlistTest` turns it red.
 
 - **`minor` · `root-agents-md` — ChatGPT Codex does not load `apps/bhw-connect/AGENTS.md` from a task started at the repository's root, so each task has to name it.**
   Found by `M214` (2026-11-05), writing jongsky25's handoff, and decided against there.
@@ -15789,6 +15924,60 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   - **The remedy, to be measured when taken:** a tracker surgery that moves the oldest status bullets to `PROGRESS_ARCHIVE.md` with `scripts/tracker-surgery.php`, run before that merge point's close-out, never during it. Bullets that each name several increments would only delay it.
 
   **Latent** — nothing is over the ceiling yet. Filed by `M216`. **Tier: during-testing.**
+
+- **`minor` · `virus-scanner-unwired` — No virus scanner is wired, so every uploaded file is served to other users unscanned.**
+  Found by `M224` (2026-11-08), correcting the three documents that said a file waits for a clean scan.
+  - `ScanAttachmentJob` marks every upload `skipped` while `attachments.scanner_enabled` is false, its default, and `ScanStatus::servable()` serves `skipped`. No `AttachmentScanner` implementation exists, and `ATTACHMENT_SCANNER_ENABLED` is set nowhere in the repository.
+  - So a file a respondent or member uploads is served to staff exactly as uploaded. What bounds it today is the type read from the file's bytes and checked against the field's allowlist.
+  - The plan for it lived only in prose: *"ClamAV, deferred"* in `ScanStatus`'s docblock and in `config/attachments.php`.
+  The remedy, to be chosen when taken: a scanner on the box behind the existing `AttachmentScanner` seam, and a decision on the files already marked `skipped`.
+
+  **Live.** Filed by `M224`. **Tier: before-launch.**
+
+- **`nit` · `invitation-volume-unwatched` — Nothing counts invitations, so `D33`'s *"watch invitation volume on the testing server"* has nothing to watch with.**
+  Found by `M224` (2026-11-08). `M121` noted it in prose while closing `R-950ef5f1` and filed nothing.
+  - `D33` = A kept inviting any address and asked in return that invitation volume be watched on the testing server. No instrument, console line or runbook step reads it.
+  - `invite()` writes no audit row (`docs/data-dictionary.md`, the K1c backfill note), so a count has to come from `tenant_users.invited_at`.
+  The remedy, to be chosen when taken: a line on the operator console, or a count in a script the operator already runs.
+
+  **Live.** Filed by `M224`. **Tier: during-testing.**
+
+- **`nit` · `contains-label-in-dialogs` — The conflict dialog and the type-change dialog call a single-choice rule's "contains" plain "contains", while the rule editor now calls it "contains the text".**
+  Found by `M226` (2026-11-08), building `D214`'s relabel.
+  - `conflict-diff.ts` and `field-conversion.ts` each describe a saved rule with `optionLabel(enums.comparison_operators, rule.operator)`, the operator's plain `label`.
+  - `D214`'s answer named the rule editor, so neither changed. Both would need the compared question's shape to pick `shape_labels`, and neither has it to hand today.
+  The remedy, when taken: pass the compared question's value shape to both describers and read `shape_labels` first, as `ValidationEditor` does.
+
+  **Live.** Filed by `M226`. **Tier: during-testing.**
+
+- **`nit` · `ocr-printed-run-answer` — A written answer of two or more words that repeats a run of whole printed words in its region (for example "THIS FORM" above the footer) is still dropped as printed text.**
+  Found by `M228` (2026-11-08), narrowing `OcrAnswerReader::isStatic()` for `R-5d7128da`.
+  - A wrapped hint's middle line is a run of whole words too, so the text alone cannot tell the two apart.
+  - Only where the line sits can: whether it is in the answer box or where the printed text was set. The reader has no printed positions today, only the strings.
+  - Rare, because an answer has to repeat two or more printed words in order.
+  The remedy, when taken: give the reader each printed string's place in the region, and drop a line as printed only where it sits there.
+
+  **Live.** Filed by `M228`. **Tier: during-testing.**
+
+- **`minor` · `ocr-translated-printout` — A blank form printed in a language other than the form's default cannot be read by the scanner, so its responses must be keyed in.**
+  Found by `M229` (2026-11-09), under `D215` = A, which shipped printing in another language and left reading it for later.
+  - `PrintedFormMatcher` builds what it expects from `BlankFormPrintPresenter::present()` in the default language, and ticks are matched by their choice labels. A page with Filipino labels would read badly.
+  - The paper says so in its footer today, so a tester is not misled. `D215`'s option B is the remedy: print the language beside the version stamp, and have the matcher read the page in that language.
+
+  **Live.** Filed by `M229`. **Tier: before-launch.**
+
+- **`nit` · `xlsform-languages-shared` — `XlsformExporter::extraLanguages()` keeps its own copy of the rule that `LocaleVariant::languagesIn()` now holds.**
+  Found by `M229` (2026-11-09). The print side needed the same list of a version's languages, and #414 holds `XlsformExporter.php`, so the rule moved to `LocaleVariant` and the exporter was left alone.
+  - The two differ today: the exporter also reads validation messages' translations, and the shared rule reads choice labels and section descriptions.
+  The remedy, after #414 merges: decide which translated columns count, and have the exporter call the shared rule.
+
+  **Live.** Filed by `M229`. **Tier: during-testing.**
+
+- **`nit` · `e2e-seeder-rule-modal-comment` — `E2eSeeder::seedConnections()` says no spec opens the rule modal, and since `M233` one does.**
+  Found by `M233` (2026-11-10). Two comments in it, the Slack fixture's (*"the specs never do"*) and the Sheets fixture's (*"which no spec does"*), give that as the reason the seeder triggers no outbound request. `tests/e2e/integrations-rule-modal.spec.ts` now opens a NEW Sheets rule's modal. The reason still holds in substance: that modal calls only the local `/columns` catalog, measured, and a route guard fails the spec on any `/destinations` call. Only the wording is stale.
+  The remedy is to say which modal reaches a provider: a saved Sheets rule's, which re-inspects its sheet, and a Slack rule's, which lists channels. `database/seeders/E2eSeeder.php` is held by #429, so this waits for that merge.
+
+  **Not live** — a comment, not the product. Filed by `M233`. **Tier: during-testing.**
 
 - **`minor` · `integrations-client-failure-sentences` — The integrations client says "check your connection" when the server refused, and throws past its callers when the connection really failed.**
   Found by `M234` (2026-11-10) while closing the row on the workarounds built before `M90`. Read in the code, not yet driven in a browser.

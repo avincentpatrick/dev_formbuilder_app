@@ -443,9 +443,12 @@ watch(
     gap: var(--mds-space-4);
 }
 
-/* D28's `.sheets-fields` host. A flex COLUMN, so the control is already container-width and the
-   overflow is its own flex LINE — the wrap is what fixes it, not a width clamp. This control's
-   labels ("Create a sheet for me" / "Use one I already have") are the longest of the four. */
+/* D28's `.sheets-fields` host. A flex COLUMN, so the control is already container-width, and a wrap,
+   not a width clamp, is what keeps an over-wide pair of segments inside it. ⚠️ M233 measured that
+   today's labels never need it: a segment shrinks to its LONGEST WORD ("already"), so squeezed labels
+   break onto more lines instead of overflowing. The wrap protects a label that cannot break (a long
+   word); without it, at extra_large + dyslexia, the modal body scrolls 246px sideways at 375px.
+   tests/e2e/integrations-rule-modal.spec.ts asserts it under exactly that stress. */
 .sheets-fields .mds-segmented {
     flex-wrap: wrap;
 }

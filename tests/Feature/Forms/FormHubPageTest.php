@@ -387,3 +387,17 @@ it('links each published version but the first to Compare, and the draft to Comp
             ->where('versions.2.compare_href', null)
             ->etc());
 });
+
+it('gives each published version the languages it can print in, and the draft none (R-d7e27962)', function (): void {
+    // The print route 404s a draft, so the page is never offered a language to print one in.
+    $this->withoutVite()
+        ->actingAs($this->owner)
+        ->get(hubUrl($this->form))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('versions.0.status', 'draft')
+            ->where('versions.0.print_languages', [])
+            ->where('versions.1.status', 'published')
+            ->where('versions.1.print_languages', [$this->form->default_locale])
+            ->etc());
+});

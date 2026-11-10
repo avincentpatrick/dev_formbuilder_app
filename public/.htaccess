@@ -23,3 +23,10 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# A built asset, a font, an icon and robots.txt never reach PHP, so no middleware can set this on them. Why this one
+# header belongs on a file and the other three do not: app/Http/Middleware/AppSecurityHeaders.php. Only the testing
+# site reads this file; scripts/staging-headers-judge.php checks the result from outside every night (R-25dc7ded).
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+</IfModule>

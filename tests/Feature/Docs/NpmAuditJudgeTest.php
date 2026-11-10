@@ -31,6 +31,8 @@ declare(strict_types=1);
 | `documentedCommand*` and `documentedDefault*` are already taken in this directory.
 */
 
+use Tests\Support\WorkflowText;
+
 /** The three-way contract the judge publishes. Exit 2 is never a pass. */
 const NPM_AUDIT_JUDGE_OK = 0;
 
@@ -202,16 +204,39 @@ it('is wired into ci.yml as a fetch step and a judge step, with the bash -e fenc
     //       that no test would notice;
     //   (3) --audit-level must NOT come back onto the npm command line: the threshold lives in the
     //       judge precisely so it is drivable by a mutation.
-    $workflow = (string) file_get_contents(base_path('.github/workflows/ci.yml'));
+    //
+    // ⛔ M232 — (1) AND (2) ARE READ FROM MERIDIAN'S OWN TWO STEPS, NEVER FROM THE WHOLE FILE. Every token
+    // they need now occurs more than once in `ci.yml`: the `bhw-connect` job carries a copy of both steps,
+    // its fetch step under the same name, and the staging-headers steps use the same fence. Measured with
+    // `mutate.php`, Meridian's fetch step without `continue-on-error` and Meridian's judge without
+    // `set +e` each left this arm green (`npm-audit-arm-blind`). The job is found by the judge step it
+    // runs; BHW's copy is that job's own, and a Meridian test does not turn red on it.
+    $workflow = WorkflowText::read('.github/workflows/ci.yml');
+    $job = WorkflowText::job($workflow, WorkflowText::jobRunning($workflow, 'npm audit (SCA'));
+    $fetch = WorkflowText::executable(WorkflowText::step($job, 'npm audit — fetch advisories'));
+    $judge = WorkflowText::executable(WorkflowText::step($job, 'npm audit (SCA'));
 
-    expect($workflow)->toContain('npm audit --json --omit=dev');
-    expect($workflow)->toContain('scripts/npm-audit-judge.php');
-    expect($workflow)->toContain('continue-on-error: true');
-    expect($workflow)->toContain('set +e');
-    expect($workflow)->toContain('set -e');
+    // (1) The fetch step is continue-on-error, and it fetches production dependencies only — the scope
+    //     that was locked with the user and must not drift.
+    expect($fetch)->toContain('continue-on-error: true');
+    expect($fetch)->toContain('npm audit --json --omit=dev');
 
-    // The production-only scope is the half that was locked with the user and must not drift.
-    expect($workflow)->toContain('--omit=dev');
+    // (2) The judge runs inside the fence, and its status is read before the fence goes back up.
+    $down = strpos($judge, 'set +e');
+    $runs = strpos($judge, 'php scripts/npm-audit-judge.php');
+    $read = strpos($judge, 'code=$?');
+    $up = strpos($judge, 'set -e');
+
+    // ⛔ ONE `toBeInt` PER POSITION, NEVER `->not->toContain(false, $message)`. Pest's `toContain` is
+    // variadic and takes no message: the message is a second needle, it is never present, and the
+    // negation therefore passes whatever the positions are. That is how mutant C first survived this arm.
+    foreach (['set +e' => $down, 'the judge' => $runs, 'code=$?' => $read, 'set -e' => $up] as $what => $at) {
+        expect($at)->toBeInt("the judge step lost {$what}: ".$judge);
+    }
+
+    expect($down < $runs && $runs < $read && $read < $up)->toBeTrue(
+        'the judge step must run `set +e`, the judge, `code=$?`, then `set -e`, in that order: '.$judge
+    );
 
     // ⛔ THE THRESHOLD FLAG MUST NOT COME BACK ONTO THE npm COMMAND LINE — but this is asserted over
     // EXECUTABLE lines only, never over the whole file. The comment block above that step has to
@@ -226,9 +251,11 @@ it('is wired into ci.yml as a fetch step and a judge step, with the bash -e fenc
 
     expect($executable)->not->toBe([], 'no executable npm audit line found — this arm is scanning nothing');
 
+    // ⛔ M232 — THIS BAN COULD NOT FAIL FROM `M72` UNTIL HERE. It was `->not->toContain('--audit-level',
+    // $message)`, and Pest's `toContain` reads the message as a second needle that is never in the line,
+    // so the negation passed whatever the line said. A boolean judged by `toBeFalse($message)` can fail.
     foreach ($executable as $line) {
-        expect($line)->not->toContain(
-            '--audit-level',
+        expect(str_contains($line, '--audit-level'))->toBeFalse(
             'the severity threshold belongs in scripts/npm-audit-judge.php, where a mutation can drive '.
             'it, and not on a command line nothing can test: '.trim($line)
         );

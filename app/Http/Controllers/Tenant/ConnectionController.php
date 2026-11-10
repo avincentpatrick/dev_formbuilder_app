@@ -125,9 +125,9 @@ final class ConnectionController extends Controller
      * an explaining `error` rather than a 500 (ADR-0009 §D8; H16c).
      *
      * ⚠️ A WRITE BEHIND A JSON SIDECAR, WHICH THE H15b DOCBLOCK ABOVE SAYS THIS SURFACE DOES NOT DO — so the
-     * exception is argued rather than assumed. That rule exists because a domain exception on a tenant-web
-     * route renders as a 302 (`bootstrap/app.php` keys its JSON branch on the `api/v1/*` PATH), which a fetch
-     * client follows into HTML. {@see TabularDestinationDirectory} never throws, so the hazard cannot arise.
+     * exception is argued rather than assumed. That rule was made when a domain exception on a tenant-web
+     * route rendered as a 302 even to a fetch, which followed it into HTML. Since M90 a JSON caller is answered
+     * in JSON with no flash, so the hazard is gone; {@see TabularDestinationDirectory} also never throws.
      *
      * The alternative — an Inertia visit — was rejected on behaviour, not taste: this produces a value the
      * OPEN FORM needs (the new id, its tab, its header row) and the rule is not saved yet, so a redirect

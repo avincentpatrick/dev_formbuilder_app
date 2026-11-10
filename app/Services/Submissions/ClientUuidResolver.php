@@ -87,9 +87,9 @@ final class ClientUuidResolver
      *
      * The throwing half of {@see isClaimed()}, for the callers that let the exception handler build the
      * envelope. A caller that must return its own typed envelope — {@see
-     * \App\Http\Controllers\Tenant\SubmissionDraftController::resolveTarget()}, whose route is a web route
-     * whose composable cannot read a `back()` redirect — asks `isClaimed()` and reads the message off the
-     * same factory, so there is still exactly one wording.
+     * \App\Http\Controllers\Tenant\SubmissionDraftController::resolveTarget()}, whose composable reads the
+     * nested `{error:{code}}` envelope rather than the web arms' flat one — asks `isClaimed()` and reads the
+     * message off the same factory, so there is still exactly one wording.
      *
      * @throws SubmissionConflictException when the uuid is already spent outside the caller's scope
      */

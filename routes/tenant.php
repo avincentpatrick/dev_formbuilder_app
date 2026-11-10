@@ -189,9 +189,9 @@ Route::middleware([
     | HandleInertiaRequests::share(), which renders on every page in the application.
     |
     | The two WRITES are also JSON, which is a NAMED EXCEPTION to the rule scopesClient/integrationsClient
-    | state ("every mutation on this surface is an Inertia visit"). That rule exists because bootstrap/app.php
-    | keys its domain-exception branch on the `api/v1/*` PATH, so a DomainException raised on a web route
-    | 302s even to a fetch expecting JSON. Neither route here raises one — they stamp a timestamp on a row
+    | state ("every mutation on this surface is an Inertia visit"). That rule was made when bootstrap/app.php
+    | answered a DomainException on a web route with a 302 even to a fetch expecting JSON; since M90 it
+    | answers a JSON caller in JSON. Neither route here raises one — they stamp a timestamp on a row
     | the caller owns — and framework exceptions already negotiate (bootstrap/app.php's
     | shouldRenderJsonWhen covers 401/403/404/419). The reason it MUST be a fetch is Inertia's own request
     | stream: it is `maxConcurrent: 1, interruptible: true`, so a router.post() fired in the same tick as
@@ -951,8 +951,8 @@ Route::middleware([
     Route::post('/integrations/connections/{connection}/rules', [ConnectionRuleController::class, 'store'])
         ->middleware(['can:update,connection', 'feature:native_connectors'])->name('integrations.rules.store');
     // The one read-only JSON sidecar on this surface (the scopes.impact/scopes.grants precedent) — the channel
-    // picker must load without navigating. Every MUTATION above is an Inertia visit, because a domain exception
-    // on a web route redirects rather than returning JSON.
+    // picker must load without navigating. Every MUTATION above is an Inertia visit, chosen when a domain
+    // exception on a web route redirected even a fetch (it has answered a JSON caller in JSON since M90).
     Route::get('/integrations/connections/{connection}/channels', [ConnectionController::class, 'channels'])
         ->middleware(['can:view,connection', 'feature:native_connectors'])->name('integrations.connections.channels');
     // H16b — the tabular-destination sidecars, the Sheets counterpart to the channel picker above. The read
@@ -960,8 +960,8 @@ Route::middleware([
     // the tenant's Drive using their grant, which is not something a reader may do with it.
     //
     // ⚠️ The create is a POST behind a fetch, which the comment above says this surface does not do. The
-    // reason that rule exists — a domain exception on a web route becomes a 302 a fetch client follows into
-    // HTML — cannot arise here, because TabularDestinationDirectory never throws and always answers 200 with
+    // reason that rule was made — a domain exception on a web route became a 302 a fetch client followed into
+    // HTML — no longer holds since M90, and TabularDestinationDirectory never throws anyway: it answers 200 with
     // a nullable `error`. See ConnectionController::createDestination() for why an Inertia visit is wrong.
     //
     // H16c renamed these from `/sheets`: Airtable goes through the same pair, and a base picker calling
@@ -1000,9 +1000,9 @@ Route::middleware([
     // visit still bounces off `feature:` with a toast.
     //
     // Filters are QUERY PARAMS on the index route, re-fetched as Inertia partial reloads — there is no JSON
-    // sidecar here. The question aggregate would be the obvious candidate, but it can raise a domain
-    // exception, and on a web route that returns a 302 with a flash even to an XHR (the integrationsClient
-    // trap); it is also a function of the whole declaration, which already lives in the URL.
+    // sidecar here. The question aggregate would be the obvious candidate; it can raise a domain exception,
+    // which before M90 was a 302 with a flash even to an XHR (since M90, JSON for a JSON caller), and it is
+    // a function of the whole declaration, which already lives in the URL.
     //
     // Static segments precede the binding (the H14 rule): /analytics/export and /analytics/views are declared
     // before /analytics/views/{savedReportView}, and there is no /analytics/{binding} route at all.

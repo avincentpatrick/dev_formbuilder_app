@@ -3,9 +3,9 @@
 // builder. Both of those facts are deliberate; see below.
 //
 // ── Why the writes are here and not `router.post` ──────────────────────────────────────────────────────
-// scopesClient/integrationsClient are read-only because bootstrap/app.php keys its domain-exception branch
-// on the `api/v1/*` PATH, so a DomainException raised on a web route arrives as a 302 that `fetch` follows,
-// yields HTML for, and then chokes parsing. Neither route here raises one — they stamp a timestamp on a row
+// scopesClient/integrationsClient were made read-only when a DomainException raised on a web route arrived
+// as a 302 that `fetch` follows, yields HTML for, and then chokes parsing (true until M90, which answers a
+// JSON caller in JSON). Neither route here raises one — they stamp a timestamp on a row
 // the caller owns — and framework failures already negotiate to JSON (bootstrap/app.php's
 // `shouldRenderJsonWhen` covers 401/403/404/419).
 //

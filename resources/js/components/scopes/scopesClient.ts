@@ -4,10 +4,10 @@
 // XSRF-cookie handling, the same-origin credentials and the non-ok error shape, and it is the repo's only
 // fetch client. This is its second consumer.
 //
-// READS ONLY, deliberately. Every mutation on /scopes is an Inertia visit, because bootstrap/app.php keys
-// its API branch on the `api/v1/*` PATH: a ScopeNodeException or GrantException raised on a web route is
-// rendered as `back()->with('toast')`, a 302, even for an XHR. builderClient would follow that redirect,
-// see `response.ok === true`, skip its guarded non-ok branch and throw a raw SyntaxError parsing HTML.
+// READS ONLY. Every mutation on /scopes is an Inertia visit, which was first FORCED: until M90 a
+// ScopeNodeException or GrantException raised on a web route rendered as `back()->with('toast')`, a 302,
+// even for an XHR, and builderClient would follow it and throw a raw SyntaxError parsing HTML. Since M90 a
+// JSON caller gets a flat JSON refusal and no flash, so nothing forces it now; the visits stay as built.
 // These two endpoints raise no domain exception, and a 403/404 on them still negotiates to JSON.
 
 import { builderClient, BuilderRequestError } from '@/components/builder/builderClient';

@@ -26,18 +26,18 @@ import { fetchMemberStreak } from '@/components/achievements/achievementsClient'
  * Inertia visit that re-requests the current page's props — which is the exact cost a sidecar exists to
  * avoid, and it would arrive with the keep-alive problem attached.
  *
- * ── ⚠️ `enabled` IS NOT AN OPTIMISATION. WITHOUT IT, A TENANT WITH THE MODULE OFF GETS A PHANTOM TOAST ──
- * The sidecar route carries `module:gamification`, and `bootstrap/app.php` renders `ModuleDisabledException`
- * on a NON-`api/v1/*` path as `back()->with('toast', …)` — the branch keys on the request PATH, not on the
- * `Accept` header, so a `fetch` gets a 302 and a session flash rather than a JSON 403. The fetch itself
- * degrades harmlessly (it follows the redirect, receives HTML, and `builderClient` throws a `SyntaxError`
- * this module swallows) — **but the flash is already written**, so the next Inertia render pops
- * "Points, badges and streaks is switched off for this workspace" as a toast the member did nothing to
- * provoke, on a random page, once per navigation forever.
+ * ── `enabled` IS AN ECONOMY NOW. IT WAS BUILT AS A DEFENCE, AND THE THING IT DEFENDED AGAINST IS GONE ──
+ * The sidecar route carries `module:gamification`. Until M90, `bootstrap/app.php` answered a refused `fetch`
+ * on a web path with `back()->with('toast', …)` — a 302 AND a session flash — so asking while the module was
+ * off popped "Points, badges and streaks is switched off for this workspace" on the member's next page, a
+ * toast they did nothing to provoke, once per navigation. Since M90 a JSON caller gets a JSON 403 and NO
+ * flash. M234 measured that and gated it (`tests/Feature/Http/WebJsonRefusalTest.php`, the "leaves no
+ * toast" case, beside a control that proves the same read sees a toast when one is written).
  *
- * The caller therefore passes the same visibility the Achievements nav item is rendered under, and this
- * never asks for a number the workspace has said it does not want. Stated at this length because the
- * failure is invisible from here: everything in THIS file behaves correctly while it happens.
+ * The guard stays because the question is still pointless: without it a workspace that switched the module
+ * off would send one request per navigation, every one of them refused. The caller passes the same
+ * visibility the Achievements nav item is rendered under, so this never asks for a number the workspace has
+ * said it does not want.
  */
 export function useMemberStreak(enabled: () => boolean): { current: Ref<number | null> } {
     /**

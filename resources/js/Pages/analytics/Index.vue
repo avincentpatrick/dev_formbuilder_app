@@ -9,9 +9,9 @@
 // shows one declaration and reports another. The `filters.applied` round-trip on the submissions inbox is
 // the same idea; this page just has more of it to round-trip.
 //
-// Filter changes are Inertia PARTIAL reloads, not /api/v1 calls. A tenant page takes Inertia props, there
-// is no session-authed API client, and a domain exception on a web route returns a 302 with a flash —
-// which an XHR follows, sees `ok`, and then chokes parsing as JSON.
+// Filter changes are Inertia PARTIAL reloads, not /api/v1 calls. A tenant page takes Inertia props, and
+// there is no session-authed API client. (A third reason once given, that a domain exception on a web
+// route 302s even to an XHR, stopped holding at M90.)
 //
 // `filters` and `summary` are excluded from RELOAD_ONLY on purpose: the option catalogues are
 // tenant-scoped, not range-scoped, so they cannot change when a filter changes. See query-params.ts.

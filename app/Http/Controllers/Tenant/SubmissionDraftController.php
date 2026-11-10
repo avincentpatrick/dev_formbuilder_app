@@ -52,10 +52,10 @@ use Inertia\Response;
  *
  * ── IT ANSWERS IN JSON, NOT INERTIA ─────────────────────────────────────────────────────────────────────
  * `store()` is called by a plain `fetch` from `useServerAutosave`, never by an Inertia visit, so the two
- * failure exceptions are caught HERE and rendered as typed JSON rather than left to `bootstrap/app.php`'s
- * web arms, which return a `back()` redirect the composable cannot read. This is the local-catch shape
- * `SubmissionReviewController` already uses. The codes are the contract the composable keys its
- * stop-permanently behaviour on.
+ * failure exceptions are caught HERE and rendered in the nested `{error:{code}}` envelope rather than left to
+ * `bootstrap/app.php`'s web arms. Those once returned a `back()` redirect; since M90 they answer a JSON caller
+ * FLAT (`{message, code}`), which `useServerAutosave`'s `conflictCode()` does not read. The codes are the
+ * contract the composable keys its stop-permanently behaviour on (the `SubmissionReviewController` shape).
  */
 final class SubmissionDraftController extends Controller
 {
@@ -240,8 +240,8 @@ final class SubmissionDraftController extends Controller
 
             // A superseded pin is terminal, and it is reported the way the GUEST channel reports it rather
             // than as a generic failure: `saveDraft()` would throw `SubmissionException::versionNotPublished()`,
-            // which this controller does not catch and whose global web arm is a redirect the autosave
-            // `fetch` cannot read. A typed 409 is what lets the composable stop permanently and say why.
+            // which this controller does not catch and whose global web arm answers this `fetch` FLAT, with no
+            // `error.code` to key on. A typed 409 is what lets the composable stop permanently and say why.
             return $version->status === FormVersionStatus::Published
                 ? [$version]
                 : ApiErrorResponse::make(
@@ -252,8 +252,8 @@ final class SubmissionDraftController extends Controller
         }
 
         // Not mine — but the uuid may still be spent, because the uniqueness domain is the TENANT. The
-        // refusal is BUILT from the exception factory rather than spelled out again: this route is a web
-        // route whose composable cannot read bootstrap/app.php's `back()` redirect, so it must return its own
+        // refusal is BUILT from the exception factory rather than spelled out again: this route's composable
+        // reads the nested envelope, not bootstrap/app.php's flat web answer, so it must return its own
         // envelope, and reading the code and the message off the same factory is what keeps one wording.
         if (ClientUuidResolver::isClaimed($uuid)) {
             $refusal = SubmissionConflictException::clientUuidClaimed();

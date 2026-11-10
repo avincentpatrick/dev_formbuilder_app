@@ -1,13 +1,13 @@
-// Read-only sidecar fetch for the Integrations page (H15b).
+// Sidecar fetches for the Integrations page (H15b): three reads and, since H16b, one write.
 //
 // Reuses `builderClient` for the same reasons scopesClient does — it is the repo's only fetch client and it
 // already carries the XSRF-cookie handling, same-origin credentials and non-ok error shape. This is its third
 // consumer.
 //
-// READ ONLY, deliberately. Every mutation on /integrations is an Inertia visit, because bootstrap/app.php keys
-// its API branch on the `api/v1/*` PATH: a domain exception raised on a web route renders as
-// `back()->with('toast')`, a 302, even for an XHR — which builderClient would follow, see `response.ok`, and
-// then choke parsing HTML.
+// Rule mutations on /integrations are Inertia visits. That was first FORCED: until M90 a domain exception on a
+// web route rendered as `back()->with('toast')`, a 302, even for an XHR, which builderClient would follow and
+// choke on. Since M90 a JSON caller gets a flat JSON refusal and no flash, so a fetch could read one — though
+// every failure path below still returns `null` or a generic sentence, and the server's message is dropped.
 //
 // The channel endpoint answers 200 even when the listing failed, carrying `error` in the body. That is what
 // lets the picker show WHY it is empty; a 502 would arrive here as a thrown BuilderRequestError and the reason
@@ -33,11 +33,11 @@ export async function fetchChannels(connectionId: string): Promise<ChannelsPaylo
     }
 }
 
-// ── H16b: ONE WRITE LIVES HERE NOW, AND THE READ-ONLY RULE ABOVE STILL HOLDS ─────────────────────────────
-// `createDestination` is a POST, which the header appears to forbid. It does not. That rule exists because a domain
-// exception on a web route renders as `back()->with('toast')` — a 302 this client would follow, see `ok`, and
-// choke parsing as JSON. `TabularDestinationDirectory` never throws and answers 200 with a nullable `error` for
-// every outcome, so the failure the rule protects against cannot occur on these two endpoints.
+// ── H16b: ONE WRITE LIVES HERE ─────────────────────────────────────────────────────────────────────────────
+// `createDestination` is a POST. The read-only rule it seemed to break was made when a domain exception on a
+// web route was a 302 even to a fetch, and that stopped at M90. `TabularDestinationDirectory` never throws and
+// answers 200 with a nullable `error` for every outcome; the one domain refusal that can reach these endpoints
+// is their `feature:native_connectors` gate, now a readable 402 that `transportFailure()` reduces to a sentence.
 //
 // An Inertia visit was the alternative and is wrong here on BEHAVIOUR, not taste: this produces a value the
 // OPEN, UNSAVED form needs (the new id, its tab, its header row), so a redirect would have to round-trip the

@@ -18,8 +18,8 @@
  * point at a plan nobody can buy.
  *
  * Assembled entirely from shared design-system components. Every mutation is an Inertia visit that
- * redirects with a flash; there is no JSON sidecar, because a refusal on a web route is a 302 even to an
- * XHR (the integrationsClient trap).
+ * redirects with a flash; there is no JSON sidecar. (The reason once given, that a refusal on a web route
+ * was a 302 even to an XHR, stopped holding at M90.)
  */
 import { computed, ref } from 'vue';
 import { Head, router, useForm } from '@inertiajs/vue3';

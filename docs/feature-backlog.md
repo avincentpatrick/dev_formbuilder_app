@@ -11213,9 +11213,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   vacuous today**: zero open decisions name a row id, so a rule added now would pass over an empty set, and
   `M108` declined to ship a green arm it could not exercise. ⚠️ **But the shape recurred three times in one month**
   (`D51`, `D52`, `D53`), so the trigger to build it is the next open decision that names a row. **Live.**
-  Filed by `M108`. **Tier: during-testing.**
+  Filed by `M108`. **Tier: during-testing.** ⚠️ **Noted by `M231` (2026-11-09):** the ANSWERED half of this shape now has a reader — `scripts/retier-payload.php` parses a heading that names a row and asks its tier, and `state.php --check` judges the answer against the row. What is left is this row's OPEN half, still with no open decision to exercise it.
 
-- **`minor` · A retier's PAYLOAD is a change to another file's row, nothing performs it, and the only record of that
+- ✅ **CLOSED BY `M231` (2026-11-09) — ****`minor` · A retier's PAYLOAD is a change to another file's row, nothing performs it, and the only record of that
   is a lane ledger.** Filed 2026-09-24 by `M108` while verifying `R-b6a4ea79`. `docs/claims/lane-a.md` records `M105`
   answering `D51` and `D53`, stripping both awaits tokens, and **not applying the retiers those decisions existed to
   commission** — `R-5ecfa6cd` stayed `early-testing` after being answered `before-launch`, `R-e7d6f223` stayed
@@ -11226,7 +11226,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   it is that nothing would notice the next one. ⚠️ **Distinct from the row above, and the difference decides the
   remedy:** that one asks for a RULE relating two tiers, this one asks that answering a retier decision perform its own
   payload — a close-out step, or a `scripts/next.php` check that an answered retier decision left the row it names at
-  the tier it was answered to. **Live.** Filed by `M108`. **Tier: during-testing.**
+  the tier it was answered to. **Live.** Filed by `M108`. **Tier: during-testing.** ✅ **BOTH HALVES, AND THE CHECK IS IN `state.php --check` RATHER THAN `next.php`.** `scripts/retier-payload.php` reads every retier an answered decision commissions — the `` `R-x` retiered `tier` `` runs on an answer's *What the answer files* line, lists and parentheticals included, and `D51`–`D53`'s *"Which tier?"* headings — and judges the latest answer for each row against it: an open row at another tier with no retier recorded at the row fails `--check`, which every session runs at its start. `CLAUDE.md` now asks the recording session to perform the retier at the row, in that shape. Measured first: **12 payloads, 10 rows judged and all consistent, so it is green on arrival**; three mutations (the tier comparison, the list capture, the record at the row) were each CAUGHT by `RetierPayloadTest`. ⛔ **The row's own example cannot be judged any more:** `D53`'s `R-e7d6f223`, like `D52`'s `R-e6a10f97`, was later struck through, and a struck row's id stops resolving, exactly as a reworded one's does. So an unresolved id is listed and never failed. ⚠️ **Out of its reach, said in the file's header:** a payload that names no id (`D128`'s *"the sixteen UI rows"*), a plan marker's retier (`D24`), and a row that recorded the answer's retier and later moved again without a record. **The gate half waits on `pipeline-lint.php`, which a held PR (#429) touches;** the check can move there after that merge point.
 
 - **`minor` · A bare Vue component name is invisible to the citation harvester, and PSR-4 cannot reach it.** Filed
   2026-09-24 by `M108`, which widened the harvester to resolve PHP class names and deliberately stopped there.

@@ -55,4 +55,50 @@ final class LocaleVariant
     {
         return self::from($translations, $locale) ?? $base ?? $fallback;
     }
+
+    /**
+     * Every language a snapshot has text in: a variant `from()` would use, on a section's label or description, or
+     * on a field's label, hint or choice labels. Sorted, and without `$default`, which the base columns are in.
+     *
+     * M229 (`R-d7e27962`): `forms.supported_locales` is written by nothing (`R-21e88dd1`), so a version's own
+     * text is the only honest list of what it can be shown in. `XlsformExporter::extraLanguages()` collects the
+     * same thing for the export's columns and is filed to move onto this.
+     *
+     * @param  list<array<string, mixed>>  $sections
+     * @param  list<array<string, mixed>>  $fields
+     * @return list<string>
+     */
+    public static function languagesIn(array $sections, array $fields, string $default): array
+    {
+        $languages = [];
+        $collect = static function (mixed $translations) use (&$languages): void {
+            if (! is_array($translations)) {
+                return;
+            }
+            foreach (array_keys($translations) as $language) {
+                if (self::from($translations, (string) $language) !== null) {
+                    $languages[(string) $language] = true;
+                }
+            }
+        };
+
+        foreach ($sections as $section) {
+            $collect($section['label_translations'] ?? null);
+            $collect($section['description_translations'] ?? null);
+        }
+        foreach ($fields as $field) {
+            $collect($field['label_translations'] ?? null);
+            $collect($field['hint_translations'] ?? null);
+            $options = is_array($field['config'] ?? null) ? ($field['config']['options'] ?? null) : null;
+            foreach (is_array($options) ? $options : [] as $option) {
+                $collect(is_array($option) ? ($option['label_translations'] ?? null) : null);
+            }
+        }
+
+        unset($languages[$default]);
+        $result = array_map('strval', array_keys($languages));
+        sort($result);
+
+        return $result;
+    }
 }

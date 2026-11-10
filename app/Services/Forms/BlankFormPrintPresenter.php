@@ -143,15 +143,19 @@ final class BlankFormPrintPresenter
     /**
      * The whole document model.
      *
-     * The locale is the FORM's default, not a respondent's choice — nobody has chosen anything yet.
-     * A "print this form in Tagalog" affordance is a real gap for multi-locale forms and is recorded
-     * as such in `docs/ocr-pipeline-design.md` §2.5 rather than guessed at here.
+     * The locale is the FORM's default unless `$locale` names another language this version has text in
+     * ({@see languages()}); any other value prints the default (M229, `R-d7e27962`). A respondent has chosen
+     * nothing yet, so the choice is the person printing's.
+     *
+     * ⚠️ `D215`: the scanner rebuilds what it expects to see from the default language (`PrintedFormMatcher`
+     * calls this with none), so a page in another language is printed as one to key in: `ocr_compatible` is false
+     * for it, and the footer says responses must be keyed in.
      *
      * @return array<string, mixed>
      */
-    public function present(Form $form, FormVersion $version): array
+    public function present(Form $form, FormVersion $version, ?string $locale = null): array
     {
-        $locale = $form->default_locale;
+        $locale = $this->printLocale($form, $version, $locale);
         $snapshot = $version->schema_snapshot;
 
         $fields = $this->orderedFields($this->listAt($snapshot, 'fields'));
@@ -179,7 +183,8 @@ final class BlankFormPrintPresenter
             // scans can be auto-extracted, rather than discovering it after collection. Re-derived
             // from this version's own bytes, never read off `forms.capability_flags` — that column
             // describes the CURRENTLY published version and is stale for a superseded one.
-            'ocr_compatible' => CapabilityFlags::isOcrCompatible($version),
+            // D215: a page in another language is one to key in, because the scanner reads the default language only.
+            'ocr_compatible' => CapabilityFlags::isOcrCompatible($version) && $locale === $form->default_locale,
             // Whether the FORM accepts scans today (`forms.allow_ocr_single`), which with `ocr_compatible`
             // decides what the footer promises (`M143`, `R-6bbf9d73`). A form setting, not a version fact:
             // the same paper reads differently once scanning is switched on, and the footer says so.
@@ -768,6 +773,25 @@ final class BlankFormPrintPresenter
         $value = $source[$key] ?? null;
 
         return is_array($value) && array_is_list($value) ? $value : [];
+    }
+
+    /** The language a print asks for, when this version has text in it; otherwise the form's default (M229). */
+    public function printLocale(Form $form, FormVersion $version, ?string $requested): string
+    {
+        return $requested !== null && in_array($requested, $this->languages($form, $version), true) ? $requested : $form->default_locale;
+    }
+
+    /**
+     * The languages this version can be printed in: the form's default first, then every other language its text is
+     * translated into ({@see LocaleVariant::languagesIn()}). An empty or draft snapshot prints in the default only.
+     *
+     * @return list<string>
+     */
+    public function languages(Form $form, FormVersion $version): array
+    {
+        $snapshot = $version->schema_snapshot;
+
+        return [$form->default_locale, ...LocaleVariant::languagesIn($this->listAt($snapshot, 'sections'), $this->listAt($snapshot, 'fields'), $form->default_locale)];
     }
 
     /**

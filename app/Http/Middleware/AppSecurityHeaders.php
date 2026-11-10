@@ -50,6 +50,18 @@ use Symfony\Component\HttpFoundation\Response;
  * origin in dev; introducing `default-src` here would break both and force every directive to be enumerated
  * at once, which `docs/piping-output-encoding-design.md` §262 records as its own hardening increment.
  * `frame-ancestors` is safe to state alone precisely because it has no `default-src` fallback.
+ *
+ * ── WHAT IT LEAVES UNCOVERED, AND THAT THIS IS INTENDED (M217, `R-25dc7ded`) ───────────────────────
+ * These headers reach only the routes in those groups. A static file (a built asset, a font, an icon, `/robots.txt`,
+ * `/favicon.ico`) never reaches PHP, and `/up`, `/sw.js` and a 404 reach it outside every group. Measured from outside
+ * on 2026-11-07: `/` and `/login` carry all four, those paths carry none. Header by header:
+ *
+ *   - `X-Content-Type-Options` BELONGS on them: it is the one of the four that applies to a file. `public/.htaccess`
+ *     sets it, because no middleware can reach a file PHP never sees. Every type the site serves was correct when
+ *     measured, so it blocks nothing, and `scripts/staging-headers-judge.php` checks the static paths every night.
+ *   - `frame-ancestors` and `X-Frame-Options` do NOT belong: they stop a hostile page framing a session, and a static
+ *     file, the health check and a 404 have no action to click. They cannot go global anyway, for the reason above.
+ *   - `Referrer-Policy` does NOT belong: it governs the links on a page, and this value is already browsers' default.
  */
 final class AppSecurityHeaders
 {

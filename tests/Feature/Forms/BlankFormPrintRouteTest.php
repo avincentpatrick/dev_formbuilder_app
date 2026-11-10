@@ -158,3 +158,25 @@ it('writes no audit row and meters no usage', function (): void {
     enterTenant($this->tenant->id, $this->admin->id);
     expect(DB::table('audits')->count())->toBe($before);
 });
+
+it('prints in a language the version has text in, names it in the file, and ignores one it has none in (R-d7e27962)', function (): void {
+    /** @var Tenant $tenant */
+    $tenant = Tenant::query()->where('slug', 'acme')->firstOrFail();
+    $form = app(FormService::class)->create($tenant, $this->admin, 'Clinic Intake');
+    addFormField($form->draftVersion, $this->admin, 'full_name', FieldType::ShortText, 0, [
+        'label' => 'Full name',
+        'label_translations' => ['fil' => 'Buong pangalan'],
+    ]);
+    app(PublishService::class)->publish($form->refresh(), $this->admin);
+    $form = $form->refresh();
+    $version = FormVersion::query()->whereKey($form->current_published_version_id)->firstOrFail();
+
+    $this->actingAs($this->admin)->get(printUrl($form, $version).'?lang=fil')
+        ->assertOk()
+        ->assertHeader('content-disposition', 'attachment; filename=clinic-intake-v1-blank-fil.pdf');
+
+    // German is not one of this version's languages, so the paper and its name stay in the form's own.
+    $this->actingAs($this->admin)->get(printUrl($form, $version).'?lang=de')
+        ->assertOk()
+        ->assertHeader('content-disposition', 'attachment; filename=clinic-intake-v1-blank.pdf');
+});

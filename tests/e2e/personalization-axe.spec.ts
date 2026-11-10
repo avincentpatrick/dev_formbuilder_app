@@ -105,11 +105,16 @@ test('Builder at extra_large + dyslexia font + teal — accessible & no horizont
     // which is how a wrong mechanism comes to look corroborated. ⚠️ `ThemeQuickToggle.vue` was checked
     // and is NOT a third copy: it says "inline-flex with no wrap and no overflow handling", which is
     // exactly right. Two files, not three — counted rather than assumed.
+    //
+    // ⛔ M218 (`R-20b1fe78`, `R-ffd296b1`): THIS READ USED TO SIT INSIDE `if (await strip.isVisible())`, so on
+    // any width where the switcher was off screen it was skipped without a word, and the test passed having
+    // measured nothing. It need not be conditional: at `extra_large` the builder is compact at all three
+    // widths (the note below says why), so the switcher is always on screen here, and if it is not, that is
+    // the failure.
     const strip = page.locator('.builder__pane-switch');
-    if (await strip.isVisible()) {
-        const spill = await strip.evaluate((el) => el.scrollWidth - el.clientWidth);
-        expect(spill, 'the pane switcher overflows its bar under maximum personalization').toBeLessThanOrEqual(1);
-    }
+    await expect(strip, 'the pane switcher is not on screen, so the measurement below would be vacuous').toBeVisible();
+    const spill = await strip.evaluate((el) => el.scrollWidth - el.clientWidth);
+    expect(spill, 'the pane switcher overflows its bar under maximum personalization').toBeLessThanOrEqual(1);
 
     // ⛔ M109 — THE DOCUMENT-LEVEL ASSERTION CANNOT SEE THIS ONE, BY CONSTRUCTION, AND THAT IS WHY THE
     // ORIGINAL M17 ROW WAS FALSIFIED. `.config` is `overflow-y: auto`, which forces `overflow-x` to
@@ -184,14 +189,18 @@ test('Builder at extra_large + dyslexia font + teal — accessible & no horizont
 // NAMES rather than one-word labels, so it is the likeliest of the four to overflow and was the first to do
 // so: this case was written before the `flex-wrap` host guard existed and went red on the real defect.
 //
-// ⛔ AND A SPILL READ ALONE CANNOT FAIL HERE, WHICH WAS MEASURED RATHER THAN REASONED ABOUT. `Logic Notices
-// Demo` carries seven sections, but relevance gates four of them at the empty answer state, so the strip
-// renders exactly three short segments ("1. Intake", "2. Tail", "3. Preferences") occupying 335px of a
-// 335px bar at 375px with `extra_large` and OpenDyslexic. `Community Health Survey` projects to two. NO
-// SEEDED FORM PROJECTS TO A STRIP WIDE ENOUGH TO OVERFLOW, so a spill assertion on its own is green by
-// construction and would stay green if the affordance were deleted — the exact shape of a decorative gate.
+// ⛔ UNTIL M218 A SPILL READ ALONE COULD NOT FAIL HERE, WHICH WAS MEASURED RATHER THAN REASONED ABOUT. This
+// case opened `Logic Notices Demo`, which carries seven sections, but relevance gates four of them at the
+// empty answer state, so the strip rendered exactly three short segments occupying 335px of a 335px bar at
+// 375px with `extra_large` and OpenDyslexic. `Community Health Survey` projects to two. No seeded form gave
+// a strip wide enough to overflow, so the spill read was green by construction. `R-ffd296b1` added
+// `Section Strip Demo` (`E2eSeeder`): seven always-visible sections, the most the strip draws as segments,
+// each carrying one long word. A segment shrinks to its longest word and no further, so the words are what
+// overflow the bar unless the control wraps, at all three widths. The segment count is pinned below, so a
+// fixture that stopped projecting all seven would fail here rather than quietly turn the read back into a
+// decoration, and the case proves on every run that the fixture can still make the read fail.
 //
-// ✅ SO THE STRUCTURAL HALF IS WHAT MAKES THIS GATE ABLE TO FAIL. Section names are author-controlled and
+// ✅ AND THE STRUCTURAL HALF STAYS, BECAUSE IT ANSWERS A DIFFERENT QUESTION. Section names are author-controlled and
 // unbounded, so the strip's protection cannot be "the fixtures happen to be short"; it is `D28`'s measured
 // affordance, `flex-wrap` on the hosted control, and that is asserted directly. Written before the guard
 // existed and RED on the first run, reporting `nowrap`. The spill read is kept beside it because the two
@@ -199,7 +208,7 @@ test('Builder at extra_large + dyslexia font + teal — accessible & no horizont
 test('Builder preview strip at extra_large + dyslexia font + teal — no horizontal overflow', async ({
     page,
 }) => {
-    await openBuilder(page, 'Logic Notices Demo');
+    await openBuilder(page, 'Section Strip Demo');
     await forceTheme(page, 'dark');
     await forcePersonalization(page, { accent: 'teal', fontSize: 'extra_large', dyslexia: true });
 
@@ -219,10 +228,28 @@ test('Builder preview strip at extra_large + dyslexia font + teal — no horizon
     // ⛔ IT MUST HAVE RENDERED AS SEGMENTS, not as the select it degrades to above the ceiling.
     // A `<select>` cannot overflow its bar, so a spill of zero measured on one is not a weaker
     // result — it is no result at all, and it would look identical to a pass.
+    // M218: pinned at the fixture's seven, every section a step, rather than "more than one".
     const segments = await strip.locator('input[type="radio"]').count();
     expect(
         segments,
-        'the strip did not render as segments, so a spill of zero proves nothing about the control that can spill',
+        'the strip did not render all seven of Section Strip Demo\'s sections as segments, so the reads below are not reading the fixture they were written for',
+    ).toBe(7);
+
+    // ⛔ M218 (`R-ffd296b1`): THE FIXTURE MUST BE ABLE TO TURN THE SPILL READ RED, AND THAT IS MEASURED HERE,
+    // AT EVERY WIDTH AND ON EVERY RUN, rather than trusted from the day the names were chosen. The wrap guard
+    // is taken off for one read, the strip must spill, and the guard is back before the real reads below.
+    const unguarded = await strip.locator('fieldset').evaluate((el) => {
+        const host = el as HTMLElement;
+        host.style.flexWrap = 'nowrap';
+        const bar = host.closest('[data-preview-strip]') as HTMLElement;
+        const out = bar.scrollWidth - bar.clientWidth;
+        host.style.removeProperty('flex-wrap');
+
+        return out;
+    });
+    expect(
+        unguarded,
+        'without its wrap guard the strip still fits, so the fixture cannot make the spill read below fail',
     ).toBeGreaterThan(1);
 
     const wrap = await strip.locator('fieldset').evaluate((el) => getComputedStyle(el).flexWrap);
@@ -238,4 +265,35 @@ test('Builder preview strip at extra_large + dyslexia font + teal — no horizon
     ).toBeLessThanOrEqual(1);
 
     await assertClean(page, 'Builder preview strip (max personalization)');
+});
+
+// M218 (`R-ffd296b1`): THE BRANCH ONLY VITEST HAD EVER DRAWN. Above `PREVIEW_STRIP_MAX_SEGMENTS` the strip
+// stops being a segmented control and becomes a select, and no seeded form had that many steps until
+// `Many Sections Demo` (`E2eSeeder`, eight sections, none conditional). It gets the same treatment as the
+// segments above: maximum personalization, its bar read, and an axe scan.
+test('Builder preview strip above seven sections is a select — accessible & no horizontal overflow', async ({
+    page,
+}) => {
+    await openBuilder(page, 'Many Sections Demo');
+    await forceTheme(page, 'dark');
+    await forcePersonalization(page, { accent: 'teal', fontSize: 'extra_large', dyslexia: true });
+
+    // After `forcePersonalization`, for the reason the case above gives.
+    await showBuilderPane(page, 'canvas');
+    await page.locator('.builder__centre-tabs').getByText('Preview', { exact: true }).click();
+    await expect(page.locator('[data-builder-preview]')).toBeVisible({ timeout: 15_000 });
+
+    const strip = page.locator('[data-preview-strip]');
+    const select = strip.getByRole('combobox', { name: 'Jump to section' });
+    await expect(select, 'eight sections did not render as the select the strip falls back to').toBeVisible({
+        timeout: 15_000,
+    });
+    await expect(strip.locator('input[type="radio"]')).toHaveCount(0);
+    // Every step is an option, so the fixture is above the ceiling rather than at it.
+    await expect(select.locator('option')).toHaveCount(8);
+
+    const spill = await strip.evaluate((el) => el.scrollWidth - el.clientWidth);
+    expect(spill, 'the section select overflows its bar under maximum personalization').toBeLessThanOrEqual(1);
+
+    await assertClean(page, 'Builder preview strip as a select (max personalization)');
 });

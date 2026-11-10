@@ -484,3 +484,21 @@ it('promises automatic reading only when the version can be read AND the form ac
         ->toContain('Scans of this form can be read automatically.')
         ->not->toContain('switched off');
 });
+
+it('prints a page in another of the version\'s languages and says on it that it must be keyed in (R-d7e27962, D215)', function (): void {
+    $form = app(FormService::class)->create($this->tenant, $this->user, 'Household Survey');
+    addFormField($form->draftVersion, $this->user, 'full_name', FieldType::ShortText, 0, [
+        'label' => 'Full name',
+        'label_translations' => ['fil' => 'Buong pangalan'],
+    ]);
+    $version = app(PublishService::class)->publish($form->refresh(), $this->user);
+    $form = $form->refresh();
+
+    $english = $this->renderer->html($form, $version);
+    $filipino = $this->renderer->html($form, $version, 'fil');
+
+    expect($filipino)->toContain('Buong pangalan')
+        ->and($filipino)->toContain('cannot be read automatically; responses must be keyed in')
+        ->and($english)->toContain('Full name')
+        ->and($english)->not->toContain('cannot be read automatically');
+});

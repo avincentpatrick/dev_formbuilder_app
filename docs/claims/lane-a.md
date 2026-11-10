@@ -16,7 +16,101 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M233`, `R-03715adf`: the Sheets rule modal's segmented control gets an e2e gate that can fail (m233-sheets-rule-modal-spill)
+## Status: ACTIVE CLAIM — `M234`, `R-8311c583`: a refused JSON fetch is proved to leave no toast, and the workarounds built on the pre-`M90` refusal give their real reasons (m234-web-refusal-workarounds)
+
+Taken 2026-11-10, from the plan the user approved the same day. Branch `m234-web-refusal-workarounds`, cut from origin/main at `c3f73c2e`, PR into main. Held green for a merge point (`D137`), after `M233`'s #497.
+**One row, by `D13`.** It edits two hubs, `bootstrap/app.php` and `routes/tenant.php`, both for comments only. No held PR touches either, the test file, or any file this claim names. **Chosen to stay clear:**
+- 23 rows in the line are closed by held branches. This was measured from each branch's own `docs/pipeline.md` diff against its merge base.
+- `M231` to `M233` recorded why the open rows above position 47 were passed over, and every reason still stands, because the same PRs are still held.
+- This row is position 48, the first that no held PR closes and whose files none edits.
+- No `VERSION` bump, because nothing changes for a tester. So it does not wait on #435.
+
+Row: `R-8311c583`, *"Three client-side workarounds were built ON the JSON-refusal defect `M90` fixed, and all three can now be simplified — but one of them is load-bearing until it is measured."*
+
+### Evidence verified
+- `useMemberStreak`'s `enabled` guard, *"so a module-disabled tenant never issues the fetch that would write an orphaned session flash"*: **held**. The docblock is headed *"`enabled` IS NOT AN OPTIMISATION"*, and the guard is in `refresh()`.
+- `integrationsClient`, *"read-only-and-never-throwing for the same reason, stated twice in its own header and twice more in `routes/tenant.php`"*: **held, and a floor.**
+  - The header says it at the top and again in its H16b note.
+  - `routes/tenant.php` says it four times: the notifications block, the channels sidecar, the tabular-destination note, and the analytics note, which calls it *"the integrationsClient trap"*.
+- The draft autosave, *"catches locally because a `back()` redirect is unreadable to the composable driving it"*: **held**, in the `SubmissionConflictException` arm's comment. That arm already corrects the reason in place (*"the FIFTH in-repo workaround"*), so it is not edited. `SubmissionDraftController`'s docblocks and `ClientUuidResolver` still give the old reason.
+- `docs/gamification-design.md`'s *"once per navigation forever"*: **held**, never measured.
+- None of the three files has changed since `M90` (`bd64b622`).
+
+### Premise verified
+- **The row's central premise is false by reading, and will be measured before the test.** It says *"every refused web request still writes `->with('toast', …)`"*.
+  - Every redirecting arm is `$webJson(...) ?? back()->with(...)`, so for a caller that `expectsJson()` the right-hand side never runs and no flash is written.
+  - Every sidecar sends `Accept: application/json`: `builderClient` sends it, and so does `useServerAutosave`'s own fetch. So `wantsJson()` is true for all of them.
+  - **Nothing proves it.** `WebJsonRefusalTest`'s module case asserts the body only, and there is no `assertSessionMissing('toast')` anywhere under `tests/`. A refactor that hoisted the fallback into a variable before `$webJson` would write the flash and leave every test green.
+- **"Can now be simplified" holds for none of the three as written.**
+  - **The guard's stated reason is false, but the guard stays as an economy.** Without it, a workspace with the module off sends one refused request per navigation.
+  - **`integrationsClient`'s `null` / `transportFailure()` contract is what `RuleFormModal`, `AirtableRuleFields` and `SheetsRuleFields` read.** `SheetsRuleFields.vue` is held by #497.
+  - **The autosave's catch carries weight for its envelope.** `useServerAutosave` reads `error.code` nested, and `M90`'s web arms answer flat.
+- **The row is a floor.** About 25 comments in 26 files still give the pre-`M90` 302 as current for a fetch. One mechanism spread by quotation.
+  - It was false in one place even before `M90`. *"`TabularDestinationDirectory` never throws, so the failure cannot occur on these two endpoints"* ignores `feature:native_connectors`, whose refusal was a 302 until `M90`.
+- **Two defects next to the citations, filed rather than built here:**
+  - `integrationsClient` discards the server's readable message. Fixing it changes what a tester reads, so it needs `VERSION`, and held PRs hold that file.
+  - A rethrown non-request error leaves `busy` stuck, because no consumer has a `finally`. Fixing it needs `SheetsRuleFields.vue` (#497).
+  - Both are to be verified at filing.
+
+### Remedy verdict
+**The prescribed removal is wrong for all three. What the row actually needs is the measurement it asks for, turned into a gate, plus the false reason corrected wherever it was quoted.**
+- **Measured before the test** (a scratch case, not committed), with the module off:
+  - A JSON fetch is refused with a 403, the session holds no toast, and the next page's `flash.toast` is null.
+  - As a control, the same refusal made as a navigation does carry its toast to the next page. That proves the probe can see one.
+- **`WebJsonRefusalTest`** gets three additions:
+  - The behavioural case.
+  - The control.
+  - A rule in the existing static gate: in every arm that has both, the first `$webJson(` comes before the first `->with(` or `->withErrors(`. That reaches the arms the behavioural case does not.
+- Mutants through `scripts/mutate.php`:
+  - **A:** the module arm's fallback hoisted. The behavioural case and the static rule go red.
+  - **B:** the same hoist in the `GrantException` arm. Only the static rule goes red.
+- Comment edits are line-count-neutral wherever another row cites the file by line.
+
+Files:
+- **Test:** `tests/Feature/Http/WebJsonRefusalTest.php`.
+- **Comments, PHP:** `bootstrap/app.php`, `routes/tenant.php`, `app/Services/Connectors/TabularDestinationDirectory.php`, `app/Services/Connectors/ConnectionTokenRefresher.php`, `app/Http/Controllers/Tenant/ScopeNodeController.php`, `app/Http/Controllers/Tenant/ConnectionController.php`, `app/Http/Controllers/Tenant/AnalyticsController.php`, `app/Http/Controllers/Tenant/SubmissionDraftController.php`, `app/Services/Submissions/ClientUuidResolver.php`.
+- **Comments, frontend:** `resources/js/composables/useMemberStreak.ts`, `resources/js/composables/__tests__/useMemberStreak.test.ts`, `resources/js/components/shell/Sidebar.vue`, `resources/js/components/shell/Sidebar.test.ts`, `resources/js/components/integrations/integrationsClient.ts`, `resources/js/components/scopes/scopesClient.ts`, `resources/js/components/notifications/notificationsClient.ts`, `resources/js/components/achievements/achievementsClient.ts`, `resources/js/Pages/domains/Index.vue`, `resources/js/components/domains/DomainCard.vue`, `resources/js/Pages/scopes/Index.vue`, `resources/js/Pages/analytics/Index.vue`.
+- **Comments, docs and tests:** `docs/gamification-design.md`, `tests/Feature/Scoping/ScopeWebTest.php`, `tests/Feature/Analytics/AnalyticsPageGateTest.php`.
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md` (own block only, at release).
+Paired files taken: none.
+Namespaces spent: `M234`.
+Prediction:
+- **The new cases:** both pass. Mutant A turns the behavioural case and the static rule red, B turns only the static rule red, and the control stays green throughout.
+- **Gates that read the comment edits:**
+  - Pint is clean.
+  - PHPStan does not move, because only prose changes in `app` and `routes`.
+  - Vitest does not move.
+  - The citation lint stays at 16 rotten, the trunk's figure.
+- **The one I most expect to be wrong:** the control. Whether Laravel's test client carries a flash into a second request the way a browser does.
+
+### Build record (2026-11-10, not merged)
+PR #499, head `e352daad`, run 42748812512: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5). `Boundary (from main)` is green (run 42748811999, 5 steps).
+- **The measurement, before the test** (a scratch Pest file, run once and deleted), with gamification off:
+  - **JSON fetch:** 403, no session `toast`, and a null `flash.toast` on the next page.
+  - **Navigation:** 302, the toast written, shown on the next page, and gone from the page after.
+  - Every sidecar sends `Accept: application/json`, so the row's premise is false for all of them.
+- **`WebJsonRefusalTest`: 7 passed** (the 5 it had, plus the behavioural case and its control). The order rule judges at least 14 redirecting arms, with a floor.
+- **Mutants, through `mutate.php`'s write, run and byte-restore.** Neither was committed, because the commit rule guards diff-based checks and this test reads the file.
+  - **A**, the module arm's redirect hoisted above `$webJson`: **CAUGHT**. The behavioural case and the order rule went red; the control and M90's own module case stayed green.
+  - **B**, the same hoist in the `GrantException` arm: **CAUGHT** by the order rule alone.
+  - Not run: dropping the `??`, which M90's existing cases already cover.
+- **Comments:** 26 files, every one edited line for line (insertions equal deletions per file). A sweep with `--text` found no remaining present-tense copy of the old reason. `bootstrap/app.php`'s autosave arm already corrected itself in place and was left alone.
+- **Filed:** `integrations-client-failure-sentences` (`R-ef0d47d7`).
+  - **The claim was wrong on one point:** that the stuck `busy` half needs `SheetsRuleFields.vue` (#497). Both halves are fixed inside `integrationsClient.ts`.
+  - It waits only for `VERSION`, because it changes what a tester reads.
+- **Container, Pest:** `php -d memory_limit=3G vendor/bin/pest` over `tests/Feature/{Http,Gamification,Scoping,Analytics,Connectors,Docs}` and `EncodeDraftTest`: 934 passed, 5 skipped. The one failure is `SuiteCollectionFloorTest`, the bind-mount artefact; CI is green.
+  - The first try, through `artisan test`, died at 128M. That trap is already logged, and I repeated it.
+- **Container, frontend:** Vitest 4,333 passed. Two `token-references` timeouts (load) passed alone. `type-check` is clean.
+- **Host:** PHPStan 0 errors over the whole tree; the container's 51 are the clean trunk's. Pint is clean. `pipeline-lint` 461 rows, `tracker-lint` +0 bytes, the citation lint at 16 rotten (the trunk's figure). `preflight --with-gates --with-pint` OK after merging #495 (BHW only) in.
+- **E2E:** none run locally. No spec reaches a comment; CI's E2E job is green.
+- `PROGRESS.md` is untouched until release.
+
+**How the prediction fared:** right on every gate it named, including both mutants' red sets. **The one I most expected to be wrong held:** the test client carried the flash into exactly one more request, as a browser does. **Not predicted:** the `artisan test` memory death (a known trap, re-run correctly), the two Vitest load timeouts, and that the second filed defect's fix fits in one unheld file.
+
+**The merge point owes:** merge after #497, with no dependence on #435 (no release note). Release this claim then. ⚠️ **#499 now holds a comment in `ConnectionTokenRefresher.php`**, the file `R-593e29cd` (line position 49) edits, so the next build must walk the line against #499's files too.
+
+## HELD — `M233`, `R-03715adf`: the Sheets rule modal's segmented control gets an e2e gate that can fail (m233-sheets-rule-modal-spill) — BUILT AND HELD: PR #497, waiting for a merge point
 
 Taken 2026-11-09, from the plan the user approved the same day. Branch `m233-sheets-rule-modal-spill`, cut from origin/main at `c92fa2fe`, PR into main. Held green for a merge point (`D137`), after `M232`'s #496.
 **One row, by `D13`.** Test-only plus one comment, edits no hub, and touches no held PR's files. **Chosen to stay clear:** `M232` took line position 41. The rows after it, before this one:
@@ -56,6 +150,21 @@ Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, the top-l
 Paired files taken: none.
 Namespaces spent: `M233`.
 Prediction: the new spec passes at all three projects, 9 runs. The wrap rule deleted, committed on a throwaway branch and rebuilt, turns the stress case red at all three, and the two axe cases stay green. No `VERSION` bump, because the one product edit is a CSS comment. Neither `type-check` (its `include` is `resources/js` and the public runtime) nor Vitest nor PHPStan reads an e2e spec, so none can move. Pint and the host lint gates stay clean. The one I most expect to be wrong: the "two lines" guard at 375px, if the stacked segments' tops differ by less than a pixel rounding allows.
+
+### Build record (2026-11-10, not merged)
+PR #497, head `93af09e1`, CI run 42652086518: all 8 jobs green with real step counts (Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5).
+- **`Boundary (from main)` has not started.** Three runs ended in `startup_failure` with no jobs: 42652083895 (`opened`), then 42658803413 and 42659101554 (`edited`, from notes added to the PR's description). Such a run cannot be retried.
+  - Not the repository: since #496's green Boundary run, `main` changed only this file, `boundary.yml` is unchanged since `M214`, every action is allowed, and the pinned `actions/checkout` commit (`v4.4.0`) resolves.
+  - Not billing: the repository is public. GitHub reported Actions operational, and CI started fine in the same minute.
+  - It re-runs when the merge point merges the trunk into this branch (`synchronize`). If it still cannot start then, it blocks #497 under the every-required-check rule, and the cause is investigated then.
+- **Local E2E, this spec only:** 9 passed at mobile, tablet and desktop, before and after the mutant.
+- **Mutant A** (the host's `flex-wrap: wrap` turned into a comment, committed on a throwaway branch and rebuilt): the stress case was red at all three widths, the modal body scrolling 246, 103 and 103px sideways, as the probe predicted. Both axe cases stayed green. The branch was deleted unpushed, the file's sha256 matched, and the real assets were rebuilt and run green again.
+- **Host:** `preflight --with-gates --with-pint` OK, Pint clean over 1,891 files, `pipeline-lint` 461 rows, `tracker-lint` +0 bytes, the citation lint at 16 rotten (the trunk's figure). Vitest, `type-check` and PHPStan do not read an e2e spec. `PROGRESS.md` is untouched until release.
+- The plan said to run `next.php --lane=a --write`. It rewrites `PROGRESS.md`'s hand-off line, so the change was reverted to keep `PROGRESS.md` untouched until release, as with every held build.
+
+**How the prediction fared:** right on every gate it named, including the mutant's widths. The guard I most expected to be wrong held: the stacked segments' tops differ by 34px. **Not predicted:** Boundary's startup failures. **Corrected before the claim, by measuring:** the plan assumed a plain spill read could fail on this host, and that `mutate.php` could drive an e2e mutant. The first is false, and the second is Pest-only (the gate-traps log already said so).
+
+**The merge point owes:** merge after #496, with no dependence on #435 (no release note). Boundary must be green first. Release this claim then.
 
 ## HELD — `M232`, `R-473558cf` and a sibling it files: the secret-scan and npm-audit workflow arms read their own job, not the whole of `ci.yml` (m232-workflow-arms-scoped) — BUILT AND HELD: PR #496, waiting for a merge point
 

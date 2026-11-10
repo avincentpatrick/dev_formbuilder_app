@@ -3,7 +3,7 @@ import { sequentialRamp } from "./palette";
 /** Fill for a geo with no data at all — distinct from every ramp step. */
 export const NO_DATA_COLOR = "#e5e7eb";
 
-/** One choropleth color bin: values in `[min, max]` render as `color`. */
+/** A choropleth bin has an inclusive lower edge; shared upper edges belong to the next bin. */
 export type ColorBin = { min: number; max: number; color: string };
 
 /** Pick a ramp color by fraction 0..1 (light -> dark). */

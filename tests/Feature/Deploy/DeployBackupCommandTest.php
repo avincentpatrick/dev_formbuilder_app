@@ -90,3 +90,50 @@ it('keeps the newest backups and removes only its own older ones', function (): 
         ->and($left)->toContain('deploy-20260104-000000.dump')
         ->and(in_array('deploy-20260101-000000.dump', $left, true))->toBeFalse();
 });
+
+/*
+| M216 (`R-5f180437`, `D212`): the nightly job keeps 30 in its own folder, while the deploy keeps `deploy.keep`. The cached
+| config cannot differ per caller, which is why this is an option and not an environment variable.
+*/
+it('keeps as many as --keep says, over the configured number, and still removes only its own', function (): void {
+    config()->set('deploy.pg_dump', fakePgDump($this->dir));
+    config()->set('deploy.keep', 10);
+    foreach (range(1, 4) as $i) {
+        touch($this->dir."/dumps/deploy-2026010{$i}-000000.dump", strtotime("2026-01-0{$i}"));
+    }
+    file_put_contents($this->dir.'/dumps/staging-by-hand.dump', 'kept');
+
+    $this->artisan('deploy:backup', ['--keep' => '2'])->assertSuccessful();
+
+    $left = array_map('basename', glob($this->dir.'/dumps/*.dump') ?: []);
+    expect($left)->toHaveCount(3)
+        ->and($left)->toContain('staging-by-hand.dump')
+        ->and($left)->toContain('deploy-20260104-000000.dump')
+        ->and(in_array('deploy-20260103-000000.dump', $left, true))->toBeFalse();
+});
+
+it('still keeps the configured number when --keep is not given, which is how every deploy calls it', function (): void {
+    config()->set('deploy.pg_dump', fakePgDump($this->dir));
+    config()->set('deploy.keep', 2);
+    foreach (range(1, 4) as $i) {
+        touch($this->dir."/dumps/deploy-2026010{$i}-000000.dump", strtotime("2026-01-0{$i}"));
+    }
+
+    $this->artisan('deploy:backup')->assertSuccessful();
+
+    expect(glob($this->dir.'/dumps/deploy-*.dump') ?: [])->toHaveCount(2);
+});
+
+it('refuses a --keep that is not a whole number of at least one, before it prunes anything', function (string $keep): void {
+    config()->set('deploy.pg_dump', fakePgDump($this->dir));
+    foreach (range(1, 4) as $i) {
+        touch($this->dir."/dumps/deploy-2026010{$i}-000000.dump", strtotime("2026-01-0{$i}"));
+    }
+
+    $this->artisan('deploy:backup', ['--keep' => $keep])
+        ->expectsOutputToContain('--keep must be a whole number')
+        ->assertFailed();
+
+    expect(glob($this->dir.'/dumps/deploy-*.dump') ?: [])->toHaveCount(4)
+        ->and(file_exists($this->dir.'/args.txt'))->toBeFalse();
+})->with(['a word' => 'thirty', 'zero' => '0', 'negative' => '-3', 'a fraction' => '1.5']);

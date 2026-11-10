@@ -112,12 +112,12 @@ and discards the token. `GOOGLE_SIGNIN_STATE_KEY` exists only to rotate that one
 
 Operationalizes `docs/non-functional-requirements.md` §2 (RTO 4h / RPO 15min Phase 1) and §8 (continuous WAL + daily snapshot, 30-day retention) — now on the self-managed Windows Postgres:
 
-1. **Daily full backup**: `pg_dump` (custom format) of each database via a **Windows Task Scheduler** job, written to a backup volume and **copied off-box** (a second disk / NAS / offsite target — a backup on the same box is not disaster recovery). **Besides it, every deploy that migrates takes its own** (M176, §3 step 2): `deploy-<UTC>.dump` in the deploy's backup folder, the newest 10 kept. ✅ **Proven on the testing server at merge point 2 (`D143`, run 39190622862, 2026-10-19)** — the runner (NETWORK SERVICE) ran `pg_dump` and wrote the folder with no rights changed (a 439,736-byte dump; 66 tables counted before `migrate` and held after). **It replaced the user's pre-merge backup block, which is retired (`R-2d921bbe`, `M178`):** a merge point now runs between the user's data census before and after, and reads the backup's path and both counts from each deploy's log. The nightly task (§8.3) stays. To restore after the guard leaves the site down: `pg_restore --clean --if-exists --no-owner --dbname=<db> <the dump>` as the privileged role, then `php artisan up`. Set `MERIDIAN_PG_DUMP` when `pg_dump` is not on the runner's `PATH` (otherwise the newest `C:\Program Files\PostgreSQL\<n>\bin\pg_dump.exe` is used).
-2. **Continuous WAL archiving for PITR**: `archive_mode = on` with an `archive_command` that copies WAL segments to the off-box target — this gives point-in-time recovery within the retention window and is what makes the 15-min RPO achievable (fully under our control now).
+1. **Daily full backup**: `pg_dump` (custom format) of each database via a **Windows Task Scheduler** job, written to a backup volume and **copied off-box** (a second disk / NAS / offsite target — a backup on the same box is not disaster recovery). On the testing site that job is `scripts/nightly-backup.ps1` (§8.2 step 12, §8.3; `M216`, `D212`). **Besides it, every deploy that migrates takes its own** (M176, §3 step 2): `deploy-<UTC>.dump` in the deploy's backup folder, the newest 10 kept. ✅ **Proven on the testing server at merge point 2 (`D143`, run 39190622862, 2026-10-19)** — the runner (NETWORK SERVICE) ran `pg_dump` and wrote the folder with no rights changed (a 439,736-byte dump; 66 tables counted before `migrate` and held after). **It replaced the user's pre-merge backup block, which is retired (`R-2d921bbe`, `M178`):** a merge point now runs between the user's data census before and after, and reads the backup's path and both counts from each deploy's log. The nightly task (§8.3) stays. To restore after the guard leaves the site down: `pg_restore --clean --if-exists --no-owner --dbname=<db> <the dump>` as the privileged role, then `php artisan up`. Set `MERIDIAN_PG_DUMP` when `pg_dump` is not on the runner's `PATH` (otherwise the newest `C:\Program Files\PostgreSQL\<n>\bin\pg_dump.exe` is used).
+2. **Continuous WAL archiving for PITR — production's, not the testing site's (`D212`, `R-139b1662`)**: `archive_mode = on` with an `archive_command` that copies WAL segments to the off-box target, an `archive_timeout` no longer than the RPO, and a **physical base backup** (`pg_basebackup`) for them to replay onto — this gives point-in-time recovery within the retention window and is what makes the 15-min RPO achievable (fully under our control now). ⛔ **A `pg_dump` cannot be that base:** PostgreSQL's manual says such dumps *"do not contain enough information to be used by WAL replay"*. `archive_mode` takes a server restart, and on the testing site's instance that restart would also stop `bhw_connect` (§8.4).
 3. **Retention**: 30 days rolling (prune old dumps/WAL in the same scheduled job).
-4. **Restore drills**: a full restore to a fresh instance **quarterly** — a backup never test-restored is not a verified backup.
-5. **Incident procedure** (skeleton; full runbook is Doc #23): declare → assess scope → restore from the latest clean dump + replay WAL to the target PITR point → verify integrity against the audit trail (`docs/audit-compliance-logging-spec.md`) → post-incident review.
-6. **RTO/RPO ownership**: if a drill shows the achievable RTO/RPO misses the NFR targets, that's a finding to feed back into the NFR doc or this runbook — not a silent gap.
+4. **Restore drills**: a full restore to a fresh instance **quarterly** — a backup never test-restored is not a verified backup. The testing site's last drill was on 2026-11-09 (`M216`: a scratch database on the same instance rather than a fresh one, all 70 tables restored). Nothing yet reminds anyone when the next is due (`R-38ba2f94`).
+5. **Incident procedure** (skeleton; full runbook is Doc #23): declare → assess scope → restore from the latest clean dump, which loses whatever came after it, or, where item 2 runs, from the latest physical base backup + replay WAL to the target PITR point → verify integrity against the audit trail (`docs/audit-compliance-logging-spec.md`) → post-incident review.
+6. **RTO/RPO ownership**: if a drill shows the achievable RTO/RPO misses the NFR targets, that's a finding to feed back into the NFR doc or this runbook — not a silent gap. **The testing site's answer (`D212`):** it runs items 1, 3 and 4 and not item 2, so it can lose up to a day of data, not fifteen minutes. Production owes the NFR's numbers (`R-139b1662`).
 
 ---
 
@@ -151,7 +151,7 @@ The concrete pieces to stand one site up (companion to `deploy.ps1`). Each step 
    - As the installer superuser: `CREATE ROLE meridian_app LOGIN PASSWORD '<new password>' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;` then `CREATE DATABASE meridian OWNER meridian_app;`, then `ALTER DATABASE meridian SET timezone TO 'UTC';`. ⛔ **`meridian_app` must own the database.** From PostgreSQL 15 a non-owner has no `CREATE` on schema `public`, so the first `CREATE TABLE` would fail, and FORCE row-level security relies on the app role owning every table (ADR-0013's trigger function needs the same privilege).
    - **Do not create `meridian_auth` or `meridian_superadmin` yourself, and never rename them.** The migrations create them with the passwords `.env` holds at the first migrate, then grant to the usernames `.env` names.
    - ⚠️ **The `ALTER DATABASE … SET timezone` above is belt-and-braces, not the guard.** The guard is `'timezone' => 'UTC'` on all four connections in `config/database.php`, which makes each session set its own zone. The `ALTER` is worth running anyway, for `psql` and for `pg_dump`/restore work done by hand — but it survives a restore only with `--create`, and a fresh `initdb` takes this box's zone (Asia/Manila here), which is how every PHP-bound timestamp landed eight hours early on the testing server until `M98`. If you are rebuilding a database that already holds data written under a non-UTC session, the skew is per COLUMN, not per row: values written by SQL `now()` are correct and values bound from PHP are not, and both kinds appear in one row — so never repair it with a blanket interval shift.
-   - RLS does **not** apply to superusers, so the app must NOT connect as one — this is a hard requirement for the tenancy/RLS work (Increment A). Configure `archive_mode`/`archive_command` (§5).
+   - RLS does **not** apply to superusers, so the app must NOT connect as one — this is a hard requirement for the tenancy/RLS work (Increment A). Backups come later: §8.2 step 12 sets up §5 item 1, and `archive_mode`/`archive_command` (§5 item 2) are production's (`R-139b1662`).
 3. **Redis / Memurai — not required.** *(ADR-0007 moved the queue to the `database` driver, and cache and sessions use it too, so nothing on this box needs a Redis server or the `redis` extension. Memurai returns only if ADR-0007 §D1's trigger brings Redis + Horizon.)*
 4. **The web server** — **two arms, and the testing site uses the second.**
    - **nginx for Windows** (ADR-0005's decision, and what a wildcard-subdomain production host should use) —
@@ -409,7 +409,38 @@ refuse to create an account without a console.
     the invitation link exists only in that email. A form's share link answers 404 until the form is published
     **and** its owner turns on guest submissions in Share, which is off by default.
 
-12. **Turn on automatic deploys, last.** Register the runner (step 9), set `MERIDIAN_APP_PATH`, and only now set
+12. **Set up the nightly backup, before there is anything to lose.** `scripts/nightly-backup.ps1` takes the dump with
+    `deploy:backup`, copies it to a target off this box and compares SHA-256 on both sides, keeping 30 on each (§5;
+    `M216`, `D212`). It covers the database `meridian` only, and BHW Connect has its own (§8.4). As with the
+    certificate script (§8.3), the operational copy sits outside the app tree, so a rollback cannot take it away.
+
+    ```powershell
+    Copy-Item C:\meridian\test-app\scripts\nightly-backup.ps1 C:\meridian\nightly-backup.ps1 -Force
+    $run = '-NoProfile -ExecutionPolicy Bypass -File C:\meridian\nightly-backup.ps1 -OffBoxDir "<target>"'
+    $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $run
+    $trigger = New-ScheduledTaskTrigger -Daily -At '01:30'
+    $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Hours 1)
+    Register-ScheduledTask -TaskName 'meridian-test-db-backup' -Action $action -Trigger $trigger -Settings $settings -User 'SYSTEM' -RunLevel Highest
+    ```
+
+    - **`<target>` is a folder that already exists, on another physical disk, a NAS or another machine.** The script
+      refuses to create it, because a folder made on the wrong disk after a drive went missing would look like a
+      working backup. Restrict it to SYSTEM and the operator: it holds every tester's account.
+    - ⚠️ **SYSTEM has no identity on another machine, so a share needs a credential saved in SYSTEM's own vault.** On
+      the target, make a local account with Change on the share and Modify on the folder. On the box, have a one-shot
+      task running as SYSTEM run `cmdkey /add:<target host> /user:<TARGET>\<account> /pass:<password>`, check
+      `Test-Path` on the share in the same task, and delete the task at once, because its argument holds the password.
+      This ran on the testing site on 2026-11-09 (`M216`). SYSTEM then wrote to the share, read the file back and
+      deleted it. If a host refuses the saved credential, run the task as an account with rights on the share instead.
+      The host is matched exactly as written, so the credential and `-OffBoxDir` must name it the same way.
+    - **Read the task's `LastTaskResult`:** `0` copied and checked · `1` no dump was taken · `2` the dump is on the box
+      and the copy failed or did not match · `3` no target is set, so nothing is off the box. Its log is
+      `C:\meridian\backups\backup.log`. Nothing alerts anyone (`R-91237328`).
+    - **Prove it before trusting it.** Run the task once, then restore the newest dump into a scratch database, never
+      the live one: `pg_restore --no-owner --dbname=meridian_restoretest <the dump>` as the privileged role, and compare
+      its row counts with the live tables (§5 item 4).
+
+13. **Turn on automatic deploys, last.** Register the runner (step 9), set `MERIDIAN_APP_PATH`, and only now set
     `DEPLOY_ENABLED=true`. From then on:
     - **Every merge to `main` redeploys this site** once CI is green. The release builds while the site is still
       up, then a short maintenance window swaps it in, and testers mid-session will notice it.
@@ -431,7 +462,7 @@ measured against it, and the measurement is named wherever one was taken.
 `conf\extra\meridian.conf`. `CENTRAL_DOMAIN=pitahc.gov.ph`, and `pitahc.gov.ph` itself is the agency
 website on a different machine — so **no wildcard, no subdomain workspaces, and no path-prefixed deploy**.
 App at `C:\meridian\test-app`, PHP 8.4.27 x64 NTS at `C:\php` (8.4.25 until 2026-10-22, when the box was patched by swapping that folder, every path unchanged) behind `php-cgi-9000`/`9001`, PostgreSQL 15
-+ PostGIS, worker `meridian-test-worker`, scheduler `meridian-test-scheduler` (every minute). Nightly database backup `meridian-test-db-backup` (Task Scheduler, SYSTEM, 01:30): `C:\php\php.exe C:\meridian\backups\nightly-dump.php` boots the app to read the privileged connection's login and `pg_dump`s to `C:\meridian\backups\nightly\`, keeping the newest 14 (2026-10-12; no off-box copy — `R-4bda047a`).
++ PostGIS, worker `meridian-test-worker`, scheduler `meridian-test-scheduler` (every minute). Nightly database backup `meridian-test-db-backup` (Task Scheduler, SYSTEM, 01:30), rebuilt per §8.2 step 12 on 2026-11-09 (`M216`, `D212`, `D213`). It runs `C:\meridian\nightly-backup.ps1`, a copy of `scripts/nightly-backup.ps1` kept outside the app tree, with `-OffBoxDir "\\192.168.1.119\MeridianBackup$"`. That is a hidden, encrypted share on `D:\MeridianBackup`, the user's always-on office desktop's own hard disk. The task keeps 30 dumps in `C:\meridian\backups\nightly\` and 30 on the share, and SYSTEM reaches the share with a credential saved in its own vault. The first run returned 0, and the copy's SHA-256 matched on both machines. It restored into a scratch database with no messages, and all 70 tables matched the live counts except the sessions that had expired since. The old task's definition is kept in `C:\meridian\meridian-test-db-backup.pre-M216.xml`. Its 14 `staging-*.dump` files stay in that folder: the new script prunes only its own `deploy-*.dump`. ⚠️ The desktop's address comes from DHCP (`backup-target-dhcp`), and a failed copy alerts no one (`R-91237328`).
 Main `ErrorLog` is `logs\error_log` — **no extension** — and the vhost writes
 `logs\meridian-{access,error}.log`. `openssl.exe` ships at `C:\Apache24\bin\`.
 

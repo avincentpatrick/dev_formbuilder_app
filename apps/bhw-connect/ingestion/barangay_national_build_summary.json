@@ -1,0 +1,167 @@
+{
+  "assessment_date": "2026-11-08",
+  "source_release": "faeldon/philippines-psgc-shapefiles v1.0.1",
+  "mapshaper_version": "0.6.113",
+  "publication_ready": false,
+  "scope": "National build diagnostics against local development geography; not production or historical certification.",
+  "variants": {
+    "joint-10": {
+      "command": "-filter geo_level==Bgy -proj wgs84 -simplify 10% keep-shapes no-repair -o format=geojson",
+      "output_bytes": 115729230,
+      "provenance": {
+        "source_sha256": "0c1627035e1bef618a7f57ca96bc93822710aef03aa0c273a922f3b7cd3b198a",
+        "reference_sha256": "e21e46edbb09995f5a1d2bfd46e621c5b8bed6b7597dc00d4db9dee7a4696fbe",
+        "candidate_sha256": "be5732269de51b6bc736357206a311a9b84c9602b973e7ca40a412678cf3523a"
+      },
+      "retention_counts": {
+        "source_records": 42010,
+        "candidate_records": 42010,
+        "missing_source_codes": 0,
+        "unexpected_candidate_codes": 0,
+        "duplicate_candidate_codes": 0,
+        "non_barangay_features": {},
+        "source_invalid_codes": 4,
+        "candidate_invalid_codes": 108,
+        "newly_invalid_codes": 104,
+        "lost_components": 216,
+        "lost_holes": 3,
+        "source_components": 45573,
+        "candidate_components": 45080,
+        "source_holes": 12,
+        "candidate_holes": 9,
+        "gained_components": 0,
+        "gained_holes": 0
+      },
+      "reconciliation_counts": {
+        "reference": 41991,
+        "same_code": 41580,
+        "missing": 411,
+        "invalid_geometry": 106,
+        "parent_mismatch": 0,
+        "overlap": 21,
+        "candidate_usable": 41453,
+        "source_barangay_features": 42010,
+        "source_unique_codes": 42010,
+        "unmatched_source": 430,
+        "duplicate_source_codes": 0,
+        "invalid_source_features": 108,
+        "positive_area_overlap_pairs": 16
+      },
+      "blocking_checks": [
+        "source_invalid_codes",
+        "candidate_invalid_codes",
+        "lost_components",
+        "lost_holes",
+        "missing_reference_codes",
+        "unmatched_source_codes",
+        "positive_area_overlaps"
+      ],
+      "automated_checks_pass": false
+    },
+    "joint-10-retain": {
+      "command": "-filter geo_level==Bgy -proj wgs84 -simplify 10% keep-shapes -o format=geojson",
+      "output_bytes": 115737710,
+      "provenance": {
+        "source_sha256": "0c1627035e1bef618a7f57ca96bc93822710aef03aa0c273a922f3b7cd3b198a",
+        "reference_sha256": "e21e46edbb09995f5a1d2bfd46e621c5b8bed6b7597dc00d4db9dee7a4696fbe",
+        "candidate_sha256": "29449827b63d2cdea9e1bed77d0557d57d2cfc41b6cc9d7db48f52dc8fa65efc"
+      },
+      "retention_counts": {
+        "source_records": 42010,
+        "candidate_records": 42010,
+        "missing_source_codes": 0,
+        "unexpected_candidate_codes": 0,
+        "duplicate_candidate_codes": 0,
+        "non_barangay_features": {},
+        "source_invalid_codes": 4,
+        "candidate_invalid_codes": 4,
+        "newly_invalid_codes": 0,
+        "lost_components": 216,
+        "lost_holes": 3,
+        "source_components": 45573,
+        "candidate_components": 45080,
+        "source_holes": 12,
+        "candidate_holes": 9,
+        "gained_components": 0,
+        "gained_holes": 0
+      },
+      "reconciliation_counts": {
+        "reference": 41991,
+        "same_code": 41580,
+        "missing": 411,
+        "invalid_geometry": 4,
+        "parent_mismatch": 0,
+        "overlap": 11,
+        "candidate_usable": 41565,
+        "source_barangay_features": 42010,
+        "source_unique_codes": 42010,
+        "unmatched_source": 430,
+        "duplicate_source_codes": 0,
+        "invalid_source_features": 4,
+        "positive_area_overlap_pairs": 11
+      },
+      "blocking_checks": [
+        "source_invalid_codes",
+        "candidate_invalid_codes",
+        "lost_components",
+        "lost_holes",
+        "missing_reference_codes",
+        "unmatched_source_codes",
+        "positive_area_overlaps"
+      ],
+      "automated_checks_pass": false
+    },
+    "joint-full": {
+      "command": "-filter geo_level==Bgy -proj wgs84 -o format=geojson",
+      "output_bytes": 674377368,
+      "provenance": {
+        "source_sha256": "0c1627035e1bef618a7f57ca96bc93822710aef03aa0c273a922f3b7cd3b198a",
+        "reference_sha256": "e21e46edbb09995f5a1d2bfd46e621c5b8bed6b7597dc00d4db9dee7a4696fbe",
+        "candidate_sha256": "2d281667dafe388f6d93f5658c406e3593e99e7785f94100d2abdd38a44c283d"
+      },
+      "retention_counts": {
+        "source_records": 42010,
+        "candidate_records": 42010,
+        "missing_source_codes": 0,
+        "unexpected_candidate_codes": 0,
+        "duplicate_candidate_codes": 0,
+        "non_barangay_features": {},
+        "source_invalid_codes": 4,
+        "candidate_invalid_codes": 10,
+        "newly_invalid_codes": 6,
+        "lost_components": 0,
+        "lost_holes": 1,
+        "source_components": 45573,
+        "candidate_components": 45573,
+        "source_holes": 12,
+        "candidate_holes": 11,
+        "gained_components": 0,
+        "gained_holes": 0
+      },
+      "reconciliation_counts": {
+        "reference": 41991,
+        "same_code": 41580,
+        "missing": 411,
+        "invalid_geometry": 9,
+        "parent_mismatch": 0,
+        "overlap": 7,
+        "candidate_usable": 41564,
+        "source_barangay_features": 42010,
+        "source_unique_codes": 42010,
+        "unmatched_source": 430,
+        "duplicate_source_codes": 0,
+        "invalid_source_features": 10,
+        "positive_area_overlap_pairs": 5
+      },
+      "blocking_checks": [
+        "source_invalid_codes",
+        "candidate_invalid_codes",
+        "lost_holes",
+        "missing_reference_codes",
+        "unmatched_source_codes",
+        "positive_area_overlaps"
+      ],
+      "automated_checks_pass": false
+    }
+  }
+}

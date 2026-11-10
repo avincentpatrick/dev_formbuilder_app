@@ -1,0 +1,79 @@
+/** Opt-in local/production read-only measurement. Run separately from CI correctness tests.
+ * node scripts/measure-dataset-maps.mjs http://127.0.0.1:3100/bhw-connect/
+ */
+import { readFileSync } from 'node:fs';
+import { chromium } from 'playwright';
+// Optional: MEASURE_STUB_API=<ms> answers /api/dataset-map with a synthetic national payload after that
+// delay, for a machine with no database. It measures client start-up only and says so in the report.
+const stubDelayMs = process.env.MEASURE_STUB_API ? Number(process.env.MEASURE_STUB_API) : null;
+const stubRows = stubDelayMs === null ? [] : JSON.parse(readFileSync(new URL('../public/geo/regions.json', import.meta.url), 'utf8'))
+  .features.map((feature, index) => ({ code: feature.properties.geo_code, name: String(feature.properties.geo_code), value: index + 1 }));
+const base = new URL(process.argv[2] ?? 'http://127.0.0.1:3100/bhw-connect/');
+if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password ||
+    !base.pathname.endsWith('/bhw-connect/') || base.search || base.hash)
+  throw new Error('Supply an HTTP(S) /bhw-connect/ base URL without credentials');
+const browser = await chromium.launch({ headless: true, executablePath: process.env.MEASURE_CHROMIUM || undefined });
+try {
+  const results = [];
+  for (const { mode, run } of ['portal', 'fullscreen'].flatMap(mode =>
+    Array.from({ length: 3 }, (_, index) => ({ mode, run: index + 1 })))) {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(120000);
+      page.setDefaultNavigationTimeout(120000);
+      const cdp = await context.newCDPSession(page);
+      const network = new Map();
+      cdp.on('Network.requestWillBeSent', event => {
+        const path = new URL(event.request.url).pathname;
+        if (/\/(geo\/|api\/dataset-map|maplibre-gl-worker|_next\/static\/)/.test(path))
+          network.set(event.requestId, { path, start: event.timestamp * 1000 });
+      });
+      cdp.on('Network.loadingFinished', event => {
+        const entry = network.get(event.requestId);
+        if (entry) entry.end = event.timestamp * 1000;
+      });
+      await cdp.send('Network.enable');
+      await cdp.send('Network.setCacheDisabled', { cacheDisabled: true });
+      await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 80,
+        downloadThroughput: 4 * 1024 * 1024 / 8, uploadThroughput: 1024 * 1024 / 8 });
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+      if (stubDelayMs !== null) await page.route('**/api/dataset-map?**', async route => {
+        await new Promise(resolve => setTimeout(resolve, stubDelayMs));
+        await route.fulfill({ json: { state: 'available', rows: stubRows, total: stubRows.length, area: 'Philippines',
+          childLevel: 'region', source: 'Synthetic', date: '2026-09-01', license: 'Test only',
+          geometryUrl: new URL('geo/regions.json', base).pathname } });
+      });
+      const requested = [];
+      page.on('request', request => {
+        const url = new URL(request.url());
+        if (url.pathname.endsWith('/api/dataset-map')) requested.push(url.searchParams.get('dataset'));
+      });
+      const started = performance.now();
+      await page.goto(new URL(mode === 'portal' ? './' : 'map?dataset=uuc-phc-2025', base).href, { waitUntil: 'domcontentloaded' });
+      const card = page.getByRole('article', { name: 'UUC for PHC 2025 map', exact: true });
+      await card.waitFor();
+      const beforeScrollRequests = [...requested];
+      const visibleStart = performance.now();
+      if (mode === 'portal') await card.scrollIntoViewIfNeeded();
+      await card.locator('[data-map-state="ready"]').waitFor();
+      const ready = performance.now();
+      const resources = await page.evaluate(() => performance.getEntriesByType('resource')
+        .filter(entry => /\/(geo\/|api\/dataset-map|maplibre-gl-worker)/.test(new URL(entry.name).pathname))
+        .map(entry => ({ path: new URL(entry.name).pathname, transferSize: entry.transferSize,
+          encodedBodySize: entry.encodedBodySize, durationMs: entry.duration >= 0 ? Math.round(entry.duration) : null,
+          timingValid: entry.duration >= 0 })));
+      results.push({ mode, run, navigationToReadyMs: Math.round(ready - started),
+        afterDocumentAndScrollReadyMs: Math.round(ready - visibleStart),
+        targetMs: 3000, meetsPostDocumentTarget: ready - visibleStart <= 3000,
+        beforeScrollRequests, requestedDatasets: requested, liveMaps: await page.locator('.maplibregl-map').count(), resources,
+        waterfall: [...network.values()].map(entry => ({ path: entry.path,
+          startMs: Math.round(entry.start - Math.min(...[...network.values()].map(item => item.start))),
+          durationMs: entry.end === undefined ? null : Math.round(entry.end - entry.start) })) });
+    } finally { await context.close(); }
+  }
+  console.log(JSON.stringify({ measuredAt: new Date().toISOString(), origin: base.origin,
+    browser: browser.version(), profile: { viewport: '390x844', cpuSlowdown: 4, latencyMs: 80,
+      downloadBytesPerSecond: 524288, uploadBytesPerSecond: 131072, browserCache: 'disabled', runsPerScenario: 3 },
+    stubbedApi: stubDelayMs, caveat: (stubDelayMs === null ? '' : 'Dataset API stubbed with a synthetic payload: client start-up only. ') + 'Chromium emulation, not a real handset. Server caches are not reset. Post-document timing is not cold navigation latency. No production claim from local results.', results }, null, 2));
+} finally { await browser.close(); }

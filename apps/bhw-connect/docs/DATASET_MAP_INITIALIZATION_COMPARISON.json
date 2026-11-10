@@ -1,0 +1,604 @@
+{
+  "environment": "Local prefixed production build and synthetic development DB. Not real-device/production acceptance.",
+  "profile": {
+    "viewport": "390x844",
+    "cpuSlowdown": 4,
+    "latencyMs": 80,
+    "downloadBytesPerSecond": 524288,
+    "uploadBytesPerSecond": 131072,
+    "browserCache": "disabled",
+    "runsPerScenario": 3
+  },
+  "browser": "149.0.7827.55",
+  "beforeMeasuredAt": "2026-11-08T07:40:45.655Z",
+  "afterMeasuredAt": "2026-11-08T07:42:58.971Z",
+  "baseCommit": "c8e5deae",
+  "scenarios": {
+    "portal": {
+      "before": [
+        {
+          "run": 1,
+          "navigationToReadyMs": 3918,
+          "afterDocumentAndScrollReadyMs": 3016,
+          "meetsPostDocumentTarget": false,
+          "beforeScrollRequests": [],
+          "requestedDatasets": [
+            "uuc-phc-2025"
+          ],
+          "liveMaps": 1
+        },
+        {
+          "run": 2,
+          "navigationToReadyMs": 3829,
+          "afterDocumentAndScrollReadyMs": 3191,
+          "meetsPostDocumentTarget": false,
+          "beforeScrollRequests": [],
+          "requestedDatasets": [
+            "uuc-phc-2025"
+          ],
+          "liveMaps": 1
+        },
+        {
+          "run": 3,
+          "navigationToReadyMs": 3760,
+          "afterDocumentAndScrollReadyMs": 3207,
+          "meetsPostDocumentTarget": false,
+          "beforeScrollRequests": [],
+          "requestedDatasets": [
+            "uuc-phc-2025"
+          ],
+          "liveMaps": 1
+        }
+      ],
+      "after": [
+        {
+          "run": 1,
+          "navigationToReadyMs": 3017,
+          "afterDocumentAndScrollReadyMs": 2461,
+          "meetsPostDocumentTarget": true,
+          "beforeScrollRequests": [],
+          "requestedDatasets": [
+            "uuc-phc-2025"
+          ],
+          "liveMaps": 1
+        },
+        {
+          "run": 2,
+          "navigationToReadyMs": 2917,
+          "afterDocumentAndScrollReadyMs": 2358,
+          "meetsPostDocumentTarget": true,
+          "beforeScrollRequests": [],
+          "requestedDatasets": [
+            "uuc-phc-2025"
+          ],
+          "liveMaps": 1
+        },
+        {
+          "run": 3,
+          "navigationToReadyMs": 3296,
+          "afterDocumentAndScrollReadyMs": 2760,
+          "meetsPostDocumentTarget": true,
+          "beforeScrollRequests": [],
+          "requestedDatasets": [
+            "uuc-phc-2025"
+          ],
+          "liveMaps": 1
+        }
+      ],
+      "beforeMedianMs": 3191,
+      "afterMedianMs": 2461,
+      "beforeFirstWaterfall": [
+        {
+          "path": "/bhw-connect/_next/static/media/GeistMono_Variable.p.3ms9vq719j3f8.woff2",
+          "startMs": 0,
+          "durationMs": 471
+        },
+        {
+          "path": "/bhw-connect/_next/static/media/Geist_Variable-s.p.0mrjj4bg00-he.woff2",
+          "startMs": 3,
+          "durationMs": 483
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/1r9wzy2qht42z.css",
+          "startMs": 45,
+          "durationMs": 142
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/2ra52k1pgkjys.js",
+          "startMs": 48,
+          "durationMs": 274
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/0ru42f0d0bdtw.js",
+          "startMs": 49,
+          "durationMs": 323
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/0f8uddcniwing.js",
+          "startMs": 49,
+          "durationMs": 726
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/2m2-nspc5tsz6.js",
+          "startMs": 49,
+          "durationMs": 670
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/turbopack-243om7btj48ld.js",
+          "startMs": 50,
+          "durationMs": 447
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/0a-rekt06v0sv.js",
+          "startMs": 50,
+          "durationMs": 493
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/34gz5bodwoqvq.js",
+          "startMs": 50,
+          "durationMs": 513
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/24uc84sibsy7t.js",
+          "startMs": 51,
+          "durationMs": 635
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/1p_-spc_9975l.js",
+          "startMs": 51,
+          "durationMs": 561
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/07dddr9facc3d.js",
+          "startMs": 52,
+          "durationMs": 689
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/3dsi39vh8bzw4.js",
+          "startMs": 52,
+          "durationMs": 605
+        },
+        {
+          "path": "/bhw-connect/_next/static/media/equity-mark.0x56z6onmlm7f.png",
+          "startMs": 344,
+          "durationMs": 579
+        },
+        {
+          "path": "/bhw-connect/api/dataset-map",
+          "startMs": 1170,
+          "durationMs": 114
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/2ddmrojwgxvfe.css",
+          "startMs": 1295,
+          "durationMs": 112
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/3xihm0f-iuj3z.js",
+          "startMs": 1298,
+          "durationMs": 97
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/3wj37qui8srz5.js",
+          "startMs": 1624,
+          "durationMs": 993
+        },
+        {
+          "path": "/bhw-connect/geo/regions.json",
+          "startMs": 1629,
+          "durationMs": 767
+        },
+        {
+          "path": "/bhw-connect/maplibre-gl-worker.mjs",
+          "startMs": 3037,
+          "durationMs": null
+        }
+      ],
+      "afterFirstWaterfall": [
+        {
+          "path": "/bhw-connect/_next/static/media/GeistMono_Variable.p.3ms9vq719j3f8.woff2",
+          "startMs": 0,
+          "durationMs": 578
+        },
+        {
+          "path": "/bhw-connect/_next/static/media/Geist_Variable-s.p.0mrjj4bg00-he.woff2",
+          "startMs": 4,
+          "durationMs": 569
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/1r9wzy2qht42z.css",
+          "startMs": 6,
+          "durationMs": 157
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/2ra52k1pgkjys.js",
+          "startMs": 6,
+          "durationMs": 278
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/0ru42f0d0bdtw.js",
+          "startMs": 6,
+          "durationMs": 352
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/0f8uddcniwing.js",
+          "startMs": 6,
+          "durationMs": 766
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/2m2-nspc5tsz6.js",
+          "startMs": 7,
+          "durationMs": 646
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/turbopack-243om7btj48ld.js",
+          "startMs": 7,
+          "durationMs": 415
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/0a-rekt06v0sv.js",
+          "startMs": 7,
+          "durationMs": 475
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/34gz5bodwoqvq.js",
+          "startMs": 7,
+          "durationMs": 507
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/24uc84sibsy7t.js",
+          "startMs": 7,
+          "durationMs": 670
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/0efzzuc4esy4c.js",
+          "startMs": 7,
+          "durationMs": 623
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/0zdu8whez2sxr.js",
+          "startMs": 7,
+          "durationMs": 726
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/3dsi39vh8bzw4.js",
+          "startMs": 7,
+          "durationMs": 664
+        },
+        {
+          "path": "/bhw-connect/_next/static/media/equity-mark.0x56z6onmlm7f.png",
+          "startMs": 216,
+          "durationMs": 708
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/2ddmrojwgxvfe.css",
+          "startMs": 1079,
+          "durationMs": 128
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/0wuq1b16x01i6.js",
+          "startMs": 1086,
+          "durationMs": 94
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/3fywgljy_p2mm.js",
+          "startMs": 1088,
+          "durationMs": 90
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/36gimxkls4cq2.js",
+          "startMs": 1090,
+          "durationMs": 793
+        },
+        {
+          "path": "/bhw-connect/api/dataset-map",
+          "startMs": 1093,
+          "durationMs": 135
+        },
+        {
+          "path": "/bhw-connect/geo/regions.json",
+          "startMs": 1580,
+          "durationMs": 537
+        },
+        {
+          "path": "/bhw-connect/maplibre-gl-worker.mjs",
+          "startMs": 2286,
+          "durationMs": null
+        }
+      ]
+    },
+    "fullscreen": {
+      "before": [
+        {
+          "run": 1,
+          "navigationToReadyMs": 3426,
+          "afterDocumentAndScrollReadyMs": 3062,
+          "meetsPostDocumentTarget": false,
+          "beforeScrollRequests": [],
+          "requestedDatasets": [
+            "uuc-phc-2025"
+          ],
+          "liveMaps": 1
+        },
+        {
+          "run": 2,
+          "navigationToReadyMs": 3541,
+          "afterDocumentAndScrollReadyMs": 3140,
+          "meetsPostDocumentTarget": false,
+          "beforeScrollRequests": [],
+          "requestedDatasets": [
+            "uuc-phc-2025"
+          ],
+          "liveMaps": 1
+        },
+        {
+          "run": 3,
+          "navigationToReadyMs": 3542,
+          "afterDocumentAndScrollReadyMs": 3150,
+          "meetsPostDocumentTarget": false,
+          "beforeScrollRequests": [],
+          "requestedDatasets": [
+            "uuc-phc-2025"
+          ],
+          "liveMaps": 1
+        }
+      ],
+      "after": [
+        {
+          "run": 1,
+          "navigationToReadyMs": 3016,
+          "afterDocumentAndScrollReadyMs": 2612,
+          "meetsPostDocumentTarget": true,
+          "beforeScrollRequests": [],
+          "requestedDatasets": [
+            "uuc-phc-2025"
+          ],
+          "liveMaps": 1
+        },
+        {
+          "run": 2,
+          "navigationToReadyMs": 3167,
+          "afterDocumentAndScrollReadyMs": 2720,
+          "meetsPostDocumentTarget": true,
+          "beforeScrollRequests": [],
+          "requestedDatasets": [
+            "uuc-phc-2025"
+          ],
+          "liveMaps": 1
+        },
+        {
+          "run": 3,
+          "navigationToReadyMs": 3094,
+          "afterDocumentAndScrollReadyMs": 2695,
+          "meetsPostDocumentTarget": true,
+          "beforeScrollRequests": [],
+          "requestedDatasets": [
+            "uuc-phc-2025"
+          ],
+          "liveMaps": 1
+        }
+      ],
+      "beforeMedianMs": 3140,
+      "afterMedianMs": 2695,
+      "beforeFirstWaterfall": [
+        {
+          "path": "/bhw-connect/_next/static/media/GeistMono_Variable.p.3ms9vq719j3f8.woff2",
+          "startMs": 0,
+          "durationMs": 563
+        },
+        {
+          "path": "/bhw-connect/_next/static/media/Geist_Variable-s.p.0mrjj4bg00-he.woff2",
+          "startMs": 1,
+          "durationMs": 553
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/1r9wzy2qht42z.css",
+          "startMs": 1,
+          "durationMs": 141
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/2ra52k1pgkjys.js",
+          "startMs": 1,
+          "durationMs": 258
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/0ru42f0d0bdtw.js",
+          "startMs": 2,
+          "durationMs": 332
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/0f8uddcniwing.js",
+          "startMs": 2,
+          "durationMs": 727
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/2m2-nspc5tsz6.js",
+          "startMs": 2,
+          "durationMs": 623
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/turbopack-243om7btj48ld.js",
+          "startMs": 2,
+          "durationMs": 395
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/0a-rekt06v0sv.js",
+          "startMs": 2,
+          "durationMs": 455
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/34gz5bodwoqvq.js",
+          "startMs": 2,
+          "durationMs": 491
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/24uc84sibsy7t.js",
+          "startMs": 2,
+          "durationMs": 638
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/3dsi39vh8bzw4.js",
+          "startMs": 2,
+          "durationMs": 581
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/041wxyaavob1x.js",
+          "startMs": 5,
+          "durationMs": 652
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/0wvfw8p119qlr.js",
+          "startMs": 5,
+          "durationMs": 644
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/07dddr9facc3d.js",
+          "startMs": 5,
+          "durationMs": 721
+        },
+        {
+          "path": "/bhw-connect/api/dataset-map",
+          "startMs": 1026,
+          "durationMs": 90
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/2ddmrojwgxvfe.css",
+          "startMs": 1124,
+          "durationMs": 108
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/3xihm0f-iuj3z.js",
+          "startMs": 1126,
+          "durationMs": 95
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/3wj37qui8srz5.js",
+          "startMs": 1452,
+          "durationMs": 993
+        },
+        {
+          "path": "/bhw-connect/geo/regions.json",
+          "startMs": 1456,
+          "durationMs": 769
+        },
+        {
+          "path": "/bhw-connect/maplibre-gl-worker.mjs",
+          "startMs": 2784,
+          "durationMs": null
+        }
+      ],
+      "afterFirstWaterfall": [
+        {
+          "path": "/bhw-connect/_next/static/media/GeistMono_Variable.p.3ms9vq719j3f8.woff2",
+          "startMs": 0,
+          "durationMs": 563
+        },
+        {
+          "path": "/bhw-connect/_next/static/media/Geist_Variable-s.p.0mrjj4bg00-he.woff2",
+          "startMs": 1,
+          "durationMs": 553
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/1r9wzy2qht42z.css",
+          "startMs": 4,
+          "durationMs": 139
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/2ra52k1pgkjys.js",
+          "startMs": 5,
+          "durationMs": 256
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/0ru42f0d0bdtw.js",
+          "startMs": 5,
+          "durationMs": 329
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/0f8uddcniwing.js",
+          "startMs": 5,
+          "durationMs": 723
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/2m2-nspc5tsz6.js",
+          "startMs": 5,
+          "durationMs": 617
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/turbopack-243om7btj48ld.js",
+          "startMs": 5,
+          "durationMs": 391
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/0a-rekt06v0sv.js",
+          "startMs": 5,
+          "durationMs": 451
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/34gz5bodwoqvq.js",
+          "startMs": 6,
+          "durationMs": 485
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/24uc84sibsy7t.js",
+          "startMs": 6,
+          "durationMs": 634
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/3dsi39vh8bzw4.js",
+          "startMs": 7,
+          "durationMs": 574
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/041wxyaavob1x.js",
+          "startMs": 8,
+          "durationMs": 650
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/2-9rzscuo61z9.js",
+          "startMs": 8,
+          "durationMs": 642
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/0zdu8whez2sxr.js",
+          "startMs": 8,
+          "durationMs": 715
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/2ddmrojwgxvfe.css",
+          "startMs": 1081,
+          "durationMs": 132
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/0wuq1b16x01i6.js",
+          "startMs": 1091,
+          "durationMs": 97
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/3fywgljy_p2mm.js",
+          "startMs": 1095,
+          "durationMs": 91
+        },
+        {
+          "path": "/bhw-connect/_next/static/chunks/36gimxkls4cq2.js",
+          "startMs": 1099,
+          "durationMs": 849
+        },
+        {
+          "path": "/bhw-connect/api/dataset-map",
+          "startMs": 1103,
+          "durationMs": 101
+        },
+        {
+          "path": "/bhw-connect/geo/regions.json",
+          "startMs": 1538,
+          "durationMs": 590
+        },
+        {
+          "path": "/bhw-connect/maplibre-gl-worker.mjs",
+          "startMs": 2363,
+          "durationMs": null
+        }
+      ]
+    }
+  }
+}

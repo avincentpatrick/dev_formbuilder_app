@@ -54,7 +54,7 @@ final class PublicFormPresenter
                 // the per-form opt-in AND the tenant plan. The plan half mirrors RequireFeature exactly —
                 // fail-open when no catalog resolves — so this flag and the draft route never disagree. The
                 // route is still authoritative; this only decides whether the control is shown.
-                'save_and_resume' => $form->save_and_resume && $this->tenantAllowsSaveResume(),
+                'save_and_resume' => $this->offersSaveAndResume($form),
                 // Whether this form requires a proof-of-work spam check before it will accept a submission
                 // (I8b). A hint, not a gate: the submit route decides, and this only saves the client a
                 // rejected round trip. A client replaying queued submissions may send one without having
@@ -117,6 +117,13 @@ final class PublicFormPresenter
             ->where('form_id', $form->id)
             ->consumesCapacity()
             ->count();
+    }
+
+    // M225 (`R-4ea564fe`): a method with a `bool` return rather than the `&&` inline, because Scramble typed the
+    // inline expression as a string and published `save_and_resume` that way in `openapi.json`.
+    private function offersSaveAndResume(Form $form): bool
+    {
+        return $form->save_and_resume && $this->tenantAllowsSaveResume();
     }
 
     /**

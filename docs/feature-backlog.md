@@ -13014,10 +13014,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   default is 60.** Found by `M130`. Its rate-limit table against `config/guest.php`'s `submit_per_ip` default.
   **Not live**. Filed by `M130`. **Tier: during-testing.**
 
-- **`nit` · `openapi.json` publishes the guest schema's `save_and_resume` as a string; it is a boolean.** Found by
+- ✅ **CLOSED BY `M225` (2026-11-08) — ****`nit` · `openapi.json` publishes the guest schema's `save_and_resume` as a string; it is a boolean.** Found by
   `M130`. Scramble infers it from `PublicFormPresenter`'s `&&` expression and gets the type wrong, so a client
   generated from the contract types the flag as text. An explicit array-shape docblock on the presenter fixes the
   inference. **Live.** Filed by `M130`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M225` (2026-11-08), on its branch.**
+  - The flag now comes from `offersSaveAndResume()`, a method returning `bool`, and the export publishes it as `boolean`. The prescribed docblock was not used: `present()` returns about twenty keys, and Scramble keeps a docblock only when it carries more known types than its own inference.
+  - A new `OpenApiContractTest` case pins the type; it was red against the old file, and a mutant flipping the type back is CAUGHT.
+  - **`D13` exception #10:** batched with `R-e2c1ba51` in one PR, allowed by the user in chat on 2026-11-08.
 
 - **`minor` · No test checks the guest schema's real response against `openapi.json`.** Found by `M130`. CI
   byte-diffs a fresh export against the committed file, which proves the document matches the code's inference,
@@ -13081,12 +13085,18 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   button and no setting exists. A form meant to be answered once per respondent therefore invites a second response.
   **Not live**. Filed by `M130`. **Tier: before-launch.**
 
-- **`minor` · `openapi.json` documents the guest submit's success as a bare string, so its body — `id`, `reference`,
+- ✅ **CLOSED BY `M225` (2026-11-08) — ****`minor` · `openapi.json` documents the guest submit's success as a bare string, so its body — `id`, `reference`,
   `status` and, since M130, `redirect` — is in no contract.** Found by `M130` while regenerating the document for
   `R-db169c29`. `GuestSubmissionController::store()` answers `201` or `200` from one expression, and Scramble documents
   that as `200: {type: string}`; adding `redirect` changed nothing in the export. A client generated from the contract
   cannot read the reference or the destination. An explicit response annotation fixes it. **Live.** Filed by `M130`.
   **Tier: during-testing.**
+  ✅ **CLOSED BY `M225` (2026-11-08), on its branch.**
+  - **The cause was the ternary status code, not a missing annotation.** The body is now built once and returned with a literal status on each branch, and the export publishes both 200 and 201 as an object carrying `id`, `reference`, `status` and `redirect`.
+  - **The guest draft save had the same defect** (`GuestDraftController::store()`, `POST /public/f/{shareToken}/draft`), and is fixed the same way. The tenant `SubmissionDraftController` has the same ternary, but it is a session route outside the contract.
+  - Once a body is inferred, Scramble publishes a `//` comment above an array key as that property's description, so the internal notes moved above the assignment, and only short descriptions for integrators stay on `reference`, `redirect` and `content_checksum`.
+  - A new `OpenApiContractTest` case pins both bodies on both statuses; it was red against the old file, and mutants on the submit's 200 and the draft's 201 are CAUGHT.
+  - **`D13` exception #10:** batched with `R-4ea564fe` in one PR, allowed by the user in chat on 2026-11-08.
 
 - **`minor` · CI's E2E job proves no service-worker behaviour: the secure-origin launch flag does not take on its origin,
   so every offline case in `tests/e2e/public-runtime-offline.spec.ts` skips there or runs without its service-worker leg.**

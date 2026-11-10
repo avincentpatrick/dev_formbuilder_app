@@ -123,19 +123,32 @@ final class GuestDraftController extends Controller
                 );
         }
 
-        return response()->json([
+        // Increment P3a — `content_checksum` is the baseline for this device's NEXT save, taken from what the service
+        // just wrote rather than re-read. A device that does not chain this forward will be refused on its following
+        // save, which is the intended direction for a guard to fail.
+        //
+        // M225 (`R-e2c1ba51`'s second instance): the body is built once and returned with a literal status on each
+        // branch, because Scramble cannot infer a status chosen by a ternary and published the whole success body as
+        // a bare string. These notes sit here, not above the keys, because Scramble publishes a comment above an
+        // array key as that property's description in `openapi.json`.
+        $body = [
             'data' => [
                 'id' => $submission->id,
                 'completeness_percent' => $submission->completeness_percent,
                 'resume_token' => $minted->token,
                 'resume_url' => $resumeUrl,
                 'expires_at' => gmdate('c', $minted->expiresAt),
-                // Increment P3a — the baseline for this device's NEXT save, taken from what the service just
-                // wrote rather than re-read. A device that does not chain this forward will be refused on its
-                // following save, which is the intended direction for a guard to fail.
+                // The baseline for this device's next save. Send it back with that save; a save made against an
+                // older baseline is refused with a 409.
                 'content_checksum' => $result->contentChecksum,
             ],
-        ], $result->created ? 201 : 200);
+        ];
+
+        if ($result->created) {
+            return response()->json($body, 201);
+        }
+
+        return response()->json($body);
     }
 
     /**

@@ -13815,9 +13815,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   inside the first one's reorder session, and Enter there announces the second as dropped. The remedy acts on `grabbedUid`,
   or cancels a grab when its grip loses focus. **Live.** Filed by `M150`. **Tier: during-testing.**
 
-- **`nit` · A section drag is announced as "Dragging a section", without the section's name.** Found by `M150` in
+- ✅ **CLOSED BY `M222` (2026-11-08) — ****`nit` · A section drag is announced as "Dragging a section", without the section's name.** Found by `M150` in
   `useCanvasReorder.ts`: a question's drag, grab and drop name the question, and a section's name only its position
   ("Dropped section, section 2 of 3"). **Live.** Filed by `M150`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M222` (2026-11-08), on its branch.**
+  - `useCanvasReorder.ts`'s new `sectionName()` puts the section's title into all four messages: drag, pointer drop, grab and keyboard drop. A section with no title yet says "a section".
+  - No test pinned any section announcement before. Three new `useCanvasReorder.test.ts` cases do now, and two were red before the fix.
+  - Five Vitest mutants, each restored byte for byte, all CAUGHT.
+  - Ships as 0.18.1.
 
 - **`nit` · Every question's Duplicate and Delete buttons share one name, "Duplicate field" and "Delete field".** Found by
   `M150` in `BuilderCanvas.vue`: a screen reader listing the buttons hears the same two names on every row, and the builder

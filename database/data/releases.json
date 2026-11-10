@@ -1,5 +1,15 @@
 [
     {
+        "version": "0.18.1",
+        "title": "Moving a section says which one",
+        "items": [
+            {
+                "kind": "fixed",
+                "text": "With a screen reader, moving a section in the builder’s Structure view now says the section’s name when you pick it up, move it and drop it, as moving a question already did. Before, it said only “a section”."
+            }
+        ]
+    },
+    {
         "version": "0.18.0",
         "title": "Rename a section where you see it",
         "items": [

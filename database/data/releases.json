@@ -10,6 +10,16 @@
         ]
     },
     {
+        "version": "0.17.2",
+        "title": "XLSForm exports keep translated choices",
+        "items": [
+            {
+                "kind": "fixed",
+                "text": "A form translated only in its answer choices, or in the rows and columns of a grid, now keeps those translations when you export it to XLSForm. Before, the export left them out unless a question's own label was translated too."
+            }
+        ]
+    },
+    {
         "version": "0.17.1",
         "title": "Builder panels that grow with your text",
         "items": [

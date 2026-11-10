@@ -1,0 +1,118 @@
+{
+  "candidate_overlap_pairs": 10322,
+  "relationships": {
+    "touching-upstream": 10314,
+    "disjoint-upstream": 3,
+    "overlap-present-upstream": 5
+  },
+  "by_parent_scope": {
+    "different-source-municipalities": {
+      "touching-upstream": 10310,
+      "disjoint-upstream": 3,
+      "overlap-present-upstream": 3
+    },
+    "same-source-municipality": {
+      "overlap-present-upstream": 2,
+      "touching-upstream": 4
+    }
+  },
+  "publication_ready": false,
+  "scope": "Only previously reported downstream overlap pairs, not a nationwide upstream topology certification.",
+  "interpretation": "Touching/disjoint upstream identifies an export-pipeline issue to investigate, not permission to snap or clip polygons.",
+  "provenance": {
+    "source_release": "v1.0.1",
+    "source_url": "https://github.com/faeldon/philippines-psgc-shapefiles/releases/download/v1.0.1/PH_Adm4_BgySubMuns.shp.zip",
+    "source_sha256": "0c1627035e1bef618a7f57ca96bc93822710aef03aa0c273a922f3b7cd3b198a",
+    "candidate_report_sha256": "d243bd9464f93e709db58a2633ec0cb65a3661814a0f5a417f5c5bc743057665",
+    "candidate_provenance": {
+      "release": "v1.1.1-PSGC-2026-3Q",
+      "source": "https://github.com/faeldon/philippines-json-maps/releases/download/v1.1.1/geojson-hires.zip",
+      "archive_sha256": "d6aedda878af0884f112d992183639df61f5e74af380cf71a589055f9437a348",
+      "reference_sha256": "e21e46edbb09995f5a1d2bfd46e621c5b8bed6b7597dc00d4db9dee7a4696fbe",
+      "reference_description": "Local synthetic-development database dim_geo; not production certification",
+      "shapely_version": "2.1.2",
+      "attribution": "James Faeldon (MIT); underlying NAMRIA and PSA boundaries through OCHA COD-AB (CC BY 3.0 IGO).",
+      "normalization": "Supplier integer PSGC padded to ten digits; no historical remapping."
+    },
+    "source_crs_wkt": "PROJCS[\"WGS_1984_UTM_Zone_51N\",GEOGCS[\"GCS_WGS_1984\",DATUM[\"D_WGS_1984\",SPHEROID[\"WGS_1984\",6378137.0,298.257223563]],PRIMEM[\"Greenwich\",0.0],UNIT[\"Degree\",0.0174532925199433]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"False_Easting\",500000.0],PARAMETER[\"False_Northing\",0.0],PARAMETER[\"Central_Meridian\",123.0],PARAMETER[\"Scale_Factor\",0.9996],PARAMETER[\"Latitude_Of_Origin\",0.0],UNIT[\"Meter\",1.0]]",
+    "source_crs_sha256": "01fbf2c44b71ea8a0a0a4253817bc070539d7b073da64fdbd4729c43b4c77415",
+    "shapely_version": "2.1.2",
+    "pyshp_version": "2.3.1"
+  },
+  "assessment_date": "2026-11-08",
+  "controlled_trial": {
+    "municipalities": [
+      "0102802000",
+      "0102812000"
+    ],
+    "mapshaper_version": "0.6.113",
+    "command": "-proj wgs84 -simplify 10% keep-shapes no-repair -o format=geojson",
+    "results": {
+      "supplier_hires": {
+        "summary": {
+          "reference": 123,
+          "same_code": 123,
+          "missing": 0,
+          "invalid_geometry": 0,
+          "parent_mismatch": 0,
+          "overlap": 9,
+          "candidate_usable": 114,
+          "source_barangay_features": 123,
+          "source_unique_codes": 123,
+          "unmatched_source": 0,
+          "duplicate_source_codes": 0,
+          "invalid_source_features": 0,
+          "positive_area_overlap_pairs": 7
+        },
+        "polygon_components": 123,
+        "code_count": 123
+      },
+      "joint": {
+        "summary": {
+          "reference": 123,
+          "same_code": 123,
+          "missing": 0,
+          "invalid_geometry": 0,
+          "parent_mismatch": 0,
+          "overlap": 0,
+          "candidate_usable": 123,
+          "source_barangay_features": 123,
+          "source_unique_codes": 123,
+          "unmatched_source": 0,
+          "duplicate_source_codes": 0,
+          "invalid_source_features": 0,
+          "positive_area_overlap_pairs": 0
+        },
+        "polygon_components": 123,
+        "code_count": 123
+      },
+      "separate": {
+        "summary": {
+          "reference": 123,
+          "same_code": 123,
+          "missing": 0,
+          "invalid_geometry": 0,
+          "parent_mismatch": 0,
+          "overlap": 9,
+          "candidate_usable": 114,
+          "source_barangay_features": 123,
+          "source_unique_codes": 123,
+          "unmatched_source": 0,
+          "duplicate_source_codes": 0,
+          "invalid_source_features": 0,
+          "positive_area_overlap_pairs": 7
+        },
+        "polygon_components": 123,
+        "code_count": 123
+      }
+    },
+    "publication_ready": false,
+    "scope": "Controlled two-municipality trial only; not nationwide or historical acceptance.",
+    "artifact_hashes": {
+      "joint.geojson": "bacbcb7a60331c560ca87ecbbc48f12fb03e7af67a27556ae33349ecebcf2e0e",
+      "separate-102802000.geojson": "5e803a1419d83000395f6fd9cf025b7bed6708beeb5515c98d81aa784b9b9d15",
+      "separate-102812000.geojson": "0253765e8c4e33bacb84b57a3329a59180f60168cfc355465174a7958f3e069d"
+    }
+  },
+  "attribution": "James Faeldon; underlying NAMRIA and PSA boundaries through OCHA COD-AB (CC BY 3.0 IGO). Preserve original notices when redistributing."
+}

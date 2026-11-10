@@ -227,15 +227,42 @@ final class XlsformExporter
         foreach ($this->pairs($config, 'rows') as $rowOpt) {
             foreach ($this->pairs($config, 'columns') as $colOpt) {
                 $cell = $cellTypes[$colOpt['value']] ?? ['type' => 'select_one '.$sharedList, 'required' => $gridRequired];
-                $survey[] = [
+                $row = [
                     'type' => $cell['type'],
                     'name' => $key.'_'.$rowOpt['value'].'_'.$colOpt['value'],
-                    'label' => trim($rowOpt['label'].' — '.$colOpt['label']),
                     'required' => $cell['required'] ? 'yes' : '',
                     '#meridian' => XlsformTypeMap::MARKER_MATRIX.':'.$key,
                 ];
+                $this->fillText($row, 'label', trim($rowOpt['label'].' — '.$colOpt['label']), $this->cellTranslations($rowOpt, $colOpt, $langs), $langs);
+                $survey[] = $row;
             }
         }
+    }
+
+    /**
+     * A matrix cell's label in each language, built as its base label is: the row, then the column. A language only one
+     * of them has borrows the other's default-language text, because half a label is still the question. A language
+     * neither has stays out, so its cell is blank rather than reading as a translation somebody wrote (M217, `R-df883cbf`).
+     *
+     * @param  array{value: string, label: string, translations: mixed}  $row
+     * @param  array{value: string, label: string, translations: mixed}  $column
+     * @param  list<string>  $langs
+     * @return array<string, string>
+     */
+    private function cellTranslations(array $row, array $column, array $langs): array
+    {
+        $in = static fn (mixed $map, string $lang): string => is_array($map) && is_scalar($map[$lang] ?? null) ? trim((string) $map[$lang]) : '';
+
+        $labels = [];
+        foreach ($langs as $lang) {
+            $rowText = $in($row['translations'], $lang);
+            $columnText = $in($column['translations'], $lang);
+            if ($rowText !== '' || $columnText !== '') {
+                $labels[$lang] = trim(($rowText !== '' ? $rowText : $row['label']).' — '.($columnText !== '' ? $columnText : $column['label']));
+            }
+        }
+
+        return $labels;
     }
 
     /**
@@ -255,12 +282,13 @@ final class XlsformExporter
         $this->pushPairList($listName, $this->pairs($config, 'columns'), $locale, $langs, $choices, $listsSeen);
 
         foreach ($this->pairs($config, 'rows') as $rowOpt) {
-            $survey[] = [
+            $row = [
                 'type' => 'select_one '.$listName,
                 'name' => $key.'_'.$rowOpt['value'],
-                'label' => $rowOpt['label'] !== '' ? $rowOpt['label'] : $rowOpt['value'],
                 '#meridian' => XlsformTypeMap::MARKER_LIKERT_MATRIX.':'.$key,
             ];
+            $this->fillText($row, 'label', $rowOpt['label'] !== '' ? $rowOpt['label'] : $rowOpt['value'], $rowOpt['translations'], $langs);
+            $survey[] = $row;
         }
     }
 
@@ -616,6 +644,25 @@ final class XlsformExporter
             $collect($field['hint_translations'] ?? null);
             foreach (is_array($field['validations'] ?? null) ? $field['validations'] : [] as $validation) {
                 $collect($validation['error_message_translations'] ?? null);
+            }
+
+            // Every list inside the config that this exporter writes a translation from (M217, `R-df883cbf`). Not
+            // `levels`: a cascade level has no row in the workbook, so its languages would only add an empty column.
+            $config = is_array($field['config'] ?? null) ? $field['config'] : [];
+            foreach (['options', 'rows', 'columns', 'cells'] as $list) {
+                foreach (is_array($config[$list] ?? null) ? $config[$list] : [] as $entry) {
+                    if (! is_array($entry)) {
+                        continue;
+                    }
+                    $collect($entry['label_translations'] ?? null);
+
+                    // A grid column's own choices, since M183.
+                    foreach (is_array($entry['options'] ?? null) ? $entry['options'] : [] as $choice) {
+                        if (is_array($choice)) {
+                            $collect($choice['label_translations'] ?? null);
+                        }
+                    }
+                }
             }
         }
 

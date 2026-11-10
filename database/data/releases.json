@@ -1,5 +1,15 @@
 [
     {
+        "version": "0.17.4",
+        "title": "Saved questions keep their rules as loose as they were",
+        "items": [
+            {
+                "kind": "fixed",
+                "text": "When you use Save to library on a question whose rules are grouped (any of these, or all of these) and one rule in the group compares with another question, the whole group is now left out of the saved copy. Before, only the comparison was left out, so the copy was stricter than the question you saved. A comparison with another question still cannot be saved to the library, because the other question is not there."
+            }
+        ]
+    },
+    {
         "version": "0.17.3",
         "title": "XLSForm imports with long appearances",
         "items": [

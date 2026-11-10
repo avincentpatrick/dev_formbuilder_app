@@ -13091,12 +13091,18 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   replaced), or serve CI's E2E on a `*.localhost` origin; then make a skip in CI fail rather than pass quietly.
   **Live.** Filed by `M130`. **Tier: during-testing.**
 
-- **`minor` · Saving a question to the field library drops its cross-field rules but keeps their group, so an "any of
+- ✅ **CLOSED BY `M220` (2026-11-08) — ****`minor` · Saving a question to the field library drops its cross-field rules but keeps their group, so an "any of
   these" group comes back stricter.** Found by `M131` while verifying `R-799d60f5`. `FieldLibrary::fromField()` drops
   every rule that names another question and keeps the remaining rows' group ordinals, so an OR group that loses a
   field comparison offers fewer alternatives and refuses answers the original accepted. Reachable once the builder
   authors groups. The remedy is to drop a group whole when any member goes, or to ungroup the survivors and say so.
   Read, not run. **Live.** Filed by `M131`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M220` (2026-11-08), on its branch: the group is dropped whole.**
+  - Run, not only read: the new `FieldLibraryMapperTest` case failed before the fix, with the `or` group's survivor (`min_value:0`) back on its own.
+  - `FieldLibrary::fromField()` now drops every rule of a group that has a cross-field member. Rules in a group with no such member travel together, still one group, and an ungrouped comparison is dropped as before.
+  - **The other remedy, ungrouping the survivors, is wrong and was not taken.** The engines combine units as ANY (required, skip) or ALL (constraints), so an ungrouped constraint must pass on its own, which is stricter still.
+  - Three mutants through `scripts/mutate.php`, all CAUGHT.
+  - Ships as 0.17.4, numbered after #414 and #431.
 
 - **`minor` · A form's preset theme reaches the guest page and the builder preview and nothing else.** Found by `M131`
   while verifying `R-6017d6d8`. Mail and the response PDF read `BrandPalette`, not the brand partial, and the encode

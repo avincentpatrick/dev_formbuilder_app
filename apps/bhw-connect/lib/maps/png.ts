@@ -52,7 +52,7 @@ export function pngNotes(data: Context): string[] {
     `Legend: ${data.legend.method}. Gray: unavailable value or navigation-only geography; not zero.`,
     ...(data.rows.some(row => "smallSample" in row && row.smallSample) ? [`Faded fills and dashed outlines: few BHWs profiled — unstable (fewer than ${MIN_LEADER_N} profiles).`] : []),
     `Coverage: ${data.rows.length} areas in complete table; ${missing} without drawable geometry; ${unchecked} with geometry not checked. The image shows the current viewport only.`,
-    `Reported parent ${data.parentMeasure.kind}: ${data.parentMeasure.value ?? "not available / not applicable"}${data.parentMeasure.kind === "rate" ? "%" : ""}. ${data.totalNote}`,
+    `Reported parent ${data.parentMeasure.kind}: ${data.parentMeasure.value ?? "not available / not applicable"}${data.parentMeasure.kind === "rate" ? "%" : data.parentMeasure.kind === "mean" ? ` ${data.parentMeasure.unit}` : ""}. ${data.totalNote}`,
     ...(data.indicator.denominator ? [`Denominator: ${data.indicator.denominator}`] : []),
     ...(selected ? [`Selected value: ${selectedValue}${selected.label ? ` (${selected.label})` : ""}. ${selected.note ?? ""}`] : []),
     ...(selected && data.indicator.confidenceLevel ? [`Published ${data.indicator.confidenceLevel! * 100}% confidence interval: ${selected.ciLow ?? "unavailable"} to ${selected.ciHigh ?? "unavailable"}.`] : []),

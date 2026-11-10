@@ -203,3 +203,55 @@ describe('keyboard grab (M150)', () => {
         expect(reorders()).toBe(1);
     });
 });
+
+/**
+ * M222 (`R-0ace5ea8`) — a section's drag, grab and drop say which section, as a question's always have. Before it a screen
+ * reader heard "Dragging a section", "Grabbed a section" and "Dropped section", and only a position.
+ */
+describe('a section named in its announcements (M222)', () => {
+    const sections = [
+        serverSection({ id: 's1', key: 'visit', label: 'Visit', sequence: 1 }),
+        serverSection({ id: 's2', key: 'household', label: 'Household', sequence: 2 }),
+    ];
+
+    function sectionGrip(w: VueWrapper, label: string): HTMLElement {
+        return w.find(`button[aria-label^="Reorder section ${label}."]`).element as HTMLElement;
+    }
+
+    it('names the section it drags and drops with the pointer', async () => {
+        const { wrapper: w } = canvas([{}], sections);
+
+        pointer(sectionGrip(w, 'Household'), 'pointerdown', 20);
+        pointer(window, 'pointermove', 40);
+        await flushPromises();
+        expect(said(w)).toBe('Dragging section Household. Move over a position and release to drop.');
+
+        pointer(window, 'pointerup', 40);
+        await flushPromises();
+        expect(said(w)).toMatch(/^Dropped section Household, section \d of 2\.$/);
+    });
+
+    it('names the section it grabs and drops with the keyboard', async () => {
+        const { wrapper: w } = canvas([{}], sections);
+
+        sectionGrip(w, 'Household').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        await flushPromises();
+        expect(said(w)).toBe('Grabbed section Household, section 2 of 2. Use up and down arrows to move, Enter to drop, Escape to cancel.');
+
+        (w.find('button[aria-label^="Reorder section Household."]').element as HTMLElement).dispatchEvent(
+            new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+        );
+        await flushPromises();
+        expect(said(w)).toBe('Dropped section Household, section 2 of 2.');
+    });
+
+    it('says "a section" for one with no title yet', async () => {
+        const { wrapper: w } = canvas([{}], [serverSection({ id: 's1', key: 'blank', label: '', sequence: 1 })]);
+
+        (w.find('button[aria-label^="Reorder section ."]').element as HTMLElement).dispatchEvent(
+            new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+        );
+        await flushPromises();
+        expect(said(w)).toContain('Grabbed a section, section 1 of 1.');
+    });
+});

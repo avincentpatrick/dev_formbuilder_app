@@ -64,3 +64,32 @@ it("does not assign accreditation uncertainty to honorarium receipt exports", ()
   expect(result.indicator.denominator).toContain("Validated BHW Census profiles");
   expect(result.parentMeasure).toMatchObject({ kind: "rate", value: 75 });
 });
+
+it("exports percentage legend labels and exact inclusive/exclusive bounds for PNG and JSON", async () => {
+  const { STEPZERO_ACCREDITATION_BINS } = await import("./stepzero-accreditation");
+  const result = datasetMapExport({ ...initialMapChoice("bhw-stepzero-2026"), indicator: "bhw.declared-accreditation" },
+    { ...data, total: null, parentRate: 25 }, STEPZERO_ACCREDITATION_BINS, []);
+  expect(result.legend.unit).toBe("%");
+  expect(result.legend.bins[0]).toMatchObject({ label: "0–<25%", minInclusive: true, maxInclusive: false });
+  expect(result.legend.bins.at(-1)).toMatchObject({ label: "100%", minInclusive: true, maxInclusive: true });
+});
+it("exports mean legend units without rounding distinct breaks together", () => {
+  const bins = [{ min: 0.01, max: 0.02, color: "#fff" }, { min: 0.02, max: 0.03, color: "#000" }];
+  const result = datasetMapExport({ ...initialMapChoice("bhw-2025"), indicator: "bhw.active-years" },
+    { ...data, total: null, parentMean: 0.02 }, bins, []);
+  expect(result.legend.bins.map(b => b.label)).toEqual(["0.01–<0.02 years", "0.02–0.03 years"]);
+  expect(result.legend.unit).toBe("years");
+});
+
+it("keeps profiling's top class open-ended in exports, distinct from bounded percentages", async () => {
+  const { PROFILING_BINS } = await import("./profiling");
+  const result = datasetMapExport(initialMapChoice("bhw-profiling-status-2026"), data, PROFILING_BINS, []);
+  expect(result.legend.bins.at(-1)).toMatchObject({ label: "100% or more", max: null, openEnded: true, maxInclusive: false });
+});
+
+it("retains inclusive singleton bounds and published income-class labels", () => {
+  const result = datasetMapExport(initialMapChoice("lgu-income-class"), data,
+    [{ min: 1, max: 1, color: "#fff" }, { min: 2, max: 2, color: "#000" }], []);
+  expect(result.legend.bins[0]).toMatchObject({ min: 1, max: 1, minInclusive: true, maxInclusive: true });
+  expect(result.legend.bins[0].label).toBeTruthy();
+});

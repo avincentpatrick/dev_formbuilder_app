@@ -839,3 +839,144 @@ test("Census honorarium receipt has its own rate and no invented confidence inte
   expect(data.indicator).toMatchObject({ id: "bhw.any-honorarium", period: "2025", confidenceLevel: null });
   expect(data.rows[0]).toMatchObject({ value: 0, ciLow: null, ciHigh: null, smallSample: true });
 });
+
+test("Census active years preserves decimal means, years and the unknown contributing count", async ({ page }) => {
+  await page.route("**/api/dataset-map?**", route => route.fulfill({ json: {
+    state: "available", rows: [{ code: "01", name: "Synthetic years region", value: 12.34,
+      note: "Published mean of reported active-year counts; missing counts excluded. Contributing count and confidence interval are not supplied." }],
+    total: null, parentMean: 9.87, area: "Philippines", childLevel: "region", source: "Synthetic Census", date: "2025-12-31",
+    license: "Test only", geometryUrl: "/bhw-connect/geo/regions.json",
+  } }));
+  await page.goto("map?dataset=bhw-2025&indicator=bhw.active-years");
+  await expect(page.getByText(/Reported area mean: 9.87 years/)).toBeVisible();
+  await expect(page.getByText(/contributing count not supplied/)).toBeVisible();
+  await expect(page.getByText(/Reported area total:|Reported area rate:/)).toHaveCount(0);
+  await page.getByText(/Complete area table/).click();
+  await expect(page.getByRole("columnheader", { name: "years", exact: true })).toBeVisible();
+  await expect(page.getByRole("row", { name: /Synthetic years region 12.34/ })).toBeVisible();
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download map data (JSON)" }).click();
+  const stream = await (await downloaded).createReadStream();
+  const chunks = []; for await (const chunk of stream!) chunks.push(chunk);
+  const data = JSON.parse(Buffer.concat(chunks).toString());
+  expect(data.parentMeasure).toEqual({ kind: "mean", value: 9.87, unit: "years" });
+  expect(data.total).toBeNull();
+  expect(data.indicator).toMatchObject({ period: "2025", confidenceLevel: null });
+});
+
+test("decimal year legends match exported labels without collapsing distinct breaks", async ({ page }) => {
+  await page.route("**/api/dataset-map?**", route => route.fulfill({ json: {
+    state: "available", rows: [
+      { code: "01", name: "Synthetic low", value: 0.01 },
+      { code: "02", name: "Synthetic middle", value: 0.02 },
+      { code: "03", name: "Synthetic high", value: 0.03 },
+    ], total: null, parentMean: 0.02, area: "Philippines", childLevel: "region", source: "Synthetic Census",
+    date: "2025-12-31", license: "Test only", geometryUrl: "/bhw-connect/geo/regions.json",
+  } }));
+  await page.goto("map?dataset=bhw-2025&indicator=bhw.active-years");
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download map data (JSON)" }).click();
+  const stream = await (await downloaded).createReadStream();
+  const chunks = []; for await (const chunk of stream!) chunks.push(chunk);
+  const result = JSON.parse(Buffer.concat(chunks).toString());
+  expect(result.legend.unit).toBe("years");
+  expect(result.legend.bins.length).toBeGreaterThan(1);
+  for (const bin of result.legend.bins) {
+    await expect(page.getByText(bin.label, { exact: true })).toBeVisible();
+    expect(bin.label).toContain(" years");
+  }
+  expect(result.legend.bins[0]).toMatchObject({ min: 0.01, minInclusive: true, maxInclusive: false });
+  expect(result.legend.bins.at(-1)).toMatchObject({ max: 0.03, maxInclusive: true });
+});
+
+for (const query of [
+  "dataset=nhfr-2026-09&indicator=nhfr.facilities&indicator=nhfr.private",
+  "dataset=nhfr-2026-09&level=region&code=01&selected=01",
+]) {
+  test(`invalid map link does not load a fallback and can recover: ${query}`, async ({ page }) => {
+    const requests: string[] = [];
+    await page.route("**/api/dataset-map?**", route => {
+      requests.push(route.request().url());
+      return route.fulfill({ json: { state: "available", rows: [{ code: "01", name: "Synthetic region", value: 1 }],
+        total: 1, area: "Philippines", childLevel: "region", source: "Synthetic NHFR", date: "2026-09-01",
+        license: "Test only", geometryUrl: "/bhw-connect/geo/regions.json" } });
+    });
+    await page.goto(`map?${query}`);
+    await expect(page.getByRole("status")).toContainText("If a shared link has an unsupported indicator");
+    await expect(page.getByRole("article")).toHaveCount(0);
+    expect(requests).toEqual([]);
+    await page.getByLabel("Map dataset", { exact: true }).selectOption("nhfr-2026-09");
+    await expect(page.getByText(/Reported area total: 1/)).toBeVisible();
+    expect(requests).toHaveLength(1);
+    const choice = new URL(requests[0]).searchParams;
+    expect(choice.get("dataset")).toBe("nhfr-2026-09");
+    expect(choice.get("indicator")).toBe("nhfr.facilities");
+    expect(choice.get("level")).toBe("national");
+  });
+}
+
+const syntheticSource = { source: "Synthetic NHFR", date: "2026-09-01", license: "Test only" };
+function barangayApi(page: import("@playwright/test").Page, barangayDrill: boolean) {
+  return page.route("**/api/dataset-map?**", route => {
+    const province = new URL(route.request().url()).searchParams.get("level") === "province";
+    return route.fulfill({ json: province
+      ? { state: "available", rows: [{ code: "0102801", name: "Adams", value: 3 }], total: 3, area: "Ilocos Norte",
+          childLevel: "citymun", ...(barangayDrill ? { barangayDrill: true } : {}), ...syntheticSource,
+          geometryUrl: "/bhw-connect/geo/citymun/01028.json" }
+      : { state: "available", rows: [{ code: "0102801001", name: "Adams (Pob.)", value: 2 },
+          { code: "0102801002", name: "Bacsil (no boundary yet)", value: 1 }], total: 3, area: "Adams",
+          childLevel: "barangay", ...syntheticSource, geometryUrl: "/bhw-connect/maps/rel-1/citymun/0102801.json" } });
+  });
+}
+const square = (code: string, x: number) => ({ type: "FeatureCollection", features: [{ type: "Feature",
+  properties: { geo_code: code }, geometry: { type: "Polygon",
+    coordinates: [[[x, 18.4], [x + 0.1, 18.4], [x + 0.1, 18.5], [x, 18.5], [x, 18.4]]] } }] });
+
+test("a municipality drills into its barangays, and a barangay without a boundary stays in the table", async ({ page }) => {
+  await barangayApi(page, true);
+  await page.route("**/geo/citymun/01028.json", route => route.fulfill({ json: square("0102801", 120.4) }));
+  await page.route("**/maps/rel-1/citymun/0102801.json", route => route.fulfill({ json: square("0102801001", 120.4) }));
+  await page.goto("map?dataset=nhfr-2026-09&level=province&code=01028&selected=0102801");
+  await page.getByRole("button", { name: /Show areas within/ }).click();
+  await expect(page.getByRole("link", { name: "Share this map selection" })).toHaveAttribute("href", /level=citymun&code=0102801/);
+  await page.getByText(/Complete area table/).click();
+  await expect(page.getByRole("table")).toContainText("Bacsil (no boundary yet)");
+  await page.getByLabel("NHFR September 2026 area").selectOption("0102801001");
+  await expect(page.getByText("Barangays are the smallest area on this map.")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Show areas within/ })).toHaveCount(0);
+});
+
+test("without barangay drill-down a municipality keeps its dashboard link and no drill button", async ({ page }) => {
+  await barangayApi(page, false);
+  await page.route("**/geo/citymun/01028.json", route => route.fulfill({ json: square("0102801", 120.4) }));
+  await page.goto("map?dataset=nhfr-2026-09&level=province&code=01028&selected=0102801");
+  await expect(page.getByText("Barangay polygons are not yet validated.")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Show areas within/ })).toHaveCount(0);
+});
+
+test("barangay values show, and an indicator without a barangay reader returns the view to its province", async ({ page }) => {
+  await page.route("**/api/dataset-map?**", route => {
+    const params = new URL(route.request().url()).searchParams;
+    const supported = params.get("indicator") === "uuc.listed";
+    return route.fulfill({ json: params.get("level") === "citymun"
+      ? { state: "available", rows: [{ code: "0102801001", name: "Adams (Pob.)", value: 0 },
+          { code: "0102801002", name: "Bacsil", value: 1 }], total: 1, area: "Adams", childLevel: "barangay",
+          totalNote: "Test note about unplaced facilities.", ...syntheticSource,
+          geometryUrl: "/bhw-connect/maps/rel-1/citymun/0102801.json" }
+      : { state: "available", rows: [{ code: "0102801", name: "Adams", value: 1 }], total: 1, area: "Ilocos Norte",
+          childLevel: "citymun", ...(supported ? { barangayDrill: true } : {}), ...syntheticSource,
+          geometryUrl: "/bhw-connect/geo/citymun/01028.json" } });
+  });
+  await page.route("**/geo/citymun/01028.json", route => route.fulfill({ json: square("0102801", 120.4) }));
+  await page.route("**/maps/rel-1/citymun/0102801.json", route => route.fulfill({ json: square("0102801002", 120.4) }));
+  await page.goto("map?dataset=uuc-phc-2025&level=province&code=01028&selected=0102801");
+  await page.getByRole("button", { name: /Show areas within/ }).click();
+  await expect(page.getByRole("link", { name: "Share this map selection" })).toHaveAttribute("href", /level=citymun&code=0102801/);
+  await page.getByText(/Complete area table/).click();
+  await expect(page.getByRole("table")).toContainText("Bacsil");
+  await expect(page.getByText("Test note about unplaced facilities.")).toBeVisible();
+  await page.getByLabel("UUC for PHC 2025 indicator").selectOption("uuc.route.ip");
+  await expect(page.getByRole("status").filter({ hasText: "no barangay map" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Share this map selection" })).toHaveAttribute("href", /level=province&code=01028/);
+  await expect(page.getByRole("button", { name: /Show areas within/ })).toHaveCount(0);
+});

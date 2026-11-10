@@ -399,11 +399,7 @@ it('records the type change in the next published version', function (): void {
 it('exports a dropdown converted to single choice as a plain select_one, choices intact', function (): void {
     $form = conversionServiceForm($this->tenant, $this->user);
     $draft = conversionServiceDraft($form);
-    // ⚠️ The FIELD-level translation is load-bearing: the exporter collects its languages from labels and
-    // hints, never from option translations, so without it no `label::es` column exists at all. That is a
-    // separate defect (filed by M121) — this fixture works around it deliberately.
     $field = addFormField($draft, $this->user, 'colour', FieldType::Dropdown, 0, [
-        'label_translations' => ['es' => 'Color'],
         'config' => ['options' => [['value' => 'r', 'label' => 'Red', 'label_translations' => ['es' => 'Rojo']]]],
     ]);
 

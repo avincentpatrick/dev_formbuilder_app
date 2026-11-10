@@ -236,3 +236,50 @@ it('reports nothing for a lossless conversion inside the text family', function 
 
     expect(conversionCensusOf($this->census, $this->form, $name, FieldType::LongText))->toBe([]);
 });
+
+// ── (e) a date becomes a time, or back (M227, `R-cf7d0362`) ───────────────────────────────────────────────
+
+it('reports a date ordered against today() and against another date when the date becomes a time', function (): void {
+    $visit = addFormField($this->draft, $this->user, 'visit', FieldType::Date, 1);
+    addFormField($this->draft, $this->user, 'due', FieldType::Date, 2);
+    addFormField($this->draft, $this->user, 'late_reason', FieldType::ShortText, 3, ['relevant_expression' => '${visit} > today()']);
+    // `due` sorts before `visit`, so the publish gate files this pair's refusal under `due`. The census still sees it.
+    addFormField($this->draft, $this->user, 'early_reason', FieldType::ShortText, 4, ['relevant_expression' => '${visit} < ${due}']);
+
+    expect(conversionCensusOf($this->census, $this->form, $visit, FieldType::Time))->toBe([
+        'temporal_ordering_breaks@relevance:early_reason',
+        'temporal_ordering_breaks@relevance:late_reason',
+    ]);
+});
+
+it('stays silent when a date becomes a date and time, because the two still order against each other', function (): void {
+    $visit = addFormField($this->draft, $this->user, 'visit', FieldType::Date, 1);
+    addFormField($this->draft, $this->user, 'due', FieldType::Date, 2);
+    addFormField($this->draft, $this->user, 'late_reason', FieldType::ShortText, 3, ['relevant_expression' => '${visit} > today()']);
+    addFormField($this->draft, $this->user, 'early_reason', FieldType::ShortText, 4, ['relevant_expression' => '${visit} < ${due}']);
+
+    expect(conversionCensusOf($this->census, $this->form, $visit, FieldType::Datetime))->toBe([]);
+});
+
+it('reports a time ordered against another time through that question own constraint when it becomes a date', function (): void {
+    $start = addFormField($this->draft, $this->user, 'start', FieldType::Time, 1);
+    $end = addFormField($this->draft, $this->user, 'end', FieldType::Time, 2);
+    // `.` is `end` here, so the other side of the ordering is the constraint's owner, not the converted question.
+    conversionCensusConstraint($end, '. > ${start}');
+
+    expect(conversionCensusOf($this->census, $this->form, $start, FieldType::Date))->toBe(['temporal_ordering_breaks@constraint:end']);
+});
+
+it('blames the change only for what it breaks: silent beside a text question, on arithmetic, and on a pair the old type broke', function (): void {
+    $visit = addFormField($this->draft, $this->user, 'visit', FieldType::Date, 1);
+    addFormField($this->draft, $this->user, 'typed_date', FieldType::ShortText, 2);
+    addFormField($this->draft, $this->user, 'clock_in', FieldType::Time, 3);
+    // Text may hold a date, so publish lets this through as a date and as a time alike.
+    addFormField($this->draft, $this->user, 'a', FieldType::ShortText, 4, ['relevant_expression' => '${visit} > ${typed_date}']);
+    // A date against a time is already refused; as a time it starts to hold, which is a repair, not a break.
+    addFormField($this->draft, $this->user, 'b', FieldType::ShortText, 5, ['relevant_expression' => '${visit} > ${clock_in}']);
+    // Arithmetic on a date or a time is refused either way.
+    addFormField($this->draft, $this->user, 'c', FieldType::ShortText, 6, ['relevant_expression' => '${visit} + 1 > 3']);
+
+    expect(conversionCensusOf($this->census, $this->form, $visit, FieldType::Time))->toBe([]);
+});

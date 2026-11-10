@@ -28,6 +28,9 @@ enum ConversionImpact: string
     /** A `contains`, `count()` or equality reads a list differently from one value, and the conversion crosses that line. */
     case ListMeaningChanges = 'list_meaning_changes';
 
+    /** M227 (`R-cf7d0362`): the answer is compared with a date or a time, and the new type cannot be compared with it. */
+    case TemporalOrderingBreaks = 'temporal_ordering_breaks';
+
     /** A `${key}` in text shows this question's answer, and the new type has none it can show. */
     case TemplateHoleUnanswerable = 'template_hole_unanswerable';
 
@@ -38,6 +41,7 @@ enum ConversionImpact: string
             self::ReferenceHasNoAnswer => 'The new type has no answer, so “is empty” will always be true here, and every other check will fail.',
             self::NumericUseOnNonNumber => 'This treats the answer as a number. The new type isn’t a number, so this only works while an answer happens to be one.',
             self::ListMeaningChanges => 'This checks for a choice. The new type changes whether the answer is one choice or several, so the check will mean something different.',
+            self::TemporalOrderingBreaks => 'This compares the answer with a date or a time. A date and a time can’t be compared, so you’ll need to change this before you publish.',
             self::TemplateHoleUnanswerable => 'This text shows the question’s answer, but the new type has no answer to show. Remove it before you publish.',
         };
     }

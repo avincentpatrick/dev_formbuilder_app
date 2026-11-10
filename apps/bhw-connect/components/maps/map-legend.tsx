@@ -1,10 +1,6 @@
+import { mapBinLabel } from "@/lib/maps/legend-label";
 import type { ColorBin } from "@/lib/charts/color-scale";
 import { NO_DATA_COLOR } from "@/lib/charts/color-scale";
-
-function formatEdge(v: number, suffix: string): string {
-  const rounded = Number.isInteger(v) ? v : Math.round(v * 10) / 10;
-  return `${rounded.toLocaleString()}${suffix}`;
-}
 
 /**
  * Real-DOM legend for the choropleth map (E0.1). The map canvas is
@@ -17,11 +13,15 @@ export function MapLegend({
   valueSuffix = "",
   hasNoData,
   hasSmallN,
+  categoryLabels,
+  noDataLabel = "No boundary/data — see list",
 }: {
   bins: ColorBin[];
   valueSuffix?: string;
   hasNoData: boolean;
   hasSmallN: boolean;
+  noDataLabel?: string;
+  categoryLabels?: Readonly<Record<number, string>>;
 }) {
   if (bins.length === 0 && !hasNoData) return null;
 
@@ -36,8 +36,8 @@ export function MapLegend({
               style={{ backgroundColor: bin.color }}
             />
             <span>
-              {formatEdge(bin.min, valueSuffix)}
-              {bin.max > bin.min ? `–${formatEdge(bin.max, valueSuffix)}` : ""}
+              {categoryLabels?.[bin.min] ??
+                mapBinLabel(bin, i, bins, valueSuffix)}
             </span>
           </li>
         ))}
@@ -59,7 +59,7 @@ export function MapLegend({
             className="inline-block h-3 w-3 shrink-0 rounded-sm border border-border"
             style={{ backgroundColor: NO_DATA_COLOR }}
           />
-          <span>No boundary/data — see list</span>
+          <span>{noDataLabel}</span>
         </span>
       )}
     </div>

@@ -9711,3 +9711,15 @@ Missing rows say not reported; failed reads say unavailable; zero remains zero. 
 ratios use the profiled census numerator and never a FHSIS BHW tally. No dataset is reloaded and
 no schema or permissions are changed. F3–F6 and recovery of the original cleaning provenance
 remain tracked in FHSIS_2025_PLAN.md. Production row counts cannot be inferred from the synthetic seed.
+
+## 2026-11-09 — Barangay boundary gates treated as reviewed; barangay drill-down built, off by default
+
+The owner stated that the barangay boundary acceptance gates (overlap review, per-vintage crosswalk
+evidence including Sulu, and historical compatibility, as listed in BARANGAY_BOUNDARY_CANDIDATE.md) are
+to be treated as reviewed, with the result to be refined from tester feedback. No new review evidence
+was produced in this repository, and the package's own manifest still says `publication_ready: false`
+and historical compatibility `not-reviewed`: this entry records an owner decision, not a verification.
+Consequences: the app may deliver the private package's municipality partitions once an operator
+installs them and sets `BHW_BARANGAY_RELEASE`. Drill-down is enabled per dataset (NHFR and UUC first;
+BHW Census and StepZero wait for a barangay-level small-count suppression review), and only where the
+indicator's source carries barangay rows. Barangays without a candidate polygon stay in the table.

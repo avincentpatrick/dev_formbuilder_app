@@ -81,7 +81,7 @@ on:
 # `push` run above is the re-verification" — which is why the defect survived seven increments: an
 # auditor reads the assertion, not the run list. `deploy.yml` fires on a successful CI run on
 # `main`, so before this fix the ONLY runs that could ever have triggered a deploy were docs-only
-# close-out runs. `DEPLOY_ENABLED` is unset, so that was latent rather than live.
+# close-out runs. `DEPLOY_ENABLED` was unset until 2026-09-17, so that was latent rather than live.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}

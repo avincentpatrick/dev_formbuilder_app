@@ -1,0 +1,41 @@
+{
+  "release": "psgc-2026q3-ring-candidate-v1",
+  "publication_ready": false,
+  "provenance": {
+    "candidate_sha256": "8c3092e28015e73432c3e01cf3a4cf127bef21c0c0e010a9f46a773f735e969f",
+    "reference_sha256": "e21e46edbb09995f5a1d2bfd46e621c5b8bed6b7597dc00d4db9dee7a4696fbe",
+    "validation_sha256": "767c9367ff0df2e6d8b19b94a4973d6af45be604c6e45dfa25f3e6cd328f9ed4",
+    "source_sha256": "0c1627035e1bef618a7f57ca96bc93822710aef03aa0c273a922f3b7cd3b198a"
+  },
+  "manifest_sha256": "d4295476593d0429aa500a09f3352b83e6aa777ef8b38dcd984e702881139002",
+  "summary": {
+    "reference_barangays": 41991,
+    "candidate_polygons": 41567,
+    "withheld_reference_barangays": 424,
+    "primary_reasons": {
+      "overlap-conflict": 8,
+      "no-matched-source-code": 411,
+      "source-geometry-unavailable": 4,
+      "candidate-geometry-unavailable": 1
+    },
+    "municipalities": 1655,
+    "municipality_states": {
+      "complete-candidate": 1629,
+      "partial-candidate": 7,
+      "no-candidate": 19
+    },
+    "unmatched_source_records": 430,
+    "quarantined_overlap_source_codes": 10
+  },
+  "verification": {
+    "all_hashes_match": true,
+    "all_packaged_geometry_unchanged": true,
+    "cross_shard_overlap_pairs": 0,
+    "files": 1636,
+    "total_geometry_bytes": 108927063,
+    "largest_file_bytes": 718722,
+    "median_file_bytes": 51046.0,
+    "coverage_bytes": 4705692,
+    "publication_ready": false
+  }
+}

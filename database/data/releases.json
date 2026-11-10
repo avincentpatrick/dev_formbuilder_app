@@ -10,6 +10,26 @@
         ]
     },
     {
+        "version": "0.17.3",
+        "title": "XLSForm imports with long appearances",
+        "items": [
+            {
+                "kind": "fixed",
+                "text": "Importing an XLSForm no longer fails when a question’s appearance is longer than 60 characters, such as an ODK search() lookup. The question is imported without that appearance, and the import’s warnings say which question it was."
+            }
+        ]
+    },
+    {
+        "version": "0.17.2",
+        "title": "XLSForm exports keep translated choices",
+        "items": [
+            {
+                "kind": "fixed",
+                "text": "A form translated only in its answer choices, or in the rows and columns of a grid, now keeps those translations when you export it to XLSForm. Before, the export left them out unless a question's own label was translated too."
+            }
+        ]
+    },
+    {
         "version": "0.17.1",
         "title": "Builder panels that grow with your text",
         "items": [

@@ -10245,7 +10245,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   run meant to bring the site back up at its deployed commit would be skipped; a rollback by hand through
   `-Ref` must bypass it. **Seen live on 2026-11-06, harmlessly (`M214`'s close-out):** CI's run on `2c3255ed` ended at
   02:38:42 UTC, and its Deploy 42151635152 fetched `origin/main` and shipped `40c52e5d`, whose own run then failed at
-  03:15:38 UTC on a flaky test (`pdf-supersede-test-minute-flake`). Both commits changed documents only. **Live.** —
+  03:15:38 UTC on a flaky test (`pdf-supersede-test-minute-flake`). Both commits changed documents only. **Seen again on 2026-11-10, and this time on served code:** jongsky25's BHW #500 merged while #432 (`34e7c552`) was in its own trunk run, and #500's Deploy 42791100977 fetched `origin/main` and shipped `34e7c552` about half an hour before that run went green (it did). The merge point then waited for the trunk to be idle, no CI run or Deploy in flight, before every merge. **Live.** —
   needs a push to `main` between one CI run's success and that run's Deploy fetch, and a close-out's two pushes make
   one every time. Filed by `M98`. **Tier: before-launch.**
 - ~~**`major` · Every visitor reaches the testing server as one private address, so the per-address limits, the login lockout and every audit IP lose their meaning.**~~
@@ -15917,13 +15917,16 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   **Latent** — the lease has not changed; nothing has failed yet. Filed by `M216`. **Tier: during-testing.**
 
-- **`minor` · `tracker-headroom-held-batch` — `PROGRESS.md` has room for about four more status bullets, and fourteen held increments each owe one at their merge point.**
+- ✅ **CLOSED BY `M234` (2026-11-10) — ****`minor` · `tracker-headroom-held-batch` — `PROGRESS.md` has room for about four more status bullets, and fourteen held increments each owe one at their merge point.**
   Found by `M216`'s close-out (2026-11-09).
   - **Measured:** after `M215` and `M216`'s bullet, `PROGRESS.md` is 124,911 bytes against `tracker-lint`'s R1 ceiling of 130,000, so 5,089 bytes are left. That bullet cost 1,303 bytes for two increments, and `M214`'s alone was about the same size.
   - **What is waiting:** `M217` to `M230`, held as #414 to #489. R9 requires each released increment to have exactly one status bullet, so the next merge point's close-out will cross R1 part of the way through unless the tracker is trimmed first.
   - **The remedy, to be measured when taken:** a tracker surgery that moves the oldest status bullets to `PROGRESS_ARCHIVE.md` with `scripts/tracker-surgery.php`, run before that merge point's close-out, never during it. Bullets that each name several increments would only delay it.
 
   **Latent** — nothing is over the ceiling yet. Filed by `M216`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M234` (2026-11-10), at the close-out of the merge point that released `M217` to `M234`.**
+  - The fourteenth tracker surgery went first, as `d6618ea0`: 56 lines and 22,483 bytes, `M200` down to `M184`, moved into `PROGRESS_ARCHIVE.md` above the `M183` bullet and proved by `scripts/tracker-surgery.php` on its first run. `PROGRESS.md` went from 124,911 to 102,428 bytes.
+  - The eighteen releases then took one status bullet between them, naming each increment once, as R9 counts it.
 
 - **`minor` · `virus-scanner-unwired` — No virus scanner is wired, so every uploaded file is served to other users unscanned.**
   Found by `M224` (2026-11-08), correcting the three documents that said a file waits for a clean scan.

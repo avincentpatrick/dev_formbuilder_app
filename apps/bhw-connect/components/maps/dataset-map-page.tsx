@@ -1,8 +1,8 @@
 "use client";
 import { useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { DATASET_MAPS } from "@/lib/maps/definitions";
-import { isReleasePublic } from "@/lib/releases/visibility";
+import { getDatasetMap } from "@/lib/maps/definitions";
+import { MAP_SUBJECTS, subjectReleases } from "@/lib/maps/subjects";
 import {
   initialMapChoice,
   mapHref,
@@ -38,10 +38,15 @@ export function DatasetMapPage({ choice }: { choice: MapChoice | null }) {
           <option value="" disabled>
             Choose a dataset
           </option>
-          {DATASET_MAPS.filter((d) => isReleasePublic(d.slug)).map((d) => (
-            <option key={d.slug} value={d.slug}>
-              {d.title}
-            </option>
+          {/* Grouped by dataset: BHW offers its Headcount and its Profiles side by side. */}
+          {MAP_SUBJECTS.map((subject) => (
+            <optgroup key={subject.id} label={subject.title}>
+              {subjectReleases(subject).map((slug) => (
+                <option key={slug} value={slug}>
+                  {getDatasetMap(slug)!.title}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
       </label>

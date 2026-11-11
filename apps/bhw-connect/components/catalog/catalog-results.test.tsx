@@ -184,3 +184,15 @@ it.each(["unsupported", "unavailable", "suppressed", "failed"] as const)(
     expect(document.querySelector("table")).toBeNull();
   },
 );
+
+it("gives each card and the dataset view its own full map, at the chosen place", () => {
+  for (const markup of [
+    renderToStaticMarkup(<CatalogResults catalog={catalog([dataset])} locationName="Region I" />),
+    renderToStaticMarkup(<CatalogDetails catalog={catalog([dataset])} dataset={dataset} />),
+  ]) {
+    const { document } = parseHTML(markup);
+    const link = document.querySelector('a[aria-label="Open full NHFR map"]');
+    expect(link?.textContent).toBe("Open full map →");
+    expect(link?.getAttribute("href")).toMatch(/^\/map\?dataset=nhfr-2026-09&.*level=region&code=01/);
+  }
+});

@@ -2,6 +2,8 @@ import Link from "next/link";
 import { measureDefinition, derivationNote } from "@/lib/catalog/measure-notes";
 import type { CatalogDataset, PublicCatalog } from "@/lib/catalog/types";
 import { catalogHref } from "@/lib/catalog/navigation";
+import { subjectMapHref } from "@/lib/maps/subjects";
+import type { CatalogSelection } from "@/lib/catalog/types";
 import { hasAvailableValue } from "@/lib/catalog/summary";
 import {
   formatValue,
@@ -182,6 +184,7 @@ export function CatalogResults({
               >
                 View {dataset.title} indicators →
               </Link>
+              <FullMapLink dataset={dataset} selection={catalog.selection} />
               <SourceDates dataset={dataset} />
             </div>
           </article>
@@ -209,6 +212,22 @@ export function CatalogResults({
         </section>
       )}
     </div>
+  );
+}
+
+/** The dataset's own full-size map, at the place chosen here (docs/DATASET_HUB_PLAN.md). */
+function FullMapLink({ dataset, selection }: { dataset: CatalogDataset; selection: CatalogSelection }) {
+  const href = subjectMapHref(dataset.id, selection);
+  if (!href) return null;
+  return (
+    <Link
+      prefetch={false}
+      href={href}
+      aria-label={`Open full ${dataset.title} map`}
+      className="mt-2 block text-sm font-semibold text-accent underline underline-offset-4"
+    >
+      Open full map →
+    </Link>
   );
 }
 
@@ -246,6 +265,7 @@ export function CatalogDetails({
           {dataset.availableIndicators} of {dataset.totalIndicators} indicators available
         </p>
       </div>
+      <FullMapLink dataset={dataset} selection={catalog.selection} />
       {dataset.detailHref && (
         <Link
           href={dataset.detailHref}

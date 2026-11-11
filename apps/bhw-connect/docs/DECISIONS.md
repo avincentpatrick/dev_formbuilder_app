@@ -9746,3 +9746,10 @@ Agreed with avincentpatrick (plan: `docs/DATASET_HUB_PLAN.md`). Users now see th
 profiled subset. The headcount's map period is corrected from 2026 to 2025 — its data is 2025 (2026-07-20 entry);
 only the slug says 2026, and slugs, tables and function names are unchanged. No 2026 BHW data is presented yet,
 so `bhw-profiling-status-2026` is hidden by `lib/releases/visibility.ts`; NHFR September 2026 is not.
+
+## 2026-11-11 — One full map per dataset, opened from its card
+
+Agreed with avincentpatrick (`docs/DATASET_HUB_PLAN.md`, Step 3). This replaces `DATASET_MAPS_PLAN.md`'s layout
+of one map card per release on the portal; its data rules stand. The portal's map gallery is removed, each
+catalog card links to its dataset's full map on `/map` (address kept so shared links survive), and the picker
+groups releases by dataset (`lib/maps/subjects.ts`), so BHW's Headcount 2025 and Profiles 2025 sit together.

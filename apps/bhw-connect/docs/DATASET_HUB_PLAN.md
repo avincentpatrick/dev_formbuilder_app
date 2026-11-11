@@ -1,7 +1,7 @@
 # BHW naming, 2026 data, and one full map per dataset — plan
 
-Status: agreed with avincentpatrick on 2026-11-10, for jongsky25 to review. **Steps 1 and 2 are built** in
-the pull request that adds this file; Step 3 is still a plan.
+Status: agreed with avincentpatrick on 2026-11-10. Steps 1 and 2 shipped in #501; **Step 3 is built** in the
+pull request that follows it.
 
 ## Why
 
@@ -66,31 +66,24 @@ git history with the release.
 The admin place page (`app/admin/(dashboard)/place/...`) keeps its link, so admins can still check it. The
 data and migrations stay; turning the switch on restores everything.
 
-## Step 3 — One full map per dataset, opened from its card
+## Step 3 — One full map per dataset, opened from its card — built
 
-- **Grouping:** add a mapping from each catalog dataset to its map releases (new, in `lib/maps/`):
-  BHW → Headcount 2025 + Profiles 2025; NHFR, UUC-PHC, FHSIS, Population → their one release each;
-  Poverty → poverty + LGU income class. The per-release definitions in `lib/maps/definitions.ts` stay the
-  contract underneath, so each release keeps its own period, denominator, disclosure and legend.
-- **Card link:** every card in `components/catalog/catalog-results.tsx` and the dataset view
-  (`CatalogDetails`) gets **"Open full map →"**, carrying the location already chosen on the catalog.
-- **Map page:** `/catalog/map?dataset=bhw&…` (or `/map?dataset=bhw`, see open question), one full-width map,
-  the existing enlarged `DatasetMapCard`. BHW gets a switch between **Headcount** and **Profiles**; switching
-  keeps the area and never carries values across releases (the existing `dataset-map-page.tsx` rule).
-- **Home page:** remove `<DatasetMapGallery />` from `app/page.tsx`, and the "Dataset maps" link under More
-  resources. No live maps on the home page at all.
-- **Old links:** `/map?dataset=<release>&…` redirects to its dataset's map page with that release selected.
-- **Orphan map cards:** Legislative districts moves to `/districts`; Ways forward (no data) is dropped.
-- **Records:** add a `docs/DECISIONS.md` entry that this replaces `DATASET_MAPS_PLAN.md`'s "one card per
-  release" layout (its data rules stand); update `e2e/dataset-maps.spec.ts`.
+Address decided 2026-11-11 (avincentpatrick): keep `/map`, so every link already shared keeps working with no
+redirect.
 
-## Order
-
-Step 1 and Step 2 are independent and small; ship them first. Step 3 lands as two PRs: grouping plus the map
-page and card links (nothing removed), then the gallery removal, redirects and orphans.
-
-## Open question for jongsky25
-
-The map page address: `/catalog/map?dataset=bhw` (keeps it inside the catalog it belongs to) or reuse `/map`
-with subject slugs. Recommendation: reuse `/map`, since shared links already point there and the redirect
-becomes a slug translation inside one page.
+- **Grouping:** `lib/maps/subjects.ts` files each map release under its catalog dataset: BHW → Headcount 2025,
+  Profiles 2025 (and the hidden 2026 profiling status); NHFR, UUC-PHC, FHSIS, Population → their one release;
+  Poverty → poverty and LGU income class; Legislative districts on its own. The per-release definitions stay
+  the contract underneath.
+- **Card link:** every card and the dataset view carry **"Open full map →"**, which opens `/map` on the
+  dataset's first release at the place chosen on the catalog (a barangay opens inside its municipality, or its
+  province where the indicator has no barangay figures; a district selection opens the national view).
+- **Map page:** names the dataset ("BHW map"), links back to its card, and its picker groups releases by dataset,
+  so BHW reads Headcount 2025 / Profiles 2025. Switching keeps the area and never carries values across.
+  `/map` with no dataset lists one link per dataset.
+- **Home page:** the map gallery is gone; no map or map data loads there. "More resources" links to all maps.
+- **Removed:** `components/maps/dataset-map-gallery.tsx`, and the empty Ways forward slot from the picker (its
+  definition stays). The district map is reachable from the picker; it is still an availability view.
+- **Tests:** the e2e specs that proved several maps could share the home page (two-map limit, independent card
+  searches, phone and tall-screen paging) went with the gallery. New ones prove the home page draws no map, a
+  card opens its map at the chosen place and back, and BHW's two releases sit side by side.

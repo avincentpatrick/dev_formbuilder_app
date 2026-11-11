@@ -20,13 +20,15 @@ test("a dataset card opens its own full map, and the home page draws no map", as
   await expect(page).toHaveURL(/catalog\?mode=all&dataset=uuc-phc/);
 });
 
-test("a card opens its map at the place chosen on the catalog", async ({ page }) => {
-  await page.goto("catalog?mode=psgc&location=region%3A01");
-  // Whichever dataset the made-up seed fills for this region: the place carries over either way.
-  await page.getByRole("link", { name: /^Open full .+ map$/ }).first().click();
-  await expect(page).toHaveURL(/[?&]level=region&code=01(&|$)/);
-  await expect(page.getByRole("heading", { level: 1, name: / map$/ })).toBeVisible();
+// The made-up seed pairs codes and levels at random, so no region reliably shows cards; the place
+// carried into the link is proved by components/catalog/catalog-results.test.tsx instead.
+test("a dataset's detail view opens the same full map", async ({ page }) => {
+  await page.goto("catalog?mode=all&dataset=uuc-phc");
+  await page.getByRole("link", { name: "Open full UUC-PHC map" }).click();
+  await expect(page).toHaveURL(/dataset=uuc-phc-2025&.*level=national&code=PH/);
+  await expect(page.getByRole("heading", { level: 1, name: "UUC-PHC map" })).toBeVisible();
 });
+
 test("enlarged selection and dataset switch preserve supported geography", async ({ page }) => {
   await page.goto("map?dataset=uuc-phc-2025&level=region&code=01&selected=01028");
   await expect(page.getByLabel("UUC for PHC 2025 area")).toHaveValue("01028");

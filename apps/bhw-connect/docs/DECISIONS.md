@@ -9772,5 +9772,23 @@ repository: admin edits to the live dictionary (the replacements apply to whatev
 of cached answers. The same change fixes "BHW census" left in public methodology pages, the roadmap, the UUC
 coverage note and four admin/AI strings.
 Explore's district layer gets a visible caveat (boundaries not yet validated; the districts without a polygon are
-listed) rather than losing its rates. What /map shows for legislative districts is still being settled with the
-owner, who asked whether the district view can drill down only as far as municipalities.
+listed) rather than losing its rates.
+
+## 2026-11-11 — Legislative districts on /map: through member municipalities, both views
+
+Agreed with avincentpatrick, who asked for districts to drill down only as far as municipalities and chose both
+views. No district has a validated outline (0 of 250: the 189 shapes in `public/geo/districts.json` come from a
+builder that never checked membership completeness; 42 districts need barangay polygons; 19 have a member with no
+source boundary), and no district measure is defined as validated. So `/map`'s district view draws **no district
+outline and no district total**:
+- **Districts in a province** — each city or municipality on the existing municipal boundaries, coloured by its
+  district; a city the mapping divides barangay by barangay is drawn whole in a "divided" colour; an unplaced one
+  stays grey and is listed ("no answer, not no district").
+- **One district's municipalities** — its members outlined and shaded by their own published figure, read from
+  `/api/dataset-map` exactly as every other map reads it; the rest of the province is pale context. A divided
+  city's figure is labelled as the whole city's. A district with members in more than one province is drawn on the
+  province holding most of them, and the others are named.
+Membership comes from `geo_district_map` (live rows: not rejected, not superseded) through `/api/district-map`,
+which reads no figures. Income classes stay on their own map. District pages link to their view. Still waiting:
+outlines and totals need a reviewed roster attesting complete membership (owner), the barangay package installed
+(operator), and boundaries for the 19 (outside data).

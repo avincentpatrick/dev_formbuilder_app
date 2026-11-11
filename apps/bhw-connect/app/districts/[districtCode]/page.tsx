@@ -10,6 +10,7 @@ import {
 import { getBhwCounts } from "@/lib/db/indicators";
 import { NATIONAL_GEO_CODE } from "@/lib/filters/schema";
 import { districtOrdinalLabel } from "@/components/districts/district-ordinal";
+import { districtViewHref, parseDistrictView } from "@/lib/maps/district-view";
 import { DistrictMemberTable } from "@/components/districts/district-member-table";
 import { SourceRefLink } from "@/components/districts/source-ref-link";
 import { CorrectionForm } from "@/components/districts/correction-form";
@@ -33,11 +34,7 @@ export async function generateMetadata({
   return { title: detail.districtName };
 }
 
-export default async function DistrictDetailPage({
-  params,
-}: {
-  params: Promise<DistrictParams>;
-}) {
+export default async function DistrictDetailPage({ params }: { params: Promise<DistrictParams> }) {
   const { districtCode } = await params;
   const [detail, datasetGaps, districtIndex, figures, nationalCounts] = await Promise.all([
     getDistrictDetail(districtCode),
@@ -70,6 +67,18 @@ export default async function DistrictDetailPage({
             tell us
           </a>
           .
+        </p>
+        <p className="mt-2 text-sm">
+          <Link
+            href={districtViewHref({
+              ...parseDistrictView(new URLSearchParams()),
+              view: "district",
+              district: detail.districtCode,
+            })}
+            className="underline hover:text-accent"
+          >
+            See its cities and municipalities on the map →
+          </Link>
         </p>
       </div>
 
@@ -182,7 +191,11 @@ export default async function DistrictDetailPage({
               benchmark={
                 <BenchmarkBars
                   rows={[
-                    { label: detail.districtName, value: figures.anyHonorariumPct, isPrimary: true },
+                    {
+                      label: detail.districtName,
+                      value: figures.anyHonorariumPct,
+                      isPrimary: true,
+                    },
                     { label: "Philippines", value: nationalCounts?.anyHonorariumPct ?? null },
                   ]}
                   format="percent"
@@ -322,8 +335,8 @@ export default async function DistrictDetailPage({
         <p className="text-sm text-muted">
           A structured proposal, not a message — it is reviewed against the source above and, once
           accepted, supersedes the row it corrects rather than overwriting it (the correction
-          history section above is where that history shows up). Every proposal is then published
-          on the{" "}
+          history section above is where that history shows up). Every proposal is then published on
+          the{" "}
           <Link href="/districts/corrections" className="underline hover:text-accent">
             correction ledger
           </Link>{" "}
@@ -333,7 +346,10 @@ export default async function DistrictDetailPage({
           districtCode={detail.districtCode}
           districtName={detail.districtName}
           members={detail.members.map((m) => ({ geoCode: m.geoCode, geoName: m.geoName }))}
-          districtOptions={districtIndex.map((d) => ({ code: d.districtCode, name: d.districtName }))}
+          districtOptions={districtIndex.map((d) => ({
+            code: d.districtCode,
+            name: d.districtName,
+          }))}
         />
       </section>
     </div>

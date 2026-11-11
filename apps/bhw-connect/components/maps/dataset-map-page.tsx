@@ -10,8 +10,16 @@ import {
   type MapChoice,
 } from "@/lib/maps/prototype";
 import { clampBarangayScope } from "@/lib/maps/barangay-support";
+import { DISTRICT_MAP_SLUG, type DistrictView } from "@/lib/maps/district-view";
 import { DatasetMapCard } from "./dataset-map-card";
-export function DatasetMapPage({ choice }: { choice: MapChoice | null }) {
+import { DistrictMapCard } from "./district-map-card";
+export function DatasetMapPage({
+  choice,
+  districtView,
+}: {
+  choice: MapChoice | null;
+  districtView?: DistrictView;
+}) {
   const router = useRouter();
   const current = useRef(choice);
   const trackChoice = useCallback((value: MapChoice) => {
@@ -52,9 +60,12 @@ export function DatasetMapPage({ choice }: { choice: MapChoice | null }) {
       </label>
       <p className="text-sm text-muted">
         Switching between available maps retains the supported area. Pending maps open their
-        national availability view; they do not inherit another dataset’s values.
+        national availability view; they do not inherit another dataset’s values. Legislative
+        districts open their own view, through member cities and municipalities.
       </p>
-      {choice ? (
+      {choice?.dataset === DISTRICT_MAP_SLUG && districtView ? (
+        <DistrictMapCard initial={districtView} />
+      ) : choice ? (
         <DatasetMapCard
           key={mapHref(choice)}
           dataset={choice.dataset}

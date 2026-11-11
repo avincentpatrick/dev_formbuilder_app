@@ -17,6 +17,7 @@ export function DatasetCanvas({
   onCapture,
   onRetry,
   expanded,
+  emphasis,
 }: {
   url: string;
   rows: MapRow[];
@@ -27,6 +28,8 @@ export function DatasetCanvas({
   onCapture: (capture: (() => Promise<HTMLCanvasElement>) | null) => void;
   expanded: boolean;
   onRetry: () => void;
+  /** Areas to outline strongly, e.g. one district's members among their province's municipalities. */
+  emphasis?: readonly string[];
 }) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("maplibre-gl").Map | null>(null);
@@ -39,6 +42,7 @@ export function DatasetCanvas({
   const [failed, setFailed] = useState(false);
   const [ready, setReady] = useState(false);
   const callbacks = useRef({ onSelect, onGeometry, onCapture });
+  const emphasisKey = emphasis?.join(",") ?? "";
   useEffect(() => {
     callbacks.current = { onSelect, onGeometry, onCapture };
   });
@@ -96,7 +100,10 @@ export function DatasetCanvas({
         resize = new ResizeObserver(() => map?.resize());
         resize.observe(container.current);
         map.on("error", () => {
-          if (!disposed) { setFailed(true); callbacks.current.onCapture(null); }
+          if (!disposed) {
+            setFailed(true);
+            callbacks.current.onCapture(null);
+          }
         });
         map.on("load", () => {
           if (!map || disposed) return;
@@ -106,7 +113,10 @@ export function DatasetCanvas({
             id: "fill",
             type: "fill",
             source: "areas",
-            paint: { "fill-color": ["get", "color"], "fill-opacity": ["case", ["==", ["get", "smallSample"], true], 0.4, 0.9] },
+            paint: {
+              "fill-color": ["get", "color"],
+              "fill-opacity": ["case", ["==", ["get", "smallSample"], true], 0.4, 0.9],
+            },
           });
           map.addLayer({
             id: "outline",
@@ -121,6 +131,14 @@ export function DatasetCanvas({
             filter: ["==", "smallSample", true],
             paint: { "line-color": "#6b7280", "line-width": 2, "line-dasharray": [2, 2] },
           });
+          if (emphasisKey)
+            map.addLayer({
+              id: "emphasis",
+              type: "line",
+              source: "areas",
+              filter: ["in", ["get", "geo_code"], ["literal", emphasisKey.split(",")]],
+              paint: { "line-color": "#374151", "line-width": 2 },
+            });
           map.addLayer({
             id: "selection",
             type: "line",
@@ -143,7 +161,10 @@ export function DatasetCanvas({
           });
         });
       } catch {
-        if (!disposed) { setFailed(true); callbacks.current.onCapture(null); }
+        if (!disposed) {
+          setFailed(true);
+          callbacks.current.onCapture(null);
+        }
       }
     }
     void start();
@@ -155,7 +176,7 @@ export function DatasetCanvas({
       map?.remove();
       mapRef.current = null;
     };
-  }, [url, rows, bins]);
+  }, [url, rows, bins, emphasisKey]);
   return (
     <div>
       <div
@@ -168,7 +189,11 @@ export function DatasetCanvas({
             : "h-64 w-full rounded-lg border border-border"
         }
       />
-      {!ready && !failed && <p role="status" className="text-sm">Loading map rendering…</p>}
+      {!ready && !failed && (
+        <p role="status" className="text-sm">
+          Loading map rendering…
+        </p>
+      )}
       {failed && (
         <div className="space-y-2 text-sm">
           <p role="status">Map unavailable. Use the area selector and complete table below.</p>

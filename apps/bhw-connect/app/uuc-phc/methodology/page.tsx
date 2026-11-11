@@ -189,10 +189,10 @@ export default function UucPhcMethodology() {
           The <strong>Ask the data</strong> box on these pages is an AI assistant with no knowledge
           of its own. Every number it gives you comes from a query it ran against this dataset while
           answering, and any sentence carrying a number it cannot trace back to one of those queries
-          is removed before you see it. It reads only this list — not the Barangay Health Worker
-          census, which is a separate dashboard at{" "}
+          is removed before you see it. It reads only this list — not the BHW Headcount 2025 or BHW
+          Profiles 2025 data, which has its own dashboard at{" "}
           <Link href="/bhw" className="underline hover:text-accent">
-            BHW Connect
+            BHW 2025
           </Link>
           .
         </p>

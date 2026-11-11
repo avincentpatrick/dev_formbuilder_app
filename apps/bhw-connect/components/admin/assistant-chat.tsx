@@ -66,7 +66,7 @@ const STARTER_QUESTIONS = [
   "Which provinces are outliers on honorarium receipt?",
   "Is DC No. 2025-0549 still the current UUC for PHC issuance?",
   "Where does pct_accredited come from, and what built it?",
-  "Which fields have the largest gaps in the BHW census?",
+  "Which fields have the largest gaps in BHW Profiles 2025?",
   "How does Basilan compare with its provincial peers on accreditation?",
 ];
 

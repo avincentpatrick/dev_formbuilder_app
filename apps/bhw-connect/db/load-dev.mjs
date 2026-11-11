@@ -36,6 +36,11 @@ export async function loadDev(client, { log = () => {} } = {}) {
 
   await client.query(readFileSync(BASELINE_SCHEMA, "utf8"));
   log("schema: db/baseline/schema.sql loaded");
+  // The dump ends its preamble with `set_config('search_path', '', false)`, which lasts for the
+  // session. The box's deploy runs migrations on a fresh connection, so a migration that names
+  // `dim_dataset` rather than `public.dim_dataset` works there and failed here ("relation does not
+  // exist") — first met by 20261111090000. Back to the connection's defaults before migrating.
+  await client.query("RESET ALL");
 
   const version = readFileSync(BASELINE_VERSION, "utf8").trim();
   const { baselined } = await migrate(client, { baseline: version });

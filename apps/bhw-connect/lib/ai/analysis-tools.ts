@@ -353,7 +353,7 @@ const areaProfileTool: Tool = {
   definition: {
     name: "getAreaProfile",
     description:
-      "Every dataset that covers one geography in a single call — BHW census overview and counts, demographics, training, honorarium and its sufficiency, 2026 profiling status, UUC for PHC listing, qualifying routes and BHW coverage, poverty, census population, peer ranks, and any ingested document passage that names the place — together with a coverage list naming every dataset that has NO figure for it and why. Use this to open a broad question about one place, and when reporting, say what is missing as well as what is there: 'not built at this level' is a property of how a dataset was built, not a gap in the data, and the two must not be described the same way.",
+      "Every dataset that covers one geography in a single call — BHW Headcount 2025 and BHW Profiles 2025 overview and counts, demographics, training, honorarium and its sufficiency, 2026 profiling status, UUC for PHC listing, qualifying routes and BHW coverage, poverty, census population, peer ranks, and any ingested document passage that names the place — together with a coverage list naming every dataset that has NO figure for it and why. Use this to open a broad question about one place, and when reporting, say what is missing as well as what is there: 'not built at this level' is a property of how a dataset was built, not a gap in the data, and the two must not be described the same way.",
     parameters: {
       type: "object",
       properties: {

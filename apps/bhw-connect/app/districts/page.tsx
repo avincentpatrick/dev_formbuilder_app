@@ -64,6 +64,14 @@ export default async function DistrictsPage() {
           </Link>
           .
         </p>
+        <p className="mt-2 text-sm">
+          <Link
+            href="/map?dataset=ph-legislative-districts&level=national&code=PH"
+            className="underline hover:text-accent"
+          >
+            See districts on the map, through their cities and municipalities →
+          </Link>
+        </p>
       </div>
 
       <section aria-label="Find a legislative district" className="flex flex-col gap-2">

@@ -9753,3 +9753,42 @@ Agreed with avincentpatrick (`docs/DATASET_HUB_PLAN.md`, Step 3). This replaces 
 of one map card per release on the portal; its data rules stand. The portal's map gallery is removed, each
 catalog card links to its dataset's full map on `/map` (address kept so shared links survive), and the picker
 groups releases by dataset (`lib/maps/subjects.ts`), so BHW's Headcount 2025 and Profiles 2025 sit together.
+
+## 2026-11-11 — Stored names follow the rename; old AI answers expire by version
+
+Agreed with avincentpatrick. PR #501 renamed the labels in code; the same names also lived in database rows.
+`20261111090000_bhw_dataset_display_names.sql` (UPDATE only) renames the two dataset records — `bhw-stepzero-2026`
+to **BHW Headcount 2025** with a source line in the same words, and `bhw-2025` to **BHW Profiles 2025** — so the
+catalog card, the source line under each headcount map and every export stop saying "StepZero Quick-Count". It
+rewrites the assistant's dataset dictionary (`dataset_registry`, `dataset_column`) phrase by phrase; the
+replacements are case-sensitive, so lowercase identifiers (`agg_bhw_stepzero_counts`, the slugs) are unchanged.
+Cached AI answers and place summaries are expired by bumping `last_updated_at` for `bhw-2025` and `uuc-phc-2025`,
+the app's own versioning: approved answers regenerate in the nightly refresh, the rest on the next ask, nothing is
+deleted. Accepted side effect: "Last updated" for those two datasets shows the migration date.
+Left as they are, on purpose: `ai_ask_log` (a history), the knowledge-graph lineage (it holds only identifiers),
+and `doc_chunk` with its embeddings and chunk-sourced graph rows (verbatim DOH source text, which
+`kb_evidence_is_grounded()` requires to stay verbatim), so nothing needs re-embedding. Not visible from the
+repository: admin edits to the live dictionary (the replacements apply to whatever the rows say) and the content
+of cached answers. The same change fixes "BHW census" left in public methodology pages, the roadmap, the UUC
+coverage note and four admin/AI strings.
+Explore's district layer gets a visible caveat (boundaries not yet validated; the districts without a polygon are
+listed) rather than losing its rates.
+
+## 2026-11-11 — Legislative districts on /map: through member municipalities, both views
+
+Agreed with avincentpatrick, who asked for districts to drill down only as far as municipalities and chose both
+views. No district has a validated outline (0 of 250: the 189 shapes in `public/geo/districts.json` come from a
+builder that never checked membership completeness; 42 districts need barangay polygons; 19 have a member with no
+source boundary), and no district measure is defined as validated. So `/map`'s district view draws **no district
+outline and no district total**:
+- **Districts in a province** — each city or municipality on the existing municipal boundaries, coloured by its
+  district; a city the mapping divides barangay by barangay is drawn whole in a "divided" colour; an unplaced one
+  stays grey and is listed ("no answer, not no district").
+- **One district's municipalities** — its members outlined and shaded by their own published figure, read from
+  `/api/dataset-map` exactly as every other map reads it; the rest of the province is pale context. A divided
+  city's figure is labelled as the whole city's. A district with members in more than one province is drawn on the
+  province holding most of them, and the others are named.
+Membership comes from `geo_district_map` (live rows: not rejected, not superseded) through `/api/district-map`,
+which reads no figures. Income classes stay on their own map. District pages link to their view. Still waiting:
+outlines and totals need a reviewed roster attesting complete membership (owner), the barangay package installed
+(operator), and boundaries for the 19 (outside data).

@@ -1,6 +1,9 @@
 import { CENSUS_ACTIVE_YEARS_ID, CENSUS_ACTIVE_YEARS_DENOMINATOR } from "./census-active-years";
 import { isCensusProfileRate, CENSUS_ACCREDITATION_DENOMINATOR } from "./census-accreditation";
-import { STEPZERO_ACCREDITATION_ID, STEPZERO_ACCREDITATION_DENOMINATOR } from "./stepzero-accreditation";
+import {
+  STEPZERO_ACCREDITATION_ID,
+  STEPZERO_ACCREDITATION_DENOMINATOR,
+} from "./stepzero-accreditation";
 import { UUC_ROUTE_LABELS } from "./uuc-routes";
 import { CATALOG, type IndicatorSpec } from "@/lib/catalog/definitions";
 import type { GeoLevel } from "@/lib/filters/schema";
@@ -64,7 +67,13 @@ function indicator(spec: IndicatorSpec): MapIndicator {
           : periods[spec.source],
     levels: spec.levels,
     denominator:
-      (spec.id === CENSUS_ACTIVE_YEARS_ID ? CENSUS_ACTIVE_YEARS_DENOMINATOR : isCensusProfileRate(spec.id) ? CENSUS_ACCREDITATION_DENOMINATOR : spec.id === STEPZERO_ACCREDITATION_ID ? STEPZERO_ACCREDITATION_DENOMINATOR : spec.attributes?.denominator) ??
+      (spec.id === CENSUS_ACTIVE_YEARS_ID
+        ? CENSUS_ACTIVE_YEARS_DENOMINATOR
+        : isCensusProfileRate(spec.id)
+          ? CENSUS_ACCREDITATION_DENOMINATOR
+          : spec.id === STEPZERO_ACCREDITATION_ID
+            ? STEPZERO_ACCREDITATION_DENOMINATOR
+            : spec.attributes?.denominator) ??
       (spec.unit === "%" ? "Required from accepted source definition" : null),
     legend:
       spec.unit === "%" || spec.unit.startsWith("per ") || spec.unit === "years" ? "rate" : "count",
@@ -74,7 +83,10 @@ function indicator(spec: IndicatorSpec): MapIndicator {
 // Map-only source context: do not reuse the dashboard population fallback or add ratios.
 const stepzeroContext: IndicatorSpec[] = ["population", "households"].map((column) => ({
   id: `stepzero.${column}`,
-  label: column === "population" ? "Source population (BHW Headcount)" : "Source households (BHW Headcount)",
+  label:
+    column === "population"
+      ? "Source population (BHW Headcount)"
+      : "Source households (BHW Headcount)",
   unit: column === "population" ? "people" : "households",
   source: "bhw-stepzero-2026",
   table: "agg_bhw_stepzero_counts",
@@ -194,7 +206,7 @@ export const DATASET_MAPS: readonly DatasetMapDefinition[] = [
     "Legislative districts",
     "20th Congress public district mapping",
     "district",
-    "District slugs are not PSGC codes. Incomplete member geometry must remain incomplete; only validated district measures may be published.",
+    "Districts are not PSGC areas. Membership is single-source and correctable. No district outline or district total is published until district boundaries and measures are validated.",
   ),
   {
     ...catalogMap(
@@ -258,7 +270,7 @@ export const PLANNED_MAP_WORK = [
   },
   {
     dataset: "ph-legislative-districts",
-    work: "Complete validated municipal/barangay member geometry",
+    work: "District outlines and totals: validated, complete municipal/barangay member geometry (until then the map shows districts through their member cities and municipalities)",
   },
 ] as const;
 export function getDatasetMap(slug: string): DatasetMapDefinition | undefined {

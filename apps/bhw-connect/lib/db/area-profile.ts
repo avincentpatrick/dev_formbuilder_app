@@ -195,7 +195,7 @@ export async function getAreaProfile(
   const sections: AreaProfile["sections"] = {
     bhwOverview: overview
       ? present(overview)
-      : absent("no-data", `No BHW census overview is recorded for ${geo.geoName}.`),
+      : absent("no-data", `No BHW Headcount or Profiles overview is recorded for ${geo.geoName}.`),
 
     bhwCounts: counts
       ? present(counts)

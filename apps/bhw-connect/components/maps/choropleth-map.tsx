@@ -73,6 +73,7 @@ export function ChoroplethMap({
   onHoverGeo,
   onSelectGeo,
   onDrill,
+  onGeometryLoaded,
 }: {
   geojsonUrl: string;
   /** Only used as the map (re)init effect's dependency key below — a `GeoLevel` for the geo
@@ -89,6 +90,9 @@ export function ChoroplethMap({
   onHoverGeo: (code: string | null) => void;
   onSelectGeo: (code: string | null) => void;
   onDrill: (code: string) => void;
+  /** Called once the boundary file has loaded, with the code of every feature it draws. Lets a
+   * caller say which of its rows have no outline rather than leave them silently off the map. */
+  onGeometryLoaded?: (featureCodes: string[]) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -111,6 +115,7 @@ export function ChoroplethMap({
   const onHoverRef = useRef(onHoverGeo);
   const onSelectRef = useRef(onSelectGeo);
   const onDrillRef = useRef(onDrill);
+  const onGeometryLoadedRef = useRef(onGeometryLoaded);
   useEffect(() => {
     dataRef.current = data;
     binsRef.current = bins;
@@ -120,6 +125,7 @@ export function ChoroplethMap({
     onHoverRef.current = onHoverGeo;
     onSelectRef.current = onSelectGeo;
     onDrillRef.current = onDrill;
+    onGeometryLoadedRef.current = onGeometryLoaded;
     dataMapRef.current = new Map(data.map((d) => [d.geoCode, d]));
   });
 
@@ -139,6 +145,9 @@ export function ChoroplethMap({
         if (cancelled || !containerRef.current) return;
 
         geojsonRef.current = geojson;
+        onGeometryLoadedRef.current?.(
+          (geojson as GeoJson).features.map((f) => String(f.properties.geo_code)),
+        );
         paintFeatures(geojson, dataRef.current, binsRef.current, minNRef.current);
 
         map = new maplibregl.Map({

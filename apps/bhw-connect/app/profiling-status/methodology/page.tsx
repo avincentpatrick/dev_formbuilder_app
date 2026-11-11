@@ -82,7 +82,7 @@ export default function ProfilingStatusMethodology() {
         <p className="text-muted">
           Progress percentages are measured against <strong>all BHWs to be profiled</strong> —
           registered, accredited, and non-registered combined. The 2026 goal is to profile every
-          BHW, so (unlike the 2025 census) non-registered BHWs are part of the base, not excluded
+          BHW, so (unlike BHW Profiles 2025) non-registered BHWs are part of the base, not excluded
           from it.
         </p>
       </section>

@@ -83,7 +83,7 @@ it('offers an entitled Owner every destination in the catalog, and no more', fun
     $keys = array_column(app(DestinationCatalog::class)->visibleTo($this->owner), 'key');
 
     expect($keys)->toBe([
-        'forms', 'submissions', 'dashboard', 'achievements', 'analytics', 'members', 'scopes',
+        'forms', 'submissions', 'dashboard', 'achievements', 'analytics', 'explore', 'members', 'scopes',
         'audit', 'feedback', 'webhooks', 'integrations', 'domains', 'settings', 'help',
     ]);
 });
@@ -119,6 +119,7 @@ it('lands an offered destination on a real Inertia page', function (string $key,
     'dashboard' => ['dashboard', 'Dashboard'],
     'achievements' => ['achievements', 'achievements/Index'],
     'analytics' => ['analytics', 'analytics/Index'],
+    'explore' => ['explore', 'explore/Index'],
     'members' => ['members', 'members/Index'],
     'scopes' => ['scopes', 'scopes/Index'],
     'audit' => ['audit', 'audit/Index'],
@@ -142,7 +143,7 @@ it('offers a Viewer only the destinations a Viewer can open', function (): void 
     // the narrowest reader on the strength of a plan feature alone. The NAMED ladder inside that page is
     // still gated on `dashboard.org.view`, which a Viewer happens to hold; a Form Editor would reach the
     // same page and be served a null `scoreboard`.
-    expect($keys)->toBe(['submissions', 'dashboard', 'achievements', 'analytics', 'settings', 'help']);
+    expect($keys)->toBe(['submissions', 'dashboard', 'achievements', 'analytics', 'explore', 'settings', 'help']);
 });
 
 it('lands a Viewer on a real Inertia page too', function (string $key, string $component): void {
@@ -162,6 +163,7 @@ it('lands a Viewer on a real Inertia page too', function (string $key, string $c
     'dashboard' => ['dashboard', 'Dashboard'],
     'achievements' => ['achievements', 'achievements/Index'],
     'analytics' => ['analytics', 'analytics/Index'],
+    'explore' => ['explore', 'explore/Index'],
     'settings' => ['settings', 'Settings/Index'],
     'help' => ['help', 'help/Index'],
 ]);

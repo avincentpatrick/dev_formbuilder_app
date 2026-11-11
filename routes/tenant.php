@@ -1019,6 +1019,10 @@ Route::middleware([
     Route::delete('/analytics/views/{savedReportView}', [AnalyticsViewController::class, 'destroy'])
         ->middleware(['can:delete,savedReportView', 'feature:advanced_analytics'])->name('analytics.views.destroy');
 
+    // The data explorer (ADR-0025, M235) — a member's own charts, in a route file of its own. It is mounted
+    // here, inside this group, so its routes carry exactly the middleware every route above carries.
+    require __DIR__.'/explorer.php';
+
     /*
     | The audit log (Increment I2, PRD Feature #12) — the Owner/Admin compliance ledger, the first surface
     | that lets a human READ what H4 has been writing since July.

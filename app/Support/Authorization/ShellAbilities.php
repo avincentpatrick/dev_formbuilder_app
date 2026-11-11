@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Authorization;
 
 use App\Models\Audit;
+use App\Models\ExplorerChart;
 use App\Models\Form;
 use App\Models\SavedReportView;
 use App\Models\ScopeNode;
@@ -84,6 +85,10 @@ final class ShellAbilities
             // without it never sees a destination it would only bounce off (ADR-0011 §D9 — hidden,
             // never locked-with-upsell, because Business is held from sale).
             'viewAnalytics' => (bool) $user?->can('viewAny', SavedReportView::class),
+            // Gates the Explore nav item and the /explore pages (M235, ADR-0025). The POLICY, for the
+            // reason above. It opens the PAGE only: which data sources a reader may chart is decided
+            // per source by ExplorerCatalog, so this being true promises a workbench and no row.
+            'viewExplorer' => (bool) $user?->can('viewAny', ExplorerChart::class),
             // Gates the Domains nav item + the /domains page (H22b). The BARE PERMISSION, not a
             // policy: `domains` is RLS-exempt and has no model policy at all (ADR-0012 — there is no
             // per-instance authorization question, and a policy over an unscoped table would invite

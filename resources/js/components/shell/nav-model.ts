@@ -80,6 +80,10 @@ export const navGroups: NavGroup[] = [
             // — below 1024px the sidebar is icons only, and there the mark is the only thing distinguishing it
             // from Webhooks.
             { key: 'analytics', label: 'Analytics', icon: 'chart-bar', href: '/analytics', gate: 'viewAnalytics', feature: 'advanced_analytics' },
+            // The data explorer (M235, ADR-0025) — a member's own charts over the data they can already read.
+            // Beside Analytics and behind the same plan key, because it is the same kind of surface; a glyph of
+            // its own, because below 1024px the mark is all that tells the two apart.
+            { key: 'explore', label: 'Explore', icon: 'chart-pie', href: '/explore', gate: 'viewExplorer', feature: 'advanced_analytics' },
         ],
     },
     {

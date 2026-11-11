@@ -61,6 +61,7 @@ function allAbilities(overrides: Record<string, boolean> = {}): Record<string, b
         manageWebhooks: true,
         manageIntegrations: true,
         viewAnalytics: true,
+        viewExplorer: true,
         manageDomains: true,
         viewAuditLog: true,
         viewFeedback: true,
@@ -102,6 +103,31 @@ describe('Sidebar — the Analytics destination', () => {
         const wrapper = render(allAbilities({ viewAnalytics: false }), { advanced_analytics: true });
 
         expect(labels(wrapper).join(' ')).not.toContain('Analytics');
+        wrapper.unmount();
+    });
+
+    // M235 — the data explorer sits beside Analytics, behind the same plan key and its own ability.
+    it('shows Explore to an entitled tenant whose user may open it', () => {
+        const wrapper = render(allAbilities(), { advanced_analytics: true });
+
+        expect(labels(wrapper)).toContain('Explore');
+        wrapper.unmount();
+    });
+
+    it('HIDES Explore from a tenant whose plan lacks advanced_analytics', () => {
+        const wrapper = render(allAbilities(), { advanced_analytics: false });
+
+        expect(labels(wrapper)).not.toContain('Explore');
+        wrapper.unmount();
+    });
+
+    it('hides Explore from a user without viewExplorer, and leaves Analytics where it was', () => {
+        // The two abilities are separate keys on purpose: this is the case that fails if one nav item is
+        // ever gated on the other's.
+        const wrapper = render(allAbilities({ viewExplorer: false }), { advanced_analytics: true });
+
+        expect(labels(wrapper)).not.toContain('Explore');
+        expect(labels(wrapper)).toContain('Analytics');
         wrapper.unmount();
     });
 
@@ -285,7 +311,7 @@ describe('Sidebar — grouping', () => {
         const { navGroups, navItems } = await import('./nav-model');
 
         expect(navItems.map((i) => i.key)).toEqual([
-            'forms', 'submissions', 'dashboard', 'achievements', 'analytics',
+            'forms', 'submissions', 'dashboard', 'achievements', 'analytics', 'explore',
             'members', 'scopes', 'audit', 'feedback',
             'webhooks', 'integrations', 'domains',
             'settings', 'help',

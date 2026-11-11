@@ -1,32 +1,31 @@
 import { expect, test } from "@playwright/test";
 
-test("UUC and NHFR keep independent choices and enlarge with those choices", async ({ page }) => {
+test("a dataset card opens its own full map, and the home page draws no map", async ({ page }) => {
+  const reads: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.endsWith("/api/dataset-map")) reads.push(request.url());
+  });
   await page.goto("./");
-  const uuc = page.getByRole("article", { name: "UUC for PHC 2025 map", exact: true });
-  const nhfr = page.getByRole("article", { name: "NHFR September 2026 map", exact: true });
-  await uuc.scrollIntoViewIfNeeded();
-  await expect(uuc.getByLabel("UUC for PHC 2025 area")).toBeVisible();
-  await uuc.getByLabel("UUC for PHC 2025 area").selectOption("01");
-  await nhfr.scrollIntoViewIfNeeded();
-  await nhfr.getByLabel("NHFR September 2026 indicator").selectOption("nhfr.government");
-  await expect(nhfr.getByRole("link", { name: "Enlarge NHFR September 2026 map" })).toHaveAttribute(
-    "href",
-    /indicator=nhfr.government/,
-  );
-  await expect(uuc.getByRole("link", { name: "Enlarge UUC for PHC 2025 map" })).toHaveAttribute(
-    "href",
-    /selected=01/,
-  );
-  await expect.poll(() => page.locator(".maplibregl-map").count()).toBeLessThanOrEqual(2);
-  await nhfr.getByRole("link", { name: "Enlarge NHFR September 2026 map" }).click();
-  await expect(page.getByLabel("Map dataset")).toHaveValue("nhfr-2026-09");
-  await expect(
-    page.getByText("Map unavailable. Use the area selector and complete table below."),
-  ).toHaveCount(0);
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByRole("region", { name: "Independent dataset maps" })).toHaveCount(0);
+  await expect(page.locator(".maplibregl-map")).toHaveCount(0);
+  expect(reads).toEqual([]);
+  await page.getByRole("link", { name: "Open full UUC-PHC map" }).first().click();
+  await expect(page.getByRole("heading", { level: 1, name: "UUC-PHC map" })).toBeVisible();
+  await expect(page.getByLabel("Map dataset")).toHaveValue("uuc-phc-2025");
   await expect(page.locator("canvas")).toHaveCount(1);
-  await expect(page.getByLabel("NHFR September 2026 indicator")).toHaveValue("nhfr.government");
+  await page.getByLabel("UUC for PHC 2025 area").selectOption("01");
+  await expect(page.getByRole("link", { name: "Share this map selection" })).toHaveAttribute("href", /selected=01/);
+  await page.getByRole("link", { name: "← UUC-PHC dataset" }).click();
+  await expect(page).toHaveURL(/catalog\?mode=all&dataset=uuc-phc/);
 });
 
+test("a card opens its map at the place chosen on the catalog", async ({ page }) => {
+  await page.goto("catalog?mode=psgc&location=region%3A01");
+  await page.getByRole("link", { name: "Open full NHFR map" }).click();
+  await expect(page).toHaveURL(/dataset=nhfr-2026-09&.*level=region&code=01/);
+  await expect(page.getByRole("heading", { level: 1, name: "NHFR map" })).toBeVisible();
+});
 test("enlarged selection and dataset switch preserve supported geography", async ({ page }) => {
   await page.goto("map?dataset=uuc-phc-2025&level=region&code=01&selected=01028");
   await expect(page.getByLabel("UUC for PHC 2025 area")).toHaveValue("01028");
@@ -38,9 +37,10 @@ test("enlarged selection and dataset switch preserve supported geography", async
   await page.getByLabel("Map dataset").selectOption("nhfr-2026-09");
   await expect(page).toHaveURL(/level=province&code=01028/);
   await expect(page.getByLabel("NHFR September 2026 area")).toBeVisible();
-  await page.getByLabel("Map dataset").selectOption("ways-forward");
-  await expect(page.getByText(/This roadmap has no ingested figures/)).toBeVisible();
-  await expect(page.locator("canvas")).toHaveCount(0);
+  // The picker groups releases by dataset; the empty roadmap slot is not offered.
+  const bhw = page.getByLabel("Map dataset").locator('optgroup[label="BHW"] option');
+  await expect(bhw).toHaveText(["BHW Headcount 2025", "BHW Profiles 2025"]);
+  await expect(page.getByLabel("Map dataset").locator('option[value="ways-forward"]')).toHaveCount(0);
 });
 
 test("failed boundaries retain complete table and accessible selection", async ({ page }) => {
@@ -127,36 +127,6 @@ test("census, StepZero and PSA maps keep their own indicators and periods", asyn
   await page.getByLabel("Map dataset").selectOption("bhw-2025");
   await expect(page).toHaveURL(/period=2025&level=region&code=01/);
   await expect(page.getByLabel("BHW Profiles 2025 indicator")).toHaveValue("bhw.validated-profiles");
-});
-
-test("many visible cards share at most two maps and only lease owners load rows", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 1400, height: 8000 });
-  const datasets: string[] = [];
-  page.on("request", (request) => {
-    const url = new URL(request.url());
-    if (url.pathname.endsWith("/api/dataset-map")) datasets.push(url.searchParams.get("dataset")!);
-  });
-  await page.goto("./");
-  await expect(page.locator(".maplibregl-map")).toHaveCount(2);
-  await expect.poll(() => new Set(datasets).size).toBe(2);
-  expect(datasets).not.toContain("fhsis-2025");
-  await page.setViewportSize({ width: 390, height: 844 });
-  const population = page.getByRole("article", { name: "PSA population 2024 map", exact: true });
-  await population.scrollIntoViewIfNeeded();
-  await expect(population.getByLabel("PSA population 2024 area")).toBeVisible();
-  await expect.poll(() => page.locator(".maplibregl-map").count()).toBeLessThanOrEqual(2);
-  const before = datasets.filter((d) => d === "psa-popcen-2024").length;
-  await page
-    .getByRole("article", { name: "Ways forward map", exact: true })
-    .scrollIntoViewIfNeeded();
-  // Another supported card may be adjacent to Ways forward as adapters roll out.
-  await expect(population.locator(".maplibregl-map")).toHaveCount(0);
-  await expect.poll(() => page.locator(".maplibregl-map").count()).toBeLessThanOrEqual(2);
-  await population.scrollIntoViewIfNeeded();
-  await expect(population.locator("canvas")).toHaveCount(1);
-  expect(datasets.filter((d) => d === "psa-popcen-2024").length).toBe(before);
 });
 
 test("poverty starts with geographic navigation, never regional rates or a parent total", async ({
@@ -308,13 +278,9 @@ test("income table separates classified, unclassified and unmatched LGUs", async
 // The 2026 profiling release is hidden until the owner presents 2026 data (lib/releases/visibility.ts).
 // Its two rendering specs (stage map and shareable geography; over-headcount shares) were removed
 // in the commit that hid it; restore them from git history together with the release.
-test("the hidden 2026 profiling release is absent from the homepage, the picker and its section", async ({
+test("the hidden 2026 profiling release is absent from the picker and its section", async ({
   page,
 }) => {
-  await page.goto("./");
-  await expect(
-    page.getByRole("article", { name: "Profiling status 2026 map", exact: true }),
-  ).toHaveCount(0);
   await page.goto("map?dataset=bhw-profiling-status-2026");
   await expect(page.getByRole("status").filter({ hasText: "Choose a dataset to open its map" })).toBeVisible();
   await expect(page.getByLabel("Map dataset").locator("option", { hasText: "Profiling status" })).toHaveCount(0);
@@ -322,22 +288,14 @@ test("the hidden 2026 profiling release is absent from the homepage, the picker 
   expect(section?.status()).toBe(404);
 });
 
-test("UUC qualifying routes preserve independent selections and share the chosen count", async ({
-  page,
-}) => {
-  await page.goto("./");
-  const uuc = page.getByRole("article", { name: "UUC for PHC 2025 map", exact: true });
-  await uuc.scrollIntoViewIfNeeded();
-  await uuc.getByLabel("UUC for PHC 2025 indicator").selectOption("uuc.route.health");
-  await expect(uuc.getByText(/Routes overlap and must not be added together/)).toBeVisible();
-  await expect(uuc.getByRole("link", { name: "Enlarge UUC for PHC 2025 map" })).toHaveAttribute(
+test("UUC qualifying routes share the chosen count", async ({ page }) => {
+  await page.goto("map?dataset=uuc-phc-2025");
+  await page.getByLabel("UUC for PHC 2025 indicator").selectOption("uuc.route.health");
+  await expect(page.getByText(/Routes overlap and must not be added together/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Share this map selection" })).toHaveAttribute(
     "href",
     /indicator=uuc.route.health&period=2025/,
   );
-  const nhfr = page.getByRole("article", { name: "NHFR September 2026 map", exact: true });
-  await expect(nhfr.getByLabel("NHFR September 2026 indicator")).toHaveValue("nhfr.facilities");
-  await uuc.getByRole("link", { name: "Enlarge UUC for PHC 2025 map" }).click();
-  await expect(page.getByLabel("UUC for PHC 2025 indicator")).toHaveValue("uuc.route.health");
 });
 
 test("UUC health-route table distinguishes zero, excluded and missing reports", async ({
@@ -515,73 +473,6 @@ test("area search preserves complete data, missing shapes and selection", async 
   await expect(search).toHaveValue("02");
   await page.getByLabel("Map dataset").selectOption("uuc-phc-2025");
   await expect(page.getByRole("searchbox", { name: "UUC for PHC 2025 search areas" })).toHaveValue("");
-});
-
-test("portal card searches remain independent", async ({ page }) => {
-  await page.goto("./");
-  const uuc = page.getByRole("article", { name: "UUC for PHC 2025 map", exact: true });
-  const nhfr = page.getByRole("article", { name: "NHFR September 2026 map", exact: true });
-  await uuc.scrollIntoViewIfNeeded();
-  await uuc.getByRole("searchbox").fill("01");
-  await nhfr.scrollIntoViewIfNeeded();
-  await expect(nhfr.getByRole("searchbox")).toHaveValue("");
-  await nhfr.getByRole("searchbox").fill("02");
-  await expect(uuc.getByRole("searchbox")).toHaveValue("01");
-});
-
-test("phone portal loads only visible datasets and disposes maps without losing state", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  const requests: string[] = [];
-  page.on("request", (request) => {
-    const url = new URL(request.url());
-    if (url.pathname.endsWith("/api/dataset-map")) requests.push(url.searchParams.get("dataset")!);
-  });
-  await page.addInitScript(() => {
-    const state = window as typeof window & { mapPeak: number };
-    state.mapPeak = 0;
-    new MutationObserver(() => {
-      state.mapPeak = Math.max(state.mapPeak, document.querySelectorAll(".maplibregl-map").length);
-    }).observe(document, { childList: true, subtree: true });
-  });
-  await page.goto("./");
-  await page.waitForLoadState("networkidle");
-  expect(requests).toEqual([]);
-  await expect(page.locator(".maplibregl-map")).toHaveCount(0);
-  const uuc = page.getByRole("article", { name: "UUC for PHC 2025 map", exact: true });
-  await uuc.scrollIntoViewIfNeeded();
-  await expect(uuc.locator('[data-map-state="ready"]')).toHaveCount(1);
-  await uuc.getByLabel("UUC for PHC 2025 area", { exact: true }).selectOption("01");
-  await uuc.getByRole("searchbox").fill("01");
-  expect(new Set(requests)).toEqual(new Set(["uuc-phc-2025"]));
-  const firstReads = requests.filter((slug) => slug === "uuc-phc-2025").length;
-  const nhfr = page.getByRole("article", { name: "NHFR September 2026 map", exact: true });
-  await nhfr.scrollIntoViewIfNeeded();
-  await expect(nhfr.locator('[data-map-state="ready"]')).toHaveCount(1);
-  await expect(uuc.locator(".maplibregl-map")).toHaveCount(0);
-  expect(new Set(requests)).toEqual(new Set(["uuc-phc-2025", "nhfr-2026-09"]));
-  await uuc.getByText(/Map paused/).scrollIntoViewIfNeeded();
-  await expect(uuc.locator('[data-map-state="ready"]')).toHaveCount(1);
-  await expect(uuc.getByLabel("UUC for PHC 2025 area", { exact: true })).toHaveValue("01");
-  await expect(uuc.getByRole("searchbox")).toHaveValue("01");
-  expect(requests.filter((slug) => slug === "uuc-phc-2025")).toHaveLength(firstReads);
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await expect(page.locator(".maplibregl-map")).toHaveCount(0);
-  expect(await page.evaluate(() => (window as typeof window & { mapPeak: number }).mapPeak)).toBeLessThanOrEqual(2);
-});
-
-test("tall desktop portal keeps the two-map limit when several cards are visible", async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 3000 });
-  await page.addInitScript(() => {
-    const state = window as typeof window & { mapPeak: number };
-    state.mapPeak = 0;
-    new MutationObserver(() => {
-      state.mapPeak = Math.max(state.mapPeak, document.querySelectorAll(".maplibregl-map").length);
-    }).observe(document, { childList: true, subtree: true });
-  });
-  await page.goto("./");
-  await page.getByRole("heading", { name: "Dataset maps", exact: true }).scrollIntoViewIfNeeded();
-  await expect(page.locator('[data-map-state="ready"]')).toHaveCount(2);
-  expect(await page.evaluate(() => (window as typeof window & { mapPeak: number }).mapPeak)).toBeLessThanOrEqual(2);
 });
 
 test("retrying failed geometry retains choices and avoids rereading dataset values", async ({ page }) => {

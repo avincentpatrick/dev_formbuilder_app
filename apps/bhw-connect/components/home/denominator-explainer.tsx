@@ -26,7 +26,7 @@ export function DenominatorExplainer({
       key: "total",
       value: totalBhw,
       label: <GlossaryTerm slug="total_bhw">Total BHWs</GlossaryTerm>,
-      note: "Everyone counted in the DOH StepZero quick-count (registered, accredited, and non-registered).",
+      note: "Everyone counted in the DOH BHW Headcount 2025 (registered, accredited, and non-registered).",
     },
     {
       key: "registered",
@@ -61,7 +61,7 @@ export function DenominatorExplainer({
     >
       <h2 className="text-sm font-semibold tracking-tight">Three ways BHWs are counted here</h2>
       <p className="mt-1 text-xs text-muted">
-        The headline total is the quick-count; the per-person figures below use the smaller
+        The headline total is the BHW Headcount; the per-person figures below use the smaller
         validated subset. This is why two &ldquo;how many BHWs&rdquo; numbers can differ.
       </p>
 

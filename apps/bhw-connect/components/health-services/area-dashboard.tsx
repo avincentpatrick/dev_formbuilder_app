@@ -402,8 +402,8 @@ export async function AreaDashboard({ geo }: { geo: GeoOption }) {
           The workforce alongside BHWs
         </h2>
         <p className="my-2 text-sm text-muted">
-          {FHSIS_RELEASE_LABEL} · LGU- and DOH-hired staff. Ratios use profiled BHWs from the 2025
-          BHW Census, not a FHSIS BHW count.
+          {FHSIS_RELEASE_LABEL} · LGU- and DOH-hired staff. Ratios use profiled BHWs from BHW Profiles
+          2025, not a FHSIS BHW count.
         </p>
         {area.workforce.length === 0 ? (
           <p>Workforce not reported in 2025 for this area.</p>

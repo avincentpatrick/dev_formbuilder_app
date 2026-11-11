@@ -17,7 +17,7 @@ type SearchMode =
   | "health-services"
   | "districts";
 const DATASETS = {
-  place: "2025 BHW Census",
+  place: "BHW 2025",
   "uuc-phc": "2025 UUC for PHC",
   facilities: "Health facilities",
   "health-services": "Health services",

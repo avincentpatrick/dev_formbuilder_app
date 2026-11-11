@@ -69,10 +69,10 @@ function educationTile(rows: DemographicRow[]): {
   return { hsPlusPct: hsGradOrAbovePct(rows) ?? 0, rows: rowsOut, hasData: byCat.size > 0 };
 }
 
-// Names this dataset the "2025 BHW Census" (the tab reads "2025 BHW Census · BHW Connect"),
+// Names this section "BHW 2025" (the tab reads "BHW 2025 · BHW Connect"): the Headcount and Profiles together,
 // distinguishing it from the separate 2026 BHW Profiling Status section.
 export const metadata: Metadata = {
-  title: "2025 BHW Census",
+  title: "BHW 2025",
 };
 
 export default async function Home() {
@@ -127,7 +127,7 @@ export default async function Home() {
       color: "var(--seq-6)",
     },
     {
-      label: "Non-registered (LGU-declared)",
+      label: "Non-registered (LGU-reported)",
       value: overview.nonRegistered ?? 0,
       color: "var(--seq-1)",
     },
@@ -192,10 +192,10 @@ export default async function Home() {
             <StatHero
               label="Total BHWs"
               value={formatCount(overview.totalBhw)}
-              caption="Registered/accredited + non-registered (LGU-declared, pre-profiling) · 2025"
+              caption="Registered/accredited + non-registered (LGU-reported, pre-profiling) · BHW Headcount 2025"
               context={
                 <p className="mt-1 text-xs text-muted">
-                  LGU-declared universe; N = {formatCount(overview.validatedProfiles)} individually
+                  LGU-reported universe; N = {formatCount(overview.validatedProfiles)} individually
                   profiled{coverage !== null ? ` (${coverage}%)` : ""}.
                 </p>
               }
@@ -321,7 +321,7 @@ export default async function Home() {
               }
               caption={
                 overview.households !== null
-                  ? `Households served per BHW, on average · across ${formatCount(overview.households)} households · StepZero · 2025`
+                  ? `Households served per BHW, on average · across ${formatCount(overview.households)} households · BHW Headcount 2025`
                   : "Household data not available"
               }
               context={

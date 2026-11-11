@@ -46,7 +46,7 @@ export default async function MethodologyPage() {
         </p>
         <ul className="list-inside list-disc">
           <li>
-            The <GlossaryTerm slug="stepzero">StepZero quick-count</GlossaryTerm> — a DOH
+            The <GlossaryTerm slug="stepzero">BHW Headcount 2025</GlossaryTerm> — a DOH
             barangay-level aggregate headcount — gives the{" "}
             <GlossaryTerm slug="total_bhw">total number of BHWs</GlossaryTerm>: about{" "}
             <strong>306,835</strong> nationally, split into{" "}
@@ -72,34 +72,34 @@ export default async function MethodologyPage() {
         </p>
         <p className="text-sm text-muted">
           Both datasets come from the same 2025 BHW profiling initiative, not separate exercises:
-          StepZero is the LGU-reported headcount collected first — local government units were
+          The BHW Headcount is the LGU-reported count collected first — local government units were
           asked how many BHWs they had before individual profiling began, so that denominators
-          would be clear going in. The validated-profiles dataset is the result of that individual
+          would be clear going in. The BHW Profiles 2025 dataset is the result of that individual
           profiling. A small number of places (mostly whole cities/municipalities, plus individual
-          barangays elsewhere) appear in StepZero&apos;s total but have no validated profiles yet —
+          barangays elsewhere) appear in the Headcount&apos;s total but have no validated profiles yet —
           this reflects where individual profiling was still incomplete as of the 2025 snapshot,
           not a data error.
         </p>
         <p className="text-sm text-muted">
           Note on the official figure: DOH cites approximately <strong>277,767</strong> registered
-          &amp; accredited BHWs. The StepZero sheet used here sums to 278,240 registered BHWs — a
+          &amp; accredited BHWs. The Headcount sheet used here sums to 278,240 registered BHWs — a
           difference of a few hundred that reflects ordinary drift between an official tally and this
           sheet export. The site computes its totals from the sheet.
         </p>
         <p className="text-sm text-muted">
-          Two different notions of &quot;accredited&quot; exist and are not mixed: the StepZero
+          Two different notions of &quot;accredited&quot; exist and are not mixed: the Headcount
           count is a self-reported barangay tally, while the per-person{" "}
           <GlossaryTerm slug="accredited">accreditation</GlossaryTerm> figures come from each
           BHW&apos;s verified accreditation flag in the profiled dataset.
         </p>
         <p>
-          StepZero&apos;s household counts also power{" "}
+          The Headcount&apos;s household counts also power{" "}
           <GlossaryTerm slug="households_per_bhw">Households per BHW</GlossaryTerm>, shown alongside
           the headcount everywhere Total BHWs appears: households divided by Total BHWs, giving
           roughly how many households each BHW serves. BHWs in the Philippines are assigned to
           households, so this ratio — rather than a per-capita rate — is the workload measure that
           matters, and it lets places of very different sizes be compared. It&apos;s shown only
-          where StepZero has a household figure for that area.
+          where the Headcount has a household figure for that area.
         </p>
       </section>
 
@@ -177,9 +177,9 @@ export default async function MethodologyPage() {
           </li>
           <li>
             <strong>BHWs per 1,000 residents.</strong> Total BHWs divided by population, times
-            1,000. Population is the BHW program&apos;s own self-reported StepZero figure — the
+            1,000. Population is the BHW program&apos;s own self-reported Headcount figure — the
             same barangay roster the BHW counts themselves come from; where an area has no
-            StepZero population at all, it falls back to the{" "}
+            Headcount population at all, it falls back to the{" "}
             <GlossaryTerm slug="census_population">PSA 2024 census count</GlossaryTerm> (POPCEN),
             name-matched to each area. City/municipality is the finest census grain, so a
             barangay falling back to census uses its city/municipality count. Full
@@ -203,7 +203,7 @@ export default async function MethodologyPage() {
             &quot;percent licensed&quot; figure is published.
           </li>
           <li>
-            <strong>Accreditation, two sources.</strong> The StepZero quick-count reports an
+            <strong>Accreditation, two sources.</strong> The BHW Headcount reports an
             accredited share of the whole BHW universe (
             <GlossaryTerm slug="lgu_reported_accreditation">LGU-reported accreditation</GlossaryTerm>
             ), while the verified rate counts only individually validated profiles. These come from

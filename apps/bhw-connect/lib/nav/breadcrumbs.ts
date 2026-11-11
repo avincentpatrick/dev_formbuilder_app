@@ -25,7 +25,7 @@ export type Crumb = { label: string; href?: string };
 export const PORTAL_CRUMB: Crumb = { label: "iconnect", href: "/" };
 
 /** Section roots — also the first crumb a dynamic page prepends to its own trail. */
-export const BHW_CRUMB: Crumb = { label: "2025 BHW Census", href: "/bhw" };
+export const BHW_CRUMB: Crumb = { label: "BHW 2025", href: "/bhw" };
 export const PROFILING_STATUS_CRUMB: Crumb = {
   label: "2026 BHW Profiling Status",
   href: "/profiling-status",

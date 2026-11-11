@@ -44,7 +44,7 @@ export default function RoadmapPage() {
           <li>An admin panel for feedback triage, usage dashboards, and content curation (staff-only)</li>
           <li>
             Workload context — &quot;Households per BHW&quot;, the ratio BHWs are actually
-            assigned by — using household figures from the StepZero quick-count, shown alongside
+            assigned by — using household figures from the BHW Headcount 2025, shown alongside
             Total BHWs
           </li>
         </ul>

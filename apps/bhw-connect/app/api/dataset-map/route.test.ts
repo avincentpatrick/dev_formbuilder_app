@@ -5,6 +5,16 @@ const mock = vi.hoisted(() => ({ source: vi.fn(), geo: vi.fn(), from: vi.fn() })
 vi.mock("@/lib/db/dataset", () => ({ readDatasetBySlug: mock.source }));
 vi.mock("@/lib/db/geo", () => ({ getGeoByCode: mock.geo }));
 vi.mock("@/lib/db/supabase", () => ({ createSupabaseServerClient: () => ({ from: mock.from }) }));
+// The 2026 profiling release is hidden in production; its tests below show it to keep its reader proved.
+const visibility = vi.hoisted(() => ({ profilingShown: false }));
+vi.mock("@/lib/releases/visibility", async (original) => {
+  const real = await original<typeof import("@/lib/releases/visibility")>();
+  return {
+    ...real,
+    isReleasePublic: (slug: string) =>
+      slug === real.PROFILING_STATUS_SLUG ? visibility.profilingShown : real.isReleasePublic(slug),
+  };
+});
 import { GET } from "./route";
 function query(result: unknown) {
   const chain: Record<string, unknown> = {};
@@ -14,6 +24,7 @@ function query(result: unknown) {
 }
 beforeEach(() => {
   vi.resetAllMocks();
+  visibility.profilingShown = false;
   mock.source.mockResolvedValue({
     state: "available",
     value: {
@@ -246,7 +257,17 @@ it("rejects unsupported income periods and barangay scopes", async () => {
   expect(mock.from).not.toHaveBeenCalled();
 });
 
+it("refuses the hidden 2026 profiling release without reading anything", async () => {
+  const response = await GET(
+    new NextRequest("http://localhost/api/dataset-map?dataset=bhw-profiling-status-2026&indicator=encoded"),
+  );
+  expect(response.status).toBe(400);
+  expect(mock.source).not.toHaveBeenCalled();
+  expect(mock.from).not.toHaveBeenCalled();
+});
+
 it("reads profiling stage snapshots from their own dataset and level without parent averaging", async () => {
+  visibility.profilingShown = true;
   const values = query({
     data: [
       {
@@ -280,6 +301,7 @@ it("reads profiling stage snapshots from their own dataset and level without par
   expect(values.eq).toHaveBeenCalledWith("geo_level", "region");
 });
 it("rejects profiling periods and individual record fields outside the map contract", async () => {
+  visibility.profilingShown = true;
   for (const query of ["period=2025", "indicator=n_drafted", "level=barangay&code=0102801001"]) {
     expect(
       (

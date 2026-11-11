@@ -4,6 +4,9 @@ import { getProfilingStatusStaticParams } from "@/lib/db/profiling-status";
 import { getUucPhcStaticParams } from "@/lib/db/uuc-phc";
 import { getDistrictIndex } from "@/lib/db/districts";
 import { SITE_URL } from "@/lib/site-url";
+import { isReleasePublic, PROFILING_STATUS_SLUG } from "@/lib/releases/visibility";
+
+const PROFILING_PUBLIC = isReleasePublic(PROFILING_STATUS_SLUG);
 
 // Origin plus base path (`lib/site-url.ts`): a sitemap entry is an absolute URL, so it carries
 // the prefix itself.
@@ -22,8 +25,7 @@ const STATIC_PATHS = [
   "/privacy",
   "/feedback",
   "/roadmap",
-  "/profiling-status",
-  "/profiling-status/methodology",
+  ...(PROFILING_PUBLIC ? ["/profiling-status", "/profiling-status/methodology"] : []),
   "/districts",
   "/districts/corrections",
   "/uuc-phc",
@@ -48,7 +50,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [geos, profilingGeos, uucPhcGeos, districts] = await Promise.all([
     getAllGeosAtLevels(["region", "province", "citymun"]),
     // Only region/province profiling pages that actually have data (city/mun is ISR).
-    getProfilingStatusStaticParams(),
+    PROFILING_PUBLIC ? getProfilingStatusStaticParams() : Promise.resolve([]),
     // Region + province UUC for PHC pages (city/mun is ISR, as above).
     getUucPhcStaticParams(),
     // 250 legislative districts (D2.1/D2.2) — well under the 1,000-row page cap, one request.

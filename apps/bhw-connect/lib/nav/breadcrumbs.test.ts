@@ -57,7 +57,7 @@ describe("trailForPathname", () => {
     const trail = trailForPathname("/admin/assistant/source/abc-123");
     expect(trail?.map((c) => c.label)).toEqual([
       "iconnect",
-      "2025 BHW Census",
+      "BHW 2025",
       "Admin",
       "Assistant",
       "Source",

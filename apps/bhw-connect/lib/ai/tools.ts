@@ -51,7 +51,7 @@ export const TOOLS: Tool[] = [
     definition: {
       name: "getIndicatorByGeo",
       description:
-        "Get one indicator's figures for a single geography, identified by its exact geo_code (use searchGeo first if you only have a place name). Every response includes Total BHWs (the full DOH StepZero universe) alongside Validated profiles (the individually-profiled subset) — always describe these as two distinct counts, never as the same number.",
+        "Get one indicator's figures for a single geography, identified by its exact geo_code (use searchGeo first if you only have a place name). Every response includes Total BHWs (the full BHW Headcount 2025 universe) alongside Validated profiles (the individually-profiled subset) — always describe these as two distinct counts, never as the same number.",
       parameters: {
         type: "object",
         properties: {

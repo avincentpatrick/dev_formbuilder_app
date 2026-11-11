@@ -133,7 +133,7 @@ export function BhwCoverageSection({
         <section className="rounded-lg border border-border bg-background p-5 sm:p-6">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <h2 className="text-lg font-semibold tracking-tight">BHW coverage in {areaLabel}</h2>
-            <p className="text-sm text-muted">StepZero headcount, every barangay</p>
+            <p className="text-sm text-muted">BHW Headcount 2025, every barangay</p>
           </div>
 
           {comparison.kind === "comparable" && (
@@ -237,7 +237,7 @@ export function BhwCoverageSection({
                 {formatCount(coverage.unallocatedHouseholds)} household
                 {coverage.unallocatedHouseholds === 1 ? "" : "s"}
               </strong>{" "}
-              in this area&rsquo;s published quick-count total sit in neither group: the quick count
+              in this area&rsquo;s published headcount total sit in neither group: the headcount
               carries them above barangay level only, so there is no barangay to attach a list
               status to. They are stated rather than absorbed — the two groups plus this figure are
               the area total exactly.
@@ -245,7 +245,7 @@ export function BhwCoverageSection({
           )}
 
           <p className="mt-4 border-t border-border pt-4 text-xs text-muted">
-            Built from the StepZero quick count, which covers every one of the country&rsquo;s
+            Built from the BHW Headcount 2025, which covers every one of the country&rsquo;s
             barangays, and <strong>not</strong> from the individually-profiled census. Listed
             barangays are remote by construction and so are plausibly also less profiled — splitting
             a profiled figure by list status would measure profiling progress and report it as BHW

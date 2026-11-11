@@ -32,7 +32,7 @@ it("labels a declared parent rate in PNG notes without turning it into a total",
   const notes = pngNotes(context).join("\n");
   expect(notes).toContain("Reported parent rate: 0%");
   expect(notes).not.toContain("Reported parent total:");
-  expect(notes).toContain("All LGU-declared BHWs");
+  expect(notes).toContain("All LGU-reported BHWs");
 });
 
 it("keeps unverified geometry separate from confirmed missing polygons", () => {
@@ -57,7 +57,7 @@ it("preserves Census confidence level, profile denominator and rate semantics in
   expect(context.total).toBeNull();
   const notes = pngNotes(context).join("\n");
   expect(notes).toContain("Published 95% confidence interval: 6.15 to 79.23");
-  expect(notes).toContain("Validated BHW Census profiles");
+  expect(notes).toContain("Validated BHW Profiles 2025 records");
 });
 
 it("exports a mean in years with a contributing-count caveat, not a total or percentage", () => {

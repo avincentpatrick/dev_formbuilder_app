@@ -109,7 +109,7 @@ export default async function ProfilingStatusLanding() {
         </Link>{" "}
         for how the pipeline steps and denominator are defined. This dataset is separate from the{" "}
         <Link href="/bhw" className="underline hover:text-accent">
-          2025 BHW Census
+          2025 BHW Headcount and Profiles
         </Link>
         .
       </p>

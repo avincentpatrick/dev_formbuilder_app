@@ -19,7 +19,7 @@ export default function ProfilingStatusMethodology() {
           Barangay Health Workers has progressed this year. It is a live operational snapshot of an
           encoding workflow — not a demographic census. It is a separate dataset from the{" "}
           <Link href="/bhw" className="underline hover:text-accent">
-            2025 BHW Census
+            2025 BHW Headcount and Profiles
           </Link>
           .
         </p>

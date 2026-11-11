@@ -3,7 +3,9 @@ import { InnovationEndorsement } from "@/components/branding/innovation-endorsem
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { notFound } from "next/navigation";
 import { SiteBreadcrumbs } from "@/components/layout/site-breadcrumbs";
+import { isReleasePublic, PROFILING_STATUS_SLUG } from "@/lib/releases/visibility";
 
 // This section is its own dataset, distinct from the 2025 BHW Census — so it carries its own
 // title template instead of the root layout's "%s · BHW Connect". The shared BHW header/footer
@@ -78,6 +80,8 @@ function SectionFooter() {
 }
 
 export default function ProfilingStatusLayout({ children }: { children: ReactNode }) {
+  // Not presented yet: see lib/releases/visibility.ts.
+  if (!isReleasePublic(PROFILING_STATUS_SLUG)) notFound();
   return (
     <div className="flex min-h-screen flex-col">
       <SectionHeader />

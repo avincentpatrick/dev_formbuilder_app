@@ -2,6 +2,7 @@
 import { useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { DATASET_MAPS } from "@/lib/maps/definitions";
+import { isReleasePublic } from "@/lib/releases/visibility";
 import {
   initialMapChoice,
   mapHref,
@@ -37,7 +38,7 @@ export function DatasetMapPage({ choice }: { choice: MapChoice | null }) {
           <option value="" disabled>
             Choose a dataset
           </option>
-          {DATASET_MAPS.map((d) => (
+          {DATASET_MAPS.filter((d) => isReleasePublic(d.slug)).map((d) => (
             <option key={d.slug} value={d.slug}>
               {d.title}
             </option>

@@ -1,5 +1,6 @@
 import { TRAINING_TOPICS } from "@/lib/catalog/definitions";
 import { getDatasetMap } from "./definitions";
+import { isReleasePublic } from "@/lib/releases/visibility";
 
 export type MapScope = { level: "national" | "region" | "province" | "citymun"; code: string };
 export type MapChoice = MapScope & {
@@ -90,10 +91,13 @@ export function parseMapChoice(params: URLSearchParams): MapChoice | null {
   if (["dataset", "indicator", "period", "level", "code", "selected"].some(key => params.getAll(key).length > 1))
     return null;
   const dataset = params.get("dataset");
-  if (!dataset || !getDatasetMap(dataset)) return null;
+  if (!dataset || !getDatasetMap(dataset) || !isReleasePublic(dataset)) return null;
   const base = initialMapChoice(dataset);
   const indicator = params.get("indicator") ?? base.indicator;
-  const period = params.get("period") ?? base.period;
+  const requested = params.get("period");
+  // Links shared before the headcount's period was corrected to 2025 still carry "2026".
+  const period =
+    dataset === "bhw-stepzero-2026" && requested === "2026" ? "2025" : (requested ?? base.period);
   const level = params.get("level") ?? "national";
   const code = params.get("code") ?? "PH";
   if (!["national", "region", "province", "citymun"].includes(level)) return null;

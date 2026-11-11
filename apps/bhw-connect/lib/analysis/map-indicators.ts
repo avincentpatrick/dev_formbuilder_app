@@ -54,7 +54,7 @@ export const MAP_BASE_INDICATOR_META: Record<MapBaseIndicator, MapIndicatorMeta>
     headlinePhrase: "household load per BHW",
     axisLabel: "Households per BHW",
     suffix: "",
-    denominator: "households ÷ total BHWs, from the StepZero quick-count",
+    denominator: "households ÷ total BHWs, from the BHW Headcount 2025",
   },
   avg_active_years: {
     label: "Avg years of service",
@@ -68,7 +68,7 @@ export const MAP_BASE_INDICATOR_META: Record<MapBaseIndicator, MapIndicatorMeta>
     headlinePhrase: "profile coverage",
     axisLabel: "% of registered profiled",
     suffix: "%",
-    denominator: "validated profiles as a share of the StepZero registered universe",
+    denominator: "validated profiles as a share of the BHW Headcount registered universe",
   },
   bhw_per_1000: {
     label: "BHWs per 1,000 residents",
@@ -76,7 +76,7 @@ export const MAP_BASE_INDICATOR_META: Record<MapBaseIndicator, MapIndicatorMeta>
     axisLabel: "BHWs per 1,000 residents",
     suffix: "",
     denominator:
-      "total BHWs per 1,000 residents (StepZero self-reported population, or PSA 2024 census where StepZero has no population figure)",
+      "total BHWs per 1,000 residents (BHW Headcount self-reported population, or PSA 2024 census where the Headcount has no population figure)",
   },
 };
 

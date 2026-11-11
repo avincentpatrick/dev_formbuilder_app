@@ -7,6 +7,8 @@ import {
   renderProfilingStatusPng,
 } from "@/lib/exports/profiling-status-figure";
 
+import { isReleasePublic, PROFILING_STATUS_SLUG } from "@/lib/releases/visibility";
+
 export const runtime = "nodejs";
 
 const querySchema = z.object({
@@ -17,6 +19,8 @@ const querySchema = z.object({
 /** One-page PNG summary of the 2026 BHW profiling status for a chosen geo level:
  * header + meta, the Encode → Validate → Attest stages, a child-unit breakdown, and bars. */
 export async function GET(request: Request) {
+  if (!isReleasePublic(PROFILING_STATUS_SLUG))
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   const { searchParams } = new URL(request.url);
   const parsed = querySchema.safeParse({
     geoCode: searchParams.get("geoCode"),

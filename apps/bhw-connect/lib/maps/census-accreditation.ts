@@ -2,7 +2,7 @@ import type { MapRow } from "./prototype";
 import { MIN_LEADER_N } from "@/lib/analysis/thresholds";
 export const CENSUS_HONORARIUM_ID = "bhw.any-honorarium";
 export const CENSUS_ACCREDITATION_ID = "bhw.profile-accreditation";
-export const CENSUS_ACCREDITATION_DENOMINATOR = "Validated BHW Census profiles in the selected area";
+export const CENSUS_ACCREDITATION_DENOMINATOR = "Validated BHW Profiles 2025 records in the selected area";
 export function isCensusProfileRate(id: string) {
   return id === CENSUS_HONORARIUM_ID || id === CENSUS_ACCREDITATION_ID || id.startsWith("bhw.training.");
 }
@@ -32,8 +32,8 @@ function joinProfileRate(children: { geo_code: string; geo_name: string }[], rec
     return { code: child.geo_code, name: child.geo_name, value: valid ? rate : null,
       ciLow: interval ? low : null, ciHigh: interval ? high : null,
       smallSample: valid && n < MIN_LEADER_N,
-      note: !valid ? "Missing, duplicate or inconsistent Census percentage or denominator."
-        : `Published Census percentage; ${n} validated profiles.${n < MIN_LEADER_N ? " Few BHWs profiled — unstable." : ""}` };
+      note: !valid ? "Missing, duplicate or inconsistent BHW Profiles percentage or denominator."
+        : `Published BHW Profiles percentage; ${n} validated profiles.${n < MIN_LEADER_N ? " Few BHWs profiled — unstable." : ""}` };
   });
 }
 

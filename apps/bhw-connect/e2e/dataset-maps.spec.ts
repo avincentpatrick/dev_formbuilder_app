@@ -22,9 +22,10 @@ test("a dataset card opens its own full map, and the home page draws no map", as
 
 test("a card opens its map at the place chosen on the catalog", async ({ page }) => {
   await page.goto("catalog?mode=psgc&location=region%3A01");
-  await page.getByRole("link", { name: "Open full NHFR map" }).click();
-  await expect(page).toHaveURL(/dataset=nhfr-2026-09&.*level=region&code=01/);
-  await expect(page.getByRole("heading", { level: 1, name: "NHFR map" })).toBeVisible();
+  // Whichever dataset the made-up seed fills for this region: the place carries over either way.
+  await page.getByRole("link", { name: /^Open full .+ map$/ }).first().click();
+  await expect(page).toHaveURL(/[?&]level=region&code=01(&|$)/);
+  await expect(page.getByRole("heading", { level: 1, name: / map$/ })).toBeVisible();
 });
 test("enlarged selection and dataset switch preserve supported geography", async ({ page }) => {
   await page.goto("map?dataset=uuc-phc-2025&level=region&code=01&selected=01028");
@@ -368,7 +369,8 @@ test("map data download preserves complete rows and selected context when geomet
   expect(content.rows.map((r: { value: number | null }) => r.value)).toEqual([0, null, 42]);
   expect(content.rows.every((r: { geometry: string }) => r.geometry === "not-checked")).toBe(true);
   expect(content.total).toBe(42);
-  await page.getByLabel("Map dataset").selectOption("ways-forward");
+  // A map with no figures yet (the district availability view) offers no data download.
+  await page.getByLabel("Map dataset").selectOption("ph-legislative-districts");
   await expect(page.getByRole("button", { name: "Download map data (JSON)" })).toHaveCount(0);
 });
 

@@ -246,11 +246,11 @@ export function BhwCoverageSection({
 
           <p className="mt-4 border-t border-border pt-4 text-xs text-muted">
             Built from the BHW Headcount 2025, which covers every one of the country&rsquo;s
-            barangays, and <strong>not</strong> from the individually-profiled census. Listed
-            barangays are remote by construction and so are plausibly also less profiled — splitting
-            a profiled figure by list status would measure profiling progress and report it as BHW
-            supply. The &ldquo;individually profiled&rdquo; row on each card is there so that
-            difference is visible rather than acting unseen.{" "}
+            barangays, and <strong>not</strong> from BHW Profiles 2025, the individually profiled
+            subset. Listed barangays are remote by construction and so are plausibly also less
+            profiled — splitting a profiled figure by list status would measure profiling progress
+            and report it as BHW supply. The &ldquo;individually profiled&rdquo; row on each card is
+            there so that difference is visible rather than acting unseen.{" "}
             <Link href="/uuc-phc/methodology" className="underline hover:text-accent">
               Methodology
             </Link>

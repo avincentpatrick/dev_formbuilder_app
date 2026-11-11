@@ -87,7 +87,7 @@ export default function FacilitiesMethodology() {
         </p>
         <p className="text-sm text-muted">
           Some places on the registry have no entry in this site&apos;s geography at all, because
-          that geography was built from the 2025 BHW census and a place with facilities but no
+          that geography was built from BHW Profiles 2025 and a place with facilities but no
           profiled BHW never appeared in it. Four districts of the City of Manila — Binondo, San
           Miguel, Ermita and Intramuros — are in that position, and are added explicitly rather
           than dropped.
@@ -172,10 +172,10 @@ export default function FacilitiesMethodology() {
           The <strong>Ask the data</strong> box on these pages is an AI assistant with no knowledge
           of its own. Every number it gives you comes from a query it ran against this registry
           while answering, and any sentence carrying a number it cannot trace back to one of those
-          queries is removed before you see it. It reads only this registry — not the Barangay
-          Health Worker census, which is a separate dashboard at{" "}
+          queries is removed before you see it. It reads only this registry — not the BHW
+          Headcount 2025 or BHW Profiles 2025 data, which has its own dashboard at{" "}
           <Link href="/bhw" className="underline hover:text-accent">
-            BHW Connect
+            BHW 2025
           </Link>
           .
         </p>
@@ -198,7 +198,7 @@ export default function FacilitiesMethodology() {
           <Link href="/methodology" className="underline hover:text-accent">
             methodology
           </Link>{" "}
-          for how this dataset sits alongside the BHW census.
+          for how this dataset sits alongside BHW 2025.
         </p>
       </section>
     </div>

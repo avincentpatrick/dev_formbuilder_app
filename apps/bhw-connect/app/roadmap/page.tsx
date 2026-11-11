@@ -55,7 +55,7 @@ export default function RoadmapPage() {
         <ul className="list-inside list-disc">
           <li>Barangay-level map polygons</li>
           <li>
-            More datasets alongside the BHW census — see the scoping notes below for candidates
+            More datasets alongside BHW 2025 — see the scoping notes below for candidates
             and how we assess them. Health facilities (NHFR) is the most recent to land; DOH FHSIS
             service indicators are the next candidate, access and license permitting
           </li>

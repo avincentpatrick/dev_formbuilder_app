@@ -18,6 +18,7 @@ import {
 import { logEvent } from "@/lib/usage/log-client";
 import type { DistrictMapIndicator } from "@/lib/filters/schema";
 import { withBasePath } from "@/lib/base-path";
+import { districtsWithoutOutline } from "@/lib/maps/district-outlines";
 
 const ChoroplethMap = dynamic(
   () => import("@/components/maps/choropleth-map").then((m) => m.ChoroplethMap),
@@ -72,6 +73,12 @@ export function DistrictMapFigure({
 
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [hoveredCode, setHoveredCode] = useState<string | null>(null);
+  const [drawnCodes, setDrawnCodes] = useState<ReadonlySet<string> | null>(null);
+  const onGeometryLoaded = useCallback((codes: string[]) => setDrawnCodes(new Set(codes)), []);
+  const withoutOutline = useMemo(
+    () => districtsWithoutOutline(items, drawnCodes),
+    [items, drawnCodes],
+  );
 
   const meta = MAP_BASE_INDICATOR_META[activeIndicator];
   const suffix = meta.suffix;
@@ -160,13 +167,34 @@ export function DistrictMapFigure({
           <Link href="/districts" className="underline hover:text-accent">
             /districts
           </Link>{" "}
-          for the full mapping and its known gaps. Districts spanning a multi-district city with no
-          barangay boundary in the source render hatched/grey; the ranked list below still covers
-          every district.
+          for the full mapping and its known gaps. A district has no outline when it splits a city
+          by barangay or one of its members has no boundary in the source; it is listed above the
+          map instead, and the ranked list below still covers every district with figures.
         </p>
       }
     >
       <div className="flex flex-col gap-4">
+        <div className="rounded-md border border-border bg-surface p-3 text-xs text-muted">
+          <p>
+            <strong className="text-foreground">District outlines are not yet validated.</strong>{" "}
+            Each outline joins the cities and municipalities one public source lists for the
+            district, and some districts have members missing from that list, so an outline can be
+            incomplete. Only BHWs whose place has been matched to a district are counted.
+          </p>
+          {withoutOutline.length > 0 && (
+            <details className="mt-2">
+              <summary className="cursor-pointer">
+                {withoutOutline.length} district{withoutOutline.length === 1 ? " has" : "s have"} no
+                outline on this map
+              </summary>
+              <p className="mt-1">
+                {withoutOutline.map((d) => d.districtName).join(", ")}. Where they have figures,
+                those are in the ranked list below.
+              </p>
+            </details>
+          )}
+        </div>
+
         <label className="flex w-fit flex-col gap-1 text-xs font-medium text-muted">
           Indicator
           <select
@@ -195,6 +223,7 @@ export function DistrictMapFigure({
             onHoverGeo={setHoveredCode}
             onSelectGeo={select}
             onDrill={drill}
+            onGeometryLoaded={onGeometryLoaded}
           />
 
           {selected && (

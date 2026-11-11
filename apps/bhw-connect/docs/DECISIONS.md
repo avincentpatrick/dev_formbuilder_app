@@ -9753,3 +9753,24 @@ Agreed with avincentpatrick (`docs/DATASET_HUB_PLAN.md`, Step 3). This replaces 
 of one map card per release on the portal; its data rules stand. The portal's map gallery is removed, each
 catalog card links to its dataset's full map on `/map` (address kept so shared links survive), and the picker
 groups releases by dataset (`lib/maps/subjects.ts`), so BHW's Headcount 2025 and Profiles 2025 sit together.
+
+## 2026-11-11 — Stored names follow the rename; old AI answers expire by version
+
+Agreed with avincentpatrick. PR #501 renamed the labels in code; the same names also lived in database rows.
+`20261111090000_bhw_dataset_display_names.sql` (UPDATE only) renames the two dataset records — `bhw-stepzero-2026`
+to **BHW Headcount 2025** with a source line in the same words, and `bhw-2025` to **BHW Profiles 2025** — so the
+catalog card, the source line under each headcount map and every export stop saying "StepZero Quick-Count". It
+rewrites the assistant's dataset dictionary (`dataset_registry`, `dataset_column`) phrase by phrase; the
+replacements are case-sensitive, so lowercase identifiers (`agg_bhw_stepzero_counts`, the slugs) are unchanged.
+Cached AI answers and place summaries are expired by bumping `last_updated_at` for `bhw-2025` and `uuc-phc-2025`,
+the app's own versioning: approved answers regenerate in the nightly refresh, the rest on the next ask, nothing is
+deleted. Accepted side effect: "Last updated" for those two datasets shows the migration date.
+Left as they are, on purpose: `ai_ask_log` (a history), the knowledge-graph lineage (it holds only identifiers),
+and `doc_chunk` with its embeddings and chunk-sourced graph rows (verbatim DOH source text, which
+`kb_evidence_is_grounded()` requires to stay verbatim), so nothing needs re-embedding. Not visible from the
+repository: admin edits to the live dictionary (the replacements apply to whatever the rows say) and the content
+of cached answers. The same change fixes "BHW census" left in public methodology pages, the roadmap, the UUC
+coverage note and four admin/AI strings.
+Explore's district layer gets a visible caveat (boundaries not yet validated; the districts without a polygon are
+listed) rather than losing its rates. What /map shows for legislative districts is still being settled with the
+owner, who asked whether the district view can drill down only as far as municipalities.

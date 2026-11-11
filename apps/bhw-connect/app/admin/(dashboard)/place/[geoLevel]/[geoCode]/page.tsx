@@ -28,7 +28,7 @@ const isGeoLevel = (value: string): value is GeoLevel =>
 
 /** Human labels for the section keys, so the coverage list reads as findings rather than fields. */
 const SECTION_LABEL: Record<string, string> = {
-  bhwOverview: "BHW census overview",
+  bhwOverview: "BHW Headcount and Profiles overview",
   bhwCounts: "Validated-profile counts",
   demographics: "Demographic breakdowns",
   training: "Training coverage",

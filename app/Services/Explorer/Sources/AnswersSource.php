@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Support\Explorer\ExplorerField;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
+use stdClass;
 
 /**
  * The answers to ONE form, with each of its questions as a field (ADR-0025 §D6).
@@ -98,7 +99,8 @@ final class AnswersSource extends AbstractExplorerSource
     public function fields(User $user, ?Form $form): array
     {
         $fields = [
-            $this->enumField('status', 'Status', 'submissions.status', SubmissionStatus::class, 'Response'),
+            // A draft is not a response yet: the countable predicate below never returns one.
+            $this->enumField('status', 'Status', 'submissions.status', SubmissionStatus::class, 'Response', [SubmissionStatus::Draft]),
             $this->enumField('source', 'Channel', 'submissions.source', SubmissionSource::class, 'Response'),
             $this->category('locale', 'Language', 'submissions.locale', 'Response'),
             $this->time('submitted_at', 'Submitted', 'submissions.submitted_at', 'Response'),
@@ -211,14 +213,14 @@ final class AnswersSource extends AbstractExplorerSource
         ];
     }
 
-    private function carriesAnAnswer(object $row): bool
+    private function carriesAnAnswer(stdClass $row): bool
     {
         $type = FieldType::tryFrom((string) $row->field_type);
 
         return $type !== null && ValueShape::for($type) !== ValueShape::NoAnswer;
     }
 
-    private function questionField(string $key, object $row): ?ExplorerField
+    private function questionField(string $key, stdClass $row): ?ExplorerField
     {
         $type = FieldType::tryFrom((string) $row->field_type);
 
@@ -226,6 +228,10 @@ final class AnswersSource extends AbstractExplorerSource
             return null;
         }
 
+        // ⛔ THE ONE PLACE A RUNTIME VALUE BECOMES SQL TEXT IN THE EXPLORER. `ExplorerField` demands a
+        // literal string and this is not one, so the annotation below is a claim, and what backs it is the
+        // two lines around it: the key has just matched KEY_PATTERN, and it goes through the driver's quoting.
+        /** @var literal-string $literal */
         $literal = DB::connection()->getPdo()->quote($key);
         $text = '('.self::ANSWERS." ->> {$literal})";
         $json = '('.self::ANSWERS." -> {$literal})";
@@ -262,7 +268,7 @@ final class AnswersSource extends AbstractExplorerSource
      *
      * @return array<string, string>|null
      */
-    private function options(object $row): ?array
+    private function options(stdClass $row): ?array
     {
         $config = is_string($row->config) ? json_decode($row->config, true) : $row->config;
         $options = is_array($config) ? ($config['options'] ?? null) : null;
@@ -287,6 +293,10 @@ final class AnswersSource extends AbstractExplorerSource
      * An answer as a number, or NULL. A jsonb number is taken as it is; a string only if it is digits with
      * an optional sign and decimal part. The pattern is written without `?` because a raw `?` in a
      * statement is a placeholder to the driver.
+     *
+     * @param  literal-string  $text
+     * @param  literal-string  $json
+     * @return literal-string
      */
     private static function numberSql(string $text, string $json): string
     {
@@ -301,6 +311,9 @@ final class AnswersSource extends AbstractExplorerSource
      * well-formed `YYYY-MM-DD`, and the day exists in that month. Without the second, `2026-02-30` passes
      * the pattern and `make_date` raises, which would fail the whole query for one bad row. (PostgreSQL 16
      * has `pg_input_is_valid` for this; the testing server runs 15.)
+     *
+     * @param  literal-string  $text
+     * @return literal-string
      */
     private static function dateSql(string $text): string
     {

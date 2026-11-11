@@ -484,7 +484,7 @@ function destroy(): void {
                         <fieldset v-for="(measure, index) in definition.measures" :key="index" class="builder__measure">
                             <legend class="builder__legend">{{ definition.measures.length > 1 ? `Value ${index + 1}` : 'Value' }}</legend>
 
-                            <div class="builder__measure-row">
+                            <div class="builder__measure-row" :class="{ 'builder__measure-row--solo': definition.measures.length === 1 }">
                                 <MdsSelect
                                     :model-value="measure.aggregate"
                                     :options="aggregateOptions()"
@@ -697,6 +697,11 @@ function destroy(): void {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: var(--mds-space-2);
+}
+
+/* With one value there is no remove button, and an empty second track would still cost its gap. */
+.builder__measure-row--solo {
+    grid-template-columns: minmax(0, 1fr);
 }
 
 .builder__add {

@@ -57,10 +57,9 @@ final class ExplorerPresenter
             ->all();
 
         return [
-            'charts' => $charts
+            'charts' => array_values($charts
                 ->map(fn (ExplorerChart $chart): array => $this->chart($chart, $user, $names))
-                ->values()
-                ->all(),
+                ->all()),
             'can' => ['create' => $user->can('create', ExplorerChart::class)],
             'limits' => ['max_charts' => ExplorerChartService::MAX_CHARTS_PER_USER],
         ];
@@ -263,14 +262,19 @@ final class ExplorerPresenter
             return [];
         }
 
-        return Form::query()
+        $forms = Form::query()
             ->whereIn('forms.id', $this->reach->formIds($user))
             ->where('forms.status', '!=', FormStatus::Draft->value)
             ->orderBy('forms.title')
             ->limit(self::FORM_OPTIONS)
-            ->get(['forms.id', 'forms.title'])
-            ->map(static fn (Form $form): array => ['value' => (string) $form->getKey(), 'label' => (string) $form->title])
-            ->values()
-            ->all();
+            ->get(['forms.id', 'forms.title']);
+
+        $options = [];
+
+        foreach ($forms as $form) {
+            $options[] = ['value' => (string) $form->getKey(), 'label' => (string) $form->title];
+        }
+
+        return $options;
     }
 }

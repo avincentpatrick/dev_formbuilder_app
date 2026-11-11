@@ -56,7 +56,8 @@ final class ResponsesSource extends AbstractExplorerSource
     {
         return [
             $this->category('form', 'Form', 'submissions.form_id', 'Response', lookup: 'forms'),
-            $this->enumField('status', 'Status', 'submissions.status', SubmissionStatus::class, 'Response'),
+            // A draft is not a response yet: the countable predicate below never returns one.
+            $this->enumField('status', 'Status', 'submissions.status', SubmissionStatus::class, 'Response', [SubmissionStatus::Draft]),
             $this->enumField('source', 'Channel', 'submissions.source', SubmissionSource::class, 'Response'),
             $this->category('locale', 'Language', 'submissions.locale', 'Response'),
             $this->category('reviewed_by', 'Reviewed by', 'submissions.validated_by', 'Response', lookup: 'users'),

@@ -40,6 +40,12 @@ const donut = computed(() => toDonut(props.result));
 const tiles = computed(() => toTiles(props.result));
 
 const isEmpty = computed(() => props.result.totals.rows === 0);
+
+/**
+ * Fewer axis labels when the labels are long. The primitives thin labels by an even stride and do not
+ * measure text, so six of "Week of 10 Aug 2026" run into each other where six of "Aug 2026" do not.
+ */
+const maxTicks = computed(() => (props.result.categories.some((c) => c.label.length > 12) ? 4 : 6));
 </script>
 
 <template>
@@ -91,6 +97,7 @@ const isEmpty = computed(() => props.result.totals.rows === 0);
             :series="lines.series"
             :title="title"
             :variant="result.chart"
+            :max-ticks="maxTicks"
             :category-label="categoryLabel"
             :value-label="valueLabel"
             :table-visible="showTable"
@@ -103,6 +110,7 @@ const isEmpty = computed(() => props.result.totals.rows === 0);
             :series="columns.series"
             :title="title"
             :mode="result.chart === 'stacked' ? 'stacked' : 'grouped'"
+            :max-ticks="maxTicks"
             :category-label="categoryLabel"
             :value-label="valueLabel"
             :table-visible="showTable"

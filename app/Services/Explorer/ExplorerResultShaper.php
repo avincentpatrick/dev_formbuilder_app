@@ -91,7 +91,7 @@ final class ExplorerResultShaper
             $values = [];
 
             foreach ($measures as $index => [$measure]) {
-                $values[] = $this->value($measure->aggregate, $row->{"m{$index}"} ?? null);
+                $values[] = $this->value($measure->aggregate, $row->{ExplorerCompiler::measureAlias($index)} ?? null);
             }
 
             // A NULL group and an empty-string group are both "no value" and share one bucket.
@@ -201,7 +201,7 @@ final class ExplorerResultShaper
                 $keys,
             )));
 
-            $values = array_map(static fn (string $key): int|float|null => $sum([$key]) ?? 0, $shown);
+            $values = array_map(static fn (string $key): int|float => $sum([$key]) ?? 0, $shown);
 
             if ($hidden !== []) {
                 $values[] = $sum($hidden) ?? 0;

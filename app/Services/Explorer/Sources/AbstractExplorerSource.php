@@ -38,13 +38,19 @@ abstract class AbstractExplorerSource implements ExplorerSource
      * The labels come from the enum's own `label()` where it has one, so a status reads here exactly as it
      * reads in the inbox; an enum without one is printed as a headline of its value.
      *
+     * @param  literal-string  $expression
      * @param  class-string<BackedEnum>  $enum
+     * @param  list<BackedEnum>  $except  cases this source can never return, so a filter does not offer them
      */
-    protected function enumField(string $key, string $label, string $expression, string $enum, string $group = ''): ExplorerField
+    protected function enumField(string $key, string $label, string $expression, string $enum, string $group = '', array $except = []): ExplorerField
     {
         $options = [];
 
         foreach ($enum::cases() as $case) {
+            if (in_array($case, $except, true)) {
+                continue;
+            }
+
             $options[(string) $case->value] = method_exists($case, 'label')
                 ? (string) $case->label()
                 : Str::headline((string) $case->value);
@@ -53,21 +59,25 @@ abstract class AbstractExplorerSource implements ExplorerSource
         return new ExplorerField($key, $label, ExplorerFieldType::Category, $expression, $group, options: $options);
     }
 
+    /** @param  literal-string  $expression */
     protected function category(string $key, string $label, string $expression, string $group = '', ?string $lookup = null, bool $headline = false): ExplorerField
     {
         return new ExplorerField($key, $label, ExplorerFieldType::Category, $expression, $group, lookup: $lookup, headline: $headline);
     }
 
+    /** @param  literal-string  $expression */
     protected function boolean(string $key, string $label, string $expression, string $group = ''): ExplorerField
     {
         return new ExplorerField($key, $label, ExplorerFieldType::Boolean, $expression, $group, options: ['true' => 'Yes', 'false' => 'No']);
     }
 
+    /** @param  literal-string  $expression */
     protected function number(string $key, string $label, string $expression, string $group = ''): ExplorerField
     {
         return new ExplorerField($key, $label, ExplorerFieldType::Number, $expression, $group);
     }
 
+    /** @param  literal-string  $expression */
     protected function time(string $key, string $label, string $expression, string $group = ''): ExplorerField
     {
         return new ExplorerField($key, $label, ExplorerFieldType::Time, $expression, $group);

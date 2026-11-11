@@ -77,7 +77,11 @@ final class ExplorerQueryRunner
             $this->compiler->addFilter($base, $filter, $this->field($fields, $filter->field));
         }
 
-        $measureSql = array_map(fn (array $pair): string => $this->compiler->measureSql($pair[0], $pair[1]), $measures);
+        $measureSql = [];
+        foreach ($measures as [$measure, $field]) {
+            $measureSql[] = $this->compiler->measureSql($measure, $field);
+        }
+
         $labels = array_map(fn (array $pair): string => $this->shaper->measureLabel($pair[0], $pair[1], $source->rowNoun()), $measures);
 
         $totals = $this->totals(clone $base, $measures, $measureSql);
@@ -190,29 +194,31 @@ final class ExplorerQueryRunner
      * guarded cast contributes nothing for a row it could not read and the reader is owed the count.
      *
      * @param  list<array{0: ExplorerMeasure, 1: ExplorerField|null}>  $measures
-     * @param  list<string>  $measureSql
+     * @param  list<literal-string>  $measureSql
      * @return array{rows: int, values: list<int|float|null>, coverage: list<int|null>}
      */
     private function totals(Builder $query, array $measures, array $measureSql): array
     {
-        $select = ['count(*) as total'];
+        $query->selectRaw('count(*) as total');
 
         foreach ($measures as $index => [, $field]) {
-            $select[] = "{$measureSql[$index]} as m{$index}";
+            $alias = ExplorerCompiler::measureAlias($index);
+            $query->selectRaw("{$measureSql[$index]} as {$alias}");
 
             if ($field !== null) {
-                $select[] = "count({$field->expression}) as c{$index}";
+                $covered = ExplorerCompiler::coverageAlias($index);
+                $query->selectRaw("count({$field->expression}) as {$covered}");
             }
         }
 
-        $row = $query->selectRaw(implode(', ', $select))->first();
+        $row = $query->first();
 
         $values = [];
         $coverage = [];
 
         foreach ($measures as $index => [$measure, $field]) {
-            $values[] = $this->shaper->value($measure->aggregate, $row->{"m{$index}"} ?? null);
-            $coverage[] = $field === null ? null : (int) ($row->{"c{$index}"} ?? 0);
+            $values[] = $this->shaper->value($measure->aggregate, $row->{ExplorerCompiler::measureAlias($index)} ?? null);
+            $coverage[] = $field === null ? null : (int) ($row->{ExplorerCompiler::coverageAlias($index)} ?? 0);
         }
 
         return ['rows' => (int) ($row->total ?? 0), 'values' => $values, 'coverage' => $coverage];
@@ -220,7 +226,7 @@ final class ExplorerQueryRunner
 
     /**
      * @param  list<array{0: ExplorerDimension, 1: ExplorerField}>  $dimensions
-     * @param  list<string>  $measureSql
+     * @param  list<literal-string>  $measureSql
      * @return array{0: list<object>, 1: bool} the rows, and whether the cap cut them short
      */
     private function grouped(Builder $query, ExplorerQuery $declaration, array $dimensions, array $measureSql): array
@@ -234,20 +240,18 @@ final class ExplorerQueryRunner
         }
 
         foreach ($measureSql as $index => $sql) {
-            $query->selectRaw("{$sql} as m{$index}");
+            $alias = ExplorerCompiler::measureAlias($index);
+            $query->selectRaw("{$sql} as {$alias}");
         }
 
         // By POSITION: PostgreSQL will not match a `GROUP BY` expression to a select expression when both
-        // hold placeholders, and the time-zone bindings make these hold them.
-        $positions = implode(', ', range(1, count($dimensions)));
-        $firstMeasure = count($dimensions) + 1;
+        // hold placeholders, and the time-zone bindings make these hold them. The first value follows the
+        // group-bys, so it is column 2 with one of them and column 3 with two.
+        count($dimensions) === 1
+            ? $query->groupByRaw('1')->orderByRaw('2 desc nulls last, 1')
+            : $query->groupByRaw('1, 2')->orderByRaw('3 desc nulls last, 1, 2');
 
-        $rows = $query
-            ->groupByRaw($positions)
-            ->orderByRaw("{$firstMeasure} desc nulls last, {$positions}")
-            ->limit(self::ROW_CAP + 1)
-            ->get()
-            ->all();
+        $rows = array_values($query->limit(self::ROW_CAP + 1)->get()->all());
 
         $capped = count($rows) > self::ROW_CAP;
 

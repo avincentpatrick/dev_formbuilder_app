@@ -36,7 +36,7 @@ final class ExplorerCompiler
      */
     public function addDimension(Builder $query, int $index, ExplorerDimension $dimension, ExplorerField $field, string $timezone): void
     {
-        $alias = "d{$index}";
+        $alias = self::dimensionAlias($index);
 
         if (! $field->type->isGroupable()) {
             throw InvalidExplorerQueryException::fieldNotGroupable($field->label);
@@ -54,8 +54,9 @@ final class ExplorerCompiler
         }
 
         if ($field->type === ExplorerFieldType::MultiCategory) {
-            $query->crossJoin($query->raw("lateral jsonb_array_elements_text({$field->listExpression}) as dl{$index}(value)"));
-            $query->selectRaw("dl{$index}.value as {$alias}");
+            $list = self::listOf($field);
+            $query->crossJoin($query->raw("lateral jsonb_array_elements_text({$list}) as {$alias}_choices(value)"));
+            $query->selectRaw("{$alias}_choices.value as {$alias}");
 
             return;
         }
@@ -63,7 +64,11 @@ final class ExplorerCompiler
         $query->selectRaw("({$field->expression})::text as {$alias}");
     }
 
-    /** The SQL of one value, without an alias. `$field` is null only for a row count. */
+    /**
+     * The SQL of one value, without an alias. `$field` is null only for a row count.
+     *
+     * @return literal-string
+     */
     public function measureSql(ExplorerMeasure $measure, ?ExplorerField $field): string
     {
         if ($measure->aggregate === ExplorerAggregate::Count || $field === null) {
@@ -130,7 +135,56 @@ final class ExplorerCompiler
     }
 
     /**
-     * @return array{0: string, 1: list<string>}
+     * The column alias of a group-by. Spelled out, not built from the index, so it stays a literal.
+     *
+     * @return literal-string
+     */
+    public static function dimensionAlias(int $index): string
+    {
+        return $index === 0 ? 'd0' : 'd1';
+    }
+
+    /**
+     * The column alias of a value.
+     *
+     * @return literal-string
+     */
+    public static function measureAlias(int $index): string
+    {
+        return match ($index) {
+            0 => 'm0',
+            1 => 'm1',
+            default => 'm2',
+        };
+    }
+
+    /**
+     * The column alias of a value's coverage count.
+     *
+     * @return literal-string
+     */
+    public static function coverageAlias(int $index): string
+    {
+        return match ($index) {
+            0 => 'c0',
+            1 => 'c1',
+            default => 'c2',
+        };
+    }
+
+    /**
+     * A multi-choice field's list expression. Every such field declares one; a field that did not would be
+     * a defect in its source, and an empty list is the answer that reads no rows.
+     *
+     * @return literal-string
+     */
+    private static function listOf(ExplorerField $field): string
+    {
+        return $field->listExpression ?? "'[]'::jsonb";
+    }
+
+    /**
+     * @return array{0: literal-string, 1: list<string>}
      */
     private function bucketSql(ExplorerField $field, ?ExplorerBucket $bucket, string $timezone): array
     {
@@ -140,12 +194,22 @@ final class ExplorerCompiler
 
         $expression = $field->expression;
 
+        // The `date_trunc` unit, from a closed list. Never the enum's value interpolated: that would make the
+        // statement depend on a string a future case could carry.
+        $unit = match ($bucket) {
+            ExplorerBucket::Week => 'week',
+            ExplorerBucket::Month => 'month',
+            ExplorerBucket::Quarter => 'quarter',
+            ExplorerBucket::Year => 'year',
+            default => 'day',
+        };
+
         // A calendar date an answer holds has no time of day and no zone: it is grouped as written.
         if ($field->type === ExplorerFieldType::Date) {
             return match ($bucket) {
                 ExplorerBucket::Hour => throw InvalidExplorerQueryException::bucketNotAllowed($field->label),
                 ExplorerBucket::Weekday => ["extract(isodow from {$expression})::int::text", []],
-                default => ["date_trunc('{$bucket->value}', ({$expression})::timestamp)::date::text", []],
+                default => ["date_trunc('{$unit}', ({$expression})::timestamp)::date::text", []],
             };
         }
 
@@ -155,30 +219,42 @@ final class ExplorerCompiler
         return match ($bucket) {
             ExplorerBucket::Weekday => ["extract(isodow from ({$expression} at time zone ?))::int::text", [$timezone]],
             ExplorerBucket::Hour => ["extract(hour from ({$expression} at time zone ?))::int::text", [$timezone]],
-            default => ["(date_trunc('{$bucket->value}', {$expression}, ?) at time zone ?)::date::text", [$timezone, $timezone]],
+            default => ["(date_trunc('{$unit}', {$expression}, ?) at time zone ?)::date::text", [$timezone, $timezone]],
         };
     }
 
     private function membership(Builder $query, ExplorerFilter $filter, ExplorerField $field): void
     {
         $in = $filter->operator === ExplorerFilterOperator::In;
-        $marks = implode(', ', array_fill(0, count($filter->values), '?'));
+        $values = $filter->values;
 
         if ($field->type === ExplorerFieldType::MultiCategory) {
-            $exists = "exists (select 1 from jsonb_array_elements_text({$field->listExpression}) as fv(value) where fv.value in ({$marks}))";
-            $query->whereRaw($in ? $exists : "not {$exists}", $filter->values);
+            $list = self::listOf($field);
+            $chosen = static function (Builder $choices) use ($list, $values): void {
+                $choices->selectRaw('1')
+                    ->fromRaw("jsonb_array_elements_text({$list}) as fv(value)")
+                    ->whereIn('fv.value', $values);
+            };
+
+            $in ? $query->whereExists($chosen) : $query->whereNotExists($chosen);
 
             return;
         }
 
-        $text = "({$field->expression})::text";
+        $expression = $field->expression;
+        $text = $query->raw("({$expression})::text");
+
+        if ($in) {
+            $query->whereIn($text, $values);
+
+            return;
+        }
 
         // "Is none of" keeps the rows with no value at all: a response that left the question blank did
         // not answer "Yes", and SQL's three-valued `NOT IN` would silently drop it.
-        $query->whereRaw(
-            $in ? "{$text} in ({$marks})" : "({$text} not in ({$marks}) or {$field->expression} is null)",
-            $filter->values,
-        );
+        $query->where(static function (Builder $none) use ($text, $values, $expression): void {
+            $none->whereNotIn($text, $values)->orWhereRaw("{$expression} is null");
+        });
     }
 
     private function comparison(Builder $query, ExplorerFilter $filter, ExplorerField $field): void
@@ -189,19 +265,23 @@ final class ExplorerCompiler
             throw InvalidExplorerQueryException::filterNeedsValue($field->label);
         }
 
-        $sign = $filter->operator === ExplorerFilterOperator::AtLeast ? '>=' : '<=';
-
-        $query->whereRaw("{$field->expression} {$sign} ?::numeric", [$value]);
+        $filter->operator === ExplorerFilterOperator::AtLeast
+            ? $query->whereRaw("{$field->expression} >= ?::numeric", [$value])
+            : $query->whereRaw("{$field->expression} <= ?::numeric", [$value]);
     }
 
     private function emptiness(Builder $query, ExplorerFilter $filter, ExplorerField $field): void
     {
+        $list = self::listOf($field);
+
         $empty = match ($field->type) {
-            ExplorerFieldType::MultiCategory => "jsonb_array_length({$field->listExpression}) = 0",
+            ExplorerFieldType::MultiCategory => "jsonb_array_length({$list}) = 0",
             ExplorerFieldType::Number => "{$field->expression} is null",
             default => "({$field->expression} is null or ({$field->expression})::text = '')",
         };
 
-        $query->whereRaw($filter->operator === ExplorerFilterOperator::IsEmpty ? $empty : "not ({$empty})");
+        $filter->operator === ExplorerFilterOperator::IsEmpty
+            ? $query->whereRaw($empty)
+            : $query->whereRaw("not ({$empty})");
     }
 }

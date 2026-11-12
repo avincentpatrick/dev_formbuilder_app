@@ -54,7 +54,7 @@ export default async function AskTheDataPage({
       : null;
   const admin = await getAdminUser();
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-8">
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-8">
       <h1 className="text-xl font-semibold">Ask the Data</h1>
       <p className="text-sm text-muted">
         Explore dashboard data, document sources and their relationships. Answers include source
@@ -70,6 +70,6 @@ export default async function AskTheDataPage({
         }
         canReport={admin !== null}
       />
-    </main>
+    </section>
   );
 }

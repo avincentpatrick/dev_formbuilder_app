@@ -1,4 +1,4 @@
-// The explorer's three JSON reads (M235). `builderClient` is the repository's fetch client and already
+// The explorer's three JSON reads (M236). `builderClient` is the repository's fetch client and already
 // carries the XSRF cookie, same-origin credentials and the non-ok error shape; this is another consumer.
 //
 // A declaration the server cannot run is NOT an error here: it arrives as `{ result: null, refusal }` in a

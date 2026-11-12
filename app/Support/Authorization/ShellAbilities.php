@@ -85,7 +85,7 @@ final class ShellAbilities
             // without it never sees a destination it would only bounce off (ADR-0011 §D9 — hidden,
             // never locked-with-upsell, because Business is held from sale).
             'viewAnalytics' => (bool) $user?->can('viewAny', SavedReportView::class),
-            // Gates the Explore nav item and the /explore pages (M235, ADR-0025). The POLICY, for the
+            // Gates the Explore nav item and the /explore pages (M236, ADR-0025). The POLICY, for the
             // reason above. It opens the PAGE only: which data sources a reader may chart is decided
             // per source by ExplorerCatalog, so this being true promises a workbench and no row.
             'viewExplorer' => (bool) $user?->can('viewAny', ExplorerChart::class),

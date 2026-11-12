@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The filters of a chart (M235). Each row is a field, a comparison and — for the comparisons that take one —
+// The filters of a chart (M236). Each row is a field, a comparison and — for the comparisons that take one —
 // a value: a pick-list where the server knows the field's values, a number for a number, and plain text
 // otherwise.
 //

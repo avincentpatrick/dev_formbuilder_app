@@ -11,7 +11,7 @@ use App\Support\Explorer\ExplorerQuery;
 use Illuminate\Validation\Validator;
 
 /**
- * A saved-chart write from `/explore` (M235, ADR-0025 §D8).
+ * A saved-chart write from `/explore` (M236, ADR-0025 §D8).
  *
  * A chart is checked against the catalogue BEFORE it is stored, as the member saving it: a declaration that
  * names a field of another source, or a form they cannot reach, is a field error on `definition` while they

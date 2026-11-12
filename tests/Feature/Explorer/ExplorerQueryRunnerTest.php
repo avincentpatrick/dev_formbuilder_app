@@ -30,7 +30,7 @@ uses(RefreshDatabase::class);
 
 /*
 |--------------------------------------------------------------------------
-| M235 — the data explorer's engine (ADR-0025 §D3–§D6).
+| M236 — the data explorer's engine (ADR-0025 §D3–§D6).
 |
 | Every case here runs as `meridian_app` under the tenant GUC, which is the path the page uses. The numbers
 | are small on purpose and written out in each case, so a wrong total cannot hide behind a seeder.

@@ -6,7 +6,7 @@ import { rangeSentence } from './result-view';
 import type { BuilderOptions, ChartType, Definition, Field, Filter, Result, ResultCategory, ResultSeries, RunPayload, SavedChart } from './types';
 
 /**
- * M235 — the six components the data explorer is drawn from.
+ * M236 — the six components the data explorer is drawn from.
  *
  * ── WHY THE DATA-TABLE ASSERTIONS ARE HERE AND NOT LEFT TO THE AXE GATE ─────────────────────────────────
  * ADR-0011 §D12, on its third surface: **axe cannot detect a missing text alternative for an SVG that
@@ -349,21 +349,21 @@ describe('ExploreChart — no value is not zero', () => {
         wrapper.unmount();
     });
 
-    // ⚠️ SUSPECTED DEFECT, reported rather than fixed (this increment adds tests only). The note reads
-    // "A period with nothing to measure is drawn at zero. The table shows it as a dash." — and the table
-    // beside it shows 0. `toLines()` substitutes the 0 BEFORE the primitive sees the data, so
-    // `MdsTimeSeriesChart`'s table (which prints a dash only for a MISSING point) tabulates the invented
-    // zero as if it were measured. The table is where a reader goes to check the chart, and here it
-    // confirms the one number the note says not to trust. Remove `.fails` when the two agree.
-    it.fails('shows the substituted value as a dash in the table, as the note beneath the chart says it does', () => {
+    it('says the table shows the drawn zero too, which is what the table prints', () => {
+        // `toLines()` substitutes the zero before the primitive sees the data, so the primitive's table
+        // prints it. The note once said the table showed a dash; it now says what is true, and a chart
+        // that can draw a gap is filed as `explorer-line-gap`.
         const wrapper = drawn(monthly('line', [80, 70, 90], [60, null, 75]), { showTable: true });
 
-        expect(wrapper.get('.explore-chart__note').text()).toContain('The table shows it as a dash');
+        const note = wrapper.get('.explore-chart__note').text();
+        expect(note).toContain('the table shows that zero too');
+        expect(note).not.toContain('dash');
 
         const february = wrapper.get('.mds-tsc__table').findAll('tbody tr')[1];
         expect(february.get('th').text()).toBe('Feb 2026');
-        // Guest link's real 70, then Manual entry's gap.
-        expect(february.findAll('td').map((td) => td.text())).toEqual(['70', '—']);
+        // Guest link's real 70, then Manual entry's substituted zero.
+        expect(february.findAll('td').map((td) => td.text())).toEqual(['70', '0']);
+        wrapper.unmount();
     });
 });
 

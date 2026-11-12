@@ -3,7 +3,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { forceTheme, settlePaint } from './support/axe';
 
 /*
- * The data explorer (M235, ADR-0025) — the board of saved charts and the chart builder.
+ * The data explorer (M236, ADR-0025) — the board of saved charts and the chart builder.
  *
  * SCOPED scans, like analytics-axe: each is narrowed to the page's own root and drops the
  * horizontal-overflow check, which responsive-axe owns for both pages as whole-page scans. `scanPane` is

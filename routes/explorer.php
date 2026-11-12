@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| The data explorer (ADR-0025, M235) — a member's own charts
+| The data explorer (ADR-0025, M236) — a member's own charts
 |--------------------------------------------------------------------------
 | A separate page from /analytics, where a member picks a data source they can already read and builds
 | their own charts over it.

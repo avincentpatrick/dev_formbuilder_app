@@ -1,4 +1,4 @@
-// Pure helpers over an explorer declaration (M235). No Vue, no fetch, no clock: `today` is always passed in,
+// Pure helpers over an explorer declaration (M236). No Vue, no fetch, no clock: `today` is always passed in,
 // so every function here is a table of inputs and outputs under test.
 //
 // The server is the authority on what a declaration may hold (`ExplorerQuery`). These helpers exist so the

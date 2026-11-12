@@ -8,7 +8,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * A chart a member built and kept on `/explore` (M235, ADR-0025 §D8).
+ * A chart a member built and kept on `/explore` (M236, ADR-0025 §D8).
  *
  * ── A DECLARATION, NEVER A RESULT ───────────────────────────────────────────────────────────────────
  * `definition` holds an `ExplorerQuery` — which source, which fields, which range — and no data. The chart

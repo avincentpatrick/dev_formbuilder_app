@@ -21,7 +21,7 @@ use App\Support\Explorer\ExplorerQuery;
 use DateTimeZone;
 
 /**
- * The props of the data explorer's two pages, and the bodies of its three JSON reads (M235, ADR-0025).
+ * The props of the data explorer's two pages, and the bodies of its three JSON reads (M236, ADR-0025).
  *
  * The wire shapes are documented once, in `resources/js/components/explore/types.ts`, as derived from the
  * `@return` annotations here.

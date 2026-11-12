@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Saved explorer charts (M235, ADR-0025 §D8).
+ * Saved explorer charts (M236, ADR-0025 §D8).
  *
  * The stored row is a declaration, so the only thing a write has to guarantee is that the declaration is
  * one {@see ExplorerQuery} wrote: callers pass the query object and this stores its `toArray()`, never a

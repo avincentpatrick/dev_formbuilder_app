@@ -13,7 +13,7 @@ import {
 import type { Result, ResultCategory, ResultSeries } from './types';
 
 /**
- * M235 — from an explorer result to what each chart primitive is handed.
+ * M236 — from an explorer result to what each chart primitive is handed.
  *
  * One rule runs through this module and through every case below: **`null` is "no value", and it is never
  * drawn as zero without saying so.** The server sends `null` on purpose — an "Other" bucket of fifty
@@ -510,14 +510,13 @@ describe('disclosures', () => {
         expect(notes[1]).toContain('smaller groups');
     });
 
-    // ⚠️ SUSPECTED COPY DEFECT, reported rather than fixed (this increment adds tests only). The count is
-    // interpolated into a plural sentence, so a chart one group over its limit reads "1 smaller groups are
-    // added together". `AnswersSource::notes()` singularises the same shape on the server ("1 question …
-    // is not offered"). Remove `.fails` when the sentence is singularised.
-    it.fails('singularises the fold sentence when exactly one group was folded', () => {
-        const [note] = disclosures(result({}, { hidden_groups: 1 }));
+    it('singularises the fold sentence when exactly one group was folded', () => {
+        // A chart one group over its limit once read "1 smaller groups are added together".
+        const [additive] = disclosures(result({}, { hidden_groups: 1 }));
+        expect(additive).toBe('1 smaller group is added together as “Other”.');
 
-        expect(note).not.toContain('1 smaller groups are');
+        const [many] = disclosures(result({}, { hidden_groups: 3 }));
+        expect(many).toBe('3 smaller groups are added together as “Other”.');
     });
 });
 

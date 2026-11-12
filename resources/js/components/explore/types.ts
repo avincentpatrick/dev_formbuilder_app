@@ -1,4 +1,4 @@
-// The `/explore` wire shapes (M235, ADR-0025), derived from the PHP `@return` annotations of
+// The `/explore` wire shapes (M236, ADR-0025), derived from the PHP `@return` annotations of
 // `ExplorerPresenter` and `ExplorerQueryRunner`. Every nullable below is nullable on the server too: a
 // value an "Other" bucket cannot carry arrives as `null`, and typing it `number` would render "NaN".
 

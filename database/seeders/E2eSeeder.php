@@ -2472,7 +2472,7 @@ class E2eSeeder extends Seeder
     }
 
     /**
-     * The owner's explorer board (M235, ADR-0025): three charts, chosen for the three states a tile has.
+     * The owner's explorer board (M236, ADR-0025): three charts, chosen for the three states a tile has.
      *
      * One with a second group-by, so the multi-series column chart and its legend are under the scan. One
      * with a single value, shared, so the "Shared" badge is. And one whose stored declaration is in a format

@@ -9,7 +9,7 @@ use App\Models\User;
 use App\Services\Explorer\ExplorerCatalog;
 
 /**
- * Authorization for the data explorer (M235, ADR-0025 §D5, §D8).
+ * Authorization for the data explorer (M236, ADR-0025 §D5, §D8).
  *
  * ── `viewAny` is the gate on the PAGE, and it is not the gate on the data ───────────────────────────────
  * It is the predicate `/analytics` uses — `dashboard.org.view` or `dashboard.form.view`, which every seeded

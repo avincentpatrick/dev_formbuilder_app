@@ -13,7 +13,7 @@ use App\Support\Explorer\ExplorerQuery;
 use Illuminate\Http\RedirectResponse;
 
 /**
- * Saved charts, written from the explorer's builder (M235, ADR-0025 §D8).
+ * Saved charts, written from the explorer's builder (M236, ADR-0025 §D8).
  *
  * Inertia visits, like every other saved-thing write in the application. A new chart lands on its own
  * page, so the address bar holds something that can be bookmarked and sent to a colleague.

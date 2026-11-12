@@ -106,7 +106,7 @@ describe('Sidebar — the Analytics destination', () => {
         wrapper.unmount();
     });
 
-    // M235 — the data explorer sits beside Analytics, behind the same plan key and its own ability.
+    // M236 — the data explorer sits beside Analytics, behind the same plan key and its own ability.
     it('shows Explore to an entitled tenant whose user may open it', () => {
         const wrapper = render(allAbilities(), { advanced_analytics: true });
 

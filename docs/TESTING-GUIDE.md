@@ -365,7 +365,7 @@ rewriting its answers are different powers.
 8. Save the current filter set as a **saved view**. Reload the page and re-apply it. **Expect:** it restores.
 9. **Export** the analytics result. **Expect:** a download whose numbers match what is on screen.
 
-### 7.1 Building your own charts — Explore (`M235`, ADR `0025-data-explorer.md`)
+### 7.1 Building your own charts — Explore (`M236`, ADR `0025-data-explorer.md`)
 
 1. `/explore` · owner. **Expect:** a board of charts, each drawn live: responses each week by channel, team
    activity by action, and two charts of Patient Intake's answers. One carries a **Shared** badge.

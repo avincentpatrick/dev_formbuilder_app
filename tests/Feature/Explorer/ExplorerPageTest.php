@@ -25,7 +25,7 @@ uses(RefreshDatabase::class);
 
 /*
 |--------------------------------------------------------------------------
-| M235 — the data explorer's pages and JSON reads (ADR-0025 §D3, §D5).
+| M236 — the data explorer's pages and JSON reads (ADR-0025 §D3, §D5).
 |
 | ExplorerQueryRunnerTest pins what a chart computes. This file pins the surface: who gets through the
 | door, which data sources each role is then offered, and that a declaration which cannot be run reaches the
@@ -111,7 +111,7 @@ it('opens the board and the builder for every seeded role', function (string $ro
 
     $this->actingAs($member)->get(exploreUrl('/new'))
         ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->component('explore/Builder', false)->where('chart', null));
+        ->assertInertia(fn (Assert $page) => $page->component('explore/Chart', false)->where('chart', null));
 })->with(['owner', 'admin', 'form_editor', 'reviewer', 'viewer']);
 
 it('403s a member holding neither dashboard permission, on every route', function (): void {
@@ -226,7 +226,7 @@ it('gives the builder its sources with their fields, and never a field\'s SQL', 
     $response = $this->actingAs($this->owner)->get(exploreUrl('/new'))->assertOk();
 
     $response->assertInertia(fn (Assert $page) => $page
-        ->component('explore/Builder', false)
+        ->component('explore/Chart', false)
         ->has('sources', 8)
         ->where('sources.0.key', 'responses')
         ->where('sources.0.range_field', 'submitted_at')

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The outcome of running a chart, in its three states (M235): still loading, refused with a sentence, or
+// The outcome of running a chart, in its three states (M236): still loading, refused with a sentence, or
 // drawn — with the range it covers above it and what it left out beneath it.
 //
 // Used by a board tile and by the builder's preview, so the two cannot come to describe the same chart

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// One saved chart on the board (M235). It fetches its own result when it mounts, so the board paints at
+// One saved chart on the board (M236). It fetches its own result when it mounts, so the board paints at
 // once and one refused or slow chart cannot hold up the others.
 import { onMounted, ref } from 'vue';
 import { Link } from '@inertiajs/vue3';

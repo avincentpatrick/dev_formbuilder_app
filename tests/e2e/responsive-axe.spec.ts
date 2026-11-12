@@ -41,7 +41,7 @@ const pages = [
     // at 375px is the failure this gate has already caught three times on other pages. The filter rail's
     // eight controls and three checkbox groups are the other half of that risk.
     { name: 'Analytics', path: '/analytics' },
-    // The data explorer (M235, ADR-0025). Behind the same plan key as Analytics, so it rides on the same
+    // The data explorer (M236, ADR-0025). Behind the same plan key as Analytics, so it rides on the same
     // seeding and the URL assertion below is what proves the scan is on it.
     //
     // The whole-page scan owns horizontal overflow for both pages, and both are worth it. The board is an

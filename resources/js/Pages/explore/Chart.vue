@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The data explorer's builder (M235, ADR-0025): pick a data source, say what to group and what to count,
+// The data explorer's builder (M236, ADR-0025): pick a data source, say what to group and what to count,
 // and watch the chart redraw. Rendered inside the persistent AppLayout (assigned in app.ts).
 //
 // ── One declaration, and the server draws it ────────────────────────────────────────────────────────────

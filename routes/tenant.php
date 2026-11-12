@@ -1019,7 +1019,7 @@ Route::middleware([
     Route::delete('/analytics/views/{savedReportView}', [AnalyticsViewController::class, 'destroy'])
         ->middleware(['can:delete,savedReportView', 'feature:advanced_analytics'])->name('analytics.views.destroy');
 
-    // The data explorer (ADR-0025, M235) — a member's own charts, in a route file of its own. It is mounted
+    // The data explorer (ADR-0025, M236) — a member's own charts, in a route file of its own. It is mounted
     // here, inside this group, so its routes carry exactly the middleware every route above carries.
     require __DIR__.'/explorer.php';
 

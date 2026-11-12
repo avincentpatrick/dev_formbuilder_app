@@ -335,7 +335,7 @@ class AppServiceProvider extends ServiceProvider
         // why `can:viewAny,Submission::class` was rejected there.
         Gate::policy(SavedReportView::class, SavedReportViewPolicy::class);
 
-        // Saved explorer charts (M235, ADR-0025 §D8). Registered explicitly for the same fail-OPEN reason,
+        // Saved explorer charts (M236, ADR-0025 §D8). Registered explicitly for the same fail-OPEN reason,
         // and it does the same double duty: `viewAny` is the `can:` gate on the explorer's query routes.
         Gate::policy(ExplorerChart::class, ExplorerChartPolicy::class);
 

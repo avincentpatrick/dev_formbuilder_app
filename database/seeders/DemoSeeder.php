@@ -295,7 +295,7 @@ class DemoSeeder extends Seeder
     // ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
     /**
-     * A starting board on `/explore` for the demo Owner (M235, ADR-0025), so the page opens on charts and
+     * A starting board on `/explore` for the demo Owner (M236, ADR-0025), so the page opens on charts and
      * not on an empty state: one per kind of thing the explorer does that `/analytics` cannot. Responses
      * over time split by channel; the answers to one question; a number taken over another question; and a
      * source that is not responses at all. The second is shared, so signing in as any other member shows a

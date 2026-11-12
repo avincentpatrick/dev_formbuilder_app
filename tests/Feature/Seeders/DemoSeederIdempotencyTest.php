@@ -111,7 +111,7 @@ function demoShape(Tenant $tenant): array
             'notifications' => Notification::count(),
             'preferences' => NotificationPreference::count(),
             'feedback' => FeedbackReport::count(),
-            // M235 — the demo Owner's explorer board.
+            // M236 — the demo Owner's explorer board.
             'charts' => ExplorerChart::count(),
             'statuses' => Submission::query()
                 ->selectRaw('status, count(*) as n')->groupBy('status')->orderBy('status')->pluck('n', 'status')->toArray(),

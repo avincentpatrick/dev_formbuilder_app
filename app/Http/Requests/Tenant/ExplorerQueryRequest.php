@@ -9,7 +9,7 @@ use App\Support\Explorer\ExplorerQuery;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * A data-explorer declaration sent to be run (M235, ADR-0025 §D2).
+ * A data-explorer declaration sent to be run (M236, ADR-0025 §D2).
  *
  * The rules below check one thing — that a declaration was sent at all — and that is deliberate.
  * {@see ExplorerQuery::fromArray()} is the single reader of the shape, for a request and for a stored

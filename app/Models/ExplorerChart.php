@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
- * A chart a member built and kept on `/explore` (M235, ADR-0025 §D8).
+ * A chart a member built and kept on `/explore` (M236, ADR-0025 §D8).
  *
  * `definition` is an {@see ExplorerQuery} payload: a declaration resolved every time the chart is opened,
  * as the member opening it. `strict` RLS scopes the table to the TENANT only, so whose chart it is and who

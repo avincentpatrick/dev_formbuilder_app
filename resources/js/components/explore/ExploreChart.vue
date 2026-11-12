@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// One explorer result, drawn as the chart its declaration asked for (M235, ADR-0025 §D7).
+// One explorer result, drawn as the chart its declaration asked for (M236, ADR-0025 §D7).
 //
 // Every branch is a design-system primitive: this component chooses one and hands it data, and holds no
 // geometry and no colour. `result-view.ts` does the mapping, so what each chart receives is under test.
@@ -122,7 +122,7 @@ const maxTicks = computed(() => (props.result.categories.some((c) => c.label.len
             v-if="!isEmpty && (result.chart === 'line' || result.chart === 'area') && lines.substituted"
             class="explore-chart__note"
         >
-            A period with nothing to measure is drawn at zero. The table shows it as a dash.
+            A period with nothing to measure is drawn at zero, and the table shows that zero too. It is not a measured zero: there was nothing to count.
         </p>
     </div>
 </template>

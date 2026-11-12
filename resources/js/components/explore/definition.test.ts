@@ -19,7 +19,7 @@ import {
 import type { Aggregate, ChartOption, ChartType, Definition, Field, FieldType, FilterOperator, Source } from './types';
 
 /**
- * M235 — the pure helpers under the chart builder.
+ * M236 — the pure helpers under the chart builder.
  *
  * The server is the authority on what a declaration may hold; these helpers exist so the builder never SENDS
  * one the server would refuse for a reason the reader did not cause. Three of them are mirrors of PHP and

@@ -1627,7 +1627,7 @@ A question's history (M188, `R-3894369d`, `D167`, `D168`): who changed which set
 
 ## 43. `explorer_charts`
 
-A chart a member built and kept on `/explore` (`M235`; ADR `0025-data-explorer.md` §D8).
+A chart a member built and kept on `/explore` (`M236`; ADR `0025-data-explorer.md` §D8).
 
 | Column | Type | Nullable | Default | PII? | Description |
 |---|---|---|---|---|---|

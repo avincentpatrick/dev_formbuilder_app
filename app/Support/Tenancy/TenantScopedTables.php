@@ -58,7 +58,7 @@ final class TenantScopedTables
         'badge_awards',
         'connection_subscriptions',
         'connections',
-        // M235. Nothing withheld: a chart's name, the declaration its author built and whether they shared it.
+        // M236. Nothing withheld: a chart's name, the declaration its author built and whether they shared it.
         // It holds no data — a chart is run again each time it is opened.
         'explorer_charts',
         // M179. A report's thread: a member's or the support team's words (`body`, conditional PII, redacted in

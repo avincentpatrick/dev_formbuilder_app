@@ -14,7 +14,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * The data explorer's three JSON reads (M235, ADR-0025 §D3).
+ * The data explorer's three JSON reads (M236, ADR-0025 §D3).
  *
  * All three answer 200 with `{result, refusal}` or `{fields, notes}`, and a declaration that cannot be run
  * is a `refusal` in that body rather than an error status: the page prints the sentence where the chart

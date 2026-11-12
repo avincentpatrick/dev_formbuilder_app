@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// An explorer result as a plain table (M235) — the Table chart type, and what any chart reduces to.
+// An explorer result as a plain table (M236) — the Table chart type, and what any chart reduces to.
 // A real `<table>` with a caption and scoped headers, scrolled inside its own wrapper so a wide result
 // never widens the page.
 import { computed } from 'vue';

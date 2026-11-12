@@ -20,7 +20,7 @@ uses(RefreshDatabase::class);
 
 /*
 |--------------------------------------------------------------------------
-| M235 — saved explorer charts (ADR-0025 §D8).
+| M236 — saved explorer charts (ADR-0025 §D8).
 |
 | `explorer_charts` is `strict` RLS, which scopes to the tenant only. Everything narrower than that — whose
 | chart it is, who else may open it, who may change it — is the policy and one model scope, and this file
@@ -263,7 +263,7 @@ it('lets a colleague open a shared chart and nothing more', function (): void {
     $this->actingAs($this->colleague)->get(chartsUrl("/{$shared->id}"))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->component('explore/Builder', false)
+            ->component('explore/Chart', false)
             ->where('chart.id', $shared->id)
             ->where('chart.name', 'For everyone')
             ->where('chart.is_mine', false)

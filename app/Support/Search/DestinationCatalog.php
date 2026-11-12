@@ -49,7 +49,7 @@ final readonly class DestinationCatalog
         // plan field, which is exact for this one key because §D6 grants it on every tier (see nav-model).
         ['key' => 'achievements', 'label' => 'Achievements', 'url' => '/achievements', 'keywords' => 'badges points streak leaderboard progress rewards gamification', 'ability' => null, 'feature' => 'gamification'],
         ['key' => 'analytics', 'label' => 'Analytics', 'url' => '/analytics', 'keywords' => 'reports charts trends insights', 'ability' => 'viewAnalytics', 'feature' => 'advanced_analytics'],
-        // M235. The data explorer — a member's own charts. Same key and same policy shape as the row above.
+        // M236. The data explorer — a member's own charts. Same key and same policy shape as the row above.
         ['key' => 'explore', 'label' => 'Explore', 'url' => '/explore', 'keywords' => 'explorer build chart graph pivot visual analysis data studio', 'ability' => 'viewExplorer', 'feature' => 'advanced_analytics'],
         ['key' => 'members', 'label' => 'Members', 'url' => '/members', 'keywords' => 'people team invite roles permissions staff', 'ability' => 'manageMembers', 'feature' => null],
         ['key' => 'scopes', 'label' => 'Scopes', 'url' => '/scopes', 'keywords' => 'hierarchy regions offices areas branches', 'ability' => 'manageScopes', 'feature' => null],

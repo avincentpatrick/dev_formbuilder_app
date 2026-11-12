@@ -8,7 +8,7 @@ use Carbon\CarbonImmutable;
 
 /*
 |--------------------------------------------------------------------------
-| M235 — the data explorer's declaration (ADR-0025 §D2, §D3).
+| M236 — the data explorer's declaration (ADR-0025 §D2, §D3).
 |
 | The bounds live in the value object's constructor so that a request, a stored chart and a test all pass
 | the same checks. These cases therefore need no database: an unbounded query is unrepresentable.

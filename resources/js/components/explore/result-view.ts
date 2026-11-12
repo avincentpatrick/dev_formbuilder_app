@@ -1,4 +1,4 @@
-// From an explorer result to what each chart primitive takes (M235). Pure, so the mapping is under test and
+// From an explorer result to what each chart primitive takes (M236). Pure, so the mapping is under test and
 // the components that draw it hold no arithmetic.
 //
 // One rule runs through all of it: `null` is "no value" and is never drawn as zero without saying so. A bar
@@ -137,11 +137,13 @@ export function disclosures(result: Result): string[] {
 
     if (result.meta.hidden_groups > 0) {
         const additive = result.measures.every((m) => m.additive);
+        const foldedGroups =
+            result.meta.hidden_groups === 1 ? '1 smaller group is' : `${formatNumber(result.meta.hidden_groups)} smaller groups are`;
 
         notes.push(
             additive
-                ? `${formatNumber(result.meta.hidden_groups)} smaller groups are added together as “Other”.`
-                : `${formatNumber(result.meta.hidden_groups)} smaller groups are folded into “Other”, which has no value for an average, a median, a minimum or a maximum.`,
+                ? `${foldedGroups} added together as “Other”.`
+                : `${foldedGroups} folded into “Other”, which has no value for an average, a median, a minimum or a maximum.`,
         );
     }
 

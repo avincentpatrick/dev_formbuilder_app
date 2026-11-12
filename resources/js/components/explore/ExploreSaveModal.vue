@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Saving a chart from the builder (M235, ADR-0025 §D8): a name, and whether colleagues may open it.
+// Saving a chart from the builder (M236, ADR-0025 §D8): a name, and whether colleagues may open it.
 //
 // One modal for three verbs, and which one it is decides what is sent. A NEW chart and a COPY post the
 // declaration on screen. DETAILS — renaming or sharing a chart already saved — sends the name and the switch

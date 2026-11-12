@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The data explorer's board (M235, ADR-0025): every chart this member kept, and the ones colleagues shared
+// The data explorer's board (M236, ADR-0025): every chart this member kept, and the ones colleagues shared
 // with the workspace, each drawn live. Rendered inside the persistent AppLayout (assigned in app.ts).
 //
 // The page's props hold the charts' DECLARATIONS and no data. Each tile runs its own chart, as the member

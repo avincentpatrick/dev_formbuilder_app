@@ -13,7 +13,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * The data explorer's two pages (M235, ADR-0025): the board of saved charts, and the builder.
+ * The data explorer's two pages (M236, ADR-0025): the board of saved charts, and the builder.
  *
  * Neither page carries a chart's DATA in its props. A tile and the builder's preview each ask
  * {@see ExplorerQueryController} for their own result, so the page paints at once, one slow or refused
@@ -36,7 +36,7 @@ final class ExplorerController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        return Inertia::render('explore/Builder', $this->presenter->builder($user, null));
+        return Inertia::render('explore/Chart', $this->presenter->builder($user, null));
     }
 
     public function show(Request $request, ExplorerChart $explorerChart): Response
@@ -44,6 +44,6 @@ final class ExplorerController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        return Inertia::render('explore/Builder', $this->presenter->builder($user, $explorerChart));
+        return Inertia::render('explore/Chart', $this->presenter->builder($user, $explorerChart));
     }
 }

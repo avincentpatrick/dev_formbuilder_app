@@ -60,7 +60,7 @@ export const icons = {
     // the sidebar collapses to icons only, where the glyph is the SOLE signifier: two destinations sharing
     // one mark is a real navigation defect there, not a tidiness question.
     'chart-bar': 'M4 20h16 M7.5 20v-8 M12 20V5 M16.5 20v-5',
-    // M235 — the /explore destination. A pie with one slice lifted: beside `chart-bar` in an icons-only
+    // M236 — the /explore destination. A pie with one slice lifted: beside `chart-bar` in an icons-only
     // sidebar the two must not read as the same page.
     'chart-pie': 'M11 4a8.5 8.5 0 1 0 8.5 8.5H11z M14 3.5V10h6.5A8.5 8.5 0 0 0 14 3.5z',
     inbox: 'M4 13l2.5-8h11L20 13v6H4z M4 13h5a3 3 0 0 0 6 0h5',

@@ -8,7 +8,8 @@ const LINKS = [
   { href: "/admin/ingestion", label: "Ingestion history" },
   { href: "/admin/ai-quota", label: "AI quota" },
   { href: "/admin/answer-bank", label: "Answer bank" },
-  { href: "/admin/assistant", label: "Assistant" },
+  { href: "/ask-the-data", label: "Ask the Data" },
+  { href: "/admin/analysis-users", label: "Analysis access" },
   // Increment 5.4. The profile itself is per-geography, so this points at the national one; the
   // page carries a place search to get anywhere else.
   { href: "/admin/place/national/PH", label: "Area profile" },

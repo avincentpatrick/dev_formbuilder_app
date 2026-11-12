@@ -65,7 +65,14 @@ export async function POST(request: Request) {
       );
     progress = "Saving results";
     await heartbeat();
-    if (!active) return NextResponse.json({ worked: true, published: false });
+    if (!active) {
+      // A cancelled lease cannot publish, but known provider charges still belong in its audit.
+      await workerCall("fail", claimed.id, claimed.lease_id, {
+        error: "Job is no longer active",
+        usage: summariseUsage(uses) as Json,
+      });
+      return NextResponse.json({ worked: true, published: false });
+    }
     const route = events.find((e) => e.type === "route")?.route as { scope?: unknown } | undefined;
     const result = { answer: message.content, events, evidence };
     const saved = (await workerCall("finish", claimed.id, claimed.lease_id, {

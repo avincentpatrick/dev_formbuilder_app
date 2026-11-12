@@ -69,7 +69,10 @@ it('links an item only to a page that exists', function (): void {
 
             $path = (string) strtok($item['href'], '#');
 
-            expect($pages)->toContain($path, "{$release['version']} links to {$item['href']}, which no GET route serves.");
+            // Not `toContain($path, $message)`: Pest's `toContain` is variadic over NEEDLES, so a message passed
+            // there is searched for as a second page and fails every linked item (`M236` found it with the first
+            // release note to carry a link).
+            expect(in_array($path, $pages, true))->toBeTrue("{$release['version']} links to {$item['href']}, which no GET route serves.");
         }
     }
 });

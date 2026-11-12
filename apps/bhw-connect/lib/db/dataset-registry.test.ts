@@ -56,6 +56,20 @@ function column(overrides: Partial<ColumnRow> = {}): ColumnRow {
 }
 
 describe("toRegisteredDataset", () => {
+  it("excludes private project tables even if their registry entries were approved", () => {
+    for (const table_name of [
+      "analysis_projects",
+      "analysis_jobs",
+      "analysis_members",
+      "analysis_job_usage",
+      "analysis_users",
+      "analysis_sources",
+    ]) {
+      expect(
+        toRegisteredDataset(registry({ table_name, exposure: "internal" }), [column()]),
+      ).toBeNull();
+    }
+  });
   it("keeps only approved columns, in ordinal order", () => {
     const dataset = toRegisteredDataset(registry(), [
       column({ column_id: 2, column_name: "n", ordinal: 7 }),

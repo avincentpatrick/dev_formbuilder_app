@@ -9792,3 +9792,9 @@ Membership comes from `geo_district_map` (live rows: not rejected, not supersede
 which reads no figures. Income classes stay on their own map. District pages link to their view. Still waiting:
 outlines and totals need a reviewed roster attesting complete membership (owner), the barangay package installed
 (operator), and boundaries for the 19 (outside data).
+
+## 2026-11-12 — Unified Ask the Data Phase 0 design
+
+Completed the design-only phase requested by the owner. See [build plan](ASK_THE_DATA_BUILD_PLAN.md) and [technical design](ASK_THE_DATA_PHASE_0_DESIGN.md). Confirmed removal of anonymous Ask the Data in Phase 1; approved dashboard users share one dataset catalogue, while projects/files remain private unless shared. Approval does not grant administrator privileges. Selected a PostgreSQL-backed durable queue and typed Python statistical worker as the design direction, subject to actual Windows-host compatibility verification. Existing raw-number auditing must evolve to validate computed results rather than be disabled.
+
+Reviewed current WPSAR guidance, including its distinction between figure/table notes and bibliographic references and its AI-use restrictions; automated narrative is not represented as a submission-ready manuscript. Added synthetic numerical/geographic acceptance fixtures and independently checked their reference arithmetic, JSON, local document links, and whitespace. No application code, dependencies, schema, settings, or deployment changed. Application/browser/CI tests were not run for this documentation-only phase. Phase 1 has not started. The checkout has no origin/main ref, so no compliant branch/PR is claimed. Worker compatibility, search vendor, and an undecided operating budget remain recorded gates.

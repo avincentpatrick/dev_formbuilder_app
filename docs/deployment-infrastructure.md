@@ -396,8 +396,8 @@ refuse to create an account without a console.
       was open, measured from **outside the agency network** on 2026-09-18 and again on 2026-09-19: TLS 1.3
       completes, `/up` and `/login` answer 200. **It must stay open**, because `mod_md` renews over it
       (§8 step 8, §8.3). **Inbound 80 stays closed.**
-    - **Since `D216` the site answers on a public address of its own**, which the network team gave
-      `iconnect.com.de` and forwards to the box's 443. `121.58.210.237` stays with `staging.pitahc.gov.ph`,
+    - **Since `D216` the site answers on a public address of its own, `121.58.210.233`**, which the network
+      team gave `iconnect.com.de` and forwards to the box's 443. `121.58.210.237` stays with `staging.pitahc.gov.ph`,
       which no longer serves Meridian. ⛔ **The forward must carry no source NAT**, as the network team made
       the first one on 2026-09-18: every per-address limit, the login lockout and the audit trail read the
       client address Apache sees.

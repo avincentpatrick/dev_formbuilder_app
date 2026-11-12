@@ -16,6 +16,35 @@ Standing Rule 7(b-bis).
 
 ---
 
+## Status: ACTIVE CLAIM — `M235`, `iconnect-domain-move`: the testing site moves to `iconnect.com.de` (m235-iconnect-domain)
+
+Taken 2026-11-12, from the plan the user approved in chat the same day. Branch `m235-iconnect-domain`, cut from origin/main at `1fa7055f`, PR into main. **Held green for the cutover sitting, which is the merge point** (`D137`): the box switches and this PR merges in one sitting, on the user's word.
+Row: filed by this increment, `iconnect-domain-move`, *"The testing site moves from `staging.pitahc.gov.ph` to `iconnect.com.de`, and four things in the repository name the old host or would name a wrong one."* The user's answers are recorded as `D216` in the same PR: the old address stops, the same box gets a new public IP, Cloudflare stays DNS only, and testers type the bare `iconnect.com.de`, so the box runs `CENTRAL_DOMAIN=com.de` and the workspace's `domains` label becomes `iconnect`.
+
+### Evidence verified
+- `AppSettingsPresenter::forSettings()` builds `signup_host` from `$tenant->slug` and `tenancy.central_domain`: **held**. On the new layout it would read `staging.com.de`. Shown by `AccessCard.vue`.
+- `TenantUrl::appHost()` and `ConnectorRedirector::tenantHost()` read the dotless `domains` row first: **held**. So invitation, notification and OAuth landing links follow the label with no change.
+- `PlatformHost::centralFor()` matches on a dot boundary, and stancl's `InitializeTenancyBySubdomain` takes the first label of a host ending in a central domain: **held** for a two-label central domain, read in the vendor source.
+- `staging-headers-judge.php`'s `STAGING_HOST`, `activate-staged-cert.ps1`'s `-Domain` default, and `ci.yml`'s two BHW `NEXT_PUBLIC_SITE_URL` placeholders name the old host: **held**.
+
+### Premise verified
+- The box's `.env`, its Apache config and BHW's `NEXT_PUBLIC_` values are the operator's, set by hand on the box (`docs/working-agreement.md` §6, `write-settings.ps1`'s header): **held**. So the box half is the user's, in chat, not this PR's.
+- `.github/` is avincentpatrick's alone (`D211`): **held**.
+- Nothing under `apps/` is edited. jong's docs and `bhw-barangay-release.ps1` name the old host, and that script takes `-Site` (`D210`): **held**.
+- `domains` is RLS-exempt (`CreateTenantCommand`'s step 3), so the label change is one row's value, with no migration: **held**.
+- No passkey or WebAuthn binds a sign-in to the old host: **held**, no match anywhere outside `apps/`.
+
+### Remedy verdict
+Building `signup_host` from the rule `TenantUrl::appHost()` already holds works by reading. It is measured at runtime by the new layout test's first run against the unfixed presenter, which must fail on `signup_host` alone before the fix is written.
+
+Files: `app/Services/Settings/AppSettingsPresenter.php`, `tests/Feature/Settings/TenantAppSettingsTest.php`, a new `tests/Feature/Tenancy/BareDomainLayoutTest.php`, `scripts/staging-headers-judge.php`, `tests/Feature/Docs/StagingHeadersJudgeTest.php`, `scripts/activate-staged-cert.ps1`, `.github/workflows/ci.yml`, `VERSION`, `database/data/releases.json`.
+Shared artefacts taken: `docs/deployment-infrastructure.md`, `docs/working-agreement.md`, `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md` (own block only).
+Paired files taken: none.
+Namespaces spent: `D216`; nothing from the ADR or migration namespaces.
+Prediction: the layout test fails first on `signup_host` alone, then passes, and its mutation turns it red. `TenantAppSettingsTest`'s expected `acme.meridian.test` holds unchanged, because its tenant's label equals its slug. PHPStan does not move. The one most likely wrong: that `TenantUrl::appHost()`'s host comes from `app.url`, so in tests whose `app.url` is not the central domain the card may gain a port or a different host.
+
+---
+
 ## RELEASED — `M234`, `R-8311c583`: a refused JSON fetch is proved to leave no toast, and the workarounds built on the pre-`M90` refusal give their real reasons (merged as PR #499, `5a56d475`, eighteenth of eighteen at the merge point of 2026-11-10, after merging the trunk into its branch at `98cf2713`; every required check green with real step counts on its run 42868863714 — Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5, and Boundary 42868855941 green (5); the trunk's run 42875613584 on `5a56d475` 8/8, with BHW Connect at 23)
 
 **RELEASED EIGHTEENTH OF EIGHTEEN AT THE MERGE POINT OF 2026-11-10** (`D137`; the user said *"do the merge"*, then *"all"*). The branch took the trunk at `6d5e1301`: appended backlog rows conflicted (every row kept, the merged diff matching the PR's own). The line was regenerated in the tree with `vendor/`, and `pipeline-lint`, the citation lint and `tracker-lint` passed on the host before the push. Deploy 42881800297 backed up 1,176,336 bytes, counted 70 tables and 54,293 rows, had nothing to migrate and every table held; 0.19.0 stayed live, and `/up` answered 200. The user's census before was taken at 06:13:30 UTC (1 · 6 · 11 · 27 · 22 · 62 · 31 · 74); the user's census after (23:28:10 UTC) read the same, 1 · 6 · 11 · 27 · 22 · 62 · 31 · 74: no row lost.

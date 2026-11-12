@@ -12,6 +12,7 @@ use App\Services\Entitlements\EntitlementService;
 use App\Services\Forms\PsgcLists;
 use App\Support\Entitlements\ToggleableModules;
 use App\Support\Platform\BuildInfo;
+use App\Support\Tenancy\TenantUrl;
 
 /**
  * The read side of the App Settings panels (PRD Feature #10) — Increment I5.
@@ -54,8 +55,10 @@ final class AppSettingsPresenter
                 // {@see \App\Http\Middleware\EnforceTenantTwoFactor} on the authenticated tenant group.
                 'require_two_factor' => (bool) $this->settings->get(SettingKey::SecurityRequireTwoFactor),
                 // Shown in the card's hint so "people can join by signing up" names WHERE, rather than
-                // leaving an admin to guess which URL the setting is about.
-                'signup_host' => $tenant->slug.'.'.(string) config('tenancy.central_domain'),
+                // leaving an admin to guess which URL the setting is about. M235: from the workspace's
+                // own `domains` label, the one rule every outbound link uses. The slug named a host
+                // nothing serves once a label differs from it, as `iconnect` does on the testing site.
+                'signup_host' => TenantUrl::appHost($tenant),
                 // Whether the ADMIN LOOKING AT THE SWITCH is themselves enrolled. The card uses it to warn
                 // that turning enforcement on will send them to the enrollment interstitial on their very
                 // next request — true, recoverable, and alarming if it arrives unannounced.

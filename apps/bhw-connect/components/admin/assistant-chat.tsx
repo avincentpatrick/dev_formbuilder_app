@@ -84,7 +84,15 @@ function slideTitleFor(turns: Turn[], index: number): string {
   return "Answer";
 }
 
-export function AssistantChat() {
+export function AssistantChat({
+  initialScope = null,
+  dataset,
+  canReport = false,
+}: {
+  initialScope?: RouteScope | null;
+  dataset?: string;
+  canReport?: boolean;
+}) {
   const [turns, setTurns] = useState<Turn[]>([]);
   // Increment 5.1. Three separate pieces of state, because they have three different lifetimes.
   // `route` is what the server decided for the last question and is replaced every turn.
@@ -93,7 +101,7 @@ export function AssistantChat() {
   // pinning it instead would let a stale Basilan win over the Cebu a new question just named.
   const [route, setRoute] = useState<AssistantRoute | null>(null);
   const [pinned, setPinned] = useState<PinnedRoute>({});
-  const [carriedScope, setCarriedScope] = useState<RouteScope | null>(null);
+  const [carriedScope, setCarriedScope] = useState<RouteScope | null>(initialScope);
   // Increment 5.2. Derived server-side from the turn's tool payloads, so every offered question is
   // about something that was actually returned.
   const [followUps, setFollowUps] = useState<string[]>([]);
@@ -196,11 +204,12 @@ export function AssistantChat() {
     setStatus("sending");
 
     try {
-      const res = await fetch(withBasePath("/api/ai/assistant"), {
+      const res = await fetch(withBasePath("/api/analysis/chat"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: history.filter((t) => t.role !== "system"),
+          dataset,
+          messages: history.filter((t) => t.role !== "system").slice(-30),
           // Omitted entirely when nothing is pinned, so the server's schema sees `undefined`
           // rather than an empty object it would have to treat as cleared fields.
           ...(Object.keys(pinnedRoute).length > 0 ? { pinnedRoute } : {}),
@@ -208,10 +217,16 @@ export function AssistantChat() {
         }),
       });
 
-      if (res.status === 401) {
+      if (res.status === 401 || res.status === 403) {
         setTurns([
           ...history,
-          { role: "system", content: "Your admin session has expired — sign in again." },
+          {
+            role: "system",
+            content:
+              res.status === 403
+                ? "Dashboard analysis access is required. Contact an administrator."
+                : "Your session has expired — sign in again.",
+          },
         ]);
         setStatus("idle");
         return;
@@ -298,10 +313,9 @@ export function AssistantChat() {
           {turns.length === 0 && (
             <div className="flex flex-col gap-3">
               <p className="text-sm text-muted">
-                Ask across every registered dataset, or about anything in the ingested documents.
-                Figures are grounded in tool results and pass the same numeric audit as the public
-                chat; document claims come back with the passage they were drawn from, which you can
-                open and read. Anything it cannot ground, it drops.
+                Ask questions across dashboard datasets and source documents. Answers explain the
+                findings, check figures against the available evidence, and include passages you can
+                open and read. Ask a follow-up to explore a finding or request a different view.
               </p>
               <ul className="flex flex-wrap gap-2">
                 {STARTER_QUESTIONS.map((question) => (
@@ -403,7 +417,7 @@ export function AssistantChat() {
                       </pre>
                       <p className="mt-1 text-muted">
                         <Link
-                          href={`/admin/assistant/source/${citation.chunkId}`}
+                          href={`/ask-the-data/source/${citation.chunkId}`}
                           className="underline"
                         >
                           Open the stored chunk
@@ -441,7 +455,7 @@ export function AssistantChat() {
             </div>
           )}
 
-          {lastAnswer && status === "idle" && (
+          {canReport && lastAnswer && status === "idle" && (
             <div className="flex flex-col gap-2 rounded-md border border-dashed border-border p-3">
               {reportState === "saved" ? (
                 <p className="text-xs text-muted">
@@ -518,6 +532,7 @@ export function AssistantChat() {
         >
           <input
             type="text"
+            aria-label="Question for Ask the Data"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="e.g. which provinces are outliers on honorarium receipt?"

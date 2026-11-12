@@ -6,7 +6,8 @@ import { createSupabaseServiceClient } from "@/lib/db/service-client";
  *
  * Service-role only, and deliberately so: `doc_chunk` and `doc_source` hold internal budget
  * material whose own slide 26 records the BHW Connect site under system hold (§12.5). Every caller
- * must itself be admin-gated — today that is the citation click-through page and nothing else.
+ * must be admin-gated or approved-analysis-user-gated. Analyst viewers pass approvedOnly=true
+ * so unreviewed sources cannot be exposed through guessed chunk IDs.
  *
  * Reads degrade to null rather than throwing, matching `lib/db/dataset-registry.ts`: a citation
  * that cannot be resolved should render as "not found", never as a stack trace on an admin page.
@@ -27,13 +28,13 @@ export type DocChunk = {
   content: string;
 };
 
-export async function getDocChunk(chunkId: number): Promise<DocChunk | null> {
+export async function getDocChunk(chunkId: number, approvedOnly = false): Promise<DocChunk | null> {
   try {
     const supabase = createSupabaseServiceClient();
     const { data, error } = await supabase
       .from("doc_chunk")
       .select(
-        "chunk_id, page_from, page_to, char_start, char_end, heading, content, doc_source (key, title, as_of, source_path, extractor)",
+        "chunk_id, page_from, page_to, char_start, char_end, heading, content, doc_source (key, title, as_of, source_path, extractor, status)",
       )
       .eq("chunk_id", chunkId)
       .maybeSingle();
@@ -46,8 +47,9 @@ export async function getDocChunk(chunkId: number): Promise<DocChunk | null> {
       as_of: string | null;
       source_path: string;
       extractor: string;
+      status: string;
     } | null;
-    if (!source) return null;
+    if (!source || (approvedOnly && source.status !== "approved")) return null;
 
     return {
       chunkId: data.chunk_id,

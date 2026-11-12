@@ -16,7 +16,36 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M236`, a row this increment files: a data explorer, a page where a member builds their own charts over the workspace's data (claude/gifted-maxwell-ay7dx4, continued on claude/festive-keller-7gpn4c)
+## Status: ACTIVE CLAIM — `M235`, `iconnect-domain-move`: the testing site moves to `iconnect.com.de` (m235-iconnect-domain)
+
+Taken 2026-11-12, from the plan the user approved in chat the same day. Branch `m235-iconnect-domain`, cut from origin/main at `1fa7055f`, PR into main. **Held green for the cutover sitting, which is the merge point** (`D137`): the box switches and this PR merges in one sitting, on the user's word.
+Row: filed by this increment, `iconnect-domain-move`, *"The testing site moves from `staging.pitahc.gov.ph` to `iconnect.com.de`, and four things in the repository name the old host or would name a wrong one."* The user's answers are recorded as `D216` in the same PR: the old address stops, the same box gets a new public IP, Cloudflare stays DNS only, and testers type the bare `iconnect.com.de`, so the box runs `CENTRAL_DOMAIN=com.de` and the workspace's `domains` label becomes `iconnect`.
+
+### Evidence verified
+- `AppSettingsPresenter::forSettings()` builds `signup_host` from `$tenant->slug` and `tenancy.central_domain`: **held**. On the new layout it would read `staging.com.de`. Shown by `AccessCard.vue`.
+- `TenantUrl::appHost()` and `ConnectorRedirector::tenantHost()` read the dotless `domains` row first: **held**. So invitation, notification and OAuth landing links follow the label with no change.
+- `PlatformHost::centralFor()` matches on a dot boundary, and stancl's `InitializeTenancyBySubdomain` takes the first label of a host ending in a central domain: **held** for a two-label central domain, read in the vendor source.
+- `staging-headers-judge.php`'s `STAGING_HOST`, `activate-staged-cert.ps1`'s `-Domain` default, and `ci.yml`'s two BHW `NEXT_PUBLIC_SITE_URL` placeholders name the old host: **held**.
+
+### Premise verified
+- The box's `.env`, its Apache config and BHW's `NEXT_PUBLIC_` values are the operator's, set by hand on the box (`docs/working-agreement.md` §6, `write-settings.ps1`'s header): **held**. So the box half is the user's, in chat, not this PR's.
+- `.github/` is avincentpatrick's alone (`D211`): **held**.
+- Nothing under `apps/` is edited. jong's docs and `bhw-barangay-release.ps1` name the old host, and that script takes `-Site` (`D210`): **held**.
+- `domains` is RLS-exempt (`CreateTenantCommand`'s step 3), so the label change is one row's value, with no migration: **held**.
+- No passkey or WebAuthn binds a sign-in to the old host: **held**, no match anywhere outside `apps/`.
+
+### Remedy verdict
+Building `signup_host` from the rule `TenantUrl::appHost()` already holds works by reading. It is measured at runtime by the new layout test's first run against the unfixed presenter, which must fail on `signup_host` alone before the fix is written.
+
+Files: `app/Services/Settings/AppSettingsPresenter.php`, `tests/Feature/Settings/TenantAppSettingsTest.php`, a new `tests/Feature/Tenancy/BareDomainLayoutTest.php`, `scripts/staging-headers-judge.php`, `tests/Feature/Docs/StagingHeadersJudgeTest.php`, `scripts/activate-staged-cert.ps1`, `.github/workflows/ci.yml`, `VERSION`, `database/data/releases.json`.
+Shared artefacts taken: `docs/deployment-infrastructure.md`, `docs/working-agreement.md`, `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md` (own block only).
+Paired files taken: none.
+Namespaces spent: `D216`; nothing from the ADR or migration namespaces.
+Prediction: the layout test fails first on `signup_host` alone, then passes, and its mutation turns it red. `TenantAppSettingsTest`'s expected `acme.meridian.test` holds unchanged, because its tenant's label equals its slug. PHPStan does not move. The one most likely wrong: that `TenantUrl::appHost()`'s host comes from `app.url`, so in tests whose `app.url` is not the central domain the card may gain a port or a different host.
+
+---
+
+## RELEASED — `M236`, a row this increment files: a data explorer, a page where a member builds their own charts over the workspace's data (merged as PR #506, `3e39b3e5`, alone, on the user's word on 2026-11-12, after merging the trunk into its branch at `ebfca696`; every required check green with real step counts on its run 43161289527, and Boundary 43173345032 green once `@avincentpatrick` applied the label; the trunk's run 43173596100 on `3e39b3e5` 8/8 — Static analysis 33 · BHW Connect 23 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5)
 
 Taken 2026-11-11, from the user's request the same day: *"can you build a module in here separate from the built in cards where i can utilize all available data sources to do my own visual analysis like a powerbi or a tableau"*. Branch `claude/gifted-maxwell-ay7dx4`, cut from origin/main at `1fa7055f`, PR into main, **held green for a merge point** (it changes what a tester sees, so it bumps `VERSION`).
 Row: filed by this increment in `docs/feature-backlog.md` as a suggestion, tier `during-testing`, and closed by it. The user asked for it directly, which is why it is taken ahead of the line's next rows.
@@ -50,34 +79,7 @@ Prediction: Pest, Vitest, type-check and the host lints green on the first full 
 
 **Mutations, each by `scripts/mutate.php` against an unmutated green baseline, each restored to its original sha256, each CAUGHT:** `ExplorerCatalog::resolve()` without its `allows()` check turned `ExplorerPageTest`'s *"refuses a source by name…"* red; `AnswersSource` without its flagged-question skip turned *"never offers a question marked personal or sensitive…"* and one more red; `ResponsesSource::query()` without its grant narrowing turned *"shows a member without org-wide access only the forms they hold a grant on"* red; `ExplorerChartPolicy::view()` without its ownership term turned *"keeps a private chart private…"* red; and the shaper summing a non-additive value into "Other" turned *"gives the Other bucket no value…"* red. Pest reads the working tree and none of these is a diff-based check, so the mutations were applied and restored in place by the harness rather than committed.
 
----
-
-## Status: ACTIVE CLAIM — `M235`, `iconnect-domain-move`: the testing site moves to `iconnect.com.de` (m235-iconnect-domain)
-
-Taken 2026-11-12, from the plan the user approved in chat the same day. Branch `m235-iconnect-domain`, cut from origin/main at `1fa7055f`, PR into main. **Held green for the cutover sitting, which is the merge point** (`D137`): the box switches and this PR merges in one sitting, on the user's word.
-Row: filed by this increment, `iconnect-domain-move`, *"The testing site moves from `staging.pitahc.gov.ph` to `iconnect.com.de`, and four things in the repository name the old host or would name a wrong one."* The user's answers are recorded as `D216` in the same PR: the old address stops, the same box gets a new public IP, Cloudflare stays DNS only, and testers type the bare `iconnect.com.de`, so the box runs `CENTRAL_DOMAIN=com.de` and the workspace's `domains` label becomes `iconnect`.
-
-### Evidence verified
-- `AppSettingsPresenter::forSettings()` builds `signup_host` from `$tenant->slug` and `tenancy.central_domain`: **held**. On the new layout it would read `staging.com.de`. Shown by `AccessCard.vue`.
-- `TenantUrl::appHost()` and `ConnectorRedirector::tenantHost()` read the dotless `domains` row first: **held**. So invitation, notification and OAuth landing links follow the label with no change.
-- `PlatformHost::centralFor()` matches on a dot boundary, and stancl's `InitializeTenancyBySubdomain` takes the first label of a host ending in a central domain: **held** for a two-label central domain, read in the vendor source.
-- `staging-headers-judge.php`'s `STAGING_HOST`, `activate-staged-cert.ps1`'s `-Domain` default, and `ci.yml`'s two BHW `NEXT_PUBLIC_SITE_URL` placeholders name the old host: **held**.
-
-### Premise verified
-- The box's `.env`, its Apache config and BHW's `NEXT_PUBLIC_` values are the operator's, set by hand on the box (`docs/working-agreement.md` §6, `write-settings.ps1`'s header): **held**. So the box half is the user's, in chat, not this PR's.
-- `.github/` is avincentpatrick's alone (`D211`): **held**.
-- Nothing under `apps/` is edited. jong's docs and `bhw-barangay-release.ps1` name the old host, and that script takes `-Site` (`D210`): **held**.
-- `domains` is RLS-exempt (`CreateTenantCommand`'s step 3), so the label change is one row's value, with no migration: **held**.
-- No passkey or WebAuthn binds a sign-in to the old host: **held**, no match anywhere outside `apps/`.
-
-### Remedy verdict
-Building `signup_host` from the rule `TenantUrl::appHost()` already holds works by reading. It is measured at runtime by the new layout test's first run against the unfixed presenter, which must fail on `signup_host` alone before the fix is written.
-
-Files: `app/Services/Settings/AppSettingsPresenter.php`, `tests/Feature/Settings/TenantAppSettingsTest.php`, a new `tests/Feature/Tenancy/BareDomainLayoutTest.php`, `scripts/staging-headers-judge.php`, `tests/Feature/Docs/StagingHeadersJudgeTest.php`, `scripts/activate-staged-cert.ps1`, `.github/workflows/ci.yml`, `VERSION`, `database/data/releases.json`.
-Shared artefacts taken: `docs/deployment-infrastructure.md`, `docs/working-agreement.md`, `docs/claims/decisions.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md` (own block only).
-Paired files taken: none.
-Namespaces spent: `D216`; nothing from the ADR or migration namespaces.
-Prediction: the layout test fails first on `signup_host` alone, then passes, and its mutation turns it red. `TenantAppSettingsTest`'s expected `acme.meridian.test` holds unchanged, because its tenant's label equals its slug. PHPStan does not move. The one most likely wrong: that `TenantUrl::appHost()`'s host comes from `app.url`, so in tests whose `app.url` is not the central domain the card may gain a port or a different host.
+**RELEASED ALONE, ON THE USER'S WORD** (*"merge when ready"*, then *"merge"*). **The census before and after was skipped at the user's request** (*"skip the counts before and after"*); the deploy's own backup and row count stand in its place. Deploy 43177810961 backed up 1,176,565 bytes, counted 70 tables and 54,298 rows, migrated `2026_08_17_000149_create_explorer_charts_table` alone, and found every table holding at least as many rows as before (71 tables, the new one included). `releases:sync` added 0.20.0, and `/up` answered 200 on the testing site. The first two Boundary runs failed because the label was applied from the account `jongsky25`, which owns none of the paths; the user re-applied it as `avincentpatrick`. This pull request, its merge and the trunk run are recorded under `jongsky25`, the GitHub account this cloud session's connection acts as.
 
 ---
 

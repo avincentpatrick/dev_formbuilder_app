@@ -6,7 +6,8 @@ import { createSupabaseServiceClient } from "@/lib/db/service-client";
  *
  * Service-role only, and deliberately so: `doc_chunk` and `doc_source` hold internal budget
  * material whose own slide 26 records the BHW Connect site under system hold (§12.5). Every caller
- * must itself be admin-gated — today that is the citation click-through page and nothing else.
+ * must be admin-gated or approved-analysis-user-gated. Analyst viewers pass approvedOnly=true
+ * so unreviewed sources cannot be exposed through guessed chunk IDs.
  *
  * Reads degrade to null rather than throwing, matching `lib/db/dataset-registry.ts`: a citation
  * that cannot be resolved should render as "not found", never as a stack trace on an admin page.

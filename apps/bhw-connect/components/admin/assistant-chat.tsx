@@ -313,10 +313,9 @@ export function AssistantChat({
           {turns.length === 0 && (
             <div className="flex flex-col gap-3">
               <p className="text-sm text-muted">
-                Ask across every registered dataset, or about anything in the ingested documents.
-                Figures are grounded in tool results and pass the same numeric audit as the public
-                chat; document claims come back with the passage they were drawn from, which you can
-                open and read. Anything it cannot ground, it drops.
+                Ask questions across dashboard datasets and source documents. Answers explain the
+                findings, check figures against the available evidence, and include passages you can
+                open and read. Ask a follow-up to explore a finding or request a different view.
               </p>
               <ul className="flex flex-wrap gap-2">
                 {STARTER_QUESTIONS.map((question) => (

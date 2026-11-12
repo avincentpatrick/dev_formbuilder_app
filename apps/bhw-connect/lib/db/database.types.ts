@@ -8,6 +8,12 @@ export type Database = {
   };
   public: {
     Tables: {
+      analysis_users: {
+        Row: { user_id: string; approved: boolean; updated_at: string; updated_by: string };
+        Insert: { user_id: string; approved?: boolean; updated_at?: string; updated_by: string };
+        Update: { user_id?: string; approved?: boolean; updated_at?: string; updated_by?: string };
+        Relationships: [];
+      };
       fact_fhsis_indicator: {
         Row: {
           id: number;

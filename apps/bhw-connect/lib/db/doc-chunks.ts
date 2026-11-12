@@ -27,13 +27,13 @@ export type DocChunk = {
   content: string;
 };
 
-export async function getDocChunk(chunkId: number): Promise<DocChunk | null> {
+export async function getDocChunk(chunkId: number, approvedOnly = false): Promise<DocChunk | null> {
   try {
     const supabase = createSupabaseServiceClient();
     const { data, error } = await supabase
       .from("doc_chunk")
       .select(
-        "chunk_id, page_from, page_to, char_start, char_end, heading, content, doc_source (key, title, as_of, source_path, extractor)",
+        "chunk_id, page_from, page_to, char_start, char_end, heading, content, doc_source (key, title, as_of, source_path, extractor, status)",
       )
       .eq("chunk_id", chunkId)
       .maybeSingle();
@@ -46,8 +46,9 @@ export async function getDocChunk(chunkId: number): Promise<DocChunk | null> {
       as_of: string | null;
       source_path: string;
       extractor: string;
+      status: string;
     } | null;
-    if (!source) return null;
+    if (!source || (approvedOnly && source.status !== "approved")) return null;
 
     return {
       chunkId: data.chunk_id,

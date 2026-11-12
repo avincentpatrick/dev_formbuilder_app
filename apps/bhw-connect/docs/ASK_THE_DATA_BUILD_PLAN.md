@@ -1,6 +1,6 @@
 # Unified Ask the Data phased build plan
 
-**Status:** Phase 0 design completed on 2026-11-12. Application implementation has not started. See [Phase 0 technical design](ASK_THE_DATA_PHASE_0_DESIGN.md) for the component inventory, architecture, method matrix, WPSAR checklist, fixtures, and deployment gates.
+**Status:** Phase 0 merged in PR #509. Phase 1 implementation is under verification on 2026-11-12; it is not deployed. See [Phase 0 technical design](ASK_THE_DATA_PHASE_0_DESIGN.md) for the component inventory, architecture, method matrix, WPSAR checklist, fixtures, and deployment gates.
 **Owner decisions recorded:** 2026-11-07.
 **Application:** BHW Connect, under `apps/bhw-connect/`.
 
@@ -195,7 +195,7 @@ Ask the owner necessary questions one at a time. Do not reopen confirmed choices
 | Phase | Status | Implementation and verification evidence |
 | --- | --- | --- |
 | 0 — Foundations and design | Design complete, 2026-11-12 | [Technical design](ASK_THE_DATA_PHASE_0_DESIGN.md) and [synthetic acceptance fixtures](fixtures/ask-the-data-phase-0.json). Code/source inspection complete; runtime and deployment unverified. |
-| 1 — Approved access and unified workspace | Not started | — |
+| 1 — Approved access and unified workspace | Implemented; verification in progress | Separate approval/admin controls, shared protected chat APIs, public-chat removal, source viewer and context-aware navigation. See the Phase 1 entry below. |
 | 2 — Projects, sharing, and jobs | Not started | — |
 | 3 — Sources, files, and graph | Not started | — |
 | 4 — Statistics and narrative | Not started | — |
@@ -209,3 +209,9 @@ For each completed increment, append the date, changed scope, PR/commit if avail
 Recorded the code inventory and public-chat removal locations, separate approval/project permissions, additive data model, complete-data extraction and result provenance, proposed Windows-compatible worker architecture with explicit compatibility gates, initial statistical methods, current WPSAR presentation guidance, and synthetic acceptance scenarios. Baseline inspected: `b41d1766`. Only documentation and synthetic fixture files changed. Next authorized build phase would be Phase 1; it has not started.
 
 Local verification: JSON parsing and independent standard-library arithmetic checks for the fixture expectations; local Markdown file links checked; whitespace checks passed. No application/browser/CI tests or deployment run for this documentation-only phase. No `origin/main` ref is present in the checkout, so no compliant branch/PR or deployment is claimed. Later gates: prove worker/converter compatibility on the actual host or a supported worker host; select a search provider; monthly budget remains undecided.
+
+### 2026-11-12 — Phase 1 implementation and verification
+
+Built separate administrator-managed analysis approvals, the private `/ask-the-data` workspace, protected document citation viewing, shared execution for the new and both legacy chat endpoints, and navigation replacing anonymous chat. Removed per-user message quotas, retained evidence checks/provider capacity handling, and updated help text and breadcrumbs. No Phase 2 work started.
+
+Verification so far: lint/typecheck passed; the full suite against synthetic PostgreSQL passed with 1,744 tests and 11 skips, followed by the added approval-table RLS/grant test passing independently. Focused authorization, route, source and breadcrumb regression checks passed (93 tests). Additive migration lint passed. Production build and browser results, CI/PR and deployment status will be recorded before marking this phase complete. The first no-database runtime browser attempt correctly failed because that build-only mode cannot run a production server; verification moved to the synthetic data stack without changing the runtime guard.

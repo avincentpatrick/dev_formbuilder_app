@@ -2,14 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AssistantRoute } from "@/lib/ai/route";
 
 const {
-  getAdminUser,
+  getAnalysisAuthResult,
   runToolLoop,
   isInternalAssistantRateLimited,
   recordInternalAssistantMessage,
   internalTools,
   routeRequest,
 } = vi.hoisted(() => ({
-  getAdminUser: vi.fn(),
+  getAnalysisAuthResult: vi.fn(),
   runToolLoop: vi.fn(),
   isInternalAssistantRateLimited: vi.fn(),
   recordInternalAssistantMessage: vi.fn(),
@@ -33,7 +33,7 @@ const {
   })),
 }));
 
-vi.mock("@/lib/db/require-admin", () => ({ getAdminUser }));
+vi.mock("@/lib/db/require-analysis", () => ({ getAnalysisAuthResult }));
 vi.mock("@/lib/ai/agent-loop", () => ({ runToolLoop }));
 vi.mock("@/lib/ai/rate-limit", () => ({
   isInternalAssistantRateLimited,
@@ -81,7 +81,7 @@ async function eventsOf(response: Response): Promise<Record<string, unknown>[]> 
 }
 
 beforeEach(() => {
-  getAdminUser.mockReset().mockResolvedValue(ADMIN);
+  getAnalysisAuthResult.mockReset().mockResolvedValue({ status: "approved", user: ADMIN });
   runToolLoop.mockReset();
   isInternalAssistantRateLimited.mockReset().mockResolvedValue(false);
   recordInternalAssistantMessage.mockReset().mockResolvedValue(undefined);
@@ -93,9 +93,9 @@ beforeEach(() => {
   });
 });
 
-describe("POST /api/ai/assistant — the admin boundary", () => {
+describe("POST /api/ai/assistant — approved-user boundary", () => {
   it("refuses an anonymous request with 401 and never reaches a provider", async () => {
-    getAdminUser.mockResolvedValue(null);
+    getAnalysisAuthResult.mockResolvedValue({ status: "signed_out" });
 
     const response = await POST(ask());
 
@@ -106,9 +106,9 @@ describe("POST /api/ai/assistant — the admin boundary", () => {
     expect(recordInternalAssistantMessage).not.toHaveBeenCalled();
   });
 
-  it("checks the admin session on the route itself, not only on the page", async () => {
+  it("checks dashboard approval on the route itself, not only on the page", async () => {
     await POST(ask());
-    expect(getAdminUser).toHaveBeenCalled();
+    expect(getAnalysisAuthResult).toHaveBeenCalled();
   });
 
   it("rejects a malformed body with 400", async () => {
@@ -121,14 +121,17 @@ describe("POST /api/ai/assistant — the admin boundary", () => {
 });
 
 describe("POST /api/ai/assistant — limits and tool set", () => {
-  it("returns 429 once the admin's own limit is reached, without calling a provider", async () => {
+  it("does not enforce the old per-user quota", async () => {
     isInternalAssistantRateLimited.mockResolvedValue(true);
-
-    const response = await POST(ask());
-
-    expect(response.status).toBe(429);
-    expect(isInternalAssistantRateLimited).toHaveBeenCalledWith(ADMIN.id);
-    expect(runToolLoop).not.toHaveBeenCalled();
+    runToolLoop.mockResolvedValue({
+      finalText: "Available.",
+      toolPayloads: [],
+      provider: "gemini",
+      allCapped: false,
+    });
+    expect((await POST(ask())).status).toBe(200);
+    expect(isInternalAssistantRateLimited).not.toHaveBeenCalled();
+    expect(runToolLoop).toHaveBeenCalled();
   });
 
   it("runs the loop with the internal tool set and the internal system prompt", async () => {

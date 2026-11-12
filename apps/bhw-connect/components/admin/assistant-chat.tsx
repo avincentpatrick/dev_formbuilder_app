@@ -532,6 +532,7 @@ export function AssistantChat({
         >
           <input
             type="text"
+            aria-label="Question for Ask the Data"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="e.g. which provinces are outliers on honorarium receipt?"

@@ -35,7 +35,7 @@ Never push to `main` directly, and never force-push a branch someone else works 
 
 ## 3. What a merge does
 
-Every merge to `main` deploys to the testing server, `https://staging.pitahc.gov.ph`.
+Every merge to `main` deploys to the testing server, `https://iconnect.com.de` (`staging.pitahc.gov.ph` until `D216`).
 
 - **A BHW-only merge** — only files under `apps/bhw-connect/` — rebuilds and restarts **only BHW**, about
   30–60 minutes later, once `main`'s checks have run. Meridian is not touched and its testers notice nothing. jongsky25 may merge one **whenever its
@@ -54,7 +54,7 @@ Every merge to `main` deploys to the testing server, `https://staging.pitahc.gov
    show as passed, and the secret scan still runs, so it takes minutes. A change under `ops/` is shared, so it
    runs them all and takes about 30–40 minutes.
 3. Green → merge it.
-4. Look at it on `https://staging.pitahc.gov.ph/bhw-connect` about 30–60 minutes later. **Staging is BHW's
+4. Look at it on `https://iconnect.com.de/bhw-connect` about 30–60 minutes later. **Staging is BHW's
    preview.**
 5. Broken? Either open a revert pull request (one more CI run), or ask avincentpatrick to roll back on
    the server — seconds, no rebuild.

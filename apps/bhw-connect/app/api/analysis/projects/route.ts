@@ -18,7 +18,7 @@ const schema = z.discriminatedUnion("operation", [
   z.object({
     operation: z.literal("get"),
     projectId: z.uuid(),
-    before: z.iso.datetime().optional(),
+    before: z.iso.datetime({ offset: true }).optional(),
   }),
   z.object({
     operation: z.literal("rename"),
@@ -53,9 +53,6 @@ export async function POST(request: Request) {
   return handle(request);
 }
 async function handle(request?: Request) {
-  const origin = request?.headers.get("origin");
-  if (origin && origin !== new URL(request!.url).origin)
-    return NextResponse.json({ error: "Origin not allowed" }, { status: 403, headers });
   const auth = await getAnalysisAuthResult();
   if (auth.status !== "approved")
     return NextResponse.json(
@@ -63,6 +60,11 @@ async function handle(request?: Request) {
       { status: auth.status === "signed_out" ? 401 : 403, headers },
     );
   try {
+    if (
+      request &&
+      request.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "application/json"
+    )
+      return NextResponse.json({ error: "JSON content type required" }, { status: 415, headers });
     if (!request) return NextResponse.json(await projectCall(auth.user.id, "list"), { headers });
     const parsed = schema.safeParse(await request.json().catch(() => null));
     if (!parsed.success)

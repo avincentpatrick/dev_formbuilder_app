@@ -1,6 +1,6 @@
 # Unified Ask the Data phased build plan
 
-**Status:** Phase 0 merged in PR #509. Phase 1 merged in PR #510. Phase 2 implementation is under verification on 2026-11-12; server worker setup is a release prerequisite. See [Phase 0 technical design](ASK_THE_DATA_PHASE_0_DESIGN.md) for the component inventory, architecture, method matrix, WPSAR checklist, fixtures, and deployment gates.
+**Status:** Phase 0 merged in PR #509. Phase 1 merged in PR #510. Phase 2 is implemented and locally verified on 2026-11-12 in PR #511; server worker setup is a release prerequisite. See [Phase 0 technical design](ASK_THE_DATA_PHASE_0_DESIGN.md) for the component inventory, architecture, method matrix, WPSAR checklist, fixtures, and deployment gates.
 **Owner decisions recorded:** 2026-11-07.
 **Application:** BHW Connect, under `apps/bhw-connect/`.
 
@@ -196,7 +196,7 @@ Ask the owner necessary questions one at a time. Do not reopen confirmed choices
 | --- | --- | --- |
 | 0 — Foundations and design | Design complete, 2026-11-12 | [Technical design](ASK_THE_DATA_PHASE_0_DESIGN.md) and [synthetic acceptance fixtures](fixtures/ask-the-data-phase-0.json). Code/source inspection complete; runtime and deployment unverified. |
 | 1 — Approved access and unified workspace | Merged, PR #510 | Separate approval/admin controls, shared protected chat APIs, public-chat removal, source viewer and context-aware navigation. See the Phase 1 entry below. |
-| 2 — Projects, sharing, and jobs | Implemented; verification in progress | Private projects, sharing, durable queue, result downloads and attempt usage. See [operations](ASK_THE_DATA_PROJECTS_OPERATIONS.md). Target-server worker setup remains required. |
+| 2 — Projects, sharing, and jobs | Locally verified; PR #511 | Private projects, sharing, durable queue, result downloads and attempt usage. See [operations](ASK_THE_DATA_PROJECTS_OPERATIONS.md). Target-server worker setup remains required. |
 | 3 — Sources, files, and graph | Not started | — |
 | 4 — Statistics and narrative | Not started | — |
 | 5 — Geographic analysis | Not started | — |
@@ -227,3 +227,7 @@ Phase 1 merged with all required CI checks passing. Added PostgreSQL-backed priv
 The worker is a separate Node polling service dispatching the shared audited engine through a secret-protected loopback endpoint. Its script is included in standalone output; no shared deployment scripts were changed. [Operations and release prerequisites](ASK_THE_DATA_PROJECTS_OPERATIONS.md) describe required operator service setup, environment/pricing configuration and backup behavior. No production worker/service or paid subscription was installed.
 
 Focused database/API/usage tests passed. Full local lint/typecheck and the synthetic-database suite are being run; final browser/build/CI evidence will be recorded in the PR. Phase 2 must not be described as deployed or operationally complete before the target worker service and recovery checks are verified. Phase 3 has not started.
+
+Local Phase 2 evidence: lint and typecheck passed; the synthetic-PostgreSQL suite passed with 1,757 tests and 11 skips before the final JSON-media-type coverage addition. Migration lint and both production configurations passed. The standalone worker script is present and passes Node syntax checking. Browser tests verified project autosave/reopen, owner/viewer/editor permissions, private-project denial, cancellation, unsharing, deletion, stored narrative rendering, and authorized versus unauthorized result downloads. The actual bundled Node worker processed a queued job after the browser page closed; without AI keys it saved a retryable capacity failure and an unknown-cost usage record. Successful result rendering/download used an explicitly synthetic database fixture, not a live provider claim. Expired-lease recovery and stale-worker publication rejection passed deterministic PostgreSQL tests. Runtime browser testing used synthetic whoami identities and made-up data only.
+
+PR #511 contains the complete reviewable change. Required CI must pass before merge. Target Windows service installation, live-provider execution and target-host recovery remain unverified; the operator action is to run the bundled worker service with the existing BHW environment and CRON_SECRET before release. No Phase 3 implementation has begun.

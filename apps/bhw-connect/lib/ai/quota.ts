@@ -170,13 +170,15 @@ export async function completeWithCascade(
     const check = await checkQuota(providerId, now);
     if (!check.available) continue;
 
+    let attempted = false;
     try {
       await reserveRequest(providerId, now);
+      attempted = true;
       const completion = await getProvider(providerId).complete(messages, tools);
       observeProviderUse(providerId, completion);
       return { allCapped: false, provider: providerId, completion };
     } catch (err) {
-      if (!(err instanceof ProviderUnavailableError))
+      if (attempted && !(err instanceof ProviderUnavailableError))
         observeProviderUse(providerId, { content: null, toolCalls: [] });
       if (err instanceof ProviderRateLimitedError) {
         console.warn(

@@ -7,6 +7,7 @@ const id = "00000000-0000-4000-8000-000000000001";
 const request = (body: unknown) =>
   new Request("http://localhost/api/analysis/projects", {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
 beforeEach(() => {
@@ -20,6 +21,16 @@ describe("project API boundary", () => {
       auth.mockResolvedValueOnce({ status });
       expect((await GET()).status).toBe(status === "signed_out" ? 401 : 403);
     }
+    expect(call).not.toHaveBeenCalled();
+  });
+  it("rejects browser form content types before mutation", async () => {
+    const response = await POST(
+      new Request("http://localhost/api/analysis/projects", {
+        method: "POST",
+        body: JSON.stringify({ operation: "create", requestId: id }),
+      }),
+    );
+    expect(response.status).toBe(415);
     expect(call).not.toHaveBeenCalled();
   });
   it("takes the actor from the session, not JSON", async () => {

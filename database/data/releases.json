@@ -1,6 +1,6 @@
 [
     {
-        "version": "0.19.1",
+        "version": "0.20.1",
         "title": "Meridian has a new address: iconnect.com.de",
         "items": [
             {
@@ -10,6 +10,21 @@
             {
                 "kind": "fixed",
                 "text": "Settings → Access now shows the address where people can sign up to join your workspace. Before the move it would have shown an address that does not open anything."
+            }
+        ]
+    },
+    {
+        "version": "0.20.0",
+        "title": "Explore: build your own charts",
+        "items": [
+            {
+                "kind": "new",
+                "text": "A new page, Explore, in the left menu. Pick what to count (responses, the answers to one form, forms, members, activity and more), choose how to group it, and see it as a bar, column, line, donut or a single number, with the table of numbers behind it. Save a chart to your own board, and share it with the workspace if you like.",
+                "href": "/explore"
+            },
+            {
+                "kind": "new",
+                "text": "A shared chart only ever shows each person what they could already see, and questions marked personal or sensitive are never offered for charting."
             }
         ]
     },

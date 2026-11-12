@@ -8,6 +8,7 @@ use App\Enums\TenantUserStatus;
 use App\Models\Audit;
 use App\Models\BadgeAward;
 use App\Models\Domain;
+use App\Models\ExplorerChart;
 use App\Models\FeedbackReport;
 use App\Models\Form;
 use App\Models\Notification;
@@ -110,6 +111,8 @@ function demoShape(Tenant $tenant): array
             'notifications' => Notification::count(),
             'preferences' => NotificationPreference::count(),
             'feedback' => FeedbackReport::count(),
+            // M236 — the demo Owner's explorer board.
+            'charts' => ExplorerChart::count(),
             'statuses' => Submission::query()
                 ->selectRaw('status, count(*) as n')->groupBy('status')->orderBy('status')->pluck('n', 'status')->toArray(),
             'sources' => Submission::query()

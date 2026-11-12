@@ -138,3 +138,118 @@ export function strideLabels(length: number, max: number): number[] {
 
     return [...seen].sort((a, b) => a - b);
 }
+
+export interface BandRect {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
+/**
+ * Column rectangles for `MdsColumnChart`, on the 0-100 square its stretched canvas uses.
+ *
+ * `values[s][b]` is series `s` in band `b`; the result has the same shape, with `null` wherever no bar
+ * is drawn. The x range is cut into `bandCount` equal bands and each band is inset by `padding` (a
+ * fraction of the band) on both sides.
+ *
+ * - `grouped`: the padded band is split evenly among the series, and each bar runs from the zero line to
+ *   its value — downward for a negative one. A missing value leaves its slot empty rather than closing
+ *   the gap, so a series keeps the same position in every band.
+ * - `stacked`: one full-width bar per band, segments piled upward from zero in series order. A negative
+ *   or missing value contributes nothing and yields `null`.
+ *
+ * A zero is a real value and yields a zero-height rect, which SVG does not paint. A degenerate or
+ * non-finite domain collapses every bar onto the baseline instead of emitting `NaN`.
+ */
+export function bandRects(
+    values: (number | null | undefined)[][],
+    bandCount: number,
+    domainMin: number,
+    domainMax: number,
+    mode: 'grouped' | 'stacked' = 'grouped',
+    padding = 0.15,
+): (BandRect | null)[][] {
+    if (!Number.isFinite(bandCount) || bandCount <= 0) return values.map(() => []);
+
+    const finiteDomain = Number.isFinite(domainMin) && Number.isFinite(domainMax);
+    const y = (value: number): number =>
+        finiteDomain ? scaleLinear(value, domainMin, domainMax, 100, 0) : 100;
+
+    const inset = Number.isFinite(padding) ? Math.min(Math.max(padding, 0), 0.45) : 0.15;
+    const band = 100 / bandCount;
+    const inner = band * (1 - 2 * inset);
+    const stacked = mode === 'stacked';
+    const width = stacked ? inner : inner / Math.max(1, values.length);
+    const stackTop: number[] = Array.from({ length: bandCount }, () => 0);
+
+    return values.map((row, s) =>
+        Array.from({ length: bandCount }, (_, b): BandRect | null => {
+            const value = row[b];
+            if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+            if (stacked && value < 0) return null;
+
+            const from = stacked ? stackTop[b] : 0;
+            const to = from + value;
+            if (stacked) stackTop[b] = to;
+
+            // Both edges are rounded BEFORE the height is taken, so stacked segments tile exactly
+            // instead of each rounding its own height and leaving a hairline.
+            const top = coord(Math.min(y(from), y(to)));
+            const bottom = coord(Math.max(y(from), y(to)));
+
+            return {
+                x: coord(b * band + band * inset + (stacked ? 0 : s * width)),
+                y: top,
+                width: coord(width),
+                height: coord(bottom - top),
+            };
+        }),
+    );
+}
+
+/**
+ * An SVG `d` for an annular sector — one donut slice. Angles are radians, 0 at 12 o'clock, clockwise.
+ *
+ * ⚠️ A FULL CIRCLE IS TWO HALF ARCS, NOT ONE. An arc whose start and end points coincide is omitted by
+ * the SVG renderer, so a single 360° slice — the ordinary shape of a breakdown with one non-zero
+ * category — would draw nothing, throw nothing, and fail no gate. The same guard covers a slice so close
+ * to full that its two ends ROUND to the same coordinate.
+ *
+ * `innerR <= 0` gives a plain pie sector. An empty or non-finite sweep yields an empty path.
+ */
+export function arcPath(
+    cx: number,
+    cy: number,
+    outerR: number,
+    innerR: number,
+    startAngle: number,
+    endAngle: number,
+): string {
+    if (![cx, cy, outerR, innerR, startAngle, endAngle].every((n) => Number.isFinite(n))) return '';
+
+    const sweep = endAngle - startAngle;
+    if (outerR <= 0 || sweep <= 0) return '';
+
+    const hole = Math.min(Math.max(innerR, 0), outerR);
+    const at = (r: number, angle: number): string =>
+        `${coord(cx + r * Math.sin(angle))} ${coord(cy - r * Math.cos(angle))}`;
+    const arc = (r: number, large: 0 | 1, clockwise: 0 | 1, angle: number): string =>
+        `A${coord(r)} ${coord(r)} 0 ${large} ${clockwise} ${at(r, angle)}`;
+
+    const full = sweep >= 2 * Math.PI || (sweep > Math.PI && at(outerR, startAngle) === at(outerR, endAngle));
+    if (full) {
+        const half = startAngle + Math.PI;
+        const ring = (r: number, clockwise: 0 | 1): string =>
+            `M${at(r, startAngle)} ${arc(r, 1, clockwise, half)} ${arc(r, 1, clockwise, startAngle)} Z`;
+
+        // The hole runs the other way round, so it is a hole under either fill rule.
+        return hole > 0 ? `${ring(outerR, 1)} ${ring(hole, 0)}` : ring(outerR, 1);
+    }
+
+    const large = sweep > Math.PI ? 1 : 0;
+    const outer = `M${at(outerR, startAngle)} ${arc(outerR, large, 1, endAngle)}`;
+    if (hole <= 0) return `${outer} L${coord(cx)} ${coord(cy)} Z`;
+
+    return `${outer} L${at(hole, endAngle)} ${arc(hole, large, 0, startAngle)} Z`;
+}

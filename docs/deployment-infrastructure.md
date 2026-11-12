@@ -564,7 +564,8 @@ certificate lands in `md\staging\<domain>\`, the error log records
 `AH10059 … activated on next (graceful) server restart`, and the **next 03:20 task run** performs that
 restart and logs the new serial and expiry. The old name's leaf (as of 2026-09-19, serial `05F10E…53AE`, valid
 **2026-09-18 → 2026-12-17**) stopped mattering when `D216` removed its `<MDomain>`. `iconnect.com.de`'s first
-leaf was issued at the move; `mod_md` renews it about 30 days before it expires.
+leaf was issued at the move (2026-11-12, serial `05C594…D6E0`, EC P-256 from Let's Encrypt `YE1`, valid until
+**2027-02-10**); `mod_md` renews it about 30 days before it expires.
 
 ⚠️ **`httpd -t` on this box no longer prints `AH00558`, and that is a change `M102` made rather than a fact
 it found.** `httpd.conf` now carries a global `ServerName localhost`, appended with a six-line comment giving
@@ -701,7 +702,11 @@ edit and one `domains` value, and the old name goes last.
      HSTS and BHW proxy lines. Its floor `SSLCertificateFile` points at the CURRENT certificate's files,
      because a vhost with no floor serves a 503 (trap 2).
    - A `<MDomain <name>>` beside the first.
-   - `httpd -t`, restart, wait for `AH10059`, then restart again (trap 4).
+   - `httpd -t`, restart, wait for `AH10059`, then restart again (trap 4). At `D216` the line came ten
+     seconds after the first restart, and the second restart served the new leaf.
+   - ⚠️ Wrap any guarded block pasted into the box's console in `& { … }`. Pasted bare, it runs line by
+     line, so a `throw` prints and the next line still runs: at `D216` a block pasted twice restarted
+     Apache after every one of its guards had fired.
    - From outside, `openssl s_client -connect <name>:443 -servername <name>` must show Let's Encrypt and the
      new name.
 3. **The switch, inside one `artisan down --render=deploy-window` window.**

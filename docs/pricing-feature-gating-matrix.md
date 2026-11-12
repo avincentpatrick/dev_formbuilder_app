@@ -48,7 +48,7 @@ Uses the **exact flag key names** `docs/data-dictionary.md` §16 already gives a
 | `branding` (tenant logo / theme) | ✗ | ✓ | ✓ | ✓ | ✓ |
 | `form_templates` (reusable whole-form blueprints) | ✗ | ✓ | ✓ | ✓ | ✓ |
 | `field_library` (reusable questions) | ✗ | ✓ | ✓ | ✓ | ✓ |
-| `advanced_analytics` (advanced cross-form analytics) | ✗ | ✗ | ✗ | ✓ | ✓ |
+| `advanced_analytics` (advanced cross-form analytics, and the data explorer at `/explore` — ADR `0025-data-explorer.md` §D1) | ✗ | ✗ | ✗ | ✓ | ✓ |
 | `custom_domain` | ✗ | ✗ | ✗ | ✓ | ✓ |
 | Embedded payments (Stripe Checkout) — **deferred to Phase 4** | ✗ | ✗ | ✓ | ✓ | ✓ |
 | `sso_saml` | ✗ | ✗ | ✗ | ✗ | ✓ |

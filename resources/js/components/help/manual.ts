@@ -160,6 +160,9 @@ const SHARE = 'resources/js/components/forms/SharePanel.vue';
 const PUBLISH = 'app/Http/Controllers/Tenant/FormPublishController.php';
 const INBOX = 'resources/js/Pages/submissions/Inbox.vue';
 const ANALYTICS = 'resources/js/Pages/forms/Analytics.vue';
+const EXPLORE_BOARD = 'resources/js/Pages/explore/Index.vue';
+const EXPLORE_CHART = 'resources/js/Pages/explore/Chart.vue';
+const EXPLORE_SAVE = 'resources/js/components/explore/ExploreSaveModal.vue';
 // M176 (`R-61d43278`): "No negative numbers" is a kind the builder names itself, stored as a minimum of 0.
 const RULE_WORDS = 'resources/js/components/builder/field-conversion.ts';
 
@@ -619,6 +622,25 @@ const guide: ChapterDraft[] = [
                     p('On the ', ui('Responses', TABS), ' tab, click ', ui('Export CSV', INBOX), ' or ', ui('Export XLSX', INBOX), ' (for Excel). Each response is one row and each question one column.'),
                     p('A photo, file, recording or signature shows its name and a link to open it. Whoever opens the link signs in first, so the file is never open to someone who could not see the response.'),
                     tip('info', 'Reviewing and approving responses, scanning paper forms, inviting members and automatic emails are covered by your workspace’s own guidance, not by this manual.'),
+                ],
+            },
+            {
+                id: 'explore',
+                title: 'Make your own charts',
+                blocks: [
+                    p(
+                        ui('Explore', NAV), ' in the left menu is where you build charts of your own, over any data you can already see: responses, the answers to one form, forms, members, activity and more. Open it with ',
+                        link('Explore', '/explore'), '.',
+                    ),
+                    steps(
+                        ['Click ', ui('New chart', EXPLORE_BOARD), ' (or ', ui('Build a chart', EXPLORE_BOARD), ' if you have none yet).'],
+                        ['Under ', ui('Data source', EXPLORE_CHART), ', choose what to count. To chart the answers to a form, choose the form under ', ui('Form', EXPLORE_CHART), '.'],
+                        ['Choose a ', ui('Chart type', EXPLORE_CHART), ' and what to ', ui('Group by', EXPLORE_CHART), '. The chart redraws as you change it.'],
+                        ['Narrow it with ', ui('Filters', EXPLORE_CHART), ' and the ', ui('Date range', EXPLORE_CHART), ', and tick ', ui('Show the numbers', EXPLORE_CHART), ' to see the table behind the chart.'],
+                        ['Click ', ui('Save chart', EXPLORE_CHART), ', give it a ', ui('Name', EXPLORE_SAVE), ', and tick ', ui('Share with the workspace', EXPLORE_SAVE), ' if your colleagues should see it too.'],
+                    ),
+                    p('Saved charts appear under ', ui('Your charts', EXPLORE_BOARD), '. Charts colleagues shared appear under ', ui('Shared with the workspace', EXPLORE_BOARD), '; you can look at them, and save a copy to change.'),
+                    tip('info', 'A shared chart only ever shows each person what they could already see, so two people may see different numbers on the same chart. Questions marked personal or sensitive are never offered.'),
                 ],
             },
         ],

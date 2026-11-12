@@ -7,6 +7,7 @@ use App\Models\Attachment;
 use App\Models\Audit;
 use App\Models\Connection;
 use App\Models\ConnectionSubscription;
+use App\Models\ExplorerChart;
 use App\Models\FeedbackReport;
 use App\Models\Form;
 use App\Models\FormField;
@@ -24,6 +25,7 @@ use App\Policies\AttachmentPolicy;
 use App\Policies\AuditPolicy;
 use App\Policies\ConnectionPolicy;
 use App\Policies\ConnectionSubscriptionPolicy;
+use App\Policies\ExplorerChartPolicy;
 use App\Policies\FeedbackReportPolicy;
 use App\Policies\FormFolderPolicy;
 use App\Policies\FormPolicy;
@@ -332,6 +334,10 @@ class AppServiceProvider extends ServiceProvider
         // and question routes, which have no model of their own — see SavedReportViewPolicy's docblock for
         // why `can:viewAny,Submission::class` was rejected there.
         Gate::policy(SavedReportView::class, SavedReportViewPolicy::class);
+
+        // Saved explorer charts (M236, ADR-0025 §D8). Registered explicitly for the same fail-OPEN reason,
+        // and it does the same double duty: `viewAny` is the `can:` gate on the explorer's query routes.
+        Gate::policy(ExplorerChart::class, ExplorerChartPolicy::class);
 
         // Native-connector OAuth grants (H15a). Owner/Admin only, via the new `integrations.manage`
         // permission. Registered explicitly for the same fail-OPEN reason as the policies above. The /api/v1

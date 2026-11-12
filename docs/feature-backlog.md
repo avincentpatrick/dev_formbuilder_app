@@ -2262,7 +2262,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `PROGRESS_ARCHIVE.md` keeps what was believed at the time.
   ⚠️⚠️ **AND THIS INCREMENT REPRODUCED THE VERY DEFECT CLASS IT CLOSES — FOUR TIMES, IN ITS OWN PROSE.**
   A +59-line §D32 and a +10-line middleware docblock invalidated M7's own `0016:238`, its `0019:37` /
-  `ACCESS-MATRIX.md:412` evidence list, **and two LIVE rows in this file that M7 never read** — one of
+  `ACCESS-MATRIX.md:413` evidence list, **and two LIVE rows in this file that M7 never read** — one of
   them `EnforceTenantTwoFactor.php:33-52`, the sole evidence for the *enrolment-nudge* argument §D32
   leans on twice. M7 had explicitly checked which citations its insertion would move and answered
   *"nothing else moves"* — true of the citations that already existed, and silent about the ones the same
@@ -4591,7 +4591,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   comment **inside a fenced block** — which is one of the two cases the citation-liveness gate added by this
   increment detects mechanically. Original filing follows.
   **`major` · ACCESS-MATRIX's verification step 4 sends the reader to the platform host, which the same
-  document proves is a dead end.** `docs/ACCESS-MATRIX.md:446` says sign in at
+  document proves is a dead end.** `docs/ACCESS-MATRIX.md:447` says sign in at
   `http://localhost:8080/login` as `viewer@demo.test` and inspect the sidebar; `:70-92` records the
   measured finding that Fortify lands on `/dashboard` on the central host, `PreventAccessFromCentralDomains`
   302s it to `/`, and walking to the subdomain afterwards does not rescue it. Step 5 two lines below
@@ -16011,3 +16011,64 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, when taken: send those fallbacks to the one workspace's own host when the deployment has exactly one, or answer them with a plain page rather than a redirect.
 
   **Latent.** Filed by `M235`. **Tier: during-testing.**
+
+- ✅ **CLOSED BY `M236` (2026-11-12) — ****`minor` · `data-explorer` — A member cannot build their own chart over the workspace's data; `/analytics` answers a fixed set of questions with fixed cards.**
+  Found by `M236` (2026-11-11), from the user's request: *"can you build a module in here separate from the built in cards where i can utilize all available data sources to do my own visual analysis like a powerbi or a tableau"*. `/analytics` lets a reader choose one of five axes and nothing else, and reaches `submissions` only.
+
+  **Live.** Filed by `M236`. **Tier: during-testing.**
+  ✅ **Closed by `M236` (2026-11-12), on its branch:** a second page, `/explore`, where a member picks one of eight data sources (responses, the answers of one form, forms, members, activity, deliveries, points, feedback reports), chooses up to two group-bys, up to three values and filters, sees the chart with a data table behind it, and saves it to a personal board, optionally shared with the workspace read-only. Recorded in `docs/adr/0025-data-explorer.md`; its three choices that are the user's are `D217`, `D218` and `D219`. What it leaves for later is filed in the rows below.
+
+- **`minor` · `explorer-export` — An explorer chart's numbers cannot be downloaded.**
+  Found by `M236` (2026-11-12). `/analytics` has a metered CSV and XLSX export of its tables; `/explore` shows each chart's numbers in a table on the page and offers no download. The remedy, when taken: export the shaped result (the table the page already prints) through the same metered export path, so a chart's download counts against the plan the way an analytics export does.
+
+  **Live.** Filed by `M236`. **Tier: during-testing.**
+
+- **`minor` · `explorer-area-and-folder` — The explorer cannot group responses by area (scope node), which `/analytics` offers.**
+  Found by `M236` (2026-11-12). `ResponsesSource` offers form, status, channel, language, reviewer and dates as group-bys. The area a response belongs to is one of `/analytics`' five axes, and the reader who moves to `/explore` loses it. The remedy, when taken: a scope-node field on the responses source, labelled through the scope tree and narrowed by the member's own scope grants, as the analytics axis is.
+
+  **Live.** Filed by `M236`. **Tier: during-testing.**
+
+- **`minor` · `explorer-unchartable-questions` — Questions in repeating sections, grids, cascading choices, locations, files and long text cannot be charted in the explorer.**
+  Found by `M236` (2026-11-12). `AnswersSource` offers a form's top-level questions of the countable kinds and says on the page how many it left out (ADR `0025-data-explorer.md` §D6). A repeating section's answers are an array per response, a grid's are an object per row, and a cascading choice stores a path, so each needs its own unnesting rule before it can be grouped or counted. Location, file and long-text answers have no category to group by.
+
+  **Live.** Filed by `M236`. **Tier: during-testing.**
+
+- **`nit` · `explorer-line-gap` — An explorer line or area chart draws a period with nothing to measure at zero.**
+  Found by `M236` (2026-11-12). `MdsTimeSeriesChart` cannot draw a gap, so `result-view.ts`'s `toLines()` substitutes zero for a missing value before the chart sees it, and the chart's table prints that zero. The note under the chart says so (*"…drawn at zero, and the table shows that zero too. It is not a measured zero"*), which is honest and still worse than a gap. The remedy, when taken: let the design-system primitive take a missing point, break the line there, and print a dash in its table, then drop the substitution and the note.
+
+  **Live.** Filed by `M236`. **Tier: during-testing.**
+
+- **`minor` · `explorer-answers-scale` — Charting a form's answers reads `submission_answers.answers` as `jsonb` per chart, and its cost on a large form is unmeasured.**
+  Found by `M236` (2026-11-12). ADR `0025-data-explorer.md` §D6 bounds the read to one form and one date range, served by `submissions_form_finalized_idx`, and it was measured at under a millisecond on the demo's few hundred responses. ADR `0011-analytics-substrate.md`'s scale risk applies unchanged: nothing has timed a form with hundreds of thousands of responses, and there is no expression index on an answer key. The remedy, when taken: time the worst declaration (two answer group-bys, a guarded numeric average, a year's range) on a seeded large form under row-level security, and add a statement timeout or an index only if the number asks for one.
+
+  **Latent** — no workspace on the testing server holds a form that size. Filed by `M236`. **Tier: before-launch.**
+
+- **`minor` · `explorer-audit-trail` — Saving, sharing and deleting an explorer chart write no audit entry.**
+  Found by `M236` (2026-11-12). `ExplorerChartService` writes `explorer_charts` with no `Auditable` model and no entry in `AuditableTypes`. A chart holds no data, only a declaration, but sharing one with the workspace puts it on every member's board, and an administrator cannot see who did that or when. The remedy, when taken: make `ExplorerChart` auditable for create, update (sharing included) and delete, and add its type to the audit spec.
+
+  **Live.** Filed by `M236`. **Tier: before-launch.**
+
+- **`minor` · `explorer-boards` — The explorer has one flat board per member: no named dashboards, layout, sizes or ordering.**
+  Found by `M236` (2026-11-12). `/explore` lists a member's own charts, then the workspace's shared ones, newest first, each tile the same size, and each tile runs its own query on load, up to the fifty-chart cap. A Power BI or Tableau user expects several named boards with tiles arranged and sized. The remedy, when taken: a board table holding an ordered, sized set of chart ids, and a board that loads its tiles in view rather than all at once.
+
+  **Not live** — a request the increment did not take, not a defect. Filed by `M236`. **Tier: after-launch.**
+
+- **`minor` · `explorer-more-sources` — OCR scans, automation runs and usage counters are not explorer sources.**
+  Found by `M236` (2026-11-12). The eight sources cover every tenant table a member reads on a page today except these. OCR scans are gated per form and per plan, automation runs belong to the integrations page's own permission, and usage counters are the billing page's, so each needs its own access rule in its source before it is offered.
+
+  **Not live** — a request the increment did not take. Filed by `M236`. **Tier: after-launch.**
+
+- **`nit` · `explorer-number-bands` — The explorer cannot group by a number, and has no share of total or running total.**
+  Found by `M236` (2026-11-12). A number field can be counted, summed or averaged but not grouped by, so age bands or score ranges need a group-by with a band width. A value is always the aggregate itself; a percentage of the total or a cumulative line is not offered.
+
+  **Not live** — a request the increment did not take. Filed by `M236`. **Tier: after-launch.**
+
+- **`nit` · `explorer-api` — The explorer has no `/api/v1` twin, unlike analytics.**
+  Found by `M236` (2026-11-12). `/analytics` reports are reachable with an API token; an explorer declaration is not. The engine takes the same declaration from any caller, so a twin is a route, a token scope and an OpenAPI entry.
+
+  **Not live** — a request the increment did not take. Filed by `M236`. **Tier: after-launch.**
+
+- **`nit` · `demo-patient-name-not-flagged` — The demo's Patient Intake form does not mark `patient_name` as personal, so the explorer offers it as a group-by.**
+  Found by `M236` (2026-11-12). `DemoSeeder` builds the Patient Intake form without the personal flag on its name question. `AnswersSource` withholds every question flagged personal or sensitive in any version (ADR `0025-data-explorer.md` §D6), so on the demo workspace a reader can chart responses by patient name. The remedy, when taken: flag the question in the seeder, idempotently, so a reseed corrects an existing demo.
+
+  **Not live** — demo data, with invented names. Filed by `M236`. **Tier: during-testing.**

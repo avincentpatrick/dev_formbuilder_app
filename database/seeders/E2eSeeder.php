@@ -31,6 +31,7 @@ use App\Models\Audit;
 use App\Models\Connection;
 use App\Models\ConnectionSubscription;
 use App\Models\Domain;
+use App\Models\ExplorerChart;
 use App\Models\FeedbackComment;
 use App\Models\FeedbackReport;
 use App\Models\Form;
@@ -2233,6 +2234,7 @@ class E2eSeeder extends Seeder
         }
 
         $this->seedSavedReportViews($owner, $tenant);
+        $this->seedExplorerCharts($owner, $tenant);
     }
 
     /**
@@ -2466,6 +2468,63 @@ class E2eSeeder extends Seeder
         SavedReportView::updateOrCreate(
             ['tenant_id' => $tenant->id, 'user_id' => $owner->id, 'name' => 'Legacy monthly rollup'],
             ['definition' => ['v' => 99, 'from' => '2026-01-01', 'to' => '2026-01-31']],
+        );
+    }
+
+    /**
+     * The owner's explorer board (M236, ADR-0025): three charts, chosen for the three states a tile has.
+     *
+     * One with a second group-by, so the multi-series column chart and its legend are under the scan. One
+     * with a single value, shared, so the "Shared" badge is. And one whose stored declaration is in a format
+     * this version does not read — nothing can CREATE that through the product, which is the point: the
+     * board is meant to draw the other two and print a sentence for this one, and seeding it is what puts
+     * that sentence inside a merge-blocking scan. `updateOrCreate` on the unique key, so a re-seed converges.
+     *
+     * Declarations are written as arrays in the stored shape, with a range that rolls with the clock so the
+     * seeded analytics rows stay inside it.
+     */
+    private function seedExplorerCharts(User $owner, Tenant $tenant): void
+    {
+        $range = [
+            'from' => now()->utc()->subDays(89)->toDateString(),
+            'to' => now()->utc()->toDateString(),
+            'timezone' => 'UTC',
+        ];
+
+        $base = [
+            'v' => 1,
+            'source' => 'responses',
+            'form_id' => null,
+            'filters' => [],
+            'sort' => 'value_desc',
+            'limit' => 10,
+            ...$range,
+        ];
+
+        ExplorerChart::updateOrCreate(
+            ['tenant_id' => $tenant->id, 'user_id' => $owner->id, 'name' => 'Responses by status and channel'],
+            ['is_shared' => false, 'definition' => [
+                ...$base,
+                'chart' => 'column',
+                'dimensions' => [['field' => 'status', 'bucket' => null], ['field' => 'source', 'bucket' => null]],
+                'measures' => [['aggregate' => 'count', 'field' => null]],
+            ]],
+        );
+
+        ExplorerChart::updateOrCreate(
+            ['tenant_id' => $tenant->id, 'user_id' => $owner->id, 'name' => 'Responses by form'],
+            ['is_shared' => true, 'definition' => [
+                ...$base,
+                'chart' => 'donut',
+                'limit' => 5,
+                'dimensions' => [['field' => 'form', 'bucket' => null]],
+                'measures' => [['aggregate' => 'count', 'field' => null]],
+            ]],
+        );
+
+        ExplorerChart::updateOrCreate(
+            ['tenant_id' => $tenant->id, 'user_id' => $owner->id, 'name' => 'Legacy chart'],
+            ['is_shared' => false, 'definition' => ['v' => 99, 'source' => 'responses']],
         );
     }
 

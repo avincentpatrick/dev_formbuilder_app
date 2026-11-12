@@ -1,0 +1,45 @@
+{
+  "description": "Synthetic acceptance inputs only. No real records or production coordinates.",
+  "numeric_tolerance": 1e-9,
+  "descriptive": {
+    "values": [2, 4, 6, 8, null],
+    "expected": { "n": 4, "missing": 1, "mean": 5, "median": 5, "sample_variance": 6.666666666666667, "sample_sd": 2.581988897471611 }
+  },
+  "welch": {
+    "group_a": [2, 4, 6, 8],
+    "group_b": [4, 6, 8, 10],
+    "contrast": "b minus a",
+    "expected": { "mean_difference": 2, "standard_error": 1.8257418583505538, "t": 1.0954451150103321, "degrees_of_freedom": 6 }
+  },
+  "ols": {
+    "x": [1, 2, 3, 4],
+    "y": [3, 5, 7, 9],
+    "expected": { "intercept": 1, "slope": 2, "residual_sum_squares": 0 },
+    "note": "Exact linear fit verifies coefficients only; do not use as an inferential diagnostic fixture."
+  },
+  "geography": {
+    "crs": "EPSG:4326",
+    "features": {
+      "type": "FeatureCollection",
+      "features": [
+        { "type": "Feature", "properties": { "code": "SYN-A" }, "geometry": { "type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] } },
+        { "type": "Feature", "properties": { "code": "SYN-B" }, "geometry": { "type": "Polygon", "coordinates": [[[1, 0], [2, 0], [2, 1], [1, 1], [1, 0]]] } }
+      ]
+    },
+    "observations": [
+      { "code": "SYN-A", "events": 10, "population": 1000 },
+      { "code": "SYN-B", "events": 30, "population": 2000 },
+      { "code": "SYN-UNKNOWN", "events": 5, "population": 500 }
+    ],
+    "expected": { "matched": 2, "unmatched": 1, "rate_per_100000": { "SYN-A": 1000, "SYN-B": 1500 }, "matched_combined_rate_per_100000": 1333.3333333333333 }
+  },
+  "complete_extraction": {
+    "recipe": [{ "repeat": 100, "value": 1 }, { "repeat": 150, "value": 3 }],
+    "expected": { "n": 250, "sum": 550, "mean": 2.2 },
+    "note": "A 100-row preview incorrectly produces mean 1; no truncated sample may be reported as complete."
+  },
+  "conflicting_sources": [
+    { "source": "dashboard", "period": "2025", "indicator": "synthetic coverage", "value": 40, "unit": "percent" },
+    { "source": "web fixture", "period": "2024", "indicator": "synthetic coverage", "value": 35, "unit": "percent" }
+  ]
+}

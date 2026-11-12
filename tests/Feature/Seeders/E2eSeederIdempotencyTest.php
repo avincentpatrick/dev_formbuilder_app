@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\TenantUserStatus;
 use App\Models\BadgeAward;
 use App\Models\Domain;
+use App\Models\ExplorerChart;
 use App\Models\Form;
 use App\Models\Notification;
 use App\Models\NotificationPreference;
@@ -78,6 +79,8 @@ function seededShape(Tenant $tenant, User $owner): array
             'answers' => SubmissionAnswer::count(),
             'index' => SubmissionAnswerIndex::count(),
             'views' => SavedReportView::count(),
+            // M236 — the explorer board: two charts that draw and one that is meant not to.
+            'charts' => ExplorerChart::count(),
             // K1c — the seeded gamification ledger, projected for the same reason as everything above it:
             // it is written through the real recorder, so what has to converge is `ON CONFLICT DO NOTHING`.
             'awards' => PointAward::count(),

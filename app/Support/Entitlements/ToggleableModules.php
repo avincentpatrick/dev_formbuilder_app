@@ -117,7 +117,7 @@ final class ToggleableModules
             'xlsform_export' => 'Hides XLSForm import and export from the builder.',
             'form_templates' => 'Hides the template gallery when creating a form.',
             'field_library' => 'Hides the saved-question library in the builder.',
-            'advanced_analytics' => 'Hides the analytics workspace; the dashboard and per-form statistics are unaffected.',
+            'advanced_analytics' => 'Hides the analytics workspace and the Explore page; the dashboard and per-form statistics are unaffected.',
             'gamification' => 'Stops awarding points and badges, and hides the leaderboard. Nothing already earned is deleted.',
             default => '',
         };

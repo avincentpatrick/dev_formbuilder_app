@@ -1625,6 +1625,30 @@ A question's history (M188, `R-3894369d`, `D167`, `D168`): who changed which set
 
 ---
 
+## 43. `explorer_charts`
+
+A chart a member built and kept on `/explore` (`M236`; ADR `0025-data-explorer.md` §D8).
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `uuid` | No | application-generated (`HasUuidv7`) | No | Primary key. |
+| `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`, `ON DELETE CASCADE`. |
+| `user_id` | `uuid` | No | — | No | FK to `users.id`, `ON DELETE CASCADE` — the chart's author, and the only member who may change or delete it. Single-column, as `saved_report_views.user_id` is: `users` is a tenant-free global table. |
+| `name` | `varchar(150)` | No | — | No | Unique per `(tenant_id, user_id)`: two members may each keep a "Weekly intake", one member may not keep two. A duplicate raises SQLSTATE 23505, mapped to a field error. |
+| `definition` | `jsonb` | No | `'{}'` | No | An `ExplorerQuery` **declaration**, carrying its own `v` schema tag: which data source, which fields, which range. It holds no data and no SQL. |
+| `is_shared` | `boolean` | No | `false` | No | Whether colleagues who can open `/explore` see this chart on their board. Read-only for them, and run under their own access. |
+| `created_at` / `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
+
+**Indexes:** `unique (tenant_id, user_id, name)`. **RLS:** `strict`.
+
+> **Design Notes**
+> - **A declaration, never a result.** The chart is run again each time it is opened, as the member opening it. So a saved chart cannot go stale, and one naming a form or a question that has since gone degrades to a stated refusal on a board that still loads.
+> - **`strict`, not `belongs_to_user`,** for the reason §26 gives. Whose chart it is and who else may open it are application predicates: `ExplorerChart::scopeVisibleTo()` on the board and `ExplorerChartPolicy` on every single-row action — an Owner included.
+> - **Sharing never widens access.** A shared chart over the audit trail shows a Reviewer a sentence, because it runs with the Reviewer's permissions and form reach, not its author's.
+> - **Nothing is withheld from the tenant extract**, and no soft delete: user-owned convenience metadata with no audit claim on it. One member keeps at most fifty, enforced in `ExplorerChartService`.
+
+---
+
 ## Foreign Key Relationship Summary
 
 ```
@@ -1754,6 +1778,8 @@ notification_preferences.user_id       -> users.id           (external)
 
 saved_report_views.tenant_id           -> tenants.id
 saved_report_views.user_id             -> users.id           (external)
+explorer_charts.tenant_id              -> tenants.id
+explorer_charts.user_id                -> users.id           (external, CASCADE)
 
 sso_connections.tenant_id              -> tenants.id
 sso_connections.created_by             -> users.id           (external, nullable, SET NULL)

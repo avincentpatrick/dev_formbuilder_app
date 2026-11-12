@@ -57,6 +57,9 @@ export interface AppAbilities {
     // combines it with the `advanced_analytics` entitlement, which is what makes the surface HIDDEN rather
     // than locked for a tier that does not have it (ADR-0011 §D9).
     viewAnalytics: boolean;
+    // M236 — ExplorerChartPolicy::viewAny, the same composition. It opens the /explore pages; what a
+    // reader may chart there is decided per data source on the server (ADR-0025 §D5).
+    viewExplorer: boolean;
     // H22b — the bare `tenant.settings.manage` permission (Owner/Admin). The NAV ITEM combines it with the
     // `custom_domain` entitlement; the PAGE deliberately does not, so a tenant downgraded off Business can
     // still see and remove a hostname that is still resolving (ADR-0012 §D9).

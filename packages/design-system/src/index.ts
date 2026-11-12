@@ -199,6 +199,8 @@ export type { BreadcrumbItem } from './components/Breadcrumb/Breadcrumb.vue';
 export { default as MdsPagination } from './components/Pagination/Pagination.vue';
 export { default as MdsTimeSeriesChart } from './components/TimeSeriesChart/TimeSeriesChart.vue';
 export { default as MdsBarChart } from './components/BarChart/BarChart.vue';
+export { default as MdsColumnChart } from './components/ColumnChart/ColumnChart.vue';
+export { default as MdsDonutChart } from './components/DonutChart/DonutChart.vue';
 export { default as MdsChartLegend } from './components/ChartLegend/ChartLegend.vue';
 export {
     MAX_CHART_SERIES,
@@ -206,6 +208,7 @@ export {
     type ChartLegendItem,
     type ChartPoint,
     type ChartSeries,
+    type ColumnSeries,
 } from './charts/types';
 export { statusVariant, type BadgeVariant, type StatusDescriptor } from './components/Badge/status-variant';
 export { type ToastType, type ToastItem } from './components/Toast/toast';

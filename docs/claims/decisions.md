@@ -24,10 +24,36 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D215`, the last filed, was asked and answered on 2026-11-09 in `M229`'s session, before its build. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D219`, the last filed, was asked and answered on 2026-11-12 in `M236`'s session, after its build. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D219 — Who may share an explorer chart with the whole workspace? **A — any member who can open Explore; a shared chart is read-only to everyone else and runs with each viewer's own access.**
+
+**Asked and answered 2026-11-12 (user decision, in chat), in `M236`'s session, after its build, which was built on the recommendation.** Recorded by ADR `0025-data-explorer.md` §D8.
+- **A — any member (chosen, the session's recommendation).** Sharing never widens access: a shared chart is listed on every member's board and run under that member's permissions and form reach, and only its author changes or deletes it.
+- **B — Owners and Admins only.** Only they see the share switch; everyone else's charts stay private.
+- **C — no sharing.** Every chart is private to its author.
+
+**What it creates:** nothing beyond what `M236` built. Who shared what, and when, is unaudited; that is `explorer-audit-trail`, filed `before-launch`.
+
+### D218 — May a form question marked personal or sensitive be charted in the explorer? **A — never: a question flagged in any version of its form is not offered, and a chart naming one is refused.**
+
+**Asked and answered 2026-11-12 (user decision, in chat), in `M236`'s session, after its build, which was built on the recommendation.** Recorded by ADR `0025-data-explorer.md` §D6.
+- **A — never (chosen, the session's recommendation).** A flag added in version 3 describes version 1's answers too, so any version's flag withholds the question.
+- **B — count only.** The chart may say how many answered it, never group by or aggregate the answers.
+- **C — Owners and Admins only.** They may chart such questions; nobody else may.
+
+**What it creates:** nothing beyond what `M236` built. The demo's Patient Intake name question is not flagged, so the demo offers it; that is `demo-patient-name-not-flagged`, filed `during-testing`.
+
+### D217 — Which switch and plan gate the explorer page? **A — the existing `advanced_analytics` key it shares with Analytics; one Modules switch hides both pages.**
+
+**Asked and answered 2026-11-12 (user decision, in chat), in `M236`'s session, after its build, which was built on the recommendation.** Recorded by ADR `0025-data-explorer.md` §D1.
+- **A — share Analytics' key (chosen, the session's recommendation).** A deploy does not re-run the plan seeder, so a key coined now would be absent from every existing plan row and the page would be hidden on the testing server.
+- **B — its own plan key and Modules switch.** Needs a data migration adding the key to every existing plan row.
+- **C — no plan gate.** Permission alone decides.
+
+**What it creates:** nothing beyond what `M236` built.
 ### D215 — A blank form can be printed in another of its languages, but the scanner knows only the form's default language, so it cannot read ticks beside, say, Tagalog choice labels. What should a printout in another language do? **A — print it, and its footer says responses must be keyed in; reading scans of translated printouts is filed for later.**
 
 **Asked and answered 2026-11-09 (user decision, in chat), in the session that took `R-d7e27962`, before its build.** Filed and answered in one push, with `M229`'s claim.

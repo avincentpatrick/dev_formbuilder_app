@@ -40,6 +40,15 @@ export interface BarDatum {
     href?: string;
 }
 
+export interface ColumnSeries {
+    key: string;
+    label: string;
+    /** One value per category, aligned by index. `null` means "no value" — drawn as no bar, shown as an em dash in the table. */
+    values: (number | null)[];
+    /** Paints the series with `--mds-chart-other`; it does not count toward the five (ADR-0011 §D11). */
+    neutral?: boolean;
+}
+
 export interface ChartLegendItem {
     key: string;
     label: string;

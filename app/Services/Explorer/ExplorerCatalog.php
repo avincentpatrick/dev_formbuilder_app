@@ -12,7 +12,7 @@ use App\Services\Explorer\Sources\AnswersSource;
 use App\Services\Explorer\Sources\DeliveriesSource;
 use App\Services\Explorer\Sources\ExplorerFormReach;
 use App\Services\Explorer\Sources\ExplorerSource;
-use App\Services\Explorer\Sources\FeedbackSource;
+use App\Services\Explorer\Sources\FeedbackReportsSource;
 use App\Services\Explorer\Sources\FormsSource;
 use App\Services\Explorer\Sources\MembersSource;
 use App\Services\Explorer\Sources\PointsSource;
@@ -41,7 +41,7 @@ final class ExplorerCatalog
         ActivitySource::class,
         DeliveriesSource::class,
         PointsSource::class,
-        FeedbackSource::class,
+        FeedbackReportsSource::class,
     ];
 
     /** @var array<string, ExplorerSource>|null */

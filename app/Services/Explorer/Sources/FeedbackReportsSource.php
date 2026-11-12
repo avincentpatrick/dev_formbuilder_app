@@ -16,7 +16,7 @@ use Illuminate\Database\Query\Builder;
  * Feedback reports filed from inside the workspace, one row each (ADR-0025 §D5). Gated on `feedback.view`,
  * as `/feedback` is. The report's text and screenshot are not fields.
  */
-final class FeedbackSource extends AbstractExplorerSource
+final class FeedbackReportsSource extends AbstractExplorerSource
 {
     public function key(): string
     {

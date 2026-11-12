@@ -1203,7 +1203,7 @@ Charts are **design-system components, not a charting library.** The decision an
 
 **Build rules**: SVG only — no canvas, no `:style` bindings, no runtime colour computation (geometry is presentation attributes, colour is `fill`/`stroke` referencing custom properties). This keeps the primitives from being the reason a future `default-src` policy has to permit inline styles. Scales are in-repo arithmetic, not a dependency.
 
-**Deliberately not built**, recorded so a later increment does not assume otherwise: pie/donut, stacked bars, scatter, heatmap, sankey, zoom/pan/brush, and automatic axis-label collision avoidance.
+**Deliberately not built**, recorded so a later increment does not assume otherwise: pie/donut, stacked bars, scatter, heatmap, sankey, zoom/pan/brush, and automatic axis-label collision avoidance. ⚠️ **Amended 2026-11-11 (`M235`, ADR `0025-data-explorer.md` §D7): the donut and the stacked bar are now built**, as `MdsDonutChart` and `MdsColumnChart` (vertical bars, grouped or stacked, one to five series plus a neutral "Other"), for the data explorer. Both follow every rule of this section — SVG only, static classes per series, a real data table behind the plot — and add one: a bar or a slice is outlined in the surface colour with its series' dash pattern, which is the non-colour channel a filled mark has no stroke of its own to carry. Pie, scatter, heatmap, sankey, zoom and collision avoidance are still not built.
 
 Contrast, colour-channel and text-alternative obligations are in §4.1.
 

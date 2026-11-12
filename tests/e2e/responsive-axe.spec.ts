@@ -41,6 +41,15 @@ const pages = [
     // at 375px is the failure this gate has already caught three times on other pages. The filter rail's
     // eight controls and three checkbox groups are the other half of that risk.
     { name: 'Analytics', path: '/analytics' },
+    // The data explorer (M235, ADR-0025). Behind the same plan key as Analytics, so it rides on the same
+    // seeding and the URL assertion below is what proves the scan is on it.
+    //
+    // The whole-page scan owns horizontal overflow for both pages, and both are worth it. The board is an
+    // `auto-fit` grid of chart tiles — E2eSeeder seeds a multi-series column chart, a donut with its legend
+    // and one chart that is refused, so all three tile states are in the scan. The builder is the widest
+    // layout in the application above 1024px, a control column beside a chart, and one column below it.
+    { name: 'Explore', path: '/explore' },
+    { name: 'Explore builder', path: '/explore/new' },
     // The achievements surface (K1e). ⚠️ THIS IS THE ONLY GATE THAT CAN SEE MOST OF THIS PAGE, and it has
     // more to catch here than the neighbours: two `auto-fit` tile grids, a badge grid whose cards carry a
     // meter, and a leaderboard row of four flex children with a name that must ellipsis rather than push

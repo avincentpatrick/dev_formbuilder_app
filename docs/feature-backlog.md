@@ -2262,7 +2262,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `PROGRESS_ARCHIVE.md` keeps what was believed at the time.
   ⚠️⚠️ **AND THIS INCREMENT REPRODUCED THE VERY DEFECT CLASS IT CLOSES — FOUR TIMES, IN ITS OWN PROSE.**
   A +59-line §D32 and a +10-line middleware docblock invalidated M7's own `0016:238`, its `0019:37` /
-  `ACCESS-MATRIX.md:412` evidence list, **and two LIVE rows in this file that M7 never read** — one of
+  `ACCESS-MATRIX.md:413` evidence list, **and two LIVE rows in this file that M7 never read** — one of
   them `EnforceTenantTwoFactor.php:33-52`, the sole evidence for the *enrolment-nudge* argument §D32
   leans on twice. M7 had explicitly checked which citations its insertion would move and answered
   *"nothing else moves"* — true of the citations that already existed, and silent about the ones the same
@@ -4591,7 +4591,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   comment **inside a fenced block** — which is one of the two cases the citation-liveness gate added by this
   increment detects mechanically. Original filing follows.
   **`major` · ACCESS-MATRIX's verification step 4 sends the reader to the platform host, which the same
-  document proves is a dead end.** `docs/ACCESS-MATRIX.md:446` says sign in at
+  document proves is a dead end.** `docs/ACCESS-MATRIX.md:447` says sign in at
   `http://localhost:8080/login` as `viewer@demo.test` and inspect the sidebar; `:70-92` records the
   measured finding that Fortify lands on `/dashboard` on the central host, `PreventAccessFromCentralDomains`
   302s it to `/`, and walking to the subdomain afterwards does not rescue it. Step 5 two lines below

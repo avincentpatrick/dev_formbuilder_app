@@ -17,6 +17,7 @@ use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
 use App\Enums\TenantUserStatus;
 use App\Models\Audit;
+use App\Models\ExplorerChart;
 use App\Models\FeedbackReport;
 use App\Models\Form;
 use App\Models\FormField;
@@ -281,6 +282,7 @@ class DemoSeeder extends Seeder
             $this->seedDemoAudits($owner, $editor);
             $this->seedDemoNotifications($owner, $reviewer);
             $this->seedFeedback($people);
+            $this->seedExplorerCharts($owner);
         });
 
         $tenant->forceFill(['owner_user_id' => $owner->getKey()])->save();
@@ -291,6 +293,73 @@ class DemoSeeder extends Seeder
     // ─────────────────────────────────────────────────────────────────────────────────────────────────────
     // Tenant 2 — deliberately thin, and that is its whole job
     // ─────────────────────────────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * A starting board on `/explore` for the demo Owner (M235, ADR-0025), so the page opens on charts and
+     * not on an empty state: one per kind of thing the explorer does that `/analytics` cannot. Responses
+     * over time split by channel; the answers to one question; a number taken over another question; and a
+     * source that is not responses at all. The second is shared, so signing in as any other member shows a
+     * colleague's chart.
+     *
+     * The Patient Intake charts name its questions by key, which the seeder above also writes; a chart
+     * whose form is missing is skipped. `updateOrCreate` on the unique key, so a re-seed converges.
+     */
+    private function seedExplorerCharts(User $owner): void
+    {
+        $range = [
+            'from' => now()->utc()->subDays(89)->toDateString(),
+            'to' => now()->utc()->toDateString(),
+            'timezone' => 'Asia/Manila',
+        ];
+
+        $base = ['v' => 1, 'form_id' => null, 'filters' => [], 'sort' => 'value_desc', 'limit' => 10, ...$range];
+        $count = [['aggregate' => 'count', 'field' => null]];
+        $intake = Form::query()->where('title', 'Patient Intake')->value('id');
+
+        $charts = [
+            'Responses each week, by channel' => [false, [
+                ...$base,
+                'source' => 'responses',
+                'chart' => 'area',
+                'dimensions' => [['field' => 'submitted_at', 'bucket' => 'week'], ['field' => 'source', 'bucket' => null]],
+                'measures' => $count,
+            ]],
+            'Team activity by action' => [false, [
+                ...$base,
+                'source' => 'activity',
+                'chart' => 'bar',
+                'dimensions' => [['field' => 'event', 'bucket' => null]],
+                'measures' => $count,
+            ]],
+        ];
+
+        if (is_string($intake)) {
+            $charts['Patient Intake: presenting symptoms'] = [true, [
+                ...$base,
+                'source' => 'answers',
+                'form_id' => $intake,
+                'chart' => 'donut',
+                'limit' => 5,
+                'dimensions' => [['field' => 'answer:symptoms', 'bucket' => null]],
+                'measures' => $count,
+            ]];
+            $charts['Patient Intake: patients and average age, by sex'] = [false, [
+                ...$base,
+                'source' => 'answers',
+                'form_id' => $intake,
+                'chart' => 'column',
+                'dimensions' => [['field' => 'answer:sex', 'bucket' => null]],
+                'measures' => [...$count, ['aggregate' => 'avg', 'field' => 'answer:age']],
+            ]];
+        }
+
+        foreach ($charts as $name => [$shared, $definition]) {
+            ExplorerChart::updateOrCreate(
+                ['tenant_id' => TenantContext::currentTenantId(), 'user_id' => $owner->getKey(), 'name' => $name],
+                ['is_shared' => $shared, 'definition' => $definition],
+            );
+        }
+    }
 
     /**
      * A second workspace with one owner, one form and a handful of submissions.

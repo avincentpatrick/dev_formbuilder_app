@@ -356,7 +356,7 @@ function destroy(): void {
 </script>
 
 <template>
-    <div>
+    <div class="explore-builder">
         <Head :title="chart === null ? 'New chart' : chart.name" />
 
         <PageHeader :title="title" icon="chart-pie">

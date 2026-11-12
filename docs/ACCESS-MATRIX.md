@@ -256,6 +256,7 @@ All URLs are relative to a workspace host, e.g. `http://demo.localhost:8080/form
 | `/forms` | `manageForms` | `FormPolicy::viewAny` = `forms.create` ∨ `forms.edit.any` ∨ `forms.edit.own` | — | ✅ | ✅ | ✅ | — | — |
 | `/submissions` | `viewSubmissions` | `submissions.view` | — | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `/analytics` | `viewAnalytics` | `SavedReportViewPolicy::viewAny` = `dashboard.org.view` ∨ `dashboard.form.view` | `advanced_analytics` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `/explore` | `viewExplorer` | `ExplorerChartPolicy::viewAny` = `dashboard.org.view` ∨ `dashboard.form.view`. **The page only:** each data source then asks for its own page's permission (ADR `0025-data-explorer.md` §D5) — *Members* `tenant.members.invite`, *Activity* `audit_log.view`, *Deliveries* `webhooks.manage` or `integrations.manage`, *Points* `dashboard.org.view`, *Feedback* `feedback.view`, *Answers to a form* `submissions.view`; responses and forms are narrowed to the forms the member can reach. | `advanced_analytics` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `/members` | `manageMembers` | `tenant.members.invite` | — | ✅ | ✅ | — | — | — |
 | `/scopes` | `manageScopes` | `ScopeNodePolicy::viewAny` = `scopes.manage` | — | ✅ | ✅ | — | — | — |
 | `/audit-log` | `viewAuditLog` | `AuditPolicy::viewAny` = `audit_log.view` | — | ✅ | ✅ | — | — | — |

@@ -365,6 +365,36 @@ rewriting its answers are different powers.
 8. Save the current filter set as a **saved view**. Reload the page and re-apply it. **Expect:** it restores.
 9. **Export** the analytics result. **Expect:** a download whose numbers match what is on screen.
 
+### 7.1 Building your own charts — Explore (`M235`, ADR `0025-data-explorer.md`)
+
+1. `/explore` · owner. **Expect:** a board of charts, each drawn live: responses each week by channel, team
+   activity by action, and two charts of Patient Intake's answers. One carries a **Shared** badge.
+2. **New chart**. **Expect:** a bar chart of responses by form appears at once, with the range it covers
+   printed above it.
+3. Set **Data source** to *Answers to a form* and choose **Patient Intake**. **Expect:** *Group by* now offers
+   the form's own questions under a *Questions* heading.
+4. Group by *Presenting symptoms* and set **Chart type** to *Donut*. **Expect:** a slice per symptom, and a
+   note under the chart that a response is counted once for every choice it made — the three slices add up
+   to more than the number of responses, and the note is why.
+5. Set **Chart type** to *Columns*, group by *Sex*, press **Add a value** and choose *Average* of *Age*.
+   **Expect:** two series, and a line under the chart saying how many responses had an age at all.
+6. Set **Split by** to *Consent given*. **Expect:** the second value is dropped — a chart split by a second
+   field shows one value — and each sex gets a column per answer.
+7. Group by *Submitted* and choose *Week*. Switch **Chart type** to *Line*. **Expect:** a week with no
+   responses is drawn at zero, not skipped.
+8. **Add a filter**. **Expect:** the chart gives way to *"Give each filter a value, or remove it."* and
+   **Save chart** is disabled until you tick a value.
+9. Turn on **Show the numbers**. **Expect:** the table behind the chart, with the same figures.
+10. **Save chart**, name it, and turn on *Share with the workspace*. **Expect:** you land on the chart's own
+    page, and it is on the board.
+11. Sign in as `reviewer@demo.test` and open `/explore`. **Expect:** your shared chart is listed under
+    *Shared with the workspace*, drawn from the three forms this reviewer holds a grant on — its numbers are
+    smaller than the owner's. Open it. **Expect:** *Save a copy*, and no way to change or delete the original.
+12. Still as the reviewer, open **New chart** and look at **Data source**. **Expect:** *Responses*, *Answers
+    to a form* and *Forms* only — no *Members*, *Activity*, *Deliveries* or *Feedback*.
+13. Sign in as `owner@northwind.test`. **Expect:** no **Explore** in the sidebar, for the reason there is no
+    Analytics: Starter lacks `advanced_analytics`.
+
 ---
 
 ## 8. Settings — Feature #10

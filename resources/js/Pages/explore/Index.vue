@@ -23,7 +23,7 @@ const shared = computed(() => props.charts.filter((chart) => !chart.is_mine));
 </script>
 
 <template>
-    <div>
+    <div class="explore">
         <Head title="Explore" />
 
         <PageHeader title="Explore" icon="chart-pie">

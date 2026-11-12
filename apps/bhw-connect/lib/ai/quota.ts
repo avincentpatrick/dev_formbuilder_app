@@ -1,4 +1,5 @@
 import "server-only";
+import { observeProviderUse } from "@/lib/analysis-projects/usage";
 import { createSupabaseServiceClient } from "@/lib/db/service-client";
 import { getProvider, PROVIDER_CASCADE } from "./providers";
 import {
@@ -99,7 +100,10 @@ export type QuotaCheckResult =
  * collapses to `completeWithCascade`'s `allCapped` signal instead of crashing the caller (see
  * docs/DECISIONS.md 2.4, caught via an actual local run of the chat route).
  */
-export async function checkQuota(provider: ProviderId, now: Date = new Date()): Promise<QuotaCheckResult> {
+export async function checkQuota(
+  provider: ProviderId,
+  now: Date = new Date(),
+): Promise<QuotaCheckResult> {
   let minuteRow: QuotaRow;
   let dayRow: QuotaRow;
   try {
@@ -115,7 +119,8 @@ export async function checkQuota(provider: ProviderId, now: Date = new Date()): 
   if (dayRow.is_paused && dayRow.paused_until && new Date(dayRow.paused_until) > now) {
     return { available: false, reason: "paused" };
   }
-  if (minuteRow.request_count >= minuteRow.limit_value) return { available: false, reason: "capped_minute" };
+  if (minuteRow.request_count >= minuteRow.limit_value)
+    return { available: false, reason: "capped_minute" };
   if (dayRow.request_count >= dayRow.limit_value) return { available: false, reason: "capped_day" };
   return { available: true };
 }
@@ -168,10 +173,15 @@ export async function completeWithCascade(
     try {
       await reserveRequest(providerId, now);
       const completion = await getProvider(providerId).complete(messages, tools);
+      observeProviderUse(providerId, completion);
       return { allCapped: false, provider: providerId, completion };
     } catch (err) {
+      if (!(err instanceof ProviderUnavailableError))
+        observeProviderUse(providerId, { content: null, toolCalls: [] });
       if (err instanceof ProviderRateLimitedError) {
-        console.warn(`[ai] ${providerId} rate-limited (retryAfter=${err.retryAfterSeconds ?? "n/a"}s) — pausing`);
+        console.warn(
+          `[ai] ${providerId} rate-limited (retryAfter=${err.retryAfterSeconds ?? "n/a"}s) — pausing`,
+        );
         await recordRateLimited(providerId, err.retryAfterSeconds, now);
         continue;
       }
@@ -180,7 +190,9 @@ export async function completeWithCascade(
       // A real non-2xx / transport failure from a configured provider — the diagnostic that actually
       // matters, otherwise invisible: the cascade turns it into a silent "all capped" downstream.
       if (err instanceof ProviderRequestError) {
-        console.error(`[ai] ${providerId} request failed (status=${err.status ?? "n/a"}): ${err.message}`);
+        console.error(
+          `[ai] ${providerId} request failed (status=${err.status ?? "n/a"}): ${err.message}`,
+        );
         continue;
       }
       console.error(`[ai] ${providerId} unexpected error:`, err);

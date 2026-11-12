@@ -116,6 +116,8 @@ const STATIC_TRAILS: Record<string, Crumb[]> = {
 export function trailForPathname(pathname: string): Crumb[] | null {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
 
+  if (path.startsWith("/ask-the-data/projects/"))
+    return [PORTAL_CRUMB, { label: "Ask the Data", href: "/ask-the-data" }, { label: "Project" }];
   if (path.startsWith("/ask-the-data/source/")) {
     return [PORTAL_CRUMB, { label: "Ask the Data", href: "/ask-the-data" }, { label: "Source" }];
   }

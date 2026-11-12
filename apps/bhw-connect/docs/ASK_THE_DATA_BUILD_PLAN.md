@@ -1,6 +1,6 @@
 # Unified Ask the Data phased build plan
 
-**Status:** Phase 0 merged in PR #509. Phase 1 is implemented and locally verified on 2026-11-12; PR #510 is under CI review and is not deployed. See [Phase 0 technical design](ASK_THE_DATA_PHASE_0_DESIGN.md) for the component inventory, architecture, method matrix, WPSAR checklist, fixtures, and deployment gates.
+**Status:** Phase 0 merged in PR #509. Phase 1 merged in PR #510. Phase 2 implementation is under verification on 2026-11-12; server worker setup is a release prerequisite. See [Phase 0 technical design](ASK_THE_DATA_PHASE_0_DESIGN.md) for the component inventory, architecture, method matrix, WPSAR checklist, fixtures, and deployment gates.
 **Owner decisions recorded:** 2026-11-07.
 **Application:** BHW Connect, under `apps/bhw-connect/`.
 
@@ -195,8 +195,8 @@ Ask the owner necessary questions one at a time. Do not reopen confirmed choices
 | Phase | Status | Implementation and verification evidence |
 | --- | --- | --- |
 | 0 — Foundations and design | Design complete, 2026-11-12 | [Technical design](ASK_THE_DATA_PHASE_0_DESIGN.md) and [synthetic acceptance fixtures](fixtures/ask-the-data-phase-0.json). Code/source inspection complete; runtime and deployment unverified. |
-| 1 — Approved access and unified workspace | Locally verified; PR #510 | Separate approval/admin controls, shared protected chat APIs, public-chat removal, source viewer and context-aware navigation. See the Phase 1 entry below. |
-| 2 — Projects, sharing, and jobs | Not started | — |
+| 1 — Approved access and unified workspace | Merged, PR #510 | Separate approval/admin controls, shared protected chat APIs, public-chat removal, source viewer and context-aware navigation. See the Phase 1 entry below. |
+| 2 — Projects, sharing, and jobs | Implemented; verification in progress | Private projects, sharing, durable queue, result downloads and attempt usage. See [operations](ASK_THE_DATA_PROJECTS_OPERATIONS.md). Target-server worker setup remains required. |
 | 3 — Sources, files, and graph | Not started | — |
 | 4 — Statistics and narrative | Not started | — |
 | 5 — Geographic analysis | Not started | — |
@@ -219,3 +219,11 @@ Verification so far: lint/typecheck passed; the full suite against synthetic Pos
 Local release checks completed: production builds passed, including a build with local connection settings and the build-only no-source mode; a running production server then used synthetic PostgreSQL/PostgREST. Browser checks passed for anonymous launcher/API denial and source protection, approved analyst UI/place context, pending-user denial, editor approval-page denial, administrator revoke/reapprove actions, and immediate API denial after revocation. Identity was supplied by a local synthetic whoami fixture; no live account or AI-provider execution was tested. The browser test initially raced a repeated success message; it was corrected to wait for the actual approval action response.
 
 CI initially caught that the new database-permission test ran before application migrations. The test now executes the actual migration in an isolated transactional schema and rolls it back, including checks against permissive default privileges. The corrected database test passed locally. Required CI must be green before merge; this entry makes no deployment claim. Code review and operator verification remain the release gates.
+
+### 2026-11-12 — Phase 2 implementation
+
+Phase 1 merged with all required CI checks passing. Added PostgreSQL-backed private projects and viewer/editor memberships, saved question/result/evidence records, optimistic revisions, idempotent submission keys, durable jobs with lease fencing, cancellation/retry and recovery, protected JSON downloads, deletion of active content, and isolated attempt-level provider usage with explicit unknown-cost reporting. The new UI reopens saved work and manages sharing by approved-user sharing ID. Uploads and their file/index lifecycle remain Phase 3.
+
+The worker is a separate Node polling service dispatching the shared audited engine through a secret-protected loopback endpoint. Its script is included in standalone output; no shared deployment scripts were changed. [Operations and release prerequisites](ASK_THE_DATA_PROJECTS_OPERATIONS.md) describe required operator service setup, environment/pricing configuration and backup behavior. No production worker/service or paid subscription was installed.
+
+Focused database/API/usage tests passed. Full local lint/typecheck and the synthetic-database suite are being run; final browser/build/CI evidence will be recorded in the PR. Phase 2 must not be described as deployed or operationally complete before the target worker service and recovery checks are verified. Phase 3 has not started.

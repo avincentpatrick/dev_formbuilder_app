@@ -5,18 +5,31 @@ vi.mock("./require-admin", () => ({
 }));
 vi.mock("./service-client", () => ({
   createSupabaseServiceClient: () => ({
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          maybeSingle: async () => ({
-            data: {
-              chunk_id: 1,
-              doc_source: { key: row.key, title: "Synthetic document", status: row.status },
-            },
-          }),
-        }),
-      }),
-    }),
+    from: (table: string) =>
+      table === "document_extraction"
+        ? {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: { id: "revision", version_id: "version", revision: 1, source_id: 10 },
+                  error: null,
+                }),
+              }),
+            }),
+          }
+        : {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: {
+                    chunk_id: 1,
+                    doc_id: 10,
+                    doc_source: { key: row.key, title: "Synthetic document", status: row.status },
+                  },
+                }),
+              }),
+            }),
+          },
   }),
 }));
 const { getDocChunk } = await import("./doc-chunks");

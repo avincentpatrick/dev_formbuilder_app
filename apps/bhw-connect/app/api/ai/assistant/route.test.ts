@@ -714,3 +714,18 @@ it("revalidates the library version server-side and refuses archived/unavailable
   });
   expect(runToolLoop).not.toHaveBeenCalled();
 });
+
+it("refuses policy source controls from an approved editor before resolving sources or invoking providers", async () => {
+  getStrictAdminUser.mockResolvedValue(null);
+  const response = await POST(
+    new Request("http://localhost/api/ai/assistant", {
+      method: "POST",
+      body: JSON.stringify({
+        messages: [{ role: "user", content: "compare policies" }],
+        policySources: { mode: "active" },
+      }),
+    }),
+  );
+  expect(response.status).toBe(403);
+  expect(runToolLoop).not.toHaveBeenCalled();
+});

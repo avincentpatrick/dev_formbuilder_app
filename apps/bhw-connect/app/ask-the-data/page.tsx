@@ -1,6 +1,8 @@
 import { AssistantChat } from "@/components/admin/assistant-chat";
 import { getStrictAdminUser } from "@/lib/db/require-admin";
-import { libraryCall } from "@/lib/documents/library";
+import { policyCall } from "@/lib/policy-analysis/evidence";
+import { policySourcesSchema, type PolicyRecord } from "@/lib/policy-analysis/schema";
+import { listRegisteredDatasets } from "@/lib/db/dataset-registry";
 import { z } from "zod";
 import { ProjectWorkspace } from "@/components/analysis/project-workspace";
 import { getAnalysisAuthResult } from "@/lib/db/require-analysis";
@@ -50,36 +52,69 @@ export default async function AskTheDataPage({
     );
   }
   const params = await searchParams;
-  if (params.libraryVersion || params.libraryCollection) {
+  if (params.policies || params.libraryVersion || params.libraryCollection) {
     const admin = await getStrictAdminUser();
-    if (!admin) return <p className="p-6">Admin role required for the document library.</p>;
-    const version = typeof params.libraryVersion === "string" ? params.libraryVersion : undefined;
-    const collection =
-      typeof params.libraryCollection === "string" ? params.libraryCollection : undefined;
+    if (!admin) return <p className="p-6">Admin role required for policy analysis.</p>;
+    const version =
+      typeof params.libraryVersion === "string"
+        ? params.libraryVersion
+        : typeof params.version === "string"
+          ? params.version
+          : undefined;
+    const revision = typeof params.revision === "string" ? params.revision : undefined;
+    const collection = typeof params.libraryCollection === "string" ? params.libraryCollection : "";
     if (
       (version && !z.uuid().safeParse(version).success) ||
-      (collection && collection.length > 100)
+      (revision && !z.uuid().safeParse(revision).success)
     )
-      return <p className="p-6">Invalid document selection.</p>;
+      return <p className="p-6">Invalid policy selection.</p>;
+    const initialResult = policySourcesSchema.safeParse({
+      mode: version || revision ? "selected" : "active",
+      versions: version ? [version] : [],
+      revisions: revision ? [revision] : [],
+      collection,
+      historical: params.historical === "1",
+    });
+    if (!initialResult.success) return <p className="p-6">Invalid policy selection.</p>;
+    const initial = initialResult.data;
+    let policies: PolicyRecord[];
+    let datasets: Awaited<ReturnType<typeof listRegisteredDatasets>>;
     try {
-      await libraryCall(admin.id, "selection", { version, collection });
+      [policies, datasets] = await Promise.all([
+        policyCall<PolicyRecord[]>(admin.id, "catalog", { historical: true }),
+        listRegisteredDatasets("internal"),
+      ]);
     } catch {
       return (
-        <p className="p-6">Selected documents are unavailable, archived, or still processing.</p>
+        <p className="p-6">
+          Policy sources are unavailable. Try again later; no online research was enabled.
+        </p>
       );
     }
     return (
       <section className="mx-auto grid max-w-4xl gap-4 p-4">
-        <h1 className="text-xl font-semibold">Ask the Data</h1>
+        <h1 className="text-xl font-semibold">Ask the Data · policies and datasets</h1>
         <p>
-          Policy source: {collection ? `collection ${collection}` : "selected document"}. Dataset
-          tools remain available. This is a search-based question, not an exhaustive review of every
-          policy.
+          Compare policy evidence with applicable registered data. Sources are checked again for
+          each question.
         </p>
-        <AssistantChat libraryVersion={version} libraryCollection={collection} canReport />
+        <AssistantChat
+          key={JSON.stringify(initial)}
+          canReport
+          initialPolicySources={initial}
+          policyOptions={{
+            policies: policies.map((p) => ({ ...p, warnings: [] })),
+            datasets: datasets.map((d) => ({
+              tableName: d.tableName,
+              title: d.title,
+              grain: d.grain,
+            })),
+          }}
+        />
       </section>
     );
   }
+
   const dataset = isDatasetScopeId(params.dataset) ? params.dataset : undefined;
   const geo =
     typeof params.geoCode === "string" && params.geoCode.length <= 20

@@ -1,4 +1,6 @@
 import "server-only";
+import { createPolicyTools } from "@/lib/policy-analysis/tools";
+import type { PolicyContext } from "@/lib/policy-analysis/schema";
 import {
   describeDataset,
   listRegisteredDatasets,
@@ -37,7 +39,11 @@ import { createTraversalTool } from "./traverse-graph";
  * fixes exist to prevent, arriving through the front door. Omitting it is unchanged behaviour, so
  * the internal assistant still sees everything its exposure allows.
  */
-export function createDatasetTools(exposure: Exposure, datasetSlugs?: readonly string[]): Tool[] {
+export function createDatasetTools(
+  exposure: Exposure,
+  datasetSlugs?: readonly string[],
+  allowedTables?: readonly string[],
+): Tool[] {
   return [
     {
       definition: {
@@ -57,6 +63,8 @@ export function createDatasetTools(exposure: Exposure, datasetSlugs?: readonly s
       async execute(args) {
         const table = typeof args.table === "string" ? args.table : null;
 
+        if (table && allowedTables && !allowedTables.includes(table))
+          return { error: "Table outside the selected dataset scope" };
         if (table) {
           const dataset = await getRegisteredDataset(table, exposure, datasetSlugs);
           if (!dataset) {
@@ -68,7 +76,9 @@ export function createDatasetTools(exposure: Exposure, datasetSlugs?: readonly s
           return { table: dataset.tableName, dictionary: describeDataset(dataset) };
         }
 
-        const datasets = await listRegisteredDatasets(exposure, datasetSlugs);
+        const datasets = (await listRegisteredDatasets(exposure, datasetSlugs)).filter(
+          (d) => !allowedTables || allowedTables.includes(d.tableName),
+        );
         if (datasets.length === 0) {
           return {
             error: "The dataset registry is unavailable — use the indicator tools instead.",
@@ -132,6 +142,11 @@ export function createDatasetTools(exposure: Exposure, datasetSlugs?: readonly s
         },
       },
       async execute(args) {
+        if (
+          allowedTables &&
+          (typeof args.table !== "string" || !allowedTables.includes(args.table))
+        )
+          return { error: "Table outside the selected dataset scope" };
         return executeQueryDataset(args, exposure, datasetSlugs);
       },
     },
@@ -167,17 +182,25 @@ export function createInternalTools({
   allowLibraryDocuments = false,
   libraryKeys,
   libraryActor,
+  policyContext,
 }: {
   allowLibraryDocuments?: boolean;
   libraryKeys?: string[];
   libraryActor?: string;
+  policyContext?: PolicyContext;
 } = {}): Tool[] {
+  if (policyContext)
+    return [
+      ...TOOLS.filter((t) => t.definition.name === "searchGeo"),
+      ...createDatasetTools("internal", undefined, policyContext.tables),
+      ...createPolicyTools(policyContext),
+    ];
   return [
     ...TOOLS,
     ...createDatasetTools("internal"),
     createTraversalTool(),
     createSearchDocumentsTool({
-      allowUploads: allowLibraryDocuments,
+      allowUploads: allowLibraryDocuments && Boolean(libraryKeys?.length),
       libraryKeys,
       actor: libraryActor,
     }),

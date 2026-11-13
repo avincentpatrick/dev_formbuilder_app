@@ -102,6 +102,14 @@ export default async function DocumentPage({
         OCR and reading order can be inaccurate. Blank/unreadable pages are limitations, not
         evidence that a requirement is absent. Upload dates are not effective dates.
       </p>
+      {detail.archived && detail.extraction && (
+        <Link
+          className="underline"
+          href={`/ask-the-data?policies=selected&version=${version}&historical=1`}
+        >
+          Ask about this historical version
+        </Link>
+      )}
       <DocumentControls detail={{ ...detail, extraction: null }} />
       <section>
         <h3 className="font-semibold">Processing history</h3>

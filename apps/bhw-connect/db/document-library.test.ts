@@ -28,7 +28,13 @@ describe.skipIf(!database)("document library PostgreSQL contract", () => {
     connection.pathname = `/${testDatabase}`;
     client = new pg.Client({ connectionString: connection.toString() });
     await client.connect();
-    await client.query(readFileSync(new URL("./bootstrap-roles.sql", import.meta.url), "utf8"));
+    // Roles are cluster-wide even though each suite has its own database.
+    await admin.query("select pg_advisory_lock(761004)");
+    try {
+      await client.query(readFileSync(new URL("./bootstrap-roles.sql", import.meta.url), "utf8"));
+    } finally {
+      await admin.query("select pg_advisory_unlock(761004)");
+    }
     await loadDev(client);
   }, 30000);
   afterAll(async () => {

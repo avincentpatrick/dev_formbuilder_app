@@ -177,20 +177,20 @@ uploads remain visible. Another authorized admin can see the shared library; edi
 
 ## Phase 4 — Combined policy and dataset analysis
 
-- [ ] Extend existing retrieval with validated document/version/collection filters and tools to
+- [x] Extend existing retrieval with validated document/version/collection filters and tools to
   list eligible documents and read complete passages or neighboring sections beyond truncated hits.
-- [ ] Update citations from slide-only wording to document + immutable version + PDF page/section.
+- [x] Update citations from slide-only wording to document + immutable version + PDF page/section.
   Do not confuse printed page labels with physical PDF page numbers.
-- [ ] Add source controls to the shared assistant: active library or selected documents,
+- [x] Add source controls to the shared assistant: active library or selected documents,
   automatic/restricted dataset selection, and online research off by default.
-- [ ] Use the existing dataset registry/query tools for calculations. Do not embed numeric rows
+- [x] Use the existing dataset registry/query tools for calculations. Do not embed numeric rows
   and treat similarity matches as computed totals.
-- [ ] Distinguish policy requirements, dataset observations, documentary figures, and analytical
+- [x] Distinguish policy requirements, dataset observations, documentary figures, and analytical
   conclusions. Compare dates, geography, units, and population definitions before joining evidence.
-- [ ] Report unavailable evidence and conflicting policies; distinguish newer publication from
+- [x] Report unavailable evidence and conflicting policies; distinguish newer publication from
   confirmed legal supersession. Never infer noncompliance solely from missing dataset fields.
-- [ ] Keep source content untrusted: documents cannot change tool permissions or system instructions.
-- [ ] Retain existing numeric/citation checks and add version-aware evidence checks. Keep internal
+- [x] Keep source content untrusted: documents cannot change tool permissions or system instructions.
+- [x] Retain existing numeric/citation checks and add version-aware evidence checks. Keep internal
   answers and source text out of public caches/logs and public tools.
 
 **Acceptance:** Questions using a policy alone, multiple conflicting policies, and policy plus
@@ -274,7 +274,7 @@ assistant, and request a verifiable full-collection review with optional online 
 | 1 — Contracts and access | In progress | Additive schema, strict assistant/API/source guards, private atomic storage, and contracts in POLICY_DOCUMENT_STORAGE.md. Upload endpoints remain later phases. Local migration/RLS checks passed (80 related tests); 16 local browser/API checks passed; scanned/mixed synthetic probes completed. Windows acceptance and worker enforcement remain. |
 | 2 — Extraction and OCR | Implemented; Windows acceptance pending | Generic parser, local OCR, leased queue, atomic lexical activation, separate embeddings; 16 synthetic Python/DB tests pass. See POLICY_DOCUMENT_WORKER.md. Operator must validate Windows runtime/languages/process limits before deployment. |
 | 3 — Admin library | Implemented and locally verified | Upload/catalog/detail/downloads/retries/versions/archives and validated shared Ask the Data selection. Ten browser acceptance groups passed with synthetic identity/provider. Windows worker setup remains deployment work. |
-| 4 — Combined analysis | Not started | Reuse existing assistant and document/dataset tools. |
+| 4 — Combined analysis | Implemented; local verification complete | Shared source controls, scoped full passages, exact version/extraction citations, registered-table restrictions and evidence audits. Online is off/unavailable until Phase 6. Windows configuration remains deferred. |
 | 5 — Full-collection review | Not started | Requires durable runs and explicit coverage accounting. |
 | 6 — Online research | Not started | Per-question opt-in; provider not selected. |
 | 7 — Deployment and verification | Not started | Coordinate worker, OCR dependencies, and backups. |
@@ -443,3 +443,46 @@ existing deliberate-fixture warning; types, migration lint, prefixed production
 build and whitespace checks passed. Worker errors now preserve only allowlisted,
 fixed parser reasons (e.g. encrypted PDF, page limit, missing OCR language data)
 for useful catalog failures without retaining parser stderr or document text.
+
+### Phase 4 — combined policy/dataset analysis (2026-11-13)
+
+Owner explicitly deferred avincentpatrick's Windows configuration; no server
+settings, scheduled tasks, ops files or external messages were changed. Added
+`POLICY_ANALYSIS_CONTRACT.md`, the service-only `policy_evidence_api` migration,
+policy context/tools/audits under `lib/policy-analysis/`, and source controls on
+the existing shared Ask the Data component. Existing library links now use the
+same policy mode. Non-policy/project paths retain their original behavior,
+while shared library uploads are exposed only through validated library contexts.
+
+Active/selected document and collection scopes, explicit historical revisions,
+automatic/restricted registered tables and policy-only mode are checked by the
+server. Online research stays off and cannot be enabled until its Phase 6 tools
+are implemented. Full stored passages and neighbors are available beyond excerpts.
+Source citations bind immutable version, extraction, chunk and physical PDF page;
+both source viewers link to that exact extraction. Newer publication alone and
+missing data fields are not treated as legal supersession or noncompliance.
+
+Policy-mode answers separate requirements, documentary figures, dataset
+observations and conclusions. Exact identity/quotation/date and numeric checks
+withhold unsupported claims and report partial removals. These are conservative
+checks, not proof of semantic/legal correctness. Existing numeric/statistical
+and citation checks remain on the other shared assistant paths. Raw policy text
+never enables tools, changes scope or reaches public caches/logs.
+
+Focused tests cover policy-only, conflicting policy and policy-plus-data answers;
+same-page swaps; invented identities/quotes/dates/figures; missing-field and
+publication-date overclaims; empty/restricted scopes; and online-off behavior.
+Real PostgreSQL cases cover full passages, archive/history and role/scope checks.
+The final counts, browser results and CI link are recorded after verification.
+Next application phase is Phase 5 full-collection runs and coverage; Windows/live
+provider verification remains deferred rather than blocking application work.
+
+Final Phase 4 verification: 1,853 app tests passed / 13 skipped; this includes
+20 focused policy audit/context/tool/shared-engine cases and four real PostgreSQL
+policy evidence cases. Thirteen mobile browser acceptance groups passed, adding
+restricted registered counts, empty-selection controls and explicit historical
+extraction access to the upload/citation flows. Identity and provider transports
+were synthetic; PostgreSQL/PostgREST, registry queries and OCR were real locally.
+Lint (one existing deliberate-fixture warning), typecheck, migration lint, the
+prefixed production build and whitespace checks passed. CI results accompany the
+pull request. Windows worker installation/configuration remains explicitly deferred.

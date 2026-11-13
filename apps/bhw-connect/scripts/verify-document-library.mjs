@@ -27,6 +27,7 @@ const roles = {
 };
 const root = await mkdtemp(join(tmpdir(), "bhw-library-e2e-"));
 let app, browser;
+let registry;
 const server = createServer((req, res) => {
   const role = /meridian-session=(admin|other|editor|member)/.exec(req.headers.cookie ?? "")?.[1];
   res.writeHead(role ? 200 : 401, { "content-type": "application/json" });
@@ -51,6 +52,22 @@ try {
     await db.query("insert into analysis_users(user_id,approved,updated_by) values($1,true,$1)", [
       id,
     ]);
+  }
+  if (process.env.BHW_POLICY_E2E_COMBINED === "1") {
+    const existing = await db.query(
+      "select registry_id from dataset_registry where table_name='fact_bhw_raw'",
+    );
+    if (!existing.rows.length) {
+      registry = (
+        await db.query(
+          "insert into dataset_registry(table_name,title,summary,grain,exposure,source_kind,status) values('fact_bhw_raw','Synthetic BHW records','Synthetic development data only','one made-up worker','internal','hand_written','approved') returning registry_id",
+        )
+      ).rows[0].registry_id;
+      await db.query(
+        "insert into dataset_column(registry_id,column_name,ordinal,data_type,meaning,role,status) values($1,'bhw_id',1,'bigint','Synthetic worker ID','key','approved')",
+        [registry],
+      );
+    }
   }
   await new Promise((r) => server.listen(53103, "127.0.0.1", r));
   const secret = "bhw-local-jwt-secret-for-this-machine-only";
@@ -183,12 +200,33 @@ r=p.get_pixmap(dpi=200).tobytes('png');d=fitz.open();p=d.new_page();p.insert_ima
   }
   checks.push("signed-out, editor and member direct access denial");
   await detail.getByRole("link", { name: "Ask about this document", exact: true }).click();
-  const box = detail.getByRole("textbox").first();
+  if (process.env.BHW_POLICY_E2E_COMBINED === "1") {
+    await detail.getByLabel("Dataset selection").selectOption("restricted");
+    await detail.getByRole("checkbox", { name: /fact_bhw_raw/ }).check();
+  }
+  const box = detail.getByRole("textbox", { name: "Question for Ask the Data" });
   await box.fill("What does the policy require for referral records?");
+  if (process.env.BHW_POLICY_E2E_COMBINED === "1") {
+    const chosen = detail
+      .getByRole("group", { name: "Selected policy revisions" })
+      .getByRole("checkbox")
+      .first();
+    await chosen.uncheck();
+    assert(await detail.getByRole("button", { name: "Ask", exact: true }).isDisabled());
+    await chosen.check();
+    checks.push("policy source controls prevent empty selections");
+  }
   await detail.getByRole("button", { name: "Ask", exact: true }).click();
   await detail
     .getByText("The policy requires a signed referral record.", { exact: false })
     .waitFor();
+  if (process.env.BHW_POLICY_E2E_COMBINED === "1") {
+    const expected = (await db.query("select count(*)::int as n from fact_bhw_raw")).rows[0].n;
+    await detail.getByText(`${expected} BHW records`, { exact: false }).waitFor();
+    checks.push(
+      "combined policy and restricted registered dataset count, with evidence categories",
+    );
+  }
   const sourceSummary = detail
     .locator("summary")
     .filter({ hasText: "Synthetic shared policy" })
@@ -255,6 +293,33 @@ r=p.get_pixmap(dpi=200).tobytes('png');d=fitz.open();p=d.new_page();p.insert_ima
   const revisions = await context.request.get(`${base}/api/admin/documents/${version}`);
   assert.equal((await revisions.json()).revisions.length, 2);
   checks.push("reprocessing creates a retained extraction revision");
+  if (process.env.BHW_POLICY_E2E_COMBINED === "1") {
+    const detailResponse = await context.request.get(`${base}/api/admin/documents/${version}`);
+    const stored = await detailResponse.json();
+    const oldest = stored.revisions.at(-1).id;
+    const historical = await context.request.post(`${base}/api/analysis/chat`, {
+      data: {
+        policySources: {
+          mode: "selected",
+          revisions: [oldest],
+          historical: true,
+          datasetMode: "restricted",
+          tables: ["fact_bhw_raw"],
+        },
+        messages: [{ role: "user", content: "Compare policy evidence and worker records" }],
+      },
+    });
+    assert.equal(historical.status(), 200);
+    assert((await historical.text()).includes(`"extractionId":"${oldest}"`));
+    const hidden = await context.request.post(`${base}/api/analysis/chat`, {
+      data: {
+        policySources: { mode: "selected", revisions: [oldest], historical: false },
+        messages: [{ role: "user", content: "referral" }],
+      },
+    });
+    assert.equal(hidden.status(), 400);
+    checks.push("explicit historical extraction selection and default exclusion");
+  }
   console.log(JSON.stringify({ checks, passed: checks.length }, null, 2));
 } finally {
   await browser?.close();
@@ -287,6 +352,10 @@ r=p.get_pixmap(dpi=200).tobytes('png');d=fitz.open();p=d.new_page();p.insert_ima
   await db.query("delete from doc_source where doc_id=any($1)", [sources]);
   await db.query("delete from analysis_users where user_id=any($1)", [actors]);
   await db.query("delete from admin_users where user_id=any($1)", [actors]);
+  if (registry) {
+    await db.query("delete from dataset_column where registry_id=$1", [registry]);
+    await db.query("delete from dataset_registry where registry_id=$1", [registry]);
+  }
   await db.end();
   await rm(root, { recursive: true, force: true });
 }

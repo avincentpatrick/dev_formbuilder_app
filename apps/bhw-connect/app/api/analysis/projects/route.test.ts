@@ -50,3 +50,22 @@ describe("project API boundary", () => {
     expect(await response.text()).not.toContain("private SQL");
   });
 });
+
+it("keeps full calculation input snapshots out of routine project polling", async () => {
+  call.mockResolvedValueOnce({
+    id,
+    jobs: [
+      {
+        id,
+        result: {
+          answer: "Verified summary",
+          events: [],
+          statistics: [{ manifest: { rows: [{ privateValue: 123 }] } }],
+        },
+      },
+    ],
+  });
+  const response = await POST(request({ operation: "get", projectId: id }));
+  const body = await response.json();
+  expect(body.jobs[0].result).toEqual({ answer: "Verified summary", events: [] });
+});

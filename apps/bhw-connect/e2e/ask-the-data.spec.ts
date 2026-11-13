@@ -32,6 +32,12 @@ test("Ask the Data has no anonymous page or API answering path", async ({
       )
     ).status(),
   ).toBe(401);
+  const statisticsUrl = new URL(
+    `api/analysis/projects/${projectId}/statistics/${projectId}/0`,
+    baseURL!,
+  ).toString();
+  expect((await request.get(statisticsUrl)).status()).toBe(401);
+  expect((await request.post(statisticsUrl)).status()).toBe(401);
   await page.goto(`ask-the-data/projects/${projectId}/sources/${projectId}`);
   await expect(page).toHaveURL(/ask-the-data$/);
   await page.goto("ask-the-data/source/1");

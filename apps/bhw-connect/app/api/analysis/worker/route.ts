@@ -1,3 +1,5 @@
+import { createStatisticalTools } from "@/lib/analysis-statistics/tools";
+import type { SavedStatistic } from "@/lib/analysis-statistics/types";
 import { cleanupDeletedSources, processNextSource } from "@/lib/analysis-sources/process";
 import { createProjectSourceTools } from "@/lib/analysis-sources/tools";
 import { timingSafeEqual } from "node:crypto";
@@ -45,6 +47,7 @@ export async function POST(request: Request) {
   try {
     const input = analysisInputSchema.parse(claimed.input);
     let evidence: unknown[] = [];
+    const statistics: SavedStatistic[] = [];
     const text = await analysisUsage.run(uses, async () => {
       const response = await analysisResponse(
         input,
@@ -56,11 +59,16 @@ export async function POST(request: Request) {
           progress =
             event.type === "tool_call" ? "Looking up data and sources" : "Composing the answer";
         },
-        createProjectSourceTools(
-          claimed.actor_id,
-          claimed.project_id,
-          input.messages.filter((m) => m.role === "user").at(-1)?.content ?? "",
-        ),
+        [
+          ...createStatisticalTools(claimed.actor_id, claimed.project_id, (saved) =>
+            statistics.push(saved),
+          ),
+          ...createProjectSourceTools(
+            claimed.actor_id,
+            claimed.project_id,
+            input.messages.filter((m) => m.role === "user").at(-1)?.content ?? "",
+          ),
+        ],
       );
       return response.text();
     });
@@ -85,7 +93,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ worked: true, published: false });
     }
     const route = events.find((e) => e.type === "route")?.route as { scope?: unknown } | undefined;
-    const result = { answer: message.content, events, evidence };
+    const result = { answer: message.content, events, evidence, statistics };
     const saved = (await workerCall("finish", claimed.id, claimed.lease_id, {
       result: result as Json,
       usage: summariseUsage(uses) as Json,

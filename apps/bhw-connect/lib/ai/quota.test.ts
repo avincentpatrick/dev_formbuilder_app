@@ -30,12 +30,18 @@ function createFakeSupabase(seed: Row[] = []) {
             return builder;
           },
           async maybeSingle() {
-            const match = rows.find((r) => Object.entries(filters).every(([k, v]) => (r as never)[k] === v));
+            const match = rows.find((r) =>
+              Object.entries(filters).every(([k, v]) => (r as never)[k] === v),
+            );
             return { data: match ?? null, error: null };
           },
           async single() {
-            const match = rows.find((r) => Object.entries(filters).every(([k, v]) => (r as never)[k] === v));
-            return match ? { data: match, error: null } : { data: null, error: { message: "not found" } };
+            const match = rows.find((r) =>
+              Object.entries(filters).every(([k, v]) => (r as never)[k] === v),
+            );
+            return match
+              ? { data: match, error: null }
+              : { data: null, error: { message: "not found" } };
           },
         };
         return builder;
@@ -94,6 +100,7 @@ const { checkQuota, completeWithCascade } = await import("./quota");
 
 beforeEach(() => {
   fakeSupabase.current = createFakeSupabase();
+  createSupabaseServiceClient.mockImplementation(() => fakeSupabase.current);
   getProvider.mockReset();
 });
 
@@ -123,7 +130,9 @@ describe("checkQuota", () => {
 
   it("reports unavailable rather than throwing when the service client itself is unconfigured", async () => {
     createSupabaseServiceClient.mockImplementationOnce(() => {
-      throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.");
+      throw new Error(
+        "Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.",
+      );
     });
     const result = await checkQuota("gemini");
     expect(result).toEqual({ available: false, reason: "unavailable" });
@@ -162,7 +171,11 @@ describe("completeWithCascade", () => {
 
     const result = await completeWithCascade([], []);
     expect(attempted).toEqual(["gemini", "groq", "openrouter"]);
-    expect(result).toEqual({ allCapped: false, provider: "openrouter", completion: { content: "answer", toolCalls: [] } });
+    expect(result).toEqual({
+      allCapped: false,
+      provider: "openrouter",
+      completion: { content: "answer", toolCalls: [] },
+    });
   });
 
   it("skips a provider whose quota is already capped", async () => {
@@ -208,16 +221,25 @@ describe("completeWithCascade", () => {
     expect(attempted).toEqual(["gemini", "groq"]);
     expect(result.allCapped).toBe(false);
 
-    const geminiDayRow = fakeSupabase.current!.rows.find((r) => r.provider === "gemini" && r.window_type === "day");
+    const geminiDayRow = fakeSupabase.current!.rows.find(
+      (r) => r.provider === "gemini" && r.window_type === "day",
+    );
     expect(geminiDayRow?.is_paused).toBe(true);
     expect(geminiDayRow?.paused_until).toBeTruthy();
   });
 
   it("returns allCapped (not a throw) when the service client itself is unconfigured for the whole run", async () => {
     createSupabaseServiceClient.mockImplementation(() => {
-      throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.");
+      throw new Error(
+        "Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.",
+      );
     });
-    getProvider.mockImplementation(() => ({ id: "unused", async complete() { return { content: "unreachable", toolCalls: [] }; } }));
+    getProvider.mockImplementation(() => ({
+      id: "unused",
+      async complete() {
+        return { content: "unreachable", toolCalls: [] };
+      },
+    }));
 
     await expect(completeWithCascade([], [])).resolves.toEqual({ allCapped: true, provider: null });
   });
@@ -232,5 +254,27 @@ describe("completeWithCascade", () => {
 
     const result = await completeWithCascade([], []);
     expect(result).toEqual({ allCapped: true, provider: null });
+  });
+});
+
+describe("cascade cancellation", () => {
+  it("does not attempt a provider when cancelled", async () => {
+    await expect(
+      completeWithCascade([], [], new Date(), AbortSignal.abort(new Error("Cancelled"))),
+    ).rejects.toThrow("Cancelled");
+    expect(getProvider).not.toHaveBeenCalled();
+  });
+  it("does not fall back to another provider after cancellation", async () => {
+    const controller = new AbortController();
+    const complete = vi.fn(async () => {
+      controller.abort(new Error("Cancelled"));
+      throw new Error("Aborted fetch");
+    });
+    getProvider.mockReturnValue({ complete });
+    await expect(completeWithCascade([], [], new Date(), controller.signal)).rejects.toThrow(
+      "Cancelled",
+    );
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect(complete).toHaveBeenCalledWith([], [], controller.signal);
   });
 });

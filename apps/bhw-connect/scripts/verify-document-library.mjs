@@ -43,6 +43,8 @@ const checks = [];
 const base = "http://127.0.0.1:53102/bhw-connect";
 try {
   await db.connect();
+  // Fixture runs share a disposable DB; real quota behavior has dedicated tests.
+  await db.query("update ai_provider_quota set request_count=0 where provider='gemini'");
   for (const [role, id] of Object.entries(roles)) {
     if (role !== "member")
       await db.query("insert into admin_users values($1,$2)", [
@@ -82,6 +84,7 @@ try {
     BHW_AUTH_MODE: "meridian",
     BHW_STORAGE_DIR: root,
     GEMINI_API_KEY: "synthetic-fixture",
+    CRON_SECRET: "synthetic-local-worker-secret",
     GEMINI_EMBEDDING_MODEL: "",
     NODE_OPTIONS: `--require ${resolve("scripts/fixtures/document-provider.cjs")}`,
   };
@@ -235,6 +238,160 @@ r=p.get_pixmap(dpi=200).tobytes('png');d=fitz.open();p=d.new_page();p.insert_ima
   await sourceSummary.click();
   await detail.getByRole("link", { name: "Open the stored chunk", exact: true }).waitFor();
   checks.push("scoped shared assistant with synthetic provider and real retrieval/citation");
+  if (process.env.BHW_POLICY_E2E_REVIEW === "1") {
+    const extraBytes = execFileSync("python", [
+      "-c",
+      `import fitz,sys
+x=fitz.open();p=x.new_page();p.insert_text((72,100),'Original signed endorsement must accompany each exception.',fontsize=12);sys.stdout.buffer.write(x.tobytes(deflate=True))`,
+    ]);
+    const uploaded = await context.request.post(`${base}/api/admin/documents`, {
+      multipart: {
+        title: "Synthetic exception annex",
+        collection: "synthetic-e2e",
+        file: { name: "exception.pdf", mimeType: "application/pdf", buffer: extraBytes },
+      },
+    });
+    assert.equal(uploaded.status(), 201);
+    const extraVersion = (await uploaded.json()).versionId;
+    execFileSync("python", ["ingestion/document_worker.py", "--once"], {
+      env: {
+        ...process.env,
+        BHW_WORKER_DATABASE_URL: database,
+        BHW_STORAGE_DIR: root,
+        GEMINI_API_KEY: "",
+      },
+      timeout: 60000,
+    });
+    const quick = await db.query("select policy_evidence_api($1,'search',$2) as data", [
+      roles.admin,
+      JSON.stringify({
+        keys: [
+          `upload:${(await db.query("select current_extraction_id as id from document_version where id=$1", [version])).rows[0].id}`,
+          `upload:${(await db.query("select current_extraction_id as id from document_version where id=$1", [extraVersion])).rows[0].id}`,
+        ],
+        query: "referral",
+        limit: 1,
+      }),
+    ]);
+    assert.equal(quick.rows[0].data[0].version_id, version);
+    assert(!quick.rows[0].data.some((r) => r.version_id === extraVersion));
+    await detail.getByLabel("Policy scope").selectOption("active");
+    await detail.getByLabel("Collection (optional)").fill("synthetic-e2e");
+    await detail.getByLabel("Analysis mode").selectOption("full");
+    await detail
+      .getByLabel("Review question", { exact: true })
+      .fill("Review record keeping and exceptions across the whole collection.");
+    await detail.getByLabel("Section-attempt budget").fill("1");
+    await detail.getByRole("button", { name: "Start full review", exact: true }).click();
+    await detail.getByText("0 / 1 section attempts used", { exact: false }).waitFor();
+    const list = await (await context.request.get(`${base}/api/admin/policy-reviews`)).json();
+    const run = list[0].id;
+    await detail.close();
+    const dispatch = async () => {
+      await db.query("update ai_provider_quota set request_count=0 where provider='gemini'");
+      const res = await context.request.post(`${base}/api/analysis/worker?kind=policy-review`, {
+        headers: { authorization: "Bearer synthetic-local-worker-secret" },
+      });
+      assert.equal(res.status(), 200);
+      return (await res.json()).worked;
+    };
+    assert.equal(
+      (await context.request.post(`${base}/api/analysis/worker?kind=policy-review`)).status(),
+      401,
+    );
+    await dispatch();
+    let report = await (
+      await context.request.get(`${base}/api/admin/policy-reviews?run=${run}`)
+    ).json();
+    assert.equal(report.run.status, "partial");
+    assert.equal(report.complete, false);
+    assert.equal(report.run.used, 1);
+    const resume = await context.request.post(`${base}/api/admin/policy-reviews`, {
+      data: { operation: "resume", run, extraBudget: 20, retryFailed: true },
+    });
+    assert.equal(resume.status(), 200);
+    for (let i = 0; i < 8; i++) if (!(await dispatch())) break;
+    report = await (
+      await context.request.get(`${base}/api/admin/policy-reviews?run=${run}`)
+    ).json();
+    assert.equal(report.coverage.examined + report.coverage.no_finding, report.coverage.total);
+    assert(
+      report.sections.some((s) =>
+        s.result?.findings.some((f) => f.quote.includes("Original signed endorsement")),
+      ),
+    );
+    // OCR/layout warnings keep the mixed collection explicitly partial even after traversal.
+    assert.equal(report.complete, false);
+    assert(report.documents.some((d) => d.warnings.length));
+    const clean = await context.request.post(`${base}/api/admin/policy-reviews`, {
+      data: {
+        operation: "create",
+        requestKey: randomUUID(),
+        question: "Review exceptions",
+        sources: {
+          mode: "selected",
+          versions: [extraVersion],
+          datasetMode: "restricted",
+          tables: [],
+        },
+        budget: 2,
+      },
+    });
+    assert.equal(clean.status(), 201);
+    const cleanRun = (await clean.json()).id;
+    await dispatch();
+    const cleanReport = await (
+      await context.request.get(`${base}/api/admin/policy-reviews?run=${cleanRun}`)
+    ).json();
+    assert.equal(cleanReport.complete, true, JSON.stringify(cleanReport));
+    const returned = await context.newPage();
+    await returned.goto(`${base}/ask-the-data?policies=active`);
+    await returned.getByLabel("Analysis mode").selectOption("full");
+    await returned.getByLabel("Your saved reviews").selectOption(run);
+    await returned.getByText("Review is not complete", { exact: false }).waitFor();
+    const citation = returned.getByRole("link", { name: /Synthetic exception annex · PDF page/ });
+    await citation.click();
+    await returned.waitForURL(/\/reviews\/.*\/sections\//);
+    await returned
+      .getByText("Original signed endorsement must accompany each exception.", { exact: true })
+      .waitFor();
+    assert((await returned.locator("body").innerText()).includes("Verified SHA-256"));
+    const second = await browser.newContext();
+    await second.addCookies([
+      { name: "meridian-session", value: "other", domain: "127.0.0.1", path: "/" },
+    ]);
+    assert.equal(
+      (await second.request.get(`${base}/api/admin/policy-reviews?run=${run}`)).status(),
+      503,
+    );
+    await second.close();
+    const cancelled = await context.request.post(`${base}/api/admin/policy-reviews`, {
+      data: {
+        operation: "create",
+        requestKey: randomUUID(),
+        question: "Cancel test",
+        sources: {
+          mode: "selected",
+          versions: [extraVersion],
+          datasetMode: "restricted",
+          tables: [],
+        },
+        budget: 2,
+      },
+    });
+    const cancelledRun = (await cancelled.json()).id;
+    await context.request.post(`${base}/api/admin/policy-reviews`, {
+      data: { operation: "cancel", run: cancelledRun },
+    });
+    assert.equal(await dispatch(), false);
+    checks.push(
+      "full review includes decisive low-similarity annex missed by quick search",
+      "closed-browser worker, budget pause and resumable persisted findings",
+      "warning-limited partial coverage and clean complete coverage",
+      "mobile full-review report and hash-verified immutable citation",
+      "private run owner, worker authorization and cancellation",
+    );
+  }
   const edited = await context.request.post(`${base}/api/admin/documents`, {
     data: {
       operation: "metadata",
@@ -327,6 +484,15 @@ r=p.get_pixmap(dpi=200).tobytes('png');d=fitz.open();p=d.new_page();p.insert_ima
   server.close();
   // Only this harness's generated identities/records are removed; the practice DB is retained.
   const actors = Object.values(roles);
+  await db.query(
+    "delete from policy_review_section where run_id in (select id from policy_review_run where actor_id=any($1))",
+    [actors],
+  );
+  await db.query(
+    "delete from policy_review_document where run_id in (select id from policy_review_run where actor_id=any($1))",
+    [actors],
+  );
+  await db.query("delete from policy_review_run where actor_id=any($1)", [actors]);
   const versions = (
     await db.query("select id from document_version where uploaded_by=any($1)", [actors])
   ).rows.map((x) => x.id);

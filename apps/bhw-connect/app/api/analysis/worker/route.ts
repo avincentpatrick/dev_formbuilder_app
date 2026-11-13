@@ -1,3 +1,4 @@
+import { processOnePolicyReview } from "@/lib/policy-review/worker";
 import { createStatisticalTools } from "@/lib/analysis-statistics/tools";
 import type { SavedStatistic } from "@/lib/analysis-statistics/types";
 import { cleanupDeletedSources, processNextSource } from "@/lib/analysis-sources/process";
@@ -15,6 +16,8 @@ export async function POST(request: Request) {
   const supplied = Buffer.from(request.headers.get("authorization") ?? "");
   if (!secret || expected.length !== supplied.length || !timingSafeEqual(expected, supplied))
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (new URL(request.url).searchParams.get("kind") === "policy-review")
+    return NextResponse.json({ worked: await processOnePolicyReview() });
   await cleanupDeletedSources();
   if (await processNextSource()) return NextResponse.json({ worked: true });
   const claimed = (await workerCall("claim")) as {
@@ -24,7 +27,7 @@ export async function POST(request: Request) {
     lease_id: string;
     input: unknown;
   } | null;
-  if (!claimed) return NextResponse.json({ worked: false });
+  if (!claimed) return NextResponse.json({ worked: await processOnePolicyReview() });
   const uses: ProviderUse[] = [];
   let active = true;
   let progress = "Analysing sources";

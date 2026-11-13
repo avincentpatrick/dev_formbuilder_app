@@ -72,7 +72,7 @@ function parseToolCalls(raw: OpenAIToolCall[] | undefined): ToolCall[] {
 export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): AIProvider {
   return {
     id: config.id,
-    async complete(messages, tools) {
+    async complete(messages, tools, signal) {
       const apiKey = process.env[config.apiKeyEnv];
       if (!apiKey) throw new ProviderUnavailableError(config.id);
 
@@ -80,6 +80,7 @@ export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): 
       try {
         response = await fetch(`${config.baseUrl}/chat/completions`, {
           method: "POST",
+          ...(signal ? { signal } : {}),
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${apiKey}`,

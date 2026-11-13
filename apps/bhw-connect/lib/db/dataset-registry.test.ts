@@ -64,6 +64,9 @@ describe("toRegisteredDataset", () => {
       "analysis_job_usage",
       "analysis_users",
       "analysis_sources",
+      "policy_review_run",
+      "policy_review_document",
+      "policy_review_section",
     ]) {
       expect(
         toRegisteredDataset(registry({ table_name, exposure: "internal" }), [column()]),

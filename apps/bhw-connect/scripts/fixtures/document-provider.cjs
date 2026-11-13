@@ -8,6 +8,18 @@ globalThis.fetch = async (input, init) => {
       .flatMap((c) => c.parts ?? [])
       .filter((p) => p.functionResponse);
     const results = responses.flatMap((p) => p.functionResponse.response.results ?? []);
+    const frozen = (body.contents ?? [])
+      .flatMap((c) => c.parts ?? [])
+      .flatMap((p) => {
+        if (!p.text) return [];
+        try {
+          const data = JSON.parse(p.text);
+          return data.untrustedPolicySection?.results ?? [];
+        } catch {
+          return [];
+        }
+      });
+    if (frozen.length) results.push(...frozen);
     const policyToken = results.find((r) => r.evidenceToken)?.evidenceToken;
     const combined = process.env.BHW_POLICY_E2E_COMBINED === "1";
     const hasDictionary = responses.some((p) => p.functionResponse.name === "listDatasets");
@@ -40,6 +52,48 @@ globalThis.fetch = async (input, init) => {
           },
         ],
       });
+    if (frozen.length) {
+      const hit = frozen[0];
+      const phrase = hit.text.includes("Original signed endorsement")
+        ? "Original signed endorsement must accompany each exception."
+        : "Every clinic must retain a signed referral record.";
+      const findings = hit.text.includes(phrase)
+        ? [
+            {
+              kind: "policy_requirement",
+              topic: "record retention",
+              text: `${phrase} ${hit.evidenceToken}`,
+              quote: phrase,
+              comparisonValue: phrase,
+            },
+          ]
+        : [];
+      if (typeof query?.matchingRows === "number")
+        findings.push({
+          kind: "dataset_observation",
+          topic: "available dataset",
+          text: `${query.matchingRows} BHW records were counted. ${hit.evidenceToken}`,
+          quote: phrase,
+          comparisonValue: "",
+        });
+      return Response.json({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    relevant: findings.length > 0,
+                    findings,
+                    limitations: [],
+                  }),
+                },
+              ],
+            },
+          },
+        ],
+      });
+    }
     const parts = results.length
       ? [
           {

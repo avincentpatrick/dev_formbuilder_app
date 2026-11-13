@@ -1,5 +1,10 @@
 import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
-const { call, execute } = vi.hoisted(() => ({ call: vi.fn(), execute: vi.fn() }));
+const { call, execute, review } = vi.hoisted(() => ({
+  call: vi.fn(),
+  execute: vi.fn(),
+  review: vi.fn(async () => false),
+}));
+vi.mock("@/lib/policy-review/worker", () => ({ processOnePolicyReview: review }));
 vi.mock("@/lib/analysis-projects/db", () => ({ workerCall: call }));
 vi.mock("@/lib/ai/analysis-chat", () => ({
   analysisInputSchema: { parse: (v: unknown) => v },
@@ -64,4 +69,24 @@ describe("durable worker gate and publication", () => {
       expect.objectContaining({ error: "No provider available" }),
     );
   });
+});
+
+it("dispatches policy work through the secret gate without claiming a project lease", async () => {
+  const url = "http://localhost/api/analysis/worker?kind=policy-review";
+  expect((await POST(new Request(url, { method: "POST" }))).status).toBe(401);
+  expect(review).not.toHaveBeenCalled();
+  const res = await POST(
+    new Request(url, {
+      method: "POST",
+      headers: { authorization: "Bearer synthetic-test-secret" },
+    }),
+  );
+  expect(await res.json()).toEqual({ worked: false });
+  expect(review).toHaveBeenCalledTimes(1);
+  expect(call).not.toHaveBeenCalled();
+});
+it("falls back to policy work only when there is no project job", async () => {
+  call.mockResolvedValue(null);
+  await POST(ask("synthetic-test-secret"));
+  expect(review).toHaveBeenCalledTimes(1);
 });
